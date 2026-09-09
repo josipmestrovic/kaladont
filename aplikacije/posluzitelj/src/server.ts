@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sql } from 'drizzle-orm';
@@ -65,10 +66,17 @@ export async function izgradiPosluzitelj(): Promise<Posluzitelj> {
   await registrirajRjecnikRute(app, rjecnik);
 
   if (konfiguracija.NODE_ENV !== 'test') {
-    const putanjaWebHandlera = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      '../../web/build/handler.js',
-    );
+    const direktorijServera = path.dirname(fileURLToPath(import.meta.url));
+    const mogucePutanjeWebHandlera = [
+      path.resolve(direktorijServera, '../web/build/handler.js'),
+      path.resolve(direktorijServera, '../../web/build/handler.js'),
+    ];
+    const putanjaWebHandlera = mogucePutanjeWebHandlera.find((putanja) => existsSync(putanja));
+
+    if (!putanjaWebHandlera) {
+      throw new Error(`SvelteKit handler nije pronađen: ${mogucePutanjeWebHandlera.join(', ')}`);
+    }
+
     const { handler } = await import(pathToFileURL(putanjaWebHandlera).href);
 
     app.route({
