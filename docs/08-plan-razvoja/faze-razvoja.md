@@ -2,7 +2,7 @@
 
 Svaka faza ima **kriterij završetka** — mjerljivo stanje, ne osjećaj. Faza se ne otvara dok prethodna ne zadovolji kriterij (iznimka: dokumentacija se dopunjava stalno).
 
-> **Stanje 2026-09-08:** lokalna MVP jezgra i HTTP sučelje implementirani su i testirani, ali Faza 8 nije dovršena. Docker/Compose/Caddy artefakti, GitHub Actions workflowi, produkcijski email, operativni CLI alati, prošireni health check i backup automatika još ne postoje. Poslužitelj se zato još ne postavlja prema produkcijskim uputama.
+> **Stanje 2026-09-09:** lokalna MVP jezgra, HTTP sučelje, Docker/Compose/Caddy artefakti, CI smoke test, prošireni health check i GHCR objava su implementirani. Staging VPS je ručno postavljen s HTTPS-om i stvarnim hrLex rječnikom. Automatski staging deploy, produkcijski deploy, trustProxy/CORS učvršćivanje, prvi-admin CLI i backup/restore automatika još nisu implementirani.
 
 ## Faza 0 — Dokumentacija ✅
 
@@ -48,7 +48,7 @@ Prijava greške s poteza, poziv email adaptera, admin stranica (prijave + rječn
 
 Faza najprije dovršava aplikacijske preduvjete: Fastify poslužuje SvelteKit build iz jednog Node procesa; klijent je same-origin; `trustProxy`, uski CORS i centralna validacija produkcijske konfiguracije su aktivni; `/zdravlje` provjerava bazu i rječnik te vraća 503 kad servis nije spreman; Resend stvarno šalje email uz staging allowlistu; prvi administrator nastaje kroz jednokratni CLI; postoje stranice Privatnost i Uvjeti.
 
-Zatim se dodaju verzionirani Dockerfile, Compose i Caddy konfiguracije, jednokratni alati za migracije/uvoz/admin, mali sintetički CI rječnik i GitHub Actions workflowi. CI gradi i smoke-testira stvarnu amd64 sliku; merge u `main` automatski objavljuje staging, a produkcija ručno promovira isti digest. Staging je zaštićen Basic Authom osim javnog `/zdravlje`.
+Dockerfile, Compose i Caddy konfiguracije, mali sintetički CI rječnik, CI smoke test i GHCR workflow su implementirani. CI gradi i smoke-testira stvarnu amd64 sliku; merge u `main` objavljuje image u GHCR-u, a staging se trenutno ručno ažurira istim digestom. Staging je privremeno bez Basic Autha zbog Socket.IO promptova i šalje `noindex` zaglavlje.
 
 Tek nakon toga postavljaju se staging i produkcijski Hetzner VPS prema [operativnom modelu](../03-arhitektura/odluke/014-operativni-model-mvp-a.md), off-server backupi na Storage Box, UptimeRobot, Healthchecks.io i pripadajući runbookovi. Umami se dodaje nakon stabilizacije javnog ranog pristupa i nije kriterij ove faze.
 
