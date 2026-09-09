@@ -1,0 +1,1 @@
+ALTER TABLE "igraci" ADD COLUMN "avatar_id" smallint DEFAULT 0 NOT NULL;

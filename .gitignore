@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+.env
+.svelte-kit/
+coverage/
+
+# hrLex je CC BY-SA - izvedeni podaci se ne commitaju (ADR-010)
+skripte/uvoz-rjecnika/podaci/

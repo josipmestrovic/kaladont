@@ -1,0 +1,72 @@
+<script lang="ts">
+  /**
+   * SVG prsten koji se prazni sinkrono s 30s odbrojavanjem (istekPotezaIso je izvor istine - server je sat).
+   * Zadnjih 5s pulsira (ekrani.md §3).
+   */
+  interface Props {
+    istekIso: string;
+    velicina?: number;
+  }
+
+  const { istekIso, velicina = 56 }: Props = $props();
+  const TRAJANJE_MS = 30_000;
+  const POLUMJER = 46;
+  const OPSEG = 2 * Math.PI * POLUMJER;
+
+  let preostaliUdio = $state(1);
+
+  $effect(() => {
+    const istek = new Date(istekIso).getTime();
+    const interval = setInterval(() => {
+      const preostaloMs = istek - Date.now();
+      preostaliUdio = Math.max(0, Math.min(1, preostaloMs / TRAJANJE_MS));
+    }, 200);
+    return () => clearInterval(interval);
+  });
+
+  const pulsira = $derived(preostaliUdio > 0 && preostaliUdio < 5 / 30);
+</script>
+
+<svg
+  class="timer-prsten"
+  class:pulsira
+  viewBox="0 0 100 100"
+  width={velicina}
+  height={velicina}
+>
+  <circle cx="50" cy="50" r={POLUMJER} fill="none" stroke="#e5ddc8" stroke-width="6" />
+  <circle
+    cx="50"
+    cy="50"
+    r={POLUMJER}
+    fill="none"
+    stroke="#e4572e"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-dasharray={OPSEG}
+    stroke-dashoffset={OPSEG * (1 - preostaliUdio)}
+    transform="rotate(-90 50 50)"
+  />
+</svg>
+
+<style>
+  .timer-prsten {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+
+  .timer-prsten circle:last-child {
+    transition: stroke-dashoffset 0.2s linear;
+  }
+
+  .timer-prsten.pulsira {
+    animation: timer-puls 0.6s ease-in-out infinite;
+  }
+
+  @keyframes timer-puls {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+</style>

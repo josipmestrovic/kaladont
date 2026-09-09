@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "idx_rijeci_prva_dva" ON "rijeci" USING btree ("prva_dva") WHERE aktivna;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_rijeci_zadnja_dva" ON "rijeci" USING btree ("zadnja_dva") WHERE aktivna;

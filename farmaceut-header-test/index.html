@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Farmaceut.hr — test zaglavlja</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="stil.css">
+</head>
+<body>
+
+  <header class="zaglavlje">
+
+    <!-- Gornja traka: promo ponude + besplatna dostava -->
+    <div class="traka-vrh">
+      <div class="traka-vrh-red">
+        <nav class="promo-ponude" aria-label="Aktualne ponude">
+          <a class="promo-gumb" href="#">
+            <span>20% popusta na drugi proizvod</span>
+            <img src="assets/ikona-strelica-desno.svg" alt="" width="24" height="24">
+          </a>
+          <span class="razdjelnik razdjelnik-zeleni" aria-hidden="true"></span>
+          <a class="promo-gumb" href="#">
+            <span>1+1 gratis na Solgar proizvode</span>
+            <img src="assets/ikona-strelica-desno.svg" alt="" width="24" height="24">
+          </a>
+          <span class="razdjelnik razdjelnik-zeleni" aria-hidden="true"></span>
+          <a class="promo-gumb" href="#">
+            <span>Vidi sve ponude (3)</span>
+            <img src="assets/ikona-strelica-desno.svg" alt="" width="24" height="24">
+          </a>
+        </nav>
+        <p class="besplatna-dostava">
+          <img src="assets/ikona-kamion.svg" alt="" width="24" height="24">
+          <span><a href="#">Besplatna dostava</a> za narudžbe iznad €40</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Srednja traka: logo, tražilica, korisnički izbornik -->
+    <div class="traka-sredina">
+      <div class="traka-sredina-red">
+        <a class="logo" href="#">
+          <img src="assets/logo-farmaceut.svg" alt="farmaceut.hr" width="220" height="34">
+        </a>
+        <form class="trazilica" role="search" action="#">
+          <input type="search" name="q" placeholder="Pretražite po nazivu, brendu ili šifri" aria-label="Pretraga proizvoda">
+          <button type="submit" aria-label="Pretraži">
+            <img src="assets/ikona-povecalo.svg" alt="" width="24" height="24">
+          </button>
+        </form>
+        <div class="korisnicki-izbornik">
+          <button class="stavka-izbornika" type="button" aria-haspopup="true" aria-expanded="false">
+            <img src="assets/ikona-info.svg" alt="" width="24" height="24">
+            <span class="stavka-grupa">
+              <span>Info</span>
+              <img src="assets/ikona-strelica-dolje.svg" alt="" width="24" height="24">
+            </span>
+          </button>
+          <button class="stavka-izbornika" type="button" aria-haspopup="true" aria-expanded="false">
+            <img src="assets/ikona-korisnik.svg" alt="" width="24" height="24">
+            <span class="stavka-grupa">
+              <span>Moj račun</span>
+              <img src="assets/ikona-strelica-dolje.svg" alt="" width="24" height="24">
+            </span>
+          </button>
+          <a class="stavka-izbornika" href="#">
+            <span class="kosarica-ikona">
+              <img class="kosarica-slika" src="assets/ikona-kosarica.svg" alt="" width="24" height="24">
+              <span class="kosarica-znacka">11</span>
+            </span>
+            <span>Košarica</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Donja traka: kategorije + istaknuti linkovi -->
+    <nav class="traka-navigacija" aria-label="Glavna navigacija">
+      <ul class="kategorije">
+        <li><a href="#">Dodaci prehrani</a></li>
+        <li><a href="#">Kozmetika</a></li>
+        <li><a href="#">Med. pomagala</a></li>
+        <li><a href="#">Mame i bebe</a></li>
+        <li><a href="#">Sport</a></li>
+        <li aria-hidden="true"><span class="razdjelnik razdjelnik-sivi"></span></li>
+        <li><a href="#">Brandovi</a></li>
+        <!-- U dizajnu piše „Samolječenje" (pravopisna greška) — ovdje ispravljeno -->
+        <li><a href="#">Tegobe / Samoliječenje</a></li>
+      </ul>
+      <ul class="istaknuto">
+        <li>
+          <a class="stavka-znacke" href="#">
+            <span>Ponude</span>
+            <span class="znacka znacka-postotak">%</span>
+          </a>
+        </li>
+        <li>
+          <a class="stavka-znacke" href="#">
+            <span>Najprodavanije</span>
+            <span class="znacka znacka-top">Top</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+  </header>
+
+</body>
+</html>

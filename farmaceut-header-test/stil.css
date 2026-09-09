@@ -1,0 +1,282 @@
+/* ============================================================
+   Farmaceut.hr — test zaglavlja (izdvojeni test, nije dio Kaladonta)
+   Izvor: Figma „Kaladont" → frame „De - Homepage - Dev Test" (101:181)
+   ============================================================ */
+
+/* Dizajn-tokeni iz Figma varijabli — preimenovani semantički
+   (u Figmi se zovu po vrijednostima: --12, --24, --120…) */
+:root {
+  --zelena-200: #b6efa0;
+  --zelena-500: #216968;
+  --zelena-700: #143f3e;
+  --zelena-svijetla: #f0fcec;
+  --siva-0: #fff;
+  --siva-100: #f7f7f7;
+  --siva-300: #e6e6e6;
+  --siva-800: #666;
+  --siva-900: #333;
+
+  --radijus-12: 12px;
+  --radijus-18: 18px;
+  --radijus-24: 24px;
+  --radijus-pilula: 120px;
+
+  --sirina-sadrzaja: 1200px;
+  --font-osnovni: "Google Sans Flex", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--siva-0);
+  font-family: var(--font-osnovni);
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--siva-900);
+}
+
+img { display: block; }
+
+/* ---------- Gornja traka (promo + dostava) ---------- */
+
+.traka-vrh {
+  display: flex;
+  justify-content: center;
+  padding: 6px 24px;
+  background: linear-gradient(to right, var(--zelena-500), var(--zelena-700));
+}
+
+.traka-vrh-red {
+  flex: 1;
+  max-width: var(--sirina-sadrzaja);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.promo-ponude {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.promo-gumb {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--radijus-18);
+  color: var(--siva-0);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Dizajn ne definira hover stanja — improvizirano */
+.promo-gumb:hover { background: rgba(255, 255, 255, 0.12); }
+
+.besplatna-dostava {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--siva-0);
+  white-space: nowrap;
+}
+
+.besplatna-dostava a {
+  color: var(--siva-0);
+  text-decoration: underline;
+}
+
+/* ---------- Srednja traka (logo, tražilica, izbornik) ---------- */
+
+.traka-sredina {
+  position: relative;
+  z-index: 1; /* sjena mora pasti preko donje trake */
+  display: flex;
+  justify-content: center;
+  padding: 12px 24px;
+  background: linear-gradient(to right, var(--siva-0) 55.288%, var(--siva-100));
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+.traka-sredina-red {
+  flex: 1;
+  max-width: var(--sirina-sadrzaja);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 47px;
+}
+
+.logo { padding: 6px; }
+.logo img { width: 220px; height: 34px; }
+
+.trazilica {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 24px;
+  background: var(--siva-0);
+  border: 2px solid var(--zelena-500);
+  border-radius: var(--radijus-24);
+}
+
+.trazilica:focus-within { outline: 2px solid var(--zelena-200); }
+
+.trazilica input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  padding: 0;
+  font: inherit;
+  color: var(--siva-900);
+}
+
+.trazilica input::placeholder { color: var(--siva-800); }
+
+.trazilica button {
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.korisnicki-izbornik {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px;
+  border-radius: var(--radijus-pilula);
+  background: linear-gradient(to right, var(--siva-0), var(--zelena-svijetla));
+}
+
+.stavka-izbornika {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radijus-12);
+  background: none;
+  font: inherit;
+  color: var(--siva-900);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stavka-izbornika:hover { background: rgba(33, 105, 104, 0.08); }
+
+.stavka-grupa {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Košarica: ikona s brojčanom značkom u gornjem desnom kutu */
+.kosarica-ikona {
+  position: relative;
+  width: 30px;
+  height: 29px;
+}
+
+.kosarica-slika {
+  position: absolute;
+  left: 0;
+  top: 5px;
+}
+
+.kosarica-znacka {
+  position: absolute;
+  left: 12px;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  background: url("assets/znacka-elipsa.svg") center / contain no-repeat;
+  color: var(--siva-0);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ---------- Donja traka (kategorije + istaknuto) ---------- */
+
+.traka-navigacija {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 80px;
+  padding: 12px 24px;
+  background: linear-gradient(to right, var(--siva-0) 55.288%, var(--siva-100));
+  border-radius: 0 0 var(--radijus-24) var(--radijus-24);
+  box-shadow: 0 3px 1.5px rgba(0, 0, 0, 0.1);
+}
+
+.kategorije,
+.istaknuto {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kategorije { gap: 6px; }
+.istaknuto { gap: 12px; }
+
+.kategorije a {
+  display: block;
+  padding: 9px 12px;
+  border-radius: var(--radijus-12);
+  color: var(--siva-900);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.kategorije a:hover { background: rgba(33, 105, 104, 0.08); }
+
+.stavka-znacke {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: var(--radijus-12);
+  color: var(--siva-900);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.stavka-znacke:hover { background: rgba(33, 105, 104, 0.08); }
+
+.znacka {
+  padding: 6px;
+  border-radius: var(--radijus-12) 0 var(--radijus-12) 0;
+  color: var(--siva-0);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.znacka-postotak { background: linear-gradient(to left, #e30b04, #ee6d68); }
+
+/* U Figmi ispod ovog gradijenta leži i mrtvi crveni gradijent — izostavljen */
+.znacka-top { background: linear-gradient(90deg, #f7aa6d, #f2720c); }
+
+/* ---------- Razdjelnici ---------- */
+
+.razdjelnik {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  margin: 0 5.5px;
+  border-radius: var(--radijus-pilula);
+}
+
+.razdjelnik-zeleni { background: var(--zelena-200); }
+.razdjelnik-sivi { background: var(--siva-300); }

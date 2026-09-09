@@ -1,0 +1,36 @@
+{
+  "name": "posluzitelj",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p .",
+    "start": "node dist/index.js",
+    "migracije:generiraj": "drizzle-kit generate",
+    "migracije": "drizzle-kit migrate",
+    "simulacija": "tsx src/cli/simulacija.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^10.0.1",
+    "@fastify/rate-limit": "^10.1.1",
+    "@node-rs/argon2": "^2.0.2",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.36.4",
+    "fastify": "^5.1.0",
+    "pino": "^9.5.0",
+    "postgres": "^3.4.5",
+    "socket.io": "^4.8.1",
+    "zajednicko": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.28.1",
+    "fast-check": "^3.23.1",
+    "socket.io-client": "^4.8.1",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.5"
+  }
+}

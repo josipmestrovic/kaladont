@@ -1,0 +1,114 @@
+/**
+ * Design tokeni (docs/05-ux-ui/vizualni-identitet.md) - odgovaraju Figma varijablama
+ * na Foundations stranici. Jedini izvor CSS custom properties za cijelu aplikaciju.
+ */
+:root {
+  /* Boje - primitivi */
+  --boja-krem: #faf3e3;
+  --boja-mint: #2fa98c;
+  --boja-mint-tamni: #1d6f5c;
+  --boja-crvena: #e4572e;
+  --boja-tekst: #26221b;
+  --boja-tekst-sekundarni: #7a7264;
+  --boja-zuta-krema: #f4c95d;
+
+  /* Boje - semanticki slojevi */
+  --boja-pozadina-podloga: var(--boja-krem);
+  --boja-pozadina-primarna: var(--boja-mint);
+  --boja-tekst-naslov: var(--boja-mint-tamni);
+  --boja-akcent: var(--boja-crvena);
+  --boja-tekst-osnovni: var(--boja-tekst);
+  --boja-isticanje-slova: var(--boja-zuta-krema);
+
+  /* Razmaci */
+  --razmak-4: 4px;
+  --razmak-8: 8px;
+  --razmak-12: 12px;
+  --razmak-16: 16px;
+  --razmak-24: 24px;
+  --razmak-32: 32px;
+  --razmak-48: 48px;
+
+  /* Radijusi */
+  --radijus-kartica: 16px;
+  --radijus-pill: 999px;
+
+  /* Tipografija - obitelji */
+  --font-naslov: 'Baloo 2', sans-serif;
+  --font-tijelo: 'Inter', sans-serif;
+
+  /*
+   * Tipografija - responzivne veličine (vrijednosti za mobitel; desktop u @media 768px).
+   * Sav tekst u aplikaciji koristi ove tokene — nove veličine dodavati ovdje, ne po komponentama.
+   */
+  --tekst-baza: 16px; /* osnovni tekst */
+  --tekst-mali: 15px; /* sekundarni tekst, opisi, stavke lista */
+  --tekst-sitni: 14px; /* pomoćne oznake, mali gumbi */
+  --tekst-mikro: 13px; /* bedževi, oblačići reakcija */
+  --tekst-oznaka: 10px; /* najmanje oznake (npr. „gost“ na avataru) */
+  --tekst-rijec-stola: 20px; /* trenutna riječ i tražena slova za stolom */
+  --naslov-1: 32px;
+  --naslov-2: 24px;
+  --naslov-3: 18px;
+
+  /* Sjena */
+  --sjena-suptilna: 0 2px 8px rgba(38, 34, 27, 0.12);
+}
+
+/* Tablet/desktop: tipografska skala raste na jednom mjestu. */
+@media (min-width: 768px) {
+  :root {
+    --tekst-baza: 18px;
+    --tekst-mali: 17px;
+    --tekst-sitni: 16px;
+    --tekst-mikro: 15px;
+    --tekst-oznaka: 12px;
+    --tekst-rijec-stola: 22px;
+    --naslov-1: 64px;
+    --naslov-2: 48px;
+    --naslov-3: 36px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: var(--tekst-baza);
+}
+
+body {
+  margin: 0;
+  background: var(--boja-pozadina-podloga);
+  color: var(--boja-tekst-osnovni);
+  font-family: var(--font-tijelo);
+  font-size: var(--tekst-baza);
+  line-height: 1.4;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-naslov);
+  color: var(--boja-tekst-naslov);
+  margin: 0 0 var(--razmak-16) 0;
+}
+
+h1 {
+  font-size: var(--naslov-1);
+}
+
+h2 {
+  font-size: var(--naslov-2);
+}
+
+h3 {
+  font-size: var(--naslov-3);
+}
+
+a {
+  color: var(--boja-tekst-naslov);
+}
+
+button {
+  font-family: var(--font-tijelo);
+}
