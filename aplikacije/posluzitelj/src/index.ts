@@ -1,15 +1,10 @@
-import path from 'node:path';
-import { config } from 'dotenv';
+import { konfiguracija } from './konfiguracija.js';
 import { izgradiPosluzitelj } from './server.js';
-
-config({ path: path.resolve(process.cwd(), '../../.env') });
-
-const PORT = Number(process.env.PORT ?? 3000);
 
 async function pokreni() {
   const { app } = await izgradiPosluzitelj();
-  await app.listen({ port: PORT, host: '0.0.0.0' });
-  app.log.info(`Poslužitelj sluša na http://localhost:${PORT}`);
+  await app.listen({ port: konfiguracija.PORT, host: '0.0.0.0' });
+  app.log.info(`Poslužitelj sluša na http://localhost:${konfiguracija.PORT}`);
 }
 
 pokreni().catch((greska) => {

@@ -1,4 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { sql } from 'drizzle-orm';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
@@ -14,6 +17,8 @@ import { registrirajProfilRute } from './profil/rute.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
 import { registrirajRjecnikRute } from './rjecnik/rute.js';
+import { konfiguracija } from './konfiguracija.js';
+import { baza } from './baza/klijent.js';
 
 export interface PodaciSocketa {
   igracId: string;
@@ -59,14 +64,22 @@ export async function izgradiPosluzitelj(): Promise<Posluzitelj> {
   await registrirajAdminRute(app, rjecnik);
   await registrirajRjecnikRute(app, rjecnik);
 
-  app.get('/zdravlje', async () => ({
-    ok: true,
-    brojRijeci: rjecnik.brojRijeci(),
-  }));
+  if (konfiguracija.NODE_ENV !== 'test') {
+    const putanjaWebHandlera = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../../web/build/handler.js',
+    );
+    const { handler } = await import(pathToFileURL(putanjaWebHandlera).href);
 
-  await app.ready();
-
-  await osvjeziProsjekCekanja();
+    app.route({
+      method: ['GET', 'HEAD'],
+      url: '/*',
+      handler: async (zahtjev, odgovor) => {
+        odgovor.hijack();
+        await handler(zahtjev.raw, odgovor.raw);
+      },
+    });
+  }
 
   const io: KaladontIo = new SocketIoServer(app.server, {
     cors: { origin: true },
@@ -74,6 +87,34 @@ export async function izgradiPosluzitelj(): Promise<Posluzitelj> {
 
   const registarVeza = new RegistarVeza();
   const upravitelj = stvoriUpraviteljPartija(io, rjecnik);
+
+  app.get('/zdravlje', async (_zahtjev, odgovor) => {
+    let bazaDostupna = true;
+    try {
+      await baza.execute(sql`select 1`);
+    } catch (greska) {
+      bazaDostupna = false;
+      app.log.warn({ greska }, 'Provjera baze za health nije uspjela');
+    }
+
+    const brojRijeci = rjecnik.brojRijeci();
+    const spreman = bazaDostupna && brojRijeci > 0;
+    const tijelo = {
+      ok: spreman,
+      baza: bazaDostupna ? 'dostupna' : 'nedostupna',
+      brojRijeci,
+      aktivnePartije: upravitelj.brojAktivnihPartija(),
+      uptimeSekunde: Math.floor(process.uptime()),
+      verzija: konfiguracija.VERZIJA,
+      digest: konfiguracija.DIGEST,
+    };
+
+    return odgovor.code(spreman ? 200 : 503).send(tijelo);
+  });
+
+  await app.ready();
+
+  await osvjeziProsjekCekanja();
 
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;

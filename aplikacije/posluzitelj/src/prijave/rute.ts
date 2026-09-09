@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { baza } from '../baza/klijent.js';
 import { igraci, prijave } from '../baza/shema.js';
 import { posaljiEmail } from '../email.js';
+import { konfiguracija } from '../konfiguracija.js';
 import { zahtijevajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
 import { eq } from 'drizzle-orm';
 
@@ -34,8 +35,8 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
       .returning();
 
     const [prviAdmin] = await baza.select().from(igraci).where(eq(igraci.vrsta, 'admin')).limit(1);
-    const primatelj = process.env.DEV_MAIL ?? prviAdmin?.email ?? 'dev@example.com';
-    posaljiEmail(app.log, primatelj, `Nova prijava #${nova?.id} od ${igrac.nadimak}: ${rezultat.data.poruka}`);
+    const primatelj = konfiguracija.DEV_MAIL || prviAdmin?.email || 'dev@example.com';
+    await posaljiEmail(app.log, primatelj, `Nova prijava #${nova?.id} od ${igrac.nadimak}: ${rezultat.data.poruka}`);
 
     return {
       ok: true,

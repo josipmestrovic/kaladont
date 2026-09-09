@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
 import { posaljiEmail } from '../email.js';
+import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
 import {
   izdajSesijskiToken,
@@ -40,7 +41,7 @@ function postaviSesijskiKolacic(odgovor: import('fastify').FastifyReply, token: 
   odgovor.setCookie(NAZIV_KOLACICA, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: konfiguracija.NODE_ENV === 'production',
     maxAge: TRAJANJE_KOLACICA_MS / 1000,
     path: '/',
   });
@@ -101,7 +102,7 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
     }
 
     const tokenPotvrde = izdajTokenPotvrdeEmaila(igracId);
-    posaljiEmail(app.log, email, `Potvrdi email: /racuni/potvrdi-email?token=${tokenPotvrde}`);
+    await posaljiEmail(app.log, email, `Potvrdi email: /racuni/potvrdi-email?token=${tokenPotvrde}`);
 
     const sesijskiToken = izdajSesijskiToken(igracId);
     postaviSesijskiKolacic(odgovor, sesijskiToken);
@@ -159,7 +160,7 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
     const [korisnik] = await baza.select().from(igraci).where(eq(igraci.email, rezultat.data.email)).limit(1);
     if (korisnik) {
       const token = izdajTokenResetaLozinke(korisnik.id);
-      posaljiEmail(app.log, rezultat.data.email, `Resetiraj lozinku: /racuni/resetiraj-lozinku?token=${token}`);
+      await posaljiEmail(app.log, rezultat.data.email, `Resetiraj lozinku: /racuni/resetiraj-lozinku?token=${token}`);
     }
 
     return { ok: true, poruka: PORUKA };

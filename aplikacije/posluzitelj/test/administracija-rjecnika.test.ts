@@ -134,6 +134,32 @@ describe('POST /admin/rjecnik/dodaj', () => {
   });
 });
 
+describe('GET /zdravlje', () => {
+  it('vraća dokumentirani health ugovor kada su baza i rječnik dostupni', async () => {
+    const odgovor = await fetch(`${adresa}/zdravlje`);
+    const tijelo = (await odgovor.json()) as {
+      ok: boolean;
+      baza: string;
+      brojRijeci: number;
+      aktivnePartije: number;
+      uptimeSekunde: number;
+      verzija: string;
+      digest: string;
+    };
+
+    expect(odgovor.status).toBe(200);
+    expect(tijelo).toMatchObject({
+      ok: true,
+      baza: 'dostupna',
+      aktivnePartije: 0,
+      verzija: 'lokalno',
+      digest: 'lokalno',
+    });
+    expect(tijelo.brojRijeci).toBeGreaterThan(0);
+    expect(tijelo.uptimeSekunde).toBeGreaterThanOrEqual(0);
+  });
+});
+
 describe('GET /rjecnik/statistika', () => {
   it('javno vraća broj oblika po kategoriji sortirano silazno', async () => {
     const odgovor = await fetch(`${adresa}/rjecnik/statistika`);

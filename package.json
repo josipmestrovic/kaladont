@@ -7,9 +7,10 @@
   },
   "packageManager": "pnpm@9.15.9",
   "scripts": {
+    "predev": "pnpm --filter zajednicko build",
     "dev": "pnpm --parallel --filter web --filter posluzitelj dev",
-    "build": "pnpm --recursive build",
-    "test": "pnpm --recursive test",
+    "build": "pnpm --filter zajednicko build && pnpm --filter web build && pnpm --filter posluzitelj build",
+    "test": "pnpm --filter zajednicko build && pnpm --recursive test",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

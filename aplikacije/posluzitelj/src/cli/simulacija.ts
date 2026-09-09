@@ -3,9 +3,7 @@
  * Korisno za ručno/dimno testiranje bez otvaranja 4 preglednika (testiranje.md, PLAN-IMPLEMENTACIJE.md Faza 8).
  * Pokreni: pnpm --filter posluzitelj simulacija (poslužitelj mora već raditi na istoj adresi).
  */
-import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { config } from 'dotenv';
 import { io as ioClient } from 'socket.io-client';
 import { and, eq } from 'drizzle-orm';
 import type {
@@ -18,10 +16,9 @@ import type {
 } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
+import { konfiguracija } from '../konfiguracija.js';
 
-config({ path: path.resolve(process.cwd(), '../../.env') });
-
-const ADRESA = process.env.SIMULACIJA_ADRESA ?? 'http://localhost:3000';
+const ADRESA = konfiguracija.SIMULACIJA_ADRESA;
 const VREMENSKO_OGRANICENJE_MS = 60_000;
 
 async function pronadjiRijec(

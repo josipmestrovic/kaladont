@@ -1,0 +1,34 @@
+# Git and local metadata
+.git
+.github
+.vscode
+
+# Dependencies and generated output
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+.svelte-kit
+**/.svelte-kit
+coverage
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.primjer
+
+# Tests and local logs
+**/test
+**/*.test.ts
+*.log
+
+# Documentation and unrelated project material
+docs
+farmaceut-header-test
+*.md
+!README.md
+
+# Derived dictionary data
+skripte/uvoz-rjecnika/podaci

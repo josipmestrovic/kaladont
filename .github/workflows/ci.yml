@@ -78,3 +78,40 @@ jobs:
 
       - name: Izgraditi workspace
         run: pnpm build
+
+      - name: Izgraditi Docker sliku
+        run: docker build --platform linux/amd64 -t kaladont:ci .
+
+      - name: Pokrenuti CI bazu
+        run: docker compose -f docker-compose.ci.yml up -d baza
+
+      - name: Primijeniti migracije u CI imageu
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija pnpm migracije
+
+      - name: Učitati sintetički fixture u CI imageu
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija pnpm ci-fixture
+
+      - name: Pokrenuti CI aplikaciju
+        run: docker compose -f docker-compose.ci.yml up -d aplikacija
+
+      - name: Provjeriti health endpoint CI imagea
+        shell: bash
+        run: |
+          for pokusaj in {1..30}; do
+            odgovor=$(curl --silent --show-error --fail http://127.0.0.1:3000/zdravlje || true)
+            if echo "$odgovor" | jq -e '.ok == true and .baza == "dostupna" and .brojRijeci > 0 and .verzija == "ci" and .digest == "ci"' >/dev/null; then
+              echo "$odgovor"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.ci.yml logs aplikacija
+          echo 'CI image nije postao zdrav u zadanom roku.'
+          exit 1
+
+      - name: Pokrenuti simulaciju četiri igrača
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija pnpm simulacija
+
+      - name: Ugasi CI stack i ukloni volume
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down --volumes --remove-orphans

@@ -3,14 +3,13 @@
  * Format: `${svrha}.${igracId}.${istekMs}.${potpis}` - razlikuje se od gost UUID-a (nema tocaka).
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { konfiguracija } from '../konfiguracija.js';
 
 const TRAJANJE_SESIJE_MS = 30 * 24 * 60 * 60 * 1000; // 30 dana
 const TRAJANJE_POTVRDE_MS = 24 * 60 * 60 * 1000; // 24 h (sigurnost-i-privatnost.md)
 
 function tajna(): string {
-  const t = process.env.SESIJA_TAJNA;
-  if (!t) throw new Error('SESIJA_TAJNA nije postavljen (vidi .env.primjer)');
-  return t;
+  return konfiguracija.SESIJA_TAJNA;
 }
 
 function potpisi(sadrzaj: string): string {

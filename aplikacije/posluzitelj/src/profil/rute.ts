@@ -76,7 +76,7 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
       .set({ email: rezultat.data.noviEmail, emailPotvrdjen: false })
       .where(eq(igraci.id, igrac.id));
     const tokenPotvrde = izdajTokenPotvrdeEmaila(igrac.id);
-    posaljiEmail(app.log, rezultat.data.noviEmail, `Potvrdi novi email: /racuni/potvrdi-email?token=${tokenPotvrde}`);
+    await posaljiEmail(app.log, rezultat.data.noviEmail, `Potvrdi novi email: /racuni/potvrdi-email?token=${tokenPotvrde}`);
     return { ok: true };
   });
 

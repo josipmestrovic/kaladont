@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { konfiguracija } from '../konfiguracija.js';
 import {
   validirajPotez,
   odrediRazlogMrtvihSlova,
@@ -33,7 +34,7 @@ const TRAJANJE_POTEZA_MS = 30_000;
 const TRAJANJE_IZBORA_SUSTAVA_MS = 5_000;
 // Namjerno NIJE vezano uz ONEMOGUCI_TIMER_POTEZA: countdown u čekaonici je UX značajka koja mora
 // raditi i u razvoju s isključenim timerom poteza. Testovi je nuliraju kroz env.
-const ODGODA_POCETKA_PARTIJE_MS = Number(process.env.ODGODA_POCETKA_PARTIJE_MS ?? 10_000);
+const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
 const SOBA_PARTIJE = (partijaId: string) => `partija:${partijaId}`;
 
@@ -71,7 +72,7 @@ interface StanjeStola {
 
 export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje) {
   // SAMO za lokalno testiranje (docs/06-razvoj/postavljanje-okoline.md) - u produkciji mora biti iskljuceno/nepostavljeno
-  const timerOnemogucen = process.env.ONEMOGUCI_TIMER_POTEZA === 'true';
+  const timerOnemogucen = konfiguracija.ONEMOGUCI_TIMER_POTEZA === 'true';
 
   const partije = new Map<string, StanjeStola>();
   const partijaPoIgracu = new Map<string, string>(); // igracId -> partijaId
@@ -574,5 +575,10 @@ export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje)
     });
   }
 
-  return { zapocniPartiju, registrirajHandlere, nadimak };
+  return {
+    zapocniPartiju,
+    registrirajHandlere,
+    nadimak,
+    brojAktivnihPartija: () => partije.size,
+  };
 }

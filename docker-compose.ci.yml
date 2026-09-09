@@ -1,0 +1,43 @@
+services:
+  baza:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kaladont
+      POSTGRES_PASSWORD: kaladont
+      POSTGRES_DB: kaladont_ci
+    networks:
+      - ci
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kaladont -d kaladont_ci"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  aplikacija:
+    image: kaladont:ci
+    environment:
+      NODE_ENV: test
+      PORT: 3000
+      BAZA_URL: postgresql://kaladont:kaladont@baza:5432/kaladont_ci
+      SESIJA_TAJNA: ci-test-secret
+      EMAIL_API_KLJUC: ""
+      EMAIL_POSILJATELJ: noreply@kaladont.hr
+      STAGING_EMAIL_ALLOWLIST: ""
+      DEV_MAIL: dev@example.com
+      ONEMOGUCI_TIMER_POTEZA: "false"
+      ODGODA_POCETKA_PARTIJE_MS: "0"
+      ADMIN_TAJNI_KLJUC: ci-admin-secret
+      VERZIJA: ci
+      DIGEST: ci
+      SIMULACIJA_ADRESA: http://aplikacija:3000
+    networks:
+      - ci
+    depends_on:
+      baza:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+
+networks:
+  ci:
+    driver: bridge
