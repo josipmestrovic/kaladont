@@ -24,7 +24,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+RUN npm install --global pnpm@9.15.9
 
 RUN addgroup -S kaladont \
   && adduser -S --ingroup kaladont kaladont
