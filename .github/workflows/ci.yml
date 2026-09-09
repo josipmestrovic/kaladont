@@ -89,7 +89,7 @@ jobs:
         run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija pnpm migracije
 
       - name: Učitati sintetički fixture u CI imageu
-        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija pnpm ci-fixture
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/ci-fixture.js
 
       - name: Pokrenuti CI aplikaciju
         run: docker compose -f docker-compose.ci.yml up -d aplikacija
@@ -110,7 +110,7 @@ jobs:
           exit 1
 
       - name: Pokrenuti simulaciju četiri igrača
-        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija pnpm simulacija
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/simulacija.js
 
       - name: Ugasi CI stack i ukloni volume
         if: always()
