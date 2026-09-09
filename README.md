@@ -1,12 +1,14 @@
 # Kaladont
 
-Hrvatska višeigračka igra riječi — reci riječ koja počinje na posljednja dva slova prethodne. Četvero igrača za stolom, 30 sekundi po potezu, ispadanje do posljednjeg. Uskoro na **kaladont.hr**.
+Hrvatska višeigračka igra riječi — reci riječ koja počinje na posljednja dva slova prethodne. Četvero igrača za stolom, 30 sekundi po potezu, ispadanje do posljednjeg. Produkcija još nije javno objavljena.
 
 ## Status
 
-Lokalna MVP jezgra igre, HTTP API i web sučelje implementirani su i testirani. Produkcijska Faza 8 još nije dovršena: nedostaju objedinjeni produkcijski proces, Docker/Compose/Caddy artefakti, GitHub Actions deployment, stvarno slanje emaila, operativni CLI alati te automatizirani backup i recovery postupci. Kaladont zato još nije spreman za VPS objavu.
+Lokalna MVP jezgra igre, HTTP API i web sučelje implementirani su i testirani. Docker/Compose/Caddy runtime, CI Docker smoke test, prošireni health check i GHCR objava su implementirani. Staging radi na `staging.kaladont.hr` s HTTPS-om, vlastitom PostgreSQL bazom i stvarnim hrLex rječnikom; aplikacijski deploy na staging trenutno se radi ručno punim GHCR digestom.
 
-Kompletan opis proizvoda, pravila, arhitekture i plana razvoja nalazi se u [docs/README.md](docs/README.md). Ciljani operativni model definira [ADR-014](docs/03-arhitektura/odluke/014-operativni-model-mvp-a.md).
+Produkcija još nije postavljena. Preostali production blokatori su automatski staging i produkcijski deploy workflowi, `trustProxy` i restriktivni CORS, prvi-admin CLI, automatizirani off-server backup/restore te produkcijski recovery drill. Staging je privremeno javno dostupan uz `noindex` jer je Caddy Basic Auth uklonjen zbog ponavljajućih promptova na Socket.IO prometu.
+
+Kompletan opis proizvoda, pravila, arhitekture i plana razvoja nalazi se u [docs/README.md](docs/README.md). Stvarni operativni status i preostali blokatori opisani su u [produkcija-i-objava.md](docs/07-operacije/produkcija-i-objava.md), a arhitekturni model u [ADR-014](docs/03-arhitektura/odluke/014-operativni-model-mvp-a.md).
 
 ## Brzi pregled
 
