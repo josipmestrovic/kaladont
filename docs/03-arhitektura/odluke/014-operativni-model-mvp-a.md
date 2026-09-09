@@ -24,7 +24,7 @@ Staging i produkcija koriste Ubuntu 24.04 LTS na x86/amd64 instancama u istoj He
 
 ### Staging i objava
 
-Staging je stalno uključen, ima vlastitu bazu, tajne, rječnik i isključivo sintetičke račune. Produkcijski podaci nikad se ne kopiraju na staging. Sve staging rute osim javnog `/zdravlje` štiti jedan zajednički Caddy Basic Auth račun; lozinka je hashirana, a cijelo okruženje šalje i `X-Robots-Tag: noindex`.
+Staging je stalno uključen, ima vlastitu bazu, tajne, rječnik i isključivo sintetičke račune. Produkcijski podaci nikad se ne kopiraju na staging. Za privremeno ručno multiplayer testiranje staging nema Caddy Basic Auth jer browser HTTP Basic izazovi nisu pouzdani preko Socket.IO polling/upgrade zahtjeva; cijelo okruženje šalje `X-Robots-Tag: noindex`, što nije kontrola pristupa. Prije šireg dijeljenja staginga treba uvesti VPN, IP allowlist ili drugi session-based gateway.
 
 Početni razvoj i objava imaju jednog operatera:
 

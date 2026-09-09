@@ -12,9 +12,6 @@ staging.kaladont.hr {
     }
 
     handle {
-        basic_auth {
-            {$STAGING_BASIC_AUTH_KORISNIK} {$STAGING_BASIC_AUTH_HASH}
-        }
         reverse_proxy aplikacija:3000
     }
 }

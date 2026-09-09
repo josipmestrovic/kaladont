@@ -159,7 +159,7 @@ Stvori kolekciju ili mapu `Kaladont / Operacije` i odvojene zapise:
 - `Storage Box glavni račun`;
 - `Storage Box produkcija`;
 - `age recovery ključ`;
-- `Staging Basic Auth`;
+- `Staging pristup` (privremeno bez Caddy Basic Autha za multiplayer testiranje);
 - `Resend produkcija`;
 - `UptimeRobot`;
 - `Healthchecks.io`.
@@ -696,7 +696,7 @@ Ciljana konfiguracija mora obuhvatiti barem:
 - oznaku staging okruženja;
 - aplikacijski digest/verziju;
 - Resend staging ključ/način i popis punih allowlistanih adresa;
-- staging Basic Auth korisnika i hash;
+- staging pristupni model i kasniji gateway (trenutno nema Basic Autha zbog Socket.IO promptova);
 - Storage Box podračun/ključ i javni `age` recipient;
 - zasebne Healthchecks ping URL-ove;
 - `ONEMOGUCI_TIMER_POTEZA` izostavljen ili strogo `false`.
@@ -709,16 +709,11 @@ openssl rand -base64 48
 
 Rezultat odmah spremi u Bitwarden i deploy-owned `.env` s pravima 600; ne lijepi ga u chat. Svako okruženje ima drugu vrijednost.
 
-## 16. Staging Basic Auth
+## 16. Staging pristup
 
-Kada postoji pinana Caddy slika, hash generiraj **ručno i interaktivno na staging VPS-u** iz te slike, bez plaintext lozinke u argumentu. Ova naredba ne pripada GitHub Actions workflowu jer bi ondje čekala unos i zaglavila job:
+Privremeni staging nema Caddy Basic Auth jer browser HTTP Basic izaziva ponavljajuće promptove na API i Socket.IO polling/upgrade zahtjevima. Staging je zato javno dostupan uz `X-Robots-Tag: noindex, nofollow`, što nije sigurnosna kontrola. Ne dijeli staging URL izvan testiranja. Prije šireg dijeljenja uvedi VPN, IP allowlist ili drugi session-based gateway.
 
-```bash
-# CILJANI OBLIK - NE IZVODITI DOK CADDY IMAGE I COMPOSE NE POSTOJE
-docker run --rm -it <PINANI_CADDY_IMAGE> caddy hash-password --algorithm argon2id
-```
-
-Terminal traži lozinku bez prikaza. Plaintext spremi u Bitwarden; hash ide u staging VPS konfiguraciju. Način escapiranja znakova `$` mora odgovarati stvarnom Compose/Caddy mehanizmu i mora proći `docker compose config` te `caddy validate`. Ne pokušavaj ručno „popraviti” hash.
+`/zdravlje` i ostatak aplikacije prolaze kroz isti Caddy reverse proxy bez dodatnog browser prompta, pa Socket.IO može stabilno koristiti polling i WebSocket upgrade.
 
 ## 17. Zatraži staging DNS od XHostinga
 

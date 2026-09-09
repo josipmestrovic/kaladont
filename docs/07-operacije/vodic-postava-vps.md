@@ -127,7 +127,7 @@ sudo -u deploy touch /opt/kaladont/.env
 sudo chmod 600 /opt/kaladont/.env
 ```
 
-Konačan popis varijabli mora potjecati iz implementirane centralne konfiguracijske sheme. Najmanje obuhvaća internu `BAZA_URL`, jedinstvenu `SESIJA_TAJNA`, oznaku okruženja, digest/verziju, Resend konfiguraciju, staging email allowlistu te staging Basic Auth korisnika i hash. `ONEMOGUCI_TIMER_POTEZA` ne postavlja se; aplikacija mora odbiti produkcijski/staging start ako je uključena.
+Konačan popis varijabli mora potjecati iz implementirane centralne konfiguracijske sheme. Najmanje obuhvaća internu `BAZA_URL`, jedinstvenu `SESIJA_TAJNA`, oznaku okruženja, digest/verziju, Resend konfiguraciju i staging email allowlistu. Privremeni multiplayer staging nema Caddy Basic Auth jer bi izazivao ponavljajuće promptove na Socket.IO prometu; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway. `ONEMOGUCI_TIMER_POTEZA` ne postavlja se; aplikacija mora odbiti produkcijski/staging start ako je uključena.
 
 PostgreSQL i Caddy navode se točnom verzijom i digestom, bez `latest`. Aplikacija se navodi isključivo punim GHCR digestom.
 

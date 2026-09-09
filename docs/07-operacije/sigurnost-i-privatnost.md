@@ -31,7 +31,7 @@
 - Hetzner Cloud Firewall i UFW dopuštaju samo SSH (22), HTTP (80) i HTTPS (443). Compose javno objavljuje samo Caddyjeve 80/443; aplikacija i PostgreSQL nemaju host port jer Dockerova pravila mogu zaobići očekivano UFW filtriranje.
 - SSH koristi samo ključeve i pinane host fingerprintove. Root prijava i prijava lozinkom su isključene; fail2ban usporava automatizirane pokušaje. `StrictHostKeyChecking=no` nije dopušten ni ljudima ni workflowima.
 - Osobni korisnik `kaladont` ima sudo. Korisnik `deploy` nema sudo, ali je član Docker grupe radi objave; Docker grupa daje praktično root-ekvivalentne ovlasti, pa svaki VPS ima zaseban deploy ključ koji služi samo GitHub Actionsu.
-- Staging (`staging.kaladont.hr`) štiti jedan zajednički Caddy Basic Auth račun, osim javnog `/zdravlje`. Caddy prima samo Argon2id hash, ne plaintext lozinku. `X-Robots-Tag: noindex, nofollow` ostaje dodatna uputa tražilicama, ne sigurnosna kontrola.
+- Staging (`staging.kaladont.hr`) je tijekom privremenog multiplayer testiranja bez Caddy Basic Autha jer bi HTTP Basic izazovi prekidali Socket.IO polling/upgrade tok. `X-Robots-Tag: noindex, nofollow` ostaje samo uputa tražilicama, ne sigurnosna kontrola. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi session-based gateway.
 - Staging ima vlastite sintetičke podatke, tajne i email allowlistu. Produkcijski dump, račun, email popis ni tajna nikad ne završavaju na stagingu.
 - Sigurnosna zaglavlja (Caddy/SvelteKit): CSP bez inline skripti, `X-Content-Type-Options`, `Referrer-Policy`.
 - Ovisnosti: Dependabot tjedno; `pnpm audit` u CI-ju (upozorenje, ne bloker).

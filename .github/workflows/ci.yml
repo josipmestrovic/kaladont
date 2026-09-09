@@ -92,8 +92,6 @@ jobs:
             caddy validate --config /etc/caddy/Caddyfile
           docker run --rm \
             -e CADDY_EMAIL=ops@example.com \
-            -e STAGING_BASIC_AUTH_KORISNIK=staging \
-            -e 'STAGING_BASIC_AUTH_HASH=$argon2id$v=19$m=47104,t=3,p=1$hash' \
             -v "$PWD/Caddyfile.staging:/etc/caddy/Caddyfile:ro" \
             caddy:2.9.1-alpine \
             caddy validate --config /etc/caddy/Caddyfile

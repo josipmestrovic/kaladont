@@ -63,23 +63,12 @@ www.kaladont.hr {
 }
 ```
 
-Staging štiti sve osim health checka. Caddy prihvaća samo hashiranu lozinku; plaintext lozinka ne ide u Caddyfile ni git:
+Staging je tijekom privremenog multiplayer testiranja bez Basic Autha kako browser ne bi ponavljao promptove na HTTP i Socket.IO zahtjevima. Cijelo okruženje šalje `X-Robots-Tag: noindex, nofollow`; to nije kontrola pristupa. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway. Produkcija nema ovaj staging gateway i koristi samo javni reverse proxy:
 
 ```text
 staging.kaladont.hr {
     header X-Robots-Tag "noindex, nofollow"
-
-    @zdravlje path /zdravlje
-    handle @zdravlje {
-        reverse_proxy aplikacija:3000
-    }
-
-    handle {
-        basic_auth argon2id {
-            {$STAGING_BASIC_AUTH_KORISNIK} {$STAGING_BASIC_AUTH_HASH}
-        }
-        reverse_proxy aplikacija:3000
-    }
+    reverse_proxy aplikacija:3000
 }
 ```
 

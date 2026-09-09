@@ -93,7 +93,7 @@ Staging job smije početi samo za commit čiji su CI, smoke test i GHCR push usp
 9. Ponavlja javni `https://staging.kaladont.hr/zdravlje` do uspjeha ili zadanog kratkog roka; odgovor mora sadržavati očekivani digest.
 10. Zapisuje GitHub Deployment i sažetak s digestom, URL-om i rezultatom.
 
-Staging Basic Auth ne štiti `/zdravlje`, zato deploy health check ne treba staging korisničku lozinku. Ostatak stranice mora vratiti 401 bez vjerodajnica i raditi s jednim zajedničkim računom spremljenim u Bitwardenu.
+Staging tijekom privremenog multiplayer testiranja nema Basic Auth kako browser ne bi izazivao ponovne promptove na Socket.IO zahtjevima. `X-Robots-Tag: noindex, nofollow` nije kontrola pristupa; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway.
 
 ## Ručna produkcija — ciljani `promoviraj-produkciju.yml`
 

@@ -10,8 +10,6 @@ services:
       - "443:443"
     environment:
       CADDY_EMAIL: ${CADDY_EMAIL:?Postavi adresu za Caddy TLS obavijesti}
-      STAGING_BASIC_AUTH_KORISNIK: ${STAGING_BASIC_AUTH_KORISNIK:?Postavi korisnika za staging Basic Auth}
-      STAGING_BASIC_AUTH_HASH: ${STAGING_BASIC_AUTH_HASH:?Postavi Argon2id hash za staging Basic Auth}
     volumes:
       - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
       - caddy_staging_podaci:/data
