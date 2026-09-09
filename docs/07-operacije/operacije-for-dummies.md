@@ -12,6 +12,8 @@ Autoritativne odluke su u [ADR-u 014](../03-arhitektura/odluke/014-operativni-mo
 
 ## 1. Kako koristiti ovaj vodič
 
+Za svakodnevni ritam izdanja, digest, status release kandidata i staging closed test checklist koristi [release shemu](release-shema.md). Ovaj vodič ostaje širi put od praznog VPS-a do produkcije.
+
 ### Oznake
 
 - **DANAS POSTOJI** — korak se oslanja na već implementiranu funkcionalnost.
@@ -63,7 +65,7 @@ Najčešći placeholderi:
 
 ## 2. Crveni STOP: production-readiness lista
 
-Ovo je najvažniji odjeljak. **Na datum pisanja sve se kućice smatraju nedovršenima**, čak i ako je cilj opisan prezentom. Kućica se označava tek kada postoji konkretan artefakt u repozitoriju, automatski test i ručni dokaz gdje je potreban. VPS se kupuje tek kada za svaku stavku možeš zapisati commit/digest ili rezultat provjere.
+Ovo je najvažniji odjeljak. Kućica se označava tek kada postoji konkretan artefakt u repozitoriju, automatski test i ručni dokaz gdje je potreban. Produkcijski VPS se kupuje tek kada za svaku produkcijsku stavku možeš zapisati commit/digest ili rezultat provjere. Staging je već ručno podignut, ali ne smije se tretirati kao dokaz da je produkcijski release put gotov.
 
 ### Aplikacija
 
@@ -82,11 +84,11 @@ Ovo je najvažniji odjeljak. **Na datum pisanja sve se kućice smatraju nedovrš
 
 - [ ] Postoji produkcijski multi-stage `Dockerfile` za `linux/amd64` i aplikacija u njemu radi kao ne-root korisnik.
 - [ ] Postoje `docker-compose.staging.yml` i `docker-compose.prod.yml`.
-- [ ] Postoje staging i produkcijska Caddy konfiguracija; staging štiti sve osim `/zdravlje`.
+- [ ] Postoje staging i produkcijska Caddy konfiguracija; staging je najmanje `noindex`, a prije šireg dijeljenja dobiva VPN, IP allowlist ili drugi gateway.
 - [ ] PostgreSQL i Caddy koriste točnu verziju i digest, ne `latest`.
 - [ ] Ista aplikacijska slika sadrži jednokratne alate za migracije, uvoz rječnika i admin CLI.
 - [ ] Postoji mali sintetički rječnik za CI koji nije hrLex derivat.
-- [ ] Postoje `ci.yml`, `objavi-staging.yml` i `promoviraj-produkciju.yml`.
+- [ ] Postoje `ci.yml` i `objavi-ghcr.yml`; automatski `objavi-staging.yml` i `promoviraj-produkciju.yml` ostaju zasebne buduće stavke.
 - [ ] Sve third-party Actions reference pinane su na puni commit SHA.
 - [ ] CI izgradi stvarnu sliku, podigne PostgreSQL, migrira, uveze fixture, provjeri health i odigra simulaciju.
 - [ ] Privatni GHCR image moguće je povući kratkotrajnim `GITHUB_TOKEN`-om bez trajnog PAT-a na VPS-u.
@@ -283,7 +285,7 @@ Ne dodaje se ručni GHCR token. Workflow koristi ugrađeni, kratkotrajni `GITHUB
 
 Prvi uspješni workflow stvara package. Provjeri Package settings:
 
-- visibility je Private;
+- visibility odgovara odluci za MVP; trenutačni paket smije biti javno dostupan, a privatni paket traži dodatni `read:packages` pristup za VPS;
 - package je povezan s Kaladont repozitorijem;
 - workflow repozitorij ima potreban package pristup;
 - brisanje packagea nije dio deploy ovlasti.
@@ -786,11 +788,9 @@ Spoji potpuno zeleni PR u `main`. U GitHub Actionsu očekuješ redom:
 
 - CI zelen;
 - Docker smoke test zelen;
-- privatni GHCR push s digestom;
-- staging deployment zelen;
-- `/zdravlje` prikazuje isti digest.
+- GHCR push s punim digestom.
 
-Ako bilo koji korak padne, ne pokreći sljedeći ručno preko SSH-a. Otvori log točno tog koraka i popravi implementaciju novim PR-om.
+Nakon toga operater ručno ažurira staging punim digestom prema [release shemi](release-shema.md). Ako CI ili GHCR objava padnu, ne pokreći sljedeći korak preko SSH-a. Otvori log točno tog koraka i popravi implementaciju novim PR-om.
 
 ### 18.3. Provjeri staging izvana
 
@@ -802,17 +802,15 @@ Invoke-RestMethod https://staging.kaladont.hr/zdravlje
 
 Očekuješ `ok: true`, bazu `dostupna`, broj riječi veći od nule i digest iz workflowa.
 
-Provjeri da naslovnica bez Basic Autha vraća 401:
+Provjeri da je naslovnica dostupna bez Basic Autha i da staging šalje `noindex` zaglavlje:
 
 ```powershell
-try {
-  (Invoke-WebRequest https://staging.kaladont.hr/).StatusCode
-} catch {
-  [int]$_.Exception.Response.StatusCode
-}
+$odgovor = Invoke-WebRequest https://staging.kaladont.hr/ -UseBasicParsing
+$odgovor.StatusCode
+$odgovor.Headers["X-Robots-Tag"]
 ```
 
-Očekuješ `401`. U pregledniku zatim unesi zajedničke staging vjerodajnice iz Bitwardena i provjeri da stranica radi te ima `X-Robots-Tag: noindex, nofollow`.
+Očekuješ `200` i `X-Robots-Tag: noindex, nofollow`. Staging URL dijeli se samo malom closed test krugu; prije šireg dijeljenja uvedi VPN, IP allowlist ili drugi gateway.
 
 Na VPS-u provjeri javne portove:
 
@@ -1063,18 +1061,22 @@ Zatim odigraj cijelu partiju u četiri izolirana browser konteksta. Dogovoreno j
 
 ## 24. Svakodnevni release
 
+Detaljna pravila identiteta releasea, statusa i closed test provjere nalaze se u [release shemi](release-shema.md). Ovaj sažetak vrijedi za današnji ručni staging i ciljanu buduću produkciju.
+
 1. Na Windowsu stvori radnu granu.
 2. Napravi usku promjenu i lokalne provjere.
 3. Pushni granu i otvori PR.
 4. Pročitaj diff i čekaj zeleni CI.
 5. Mergeaj u `main`.
-6. Pričekaj CI i GHCR objavu, zatim ručno ažuriraj staging punim digestom i zapiši rezultat.
-7. Na stagingu odigraj cijelu partiju i ciljano testiraj promjenu.
-8. Odaberi produkcijski termin slabog prometa.
-9. Ručno pokreni produkcijski workflow s istim digestom.
-10. Prati pre-migration backup, migracije i health.
-11. Provjeri produkciju i odigraj cijelu partiju.
-12. Upiši izdanje i testnu partiju u evidenciju.
+6. Pričekaj CI i GHCR objavu, zapiši digest, commit SHA, workflow i prethodni staging digest.
+7. Ručno ažuriraj staging punim digestom i zapiši rezultat kao `kandidat`.
+8. Na stagingu odigraj cijelu partiju i ciljano testiraj promjenu.
+9. Ako provjera prođe, zapiši `staging-provjereno` i tek tada dijeli release closed testerima.
+10. Kada produkcija bude postavljena, odaberi produkcijski termin slabog prometa.
+11. Ručno pokreni produkcijski workflow s istim digestom.
+12. Prati pre-migration backup, migracije i health.
+13. Provjeri produkciju i odigraj cijelu partiju.
+14. Upiši izdanje i testnu partiju u evidenciju.
 
 Ne postoji korak „SSH na server i brzo promijeni datoteku”. Takva promjena nema testirani digest ni pouzdan rollback.
 
@@ -1229,7 +1231,7 @@ Ako naredba sadrži `-v`, `--volumes`, `rm`, `prune`, `drop`, `delete`, `reset` 
 - [ ] Javno su otvoreni samo 22/80/443.
 - [ ] CI gradi, testira i objavljuje privatni digest.
 - [ ] Merge u `main` automatski deploya staging.
-- [ ] `/zdravlje` je javno i zdravo; ostatak staginga traži Basic Auth i ima noindex.
+- [ ] `/zdravlje` je javno i zdravo; staging ima `noindex`, bez Basic Autha za prvi mali closed test krug.
 - [ ] Cijela partija prolazi u četiri izolirana browser konteksta.
 - [ ] Email stiže allowlistanoj i ne stiže nedopuštenoj adresi.
 - [ ] Admin CLI radi bez ručnog SQL-a.
@@ -1251,6 +1253,7 @@ Ako naredba sadrži `-v`, `--volumes`, `rm`, `prune`, `drop`, `delete`, `reset` 
 
 | Problem                                  | Dokument                                                   |
 | ---------------------------------------- | ---------------------------------------------------------- |
+| release identitet, status ili closed test checklist | [Release shema](release-shema.md)                          |
 | workflow, GHCR ili digest                | [CI/CD](ci-cd.md)                                          |
 | redovna objava ili rollback              | [Runbook objave i rollbacka](runbook-objava-i-rollback.md) |
 | dump, restore ili cijeli VPS             | [Runbook backupa i vraćanja](runbook-backup-i-vracanje.md) |

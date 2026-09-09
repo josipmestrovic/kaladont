@@ -3,6 +3,8 @@
 - **Status:** djelomično zamijenjen [ADR-om 014](014-operativni-model-mvp-a.md)
 - **Datum:** 2026-09-03
 
+> **Napomena 2026-09-09:** važeći operativni ritam za prve closed testove opisuju [ADR-014](014-operativni-model-mvp-a.md) i [release shema](../../07-operacije/release-shema.md). Staging se trenutno ažurira ručno punim GHCR digestom; automatski staging workflow i produkcijski promotion workflow ostaju ciljano stanje.
+
 ## Kontekst
 
 ADR-009 definira jedan produkcijski VPS i deploy s `main` grane. Prije javnog lansiranja treba sigurnosna mreža: mjesto gdje se svaka promjena isproba u uvjetima identičnim produkciji (Docker, Caddy, TLS, pravi rječnik) prije nego dođe do igrača. Dodatno ograničenje: razvojno računalo nema virtualizaciju, pa se Docker slika **ne može** testirati lokalno — provjera mora živjeti u CI-ju i na stagingu.
@@ -14,7 +16,7 @@ Dva odvojena, jednako konfigurirana Hetzner VPS-a:
 - **Staging** (`staging.kaladont.hr`): trenutno je ručno postavljen i ručno se ažurira nakon zelenog CI-ja i GHCR objave. Javan je uz `noindex` (bez Basic Autha zbog Socket.IO promptova), s vlastitom bazom i stvarnim hrLex rječnikom. Automatski staging workflow još nije implementiran.
 - **Produkcija** (`kaladont.hr`): objava **isključivo ručnom promocijom** — GitHub Actions workflow s obveznim odobrenjem (GitHub Environment `produkcija`) postavlja **identičan image digest** koji je već prošao staging. Slika se ne builda ponovno i ništa se ne kopira sa staging stroja.
 
-Tok: `merge u main → CI + smoke test slike → GHCR (tag sha + digest) → auto-deploy staging → ručna provjera → odobrenje → isti digest u produkciju`.
+Izvorni ciljani tok ove odluke bio je: `merge u main → CI + smoke test slike → GHCR (tag sha + digest) → auto-deploy staging → ručna provjera → odobrenje → isti digest u produkciju`. Važeći početni tok nakon ADR-014 koristi ručno ažuriranje staginga punim digestom dok automatski staging workflow ne postoji.
 
 Rollback = ponovno pokretanje promocije s prethodnim poznato-zdravim digestom. Baza se ne vraća; migracije moraju biti kompatibilne unatrag barem jedan ciklus.
 

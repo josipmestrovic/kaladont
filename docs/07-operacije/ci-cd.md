@@ -76,11 +76,13 @@ Nakon zelenog smoke testa workflow se prijavljuje u `ghcr.io` ugrađenim `GITHUB
 
 Tag `latest` smije biti informativan, ali se nikad ne koristi za deploy, migraciju ni rollback. Jedina dopuštena referenca na serveru je `ghcr.io/<vlasnik>/kaladont@sha256:<digest>`.
 
+Operativna pravila za release identitet, status kandidata, staging closed test checklistu i evidenciju nalaze se u [release shemi](release-shema.md). Za prve zatvorene testove release se označava digestom i commit SHA-om; SemVer se ne uvodi dok ne postoji javni ritam izdanja.
+
 VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kratkotrajni `GITHUB_TOKEN` šalje se udaljenom `docker login --password-stdin` procesu preko zaštićene SSH veze i koristi s privremenim `DOCKER_CONFIG` direktorijem. Token se ne stavlja u argument naredbe ni log. Nakon `docker pull`/`compose pull` workflow izvršava `docker logout` i briše privremeni direktorij čak i kada deploy padne.
 
 ## Staging — trenutačni ručni postupak i budući workflow
 
-Automatski `objavi-staging.yml` još ne postoji. Trenutno operater nakon zelenog CI-ja i GHCR objave ručno upisuje puni digest u `/opt/kaladont/.env`, povlači aplikacijski image i rekreira samo aplikaciju. Konfiguracije se ručno kopiraju na VPS; `.env` i tajne se ne kopiraju iz repozitorija.
+Automatski `objavi-staging.yml` još ne postoji. Trenutno operater nakon zelenog CI-ja i GHCR objave ručno upisuje puni digest u `/opt/kaladont/.env`, povlači aplikacijski image i rekreira samo aplikaciju. Taj ručni staging deploy punim digestom službeni je postupak dok workflow ne postoji. Konfiguracije se ručno kopiraju na VPS; `.env` i tajne se ne kopiraju iz repozitorija.
 
 1. Zapiše trenutno aktivni staging digest radi dijagnostike.
 2. Sigurno prenese verzionirane Compose/Caddy konfiguracije u `/opt/kaladont`; `.env` i tajne nikad se ne kopiraju iz repozitorija.

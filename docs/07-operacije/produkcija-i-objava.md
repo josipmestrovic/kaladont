@@ -95,7 +95,7 @@ Detaljni koraci za početnika nalaze se u [Operacije for dummies](operacije-for-
 
 ## Objava nove verzije
 
-Automatika i njezin ciljani ugovor opisani su u [CI/CD dokumentu](ci-cd.md); ljudski postupci su u [runbooku objave i rollbacka](runbook-objava-i-rollback.md). Tok je: radna grana → Pull Request → zeleni CI → merge u `main` → automatski staging → ručna provjera → ručno pokrenuta promocija **istog digesta** u produkciju.
+Identitet releasea, statusi, staging closed test checklist i evidencija opisani su u [release shemi](release-shema.md). Automatika i njezin ciljani ugovor opisani su u [CI/CD dokumentu](ci-cd.md); ljudski postupci su u [runbooku objave i rollbacka](runbook-objava-i-rollback.md). Trenutačni tok je: radna grana → Pull Request → zeleni CI → merge u `main` → GHCR objava → ručno ažuriranje staginga punim digestom → ručna provjera. Ciljani produkcijski tok nastavlja se ručno pokrenutom promocijom **istog digesta** u produkciju.
 
 - Postoji jedan stvarni operater. Nema obveznog drugog reviewera ni dodatnog GitHub Environment approval koraka; ručno pokretanje produkcijskog workflowa kontrolna je točka.
 - Redovni deploy može prekinuti aktivne partije i ne blokira se automatski. Radi se u doba slabog prometa. Očekivani prekid dulji od 5 minuta najavljuje se najmanje 24 sata unaprijed na forumu i bannerom objavljenim prethodnim izdanjem.

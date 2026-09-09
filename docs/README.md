@@ -67,6 +67,7 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | Dokument                                                                        | Sadržaj                                                                                |
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | [operacije-for-dummies.md](07-operacije/operacije-for-dummies.md)               | Linearni vodič od nule: preduvjeti, staging, produkcija, backup, održavanje i recovery |
+| [release-shema.md](07-operacije/release-shema.md)                               | Identitet releasea, staging closed test checklist, promocija i rollback pravila        |
 | [produkcija-i-objava.md](07-operacije/produkcija-i-objava.md)                   | Okruženja (staging/produkcija), Hetzner, Docker, Caddy, DNS                            |
 | [dimenzioniranje-posluzitelja.md](07-operacije/dimenzioniranje-posluzitelja.md) | Procjena resursa i veličine servera po ulozi                                           |
 | [ci-cd.md](07-operacije/ci-cd.md)                                               | GitHub Actions: CI, smoke test slike, staging, promocija digesta                       |

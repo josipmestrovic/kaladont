@@ -53,9 +53,12 @@ Redovito, dosadno i kratko — tako se izbjegavaju noćna iznenađenja. Alarmi (
 
 ## Evidencija drillova, objava i većih zahvata
 
-| UTC datum/vrijeme            | Vrsta               | Digest / kopija / partija                          | Trajanje | Rezultat i napomena                                 |
-| ---------------------------- | ------------------- | -------------------------------------------------- | -------- | --------------------------------------------------- |
-| _(primjer)_ 2026-09-20 04:30 | DB restore drill    | `backup-PLACEHOLDER.dump.age`                      | 12 min   | OK; sve provjere prošle; privremeni volume uklonjen |
-| _(primjer)_ 2026-09-21 06:00 | Produkcijska objava | `sha256:PLACEHOLDER`; probna partija `PLACEHOLDER` | 4 min    | Health, stranice i cijela partija prošli            |
+Release identitet, statusi i obavezna polja definirani su u [release shemi](release-shema.md#predložak-zapisa-releasea). U evidenciju ulazi svaki staging closed test kandidat, produkcijska promocija, rollback, produkcijska probna partija, DB restore drill, potpuni recovery drill, rotacija ključeva, veća OS/PostgreSQL nadogradnja i incident.
 
-U evidenciju ulaze: svaka produkcijska promocija i rollback, produkcijska probna partija, DB restore drill, potpuni recovery drill, rotacija ključeva, veća OS/PostgreSQL nadogradnja i incident. Stvarne tajne, email adrese i privatni ključevi nikad se ne zapisuju.
+| UTC datum/vrijeme            | Vrsta                       | Digest / commit / kopija / partija                 | Trajanje | Rezultat i napomena                                 |
+| ---------------------------- | --------------------------- | -------------------------------------------------- | -------- | --------------------------------------------------- |
+| _(primjer)_ 2026-09-20 04:30 | DB restore drill            | `backup-PLACEHOLDER.dump.age`                      | 12 min   | OK; sve provjere prošle; privremeni volume uklonjen |
+| _(primjer)_ 2026-09-21 06:00 | Staging closed test release | `sha256:PLACEHOLDER`; commit `PLACEHOLDER`         | 18 min   | `staging-provjereno`; četiri sesije i login prošli  |
+| _(primjer)_ 2026-09-22 06:00 | Produkcijska objava         | `sha256:PLACEHOLDER`; probna partija `PLACEHOLDER` | 4 min    | `promovirano`; health, stranice i cijela partija prošli |
+
+Stvarne tajne, email adrese, privatni ključevi i popisi testera nikad se ne zapisuju u repozitorij.

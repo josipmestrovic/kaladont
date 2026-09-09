@@ -4,7 +4,7 @@ Ovo je **sažeti tehnički checklist** za postavu aplikacijskog VPS-a. Potpuno p
 
 > **Status 2026-09-09:** Docker/Compose/Caddy artefakti, CI smoke test i GHCR objava postoje. Staging VPS je ručno postavljen na `staging.kaladont.hr`, s HTTPS-om, privatnom bazom i stvarnim hrLex rječnikom. Automatski deploy, produkcijski VPS, prvi-admin CLI i backup/restore automatika još nisu implementirani; ovaj vodič za njih ostaje budući postupak.
 
-> **Zlatna pravila:** ništa se ne deploya ručno (objava ide kroz GitHub Actions — [CI/CD](ci-cd.md)); VPS ne klonira git repozitorij; stvarne IP adrese, ključevi, hashovi i lozinke nikad se ne zapisuju u repozitorij.
+> **Zlatna pravila:** produkcija se ne deploya ručno i nikad ne dobiva svježi build; staging se zasad ručno ažurira isključivo punim GHCR digestom prema [release shemi](release-shema.md); VPS ne klonira git repozitorij; stvarne IP adrese, ključevi, hashovi i lozinke nikad se ne zapisuju u repozitorij.
 
 ## Pojmovnik (60 sekundi)
 

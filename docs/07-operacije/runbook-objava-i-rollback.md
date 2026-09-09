@@ -1,6 +1,6 @@
 # Runbook: objava i vraćanje unatrag
 
-Postupci za svakodnevne objave. Automatika je opisana u [ci-cd.md](ci-cd.md); ovdje je ono što radi čovjek. Pravilo: **promocija u produkciju uvijek nosi digest koji je već prošao staging** — nikad svježi build, nikad ručni SSH deploy.
+Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani su u [release shemi](release-shema.md), automatika u [ci-cd.md](ci-cd.md), a ovdje je ono što radi čovjek. Pravilo: **promocija u produkciju uvijek nosi digest koji je već prošao staging** — nikad svježi build, nikad ručni SSH deploy.
 
 > **Status: djelomično izvedivo.** CI, Docker smoke test i GHCR objava postoje. Staging je ručno postavljen i ručno se ažurira digestom. Automatski staging deploy i produkcijska promocija workflowom još ne postoje; koraci koji ih pretpostavljaju ostaju ciljani budući postupak.
 
@@ -15,8 +15,9 @@ Postupci za svakodnevne objave. Automatika je opisana u [ci-cd.md](ci-cd.md); ov
 ## Redovna objava
 
 1. **Spoji PR u `main`** tek kada su obvezne provjere zelene. CI zatim objavljuje image u GHCR-u.
-2. **Ručno ažuriraj staging** punim `sha256:...` digestom iz GHCR workflowa i rekreiraj samo aplikaciju.
-3. **Provjeri staging** bez Basic Autha; staging je privremeno javno dostupan uz `noindex`:
+2. **Zabilježi release kandidata** prema [release shemi](release-shema.md#predložak-zapisa-releasea): puni digest, commit SHA, workflow run, prethodni staging digest, kratak opis promjene i početni status `kandidat`.
+3. **Ručno ažuriraj staging** punim `sha256:...` digestom iz GHCR workflowa i rekreiraj samo aplikaciju. Dok automatski staging workflow ne postoji, ovo je službeni staging postupak, ne zaobilaženje procesa.
+4. **Provjeri staging** bez Basic Autha; staging je privremeno javno dostupan uz `noindex`:
    - `/zdravlje` vraća 200;
    - landing, registracija/prijava, red i WebSocket rade;
    - odigraj cijelu partiju u četiri odvojene pregledničke sesije, od reda do rezultata;
@@ -24,18 +25,19 @@ Postupci za svakodnevne objave. Automatika je opisana u [ci-cd.md](ci-cd.md); ov
    - ciljano provjeri svako područje koje je promjena dirala;
    - za email promjenu potvrdi stvarnu isporuku samo točno allowlistanoj adresi i odbijanje adrese izvan popisa;
    - za baznu promjenu pregledaj migracijski korak i potvrdi da stara aplikacija može raditi nad novom shemom barem jedan ciklus.
-4. **Zabilježi staging rezultat** i release digest. Ne promoviraj poznatu grešku uz obećanje da će se popraviti poslije.
-5. **Odaberi vrijeme slabog prometa.** Workflow ne blokira aktivne partije; zamjena procesa može ih prekinuti.
-6. **Pokreni `promoviraj-produkciju`** preko Actions → Run workflow i unesi puni staging digest. Nema dodatnog Environment odobrenja jer postoji jedan operater.
-7. **Prati svaki korak:** prethodni digest, svježi šifrirani off-server backup, migracije, pull istog digesta, zamjena i health check. Crveni korak nije poziv na naslijepo ponovno pokretanje.
-8. **Provjeri produkciju:** `/zdravlje` vraća 200 i očekivani digest; landing, Pravila, O igri, Privatnost i Uvjeti rade; zatim odigraj cijelu partiju u četiri odvojene sesije. Ta partija ostaje u običnoj statistici.
-9. **Pregledaj logove** bez ispisivanja tajni:
+5. **Zabilježi staging rezultat** kao `staging-provjereno` ili `odbačeno`. Ne promoviraj i ne dijeli closed testerima poznatu grešku uz obećanje da će se popraviti poslije.
+6. **Za closed test release** pošalji testerima samo staging link, kratku napomenu što se testira i način prijave greške. Popis testera i privatni kontakt podaci ne ulaze u git.
+7. **Za buduću produkciju odaberi vrijeme slabog prometa.** Workflow ne blokira aktivne partije; zamjena procesa može ih prekinuti.
+8. **Pokreni `promoviraj-produkciju`** preko Actions → Run workflow i unesi puni staging digest. Nema dodatnog Environment odobrenja jer postoji jedan operater. Ovaj korak je ciljano stanje dok produkcijski workflow ne postoji.
+9. **Prati svaki korak:** prethodni digest, svježi šifrirani off-server backup, migracije, pull istog digesta, zamjena i health check. Crveni korak nije poziv na naslijepo ponovno pokretanje.
+10. **Provjeri produkciju:** `/zdravlje` vraća 200 i očekivani digest; landing, Pravila, O igri, Privatnost i Uvjeti rade; zatim odigraj cijelu partiju u četiri odvojene sesije. Ta partija ostaje u običnoj statistici.
+11. **Pregledaj logove** bez ispisivanja tajni:
 
    ```bash
    ssh kaladont@PROD_IP 'cd /opt/kaladont && docker compose -f docker-compose.prod.yml logs --since 10m aplikacija'
    ```
 
-10. U [evidenciju održavanja](odrzavanje.md#evidencija-drillova-objava-i-većih-zahvata) upiši vrijeme, digest, rezultat, trajanje prekida i identitete/ID probne produkcijske partije kako bi se mogla prepoznati u malom uzorku metrika.
+12. U [evidenciju održavanja](odrzavanje.md#evidencija-drillova-objava-i-većih-zahvata) upiši vrijeme, status, digest, commit SHA, workflow, rezultat, trajanje prekida i identitete/ID probne produkcijske partije kako bi se mogla prepoznati u malom uzorku metrika.
 
 ## Kada NE objavljivati
 
