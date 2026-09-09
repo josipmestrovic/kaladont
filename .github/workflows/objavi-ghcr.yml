@@ -1,0 +1,52 @@
+name: Objaviti Docker sliku
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ghcr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  objava:
+    name: Objaviti sliku u GHCR
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Preuzeti repozitorij
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Prijaviti se u GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Izgraditi i objaviti amd64 sliku
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/josipmestrovic/kaladont:${{ github.event.workflow_run.head_sha }}
+            ghcr.io/josipmestrovic/kaladont:main
+          labels: |
+            org.opencontainers.image.title=Kaladont
+            org.opencontainers.image.description=Hrvatska višeigračka igra riječi
+            org.opencontainers.image.source=https://github.com/josipmestrovic/kaladont
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
