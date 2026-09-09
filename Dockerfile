@@ -24,8 +24,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN addgroup -S --gid 1000 kaladont \
-  && adduser -S --uid 1000 --ingroup kaladont kaladont
+RUN addgroup -S kaladont \
+  && adduser -S --ingroup kaladont kaladont
 
 COPY --from=builder --chown=kaladont:kaladont /runtime ./
 COPY --from=builder --chown=kaladont:kaladont /app/aplikacije/posluzitelj/dist ./dist
