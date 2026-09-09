@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "migracije:generiraj": "drizzle-kit generate",
     "migracije": "drizzle-kit migrate",
+    "ci-fixture": "tsx src/cli/ci-fixture.ts",
     "simulacija": "tsx src/cli/simulacija.ts",
     "test": "vitest run"
   },

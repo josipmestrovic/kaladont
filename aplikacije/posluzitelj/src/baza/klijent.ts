@@ -13,3 +13,4 @@ if (!process.env.BAZA_URL) {
 const klijent = postgres(process.env.BAZA_URL);
 
 export const baza = drizzle(klijent, { schema: shema });
+export const zatvoriBazu = () => klijent.end();

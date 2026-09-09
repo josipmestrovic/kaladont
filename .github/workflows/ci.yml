@@ -64,6 +64,9 @@ jobs:
       - name: Primijeniti migracije baze
         run: pnpm --filter posluzitelj migracije
 
+      - name: Učitati sintetički CI rječnik
+        run: pnpm --filter posluzitelj ci-fixture
+
       - name: Pokrenuti lint
         run: pnpm lint
 
