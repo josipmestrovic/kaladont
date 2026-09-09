@@ -1,6 +1,6 @@
 # Produkcija i objava
 
-> **Status: ciljano stanje, još nije implementirano.** Dockerfile, Compose/Caddy konfiguracije, GitHub Actions workflowi i produkcijski aplikacijski preduvjeti još ne postoje. Ovaj dokument definira operativni ugovor koji implementacija mora zadovoljiti; nije potvrda da se opisane naredbe danas mogu izvršiti. Potpuno početničko vođenje i STOP kriteriji nalaze se u [Operacije for dummies](operacije-for-dummies.md).
+> **Status: djelomično implementirano.** Dockerfile, CI smoke test, `docker-compose.staging.yml`, `docker-compose.prod.yml`, `Caddyfile` i `Caddyfile.staging` postoje i validiraju se u CI-ju. GHCR objava, VPS workflowi, backupi i stvarna staging/produkcijska postava još nisu implementirani. Ovaj dokument i dalje definira operativni ugovor koji implementacija mora zadovoljiti. Potpuno početničko vođenje i STOP kriteriji nalaze se u [Operacije for dummies](operacije-for-dummies.md).
 
 Izvor odluke je [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Lokalni Windows razvoj ostaje odvojen i opisan u [postavljanju razvojne okoline](../06-razvoj/postavljanje-okoline.md).
 
@@ -20,7 +20,7 @@ Staging i produkcija ne dijele bazu, `.env`, tajne, Docker mrežu ni volumene. *
 
 ## Sastav aplikacijskog VPS-a
 
-Ciljane datoteke su `docker-compose.staging.yml` i `docker-compose.prod.yml`; danas još ne postoje.
+Ciljane datoteke su `docker-compose.staging.yml` i `docker-compose.prod.yml`; konfiguracije postoje u korijenu repozitorija i koriste isti image digest kroz `KALADONT_IMAGE`.
 
 | Servis       | Uloga                                                                                                                                        |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -49,9 +49,9 @@ AAAA zapisi i Cloudflare proxy ne uvode se u početku. `analitika.kaladont.hr` n
 
 Caddy može izdati javni TLS certifikat tek kada DNS pokazuje na odgovarajući VPS i portovi 80/443 su dostupni.
 
-## Caddy (koncept, nije gotova konfiguracija)
+## Caddy
 
-Stvarni Caddyfile mora biti verzioniran, validiran u CI-ju i isporučen workflowom. Sljedeći isječci prikazuju samo namjeru.
+Produkcijska konfiguracija nalazi se u `Caddyfile`, a staging konfiguracija u `Caddyfile.staging`. Obje se validiraju u CI-ju; stvarni TLS certifikat može se izdati tek nakon DNS-a i otvaranja portova 80/443.
 
 ```text
 kaladont.hr {

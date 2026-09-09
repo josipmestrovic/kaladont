@@ -1,0 +1,12 @@
+{
+    email {$CADDY_EMAIL}
+}
+
+kaladont.hr {
+    encode gzip
+    reverse_proxy aplikacija:3000
+}
+
+www.kaladont.hr {
+    redir https://kaladont.hr{uri} permanent
+}

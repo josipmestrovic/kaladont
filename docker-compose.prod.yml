@@ -1,0 +1,79 @@
+services:
+  caddy:
+    image: caddy:2.9.1-alpine
+    restart: unless-stopped
+    depends_on:
+      aplikacija:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CADDY_EMAIL: ${CADDY_EMAIL:?Postavi adresu za Caddy TLS obavijesti}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_prod_podaci:/data
+      - caddy_prod_konfiguracija:/config
+    networks:
+      - javna
+
+  aplikacija:
+    image: ${KALADONT_IMAGE:?Postavi GHCR image digest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      BAZA_URL: postgresql://kaladont:${BAZA_LOZINKA:?Postavi BAZA_LOZINKA}@baza:5432/kaladont_prod
+      SESIJA_TAJNA: ${SESIJA_TAJNA:?Postavi produkcijsku SESIJA_TAJNA}
+      EMAIL_API_KLJUC: ${EMAIL_API_KLJUC:?Postavi produkcijski EMAIL_API_KLJUC}
+      EMAIL_POSILJATELJ: ${EMAIL_POSILJATELJ:-noreply@kaladont.hr}
+      STAGING_EMAIL_ALLOWLIST: ""
+      DEV_MAIL: ${DEV_MAIL:?Postavi produkcijski DEV_MAIL}
+      UMAMI_URL: ${UMAMI_URL:-}
+      ONEMOGUCI_TIMER_POTEZA: "false"
+      ODGODA_POCETKA_PARTIJE_MS: "10000"
+      ADMIN_TAJNI_KLJUC: ${ADMIN_TAJNI_KLJUC:?Postavi produkcijski ADMIN_TAJNI_KLJUC}
+      SIMULACIJA_ADRESA: http://aplikacija:3000
+      VERZIJA: ${VERZIJA:?Postavi verziju izdanja}
+      DIGEST: ${DIGEST:?Postavi digest izdanja}
+    depends_on:
+      baza:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/zdravlje').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - javna
+      - privatna
+
+  baza:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kaladont
+      POSTGRES_PASSWORD: ${BAZA_LOZINKA:?Postavi BAZA_LOZINKA}
+      POSTGRES_DB: kaladont_prod
+    volumes:
+      - postgres_prod_podaci:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kaladont -d kaladont_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - privatna
+
+volumes:
+  caddy_prod_podaci:
+  caddy_prod_konfiguracija:
+  postgres_prod_podaci:
+
+networks:
+  javna:
+  privatna:
+    internal: true
