@@ -2,7 +2,7 @@
 
 Ovo je **sažeti tehnički checklist** za postavu aplikacijskog VPS-a. Potpuno početničko objašnjenje svake naredbe, očekivanog rezultata i sigurne reakcije na grešku nalazi se u [Operacije for dummies](operacije-for-dummies.md). Kontekst i arhitektura definirani su u [produkciji i objavi](produkcija-i-objava.md) te [ADR-u 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md).
 
-> **STOP — ciljano stanje još nije implementirano.** Ne postoje svi potrebni Docker/Compose/Caddy artefakti, workflowi, operativni CLI alati, prošireni health check ni backup automatika. Ne kupovati niti postavljati novi VPS prema ovom dokumentu dok production-readiness lista iz početničkog vodiča nije potpuno zelena.
+> **Status 2026-09-09:** Docker/Compose/Caddy artefakti, CI smoke test i GHCR objava postoje. Staging VPS je ručno postavljen na `staging.kaladont.hr`, s HTTPS-om, privatnom bazom i stvarnim hrLex rječnikom. Automatski deploy, produkcijski VPS, prvi-admin CLI i backup/restore automatika još nisu implementirani; ovaj vodič za njih ostaje budući postupak.
 
 > **Zlatna pravila:** ništa se ne deploya ručno (objava ide kroz GitHub Actions — [CI/CD](ci-cd.md)); VPS ne klonira git repozitorij; stvarne IP adrese, ključevi, hashovi i lozinke nikad se ne zapisuju u repozitorij.
 
@@ -161,11 +161,11 @@ Rezultat mora sadržavati točno sačuvanu staging Primary IPv4. Caddy ne može 
 
 ## Korak 8 — Prvi deploy
 
-1. Merge u `main` nakon zelenog CI-ja pokreće automatski staging deploy ([CI/CD specifikacija](ci-cd.md)).
-2. Workflow validira konfiguraciju, povlači točan digest, primjenjuje migracije i provjerava je li rječnik prazan.
-3. Samo pri prvom praznom rječniku workflow iz istog digesta pokreće puni hrLex uvoz; kasniji deployi ga preskaču.
-4. Workflow pokreće aplikaciju i zahtijeva javni `/zdravlje` 200 s dostupnom bazom, `brojRijeci > 0` i očekivanim digestom.
-5. Bez Basic Autha `/zdravlje` mora biti dostupan, a ostale staging rute moraju vratiti 401. S vjerodajnicama mora raditi cijeli web i WebSocket.
+1. Merge u `main` nakon zelenog CI-ja objavljuje image u GHCR-u; staging se trenutno ažurira ručno punim digestom.
+2. Ručni staging postupak validira konfiguraciju, povlači točan digest i provjerava postojeću bazu/rječnik.
+3. Puni hrLex uvoz izveden je jednokratno na stagingu; kasniji deployi ga ne ponavljaju.
+4. Staging mora imati javni `/zdravlje` 200 s dostupnom bazom, `brojRijeci > 0` i očekivanim digestom.
+5. Staging je privremeno bez Basic Autha zbog Socket.IO prometa; prije šireg dijeljenja treba uvesti gateway zaštitu.
 6. Ručno odigraj cijelu partiju u četiri odvojene sesije, testiraj Resend samo prema točnoj staging allowlisti i jednokratnim CLI alatom dodijeli prvi admin račun.
 7. Napravi šifrirani staging dump na privremeni Storage Box podračun i vrati ga u praznu izoliranu bazu.
 8. Tek nakon svih zelenih koraka ponovi provisioning za produkciju i ručno promoviraj staging digest.

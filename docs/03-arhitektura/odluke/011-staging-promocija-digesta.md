@@ -11,7 +11,7 @@ ADR-009 definira jedan produkcijski VPS i deploy s `main` grane. Prije javnog la
 
 Dva odvojena, jednako konfigurirana Hetzner VPS-a:
 
-- **Staging** (`staging.kaladont.hr`): svaki push/merge u `main` sa zelenim CI-jem automatski se deploya. Javan uz `noindex` (bez lozinke), s vlastitom bazom i sintetičkim podacima.
+- **Staging** (`staging.kaladont.hr`): trenutno je ručno postavljen i ručno se ažurira nakon zelenog CI-ja i GHCR objave. Javan je uz `noindex` (bez Basic Autha zbog Socket.IO promptova), s vlastitom bazom i stvarnim hrLex rječnikom. Automatski staging workflow još nije implementiran.
 - **Produkcija** (`kaladont.hr`): objava **isključivo ručnom promocijom** — GitHub Actions workflow s obveznim odobrenjem (GitHub Environment `produkcija`) postavlja **identičan image digest** koji je već prošao staging. Slika se ne builda ponovno i ništa se ne kopira sa staging stroja.
 
 Tok: `merge u main → CI + smoke test slike → GHCR (tag sha + digest) → auto-deploy staging → ručna provjera → odobrenje → isti digest u produkciju`.
@@ -32,5 +32,5 @@ CI dodatno izvodi **smoke test stvarne produkcijske slike**: digne compose stack
 
 - Dvostruki trošak infrastrukture aplikacije (dva VPS-a) — cijena sigurnosne mreže.
 - Ista slika na oba okruženja ⇒ **konfiguracija u build vrijeme je zabranjena**; sve razlike okruženja dolaze iz `.env`/Compose okoline (vidi ADR-012 za posljedice na klijentu).
-- Staging mora imati vlastitu bazu, tajne i rječnik; produkcijski podaci nikad na staging.
+- Staging mora imati vlastitu bazu, tajne i rječnik; produkcijski podaci nikad na staging. CI koristi sintetički fixture, dok ručno postavljeni staging koristi vlastiti uvoz hrLexa.
 - GitHub Deployment zapisi čuvaju tko je, kada i koji digest odobrio — puna sljedivost objava.

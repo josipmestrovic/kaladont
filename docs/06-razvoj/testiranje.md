@@ -12,9 +12,9 @@ Pravila igre su srce proizvoda — greška u validaciji ili bodovanju izravno kr
 
 ## Trenutačno i ciljano stanje
 
-Postojeći Vitest i Socket.IO testovi izvršavaju se lokalno uz native PostgreSQL. Produkcijski Docker smoke test još nije implementiran jer ne postoje Dockerfile, Compose workflow ni mali sintetički fixture za uvoz rječnika. To su obvezni zadaci Faze 8, ne testovi koje je danas moguće pokrenuti.
+Postojeći Vitest i Socket.IO testovi izvršavaju se lokalno uz native PostgreSQL. GitHub CI dodatno gradi i smoke-testira stvarnu amd64 Docker sliku: pokreće PostgreSQL, migracije, sintetički fixture, health check i simulaciju četiri igrača. Lokalni Windows razvoj i dalje ne zahtijeva Docker.
 
-Kada Faza 8 bude implementirana, GitHubov Ubuntu runner mora izgraditi stvarnu amd64 produkcijsku sliku, podignuti je s PostgreSQL-om, primijeniti migracije, uvesti mali sintetički rječnik, provjeriti `/zdravlje` i skriptom `simulacija` odigrati cijelu partiju. Lokalni Windows razvoj ni tada ne zahtijeva Docker.
+Na GitHubovom Ubuntu runneru stvarna amd64 slika prolazi migracije, sintetički rječnik, `/zdravlje` i simulaciju cijele partije. Nakon zelenog CI-ja zaseban workflow objavljuje image u GHCR-u s commit tagom i digestom. Stvarni hrLex uvoz izvodi se ručno na staging VPS-u, ne u CI-ju.
 
 ## Obavezno pokriveno jediničnim testovima
 

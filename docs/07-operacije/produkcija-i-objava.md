@@ -1,8 +1,10 @@
 # Produkcija i objava
 
-> **Status: djelomično implementirano.** Dockerfile, CI smoke test, `docker-compose.staging.yml`, `docker-compose.prod.yml`, `Caddyfile` i `Caddyfile.staging` postoje i validiraju se u CI-ju. GHCR objava, VPS workflowi, backupi i stvarna staging/produkcijska postava još nisu implementirani. Ovaj dokument i dalje definira operativni ugovor koji implementacija mora zadovoljiti. Potpuno početničko vođenje i STOP kriteriji nalaze se u [Operacije for dummies](operacije-for-dummies.md).
+> **Status 2026-09-09: staging ručno radi, produkcija nije postavljena.** Dockerfile, CI smoke test, GHCR objava, Compose i Caddy konfiguracije postoje. Staging VPS `staging.kaladont.hr` ručno je postavljen s HTTPS-om, privatnom bazom i stvarnim hrLex rječnikom. Automatski deploy workflow, produkcijski VPS, produkcijski deploy i backup automatika još nisu implementirani. Ovaj dokument definira preostali operativni ugovor.
 
 Izvor odluke je [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Lokalni Windows razvoj ostaje odvojen i opisan u [postavljanju razvojne okoline](../06-razvoj/postavljanje-okoline.md).
+
+**Stvarno stanje:** CI koristi mali sintetički fixture, dok ručno postavljeni staging ima vlastiti stvarni hrLex uvoz. Aplikacijski deploy na staging trenutno je ručan: nakon GHCR objave operater mijenja puni digest u `/opt/kaladont/.env` i rekreira aplikaciju. Automatski staging i produkcijski workflow još nisu implementirani.
 
 ## Okruženja
 
@@ -10,7 +12,7 @@ Aplikacija živi na **dva odvojena Hetzner VPS-a**; postojeći treći VPS nosi D
 
 | Okruženje  | Domena                | VPS                                              | Objava                                                                   |
 | ---------- | --------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ |
-| Staging    | `staging.kaladont.hr` | vlastiti x86 VPS; aplikacija + vlastiti Postgres | automatski, svaki merge u `main` sa zelenim CI-jem                       |
+| Staging    | `staging.kaladont.hr` | ručno postavljeni x86 VPS; aplikacija + vlastiti Postgres | ručno ažuriranje digestom nakon zelenog CI-ja i GHCR objave |
 | Produkcija | `kaladont.hr`         | vlastiti x86 VPS; aplikacija + vlastiti Postgres | ručna promocija **istog image digesta** sa staginga                      |
 | Forum      | `forum.kaladont.hr`   | postojeći zasebni VPS (Discourse + njegova baza) | neovisno o igri — [vodič postave Discoursea](vodic-postava-discourse.md) |
 
@@ -19,6 +21,8 @@ Oba nova VPS-a koriste Ubuntu 24.04 LTS, arhitekturu x86/amd64 i istu Hetzner lo
 Staging i produkcija ne dijele bazu, `.env`, tajne, Docker mrežu ni volumene. **Produkcijski podaci nikad ne idu na staging**; staging koristi trajne sintetičke podatke i vlastiti uvoz rječnika. Produkcijski VPS stvara se tek kada staging prođe puni deploy, ručnu partiju te šifrirani backup i restore drill. Odabir veličine i trošak opisani su u [dimenzioniranju poslužitelja](dimenzioniranje-posluzitelja.md).
 
 ## Sastav aplikacijskog VPS-a
+
+Napomena o rječniku: CI koristi sintetički fixture, dok ručno postavljeni staging trenutno ima vlastiti stvarni hrLex uvoz. Produkcijski podaci i računi ne kopiraju se na staging.
 
 Ciljane datoteke su `docker-compose.staging.yml` i `docker-compose.prod.yml`; konfiguracije postoje u korijenu repozitorija i koriste isti image digest kroz `KALADONT_IMAGE`.
 
@@ -83,7 +87,7 @@ Detaljni koraci za početnika nalaze se u [Operacije for dummies](operacije-for-
 1. Dovršiti sve production-readiness blokere u kodu i repozitoriju; CI mora izgraditi i smoke-testirati stvarnu sliku.
 2. Postaviti Storage Box i dokazati off-server backup/restore postojećeg Discoursea.
 3. Stvoriti samo staging Primary IPv4 i VPS; očvrsnuti SSH, firewall i Docker.
-4. Zatražiti staging A zapis od XHostinga i postaviti Basic Auth.
+4. Zatražiti staging A zapis od XHostinga i postaviti Caddy HTTPS; staging je privremeno bez Basic Autha zbog Socket.IO promptova.
 5. Prvi workflow izvršava migracije, uvozi hrLex samo ako je rječnik prazan, pokreće aplikaciju i provjerava `/zdravlje`.
 6. Ručno odigrati staging partiju i dokazati šifrirani backup/restore staging baze.
 7. Tek tada stvoriti i postaviti produkcijski Primary IPv4/VPS, Resend DNS, backup i monitoring.

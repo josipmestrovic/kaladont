@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-> **Status: specifikacija, još nije implementirano.** Datoteke `.github/workflows/ci.yml`, `.github/workflows/objavi-staging.yml` i `.github/workflows/promoviraj-produkciju.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički fixture rječnika još ne postoje. Ovaj dokument je ugovor koji buduća implementacija mora zadovoljiti. Ne pokušavati objavu dok production-readiness lista iz [Operacije for dummies](operacije-for-dummies.md) nije zelena.
+> **Status 2026-09-09: djelomično implementirano.** `.github/workflows/ci.yml`, `.github/workflows/objavi-ghcr.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički CI fixture postoje i provjereni su. Automatski staging workflow, produkcijski promotion workflow, backup automatika i deploy ključevi još ne postoje. Ovaj dokument razlikuje stvarni tok od ciljanog budućeg toka.
 
 Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
 
@@ -8,8 +8,8 @@ Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-mod
 flowchart LR
     A[merge u main] --> B[CI: lint + test + build]
     B --> C[Smoke test Docker slike]
-    C --> D[Privatni GHCR - SHA tag + digest]
-    D --> E[Auto-deploy staging]
+    C --> D[Javni GHCR - commit tag + digest]
+    D --> E[Ručno ažuriranje staginga po digestu]
     E --> F[Ručna provjera na stagingu]
     F --> G[Ručni produkcijski workflow]
     G --> H[Isti digest u produkciju]
@@ -70,22 +70,22 @@ Na `main` se slika gradi jednom. Taj lokalni image ili registry digest koristi s
 
 Padne li bilo koji korak, slika se ne objavljuje i staging se ne dira. Ista provjera izvodi se na PR-u koji dira Dockerfile, Compose, Caddy, migracije, startup ili workflowe kako se kvar ne bi otkrio tek nakon mergea.
 
-## Privatni GHCR i nepromjenjivi digest
+## GHCR i nepromjenjivi digest
 
-Nakon zelenog smoke testa workflow se prijavljuje u `ghcr.io` ugrađenim `GITHUB_TOKEN`-om i ovlašću `packages: write`. Objavljuje oznaku `sha-<puni-commit>` te bilježi vraćeni `sha256:...` digest u job output i sažetak. Package ostaje privatan i povezan s repozitorijem.
+Nakon zelenog smoke testa workflow se prijavljuje u `ghcr.io` ugrađenim `GITHUB_TOKEN`-om i ovlašću `packages: write`. Objavljuje puni commit SHA tag i `main` tag te bilježi vraćeni `sha256:...` digest u job output. Trenutni paket je javno dostupan; ako se promijeni u privatan, VPS će trebati zaseban `read:packages` pristup.
 
 Tag `latest` smije biti informativan, ali se nikad ne koristi za deploy, migraciju ni rollback. Jedina dopuštena referenca na serveru je `ghcr.io/<vlasnik>/kaladont@sha256:<digest>`.
 
 VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kratkotrajni `GITHUB_TOKEN` šalje se udaljenom `docker login --password-stdin` procesu preko zaštićene SSH veze i koristi s privremenim `DOCKER_CONFIG` direktorijem. Token se ne stavlja u argument naredbe ni log. Nakon `docker pull`/`compose pull` workflow izvršava `docker logout` i briše privremeni direktorij čak i kada deploy padne.
 
-## Automatski staging — ciljani `objavi-staging.yml`
+## Staging — trenutačni ručni postupak i budući workflow
 
-Staging job smije početi samo za commit čiji su CI, smoke test i GHCR push uspjeli. Koristi GitHub Environment `staging`, zasebni SSH ključ i korisnika `deploy`; host fingerprint nalazi se u zasebnoj Environment tajni.
+Automatski `objavi-staging.yml` još ne postoji. Trenutno operater nakon zelenog CI-ja i GHCR objave ručno upisuje puni digest u `/opt/kaladont/.env`, povlači aplikacijski image i rekreira samo aplikaciju. Konfiguracije se ručno kopiraju na VPS; `.env` i tajne se ne kopiraju iz repozitorija.
 
 1. Zapiše trenutno aktivni staging digest radi dijagnostike.
 2. Sigurno prenese verzionirane Compose/Caddy konfiguracije u `/opt/kaladont`; `.env` i tajne nikad se ne kopiraju iz repozitorija.
 3. Validira renderirani Compose i Caddy config prije primjene.
-4. Kratkotrajno se prijavi u privatni GHCR i povuče točan novi digest.
+4. Ako paket bude privatan, kratkotrajno se prijavi u GHCR i povuče točan novi digest.
 5. Jednokratnim alatom iz **novog digesta** primijeni migracije.
 6. Provjeri broj riječi. Samo pri prvom praznom rječniku pokreće puni hrLex uvoz; kod svakog kasnijeg deploya uvoz se preskače.
 7. Pokrene/zamijeni aplikaciju s točnim digestom.
@@ -125,7 +125,7 @@ Automatski zeleni deploy nije dovoljan za promociju. Za svaki release kandidat o
 | `PROD_HOST`, `PROD_SSH_KLJUC`, `PROD_SSH_KNOWN_HOSTS`          | `produkcija` | SSH kao fiksni korisnik `deploy` uz pinani host fingerprint                          |
 | ugrađeni `GITHUB_TOKEN`                                        | job-scoped   | Push privatne slike i kratkotrajni udaljeni pull; nikad se ne sprema kao ručna tajna |
 
-Aplikacijske tajne (baza, email, sesije, staging allowlista, Basic Auth hash, Storage Box i Healthchecks URL) žive u VPS konfiguraciji s pravima 600, dostupnoj samo računu koji je mora čitati i rootu, te u Bitwardenu prema [sigurnosnoj matrici](sigurnost-i-privatnost.md). Ne ulaze u repozitorij ni workflow logove.
+Aplikacijske tajne (baza, email, sesije, staging allowlista, Storage Box i Healthchecks URL) žive u VPS konfiguraciji s pravima 600, dostupnoj samo računu koji je mora čitati i rootu, te u Bitwardenu prema [sigurnosnoj matrici](sigurnost-i-privatnost.md). Staging trenutno nema Basic Auth hash jer je Basic Auth uklonjen zbog Socket.IO promptova. Ne ulaze u repozitorij ni workflow logove.
 
 ## Pravila
 

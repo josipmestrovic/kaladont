@@ -5,7 +5,7 @@ Ovaj vodič namijenjen je osobi koja nikada nije samostalno postavila aplikaciju
 Autoritativne odluke su u [ADR-u 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Ovaj vodič objašnjava **kako** ih jednog dana provesti. Stručni sažeci i incidentni postupci ostaju u ostalim dokumentima ove mape.
 
 > [!CAUTION]
-> **DANAS STANI OVDJE.** Ovaj dokument opisuje ciljano stanje koje još nije implementirano. Trenutačno ne postoje svi potrebni Docker/Compose/Caddy artefakti, GitHub Actions workflowi, backup skripte i systemd jedinice. Aplikaciji također nedostaju produkcijski preduvjeti navedeni u sljedećem odjeljku. Ne kupuj staging ili produkcijski VPS i ne izvršavaj naredbe iza crvenog STOP-a dok cijela readiness lista nije zelena.
+> **Stanje 2026-09-09.** Docker/Compose/Caddy artefakti, CI smoke test i GHCR objava postoje. Staging VPS je ručno postavljen i radi s HTTPS-om, privatnom bazom i stvarnim hrLex rječnikom. Automatski staging deploy, produkcijski VPS/deploy, trustProxy/CORS učvršćivanje, prvi-admin CLI i backup/restore automatika još nisu implementirani. Ne tretiraj staging kao privatno okruženje: privremeno je javno uz `noindex`.
 
 > [!IMPORTANT]
 > U ovaj repozitorij nikada ne upisuj stvarnu IP adresu, lozinku, API ključ, privatni SSH ključ, Basic Auth hash, Storage Box pristup, email allowlistu ni Healthchecks URL. Primjeri koriste vrijednosti poput `<STAGING_IPV4>` koje moraš zamijeniti privatno tijekom stvarne postave.
@@ -1068,7 +1068,7 @@ Zatim odigraj cijelu partiju u četiri izolirana browser konteksta. Dogovoreno j
 3. Pushni granu i otvori PR.
 4. Pročitaj diff i čekaj zeleni CI.
 5. Mergeaj u `main`.
-6. Pričekaj automatski staging deploy i zapiši digest.
+6. Pričekaj CI i GHCR objavu, zatim ručno ažuriraj staging punim digestom i zapiši rezultat.
 7. Na stagingu odigraj cijelu partiju i ciljano testiraj promjenu.
 8. Odaberi produkcijski termin slabog prometa.
 9. Ručno pokreni produkcijski workflow s istim digestom.

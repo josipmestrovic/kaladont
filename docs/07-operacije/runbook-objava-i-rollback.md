@@ -2,7 +2,7 @@
 
 Postupci za svakodnevne objave. Automatika je opisana u [ci-cd.md](ci-cd.md); ovdje je ono što radi čovjek. Pravilo: **promocija u produkciju uvijek nosi digest koji je već prošao staging** — nikad svježi build, nikad ručni SSH deploy.
 
-> **Status: ciljano stanje, još nije izvedivo.** Workflowi i deployment artefakti ne postoje. Ovaj runbook primjenjuje se tek kada production-readiness lista iz [Operacije for dummies](operacije-for-dummies.md) bude zelena.
+> **Status: djelomično izvedivo.** CI, Docker smoke test i GHCR objava postoje. Staging je ručno postavljen i ručno se ažurira digestom. Automatski staging deploy i produkcijska promocija workflowom još ne postoje; koraci koji ih pretpostavljaju ostaju ciljani budući postupak.
 
 ## Prije svakog release kandidata
 
@@ -14,11 +14,11 @@ Postupci za svakodnevne objave. Automatika je opisana u [ci-cd.md](ci-cd.md); ov
 
 ## Redovna objava
 
-1. **Spoji PR u `main`** tek kada su obvezne provjere zelene. Staging se zatim objavljuje automatski.
-2. **Pričekaj staging Deployment** i zapiši puni `sha256:...` digest iz sažetka workflowa. Potvrdi da `/zdravlje` vraća isti digest.
-3. **Provjeri staging** s vjerodajnicama iz Bitwardena:
-   - bez vjerodajnica `/zdravlje` vraća 200, a ostale rute 401;
-   - s vjerodajnicama landing, registracija/prijava, red i WebSocket rade;
+1. **Spoji PR u `main`** tek kada su obvezne provjere zelene. CI zatim objavljuje image u GHCR-u.
+2. **Ručno ažuriraj staging** punim `sha256:...` digestom iz GHCR workflowa i rekreiraj samo aplikaciju.
+3. **Provjeri staging** bez Basic Autha; staging je privremeno javno dostupan uz `noindex`:
+   - `/zdravlje` vraća 200;
+   - landing, registracija/prijava, red i WebSocket rade;
    - odigraj cijelu partiju u četiri odvojene pregledničke sesije, od reda do rezultata;
    - provjeri potez, odbijanje riječi, „Ne znam”, timer/eliminaciju, reakciju, povijest, bodove i povratak na novu igru;
    - ciljano provjeri svako područje koje je promjena dirala;

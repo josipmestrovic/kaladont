@@ -31,7 +31,7 @@ Početni razvoj i objava imaju jednog operatera:
 1. promjena nastaje na radnoj grani;
 2. otvara se Pull Request (PR);
 3. PR se spaja u `main` tek nakon zelenog CI-ja;
-4. merge automatski objavljuje staging;
+4. nakon mergea operater ručno ažurira staging punim GHCR digestom;
 5. operater provjerava staging;
 6. operater ručno pokreće produkcijski workflow s digestom koji je prošao staging.
 
