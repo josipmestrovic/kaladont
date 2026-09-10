@@ -13,6 +13,7 @@ export const PORUKE = {
   mrtvaSlovaIskoristeno: (dvaGrafema: string) =>
     `Sve riječi na '${dvaGrafema}' već su iskorištene u ovoj partiji.`,
   nijeTvojPotez: 'Nisi na potezu.',
+  sustavBiraRijec: 'Sustav bira novu riječ. Pričekaj trenutak.',
   prebrzo: 'Usporeni, molimo pričekaj trenutak.',
   vecURedu: 'Već si u redu čekanja.',
 } as const;

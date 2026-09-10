@@ -19,7 +19,7 @@ Postavka se sprema lokalno po browseru/uređaju u verzionirani ključ, primjeric
 
 Audio se diskretno aktivira nakon prve korisničke akcije. Ako browser blokira reprodukciju, igra nastavlja raditi bez greške; kontrola omogućuje ponovni pokušaj. Ne prikazuje se modal koji bi blokirao ulazak u igru.
 
-Primarna kontrola nalazi se u globalnom `Header.svelte`; ako header nije prisutan na lobbyju ili stolu, mora postojati diskretan fallback u pripadajućem game shellu.
+Kontrola zvuka prikazuje se na landingu i u `/postavke`; tijekom čekanja i aktivne partije nema kontrole koja bi odvlačila pažnju od igre.
 
 ## Matrica događaja
 
@@ -34,7 +34,7 @@ Primarna kontrola nalazi se u globalnom `Header.svelte`; ako header nije prisuta
 | Prihvaćena riječ | samo autoru poteza | potvrđujući ton | Ostali ne čuju tu potvrdu; njihov osobni signal dolazi kada je njihov red. |
 | Odbijena riječ | samo autoru poteza | neutralni error ton | Nikad ne svirati drugim igračima. |
 | `Ne znam` | nitko | nema zvuka | Vizualna potvrda je dovoljna. |
-| Red prijeđe na igrača | samo tom igraču | signal `tvoj red` | Jednom po prijelazu na njegov red. |
+| Red prijeđe na igrača | samo tom igraču | signal `tvoj red` | Jednom po prijelazu na njegov red. Vizualni puls prstena prikazuje se i na prvom potezu, ali bez dodatnog zvuka uz `pocetak-partije`. |
 | Eliminacija iz bilo kojeg razloga | svi u partiji | eliminacijski signal | Zajednički događaj; svi ga čuju jednom. |
 | Nova runda / otkrivena početna riječ | svi | reveal signal | Jednom kada se otvori nova runda, OSIM 1. runde partije (ta već ima početni signal `pocetak-partije`, ne preklapati). |
 | Reakcija igrača | nitko | nema zvuka | Emoji reakcije ostaju vizualne. |

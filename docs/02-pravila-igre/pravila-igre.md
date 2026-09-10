@@ -27,7 +27,7 @@ Da se ne bi moglo namjestiti ishod biranjem "ciljane" početne riječi (npr. oda
 Tijek otvaranja runde:
 
 1. Klijentima se prikaže 5-sekundni ekran s obrazloženjem zadnje eliminacije (ako postoji) i porukom „Sustav će sada nasumično odabrati novu riječ..." uz brojač/loading indikator. Tijekom ovih 5 sekundi nitko ne može igrati.
-2. Sustav nasumično odabere valjanu riječ iz rječnika koja **sama ima barem jedan slobodan (neiskorišten) nastavak** — čime je klopka u otvaranju strukturno nemoguća.
+2. Sustav nasumično odabere aktivnu **imeničku lemu u nominativu** kraću od 6 znakova koja **sama ima barem jedan slobodan (neiskorišten) nastavak**. Pool trenutno ima 3.821 riječi; ograničenje vrijedi samo za sustavovo otvaranje runde, ne i za riječi koje igrači smiju odigrati. Time je klopka u otvaranju strukturno nemoguća, a početne riječi ostaju kratke i poznatije.
 3. Riječ se objavljuje („Sustav je odabrao riječ: X") i red prelazi na **sljedećeg aktivnog igrača** nakon onoga tko je prouzročio otvaranje nove runde (napadača prethodne eliminacije, ili nasumičnog prvog igrača za 1. rundu). Tek tada kreće **30-sekundni timer** poteza.
 4. Igrač koji je sada na potezu odgovara na sustavovu riječ **kao na normalan nastavak** — ne bira on početnu riječ.
 
@@ -92,7 +92,7 @@ Redoslijed ispadanja određuje plasman: prvi ispali = 4. mjesto, zatim 3., pa 2.
 
 ## Nakon ispadanja
 
-Eliminirani igrač **ostaje za stolom kao promatrač** do kraja partije (uz gumb za izlaz). Promatrači vide sve poteze i mogu slati emoji reakcije, ali ne igraju.
+Eliminirani igrač **ostaje za stolom kao promatrač** do kraja partije. Promatrači vide sve poteze i mogu slati emoji reakcije, ali ne igraju.
 
 ## Komunikacija za stolom
 

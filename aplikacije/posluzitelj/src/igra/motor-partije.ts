@@ -292,7 +292,7 @@ export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje)
 
   function objaviRijecSustava(stanje: StanjeStola, napadac: string | null): void {
     stanje.izborHandle = null;
-    const autoRijec = rjecnik.nasumicnaValjanaRijec(stanje.iskoristeneGrupe);
+    const autoRijec = rjecnik.nasumicnaPocetnaImenickaRijec(stanje.iskoristeneGrupe);
     if (!autoRijec) {
       // ekstremni rubni slucaj (rjecnik iscrpljen) - sigurnosno zavrsi partiju
       zakljuciPartiju(stanje);
@@ -517,7 +517,10 @@ export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje)
         socket.emit('potez:odbijen', { kod: 'NIJE_TVOJ_POTEZ', poruka: PORUKE.nijeTvojPotez });
         return;
       }
-      if (stanje.izborUToku) return; // sustav trenutno bira rijec - potez se ne moze poslati
+      if (stanje.izborUToku) {
+        socket.emit('potez:odbijen', { kod: 'SUSTAV_BIRA_RIJEC', poruka: PORUKE.sustavBiraRijec });
+        return;
+      }
 
       const rijecNormalizirana = rijec.normalize('NFC').trim().toLowerCase();
       const trazenaSlova = stanje.trazenaSlova!;
@@ -557,18 +560,6 @@ export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje)
       if (sada - zadnja < 2000) return; // RS-22: tiho ignoriraj
       zadnjaReakcija.set(socket.id, sada);
       io.to(SOBA_PARTIJE(partijaId)).emit('reakcija:nova', { igracId: socket.data.igracId, poruka });
-    });
-
-    socket.on('partija:izadji', () => {
-      const partijaId = partijaPoIgracu.get(socket.data.igracId);
-      const stanje = partijaId ? partije.get(partijaId) : undefined;
-      if (!stanje || stanje.zavrsena) return;
-      const razlog: RazlogEliminacije = 'prekid';
-      eliminirajIgraca(stanje, socket.data.igracId, razlog);
-      // Igrač je svjesno napustio partiju (ne samo eliminiran) - ne smije više primati
-      // odigravanja/zvukove ostatka partije, niti da mu se stara partija vrati na sljedeći 'partija:stanje'.
-      socket.leave(SOBA_PARTIJE(partijaId!));
-      if (partijaPoIgracu.get(socket.data.igracId) === partijaId) partijaPoIgracu.delete(socket.data.igracId);
     });
 
     socket.on('disconnect', () => {

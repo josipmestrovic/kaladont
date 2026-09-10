@@ -15,7 +15,7 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 | Komponenta | Varijante | Stanja |
 |---|---|---|
 | Gumb | primary (mint), secondary (obrub), danger (crvena) | default, hover, disabled, loading |
-| Input tekst | jednoredni | default, focus, error (crveni obrub + poruka ispod) |
+| Input tekst | jednoredni | default, focus, error (crveni obrub, blaga podloga, podrhtavanje + poruka ispod) |
 | Avatar | 8 dizajna × s/bez GOST oznake | s borderom (10 varijanti po rangu), bez bordera |
 | RangBadge | 10 rangova + „Piskaralo" | — |
 | WordChip | riječ + istaknuta zadnja dva grafema (žuta krema) | — |
@@ -25,9 +25,9 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 
 | Komponenta | Opis |
 |---|---|
-| BrzaPorukaGumb | 4 varijante: 👋 Pozdrav!, 😅 Sorry!, 👏 Dobro odigrano!, 😎 Hvala |
-| CountdownRing | SVG prsten oko avatara, prazni se 30s, pulsira zadnjih 5s (crvena) |
-| SjedaloKartica | avatar + rang bedž + ime + (u /red: prosjek bodova, % pobjeda) |
+| IzbornikBrzihPoruka | Mali animirani izbornik sidren uz vlastito sjedalo; 4 okomite varijante: 👋 Prijatno, 😅 Nemoj zamjerit, 👏 Bravo!, 😎 Hvala |
+| CountdownRing | SVG prsten oko avatara, prazni se 30s, jače se oglasi pri dolasku reda i pulsira zadnjih 5 s (crvena) |
+| SjedaloKartica | avatar + rang bedž + ime + status; vlastito sjedalo jedna je klikabilna cjelina, a primljena reakcija nakratko podigne avatar |
 | Toast/Alert | uspjeh (mint), greška (crvena), info (neutralno) — auto-nestaje 2s ili traje dok se ne zatvori |
 | Modal/Dijalog | naslov + tijelo + 2 akcije (potvrdi/odustani) — koristi se za potvrdu izlaska i prijavu greške |
 | EliminacijaKartica | poruka + tko dobiva bod + gumb Prijavi |
@@ -36,7 +36,7 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 
 | Komponenta | Opis |
 |---|---|
-| Header | pozdrav, avatar+border, rang bedž, link ljestvica, gumb postavki i mute/volume kontrola — vidi ekrani.md §0 i [zvukovi.md](zvukovi.md) |
+| Header | pozdrav, avatar+border, rang bedž, link ljestvica i gumb postavki; kontrola zvuka prikazuje se samo na landingu i u postavkama |
 | Stol | ovalni vektorski stol + 4 SjedaloKartica u luku + WordChip u sredini + CountdownRing na aktivnom |
 | RedCekanjaPrikaz | 4 kružna mjesta, tekst stanja, prosjek čekanja |
 | PovijestLista | redak po potezu: runda, igrač, riječ/razlog, trajanje, gumb Prijavi |

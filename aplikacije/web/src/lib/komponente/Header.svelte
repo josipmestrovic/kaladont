@@ -4,6 +4,8 @@
   import Avatar from './Avatar.svelte';
   import AudioKontrola from './AudioKontrola.svelte';
 
+  let { prikaziAudio = false } = $props<{ prikaziAudio?: boolean }>();
+
   interface Profil {
     nadimak: string;
     avatarId: number;
@@ -14,15 +16,25 @@
   let profil = $state<Profil | null>(null);
   let jeGost = $state(true);
 
-  onMount(async () => {
-    try {
-      const odgovor = await api<Profil>('/profil');
-      profil = odgovor;
-      jeGost = !odgovor.email;
-    } catch {
-      // Neuspjelo dohvaćanje (npr. istekao token) - prikaži gosta bez rušenja stranice
-      jeGost = true;
-    }
+  onMount(() => {
+    const azurirajAvatar = (dogadaj: Event) => {
+      const avatarId = (dogadaj as CustomEvent<{ avatarId: number }>).detail.avatarId;
+      profil = profil ? { ...profil, avatarId } : profil;
+    };
+    window.addEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
+
+    void (async () => {
+      try {
+        const odgovor = await api<Profil>('/profil');
+        profil = odgovor;
+        jeGost = !odgovor.email;
+      } catch {
+        // Neuspjelo dohvaćanje (npr. istekao token) - prikaži gosta bez rušenja stranice
+        jeGost = true;
+      }
+    })();
+
+    return () => window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
   });
 </script>
 
@@ -38,7 +50,9 @@
   <div class="desno">
     <a href="/" class="link">Početna</a>
     <a href="/ljestvica" class="link">Ljestvica</a>
-    <AudioKontrola />
+    {#if prikaziAudio}
+      <AudioKontrola />
+    {/if}
     {#if profil}
       <Avatar avatarId={profil.avatarId} rang={profil.rang} gost={jeGost} velicina={32} />
     {/if}

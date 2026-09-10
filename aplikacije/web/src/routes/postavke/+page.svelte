@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { BROJ_AVATARA } from '$lib/avatari.js';
+  import { AVATARI } from '$lib/avatari.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
 
   interface Profil {
@@ -58,6 +58,7 @@
     try {
       await api('/profil/avatar', { method: 'PUT', body: JSON.stringify({ avatarId }) });
       profil = { ...profil, avatarId };
+      window.dispatchEvent(new CustomEvent('kaladont:avatar-promijenjen', { detail: { avatarId } }));
     } catch (e) {
       greska = e instanceof Error ? e.message : 'Neuspjelo spremanje avatara.';
     } finally {
@@ -101,15 +102,16 @@
 {:else if profil}
   <h2>Avatar</h2>
   <div class="avatar-grid">
-    {#each Array.from({ length: BROJ_AVATARA }, (_, i) => i) as avatarId (avatarId)}
+    {#each AVATARI as avatar (avatar.id)}
       <button
         type="button"
         class="avatar-opcija"
-        class:odabran={profil.avatarId === avatarId}
+        class:odabran={profil.avatarId === avatar.id}
         disabled={spremaSe}
-        onclick={() => odaberiAvatar(avatarId)}
+        aria-label={`Odaberi ${avatar.naziv}`}
+        onclick={() => odaberiAvatar(avatar.id)}
       >
-        <Avatar {avatarId} velicina={56} />
+        <Avatar avatarId={avatar.id} velicina={56} />
       </button>
     {/each}
   </div>
@@ -142,7 +144,7 @@
 
   <h2>Promjena emaila</h2>
   <form onsubmit={promijeniEmail}>
-    <label>Trenutni email: {profil.email}</label>
+    <p>Trenutni email: {profil.email}</p>
     <label>Novi email <input type="email" bind:value={noviEmail} required /></label>
     <label>Lozinka (potvrda) <input type="password" bind:value={lozinkaZaEmail} required /></label>
     <button type="submit">Promijeni email</button>

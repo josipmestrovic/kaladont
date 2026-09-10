@@ -8,7 +8,7 @@
 
   let { children } = $props();
 
-  // Landing i aktivna partija imaju vlastito zaglavlje.
+  // Landing, čekaonica i aktivna partija imaju vlastito zaglavlje.
   const bezHeadera = $derived(
     $page.url.pathname === '/' ||
       $page.url.pathname === '/red' ||
@@ -22,8 +22,8 @@
 
 <div class="stranica">
   {#if !bezHeadera}
-    <Header />
-  {:else}
+    <Header prikaziAudio={$page.url.pathname === '/postavke'} />
+  {:else if $page.url.pathname === '/'}
     <AudioKontrola plutaj />
   {/if}
   {@render children()}

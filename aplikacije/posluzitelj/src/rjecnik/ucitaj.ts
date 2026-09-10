@@ -29,12 +29,13 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
   // motor-partije.ts već drži na ovaj objekt (closures ispod vide novo stanje odmah)
   let rijecGrupe = new Map<string, string | readonly string[]>();
   let poPrefiksu = new Map<string, string[]>();
-  let sviOblici: string[] = [];
+  let pocetneImenickeRijeci: string[] = [];
   let kategorije: KategorijaRjecnika[] = [];
 
   async function ucitaj(): Promise<void> {
     const novoRijecGrupe = new Map<string, string | readonly string[]>();
     const novoPoPrefiksu = new Map<string, string[]>();
+    const novePocetneImenickeRijeci: string[] = [];
     const noviBrojPoVrsti = new Map<VrstaRijeci, number>();
     const kanon = new Map<string, string>();
     const kanoniziraj = (vrijednost: string): string => {
@@ -58,6 +59,9 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
       for (const redak of stranica) {
         const grupe = redak.grupe.map(kanoniziraj);
         novoRijecGrupe.set(redak.rijec, grupe.length === 1 ? grupe[0]! : grupe);
+        if (redak.rijec.length < 6 && grupe.includes(`imenica:${redak.rijec}`)) {
+          novePocetneImenickeRijeci.push(redak.rijec);
+        }
         const kljucPrefiksa = kanoniziraj(redak.prvaDva);
         const lista = novoPoPrefiksu.get(kljucPrefiksa);
         if (lista) lista.push(redak.rijec);
@@ -71,7 +75,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
 
     rijecGrupe = novoRijecGrupe;
     poPrefiksu = novoPoPrefiksu;
-    sviOblici = [...novoRijecGrupe.keys()];
+    pocetneImenickeRijeci = novePocetneImenickeRijeci;
     kategorije = [...noviBrojPoVrsti.entries()]
       .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
       .sort((a, b) => b.brojOblika - a.brojOblika);
@@ -109,14 +113,13 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     grupeZa,
     postojeRijeciNa: (dvaGrafema) => (poPrefiksu.get(dvaGrafema)?.length ?? 0) > 0,
     imaSlobodnuRijecNa,
-    nasumicnaValjanaRijec: (iskoristeneGrupe) => {
-      // Nasumično sondiranje umjesto kopije cijelog skupa (1,2 M riječi): potrošeni dio
-      // rječnika je u partiji zanemariv, pa prvi pogodak gotovo uvijek prolazi.
-      const ukupno = sviOblici.length;
+    nasumicnaPocetnaImenickaRijec: (iskoristeneGrupe) => {
+      // Početne riječi ograničene su na kratke imeničke leme; potrošeni dio poola je u partiji zanemariv.
+      const ukupno = pocetneImenickeRijeci.length;
       if (ukupno === 0) return null;
       const pomak = Math.floor(Math.random() * ukupno);
       for (let i = 0; i < ukupno; i += 1) {
-        const rijec = sviOblici[(pomak + i) % ukupno]!;
+        const rijec = pocetneImenickeRijeci[(pomak + i) % ukupno]!;
         if (!jeIgriva(rijec, iskoristeneGrupe)) continue;
         const nakonOdabira = new Set(iskoristeneGrupe);
         for (const grupa of grupeZa(rijec)) nakonOdabira.add(grupa);

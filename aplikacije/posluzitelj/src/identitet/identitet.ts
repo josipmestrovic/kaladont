@@ -11,8 +11,8 @@ import { jePotpisaniToken, provjeriSesijskiToken } from '../racuni/tokeni.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Broj predefiniranih vektorskih avatara (vidi docs/05-ux-ui/vizualni-identitet.md). */
-export const BROJ_AVATARA = 8;
+/** Broj statičkih avatara dostupnih u web katalogu. */
+export const BROJ_AVATARA = 9;
 
 export function jeValjaniToken(token: unknown): token is string {
   return typeof token === 'string' && (UUID_REGEX.test(token) || jePotpisaniToken(token));

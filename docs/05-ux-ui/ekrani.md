@@ -54,27 +54,21 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Desktop **nije** zaseban l
 
 Raspored (portret):
 
-- **Vrh:** četiri avatara u luku (protivnici) — krug, ime, značka ranga; eliminirani posive uz oznaku plasmana.
-- **Aktivni igrač:** oko njegova avatara **crveni prsten koji se prazni** sinkrono s 30-sekundnim odbrojavanjem (SVG stroke, izvor vremena `istekPotezaIso`). Zadnjih 5 s prsten pulsira. **Slojevi oko avatara, redom od avatara prema van: avatar → crveni timer prsten → rang-border prsten.** Timer prsten mora biti vizualno ispred (iznad) rang-bordera, ne iza njega — mora se vidjeti neovisno o rangu igrača.
-- **Sredina stola:** prethodna riječ velikim slovima s posljednja **dva grafema otisnuta žutom kremom** (npr. medenj**AK** → traži se „ak"; k**ONJ** → traži se „onj", jer su o + nj dva grafema) + natpis „Riječ na: ONJ".
+- **Vrh:** četiri avatara u luku (protivnici) — krug, ime, značka ranga; eliminirani posive uz oznaku plasmana. Vlastito sjedalo, uključujući avatar, ime i status ispod njega, jedna je klikabilna cjelina koja otvara izbornik brzih poruka; protivnička sjedala nisu interaktivna.
+- **Aktivni igrač:** oko njegova avatara **crveni prsten koji se prazni** sinkrono s 30-sekundnim odbrojavanjem (SVG stroke, izvor vremena `istekPotezaIso`). Prsten napravi jedan jači vizualni puls kada igrač dobije red, uključujući prvi potez partije. Zadnjih 5 s prsten pulsira, a zadnje 3 s avatar se vrlo blago pomiče lijevo-desno. **Slojevi oko avatara, redom od avatara prema van: avatar → crveni timer prsten → rang-border prsten.** Timer prsten mora biti vizualno ispred (iznad) rang-bordera, ne iza njega — mora se vidjeti neovisno o rangu igrača.
+- **Sredina stola:** prethodna riječ velikim slovima s posljednja **dva grafema otisnuta žutom kremom** (npr. medenj**AK** → traži se „ak"; k**ONJ** → traži se „onj", jer su o + nj dva grafema) + natpis „Riječ na: ONJ". Tekstualni opis odigrane riječi i obavijesti o eliminaciji prikazuju se ispod zone akcija kako ne bi pomicali unos.
 - **Otvaranje runde (sustav bira riječ):** na početku partije, nakon svake eliminacije i nakon kaladont-efekta prikazuje se **5-sekundni cjelozaslonski ekran** na svijetloj podlozi — sve ostalo (ploča, unos) nestaje. Sadržaj: obrazloženje zadnje eliminacije (ako postoji, ista rečenica kao inače uz eliminaciju), zatim tekst „Sustav će sada nasumično odabrati novu riječ..." s brojačem 5→0 (obavezan brojač ili loading indikator). Po isteku, ekran nestaje i ploča prikazuje otkrivenu riječ kao običan „zadnji potez" autora **Sustav** (isti prikaz kao za bilo koji odigrani potez), a igrač na potezu odgovara na nju kao na normalan nastavak.
-- **Dno (zona na potezu):** polje za upis (autofokus, hrvatska tipkovnica), gumb pošalji; ispod diskretni gumb **„Ne znam riječ na 'XY'"** → potvrda „Sigurno predaješ?" (štiti od slučajnog klika).
-- **Traka brzih poruka:** 4 predefinirane fraze (tekst + emoji, ne slobodan upis — izbjegava moderaciju): 👋 „Pozdrav!", 😅 „Sorry!", 👏 „Dobro odigrano!", 😎 „Hvala". Poruka doleti iznad avatara pošiljatelja i nestane (1 po 2 s); rate limit 1 poruka / 2 s.
-- **Gumb povijesti** (ikona sata): bočna ploha s kronologijom poteza dosadašnje partije.
-- **Gumb izlaska** (ikona vrata, gornji kut): napušta partiju.
-  - Aktivan igrač (bilo na potezu, bilo čeka red) → potvrda „Sigurno izlaziš? Bit ćeš eliminiran/eliminirana." prije slanja `partija:izadji` — nakon potvrde tretira se identično postojećem samoeliminacija-prekidom toku (RS-09/RS-10), bez promjene bodovanja.
-  - Promatrač (već eliminiran) → izlazi **bez potvrde** (nema više posljedica po bodove).
+- **Dno (zona na potezu):** polje za upis (autofokus, hrvatska tipkovnica, najviše 31 znak) i gumb pošalji. Na širini od 500 px naviše stoje u istom retku, pri čemu unos zauzima 70 %, a gumb 30 % širine; na užim zaslonima gumb je ispod unosa pune širine.
+- **Izbornik brzih poruka:** klik, Enter ili Space na **vlastitom sjedalu** otvara mali animirani izbornik s četiri predefinirane poruke (tekst + emoji, ne slobodan upis — izbjegava moderaciju): 👋 „Prijatno", 😅 „Nemoj zamjerit", 👏 „Bravo!", 😎 „Hvala". Opcije su prikazane jedna ispod druge radi čitljivosti. Izabrana poruka doleti iznad avatara pošiljatelja i nakratko podigne njegov avatar, zatim nestane (1 po 2 s); rate limit je 1 poruka / 2 s.
+- **Povijest poteza:** u prvoj izvedbi dostupna je nakon završetka partije, kako se tijekom brzog tijeka poteza ne bi prekidalo praćenje stola. Bočna ploha tijekom aktivne partije ostaje planirana nadogradnja.
 
-Stanja i povratne informacije:
-
-| Događaj          | Prikaz                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Odbijena riječ   | Polje zadrhti + poruka razloga (crveno, 2 s); vrijeme vidljivo teče dalje                                           |
+| Odbijena riječ   | Polje se pri svakom odbijanju zatrese i kratko dobije crveni rub i podlogu + poruka razloga (crveno, 2 s) ispod zone akcija; vrijeme vidljivo teče dalje |
 | Prihvaćena riječ | Riječ „odleti" na sredinu stola; red prelazi dalje                                                                  |
 | Eliminacija      | Preko stola kratka kartica: „Ana je ispala — nema riječi na 'onj'!" + tko dobiva bod                                |
 | Nova runda       | „Boris otvara novu rundu" + prsten na Borisu                                                                        |
-| Ja eliminiran    | Kartica s razlogom; ako je razlog „u bazi nemamo riječ na 'XY'" → **gumb Prijavi** odmah tu; prelazim u promatranje |
-| Promatram        | Traka „Promatraš partiju" + gumb „Napusti stol" (bez potvrde); poruke i povijest i dalje rade                       |
+| Ja eliminiran    | Kartica s razlogom; prelazim u promatranje                                                                          |
+| Promatram        | Traka „Promatraš partiju"; poruke i povijest i dalje rade                                                          |
 
 ## 4. Kraj partije (`/partija/:id/kraj`)
 
@@ -86,7 +80,7 @@ Stanja i povratne informacije:
 
 - Kronološki popis: runda, igrač, riječ (ili „Ne znam"/istek/prekid), tražena slova, trajanje razmišljanja.
 - Uz svaki potez gumb **„Prijavi grešku"** → obrazac s porukom (potez i partija vežu se automatski).
-- Dostupno i tijekom partije (bočna ploha na stolu) i trajno nakon nje.
+- U prvoj izvedbi dostupno trajno nakon završetka partije. Bočna ploha tijekom aktivne partije planirana je za kasniju nadogradnju.
 
 ## 6. Registracija / Prijava (`/racun`)
 
@@ -102,7 +96,7 @@ Stanja i povratne informacije:
 
 ## 7a. Postavke (`/postavke`) — samo registrirani
 
-- **Izbor avatara:** 8 ponuđenih apstraktnih vektorskih dizajna, klik odmah sprema (`PUT /profil/avatar`).
+- **Izbor avatara:** ponuđeni avatari iz statičkog kataloga slika, klik odmah sprema (`PUT /profil/avatar`) i odmah ažurira prikaz bez ručnog osvježavanja.
 - **Border** se NE bira ovdje — prikazan je informativno („Trenutni border: Riječarac — sljedeći se otključava na rangu Jezičar") jer se dodjeljuje automatski prema trenutnom rangu.
 - **Povijest partija:** popis proteklih partija (plasman, bodovi, datum) — isti podaci kao trenutno na `/povijest`, ovdje dostupno kao dio jednog panela za upravljanje računom.
 - **Detaljna statistika:** partije, pobjede (%), eliminacije po partiji, ukupni bodovi, prosjek, trenutni rang i napredak do sljedećeg (isti podaci kao `/profil`, konsolidirano ovdje).

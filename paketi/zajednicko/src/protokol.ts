@@ -66,7 +66,7 @@ export interface PrihvacenPotez {
 }
 
 export interface OdbijenPotez {
-  kod: 'RIJEC_NE_POSTOJI' | 'KRIVA_SLOVA' | 'RIJEC_ISKORISTENA' | 'NIJE_TVOJ_POTEZ';
+  kod: 'RIJEC_NE_POSTOJI' | 'KRIVA_SLOVA' | 'RIJEC_ISKORISTENA' | 'NIJE_TVOJ_POTEZ' | 'SUSTAV_BIRA_RIJEC';
   poruka: string;
 }
 
@@ -136,7 +136,6 @@ export interface DogadajiKlijentPoslužitelj {
   'potez:rijec': (payload: PayloadPotezRijec) => void;
   'potez:ne-znam': () => void;
   'reakcija:posalji': (payload: PayloadReakcijaPosalji) => void;
-  'partija:izadji': () => void;
 }
 
 /** Mapa svih događaja poslužitelj -> klijent, za tipiziranu upotrebu Socket.IO. */

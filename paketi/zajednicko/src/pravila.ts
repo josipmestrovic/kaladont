@@ -50,8 +50,8 @@ export interface RjecnikSucelje {
   postojeRijeciNa(dvaGrafema: string): boolean;
   /** Postoji li još igriva riječ (nijedna njena grupa potrošena) koja počinje na ova dva grafema. */
   imaSlobodnuRijecNa(dvaGrafema: string, iskoristeneGrupe: ReadonlySet<string>): boolean;
-  /** Nasumična igriva riječ koja sama ima slobodan nastavak (otvaranje runde). Null ako nema kandidata. */
-  nasumicnaValjanaRijec(iskoristeneGrupe: ReadonlySet<string>): string | null;
+  /** Nasumična igriva imenička lema u nominativu kraća od 6 znakova sa slobodnim nastavkom (otvaranje runde). */
+  nasumicnaPocetnaImenickaRijec(iskoristeneGrupe: ReadonlySet<string>): string | null;
 }
 
 export type KodOdbijenogPoteza = 'RIJEC_NE_POSTOJI' | 'KRIVA_SLOVA' | 'RIJEC_ISKORISTENA';

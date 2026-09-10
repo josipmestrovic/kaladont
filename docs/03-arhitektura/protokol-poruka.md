@@ -25,7 +25,6 @@ Poslužitelj razrješava identitet (ili stvara novog gosta) i veže socket uz `i
 | `potez:rijec` | `{ rijec: string }` | Pokušaj poteza |
 | `potez:ne-znam` | `{}` | Predaja poteza (klijent traži potvrdu prije slanja) |
 | `reakcija:posalji` | `{ poruka: BrzaPoruka }` | Predefinirana brza poruka (rate limit 1/2 s) |
-| `partija:izadji` | `{}` | Napuštanje stola (aktivni igrač = predaja, klijent traži potvrdu prije slanja; promatrač = izlaz bez potvrde) |
 
 ```ts
 type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
@@ -110,7 +109,7 @@ interface PrihvacenPotez {
 }
 
 interface OdbijenPotez {
-  kod: "RIJEC_NE_POSTOJI" | "KRIVA_SLOVA" | "RIJEC_ISKORISTENA" | "NIJE_TVOJ_POTEZ";
+  kod: "RIJEC_NE_POSTOJI" | "KRIVA_SLOVA" | "RIJEC_ISKORISTENA" | "NIJE_TVOJ_POTEZ" | "SUSTAV_BIRA_RIJEC";
   poruka: string;              // spreman UI tekst na hrvatskom
 }
 
@@ -143,6 +142,6 @@ type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "INTERNA";
 
 1. **Server je sat.** Klijent prikazuje odbrojavanje prema `istekPotezaIso`, ali presudu donosi isključivo server (RS-14).
 2. **Resinkronizacija:** nakon svakog ponovnog spajanja klijent dobiva `partija:stanje` ili `red:stanje` — UI se uvijek može obnoviti iz jedne poruke.
-3. **Promatrači** (eliminirani igrači) primaju sve događaje stola; smiju slati samo `reakcija:posalji` i `partija:izadji`.
+3. **Promatrači** (eliminirani igrači) primaju sve događaje stola i smiju slati `reakcija:posalji`.
 4. **Idempotentnost:** ponovljeni `red:udji` dok je igrač već u redu vraća `greska { kod: "VEC_U_REDU" }` bez nuspojava.
 5. Svaka poruka poslužitelja nosi spreman hrvatski tekst (`poruka`) — klijent ne sastavlja poruke pravila sam.

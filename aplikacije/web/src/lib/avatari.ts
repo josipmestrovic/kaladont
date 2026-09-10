@@ -1,27 +1,17 @@
-/**
- * Definicije 8 avatara (apstraktni oblik + boje) i 10 border boja po rangu,
- * usklađeno s Figma "Avatari"/"Borderi" komponentama (docs/05-ux-ui/vizualni-identitet.md).
- */
-export const BROJ_AVATARA = 8;
+/** Statički katalog avatara; novi avatar dodaje se ovdje i u static/avatari. */
+export const AVATARI = [
+  { id: 0, putanja: '/avatari/avatar-borat-1.jpg', naziv: 'Borat 1' },
+  { id: 1, putanja: '/avatari/avatar-borat-2.jpg', naziv: 'Borat 2' },
+  { id: 2, putanja: '/avatari/avatar-cage-1.jpg', naziv: 'Cage' },
+  { id: 3, putanja: '/avatari/avatar-test-1.jpg', naziv: 'Avatar 4' },
+  { id: 4, putanja: '/avatari/avatar-test-2.jpg', naziv: 'Avatar 5' },
+  { id: 5, putanja: '/avatari/avatar-test-3.jpg', naziv: 'Avatar 6' },
+  { id: 6, putanja: '/avatari/avatar-test-4.jpg', naziv: 'Avatar 7' },
+  { id: 7, putanja: '/avatari/avatar-test-5.jpg', naziv: 'Avatar 8' },
+  { id: 8, putanja: '/avatari/avatar-test-6.jpg', naziv: 'Avatar 9' },
+] as const;
 
-export type OblikSimbola = 'krug' | 'trokut' | 'kvadrat' | 'zvijezda' | 'romb' | 'poligon';
-
-export interface DizajnAvatara {
-  bg: string;
-  simbol: string;
-  oblik: OblikSimbola;
-}
-
-export const DIZAJNI_AVATARA: readonly DizajnAvatara[] = [
-  { bg: '#2FA98C', simbol: '#FAF3E3', oblik: 'krug' },
-  { bg: '#E4572E', simbol: '#F4C95D', oblik: 'trokut' },
-  { bg: '#F4C95D', simbol: '#26221B', oblik: 'kvadrat' },
-  { bg: '#1D6F5C', simbol: '#FAF3E3', oblik: 'zvijezda' },
-  { bg: '#7A7264', simbol: '#F4C95D', oblik: 'krug' },
-  { bg: '#26221B', simbol: '#2FA98C', oblik: 'romb' },
-  { bg: '#FAF3E3', simbol: '#E4572E', oblik: 'trokut' },
-  { bg: '#2FA98C', simbol: '#26221B', oblik: 'poligon' },
-];
+export const BROJ_AVATARA = AVATARI.length;
 
 const BOJE_BORDERA: Record<string, string> = {
   Prvopisac: '#8C8C8C',
@@ -36,8 +26,12 @@ const BOJE_BORDERA: Record<string, string> = {
   Kaladont: '#E4572E',
 };
 
-export function dizajnAvatara(avatarId: number): DizajnAvatara {
-  return DIZAJNI_AVATARA[avatarId % DIZAJNI_AVATARA.length]!;
+export function putanjaAvatara(avatarId: number): string {
+  return AVATARI.find((avatar) => avatar.id === avatarId)?.putanja ?? AVATARI[0].putanja;
+}
+
+export function nazivAvatara(avatarId: number): string {
+  return AVATARI.find((avatar) => avatar.id === avatarId)?.naziv ?? 'Avatar';
 }
 
 export function bojaBordera(rang: string | null): string | null {

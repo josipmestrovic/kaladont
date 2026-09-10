@@ -22,7 +22,7 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | id | uuid PK | Trajni identitet (gost ga čuva u localStorage) |
 | vrsta | enum: `gost`, `registriran`, `admin` | |
 | nadimak | text | Generiran za goste (npr. VeseliJež42); jedinstven za registrirane |
-| avatar_id | smallint | 0–7, jedan od 8 predefiniranih avatara; nasumično dodijeljen pri stvaranju, promjenjivo samo za registrirane |
+| avatar_id | smallint | Stabilni ID avatara iz statičkog kataloga web aplikacije; nasumično dodijeljen pri stvaranju, promjenjivo samo za registrirane |
 | email | text, null | Samo registrirani; jedinstven |
 | lozinka_hash | text, null | argon2id |
 | email_potvrdjen | boolean | |

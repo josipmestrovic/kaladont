@@ -403,5 +403,37 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
 
     for (const igrac of igraci) igrac.socket.disconnect();
   });
+
+  it('RS-22: emitira reakciju cijeloj sobi, a drugu unutar dvije sekunde tiho ignorira', async () => {
+    const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
+    const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
+    for (const igrac of igraci) igrac.socket.emit('red:udji');
+    await rundaPromise;
+
+    const reakcijePromise = Promise.all(
+      igraci.map(
+        (igrac) =>
+          new Promise<{ igracId: string; poruka: string }>((resolve) => {
+            igrac.socket.once('reakcija:nova', resolve);
+          }),
+      ),
+    );
+    igraci[0]!.socket.emit('reakcija:posalji', { poruka: 'pozdrav' });
+
+    const reakcije = await reakcijePromise;
+    for (const reakcija of reakcije) {
+      expect(reakcija).toEqual({ igracId: igraci[0]!.token, poruka: 'pozdrav' });
+    }
+
+    let drugaReakcijaStigla = false;
+    igraci[1]!.socket.once('reakcija:nova', () => {
+      drugaReakcijaStigla = true;
+    });
+    igraci[0]!.socket.emit('reakcija:posalji', { poruka: 'sorry' });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(drugaReakcijaStigla).toBe(false);
+
+    for (const igrac of igraci) igrac.socket.disconnect();
+  });
 });
 

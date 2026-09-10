@@ -37,7 +37,6 @@
 
 <h2>Ispadanje</h2>
 <ul>
-  <li><strong>Ne znam</strong> — klik na gumb „Ne znam riječ na 'XY'" (uz potvrdu)</li>
   <li><strong>Istek vremena</strong> — 30 sekundi prošlo bez valjane riječi</li>
   <li><strong>Mrtva slova</strong> — na tražena dva grafema ne postoji nijedna dostupna riječ</li>
   <li><strong>Prekid veze</strong> — trenutna eliminacija ako je prekid bio na tvom potezu</li>

@@ -8,9 +8,10 @@
   interface Props {
     istekIso: string;
     velicina?: number;
+    promijeniNemirAvatara?: (nemiran: boolean) => void;
   }
 
-  const { istekIso, velicina = 56 }: Props = $props();
+  const { istekIso, velicina = 56, promijeniNemirAvatara = () => undefined }: Props = $props();
   const TRAJANJE_MS = 30_000;
   const POLUMJER = 46;
   const OPSEG = 2 * Math.PI * POLUMJER;
@@ -28,6 +29,12 @@
   });
 
   const pulsira = $derived(preostaliUdio > 0 && preostaliUdio < 5 / 30);
+  const avatarJeNemiran = $derived(preostaliUdio > 0 && preostaliUdio < 3 / 30);
+
+  $effect(() => {
+    promijeniNemirAvatara(avatarJeNemiran);
+    return () => promijeniNemirAvatara(false);
+  });
 
   $effect(() => {
     if (pulsira && !pulsPusten) {
@@ -38,7 +45,7 @@
 </script>
 
 <svg
-  class="timer-prsten"
+  class="timer-prsten ulazni-puls"
   class:pulsira
   viewBox="0 0 100 100"
   width={velicina}
@@ -75,8 +82,29 @@
     animation: timer-puls 0.6s ease-in-out infinite;
   }
 
+  .timer-prsten.ulazni-puls {
+    animation: timer-ulaz 0.7s ease-out both;
+  }
+
+  .timer-prsten.ulazni-puls.pulsira {
+    animation: timer-puls 0.6s ease-in-out infinite;
+  }
+
   @keyframes timer-puls {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+  }
+
+  @keyframes timer-ulaz {
+    0% { opacity: 0.2; transform: scale(0.82); }
+    55% { opacity: 1; transform: scale(1.12); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .timer-prsten.ulazni-puls,
+    .timer-prsten.ulazni-puls.pulsira {
+      animation: none;
+    }
   }
 </style>

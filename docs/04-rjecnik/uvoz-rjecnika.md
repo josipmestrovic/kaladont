@@ -59,6 +59,8 @@ Za svaki oblik: pohlepno parsiranje digrafa (dž, lj, nj) uz **listu iznimaka** 
 
 Uz to se za svaki redak izračunava **ključ leksemske grupe** iz leme: `vrsta:lema`, a za pridjeve i priloge `vrsta:lema:stupanj` (stupanj iz `Degree=Cmp/Sup`, inače pozitiv). Oblik koji pripada većem broju kategorija dobiva **uniju** grupa u stupcu `grupe` (vidi [pravila-igre.md](../02-pravila-igre/pravila-igre.md#leksemske-grupe-zabrana-ponavljanja)).
 
+Pri učitavanju u memoriju poslužitelj iz tih grupa izvodi zaseban pool za otvaranje runde: aktivne oblike s grupom `imenica:<riječ>` i manje od 6 znakova. To su imeničke leme u nominativu; pool se ne sprema u zasebnu tablicu niti ograničava valjanost poteza igrača.
+
 ### 5. Upis u bazu
 
 - **Grupni UPSERT** (chunkovi po ~1000 redaka unutar transakcija) — 1,2 milijuna oblika mora proći u minutama, ne satima.

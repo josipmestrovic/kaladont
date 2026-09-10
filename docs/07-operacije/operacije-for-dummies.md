@@ -12,7 +12,12 @@ Autoritativne odluke su u [ADR-u 014](../03-arhitektura/odluke/014-operativni-mo
 
 ## 1. Kako koristiti ovaj vodič
 
-Za svakodnevni ritam izdanja, digest, status release kandidata i staging closed test checklist koristi [release shemu](release-shema.md). Ovaj vodič ostaje širi put od praznog VPS-a do produkcije.
+Za svaku novu objavu postoje dva različita postupka:
+
+1. [Objava staginga za početnike](objava-staginga-za-pocetnike.md) je svakodnevni runbook za već postavljeni staging. Koristi se za provjeru promjena, direktni push na `main`, ručnu migraciju staging baze, provjeru nove verzije i rollback staging aplikacije.
+2. [Release shema](release-shema.md) definira identitet digesta, statuse releasea i evidenciju.
+
+Ovaj dokument ostaje širi vodič od praznog VPS-a do produkcije, uključujući početnu postavu, backup, recovery i ciljano produkcijsko stanje. Produkcija nije dio svakodnevnog staging postupka.
 
 ### Oznake
 
