@@ -41,6 +41,25 @@ interface AudioPostavke {
   utišano: boolean;
 }
 
+// UI feedback (klik/hover) je najucestaliji i najlakse zamara - stisan na 30% (-70%); ostalo na 60% (-40%).
+const POJACANJE_PO_DOGADAJU: Record<AudioDogadaj, number> = {
+  'ulazak-u-sobu': 0.6,
+  'izlazak-iz-sobe': 0.6,
+  'odbrojavanje-single-count-sound': 0.6,
+  'pocetak-partije': 0.6,
+  'potez-prihvacen': 0.6,
+  'potez-odbijen-1': 0.6,
+  'potez-odbijen-2': 0.6,
+  'potez-odbijen-3': 0.6,
+  'tvoj-red': 0.6,
+  eliminacija: 0.6,
+  'nova-runda': 0.6,
+  'partija-kraj': 0.6,
+  'pred-istek-vremena': 0.6,
+  'klik-misa': 0.3,
+  'hover-efekt': 0.3,
+};
+
 const zadanePostavke: AudioPostavke = { volumen: 0.65, utišano: false };
 export const audioPostavke = writable<AudioPostavke>(zadanePostavke);
 
@@ -98,7 +117,7 @@ function preucitajKriticneZvukove(): void {
 export function pustiAudio(dogadaj: AudioDogadaj): void {
   if (typeof window === 'undefined' || !aktiviran || postavke.utišano || postavke.volumen <= 0) return;
   const zvuk = ucitajZvuk(dogadaj);
-  zvuk.volume = postavke.volumen;
+  zvuk.volume = postavke.volumen * POJACANJE_PO_DOGADAJU[dogadaj];
   zvuk.currentTime = 0;
   void zvuk.play().catch(() => undefined);
 }
