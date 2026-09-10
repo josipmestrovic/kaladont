@@ -4,6 +4,7 @@
   import { page } from '$app/stores';
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import Header from '$lib/komponente/Header.svelte';
+  import AudioKontrola from '$lib/komponente/AudioKontrola.svelte';
 
   let { children } = $props();
 
@@ -22,6 +23,8 @@
 <div class="stranica">
   {#if !bezHeadera}
     <Header />
+  {:else}
+    <AudioKontrola plutaj />
   {/if}
   {@render children()}
 </div>

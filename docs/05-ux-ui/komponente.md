@@ -36,7 +36,7 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 
 | Komponenta | Opis |
 |---|---|
-| Header | pozdrav, avatar+border, rang bedž, link ljestvica, gumb postavki — vidi ekrani.md §0 |
+| Header | pozdrav, avatar+border, rang bedž, link ljestvica, gumb postavki i mute/volume kontrola — vidi ekrani.md §0 i [zvukovi.md](zvukovi.md) |
 | Stol | ovalni vektorski stol + 4 SjedaloKartica u luku + WordChip u sredini + CountdownRing na aktivnom |
 | RedCekanjaPrikaz | 4 kružna mjesta, tekst stanja, prosjek čekanja |
 | PovijestLista | redak po potezu: runda, igrač, riječ/razlog, trajanje, gumb Prijavi |

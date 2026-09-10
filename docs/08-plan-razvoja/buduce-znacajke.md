@@ -20,7 +20,7 @@ Ništa odavde ne ulazi u MVP. Redoslijed će odrediti stvarni podaci ([metrike-u
 
 ## Srednji prioritet
 
-- **Zvukovi** (tik-tak zadnjih 5 s, zvuk eliminacije) s gumbom za isključenje.
+- **Suptilni zvukovi** — bez pozadinske glazbe: ulazak/izlazak, svaka sekunda čekaonice + početak partije, upozorenje pred istek poteza, osobni potezi/red te zajednički eliminacija, nova runda i kraj partije (tek na prikazu konačnih rezultata), plus UI klik/hover na gumbima; `mute + slider` spremljen po uređaju. Specifikacija: [zvukovi.md](../05-ux-ui/zvukovi.md). Implementirano.
 - **Tamna tema** — druga paleta identiteta.
 - **Statistika riječi** na profilu: najdulja riječ, omiljeni završetci, „kaladont" izvedbe.
 - **Oporavak gost-računa** vezanjem emaila bez pune registracije.

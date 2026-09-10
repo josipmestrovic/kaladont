@@ -3,6 +3,7 @@
  * jer partija:pocetak stiže dok je korisnik još na /red, prije nego /partija/[id] postoji.
  */
 import type { Eliminacija, KrajPartije, PocetakPartije, StanjePartije } from 'zajednicko';
+import { pustiAudio, type AudioDogadaj } from './audio-manager.js';
 import { dohvatiSocket } from './socket.js';
 
 interface StanjeIgre {
@@ -43,6 +44,13 @@ const stanje = $state<StanjeIgre>({
 });
 
 let pokrenuto = false;
+let brojOdbijenihNaPotezu = 0;
+
+function pustiOdbijanje(): void {
+  brojOdbijenihNaPotezu += 1;
+  const redniBroj = brojOdbijenihNaPotezu <= 2 ? 1 : brojOdbijenihNaPotezu <= 4 ? 2 : 3;
+  pustiAudio(`potez-odbijen-${redniBroj}` as AudioDogadaj);
+}
 
 function primijeniStanjePartije(p: StanjePartije): void {
   stanje.partijaId = p.partijaId;
@@ -65,6 +73,7 @@ export function pokreniSlusateljeIgre(): void {
   const socket = dohvatiSocket();
 
   socket.on('partija:pocetak', (p) => {
+    brojOdbijenihNaPotezu = 0;
     stanje.partijaId = p.partijaId;
     stanje.mojIgracId = p.mojIgracId;
     stanje.sjedala = p.sjedala;
@@ -84,6 +93,11 @@ export function pokreniSlusateljeIgre(): void {
   socket.on('partija:stanje', primijeniStanjePartije);
 
   socket.on('potez:prihvacen', (p) => {
+    if (p.igracId === stanje.mojIgracId) pustiAudio('potez-prihvacen');
+    if (p.sljedeciId === stanje.mojIgracId) {
+      brojOdbijenihNaPotezu = 0;
+      pustiAudio('tvoj-red');
+    }
     stanje.zadnjaEliminacija = null;
     stanje.naPotezuId = p.sljedeciId;
     stanje.trazenaSlova = p.trazenaSlova;
@@ -93,10 +107,12 @@ export function pokreniSlusateljeIgre(): void {
   });
 
   socket.on('potez:odbijen', (p) => {
+    pustiOdbijanje();
     stanje.poruka = p.poruka;
   });
 
   socket.on('partija:eliminacija', (p) => {
+    pustiAudio('eliminacija');
     stanje.eliminacije = [...stanje.eliminacije, p];
     stanje.zadnjaEliminacija = p;
   });
@@ -107,6 +123,12 @@ export function pokreniSlusateljeIgre(): void {
   });
 
   socket.on('partija:runda-otvorena', (p) => {
+    // 1. runda već ima pocetak-partije zvuk - nova-runda samo od 2. runde nadalje da se ne preklapaju.
+    if (p.runda > 1) pustiAudio('nova-runda');
+    if (p.naPotezuId === stanje.mojIgracId) {
+      brojOdbijenihNaPotezu = 0;
+      pustiAudio('tvoj-red');
+    }
     stanje.sustavBiraRijec = false;
     stanje.naPotezuId = p.naPotezuId;
     stanje.trazenaSlova = p.trazenaSlova;
@@ -115,6 +137,8 @@ export function pokreniSlusateljeIgre(): void {
   });
 
   socket.on('partija:kraj', (p) => {
+    // partija-kraj zvuk pušta se tek kad se prikažu konačni rezultati (partija/[id]/+page.svelte),
+    // ne ovdje - inače se preklapa sa zvukom zadnje eliminacije.
     stanje.kraj = p;
     stanje.pocetakPartijeIso = null;
   });

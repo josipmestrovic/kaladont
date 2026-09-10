@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
   import Avatar from './Avatar.svelte';
+  import AudioKontrola from './AudioKontrola.svelte';
 
   interface Profil {
     nadimak: string;
@@ -37,6 +38,7 @@
   <div class="desno">
     <a href="/" class="link">Početna</a>
     <a href="/ljestvica" class="link">Ljestvica</a>
+    <AudioKontrola />
     {#if profil}
       <Avatar avatarId={profil.avatarId} rang={profil.rang} gost={jeGost} velicina={32} />
     {/if}

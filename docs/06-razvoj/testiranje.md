@@ -67,3 +67,7 @@ Mali kontrolirani skup (~50 riječi) u `zajednicko/test/rjecnik-test.ts` — ukl
 
 - Svi testovi zeleni = uvjet za merge.
 - Pokrivenost `paketi/zajednicko`: cilj ≥ 90 % linija (mjeri se, ne blokira prvi mjesec).
+
+## Audio testovi (planirano)
+
+Audio manager i događajna integracija još nisu implementirani. Nakon implementacije testirati mute/volume, `localStorage`, autoplay fallback, SSR-safe ponašanje i deduplikaciju nakon Socket.IO reconnecta ili ponovnog mountanja. Posebno potvrditi da prihvaćena i odbijena riječ sviraju samo autoru poteza, dok eliminacija, nova runda i kraj partije sviraju svim igračima. Potpuna matrica je u [audio.md](audio.md).

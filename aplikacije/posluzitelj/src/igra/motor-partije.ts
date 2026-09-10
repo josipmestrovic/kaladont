@@ -565,6 +565,10 @@ export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje)
       if (!stanje || stanje.zavrsena) return;
       const razlog: RazlogEliminacije = 'prekid';
       eliminirajIgraca(stanje, socket.data.igracId, razlog);
+      // Igrač je svjesno napustio partiju (ne samo eliminiran) - ne smije više primati
+      // odigravanja/zvukove ostatka partije, niti da mu se stara partija vrati na sljedeći 'partija:stanje'.
+      socket.leave(SOBA_PARTIJE(partijaId!));
+      if (partijaPoIgracu.get(socket.data.igracId) === partijaId) partijaPoIgracu.delete(socket.data.igracId);
     });
 
     socket.on('disconnect', () => {

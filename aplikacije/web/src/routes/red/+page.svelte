@@ -4,6 +4,7 @@
   import { dohvatiSocket } from '$lib/socket.js';
   import { SAVJETI } from '$lib/savjeti.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
+  import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import type { PayloadGreska, StanjeReda } from 'zajednicko';
 
@@ -14,6 +15,7 @@
   let countdown = $state<number | null>(null);
   let aktivniSavjet = $state(0);
   let sliderInterval: ReturnType<typeof setInterval> | undefined;
+  let prethodniIgraci: Set<string> | null = null;
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
   const preostaloIgraca = $derived(Math.max(0, 4 - brojIgraca));
 
@@ -32,12 +34,18 @@
       countdown = null;
       return;
     }
+    let zadnjaOdsviranaSek = Number.POSITIVE_INFINITY;
     const azuriraj = () => {
       const preostalo = Math.max(0, Math.ceil((pocetakMs - Date.now()) / 1000));
       countdown = preostalo;
+      if (preostalo > 0 && preostalo < zadnjaOdsviranaSek) {
+        zadnjaOdsviranaSek = preostalo;
+        pustiAudio('odbrojavanje-single-count-sound');
+      }
       if (preostalo <= 0) {
         clearInterval(interval);
         igra.pocetakPartijeIso = null; // najava je potrošena - točno jedna navigacija po najavi
+        pustiAudio('pocetak-partije');
         void goto(`/partija/${partijaId}`);
       }
     };
@@ -54,6 +62,14 @@
     const socket = dohvatiSocket();
 
     const naStanjeReda = (novoStanje: StanjeReda) => {
+      const noviIgraci = new Set(
+        novoStanje.mjesta.filter(Boolean).map((mjesto) => `${mjesto!.nadimak}:${mjesto!.avatarId}`),
+      );
+      if (prethodniIgraci) {
+        if ([...noviIgraci].some((igracId) => !prethodniIgraci!.has(igracId))) pustiAudio('ulazak-u-sobu');
+        if ([...prethodniIgraci].some((igracId) => !noviIgraci.has(igracId))) pustiAudio('izlazak-iz-sobe');
+      }
+      prethodniIgraci = noviIgraci;
       stanje = novoStanje;
     };
     const naGresku = (greska: PayloadGreska) => {
@@ -62,6 +78,8 @@
     socket.on('red:stanje', naStanjeReda);
     socket.on('greska', naGresku);
     socket.emit('red:udji');
+    aktivirajAudio();
+    pustiAudio('ulazak-u-sobu');
 
     return () => {
       socket.off('red:stanje', naStanjeReda);

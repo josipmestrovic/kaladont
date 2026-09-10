@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import { existsSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sql } from 'drizzle-orm';
@@ -65,7 +65,7 @@ export async function izgradiPosluzitelj(): Promise<Posluzitelj> {
   await registrirajAdminRute(app, rjecnik);
   await registrirajRjecnikRute(app, rjecnik);
 
-  if (konfiguracija.NODE_ENV !== 'test') {
+  if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production') {
     const direktorijServera = path.dirname(fileURLToPath(import.meta.url));
     const mogucePutanjeWebHandlera = [
       path.resolve(direktorijServera, '../web/build/handler.js'),
@@ -78,6 +78,22 @@ export async function izgradiPosluzitelj(): Promise<Posluzitelj> {
     }
 
     const { handler } = await import(pathToFileURL(putanjaWebHandlera).href);
+
+    // Zvukovi nisu sadrzajno hashani kao _app/immutable - adapter-node im ne daje dugotrajni cache,
+    // pa ih serviramo posebno prije SvelteKit catch-alla (samo staging/produkcija, dev koristi Vite).
+    const direktorijZvukova = path.join(path.dirname(putanjaWebHandlera), 'client', 'zvukovi');
+    const MIME_ZVUKOVA: Record<string, string> = { '.wav': 'audio/wav', '.mp3': 'audio/mpeg' };
+
+    app.get('/zvukovi/*', async (zahtjev, odgovor) => {
+      const trazenaPutanja = (zahtjev.params as { '*': string })['*'];
+      const puniPuta = path.join(direktorijZvukova, trazenaPutanja);
+      if (!puniPuta.startsWith(direktorijZvukova) || !existsSync(puniPuta)) {
+        return odgovor.code(404).send();
+      }
+      const mime = MIME_ZVUKOVA[path.extname(puniPuta)] ?? 'application/octet-stream';
+      odgovor.header('cache-control', 'public, max-age=31536000, immutable').type(mime);
+      return odgovor.send(createReadStream(puniPuta));
+    });
 
     app.route({
       method: ['GET', 'HEAD'],

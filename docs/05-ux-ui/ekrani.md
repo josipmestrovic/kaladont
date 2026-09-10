@@ -11,6 +11,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Desktop **nije** zaseban l
 - **Rang bedž** uz avatar (samo registrirani, nakon kalibracije od 10 partija; gosti i igrači u kalibraciji nemaju bedž).
 - **Brzi link** na `/ljestvica`.
 - **Gumb postavki** (ikona zupčanika) → otvara `/postavke` (izbor avatara za registrirane; gostu prikazuje samo poziv na registraciju).
+- **Audio kontrola:** diskretna ikona mute/unmute i klizač glasnoće; postavka je lokalna po browseru/uređaju. Pravila i matrica događaja su u [zvukovi.md](zvukovi.md).
 
 ## 1. Landing (`/`)
 
@@ -47,6 +48,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Desktop **nije** zaseban l
 - **Prosječno čekanje: ~X s** (prosjek zadnjih 100 partija) — postavlja realna očekivanja.
 - Gumb „Odustani" vraća na landing — **bez potvrde** (nema još posljedica dok stol nije popunjen).
 - Kad sjedne četvrti: **numerički countdown 3-2-1** preko cijelog ekrana (zamjenjuje stariju statičnu poruku) → tek nakon countdowna prijelaz na stol. Countdown daje svim igračima trenutak da se priprave prije prvog poteza.
+- Audio: klik na `IGRAJ`/ulazak u sobu i ulazak/izlazak igrača koriste suptilne zajedničke signale; samo zadnje tri sekunde countdowna imaju ton.
 
 ## 3. Stol (`/partija/:id`) — srce igre
 

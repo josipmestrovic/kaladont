@@ -3,6 +3,8 @@
    * SVG prsten koji se prazni sinkrono s 30s odbrojavanjem (istekPotezaIso je izvor istine - server je sat).
    * Zadnjih 5s pulsira (ekrani.md §3).
    */
+  import { pustiAudio } from '$lib/audio-manager.js';
+
   interface Props {
     istekIso: string;
     velicina?: number;
@@ -14,6 +16,7 @@
   const OPSEG = 2 * Math.PI * POLUMJER;
 
   let preostaliUdio = $state(1);
+  let pulsPusten = false;
 
   $effect(() => {
     const istek = new Date(istekIso).getTime();
@@ -25,6 +28,13 @@
   });
 
   const pulsira = $derived(preostaliUdio > 0 && preostaliUdio < 5 / 30);
+
+  $effect(() => {
+    if (pulsira && !pulsPusten) {
+      pulsPusten = true;
+      pustiAudio('pred-istek-vremena');
+    }
+  });
 </script>
 
 <svg

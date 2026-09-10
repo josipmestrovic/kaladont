@@ -50,6 +50,7 @@ Folderi su numerirani redoslijedom čitanja. Novi suradnik kreće od `01-proizvo
 | [vizualni-identitet.md](05-ux-ui/vizualni-identitet.md) | Retro identitet, paleta, tipografija, ton |
 | [tijek-korisnika.md](05-ux-ui/tijek-korisnika.md)       | Korisnički tokovi kroz aplikaciju         |
 | [ekrani.md](05-ux-ui/ekrani.md)                         | Specifikacija svih ekrana                 |
+| [zvukovi.md](05-ux-ui/zvukovi.md)                       | UX ugovor za suptilne zvukove bez glazbe  |
 
 ### 06 — Razvoj
 
@@ -58,6 +59,7 @@ Folderi su numerirani redoslijedom čitanja. Novi suradnik kreće od `01-proizvo
 | [postavljanje-okoline.md](06-razvoj/postavljanje-okoline.md)     | Od nule do pokrenutog localhosta   |
 | [struktura-repozitorija.md](06-razvoj/struktura-repozitorija.md) | Monorepo raspored                  |
 | [konvencije.md](06-razvoj/konvencije.md)                         | Jezik, imenovanje, commitovi, stil |
+| [audio.md](06-razvoj/audio.md)                                   | Plan razvoja, asseti i testiranje zvukova |
 | [testiranje.md](06-razvoj/testiranje.md)                         | Što se testira i kako              |
 
 ### 07 — Operacije

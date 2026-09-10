@@ -112,3 +112,14 @@ a {
 button {
   font-family: var(--font-tijelo);
 }
+
+/* Suptilan hover feedback na svemu klikabilnom (uz zvuk hover-efekt iz audio-manager.ts). */
+a,
+button:not(:disabled) {
+  transition: opacity 0.15s ease;
+}
+
+a:hover,
+button:not(:disabled):hover {
+  opacity: 0.8;
+}

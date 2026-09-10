@@ -9,6 +9,7 @@
   import RaniPristupBaner from '$lib/komponente/RaniPristupBaner.svelte';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
+  import { pustiAudio } from '$lib/audio-manager.js';
   import { zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, PrihvacenPotez, RundaOtvorena } from 'zajednicko';
 
@@ -200,6 +201,7 @@
         if (odbrojavanjeIntervalId !== null) clearInterval(odbrojavanjeIntervalId);
         odbrojavanjeIntervalId = null;
         prikaziRezultate = true;
+        pustiAudio('partija-kraj');
       }
     }, 1000);
   });
