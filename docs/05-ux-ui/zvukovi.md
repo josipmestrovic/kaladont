@@ -57,4 +57,4 @@ Prva implementacija pokriva ulaz/izlaz, svaku sekundu odbrojavanja u čekaonici,
 
 ## Pristupačnost i privatnost
 
-Zvuk nikad nije jedini način razumijevanja stanja. Sve informacije moraju ostati dostupne kroz postojeći tekst, boju, animaciju ili stanje kontrole. Audio postavke su lokalne i ne šalju se analitici.
+Zvuk nikad nije jedini način razumijevanja stanja. Sve informacije moraju ostati dostupne kroz postojeći tekst, boju, animaciju ili stanje kontrole. Audio postavke su lokalne i ne šalju se analitici. Stanje „na potezu” dodatno je vidljivo kroz okvir cijelog aktivnog sjedala, label „Na redu!” i numerički prikaz preostalih sekundi; vizualni signal i pristupačna live poruka rade i kada je zvuk utišan ili blokiran.

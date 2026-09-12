@@ -32,8 +32,8 @@ const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odig
 
 const TRAJANJE_POTEZA_MS = 30_000;
 const TRAJANJE_IZBORA_SUSTAVA_MS = 5_000;
-// Namjerno NIJE vezano uz ONEMOGUCI_TIMER_POTEZA: countdown u čekaonici je UX značajka koja mora
-// raditi i u razvoju s isključenim timerom poteza. Testovi je nuliraju kroz env.
+// UX ekran mora trajati 5 s u razvoju, stagingu i produkciji. Samo testno okruženje
+// preskače čekanje kako integracijski testovi ne bi čekali stvarno vrijeme.
 const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
 const SOBA_PARTIJE = (partijaId: string) => `partija:${partijaId}`;
@@ -219,6 +219,21 @@ export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje)
     return null;
   }
 
+  function dohvatiPartijuZaSocket(socket: KaladontSocket): StanjeStola | undefined {
+    const mapiranaPartija = partijaPoIgracu.get(socket.data.igracId);
+    if (mapiranaPartija) {
+      const stanje = partije.get(mapiranaPartija);
+      if (stanje) return stanje;
+    }
+
+    for (const soba of socket.rooms) {
+      if (!soba.startsWith('partija:')) continue;
+      const stanje = partije.get(soba.slice('partija:'.length));
+      if (stanje) return stanje;
+    }
+    return undefined;
+  }
+
   function zakljuciPartiju(stanje: StanjeStola): void {
     stanje.zavrsena = true;
     if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
@@ -283,7 +298,7 @@ export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje)
     if (stanje.izborHandle) clearTimeout(stanje.izborHandle); // moze se dogoditi ako netko napusti partiju dok sustav vec bira
     stanje.izborUToku = true;
     stanje.napadacId = null;
-    const trajanje = timerOnemogucen ? 0 : TRAJANJE_IZBORA_SUSTAVA_MS;
+    const trajanje = konfiguracija.NODE_ENV === 'test' ? 0 : TRAJANJE_IZBORA_SUSTAVA_MS;
     stanje.istekIzboraIso = new Date(Date.now() + trajanje).toISOString();
     const poruka: SustavBiraRijec = { istekIzboraIso: stanje.istekIzboraIso };
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:sustav-bira-rijec', poruka);
@@ -553,13 +568,28 @@ export function stvoriUpraviteljPartija(io: KaladontIo, rjecnik: RjecnikSucelje)
       if (!rezultatSheme.success) return;
       const { poruka } = rezultatSheme.data;
 
-      const partijaId = partijaPoIgracu.get(socket.data.igracId);
-      if (!partijaId) return;
+      const stanje = dohvatiPartijuZaSocket(socket);
+      if (!stanje || stanje.zavrsena) return;
       const sada = Date.now();
       const zadnja = zadnjaReakcija.get(socket.id) ?? 0;
       if (sada - zadnja < 2000) return; // RS-22: tiho ignoriraj
       zadnjaReakcija.set(socket.id, sada);
-      io.to(SOBA_PARTIJE(partijaId)).emit('reakcija:nova', { igracId: socket.data.igracId, poruka });
+      io.to(SOBA_PARTIJE(stanje.partijaId)).emit('reakcija:nova', { igracId: socket.data.igracId, poruka });
+    });
+
+    socket.on('partija:izadji', () => {
+      const partijaId = partijaPoIgracu.get(socket.data.igracId);
+      const stanje = partijaId ? partije.get(partijaId) : undefined;
+      if (!stanje) return;
+
+      if (!stanje.zavrsena && stanje.aktivni.has(socket.data.igracId)) {
+        eliminirajIgraca(stanje, socket.data.igracId, 'prekid');
+      }
+
+      socket.leave(SOBA_PARTIJE(stanje.partijaId));
+      if (partijaPoIgracu.get(socket.data.igracId) === stanje.partijaId) {
+        partijaPoIgracu.delete(socket.data.igracId);
+      }
     });
 
     socket.on('disconnect', () => {

@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
+  import { inicijalizirajAudio, inicijalizirajGlobalneUiZvukove } from '$lib/audio-manager.js';
   import Header from '$lib/komponente/Header.svelte';
   import AudioKontrola from '$lib/komponente/AudioKontrola.svelte';
 
@@ -16,6 +17,8 @@
   );
 
   onMount(() => {
+    inicijalizirajAudio();
+    inicijalizirajGlobalneUiZvukove();
     pokreniSlusateljeIgre();
   });
 </script>

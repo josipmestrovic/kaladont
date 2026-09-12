@@ -111,7 +111,7 @@
         aria-label={`Odaberi ${avatar.naziv}`}
         onclick={() => odaberiAvatar(avatar.id)}
       >
-        <Avatar avatarId={avatar.id} velicina={56} />
+        <Avatar avatarId={avatar.id} velicina={84} />
       </button>
     {/each}
   </div>

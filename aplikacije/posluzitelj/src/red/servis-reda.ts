@@ -18,13 +18,14 @@ export function registrirajRedCekanja(
 ): { ukloniIzReda: (igracId: string) => void } {
   const red = new RedCekanja();
 
-  function izracunajStanje(): StanjeReda {
+  function izracunajStanje(mojIgracId: string): StanjeReda {
     const stavke = red.stanje();
     const mjesta: StanjeReda['mjesta'] = [null, null, null, null];
     stavke.slice(0, 4).forEach((stavka, indeks) => {
       const prosjekBodova = stavka.odigrane > 0 ? stavka.bodoviUkupno / stavka.odigrane : 0;
       const rang = izracunajRang(stavka.odigrane, prosjekBodova);
       mjesta[indeks] = {
+        igracId: stavka.igracId,
         nadimak: stavka.nadimak,
         avatarId: stavka.avatarId,
         rang: rang === 'Piskaralo' ? null : rang,
@@ -32,11 +33,13 @@ export function registrirajRedCekanja(
         postotakPobjeda: stavka.odigrane > 0 ? (stavka.pobjede / stavka.odigrane) * 100 : 0,
       };
     });
-    return { mjesta, prosjekCekanjaSek: dohvatiProsjekCekanjaSek() };
+    return { mojIgracId, mjesta, prosjekCekanjaSek: dohvatiProsjekCekanjaSek() };
   }
 
   function posaljiStanje(): void {
-    io.to(SOBA_REDA).emit('red:stanje', izracunajStanje());
+    for (const [, socket] of io.sockets.sockets) {
+      if (socket.rooms.has(SOBA_REDA)) socket.emit('red:stanje', izracunajStanje(socket.data.igracId));
+    }
   }
 
   io.on('connection', (socket) => {

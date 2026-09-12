@@ -24,7 +24,9 @@ export interface PayloadReakcijaPosalji {
 // Poslužitelj -> klijent
 
 export interface StanjeReda {
+  mojIgracId: string;
   mjesta: ({
+    igracId: string;
     nadimak: string;
     avatarId: number;
     rang: string | null;
@@ -132,6 +134,7 @@ export interface StatistikaRjecnika {
 export interface DogadajiKlijentPoslužitelj {
   'red:udji': () => void;
   'red:izadji': () => void;
+  'partija:izadji': () => void;
   'partija:stanje': () => void;
   'potez:rijec': (payload: PayloadPotezRijec) => void;
   'potez:ne-znam': () => void;

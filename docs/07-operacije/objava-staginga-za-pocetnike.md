@@ -1,6 +1,8 @@
 # Objava nove verzije na staging
 
-Ovo je **glavni početnički runbook za svaku novu objavu na staging**.
+Ovo je **privremeni početnički runbook za svaku novu objavu na staging**.
+
+Dokument opisuje postupak koji danas stvarno radi na postojećem staging VPS-u. Nije konačni deployment model i ne uvodi automatski staging workflow, posebnog deploy korisnika ni produkciju. Kada se operativni model promijeni, ovaj dokument treba ažurirati prije sljedeće objave.
 
 Primjenjuje se na:
 
@@ -20,7 +22,7 @@ Ovaj dokument **ne objavljuje produkciju**. Produkcija ne postoji u ovom postupk
 1. Provjeriti lokalne promjene.
 2. Usporediti lokalni kod i migracije s GitHubom.
 3. Napraviti commit.
-4. Direktno pushati commit na main.
+4. Direktno pushati commit na `main`.
 5. Pričekati zeleni CI.
 6. Pričekati GHCR objavu i zapisati puni digest.
 7. Zapisati trenutni staging digest.
@@ -270,21 +272,23 @@ Ako GHCR workflow ne objavi digest ili je nejasno koji digest pripada commitu, s
 
 **Gdje:** Windows PowerShell, zatim staging VPS preko SSH-a.
 
-Stvarnu staging IP adresu i SSH podatke uzmi iz sigurnog spremišta. Ne zapisuj ih u repozitorij.
+U ovom privremenom postupku na staging se ulazi kao `root`, jer na VPS-u nema korisnika `deploy`. Stvarnu staging IP adresu i root SSH pristup uzmi iz sigurnog spremišta. Ne zapisuj ih u repozitorij.
 
 ```powershell
-ssh deploy@<STAGING_IPV4>
+ssh root@<STAGING_IPV4>
 ```
 
 Na VPS-u:
 
 ```bash
 cd /opt/kaladont
+whoami
+hostname
 pwd
 docker compose -f docker-compose.staging.yml ps
 ```
 
-Očekuješ direktorij `/opt/kaladont` i postojeće servise `caddy`, `aplikacija` i `baza`. Ako servis nedostaje ili je u stanju `Exited`, sačuvaj izlaz i stani.
+Očekuješ korisnika `root`, hostname staging VPS-a, direktorij `/opt/kaladont` i postojeće servise `caddy`, `aplikacija` i `baza`. Sva tri servisa moraju biti pokrenuta, a `aplikacija` i `baza` moraju biti `healthy`. Ako servis nedostaje ili je u stanju `Exited`, sačuvaj izlaz i stani.
 
 Prije izmjene zabilježi trenutni image i release varijable bez ispisivanja cijelog `.env`:
 
@@ -299,7 +303,7 @@ Ako ime containera nije `kaladont-aplikacija-1`, pronađi ga ovako:
 docker compose -f docker-compose.staging.yml ps -q aplikacija
 ```
 
-U `.env` nemoj koristiti `cat`, `less` ili naredbu koja bi ispisala tajne u terminal. Prije deploya zapiši prethodni puni digest u privatnu evidenciju. On je rollback vrijednost.
+U `.env` nemoj koristiti `cat`, `less` ili naredbu koja bi ispisala tajne u terminal. Stari puni image digest iz `docker inspect` zapiši u privatnu evidenciju. To je rollback vrijednost.
 
 Provjeri disk:
 
@@ -314,13 +318,23 @@ Ako je disk gotovo pun ili nema dovoljno prostora za novi image i migraciju, sta
 
 ### 6.1. Promijeniti samo release varijable
 
-Otvori `.env` lokalnim editorom na VPS-u ili koristi postojeći siguran postupak koji već primjenjuješ. Promijeni samo:
+U ovom privremenom postupku promijeni samo tri release retka pomoću `sed`. Za konkretnu objavu iz ovog runbooka koristi se commit `3d82e9069ac64edb8c2b77e421d598cc46f94c40` i image digest `sha256:091b34efe08ed73cf6e6e1db755d57495c0390ddc5af5a5c26fb01d8bdf19d4c`.
 
-```dotenv
-KALADONT_IMAGE=ghcr.io/josipmestrovic/kaladont@sha256:...
-VERZIJA=<puni-commit-sha-ili-dogovorena-verzija>
-DIGEST=sha256:...
+```bash
+sed -i 's|^KALADONT_IMAGE=.*|KALADONT_IMAGE=ghcr.io/josipmestrovic/kaladont@sha256:091b34efe08ed73cf6e6e1db755d57495c0390ddc5af5a5c26fb01d8bdf19d4c|' /opt/kaladont/.env
+sed -i 's|^VERZIJA=.*|VERZIJA=3d82e9069ac64edb8c2b77e421d598cc46f94c40|' /opt/kaladont/.env
+sed -i 's|^DIGEST=.*|DIGEST=sha256:091b34efe08ed73cf6e6e1db755d57495c0390ddc5af5a5c26fb01d8bdf19d4c|' /opt/kaladont/.env
 ```
+
+Za sljedeću objavu zamijeni samo commit i digest stvarnim vrijednostima iz GHCR workflowa. Ne kopiraj konkretne vrijednosti iz ove ture ako objavljuješ drugu verziju.
+
+Provjeri samo ta tri retka:
+
+```bash
+grep -E '^(KALADONT_IMAGE|VERZIJA|DIGEST)=' /opt/kaladont/.env
+```
+
+Očekuješ da `KALADONT_IMAGE` i `DIGEST` sadrže isti puni image digest, a `VERZIJA` puni commit SHA koji je izgradio taj image.
 
 Ne mijenjaj:
 
@@ -350,7 +364,7 @@ Ako naredba ispiše grešku ili nedostaje obavezna varijabla, stani i ne pokreć
 docker compose -f docker-compose.staging.yml pull aplikacija
 ```
 
-Očekuješ da se povuče image iz novog punog digesta. Ako pull ne uspije, ne pokreći `up` i ne mijenjaj bazu.
+Očekuješ poruku da je image uspješno povučen. Ako pull ne uspije, ne pokreći `up` i ne mijenjaj bazu. U stvarnoj objavi novi image `sha256:091b34...` povučen je uspješno.
 
 ## 7. Migrirati staging bazu
 
@@ -381,7 +395,7 @@ docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm 
 
 `--no-deps` ovdje znači da Compose neće pokušati ponovno stvarati ovisne servise. Zato `baza` mora već biti pokrenuta i zdrava.
 
-Očekivani rezultat je uspješan izlazni kod. Ako migracija padne:
+Očekivani rezultat je poruka da su migracije uspješno primijenjene i uspješan izlazni kod. Ako migracija padne:
 
 1. ne pokreći novi application container;
 2. ne briši bazu ni volume;
@@ -414,7 +428,15 @@ Aplikacija mora biti `Up` i nakon kratkog vremena `healthy`. Pregledaj zadnje lo
 docker compose -f docker-compose.staging.yml logs --since 10m --tail 200 aplikacija
 ```
 
-Ne kopiraj cijele logove u javne kanale. Provjeri postoje li novi `error` zapisi, greške pri učitavanju baze ili greške pri učitavanju rječnika.
+U stvarnoj objavi startup logovi su potvrdili:
+
+- rječnik učitan s `1210654 riječi`;
+- server sluša na portu `3000`;
+- lokalni healthcheck vraća HTTP `200`;
+- Socket.IO prihvaća igrača;
+- nema startup grešaka.
+
+Za sljedeće objave očekuj isti oblik provjere: broj riječi mora biti veći od nule, server mora slušati, healthcheck mora biti uspješan i ne smije biti novih `error` zapisa. Ne kopiraj cijele logove u javne kanale.
 
 ## 9. Provjeriti staging izvana
 
@@ -445,6 +467,15 @@ $odgovor.Headers['X-Robots-Tag']
 ```
 
 Očekuješ `200` i `X-Robots-Tag` vrijednost `noindex, nofollow`.
+
+Za brzu provjeru s VPS-a možeš koristiti i:
+
+```bash
+curl --fail --silent --show-error https://staging.kaladont.hr/zdravlje
+curl --head --fail https://staging.kaladont.hr/
+```
+
+`/zdravlje` mora vratiti uspješan odgovor s novim digestom, dostupnom bazom i brojem riječi većim od nule. Naslovnica mora vratiti HTTP `200`.
 
 ## 10. Ručno testirati igru
 
@@ -549,13 +580,18 @@ Prije proglašenja releasea uspješnim sve mora biti označeno:
 - [ ] GHCR objava uspješna.
 - [ ] Puni digest zapisan.
 - [ ] Prethodni staging digest zapisan.
+- [ ] Na staging se ušlo kao `root` i potvrđeni su korisnik, hostname i `/opt/kaladont`.
 - [ ] Staging servisi provjereni prije promjene.
+- [ ] Provjereni su slobodan disk i Docker zauzeće.
+- [ ] Samo `KALADONT_IMAGE`, `VERZIJA` i `DIGEST` ažurirani su u `.env`.
 - [ ] Compose konfiguracija validirana.
 - [ ] Image povučen po punom digestu.
 - [ ] Staging baza migrirana iz novog imagea.
 - [ ] Aplikacija pokrenuta bez diranja PostgreSQL volumea.
+- [ ] Startup logovi potvrđuju učitan rječnik, slušanje na portu 3000, healthcheck i Socket.IO spajanje.
 - [ ] `/zdravlje` vraća očekivani rezultat.
 - [ ] Naslovnica i noindex zaglavlje provjereni.
+- [ ] `/zdravlje` i naslovnica provjereni su i s VPS-a pomoću `curl` naredbi.
 - [ ] Četiri odvojene sesije prošle osnovnu partiju.
 - [ ] Promijenjeno područje posebno testirano.
 - [ ] Logovi pregledani.

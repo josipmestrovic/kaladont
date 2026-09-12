@@ -10,7 +10,7 @@
 
   const igra = dohvatiStanjeIgre();
 
-  let stanje = $state<StanjeReda>({ mjesta: [null, null, null, null], prosjekCekanjaSek: 0 });
+  let stanje = $state<StanjeReda>({ mojIgracId: '', mjesta: [null, null, null, null], prosjekCekanjaSek: 0 });
   let poruka = $state<string | null>(null);
   let countdown = $state<number | null>(null);
   let aktivniSavjet = $state(0);
@@ -112,11 +112,18 @@
 
 <ul class="mjesta">
   {#each stanje.mjesta as mjesto, indeks (indeks)}
-    <li class:zauzeto={mjesto !== null} class:prazno-mjesto={mjesto === null}>
+    <li
+      class:zauzeto={mjesto !== null}
+      class:prazno-mjesto={mjesto === null}
+      class:moje-sjedalo={mjesto?.igracId === stanje.mojIgracId}
+    >
       {#if mjesto}
-        <Avatar avatarId={mjesto.avatarId} rang={mjesto.rang} velicina={56} />
+        <Avatar avatarId={mjesto.avatarId} rang={mjesto.rang} velicina={84} />
         <div class="podaci">
-          <strong>{mjesto.nadimak}</strong>
+          <strong>
+            {mjesto.nadimak}
+            {#if mjesto.igracId === stanje.mojIgracId}<span class="oznaka-ti">TI</span>{/if}
+          </strong>
           <span>{mjesto.rang ?? 'Piskaralo'}</span>
           <span>Prosjek: {mjesto.prosjekBodova.toFixed(2)} • Pobjede: {mjesto.postotakPobjeda.toFixed(0)}%</span>
         </div>
@@ -164,6 +171,24 @@
 
   .mjesta li.zauzeto {
     background: white;
+  }
+
+  .mjesta li.moje-sjedalo {
+    border: 2px solid var(--boja-mint-tamni);
+    background: rgba(47, 169, 140, 0.08);
+  }
+
+  .oznaka-ti {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 6px;
+    border-radius: var(--radijus-pill);
+    background: var(--boja-mint-tamni);
+    color: #faf3e3;
+    font-size: var(--tekst-mikro);
+    line-height: 1;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
   }
 
   .mjesta li.prazno-mjesto {

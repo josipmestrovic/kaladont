@@ -54,7 +54,7 @@
       <AudioKontrola />
     {/if}
     {#if profil}
-      <Avatar avatarId={profil.avatarId} rang={profil.rang} gost={jeGost} velicina={32} />
+      <Avatar avatarId={profil.avatarId} rang={profil.rang} gost={jeGost} velicina={48} />
     {/if}
     <a href="/postavke" class="link postavke" aria-label="Postavke">⚙</a>
   </div>
