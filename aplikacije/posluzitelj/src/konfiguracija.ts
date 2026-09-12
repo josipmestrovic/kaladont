@@ -16,6 +16,7 @@ const shemaKonfiguracije = z.object({
   UMAMI_URL: z.string().default(''),
   ONEMOGUCI_TIMER_POTEZA: z.enum(['true', 'false']).default('false'),
   ODGODA_POCETKA_PARTIJE_MS: z.coerce.number().int().nonnegative().default(10_000),
+  TOLERANCIJA_PREKIDA_MS: z.coerce.number().int().nonnegative().default(10_000),
   ADMIN_TAJNI_KLJUC: z.string().default(''),
   SIMULACIJA_ADRESA: z.string().url().default('http://localhost:3000'),
   VERZIJA: z.string().default('lokalno'),
@@ -30,6 +31,9 @@ if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'producti
   }
   if (konfiguracija.ONEMOGUCI_TIMER_POTEZA === 'true') {
     throw new Error('ONEMOGUCI_TIMER_POTEZA ne smije biti true izvan razvoja i testiranja.');
+  }
+  if (konfiguracija.TOLERANCIJA_PREKIDA_MS !== 10_000) {
+    throw new Error('TOLERANCIJA_PREKIDA_MS mora biti 10000 izvan razvoja i testiranja.');
   }
   if (!konfiguracija.EMAIL_API_KLJUC) {
     throw new Error('EMAIL_API_KLJUC mora biti postavljen izvan razvoja i testiranja.');

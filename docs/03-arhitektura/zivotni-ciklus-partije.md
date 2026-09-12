@@ -10,7 +10,10 @@ stateDiagram-v2
     StolPopunjen --> SustavBiraRijec : partija:pocetak
     SustavBiraRijec --> CekanjePoteza : 5s isteklo, riječ objavljena (partija:runda-otvorena)
     CekanjePoteza --> CekanjePoteza : valjana riječ, sljedeći igrač
-    CekanjePoteza --> Eliminacija : ne znam / istek / prekid / mrtva slova
+    CekanjePoteza --> CekaPovratak : detektiran prekid veze
+    CekaPovratak --> CekanjePoteza : ista veza identiteta obnovljena unutar 10s
+    CekaPovratak --> Eliminacija : tolerancija istekla
+    CekanjePoteza --> Eliminacija : ne znam / istek / dobrovoljni izlazak / mrtva slova
     Eliminacija --> SustavBiraRijec : ostalo ≥ 2 igrača (sustav ponovno bira riječ)
     Eliminacija --> KrajPartije : ostao 1 igrač
     KrajPartije --> [*] : plasmani, bodovi, upis u bazu
@@ -18,8 +21,9 @@ stateDiagram-v2
 
 Napomene:
 
-- **SustavBiraRijec:** traje 5 sekundi; nitko ne može igrati. Server nasumično bira valjanu riječ sa slobodnim nastavkom (`nasumicnaValjanaRijec`) - i za 1. rundu partije i nakon svake eliminacije/kaladont-efekta (RS-01). Klijent prikazuje obrazloženje zadnje eliminacije (ako postoji) i brojač. 30-sekundni timer poteza kreće tek kad ovo stanje završi.
+- **SustavBiraRijec:** traje 10 sekundi; nitko ne može igrati. Server nasumično bira valjanu riječ sa slobodnim nastavkom (`nasumicnaValjanaRijec`) - i za 1. rundu partije i nakon svake eliminacije/kaladont-efekta (RS-01). Klijent prikazuje obrazloženje zadnje eliminacije (ako postoji) i brojač. 30-sekundni timer poteza kreće tek kad ovo stanje završi.
 - **Mrtva slova** eliminiraju sljedećeg igrača trenutno, bez ulaska u njegovo `CekanjePoteza` (RS-02/RS-03).
+- **CekaPovratak:** mrežni prekid pokreće 10-sekundnu toleranciju samo za prekinutog igrača. Timer poteza ne pauzira se; istek poteza ima prednost ako nastupi prije isteka tolerancije. Dobrovoljni izlazak ne ulazi u ovo stanje.
 - Eliminirani igrač prelazi u ulogu **promatrača** istog stola do `KrajPartije`.
 
 ## Slijed poruka za tipičan potez
@@ -38,7 +42,7 @@ sequenceDiagram
         Note over S: timer 30 s za sljedećeg igrača
     else nastavka nema
         S->>O: partija:eliminacija (sljedeći igrač, razlog mrtva_slova_*)
-        S->>O: partija:sustav-bira-rijec, zatim (5s) partija:runda-otvorena, ili partija:kraj
+        S->>O: partija:sustav-bira-rijec, zatim (10s) partija:runda-otvorena, ili partija:kraj
     end
 ```
 
@@ -46,7 +50,7 @@ sequenceDiagram
 
 - Jedini mjerodavni timer je na poslužitelju; 30s timer poteza pokreće se u trenutku emitiranja `potez:prihvacen` / `partija:runda-otvorena` (ne dok sustav bira riječ).
 - Klijent dobiva apsolutni `istekPotezaIso` pa ni kašnjenje mreže ne pomiče prikaz.
-- Istek na poslužitelju okida eliminaciju čak i ako klijent šuti (zatvoren laptop, ugašen tab).
+- Istek na poslužitelju okida eliminaciju čak i ako klijent šuti ili je privremeno odspojen. Ponovno spajanje ne resetira niti pomiče `istekPotezaIso`.
 
 ## Kraj partije — transakcija
 

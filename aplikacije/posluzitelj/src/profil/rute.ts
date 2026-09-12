@@ -19,6 +19,7 @@ import {
 } from '../racuni/autentikacija.js';
 
 const ShemaAvatar = z.object({ avatarId: z.number().int().min(0).max(BROJ_AVATARA - 1) });
+const ShemaNadimak = z.object({ nadimak: z.string().trim().min(2).max(20) });
 const ShemaLimit = z.object({ limit: z.coerce.number().int().refine((n) => n === 10 || n === 100, 'limit mora biti 10 ili 100').optional() });
 const ShemaEmail = z.object({ noviEmail: z.string().email(), lozinka: z.string().min(1) });
 const ShemaLozinka = z.object({ trenutnaLozinka: z.string().min(1), novaLozinka: z.string().min(8) });
@@ -48,7 +49,8 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
     };
   });
 
-  app.put('/profil/avatar', { preHandler: zahtijevajPrijavu }, async (zahtjev, odgovor) => {
+  // Onboarding dopušta i gostima da odaberu avatar (jednokratno, prvi ulazak - dobrodoslica/+page.svelte)
+  app.put('/profil/avatar', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
     const rezultat = ShemaAvatar.safeParse(zahtjev.body);
     if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravan avatarId.' });
@@ -56,6 +58,16 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
     await baza.update(igraci).set({ avatarId: rezultat.data.avatarId }).where(eq(igraci.id, igrac.id));
     return { ok: true, avatarId: rezultat.data.avatarId };
+  });
+
+  app.put('/profil/nadimak', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
+    const rezultat = ShemaNadimak.safeParse(zahtjev.body);
+    if (!rezultat.success) {
+      return odgovor.code(400).send({ ok: false, greska: 'Ime mora imati 2-20 znakova.' });
+    }
+    const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+    await baza.update(igraci).set({ nadimak: rezultat.data.nadimak }).where(eq(igraci.id, igrac.id));
+    return { ok: true, nadimak: rezultat.data.nadimak };
   });
 
   app.put('/profil/email', { preHandler: zahtijevajPrijavu }, async (zahtjev, odgovor) => {

@@ -20,6 +20,7 @@ import { registrirajAdminRute } from './admin/rute.js';
 import { registrirajRjecnikRute } from './rjecnik/rute.js';
 import { konfiguracija } from './konfiguracija.js';
 import { baza } from './baza/klijent.js';
+import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 
 export interface PodaciSocketa {
   igracId: string;
@@ -49,8 +50,12 @@ export interface Posluzitelj {
   io: KaladontIo;
 }
 
+export interface OpcijePosluzitelja {
+  postavkeMotora?: PostavkeMotoraPartije;
+}
+
 /** Izgrađuje Fastify + Socket.IO instancu (bez pokretanja listen-a) - koristi ga i index.ts i testovi. */
-export async function izgradiPosluzitelj(): Promise<Posluzitelj> {
+export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promise<Posluzitelj> {
   const app = Fastify({ logger: true });
   await app.register(cors, { origin: true, credentials: true });
   await app.register(cookie);
@@ -110,7 +115,18 @@ export async function izgradiPosluzitelj(): Promise<Posluzitelj> {
   });
 
   const registarVeza = new RegistarVeza();
-  const upravitelj = stvoriUpraviteljPartija(io, rjecnik);
+  const upravitelj = stvoriUpraviteljPartija(
+    io,
+    rjecnik,
+    {
+      dohvatiSocket: (igracId) => {
+        const socketId = registarVeza.dohvatiSocketId(igracId);
+        return socketId ? io.sockets.sockets.get(socketId) : undefined;
+      },
+      jeAktivnaVeza: (igracId, socketId) => registarVeza.dohvatiSocketId(igracId) === socketId,
+    },
+    opcije.postavkeMotora,
+  );
 
   app.get('/zdravlje', async (_zahtjev, odgovor) => {
     let bazaDostupna = true;
@@ -182,7 +198,7 @@ export async function izgradiPosluzitelj(): Promise<Posluzitelj> {
   registrirajRedCekanja(io, (stol) => {
     upravitelj.zapocniPartiju(stol);
     void osvjeziProsjekCekanja();
-  });
+  }, upravitelj.imaAktivnuPartiju);
 
   return { app, io };
 }

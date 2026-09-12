@@ -83,6 +83,10 @@ interface StanjePartije {
   eliminacije: Eliminacija[];
   sustavBiraRijec: boolean;
   istekIzboraIso: string | null;
+  zadnjaRijec: string | null;             // autoritativna zadnja riječ za obnovu prikaza
+  zadnjaRijecIgracId: string | null;      // null za sustavsku riječ
+  zadnjaRijecVrsta: "rijec" | "sustav_rijec" | null;
+  zavrsena: boolean;                      // završena partija zadržana radi rezultata nije aktivna
 }
 
 /** Sustav je počeo birati riječ za otvaranje runde. */
@@ -124,6 +128,7 @@ interface Eliminacija {
 }
 
 interface KrajPartije {
+  partijaId: string;
   plasmani: {
     igracId: string;
     plasman: 1 | 2 | 3 | 4;
@@ -141,7 +146,7 @@ type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "INTERNA";
 ## Pravila protokola
 
 1. **Server je sat.** Klijent prikazuje odbrojavanje prema `istekPotezaIso`, ali presudu donosi isključivo server (RS-14).
-2. **Resinkronizacija:** nakon svakog ponovnog spajanja klijent dobiva `partija:stanje` ili `red:stanje` — UI se uvijek može obnoviti iz jedne poruke.
+2. **Resinkronizacija:** nakon ponovnog spajanja istim identitetom poslužitelj vraća vezu u sobu aktivne partije i šalje `partija:stanje`; timer poteza nastavlja teći prema izvornom `istekPotezaIso`. U redu čekanja nema 10-sekundne tolerancije: svaki prekid odmah oslobađa mjesto, a klijent na `/red` nakon povratka ponovno šalje `red:udji` i ulazi na kraj reda. UI aktivne partije uvijek se može obnoviti iz jedne poruke.
 3. **Promatrači** (eliminirani igrači) primaju sve događaje stola i smiju slati `reakcija:posalji`.
-4. **Idempotentnost:** ponovljeni `red:udji` dok je igrač već u redu vraća `greska { kod: "VEC_U_REDU" }` bez nuspojava.
+4. **Idempotentnost:** ponovljeni `red:udji` dok je igrač već u redu ponovno šalje `red:stanje` bez promjene položaja.
 5. Svaka poruka poslužitelja nosi spreman hrvatski tekst (`poruka`) — klijent ne sastavlja poruke pravila sam.

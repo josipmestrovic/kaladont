@@ -75,7 +75,8 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     });
     setTimeout(posaljiNeZnam, 30);
 
-    await krajPromise;
+    const prviKraj = await krajPromise;
+    expect(prviKraj.partijaId).toBe(prviPocetci[0]!.partijaId);
 
     // 2. partija: svi se odmah vraćaju u red ("Igraj opet" unutar prozora zadržavanja sobe)
     const drugiPocetciPromise = cekajPocetke(klijenti);

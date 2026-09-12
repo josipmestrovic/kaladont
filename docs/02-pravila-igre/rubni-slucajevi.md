@@ -41,20 +41,20 @@ Riječi poput „injekcija" gdje n+j nije digraf.
 ## Mreža i prekidi
 
 **RS-09 — Prekid veze na svom potezu.**
-**Odluka:** trenutna eliminacija; **napadač dobiva bod** (ekvivalent isteka vremena). Plasman prema trenutku ispadanja.
+**Odluka:** nakon što Socket.IO utvrdi prekid, igrač ima **10 sekundi tolerancije** za ponovno spajanje istim identitetom. Timer poteza za to vrijeme nastavlja teći. Ako se igrač ne vrati prije isteka tolerancije, eliminira se zbog prekida i **napadač dobiva bod**. Ako prije toga istekne timer poteza, eliminacija je zbog isteka vremena.
 
 **RS-10 — Prekid veze izvan svog poteza.**
-**Odluka:** trenutna eliminacija bez ičijeg boda (samoeliminacija). Krug se nastavlja preskačući prazno mjesto; ako je eliminirani bio sljedeći na redu, red prelazi na idućeg preživjelog.
+**Odluka:** nakon što Socket.IO utvrdi prekid, igrač ima **10 sekundi tolerancije** za ponovno spajanje istim identitetom. Ako se ne vrati, eliminira se bez ičijeg boda (samoeliminacija). Krug se nastavlja preskačući prazno mjesto; ako je eliminirani bio sljedeći na redu, red prelazi na idućeg preživjelog.
 
 **RS-11 — Dobrovoljni izlazak iz partije (gumb izlaza tijekom igre).**
-**Odluka:** identično prekidu veze (RS-09/RS-10, ovisno je li igrač bio na potezu).
+**Odluka:** namjerni `partija:izadji` ne koristi toleranciju i eliminira igrača odmah, prema RS-09/RS-10 ovisno o tome je li bio na potezu.
 
 **RS-12 — Detekcija prekida nije trenutna.**
 Socket.IO heartbeat otkriva prekid s odgodom od nekoliko sekundi.
-**Odluka:** prihvatljivo; eliminacija nastupa u trenutku detekcije. Ako je u međuvremenu istekao timer, primjenjuje se istek (RS-09 svodi se na isto — bod napadaču).
+**Odluka:** tolerancija od 10 sekundi počinje tek nakon što poslužitelj primi `disconnect`. Povratak istog identiteta prije isteka tolerancije poništava eliminaciju, vraća novu vezu u sobu partije i šalje potpuno stanje za resinkronizaciju. Nova veza istog identiteta zamjenjuje staru; naknadni `disconnect` stare veze ne pokreće eliminaciju. Ako je u međuvremenu istekao timer poteza, primjenjuje se istek.
 
 **RS-13 — Svi preostali igrači prekinu vezu istovremeno.**
-**Odluka:** eliminacije se obrađuju redoslijedom detekcije (deterministički na serveru); posljednji preostali je pobjednik. Ako server ne može utvrditi redoslijed unutar istog ticka, prednost ima igrač koji NIJE bio na potezu.
+**Odluka:** za svakog se neovisno pokreće 10-sekundna tolerancija. Povratnici nastavljaju partiju, a preostale eliminacije obrađuju se redoslijedom isteka tolerancije (deterministički na serveru); posljednji preostali je pobjednik. Rokovi unutar istog detekcijskog vala od 25 ms tretiraju se kao istodobni; tada prednost ima igrač koji NIJE bio na potezu.
 
 **RS-14 — Utrka poteza i isteka vremena.**
 Riječ stigne u istom trenutku kad timer istekne.

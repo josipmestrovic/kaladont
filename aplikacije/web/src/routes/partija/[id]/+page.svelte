@@ -11,7 +11,7 @@
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import { pustiAudio } from '$lib/audio-manager.js';
   import { zadnjaDva } from 'zajednicko';
-  import type { BrzaPoruka, Eliminacija, PrihvacenPotez, RundaOtvorena } from 'zajednicko';
+  import type { BrzaPoruka, Eliminacija, KrajPartije, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
   const partijaId = $derived($page.params.id);
@@ -129,6 +129,10 @@
     return stanje.sjedala.find((s) => s.igracId === igracId)?.nadimak ?? igracId;
   }
 
+  function jeAktualnaPartija(): boolean {
+    return stanje.partijaId === partijaId;
+  }
+
   function eliminacijaIgraca(igracId: string): Eliminacija | undefined {
     return stanje.eliminacije.find((eliminacija) => eliminacija.igracId === igracId);
   }
@@ -226,6 +230,27 @@
     queueMicrotask(() => unosInput?.focus());
   });
 
+  $effect(() => {
+    const rijec = stanje.zadnjaRijec;
+    const vrsta = stanje.zadnjaRijecVrsta;
+    if (stanje.partijaId !== partijaId || !rijec || !vrsta || stanje.sustavBiraRijec) return;
+    if (
+      prikazanaRijec?.rijec === rijec &&
+      prikazanaRijec.vrsta === vrsta &&
+      prikazanaRijec.igracId === stanje.zadnjaRijecIgracId
+    ) return;
+    prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
+    prikazanaRijec = {
+      id: -Date.now(),
+      redniBroj: 0,
+      igracId: stanje.zadnjaRijecIgracId,
+      vrsta,
+      rijec,
+      trazenaSlova: stanje.trazenaSlova,
+      vrijeme: new Date().toISOString(),
+    };
+  });
+
   let sustavBrojac = $state(5);
   let sustavBrojacIntervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -269,6 +294,7 @@
       const odgovor = await api<{ potezi: Potez[] }>(`/partije/${partijaId}/potezi`);
       potezi = odgovor.potezi;
       if (prikaziZadnjuRijec) {
+        if (stanje.partijaId === partijaId && stanje.zadnjaRijec && stanje.zadnjaRijecVrsta) return;
         const sRijeci = odgovor.potezi.filter((potez) => potez.rijec);
         prikazanaRijec = sRijeci.at(-1) ?? null;
         prethodnaRijecStola =
@@ -301,6 +327,7 @@
     const socket = dohvatiSocket();
 
     const naReakciju = ({ igracId, poruka }: { igracId: string; poruka: BrzaPoruka }) => {
+      if (!jeAktualnaPartija()) return;
       const id = sljedeciIdReakcije++;
       reakcije = [...reakcije, { id, igracId, poruka }];
       odskociAvatara = { ...odskociAvatara, [igracId]: (odskociAvatara[igracId] ?? 0) + 1 };
@@ -310,6 +337,7 @@
     };
 
     const naEliminaciju = (eliminacija: Eliminacija) => {
+      if (!jeAktualnaPartija()) return;
       slanjeUTijeku = false;
       // Ubojita riječ (mrtva slova/kaladont) nikad ne stiže kroz potez:prihvacen - prikaži je iz eliminacije
       if (eliminacija.rijecUzrok && eliminacija.rijecUzrok !== prikazanaRijec?.rijec) {
@@ -335,6 +363,7 @@
     // Jedini izvor istine za trenutnu riječ su socket događaji - REST lista služi samo za povijest
     // (fire-and-forget upis u bazu znači da refetch odmah nakon eventa može vratiti stariju listu).
     const naPrihvacenPotez = (potez: PrihvacenPotez) => {
+      if (!jeAktualnaPartija()) return;
       if (potez.igracId === stanje.mojIgracId) slanjeUTijeku = false;
       prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
       prikazanaRijec = {
@@ -349,12 +378,14 @@
     };
 
     const naSustavBira = () => {
+      if (!jeAktualnaPartija()) return;
       slanjeUTijeku = false;
       prikazanaRijec = null;
       prethodnaRijecStola = null;
     };
 
     const naRunduOtvorenu = (runda: RundaOtvorena) => {
+      if (!jeAktualnaPartija()) return;
       slanjeUTijeku = false;
       prethodnaRijecStola = null;
       prikazanaRijec = {
@@ -368,19 +399,22 @@
       };
     };
 
-    const naKraj = () => {
+    const naKraj = (kraj: KrajPartije) => {
+      if (kraj.partijaId !== partijaId) return;
       slanjeUTijeku = false;
       void ucitajPoteze(false);
     };
-    const naStanjePartije = () => {
+    const naStanjePartije = (novoStanje: StanjePartije) => {
+      if (novoStanje.partijaId !== partijaId) return;
       slanjeUTijeku = false;
     };
     const naOdbijenPotez = ({ poruka }: { poruka: string }) => {
+      if (!jeAktualnaPartija()) return;
       slanjeUTijeku = false;
       prikaziGreskuPoteza(poruka);
     };
     const naGresku = ({ poruka }: { poruka: string }) => {
-      if (!slanjeUTijeku) return;
+      if (!jeAktualnaPartija() || !slanjeUTijeku) return;
       slanjeUTijeku = false;
       prikaziGreskuPoteza(poruka);
     };

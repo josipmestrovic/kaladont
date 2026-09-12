@@ -7,8 +7,11 @@ flowchart TD
     A[Landing kaladont.hr] -->|klik IGRAJ| B{Ima li gost ID?}
     B -->|ne| C[Stvori gosta: UUID + generirano ime]
     B -->|da| D[Učitaj identitet]
-    C --> E[Red čekanja]
-    D --> E
+    C --> Z{Prošao onboarding?}
+    D --> Z
+    Z -->|ne, gost prvi put| W[Dobrodošlica: ime → avatar]
+    W --> E[Red čekanja]
+    Z -->|da / registriran| E
     E -->|4 igrača| F[Stol — partija]
     E -->|odustani| A
     F -->|eliminacija| G[Promatranje stola]
@@ -23,7 +26,7 @@ flowchart TD
 Ključna svojstva:
 
 - **Jedan klik do reda:** bez lobbyja, bez odabira sobe, bez postavki.
-- Gost ID i ime stvaraju se tiho — igrač ne ispunjava ništa.
+- Gost ID stvara se tiho — igrač ne ispunjava ništa za to. Ime i avatar bira jednom, pri prvom ulasku (`/dobrodoslica`), prije prvog reda čekanja.
 - „Igraj opet" vraća u red čekanja s istim identitetom.
 
 ## Registracija (u bilo kojem trenutku)
@@ -53,5 +56,5 @@ Dostupno svima (i gostima) — prijave su dar, ne privilegija računa.
 ## Rukovanje prekidima
 
 - Pad veze u **redu čekanja**: mjesto se oslobađa, ostali vide promjenu u real-timeu (RS-16).
-- Pad veze u **partiji**: trenutna eliminacija (RS-09/RS-10); po povratku igrač vidi stol kao promatrač s porukom „Veza je pukla — ispao si iz partije."
+- Pad veze u **partiji**: poslužitelj čeka povratak istog identiteta 10 sekundi, bez zaustavljanja timera poteza (RS-09/RS-10); nakon isteka tolerancije igrač ispada i po povratku vidi stol kao promatrač.
 - Povratak na otvorenu karticu nakon spavanja mobitela: klijent traži `partija:stanje` i obnavlja prikaz iz jedne poruke.

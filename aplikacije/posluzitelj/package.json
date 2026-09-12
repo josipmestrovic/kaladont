@@ -11,6 +11,7 @@
     "migracije": "drizzle-kit migrate",
     "ci-fixture": "tsx src/cli/ci-fixture.ts",
     "simulacija": "tsx src/cli/simulacija.ts",
+    "opterecenje": "tsx src/cli/opterecenje.ts",
     "test": "vitest run"
   },
   "dependencies": {

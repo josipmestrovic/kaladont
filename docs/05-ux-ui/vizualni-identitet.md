@@ -44,7 +44,7 @@ Pravila upotrebe:
 
 **Avatari:** statički katalog stvarnih kvadratnih JPG/WebP slika u `aplikacije/web/static/avatari/`. Katalog se može proširivati bez promjene sheme baze; slike se prikazuju kružno i ne učitavaju ih korisnici.
 
-- **Gost:** dobiva nasumičan avatar automatski pri stvaranju, bez pitanja i bez mogućnosti promjene; nosi diskretnu oznaku „GOST" i nikad nema border.
+- **Gost:** bira avatar jednokratno pri onboardingu (`/dobrodoslica`, prvi ulazak), nosi diskretnu oznaku „GOST" i nikad nema border; nakon onboardinga više ne može mijenjati avatar (nema pristup `/postavke`).
 - **Registriran:** bira avatar u `/postavke`, promjenjivo u svakom trenutku (`PUT /profil/avatar`), a promjena se odmah vidi u zaglavlju.
 
 **Borderi:** 10 komada, 1:1 s rang-imenima (Prvopisac/Riječarac/Jezičar/Lektor/Književnik/Jezikoslovac/Doktor riječi/Jezični maestro/Gospodar riječnika/Kaladont — vidi [bodovanje-i-rangovi.md](../02-pravila-igre/bodovanje-i-rangovi.md)). Border se **računa i primjenjuje automatski** prema trenutnom rangu igrača — nikad se ne bira ručno. Igrači u kalibraciji („Piskaralo", < 10 partija) nemaju border. Najviši border (Kaladont) jedini koristi motiv tube paste — vizualna kruna ljestvice.

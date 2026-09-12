@@ -26,6 +26,7 @@ services:
       DEV_MAIL: dev@example.com
       ONEMOGUCI_TIMER_POTEZA: "false"
       ODGODA_POCETKA_PARTIJE_MS: "0"
+      TOLERANCIJA_PREKIDA_MS: "10000"
       ADMIN_TAJNI_KLJUC: ci-admin-secret
       VERZIJA: ci
       DIGEST: ci

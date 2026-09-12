@@ -13,7 +13,7 @@ import {
 } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { rijeci } from '../src/baza/shema.js';
+import { partije, rijeci } from '../src/baza/shema.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -35,13 +35,94 @@ interface Igrac {
   socket: ClientSocket;
 }
 
-function spojiIgraca(): Promise<Igrac> {
-  const token = randomUUID();
+function spojiIgraca(token = randomUUID(), ciljnaAdresa = adresa): Promise<Igrac> {
   return new Promise((resolve, reject) => {
-    const socket = ioClient(adresa, { auth: { token }, forceNew: true });
+    const socket = ioClient(ciljnaAdresa, { auth: { token }, forceNew: true });
     socket.on('connect', () => resolve({ token, socket }));
     socket.on('connect_error', reject);
   });
+}
+
+function spojiIgracaIPricekajStanje(
+  token: string,
+  ciljnaAdresa = adresa,
+): Promise<{ igrac: Igrac; stanje: StanjePartije }> {
+  return new Promise((resolve, reject) => {
+    const socket = ioClient(ciljnaAdresa, { auth: { token }, forceNew: true, autoConnect: false });
+    let spojeno = false;
+    let stanje: StanjePartije | null = null;
+    const dovrsi = () => {
+      if (spojeno && stanje) resolve({ igrac: { token, socket }, stanje });
+    };
+    socket.once('connect', () => {
+      spojeno = true;
+      dovrsi();
+    });
+    socket.once('partija:stanje', (novoStanje) => {
+      stanje = novoStanje;
+      dovrsi();
+    });
+    socket.once('connect_error', reject);
+    socket.connect();
+  });
+}
+
+function spojiIgracaIPricekajStanjeIKraj(
+  token: string,
+  ciljnaAdresa = adresa,
+): Promise<{ igrac: Igrac; stanje: StanjePartije; kraj: KrajPartije }> {
+  return new Promise((resolve, reject) => {
+    const socket = ioClient(ciljnaAdresa, { auth: { token }, forceNew: true, autoConnect: false });
+    let stanje: StanjePartije | null = null;
+    let kraj: KrajPartije | null = null;
+    const dovrsi = () => {
+      if (stanje && kraj) resolve({ igrac: { token, socket }, stanje, kraj });
+    };
+    socket.once('partija:stanje', (poruka) => {
+      stanje = poruka;
+      dovrsi();
+    });
+    socket.once('partija:kraj', (poruka) => {
+      kraj = poruka;
+      dovrsi();
+    });
+    socket.once('connect_error', reject);
+    socket.connect();
+  });
+}
+
+function odgodi(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function cekajZavrsenuPartiju(partijaId: string, timeoutMs = 2_000): Promise<void> {
+  const istek = Date.now() + timeoutMs;
+  while (Date.now() < istek) {
+    const [partija] = await baza
+      .select({ status: partije.status })
+      .from(partije)
+      .where(eq(partije.id, partijaId));
+    if (partija?.status === 'zavrsena') return;
+    await odgodi(20);
+  }
+  throw new Error(`Partija ${partijaId} nije završena unutar ${timeoutMs} ms.`);
+}
+
+async function pokreniPartiju(
+  ciljnaAdresa = adresa,
+): Promise<{ igraci: Igrac[]; pocetak: PocetakPartije; runda: RundaOtvorena }> {
+  const igraci = await Promise.all(Array.from({ length: 4 }, () => spojiIgraca(randomUUID(), ciljnaAdresa)));
+  const pocetakPromise = new Promise<PocetakPartije>((resolve) => igraci[0]!.socket.once('partija:pocetak', resolve));
+  const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
+  for (const igrac of igraci) igrac.socket.emit('red:udji');
+  const [pocetak, runda] = await Promise.all([pocetakPromise, rundaPromise]);
+  return { igraci, pocetak, runda };
+}
+
+function odspojiIgrace(igraci: readonly Igrac[]): void {
+  for (const igrac of igraci) {
+    if (igrac.socket.connected) igrac.socket.disconnect();
+  }
 }
 
 function cekajJedanOd<T extends string>(
@@ -214,6 +295,9 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(stanje.trazenaSlova).toBe(runda.trazenaSlova);
     expect(stanje.sustavBiraRijec).toBe(false);
     expect(stanje.brojIskoristenih).toBeGreaterThan(0);
+    expect(stanje.zadnjaRijec).toBe(runda.rijec);
+    expect(stanje.zadnjaRijecIgracId).toBeNull();
+    expect(stanje.zadnjaRijecVrsta).toBe('sustav_rijec');
 
     for (const igrac of igraci) igrac.socket.disconnect();
   });
@@ -226,7 +310,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     });
     const prvaRundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
     for (const igrac of igraci) igrac.socket.emit('red:udji');
-    await pocetakPromise;
+    const pocetak = await pocetakPromise;
     const prvaRunda = await prvaRundaPromise;
 
     let naPotezuId = prvaRunda.naPotezuId;
@@ -245,6 +329,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     }
 
     expect(krajPoruka).not.toBeNull();
+  expect(krajPoruka!.partijaId).toBe(pocetak.partijaId);
     const plasmani = krajPoruka!.plasmani;
     expect(plasmani).toHaveLength(4);
     expect(new Set(plasmani.map((p) => p.plasman))).toEqual(new Set([1, 2, 3, 4]));
@@ -281,10 +366,20 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     const rezultat = await Promise.race([prihvacenoPromise, odbijenoPromise]);
     expect(rezultat).toHaveProperty('trazenaSlova', zadnjaDva(rijecZaIgru));
 
+    const stanjePromise = new Promise<StanjePartije>((resolve) => {
+      igraci[1]!.socket.once('partija:stanje', resolve);
+    });
+    igraci[1]!.socket.emit('partija:stanje');
+    const stanje = await stanjePromise;
+    expect(stanje.zadnjaRijec).toBe(rijecZaIgru);
+    expect(stanje.zadnjaRijecIgracId).toBe(otvarac.token);
+    expect(stanje.zadnjaRijecVrsta).toBe('rijec');
+    expect(stanje.zavrsena).toBe(false);
+
     for (const igrac of igraci) igrac.socket.disconnect();
   });
 
-  it('RS-09: prekid veze na potezu eliminira igrača i daje bod napadaču', async () => {
+  it('RS-09: istek tolerancije na potezu eliminira igrača i daje bod napadaču', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
 
     const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
@@ -326,7 +421,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     for (const igrac of igraci) if (igrac !== sljedeci) igrac.socket.disconnect();
   });
 
-  it('RS-10: prekid veze izvan poteza je samoeliminacija bez boda, igra se nastavlja', async () => {
+  it('RS-10: istek tolerancije izvan poteza je samoeliminacija bez boda, igra se nastavlja', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
 
     const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
@@ -355,6 +450,196 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(eliminacija.bodZa).toBeNull(); // samoeliminacija - nitko ne dobiva bod
 
     for (const igrac of igraci) igrac.socket.disconnect();
+  });
+
+  it('RS-10 koristi stanje u trenutku prekida ako red tijekom tolerancije dođe do igrača', async () => {
+    const { igraci, pocetak, runda } = await pokreniPartiju();
+    const poredak = pocetak.sjedala.map((sjedalo) => sjedalo.igracId);
+    const indeksNaPotezu = poredak.indexOf(runda.naPotezuId);
+    const sljedeciId = poredak[(indeksNaPotezu + 1) % poredak.length]!;
+    const naPotezu = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+    const sljedeci = igraci.find((igrac) => igrac.token === sljedeciId)!;
+    const promatrac = igraci.find((igrac) => igrac !== naPotezu && igrac !== sljedeci)!;
+    const rijecZaIgru = await pronadjiRijecNaPrefiks(
+      runda.trazenaSlova,
+      new Set(await grupeRijeci(runda.rijec)),
+    );
+    const prihvacenoPromise = cekajPrihvacenOdIgraca(promatrac.socket, naPotezu.token);
+    const eliminacijaPromise = new Promise<Eliminacija>((resolve) => {
+      promatrac.socket.on('partija:eliminacija', (eliminacija) => {
+        if (eliminacija.igracId === sljedeciId) resolve(eliminacija);
+      });
+    });
+    const stanjeNakonPreskakanja = new Promise<StanjePartije>((resolve) => {
+      promatrac.socket.once('partija:stanje', resolve);
+    });
+
+    sljedeci.socket.disconnect();
+    naPotezu.socket.emit('potez:rijec', { rijec: rijecZaIgru });
+    const prihvaceno = await prihvacenoPromise;
+    expect(prihvaceno.sljedeciId).toBe(sljedeciId);
+
+    const eliminacija = await eliminacijaPromise;
+    const stanje = await stanjeNakonPreskakanja;
+    expect(eliminacija.razlog).toBe('prekid');
+    expect(eliminacija.bodZa).toBeNull();
+    expect(stanje.naPotezuId).not.toBe(sljedeciId);
+    expect(stanje.trazenaSlova).toBe(prihvaceno.trazenaSlova);
+
+    odspojiIgrace(igraci);
+  });
+
+  it('RS-09/RS-12: povratak unutar tolerancije obnavlja stanje bez eliminacije i resetiranja timera', async () => {
+    const { igraci, runda } = await pokreniPartiju();
+    const odspojeni = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+    const promatrac = igraci.find((igrac) => igrac !== odspojeni)!;
+    const eliminacije: Eliminacija[] = [];
+    promatrac.socket.on('partija:eliminacija', (eliminacija) => eliminacije.push(eliminacija));
+
+    odspojeni.socket.disconnect();
+    await odgodi(25);
+    const { igrac: obnovljeni, stanje } = await spojiIgracaIPricekajStanje(odspojeni.token);
+
+    expect(stanje.partijaId).toBeDefined();
+    expect(stanje.naPotezuId).toBe(runda.naPotezuId);
+    expect(stanje.istekPotezaIso).toBe(runda.istekPotezaIso);
+    const reakcijaUSobi = new Promise<void>((resolve) => obnovljeni.socket.once('reakcija:nova', () => resolve()));
+    promatrac.socket.emit('reakcija:posalji', { poruka: 'pozdrav' });
+    await reakcijaUSobi;
+    await odgodi(350);
+    expect(eliminacije.filter((eliminacija) => eliminacija.igracId === odspojeni.token)).toHaveLength(0);
+
+    odspojiIgrace([...igraci, obnovljeni]);
+  });
+
+  it('RS-18: zamjena veze u aktivnoj partiji ne pokreće eliminaciju', async () => {
+    const { igraci, runda } = await pokreniPartiju();
+    const zamijenjeni = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+    const promatrac = igraci.find((igrac) => igrac !== zamijenjeni)!;
+    const eliminacije: Eliminacija[] = [];
+    promatrac.socket.on('partija:eliminacija', (eliminacija) => eliminacije.push(eliminacija));
+
+    const { igrac: novaVeza, stanje } = await spojiIgracaIPricekajStanje(zamijenjeni.token);
+
+    expect(zamijenjeni.socket.connected).toBe(false);
+    expect(stanje.naPotezuId).toBe(runda.naPotezuId);
+    await odgodi(350);
+    expect(eliminacije.filter((eliminacija) => eliminacija.igracId === zamijenjeni.token)).toHaveLength(0);
+
+    odspojiIgrace([...igraci, novaVeza]);
+  });
+
+  it('RS-22: reconnect ne resetira cooldown reakcije', async () => {
+    const { igraci } = await pokreniPartiju();
+    const posiljatelj = igraci[0]!;
+    const promatrac = igraci[1]!;
+    const prvaReakcija = new Promise<void>((resolve) => promatrac.socket.once('reakcija:nova', () => resolve()));
+    posiljatelj.socket.emit('reakcija:posalji', { poruka: 'pozdrav' });
+    await prvaReakcija;
+
+    posiljatelj.socket.disconnect();
+    const novaVeza = await spojiIgraca(posiljatelj.token);
+    let drugaReakcijaStigla = false;
+    promatrac.socket.once('reakcija:nova', () => {
+      drugaReakcijaStigla = true;
+    });
+    novaVeza.socket.emit('reakcija:posalji', { poruka: 'sorry' });
+    await odgodi(100);
+
+    expect(drugaReakcijaStigla).toBe(false);
+    odspojiIgrace([...igraci, novaVeza]);
+  });
+
+  it('RS-23: reconnect ne resetira limit pokušaja poteza', async () => {
+    const { igraci, runda } = await pokreniPartiju();
+    const igracNaPotezu = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+    const prvaGreskaPromise = new Promise<{ kod: string }>((resolve) => {
+      igracNaPotezu.socket.once('greska', resolve);
+    });
+    for (let pokusaj = 0; pokusaj < 4; pokusaj += 1) {
+      igracNaPotezu.socket.emit('potez:rijec', { rijec: 'x' });
+    }
+    expect((await prvaGreskaPromise).kod).toBe('PREBRZO');
+
+    igracNaPotezu.socket.disconnect();
+    const novaVeza = await spojiIgraca(igracNaPotezu.token);
+    const drugaGreskaPromise = new Promise<{ kod: string }>((resolve) => {
+      novaVeza.socket.once('greska', resolve);
+    });
+    novaVeza.socket.emit('potez:rijec', { rijec: 'x' });
+
+    expect((await drugaGreskaPromise).kod).toBe('PREBRZO');
+    odspojiIgrace([...igraci, novaVeza]);
+  });
+
+  it('RS-11: dobrovoljni izlazak eliminira odmah bez tolerancije', async () => {
+    const { igraci, runda } = await pokreniPartiju();
+    const igracKojiIzlazi = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+    const promatrac = igraci.find((igrac) => igrac !== igracKojiIzlazi)!;
+    const eliminacijaPromise = new Promise<Eliminacija>((resolve) => {
+      promatrac.socket.once('partija:eliminacija', resolve);
+    });
+
+    igracKojiIzlazi.socket.emit('partija:izadji');
+    igracKojiIzlazi.socket.emit('potez:ne-znam');
+    const eliminacija = await eliminacijaPromise;
+
+    expect(eliminacija.igracId).toBe(igracKojiIzlazi.token);
+    expect(eliminacija.razlog).toBe('prekid');
+    odspojiIgrace(igraci);
+  });
+
+  it('eliminirani igrač se nakon reconnecta vraća kao promatrač', async () => {
+    const { igraci, runda } = await pokreniPartiju();
+    const eliminirani = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+    const promatrac = igraci.find((igrac) => igrac !== eliminirani)!;
+    const eliminacijaPromise = new Promise<Eliminacija>((resolve) => {
+      promatrac.socket.once('partija:eliminacija', resolve);
+    });
+    eliminirani.socket.emit('potez:ne-znam');
+    await eliminacijaPromise;
+    eliminirani.socket.disconnect();
+
+    const { igrac: novaVeza, stanje } = await spojiIgracaIPricekajStanje(eliminirani.token);
+
+    expect(stanje.eliminacije.some((eliminacija) => eliminacija.igracId === eliminirani.token)).toBe(true);
+    odspojiIgrace([...igraci, novaVeza]);
+  });
+
+  it('igrač koji se vrati nakon završetka dobiva stanje i personalizirani rezultat', async () => {
+    const { igraci, pocetak, runda } = await pokreniPartiju();
+    const buduciPobjednik = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+    const ostali = igraci.filter((igrac) => igrac !== buduciPobjednik);
+    buduciPobjednik.socket.disconnect();
+    for (const igrac of ostali) igrac.socket.emit('partija:izadji');
+
+    await cekajZavrsenuPartiju(pocetak.partijaId);
+
+    const rezultat = await spojiIgracaIPricekajStanjeIKraj(buduciPobjednik.token);
+
+    expect(rezultat.stanje.partijaId).toBe(pocetak.partijaId);
+    expect(rezultat.stanje.zavrsena).toBe(true);
+    expect(rezultat.kraj.plasmani.find((p) => p.igracId === buduciPobjednik.token)?.plasman).toBe(1);
+    odspojiIgrace([...igraci, rezultat.igrac]);
+  });
+
+  it('RS-13: kod istodobnih prekida igrač koji je bio na potezu nema prednost', async () => {
+    const { igraci, pocetak, runda } = await pokreniPartiju();
+    let rezultat: Awaited<ReturnType<typeof spojiIgracaIPricekajStanjeIKraj>> | null = null;
+    try {
+      const naPotezu = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+      const izvanPoteza = igraci.filter((igrac) => igrac !== naPotezu);
+
+      for (const igrac of izvanPoteza) igrac.socket.disconnect();
+      naPotezu.socket.disconnect();
+      await cekajZavrsenuPartiju(pocetak.partijaId);
+
+      rezultat = await spojiIgracaIPricekajStanjeIKraj(igraci[0]!.token);
+      const pobjednik = rezultat.kraj.plasmani.find((plasman) => plasman.plasman === 1)!;
+      expect(pobjednik.igracId).not.toBe(naPotezu.token);
+    } finally {
+      odspojiIgrace([...igraci, ...(rezultat ? [rezultat.igrac] : [])]);
+    }
   });
 
   it('kaladont: eliminira igraca koji je omogucio "ka", bod ide igracu koji ga izgovori', async () => {
@@ -401,6 +686,13 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(novaRunda.naPotezuId).not.toBe(igracKojiJeOmoguciKa);
     expect(novaRunda.naPotezuId).not.toBe(sayer.token);
 
+    const stanjePromise = new Promise<StanjePartije>((resolve) => {
+      promatrac.socket.once('partija:stanje', resolve);
+    });
+    promatrac.socket.emit('partija:stanje');
+    const stanje = await stanjePromise;
+    expect(stanje.eliminacije).toContainEqual(eliminacija);
+
     for (const igrac of igraci) igrac.socket.disconnect();
   });
 
@@ -434,6 +726,126 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(drugaReakcijaStigla).toBe(false);
 
     for (const igrac of igraci) igrac.socket.disconnect();
+  });
+});
+
+describe('motor partije - utrka timera i tolerancije prekida', () => {
+  it('zakašnjeli reconnect obrađuje sve istekle prekide kronološkim redom', async () => {
+    const posebniPosluzitelj = await izgradiPosluzitelj({
+      postavkeMotora: {
+        timerOnemogucen: true,
+        tolerancijaPrekidaMs: 100,
+        odgodaObradePrekidaMs: 500,
+      },
+    });
+    const igraciZaCiscenje: Igrac[] = [];
+    try {
+      await posebniPosluzitelj.app.listen({ port: 0, host: '127.0.0.1' });
+      const podaci = posebniPosluzitelj.app.server.address();
+      const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
+      const posebnaAdresa = `http://127.0.0.1:${port}`;
+      const { igraci, runda } = await pokreniPartiju(posebnaAdresa);
+      igraciZaCiscenje.push(...igraci);
+      const naPotezu = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+      const ranijeOdspojeni = igraci.find((igrac) => igrac !== naPotezu)!;
+      const promatrac = igraci.find((igrac) => igrac !== naPotezu && igrac !== ranijeOdspojeni)!;
+      const redoslijedEliminacija: string[] = [];
+      const dvijeEliminacije = new Promise<void>((resolve) => {
+        promatrac.socket.on('partija:eliminacija', (eliminacija) => {
+          if (eliminacija.igracId !== ranijeOdspojeni.token && eliminacija.igracId !== naPotezu.token) return;
+          redoslijedEliminacija.push(eliminacija.igracId);
+          if (redoslijedEliminacija.length === 2) resolve();
+        });
+      });
+
+      ranijeOdspojeni.socket.disconnect();
+      await odgodi(50);
+      naPotezu.socket.disconnect();
+      await odgodi(120);
+      const zakasnjeli = await spojiIgraca(naPotezu.token, posebnaAdresa);
+      igraciZaCiscenje.push(zakasnjeli);
+      await dvijeEliminacije;
+
+      expect(redoslijedEliminacija).toEqual([ranijeOdspojeni.token, naPotezu.token]);
+    } finally {
+      odspojiIgrace(igraciZaCiscenje);
+      await posebniPosluzitelj.app.close();
+    }
+  });
+
+  it('reconnect nakon formalnog roka ne poništava eliminaciju dok batch obrada kasni', async () => {
+    const posebniPosluzitelj = await izgradiPosluzitelj({
+      postavkeMotora: {
+        timerOnemogucen: true,
+        tolerancijaPrekidaMs: 100,
+        odgodaObradePrekidaMs: 500,
+      },
+    });
+    const igraciZaCiscenje: Igrac[] = [];
+    try {
+      await posebniPosluzitelj.app.listen({ port: 0, host: '127.0.0.1' });
+      const podaci = posebniPosluzitelj.app.server.address();
+      const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
+      const posebnaAdresa = `http://127.0.0.1:${port}`;
+      const { igraci, runda } = await pokreniPartiju(posebnaAdresa);
+      igraciZaCiscenje.push(...igraci);
+      const odspojeni = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+      const promatrac = igraci.find((igrac) => igrac !== odspojeni)!;
+      const eliminacijaPromise = new Promise<Eliminacija>((resolve) => {
+        promatrac.socket.on('partija:eliminacija', (eliminacija) => {
+          if (eliminacija.igracId === odspojeni.token) resolve(eliminacija);
+        });
+      });
+
+      odspojeni.socket.disconnect();
+      await odgodi(150);
+      const zakasnjeli = await spojiIgraca(odspojeni.token, posebnaAdresa);
+      igraciZaCiscenje.push(zakasnjeli);
+      const eliminacija = await eliminacijaPromise;
+
+      expect(eliminacija.razlog).toBe('prekid');
+    } finally {
+      odspojiIgrace(igraciZaCiscenje);
+      await posebniPosluzitelj.app.close();
+    }
+  });
+
+  it('istek poteza prije tolerancije proizvodi samo jednu eliminaciju s razlogom istek', async () => {
+    const posebniPosluzitelj = await izgradiPosluzitelj({
+      postavkeMotora: {
+        timerOnemogucen: false,
+        trajanjePotezaMs: 1_000,
+        tolerancijaPrekidaMs: 2_000,
+      },
+    });
+    const igraciZaCiscenje: Igrac[] = [];
+    try {
+      await posebniPosluzitelj.app.listen({ port: 0, host: '127.0.0.1' });
+      const podaci = posebniPosluzitelj.app.server.address();
+      const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
+      const posebnaAdresa = `http://127.0.0.1:${port}`;
+      const { igraci, runda } = await pokreniPartiju(posebnaAdresa);
+      igraciZaCiscenje.push(...igraci);
+      const odspojeni = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+      const promatrac = igraci.find((igrac) => igrac !== odspojeni)!;
+      const eliminacije: Eliminacija[] = [];
+      const eliminacijaPromise = new Promise<Eliminacija>((resolve) => {
+        promatrac.socket.on('partija:eliminacija', (eliminacija) => {
+          eliminacije.push(eliminacija);
+          if (eliminacija.igracId === odspojeni.token) resolve(eliminacija);
+        });
+      });
+
+      expect(new Date(runda.istekPotezaIso).getTime() - Date.now()).toBeGreaterThan(500);
+      odspojeni.socket.disconnect();
+      const eliminacija = await eliminacijaPromise;
+      expect(eliminacija.razlog).toBe('istek');
+      await odgodi(2_050);
+      expect(eliminacije.filter((dogadaj) => dogadaj.igracId === odspojeni.token)).toHaveLength(1);
+    } finally {
+      odspojiIgrace(igraciZaCiscenje);
+      await posebniPosluzitelj.app.close();
+    }
   });
 });
 

@@ -56,6 +56,10 @@ export interface StanjePartije {
   eliminacije: Eliminacija[];
   sustavBiraRijec: boolean;
   istekIzboraIso: string | null;
+  zadnjaRijec: string | null;
+  zadnjaRijecIgracId: string | null;
+  zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
+  zavrsena: boolean;
 }
 
 export interface PrihvacenPotez {
@@ -91,6 +95,7 @@ export interface Eliminacija {
 }
 
 export interface KrajPartije {
+  partijaId: string;
   plasmani: {
     igracId: string;
     plasman: 1 | 2 | 3 | 4;

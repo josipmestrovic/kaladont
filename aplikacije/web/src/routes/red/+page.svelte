@@ -2,11 +2,12 @@
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { dohvatiSocket } from '$lib/socket.js';
+  import { jeRegistriranKorisnik, jeOnboardingZavrsen } from '$lib/identitet.js';
   import { SAVJETI } from '$lib/savjeti.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
-  import type { PayloadGreska, StanjeReda } from 'zajednicko';
+  import type { PayloadGreska, StanjePartije, StanjeReda } from 'zajednicko';
 
   const igra = dohvatiStanjeIgre();
 
@@ -55,6 +56,10 @@
   });
 
   onMount(() => {
+    if (!jeRegistriranKorisnik() && !jeOnboardingZavrsen()) {
+      void goto('/dobrodoslica');
+      return;
+    }
     pokreniSlusateljeIgre();
     sliderInterval = setInterval(() => {
       aktivniSavjet = (aktivniSavjet + 1) % SAVJETI.length;
@@ -75,14 +80,25 @@
     const naGresku = (greska: PayloadGreska) => {
       poruka = greska.poruka;
     };
+    const naStanjePartije = (stanjePartije: StanjePartije) => {
+      if (!stanjePartije.zavrsena) void goto(`/partija/${stanjePartije.partijaId}`);
+    };
     socket.on('red:stanje', naStanjeReda);
+    socket.on('partija:stanje', naStanjePartije);
     socket.on('greska', naGresku);
-    socket.emit('red:udji');
+    const udjiURed = () => {
+      socket.emit('partija:stanje');
+      socket.emit('red:udji');
+    };
+    socket.on('connect', udjiURed);
+    if (socket.connected) udjiURed();
     aktivirajAudio();
     pustiAudio('ulazak-u-sobu');
 
     return () => {
+      socket.off('connect', udjiURed);
       socket.off('red:stanje', naStanjeReda);
+      socket.off('partija:stanje', naStanjePartije);
       socket.off('greska', naGresku);
     };
   });

@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
@@ -29,6 +30,13 @@ afterEach(async () => {
 afterAll(async () => {
   await app.close();
 });
+
+/** Umeće gost-zapis izravno u bazu (bez Socket.IO handshakea) za testiranje REST ruta. */
+async function stvoriGosta(): Promise<string> {
+  const id = randomUUID();
+  await baza.insert(igraci).values({ id, vrsta: 'gost', nadimak: 'PocetniGost', avatarId: 0 });
+  return id;
+}
 
 describe('GET /profil', () => {
   it('odbija neprijavljeni zahtjev', async () => {
@@ -78,5 +86,101 @@ describe('GET /povijest/:igracId', () => {
     expect(odgovor.status).toBe(200);
     const tijelo = (await odgovor.json()) as { ok: boolean; partije: unknown[] };
     expect(tijelo.partije).toEqual([]);
+  });
+});
+
+describe('PUT /profil/avatar', () => {
+  it('odbija neidentificirani zahtjev', async () => {
+    const odgovor = await fetch(`${adresa}/profil/avatar`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ avatarId: 1 }),
+    });
+    expect(odgovor.status).toBe(401);
+  });
+
+  it('dopušta gostu da odabere avatar (onboarding)', async () => {
+    const gostId = await stvoriGosta();
+    try {
+      const odgovor = await fetch(`${adresa}/profil/avatar`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${gostId}` },
+        body: JSON.stringify({ avatarId: 3 }),
+      });
+      expect(odgovor.status).toBe(200);
+      const tijelo = (await odgovor.json()) as { ok: boolean; avatarId: number };
+      expect(tijelo.avatarId).toBe(3);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.id, gostId));
+    }
+  });
+
+  it('odbija avatarId izvan raspona', async () => {
+    const gostId = await stvoriGosta();
+    try {
+      const odgovor = await fetch(`${adresa}/profil/avatar`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${gostId}` },
+        body: JSON.stringify({ avatarId: 999 }),
+      });
+      expect(odgovor.status).toBe(400);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.id, gostId));
+    }
+  });
+});
+
+describe('PUT /profil/nadimak', () => {
+  it('odbija neidentificirani zahtjev', async () => {
+    const odgovor = await fetch(`${adresa}/profil/nadimak`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nadimak: 'Ana' }),
+    });
+    expect(odgovor.status).toBe(401);
+  });
+
+  it('dopušta gostu da postavi ime (onboarding)', async () => {
+    const gostId = await stvoriGosta();
+    try {
+      const odgovor = await fetch(`${adresa}/profil/nadimak`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${gostId}` },
+        body: JSON.stringify({ nadimak: 'Ana' }),
+      });
+      expect(odgovor.status).toBe(200);
+      const tijelo = (await odgovor.json()) as { ok: boolean; nadimak: string };
+      expect(tijelo.nadimak).toBe('Ana');
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.id, gostId));
+    }
+  });
+
+  it('odbija ime kraće od 2 znaka', async () => {
+    const gostId = await stvoriGosta();
+    try {
+      const odgovor = await fetch(`${adresa}/profil/nadimak`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${gostId}` },
+        body: JSON.stringify({ nadimak: 'A' }),
+      });
+      expect(odgovor.status).toBe(400);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.id, gostId));
+    }
+  });
+
+  it('odbija ime dulje od 20 znakova', async () => {
+    const gostId = await stvoriGosta();
+    try {
+      const odgovor = await fetch(`${adresa}/profil/nadimak`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${gostId}` },
+        body: JSON.stringify({ nadimak: 'A'.repeat(21) }),
+      });
+      expect(odgovor.status).toBe(400);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.id, gostId));
+    }
   });
 });

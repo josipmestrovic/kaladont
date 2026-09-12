@@ -3,13 +3,14 @@
  * potpisani sesijski token nakon prijave - racuni/tokeni.ts).
  * RS-18: dopuštena je samo jedna aktivna veza po identitetu.
  */
-import { eq } from 'drizzle-orm';
+import { and, eq, lt } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
 import { generirajNadimak } from './nadimci.js';
 import { jePotpisaniToken, provjeriSesijskiToken } from '../racuni/tokeni.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INTERVAL_AKTIVNOSTI_MS = 15 * 60 * 1000;
 
 /** Broj statičkih avatara dostupnih u web katalogu. */
 export const BROJ_AVATARA = 9;
@@ -40,6 +41,17 @@ function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
   };
 }
 
+async function osvjeziZadnjuAktivnostAkoTreba(redak: typeof igraci.$inferSelect): Promise<void> {
+  const sada = new Date();
+  const granica = new Date(sada.getTime() - INTERVAL_AKTIVNOSTI_MS);
+  if (redak.zadnjaAktivnost >= granica) return;
+
+  await baza
+    .update(igraci)
+    .set({ zadnjaAktivnost: sada })
+    .where(and(eq(igraci.id, redak.id), lt(igraci.zadnjaAktivnost, granica)));
+}
+
 /**
  * Razrješava identitet iz tokena poslanog u Socket.IO handshakeu.
  * - Potpisani sesijski token (nakon prijave) -> mora postojati odgovarajući red, inače baca grešku.
@@ -56,7 +68,7 @@ export async function razrijesiIdentitet(token: string): Promise<Identitet> {
     if (!postojeci) {
       throw new Error('Sesijski token ne odgovara nijednom igraču');
     }
-    await baza.update(igraci).set({ zadnjaAktivnost: new Date() }).where(eq(igraci.id, igracId));
+    await osvjeziZadnjuAktivnostAkoTreba(postojeci);
     return uIdentitet(postojeci);
   }
 
@@ -66,10 +78,7 @@ export async function razrijesiIdentitet(token: string): Promise<Identitet> {
     if (postojeci.vrsta !== 'gost') {
       throw new Error('Registrirani račun zahtijeva sesijski token, ne goli identitet');
     }
-    await baza
-      .update(igraci)
-      .set({ zadnjaAktivnost: new Date() })
-      .where(eq(igraci.id, token));
+    await osvjeziZadnjuAktivnostAkoTreba(postojeci);
     return uIdentitet(postojeci);
   }
 

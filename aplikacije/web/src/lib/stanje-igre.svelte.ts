@@ -23,6 +23,9 @@ interface StanjeIgre {
   kraj: KrajPartije | null;
   sustavBiraRijec: boolean;
   istekIzboraIso: string | null;
+  zadnjaRijec: string | null;
+  zadnjaRijecIgracId: string | null;
+  zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
 }
 
 const stanje = $state<StanjeIgre>({
@@ -41,6 +44,9 @@ const stanje = $state<StanjeIgre>({
   kraj: null,
   sustavBiraRijec: false,
   istekIzboraIso: null,
+  zadnjaRijec: null,
+  zadnjaRijecIgracId: null,
+  zadnjaRijecVrsta: null,
 });
 
 let pokrenuto = false;
@@ -54,6 +60,7 @@ function pustiOdbijanje(): void {
 
 function primijeniStanjePartije(p: StanjePartije): void {
   stanje.partijaId = p.partijaId;
+  stanje.pocetakPartijeIso = null;
   stanje.mojIgracId = p.mojIgracId;
   stanje.sjedala = p.sjedala;
   stanje.naPotezuId = p.naPotezuId;
@@ -65,6 +72,9 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.zadnjaEliminacija = p.eliminacije.at(-1) ?? null;
   stanje.sustavBiraRijec = p.sustavBiraRijec;
   stanje.istekIzboraIso = p.istekIzboraIso;
+  stanje.zadnjaRijec = p.zadnjaRijec;
+  stanje.zadnjaRijecIgracId = p.zadnjaRijecIgracId;
+  stanje.zadnjaRijecVrsta = p.zadnjaRijecVrsta;
 }
 
 export function pokreniSlusateljeIgre(): void {
@@ -88,6 +98,9 @@ export function pokreniSlusateljeIgre(): void {
     stanje.poruka = null;
     stanje.sustavBiraRijec = false;
     stanje.istekIzboraIso = null;
+    stanje.zadnjaRijec = null;
+    stanje.zadnjaRijecIgracId = null;
+    stanje.zadnjaRijecVrsta = null;
   });
 
   socket.on('partija:stanje', primijeniStanjePartije);
@@ -104,6 +117,9 @@ export function pokreniSlusateljeIgre(): void {
     stanje.istekPotezaIso = p.istekPotezaIso;
     stanje.brojIskoristenih = p.brojIskoristenih;
     stanje.poruka = null;
+    stanje.zadnjaRijec = p.rijec;
+    stanje.zadnjaRijecIgracId = p.igracId;
+    stanje.zadnjaRijecVrsta = 'rijec';
   });
 
   socket.on('potez:odbijen', (p) => {
@@ -115,6 +131,11 @@ export function pokreniSlusateljeIgre(): void {
     pustiAudio('eliminacija');
     stanje.eliminacije = [...stanje.eliminacije, p];
     stanje.zadnjaEliminacija = p;
+    if (p.rijecUzrok) {
+      stanje.zadnjaRijec = p.rijecUzrok;
+      stanje.zadnjaRijecIgracId = p.bodZa;
+      stanje.zadnjaRijecVrsta = 'rijec';
+    }
   });
 
   socket.on('partija:sustav-bira-rijec', (p) => {
@@ -134,9 +155,13 @@ export function pokreniSlusateljeIgre(): void {
     stanje.trazenaSlova = p.trazenaSlova;
     stanje.istekPotezaIso = p.istekPotezaIso;
     stanje.runda = p.runda;
+    stanje.zadnjaRijec = p.rijec;
+    stanje.zadnjaRijecIgracId = null;
+    stanje.zadnjaRijecVrsta = 'sustav_rijec';
   });
 
   socket.on('partija:kraj', (p) => {
+    if (p.partijaId !== stanje.partijaId) return;
     // partija-kraj zvuk pušta se tek kad se prikažu konačni rezultati (partija/[id]/+page.svelte),
     // ne ovdje - inače se preklapa sa zvukom zadnje eliminacije.
     stanje.kraj = p;

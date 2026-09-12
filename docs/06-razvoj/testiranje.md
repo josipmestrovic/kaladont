@@ -16,6 +16,18 @@ Postojeći Vitest i Socket.IO testovi izvršavaju se lokalno uz native PostgreSQ
 
 Na GitHubovom Ubuntu runneru stvarna amd64 slika prolazi migracije, sintetički rječnik, `/zdravlje` i simulaciju cijele partije. Nakon zelenog CI-ja zaseban workflow objavljuje image u GHCR-u s commit tagom i digestom. Stvarni hrLex uvoz izvodi se ručno na staging VPS-u, ne u CI-ju.
 
+## Baseline Socket.IO opterećenja
+
+CLI `pnpm --filter posluzitelj opterecenje` pokreće kontrolirano opterećenje prema adresi iz `SIMULACIJA_ADRESA` ili argumenta `--adresa`. Ne pokreće se automatski u CI-ju i ne smije se usmjeriti na produkciju.
+
+```powershell
+pnpm --filter posluzitelj opterecenje -- --scenarij=veze --klijenti=100 --val=20 --trajanje-ms=5000
+pnpm --filter posluzitelj opterecenje -- --scenarij=red --klijenti=40 --idle=100 --val=20
+pnpm --filter posluzitelj opterecenje -- --scenarij=reconnect --klijenti=100 --val=20 --ciklusi=3
+```
+
+Scenariji ispisuju JSON s p50/p95 i maksimalnim trajanjem spajanja, odnosno čekanja na sastavljanje stola. `--idle` u scenariju reda drži dodatne veze izvan čekaonice kako bi mjerenje otkrilo regresiju na globalni obilazak socketova. Nakon matchmaking mjerenja alat šalje `partija:izadji` svim uparenim klijentima i zadano čeka 16 sekundi da se stolovi uklone; čekanje se može promijeniti argumentom `--cekaj-ciscenje-ms`. Before/after mjerenje mora koristiti isti stroj, bazu, broj klijenata, veličinu vala i mrežni put. Staging test počinje malim brojem klijenata i povećava se stupnjevito uz praćenje CPU-a, memorije, PostgreSQL-a i pogrešaka.
+
 ## Obavezno pokriveno jediničnim testovima
 
 ### Grafemi (`grafemi.ts`)
@@ -47,8 +59,12 @@ Na GitHubovom Ubuntu runneru stvarna amd64 slika prolazi migracije, sintetički 
 
 - Puna simulirana partija: 4 socket klijenta, nasumične valjane riječi → partija završi, plasmani konzistentni, agregati točni.
 - Istek timera eliminira šutljivog klijenta (ubrzani sat u testu).
-- Prekid veze na potezu / izvan poteza → RS-09 / RS-10 bodovi.
+- Prekid veze kraći od 10 sekundi obnavlja sobu i potpuno stanje bez pomicanja timera poteza.
+- Prekid veze dulji od 10 sekundi na potezu / izvan poteza → RS-09 / RS-10 bodovi.
+- Zamjena stare veze novom vezom istog identiteta ne eliminira igrača iz aktivne partije; u redu čekanja stara veza odmah gubi mjesto, a nova ulazi na kraj.
+- Dobrovoljni izlazak eliminira odmah, bez tolerancije.
 - Utrka potez vs. istek: potez pristigao „prekasno" se ignorira (RS-14).
+- Utrka isteka poteza i tolerancije prekida daje točno jednu eliminaciju; raniji istek određuje razlog.
 
 ## Svojstveni test (property-based, poželjno)
 

@@ -3,7 +3,6 @@
  * RS-16: heartbeat/disconnect uklanja igrača iz reda u real-timeu.
  * RS-17: sastavljanje stola je atomarno (RedCekanja.pokusajSastaviStol).
  */
-import { PORUKE } from 'zajednicko';
 import type { StanjeReda } from 'zajednicko';
 import { izracunajRang } from 'zajednicko';
 import type { KaladontIo } from '../server.js';
@@ -15,6 +14,7 @@ const SOBA_REDA = 'red-cekanja';
 export function registrirajRedCekanja(
   io: KaladontIo,
   naStolSastavljen: (stol: StavkaReda[]) => void,
+  igracImaAktivnuPartiju: (igracId: string) => boolean,
 ): { ukloniIzReda: (igracId: string) => void } {
   const red = new RedCekanja();
 
@@ -37,15 +37,20 @@ export function registrirajRedCekanja(
   }
 
   function posaljiStanje(): void {
-    for (const [, socket] of io.sockets.sockets) {
-      if (socket.rooms.has(SOBA_REDA)) socket.emit('red:stanje', izracunajStanje(socket.data.igracId));
+    const socketIdovi = io.sockets.adapter.rooms.get(SOBA_REDA);
+    if (!socketIdovi) return;
+    for (const socketId of socketIdovi) {
+      const socket = io.sockets.sockets.get(socketId);
+      if (socket) socket.emit('red:stanje', izracunajStanje(socket.data.igracId));
     }
   }
 
   io.on('connection', (socket) => {
     socket.on('red:udji', () => {
+      if (igracImaAktivnuPartiju(socket.data.igracId)) return;
       if (red.stanje().some((s) => s.igracId === socket.data.igracId)) {
-        socket.emit('greska', { kod: 'VEC_U_REDU', poruka: PORUKE.vecURedu });
+        socket.join(SOBA_REDA);
+        socket.emit('red:stanje', izracunajStanje(socket.data.igracId));
         return;
       }
 

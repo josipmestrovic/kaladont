@@ -20,9 +20,9 @@ afterAll(async () => {
   await app.close();
 });
 
-function spojiSe(): Promise<ClientSocket> {
+function spojiSe(token = randomUUID()): Promise<ClientSocket> {
   return new Promise((resolve, reject) => {
-    const socket = ioClient(adresa, { auth: { token: randomUUID() }, forceNew: true });
+    const socket = ioClient(adresa, { auth: { token }, forceNew: true });
     socket.on('connect', () => resolve(socket));
     socket.on('connect_error', reject);
   });
@@ -78,5 +78,111 @@ describe('red čekanja', () => {
     expect(stanjaPetog.length).toBeGreaterThan(0);
 
     for (const klijent of klijenti) klijent.disconnect();
+  });
+
+  it('stanje reda šalje samo socketima koji su u sobi reda', async () => {
+    const izvanReda = await spojiSe();
+    const uRedu = await spojiSe();
+    let izvanRedaPrimioStanje = false;
+    izvanReda.on('red:stanje', () => {
+      izvanRedaPrimioStanje = true;
+    });
+
+    const stanjePromise = new Promise<StanjeReda>((resolve) => uRedu.once('red:stanje', resolve));
+    uRedu.emit('red:udji');
+    const stanje = await stanjePromise;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(stanje.mjesta.filter(Boolean)).toHaveLength(1);
+    expect(izvanRedaPrimioStanje).toBe(false);
+    izvanReda.disconnect();
+    uRedu.disconnect();
+  });
+
+  it('RS-18: zamjenska veza ponovno ulazi na kraj reda bez duplikata', async () => {
+    const tokeni = [randomUUID(), randomUUID(), randomUUID()];
+    const veze = await Promise.all(tokeni.map((token) => spojiSe(token)));
+    for (const veza of veze) {
+      const stanjePromise = new Promise<StanjeReda>((resolve) => veza.once('red:stanje', resolve));
+      veza.emit('red:udji');
+      await stanjePromise;
+    }
+
+    const odjavaStare = new Promise<void>((resolve) => veze[1]!.once('disconnect', () => resolve()));
+    const zamjenskaVeza = await spojiSe(tokeni[1]!);
+    await odjavaStare;
+    const stanjePromise = new Promise<StanjeReda>((resolve) => zamjenskaVeza.once('red:stanje', resolve));
+    zamjenskaVeza.emit('red:udji');
+    const stanje = await stanjePromise;
+
+    expect(stanje.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
+      tokeni[0],
+      tokeni[2],
+      tokeni[1],
+    ]);
+    for (const veza of [...veze, zamjenskaVeza]) veza.disconnect();
+  });
+
+  it('RS-16: stvarni prekid oslobađa mjesto, a povratak ulazi na kraj reda', async () => {
+    const tokeni = [randomUUID(), randomUUID(), randomUUID()];
+    const veze = await Promise.all(tokeni.map((token) => spojiSe(token)));
+    for (const veza of veze) {
+      const stanjePromise = new Promise<StanjeReda>((resolve) => veza.once('red:stanje', resolve));
+      veza.emit('red:udji');
+      await stanjePromise;
+    }
+
+    const stanjeNakonPrekida = new Promise<StanjeReda>((resolve) => veze[0]!.once('red:stanje', resolve));
+    veze[1]!.disconnect();
+    const bezOdspojenog = await stanjeNakonPrekida;
+    expect(bezOdspojenog.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
+      tokeni[0],
+      tokeni[2],
+    ]);
+
+    const povratnaVeza = await spojiSe(tokeni[1]!);
+    const stanjeNakonPovratka = new Promise<StanjeReda>((resolve) => povratnaVeza.once('red:stanje', resolve));
+    povratnaVeza.emit('red:udji');
+    const stanje = await stanjeNakonPovratka;
+    expect(stanje.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
+      tokeni[0],
+      tokeni[2],
+      tokeni[1],
+    ]);
+
+    for (const veza of [...veze, povratnaVeza]) veza.disconnect();
+  });
+
+  it('igrač iz aktivne partije ne može ponovno popuniti drugi stol', async () => {
+    const tokeniAktivnePartije = Array.from({ length: 4 }, () => randomUUID());
+    const aktivniIgraci = await Promise.all(tokeniAktivnePartije.map((token) => spojiSe(token)));
+    const pocetakAktivne = new Promise<PocetakPartije>((resolve) => {
+      aktivniIgraci[0]!.once('partija:pocetak', resolve);
+    });
+    for (const igrac of aktivniIgraci) igrac.emit('red:udji');
+    await pocetakAktivne;
+
+    const noviTokeni = Array.from({ length: 4 }, () => randomUUID());
+    const noviIgraci = await Promise.all(noviTokeni.map((token) => spojiSe(token)));
+    for (const igrac of noviIgraci.slice(0, 3)) igrac.emit('red:udji');
+    aktivniIgraci[0]!.emit('red:udji');
+
+    const pocetciNovih = Promise.all(
+      noviIgraci.map(
+        (igrac) => new Promise<PocetakPartije>((resolve) => igrac.once('partija:pocetak', resolve)),
+      ),
+    );
+    noviIgraci[3]!.emit('red:udji');
+    const pocetci = await pocetciNovih;
+
+    for (const pocetak of pocetci) {
+      expect(new Set(pocetak.sjedala.map((sjedalo) => sjedalo.igracId))).toEqual(new Set(noviTokeni));
+      expect(pocetak.sjedala.some((sjedalo) => sjedalo.igracId === tokeniAktivnePartije[0])).toBe(false);
+    }
+
+    for (const igrac of [...aktivniIgraci, ...noviIgraci]) {
+      igrac.emit('partija:izadji');
+      igrac.disconnect();
+    }
   });
 });

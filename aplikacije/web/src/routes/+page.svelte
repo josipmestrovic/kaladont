@@ -1,15 +1,25 @@
 <script lang="ts">
-  import { jeRegistriranKorisnik } from '$lib/identitet.js';
+  import { goto } from '$app/navigation';
+  import { jeRegistriranKorisnik, jeOnboardingZavrsen } from '$lib/identitet.js';
   import StatistikaRjecnika from '$lib/komponente/StatistikaRjecnika.svelte';
 
   const registriran = jeRegistriranKorisnik();
+
+  function igraj(e: MouseEvent) {
+    e.preventDefault();
+    if (!registriran && !jeOnboardingZavrsen()) {
+      void goto('/dobrodoslica');
+    } else {
+      void goto('/red');
+    }
+  }
 </script>
 
 <div class="landing">
   <h1 class="logotip">Kaladont</h1>
   <p class="podnaslov">Hrvatska igra riječi. Četvero za stolom, 30 sekundi po potezu.</p>
 
-  <a href="/red" class="igraj-gumb">IGRAJ</a>
+  <a href="/red" class="igraj-gumb" onclick={igraj}>IGRAJ</a>
 
   {#if registriran}
     <p><a href="/postavke">⚙ Postavke</a></p>

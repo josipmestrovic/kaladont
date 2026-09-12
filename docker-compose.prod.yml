@@ -32,6 +32,7 @@ services:
       UMAMI_URL: ${UMAMI_URL:-}
       ONEMOGUCI_TIMER_POTEZA: "false"
       ODGODA_POCETKA_PARTIJE_MS: "10000"
+      TOLERANCIJA_PREKIDA_MS: "10000"
       ADMIN_TAJNI_KLJUC: ${ADMIN_TAJNI_KLJUC:?Postavi produkcijski ADMIN_TAJNI_KLJUC}
       SIMULACIJA_ADRESA: http://aplikacija:3000
       VERZIJA: ${VERZIJA:?Postavi verziju izdanja}

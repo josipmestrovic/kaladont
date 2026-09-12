@@ -26,7 +26,7 @@ Da se ne bi moglo namjestiti ishod biranjem "ciljane" početne riječi (npr. oda
 
 Tijek otvaranja runde:
 
-1. Klijentima se prikaže 5-sekundni ekran s obrazloženjem zadnje eliminacije (ako postoji) i porukom „Sustav će sada nasumično odabrati novu riječ..." uz brojač/loading indikator. Tijekom ovih 5 sekundi nitko ne može igrati.
+1. Klijentima se prikaže 10-sekundni ekran s obrazloženjem zadnje eliminacije (ako postoji) i porukom „Sustav će sada nasumično odabrati novu riječ..." uz brojač/loading indikator. Tijekom ovih 10 sekundi nitko ne može igrati.
 2. Sustav nasumično odabere aktivnu **imeničku lemu u nominativu** kraću od 6 znakova koja **sama ima barem jedan slobodan (neiskorišten) nastavak**. Pool trenutno ima 3.821 riječi; ograničenje vrijedi samo za sustavovo otvaranje runde, ne i za riječi koje igrači smiju odigrati. Time je klopka u otvaranju strukturno nemoguća, a početne riječi ostaju kratke i poznatije.
 3. Riječ se objavljuje („Sustav je odabrao riječ: X") i red prelazi na **sljedećeg aktivnog igrača** nakon onoga tko je prouzročio otvaranje nove runde (napadača prethodne eliminacije, ili nasumičnog prvog igrača za 1. rundu). Tek tada kreće **30-sekundni timer** poteza.
 4. Igrač koji je sada na potezu odgovara na sustavovu riječ **kao na normalan nastavak** — ne bira on početnu riječ.
@@ -75,7 +75,7 @@ Igrač ispada iz partije na jedan od pet načina:
 | **Ne znam** | Klik na gumb „Ne znam riječ na 'XY'" (uz potvrdu) | Da |
 | **Istek vremena** | 30 sekundi prošlo bez valjane riječi | Da |
 | **Mrtva slova** | Na tražena dva grafema ne postoji nijedna dostupna riječ — server to utvrđuje **odmah** pri upisu prethodne riječi | Da |
-| **Prekid veze** | Veza prekinuta tijekom partije → trenutna eliminacija | Samo ako je prekid bio na potezu prekinutog |
+| **Prekid veze** | Veza nije obnovljena unutar 10 sekundi nakon detektiranog prekida | Samo ako je prekid bio na potezu prekinutog |
 | **Kaladont** | Netko je izgovorio „kaladont"/„kalodont" — ispada igrač koji je omogućio „ka" | Da, onome tko je izgovorio riječ |
 
 Kod „mrtvih slova" razlikuju se dvije poruke eliminiranom igraču:
