@@ -31,7 +31,8 @@ function prosjekBodova(bodoviUkupno: number, odigrane: number): number {
 export async function registrirajProfilRute(app: FastifyInstance): Promise<void> {
   app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    const prosjek = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
+    const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
+    const prosjek1v1 = prosjekBodova(igrac.bodovi1v1, igrac.odigrane1v1);
     return {
       ok: true,
       igracId: igrac.id,
@@ -43,8 +44,14 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
       pobjede: igrac.pobjede,
       eliminacijeUkupno: igrac.eliminacijeUkupno,
       bodoviUkupno: igrac.bodoviUkupno,
-      prosjekBodova: prosjek,
-      rang: izracunajRang(igrac.odigrane, prosjek),
+      prosjekBodova: prosjek4p,
+      rang: izracunajRang(igrac.odigrane, prosjek4p),
+      odigrane1v1: igrac.odigrane1v1,
+      pobjede1v1: igrac.pobjede1v1,
+      eliminacije1v1: igrac.eliminacije1v1,
+      bodovi1v1: igrac.bodovi1v1,
+      prosjekBodova1v1: prosjek1v1,
+      rang1v1: izracunajRang(igrac.odigrane1v1, prosjek1v1),
       stvoren: igrac.stvoren,
     };
   });
@@ -106,45 +113,60 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
     return { ok: true };
   });
 
-  app.get<{ Querystring: { limit?: string } }>('/ljestvica', { preHandler: pokusajIdentifikaciju }, async (zahtjev) => {
+  app.get<{ Querystring: { limit?: string; mod?: string } }>('/ljestvica', { preHandler: pokusajIdentifikaciju }, async (zahtjev) => {
     const rezultatLimita = ShemaLimit.safeParse(zahtjev.query);
     const limit = rezultatLimita.success ? (rezultatLimita.data.limit ?? 10) : 10;
+    const je1v1 = zahtjev.query.mod === 'dva_igraca' || zahtjev.query.mod === '1v1';
+
+    const colOdigrane = je1v1 ? igraci.odigrane1v1 : igraci.odigrane;
+    const colPobjede = je1v1 ? igraci.pobjede1v1 : igraci.pobjede;
+    const colBodovi = je1v1 ? igraci.bodovi1v1 : igraci.bodoviUkupno;
 
     const kandidati = await baza
       .select()
       .from(igraci)
-      .where(gte(igraci.odigrane, 10))
-      .orderBy(desc(sql`${igraci.bodoviUkupno}::float / ${igraci.odigrane}`))
+      .where(gte(colOdigrane, 10))
+      .orderBy(desc(sql`${colBodovi}::float / ${colOdigrane}`))
       .limit(limit);
 
     const ljestvica = kandidati.map((igrac, indeks) => {
-      const prosjek = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
+      const odig = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
+      const bod = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
+      const pobj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
+      const prosjek = prosjekBodova(bod, odig);
+
       return {
         mjesto: indeks + 1,
         nadimak: igrac.nadimak,
-        rang: izracunajRang(igrac.odigrane, prosjek),
+        rang: izracunajRang(odig, prosjek),
         prosjekBodova: prosjek,
-        odigrane: igrac.odigrane,
-        postotakPobjeda: igrac.odigrane > 0 ? (igrac.pobjede / igrac.odigrane) * 100 : 0,
+        odigrane: odig,
+        postotakPobjeda: odig > 0 ? (pobj / odig) * 100 : 0,
       };
     });
 
     let mojeMjesto: (typeof ljestvica)[number] | null = null;
     const igrac = (zahtjev as ZahtjevSIgracem).igrac;
-    if (igrac && igrac.odigrane >= 10) {
-      const prosjekMoj = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
-      const [redakBoljih] = await baza
-        .select({ boljihOdMene: sql<number>`count(*)::int` })
-        .from(igraci)
-        .where(sql`${igraci.odigrane} >= 10 and ${igraci.bodoviUkupno}::float / ${igraci.odigrane} > ${prosjekMoj}`);
-      mojeMjesto = {
-        mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
-        nadimak: igrac.nadimak,
-        rang: izracunajRang(igrac.odigrane, prosjekMoj),
-        prosjekBodova: prosjekMoj,
-        odigrane: igrac.odigrane,
-        postotakPobjeda: (igrac.pobjede / igrac.odigrane) * 100,
-      };
+    if (igrac) {
+      const odigMoj = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
+      const bodMoj = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
+      const pobjMoj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
+
+      if (odigMoj >= 10) {
+        const prosjekMoj = prosjekBodova(bodMoj, odigMoj);
+        const [redakBoljih] = await baza
+          .select({ boljihOdMene: sql<number>`count(*)::int` })
+          .from(igraci)
+          .where(sql`${colOdigrane} >= 10 and ${colBodovi}::float / ${colOdigrane} > ${prosjekMoj}`);
+        mojeMjesto = {
+          mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
+          nadimak: igrac.nadimak,
+          rang: izracunajRang(odigMoj, prosjekMoj),
+          prosjekBodova: prosjekMoj,
+          odigrane: odigMoj,
+          postotakPobjeda: (pobjMoj / odigMoj) * 100,
+        };
+      }
     }
 
     return { ok: true, ljestvica, mojeMjesto };
@@ -182,7 +204,10 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
     };
   });
 
-  app.get<{ Params: { igracId: string } }>('/povijest/:igracId', async (zahtjev) => {
+  app.get<{ Params: { igracId: string }; Querystring: { limit?: string; offset?: string } }>('/povijest/:igracId', async (zahtjev) => {
+    const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '10', 10) || 10, 1), 50);
+    const offset = Math.max(parseInt(zahtjev.query.offset ?? '0', 10) || 0, 0);
+
     const retci = await baza
       .select({
         partijaId: sudioniciPartije.partijaId,
@@ -197,7 +222,8 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
       .innerJoin(partije, eq(partije.id, sudioniciPartije.partijaId))
       .where(eq(sudioniciPartije.igracId, zahtjev.params.igracId))
       .orderBy(desc(partije.pocetak))
-      .limit(50);
+      .limit(limit)
+      .offset(offset);
 
     return { ok: true, partije: retci };
   });

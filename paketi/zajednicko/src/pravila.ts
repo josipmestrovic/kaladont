@@ -46,15 +46,36 @@ export interface RjecnikSucelje {
   jePostojecaRijec(rijec: string): boolean;
   /** Leksemske grupe kojima oblik pripada; prazan niz ako riječ nije u bazi. */
   grupeZa(rijec: string): readonly string[];
+  /** Vrste riječi kojima oblik pripada (npr. ['imenica']). */
+  vrsteZa?(rijec: string): readonly VrstaRijeci[];
+  /** Je li riječ osnovni oblik (nominativ imenice/pridjeva/zamjenice/broja ili infinitiv glagola). */
+  jeOsnovniOblik?(rijec: string): boolean;
   /** Postoji li ikoja aktivna riječ u bazi koja počinje na ova dva grafema. */
   postojeRijeciNa(dvaGrafema: string): boolean;
   /** Postoji li još igriva riječ (nijedna njena grupa potrošena) koja počinje na ova dva grafema. */
-  imaSlobodnuRijecNa(dvaGrafema: string, iskoristeneGrupe: ReadonlySet<string>): boolean;
+  imaSlobodnuRijecNa(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): boolean;
   /** Nasumična igriva imenička lema u nominativu kraća od 6 znakova sa slobodnim nastavkom (otvaranje runde). */
-  nasumicnaPocetnaImenickaRijec(iskoristeneGrupe: ReadonlySet<string>): string | null;
+  nasumicnaPocetnaImenickaRijec(
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): string | null;
 }
 
-export type KodOdbijenogPoteza = 'RIJEC_NE_POSTOJI' | 'KRIVA_SLOVA' | 'RIJEC_ISKORISTENA';
+export type KodOdbijenogPoteza =
+  | 'RIJEC_NE_POSTOJI'
+  | 'KRIVA_SLOVA'
+  | 'RIJEC_ISKORISTENA'
+  | 'NEDOPUSTENA_VRSTA'
+  | 'NIJE_OSNOVNI_OBLIK'
+  | 'PREKRATKA_RIJEC';
 
 export interface RezultatValidacije {
   valjano: boolean;
@@ -69,6 +90,10 @@ export interface ParametriValidacije {
   iskoristeneGrupe: ReadonlySet<string>;
   /** Grupa -> oblik koji ju je potrošio (za specifičnu poruku odbijanja). */
   potrosioGrupu: ReadonlyMap<string, string>;
+  /** Prilagođeni skup dopuštenih vrsta riječi u privatnoj sobi. Ako nije zadan, dopuštene su sve. */
+  dopusteneVrste?: ReadonlySet<VrstaRijeci>;
+  samoOsnovniOblici?: boolean;
+  minDuljinaRijeci?: number;
   rjecnik: RjecnikSucelje;
 }
 
@@ -86,6 +111,29 @@ export function validirajPotez(params: ParametriValidacije): RezultatValidacije 
   }
 
   if (!jePosebnaRijec) {
+    if (params.minDuljinaRijeci && params.minDuljinaRijeci > 0) {
+      if (rijecNormalizirana.length < params.minDuljinaRijeci) {
+        return {
+          valjano: false,
+          kod: 'PREKRATKA_RIJEC',
+          poruka: PORUKE.prekratkaRijec(params.minDuljinaRijeci),
+        };
+      }
+    }
+
+    if (params.dopusteneVrste && params.rjecnik.vrsteZa) {
+      const vrste = params.rjecnik.vrsteZa(rijecNormalizirana);
+      if (vrste.length > 0 && !vrste.some((v) => params.dopusteneVrste!.has(v))) {
+        return { valjano: false, kod: 'NEDOPUSTENA_VRSTA', poruka: PORUKE.nedopustenaVrsta };
+      }
+    }
+
+    if (params.samoOsnovniOblici && params.rjecnik.jeOsnovniOblik) {
+      if (!params.rjecnik.jeOsnovniOblik(rijecNormalizirana)) {
+        return { valjano: false, kod: 'NIJE_OSNOVNI_OBLIK', poruka: PORUKE.nijeOsnovniOblik };
+      }
+    }
+
     for (const grupa of params.rjecnik.grupeZa(rijecNormalizirana)) {
       if (params.iskoristeneGrupe.has(grupa)) {
         const potroseniOblik = params.potrosioGrupu.get(grupa);
@@ -111,8 +159,11 @@ export function odrediRazlogMrtvihSlova(
   dvaGrafema: string,
   iskoristeneGrupe: ReadonlySet<string>,
   rjecnik: RjecnikSucelje,
+  dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+  samoOsnovniOblici?: boolean,
+  minDuljinaRijeci?: number,
 ): RazlogMrtvihSlova | null {
-  if (rjecnik.imaSlobodnuRijecNa(dvaGrafema, iskoristeneGrupe)) {
+  if (rjecnik.imaSlobodnuRijecNa(dvaGrafema, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
     return null;
   }
   return rjecnik.postojeRijeciNa(dvaGrafema) ? 'mrtva_slova_iskoristeno' : 'mrtva_slova_baza';

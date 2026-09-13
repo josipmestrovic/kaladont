@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { dohvatiSocket } from '$lib/socket.js';
-  import { jeRegistriranKorisnik, jeOnboardingZavrsen } from '$lib/identitet.js';
   import { SAVJETI } from '$lib/savjeti.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
@@ -11,14 +11,24 @@
 
   const igra = dohvatiStanjeIgre();
 
-  let stanje = $state<StanjeReda>({ mojIgracId: '', mjesta: [null, null, null, null], prosjekCekanjaSek: 0 });
+  const trazeneMod = $derived(
+    $page.url.searchParams.get('mod') === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca'
+  );
+  const ukupnoMjesta = $derived(trazeneMod === 'dva_igraca' ? 2 : 4);
+
+  let stanje = $state<StanjeReda>({
+    mojIgracId: '',
+    mod: 'cetiri_igraca',
+    mjesta: [null, null, null, null],
+    prosjekCekanjaSek: 0,
+  });
   let poruka = $state<string | null>(null);
   let countdown = $state<number | null>(null);
   let aktivniSavjet = $state(0);
   let sliderInterval: ReturnType<typeof setInterval> | undefined;
   let prethodniIgraci: Set<string> | null = null;
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
-  const preostaloIgraca = $derived(Math.max(0, 4 - brojIgraca));
+  const preostaloIgraca = $derived(Math.max(0, ukupnoMjesta - brojIgraca));
 
   // Odbrojavanje se izvodi iz globalnog stanja (partija:pocetak hvata se jednom, u stanje-igre),
   // pa radi neovisno o redoslijedu mountanja i ne curi listenere po posjetu čekaonici.
@@ -56,10 +66,6 @@
   });
 
   onMount(() => {
-    if (!jeRegistriranKorisnik() && !jeOnboardingZavrsen()) {
-      void goto('/dobrodoslica');
-      return;
-    }
     pokreniSlusateljeIgre();
     sliderInterval = setInterval(() => {
       aktivniSavjet = (aktivniSavjet + 1) % SAVJETI.length;
@@ -88,7 +94,7 @@
     socket.on('greska', naGresku);
     const udjiURed = () => {
       socket.emit('partija:stanje');
-      socket.emit('red:udji');
+      socket.emit('red:udji', { mod: trazeneMod });
     };
     socket.on('connect', udjiURed);
     if (socket.connected) udjiURed();
@@ -117,7 +123,7 @@
 {#if countdown !== null}
   <h1 aria-live="polite">Svi igrači su tu! Partija kreće za {countdown}…</h1>
 {:else}
-  <h1>Čekamo još {preostaloIgraca} {preostaloIgraca === 1 ? 'igrač' : 'igrača'}...</h1>
+  <h1>Čekamo još {preostaloIgraca} {preostaloIgraca === 1 ? (trazeneMod === 'dva_igraca' ? 'igrača' : 'igrač') : 'igrača'}...</h1>
 {/if}
 
 {#if poruka}

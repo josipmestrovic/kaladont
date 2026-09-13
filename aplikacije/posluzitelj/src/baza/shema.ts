@@ -19,6 +19,7 @@ import { sql } from 'drizzle-orm';
 
 export const vrstaIgraca = pgEnum('vrsta_igraca', ['gost', 'registriran', 'admin']);
 export const statusPartije = pgEnum('status_partije', ['u_tijeku', 'zavrsena', 'ponistena']);
+export const modPartije = pgEnum('mod_partije', ['cetiri_igraca', 'dva_igraca']);
 export const nacinIspadanja = pgEnum('nacin_ispadanja', [
   'ne_znam',
   'istek',
@@ -55,12 +56,17 @@ export const igraci = pgTable('igraci', {
   pobjede: integer('pobjede').notNull().default(0),
   eliminacijeUkupno: integer('eliminacije_ukupno').notNull().default(0),
   bodoviUkupno: integer('bodovi_ukupno').notNull().default(0),
+  odigrane1v1: integer('odigrane_1v1').notNull().default(0),
+  pobjede1v1: integer('pobjede_1v1').notNull().default(0),
+  eliminacije1v1: integer('eliminacije_1v1').notNull().default(0),
+  bodovi1v1: integer('bodovi_1v1').notNull().default(0),
   stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
   zadnjaAktivnost: timestamp('zadnja_aktivnost', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const partije = pgTable('partije', {
   id: uuid('id').primaryKey().defaultRandom(),
+  mod: modPartije('mod').notNull().default('cetiri_igraca'),
   pocetak: timestamp('pocetak', { withTimezone: true }).notNull().defaultNow(),
   kraj: timestamp('kraj', { withTimezone: true }),
   status: statusPartije('status').notNull().default('u_tijeku'),

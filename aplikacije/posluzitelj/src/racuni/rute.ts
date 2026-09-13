@@ -27,6 +27,7 @@ const ShemaRegistracije = z.object({
   email: z.string().email(),
   lozinka: z.string().min(8),
   nadimak: z.string().min(2).max(40).optional(),
+  avatarId: z.number().int().min(0).max(BROJ_AVATARA - 1).optional(),
 });
 
 const ShemaPrijave = z.object({
@@ -53,7 +54,7 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
     if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
     }
-    const { gostToken, email, lozinka, nadimak } = rezultat.data;
+    const { gostToken, email, lozinka, nadimak, avatarId } = rezultat.data;
 
     const [postojeciEmail] = await baza.select().from(igraci).where(eq(igraci.email, email)).limit(1);
     if (postojeciEmail) {
@@ -78,6 +79,7 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
           lozinkaHash,
           emailPotvrdjen: false,
           ...(nadimak ? { nadimak } : {}),
+          ...(avatarId !== undefined ? { avatarId } : {}),
         })
         .where(eq(igraci.id, postojeciGost.id));
       igracId = postojeciGost.id;
@@ -91,7 +93,7 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
           lozinkaHash,
           emailPotvrdjen: false,
           nadimak: nadimak ?? email.split('@')[0]!,
-          avatarId: Math.floor(Math.random() * BROJ_AVATARA),
+          avatarId: avatarId ?? Math.floor(Math.random() * BROJ_AVATARA),
         })
         .returning();
       if (!novi) {

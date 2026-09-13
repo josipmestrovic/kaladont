@@ -1,29 +1,43 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { jeRegistriranKorisnik, jeOnboardingZavrsen } from '$lib/identitet.js';
+  import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import StatistikaRjecnika from '$lib/komponente/StatistikaRjecnika.svelte';
 
   const registriran = jeRegistriranKorisnik();
+  let otvorenModal = $state(false);
 
-  function igraj(e: MouseEvent) {
+  function igrajKlik(e: MouseEvent) {
     e.preventDefault();
-    if (!registriran && !jeOnboardingZavrsen()) {
-      void goto('/dobrodoslica');
+    otvorenModal = true;
+  }
+
+  function odaberiMod(mod: '4p' | '1v1') {
+    otvorenModal = false;
+    if (mod === '1v1') {
+      void goto('/red?mod=dva_igraca');
     } else {
-      void goto('/red');
+      void goto('/red?mod=cetiri_igraca');
     }
   }
 </script>
 
 <div class="landing">
-  <h1 class="logotip">Kaladont</h1>
-  <p class="podnaslov">Hrvatska igra riječi. Četvero za stolom, 30 sekundi po potezu.</p>
+  <h1 class="logotip">Kaladont Multiplayer <span>(v0.1.0-closed-alpha.1)</span></h1>
+  <p class="podnaslov">Hrvatska igra riječi</p>
 
-  <a href="/red" class="igraj-gumb" onclick={igraj}>IGRAJ</a>
+  <div class="gumbi-sekcija">
+    <div class="gumb-blok">
+      <a href="/red" class="igraj-gumb" onclick={igrajKlik}>IGRAJ</a>
+      <p class="gumb-napomena">Bodovanje i rangiranje: prati <a href="/pravila">službena pravila</a>.</p>
+    </div>
 
-  {#if registriran}
-    <p><a href="/postavke">⚙ Postavke</a></p>
-  {:else}
+    <div class="gumb-blok privatna-soba-blok">
+      <a href="/soba/kreiraj" class="soba-gumb">Privatna soba</a>
+      <p class="gumb-napomena">Igraj s ekipom po svojim pravilima</p>
+    </div>
+  </div>
+
+  {#if !registriran}
     <p class="racun-linkovi">
       <a href="/prijava">Prijavi se</a> · <a href="/registracija">Registriraj se</a>
     </p>
@@ -36,8 +50,31 @@
   </p>
 </div>
 
+{#if otvorenModal}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-podloga" onclick={() => (otvorenModal = false)} onkeydown={(e) => e.key === 'Escape' && (otvorenModal = false)}>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="modal-sadrzaj" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
+      <h2>Što želiš igrati?</h2>
+      <p class="modal-podtekst">Ovaj način igre bilježi bodove i pobjede te sudjeluje u dodjeli rangiranja i top ljestvici.</p>
+
+      <div class="modal-gumbi">
+        <button type="button" class="modal-izbor-gumb" onclick={() => odaberiMod('4p')}>
+          4 igrača
+        </button>
+
+        <button type="button" class="modal-izbor-gumb" onclick={() => odaberiMod('1v1')}>
+          2 igrača
+        </button>
+      </div>
+
+      <button type="button" class="zatvori-modal-gumb" onclick={() => (otvorenModal = false)}>Zatvori</button>
+    </div>
+  </div>
+{/if}
+
 <footer>
-  <a href="/pravila">Pravila</a> · <a href="/o-igri">O igri</a> · <a href="/ljestvica">Ljestvica</a>
+  <a href="/o-igri">O igri</a> · <a href="/uvjeti">Uvjeti korištenja</a> · <a href="/privatnost">Pravila privatnosti</a>
 </footer>
 
 <style>
@@ -50,10 +87,52 @@
     font-size: 40px;
   }
 
+  .logotip span {
+    display: block;
+    margin-top: 4px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-baza);
+    font-weight: 600;
+  }
+
   .podnaslov {
     color: var(--boja-tekst-sekundarni);
     margin-bottom: 32px;
     font-size: inherit;
+  }
+
+  .gumbi-sekcija {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .gumb-blok {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .gumb-napomena {
+    margin: 0;
+    font-size: var(--tekst-sitni);
+    color: var(--boja-tekst-osnovni);
+    background: #faf8f0;
+    border: 1px solid #e5ddc8;
+    border-radius: 4px;
+    padding: 5px 10px;
+    max-width: 320px;
+  }
+
+  .privatna-soba-blok {
+    margin-top: 18px;
+  }
+
+  .gumb-napomena a {
+    color: var(--boja-pozadina-primarna);
+    font-weight: 700;
   }
 
   .igraj-gumb {
@@ -69,6 +148,20 @@
     box-shadow: var(--sjena-suptilna);
   }
 
+  .soba-gumb {
+    display: inline-block;
+    background: white;
+    border: 2px solid var(--boja-pozadina-primarna);
+    color: var(--boja-pozadina-primarna);
+    font-family: var(--font-naslov);
+    font-size: 18px;
+    font-weight: 700;
+    text-decoration: none;
+    padding: 12px 32px;
+    border-radius: var(--radijus-pill);
+    box-shadow: var(--sjena-suptilna);
+  }
+
   .racun-linkovi {
     margin-top: 20px;
     font-size: inherit;
@@ -78,7 +171,7 @@
     max-width: 360px;
     margin: 24px auto 0;
     color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-mali);
+    font-size: var(--tekst-baza);
   }
 
   footer {
@@ -86,5 +179,79 @@
     font-size: var(--tekst-mali);
     color: var(--boja-tekst-sekundarni);
     text-align: center;
+  }
+
+  .modal-podloga {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(26, 24, 21, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 100;
+  }
+
+  .modal-sadrzaj {
+    background: white;
+    border-radius: var(--radijus-kartica);
+    padding: 24px;
+    max-width: 440px;
+    width: 100%;
+    box-shadow: var(--sjena-suptilna);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .modal-sadrzaj h2 {
+    margin: 0;
+    font-size: var(--naslov-2);
+    line-height: 1.15;
+  }
+
+  .modal-podtekst {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+  }
+
+  .modal-gumbi {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .modal-izbor-gumb {
+    background: #faf8f0;
+    border: 2px solid #e5ddc8;
+    border-radius: var(--radijus-pill);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-family: var(--font-naslov);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--boja-tekst-naslov);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .zatvori-modal-gumb {
+    background: none;
+    border: none;
+    color: var(--boja-tekst-sekundarni);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: var(--tekst-sitni);
   }
 </style>

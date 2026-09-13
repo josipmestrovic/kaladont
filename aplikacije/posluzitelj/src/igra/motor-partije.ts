@@ -22,6 +22,8 @@ import {
   type SustavBiraRijec,
   type RundaOtvorena,
   type StanjePartije,
+  type PostavkePrivatneSobe,
+  type VrstaRijeci,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
@@ -36,6 +38,7 @@ const PROZOR_ISTODOBNIH_PREKIDA_MS = 25;
 // UX ekran mora trajati 5 s u razvoju, stagingu i produkciji. Samo testno okruženje
 // preskače čekanje kako integracijski testovi ne bi čekali stvarno vrijeme.
 const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;
+const ODGODA_POCETKA_PRIVATNE_PARTIJE_MS = 0;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
 const SOBA_PARTIJE = (partijaId: string) => `partija:${partijaId}`;
 
@@ -57,6 +60,8 @@ export interface PostavkeMotoraPartije {
   trajanjePotezaMs?: number;
   tolerancijaPrekidaMs?: number;
   odgodaObradePrekidaMs?: number;
+  naPartijaZavrsila?: (partijaId: string) => void;
+  naPrivatnaPartijaZavrsila?: (kodSobe: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => void;
 }
 
 interface PrekidUTijeku {
@@ -68,7 +73,8 @@ interface PrekidUTijeku {
 
 interface StanjeStola {
   partijaId: string;
-  sudionici: SudionikPartije[]; // svi 4, fiksni redoslijed po sjedalu
+  mod: 'cetiri_igraca' | 'dva_igraca';
+  sudionici: SudionikPartije[]; // svi 4 ili 2, fiksni redoslijed po sjedalu
   aktivni: Set<string>;
   eliminirani: string[]; // redoslijed ispadanja - prvi ispali je na indeksu 0
   naPotezuId: string;
@@ -96,6 +102,11 @@ interface StanjeStola {
   obradaPrekidaZakazana: boolean;
   rezultatiKraja: Map<string, KrajPartije>;
   zavrsena: boolean;
+  jePrivatna?: boolean;
+  kodSobe?: string;
+  trajanjePotezaSek?: number;
+  dopusteneVrste?: ReadonlySet<VrstaRijeci>;
+  postavkePrivatneSobe?: PostavkePrivatneSobe;
 }
 
 export function stvoriUpraviteljPartija(
@@ -140,17 +151,27 @@ export function stvoriUpraviteljPartija(
   function postaviTimer(stanje: StanjeStola): void {
     if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
     stanje.vrijemePocetkaPotezaMs = Date.now();
-    if (timerOnemogucen) {
+    const trajanjeMs =
+      stanje.trajanjePotezaSek !== undefined
+        ? stanje.trajanjePotezaSek * 1000
+        : trajanjePotezaMs;
+
+    if (timerOnemogucen || trajanjeMs <= 0) {
       stanje.timerHandle = null;
       return;
     }
     stanje.timerHandle = setTimeout(() => {
       eliminirajIgraca(stanje, stanje.naPotezuId, 'istek');
-    }, trajanjePotezaMs);
+    }, trajanjeMs);
   }
 
   function istekPotezaIso(stanje: StanjeStola): string {
-    return new Date(stanje.vrijemePocetkaPotezaMs + trajanjePotezaMs).toISOString();
+    const trajanjeMs =
+      stanje.trajanjePotezaSek !== undefined
+        ? stanje.trajanjePotezaSek * 1000
+        : trajanjePotezaMs;
+    if (trajanjeMs <= 0) return '';
+    return new Date(stanje.vrijemePocetkaPotezaMs + trajanjeMs).toISOString();
   }
 
   function posaljiStanje(socket: KaladontSocket): void {
@@ -174,15 +195,25 @@ export function stvoriUpraviteljPartija(
       zadnjaRijecIgracId: stanje.zadnjaRijecIgracId,
       zadnjaRijecVrsta: stanje.zadnjaRijecVrsta,
       zavrsena: stanje.zavrsena,
+      mod: stanje.mod,
+      jePrivatna: stanje.jePrivatna,
+      kodSobe: stanje.kodSobe,
+      trajanjePotezaSek: stanje.trajanjePotezaSek,
+      dopusteneVrste: stanje.dopusteneVrste ? [...stanje.dopusteneVrste] : undefined,
     };
     socket.emit('partija:stanje', poruka);
   }
 
-  function zapocniPartiju(sudioniciUlaz: StavkaReda[]): void {
+  function zapocniPartiju(
+    sudioniciUlaz: StavkaReda[],
+    mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
+  ): void {
     const izmjesano = [...sudioniciUlaz].sort(() => Math.random() - 0.5);
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
-      const prosjekBodova = s.odigrane > 0 ? s.bodoviUkupno / s.odigrane : 0;
-      const rang = izracunajRang(s.odigrane, prosjekBodova);
+      const odigrane = mod === 'dva_igraca' ? (s.odigrane1v1 ?? 0) : s.odigrane;
+      const bodoviUkupno = mod === 'dva_igraca' ? (s.bodovi1v1 ?? 0) : s.bodoviUkupno;
+      const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
+      const rang = izracunajRang(odigrane, prosjekBodova);
       return {
         igracId: s.igracId,
         nadimak: s.nadimak,
@@ -193,11 +224,12 @@ export function stvoriUpraviteljPartija(
     });
     const partijaId = randomUUID();
     const prviIgracId = sudionici[0]!.igracId;
-    const odgodaMs = ODGODA_POCETKA_PARTIJE_MS;
+     const odgodaMs = ODGODA_POCETKA_PARTIJE_MS;
     const pocetakIso = new Date(Date.now() + odgodaMs).toISOString();
 
     const stanje: StanjeStola = {
       partijaId,
+      mod,
       sudionici,
       aktivni: new Set(sudionici.map((s) => s.igracId)),
       eliminirani: [],
@@ -232,17 +264,19 @@ export function stvoriUpraviteljPartija(
     for (const s of sudionici) partijaPoIgracu.set(s.igracId, partijaId);
 
     const cekanjeMsPoIgracu = new Map(izmjesano.map((s) => [s.igracId, Date.now() - s.usaoU]));
-    const upisPocetkaPromise = zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu);
+    const upisPocetkaPromise = zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod);
 
     const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
       partijaId,
       pocetakIso,
       sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, avatarId: s.avatarId, rang: s.rang })),
+      mod,
     };
 
     for (const s of sudionici) {
       const socket = aktivneVeze.dohvatiSocket(s.igracId);
-      socket?.leave('red-cekanja');
+      socket?.leave('red-cekanja-4p');
+      socket?.leave('red-cekanja-1v1');
       socket?.join(SOBA_PARTIJE(partijaId));
     }
     for (const s of sudionici) {
@@ -272,6 +306,12 @@ export function stvoriUpraviteljPartija(
     return undefined;
   }
 
+  function spremiPotezAkoTreba(stanje: StanjeStola, zapis: Omit<import('./upis-partije.js').ZapisPoteza, 'partijaId'>) {
+    if (!stanje.jePrivatna) {
+      zapisiPotez({ partijaId: stanje.partijaId, ...zapis });
+    }
+  }
+
   function zakljuciPartiju(stanje: StanjeStola): void {
     stanje.zavrsena = true;
     if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
@@ -279,22 +319,25 @@ export function stvoriUpraviteljPartija(
     for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
     stanje.prekidiUTijeku.clear();
 
-    // eliminirani[0] je prvi ispao (4. mjesto), zadnji preostali (aktivni) je pobjednik (1. mjesto)
+    // eliminirani[0] je prvi ispao (npr. 4. mjesto), zadnji preostali (aktivni) je pobjednik (1. mjesto)
     const pobjednikId = [...stanje.aktivni][0]!;
     const redoslijedOdPobjednika = [pobjednikId, ...[...stanje.eliminirani].reverse()];
 
     const plasmani = redoslijedOdPobjednika.map((igracId, indeks) => {
-      const plasman = (indeks + 1) as 1 | 2 | 3 | 4;
+      const plasman = indeks + 1;
       const eliminacije = stanje.eliminacijeBrojac.get(igracId) ?? 0;
-      return { igracId, plasman, bodovi: izracunajBodove({ plasman, eliminacije }), eliminacije };
+      let bodovi = 0;
+
+      if (stanje.jePrivatna) {
+        const pobjednikBodova = 2;
+        const elimBod = stanje.postavkePrivatneSobe?.eliminacijskiBodovi ? eliminacije : 0;
+        bodovi = (plasman === 1 ? pobjednikBodova : 0) + elimBod;
+      } else {
+        bodovi = izracunajBodove({ plasman: plasman as 1 | 2 | 3 | 4, eliminacije }, stanje.mod);
+      }
+
+      return { igracId, plasman, bodovi, eliminacije };
     });
-    const rezultatiZaUpis = plasmani.map((p) => ({
-      igracId: p.igracId,
-      plasman: p.plasman,
-      bodovi: p.bodovi,
-      eliminacije: p.eliminacije,
-      nacinIspadanja: p.plasman === 1 ? ('pobjednik' as const) : nacinIspadanjaZaIgraca(stanje, p.igracId),
-    }));
 
     stanje.zadnjiPotezi.clear();
     stanje.zadnjeReakcije.clear();
@@ -308,7 +351,37 @@ export function stvoriUpraviteljPartija(
       partije.delete(stanje.partijaId);
     }, ZADRZAVANJE_SOBE_NAKON_KRAJA_MS).unref();
 
-    void zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis)
+    if (stanje.jePrivatna) {
+      if (stanje.kodSobe) {
+        postavke.naPrivatnaPartijaZavrsila?.(stanje.kodSobe, pobjednikId, plasmani);
+      }
+      for (const p of plasmani) {
+        const poruka: KrajPartije = {
+          partijaId: stanje.partijaId,
+          plasmani,
+          mojNoviProsjek: 0,
+          mojRang: null,
+          jePrivatna: true,
+          kodSobe: stanje.kodSobe,
+        };
+        stanje.rezultatiKraja.set(p.igracId, poruka);
+        if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) {
+          aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
+        }
+      }
+      postavke.naPartijaZavrsila?.(stanje.partijaId);
+      return;
+    }
+
+    const rezultatiZaUpis = plasmani.map((p) => ({
+      igracId: p.igracId,
+      plasman: p.plasman as 1 | 2 | 3 | 4,
+      bodovi: p.bodovi,
+      eliminacije: p.eliminacije,
+      nacinIspadanja: p.plasman === 1 ? ('pobjednik' as const) : nacinIspadanjaZaIgraca(stanje, p.igracId),
+    }));
+
+    void zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod)
       .then((agregati) => {
         for (const p of plasmani) {
           const agregat = agregati.get(p.igracId);
@@ -318,6 +391,7 @@ export function stvoriUpraviteljPartija(
             plasmani,
             mojNoviProsjek: prosjek,
             mojRang: null,
+            mod: stanje.mod,
           };
           stanje.rezultatiKraja.set(p.igracId, poruka);
           if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) {
@@ -356,7 +430,7 @@ export function stvoriUpraviteljPartija(
 
   function objaviRijecSustava(stanje: StanjeStola, napadac: string | null): void {
     stanje.izborHandle = null;
-    const autoRijec = rjecnik.nasumicnaPocetnaImenickaRijec(stanje.iskoristeneGrupe);
+    const autoRijec = rjecnik.nasumicnaPocetnaImenickaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
     if (!autoRijec) {
       // ekstremni rubni slucaj (rjecnik iscrpljen) - sigurnosno zavrsi partiju
       zakljuciPartiju(stanje);
@@ -377,8 +451,7 @@ export function stvoriUpraviteljPartija(
     stanje.istekIzboraIso = null;
 
     stanje.redniBroj += 1;
-    zapisiPotez({
-      partijaId: stanje.partijaId,
+    spremiPotezAkoTreba(stanje, {
       runda: stanje.runda,
       redniBroj: stanje.redniBroj,
       igracId: null,
@@ -415,8 +488,7 @@ export function stvoriUpraviteljPartija(
     stanje.razloziEliminacije.set(igracId, razlog);
 
     stanje.redniBroj += 1;
-    zapisiPotez({
-      partijaId: stanje.partijaId,
+    spremiPotezAkoTreba(stanje, {
       runda: stanje.runda,
       redniBroj: stanje.redniBroj,
       igracId,
@@ -438,7 +510,7 @@ export function stvoriUpraviteljPartija(
       stanje.eliminacijeBrojac.set(napadac, (stanje.eliminacijeBrojac.get(napadac) ?? 0) + 1);
     }
 
-    const plasman = (stanje.aktivni.size + 1) as 2 | 3 | 4;
+    const plasman = stanje.aktivni.size + 1;
     const poruka: Eliminacija = {
       igracId,
       plasman,
@@ -486,8 +558,7 @@ export function stvoriUpraviteljPartija(
     stanje.zadnjaRijecIgracId = igracId;
     stanje.zadnjaRijecVrsta = 'rijec';
 
-    zapisiPotez({
-      partijaId: stanje.partijaId,
+    spremiPotezAkoTreba(stanje, {
       runda: stanje.runda,
       redniBroj: stanje.redniBroj,
       igracId,
@@ -504,7 +575,12 @@ export function stvoriUpraviteljPartija(
     }
 
     const novaTrazenaSlova = zadnjaDva(rijecNormalizirana);
-    const razlogMrtvihSlova = odrediRazlogMrtvihSlova(novaTrazenaSlova, stanje.iskoristeneGrupe, rjecnik);
+    const razlogMrtvihSlova = odrediRazlogMrtvihSlova(
+      novaTrazenaSlova,
+      stanje.iskoristeneGrupe,
+      rjecnik,
+      stanje.dopusteneVrste,
+    );
 
     if (razlogMrtvihSlova) {
       const sljedeci = sljedeciAktivni(stanje, igracId);
@@ -549,8 +625,7 @@ export function stvoriUpraviteljPartija(
     stanje.eliminacijeBrojac.set(sayerId, (stanje.eliminacijeBrojac.get(sayerId) ?? 0) + 1);
 
     stanje.redniBroj += 1;
-    zapisiPotez({
-      partijaId: stanje.partijaId,
+    spremiPotezAkoTreba(stanje, {
       runda: stanje.runda,
       redniBroj: stanje.redniBroj,
       igracId: prethodniId,
@@ -560,7 +635,7 @@ export function stvoriUpraviteljPartija(
       trajanjeMs: 0,
     });
 
-    const plasman = (stanje.aktivni.size + 1) as 2 | 3 | 4;
+    const plasman = stanje.aktivni.size + 1;
     const porukaElim: Eliminacija = {
       igracId: prethodniId,
       plasman,
@@ -719,6 +794,7 @@ export function stvoriUpraviteljPartija(
         trazenaSlova,
         iskoristeneGrupe: stanje.iskoristeneGrupe,
         potrosioGrupu: stanje.potrosioGrupu,
+        dopusteneVrste: stanje.dopusteneVrste,
         rjecnik,
       });
 
@@ -773,8 +849,93 @@ export function stvoriUpraviteljPartija(
     obnoviVezuPartije(socket);
   }
 
+  function zapocniPrivatnuPartiju(
+    sudioniciUlaz: StavkaReda[],
+    postavkeSobe: PostavkePrivatneSobe,
+    kodSobe: string,
+  ): string {
+    const sudionici: SudionikPartije[] = sudioniciUlaz.map((s, sjedalo) => {
+      const prosjekBodova = s.odigrane > 0 ? s.bodoviUkupno / s.odigrane : 0;
+      const rang = izracunajRang(s.odigrane, prosjekBodova);
+      return {
+        igracId: s.igracId,
+        nadimak: s.nadimak,
+        avatarId: s.avatarId,
+        rang: rang === 'Piskaralo' ? null : rang,
+        sjedalo,
+      };
+    });
+    const partijaId = randomUUID();
+    const prviIgracId = sudionici[0]!.igracId;
+      const odgodaMs = ODGODA_POCETKA_PRIVATNE_PARTIJE_MS;
+    const pocetakIso = new Date(Date.now() + odgodaMs).toISOString();
+
+    const stanje: StanjeStola = {
+      partijaId,
+      mod: 'cetiri_igraca',
+      sudionici,
+      aktivni: new Set(sudionici.map((s) => s.igracId)),
+      eliminirani: [],
+      naPotezuId: prviIgracId,
+      napadacId: null,
+      trazenaSlova: null,
+      zadnjaRijec: null,
+      zadnjaRijecIgracId: null,
+      zadnjaRijecVrsta: null,
+      iskoristeneGrupe: new Set(),
+      potrosioGrupu: new Map(),
+      brojOdigranih: 0,
+      runda: 0,
+      redniBroj: 0,
+      vrijemePocetkaPotezaMs: Date.now(),
+      timerHandle: null,
+      izborUToku: true,
+      izborHandle: null,
+      istekIzboraIso: pocetakIso,
+      eliminacije: [],
+      eliminacijeBrojac: new Map(),
+      zadnjiPotezi: new Map(),
+      zadnjeReakcije: new Map(),
+      razloziEliminacije: new Map(),
+      prekidiUTijeku: new Map(),
+      obradaPrekidaZakazana: false,
+      rezultatiKraja: new Map(),
+      zavrsena: false,
+      jePrivatna: true,
+      kodSobe,
+      trajanjePotezaSek: postavkeSobe.trajanjePotezaSek,
+      dopusteneVrste: new Set(postavkeSobe.dopusteneVrste),
+      postavkePrivatneSobe: postavkeSobe,
+    };
+
+    partije.set(partijaId, stanje);
+    for (const s of sudionici) partijaPoIgracu.set(s.igracId, partijaId);
+
+    const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
+      partijaId,
+      pocetakIso,
+      sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, avatarId: s.avatarId, rang: s.rang })),
+      jePrivatna: true,
+      kodSobe,
+    };
+
+    for (const s of sudionici) {
+      const socket = aktivneVeze.dohvatiSocket(s.igracId);
+      socket?.join(SOBA_PARTIJE(partijaId));
+    }
+    for (const s of sudionici) {
+      aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
+    }
+
+    const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - Date.now());
+    stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), preostaloMs);
+
+    return partijaId;
+  }
+
   return {
     zapocniPartiju,
+    zapocniPrivatnuPartiju,
     registrirajHandlere,
     nadimak,
     imaAktivnuPartiju: (igracId: string) => {

@@ -4,60 +4,36 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Desktop **nije** zaseban l
 
 ## 0. Header / navigacija (trajna traka)
 
-**Svrha:** stalna orijentacija — tko sam, koji mi je status, brz pristup postavkama. Prikazuje se na svim ekranima OSIM landinga i registracije/prijave (koji imaju vlastiti minimalni zaglavni prostor).
+**Svrha:** stalna orijentacija — tko sam, brz pristup postavkama i pravilima. Prikazuje se na svim ekranima OSIM u čekaonici (`/red`) i u tijeku partije (`/partija/*`).
 
-- **Lijevo:** pozdrav — „Bok, Ana" (registriran) ili „Igraš kao gost" (gost, bez imena jer nadimak je nasumičan i nebitan gostu).
-- **Sredina/desno:** avatar (s automatskim rang-borderom za registrirane; gost avatar nosi diskretnu oznaku „GOST", bez bordera).
-- **Rang bedž** uz avatar (samo registrirani, nakon kalibracije od 10 partija; gosti i igrači u kalibraciji nemaju bedž).
-- **Brzi link** na `/ljestvica`.
-- **Gumb postavki** (ikona zupčanika) → otvara `/postavke` (izbor avatara za registrirane; gostu prikazuje samo poziv na registraciju).
-- **Audio kontrola:** diskretna ikona mute/unmute i klizač glasnoće; postavka je lokalna po browseru/uređaju. Pravila i matrica događaja su u [zvukovi.md](zvukovi.md).
+- **Lijevo:** ikone i labele navigacije u boji osnovnog teksta (narančasto istaknuto aktivno stanje, bez podcrtavanja) — **Početna** (🏠), **Pravila** (📖), **Ljestvice** (🏆), **Postavke** (⚙).
+- **Desno:** avatar korisnika ili gosta. Pokraj avatara desno u boji naslova prikazano je ime samo za ulogirane registrirane korisnike, dok gosti imaju samo avatar (s tekstualnim napisom `GOST` unutar kružnog avatara). Klik na avatar vodi na `/profil`.
 
 ## 1. Landing (`/`)
 
-**Svrha:** jedan pogled → jedan klik → igra. Dvije varijante ovisno o statusu prijave.
+**Svrha:** jedan pogled → odabir moda ili privatne sobe.
 
-**Gost (nije prijavljen):**
+- Logotip + podnaslov: „Hrvatska igra riječi. IGRAJ mod po želji ili stvori svoju sobu."
+- **Tipka IGRAJ** — otvara modalni prozor s izborom stola:
+  - **4 Igrača (Klasični mod)** — vodi u čekaonicu za 4p (osvajaju se bodovi i rangovi).
+  - **2 Igrača (1v1 Dvoboj)** — vodi u čekaonicu za 1v1 dvoboj (pobjednik nosi 1 bod).
+  - Ispod gumba stoji objašnjenje: `*Glavni način igre gdje se osvajaju bodovi i rangovi`.
+- **Tipka Privatna soba** — vodi na kreiranje privatne sobe po vlastitim pravilima s pozivnim linkom (bez ikone lokota). Ispod gumba stoji objašnjenje: `*Kreirate sobu po svojim pravilima i preko linka pozovete prijatelje`.
+- Poveznice Prijavi se / Registriraj se za neotvorene sesije.
 
-- Logotip + podnaslov: „Hrvatska igra riječi. Četvero za stolom, 30 sekundi po potezu."
-- **Velika tipka IGRAJ** — ako gost još nije prošao onboarding (vidi niže), vodi na `/dobrodoslica`; inače ravno u red čekanja.
-- U ranom pristupu uz igru je vidljiva poveznica „Pridruži se zajednici” na `https://forum.kaladont.hr` i kratka poruka da se igra aktivno testira. Poveznica ne blokira niti uvjetuje ulazak u red.
-- Diskretno ispod: „Prijavi se" / „Registriraj se" i tri retka pravila u slikovnicama (riječ na zadnja dva slova → 30 sekundi → zadnji preživjeli pobjeđuje).
+## 2. Red čekanja (`/red?mod=cetiri_igraca|dva_igraca`)
 
-**Registriran (prijavljen):**
+- Ovisno o odabranom modu (4p ili 1v1), čekaonica prikazuje 4 ili 2 kružna mjesta.
+- Čim se skupe 4 (ili 2) igrača, pokreće se numerički countdown 3-2-1 i partija kreće.
+- Gosti idu ravno u čekaonicu klikom na odabrani mod bez zapreka ili prompta za ime.
 
-- Isti logotip + IGRAJ gumb.
-- Umjesto „Prijavi se/Registriraj se": **ikona postavki (zupčanik) + tekst „Postavke"** — link na `/postavke`.
-- **Rotirajući hint tekst** ispod IGRAJ gumba — pri svakom učitavanju stranice nasumično prikazuje jednu od nekoliko kratkih činjenica o bodovanju/rangovima (izvor istine: [bodovanje-i-rangovi.md](../02-pravila-igre/bodovanje-i-rangovi.md), ne izmišljati nove brojke ovdje). Primjeri hint tekstova:
-  - „Prosjek bodova po partiji jedina je metrika ranga — očekivani prosjek je 2,5."
-  - „Savršena partija nosi 7 bodova: pobjeda + bonus + sve 3 eliminacije."
-  - „Od 11. partije rang se računa iz prosjeka bodova — prvih 10 igraš kao Piskaralo."
-  - „Najviši rang zove se Kaladont — prosjek 5,70 ili više."
+## 2a. Privatna soba (`/soba/kreiraj` i `/soba/[kod]`)
 
-- Podnožje (obje varijante): poveznice **Pravila**, **O igri**, Ljestvica, Privatnost, Uvjeti i **Zajednica** — vode na stvarne rute (`/pravila`, `/o-igri`, `/ljestvica`, `/privatnost`, `/uvjeti`) odnosno `https://forum.kaladont.hr`. Vanjska poveznica ima pristupačni naziv koji navodi da otvara forum Kaladonta.
-- **Statistika rječnika (obje varijante):** blok ispod IGRAJ gumba — ukupan broj riječi + broj oblika po kategoriji (imenice, glagoli, pridjevi…), **sortirano silazno po broju oblika**. Podaci s `GET /rjecnik/statistika` (javno, bez tokena); ako dohvat ne uspije, blok se jednostavno ne prikazuje. Vidljivo gostu i registriranom.
-- SSR (SEO za „kaladont igra" upite).
-- Nakon naknadne konfiguracije Umamija anonimno se bilježe klik na IGRAJ i klikovi na forumsku poveznicu s landinga i stranice „O igri”, bez identifikatora korisnika. Umami nije preduvjet javnog starta.
-
-## 1a. Dobrodošlica (`/dobrodoslica`) — samo prvi ulazak gosta
-
-**Svrha:** predstaviti se prije prvog ulaska u red čekanja — jednom po uređaju/pregledniku, samo za goste koji još nisu prošli ovaj korak (lokalna oznaka nakon završetka; registrirani i gosti koji su već prošli idu ravno u `/red`). Cjelozaslonski, bez headera/navigacije — dva uzastopna koraka, bez mogućnosti povratka na prethodni:
-
-1. **Ime:** kratak tekst objašnjava da je ovo gostov prvi put, da statistika nije trajno spremljena dok se ne registrira, i traži ime (2-20 znakova). Veliko središnje polje za unos (autofokus), gumb „Dalje" onemogućen dok ime nema barem 2 znaka.
-2. **Avatar:** grid statičkog kataloga avatara (isti izvor kao `/postavke`); klik samo odabire (ne sprema odmah), gumb „Igraj" onemogućen dok avatar nije odabran. Potvrdom se ime i avatar spremaju na poslužitelju, postavlja se lokalna oznaka završenog onboardinga, i igrač prelazi u `/red`.
-
-Gost nakon ovog koraka **ne može kasnije mijenjati avatar** (nema pristup `/postavke`) — izbor je trajan dok se ne registrira.
-
-## 2. Red čekanja (`/red`)
-
-**Svrha:** pretvoriti čekanje u iščekivanje — igrač mora _vidjeti_ da se stol puni.
-
-- Četiri kružna mjesta oko praznog stola; svako popunjeno mjesto **odmah** dobiva avatar, ime i **punu statistiku** pridošlog igrača (rang, prosjek bodova, % pobjeda — isti podaci kao na ljestvici) uz suptilnu animaciju. Igrači u kalibraciji prikazuju „Piskaralo" umjesto ranga.
-- Tekst stanja: „Čekamo još N igrača…"
-- **Prosječno čekanje: ~X s** (prosjek zadnjih 100 partija) — postavlja realna očekivanja.
-- Gumb „Odustani" vraća na landing — **bez potvrde** (nema još posljedica dok stol nije popunjen).
-- Kad sjedne četvrti: **numerički countdown 3-2-1** preko cijelog ekrana (zamjenjuje stariju statičnu poruku) → tek nakon countdowna prijelaz na stol. Countdown daje svim igračima trenutak da se priprave prije prvog poteza.
-- Audio: klik na `IGRAJ`/ulazak u sobu i ulazak/izlazak igrača koriste suptilne zajedničke signale; samo zadnje tri sekunde countdowna imaju ton.
+- Konfiguracija: najviše 8 igrača, tajmer poteza (15s, 30s, 60s ili Bez tajmera), bodovi za eliminacije te selektivne vrste riječi (imenice, pridjevi, glagoli, zamjenice, brojevi, prilozi, prijedlozi, veznici, čestice, usklici).
+- Generira se kod sobe i pozivni link. Gosti i registrirani mogu ući kao gosti ili igrači.
+- Soba živi u memoriji poslužitelja bez spremanja u bazu. Svaka igra je zasebna partija i počinje odmah; po završetku soba ostaje aktivna 5 minuta za novu partiju s istim postavkama.
+- Iznad pravila sobe prikazuje se njezina kumulativna ljestvica: poredana je po osvojenim bodovima, zatim po pobjedama, a vodeći igrač dobiva krunu. Ti rezultati ne mijenjaju globalne ljestvice ni agregate igrača.
+- Na sjedalima se igračima prikazuje **viši rang** (između 4p i 1v1 ranga).
 
 ## 3. Stol (`/partija/:id`) — srce igre
 
@@ -91,33 +67,28 @@ Raspored (portret):
 - Uz svaki potez gumb **„Prijavi grešku"** → obrazac s porukom (potez i partija vežu se automatski).
 - U prvoj izvedbi dostupno trajno nakon završetka partije. Bočna ploha tijekom aktivne partije planirana je za kasniju nadogradnju.
 
-## 6. Registracija / Prijava (`/racun`)
+## 6. Registracija / Prijava (`/registracija` i `/prijava`)
 
-- Registracija: email, lozinka, nadimak (ako je gost imao statistiku — jasna poruka: „Tvoja dosadašnja statistika ostaje uz tebe"). Kraj email polja diskretna napomena: „Email koristimo isključivo za pristup računu (npr. zaboravljena lozinka) — nema newslettera, nema reklamnih poruka."
-- Potvrda emaila poveznicom; prijava standardna; „Zaboravljena lozinka" tok.
+- Registracija: višekoračni tijek (1. Korak: nadimak; 2. Korak: email, lozinka, odabir avatara). Kod email polja diskretna napomena: „Na tvoju email adresu nećemo slati nikakve obavijesti, isključivo je koristimo kako bi ti omogućili pristup računu ako zaboraviš lozinku."
+- Prijava: jednostavna prijava u dva odvojena retka (Email i Lozinka) s velikim zelenim gumbom.
 
 ## 7. Profil (`/profil`) — samo vlastiti
 
-- Rang sa značkom + prosjek bodova; napredak do sljedećeg ranga.
-- Statistika: partije, pobjede (%), eliminacije po partiji, ukupni bodovi.
-- Zadnjih 10 partija s plasmanom → poveznice na povijesti.
-- Kalibracija: „Još X partija do ranga" (dok je Piskaralo).
+- Sadrži tabove **4 Igrača** i **2 Igrača (1v1)** s odvojenim karticama statistike (`Odigrane`, `Pobjede`, `Ukupno bodova`, `Prosjek`, `Eliminacije`, `Rang`).
+- Prikazuje paginiranu povijest partija (prvih 10 partija + gumb "Učitaj još").
+- Gosti vide žuto/krem upozorenje s pozivom/CTA gumbom za registraciju kako bi sačuvali statistiku. Registrirani korisnici ovaj okvir ne vide.
 
-## 7a. Postavke (`/postavke`) — samo registrirani
+## 7a. Postavke (`/postavke`)
 
-- **Izbor avatara:** ponuđeni avatari iz statičkog kataloga slika, klik odmah sprema (`PUT /profil/avatar`) i odmah ažurira prikaz bez ručnog osvježavanja.
-- **Border** se NE bira ovdje — prikazan je informativno („Trenutni border: Riječarac — sljedeći se otključava na rangu Jezičar") jer se dodjeljuje automatski prema trenutnom rangu.
-- **Povijest partija:** popis proteklih partija (plasman, bodovi, datum) — isti podaci kao trenutno na `/povijest`, ovdje dostupno kao dio jednog panela za upravljanje računom.
-- **Detaljna statistika:** partije, pobjede (%), eliminacije po partiji, ukupni bodovi, prosjek, trenutni rang i napredak do sljedećeg (isti podaci kao `/profil`, konsolidirano ovdje).
-- **Promjena emaila:** polje + potvrda trenutnom lozinkom — nova adresa zahtijeva ponovnu potvrdu emailom prije nego postane aktivna (`PUT /profil/email`).
-- **Promjena lozinke:** trenutna lozinka + nova lozinka (min. 8 znakova) (`PUT /profil/lozinka`).
-- Gost koji dođe na ovu rutu vidi samo poziv na registraciju umjesto cijelog panela.
+- Zvučne kontrole (`AudioKontrola`) dostupne su svim korisnicima.
+- Registrirani igrači vide izbor avatara, izmjenu email adrese i lozinke.
+- Gosti vide obavijest da su napredne postavke rezervirane za registrirane korisnike uz gumb za registraciju.
 
 ## 8. Ljestvica (`/ljestvica?tab=igraci|rijeci`)
 
-Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvojene stranice. **Lijeno učitavanje**: zadano se dohvaća i prikazuje samo top 10; puna top 100 lista dohvaća se tek na zahtjev.
-
-- **Tab „Igrači" (zadano):** Top 10 zadano: mjesto, nadimak, značka ranga, prosjek bodova, partije, % pobjeda (min. 10 partija). **„Tvoje mjesto"** prikazano je uvijek (posebni redak ispod top liste ili istaknuto unutar nje ako si već u top 10), čak i ako nisi u trenutno prikazanom dijelu liste. Ispod top 10, gumb **„Učitaj do 100"** — klik okida novi upit prema `GET /ljestvica?limit=100`, prikazuje loading indikator dok traje, zatim proširuje listu na puni top 100. Prazno stanje: „Odigraj 10 partija da uđeš na ljestvicu."
+Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvojene stranice.
+- Pod-tabovi **4 Igrača** i **2 Igrača (1v1)** omogućuju neovisni pregled ljestvice po modovima.
+- **Zadano učitavanje:** prikazuje top 10 igrača, uz gumb "Učitaj do 100" koji dohvaća cijelu top 100 listu s poslužitelja.
 - **Tab „Riječi":** Top 10 zadano najučestalijih odigranih riječi u svim partijama (stvarna upotreba iz `potezi`, ne statička frekvencija iz uvoznog korpusa). Stupci: mjesto, riječ (WordChip s istaknuta zadnja dva grafema), broj upotreba, % partija u kojima se pojavila. Isti gumb **„Učitaj do 100"** s loading indikatorom — nema koncepta „tvoje riječi" pa nema dodatnog retka.
 - Prebacivanje tabova bez ponovnog učitavanja cijele stranice (isti header/podnožje); učitana proširena lista (100) pamti se dok je tab otvoren, ne treba ponovno učitavati pri povratku na isti tab.
 

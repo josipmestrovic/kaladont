@@ -1,52 +1,115 @@
-<h1>Pravila igre</h1>
+<svelte:head>
+  <title>Pravila igre | Kaladont</title>
+</svelte:head>
 
-<p>
-  <strong>Kaladont</strong> je hrvatska igra riječima za četvero igrača. Cilj: reći riječ koja počinje na
-  <strong>posljednja dva grafema</strong> riječi prethodnog igrača — i preživjeti dulje od ostalih.
-</p>
+<main class="pravila">
+  <h1>Pravila igre</h1>
 
-<p>
-  Ime igre dolazi od paste za zube: riječ „kaladont" završava na „nt", a nijedna hrvatska riječ ne počinje na
-  „nt" — pa onaj tko je izgovori postavlja protivniku nerješiv zadatak.
-</p>
+  <section>
+    <h2>2 zadnja slova</h2>
+    <p>Odgovori riječju koja počinje na zadnja 2 slova prethodne riječi. <strong>Nj, lj i dž</strong> jedno su slovo.</p>
+    <p>Primjer: nakon <strong>kralj</strong>, traži se <strong>alj</strong>; nakon <strong>ulje</strong>, traži se <strong>lje</strong>. Kod nekoliko riječi, poput „injekcija”, slova se pravilno rastavljaju kao <strong>i-n-j</strong>.</p>
+  </section>
 
-<h2>Postava</h2>
-<ul>
-  <li>Partiju igra točno <strong>4 igrača</strong> (gosti i registrirani zajedno, bez razlike).</li>
-  <li>Raspored za stolom dodjeljuje se nasumično pri početku.</li>
-  <li>Igra se u krug, u smjeru rastućih sjedala.</li>
-</ul>
+  <section>
+    <h2>Koje su riječi dozvoljene?</h2>
+    <p> da bi riječ bila prihvačena, moraš slijediti ova pravila:</p>
+    <ul>
+      <li>riječ mora biti u standardnom, hrvatskom rječniku i početi na tražena 2 slova</li>
+      <li>prihvaćamo: imenice, glagole, pridjeve, priloge, zamjenice, brojeve, prijedloge, veznike, čestice i usklike, u svim njihovim oblicima</li>
+      <li>dijakritici vrijede: <strong>č nije c</strong>, <strong>š nije s</strong> i tako redom; ta slova na tipkovnici nisu dekoracija</li>
+      <li>vlastita imena, kratice, riječi s brojkama, crticama ili razmacima nisu u igri.</li>
+    </ul>
+  </section>
 
-<h2>Tijek partije</h2>
-<ol>
-  <li><strong>Sustav</strong> nasumično odabire prvu riječ partije — igrač nikad ne bira otvarajuću riječ.</li>
-  <li>Sljedeći igrač ima <strong>30 sekundi</strong> da upiše riječ koja počinje na zadnja dva grafema prethodne.</li>
-  <li>Krug se nastavlja dok netko ne ispadne.</li>
-  <li>Nakon svake eliminacije sustav ponovno nasumično bira riječ za otvaranje nove runde.</li>
-  <li>Partija završava kad ostane jedan igrač — pobjednik.</li>
-</ol>
+  <section>
+    <h2>Jednom odigrano, potrošeno</h2>
+    <p>Ne možeš vrtjeti istu riječ u raznim padežima i očekivati da nitko ne primijeti. Nakon „dobar”, ne prolaze ni „dobra” ni „dobro”. Ako je oblik već potrošen, reć ćemo ti koji je bio prvi.</p>
+    <p>„Bolji” i „najbolji” su zasebne grupe, baš kao i „pisati” i „napisati”. Posebna iznimka su <strong>„kaladont”</strong> i <strong>„kalodont”</strong>, oni se mogu ponoviti.</p>
+  </section>
 
-<h2>Valjana riječ</h2>
-<p>Riječ je valjana ako: postoji u našoj bazi (sve vrste riječi u svim oblicima — imenice, glagoli, pridjevi,
-  prilozi, zamjenice…), počinje na tražena dva grafema, njezina riječ-obitelj nije već iskorištena u ovoj
-  partiji, i dijakritici su upisani točno.</p>
-<p>Ponavljanje se računa po <strong>obitelji oblika</strong>: nakon „dobar" više ne prolaze ni „dobra" ni
-  „dobro" — poruka ti kaže koji je oblik već odigran. Stupnjevi su zasebni („bolji" i „najbolji" i dalje
-  vrijede), kao i glagolski parovi („pisati" i „napisati" dvije su riječi).</p>
-<p>Neispravan pokušaj <strong>ne eliminira igrača</strong> — riječ se odbija uz poruku, a vrijeme teče dalje.</p>
+  <section>
+    <h2>Kada ispadaš?</h2>
+      <p>Izgubio si ako:</p>
+    <ul>
+      <li>klikneš <strong>Ne znam</strong></li>
+      <li>istekne vrijeme prije valjane riječi</li>
+      <li>ti prethodni igrač ostavi mrtva slova, odnosno nema nijednog dostupnog nastavka</li>
+      <li>se ne vratiš nakon prekida veze u roku od 10 sekundi.</li>
+    </ul>
+    <p>Pogrešno upisana riječ te ne ruši odmah. Samo ti pojede vrijeme što je i dovoljno poučno.</p>
+  </section>
 
-<h2>Ispadanje</h2>
-<ul>
-  <li><strong>Istek vremena</strong> — 30 sekundi prošlo bez valjane riječi</li>
-  <li><strong>Mrtva slova</strong> — na tražena dva grafema ne postoji nijedna dostupna riječ</li>
-  <li><strong>Prekid veze</strong> — trenutna eliminacija ako je prekid bio na tvom potezu</li>
-</ul>
-<p>Redoslijed ispadanja određuje plasman: prvi ispali = 4. mjesto, zatim 3., pa 2.; preostali igrač = 1. mjesto.</p>
+  <section>
+    <h2>Kaladont efekt</h2>
+    <p>Kada odigraš „kaladont” ili „kalodont” na <strong>ka</strong>, ne ispada sljedeći igrač nego onaj tko ti je otvorio „ka”. Ti dobivaš bod za eliminaciju, a sustav otvara novu rundu. Ako je „ka” dao sustav, nitko ne ispada i igra ide dalje.</p>
+  </section>
 
-<h2>Bodovanje</h2>
-<p>Plasman (0/1/2/3 boda) + 1 bod po izazvanoj eliminaciji + 1 bonus bod za 1. mjesto; najviše 7 bodova po partiji.
-  Detalji i tablica rangova na <a href="/ljestvica">ljestvici</a>.</p>
+  <section>
+    <h2>Klasični mod 4 igrača</h2>
+    <p>Igraju točno 4 igrača, nasumično odabrana. Sustav bira početnu riječ, svi imate 30 sekundi po potezu, a nakon svake eliminacije, sustav postavlja novu početnu riječ. Prvi ispali je četvrti, zadnji preostali pobjeđuje.</p>
+    <p>Bodovi: plasman donosi 0, 1, 2 ili 3 boda, svaka izazvana eliminacija još 1 bod (ukupno je moguće 3 boda za eliminaciju - slučaj kada izbaciš nekoga ako nema ili taj igrač ne zna riječ sastavljenu od zadnja 2 slova prethodne riječi), a pobjednik dobiva dodatni bod. Najviše možeš uzeti 7 bodova u jednoj igri.</p>
+  </section>
 
-<h2>Komunikacija za stolom</h2>
-<p>Jedina komunikacija su 4 predefinirane brze poruke: 👋 Pozdrav! · 😅 Sorry! · 👏 Dobro odigrano! · 😎 Hvala
-  Slobodan tekstualni chat ne postoji.</p>
+  <section>
+    <h2>1 vs 1 dvoboj</h2>
+    <p>2 igrača, nasumično odabrana, isti nastavci riječi, nema skrivanja iza trećeg čovjeka. Tko prvi ispadne, gubi; pobjednik dobiva 1 bod.</p>
+    <p>Dvoboj ima zasebne statistike, rang i <a href="/ljestvica">ljestvicu</a>. Rezultati Klasičnog moda i Dvoboja ne miješaju se.</p>
+  </section>
+
+  <section>
+    <h2>Privatne sobe</h2>
+    <p>U privatnoj sobi, s ekipom možeš dogovoriti: duljinu trajanja poteza, vrste riječi, minimalnu duljinu, osnovne oblike i bodove za eliminaciju. Pravila nastavaka, slova i ponavljanja ostaju ista; rezultat vrijedi samo za ljestvicu te sobe, ne za globalni rang.</p>
+  </section>
+</main>
+
+<style>
+  .pravila {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 56px;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-naslov);
+    color: var(--boja-tekst-naslov);
+  }
+
+  h1 {
+    margin: 0 0 28px;
+  }
+
+  section {
+    padding: 20px 0;
+    border-top: 1px solid #e5ddc8;
+  }
+
+  h2 {
+    margin: 0 0 10px;
+    font-size: var(--naslov-3);
+  }
+
+  p,
+  li {
+    line-height: 1.6;
+  }
+
+  p {
+    margin: 0 0 12px;
+  }
+
+  ul {
+    margin: 0 0 12px;
+    padding-left: 22px;
+  }
+
+  li + li {
+    margin-top: 6px;
+  }
+
+  a {
+    color: var(--boja-pozadina-primarna);
+    font-weight: 700;
+  }
+</style>

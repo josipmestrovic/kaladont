@@ -52,7 +52,7 @@
   }
 
   h2 {
-    font-size: var(--tekst-mali);
+    font-size: var(--tekst-baza);
     color: var(--boja-tekst-sekundarni);
     font-weight: 600;
     text-align: center;

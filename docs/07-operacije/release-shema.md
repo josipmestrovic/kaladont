@@ -14,7 +14,7 @@ Release mora odgovoriti na pet pitanja bez gledanja u privatne bilješke:
 4. koja je odluka donesena nakon provjere;
 5. na koji se prethodni poznato-zdravi digest možemo vratiti.
 
-Za prve zatvorene testove ne uvodi se SemVer ni datumsko imenovanje. To bi dodalo ceremoniju prije nego postoji javni ritam izdanja. Autoritativan identitet releasea je puni image digest.
+Za prve zatvorene testove puni GHCR digest ostaje autoritativan tehnički identitet releasea. Uz njega se smije koristiti SemVer prerelease oznaka radi GitHub Releasea i komunikacije s testerima. Prvo izdanje nosi oznaku `v0.1.0-closed-alpha.1`.
 
 ## Identitet releasea
 
@@ -22,6 +22,7 @@ Za prve zatvorene testove ne uvodi se SemVer ni datumsko imenovanje. To bi dodal
 | ----- | ------- |
 | Digest | Puni `sha256:...` GHCR digest je jedini autoritativni artefakt za staging, produkciju i rollback. |
 | Commit SHA | Puni Git commit SHA veže digest uz diff, PR i CI zapis. |
+| Verzija za ljude | SemVer prerelease oznaka za GitHub Release i sučelje; ne koristi se za deploy, migracije ni rollback. |
 | Ljudski opis | Jedna rečenica: što release mijenja i što posebno treba testirati. |
 | Status | Jedan od statusa iz ovog dokumenta. |
 

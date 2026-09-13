@@ -7,6 +7,9 @@ export const PORUKE = {
   rijecNePostoji: 'Ta riječ ne postoji u našoj bazi.',
   rijecIskoristena: 'Ta riječ je već iskorištena.',
   rijecIskoristenaOblik: (oblik: string) => `Već je iskorišten oblik te riječi: '${oblik}'.`,
+  nedopustenaVrsta: 'Ta vrsta riječi nije dopuštena u ovoj privatnoj sobi.',
+  nijeOsnovniOblik: 'U ovoj privatnoj sobi dopušteni su samo osnovni oblici (nominativ imenica, infinitiv glagola).',
+  prekratkaRijec: (minGrafema: number) => `Riječ mora imati najmanje ${minGrafema} slova u ovoj sobi.`,
   krivaSlova: (dvaGrafema: string) => `Riječ mora početi na '${dvaGrafema}'.`,
   mrtvaSlovaBaza: (dvaGrafema: string) =>
     `Trenutno u bazi nemamo riječ na '${dvaGrafema}'.`,

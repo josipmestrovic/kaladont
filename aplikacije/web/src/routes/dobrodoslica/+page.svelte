@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
-  import { dohvatiSocket } from '$lib/socket.js';
+  import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import { jeRegistriranKorisnik, jeOnboardingZavrsen, oznaciOnboardingZavrsen } from '$lib/identitet.js';
   import { AVATARI } from '$lib/avatari.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
@@ -15,13 +15,7 @@
   let imeInput: HTMLInputElement | null = $state(null);
 
   onMount(() => {
-    if (jeRegistriranKorisnik() || jeOnboardingZavrsen()) {
-      void goto('/red');
-      return;
-    }
-    // Spaja se odmah kako bi gost-zapis postojao u bazi prije PUT /profil/* poziva
-    dohvatiSocket();
-    imeInput?.focus();
+    void goto('/registracija');
   });
 
   async function posaljiIme(e: SubmitEvent) {
@@ -32,6 +26,7 @@
     greska = null;
     try {
       await api('/profil/nadimak', { method: 'PUT', body: JSON.stringify({ nadimak }) });
+        await osvjeziSocketIdentitet();
       korak = 'avatar';
     } catch (e) {
       greska = e instanceof Error ? e.message : 'Spremanje imena nije uspjelo.';
@@ -46,6 +41,7 @@
     greska = null;
     try {
       await api('/profil/avatar', { method: 'PUT', body: JSON.stringify({ avatarId: odabraniAvatar }) });
+        await osvjeziSocketIdentitet();
       oznaciOnboardingZavrsen();
       void goto('/red');
     } catch (e) {
@@ -59,11 +55,17 @@
   {#if korak === 'ime'}
     <div class="korak">
       <h1>Dobrodošao/la u Kaladont!</h1>
-      <p class="uvod">
-        Čini se da prvi put igraš ovu igru? Trenutno igraš kao gost — ako već imaš račun, prijavi se.
-        Statistika ti neće biti spremljena dugoročno, ali u bilo kojem trenutku možeš se registrirati
-        i sve će biti sačuvano. Za početak nam reci svoje ime.
-      </p>
+      <div class="uvod">
+        <p>
+          Čini se da prvi put igraš ovu igru? Možeš igrati Kaladont bez problema kao gost. Ako već imaš račun, <a href="/prijava">prijavi se</a>.
+        </p>
+        <p>
+          Kao gostu, statistika ti neće biti spremljena dugoročno, ali u bilo kojem trenutku možeš se registrirati i sve će biti sačuvano.
+        </p>
+        <p>
+          Za početak nam reci svoje ime.
+        </p>
+      </div>
       <form onsubmit={posaljiIme}>
         <input
           bind:this={imeInput}
@@ -110,13 +112,11 @@
 
 <style>
   .dobrodoslica {
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 24px;
+    align-items: flex-start;
+    text-align: left;
+    padding: 24px 0;
   }
 
   .korak {
@@ -124,16 +124,32 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: 16px;
+    text-align: left;
   }
 
   h1 {
     font-family: var(--font-naslov);
+    line-height: 1.15;
+    margin: 0;
   }
 
   .uvod {
     color: var(--boja-tekst-sekundarni);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .uvod p {
+    margin: 0;
+  }
+
+  .uvod a {
+    color: var(--boja-tekst-naslov);
+    text-decoration: underline;
+    font-weight: 700;
   }
 
   form {
@@ -145,7 +161,7 @@
 
   input {
     font-size: 20px;
-    text-align: center;
+    text-align: left;
     padding: 14px;
     border-radius: var(--radijus-kartica);
     border: 2px solid #e5ddc8;
@@ -153,6 +169,8 @@
 
   button {
     font-family: var(--font-naslov);
+    font-size: 22px;
+    letter-spacing: 1.5px;
     font-weight: 700;
     border: none;
     border-radius: var(--radijus-pill);
@@ -170,7 +188,7 @@
   .avatar-grid {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 12px;
   }
 

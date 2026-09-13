@@ -1,107 +1,97 @@
 # Pravila igre — službena digitalna verzija
 
-Ovaj dokument je autoritativan opis pravila. Sve druge datoteke (kod, UI tekstovi, marketing) moraju biti usklađene s njim.
+Ovaj dokument je autoritativan opis pravila. Sve druge datoteke, uključujući kod i UI tekstove, moraju biti usklađene s njim.
 
-## Cilj igre
+## Postava i modovi
 
-Reći riječ koja počinje na **posljednja dva grafema** riječi prethodnog igrača — i preživjeti dulje od ostalih. Ime igre dolazi od paste za zube: riječ „kaladont" završava na „nt", a nijedna hrvatska riječ ne počinje na „nt", pa onaj tko je izgovori postavlja protivniku nerješiv zadatak.
-
-## Postava
-
-- Partiju igra **točno 4 igrača** (gosti i registrirani zajedno, bez razlike).
-- Raspored za stolom (sjedala 0–3) dodjeljuje se nasumično pri početku.
-- Igra se u krug, u smjeru rastućih sjedala.
+- **Klasični mod** igraju točno 4 igrača. Sjedala se dodjeljuju nasumično, a igra ide u krug.
+- **1v1 Dvoboj** igraju točno 2 igrača. Nakon svakog poteza na redu je protivnik.
+- Gosti i registrirani igrači igraju pod istim pravilima.
+- Privatna soba prima 2 do 8 igrača. Vlasnik može prilagoditi tajmer, bodove za eliminaciju, dopuštene vrste riječi, osnovne oblike i minimalnu duljinu riječi. Pravila nastavaka, grafema i ponavljanja ostaju ista.
 
 ## Tijek partije
 
-1. **Sustav** (ne igrač) nasumično odabire **prvu riječ** partije — vidi „Otvaranje runde: sustav bira riječ" niže.
-2. Sljedeći igrač ima **30 sekundi** da upiše riječ koja počinje na zadnja dva grafema prethodne riječi.
-3. Krug se nastavlja dok netko ne ispadne (vidi „Ispadanje").
-4. Nakon svake eliminacije **sustav** ponovno nasumično bira riječ za otvaranje nove runde; igra se nastavlja s preostalim igračima.
-5. Partija završava kad ostane jedan igrač — **pobjednik** (1. mjesto).
+1. Sustav nasumično odabire prvu riječ. Igrač nikada ne bira otvarajuću riječ.
+2. Igrač na potezu odgovara riječju koja počinje na zadnja dva grafema prethodne riječi. U javnim modovima ima 30 sekundi; privatna soba može imati 15, 30 ili 60 sekundi, odnosno igru bez tajmera.
+3. Nakon svake eliminacije sustav bira novu početnu riječ i igra se nastavlja s preostalim igračima.
+4. Partija završava kada ostane jedan igrač. U Dvoboju prvi koji ispadne odmah gubi.
 
-## Otvaranje runde: sustav bira riječ
+## Grafemi
 
-Da se ne bi moglo namjestiti ishod biranjem "ciljane" početne riječi (npr. odabirom nejasne, rijetko poznate riječi kako bi sljedeći igrač zagarantirano ispao), **igrač nikad sam ne bira riječ kojom se otvara runda** — to uvijek radi **sustav**, i to u sljedećim trenucima: na početku partije (1. runda), nakon svake eliminacije i nakon kaladont-efekta.
+Igra se na zadnja i prva **dva grafema**, ne na dva znaka na tipkovnici.
 
-Tijek otvaranja runde:
+- `nj`, `lj` i `dž` jedno su slovo.
+- Nakon `kralj` traži se `alj`, nakon `ulje` traži se `lje`, a nakon `konj` traži se `onj`.
+- Nekoliko riječi ima jezične iznimke: primjerice, `injekcija` počinje na `in`, jer se rastavlja kao `i-n-j`.
+- Poslužitelj računa grafeme i jedini presuđuje je li potez valjan.
 
-1. Klijentima se prikaže 10-sekundni ekran s obrazloženjem zadnje eliminacije (ako postoji) i porukom „Sustav će sada nasumično odabrati novu riječ..." uz brojač/loading indikator. Tijekom ovih 10 sekundi nitko ne može igrati.
-2. Sustav nasumično odabere aktivnu **imeničku lemu u nominativu** kraću od 6 znakova koja **sama ima barem jedan slobodan (neiskorišten) nastavak**. Pool trenutno ima 3.821 riječi; ograničenje vrijedi samo za sustavovo otvaranje runde, ne i za riječi koje igrači smiju odigrati. Time je klopka u otvaranju strukturno nemoguća, a početne riječi ostaju kratke i poznatije.
-3. Riječ se objavljuje („Sustav je odabrao riječ: X") i red prelazi na **sljedećeg aktivnog igrača** nakon onoga tko je prouzročio otvaranje nove runde (napadača prethodne eliminacije, ili nasumičnog prvog igrača za 1. rundu). Tek tada kreće **30-sekundni timer** poteza.
-4. Igrač koji je sada na potezu odgovara na sustavovu riječ **kao na normalan nastavak** — ne bira on početnu riječ.
+Detaljni primjeri i popis iznimaka nalaze se u [digrafi-i-grafemi.md](digrafi-i-grafemi.md).
 
 ## Valjana riječ
 
-Riječ je valjana ako zadovoljava **sve** uvjete:
+Riječ je valjana samo ako zadovoljava sve uvjete:
 
 | # | Uvjet | Poruka pri odbijanju |
 |---|---|---|
-| 1 | Postoji u bazi riječi (sve vrste riječi u svim oblicima — vidi [Leksemske grupe](#leksemske-grupe-zabrana-ponavljanja)) | „Ta riječ ne postoji u našoj bazi." |
-| 2 | Počinje na tražena dva grafema | „Riječ mora početi na 'XY'." |
-| 3 | Njezina leksemska grupa nije već potrošena **u ovoj partiji** (u bilo kojoj rundi) | „Već je iskorišten oblik te riječi: 'X'." |
-| 4 | Dijakritici su upisani **točno** (č ≠ c, š ≠ s…) | (pokriveno uvjetom 1 ili 2) |
+| 1 | Postoji u bazi riječi | „Ta riječ ne postoji u našoj bazi.” |
+| 2 | Počinje na tražena dva grafema | „Riječ mora početi na 'XY'.” |
+| 3 | Njezina leksemska grupa nije već potrošena u toj partiji | „Već je iskorišten oblik te riječi: 'X'.” |
+| 4 | Dijakritici su upisani točno | Pokriveno provjerom riječi i početka |
 
-**Neispravan pokušaj ne eliminira igrača** — riječ se odbija uz poruku, a vrijeme teče dalje. Igrač smije pokušavati do isteka vremena.
+Baza prihvaća imenice, glagole, pridjeve, priloge, zamjenice, brojeve, prijedloge, veznike, čestice i usklike, u svim oblicima. Vlastita imena, kratice te riječi s brojkama, crticama ili razmacima nisu u bazi.
 
-### Leksemske grupe (zabrana ponavljanja)
+Nevaljan pokušaj ne eliminira igrača. Potez se odbija uz objašnjenje, a vrijeme nastavlja teći.
 
-Baza sadrži **sve vrste riječi u svim oblicima** — imenice, glagole, pridjeve, priloge, zamjenice, brojeve, prijedloge, veznike, čestice i uzvike ([ADR-013](../03-arhitektura/odluke/013-sve-vrste-rijeci-leksemske-grupe.md)). Da paradigma jedne riječi ne bi postala neiscrpan izvor poteza, ponavljanje se ne računa po točnom obliku nego po **leksemskoj grupi**:
+## Leksemske grupe i ponavljanje
 
-- Svi oblici istog leksema dijele grupu: nakon „dobar" odbijaju se i „dobra", „dobro", „dobrima"…
-- **Stupnjevi pridjeva i priloga zasebne su grupe:** „dobar", „bolji" i „najbolji" tri su različite grupe.
-- **Glagolski vid razdvaja grupe:** „pisati" i „napisati" različite su riječi.
-- Oblik koji pripada većem broju vrsta (npr. „dobro" — imenica, pridjev i prilog) pri odigravanju **troši sve svoje grupe**.
-- Poruka odbijanja navodi oblik koji je grupu potrošio: „Već je iskorišten oblik te riječi: 'dobar'."
+Zabrana ponavljanja vrijedi cijelu partiju, uključujući ranije runde, i računa se po leksemskoj grupi, a ne samo po identičnom zapisu riječi.
 
-Riječi kraće od dva grafema (i, u, s, k, a…) nisu u bazi — potez uvijek traži poklapanje **dva** grafema pa ne mogu biti valjane.
+- Nakon „dobar” odbijaju se i „dobra”, „dobro” i drugi oblici istog leksema.
+- Stupnjevi pridjeva i priloga zasebne su grupe: „dobar”, „bolji” i „najbolji” nisu ista grupa.
+- Glagolski vid razdvaja grupe: „pisati” i „napisati” mogu oba proći.
+- Oblik s više gramatičkih uloga troši sve svoje grupe.
+- „Kaladont” i „kalodont” izuzeti su od zabrane ponavljanja i smiju se odigrati više puta.
 
-## Posebno pravilo: "kaladont" i "kalodont"
+Riječi kraće od dva grafema nisu valjane jer se svaki potez mora poklapati s dva grafema.
 
-Riječi **„kaladont"** i **„kalodont"** (obje se tretiraju jednako) imaju jedinstven efekt i **izuzete su od zabrane ponavljanja** — mogu se odigrati više puta u istoj partiji, svaki put kad se za to ukaže prilika (tražena slova „ka").
+## Otvaranje runde
 
-Kad ih igrač B izgovori:
+Sustav bira početnu riječ pri početku partije, nakon eliminacije i nakon kaladont-efekta. Odabrana riječ je aktivna imenička lema u nominativu kraća od šest znakova koja ima barem jedan slobodan nastavak. Time se početak runde ne može pretvoriti u namještenu klopku.
 
-1. **Ne ispada sljedeći igrač** kako bi se očekivalo od riječi koja završava na „nt" (mrtav par) — umjesto toga ispada igrač **A**, onaj čija je riječ omogućila otvaranje na „ka". Bod za tu eliminaciju ide **B**-u (napadač).
-2. Ako je A bio pretposljednji preostali igrač, partija odmah završava — B pobjeđuje.
-3. Inače **sustav** (ne B) bira novu riječ za otvaranje nastavka runde (vidi „Otvaranje runde: sustav bira riječ"), a red nakon toga prelazi na sljedećeg aktivnog igrača nakon B.
+Nakon objave riječi na potez dolazi sljedeći aktivni igrač. Tek tada započinje tajmer poteza.
+
+## Kaladont efekt
+
+„Kaladont” i „kalodont” imaju posebno pravilo kada se odigraju na `ka`:
+
+1. Ne ispada sljedeći igrač, nego igrač čija je riječ otvorila nastavak `ka`.
+2. Bod za eliminaciju dobiva igrač koji je odigrao kaladont.
+3. Sustav zatim bira novu riječ za otvaranje runde.
+
+Ako je `ka` otvorio sustav, nema igrača koji bi ispao: nitko ne dobiva bod, a sustav odmah otvara novu rundu.
 
 ## Ispadanje
 
-Igrač ispada iz partije na jedan od pet načina:
-
 | Način | Opis | Bod napadaču? |
 |---|---|---|
-| **Ne znam** | Klik na gumb „Ne znam riječ na 'XY'" (uz potvrdu) | Da |
-| **Istek vremena** | 30 sekundi prošlo bez valjane riječi | Da |
-| **Mrtva slova** | Na tražena dva grafema ne postoji nijedna dostupna riječ — server to utvrđuje **odmah** pri upisu prethodne riječi | Da |
-| **Prekid veze** | Veza nije obnovljena unutar 10 sekundi nakon detektiranog prekida | Samo ako je prekid bio na potezu prekinutog |
-| **Kaladont** | Netko je izgovorio „kaladont"/„kalodont" — ispada igrač koji je omogućio „ka" | Da, onome tko je izgovorio riječ |
+| **Ne znam** | Igrač predaje potez | Da |
+| **Istek vremena** | Timer istekne bez valjane riječi | Da |
+| **Mrtva slova** | Nema nijedne dostupne riječi na tražena dva grafema | Da |
+| **Prekid veze** | Igrač se ne vrati u 10 sekundi od prekida | Samo ako je bio na potezu |
+| **Kaladont** | Primjenjuje se posebno pravilo iznad | Da |
 
-Kod „mrtvih slova" razlikuju se dvije poruke eliminiranom igraču:
+Ako baza nema nijednu riječ na tražena slova, eliminacija se događa odmah i igrač može prijaviti moguću rupu u bazi. Ako postoje samo već potrošene riječi, riječ je o regularnoj taktičkoj eliminaciji bez prijave.
 
-- *„Trenutno u bazi nemamo riječ na 'XY'."* — uz gumb **Prijavi** (možda je rupa u bazi);
-- *„Sve riječi na 'XY' već su iskorištene u ovoj partiji."* — regularna taktička pobjeda napadača, bez gumba za prijavu.
+U Klasičnom modu prvi ispali je četvrti, zatim treći i drugi; preostali igrač je prvi. Eliminirani ostaje promatrač do kraja partije.
 
-Redoslijed ispadanja određuje plasman: prvi ispali = 4. mjesto, zatim 3., pa 2.; preostali igrač = 1. mjesto.
+## Bodovanje
 
-## Zabrane
+- **Klasični mod:** plasman donosi 0, 1, 2 ili 3 boda; svaka izazvana eliminacija donosi 1 bod; pobjednik dobiva dodatni bod. Maksimum je 7 bodova po partiji.
+- **1v1 Dvoboj:** pobjednik dobiva 1 bod, poraženi 0. Dvoboj ima zasebne statistike, rang i ljestvicu od Klasičnog moda.
+- **Privatne sobe:** ne mijenjaju globalne statistike ni rang. Bodovi i pobjede zbrajaju se samo na privremenoj ljestvici aktivne sobe.
 
-- **Vlastita imena i kratice** ne postoje u bazi (filtrirano pri uvozu) — automatski su nevaljani.
-- **Ponavljanje** je zabranjeno kroz cijelu partiju na razini **leksemske grupe** (bilo koji oblik iste riječi, uključujući riječi iz ranijih rundi) — **izuzetak: „kaladont"/„kalodont"** (vidi gore), koje se smiju ponoviti.
-
-## Nakon ispadanja
-
-Eliminirani igrač **ostaje za stolom kao promatrač** do kraja partije. Promatrači vide sve poteze i mogu slati emoji reakcije, ali ne igraju.
-
-## Komunikacija za stolom
-
-Jedina komunikacija su **emoji reakcije** iz fiksnog skupa: 👏 😂 😮 🔥 😅 🤝. Tekstualni chat ne postoji. Reakcije su ograničene na jednu svake 2 sekunde po igraču.
-
-## Bodovi
-
-Vidi [bodovanje-i-rangovi.md](bodovanje-i-rangovi.md). Ukratko: plasman (0/1/2/3) + 1 bod po izazvanoj eliminaciji + 1 bonus bod za 1. mjesto; najviše 7 bodova po partiji.
+Detalji izračuna i rangova nalaze se u [bodovanje-i-rangovi.md](bodovanje-i-rangovi.md).
 
 ## Povijest i prijave
 
-Svaki potez partije trajno se zapisuje. Igrač u svakom trenutku može otvoriti **povijest partije**, a s bilo kojeg poteza podnijeti **prijavu greške** (npr. riječ koja nedostaje u bazi). Detalji u [../04-rjecnik/odrzavanje-rjecnika.md](../04-rjecnik/odrzavanje-rjecnika.md).
+Potezi javnih partija trajno se zapisuju. Igrač može otvoriti povijest partije i prijaviti grešku u rječniku uz pojedini potez. Detalji su u [odrzavanje-rjecnika.md](../04-rjecnik/odrzavanje-rjecnika.md).

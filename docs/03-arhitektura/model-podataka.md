@@ -21,15 +21,19 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 |---|---|---|
 | id | uuid PK | Trajni identitet (gost ga čuva u localStorage) |
 | vrsta | enum: `gost`, `registriran`, `admin` | |
-| nadimak | text | Generiran za goste (npr. VeseliJež42); jedinstven za registrirane |
-| avatar_id | smallint | Stabilni ID avatara iz statičkog kataloga web aplikacije; nasumično dodijeljen pri stvaranju, promjenjivo samo za registrirane |
+| nadimak | text | Fiksni "Gost" za goste; jedinstven za registrirane |
+| avatar_id | smallint | Stabilni ID avatara iz statičkog kataloga web aplikacije |
 | email | text, null | Samo registrirani; jedinstven |
 | lozinka_hash | text, null | argon2id |
 | email_potvrdjen | boolean | |
-| odigrane | integer | Agregat (izvor istine: `sudionici_partije`) |
-| pobjede | integer | Agregat |
-| eliminacije_ukupno | integer | Agregat |
-| bodovi_ukupno | integer | Agregat |
+| odigrane | integer | Agregat 4p moda (izvor istine: `sudionici_partije`) |
+| pobjede | integer | Agregat 4p moda |
+| eliminacije_ukupno | integer | Agregat 4p moda |
+| bodovi_ukupno | integer | Agregat 4p moda |
+| odigrane_1v1 | integer | Agregat 1v1 moda |
+| pobjede_1v1 | integer | Agregat 1v1 moda |
+| eliminacije_1v1 | integer | Agregat 1v1 moda |
+| bodovi_1v1 | integer | Agregat 1v1 moda |
 | stvoren | timestamptz | |
 | zadnja_aktivnost | timestamptz | Za čišćenje starih gostiju |
 
@@ -40,6 +44,7 @@ Agregati se ažuriraju **transakcijski** pri završetku partije, u istoj transak
 | Stupac | Tip | Opis |
 |---|---|---|
 | id | uuid PK | |
+| mod | enum: `cetiri_igraca`, `dva_igraca` | Način igre |
 | pocetak | timestamptz | |
 | kraj | timestamptz, null | |
 | status | enum: `u_tijeku`, `zavrsena`, `ponistena` | `ponistena` je rezerva za tehničke incidente |

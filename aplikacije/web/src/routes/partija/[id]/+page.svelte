@@ -69,6 +69,12 @@
     unosNastavkaRijeci = '';
   }
 
+  function posaljiNeZnam() {
+    if (slanjeUTijeku) return;
+    slanjeUTijeku = true;
+    dohvatiSocket().emit('potez:ne-znam');
+  }
+
   function prikaziGreskuPoteza(poruka: string) {
     porukaPoteza = poruka;
     brojGreskeUnosa += 1;
@@ -290,6 +296,7 @@
   });
 
   async function ucitajPoteze(prikaziZadnjuRijec = true) {
+    if (stanje.jePrivatna) return;
     try {
       const odgovor = await api<{ potezi: Potez[] }>(`/partije/${partijaId}/potezi`);
       potezi = odgovor.potezi;
@@ -456,6 +463,11 @@
 
 {#if stanje.kraj && prikaziRezultate}
   <h2>Konačni rezultati</h2>
+  {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
+    <p class="privatna-obavijest">
+      🔒 Prijateljska privatna utakmica (bodovi nisu dodijeljeni i ne utječu na ljestvicu).
+    </p>
+  {/if}
   <ol class="plasmani-lista">
     {#each [...stanje.kraj.plasmani].sort((a, b) => a.plasman - b.plasman) as igrac (igrac.igracId)}
       <li class:pobjednik={igrac.plasman === 1}>
@@ -465,13 +477,25 @@
       </li>
     {/each}
   </ol>
-  {#if !jeRegistriranKorisnik()}
+  {#if !jeRegistriranKorisnik() && !stanje.kraj.jePrivatna && !stanje.jePrivatna}
     <p class="gost-poruka">
       Ova statistika je spremljena lokalno u ovom pregledniku. Registriraj se da je zadržiš zauvijek!
     </p>
     <a href="/registracija">Registriraj se</a>
   {/if}
-  <a href="/red" class="igraj-opet-gumb">Igraj opet</a>
+  {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
+    {@const kodSobe = stanje.kraj.kodSobe ?? stanje.kodSobe}
+    <div class="kraj-akcije">
+      <a href={kodSobe ? `/soba/${kodSobe}` : '/soba/kreiraj'} class="igraj-opet-gumb">Igraj ponovno</a>
+      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
+    </div>
+  {:else}
+    {@const modPartije = stanje.kraj.mod ?? stanje.mod}
+    <div class="kraj-akcije">
+      <a href={modPartije === 'dva_igraca' ? '/red?mod=dva_igraca' : '/red?mod=cetiri_igraca'} class="igraj-opet-gumb">Igraj opet</a>
+      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
+    </div>
+  {/if}
   <section class="povijest-partije">
     <h3>Povijest partije</h3>
     {#if potezi.length === 0}
@@ -694,6 +718,9 @@
         {/key}
         <div class="potez-gumbi">
           <button type="submit" disabled={slanjeUTijeku}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
+          {#if stanje.jePrivatna && (stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
+            <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku} onclick={posaljiNeZnam}>Ne znam</button>
+          {/if}
         </div>
       </form>
     {:else if jeEliminiran}
@@ -1188,13 +1215,19 @@
     cursor: pointer;
   }
   .potez-gumbi {
-    display: contents;
+    display: flex;
+    gap: 8px;
+    width: 100%;
   }
   .potez-gumbi button {
+    flex: 1;
     width: 100%;
     margin-top: 8px;
     font: inherit;
     font-size: var(--tekst-baza);
+  }
+  .potez-gumbi button.ne-znam-gumb {
+    background: #e4572e;
   }
   form button:disabled,
   .unos-rijeci:has(input:disabled) {
@@ -1326,6 +1359,14 @@
     padding: 8px 12px;
     border-radius: 6px;
   }
+  .privatna-obavijest {
+    background: #fdf6e2;
+    border: 1px solid #f4c95d;
+    color: #5c554a;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
   @media (min-width: 601px) {
     .igraci-red {
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1360,6 +1401,13 @@
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mali);
   }
+  .kraj-akcije {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+  }
   .igraj-opet-gumb {
     display: inline-block;
     background: var(--boja-pozadina-primarna);
@@ -1367,7 +1415,16 @@
     text-decoration: none;
     padding: 10px 24px;
     border-radius: var(--radijus-pill);
-    margin-top: 12px;
+    font-weight: bold;
+  }
+  .sporedni-gumb {
+    display: inline-block;
+    background: white;
+    border: 2px solid var(--boja-tekst-sekundarni);
+    color: var(--boja-tekst-osnovni);
+    text-decoration: none;
+    padding: 10px 24px;
+    border-radius: var(--radijus-pill);
     font-weight: bold;
   }
   .prijavi-btn {

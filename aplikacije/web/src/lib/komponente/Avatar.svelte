@@ -11,6 +11,7 @@
   const { avatarId, rang = null, gost = false, velicina = 48 }: Props = $props();
 
   const border = $derived(gost ? null : bojaBordera(rang));
+  const gostFontSize = $derived(Math.max(8, Math.round(velicina * 0.21)));
 </script>
 
 <div
@@ -19,9 +20,10 @@
   style:height="{velicina}px"
   style:border={border ? `3px solid ${border}` : '3px solid transparent'}
 >
-  <img src={putanjaAvatara(avatarId)} alt={nazivAvatara(avatarId)} />
   {#if gost}
-    <span class="oznaka-gost">GOST</span>
+    <div class="gost-avatar" style:font-size="{gostFontSize}px">Gost</div>
+  {:else}
+    <img src={putanjaAvatara(avatarId)} alt={nazivAvatara(avatarId)} />
   {/if}
 </div>
 
@@ -34,6 +36,7 @@
     position: relative;
     box-sizing: border-box;
     flex-shrink: 0;
+    overflow: hidden;
   }
 
   .avatar img {
@@ -44,17 +47,19 @@
     display: block;
   }
 
-  .oznaka-gost {
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: var(--tekst-oznaka);
-    font-weight: bold;
-    background: #26221b;
-    color: #faf3e3;
-    padding: 1px 4px;
-    border-radius: 4px;
-    white-space: nowrap;
+  .gost-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #1d6f5c;
+    color: #ffffff;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+    user-select: none;
+    padding: 0 2px;
   }
 </style>

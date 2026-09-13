@@ -34,3 +34,18 @@ export function izracunajRang(odigrane: number, prosjekBodova: number): string {
   }
   return rang;
 }
+
+function hijerarhijaRanga(rang: string | null): number {
+  if (!rang || rang === 'Piskaralo') return -1;
+  const indeks = RANGOVI.findIndex((r) => r.naziv === rang);
+  return indeks >= 0 ? indeks : -1;
+}
+
+/** Vraća viši od dva ranga (koristi se za prikaz ranga u privatnoj sobi). */
+export function vratiVeciRang(rang1: string | null, rang2: string | null): string | null {
+  const h1 = hijerarhijaRanga(rang1);
+  const h2 = hijerarhijaRanga(rang2);
+  if (h1 < 0 && h2 < 0) return null;
+  if (h1 >= h2) return rang1 === 'Piskaralo' ? null : rang1;
+  return rang2 === 'Piskaralo' ? null : rang2;
+}

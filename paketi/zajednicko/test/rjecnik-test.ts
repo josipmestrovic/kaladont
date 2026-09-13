@@ -63,6 +63,7 @@ export function stvoriTestniRjecnik(): RjecnikSucelje {
   return {
     jePostojecaRijec: (rijec) => GRUPE_TEST.has(rijec),
     grupeZa: (rijec) => GRUPE_TEST.get(rijec) ?? [],
+    vrsteZa: (rijec) => ['imenica'],
     postojeRijeciNa: (dvaGrafema) => [...GRUPE_TEST.keys()].some((rijec) => prvaDva(rijec) === dvaGrafema),
     imaSlobodnuRijecNa: (dvaGrafema, iskoristene) =>
       [...GRUPE_TEST.keys()].some((rijec) => prvaDva(rijec) === dvaGrafema && jeIgriva(rijec, iskoristene)),

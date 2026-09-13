@@ -12,10 +12,11 @@ export function zapisiPocetakPartije(
   partijaId: string,
   sudionici: SudionikPartije[],
   cekanjeMsPoIgracu: Map<string, number>,
+  mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
 ): Promise<void> {
   return baza
     .insert(partije)
-    .values({ id: partijaId, status: 'u_tijeku' })
+    .values({ id: partijaId, mod, status: 'u_tijeku' })
     .then(() =>
       baza.insert(sudioniciPartije).values(
         sudionici.map((s) => ({
@@ -58,6 +59,7 @@ export async function zakljuciPartijuUBazi(
   partijaId: string,
   pobjednikId: string,
   rezultati: ZapisSudionika[],
+  mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
 ): Promise<Map<string, { bodoviUkupno: number; odigrane: number }>> {
   const agregati = new Map<string, { bodoviUkupno: number; odigrane: number }>();
 
@@ -78,19 +80,36 @@ export async function zakljuciPartijuUBazi(
         })
         .where(and(eq(sudioniciPartije.partijaId, partijaId), eq(sudioniciPartije.igracId, r.igracId)));
 
-      const [azurirani] = await tx
-        .update(igraci)
-        .set({
-          odigrane: sql`${igraci.odigrane} + 1`,
-          pobjede: sql`${igraci.pobjede} + ${r.plasman === 1 ? 1 : 0}`,
-          eliminacijeUkupno: sql`${igraci.eliminacijeUkupno} + ${r.eliminacije}`,
-          bodoviUkupno: sql`${igraci.bodoviUkupno} + ${r.bodovi}`,
-        })
-        .where(eq(igraci.id, r.igracId))
-        .returning({ bodoviUkupno: igraci.bodoviUkupno, odigrane: igraci.odigrane });
+      if (mod === 'dva_igraca') {
+        const [azurirani] = await tx
+          .update(igraci)
+          .set({
+            odigrane1v1: sql`${igraci.odigrane1v1} + 1`,
+            pobjede1v1: sql`${igraci.pobjede1v1} + ${r.plasman === 1 ? 1 : 0}`,
+            eliminacije1v1: sql`${igraci.eliminacije1v1} + ${r.eliminacije}`,
+            bodovi1v1: sql`${igraci.bodovi1v1} + ${r.bodovi}`,
+          })
+          .where(eq(igraci.id, r.igracId))
+          .returning({ bodoviUkupno: igraci.bodovi1v1, odigrane: igraci.odigrane1v1 });
 
-      if (azurirani) {
-        agregati.set(r.igracId, azurirani);
+        if (azurirani) {
+          agregati.set(r.igracId, azurirani);
+        }
+      } else {
+        const [azurirani] = await tx
+          .update(igraci)
+          .set({
+            odigrane: sql`${igraci.odigrane} + 1`,
+            pobjede: sql`${igraci.pobjede} + ${r.plasman === 1 ? 1 : 0}`,
+            eliminacijeUkupno: sql`${igraci.eliminacijeUkupno} + ${r.eliminacije}`,
+            bodoviUkupno: sql`${igraci.bodoviUkupno} + ${r.bodovi}`,
+          })
+          .where(eq(igraci.id, r.igracId))
+          .returning({ bodoviUkupno: igraci.bodoviUkupno, odigrane: igraci.odigrane });
+
+        if (azurirani) {
+          agregati.set(r.igracId, azurirani);
+        }
       }
     }
   });

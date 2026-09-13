@@ -8,11 +8,14 @@ export interface StavkaReda {
   odigrane: number;
   pobjede: number;
   bodoviUkupno: number;
+  odigrane1v1?: number;
+  pobjede1v1?: number;
+  bodovi1v1?: number;
   usaoU: number;
 }
 
 export interface StrategijaUparivanja {
-  /** Vraća 4 igrača za novi stol kad je red spreman, inače null. */
+  /** Vraća igrače za novi stol kad je red spreman, inače null. */
   pokusajSastaviStol(red: readonly StavkaReda[]): StavkaReda[] | null;
 }
 
@@ -21,6 +24,14 @@ export const prvaCetvorica: StrategijaUparivanja = {
   pokusajSastaviStol(red) {
     if (red.length < 4) return null;
     return red.slice(0, 4);
+  },
+};
+
+/** 1v1 strategija: prvi par koji je ušao u red. */
+export const prviPar: StrategijaUparivanja = {
+  pokusajSastaviStol(red) {
+    if (red.length < 2) return null;
+    return red.slice(0, 2);
   },
 };
 

@@ -17,8 +17,13 @@ export interface RezultatIgraca {
   eliminacije: number;
 }
 
-/** Bodovi jednog igrača u jednoj partiji: plasman + eliminacije + bonus za 1. mjesto. */
-export function izracunajBodove(rezultat: RezultatIgraca): number {
+export type ModPartije = 'cetiri_igraca' | 'dva_igraca';
+
+/** Bodovi jednog igrača u jednoj partiji: 4p mod = plasman + eliminacije + bonus; 1v1 mod = fiksno 1 bod za pobjedu, 0 za poraz. */
+export function izracunajBodove(rezultat: RezultatIgraca, mod: ModPartije = 'cetiri_igraca'): number {
+  if (mod === 'dva_igraca') {
+    return rezultat.plasman === 1 ? 1 : 0;
+  }
   const bonus = rezultat.plasman === 1 ? BONUS_PRVO_MJESTO : 0;
   return BODOVI_PLASMANA[rezultat.plasman] + rezultat.eliminacije + bonus;
 }

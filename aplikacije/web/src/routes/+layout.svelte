@@ -5,15 +5,12 @@
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { inicijalizirajAudio, inicijalizirajGlobalneUiZvukove } from '$lib/audio-manager.js';
   import Header from '$lib/komponente/Header.svelte';
-  import AudioKontrola from '$lib/komponente/AudioKontrola.svelte';
 
   let { children } = $props();
 
-  // Landing, čekaonica i aktivna partija imaju vlastito zaglavlje.
+  // Čekaonica (/red) i aktivna partija (/partija/*) nemaju zaglavlje radi igre na punom ekranu.
   const bezHeadera = $derived(
-    $page.url.pathname === '/' ||
-      $page.url.pathname === '/red' ||
-      $page.url.pathname.startsWith('/partija/'),
+    $page.url.pathname === '/red' || $page.url.pathname.startsWith('/partija/'),
   );
 
   onMount(() => {
@@ -23,12 +20,11 @@
   });
 </script>
 
+{#if !bezHeadera}
+  <Header />
+{/if}
+
 <div class="stranica">
-  {#if !bezHeadera}
-    <Header prikaziAudio={$page.url.pathname === '/postavke'} />
-  {:else if $page.url.pathname === '/'}
-    <AudioKontrola plutaj />
-  {/if}
   {@render children()}
 </div>
 

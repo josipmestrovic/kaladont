@@ -11,6 +11,7 @@ import type { DogadajiKlijentPoslužitelj, DogadajiPosluziteljKlijent } from 'za
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
+import { registrirajPrivatneSobe } from './soba/servis-soba.js';
 import { osvjeziProsjekCekanja } from './red/prosjek-cekanja.js';
 import { stvoriUpraviteljPartija } from './igra/motor-partije.js';
 import { registrirajRacuneRute } from './racuni/rute.js';
@@ -29,6 +30,9 @@ export interface PodaciSocketa {
   odigrane: number;
   pobjede: number;
   bodoviUkupno: number;
+  odigrane1v1: number;
+  pobjede1v1: number;
+  bodovi1v1: number;
 }
 
 export type KaladontIo = SocketIoServer<
@@ -115,6 +119,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   });
 
   const registarVeza = new RegistarVeza();
+  let sobaServis: ReturnType<typeof registrirajPrivatneSobe> | undefined;
+
   const upravitelj = stvoriUpraviteljPartija(
     io,
     rjecnik,
@@ -125,7 +131,15 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       },
       jeAktivnaVeza: (igracId, socketId) => registarVeza.dohvatiSocketId(igracId) === socketId,
     },
-    opcije.postavkeMotora,
+    {
+      ...opcije.postavkeMotora,
+      naPartijaZavrsila: (partijaId) => {
+        sobaServis?.naPartijaZavrsila(partijaId);
+      },
+      naPrivatnaPartijaZavrsila: (kodSobe, pobjednikId, rezultati) => {
+        sobaServis?.registrirajRezultatPartije(kodSobe, pobjednikId, rezultati);
+      },
+    },
   );
 
   app.get('/zdravlje', async (_zahtjev, odgovor) => {
@@ -170,6 +184,9 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       socket.data.odigrane = identitet.odigrane;
       socket.data.pobjede = identitet.pobjede;
       socket.data.bodoviUkupno = identitet.bodoviUkupno;
+      socket.data.odigrane1v1 = identitet.odigrane1v1;
+      socket.data.pobjede1v1 = identitet.pobjede1v1;
+      socket.data.bodovi1v1 = identitet.bodovi1v1;
       next();
     } catch (greska) {
       const poruka = greska instanceof Error ? greska.message : 'Interna greška';
@@ -195,10 +212,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     });
   });
 
-  registrirajRedCekanja(io, (stol) => {
-    upravitelj.zapocniPartiju(stol);
+  registrirajRedCekanja(io, (stol, mod) => {
+    upravitelj.zapocniPartiju(stol, mod);
     void osvjeziProsjekCekanja();
   }, upravitelj.imaAktivnuPartiju);
+
+  sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
+    upravitelj.zapocniPrivatnuPartiju(sudionici, postavke, kodSobe),
+  );
 
   return { app, io };
 }

@@ -27,6 +27,9 @@ export interface Identitet {
   odigrane: number;
   pobjede: number;
   bodoviUkupno: number;
+  odigrane1v1: number;
+  pobjede1v1: number;
+  bodovi1v1: number;
 }
 
 function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
@@ -38,6 +41,9 @@ function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
     odigrane: redak.odigrane,
     pobjede: redak.pobjede,
     bodoviUkupno: redak.bodoviUkupno,
+    odigrane1v1: redak.odigrane1v1,
+    pobjede1v1: redak.pobjede1v1,
+    bodovi1v1: redak.bodovi1v1,
   };
 }
 
@@ -87,8 +93,8 @@ export async function razrijesiIdentitet(token: string): Promise<Identitet> {
     .values({
       id: token,
       vrsta: 'gost',
-      nadimak: generirajNadimak(),
-      avatarId: Math.floor(Math.random() * BROJ_AVATARA),
+      nadimak: 'Gost',
+      avatarId: 0,
     })
     .returning();
 

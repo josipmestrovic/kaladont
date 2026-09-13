@@ -28,12 +28,13 @@
   let ucitavaRijeci = $state(false);
   let prosirenoIgraci = $state(false);
   let prosirenoRijeci = $state(false);
+  let modIgraca = $state<'cetiri_igraca' | 'dva_igraca'>('cetiri_igraca');
   const tab = $derived($page.url.searchParams.get('tab') === 'rijeci' ? 'rijeci' : 'igraci');
 
-  async function ucitajIgrace(limit: 10 | 100) {
+  async function ucitajIgrace(limit: 10 | 100, mod = modIgraca) {
     ucitavaIgraci = true;
     try {
-      const odgovor = await fetch(`${ADRESA_POSLUZITELJA}/ljestvica?limit=${limit}`, {
+      const odgovor = await fetch(`${ADRESA_POSLUZITELJA}/ljestvica?limit=${limit}&mod=${mod}`, {
         headers: { authorization: `Bearer ${dohvatiAuthToken()}` },
       });
       const tijelo = (await odgovor.json()) as { ljestvica: StavkaLjestvice[]; mojeMjesto: StavkaLjestvice | null };
@@ -81,7 +82,34 @@
 </div>
 
 {#if tab === 'igraci'}
-  <p>Top {prosirenoIgraci ? '100' : '10'} igrača po prosjeku bodova (minimalno 10 odigranih partija).</p>
+  <div class="pod-tabovi">
+    <button
+      type="button"
+      class="pod-tab-gumb"
+      class:aktivan={modIgraca === 'cetiri_igraca'}
+      onclick={() => {
+        modIgraca = 'cetiri_igraca';
+        prosirenoIgraci = false;
+        ucitajIgrace(10, 'cetiri_igraca');
+      }}
+    >
+        4 igrača
+    </button>
+    <button
+      type="button"
+      class="pod-tab-gumb"
+      class:aktivan={modIgraca === 'dva_igraca'}
+      onclick={() => {
+        modIgraca = 'dva_igraca';
+        prosirenoIgraci = false;
+        ucitajIgrace(10, 'dva_igraca');
+      }}
+    >
+        2 igrača
+    </button>
+  </div>
+
+  <p>Top {prosirenoIgraci ? '100' : '10'} igrača po prosjeku bodova u modu {modIgraca === 'dva_igraca' ? '2 igrača' : '4 igrača'} (min. 10 partija).</p>
 
   {#if ljestvica.length === 0 && !ucitavaIgraci}
     <p>Odigraj 10 partija da uđeš na ljestvicu.</p>
@@ -165,6 +193,30 @@
     color: #1d6f5c;
     font-weight: bold;
     border-bottom-color: #2fa98c;
+  }
+
+  .pod-tabovi {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .pod-tab-gumb {
+    background: #faf8f0;
+    border: 1px solid #e5ddc8;
+    color: var(--boja-tekst-osnovni);
+    padding: 6px 14px;
+    border-radius: var(--radijus-pill);
+    font-size: var(--tekst-sitni);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .pod-tab-gumb.aktivan {
+    background: var(--boja-tekst-naslov);
+    border-color: var(--boja-tekst-naslov);
+    color: white;
+    font-weight: 700;
   }
 
   .moje-mjesto {

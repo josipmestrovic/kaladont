@@ -26,6 +26,10 @@ interface StanjeIgre {
   zadnjaRijec: string | null;
   zadnjaRijecIgracId: string | null;
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
+  mod: 'cetiri_igraca' | 'dva_igraca' | null;
+  jePrivatna: boolean;
+  kodSobe: string | null;
+  trajanjePotezaSek: number | null;
 }
 
 const stanje = $state<StanjeIgre>({
@@ -47,6 +51,10 @@ const stanje = $state<StanjeIgre>({
   zadnjaRijec: null,
   zadnjaRijecIgracId: null,
   zadnjaRijecVrsta: null,
+  mod: null,
+  jePrivatna: false,
+  kodSobe: null,
+  trajanjePotezaSek: null,
 });
 
 let pokrenuto = false;
@@ -75,6 +83,10 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.zadnjaRijec = p.zadnjaRijec;
   stanje.zadnjaRijecIgracId = p.zadnjaRijecIgracId;
   stanje.zadnjaRijecVrsta = p.zadnjaRijecVrsta;
+  stanje.mod = p.mod ?? null;
+  stanje.jePrivatna = Boolean(p.jePrivatna);
+  stanje.kodSobe = p.kodSobe ?? null;
+  stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
 }
 
 export function pokreniSlusateljeIgre(): void {
@@ -101,6 +113,9 @@ export function pokreniSlusateljeIgre(): void {
     stanje.zadnjaRijec = null;
     stanje.zadnjaRijecIgracId = null;
     stanje.zadnjaRijecVrsta = null;
+    stanje.mod = p.mod ?? null;
+    stanje.jePrivatna = Boolean(p.jePrivatna);
+    stanje.kodSobe = p.kodSobe ?? null;
   });
 
   socket.on('partija:stanje', primijeniStanjePartije);

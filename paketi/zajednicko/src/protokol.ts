@@ -25,6 +25,7 @@ export interface PayloadReakcijaPosalji {
 
 export interface StanjeReda {
   mojIgracId: string;
+  mod: 'cetiri_igraca' | 'dva_igraca';
   mjesta: ({
     igracId: string;
     nadimak: string;
@@ -36,12 +37,53 @@ export interface StanjeReda {
   prosjekCekanjaSek: number;
 }
 
+// Privatne sobe (postavke, clanovi, stanje)
+
+export interface PostavkePrivatneSobe {
+  trajanjePotezaSek: number; // 15, 30, 60, ili 0 za bez timera
+  dopusteneVrste: VrstaRijeci[]; // filter dopuštenih vrsta riječi
+  eliminacijskiBodovi: boolean; // +1 bod po eliminaciji
+  samoOsnovniOblici: boolean; // samo nominativ imenica, infinitiv glagola
+  minDuljinaRijeci: number; // 0 = sve, 4, 5...
+}
+
+export interface ClanSobe {
+  igracId: string;
+  nadimak: string;
+  avatarId: number;
+  rang: string | null;
+  jeVlasnik: boolean;
+  pobjedeUSobi: number;
+  bodoviUSobi: number;
+}
+
+export interface StanjePrivatneSobe {
+  kod: string;
+  mojIgracId: string;
+  postavke: PostavkePrivatneSobe;
+  vlasnikId: string;
+  clanovi: ClanSobe[];
+  partijaId: string | null;
+  status: 'cekanje' | 'u_tijeku' | 'zavrsena';
+}
+
+export interface PayloadStvoriSobu {
+  postavke: PostavkePrivatneSobe;
+}
+
+export interface PayloadUdjiUSobu {
+  kod: string;
+}
+
 export interface PocetakPartije {
   partijaId: string;
   mojIgracId: string;
   /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
   pocetakIso: string;
   sjedala: { igracId: string; nadimak: string; avatarId: number; rang: string | null }[];
+  mod?: 'cetiri_igraca' | 'dva_igraca';
+  jePrivatna?: boolean;
+  kodSobe?: string;
 }
 
 export interface StanjePartije {
@@ -60,6 +102,11 @@ export interface StanjePartije {
   zadnjaRijecIgracId: string | null;
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
   zavrsena: boolean;
+  mod?: 'cetiri_igraca' | 'dva_igraca';
+  jePrivatna?: boolean;
+  kodSobe?: string;
+  trajanjePotezaSek?: number;
+  dopusteneVrste?: VrstaRijeci[];
 }
 
 export interface PrihvacenPotez {
@@ -72,7 +119,15 @@ export interface PrihvacenPotez {
 }
 
 export interface OdbijenPotez {
-  kod: 'RIJEC_NE_POSTOJI' | 'KRIVA_SLOVA' | 'RIJEC_ISKORISTENA' | 'NIJE_TVOJ_POTEZ' | 'SUSTAV_BIRA_RIJEC';
+  kod:
+    | 'RIJEC_NE_POSTOJI'
+    | 'KRIVA_SLOVA'
+    | 'RIJEC_ISKORISTENA'
+    | 'NIJE_TVOJ_POTEZ'
+    | 'SUSTAV_BIRA_RIJEC'
+    | 'NEDOPUSTENA_VRSTA'
+    | 'NIJE_OSNOVNI_OBLIK'
+    | 'PREKRATKA_RIJEC';
   poruka: string;
 }
 
@@ -86,7 +141,7 @@ export type RazlogEliminacije =
 
 export interface Eliminacija {
   igracId: string;
-  plasman: 2 | 3 | 4;
+  plasman: number;
   razlog: RazlogEliminacije;
   bodZa: string | null;
   slova: string | null;
@@ -98,12 +153,15 @@ export interface KrajPartije {
   partijaId: string;
   plasmani: {
     igracId: string;
-    plasman: 1 | 2 | 3 | 4;
+    plasman: number;
     bodovi: number;
     eliminacije: number;
   }[];
   mojNoviProsjek: number;
   mojRang: string | null;
+  mod?: 'cetiri_igraca' | 'dva_igraca';
+  jePrivatna?: boolean;
+  kodSobe?: string;
 }
 
 /** Sustav je pocelo birati rijec za otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta). */
@@ -120,7 +178,16 @@ export interface RundaOtvorena {
   runda: number;
 }
 
-export type KodGreske = 'PREBRZO' | 'NISI_U_PARTIJI' | 'VEC_U_REDU' | 'INTERNA';
+export type KodGreske =
+  | 'PREBRZO'
+  | 'NISI_U_PARTIJI'
+  | 'VEC_U_REDU'
+  | 'INTERNA'
+  | 'SOBA_NE_POSTOJI'
+  | 'SOBA_U_TIJEKU'
+  | 'SOBA_PUNA'
+  | 'NISI_VLASNIK'
+  | 'NEDOVOLJNO_IGRACA';
 
 export interface PayloadGreska {
   kod: KodGreske;
@@ -135,15 +202,24 @@ export interface StatistikaRjecnika {
   kategorije: { vrsta: VrstaRijeci; brojOblika: number }[];
 }
 
+export interface PayloadUdjiURed {
+  mod?: 'cetiri_igraca' | 'dva_igraca';
+}
+
 /** Mapa svih događaja klijent -> poslužitelj, za tipiziranu upotrebu Socket.IO. */
 export interface DogadajiKlijentPoslužitelj {
-  'red:udji': () => void;
+  'red:udji': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;
   'partija:stanje': () => void;
   'potez:rijec': (payload: PayloadPotezRijec) => void;
   'potez:ne-znam': () => void;
   'reakcija:posalji': (payload: PayloadReakcijaPosalji) => void;
+  'soba:stvori': (payload: PayloadStvoriSobu) => void;
+  'soba:udji': (payload: PayloadUdjiUSobu) => void;
+  'soba:izadji': () => void;
+  'soba:stanje': () => void;
+  'soba:pokreni': () => void;
 }
 
 /** Mapa svih događaja poslužitelj -> klijent, za tipiziranu upotrebu Socket.IO. */
@@ -158,5 +234,7 @@ export interface DogadajiPosluziteljKlijent {
   'partija:runda-otvorena': (payload: RundaOtvorena) => void;
   'partija:kraj': (payload: KrajPartije) => void;
   'reakcija:nova': (payload: { igracId: string; poruka: BrzaPoruka }) => void;
+  'soba:stvorena': (payload: { kod: string }) => void;
+  'soba:stanje': (payload: StanjePrivatneSobe) => void;
   greska: (payload: PayloadGreska) => void;
 }

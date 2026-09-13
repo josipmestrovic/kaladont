@@ -4,12 +4,12 @@
  */
 :root {
   /* Boje - primitivi */
-  --boja-krem: #faf3e3;
-  --boja-mint: #2fa98c;
+  --boja-krem: #fdfaf2;
+  --boja-mint: #1d6f5c;
   --boja-mint-tamni: #1d6f5c;
   --boja-crvena: #e4572e;
-  --boja-tekst: #26221b;
-  --boja-tekst-sekundarni: #7a7264;
+  --boja-tekst: #1a1815;
+  --boja-tekst-sekundarni: #5c554a;
   --boja-zuta-krema: #f4c95d;
 
   /* Boje - semanticki slojevi */
@@ -107,6 +107,7 @@ h3 {
 
 a {
   color: var(--boja-tekst-naslov);
+  font-weight: 700;
 }
 
 button {
