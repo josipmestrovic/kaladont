@@ -119,7 +119,6 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
     const je1v1 = zahtjev.query.mod === 'dva_igraca' || zahtjev.query.mod === '1v1';
 
     const colOdigrane = je1v1 ? igraci.odigrane1v1 : igraci.odigrane;
-    const colPobjede = je1v1 ? igraci.pobjede1v1 : igraci.pobjede;
     const colBodovi = je1v1 ? igraci.bodovi1v1 : igraci.bodoviUkupno;
 
     const kandidati = await baza

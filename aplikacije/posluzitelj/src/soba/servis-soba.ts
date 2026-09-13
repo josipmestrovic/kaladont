@@ -7,7 +7,6 @@ import {
   vratiVeciRang,
   type PostavkePrivatneSobe,
   type StanjePrivatneSobe,
-  type VrstaRijeci,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import type { StavkaReda } from '../red/red-cekanja.js';

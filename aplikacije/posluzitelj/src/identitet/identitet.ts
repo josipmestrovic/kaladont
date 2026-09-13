@@ -6,7 +6,6 @@
 import { and, eq, lt } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
-import { generirajNadimak } from './nadimci.js';
 import { jePotpisaniToken, provjeriSesijskiToken } from '../racuni/tokeni.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -119,7 +119,6 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   });
 
   const registarVeza = new RegistarVeza();
-  let sobaServis: ReturnType<typeof registrirajPrivatneSobe> | undefined;
 
   const upravitelj = stvoriUpraviteljPartija(
     io,
@@ -217,7 +216,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     void osvjeziProsjekCekanja();
   }, upravitelj.imaAktivnuPartiju);
 
-  sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
+  const sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
     upravitelj.zapocniPrivatnuPartiju(sudionici, postavke, kodSobe),
   );
 
