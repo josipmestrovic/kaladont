@@ -7,6 +7,8 @@
 
   interface StavkaLjestvice {
     mjesto: number;
+    igracId: string;
+    jeJavan: boolean;
     nadimak: string;
     rang: string;
     prosjekBodova: number;
@@ -122,7 +124,13 @@
         {#each ljestvica as stavka (stavka.mjesto)}
           <tr>
             <td>{stavka.mjesto}</td>
-            <td>{stavka.nadimak}</td>
+            <td>
+              {#if stavka.jeJavan}
+                <a href={`/profil/javni/${stavka.igracId}`}>{stavka.nadimak}</a>
+              {:else}
+                {stavka.nadimak}
+              {/if}
+            </td>
             <td>{stavka.rang}</td>
             <td>{stavka.prosjekBodova.toFixed(2)}</td>
             <td>{stavka.odigrane}</td>

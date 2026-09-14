@@ -4,3 +4,4 @@ export * from './bodovanje.js';
 export * from './protokol.js';
 export * from './poruke.js';
 export * from './rangovi.js';
+export * from './nagrada-za-rijec.js';

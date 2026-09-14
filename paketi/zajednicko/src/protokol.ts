@@ -116,6 +116,18 @@ export interface PrihvacenPotez {
   sljedeciId: string;
   istekPotezaIso: string;
   brojIskoristenih: number;
+  streak: number;
+  nagrada: NagradaZaRijec | null;
+}
+
+export interface NagradaZaRijec {
+  intenzitet: 'mali' | 'srednji' | 'veliki';
+  rijetkost: 'rijetka' | 'srednje_rijetka' | 'jako_rijetka' | null;
+  duljina: 'duga' | 'srednje_duga' | 'jako_duga' | null;
+  tekst: string;
+  kategorija: 'rijetke' | 'duge' | null;
+  otkljucano: number | null;
+  ukupno: number | null;
 }
 
 export interface OdbijenPotez {

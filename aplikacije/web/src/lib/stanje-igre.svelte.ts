@@ -2,7 +2,7 @@
  * Globalno reaktivno stanje igre - slušatelji se registriraju jednom (u root layoutu)
  * jer partija:pocetak stiže dok je korisnik još na /red, prije nego /partija/[id] postoji.
  */
-import type { Eliminacija, KrajPartije, PocetakPartije, StanjePartije } from 'zajednicko';
+import type { Eliminacija, KrajPartije, NagradaZaRijec, PocetakPartije, StanjePartije } from 'zajednicko';
 import { pustiAudio, type AudioDogadaj } from './audio-manager.js';
 import { dohvatiSocket } from './socket.js';
 
@@ -30,6 +30,8 @@ interface StanjeIgre {
   jePrivatna: boolean;
   kodSobe: string | null;
   trajanjePotezaSek: number | null;
+  zadnjaNagrada: NagradaZaRijec | null;
+  trenutniStreak: number;
 }
 
 const stanje = $state<StanjeIgre>({
@@ -55,6 +57,8 @@ const stanje = $state<StanjeIgre>({
   jePrivatna: false,
   kodSobe: null,
   trajanjePotezaSek: null,
+  zadnjaNagrada: null,
+  trenutniStreak: 0,
 });
 
 let pokrenuto = false;
@@ -83,6 +87,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.zadnjaRijec = p.zadnjaRijec;
   stanje.zadnjaRijecIgracId = p.zadnjaRijecIgracId;
   stanje.zadnjaRijecVrsta = p.zadnjaRijecVrsta;
+  stanje.zadnjaNagrada = null;
   stanje.mod = p.mod ?? null;
   stanje.jePrivatna = Boolean(p.jePrivatna);
   stanje.kodSobe = p.kodSobe ?? null;
@@ -107,6 +112,8 @@ export function pokreniSlusateljeIgre(): void {
     stanje.eliminacije = [];
     stanje.zadnjaEliminacija = null;
     stanje.kraj = null;
+    stanje.zadnjaNagrada = null;
+    stanje.trenutniStreak = 0;
     stanje.poruka = null;
     stanje.sustavBiraRijec = false;
     stanje.istekIzboraIso = null;
@@ -121,24 +128,33 @@ export function pokreniSlusateljeIgre(): void {
   socket.on('partija:stanje', primijeniStanjePartije);
 
   socket.on('potez:prihvacen', (p) => {
-    if (p.igracId === stanje.mojIgracId) pustiAudio('potez-prihvacen');
-    if (p.sljedeciId === stanje.mojIgracId) {
-      brojOdbijenihNaPotezu = 0;
-      pustiAudio('tvoj-red');
-    }
+    const mojPotez = p.igracId === stanje.mojIgracId;
+    const mojSljedeciRed = p.sljedeciId === stanje.mojIgracId;
     stanje.zadnjaEliminacija = null;
     stanje.naPotezuId = p.sljedeciId;
     stanje.trazenaSlova = p.trazenaSlova;
     stanje.istekPotezaIso = p.istekPotezaIso;
     stanje.brojIskoristenih = p.brojIskoristenih;
+    if (p.igracId === stanje.mojIgracId) stanje.trenutniStreak = p.streak;
     stanje.poruka = null;
     stanje.zadnjaRijec = p.rijec;
     stanje.zadnjaRijecIgracId = p.igracId;
     stanje.zadnjaRijecVrsta = 'rijec';
+    stanje.zadnjaNagrada = mojPotez ? p.nagrada : null;
+
+    // State se mora primijeniti prije zvuka: nepostojeći ili blokirani audio
+    // asset ne smije zaustaviti prijelaz reda ili ažuriranje streaka.
+    if (mojPotez) pustiAudio('potez-prihvacen');
+    if (p.nagrada && mojPotez) pustiAudio(`nagrada-${p.nagrada.intenzitet}` as AudioDogadaj);
+    if (mojSljedeciRed) {
+      brojOdbijenihNaPotezu = 0;
+      pustiAudio('tvoj-red');
+    }
   });
 
   socket.on('potez:odbijen', (p) => {
     pustiOdbijanje();
+    stanje.trenutniStreak = 0;
     stanje.poruka = p.poruka;
   });
 
@@ -154,11 +170,13 @@ export function pokreniSlusateljeIgre(): void {
   });
 
   socket.on('partija:sustav-bira-rijec', (p) => {
+    stanje.zadnjaNagrada = null;
     stanje.sustavBiraRijec = true;
     stanje.istekIzboraIso = p.istekIzboraIso;
   });
 
   socket.on('partija:runda-otvorena', (p) => {
+    stanje.zadnjaNagrada = null;
     // 1. runda već ima pocetak-partije zvuk - nova-runda samo od 2. runde nadalje da se ne preklapaju.
     if (p.runda > 1) pustiAudio('nova-runda');
     if (p.naPotezuId === stanje.mojIgracId) {

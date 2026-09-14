@@ -31,12 +31,12 @@ Socket.IO sloj s autentikacijom, red čekanja (real-time stanje s imenima + pros
 
 ## Faza 5 — Web klijent
 
-Svi igraći ekrani (landing, red, stol s prstenom i emoji trakom, kraj, povijest) po [ekrani.md](../05-ux-ui/ekrani.md), mobile-first, vizualni identitet.
+Svi igraći ekrani (landing, red, stol s prstenom, nagradnim efektima i emoji trakom, kraj, povijest, vlastiti i javni profil) po [ekrani.md](../05-ux-ui/ekrani.md), mobile-first, vizualni identitet. Nagrada za rijetke i duge riječi prikazuje jedan složeni efekt, tekstualno navodi sva pogođena svojstva i poštuje smanjenu animaciju.
 **Kriterij:** četiri osobe na mobitelima odigraju partiju bez uputa; nijedan engleski string.
 
 ## Faza 6 — Računi
 
-Registracija (email + lozinka + potvrda), prijava, gost → račun bez gubitka statistike, profil, javna ljestvica, rangovi s kalibracijom.
+Registracija (email + lozinka + potvrda), prijava, gost → račun bez gubitka statistike, vlastiti i javni profil, trajne gamifikacijske statistike, javna ljestvica s poveznicama na profile, rangovi s kalibracijom. Trajne statistike uključuju streak, tierove rijetkih i dugih riječi te najdužu i najrjeđu riječ; ažuriraju se transakcijski pri završetku partije.
 **Kriterij:** pun tok gost → registriran → prijava s drugog uređaja; ljestvica ispravna.
 
 ## Faza 7 — Prijave i admin

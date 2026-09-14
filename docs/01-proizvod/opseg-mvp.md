@@ -12,7 +12,9 @@ Jedina svrha MVP-a: **provjeriti hoće li ljudi igrati**. Sve što tome ne prido
 | Registracija           | Email + lozinka; gost postaje račun bez gubitka statistike                                                     |
 | Rangovi                | Prikazni (Prvopisac → Kaladont), nakon 10 kalibracijskih partija                                               |
 | Javna ljestvica        | Top 100 po prosjeku bodova                                                                                     |
-| Vlastiti profil        | Statistika, zadnje partije                                                                                     |
+| Vlastiti profil        | Rezultati, zadnje partije i gamifikacijske statistike                                                          |
+| Javni profili          | Registrirani igrači imaju javni profil dostupan s ljestvice i završetka partije                              |
+| Nagrade za riječi      | Konfeti, zvuk i tekst za rijetke i duge riječi; bez utjecaja na bodovanje                                    |
 | Povijest partije       | Svi potezi; dostupna tijekom i nakon igre                                                                      |
 | Prijave grešaka        | S poteza u povijesti; baza + email notifikacija                                                                |
 | Admin stranica         | Prijave sa statusima, dodavanje/uklanjanje riječi                                                              |
@@ -28,7 +30,6 @@ Jedina svrha MVP-a: **provjeriti hoće li ljudi igrati**. Sve što tome ne prido
 | Tekstualni chat                     | Trošak moderacije                                                                | [pravila-igre.md](../02-pravila-igre/pravila-igre.md)             |
 | Monetizacija                        | Prvo dokaz retencije                                                             | [vizija-proizvoda.md](vizija-proizvoda.md)                        |
 | Privatne sobe / igra s prijateljima | Nakon validacije javne igre                                                      | [buduce-znacajke.md](../08-plan-razvoja/buduce-znacajke.md)       |
-| Javni profili drugih igrača         | Minimalna vrijednost za test                                                     | —                                                                 |
 | Mobilne aplikacije                  | Mobile-first web pokriva potrebu                                                 | —                                                                 |
 | Turniri, prijatelji, poruke         | v2+                                                                              | buduce-znacajke.md                                                |
 | Oporavak gost-računa                | Trajnost je pogodnost registracije                                               | RS-19                                                             |

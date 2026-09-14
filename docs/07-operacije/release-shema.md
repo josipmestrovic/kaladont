@@ -14,7 +14,7 @@ Release mora odgovoriti na pet pitanja bez gledanja u privatne bilješke:
 4. koja je odluka donesena nakon provjere;
 5. na koji se prethodni poznato-zdravi digest možemo vratiti.
 
-Za prve zatvorene testove puni GHCR digest ostaje autoritativan tehnički identitet releasea. Uz njega se smije koristiti SemVer prerelease oznaka radi GitHub Releasea i komunikacije s testerima. Prvo izdanje nosi oznaku `v0.1.0-closed-alpha.1`.
+Za prve zatvorene testove puni GHCR digest ostaje autoritativan tehnički identitet releasea. Uz njega se smije koristiti SemVer prerelease oznaka radi GitHub Releasea i komunikacije s testerima. Prvo izdanje nosilo je oznaku `v0.1.0-closed-alpha.1`; ovo izdanje nosi oznaku `v0.2.0-closed-alpha.1`.
 
 ## Identitet releasea
 

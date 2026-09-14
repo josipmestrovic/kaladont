@@ -19,6 +19,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Desktop **nije** zaseban l
   - **2 Igrača (1v1 Dvoboj)** — vodi u čekaonicu za 1v1 dvoboj (pobjednik nosi 1 bod).
   - Ispod gumba stoji objašnjenje: `*Glavni način igre gdje se osvajaju bodovi i rangovi`.
 - **Tipka Privatna soba** — vodi na kreiranje privatne sobe po vlastitim pravilima s pozivnim linkom (bez ikone lokota). Ispod gumba stoji objašnjenje: `*Kreirate sobu po svojim pravilima i preko linka pozovete prijatelje`.
+- U footeru je skroz lijevo poveznica **Što je novo**. Otvara popis izdanja kao toggle gumbe; najnovije izdanje je otvoreno po defaultu.
 - Poveznice Prijavi se / Registriraj se za neotvorene sesije.
 
 ## 2. Red čekanja (`/red?mod=cetiri_igraca|dva_igraca`)
@@ -72,9 +73,20 @@ Raspored (portret):
 - Registracija: višekoračni tijek (1. Korak: nadimak; 2. Korak: email, lozinka, odabir avatara). Kod email polja diskretna napomena: „Na tvoju email adresu nećemo slati nikakve obavijesti, isključivo je koristimo kako bi ti omogućili pristup računu ako zaboraviš lozinku."
 - Prijava: jednostavna prijava u dva odvojena retka (Email i Lozinka) s velikim zelenim gumbom.
 
-## 7. Profil (`/profil`) — samo vlastiti
+## 7. Profil (`/profil`) — vlastiti i javni
 
-- Sadrži tabove **4 Igrača** i **2 Igrača (1v1)** s odvojenim karticama statistike (`Odigrane`, `Pobjede`, `Ukupno bodova`, `Prosjek`, `Eliminacije`, `Rang`).
+- Vlastiti profil sadrži tabove **4 Igrača** i **2 Igrača (1v1)** s odvojenim karticama rezultata (`Odigrane`, `Pobjede`, `Ukupno bodova`, `Prosjek`, `Eliminacije`, `Rang`).
+- Odjeljak „Riječi i streak” zajednički je za oba javna moda; promjena taba ne mijenja te brojke. Privatne sobe se ne računaju.
+- Registrirani igrači imaju javni read-only profil, primjerice `/profil/javni/:igracId`. Javni profil prikazuje nadimak, avatar, rang, rezultate, gamifikacijske statistike, najdužu i najrjeđu riječ, ali nikad email ili podatke za autentikaciju. Gosti nemaju javni profil.
+- Profil prikazuje najduži streak upisanih riječi bez odbijanja, kao i:
+  - `Otkriveno jako rijetkih riječi` — frekvencija `0`;
+  - `Otkriveno srednje rijetkih riječi` — frekvencija `1–9`;
+  - `Otkriveno rijetkih riječi` — frekvencija `10–99`;
+  - `Upisano dugih riječi (10–11 grafema)`;
+  - `Upisano srednje dugih riječi (12–14 grafema)`;
+  - `Upisano jako dugih riječi (15+ grafema)`.
+- Pragovi u tim nazivima dolaze iz centralne konfiguracije i moraju se prikazati stvarnim vrijednostima ako se kasnije promijene.
+- Najduža riječ je ona s najviše grafema; kod izjednačenja ostaje prva. Najrjeđa riječ je zadnja odigrana riječ iz najboljeg dosegnutog frekvencijskog tiera; riječ iz slabijeg tiera ne prepisuje je. Obje se prikazuju kao običan tekst ispod statističkih kartica, a ne kao kartice, kako duge riječi ne bi probile okvir.
 - Prikazuje paginiranu povijest partija (prvih 10 partija + gumb "Učitaj još").
 - Gosti vide žuto/krem upozorenje s pozivom/CTA gumbom za registraciju kako bi sačuvali statistiku. Registrirani korisnici ovaj okvir ne vide.
 
@@ -90,6 +102,7 @@ Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvoj
 - Pod-tabovi **4 Igrača** i **2 Igrača (1v1)** omogućuju neovisni pregled ljestvice po modovima.
 - **Zadano učitavanje:** prikazuje top 10 igrača, uz gumb "Učitaj do 100" koji dohvaća cijelu top 100 listu s poslužitelja.
 - **Tab „Riječi":** Top 10 zadano najučestalijih odigranih riječi u svim partijama (stvarna upotreba iz `potezi`, ne statička frekvencija iz uvoznog korpusa). Stupci: mjesto, riječ (WordChip s istaknuta zadnja dva grafema), broj upotreba, % partija u kojima se pojavila. Isti gumb **„Učitaj do 100"** s loading indikatorom — nema koncepta „tvoje riječi" pa nema dodatnog retka.
+- Tab „Igrači" vraća identitet igrača samo za registrirane profile. Nadimak/avatar vode na javni profil. Linkovi se ne prikazuju u lobbyju ni tijekom aktivne partije; na završnom sažetku partije profili sudionika mogu biti otvoreni.
 - Prebacivanje tabova bez ponovnog učitavanja cijele stranice (isti header/podnožje); učitana proširena lista (100) pamti se dok je tab otvoren, ne treba ponovno učitavati pri povratku na isti tab.
 
 ## 9. Admin (`/admin`) — zaštićena uloga

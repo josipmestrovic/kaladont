@@ -110,6 +110,15 @@ interface PrihvacenPotez {
   sljedeciId: string;
   istekPotezaIso: string;
   brojIskoristenih: number;    // za prikaz napretka partije
+  nagrada: NagradaZaRijec | null; // jedan efekt; null za običnu riječ
+}
+
+interface NagradaZaRijec {
+  intenzitet: "mali" | "srednji" | "veliki";
+  rijetkost: "rijetka" | "srednje_rijetka" | "jako_rijetka" | null;
+  duljina: "duga" | "srednje_duga" | "jako_duga" | null;
+  tekst: string; // npr. „Pogođena je jako rijetka i srednje duga riječ!"
+  streak: number; // trenutni streak autora nakon prihvaćenog poteza
 }
 
 interface OdbijenPotez {
@@ -150,3 +159,6 @@ type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "INTERNA";
 3. **Promatrači** (eliminirani igrači) primaju sve događaje stola i smiju slati `reakcija:posalji`.
 4. **Idempotentnost:** ponovljeni `red:udji` dok je igrač već u redu ponovno šalje `red:stanje` bez promjene položaja.
 5. Svaka poruka poslužitelja nosi spreman hrvatski tekst (`poruka`) — klijent ne sastavlja poruke pravila sam.
+6. `nagrada` se izračunava isključivo na poslužitelju nakon prihvaćene riječi igrača. Početne i druge sustavske riječi, kao i odbijeni potezi, nemaju nagradu.
+7. Ako riječ istovremeno zadovoljava kriterij rijetkosti i duljine, šalje se jedan `NagradaZaRijec` s oba razloga. Klijent ne pušta dva zvuka i ne stvara dva odvojena efekta.
+8. Nagrada se može prikazati svim klijentima u sobi, ali se ista leksemska grupa nagrađuje najviše jednom u jednoj partiji.

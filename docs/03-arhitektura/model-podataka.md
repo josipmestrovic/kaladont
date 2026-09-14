@@ -39,6 +39,30 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 
 Agregati se ažuriraju **transakcijski** pri završetku partije, u istoj transakciji sa zapisom rezultata. Uvijek su izračunljivi ponovno iz `sudionici_partije` (skripta za rekonstrukciju).
 
+### Gamifikacijski agregati igrača
+
+Registrirani igrač ima jedan trajni gamifikacijski agregat za javne i privatne partije. Dijeli se između moda za 4 igrača i 1v1, dok postojeći rezultati, pobjede, bodovi i rangovi ostaju odvojeni po modu. Privatne sobe otključavaju achievemente, ali ne mijenjaju klasične agregate ni ljestvice. Gosti ih mogu privremeno imati u memoriji/profilu, ali nisu javno dostupni i ne smatraju se trajno spremljenima dok se gost ne registrira.
+
+Napomena: privatne sobe ipak upisuju gamifikacijska otključavanja i rekord streaka u isti agregat; samo klasični rezultati privatne sobe ne ulaze u `igraci` agregate ni ljestvice.
+
+| Podatak | Opis |
+|---|---|
+| najduzi_streak | Najduži broj uzastopno prihvaćenih riječi bez odbijene riječi; rekord se ažurira pri završetku partije |
+| otkrivene_jako_rijetke_grupe | Broj jedinstvenih leksemskih grupa s frekvencijom `0` koje je igrač prvi put otkrio |
+| otkrivene_srednje_rijetke_grupe | Broj jedinstvenih leksemskih grupa s frekvencijom `1–9` |
+| otkrivene_rijetke_grupe | Broj jedinstvenih leksemskih grupa s frekvencijom `10–99` |
+| upisane_duge_rijeci | Broj prihvaćenih igračevih riječi od `10–11` grafema |
+| upisane_srednje_duge_rijeci | Broj prihvaćenih igračevih riječi od `12–14` grafema |
+| upisane_jako_duge_rijeci | Broj prihvaćenih igračevih riječi od `15+` grafema |
+| najduza_rijec | Najduža igračeva riječ po broju grafema; kod izjednačenja ostaje prva |
+| najduza_rijec_grafemi | Broj grafema spremljene najduže riječi |
+| najrjeda_rijec | Zadnja riječ iz najboljeg dosegnutog frekvencijskog tiera; unutar istog tiera nova riječ prepisuje staru |
+| najrjeda_rijec_frekvencija | Frekvencija spremljene najrjeđe riječi |
+
+Nazivi iz tablice su logički nazivi; konkretna normalizacija stupaca ili zasebna tablica po modu definirat će se pri implementaciji migracije. Pragovi su centralna konfiguracija i moraju se spremati/izlagati tako da profil može prikazati stvarni prag, npr. `10+ grafema`, bez hardkodiranja u klijentu.
+
+Streak raste nakon prihvaćenog igračevog poteza i prekida ga samo odbijena riječ. `Ne znam`, istek, prekid veze i eliminacija ne resetiraju već dosegnuti maksimum; pri kraju partije sprema se najveći dosegnuti streak. Sustavske riječi se ne računaju u gamifikacijske statistike.
+
 ## partije
 
 | Stupac | Tip | Opis |
@@ -137,3 +161,6 @@ Revizijski trag **ručnih** promjena rječnika. Masovni uvoz se ne bilježi ovdj
 - **Rang:** računa se pri prikazu iz agregata (`bodovi_ukupno / odigrane`), nikad se ne pohranjuje — promjena pragova ne traži migraciju.
 - **Border:** izveden 1:1 iz trenutnog ranga (vidi [vizualni-identitet.md](../05-ux-ui/vizualni-identitet.md#avatari-i-borderi)); nema vlastiti stupac, korisnik ga ne bira.
 - **Top riječi:** `GET /rijeci/top` grupira `potezi.rijec` (COUNT, GROUP BY) preko svih partija — stvarna učestalost igranja, različito od statičke `rijeci.frekvencija` (korpusni uvoz). Računa se na zahtjev, bez keširanja u v1.
+- **Nagrade za riječi:** server nakon prihvaćene riječi računa frekvencijski tier (`0`, `1–9`, `10–99`) i tier duljine (`10–11`, `12–14`, `15+` grafema). Jedan potez može imati oba svojstva, ali emitira samo jedan efekt; tekst navodi oba razloga. Ista leksemska grupa nagrađuje se najviše jednom u životu igrača, uključujući privatne sobe.
+- **Otključane grupe:** `otkljucane_grupe_igraca` je trajni jedinstveni skup `(igrac_id, grupa)` s tierom. Učitava se na početku svake partije i sprečava ponovno dobivanje iste nagrade u kasnijim partijama.
+- **Javni profil:** samo registrirani igrači imaju javni read-only profil. Ljestvica i završni sažetak smiju voditi na profil; lobby i aktivni stol ne prikazuju linkove na profile. Javni odgovor ne sadrži email ni podatke za autentikaciju.

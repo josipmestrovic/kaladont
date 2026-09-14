@@ -46,6 +46,9 @@ export interface RjecnikSucelje {
   jePostojecaRijec(rijec: string): boolean;
   /** Leksemske grupe kojima oblik pripada; prazan niz ako riječ nije u bazi. */
   grupeZa(rijec: string): readonly string[];
+  /** Korpusna frekvencija oblika; vraća null za riječ koja nije u rječniku. */
+  frekvencijaZa?(rijec: string): number | null;
+  ciljeviRijeci?(): { rijetke: { ukupno: number }; duge: { ukupno: number } };
   /** Vrste riječi kojima oblik pripada (npr. ['imenica']). */
   vrsteZa?(rijec: string): readonly VrstaRijeci[];
   /** Je li riječ osnovni oblik (nominativ imenice/pridjeva/zamjenice/broja ili infinitiv glagola). */

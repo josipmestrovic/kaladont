@@ -4,15 +4,19 @@
  */
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { eq, inArray } from 'drizzle-orm';
 import { konfiguracija } from '../konfiguracija.js';
 import {
   validirajPotez,
   odrediRazlogMrtvihSlova,
   izracunajBodove,
   izracunajRang,
+  grafemi,
+  PRAGOVI_DULJINE,
   zadnjaDva,
   PORUKE,
   RIJECI_KALADONT,
+  izracunajNagraduZaRijec,
   type RjecnikSucelje,
   type RazlogEliminacije,
   type PocetakPartije,
@@ -26,8 +30,10 @@ import {
   type VrstaRijeci,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
+import { baza } from '../baza/klijent.js';
+import { otkljucaneGrupeIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
-import { zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi } from './upis-partije.js';
+import { zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisStatistikeRijeci } from './upis-partije.js';
 
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50) });
 const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) });
@@ -71,6 +77,22 @@ interface PrekidUTijeku {
   napadacId: string | null;
 }
 
+interface StatistikaRijeciPartije {
+  otkljucaneRijeci: Map<string, { jakoDuga: boolean; jakoRijetka: boolean; dugaTier: number | null; rijetkaTier: number | null }>;
+  najduziStreak: number;
+  otkriveneJakoRijetkeGrupe: Set<string>;
+  otkriveneSrednjeRijetkeGrupe: Set<string>;
+  otkriveneRijetkeGrupe: Set<string>;
+  upisaneDugeRijeci: number;
+  upisaneSrednjeDugeRijeci: number;
+  upisaneJakoDugeRijeci: number;
+  najduzaRijec: string | null;
+  najduzaRijecGrafemi: number;
+  najrjedaRijec: string | null;
+  najrjedaRijecFrekvencija: number | null;
+  najrjedaTier: number | null;
+}
+
 interface StanjeStola {
   partijaId: string;
   mod: 'cetiri_igraca' | 'dva_igraca';
@@ -107,6 +129,9 @@ interface StanjeStola {
   trajanjePotezaSek?: number;
   dopusteneVrste?: ReadonlySet<VrstaRijeci>;
   postavkePrivatneSobe?: PostavkePrivatneSobe;
+  grupeSNagradom: Map<string, Map<string, number | null>>;
+  streakovi: Map<string, number>;
+  statistikeRijeci: Map<string, StatistikaRijeciPartije>;
 }
 
 export function stvoriUpraviteljPartija(
@@ -124,8 +149,38 @@ export function stvoriUpraviteljPartija(
   const partije = new Map<string, StanjeStola>();
   const partijaPoIgracu = new Map<string, string>(); // igracId -> partijaId
 
+  async function ucitajOtkljucaneGrupe(igraci: readonly SudionikPartije[]): Promise<Map<string, Map<string, number | null>>> {
+    const igracIds = igraci.map((igrac) => igrac.igracId);
+    const retci = igracIds.length === 0
+      ? []
+      : await baza.select({ igracId: otkljucaneGrupeIgraca.igracId, grupa: otkljucaneGrupeIgraca.grupa, tier: otkljucaneGrupeIgraca.tier })
+        .from(otkljucaneGrupeIgraca)
+        .where(inArray(otkljucaneGrupeIgraca.igracId, igracIds));
+    const rezultat = new Map(igracIds.map((igracId) => [igracId, new Map<string, number | null>()]));
+    for (const redak of retci) rezultat.get(redak.igracId)?.set(redak.grupa, redak.tier);
+    return rezultat;
+  }
+
   function nadimak(stanje: StanjeStola, igracId: string): string {
     return stanje.sudionici.find((s) => s.igracId === igracId)?.nadimak ?? '???';
+  }
+
+  function novaStatistikaRijeci(): StatistikaRijeciPartije {
+    return {
+      otkljucaneRijeci: new Map(),
+      najduziStreak: 0,
+      otkriveneJakoRijetkeGrupe: new Set(),
+      otkriveneSrednjeRijetkeGrupe: new Set(),
+      otkriveneRijetkeGrupe: new Set(),
+      upisaneDugeRijeci: 0,
+      upisaneSrednjeDugeRijeci: 0,
+      upisaneJakoDugeRijeci: 0,
+      najduzaRijec: null,
+      najduzaRijecGrafemi: 0,
+      najrjedaRijec: null,
+      najrjedaRijecFrekvencija: null,
+      najrjedaTier: null,
+    };
   }
 
   function sljedeciAktivni(stanje: StanjeStola, trenutniId: string): string | null {
@@ -253,6 +308,9 @@ export function stvoriUpraviteljPartija(
       eliminacijeBrojac: new Map(),
       zadnjiPotezi: new Map(),
       zadnjeReakcije: new Map(),
+      grupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      streakovi: new Map(sudionici.map((s) => [s.igracId, 0])),
+      statistikeRijeci: new Map(sudionici.map((s) => [s.igracId, novaStatistikaRijeci()])),
       razloziEliminacije: new Map(),
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
@@ -284,7 +342,8 @@ export function stvoriUpraviteljPartija(
     }
     // 1. runda preskače „sustav bira riječ“ — čekaonica već odbrojava do pocetakIso.
     // Ceka upis partije u bazu (FK potezi -> partije) prije nego sto sustav zapise prvu automatsku rijec.
-    void upisPocetkaPromise.then(() => {
+    void Promise.all([upisPocetkaPromise, ucitajOtkljucaneGrupe(sudionici)]).then(([, grupe]) => {
+      stanje.grupeSNagradom = grupe;
       if (stanje.zavrsena || stanje.izborHandle) return;
       const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - Date.now());
       stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), preostaloMs);
@@ -369,6 +428,34 @@ export function stvoriUpraviteljPartija(
           aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
         }
       }
+      const privatneStatistike = new Map<string, ZapisStatistikeRijeci>(
+        [...stanje.statistikeRijeci].map(([igracId, statistika]) => [igracId, {
+          igracId,
+          grupe: [...(stanje.grupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
+          otkljucaneRijeci: [...statistika.otkljucaneRijeci].map(([rijec, oznake]) => ({ rijec, ...oznake })),
+          najduziStreak: statistika.najduziStreak,
+          otkriveneJakoRijetkeGrupe: statistika.otkriveneJakoRijetkeGrupe.size,
+          otkriveneSrednjeRijetkeGrupe: statistika.otkriveneSrednjeRijetkeGrupe.size,
+          otkriveneRijetkeGrupe: statistika.otkriveneRijetkeGrupe.size,
+          upisaneDugeRijeci: statistika.upisaneDugeRijeci,
+          upisaneSrednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
+          upisaneJakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
+          najduzaRijec: statistika.najduzaRijec,
+          najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
+          najrjedaRijec: statistika.najrjedaRijec,
+          najrjedaRijecFrekvencija: statistika.najrjedaRijecFrekvencija,
+          najrjedaTier: statistika.najrjedaTier,
+        }]),
+      );
+      const privatniRezultati = plasmani.map((p) => ({
+        igracId: p.igracId,
+        plasman: p.plasman as 1 | 2 | 3 | 4,
+        bodovi: 0,
+        eliminacije: 0,
+        nacinIspadanja: 'pobjednik' as const,
+      }));
+      void zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, privatniRezultati, stanje.mod, privatneStatistike, true)
+        .catch((greska) => console.error('Neuspio upis gamifikacije privatne partije:', greska));
       postavke.naPartijaZavrsila?.(stanje.partijaId);
       return;
     }
@@ -381,7 +468,27 @@ export function stvoriUpraviteljPartija(
       nacinIspadanja: p.plasman === 1 ? ('pobjednik' as const) : nacinIspadanjaZaIgraca(stanje, p.igracId),
     }));
 
-    void zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod)
+    const statistike = new Map<string, ZapisStatistikeRijeci>(
+      [...stanje.statistikeRijeci].map(([igracId, statistika]) => [igracId, {
+        igracId,
+        grupe: [...(stanje.grupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
+        otkljucaneRijeci: [...statistika.otkljucaneRijeci].map(([rijec, oznake]) => ({ rijec, ...oznake })),
+        najduziStreak: statistika.najduziStreak,
+        otkriveneJakoRijetkeGrupe: statistika.otkriveneJakoRijetkeGrupe.size,
+        otkriveneSrednjeRijetkeGrupe: statistika.otkriveneSrednjeRijetkeGrupe.size,
+        otkriveneRijetkeGrupe: statistika.otkriveneRijetkeGrupe.size,
+        upisaneDugeRijeci: statistika.upisaneDugeRijeci,
+        upisaneSrednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
+        upisaneJakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
+        najduzaRijec: statistika.najduzaRijec,
+        najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
+        najrjedaRijec: statistika.najrjedaRijec,
+        najrjedaRijecFrekvencija: statistika.najrjedaRijecFrekvencija,
+        najrjedaTier: statistika.najrjedaTier,
+      }]),
+    );
+
+    void zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod, statistike)
       .then((agregati) => {
         for (const p of plasmani) {
           const agregat = agregati.get(p.igracId);
@@ -546,10 +653,71 @@ export function stvoriUpraviteljPartija(
     zapocniIzborRijeciSustava(stanje, noviOtvarac);
   }
 
-  function obradiPrihvacenPotez(stanje: StanjeStola, igracId: string, rijecNormalizirana: string): void {
+  function obradiPrihvacenPotez(
+    stanje: StanjeStola,
+    igracId: string,
+    rijecNormalizirana: string,
+    izvorniSocket?: KaladontSocket,
+  ): void {
     const trazenaSlovaZaOvajPotez = stanje.trazenaSlova!;
     const trajanjeMs = Date.now() - stanje.vrijemePocetkaPotezaMs;
     const prethodniNapadacId = stanje.napadacId;
+    const gamifikacijaAktivna = true;
+    const trenutniStreak = gamifikacijaAktivna ? (stanje.streakovi.get(igracId) ?? 0) + 1 : 0;
+    if (gamifikacijaAktivna) stanje.streakovi.set(igracId, trenutniStreak);
+    const grupe = rjecnik.grupeZa(rijecNormalizirana);
+    const frekvencija = rjecnik.frekvencijaZa?.(rijecNormalizirana);
+    const grupeIgraca = stanje.grupeSNagradom.get(igracId) ?? new Map<string, number | null>();
+    stanje.grupeSNagradom.set(igracId, grupeIgraca);
+    const noveGrupe = grupe.filter((grupa) => !grupeIgraca.has(grupa));
+    let nagrada: PrihvacenPotez['nagrada'] = null;
+    if (gamifikacijaAktivna) {
+      const statistika = stanje.statistikeRijeci.get(igracId)!;
+      const brojGrafema = grafemi(rijecNormalizirana).length;
+      statistika.najduziStreak = Math.max(statistika.najduziStreak, trenutniStreak);
+      if (brojGrafema >= PRAGOVI_DULJINE.jakoDuga) statistika.upisaneJakoDugeRijeci += 1;
+      else if (brojGrafema >= PRAGOVI_DULJINE.srednjeDuga) statistika.upisaneSrednjeDugeRijeci += 1;
+      else if (brojGrafema >= PRAGOVI_DULJINE.duga) statistika.upisaneDugeRijeci += 1;
+      if (brojGrafema > statistika.najduzaRijecGrafemi) {
+        statistika.najduzaRijec = rijecNormalizirana;
+        statistika.najduzaRijecGrafemi = brojGrafema;
+      }
+      if (frekvencija !== undefined && frekvencija !== null) {
+        const tier = frekvencija === 0 && brojGrafema >= 4 ? 0 : frekvencija <= 9 ? 1 : frekvencija <= 99 ? 2 : null;
+        const grupeZaStatistiku = tier === 0 ? statistika.otkriveneJakoRijetkeGrupe : tier === 1 ? statistika.otkriveneSrednjeRijetkeGrupe : tier === 2 ? statistika.otkriveneRijetkeGrupe : null;
+        if (tier !== null && grupeZaStatistiku) {
+          for (const grupa of noveGrupe) grupeZaStatistiku.add(grupa);
+          if (statistika.najrjedaTier === null || tier <= statistika.najrjedaTier) {
+            statistika.najrjedaTier = Math.min(statistika.najrjedaTier ?? tier, tier);
+            statistika.najrjedaRijec = rijecNormalizirana;
+            statistika.najrjedaRijecFrekvencija = frekvencija;
+          }
+        }
+      }
+      const rijecJeDuga = brojGrafema >= PRAGOVI_DULJINE.duga;
+      const rijetkaTier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
+      if (rijecJeDuga || rijetkaTier !== null) {
+        const postojeca = statistika.otkljucaneRijeci.get(rijecNormalizirana);
+        statistika.otkljucaneRijeci.set(rijecNormalizirana, {
+          jakoDuga: Boolean(postojeca?.jakoDuga || brojGrafema >= PRAGOVI_DULJINE.jakoDuga),
+          jakoRijetka: Boolean(postojeca?.jakoRijetka || rijetkaTier === 0),
+          dugaTier: brojGrafema >= 15 ? 2 : brojGrafema >= 12 ? 1 : brojGrafema >= 10 ? 0 : postojeca?.dugaTier ?? null,
+          rijetkaTier: rijetkaTier ?? postojeca?.rijetkaTier ?? null,
+        });
+      }
+      nagrada = frekvencija === undefined || frekvencija === null
+        ? null
+        : izracunajNagraduZaRijec(rijecNormalizirana, frekvencija, grupe, new Set(grupeIgraca.keys()));
+      if (nagrada) {
+        const tier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
+        for (const grupa of grupe) grupeIgraca.set(grupa, tier);
+        const brojOtkljucanih = [...grupeIgraca.values()].filter((vrijednost) => vrijednost !== null).length;
+        nagrada.otkljucano = brojOtkljucanih;
+        nagrada.ukupno = nagrada.kategorija === 'rijetke'
+          ? rjecnik.ciljeviRijeci?.().rijetke.ukupno ?? null
+          : rjecnik.ciljeviRijeci?.().duge.ukupno ?? null;
+      }
+    }
 
     potrosiGrupe(stanje, rijecNormalizirana);
     stanje.redniBroj += 1;
@@ -585,6 +753,19 @@ export function stvoriUpraviteljPartija(
     if (razlogMrtvihSlova) {
       const sljedeci = sljedeciAktivni(stanje, igracId);
       stanje.trazenaSlova = novaTrazenaSlova;
+      if (sljedeci) {
+        stanje.naPotezuId = sljedeci;
+        emitirajPrihvacenPotezSvima(stanje, {
+          igracId,
+          rijec: rijecNormalizirana,
+          trazenaSlova: novaTrazenaSlova,
+          sljedeciId: sljedeci,
+          istekPotezaIso: '',
+          brojIskoristenih: stanje.brojOdigranih,
+          streak: trenutniStreak,
+          nagrada,
+        }, izvorniSocket);
+      }
       if (sljedeci) eliminirajIgraca(stanje, sljedeci, razlogMrtvihSlova);
       return;
     }
@@ -602,8 +783,10 @@ export function stvoriUpraviteljPartija(
       sljedeciId: sljedeci,
       istekPotezaIso: istekPotezaIso(stanje),
       brojIskoristenih: stanje.brojOdigranih,
+      streak: trenutniStreak,
+      nagrada,
     };
-    io.to(SOBA_PARTIJE(stanje.partijaId)).emit('potez:prihvacen', poruka);
+    emitirajPrihvacenPotezSvima(stanje, poruka, izvorniSocket);
   }
 
   /**
@@ -678,6 +861,26 @@ export function stvoriUpraviteljPartija(
     for (const sudionik of stanje.sudionici) {
       const socket = aktivneVeze.dohvatiSocket(sudionik.igracId);
       if (socket) posaljiStanje(socket);
+    }
+  }
+
+  function emitirajPrihvacenPotezSvima(
+    stanje: StanjeStola,
+    poruka: PrihvacenPotez,
+    izvorniSocket?: KaladontSocket,
+  ): void {
+    // Nakon reconnecta socket može kratko biti izvan rooma; autor ipak mora dobiti potvrdu.
+    const poslaniSocketi = new Set<string>();
+    if (izvorniSocket) {
+      izvorniSocket.emit('potez:prihvacen', poruka);
+      poslaniSocketi.add(izvorniSocket.id);
+    }
+    for (const sudionik of stanje.sudionici) {
+      const socket = aktivneVeze.dohvatiSocket(sudionik.igracId);
+      if (socket && !poslaniSocketi.has(socket.id)) {
+        socket.emit('potez:prihvacen', poruka);
+        poslaniSocketi.add(socket.id);
+      }
     }
   }
 
@@ -799,11 +1002,18 @@ export function stvoriUpraviteljPartija(
       });
 
       if (!rezultat.valjano) {
+        stanje.streakovi.set(socket.data.igracId, 0);
         socket.emit('potez:odbijen', { kod: rezultat.kod!, poruka: rezultat.poruka! });
         return;
       }
 
-      obradiPrihvacenPotez(stanje, socket.data.igracId, rijecNormalizirana);
+      try {
+        obradiPrihvacenPotez(stanje, socket.data.igracId, rijecNormalizirana, socket);
+      } catch (greska) {
+        console.error('Neuspjela obrada prihvaćenog poteza:', { rijec: rijecNormalizirana, greska });
+        stanje.streakovi.set(socket.data.igracId, 0);
+        socket.emit('greska', { kod: 'INTERNA', poruka: 'Potez nije obrađen. Pokušaj ponovno.' });
+      }
     });
 
     socket.on('potez:ne-znam', () => {
@@ -896,6 +1106,9 @@ export function stvoriUpraviteljPartija(
       eliminacijeBrojac: new Map(),
       zadnjiPotezi: new Map(),
       zadnjeReakcije: new Map(),
+      grupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      streakovi: new Map(sudionici.map((s) => [s.igracId, 0])),
+      statistikeRijeci: new Map(sudionici.map((s) => [s.igracId, novaStatistikaRijeci()])),
       razloziEliminacije: new Map(),
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
@@ -927,8 +1140,11 @@ export function stvoriUpraviteljPartija(
       aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
     }
 
-    const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - Date.now());
-    stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), preostaloMs);
+    void ucitajOtkljucaneGrupe(sudionici).then((grupe) => {
+      stanje.grupeSNagradom = grupe;
+      const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - Date.now());
+      stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), preostaloMs);
+    });
 
     return partijaId;
   }

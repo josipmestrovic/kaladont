@@ -64,6 +64,52 @@ export const igraci = pgTable('igraci', {
   zadnjaAktivnost: timestamp('zadnja_aktivnost', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const statistikeRijeciIgraca = pgTable(
+  'statistike_rijeci_igraca',
+  {
+    igracId: uuid('igrac_id').notNull().references(() => igraci.id),
+    mod: modPartije('mod').notNull(),
+    najduziStreak: integer('najduzi_streak').notNull().default(0),
+    otkriveneJakoRijetkeGrupe: integer('otkrivene_jako_rijetke_grupe').notNull().default(0),
+    otkriveneSrednjeRijetkeGrupe: integer('otkrivene_srednje_rijetke_grupe').notNull().default(0),
+    otkriveneRijetkeGrupe: integer('otkrivene_rijetke_grupe').notNull().default(0),
+    upisaneDugeRijeci: integer('upisane_duge_rijeci').notNull().default(0),
+    upisaneSrednjeDugeRijeci: integer('upisane_srednje_duge_rijeci').notNull().default(0),
+    upisaneJakoDugeRijeci: integer('upisane_jako_duge_rijeci').notNull().default(0),
+    najduzaRijec: text('najduza_rijec'),
+    najduzaRijecGrafemi: integer('najduza_rijec_grafemi').notNull().default(0),
+    najrjedaRijec: text('najrjeda_rijec'),
+    najrjedaRijecFrekvencija: integer('najrjeda_rijec_frekvencija'),
+    najrjedaTier: smallint('najrjeda_tier'),
+  },
+  (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.mod] })],
+);
+
+export const otkljucaneGrupeIgraca = pgTable(
+  'otkljucane_grupe_igraca',
+  {
+    igracId: uuid('igrac_id').notNull().references(() => igraci.id),
+    grupa: text('grupa').notNull(),
+    tier: smallint('tier'),
+    otkljucano: timestamp('otkljucano', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.grupa] })],
+);
+
+export const otkljucaneRijeciIgraca = pgTable(
+  'otkljucane_rijeci_igraca',
+  {
+    igracId: uuid('igrac_id').notNull().references(() => igraci.id),
+    rijec: text('rijec').notNull(),
+    dugaTier: smallint('duga_tier'),
+    rijetkaTier: smallint('rijetka_tier'),
+    jakoDuga: boolean('jako_duga').notNull().default(false),
+    jakoRijetka: boolean('jako_rijetka').notNull().default(false),
+    otkljucano: timestamp('otkljucano', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.rijec] })],
+);
+
 export const partije = pgTable('partije', {
   id: uuid('id').primaryKey().defaultRandom(),
   mod: modPartije('mod').notNull().default('cetiri_igraca'),

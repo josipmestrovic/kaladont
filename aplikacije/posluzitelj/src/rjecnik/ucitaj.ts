@@ -7,7 +7,7 @@ import type { RjecnikSucelje, VrstaRijeci } from 'zajednicko';
 import { asc, eq, gt, and } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
-import { zadnjaDva } from 'zajednicko';
+import { grafemi, zadnjaDva } from 'zajednicko';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
 
@@ -16,10 +16,16 @@ export interface KategorijaRjecnika {
   brojOblika: number;
 }
 
+export interface CiljeviRijeci {
+  rijetke: { ukupno: number; niska: number; srednja: number; jaka: number };
+  duge: { ukupno: number; duga: number; srednja: number; jaka: number };
+}
+
 export interface RjecnikUMemoriji extends RjecnikSucelje {
   brojRijeci(): number;
   /** Broj oblika po kategoriji, sortirano silazno (GET /rjecnik/statistika, naslovnica). */
   brojPoKategoriji(): KategorijaRjecnika[];
+  ciljeviRijeci(): CiljeviRijeci;
   /** Ponovno učita rječnik iz baze i zamijeni podatke in-place (RS-21: signal ponovnog učitavanja). */
   ponovoUcitaj(): Promise<void>;
 }
@@ -28,17 +34,22 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
   // let (ne const) - ponovoUcitaj() mora moći zamijeniti sadržaj bez mijenjanja referenci koje
   // motor-partije.ts već drži na ovaj objekt (closures ispod vide novo stanje odmah)
   let rijecGrupe = new Map<string, string | readonly string[]>();
+  let rijecFrekvencija = new Map<string, number>();
   let rijecVrste = new Map<string, VrstaRijeci | readonly VrstaRijeci[]>();
   let poPrefiksu = new Map<string, string[]>();
   let pocetneImenickeRijeci: string[] = [];
   let kategorije: KategorijaRjecnika[] = [];
+  let ciljevi: CiljeviRijeci = { rijetke: { ukupno: 0, niska: 0, srednja: 0, jaka: 0 }, duge: { ukupno: 0, duga: 0, srednja: 0, jaka: 0 } };
 
   async function ucitaj(): Promise<void> {
     const novoRijecGrupe = new Map<string, string | readonly string[]>();
+    const novoRijecFrekvencija = new Map<string, number>();
     const novoRijecVrste = new Map<string, VrstaRijeci | readonly VrstaRijeci[]>();
     const novoPoPrefiksu = new Map<string, string[]>();
     const novePocetneImenickeRijeci: string[] = [];
     const noviBrojPoVrsti = new Map<VrstaRijeci, number>();
+    const rijetkeGrupe = [new Set<string>(), new Set<string>(), new Set<string>()];
+    const dugeRijeci = [new Set<string>(), new Set<string>(), new Set<string>()];
     const kanon = new Map<string, string>();
     const kanoniziraj = (vrijednost: string): string => {
       const postojeci = kanon.get(vrijednost);
@@ -50,7 +61,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     let zadnjaRijec = '';
     for (;;) {
       const stranica = await baza
-        .select({ rijec: rijeci.rijec, prvaDva: rijeci.prvaDva, vrste: rijeci.vrste, grupe: rijeci.grupe })
+        .select({ rijec: rijeci.rijec, prvaDva: rijeci.prvaDva, vrste: rijeci.vrste, grupe: rijeci.grupe, frekvencija: rijeci.frekvencija })
         .from(rijeci)
         .where(zadnjaRijec ? and(eq(rijeci.aktivna, true), gt(rijeci.rijec, zadnjaRijec)) : eq(rijeci.aktivna, true))
         .orderBy(asc(rijeci.rijec))
@@ -60,8 +71,14 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
 
       for (const redak of stranica) {
         const grupe = redak.grupe.map(kanoniziraj);
+        const brojGrafema = grafemi(redak.rijec).length;
+        const rarityTier = redak.frekvencija === 0 && brojGrafema >= 4 ? 2 : redak.frekvencija <= 9 ? 1 : redak.frekvencija <= 99 ? 0 : -1;
+        if (rarityTier >= 0) for (const grupa of grupe) rijetkeGrupe[rarityTier]!.add(grupa);
+        const duljinaTier = brojGrafema >= 15 ? 2 : brojGrafema >= 12 ? 1 : brojGrafema >= 10 ? 0 : -1;
+        if (duljinaTier >= 0) dugeRijeci[duljinaTier]!.add(redak.rijec);
         const vrste = (redak.vrste as VrstaRijeci[]).map(kanoniziraj) as VrstaRijeci[];
         novoRijecGrupe.set(redak.rijec, grupe.length === 1 ? grupe[0]! : grupe);
+        novoRijecFrekvencija.set(redak.rijec, redak.frekvencija);
         novoRijecVrste.set(redak.rijec, vrste.length === 1 ? vrste[0]! : vrste);
         if (redak.rijec.length < 6 && grupe.includes(`imenica:${redak.rijec}`)) {
           novePocetneImenickeRijeci.push(redak.rijec);
@@ -78,18 +95,27 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     }
 
     rijecGrupe = novoRijecGrupe;
+    rijecFrekvencija = novoRijecFrekvencija;
     rijecVrste = novoRijecVrste;
     poPrefiksu = novoPoPrefiksu;
     pocetneImenickeRijeci = novePocetneImenickeRijeci;
     kategorije = [...noviBrojPoVrsti.entries()]
       .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
       .sort((a, b) => b.brojOblika - a.brojOblika);
+    ciljevi = {
+      rijetke: { niska: rijetkeGrupe[0]!.size, srednja: rijetkeGrupe[1]!.size, jaka: rijetkeGrupe[2]!.size, ukupno: 81037 },
+      duge: { duga: dugeRijeci[0]!.size, srednja: dugeRijeci[1]!.size, jaka: dugeRijeci[2]!.size, ukupno: 379193 },
+    };
   }
 
   function grupeZa(rijec: string): readonly string[] {
     const grupe = rijecGrupe.get(rijec);
     if (grupe === undefined) return [];
     return typeof grupe === 'string' ? [grupe] : grupe;
+  }
+
+  function frekvencijaZa(rijec: string): number | null {
+    return rijecFrekvencija.get(rijec) ?? null;
   }
 
   function vrsteZa(rijec: string): readonly VrstaRijeci[] {
@@ -161,8 +187,10 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
   return {
     brojRijeci: () => rijecGrupe.size,
     brojPoKategoriji: () => kategorije,
+    ciljeviRijeci: () => ciljevi,
     jePostojecaRijec: (rijec) => rijecGrupe.has(rijec),
     grupeZa,
+    frekvencijaZa,
     vrsteZa,
     jeOsnovniOblik,
     postojeRijeciNa: (dvaGrafema) => (poPrefiksu.get(dvaGrafema)?.length ?? 0) > 0,

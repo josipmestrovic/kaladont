@@ -2,9 +2,11 @@
   import { goto } from '$app/navigation';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import StatistikaRjecnika from '$lib/komponente/StatistikaRjecnika.svelte';
+    import StoJeNovo from '$lib/komponente/StoJeNovo.svelte';
 
   const registriran = jeRegistriranKorisnik();
   let otvorenModal = $state(false);
+  let otvoreneNovosti = $state(false);
 
   function igrajKlik(e: MouseEvent) {
     e.preventDefault();
@@ -22,7 +24,7 @@
 </script>
 
 <div class="landing">
-  <h1 class="logotip">Kaladont Multiplayer <span>(v0.1.0-closed-alpha.1)</span></h1>
+  <h1 class="logotip">Kaladont Multiplayer <span>(v0.2.0-closed-alpha.1)</span></h1>
   <p class="podnaslov">Hrvatska igra riječi</p>
 
   <div class="gumbi-sekcija">
@@ -74,8 +76,13 @@
 {/if}
 
 <footer>
+  <button type="button" class="novosti-link" onclick={() => (otvoreneNovosti = true)}>Što je novo</button>
   <a href="/o-igri">O igri</a> · <a href="/uvjeti">Uvjeti korištenja</a> · <a href="/privatnost">Pravila privatnosti</a>
 </footer>
+
+{#if otvoreneNovosti}
+  <StoJeNovo zatvori={() => (otvoreneNovosti = false)} />
+{/if}
 
 <style>
   .landing {
@@ -178,8 +185,15 @@
     margin-top: 32px;
     font-size: var(--tekst-mali);
     color: var(--boja-tekst-sekundarni);
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+    text-align: left;
   }
+
+  .novosti-link { padding: 0; border: 0; background: none; color: var(--boja-tekst-naslov); font: inherit; font-weight: 700; cursor: pointer; }
 
   .modal-podloga {
     position: fixed;

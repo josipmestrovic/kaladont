@@ -1,0 +1,1 @@
+ALTER TABLE "otkljucane_grupe_igraca" ADD COLUMN IF NOT EXISTS "tier" smallint;

@@ -9,6 +9,7 @@
   import RaniPristupBaner from '$lib/komponente/RaniPristupBaner.svelte';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
+  import Konfeti from '$lib/komponente/Konfeti.svelte';
   import { pustiAudio } from '$lib/audio-manager.js';
   import { zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
@@ -21,6 +22,7 @@
   let prijavaPoruka = $state('');
   let prijavaPotezId: number | null = $state(null);
   let slanjeUTijeku = $state(false);
+  let slanjeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let porukaPoteza = $state<string | null>(null);
   let brojGreskeUnosa = $state(0);
   let porukaPotezaTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -65,6 +67,12 @@
     const rijec = `${prefiksRijeci}${unosNastavkaRijeci}`.trim();
     if (rijec.length <= prefiksRijeci.length || slanjeUTijeku) return;
     slanjeUTijeku = true;
+    if (slanjeTimeoutId !== null) clearTimeout(slanjeTimeoutId);
+    slanjeTimeoutId = setTimeout(() => {
+      slanjeUTijeku = false;
+      slanjeTimeoutId = null;
+      prikaziGreskuPoteza('Poslužitelj nije potvrdio potez. Pokušaj ponovno.');
+    }, 5000);
     dohvatiSocket().emit('potez:rijec', { rijec });
     unosNastavkaRijeci = '';
   }
@@ -217,6 +225,21 @@
   const brojPreostalihIgraca = $derived(stanje.sjedala.length - stanje.eliminacije.length);
   const prefiksRijeci = $derived(stanje.trazenaSlova?.normalize('NFC').trim() ?? '');
   const najviseZnakovaNastavka = $derived(Math.max(0, 31 - prefiksRijeci.length));
+  const brojVatri = $derived(
+    stanje.trenutniStreak > 100
+      ? 100
+      : stanje.trenutniStreak >= 50
+        ? 5
+        : stanje.trenutniStreak >= 20
+          ? 4
+          : stanje.trenutniStreak >= 10
+            ? 3
+            : stanje.trenutniStreak >= 5
+              ? 2
+              : stanje.trenutniStreak > 0
+                ? 1
+                : 0,
+  );
 
   $effect(() => {
     const sadaJeNaPotezu = jeNaPotezu && !stanje.sustavBiraRijec && !stanje.kraj;
@@ -234,6 +257,20 @@
     if (!jeNaPotezu || !prefiksRijeci) return;
     unosNastavkaRijeci = '';
     queueMicrotask(() => unosInput?.focus());
+  });
+
+  // Globalni game-state listener je izvor istine i nakon reconnecta. Ako aktivni
+  // ekran propusti jedan Socket.IO event, promjena reda ipak mora otključati
+  // ili zaključati unos bez čekanja na refresh.
+  $effect(() => {
+    if (stanje.partijaId !== partijaId) return;
+    const trebaBitiZakljucano = stanje.kraj || stanje.sustavBiraRijec || !jeNaPotezu;
+    if (!trebaBitiZakljucano) return;
+    slanjeUTijeku = false;
+    if (slanjeTimeoutId !== null) {
+      clearTimeout(slanjeTimeoutId);
+      slanjeTimeoutId = null;
+    }
   });
 
   $effect(() => {
@@ -371,7 +408,21 @@
     // (fire-and-forget upis u bazu znači da refetch odmah nakon eventa može vratiti stariju listu).
     const naPrihvacenPotez = (potez: PrihvacenPotez) => {
       if (!jeAktualnaPartija()) return;
-      if (potez.igracId === stanje.mojIgracId) slanjeUTijeku = false;
+      // Potvrda je dovoljna za otključavanje unosa. To vrijedi i kada riječ
+      // odmah uzrokuje mrtva slova i ekran nove runde.
+      slanjeUTijeku = false;
+      if (slanjeTimeoutId !== null) {
+        clearTimeout(slanjeTimeoutId);
+        slanjeTimeoutId = null;
+      }
+      // Globalni listener također obrađuje događaj, ali aktivni ekran odmah primjenjuje
+      // prijelaz reda kako render ne bi čekao drugi lifecycle ili ručno osvježavanje.
+      stanje.naPotezuId = potez.sljedeciId;
+      stanje.trazenaSlova = potez.trazenaSlova;
+      stanje.istekPotezaIso = potez.istekPotezaIso;
+      stanje.brojIskoristenih = potez.brojIskoristenih;
+      if (potez.igracId === stanje.mojIgracId) stanje.trenutniStreak = potez.streak;
+      stanje.zadnjaNagrada = potez.igracId === stanje.mojIgracId ? potez.nagrada : null;
       prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
       prikazanaRijec = {
         id: -Date.now(),
@@ -418,11 +469,19 @@
     const naOdbijenPotez = ({ poruka }: { poruka: string }) => {
       if (!jeAktualnaPartija()) return;
       slanjeUTijeku = false;
+      if (slanjeTimeoutId !== null) {
+        clearTimeout(slanjeTimeoutId);
+        slanjeTimeoutId = null;
+      }
       prikaziGreskuPoteza(poruka);
     };
     const naGresku = ({ poruka }: { poruka: string }) => {
       if (!jeAktualnaPartija() || !slanjeUTijeku) return;
       slanjeUTijeku = false;
+      if (slanjeTimeoutId !== null) {
+        clearTimeout(slanjeTimeoutId);
+        slanjeTimeoutId = null;
+      }
       prikaziGreskuPoteza(poruka);
     };
 
@@ -438,6 +497,7 @@
 
     return () => {
       if (porukaPotezaTimeoutId !== null) clearTimeout(porukaPotezaTimeoutId);
+      if (slanjeTimeoutId !== null) clearTimeout(slanjeTimeoutId);
       if (reakcijeCooldownTimeoutId !== null) clearTimeout(reakcijeCooldownTimeoutId);
       socket.off('reakcija:nova', naReakciju);
       socket.off('partija:eliminacija', naEliminaciju);
@@ -462,6 +522,9 @@
 {/snippet}
 
 {#if stanje.kraj && prikaziRezultate}
+  {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
+    <Konfeti intenzitet="veliki" />
+  {/if}
   <h2>Konačni rezultati</h2>
   {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
     <p class="privatna-obavijest">
@@ -687,6 +750,38 @@
         <p class="sustav-bira-tekst">Sustav bira novu riječ za <strong>{sustavBrojac}</strong>…</p>
       </div>
     {:else}
+      {#if stanje.zadnjaNagrada}
+        {#key `${stanje.zadnjaNagrada.tekst}-${stanje.trenutniStreak}`}
+          <Konfeti intenzitet={stanje.zadnjaNagrada.intenzitet} />
+          <p class="nagrada-za-rijec nagrada-{stanje.zadnjaNagrada.intenzitet}" role="status" aria-live="polite">
+            <span class="nagrada-ukras" aria-hidden="true">
+              {stanje.zadnjaNagrada.intenzitet === 'veliki' ? '🎊 👏 🎉 ✨ 👏 🎊' : stanje.zadnjaNagrada.intenzitet === 'srednji' ? '🎉 👏 ✨' : '🎉 👏'}
+            </span>
+            <strong>{stanje.zadnjaNagrada.tekst}</strong>
+            {#if stanje.zadnjaNagrada.otkljucano !== null}
+              <span class="nagrada-napredak">{stanje.zadnjaNagrada.kategorija === 'rijetke' ? 'Rijetke riječi' : 'Duge riječi'}: {stanje.zadnjaNagrada.otkljucano} / {stanje.zadnjaNagrada.ukupno ?? '—'} otključano</span>
+            {/if}
+            <span class="nagrada-ukras" aria-hidden="true">
+              {stanje.zadnjaNagrada.intenzitet === 'veliki' ? '🎊 👏 🎉 ✨ 👏 🎊' : stanje.zadnjaNagrada.intenzitet === 'srednji' ? '🎉 👏 ✨' : '🎉 👏'}
+            </span>
+          </p>
+        {/key}
+      {/if}
+      {#if !stanje.kraj}
+        <p class="trenutni-streak" role="status" aria-live="polite">
+          {#if brojVatri > 0}
+            <span class="streak-vatre" aria-hidden="true">
+              {#if brojVatri === 100}
+                {#each Array(100) as _}<span>🔥</span>{/each}
+              {:else}
+                {#each Array(brojVatri) as _}<span>🔥</span>{/each}
+              {/if}
+            </span>
+          {/if}
+          Tvoj streak: <strong>{stanje.trenutniStreak}</strong> riječi
+          {#if brojVatri === 100}<span class="streak-vatre" aria-hidden="true">{#each Array(100) as _}<span>🔥</span>{/each}</span>{/if}
+        </p>
+      {/if}
       {#if stanje.trazenaSlova}
         <div class="rijec-kartica">
           {#key prikazanaRijec?.rijec ?? stanje.trazenaSlova}
@@ -971,6 +1066,66 @@
     25% { transform: translateX(-1px); }
     75% { transform: translateX(1px); }
   }
+  .nagrada-za-rijec {
+    margin: 8px 0 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--boja-isticanje-slova);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--boja-isticanje-slova) 35%, white);
+    color: var(--boja-tekst-osnovni);
+    text-align: center;
+    font-weight: 700;
+  }
+  .nagrada-srednji {
+    border-color: var(--boja-mint);
+  }
+  .nagrada-veliki {
+    border-color: var(--boja-crvena);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--boja-crvena) 18%, transparent);
+  }
+  .nagrada-streak {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--tekst-mikro);
+    font-weight: 600;
+  }
+
+  .nagrada-ukras {
+    display: block;
+    margin: 2px 0;
+    font-size: 1.1em;
+    letter-spacing: 0.08em;
+  }
+
+  .nagrada-napredak {
+    display: block;
+    margin-top: 4px;
+    font-size: var(--tekst-mali);
+    font-weight: 600;
+  }
+
+  .trenutni-streak {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 8px 0 12px;
+    color: var(--boja-tekst-sekundarni);
+    text-align: center;
+    font-size: var(--tekst-mali);
+  }
+
+  .streak-vatre {
+    display: inline-flex;
+    max-width: min(42vw, 360px);
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0;
+    line-height: 1;
+    font-size: 1rem;
+  }
+
   .vlastito-sjedalo {
     display: flex;
     width: 100%;

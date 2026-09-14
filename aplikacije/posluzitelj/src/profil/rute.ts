@@ -7,8 +7,9 @@ import { desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { izracunajRang } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
-import { igraci, partije, potezi, sudioniciPartije } from '../baza/shema.js';
+import { igraci, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
+import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { posaljiEmail } from '../email.js';
 import { izdajTokenPotvrdeEmaila } from '../racuni/tokeni.js';
 import {
@@ -28,9 +29,52 @@ function prosjekBodova(bodoviUkupno: number, odigrane: number): number {
   return odigrane > 0 ? bodoviUkupno / odigrane : 0;
 }
 
-export async function registrirajProfilRute(app: FastifyInstance): Promise<void> {
+async function dohvatiStatistiku(igracId: string) {
+  const [statistika] = await baza
+    .select()
+    .from(statistikeRijeciIgraca)
+    .where(sql`${statistikeRijeciIgraca.igracId} = ${igracId} and ${statistikeRijeciIgraca.mod} = 'cetiri_igraca'`)
+    .limit(1);
+  return statistika ?? null;
+}
+
+async function dohvatiOtkljucaneRijeci(igracId: string) {
+  const retci = await baza
+    .select({ rijec: otkljucaneRijeciIgraca.rijec, dugaTier: otkljucaneRijeciIgraca.dugaTier, rijetkaTier: otkljucaneRijeciIgraca.rijetkaTier })
+    .from(otkljucaneRijeciIgraca)
+    .where(eq(otkljucaneRijeciIgraca.igracId, igracId));
+  return {
+    duge: retci.filter((redak) => redak.dugaTier === 0).map((redak) => redak.rijec).sort(),
+    srednjeDuge: retci.filter((redak) => redak.dugaTier === 1).map((redak) => redak.rijec).sort(),
+    jakoDuge: retci.filter((redak) => redak.dugaTier === 2).map((redak) => redak.rijec).sort(),
+    rijetke: retci.filter((redak) => redak.rijetkaTier === 2).map((redak) => redak.rijec).sort(),
+    srednjeRijetke: retci.filter((redak) => redak.rijetkaTier === 1).map((redak) => redak.rijec).sort(),
+    jakoRijetke: retci.filter((redak) => redak.rijetkaTier === 0).map((redak) => redak.rijec).sort(),
+  };
+}
+
+function javnaStatistika(statistika: Awaited<ReturnType<typeof dohvatiStatistiku>>) {
+  if (!statistika) return null;
+  return {
+    najduziStreak: statistika.najduziStreak,
+    otkriveneJakoRijetkeGrupe: statistika.otkriveneJakoRijetkeGrupe,
+    otkriveneSrednjeRijetkeGrupe: statistika.otkriveneSrednjeRijetkeGrupe,
+    otkriveneRijetkeGrupe: statistika.otkriveneRijetkeGrupe,
+    upisaneDugeRijeci: statistika.upisaneDugeRijeci,
+    upisaneSrednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
+    upisaneJakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
+    najduzaRijec: statistika.najduzaRijec,
+    najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
+    najrjedaRijec: statistika.najrjedaRijec,
+    najrjedaRijecFrekvencija: statistika.najrjedaRijecFrekvencija,
+  };
+}
+
+export async function registrirajProfilRute(app: FastifyInstance, rjecnik: RjecnikUMemoriji): Promise<void> {
   app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+    const statistikaRijeci = await dohvatiStatistiku(igrac.id);
+    const otkljucaneRijeci = await dohvatiOtkljucaneRijeci(igrac.id);
     const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
     const prosjek1v1 = prosjekBodova(igrac.bodovi1v1, igrac.odigrane1v1);
     return {
@@ -53,6 +97,37 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
       prosjekBodova1v1: prosjek1v1,
       rang1v1: izracunajRang(igrac.odigrane1v1, prosjek1v1),
       stvoren: igrac.stvoren,
+      statistikaRijeci: javnaStatistika(statistikaRijeci),
+      ciljeviRijeci: rjecnik.ciljeviRijeci(),
+      otkljucaneRijeci,
+    };
+  });
+
+  app.get<{ Params: { igracId: string } }>('/profil/javni/:igracId', async (zahtjev, odgovor) => {
+    const [igrac] = await baza
+      .select()
+      .from(igraci)
+      .where(sql`${igraci.id} = ${zahtjev.params.igracId} and ${igraci.vrsta} in ('registriran', 'admin')`)
+      .limit(1);
+    if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
+
+    const statistikaRijeci = await dohvatiStatistiku(igrac.id);
+    const otkljucaneRijeci = await dohvatiOtkljucaneRijeci(igrac.id);
+    const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
+    return {
+      ok: true,
+      igracId: igrac.id,
+      nadimak: igrac.nadimak,
+      avatarId: igrac.avatarId,
+      odigrane: igrac.odigrane,
+      pobjede: igrac.pobjede,
+      eliminacijeUkupno: igrac.eliminacijeUkupno,
+      bodoviUkupno: igrac.bodoviUkupno,
+      prosjekBodova: prosjek4p,
+      rang: izracunajRang(igrac.odigrane, prosjek4p),
+      statistikaRijeci: javnaStatistika(statistikaRijeci),
+      ciljeviRijeci: rjecnik.ciljeviRijeci(),
+      otkljucaneRijeci,
     };
   });
 
@@ -136,6 +211,8 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
 
       return {
         mjesto: indeks + 1,
+        igracId: igrac.id,
+        jeJavan: igrac.vrsta !== 'gost',
         nadimak: igrac.nadimak,
         rang: izracunajRang(odig, prosjek),
         prosjekBodova: prosjek,
@@ -159,6 +236,8 @@ export async function registrirajProfilRute(app: FastifyInstance): Promise<void>
           .where(sql`${colOdigrane} >= 10 and ${colBodovi}::float / ${colOdigrane} > ${prosjekMoj}`);
         mojeMjesto = {
           mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
+          igracId: igrac.id,
+          jeJavan: igrac.vrsta !== 'gost',
           nadimak: igrac.nadimak,
           rang: izracunajRang(odigMoj, prosjekMoj),
           prosjekBodova: prosjekMoj,

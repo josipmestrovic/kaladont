@@ -32,6 +32,7 @@ Kontrola zvuka prikazuje se na landingu i u `/postavke`; tijekom čekanja i akti
 | Početak partije | svi | `pocetak-partije` | Jednom, točno kad odbrojavanje u čekaonici istekne i partija krene (ne na najavu budućeg početka). |
 | Zadnjih 5 sekundi poteza (30s timer) | svi za stolom | `pred-istek-vremena` | Isti prag kao vizualni puls prstena oko igrača na potezu; jednom po potezu koji uđe u tu fazu. |
 | Prihvaćena riječ | samo autoru poteza | potvrđujući ton | Ostali ne čuju tu potvrdu; njihov osobni signal dolazi kada je njihov red. |
+| Nagrada za rijetku/dugu riječ | svi u partiji | jedan složeni nagradni zvuk + konfeti | Server izračunava tier nakon prihvaćenog igračevog poteza. Ako riječ ima oba svojstva, zvuk i efekt pokreću se samo jednom, a tekst navodi oba razloga. |
 | Odbijena riječ | samo autoru poteza | neutralni error ton | Nikad ne svirati drugim igračima. |
 | `Ne znam` | nitko | nema zvuka | Vizualna potvrda je dovoljna. |
 | Red prijeđe na igrača | samo tom igraču | signal `tvoj red` | Jednom po prijelazu na njegov red. Vizualni puls prstena prikazuje se i na prvom potezu, ali bez dodatnog zvuka uz `pocetak-partije`. |
@@ -51,9 +52,15 @@ Kontrola zvuka prikazuje se na landingu i u `/postavke`; tijekom čekanja i akti
 - Volume 0 ima isto ponašanje kao mute.
 - Nema zvuka za događaje koji nisu u matrici dok se ne doda nova odluka.
 
+## Nagrade i pristupačnost
+
+Rijetkost ima tri tiera: `0` je jako rijetka riječ, `1–9` srednje rijetka, a `10–99` rijetka. Duljina ima tri tiera po grafemima: `10–11` duga, `12–14` srednje duga, a `15+` jako duga riječ. Konfeti i zvuk razlikuju intenzitete, ali ne mijenjaju bodove ni valjanost poteza.
+
+Tekstualni signal uz efekt mora navesti točan razlog, primjerice: „Pogođena je jako rijetka i srednje duga riječ!”. Efekt mora imati `prefers-reduced-motion` varijantu i ne smije biti jedini način razumijevanja nagrade. Mute utišava zvuk, ali ne skriva tekstualnu statistiku.
+
 ## Opseg prve verzije
 
-Prva implementacija pokriva ulaz/izlaz, svaku sekundu odbrojavanja u čekaonici, početak partije, upozorenje pred istek poteza, prihvaćenu i odbijenu riječ, red na igraču, eliminaciju, novu rundu, kraj partije te UI klik/hover na gumbima. Asseti za reakcije, pozadinsku glazbu i dodatne ambijentalne efekte nisu dio prve verzije.
+Prva implementacija pokriva ulaz/izlaz, svaku sekundu odbrojavanja u čekaonici, početak partije, upozorenje pred istek poteza, prihvaćenu i odbijenu riječ, nagradu za rijetku/dugu riječ, red na igraču, eliminaciju, novu rundu, kraj partije te UI klik/hover na gumbima. Asseti za reakcije, pozadinsku glazbu i dodatne ambijentalne efekte nisu dio prve verzije.
 
 ## Pristupačnost i privatnost
 

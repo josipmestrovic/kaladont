@@ -15,7 +15,10 @@ export type AudioDogadaj =
   | 'partija-kraj'
   | 'pred-istek-vremena'
   | 'klik-misa'
-  | 'hover-efekt';
+  | 'hover-efekt'
+  | 'nagrada-mala'
+  | 'nagrada-srednja'
+  | 'nagrada-velika';
 
 const KLJUC_POSTAVKI = 'kaladont_audio_postavke_v1';
 const ZVUKOVI: Record<AudioDogadaj, string> = {
@@ -34,6 +37,9 @@ const ZVUKOVI: Record<AudioDogadaj, string> = {
   'pred-istek-vremena': '/zvukovi/pred-istek-vremena.wav',
   'klik-misa': '/zvukovi/klik-misa.wav',
   'hover-efekt': '/zvukovi/hover-efekt.wav',
+  'nagrada-mala': '/zvukovi/nagrada-mala.wav',
+  'nagrada-srednja': '/zvukovi/nagrada-srednja.wav',
+  'nagrada-velika': '/zvukovi/nagrada-velika.wav',
 };
 
 interface AudioPostavke {
@@ -58,6 +64,9 @@ const POJACANJE_PO_DOGADAJU: Record<AudioDogadaj, number> = {
   'pred-istek-vremena': 0.6,
   'klik-misa': 0.3,
   'hover-efekt': 0.3,
+  'nagrada-mala': 0.6,
+  'nagrada-srednja': 0.7,
+  'nagrada-velika': 0.8,
 };
 
 const zadanePostavke: AudioPostavke = { volumen: 0.65, utišano: false };
@@ -116,10 +125,14 @@ function preucitajKriticneZvukove(): void {
 
 export function pustiAudio(dogadaj: AudioDogadaj): void {
   if (typeof window === 'undefined' || !aktiviran || postavke.utišano || postavke.volumen <= 0) return;
-  const zvuk = ucitajZvuk(dogadaj);
-  zvuk.volume = postavke.volumen * POJACANJE_PO_DOGADAJU[dogadaj];
-  zvuk.currentTime = 0;
-  void zvuk.play().catch(() => undefined);
+  try {
+    const zvuk = ucitajZvuk(dogadaj);
+    zvuk.volume = postavke.volumen * POJACANJE_PO_DOGADAJU[dogadaj];
+    zvuk.currentTime = 0;
+    void zvuk.play().catch(() => undefined);
+  } catch {
+    // Audio nikad ne smije prekinuti Socket.IO/state obradu poteza.
+  }
 }
 
 export function postaviVolumen(volumen: number): void {

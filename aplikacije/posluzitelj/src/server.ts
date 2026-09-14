@@ -63,13 +63,13 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const app = Fastify({ logger: true });
   await app.register(cors, { origin: true, credentials: true });
   await app.register(cookie);
-  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
   await registrirajRacuneRute(app);
 
   const rjecnik = await ucitajRjecnik();
   app.log.info(`Rječnik učitan: ${rjecnik.brojRijeci()} riječi`);
 
-  await registrirajProfilRute(app);
+  await registrirajProfilRute(app, rjecnik);
   await registrirajPrijaveRute(app);
   await registrirajAdminRute(app, rjecnik);
   await registrirajRjecnikRute(app, rjecnik);
