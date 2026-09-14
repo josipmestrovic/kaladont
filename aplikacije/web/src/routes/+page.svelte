@@ -77,7 +77,12 @@
 
 <footer>
   <button type="button" class="novosti-link" onclick={() => (otvoreneNovosti = true)}>Što je novo</button>
-  <a href="/o-igri">O igri</a> · <a href="/uvjeti">Uvjeti korištenja</a> · <a href="/privatnost">Pravila privatnosti</a>
+  <span aria-hidden="true">·</span>
+  <a href="/o-igri">O igri</a>
+  <span aria-hidden="true">·</span>
+  <a href="/uvjeti">Uvjeti korištenja</a>
+  <span aria-hidden="true">·</span>
+  <a href="/privatnost">Pravila privatnosti</a>
 </footer>
 
 {#if otvoreneNovosti}
@@ -187,13 +192,13 @@
     color: var(--boja-tekst-sekundarni);
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 10px;
     flex-wrap: wrap;
-    text-align: left;
+    text-align: center;
   }
 
-  .novosti-link { padding: 0; border: 0; background: none; color: var(--boja-tekst-naslov); font: inherit; font-weight: 700; cursor: pointer; }
+  .novosti-link { padding: 0; border: 0; background: none; color: var(--boja-tekst-naslov); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
   .modal-podloga {
     position: fixed;

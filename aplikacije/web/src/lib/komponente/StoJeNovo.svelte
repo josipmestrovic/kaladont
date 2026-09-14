@@ -30,10 +30,6 @@
             <ul>{#each odjeljak.stavke as stavka}<li>{stavka}</li>{/each}</ul>
           </section>
         {/each}
-        <h4>Što testirati</h4>
-        <ol>{#each odabrano.testirati as stavka}<li>{stavka}</li>{/each}</ol>
-        <h4>Poznata ograničenja</h4>
-        <ul>{#each odabrano.ogranicenja as stavka}<li>{stavka}</li>{/each}</ul>
       </article>
     {/if}
   </div>
@@ -48,9 +44,9 @@
   .izdanja button { padding: 8px 12px; border: 1px solid #e5ddc8; border-radius: 8px; background: white; color: var(--boja-tekst-osnovni); cursor: pointer; font: inherit; font-size: var(--tekst-mali); }
   .izdanja button.odabrano { border-color: var(--boja-mint); background: var(--boja-mint); color: white; }
   .datum { margin: 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
-  h3 { margin: 4px 0 10px; font-family: var(--font-naslov); }
-  h4 { margin: 20px 0 8px; font-family: var(--font-naslov); color: var(--boja-tekst-naslov); }
-  h5 { margin: 14px 0 4px; font-size: var(--tekst-baza); }
-  .uvod { line-height: 1.55; }
-  li { margin: 5px 0; line-height: 1.45; }
+  h3 { margin: 4px 0 10px; font-family: var(--font-naslov); font-size: 1.45rem; }
+  h4 { margin: 24px 0 10px; font-family: var(--font-naslov); color: var(--boja-tekst-naslov); font-size: 1.25rem; }
+  h5 { margin: 18px 0 6px; font-size: 1.1rem; }
+  .uvod { line-height: 1.6; font-size: 1.05rem; }
+  li { margin: 7px 0; line-height: 1.55; font-size: 1.02rem; }
 </style>
