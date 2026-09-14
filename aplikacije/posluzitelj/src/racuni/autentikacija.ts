@@ -38,7 +38,14 @@ async function dohvatiIgraca(zahtjev: FastifyRequest): Promise<typeof igraci.$in
   }
 
   const [redak] = await baza.select().from(igraci).where(eq(igraci.id, igracId)).limit(1);
-  return redak ?? null;
+  if (!redak) return null;
+
+  // Goli UUID je dopušten samo za goste; registrirani/admin računi moraju koristiti sesijski token.
+  if (UUID_REGEX.test(token) && redak.vrsta !== 'gost') {
+    return null;
+  }
+
+  return redak;
 }
 
 /** Zahtijeva identifikaciju - prihvaca registrirane (potpisani token) i goste (goli UUID). */

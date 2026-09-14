@@ -104,6 +104,63 @@ describe('POST /racuni/prijava', () => {
   });
 });
 
+describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim UUID-om', () => {
+  it('odbija goli UUID registriranog računa za protected HTTP rute', async () => {
+    const email = `http-impersonation-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
+    try {
+      const registracija = await fetch(`${adresa}/racuni/registracija`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, lozinka: LOZINKA, nadimak: 'HttpImpersonator' }),
+      });
+      expect(registracija.status).toBe(200);
+      const { igracId } = (await registracija.json()) as { igracId: string };
+
+      const profil = await fetch(`${adresa}/profil`, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${igracId}` },
+      });
+      expect(profil.status).toBe(401);
+
+      const prijave = await fetch(`${adresa}/admin/prijave`, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${igracId}` },
+      });
+      expect(prijave.status).toBe(401);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.email, email));
+    }
+  });
+
+  it('odbija goli UUID admin računa za admin HTTP rute', async () => {
+    const email = `http-admin-impersonation-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
+    try {
+      const registracija = await fetch(`${adresa}/racuni/registracija`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, lozinka: LOZINKA, nadimak: 'HttpAdmin' }),
+      });
+      expect(registracija.status).toBe(200);
+      const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+      await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, igracId));
+
+      const odgovor = await fetch(`${adresa}/admin/prijave`, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${igracId}` },
+      });
+      expect(odgovor.status).toBe(401);
+
+      const odgovorSesijom = await fetch(`${adresa}/admin/prijave`, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${sesijskiToken}` },
+      });
+      expect(odgovorSesijom.status).toBe(200);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.email, email));
+    }
+  });
+});
+
 describe('Socket.IO auth sa sesijskim tokenom', () => {
   it('prihvaća valjan sesijski token nakon prijave', async () => {
     const registracija = await fetch(`${adresa}/racuni/registracija`, {
