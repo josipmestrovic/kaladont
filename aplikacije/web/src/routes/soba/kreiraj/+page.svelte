@@ -19,8 +19,6 @@
 
   let trajanjePotezaSek = $state(30);
   let eliminacijskiBodovi = $state(true);
-  let samoOsnovniOblici = $state(false);
-  let minDuljinaRijeci = $state(0);
   let odabraneVrste = $state<Set<VrstaRijeci>>(new Set(SVE_VRSTE_RIJECI));
   let otvorenHarmonik = $state(false);
   let poruka = $state<string | null>(null);
@@ -75,8 +73,6 @@
     const postavke: PostavkePrivatneSobe = {
       trajanjePotezaSek,
       eliminacijskiBodovi,
-      samoOsnovniOblici,
-      minDuljinaRijeci,
       dopusteneVrste: [...odabraneVrste],
     };
 
@@ -152,44 +148,6 @@
 
       {#if otvorenHarmonik}
         <div class="harmonik-sadrzaj">
-          <label class="preklopnik-redak">
-            <div>
-              <strong>Samo osnovni oblici</strong>
-              <p class="preklopnik-opis">Samo nominativ imenica i infinitiv glagola (npr. raditi, drvo; bez radimo, drvetu).</p>
-            </div>
-            <input type="checkbox" bind:checked={samoOsnovniOblici} />
-          </label>
-
-          <div class="duljina-sekcija">
-            <span class="sub-naslov">Minimalna duljina riječi:</span>
-            <div class="opcije-gumbi">
-              <button
-                type="button"
-                class="odabir-gumb"
-                class:odabran={minDuljinaRijeci === 0}
-                onclick={() => (minDuljinaRijeci = 0)}
-              >
-                Bilo koja duljina
-              </button>
-              <button
-                type="button"
-                class="odabir-gumb"
-                class:odabran={minDuljinaRijeci === 4}
-                onclick={() => (minDuljinaRijeci = 4)}
-              >
-                Min. 4 slova
-              </button>
-              <button
-                type="button"
-                class="odabir-gumb"
-                class:odabran={minDuljinaRijeci === 5}
-                onclick={() => (minDuljinaRijeci = 5)}
-              >
-                Min. 5 slova
-              </button>
-            </div>
-          </div>
-
           <div class="vrste-sekcija">
             <div class="naslov-redak">
               <span class="sub-naslov">Dopuštene vrste riječi:</span>
@@ -332,13 +290,6 @@
     cursor: pointer;
   }
 
-  .preklopnik-opis {
-    margin: 2px 0 0 0;
-    font-weight: 400;
-    color: var(--boja-tekst-sekundarni);
-    font-size: 12px;
-  }
-
   input[type='checkbox'] {
     width: 20px;
     height: 20px;
@@ -346,7 +297,7 @@
     cursor: pointer;
   }
 
-  .tajmer-sekcija, .duljina-sekcija, .vrste-sekcija {
+  .tajmer-sekcija, .vrste-sekcija {
     display: flex;
     flex-direction: column;
     gap: 8px;

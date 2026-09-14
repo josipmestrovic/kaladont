@@ -7,7 +7,7 @@ Ovaj dokument je autoritativan opis pravila. Sve druge datoteke, uključujući k
 - **Klasični mod** igraju točno 4 igrača. Sjedala se dodjeljuju nasumično, a igra ide u krug.
 - **1v1 Dvoboj** igraju točno 2 igrača. Nakon svakog poteza na redu je protivnik.
 - Gosti i registrirani igrači igraju pod istim pravilima.
-- Privatna soba prima 2 do 8 igrača. Vlasnik može prilagoditi tajmer, bodove za eliminaciju, dopuštene vrste riječi, osnovne oblike i minimalnu duljinu riječi. Pravila nastavaka, grafema i ponavljanja ostaju ista.
+- Privatna soba prima 2 do 8 igrača. Vlasnik može prilagoditi tajmer, bodove za eliminaciju i dopuštene vrste riječi. Pravila nastavaka, grafema i ponavljanja ostaju ista.
 
 ## Tijek partije
 

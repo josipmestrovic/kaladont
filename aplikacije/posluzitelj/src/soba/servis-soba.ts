@@ -63,8 +63,6 @@ function normalizirajPostavke(p?: Partial<PostavkePrivatneSobe>): PostavkePrivat
     trajanjePotezaSek,
     dopusteneVrste,
     eliminacijskiBodovi: Boolean(p?.eliminacijskiBodovi),
-    samoOsnovniOblici: Boolean(p?.samoOsnovniOblici),
-    minDuljinaRijeci: p?.minDuljinaRijeci && p.minDuljinaRijeci > 0 ? p.minDuljinaRijeci : 0,
   };
 }
 

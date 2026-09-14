@@ -43,8 +43,6 @@ export interface PostavkePrivatneSobe {
   trajanjePotezaSek: number; // 15, 30, 60, ili 0 za bez timera
   dopusteneVrste: VrstaRijeci[]; // filter dopuštenih vrsta riječi
   eliminacijskiBodovi: boolean; // +1 bod po eliminaciji
-  samoOsnovniOblici: boolean; // samo nominativ imenica, infinitiv glagola
-  minDuljinaRijeci: number; // 0 = sve, 4, 5...
 }
 
 export interface ClanSobe {

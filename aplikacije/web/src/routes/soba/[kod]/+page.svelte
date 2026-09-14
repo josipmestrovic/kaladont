@@ -171,16 +171,6 @@
               ? `${stanjeSobe.postavke.trajanjePotezaSek} sekundi`
               : 'Bez tajmera (isključeno)'}
           </li>
-          {#if stanjeSobe.postavke.samoOsnovniOblici}
-            <li>
-              <strong>Oblici riječi:</strong> Samo osnovni oblici (Nominativ / Infinitiv)
-            </li>
-          {/if}
-          {#if stanjeSobe.postavke.minDuljinaRijeci > 0}
-            <li>
-              <strong>Minimalna duljina:</strong> Min. {stanjeSobe.postavke.minDuljinaRijeci} slova
-            </li>
-          {/if}
           <li>
             <strong>Dopuštene vrste riječi:</strong>
             <div class="tagovi-vrsta">
