@@ -39,8 +39,8 @@
         }),
       });
       spremiSesijskiToken(odgovor.sesijskiToken);
-        await osvjeziSocketIdentitet();
-      void goto('/red');
+      await osvjeziSocketIdentitet();
+      void goto('/');
     } catch (greska) {
       poruka = greska instanceof Error ? greska.message : 'Registracija nije uspjela.';
     } finally {

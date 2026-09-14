@@ -19,10 +19,12 @@ export function dohvatiGostToken(): string {
 /** Sprema potpisani sesijski token nakon prijave/registracije (racuni/tokeni.ts na serveru). */
 export function spremiSesijskiToken(token: string): void {
   localStorage.setItem(KLJUC_SESIJSKI_TOKEN, token);
+  localStorage.removeItem(KLJUC_GOST_TOKEN);
 }
 
 export function obrisiSesijskiToken(): void {
   localStorage.removeItem(KLJUC_SESIJSKI_TOKEN);
+  localStorage.removeItem(KLJUC_GOST_TOKEN);
 }
 
 /** Token koji se koristi za autentikaciju - sesijski (nakon prijave) ili gost UUID. */
