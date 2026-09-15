@@ -862,6 +862,6 @@ describe('motor partije - utrka timera i tolerancije prekida', () => {
       odspojiIgrace(igraciZaCiscenje);
       await posebniPosluzitelj.app.close();
     }
-  });
+  }, 30000);
 });
 

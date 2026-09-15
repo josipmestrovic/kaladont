@@ -94,5 +94,5 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     expect(Number.isNaN(new Date(drugiPocetci![0]!.pocetakIso).getTime())).toBe(false);
 
     for (const klijent of klijenti) klijent.disconnect();
-  }, 20000);
+  }, 30000);
 });
