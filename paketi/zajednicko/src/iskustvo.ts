@@ -33,6 +33,7 @@ export interface ObracunIskustva {
   mnoziteljStreaka: number;
   brutoIskustvo: number;
   osvojenoIskustvo: number;
+  bonusOcjenaIgre: number;
 }
 
 export function iskustvoDoIduceRazina(razina: number): number | null {
@@ -113,15 +114,19 @@ export function izracunajObracunIskustva(
   ukupnoPrije: number,
   stavkeBezStreaka: StavkaIskustva[],
   najboljiStreak: number,
+  bonusOcjenaIgre = 0,
 ): ObracunIskustva {
   const prije = stanjeIskustva(ukupnoPrije);
   const subtotal = stavkeBezStreaka.reduce((zbroj, stavka) => zbroj + stavka.iskustvo, 0);
   const mnoziteljStreaka = mnoziteljZaStreak(najboljiStreak);
-  const brutoIskustvo = Math.round(subtotal * mnoziteljStreaka);
+  const brutoBezOcjene = Math.round(subtotal * mnoziteljStreaka);
+  const bonusIskustva = Math.round(brutoBezOcjene * bonusOcjenaIgre / 100);
+  const brutoIskustvo = brutoBezOcjene + bonusIskustva;
   const osvojenoIskustvo = Math.max(0, Math.min(brutoIskustvo, MAKSIMALNO_ISKUSTVO - prije.ukupno));
   const bonusStreaka = brutoIskustvo - subtotal;
   const stavke: StavkaIskustva[] = bonusStreaka > 0
     ? [...stavkeBezStreaka, { vrsta: 'streak', naziv: `Streak ${najboljiStreak} x${mnoziteljStreaka.toFixed(2)}`, kolicina: najboljiStreak, poStavci: null, iskustvo: bonusStreaka }]
-    : stavkeBezStreaka;
-  return { prije, poslije: stanjeIskustva(prije.ukupno + osvojenoIskustvo), stavke, najboljiStreak, mnoziteljStreaka, brutoIskustvo, osvojenoIskustvo };
+    : [...stavkeBezStreaka];
+  if (bonusIskustva > 0) stavke.push({ vrsta: 'streak', naziv: `Ocjena igre +${bonusOcjenaIgre}%`, kolicina: 1, poStavci: null, iskustvo: bonusIskustva });
+  return { prije, poslije: stanjeIskustva(prije.ukupno + osvojenoIskustvo), stavke, najboljiStreak, mnoziteljStreaka, brutoIskustvo, osvojenoIskustvo, bonusOcjenaIgre };
 }

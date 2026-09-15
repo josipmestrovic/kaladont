@@ -5,7 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import { desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { DEFINICIJE_DOSTIGNUCA, izracunajKaladontDnk, izracunajRang, stanjeIskustva } from 'zajednicko';
+import { DEFINICIJE_DOSTIGNUCA, izracunajKaladontDnk, izracunajRang, izracunajRazinuDostignuca, stanjeIskustva } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
@@ -20,7 +20,7 @@ import {
 } from '../racuni/autentikacija.js';
 
 const ShemaAvatar = z.object({ avatarId: z.number().int().min(0).max(BROJ_AVATARA - 1) });
-const ShemaNadimak = z.object({ nadimak: z.string().trim().min(2).max(20) });
+const ShemaNadimak = z.object({ nadimak: z.string().trim().min(2).max(12) });
 const ShemaLimit = z.object({ limit: z.coerce.number().int().refine((n) => n === 10 || n === 100, 'limit mora biti 10 ili 100').optional() });
 const ShemaEmail = z.object({ noviEmail: z.string().email(), lozinka: z.string().min(1) });
 const ShemaLozinka = z.object({ trenutnaLozinka: z.string().min(1), novaLozinka: z.string().min(8) });
@@ -29,7 +29,8 @@ function prosjekBodova(bodoviUkupno: number, odigrane: number): number {
   return odigrane > 0 ? bodoviUkupno / odigrane : 0;
 }
 
-function stilIgre(odigrane: number, eliminacije: number): 'agresivan' | 'uravnotežen' | 'pacifist' {
+function stilIgre(odigrane: number, eliminacije: number): 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen' {
+  if (odigrane === 0) return 'neodređen';
   const eliminacijePoPartiji = odigrane > 0 ? eliminacije / odigrane : 0;
   if (eliminacijePoPartiji > 0.4) return 'agresivan';
   if (eliminacijePoPartiji >= 0.2) return 'uravnotežen';
@@ -52,6 +53,11 @@ async function dohvatiDnkStatistiku(igracId: string, mod: 'cetiri_igraca' | 'dva
     .where(sql`${dnkStatistikeIgraca.igracId} = ${igracId} and ${dnkStatistikeIgraca.mod} = ${mod}`)
     .limit(1);
   return statistika ?? null;
+}
+
+function prosjecnaOcjena(statistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null): number | null {
+  if (!statistika || statistika.brojOcjenaIgre === 0) return null;
+  return statistika.zbrojOcjenaIgre / statistika.brojOcjenaIgre;
 }
 
 async function dohvatiOtkljucaneRijeci(igracId: string) {
@@ -139,7 +145,8 @@ async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number
   const razine = new Map(otkljucana.map((redak) => [redak.dostignuceId, redak.razina]));
   const dostignuca = DEFINICIJE_DOSTIGNUCA.map((definicija) => {
     const vrijednost = definicija.brojac === 'razina' ? razinaIskustva : Number(brojac?.[definicija.brojac] ?? 0);
-    const razina = razine.get(definicija.id) ?? 0;
+    const izracunataRazina = izracunajRazinuDostignuca(definicija, vrijednost);
+    const razina = Math.max(razine.get(definicija.id) ?? 0, izracunataRazina);
     return { ...definicija, razina, vrijednost, sljedeciPrag: definicija.pragovi[razina] ?? null };
   });
   return {
@@ -191,6 +198,7 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
         cetiriIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkCetiri, 'cetiri_igraca'),
         dvaIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkDva, 'dva_igraca'),
       },
+      prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
       stilIgre: stil,
       stvoren: igrac.stvoren,
@@ -240,6 +248,7 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
         cetiriIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkCetiri, 'cetiri_igraca'),
         dvaIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkDva, 'dva_igraca'),
       },
+      prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
       stilIgre: stil,
       statistikaRijeci: javnaStatistika(statistikaRijeci),

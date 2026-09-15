@@ -137,6 +137,28 @@ export function jeDnkOtkljucan(odigrano: number): boolean {
   return odigrano >= 10;
 }
 
+export function izracunajOcjenuDnk(osi: readonly DnkOs[]): number {
+  if (osi.length === 0) return 0;
+  const prosjek = osi.reduce((zbroj, os) => zbroj + os.vrijednost, 0) / osi.length;
+  return Math.max(0, Math.min(5, Math.round(prosjek / 20)));
+}
+
+export function izracunajOcjenuIgre(
+  prije: readonly DnkOs[],
+  poslije: readonly DnkOs[],
+  pobjeda: boolean,
+): number {
+  const deltaProsjek = poslije.length === 0
+    ? 0
+    : poslije.reduce((zbroj, os) => zbroj + (os.vrijednost - (prije.find((staro) => staro.kljuc === os.kljuc)?.vrijednost ?? os.vrijednost)), 0) / poslije.length;
+  const osnovneZvjezdice = Math.max(0, Math.min(4, Math.round((deltaProsjek + 20) / 10)));
+  return Math.max(0, Math.min(5, osnovneZvjezdice + (pobjeda ? 1 : 0)));
+}
+
+export function postotakXpZaOcjenu(ocjena: number): number {
+  return Math.max(0, Math.min(20, Math.max(0, ocjena - 1) * 5));
+}
+
 export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
   const otkljucan = jeDnkOtkljucan(ulaz.odigrano);
   const prosjekBodova = ulaz.prosjekBodova ?? 0;

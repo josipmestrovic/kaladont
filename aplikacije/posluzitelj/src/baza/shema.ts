@@ -100,6 +100,8 @@ export const dnkStatistikeIgraca = pgTable(
     rijetkeRijeci: integer('rijetke_rijeci').notNull().default(0),
     srednjeRijetkeRijeci: integer('srednje_rijetke_rijeci').notNull().default(0),
     jakoRijetkeRijeci: integer('jako_rijetke_rijeci').notNull().default(0),
+    zbrojOcjenaIgre: integer('zbroj_ocjena_igre').notNull().default(0),
+    brojOcjenaIgre: integer('broj_ocjena_igre').notNull().default(0),
     otkljucanAt: timestamp('otkljucan_at', { withTimezone: true }),
   },
   (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.mod] })],

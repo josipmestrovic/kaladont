@@ -162,23 +162,22 @@
     igrac: string;
     opis: string;
     bodIgrac: string | null;
+    rijec: string | null;
+    slova: string | null;
   } {
     const igrac = `Igrač ${imeIgraca(eliminacija.igracId)}`;
     const bodIgrac = eliminacija.bodZa ? imeIgraca(eliminacija.bodZa) : null;
 
     if (eliminacija.razlog === 'mrtva_slova_baza') {
-      const rijec = eliminacija.rijecUzrok ? ` nakon riječi „${eliminacija.rijecUzrok}”` : '';
-      const slova = eliminacija.slova ? ` na „${eliminacija.slova.toUpperCase()}”` : '';
-      return { igrac, opis: `ispada${rijec} jer u rječniku nema riječi${slova}.`, bodIgrac };
+      return { igrac, opis: 'ispada jer u rječniku nema riječi', bodIgrac, rijec: eliminacija.rijecUzrok, slova: eliminacija.slova };
     }
     if (eliminacija.razlog === 'mrtva_slova_iskoristeno') {
-      const slova = eliminacija.slova ? ` na „${eliminacija.slova.toUpperCase()}”` : '';
-      return { igrac, opis: `ispada jer su sve riječi${slova} već iskorištene u ovoj partiji.`, bodIgrac };
+      return { igrac, opis: 'ispada jer su sve riječi već iskorištene u ovoj igri na', bodIgrac, rijec: eliminacija.rijecUzrok, slova: eliminacija.slova };
     }
-    if (eliminacija.razlog === 'istek') return { igrac, opis: 'ispada zbog isteka vremena.', bodIgrac };
-    if (eliminacija.razlog === 'ne_znam') return { igrac, opis: 'predaje potez.', bodIgrac };
-    if (eliminacija.razlog === 'prekid') return { igrac, opis: 'ispada zbog izgubljene veze.', bodIgrac };
-    return { igrac, opis: 'ispada zbog Kaladonta.', bodIgrac };
+    if (eliminacija.razlog === 'istek') return { igrac, opis: 'ispada zbog isteka vremena.', bodIgrac, rijec: null, slova: null };
+    if (eliminacija.razlog === 'ne_znam') return { igrac, opis: 'predaje potez.', bodIgrac, rijec: null, slova: null };
+    if (eliminacija.razlog === 'prekid') return { igrac, opis: 'ispada zbog izgubljene veze.', bodIgrac, rijec: null, slova: null };
+    return { igrac, opis: 'je omogućio/omogućila Kaladont igraču', bodIgrac, rijec: null, slova: null };
   }
 
   async function otstvoriDijalogZaPrijavu(potezId?: number) {
@@ -548,7 +547,7 @@
 {/if}
 
 {#if stanje.kraj && prikaziRezultate}
-  <Header />
+  <div class="zavrsni-header"><Header /></div>
   {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
     <Konfeti intenzitet="veliki" />
   {/if}
@@ -561,6 +560,11 @@
   {#if stanje.kraj.mojeIskustvo}
     <IskustvoPartije obracun={stanje.kraj.mojeIskustvo} />
   {/if}
+  <section class="ocjena-igre-zavrsna" aria-label="Ocjena igre">
+    <span>Ocjena igre</span>
+    <strong>{stanje.kraj.mojaOcjenaIgre ?? 0} / 5</strong>
+    <span class="ocjena-zvjezdice" aria-hidden="true">{'★'.repeat(stanje.kraj.mojaOcjenaIgre ?? 0)}{'☆'.repeat(5 - (stanje.kraj.mojaOcjenaIgre ?? 0))}</span>
+  </section>
   {#if stanje.kraj.mojDnk}
     <KaladontDnkPromjena
       prije={stanje.kraj.mojDnk.prije}
@@ -775,21 +779,23 @@
           <ol class="dogadaji-partije">
             {#each stanje.eliminacije as eliminacija, indeks (indeks)}
               <li>
-                <strong>{imeIgraca(eliminacija.igracId)}</strong>
                 {#if eliminacija.razlog.startsWith('mrtva_slova')}
-                  ispao/ispala je jer nakon riječi
-                  <strong>{eliminacija.rijecUzrok ?? 'prethodne riječi'}</strong> nije bilo riječi na
-                  <strong>{eliminacija.slova?.toUpperCase() ?? 'tražena slova'}</strong>.
-                {:else if eliminacija.razlog === 'ne_znam'}
+                  <strong>{eliminacija.bodZa ? imeIgraca(eliminacija.bodZa) : 'Prethodni igrač'}</strong> je rekao riječ
+                  {#if eliminacija.rijecUzrok}{@render trenutnaRijec(eliminacija.rijecUzrok)}{:else}<strong>prethodnu riječ</strong>{/if}, a
+                  <strong>{imeIgraca(eliminacija.igracId)}</strong> ispada jer nema riječi na
+                  <strong class="trazena-slova-istaknuta">{eliminacija.slova?.toUpperCase() ?? 'TRAŽENA SLOVA'}</strong>.
+                {:else if eliminacija.razlog === 'kaladont'}
+                  <strong>{eliminacija.bodZa ? imeIgraca(eliminacija.bodZa) : 'Igrač'}</strong> je napisao/napisala Kaladont, a
+                  <strong>{imeIgraca(eliminacija.igracId)}</strong>, koji mu/joj je omogućio Kaladont, ispao/ispala je.
+                  {#if eliminacija.bodZa}<strong>{imeIgraca(eliminacija.bodZa)}</strong> dobiva bod.{/if}
+                {:else}
+                  <strong>{imeIgraca(eliminacija.igracId)}</strong>
+                {/if}
+                {#if !eliminacija.razlog.startsWith('mrtva_slova') && eliminacija.razlog !== 'kaladont' && eliminacija.razlog === 'ne_znam'}
                   predao/predala je potez.
                 {:else if eliminacija.razlog === 'istek'}
                   ispao/ispala je zbog isteka vremena.
-                {:else if eliminacija.razlog === 'kaladont'}
-                  ispao/ispala je jer je omogućio/omogućila
-                  <strong>{eliminacija.rijecUzrok ?? 'Kaladont'}</strong>
-                  koji je izveo/izvela
-                  <strong>{eliminacija.bodZa ? imeIgraca(eliminacija.bodZa) : 'drugi igrač'}</strong>.
-                {:else}
+                {:else if eliminacija.razlog === 'prekid'}
                   napustio/napustila je partiju.
                 {/if}
               </li>
@@ -809,9 +815,20 @@
         {#if stanje.zadnjaEliminacija}
           {@const opis = opisEliminacijeZaNovuRundu(stanje.zadnjaEliminacija)}
           <p class="sustav-bira-obrazlozenje">
-            <strong class="igrac-ispao">{opis.igrac}</strong> {opis.opis}
+            {#if stanje.zadnjaEliminacija.razlog.startsWith('mrtva_slova')}
+              <strong class="igrac-bod">{opis.bodIgrac ?? 'Prethodni igrač'}</strong> je rekao riječ
+              {#if opis.rijec}{@render trenutnaRijec(opis.rijec)}{:else}<strong>prethodnu riječ</strong>{/if}, a
+              <strong class="igrac-ispao">{opis.igrac.replace('Igrač ', '')}</strong> {opis.opis}
+              {#if opis.slova}<strong class="trazena-slova-istaknuta">{opis.slova.toUpperCase()}</strong>.{/if}
+            {:else if stanje.zadnjaEliminacija.razlog === 'kaladont'}
+              <strong class="igrac-bod">{opis.bodIgrac ?? 'Igrač'}</strong> je napisao/napisala Kaladont, a
+              <strong class="igrac-ispao">{imeIgraca(stanje.zadnjaEliminacija.igracId)}</strong>, koji mu/joj je omogućio Kaladont, ispao/ispala je.
+              {#if opis.bodIgrac}<strong class="igrac-bod">{opis.bodIgrac} dobiva bod.</strong>{/if}
+            {:else}
+              <strong class="igrac-ispao">{opis.igrac}</strong> {opis.opis}
+            {/if}
             {#if opis.bodIgrac}
-              <strong class="igrac-bod">{opis.bodIgrac} dobiva bod.</strong>
+              {#if !stanje.zadnjaEliminacija.razlog.startsWith('mrtva_slova') && stanje.zadnjaEliminacija.razlog !== 'kaladont'}<strong class="igrac-bod">{opis.bodIgrac} dobiva bod.</strong>{/if}
             {/if}
           </p>
         {/if}
@@ -937,7 +954,16 @@
 {/if}
 
 <style>
-  .status-iskustva { display: none; position: fixed; z-index: 40; top: 0; left: 50%; width: 100vw; transform: translateX(-50%); background: white; border-block: 1px solid #e5ddc8; box-shadow: 0 2px 8px rgb(26 24 21 / 8%); }
+  .zavrsni-header {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .zavrsni-header + h2 {
+    margin-top: 32px;
+  }
+
+  .status-iskustva { display: none; position: fixed; z-index: 40; top: 0; right: 0; left: 0; width: auto; background: white; border-block: 1px solid #e5ddc8; box-shadow: 0 2px 8px rgb(26 24 21 / 8%); }
   .status-iskustva.vidljiv { display: block; }
   .dobitak-iskustva { display: flex; width: min(960px, calc(100% - 32px)); align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 20px; min-height: 42px; margin: 0 auto; padding: 8px 0; font-size: var(--tekst-sitni); animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
   .dobitak-iskustva strong { color: var(--boja-mint); font-size: var(--tekst-baza); }
@@ -1005,6 +1031,20 @@
     background: #fff;
     text-align: left;
   }
+  .ocjena-igre-zavrsna {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 28px auto 0;
+    padding: 14px 18px;
+    border: 1px solid #e5ddc8;
+    border-radius: 8px;
+    background: #fffdf5;
+    color: var(--boja-tekst-sekundarni);
+  }
+  .ocjena-igre-zavrsna strong { color: var(--boja-tekst-naslov); font-size: 1.2rem; }
+  .ocjena-zvjezdice { color: var(--boja-zuta-krema); letter-spacing: 0.1em; font-size: 1.2rem; }
   .zavrsni-dnk-zaglavlje {
     display: flex;
     align-items: center;
@@ -1410,6 +1450,17 @@
     padding: 2px 8px;
     border-radius: 6px;
   }
+  .trazena-slova-istaknuta {
+    display: inline-block;
+    margin-left: 4px;
+    color: var(--boja-isticanje-slova);
+    background: var(--boja-tekst);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: var(--font-naslov);
+    font-size: var(--tekst-rijec-stola);
+    line-height: 1.1;
+  }
   .kontekst-rijeci {
     margin: 6px 0 0;
     color: var(--boja-tekst-sekundarni);
@@ -1422,8 +1473,9 @@
   }
   .trenutna-rijec {
     color: var(--boja-tekst-osnovni);
-    font-size: var(--tekst-rijec-stola);
+    font-size: inherit;
     font-weight: 700;
+    line-height: 1.2;
   }
   .trenutna-rijec-zavrsetak {
     color: var(--boja-akcent);
@@ -1691,6 +1743,7 @@
   }
   .plasmani-lista {
     list-style: none;
+    margin: 28px 0 0;
     padding: 0;
   }
   .plasmani-lista li {
@@ -1723,7 +1776,8 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 12px;
-    margin-top: 12px;
+    margin-top: 28px;
+    margin-bottom: 20px;
   }
   .kraj-donje-praznine { height: 100px; }
   .igraj-opet-gumb {

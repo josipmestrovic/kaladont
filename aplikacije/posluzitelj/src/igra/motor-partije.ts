@@ -27,6 +27,7 @@ import {
   ISKUSTVO_KALADONT,
   ISKUSTVO_ELIMINACIJA,
   ISKUSTVO_POBJEDA,
+  MAKSIMALNO_ISKUSTVO,
   type StavkaIskustva,
   type RjecnikSucelje,
   type RazlogEliminacije,
@@ -469,6 +470,14 @@ export function stvoriUpraviteljPartija(
       return { igracId, plasman, bodovi, eliminacije };
     });
 
+    for (const sudionik of stanje.sudionici) {
+      const statistika = stanje.statistikeRijeci.get(sudionik.igracId);
+      if (!statistika) continue;
+      dodajNapredakDostignuca(stanje, sudionik.igracId, {
+        ...(!stanje.jePrivatna && sudionik.igracId === pobjednikId ? { javnePobjede: 1 } : {}),
+      });
+    }
+
     stanje.zadnjiPotezi.clear();
     stanje.zadnjeReakcije.clear();
     stanje.razloziEliminacije.clear();
@@ -525,6 +534,8 @@ export function stvoriUpraviteljPartija(
               mojNoviProsjek: 0,
               mojRang: null,
               mojeIskustvo: null,
+              mojaOcjenaIgre: agregati.get(p.igracId)?.ocjenaIgre ?? 0,
+              bonusOcjenaIgre: agregati.get(p.igracId)?.bonusOcjenaIgre ?? 0,
               novaDostignuca: agregati.get(p.igracId)?.novaDostignuca ?? [],
               jePrivatna: true,
               kodSobe: stanje.kodSobe,
@@ -597,7 +608,19 @@ export function stvoriUpraviteljPartija(
             plasmani,
             mojNoviProsjek: prosjek,
             mojRang: null,
-            mojeIskustvo: obracuniIskustva.get(p.igracId) ?? null,
+            mojeIskustvo: (() => {
+              const obracun = obracuniIskustva.get(p.igracId);
+              const bonusPostotak = agregat?.bonusOcjenaIgre ?? 0;
+              if (!obracun || bonusPostotak === 0) return obracun ?? null;
+              const bonus = Math.round(obracun.osvojenoIskustvo * bonusPostotak / 100);
+              obracun.stavke.push({ vrsta: 'streak', naziv: `Ocjena igre +${bonusPostotak}%`, kolicina: 1, poStavci: null, iskustvo: bonus });
+              obracun.brutoIskustvo += bonus;
+              obracun.osvojenoIskustvo = Math.min(obracun.osvojenoIskustvo + bonus, MAKSIMALNO_ISKUSTVO - obracun.prije.ukupno);
+              obracun.poslije = stanjeIskustva(obracun.prije.ukupno + obracun.osvojenoIskustvo);
+              return obracun;
+            })(),
+            mojaOcjenaIgre: agregat?.ocjenaIgre ?? 0,
+            bonusOcjenaIgre: agregat?.bonusOcjenaIgre ?? 0,
             novaDostignuca: agregat?.novaDostignuca ?? [],
             mojDnk: agregat ? {
               odigrano: agregat.odigrane,

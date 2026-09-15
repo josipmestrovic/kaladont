@@ -44,8 +44,9 @@
     prosjekBodova1v1: number;
     rang1v1: string;
     dnk: { cetiriIgraca: DnkProfil; dvaIgraca: DnkProfil };
+    prosjecnaOcjenaIgre: number | null;
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
-    stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist';
+    stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen';
     statistikaRijeci: StatistikaRijeci | null;
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
     otkljucaneRijeci: { duge: string[]; srednjeDuge: string[]; jakoDuge: string[]; rijetke: string[]; srednjeRijetke: string[]; jakoRijetke: string[] };
@@ -174,7 +175,7 @@
       <div class="info-profila">
         <h1>{profil.nadimak}</h1>
         <span class="rang-oznaka">
-           {vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Početnik'}
+           {vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'}
         </span>
         <div class="iskustvo-profila">
           <strong>LVL {profil.iskustvo.razina}</strong>
@@ -188,6 +189,14 @@
           {/if}
         </div>
         <p class="stil-igre">Stil igre: <strong>{profil.stilIgre}</strong></p>
+        {#if profil.prosjecnaOcjenaIgre !== null}
+          {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
+          <p class="ocjena-igre">Prosječna ocjena: <span class="ocjena-zvjezdice" aria-label={`Prosječna ocjena ${ocjena} od 5`}>
+            {#each Array.from({ length: 5 }, (_, i) => i < ocjena) as jeIspunjena}
+              <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
+            {/each}
+          </span></p>
+        {/if}
         {#if profil.statistikaRijeci}
           <p class="streak-sažetak">Najduži niz bez pogreške riječi: <strong>{profil.statistikaRijeci.najduziStreak}</strong></p>
         {/if}
@@ -404,6 +413,21 @@
   .streak-sažetak strong { color: var(--boja-mint); }
   .stil-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.95rem; }
   .stil-igre strong { color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.1rem; text-transform: capitalize; }
+  .ocjena-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
+  .ocjena-zvjezdice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.08em;
+    margin-left: 0.3rem;
+    font-family: var(--font-naslov);
+    font-size: 1.45rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    vertical-align: middle;
+  }
+  .ocjena-zvjezdice .ispunjena { color: var(--boja-zuta-krema); }
+  .ocjena-zvjezdice .neispunjena { color: rgb(196 170 89 / 0.45); }
   .pogled-tabovi { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
   .pogled-tabovi button { flex: 0 0 auto; padding: 9px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
   .pogled-tabovi button.aktivan { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }

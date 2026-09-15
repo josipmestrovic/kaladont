@@ -178,6 +178,8 @@ export interface KrajPartije {
   mojNoviProsjek: number;
   mojRang: string | null;
   mojeIskustvo: ObracunIskustva | null;
+  mojaOcjenaIgre?: number;
+  bonusOcjenaIgre?: number;
   novaDostignuca: { id: string; novaRazina: number; maksimalnaRazina: number }[];
   mojDnk?: {
     odigrano: number;

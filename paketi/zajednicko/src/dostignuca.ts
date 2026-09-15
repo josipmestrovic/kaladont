@@ -49,7 +49,7 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
 
 export const UKUPNO_ZVJEZDICA_DOSTIGNUCA = DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0);
 
-function razinaZaVrijednost(definicija: DefinicijaDostignuca, vrijednost: number): number {
+export function izracunajRazinuDostignuca(definicija: DefinicijaDostignuca, vrijednost: number): number {
   return definicija.pragovi.reduce((razina, prag, indeks) => (vrijednost >= prag ? indeks + 1 : razina), 0);
 }
 
@@ -67,8 +67,8 @@ export function izracunajNovaDostignuca(
     const novaVrijednost = definicija.brojac === 'razina'
       ? razinaIskustva
       : staraVrijednost + (delta[definicija.brojac] ?? 0);
-    const staraRazina = razinaZaVrijednost(definicija, staraVrijednost);
-    const novaRazina = razinaZaVrijednost(definicija, novaVrijednost);
+    const staraRazina = izracunajRazinuDostignuca(definicija, staraVrijednost);
+    const novaRazina = izracunajRazinuDostignuca(definicija, novaVrijednost);
     return novaRazina > staraRazina
       ? [{ id: definicija.id, novaRazina, maksimalnaRazina: definicija.pragovi.length }]
       : [];

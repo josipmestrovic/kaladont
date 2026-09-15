@@ -52,15 +52,17 @@
 <header class="header">
   <div class="header-sadrzaj">
     <nav class="lijevo">
-      <a href="/" class="nav-link" class:aktivan={$page.url.pathname === '/'}>
-        <svg class="ikona-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+      <a href="/" class="nav-link igraj-link" class:aktivan={$page.url.pathname === '/'}>
+        <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 7h10c2.5 0 4.2 2 4.8 5l.8 4c.4 2-1.1 3.5-2.8 3.5-1.5 0-2.4-1-3.3-2.2l-.7-1H8.2l-.7 1C6.6 18.5 5.7 19.5 4.2 19.5c-1.7 0-3.2-1.5-2.8-3.5l.8-4C2.8 9 4.5 7 7 7Z"></path>
+          <path d="M7 10v5M4.5 12.5h5"></path>
+          <circle cx="16.5" cy="12" r=".75"></circle>
+          <circle cx="19" cy="14" r=".75"></circle>
         </svg>
-        <span>Početna</span>
+        <span>Igraj</span>
       </a>
       <a href="/pomoc?tema=pravila" class="nav-link" class:aktivan={$page.url.pathname === '/pomoc' || $page.url.pathname === '/pravila'}>
-        <svg class="ikona-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="9"></circle>
           <path d="M9.7 9a2.5 2.5 0 1 1 4.3 1.7c-.9.9-2 1.3-2 2.8"></path>
           <path d="M12 17h.01"></path>
@@ -68,7 +70,7 @@
         <span>Pomoć</span>
       </a>
       <a href="/ljestvica" class="nav-link" class:aktivan={$page.url.pathname === '/ljestvica'}>
-        <svg class="ikona-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
           <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
           <path d="M4 22h16"></path>
@@ -78,6 +80,15 @@
         </svg>
         <span>Ljestvice</span>
       </a>
+      {#if profil}
+        <a href="/profil" class="nav-link mobilni-profil-link" class:aktivan={$page.url.pathname === '/profil'} aria-label="Profil">
+          <svg class="ikona-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="3.5"></circle>
+            <path d="M5 21c.8-4 3.1-6 7-6s6.2 2 7 6"></path>
+          </svg>
+          <span>Profil</span>
+        </a>
+      {/if}
       {#if false}<a href="/postavke" class="nav-link" class:aktivan={$page.url.pathname === '/postavke'} aria-label="Postavke">
         <svg class="ikona-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
@@ -92,11 +103,13 @@
           {#if jeGost}
             <a href="/profil" class="profil-link" class:aktivan={$page.url.pathname === '/profil'} aria-label="Moj profil">
               <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost velicina={42} prikaziRangBorder={false} />
+              <span class="profil-oznaka">Profil</span>
             </a>
           {:else}
             <a href="/profil" class="profil-link registrirani-profil" class:aktivan={$page.url.pathname === '/profil'} aria-label="Moj profil">
               <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={42} prikaziRangBorder={false} />
               <span class="profil-ime">{profil.nadimak}</span>
+              <span class="profil-oznaka">Profil</span>
             </a>
           {/if}
       {/if}
@@ -132,7 +145,7 @@
   .lijevo {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 24px;
   }
 
   .desno {
@@ -148,8 +161,8 @@
     color: var(--boja-tekst-osnovni);
     text-decoration: none;
     font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.5px;
+    font-size: 15px;
+    letter-spacing: 0.6px;
     line-height: 1.1;
     gap: 3px;
   }
@@ -164,25 +177,88 @@
   }
 
   .ikona-svg {
+    width: 22px;
+    height: 22px;
     stroke: currentColor;
   }
 
   .profil-link {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
+    gap: 10px;
     text-decoration: none;
     cursor: pointer;
+  }
+
+  .profil-link :global(.avatar) {
+    width: 36px !important;
+    height: 36px !important;
   }
 
   .profil-ime {
     color: var(--boja-tekst-osnovni);
     font-weight: 700;
-    font-size: 12px;
+    font-size: 15px;
+    letter-spacing: 0.3px;
     line-height: 1.2;
+  }
+
+  .profil-oznaka {
+    display: none;
+    color: var(--boja-tekst-osnovni);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    line-height: 1.2;
+  }
+
+  @media (min-width: 600px) {
+    .nav-link {
+      font-size: 15px;
+    }
+
+    .lijevo > .nav-link .ikona-svg { width: 22px; height: 22px; }
+
+    .profil-ime {
+      font-size: 15px;
+    }
   }
 
   .profil-link:hover .profil-ime {
     color: var(--boja-akcent);
+  }
+
+  .mobilni-profil-link { display: none; }
+
+  @media (max-width: 599px) {
+    .lijevo { gap: 0; }
+    .profil-link {
+      flex-direction: column;
+      gap: 3px;
+    }
+    .profil-link :global(.avatar) {
+      width: 27px !important;
+      height: 27px !important;
+    }
+    .profil-ime { display: none; }
+    .profil-oznaka { display: block; }
+  }
+
+  @media (max-width: 599px) {
+    .header-sadrzaj { padding-inline: 16px; }
+    .lijevo {
+      width: 100%;
+      justify-content: space-between;
+      gap: 0;
+    }
+    .lijevo > .nav-link {
+      min-width: 0;
+      font-size: 14px;
+      letter-spacing: 0.35px;
+    }
+    .lijevo > .nav-link .ikona-svg { width: 24px; height: 24px; }
+    .mobilni-profil-link { display: flex; }
+    .desno { display: none; }
   }
 </style>

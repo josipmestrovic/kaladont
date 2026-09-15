@@ -36,8 +36,9 @@
     prosjekBodova1v1: number;
     rang1v1: string;
     dnk: { cetiriIgraca: DnkProfil; dvaIgraca: DnkProfil };
+    prosjecnaOcjenaIgre: number | null;
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
-    stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist';
+    stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen';
     statistikaRijeci: StatistikaRijeci | null;
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
     otkljucaneRijeci: { duge: string[]; srednjeDuge: string[]; jakoDuge: string[]; rijetke: string[]; srednjeRijetke: string[]; jakoRijetke: string[] };
@@ -85,9 +86,17 @@
       <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={velicinaAvatara} />
       <div>
         <h1>{profil.nadimak}</h1>
-        <p class="rang-oznaka">{vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Početnik'} · {profil.odigrane + profil.odigrane1v1} odigranih igara</p>
+        <p class="rang-oznaka">{vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'} · {profil.odigrane + profil.odigrane1v1} odigranih igara</p>
         <p class="iskustvo"><strong>LVL {profil.iskustvo.razina}</strong>{profil.iskustvo.doIduce === null ? ' · MAX' : ` · ${profil.iskustvo.uRazini} / ${profil.iskustvo.doIduce} XP`}</p>
         <p class="stil-igre">Stil igre: <strong>{profil.stilIgre}</strong></p>
+        {#if profil.prosjecnaOcjenaIgre !== null}
+          {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
+          <p class="ocjena-igre">Prosječna ocjena: <span class="ocjena-zvjezdice" aria-label={`Prosječna ocjena ${ocjena} od 5`}>
+            {#each Array.from({ length: 5 }, (_, i) => i < ocjena) as jeIspunjena}
+              <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
+            {/each}
+          </span></p>
+        {/if}
         {#if profil.statistikaRijeci}<p class="streak-sažetak">Najduži niz bez pogreške riječi: <strong>{profil.statistikaRijeci.najduziStreak}</strong></p>{/if}
       </div>
     </header>
@@ -176,6 +185,21 @@
   .streak-sažetak strong { color: var(--boja-mint); }
   .stil-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.95rem; }
   .stil-igre strong { color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.1rem; text-transform: capitalize; }
+  .ocjena-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
+  .ocjena-zvjezdice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.08em;
+    margin-left: 0.3rem;
+    font-family: var(--font-naslov);
+    font-size: 1.45rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    vertical-align: middle;
+  }
+  .ocjena-zvjezdice .ispunjena { color: var(--boja-zuta-krema); }
+  .ocjena-zvjezdice .neispunjena { color: rgb(196 170 89 / 0.45); }
   .rang-oznaka { margin: 6px 0 0; color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
   .dostignuca-sažetak { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
   .dostignuca-sažetak strong { color: var(--boja-mint); font-size: 1.25rem; }

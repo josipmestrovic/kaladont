@@ -174,7 +174,7 @@
   h1, h2, h3 { font-family: var(--font-naslov); color: var(--boja-tekst-naslov); }
   h1 { margin: 0; font-size: var(--naslov-1); }
   .zaglavlje > p:last-child { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); }
-  .teme { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 24px; padding-bottom: 4px; scrollbar-width: thin; }
+  .teme { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; padding-bottom: 4px; }
   .teme button { flex: 0 0 auto; padding: 10px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-weight: 700; cursor: pointer; }
   .teme button.aktivna { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
   .kratki-naziv { display: none; }
@@ -198,10 +198,10 @@
   .faq details { padding: 14px 0; border-bottom: 1px solid #e5ddc8; }
   .faq summary { cursor: pointer; font-weight: 700; }
   .faq details p { margin: 10px 0 0; color: var(--boja-tekst-sekundarni); }
-  @media (max-width: 560px) {
+  @media (max-width: 767px) {
     .pomoc { padding-top: 24px; }
     .puni-naziv { display: none; }
     .kratki-naziv { display: inline; }
-    .teme { margin-right: -4px; }
+    .teme button { flex: 1 1 auto; }
   }
 </style>

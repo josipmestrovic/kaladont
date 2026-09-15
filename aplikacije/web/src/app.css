@@ -76,10 +76,12 @@
 
 html {
   font-size: var(--tekst-baza);
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
+  overflow-x: hidden;
   background: var(--boja-pozadina-podloga);
   color: var(--boja-tekst-osnovni);
   font-family: var(--font-tijelo);

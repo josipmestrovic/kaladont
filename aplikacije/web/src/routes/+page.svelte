@@ -24,16 +24,21 @@
 </script>
 
 <div class="landing">
-  <h1 class="logotip">Kaladont Multiplayer <span>(v0.3.0-closed-alpha.1)</span></h1>
-  <p class="podnaslov">Hrvatska igra riječi.</p>
-
-  <div class="gumbi-sekcija">
-    <div class="gumb-blok">
-      <a href="/red" class="igraj-gumb" onclick={igrajKlik}>IGRAJ</a>
+  <div class="landing-glavni">
+    <div class="landing-tekst">
+      <p class="verzija">v0.3.0-closed-alpha.1</p>
+      <h1 class="logotip">Kaladont Multiplayer</h1>
+      <p class="podnaslov">Hrvatska igra riječi.</p>
     </div>
 
-    <div class="gumb-blok privatna-soba-blok">
-      <a href="/soba/kreiraj" class="soba-gumb">Privatna soba</a>
+    <div class="gumbi-sekcija">
+      <div class="gumb-blok">
+        <a href="/red" class="igraj-gumb" onclick={igrajKlik}>IGRAJ</a>
+      </div>
+
+      <div class="gumb-blok privatna-soba-blok">
+        <a href="/soba/kreiraj" class="soba-gumb">Privatna soba</a>
+      </div>
     </div>
   </div>
 
@@ -87,38 +92,64 @@
 
 <style>
   .landing {
+    width: 100%;
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     text-align: center;
     padding-top: 40px;
   }
 
-  .logotip {
-    font-size: 40px;
-    line-height: 1;
+  .landing-glavni {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 56px;
   }
 
-  .logotip span {
-    display: block;
-    margin-top: 4px;
+  .landing-tekst { text-align: center; }
+
+  .logotip {
+    width: 100%;
+    max-width: 860px;
+    font-size: clamp(48px, 8vw, 88px);
+    line-height: 1;
+    overflow-wrap: normal;
+  }
+
+  @media (min-width: 1000px) {
+    .logotip { white-space: nowrap; }
+  }
+
+  .verzija {
+    margin: 0 0 8px;
     color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-baza);
+    font-size: var(--tekst-mali);
     font-weight: 600;
+    letter-spacing: 0.04em;
   }
 
   .podnaslov {
     color: var(--boja-tekst-sekundarni);
-    margin-bottom: 32px;
-    font-size: inherit;
+    margin: 8px 0 0;
+    font-size: 28px;
+    font-weight: 600;
   }
 
   .gumbi-sekcija {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     gap: 20px;
   }
 
   .privatna-soba-blok {
-    margin-top: 18px;
+    margin-top: 0;
   }
 
   .igraj-gumb {
@@ -155,6 +186,7 @@
 
   footer {
     margin-top: 32px;
+    padding-bottom: 20px;
     font-size: var(--tekst-mali);
     color: var(--boja-tekst-sekundarni);
     display: flex;
@@ -167,6 +199,32 @@
 
   .novosti-link { padding: 0; border: 0; background: none; color: var(--boja-tekst-naslov); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   .footer-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+
+  @media (max-width: 767px) {
+    .landing {
+      justify-content: flex-start;
+      min-height: 0;
+      padding: 32px 0 20px;
+    }
+
+    .landing-glavni {
+      display: block;
+    }
+
+    .landing-tekst { text-align: center; }
+    .logotip { font-size: 40px; white-space: normal; }
+    .podnaslov { font-size: inherit; }
+    .gumbi-sekcija { flex-direction: column; }
+
+    .gumbi-sekcija {
+      margin-top: 44px;
+    }
+
+    footer {
+      margin-top: 0;
+      padding: 12px 0 24px;
+    }
+  }
 
   .modal-podloga {
     position: fixed;

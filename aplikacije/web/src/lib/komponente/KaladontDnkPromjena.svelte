@@ -90,8 +90,9 @@
 
 <style>
   .dnk-promjena {
-    max-width: 680px;
-    margin: 20px auto 0;
+    width: 100%;
+    max-width: none;
+    margin: 32px auto 0;
     padding: 18px;
     border: 1px solid #e5ddc8;
     border-radius: 8px;

@@ -72,7 +72,7 @@
           type="text"
           bind:value={ime}
           autocomplete="off"
-          maxlength={20}
+          maxlength={12}
           placeholder="Tvoje ime"
           aria-label="Tvoje ime"
           disabled={slanjeUTijeku}
