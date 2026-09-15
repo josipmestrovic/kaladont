@@ -1,7 +1,7 @@
 export const SAVJETI = [
   'Prosjek bodova po partiji jedina je metrika ranga — očekivani prosjek je 2,5.',
-  'Savršena partija nosi 7 bodova: pobjeda + bonus + sve 3 eliminacije.',
-  'Od 11. partije rang se računa iz prosjeka bodova — prvih 10 igraš kao Piskaralo.',
+  'Savršena igra nosi 7 bodova: pobjeda + bonus + sve 3 eliminacije.',
+  'Od 11. igre rang se računa iz prosjeka bodova — prvih 10 igraš kao Piskaralo.',
   'Najviši rang zove se Kaladont — prosjek 5,70 ili više.',
   'Igrač koji ne zna riječ ispada, osim kod Kaladonta: tada ispada onaj tko je omogućio „ka”.',
   'Radi pravednosti, sustav uvijek određuje prvu riječ i bira samo riječ koja ima slobodan nastavak.',

@@ -27,8 +27,6 @@
     {:else if pogled === 'o-igri'}
       <h2>O igri</h2>
       <p class="tekst">Kaladont je hrvatska igra riječi u kojoj svaki potez određuje nastavak za sljedećeg igrača. Posebnost riječi „kaladont” je završetak „nt”, nakon kojeg nema hrvatskog nastavka.</p>
-      <h4>Rani pristup</h4>
-      <p class="tekst">Igra je u ranom pristupu, besplatna je i aktivno se razvija. Greške i prijedloge možeš prijaviti kroz ugrađeni sustav tijekom partije.</p>
       <h4>Rječnik i licenca</h4>
       <p class="tekst">Popis riječi izveden je iz leksikona <strong>hrLex 1.3</strong> (Nikola Ljubešić, CLARIN.SI, <a href="http://hdl.handle.net/11356/1232" target="_blank" rel="noreferrer">hdl.handle.net/11356/1232</a>), dostupnog pod licencom <strong>CC BY-SA 4.0</strong>.</p>
       <p class="tekst">Za potrebe igre popis je filtriran bez vlastitih imena i kratica te obogaćen grafemskim parovima i leksemskim grupama. Izvedeni popis dostupan je pod istom licencom na zahtjev.</p>

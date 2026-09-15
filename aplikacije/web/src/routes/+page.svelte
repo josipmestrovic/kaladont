@@ -24,8 +24,8 @@
 </script>
 
 <div class="landing">
-  <h1 class="logotip">Kaladont Multiplayer <span>(v0.4.0-closed-alpha.1)</span></h1>
-  <p class="podnaslov">Hrvatska igra riječi</p>
+  <h1 class="logotip">Kaladont Multiplayer <span>(v0.3.0-closed-alpha.1)</span></h1>
+  <p class="podnaslov">Hrvatska igra riječi.</p>
 
   <div class="gumbi-sekcija">
     <div class="gumb-blok">
@@ -43,9 +43,6 @@
     </p>
   {/if}
 
-  <p class="early-access-napomena">
-    <strong>Early access</strong> — očekuj moguće greške. Ako ih pronađeš, prijavi ih kroz ugrađeni sustav za prijavu grešaka.
-  </p>
 </div>
 
 {#if otvorenModal}
@@ -154,13 +151,6 @@
   .racun-linkovi {
     margin-top: 20px;
     font-size: inherit;
-  }
-
-  .early-access-napomena {
-    max-width: 360px;
-    margin: 24px auto 0;
-    color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-baza);
   }
 
   footer {

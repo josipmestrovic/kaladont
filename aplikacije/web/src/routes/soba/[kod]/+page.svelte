@@ -181,7 +181,7 @@
             </div>
           </li>
           <li class="napomena-bodovi">
-            💡 <em>Ova utakmica je prijateljska i ne utječe na bodove niti ljestvicu.</em>
+            💡 <em>Ova igra je prijateljska i ne utječe na bodove niti ljestvicu.</em>
           </li>
         </ul>
       </section>

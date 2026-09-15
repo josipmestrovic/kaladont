@@ -111,14 +111,14 @@
     </button>
   </div>
 
-  <p>Top {prosirenoIgraci ? '100' : '10'} igrača po prosjeku bodova u modu {modIgraca === 'dva_igraca' ? '2 igrača' : '4 igrača'} (min. 10 partija).</p>
+  <p>Top {prosirenoIgraci ? '100' : '10'} igrača po prosjeku bodova u modu {modIgraca === 'dva_igraca' ? '2 igrača' : '4 igrača'} (min. 10 igara).</p>
 
   {#if ljestvica.length === 0 && !ucitavaIgraci}
-    <p>Odigraj 10 partija da uđeš na ljestvicu.</p>
+    <p>Odigraj 10 igara da uđeš na ljestvicu.</p>
   {:else}
     <table>
       <thead>
-        <tr><th>#</th><th>Nadimak</th><th>Rang</th><th>Prosjek</th><th>Partije</th><th>% pobjeda</th></tr>
+        <tr><th>#</th><th>Nadimak</th><th>Rang</th><th>Prosjek</th><th>Igre</th><th>% pobjeda</th></tr>
       </thead>
       <tbody>
         {#each ljestvica as stavka (stavka.mjesto)}
@@ -151,14 +151,14 @@
     {/if}
   {/if}
 {:else}
-  <p>Top {prosirenoRijeci ? '100' : '10'} najčešće odigranih riječi u svim partijama.</p>
+  <p>Top {prosirenoRijeci ? '100' : '10'} najčešće odigranih riječi u svim igrama.</p>
 
   {#if topRijeci.length === 0 && !ucitavaRijeci}
-    <p>Još nema dovoljno odigranih partija.</p>
+    <p>Još nema dovoljno odigranih igara.</p>
   {:else}
     <table>
       <thead>
-        <tr><th>#</th><th>Riječ</th><th>Broj upotreba</th><th>% partija</th></tr>
+        <tr><th>#</th><th>Riječ</th><th>Broj upotreba</th><th>% igara</th></tr>
       </thead>
       <tbody>
         {#each topRijeci as stavka (stavka.mjesto)}

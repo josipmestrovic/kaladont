@@ -6,7 +6,6 @@
   import { dohvatiSocket } from '$lib/socket.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { dohvatiStanjeIgre } from '$lib/stanje-igre.svelte.js';
-  import RaniPristupBaner from '$lib/komponente/RaniPristupBaner.svelte';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import Konfeti from '$lib/komponente/Konfeti.svelte';
@@ -556,7 +555,7 @@
   <h2>Konačni rezultati</h2>
   {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
     <p class="privatna-obavijest">
-      🔒 Prijateljska privatna utakmica (bodovi nisu dodijeljeni i ne utječu na ljestvicu).
+      🔒 Prijateljska privatna igra (bodovi nisu dodijeljeni i ne utječu na ljestvicu).
     </p>
   {/if}
   {#if stanje.kraj.mojeIskustvo}
@@ -619,7 +618,7 @@
     </div>
   {/if}
   <section class="povijest-partije">
-    <h3>Povijest partije</h3>
+    <h3>Povijest igre</h3>
     {#if potezi.length === 0}
       <p>Potezi još nisu dostupni.</p>
     {:else}
@@ -638,7 +637,7 @@
   <div class="aktivna-partija-sadrzaj">
   {#if stanje.obracunIskustva}
     <aside class="obracun-promatraca">
-      <p>Rezultat je izračunat i trajno će se spremiti kada partija završi. Možeš napustiti partiju.</p>
+      <p>Rezultat je izračunat i trajno će se spremiti kada igra završi. Možeš napustiti igru.</p>
       <IskustvoPartije obracun={stanje.obracunIskustva.mojeIskustvo} />
       <a href="/" class="sporedni-gumb">Napusti partiju</a>
     </aside>
@@ -857,7 +856,7 @@
           {/key}
         </div>
       {:else}
-        <p class="priprema-partije">Partija počinje…</p>
+        <p class="priprema-partije">Igra počinje…</p>
       {/if}
 
     {#if jeNaPotezu}
@@ -879,7 +878,7 @@
         {/key}
         <div class="potez-gumbi">
           <button type="submit" disabled={slanjeUTijeku}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
-          {#if stanje.jePrivatna && (stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
+          {#if !stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === ''}
             <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku} onclick={posaljiNeZnam}>Ne znam</button>
           {/if}
         </div>
@@ -909,10 +908,6 @@
   </section>
   </div>
 
-{/if}
-
-{#if stanje.kraj}
-  <RaniPristupBaner onclickPrijavi={() => otstvoriDijalogZaPrijavu()} />
 {/if}
 
 {#if prijavaDijalog}

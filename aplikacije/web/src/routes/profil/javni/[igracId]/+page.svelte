@@ -85,7 +85,7 @@
       <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={velicinaAvatara} />
       <div>
         <h1>{profil.nadimak}</h1>
-        <p class="rang-oznaka">{vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Početnik'} · {profil.odigrane + profil.odigrane1v1} odigranih partija</p>
+        <p class="rang-oznaka">{vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Početnik'} · {profil.odigrane + profil.odigrane1v1} odigranih igara</p>
         <p class="iskustvo"><strong>LVL {profil.iskustvo.razina}</strong>{profil.iskustvo.doIduce === null ? ' · MAX' : ` · ${profil.iskustvo.uRazini} / ${profil.iskustvo.doIduce} XP`}</p>
         <p class="stil-igre">Stil igre: <strong>{profil.stilIgre}</strong></p>
         {#if profil.statistikaRijeci}<p class="streak-sažetak">Najduži niz bez pogreške riječi: <strong>{profil.statistikaRijeci.najduziStreak}</strong></p>{/if}
@@ -108,7 +108,7 @@
       <h2>Rezultati ({aktivniTab === '4p' ? '4 igrača' : '2 igrača'})</h2>
       <KaladontDnkGraf profil={aktivniTab === '4p' ? profil.dnk.cetiriIgraca : profil.dnk.dvaIgraca} />
       <div class="mrezica-kartica">
-        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.odigrane : profil.odigrane1v1}</strong><span>Odigrane partije</span></div>
+        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.odigrane : profil.odigrane1v1}</strong><span>Odigrane igre</span></div>
         <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.pobjede : profil.pobjede1v1}</strong><span>Pobjede</span></div>
         <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.bodoviUkupno : profil.bodovi1v1}</strong><span>Ukupno bodova</span></div>
         <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.prosjekBodova : profil.prosjekBodova1v1).toFixed(2)}</strong><span>Prosjek bodova</span></div>
@@ -134,8 +134,8 @@
     {/if}
     {:else}
       <section class="povijest-sekcija">
-        <h2>Povijest partija</h2>
-        {#if partije.length === 0}<p>Još nema odigranih partija.</p>{:else}<div class="tablica-omotač"><table class="povijest-tablica"><thead><tr><th>Datum</th><th>Plasman</th><th>Bodovi</th><th>Eliminacije</th></tr></thead><tbody>{#each partije as p (p.partijaId)}<tr><td>{new Date(p.pocetak).toLocaleDateString('hr-HR')}</td><td>{p.plasman}. mjesto</td><td>{p.bodovi}</td><td>{p.eliminacije}</td></tr>{/each}</tbody></table></div>{/if}
+        <h2>Povijest igara</h2>
+        {#if partije.length === 0}<p>Još nema odigranih igara.</p>{:else}<div class="tablica-omotač"><table class="povijest-tablica"><thead><tr><th>Datum</th><th>Plasman</th><th>Bodovi</th><th>Eliminacije</th></tr></thead><tbody>{#each partije as p (p.partijaId)}<tr><td>{new Date(p.pocetak).toLocaleDateString('hr-HR')}</td><td>{p.plasman}. mjesto</td><td>{p.bodovi}</td><td>{p.eliminacije}</td></tr>{/each}</tbody></table></div>{/if}
       </section>
     {/if}
     {#if otvoreniPopup}

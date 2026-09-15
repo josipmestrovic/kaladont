@@ -35,7 +35,7 @@
       <h3 id="dnk-naslov">{naslov}</h3>
     </div>
     <span class:otkljucan={profil.otkljucan} class="dnk-status">
-      {profil.otkljucan ? `${profil.odigrano} partija` : `Otključava se nakon 10 partija`}
+      {profil.otkljucan ? `${profil.odigrano} igara` : `Otključava se nakon 10 igara`}
     </span>
   </div>
 
@@ -79,7 +79,7 @@
       <div class="zakljucani-graf" aria-hidden="true">✦</div>
       <div>
         <strong>DNK se tek oblikuje</strong>
-        <p>Odigraj još {profil.preostaloDoOtkljucavanja} javnih partija da otključaš svoj profil igre.</p>
+        <p>Odigraj još {profil.preostaloDoOtkljucavanja} javnih igara da otključaš svoj profil igre.</p>
       </div>
     </div>
   {/if}

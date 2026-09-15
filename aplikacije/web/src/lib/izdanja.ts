@@ -13,7 +13,7 @@ export const IZDANJA: IzdanjeBiljeske[] = [
     verzija: 'v0.3.0-closed-alpha.1',
     naslov: 'Kaladont Multiplayer v0.3.0 – Closed Alpha 1',
     datum: '15. rujna 2026.',
-    uvod: 'Treće zatvoreno izdanje objedinjuje trajni XP, dostignuća, mode-aware rangove i Kaladont DNK profil. Javni modovi sada imaju odvojene agregate, a završetak partije jasno prikazuje ostvareni napredak.',
+    uvod: 'Treće zatvoreno izdanje objedinjuje trajni XP, dostignuća, mode-aware rangove i Kaladont DNK profil. Javni modovi sada imaju odvojene agregate, a završetak igre jasno prikazuje ostvareni napredak.',
     novo: [
       {
         naslov: 'Dostignuća i kolekcija',
@@ -21,16 +21,16 @@ export const IZDANJA: IzdanjeBiljeske[] = [
           'Dodano je devet dostignuća s ukupno 45 zvjezdica i jasnim pragovima napretka.',
           'Dostignuća se prikazuju unutar vlastitog i javnog profila, uz razinu i sljedeći cilj.',
           'Rijetke riječi, duge riječi i streak mogu napredovati i u privatnim sobama.',
-          'Nova dostignuća obračunavaju se server-side i spremaju transakcijski na kraju partije.',
+          'Nova dostignuća obračunavaju se server-side i spremaju transakcijski na kraju igre.',
         ],
       },
       {
         naslov: 'Kaladont DNK',
         stavke: [
-          'Nakon 10 javnih partija otključava se profil igre kroz šest osi: Vještina, Taktika, Fokus, Brzina, Duge riječi i Rijetke riječi.',
+          'Nakon 10 javnih igara otključava se profil igre kroz šest osi: Vještina, Taktika, Fokus, Brzina, Duge riječi i Rijetke riječi.',
           'Četiri igrača i 1v1 imaju odvojene statistike, pragove, rangove i DNK profile.',
           'Brzina koristi stvarni prosjek trajanja prihvaćenih poteza, spremljen po modu; povijesni potezi su backfillani.',
-          'Na kraju partije prikazuje se kompaktni graf s delta promjenama, starim vrijednostima i strelicama prema novim vrijednostima.',
+          'Na kraju igre prikazuje se kompaktni graf s delta promjenama, starim vrijednostima i strelicama prema novim vrijednostima.',
         ],
       },
       {
@@ -50,7 +50,7 @@ export const IZDANJA: IzdanjeBiljeske[] = [
       'Pokreni privatnu sobu, odigraj partiju i provjeri da se XP i javni agregati ne mijenjaju.',
       'Odigraj desetu javnu partiju i provjeri otključavanje DNK bez prikaza brojača nakon otključavanja.',
       'Provjeri Brzinu na profilu nakon nekoliko prihvaćenih poteza.',
-      'Uđi u red nakon završetka partije i provjeri da se sadržaj učita bez refresha.',
+      'Uđi u red nakon završetka igre i provjeri da se sadržaj učita bez refresha.',
     ],
     ogranicenja: [
       'XP i dostignuća vrijede prema pravilima javnog i privatnog moda.',
@@ -69,7 +69,7 @@ export const IZDANJA: IzdanjeBiljeske[] = [
           'Duga riječ donosi konfete, zvuk i poruku u igri.',
           'Rijetka riječ donosi jaču proslavu; riječ koja je i duga i rijetka dobiva jedan zajednički, veći efekt.',
           'Nagrada se dobiva samo prvi put kada igrač otključa leksemsku grupu.',
-          'Konfeti i završni efekti ne mijenjaju bodove ni ishod partije.',
+          'Konfeti i završni efekti ne mijenjaju bodove ni ishod igre.',
         ],
       },
       {
@@ -93,29 +93,29 @@ export const IZDANJA: IzdanjeBiljeske[] = [
         stavke: [
           'Profil sada prikazuje napredak kroz duge i rijetke riječi.',
           'Prikazane su najduža i najrjeđa odigrana riječ te najduži streak.',
-          'Registrirani igrači imaju javni profil dostupan s ljestvice i završetka partije.',
+          'Registrirani igrači imaju javni profil dostupan s ljestvice i završetka igre.',
         ],
       },
       {
         naslov: 'Gamifikacija i u privatnoj sobi',
         stavke: [
           'Privatne sobe također otključavaju riječi, rewarde i streak dostignuća.',
-          'Privatne partije ne utječu na klasične bodove, pobjede, rang ni javnu ljestvicu.',
-          'Pobjednik svake partije dobiva završnu proslavu s konfetima.',
+          'Privatne igre ne utječu na klasične bodove, pobjede, rang ni javnu ljestvicu.',
+          'Pobjednik svake igre dobiva završnu proslavu s konfetima.',
         ],
       },
     ],
     testirati: [
       'Odigraj dugu riječ, rijetku riječ i riječ koja je istovremeno duga i rijetka.',
       'Napravi nekoliko prihvaćenih poteza, zatim namjerno pogriješi i provjeri reset streaka.',
-      'Odigraj istu leksemsku grupu u dvije partije i provjeri da se reward ne ponavlja.',
+      'Odigraj istu leksemsku grupu u dvije igre i provjeri da se reward ne ponavlja.',
       'U privatnoj sobi otključaj riječ i provjeri da se dostignuće vidi na profilu, bez promjene ranga.',
       'Na profilu otvori odvojene popise dugih i rijetkih riječi.',
-      'Provjeri završne konfete kao pobjednik javne i privatne partije.',
+      'Provjeri završne konfete kao pobjednik javne i privatne igre.',
     ],
     ogranicenja: [
       'Ovo je i dalje closed alpha izdanje namijenjeno ograničenoj grupi testera.',
-      'Partije odigrane prije ovog izdanja nemaju retroaktivno spremljene konkretne popise otključanih riječi.',
+      'Igre odigrane prije ovog izdanja nemaju retroaktivno spremljene konkretne popise otključanih riječi.',
       'Reward zvukovi rade kada su pripadajući audio asseti dostupni u klijentu.',
       'Produkcija nije dio ovog izdanja; staging se provjerava odvojeno.',
     ],
@@ -124,7 +124,7 @@ export const IZDANJA: IzdanjeBiljeske[] = [
     verzija: 'v0.1.0-closed-alpha.1',
     naslov: 'Kaladont Multiplayer v0.1.0 – Closed Alpha 1',
     datum: 'Prvo zatvoreno izdanje',
-    uvod: 'Prvi zatvoreni multiplayer test Kaladonta. Ovo izdanje služi za provjeru cijelog toka igre s manjom grupom testera: od registracije i ulaska u red do završetka partije, ljestvice i privatnih soba.',
+    uvod: 'Prvi zatvoreni multiplayer test Kaladonta. Ovo izdanje služi za provjeru cijelog toka igre s manjom grupom testera: od registracije i ulaska u red do završetka igre, ljestvice i privatnih soba.',
     novo: [
       {
         naslov: 'Javni modovi igre',
@@ -151,7 +151,7 @@ export const IZDANJA: IzdanjeBiljeske[] = [
         stavke: [
           'Gosti koriste naziv Gost i zajednički gost avatar.',
           'Registracija uključuje odabir nadimka i avatara.',
-          'Registrirani korisnik kroz profil vidi svoju statistiku i povijest partija.',
+          'Registrirani korisnik kroz profil vidi svoju statistiku i povijest igara.',
         ],
       },
       {
@@ -170,7 +170,7 @@ export const IZDANJA: IzdanjeBiljeske[] = [
       'Ulazak dvoje igrača u mod za 2 igrača.',
       'Prihvaćanje i odbijanje riječi, timer, predaju poteza i eliminacije.',
       'Bodove, statistiku i ljestvicu za oba javna moda.',
-      'Stvaranje privatne sobe, dijeljenje poveznice, prilagodbu pravila i više uzastopnih partija.',
+      'Stvaranje privatne sobe, dijeljenje poveznice, prilagodbu pravila i više uzastopnih igara.',
       'Stranice Pravila, O igri, Uvjeti korištenja i Pravila privatnosti.',
     ],
     ogranicenja: [

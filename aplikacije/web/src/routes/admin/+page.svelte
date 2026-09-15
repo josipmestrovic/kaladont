@@ -198,7 +198,7 @@
     </ul>
     {#if odabranaPartija}
       <section class="detalji-partije">
-        <h3>Partija {odabranaPartija}</h3>
+        <h3>Igra {odabranaPartija}</h3>
         <ol>
           {#each odabraniPotezi as potez (potez.id)}
             <li>{potez.igracId ?? 'Sustav'}: {potez.rijec ?? potez.vrsta}</li>

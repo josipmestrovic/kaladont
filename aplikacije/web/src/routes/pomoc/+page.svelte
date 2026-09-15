@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { RANGOVI } from 'zajednicko';
 
-  type Tema = 'pravila' | 'javne' | 'privatne' | 'rangovi' | 'napredak';
+  type Tema = 'pravila' | 'javne' | 'privatne' | 'rangovi' | 'napredak' | 'dnk';
 
   const teme: { id: Tema; puniNaziv: string; kratkiNaziv: string }[] = [
     { id: 'pravila', puniNaziv: 'Pravila igre', kratkiNaziv: 'Pravila' },
@@ -11,6 +11,7 @@
     { id: 'privatne', puniNaziv: 'Privatne igre', kratkiNaziv: 'Privatne' },
     { id: 'rangovi', puniNaziv: 'Rangovi i obrubi', kratkiNaziv: 'Rangovi' },
     { id: 'napredak', puniNaziv: 'Napredak', kratkiNaziv: 'Napredak' },
+    { id: 'dnk', puniNaziv: 'Kaladont DNK', kratkiNaziv: 'DNK' },
   ];
 
   const odabranaTema = $derived(
@@ -92,7 +93,7 @@
       <p>Javne igre su glavni natjecateljski modovi. Igraš protiv drugih igrača iz reda čekanja, a rezultat se sprema u tvoju javnu statistiku.</p>
       <section><h3>Klasični mod za 4 igrača</h3><p>Igraju točno 4 igrača. Prvi ispali završava na četvrtom mjestu, a zadnji preostali pobjeđuje. Plasman, izazvane eliminacije i pobjeda ulaze u bodovanje.</p></section>
       <section><h3>1v1 dvoboj</h3><p>Igraju 2 igrača. Pravila riječi su ista, ali bodovanje i statistika vode se zasebno od Klasičnog moda.</p></section>
-      <section><h3>Što javni modovi dijele?</h3><p>Dijele pravila nastavaka, grafeme, rječnik, leksemske grupe i osnovni sustav igre. Ne dijele statistiku, prosjek bodova, rang ni broj odigranih partija.</p></section>
+      <section><h3>Što javni modovi dijele?</h3><p>Dijele pravila nastavaka, grafeme, rječnik, leksemske grupe i osnovni sustav igre. Ne dijele statistiku, prosjek bodova, rang ni broj odigranih igara.</p></section>
       <p class="poveznica"><a href="/ljestvica">Otvori ljestvicu igrača →</a></p>
     </section>
   {:else if odabranaTema === 'privatne'}
@@ -107,7 +108,7 @@
   {:else if odabranaTema === 'rangovi'}
     <section class="sadrzaj" aria-labelledby="rangovi-naslov">
       <h2 id="rangovi-naslov">Rangovi i obrubi</h2>
-      <p>Nakon prvih 10 partija u pojedinom modu dobivaš rang prema prosjeku bodova po partiji. Rangovi za 4 igrača i 1v1 računaju se odvojeno.</p>
+      <p>Nakon prvih 10 igara u pojedinom modu dobivaš rang prema prosjeku bodova po igri. Rangovi za 4 igrača i 1v1 računaju se odvojeno.</p>
       <div class="tablica-omotac">
         <table>
           <thead><tr><th>Rang</th><th>Prosjek bodova po partiji</th></tr></thead>
@@ -121,12 +122,12 @@
       <p class="napomena">Tvoj rang mijenja boju obruba avatara. Obrub je vizualni status i ne daje prednost u igri.</p>
       <p class="poveznica">Kako skupljaš XP i otključavaš dostignuća? <button type="button" onclick={() => otvoriTemu('napredak')}>Napredak →</button></p>
     </section>
-  {:else}
+  {:else if odabranaTema === 'napredak'}
     <section class="sadrzaj" aria-labelledby="napredak-naslov">
       <h2 id="napredak-naslov">Napredak</h2>
       <section>
         <h3>Iskustvo i razine</h3>
-        <p>Razina i rang nisu isto. Rang govori o prosjeku bodova i natjecateljskom statusu, a razina govori koliko si ukupno iskustva skupio. XP dobivaš kroz poteze, pobjede, eliminacije, duge i rijetke riječi te streakove. Nakon partije vidiš točan obračun i punjenje XP trake.</p>
+        <p>Razina i rang nisu isto. Rang govori o prosjeku bodova i natjecateljskom statusu, a razina govori koliko si ukupno iskustva skupio. XP dobivaš kroz poteze, pobjede, eliminacije, duge i rijetke riječi te streakove. Nakon igre vidiš točan obračun i punjenje XP trake.</p>
       </section>
       <section>
         <h3>Dostignuća</h3>
@@ -144,21 +145,30 @@
         </ul>
       </section>
     </section>
+  {:else}
+    <section class="sadrzaj" aria-labelledby="dnk-naslov">
+      <h2 id="dnk-naslov">Kaladont DNK</h2>
+      <p>Kaladont DNK je profil tvog stila igre. Otključava se nakon 10 javnih igara u pojedinom modu i prikazuje šest odvojenih osi.</p>
+      <section><h3>Šest osi profila</h3><ul><li><strong>Vještina</strong> prati prosjek bodova.</li><li><strong>Taktika</strong> prati izazvane eliminacije po igri.</li><li><strong>Fokus</strong> prati najduži niz prihvaćenih riječi.</li><li><strong>Brzina</strong> prati prosječno trajanje prihvaćenog poteza.</li><li><strong>Duge riječi</strong> i <strong>Rijetke riječi</strong> prate tvoje jezične izbore.</li></ul></section>
+      <section><h3>Odvojeno po modu</h3><p>DNK za 4 igrača i DNK za 2 igrača računaju se zasebno, kao i rangovi i statistika. Igra u jednom modu ne mijenja profil drugog moda.</p></section>
+      <section><h3>Kada se otključa?</h3><p>Dok DNK nije otključan, vidiš napredak prema 10 javnih igara. Nakon otključavanja dobivaš radar graf sa svojim vrijednostima. Na završetku igre prikazuju se samo promjene u odnosu na prethodno stanje.</p></section>
+      <p class="poveznica"><a href="/profil">Otvori svoj profil i Kaladont DNK →</a></p>
+    </section>
   {/if}
 
   <section class="faq" aria-labelledby="faq-naslov">
     <h2 id="faq-naslov">Najčešća pitanja</h2>
     <details><summary>Zašto moja riječ nije prihvaćena?</summary><p>Provjeri tražena slova, dijakritike i je li riječ već potrošila svoju leksemsku grupu. Ako je presuda čudna, prijavi je i pusti serveru da bude sudac.</p></details>
-    <details><summary>Zašto još nemam rang?</summary><p>Rang se prikazuje nakon prvih 10 partija u pojedinom modu. Do tada si u kalibraciji.</p></details>
+    <details><summary>Zašto još nemam rang?</summary><p>Rang se prikazuje nakon prvih 10 igara u pojedinom modu. Do tada si u kalibraciji.</p></details>
     <details><summary>Utječu li privatne sobe na rang i XP?</summary><p>Ne utječu na javni rang, javne bodove ni XP. Privatna soba ima svoju malu ljestvicu, a određena jezična dostignuća i dalje mogu napredovati.</p></details>
     <details><summary>Zašto sam ispao iako nisam kliknuo „Ne znam”?</summary><p>Možda je isteklo vrijeme, ostala su mrtva slova ili se veza nije vratila na vrijeme. Igra ne kažnjava šutnju dvaput, samo je vrlo dosljedna.</p></details>
     <details><summary>Mogu li ponovno odigrati riječ u drugom padežu?</summary><p>Ne ako dijeli istu leksemsku grupu s već odigranom riječi. Drugi oblik nije uvijek novi potez.</p></details>
-    <details><summary>Kako prijaviti riječ koja nedostaje?</summary><p>Upotrijebi gumb „Prijavi” u igri ili u povijesti partije. Tako se prijava veže uz točan potez i rječnik se može pošteno provjeriti.</p></details>
+    <details><summary>Kako prijaviti riječ koja nedostaje?</summary><p>Upotrijebi gumb „Prijavi” u igri ili u povijesti igre. Tako se prijava veže uz točan potez i rječnik se može pošteno provjeriti.</p></details>
   </section>
 </main>
 
 <style>
-  .pomoc { max-width: 820px; margin: 0 auto; padding: 32px 4px 64px; }
+  .pomoc { max-width: 980px; margin: 0 auto; padding: 32px 4px 64px; }
   .zaglavlje { margin-bottom: 24px; }
   .nadnaslov { margin: 0 0 4px; color: var(--boja-mint); font-size: var(--tekst-sitni); font-weight: 700; text-transform: uppercase; }
   h1, h2, h3 { font-family: var(--font-naslov); color: var(--boja-tekst-naslov); }

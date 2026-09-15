@@ -125,7 +125,7 @@
         partije = [...partije, ...odgovor.partije];
       }
     } catch (e) {
-      greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje povijesti partija.';
+      greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje povijesti igara.';
     } finally {
       ucitavanjePartija = false;
     }
@@ -241,7 +241,7 @@
         <div class="mrezica-kartica">
           <div class="stat-kartica">
             <span class="stat-broj">{profil.odigrane}</span>
-            <span class="stat-naziv">Odigrane partije</span>
+            <span class="stat-naziv">Odigrane igre</span>
           </div>
           <div class="stat-kartica">
             <span class="stat-broj">{profil.pobjede}</span>
@@ -268,7 +268,7 @@
         <div class="mrezica-kartica">
           <div class="stat-kartica">
             <span class="stat-broj">{profil.odigrane1v1}</span>
-            <span class="stat-naziv">Odigrane partije</span>
+            <span class="stat-naziv">Odigrane igre</span>
           </div>
           <div class="stat-kartica">
             <span class="stat-broj">{profil.pobjede1v1}</span>
@@ -351,9 +351,9 @@
 
     {#if aktivniPogled === 'povijest'}
     <section class="povijest-sekcija">
-      <h2>Povijest partija</h2>
+      <h2>Povijest igara</h2>
       {#if partije.length === 0}
-        <p class="prazno">Još nema odigranih partija.</p>
+        <p class="prazno">Još nema odigranih igara.</p>
       {:else}
         <div class="tablica-omotač">
           <table class="povijest-tablica">
@@ -380,7 +380,7 @@
 
         {#if imaJosPartija}
           <button type="button" class="ucitaj-jos-gumb" disabled={ucitavanjePartija} onclick={ucitajJos}>
-            {ucitavanjePartija ? 'Učitavanje...' : 'Učitaj još partija'}
+            {ucitavanjePartija ? 'Učitavanje...' : 'Učitaj još igara'}
           </button>
         {/if}
       {/if}

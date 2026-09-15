@@ -51,7 +51,7 @@
   {:else if otkljucan}
     <p class="dnk-poruka">Kaladont DNK je otključan i profil se dalje oblikuje.</p>
   {:else}
-    <p class="dnk-poruka">Do otključavanja preostaje još <strong>{preostaloDoOtkljucavanja}</strong> javnih partija.</p>
+    <p class="dnk-poruka">Do otključavanja preostaje još <strong>{preostaloDoOtkljucavanja}</strong> javnih igara.</p>
   {/if}
 
   <div class="dnk-promjena-sadrzaj">

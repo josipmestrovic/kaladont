@@ -10,14 +10,6 @@
   postavlja protivnika u nerješiv položaj.
 </p>
 
-<h2>Rani pristup</h2>
-<p>
-  Kaladont je trenutno u <strong>ranom pristupu</strong> — aktivno testiramo sve dijelove igre i redovito
-  nadograđujemo na temelju tvojih povratnih informacija. Igra je <strong>besplatna i uvijek će biti besplatna</strong>.
-  Ako naiđeš na grešku ili imaš prijedlog, javi nam preko gumba „Prijavi" tijekom partije ili u povijesti poteza.
-  Svaka prijava se razmatra, a svaka dobra ideja može završiti u igri.
-</p>
-
 <h2>Rječnik</h2>
 <p>
   Popis riječi izveden je iz leksikona <strong>hrLex 1.3</strong> (Nikola Ljubešić, CLARIN.SI,

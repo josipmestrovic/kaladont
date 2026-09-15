@@ -15,7 +15,7 @@ Treće zatvoreno izdanje objedinjuje trajni XP, dostignuća, mode-aware rangove 
 
 ### Kaladont DNK
 
-- Nakon 10 javnih partija otključava se profil igre Kaladont DNK.
+- Nakon 10 javnih igara otključava se profil igre Kaladont DNK.
 - DNK prikazuje šest osi: Vještina, Taktika, Fokus, Brzina, Duge riječi i Rijetke riječi.
 - Četiri igrača i 1v1 imaju odvojene statistike, pragove, rangove i DNK profile.
 - Taktika koristi ocjene Pacifist, Dobrica, Taktičar, Napadač i Agresivac.
@@ -35,7 +35,7 @@ Treće zatvoreno izdanje objedinjuje trajni XP, dostignuća, mode-aware rangove 
 ## Što testirati
 
 1. Odigraj javnu partiju i provjeri XP obračun, plasmane i nova dostignuća nakon countdowna.
-2. Otvori profil nakon nekoliko partija i provjeri da se Brzina puni stvarnim prosjekom trajanja poteza.
+2. Otvori profil nakon nekoliko igara i provjeri da se Brzina puni stvarnim prosjekom trajanja poteza.
 3. Provjeri odvojene DNK/rang statistike za 4 igrača i 1v1.
 4. Odigraj desetu javnu partiju i provjeri da se DNK otključava bez prikaza `n / 10` brojača.
 5. Nakon otključavanja provjeri kompaktni radar i delta vrijednosti na desktopu i mobitelu.

@@ -126,7 +126,7 @@
 
 <main class="red-sadrzaj">
 {#if countdown !== null}
-  <h1 aria-live="polite">Svi igrači su tu! Partija kreće za {countdown}…</h1>
+  <h1 aria-live="polite">Svi igrači su tu! Igra kreće za {countdown}…</h1>
 {:else}
   <h1>Čekamo još {preostaloIgraca} {preostaloIgraca === 1 ? (trazeneMod === 'dva_igraca' ? 'igrača' : 'igrač') : 'igrača'}...</h1>
 {/if}
@@ -152,7 +152,7 @@
             {#if mjesto.igracId === stanje.mojIgracId}<span class="oznaka-ti">TI</span>{/if}
           </strong>
           <span class="rang-i-razina">{mjesto.rang ?? 'Piskaralo'}</span>
-          <span class="statistika-lobbyja"><span>Prosjek bodova: {mjesto.prosjekBodova.toFixed(2)}</span><span>Pobjede: {mjesto.postotakPobjeda.toFixed(0)}%</span><span>Odigrane partije: {mjesto.odigrane}</span></span>
+          <span class="statistika-lobbyja"><span>Prosjek bodova: {mjesto.prosjekBodova.toFixed(2)}</span><span>Pobjede: {mjesto.postotakPobjeda.toFixed(0)}%</span><span>Odigrane igre: {mjesto.odigrane}</span></span>
           <span class="razina-oznaka">LVL {mjesto.razina}</span>
         </div>
       {:else}
