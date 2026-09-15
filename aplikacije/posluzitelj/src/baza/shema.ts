@@ -60,6 +60,7 @@ export const igraci = pgTable('igraci', {
   pobjede1v1: integer('pobjede_1v1').notNull().default(0),
   eliminacije1v1: integer('eliminacije_1v1').notNull().default(0),
   bodovi1v1: integer('bodovi_1v1').notNull().default(0),
+  iskustvoUkupno: integer('iskustvo_ukupno').notNull().default(0),
   stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
   zadnjaAktivnost: timestamp('zadnja_aktivnost', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -81,6 +82,25 @@ export const statistikeRijeciIgraca = pgTable(
     najrjedaRijec: text('najrjeda_rijec'),
     najrjedaRijecFrekvencija: integer('najrjeda_rijec_frekvencija'),
     najrjedaTier: smallint('najrjeda_tier'),
+  },
+  (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.mod] })],
+);
+
+export const dnkStatistikeIgraca = pgTable(
+  'dnk_statistike_igraca',
+  {
+    igracId: uuid('igrac_id').notNull().references(() => igraci.id),
+    mod: modPartije('mod').notNull(),
+    prihvaceniPotezi: integer('prihvaceni_potezi').notNull().default(0),
+    ukupnoTrajanjePrihvaceniPoteziMs: integer('ukupno_trajanje_prihvacenih_poteza_ms').notNull().default(0),
+    najduziStreak: integer('najduzi_streak').notNull().default(0),
+    dugeRijeci: integer('duge_rijeci').notNull().default(0),
+    srednjeDugeRijeci: integer('srednje_duge_rijeci').notNull().default(0),
+    jakoDugeRijeci: integer('jako_duge_rijeci').notNull().default(0),
+    rijetkeRijeci: integer('rijetke_rijeci').notNull().default(0),
+    srednjeRijetkeRijeci: integer('srednje_rijetke_rijeci').notNull().default(0),
+    jakoRijetkeRijeci: integer('jako_rijetke_rijeci').notNull().default(0),
+    otkljucanAt: timestamp('otkljucan_at', { withTimezone: true }),
   },
   (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.mod] })],
 );
@@ -110,6 +130,29 @@ export const otkljucaneRijeciIgraca = pgTable(
   (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.rijec] })],
 );
 
+export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  valjaniPoteziUkupno: integer('valjani_potezi_ukupno').notNull().default(0),
+  rang: integer('rang').notNull().default(0),
+  rijetkeLeksemskeGrupe: integer('rijetke_leksemske_grupe').notNull().default(0),
+  dugeRijeci: integer('duge_rijeci').notNull().default(0),
+  najduziStreak: integer('najduzi_streak').notNull().default(0),
+  kaladontIzvedbe: integer('kaladont_izvedbe').notNull().default(0),
+  kaladontZrtve: integer('kaladont_zrtve').notNull().default(0),
+  izazvaneEliminacije: integer('izazvane_eliminacije').notNull().default(0),
+  mrtvaSlovaEliminacije: integer('mrtva_slova_eliminacije').notNull().default(0),
+  javnePobjede: integer('javne_pobjede').notNull().default(0),
+  azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
+
+export const dostignucaIgraca = pgTable('dostignuca_igraca', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  dostignuceId: text('dostignuce_id').notNull(),
+  razina: smallint('razina').notNull().default(0),
+  prvoOtkljucano: timestamp('prvo_otkljucano', { withTimezone: true }),
+  zadnjeOtkljucavanje: timestamp('zadnje_otkljucavanje', { withTimezone: true }),
+}, (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.dostignuceId] })]);
+
 export const partije = pgTable('partije', {
   id: uuid('id').primaryKey().defaultRandom(),
   mod: modPartije('mod').notNull().default('cetiri_igraca'),
@@ -132,6 +175,7 @@ export const sudioniciPartije = pgTable(
     plasman: smallint('plasman'),
     bodovi: smallint('bodovi').notNull().default(0),
     eliminacije: smallint('eliminacije').notNull().default(0),
+    iskustvo: integer('iskustvo').notNull().default(0),
     nacinIspadanja: nacinIspadanja('nacin_ispadanja'),
     cekanjeMs: integer('cekanje_ms').notNull().default(0),
   },

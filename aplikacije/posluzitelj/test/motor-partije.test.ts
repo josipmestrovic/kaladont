@@ -13,7 +13,7 @@ import {
 } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { partije, rijeci } from '../src/baza/shema.js';
+import { partije, rijeci, sudioniciPartije } from '../src/baza/shema.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -315,6 +315,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
 
     let naPotezuId = prvaRunda.naPotezuId;
     let krajPoruka: KrajPartije | null = null;
+    let igracKrajaId: string | null = null;
 
     for (let i = 0; i < 15 && !krajPoruka; i += 1) {
       const igrac = igraci.find((ig) => ig.token === naPotezuId)!;
@@ -323,6 +324,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       const { event, payload } = await cekanje;
       if (event === 'partija:kraj') {
         krajPoruka = payload as KrajPartije;
+        igracKrajaId = igrac.token;
       } else {
         naPotezuId = (payload as RundaOtvorena).naPotezuId;
       }
@@ -337,6 +339,13 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       expect(p.bodovi).toBeGreaterThanOrEqual(0);
       expect(p.bodovi).toBeLessThanOrEqual(7);
     }
+    expect(krajPoruka!.mojeIskustvo).not.toBeNull();
+    expect(krajPoruka!.mojeIskustvo!.osvojenoIskustvo).toBeGreaterThanOrEqual(0);
+    const [spremljeniRezultat] = await baza
+      .select({ iskustvo: sudioniciPartije.iskustvo })
+      .from(sudioniciPartije)
+      .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, igracKrajaId!)));
+    expect(spremljeniRezultat?.iskustvo).toBe(krajPoruka!.mojeIskustvo!.osvojenoIskustvo);
 
     for (const igrac of igraci) igrac.socket.disconnect();
   });
@@ -674,9 +683,16 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       promatrac.socket.on('partija:eliminacija', resolve);
     });
     const novaRundaPromise = cekajRunduOtvorenu(promatrac.socket);
+    const kaladontPrihvacen = new Promise<{ igracId: string; iskustvo?: { vrsta: string; iskustvo: number }[] }>((resolve) => {
+      sayer.socket.on('potez:prihvacen', (potez) => {
+        if (potez.igracId === sayer.token && potez.rijec === 'kaladont') resolve(potez);
+      });
+    });
 
     sayer.socket.emit('potez:rijec', { rijec: 'kaladont' });
 
+    const prihvacen = await kaladontPrihvacen;
+    expect(prihvacen.iskustvo).toContainEqual(expect.objectContaining({ vrsta: 'kaladont', iskustvo: 100 }));
     const eliminacija = await eliminacijaPromise;
     expect(eliminacija.igracId).toBe(igracKojiJeOmoguciKa); // otvarac je omogucio "ka" - on ispada
     expect(eliminacija.razlog).toBe('kaladont');

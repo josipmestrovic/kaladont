@@ -1,9 +1,9 @@
 <svelte:head>
-  <title>Uvjeti korištenja | Kaladont</title>
+  <title>Uvjeti | Kaladont</title>
 </svelte:head>
 
 <main class="stranica-obavijesti">
-  <h1>Uvjeti korištenja</h1>
+  <h1>Uvjeti</h1>
   <p>Bit će napisano uskoro.</p>
 </main>
 

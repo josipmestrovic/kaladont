@@ -56,10 +56,11 @@ describe('GET /profil', () => {
       headers: { authorization: `Bearer ${sesijskiToken}` },
     });
     expect(odgovor.status).toBe(200);
-    const tijelo = (await odgovor.json()) as { ok: boolean; rang: string; odigrane: number };
+    const tijelo = (await odgovor.json()) as { ok: boolean; rang: string; odigrane: number; iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null } };
     expect(tijelo.ok).toBe(true);
     expect(tijelo.odigrane).toBe(0);
     expect(tijelo.rang).toBe('Piskaralo');
+    expect(tijelo.iskustvo).toEqual({ razina: 1, ukupno: 0, uRazini: 0, doIduce: 100 });
   });
 });
 

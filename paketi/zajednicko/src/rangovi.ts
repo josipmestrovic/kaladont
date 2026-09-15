@@ -1,3 +1,5 @@
+import type { ModPartije } from './bodovanje.js';
+
 /**
  * Rangovi - iskljucivo prikazni status (ADR-008, bez utjecaja na uparivanje).
  * Vidi docs/02-pravila-igre/bodovanje-i-rangovi.md.
@@ -18,18 +20,36 @@ export const RANGOVI: readonly PragRanga[] = [
   { naziv: 'Jezikoslovac', minimalniProsjek: 3.3 },
   { naziv: 'Doktor riječi', minimalniProsjek: 3.8 },
   { naziv: 'Jezični maestro', minimalniProsjek: 4.4 },
-  { naziv: 'Gospodar riječnika', minimalniProsjek: 5.0 },
+  { naziv: 'Gospodar rječnika', minimalniProsjek: 5.0 },
   { naziv: 'Kaladont', minimalniProsjek: 5.7 },
+];
+
+export const RANGOVI_1V1: readonly PragRanga[] = [
+  { naziv: 'Prvopisac', minimalniProsjek: 0.0 },
+  { naziv: 'Riječarac', minimalniProsjek: 0.3 },
+  { naziv: 'Jezičar', minimalniProsjek: 0.4 },
+  { naziv: 'Lektor', minimalniProsjek: 0.47 },
+  { naziv: 'Književnik', minimalniProsjek: 0.54 },
+  { naziv: 'Jezikoslovac', minimalniProsjek: 0.61 },
+  { naziv: 'Doktor riječi', minimalniProsjek: 0.68 },
+  { naziv: 'Jezični maestro', minimalniProsjek: 0.75 },
+  { naziv: 'Gospodar rječnika', minimalniProsjek: 0.82 },
+  { naziv: 'Kaladont', minimalniProsjek: 0.89 },
 ];
 
 export const BROJ_PARTIJA_ZA_KALIBRACIJU = 10;
 
+function rangoviPoModu(mod: ModPartije): readonly PragRanga[] {
+  return mod === 'dva_igraca' ? RANGOVI_1V1 : RANGOVI;
+}
+
 /** Prvih 10 partija igrač je "Piskaralo" (bez ranga); poslije se rang računa iz prosjeka bodova. */
-export function izracunajRang(odigrane: number, prosjekBodova: number): string {
+export function izracunajRang(odigrane: number, prosjekBodova: number, mod: ModPartije = 'cetiri_igraca'): string {
   if (odigrane < BROJ_PARTIJA_ZA_KALIBRACIJU) return 'Piskaralo';
 
-  let rang = RANGOVI[0]!.naziv;
-  for (const prag of RANGOVI) {
+  const rangovi = rangoviPoModu(mod);
+  let rang = rangovi[0]!.naziv;
+  for (const prag of rangovi) {
     if (prosjekBodova >= prag.minimalniProsjek) rang = prag.naziv;
   }
   return rang;

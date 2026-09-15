@@ -1,12 +1,12 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import StatistikaRjecnika from '$lib/komponente/StatistikaRjecnika.svelte';
-    import StoJeNovo from '$lib/komponente/StoJeNovo.svelte';
+  import StoJeNovo from '$lib/komponente/StoJeNovo.svelte';
 
   const registriran = jeRegistriranKorisnik();
   let otvorenModal = $state(false);
   let otvoreneNovosti = $state(false);
+  let otvoreniFooter = $state<'o-igri' | 'uvjeti' | 'privatnost' | null>(null);
 
   function igrajKlik(e: MouseEvent) {
     e.preventDefault();
@@ -24,18 +24,16 @@
 </script>
 
 <div class="landing">
-  <h1 class="logotip">Kaladont Multiplayer <span>(v0.2.0-closed-alpha.1)</span></h1>
+  <h1 class="logotip">Kaladont Multiplayer <span>(v0.4.0-closed-alpha.1)</span></h1>
   <p class="podnaslov">Hrvatska igra riječi</p>
 
   <div class="gumbi-sekcija">
     <div class="gumb-blok">
       <a href="/red" class="igraj-gumb" onclick={igrajKlik}>IGRAJ</a>
-      <p class="gumb-napomena">Bodovanje i rangiranje: prati <a href="/pravila">službena pravila</a>.</p>
     </div>
 
     <div class="gumb-blok privatna-soba-blok">
       <a href="/soba/kreiraj" class="soba-gumb">Privatna soba</a>
-      <p class="gumb-napomena">Igraj s ekipom po svojim pravilima</p>
     </div>
   </div>
 
@@ -44,8 +42,6 @@
       <a href="/prijava">Prijavi se</a> · <a href="/registracija">Registriraj se</a>
     </p>
   {/if}
-
-  <StatistikaRjecnika />
 
   <p class="early-access-napomena">
     <strong>Early access</strong> — očekuj moguće greške. Ako ih pronađeš, prijavi ih kroz ugrađeni sustav za prijavu grešaka.
@@ -76,17 +72,20 @@
 {/if}
 
 <footer>
-  <button type="button" class="novosti-link" onclick={() => (otvoreneNovosti = true)}>Što je novo</button>
+  <button type="button" class="novosti-link" onclick={() => (otvoreneNovosti = true)}>Što je novo?</button>
   <span aria-hidden="true">·</span>
-  <a href="/o-igri">O igri</a>
+  <button type="button" class="footer-link" onclick={() => (otvoreniFooter = 'o-igri')}>O igri</button>
   <span aria-hidden="true">·</span>
-  <a href="/uvjeti">Uvjeti korištenja</a>
+  <button type="button" class="footer-link" onclick={() => (otvoreniFooter = 'uvjeti')}>Uvjeti</button>
   <span aria-hidden="true">·</span>
-  <a href="/privatnost">Pravila privatnosti</a>
+  <button type="button" class="footer-link" onclick={() => (otvoreniFooter = 'privatnost')}>Privatnost</button>
 </footer>
 
 {#if otvoreneNovosti}
   <StoJeNovo zatvori={() => (otvoreneNovosti = false)} />
+{/if}
+{#if otvoreniFooter}
+  <StoJeNovo pogled={otvoreniFooter} zatvori={() => (otvoreniFooter = null)} />
 {/if}
 
 <style>
@@ -97,6 +96,7 @@
 
   .logotip {
     font-size: 40px;
+    line-height: 1;
   }
 
   .logotip span {
@@ -120,31 +120,8 @@
     gap: 20px;
   }
 
-  .gumb-blok {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .gumb-napomena {
-    margin: 0;
-    font-size: var(--tekst-sitni);
-    color: var(--boja-tekst-osnovni);
-    background: #faf8f0;
-    border: 1px solid #e5ddc8;
-    border-radius: 4px;
-    padding: 5px 10px;
-    max-width: 320px;
-  }
-
   .privatna-soba-blok {
     margin-top: 18px;
-  }
-
-  .gumb-napomena a {
-    color: var(--boja-pozadina-primarna);
-    font-weight: 700;
   }
 
   .igraj-gumb {
@@ -199,6 +176,7 @@
   }
 
   .novosti-link { padding: 0; border: 0; background: none; color: var(--boja-tekst-naslov); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+  .footer-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 
   .modal-podloga {
     position: fixed;

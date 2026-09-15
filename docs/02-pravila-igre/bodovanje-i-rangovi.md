@@ -41,6 +41,12 @@ Za svakog igrača (uključujući goste) vode se **dva neovisna skupa statistika*
 
 Prosjek bodova po partiji računa se odvojeno za svaki mod i predstavlja temelj pojedine ljestvice i ranga.
 
+## Iskustvo i razine
+
+Iskustvo (XP) je trajni napredak odvojen od bodova, ranga i ljestvice. Dodjeljuje se samo za uredno završene javne partije 4p i 1v1; privatne sobe ne dodjeljuju XP. Valjana riječ donosi 5 XP, duljina 10–11 / 12–14 / 15+ grafema dodatnih 10 / 20 / 35 XP, a frekvencija 10–99 / 1–9 / 0 (uz najmanje 4 grafema) dodatnih 15 / 30 / 50 XP. Izazvana eliminacija vrijedi 25 XP, pobjeda 50 XP, a Kaladont je zasebna fiksna nagrada od 100 XP.
+
+Najbolji streak iz partije množi cijeli subtotal: 0–2 ×1,00; 3 ×1,10; 4 ×1,25; 5 ×1,40; 6 ×1,60; 7 ×1,75; 8 ×1,90; 9+ ×2,00. Razina 100 je maksimum i daljnji XP se ne sprema. Dobrovoljni izlazak i istek tolerancije prekida poništavaju XP igrača koji je napustio partiju.
+
 ## Rangovi
 
 Rang je u MVP-u isključivo **prikazni status** — ne utječe na uparivanje (vidi [ADR-008](../03-arhitektura/odluke/008-bez-matchmakinga-u-mvp.md)).

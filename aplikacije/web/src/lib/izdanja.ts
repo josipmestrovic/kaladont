@@ -10,6 +10,54 @@ export interface IzdanjeBiljeske {
 
 export const IZDANJA: IzdanjeBiljeske[] = [
   {
+    verzija: 'v0.3.0-closed-alpha.1',
+    naslov: 'Kaladont Multiplayer v0.3.0 – Closed Alpha 1',
+    datum: '15. rujna 2026.',
+    uvod: 'Treće zatvoreno izdanje objedinjuje trajni XP, dostignuća, mode-aware rangove i Kaladont DNK profil. Javni modovi sada imaju odvojene agregate, a završetak partije jasno prikazuje ostvareni napredak.',
+    novo: [
+      {
+        naslov: 'Dostignuća i kolekcija',
+        stavke: [
+          'Dodano je devet dostignuća s ukupno 45 zvjezdica i jasnim pragovima napretka.',
+          'Dostignuća se prikazuju unutar vlastitog i javnog profila, uz razinu i sljedeći cilj.',
+          'Rijetke riječi, duge riječi i streak mogu napredovati i u privatnim sobama.',
+          'Nova dostignuća obračunavaju se server-side i spremaju transakcijski na kraju partije.',
+        ],
+      },
+      {
+        naslov: 'Kaladont DNK',
+        stavke: [
+          'Nakon 10 javnih partija otključava se profil igre kroz šest osi: Vještina, Taktika, Fokus, Brzina, Duge riječi i Rijetke riječi.',
+          'Četiri igrača i 1v1 imaju odvojene statistike, pragove, rangove i DNK profile.',
+          'Brzina koristi stvarni prosjek trajanja prihvaćenih poteza, spremljen po modu; povijesni potezi su backfillani.',
+          'Na kraju partije prikazuje se kompaktni graf s delta promjenama, starim vrijednostima i strelicama prema novim vrijednostima.',
+        ],
+      },
+      {
+        naslov: 'Profil i privatne sobe',
+        stavke: [
+          'Profil sada ima poglede Statistika, Dostignuća, Riječi i Povijest.',
+          'Gornji rang i border uvijek koriste viši rang između 4-player i 1v1 moda.',
+          'Dodani su stil igre, detaljniji profilni sažetak i šira integracijska pokrivenost privatnih soba.',
+          'Završni ekran prikazuje DNK napredak, nova dostignuća, XP obračun, plasmane i povijest poteza.',
+          'Red čekanja ima eksplicitnu sinkronizaciju stanja za 2-player i 4-player mod.',
+        ],
+      },
+    ],
+    testirati: [
+      'Otvori vlastiti i javni profil te pregledaj sva četiri pogleda.',
+      'Odigraj rijetku ili dugu riječ i provjeri napredak dostignuća.',
+      'Pokreni privatnu sobu, odigraj partiju i provjeri da se XP i javni agregati ne mijenjaju.',
+      'Odigraj desetu javnu partiju i provjeri otključavanje DNK bez prikaza brojača nakon otključavanja.',
+      'Provjeri Brzinu na profilu nakon nekoliko prihvaćenih poteza.',
+      'Uđi u red nakon završetka partije i provjeri da se sadržaj učita bez refresha.',
+    ],
+    ogranicenja: [
+      'XP i dostignuća vrijede prema pravilima javnog i privatnog moda.',
+      'Razina 100 je trenutačni maksimum.',
+    ],
+  },
+  {
     verzija: 'v0.2.0-closed-alpha.1',
     naslov: 'Kaladont Multiplayer v0.2.0 – Closed Alpha 1',
     datum: '14. rujna 2026.',

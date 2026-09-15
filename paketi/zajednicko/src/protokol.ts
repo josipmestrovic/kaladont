@@ -3,6 +3,8 @@
  * Vidi docs/03-arhitektura/protokol-poruka.md.
  */
 import type { VrstaRijeci } from './pravila.js';
+import type { ObracunIskustva, StavkaIskustva } from './iskustvo.js';
+import type { DnkOs } from './dnk.js';
 
 export interface PodaciVeze {
   /** UUID gosta iz localStoragea ILI sesijski token registriranog igrača. */
@@ -31,6 +33,8 @@ export interface StanjeReda {
     nadimak: string;
     avatarId: number;
     rang: string | null;
+    razina: number;
+    odigrane: number;
     prosjekBodova: number;
     postotakPobjeda: number;
   } | null)[];
@@ -50,6 +54,7 @@ export interface ClanSobe {
   nadimak: string;
   avatarId: number;
   rang: string | null;
+  razina: number;
   jeVlasnik: boolean;
   pobjedeUSobi: number;
   bodoviUSobi: number;
@@ -78,7 +83,7 @@ export interface PocetakPartije {
   mojIgracId: string;
   /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
   pocetakIso: string;
-  sjedala: { igracId: string; nadimak: string; avatarId: number; rang: string | null }[];
+  sjedala: { igracId: string; nadimak: string; avatarId: number; rang: string | null; razina: number }[];
   mod?: 'cetiri_igraca' | 'dva_igraca';
   jePrivatna?: boolean;
   kodSobe?: string;
@@ -116,6 +121,8 @@ export interface PrihvacenPotez {
   brojIskoristenih: number;
   streak: number;
   nagrada: NagradaZaRijec | null;
+  /** Autoritativne XP stavke koje je autor poteza upravo ostvario; nema konačnog obračuna. */
+  iskustvo?: StavkaIskustva[];
 }
 
 export interface NagradaZaRijec {
@@ -157,6 +164,7 @@ export interface Eliminacija {
   slova: string | null;
   /** Riječ koja je izazvala mrtva slova (za obrazloženje na klijentu); null za ostale razloge. */
   rijecUzrok: string | null;
+  iskustvo?: StavkaIskustva | null;
 }
 
 export interface KrajPartije {
@@ -169,9 +177,25 @@ export interface KrajPartije {
   }[];
   mojNoviProsjek: number;
   mojRang: string | null;
+  mojeIskustvo: ObracunIskustva | null;
+  novaDostignuca: { id: string; novaRazina: number; maksimalnaRazina: number }[];
+  mojDnk?: {
+    odigrano: number;
+    preostaloDoOtkljucavanja: number;
+    otkljucan: boolean;
+    upravoOtkljucan: boolean;
+    prije: DnkOs[];
+    poslije: DnkOs[];
+  };
   mod?: 'cetiri_igraca' | 'dva_igraca';
   jePrivatna?: boolean;
   kodSobe?: string;
+}
+
+/** Privatni obračun eliminiranog igrača; trajni upis slijedi pri završetku partije. */
+export interface ObracunIskustvaTijekomPartije {
+  partijaId: string;
+  mojeIskustvo: ObracunIskustva;
 }
 
 /** Sustav je pocelo birati rijec za otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta). */
@@ -219,6 +243,7 @@ export interface PayloadUdjiURed {
 /** Mapa svih događaja klijent -> poslužitelj, za tipiziranu upotrebu Socket.IO. */
 export interface DogadajiKlijentPoslužitelj {
   'red:udji': (payload?: PayloadUdjiURed) => void;
+  'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;
   'partija:stanje': () => void;
@@ -243,6 +268,7 @@ export interface DogadajiPosluziteljKlijent {
   'partija:sustav-bira-rijec': (payload: SustavBiraRijec) => void;
   'partija:runda-otvorena': (payload: RundaOtvorena) => void;
   'partija:kraj': (payload: KrajPartije) => void;
+  'iskustvo:obracun': (payload: ObracunIskustvaTijekomPartije) => void;
   'reakcija:nova': (payload: { igracId: string; poruka: BrzaPoruka }) => void;
   'soba:stvorena': (payload: { kod: string }) => void;
   'soba:stanje': (payload: StanjePrivatneSobe) => void;

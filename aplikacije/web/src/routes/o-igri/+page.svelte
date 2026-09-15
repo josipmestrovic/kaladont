@@ -1,3 +1,7 @@
+<script lang="ts">
+  import StatistikaRjecnika from '$lib/komponente/StatistikaRjecnika.svelte';
+</script>
+
 <h1>O igri</h1>
 
 <p>
@@ -21,6 +25,8 @@
   CC BY-SA 4.0. Popis je za potrebe igre filtriran (bez vlastitih imena i kratica) te obogaćen podacima za
   tijek igre (grafemski parovi, leksemske grupe); izvedeni popis dostupan je pod istom licencom na zahtjev.
 </p>
+
+<StatistikaRjecnika />
 
 <h2>Kontakt</h2>
 <p>Pitanja, prijedlozi ili prijave grešaka: koristi gumb „Prijavi" u igri, ili nam piši na

@@ -10,8 +10,11 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import Konfeti from '$lib/komponente/Konfeti.svelte';
+  import IskustvoPartije from '$lib/komponente/IskustvoPartije.svelte';
+  import KaladontDnkPromjena from '$lib/komponente/KaladontDnkPromjena.svelte';
+  import Header from '$lib/komponente/Header.svelte';
   import { pustiAudio } from '$lib/audio-manager.js';
-  import { zadnjaDva } from 'zajednicko';
+  import { dohvatiDefinicijuDostignuca, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
@@ -145,6 +148,11 @@
 
   function jeAktualnaPartija(): boolean {
     return stanje.partijaId === partijaId;
+  }
+
+  function opisDostignuca(id: string): { naziv: string; opis: string } {
+    const definicija = dohvatiDefinicijuDostignuca(id);
+    return definicija ? { naziv: definicija.naziv, opis: definicija.opis } : { naziv: id, opis: 'Novo dostignuće.' };
   }
 
   function eliminacijaIgraca(igracId: string): Eliminacija | undefined {
@@ -521,7 +529,27 @@
   <strong class="trenutna-rijec">{rijec.slice(0, rijec.length - zavrsetak.length)}<span class="trenutna-rijec-zavrsetak">{zavrsetak}</span></strong>
 {/snippet}
 
+{#if !stanje.jePrivatna}
+  {#if stanje.intenzitetKonfetaIskustva}
+    {#key stanje.oznakaKonfetaIskustva}
+      <Konfeti intenzitet={stanje.intenzitetKonfetaIskustva} />
+    {/key}
+  {/if}
+  <header class="status-iskustva" class:vidljiv={stanje.stavkeIskustva.length > 0} aria-live="polite">
+    {#if stanje.stavkeIskustva.length > 0}
+      {#key stanje.oznakaStavkiIskustva}
+        <div class="dobitak-iskustva">
+          {#each stanje.stavkeIskustva as stavka (`${stavka.vrsta}-${stavka.naziv}`)}
+            <span class="dobitak-iskustva-tekst">{stavka.naziv} <strong>+{stavka.iskustvo} XP</strong></span>
+          {/each}
+        </div>
+      {/key}
+    {/if}
+  </header>
+{/if}
+
 {#if stanje.kraj && prikaziRezultate}
+  <Header />
   {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
     <Konfeti intenzitet="veliki" />
   {/if}
@@ -530,6 +558,37 @@
     <p class="privatna-obavijest">
       🔒 Prijateljska privatna utakmica (bodovi nisu dodijeljeni i ne utječu na ljestvicu).
     </p>
+  {/if}
+  {#if stanje.kraj.mojeIskustvo}
+    <IskustvoPartije obracun={stanje.kraj.mojeIskustvo} />
+  {/if}
+  {#if stanje.kraj.mojDnk}
+    <KaladontDnkPromjena
+      prije={stanje.kraj.mojDnk.prije}
+      poslije={stanje.kraj.mojDnk.poslije}
+      odigrano={stanje.kraj.mojDnk.odigrano}
+      otkljucan={stanje.kraj.mojDnk.otkljucan}
+      upravoOtkljucan={stanje.kraj.mojDnk.upravoOtkljucan}
+      preostaloDoOtkljucavanja={stanje.kraj.mojDnk.preostaloDoOtkljucavanja}
+    />
+  {/if}
+  {#if stanje.kraj.novaDostignuca.length > 0}
+    <section class="zavrsna-dostignuca" aria-labelledby="zavrsna-dostignuca-naslov">
+      <h3 id="zavrsna-dostignuca-naslov">Dostignuća otključana u ovoj partiji</h3>
+      <div class="zavrsna-dostignuca-mrezica">
+        {#each stanje.kraj.novaDostignuca as dostignuce (dostignuce.id)}
+          {@const detalji = opisDostignuca(dostignuce.id)}
+          <article class="zavrsno-dostignuce">
+            <span class="zavrsno-dostignuce-ikona" aria-hidden="true">★</span>
+            <div>
+              <strong>{detalji.naziv}</strong>
+              <p>{detalji.opis}</p>
+              <small>Razina {dostignuce.novaRazina} / {dostignuce.maksimalnaRazina}</small>
+            </div>
+          </article>
+        {/each}
+      </div>
+    </section>
   {/if}
   <ol class="plasmani-lista">
     {#each [...stanje.kraj.plasmani].sort((a, b) => a.plasman - b.plasman) as igrac (igrac.igracId)}
@@ -574,8 +633,16 @@
       </ol>
     {/if}
   </section>
+  <div class="kraj-donje-praznine" aria-hidden="true"></div>
 {:else}
   <div class="aktivna-partija-sadrzaj">
+  {#if stanje.obracunIskustva}
+    <aside class="obracun-promatraca">
+      <p>Rezultat je izračunat i trajno će se spremiti kada partija završi. Možeš napustiti partiju.</p>
+      <IskustvoPartije obracun={stanje.obracunIskustva.mojeIskustvo} />
+      <a href="/" class="sporedni-gumb">Napusti partiju</a>
+    </aside>
+  {/if}
   <ul class="igraci-red">
     {#each stanje.sjedala as sjedalo (sjedalo.igracId)}
       {@const eliminacija = eliminacijaIgraca(sjedalo.igracId)}
@@ -618,6 +685,7 @@
             </span>
             <span class="ime-igraca" class:aktivno={aktivno}>
               {sjedalo.nadimak}
+              <span class="rang-razina">{sjedalo.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {sjedalo.razina}</span>
               <span class="oznaka-ti" aria-label="To si ti">TI</span>
             </span>
           </button>
@@ -674,6 +742,7 @@
         {#if sjedalo.igracId !== stanje.mojIgracId}
           <span class="ime-igraca" class:aktivno={aktivno}>
             {sjedalo.nadimak}
+            <span class="rang-razina">{sjedalo.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {sjedalo.razina}</span>
             {#if sjedalo.igracId === stanje.mojIgracId}
               <span class="oznaka-ti" aria-label="To si ti">TI</span>
             {/if}
@@ -732,7 +801,7 @@
           <p class="pobjednik-sazetak"><strong>{imeIgraca(pobjednikPartije()!.igracId)}</strong> je pobjednik/pobjednica!</p>
         {/if}
         <p class="odbrojavanje-najava" aria-live="polite">
-          Finalni prikaz rezultata i zaključivanje partije za <strong>{sekundeDoRezultata}</strong>
+          Konačni rezultati stižu za <strong>{sekundeDoRezultata}</strong>
           {sekundeDoRezultata === 1 ? 'sekundu' : 'sekundi'}...
         </p>
       </div>
@@ -752,7 +821,6 @@
     {:else}
       {#if stanje.zadnjaNagrada}
         {#key `${stanje.zadnjaNagrada.tekst}-${stanje.trenutniStreak}`}
-          <Konfeti intenzitet={stanje.zadnjaNagrada.intenzitet} />
           <p class="nagrada-za-rijec nagrada-{stanje.zadnjaNagrada.intenzitet}" role="status" aria-live="polite">
             <span class="nagrada-ukras" aria-hidden="true">
               {stanje.zadnjaNagrada.intenzitet === 'veliki' ? '🎊 👏 🎉 ✨ 👏 🎊' : stanje.zadnjaNagrada.intenzitet === 'srednji' ? '🎉 👏 ✨' : '🎉 👏'}
@@ -767,21 +835,19 @@
           </p>
         {/key}
       {/if}
-      {#if !stanje.kraj}
-        <p class="trenutni-streak" role="status" aria-live="polite">
-          {#if brojVatri > 0}
-            <span class="streak-vatre" aria-hidden="true">
-              {#if brojVatri === 100}
-                {#each Array(100) as _}<span>🔥</span>{/each}
-              {:else}
-                {#each Array(brojVatri) as _}<span>🔥</span>{/each}
-              {/if}
-            </span>
-          {/if}
-          Tvoj streak: <strong>{stanje.trenutniStreak}</strong> riječi
-          {#if brojVatri === 100}<span class="streak-vatre" aria-hidden="true">{#each Array(100) as _}<span>🔥</span>{/each}</span>{/if}
-        </p>
-      {/if}
+      <p class="trenutni-streak" role="status" aria-live="polite">
+        {#if brojVatri > 0}
+          <span class="streak-vatre" aria-hidden="true">
+            {#if brojVatri === 100}
+              {#each Array(100) as _}<span>🔥</span>{/each}
+            {:else}
+              {#each Array(brojVatri) as _}<span>🔥</span>{/each}
+            {/if}
+          </span>
+        {/if}
+        Tvoj streak: <strong>{stanje.trenutniStreak}</strong> {stanje.trenutniStreak === 1 ? 'riječ' : 'riječi'}
+        {#if brojVatri === 100}<span class="streak-vatre" aria-hidden="true">{#each Array(100) as _}<span>🔥</span>{/each}</span>{/if}
+      </p>
       {#if stanje.trazenaSlova}
         <div class="rijec-kartica">
           {#key prikazanaRijec?.rijec ?? stanje.trazenaSlova}
@@ -876,6 +942,14 @@
 {/if}
 
 <style>
+  .status-iskustva { display: none; position: fixed; z-index: 40; top: 0; left: 50%; width: 100vw; transform: translateX(-50%); background: white; border-block: 1px solid #e5ddc8; box-shadow: 0 2px 8px rgb(26 24 21 / 8%); }
+  .status-iskustva.vidljiv { display: block; }
+  .dobitak-iskustva { display: flex; width: min(960px, calc(100% - 32px)); align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 20px; min-height: 42px; margin: 0 auto; padding: 8px 0; font-size: var(--tekst-sitni); animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
+  .dobitak-iskustva strong { color: var(--boja-mint); font-size: var(--tekst-baza); }
+  .dobitak-iskustva-tekst { color: var(--boja-tekst-sekundarni); }
+  @keyframes ulaz-dobitka { 0% { opacity: 0; transform: translateY(-28px) scale(.94); } 65% { opacity: 1; transform: translateY(2px) scale(1.04); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .dobitak-iskustva { animation: none; } }
+  @media (max-width: 500px) { .dobitak-iskustva { width: calc(100% - 24px); justify-content: flex-start; gap: 5px 14px; } }
   .sr-samo {
     position: absolute;
     width: 1px;
@@ -887,6 +961,7 @@
     white-space: nowrap;
     border: 0;
   }
+  .rang-razina { display: block; margin-top: 2px; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mikro); font-weight: 600; }
 
   .zavrsni-sazetak {
     padding: 8px 0 4px;
@@ -924,6 +999,98 @@
   }
   .odbrojavanje-najava strong {
     color: var(--boja-akcent);
+  }
+  .zavrsni-dnk,
+  .zavrsna-dostignuca {
+    max-width: 680px;
+    margin: 20px auto 0;
+    padding: 18px;
+    border: 1px solid #e5ddc8;
+    border-radius: 8px;
+    background: #fff;
+    text-align: left;
+  }
+  .zavrsni-dnk-zaglavlje {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .zavrsni-dnk-natpis {
+    margin: 0 0 2px;
+    color: var(--boja-akcent);
+    font-size: var(--tekst-mikro);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .zavrsna-dostignuca h3 {
+    margin: 0;
+    color: var(--boja-tekst-naslov);
+    font-family: var(--font-naslov);
+    font-size: 1.35rem;
+  }
+  .zavrsni-dnk-zaglavlje > strong {
+    color: var(--boja-akcent);
+    font-size: 1.35rem;
+    white-space: nowrap;
+  }
+  .dnk-otkljucan-poruka,
+  .dnk-napredak-poruka {
+    margin: 14px 0 10px;
+    color: var(--boja-tekst-sekundarni);
+  }
+  .dnk-otkljucan-poruka strong {
+    color: var(--boja-mint-tamni);
+  }
+  .dnk-napredak-traka {
+    height: 10px;
+    overflow: hidden;
+    border-radius: var(--radijus-pill);
+    background: #eee8dc;
+  }
+  .dnk-napredak-traka span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--boja-mint);
+  }
+  .zavrsna-dostignuca h3 {
+    margin-bottom: 12px;
+  }
+  .zavrsna-dostignuca-mrezica {
+    display: grid;
+    gap: 10px;
+  }
+  .zavrsno-dostignuce {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #eee8dc;
+    background: #faf7ef;
+  }
+  .zavrsno-dostignuce-ikona {
+    color: var(--boja-zuta-krema);
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+  .zavrsno-dostignuce strong {
+    color: var(--boja-tekst-naslov);
+  }
+  .zavrsno-dostignuce p {
+    margin: 2px 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+  }
+  .zavrsno-dostignuce small {
+    color: var(--boja-mint-tamni);
+    font-weight: 700;
+  }
+  @media (max-width: 520px) {
+    .zavrsni-dnk,
+    .zavrsna-dostignuca { padding: 14px; }
+    .zavrsni-dnk-zaglavlje { align-items: flex-start; flex-direction: column; }
   }
   .naPotezu {
     font-weight: bold;
@@ -1563,6 +1730,7 @@
     gap: 12px;
     margin-top: 12px;
   }
+  .kraj-donje-praznine { height: 100px; }
   .igraj-opet-gumb {
     display: inline-block;
     background: var(--boja-pozadina-primarna);

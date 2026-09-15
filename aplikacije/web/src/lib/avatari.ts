@@ -22,7 +22,7 @@ const BOJE_BORDERA: Record<string, string> = {
   Jezikoslovac: '#2ECC71',
   'Doktor riječi': '#5DADE2',
   'Jezični maestro': '#9B59B6',
-  'Gospodar riječnika': '#E67E22',
+  'Gospodar rječnika': '#E67E22',
   Kaladont: '#E4572E',
 };
 

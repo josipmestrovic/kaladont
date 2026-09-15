@@ -25,6 +25,7 @@ import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 
 export interface PodaciSocketa {
   igracId: string;
+  vrsta: 'gost' | 'registriran' | 'admin';
   nadimak: string;
   avatarId: number;
   odigrane: number;
@@ -33,6 +34,7 @@ export interface PodaciSocketa {
   odigrane1v1: number;
   pobjede1v1: number;
   bodovi1v1: number;
+  iskustvoUkupno: number;
 }
 
 export type KaladontIo = SocketIoServer<
@@ -178,6 +180,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     try {
       const identitet = await razrijesiIdentitet(token);
       socket.data.igracId = identitet.igracId;
+      socket.data.vrsta = identitet.vrsta;
       socket.data.nadimak = identitet.nadimak;
       socket.data.avatarId = identitet.avatarId;
       socket.data.odigrane = identitet.odigrane;
@@ -186,6 +189,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       socket.data.odigrane1v1 = identitet.odigrane1v1;
       socket.data.pobjede1v1 = identitet.pobjede1v1;
       socket.data.bodovi1v1 = identitet.bodovi1v1;
+      socket.data.iskustvoUkupno = identitet.iskustvoUkupno;
       next();
     } catch (greska) {
       const poruka = greska instanceof Error ? greska.message : 'Interna greška';

@@ -29,6 +29,7 @@ export interface Identitet {
   odigrane1v1: number;
   pobjede1v1: number;
   bodovi1v1: number;
+  iskustvoUkupno: number;
 }
 
 function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
@@ -43,6 +44,7 @@ function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
     odigrane1v1: redak.odigrane1v1,
     pobjede1v1: redak.pobjede1v1,
     bodovi1v1: redak.bodovi1v1,
+    iskustvoUkupno: redak.iskustvoUkupno,
   };
 }
 

@@ -5,3 +5,6 @@ export * from './protokol.js';
 export * from './poruke.js';
 export * from './rangovi.js';
 export * from './nagrada-za-rijec.js';
+export * from './iskustvo.js';
+export * from './dostignuca.js';
+export * from './dnk.js';

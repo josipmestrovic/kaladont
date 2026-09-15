@@ -4,6 +4,7 @@
 import {
   SVE_VRSTE_RIJECI,
   izracunajRang,
+  stanjeIskustva,
   vratiVeciRang,
   type PostavkePrivatneSobe,
   type StanjePrivatneSobe,
@@ -31,6 +32,7 @@ export interface Soba {
     string,
     {
       igracId: string;
+      vrsta: 'gost' | 'registriran' | 'admin';
       nadimak: string;
       avatarId: number;
       rang: string | null;
@@ -40,6 +42,7 @@ export interface Soba {
       odigrane1v1?: number;
       pobjede1v1?: number;
       bodovi1v1?: number;
+      iskustvoUkupno?: number;
     }
   >;
   partijaId: string | null;
@@ -101,12 +104,12 @@ export function registrirajPrivatneSobe(
       const odig4 = c.odigrane ?? 0;
       const bod4 = c.bodoviUkupno ?? 0;
       const prosjek4 = odig4 > 0 ? bod4 / odig4 : 0;
-      const rang4 = izracunajRang(odig4, prosjek4);
+      const rang4 = izracunajRang(odig4, prosjek4, 'cetiri_igraca');
 
       const odig1 = c.odigrane1v1 ?? 0;
       const bod1 = c.bodovi1v1 ?? 0;
       const prosjek1 = odig1 > 0 ? bod1 / odig1 : 0;
-      const rang1 = izracunajRang(odig1, prosjek1);
+      const rang1 = izracunajRang(odig1, prosjek1, 'dva_igraca');
 
       const veciRang = vratiVeciRang(rang4, rang1);
 
@@ -115,6 +118,7 @@ export function registrirajPrivatneSobe(
         nadimak: c.nadimak,
         avatarId: c.avatarId,
         rang: veciRang === 'Piskaralo' ? null : veciRang,
+        razina: stanjeIskustva(c.iskustvoUkupno ?? 0).razina,
         jeVlasnik: c.igracId === soba.vlasnikId,
           pobjedeUSobi: soba.pobjedeUSeriji.get(c.igracId) ?? 0,
           bodoviUSobi: soba.bodoviUSeriji.get(c.igracId) ?? 0,
@@ -191,6 +195,7 @@ export function registrirajPrivatneSobe(
             igracId,
             {
               igracId,
+              vrsta: socket.data.vrsta,
               nadimak: socket.data.nadimak,
               avatarId: socket.data.avatarId,
               rang: null,
@@ -200,6 +205,7 @@ export function registrirajPrivatneSobe(
               odigrane1v1: socket.data.odigrane1v1 ?? 0,
               pobjede1v1: socket.data.pobjede1v1 ?? 0,
               bodovi1v1: socket.data.bodovi1v1 ?? 0,
+              iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
             },
           ],
         ]),
@@ -256,6 +262,7 @@ export function registrirajPrivatneSobe(
 
       soba.clanoviMap.set(igracId, {
         igracId,
+        vrsta: socket.data.vrsta,
         nadimak: socket.data.nadimak,
         avatarId: socket.data.avatarId,
         rang: null,
@@ -265,6 +272,7 @@ export function registrirajPrivatneSobe(
         odigrane1v1: socket.data.odigrane1v1 ?? 0,
         pobjede1v1: socket.data.pobjede1v1 ?? 0,
         bodovi1v1: socket.data.bodovi1v1 ?? 0,
+        iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
       });
       sobaPoIgracu.set(igracId, kod);
       socket.join(SOBA_PREFIX(kod));
@@ -306,6 +314,7 @@ export function registrirajPrivatneSobe(
 
       const sudioniciUlaz: StavkaReda[] = [...soba.clanoviMap.values()].map((c) => ({
         igracId: c.igracId,
+        vrsta: c.vrsta,
         nadimak: c.nadimak,
         avatarId: c.avatarId,
         odigrane: c.odigrane,

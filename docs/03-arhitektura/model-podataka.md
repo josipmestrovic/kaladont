@@ -34,6 +34,7 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | pobjede_1v1 | integer | Agregat 1v1 moda |
 | eliminacije_1v1 | integer | Agregat 1v1 moda |
 | bodovi_1v1 | integer | Agregat 1v1 moda |
+| iskustvo_ukupno | integer | Trajni XP iz javnih modova; razina se izvodi iz njega |
 | stvoren | timestamptz | |
 | zadnja_aktivnost | timestamptz | Za čišćenje starih gostiju |
 
@@ -86,6 +87,7 @@ Rezultat svakog igrača u svakoj partiji — **temelj svih statistika i budućeg
 | plasman | smallint, null | 1–4; null dok partija traje |
 | bodovi | smallint | Plasman + eliminacije + bonus |
 | eliminacije | smallint | Koliko je protivnika izbacio |
+| iskustvo | integer | XP stvarno dodijeljen za tu javnu partiju |
 | nacin_ispadanja | enum, null | `ne_znam`, `istek`, `mrtva_slova`, `prekid`, `pobjednik`, `kaladont` |
 | cekanje_ms | integer | Vrijeme provedeno u redu čekanja (za prosjek zadnjih 100 partija) |
 

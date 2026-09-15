@@ -2,7 +2,7 @@
  * Globalno reaktivno stanje igre - slušatelji se registriraju jednom (u root layoutu)
  * jer partija:pocetak stiže dok je korisnik još na /red, prije nego /partija/[id] postoji.
  */
-import type { Eliminacija, KrajPartije, NagradaZaRijec, PocetakPartije, StanjePartije } from 'zajednicko';
+import type { Eliminacija, KrajPartije, NagradaZaRijec, ObracunIskustvaTijekomPartije, PocetakPartije, StavkaIskustva, StanjePartije } from 'zajednicko';
 import { pustiAudio, type AudioDogadaj } from './audio-manager.js';
 import { dohvatiSocket } from './socket.js';
 
@@ -21,6 +21,7 @@ interface StanjeIgre {
   zadnjaEliminacija: Eliminacija | null;
   poruka: string | null;
   kraj: KrajPartije | null;
+  obracunIskustva: ObracunIskustvaTijekomPartije | null;
   sustavBiraRijec: boolean;
   istekIzboraIso: string | null;
   zadnjaRijec: string | null;
@@ -32,6 +33,10 @@ interface StanjeIgre {
   trajanjePotezaSek: number | null;
   zadnjaNagrada: NagradaZaRijec | null;
   trenutniStreak: number;
+  stavkeIskustva: StavkaIskustva[];
+  oznakaStavkiIskustva: number;
+  intenzitetKonfetaIskustva: 'mali' | 'srednji' | 'veliki' | null;
+  oznakaKonfetaIskustva: number;
 }
 
 const stanje = $state<StanjeIgre>({
@@ -48,6 +53,7 @@ const stanje = $state<StanjeIgre>({
   zadnjaEliminacija: null,
   poruka: null,
   kraj: null,
+  obracunIskustva: null,
   sustavBiraRijec: false,
   istekIzboraIso: null,
   zadnjaRijec: null,
@@ -59,10 +65,42 @@ const stanje = $state<StanjeIgre>({
   trajanjePotezaSek: null,
   zadnjaNagrada: null,
   trenutniStreak: 0,
+  stavkeIskustva: [],
+  oznakaStavkiIskustva: 0,
+  intenzitetKonfetaIskustva: null,
+  oznakaKonfetaIskustva: 0,
 });
 
 let pokrenuto = false;
 let brojOdbijenihNaPotezu = 0;
+let timerStavkiIskustva: ReturnType<typeof setTimeout> | null = null;
+let timerKonfetaIskustva: ReturnType<typeof setTimeout> | null = null;
+
+function prikaziKonfeteIskustva(stavke: readonly StavkaIskustva[]): void {
+  const najjaca = Math.max(...stavke.filter((stavka) => stavka.vrsta === 'duge_rijeci' || stavka.vrsta === 'rijetke_rijeci').map((stavka) => stavka.iskustvo), 0);
+  if (najjaca === 0) return;
+  stanje.intenzitetKonfetaIskustva = najjaca >= 35 ? 'veliki' : najjaca >= 20 ? 'srednji' : 'mali';
+  stanje.oznakaKonfetaIskustva += 1;
+  if (timerKonfetaIskustva) clearTimeout(timerKonfetaIskustva);
+  timerKonfetaIskustva = setTimeout(() => {
+    stanje.intenzitetKonfetaIskustva = null;
+    timerKonfetaIskustva = null;
+  }, 3_200);
+}
+
+function prikaziStavkeIskustva(stavke: readonly StavkaIskustva[]): void {
+  stanje.stavkeIskustva = [...stavke];
+  stanje.oznakaStavkiIskustva += 1;
+  if (timerStavkiIskustva) clearTimeout(timerStavkiIskustva);
+  if (stavke.length === 0) {
+    timerStavkiIskustva = null;
+    return;
+  }
+  timerStavkiIskustva = setTimeout(() => {
+    stanje.stavkeIskustva = [];
+    timerStavkiIskustva = null;
+  }, 5_000);
+}
 
 function pustiOdbijanje(): void {
   brojOdbijenihNaPotezu += 1;
@@ -112,8 +150,13 @@ export function pokreniSlusateljeIgre(): void {
     stanje.eliminacije = [];
     stanje.zadnjaEliminacija = null;
     stanje.kraj = null;
+    stanje.obracunIskustva = null;
     stanje.zadnjaNagrada = null;
     stanje.trenutniStreak = 0;
+    prikaziStavkeIskustva([]);
+    stanje.intenzitetKonfetaIskustva = null;
+    if (timerKonfetaIskustva) clearTimeout(timerKonfetaIskustva);
+    timerKonfetaIskustva = null;
     stanje.poruka = null;
     stanje.sustavBiraRijec = false;
     stanje.istekIzboraIso = null;
@@ -141,6 +184,10 @@ export function pokreniSlusateljeIgre(): void {
     stanje.zadnjaRijecIgracId = p.igracId;
     stanje.zadnjaRijecVrsta = 'rijec';
     stanje.zadnjaNagrada = mojPotez ? p.nagrada : null;
+    if (mojPotez) {
+      prikaziStavkeIskustva(p.iskustvo ?? []);
+      prikaziKonfeteIskustva(p.iskustvo ?? []);
+    }
 
     // State se mora primijeniti prije zvuka: nepostojeći ili blokirani audio
     // asset ne smije zaustaviti prijelaz reda ili ažuriranje streaka.
@@ -162,6 +209,7 @@ export function pokreniSlusateljeIgre(): void {
     pustiAudio('eliminacija');
     stanje.eliminacije = [...stanje.eliminacije, p];
     stanje.zadnjaEliminacija = p;
+    if (p.bodZa === stanje.mojIgracId && p.iskustvo) prikaziStavkeIskustva([...stanje.stavkeIskustva, p.iskustvo]);
     if (p.rijecUzrok) {
       stanje.zadnjaRijec = p.rijecUzrok;
       stanje.zadnjaRijecIgracId = p.bodZa;
@@ -199,6 +247,10 @@ export function pokreniSlusateljeIgre(): void {
     // ne ovdje - inače se preklapa sa zvukom zadnje eliminacije.
     stanje.kraj = p;
     stanje.pocetakPartijeIso = null;
+  });
+
+  socket.on('iskustvo:obracun', (p) => {
+    if (p.partijaId === stanje.partijaId) stanje.obracunIskustva = p;
   });
 
   socket.on('greska', (g) => {

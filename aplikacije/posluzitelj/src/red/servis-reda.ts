@@ -4,7 +4,7 @@
  * RS-17: sastavljanje stola je atomarno (RedCekanja.pokusajSastaviStol).
  */
 import type { StanjeReda } from 'zajednicko';
-import { izracunajRang } from 'zajednicko';
+import { izracunajRang, stanjeIskustva } from 'zajednicko';
 import type { KaladontIo } from '../server.js';
 import { RedCekanja, prvaCetvorica, prviPar, type StavkaReda } from './red-cekanja.js';
 import { dohvatiProsjekCekanjaSek } from './prosjek-cekanja.js';
@@ -32,13 +32,15 @@ export function registrirajRedCekanja(
       const bodoviUkupno = mod === 'dva_igraca' ? (stavka.bodovi1v1 ?? 0) : stavka.bodoviUkupno;
 
       const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
-      const rang = izracunajRang(odigrane, prosjekBodova);
+      const rang = izracunajRang(odigrane, prosjekBodova, mod);
 
       mjesta[indeks] = {
         igracId: stavka.igracId,
         nadimak: stavka.nadimak,
         avatarId: stavka.avatarId,
         rang: rang === 'Piskaralo' ? null : rang,
+        razina: stanjeIskustva(stavka.iskustvoUkupno ?? 0).razina,
+        odigrane,
         prosjekBodova,
         postotakPobjeda: odigrane > 0 ? (pobjede / odigrane) * 100 : 0,
       };
@@ -62,6 +64,12 @@ export function registrirajRedCekanja(
   }
 
   io.on('connection', (socket) => {
+    socket.on('red:stanje', (payload) => {
+      const mod: 'cetiri_igraca' | 'dva_igraca' =
+        payload?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
+      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
+    });
+
     socket.on('red:udji', (payload) => {
       const mod: 'cetiri_igraca' | 'dva_igraca' =
         payload?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
@@ -83,6 +91,7 @@ export function registrirajRedCekanja(
 
       red.udji({
         igracId: socket.data.igracId,
+        vrsta: socket.data.vrsta,
         nadimak: socket.data.nadimak,
         avatarId: socket.data.avatarId,
         odigrane: socket.data.odigrane ?? 0,
@@ -91,6 +100,7 @@ export function registrirajRedCekanja(
         odigrane1v1: socket.data.odigrane1v1 ?? 0,
         pobjede1v1: socket.data.pobjede1v1 ?? 0,
         bodovi1v1: socket.data.bodovi1v1 ?? 0,
+        iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
         usaoU: Date.now(),
       });
       posaljiStanje(mod);

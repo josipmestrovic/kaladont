@@ -7,7 +7,7 @@
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
-  import type { PayloadGreska, StanjePartije, StanjeReda } from 'zajednicko';
+  import type { PayloadGreska, PocetakPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
 
   const igra = dohvatiStanjeIgre();
 
@@ -26,23 +26,16 @@
   let countdown = $state<number | null>(null);
   let aktivniSavjet = $state(0);
   let sliderInterval: ReturnType<typeof setInterval> | undefined;
+  let odbrojavanjePartije: ReturnType<typeof setInterval> | null = null;
   let prethodniIgraci: Set<string> | null = null;
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
   const preostaloIgraca = $derived(Math.max(0, ukupnoMjesta - brojIgraca));
 
-  // Odbrojavanje se izvodi iz globalnog stanja (partija:pocetak hvata se jednom, u stanje-igre),
-  // pa radi neovisno o redoslijedu mountanja i ne curi listenere po posjetu čekaonici.
-  $effect(() => {
-    const pocetakIso = igra.pocetakPartijeIso;
-    const partijaId = igra.partijaId;
-    if (!pocetakIso || !partijaId) {
-      countdown = null;
-      return;
-    }
+  function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {
+    if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
     const pocetakMs = new Date(pocetakIso).getTime();
     // Ustajala najava (npr. povratak u red nakon napuštene partije) ne smije katapultirati igrača
     if (pocetakMs - Date.now() < -3000) {
-      countdown = null;
       return;
     }
     let zadnjaOdsviranaSek = Number.POSITIVE_INFINITY;
@@ -54,16 +47,16 @@
         pustiAudio('odbrojavanje-single-count-sound');
       }
       if (preostalo <= 0) {
-        clearInterval(interval);
+        if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
+        odbrojavanjePartije = null;
         igra.pocetakPartijeIso = null; // najava je potrošena - točno jedna navigacija po najavi
         pustiAudio('pocetak-partije');
         void goto(`/partija/${partijaId}`);
       }
     };
-    const interval = setInterval(azuriraj, 250);
+    odbrojavanjePartije = setInterval(azuriraj, 250);
     azuriraj();
-    return () => clearInterval(interval);
-  });
+  }
 
   onMount(() => {
     pokreniSlusateljeIgre();
@@ -89,11 +82,20 @@
     const naStanjePartije = (stanjePartije: StanjePartije) => {
       if (!stanjePartije.zavrsena) void goto(`/partija/${stanjePartije.partijaId}`);
     };
+    const naRunduOtvorenu = (_runda: RundaOtvorena) => {
+      if (igra.partijaId) void goto(`/partija/${igra.partijaId}`);
+    };
+    const naPocetakPartije = (pocetak: PocetakPartije) => {
+      pokreniOdbrojavanje(pocetak.pocetakIso, pocetak.partijaId);
+    };
     socket.on('red:stanje', naStanjeReda);
+    socket.on('partija:pocetak', naPocetakPartije);
     socket.on('partija:stanje', naStanjePartije);
+    socket.on('partija:runda-otvorena', naRunduOtvorenu);
     socket.on('greska', naGresku);
     const udjiURed = () => {
       socket.emit('partija:stanje');
+      socket.emit('red:stanje', { mod: trazeneMod });
       socket.emit('red:udji', { mod: trazeneMod });
     };
     socket.on('connect', udjiURed);
@@ -104,13 +106,16 @@
     return () => {
       socket.off('connect', udjiURed);
       socket.off('red:stanje', naStanjeReda);
+      socket.off('partija:pocetak', naPocetakPartije);
       socket.off('partija:stanje', naStanjePartije);
+      socket.off('partija:runda-otvorena', naRunduOtvorenu);
       socket.off('greska', naGresku);
     };
   });
 
   onDestroy(() => {
     if (sliderInterval) clearInterval(sliderInterval);
+    if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
     dohvatiSocket().emit('red:izadji');
   });
 
@@ -146,8 +151,9 @@
             {mjesto.nadimak}
             {#if mjesto.igracId === stanje.mojIgracId}<span class="oznaka-ti">TI</span>{/if}
           </strong>
-          <span>{mjesto.rang ?? 'Piskaralo'}</span>
-          <span>Prosjek: {mjesto.prosjekBodova.toFixed(2)} • Pobjede: {mjesto.postotakPobjeda.toFixed(0)}%</span>
+          <span class="rang-i-razina">{mjesto.rang ?? 'Piskaralo'}</span>
+          <span class="statistika-lobbyja"><span>Prosjek bodova: {mjesto.prosjekBodova.toFixed(2)}</span><span>Pobjede: {mjesto.postotakPobjeda.toFixed(0)}%</span><span>Odigrane partije: {mjesto.odigrane}</span></span>
+          <span class="razina-oznaka">LVL {mjesto.razina}</span>
         </div>
       {:else}
         <span class="prazno">Prazno mjesto</span>
@@ -183,7 +189,8 @@
   }
 
   .mjesta li {
-    min-height: 72px;
+    position: relative;
+    min-height: 108px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -214,7 +221,7 @@
   }
 
   .mjesta li.prazno-mjesto {
-    min-height: 76px;
+    min-height: 108px;
     justify-content: center;
     border: 1px dashed var(--boja-tekst-sekundarni);
     background: transparent;
@@ -224,6 +231,14 @@
     display: flex;
     flex-direction: column;
     font-size: var(--tekst-mali);
+  }
+
+  .rang-i-razina { color: var(--boja-tekst-sekundarni); }
+  .statistika-lobbyja { display: flex; gap: 8px; color: var(--boja-tekst-sekundarni); }
+  .razina-oznaka { position: absolute; right: 14px; bottom: 12px; color: var(--boja-mint); font-size: var(--tekst-mikro); font-weight: 700; }
+
+  @media (max-width: 767px) {
+    .statistika-lobbyja { flex-direction: column; gap: 1px; margin-top: 3px; }
   }
 
   .prazno {

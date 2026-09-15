@@ -54,4 +54,6 @@ sequenceDiagram
 
 ## Kraj partije — transakcija
 
-U jednoj transakciji: upis `plasman/bodovi/eliminacije/nacin_ispadanja` u `sudionici_partije` → ažuriranje agregata u `igraci` → status partije `zavrsena`. Tek potom se emitira `partija:kraj`. Time podaci u bazi nikad ne zaostaju za onim što su igrači vidjeli.
+U jednoj transakciji: upis `plasman/bodovi/eliminacije/iskustvo/nacin_ispadanja` u `sudionici_partije` → ažuriranje agregata u `igraci`, uključujući trajni XP → status partije `zavrsena`. Tek potom se emitira personalizirani `partija:kraj`. Time podaci u bazi nikad ne zaostaju za onim što su igrači vidjeli.
+
+Igrač eliminiran bez dobrovoljnog izlaska može prije toga dobiti privatni `iskustvo:obracun` za konačne poteze i streak; taj prikaz ne obavlja isplatu. Stvarni zapis XP-a ostaje dio završne transakcije, pa se ne može dodijeliti dvaput reconnectom.

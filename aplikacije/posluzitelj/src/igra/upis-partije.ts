@@ -4,8 +4,9 @@
  * koji je transakcijski jer mijenja više tablica odjednom.
  */
 import { and, eq, sql } from 'drizzle-orm';
+import { izracunajKaladontDnk, izracunajNovaDostignuca, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
-import { igraci, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import type { SudionikPartije } from './motor-partije.js';
 
 export function zapisiPocetakPartije(
@@ -51,6 +52,7 @@ export interface ZapisSudionika {
   plasman: 1 | 2 | 3 | 4;
   bodovi: number;
   eliminacije: number;
+  iskustvo: number;
   nacinIspadanja: 'ne_znam' | 'istek' | 'mrtva_slova' | 'prekid' | 'pobjednik' | 'kaladont';
 }
 
@@ -58,6 +60,8 @@ export interface ZapisStatistikeRijeci {
   igracId: string;
   grupe: { grupa: string; tier: number | null }[];
   otkljucaneRijeci: { rijec: string; jakoDuga: boolean; jakoRijetka: boolean; dugaTier: number | null; rijetkaTier: number | null }[];
+  prihvaceniPotezi: number;
+  ukupnoTrajanjePrihvaceniPoteziMs: number;
   najduziStreak: number;
   otkriveneJakoRijetkeGrupe: number;
   otkriveneSrednjeRijetkeGrupe: number;
@@ -72,6 +76,29 @@ export interface ZapisStatistikeRijeci {
   najrjedaTier: number | null;
 }
 
+export interface ZapisNapretkaDostignuca {
+  delta: DeltaNapretkaDostignuca;
+}
+
+function dnkOs(
+  redak: { odigrane: number; bodovi: number; eliminacije: number },
+  statistika: ZapisStatistikeRijeci | undefined,
+  mod: 'cetiri_igraca' | 'dva_igraca',
+): DnkOs[] {
+  const odigrano = redak.odigrane;
+  const ponderiraneDuge = (statistika?.upisaneDugeRijeci ?? 0) + (statistika?.upisaneSrednjeDugeRijeci ?? 0) * 1.5 + (statistika?.upisaneJakoDugeRijeci ?? 0) * 2;
+  const ponderiraneRijetke = (statistika?.otkriveneRijetkeGrupe ?? 0) + (statistika?.otkriveneSrednjeRijetkeGrupe ?? 0) * 1.5 + (statistika?.otkriveneJakoRijetkeGrupe ?? 0) * 2;
+  return izracunajKaladontDnk({
+    mod,
+    odigrano,
+    prosjekBodova: odigrano > 0 ? redak.bodovi / odigrano : 0,
+    eliminacijePoPartiji: odigrano > 0 ? redak.eliminacije / odigrano : 0,
+    najduziStreak: statistika?.najduziStreak ?? 0,
+    ponderiraneDuge: ponderiraneDuge / Math.max(1, odigrano),
+    ponderiraneRijetke: ponderiraneRijetke / Math.max(1, odigrano),
+  }).osi;
+}
+
 /** Zaključuje partiju transakcijski i vraća ažurirane agregate (bodovi_ukupno, odigrane) po igraču. */
 export async function zakljuciPartijuUBazi(
   partijaId: string,
@@ -80,8 +107,9 @@ export async function zakljuciPartijuUBazi(
   mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
   statistike: Map<string, ZapisStatistikeRijeci> = new Map(),
   samoStatistika = false,
-): Promise<Map<string, { bodoviUkupno: number; odigrane: number }>> {
-  const agregati = new Map<string, { bodoviUkupno: number; odigrane: number }>();
+  napredakDostignuca: Map<string, ZapisNapretkaDostignuca> = new Map(),
+): Promise<Map<string, { bodoviUkupno: number; odigrane: number; pobjede: number; iskustvoUkupno: number; novaDostignuca: NovoDostignuce[]; dnkPrije: DnkOs[]; dnkPoslije: DnkOs[] }>> {
+  const agregati = new Map<string, { bodoviUkupno: number; odigrane: number; pobjede: number; iskustvoUkupno: number; novaDostignuca: NovoDostignuce[]; dnkPrije: DnkOs[]; dnkPoslije: DnkOs[] }>();
   const modStatistike = 'cetiri_igraca' as const;
 
   await baza.transaction(async (tx) => {
@@ -93,6 +121,31 @@ export async function zakljuciPartijuUBazi(
     }
 
     for (const r of rezultati) {
+      const [stariIgrac] = await tx.select({
+        odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
+        bodovi: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
+        eliminacije: mod === 'dva_igraca' ? igraci.eliminacije1v1 : igraci.eliminacijeUkupno,
+      }).from(igraci).where(eq(igraci.id, r.igracId));
+      const [staraStatistika] = await tx.select().from(statistikeRijeciIgraca)
+        .where(and(eq(statistikeRijeciIgraca.igracId, r.igracId), eq(statistikeRijeciIgraca.mod, mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca')))
+        .limit(1);
+      const [staraDnkStatistika] = await tx.select().from(dnkStatistikeIgraca)
+        .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)))
+        .limit(1);
+      const prije = stariIgrac ? dnkOs(stariIgrac, staraStatistika ? {
+        igracId: r.igracId,
+        prihvaceniPotezi: staraDnkStatistika?.prihvaceniPotezi ?? 0,
+        ukupnoTrajanjePrihvaceniPoteziMs: staraDnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
+        grupe: [], otkljucaneRijeci: [],
+        najduziStreak: staraStatistika.najduziStreak,
+        otkriveneJakoRijetkeGrupe: staraStatistika.otkriveneJakoRijetkeGrupe,
+        otkriveneSrednjeRijetkeGrupe: staraStatistika.otkriveneSrednjeRijetkeGrupe,
+        otkriveneRijetkeGrupe: staraStatistika.otkriveneRijetkeGrupe,
+        upisaneDugeRijeci: staraStatistika.upisaneDugeRijeci,
+        upisaneSrednjeDugeRijeci: staraStatistika.upisaneSrednjeDugeRijeci,
+        upisaneJakoDugeRijeci: staraStatistika.upisaneJakoDugeRijeci,
+        najduzaRijec: null, najduzaRijecGrafemi: 0, najrjedaRijec: null, najrjedaRijecFrekvencija: null, najrjedaTier: null,
+      } : undefined, mod) : [];
       if (!samoStatistika) {
         await tx
           .update(sudioniciPartije)
@@ -100,6 +153,7 @@ export async function zakljuciPartijuUBazi(
             plasman: r.plasman,
             bodovi: r.bodovi,
             eliminacije: r.eliminacije,
+            iskustvo: r.iskustvo,
             nacinIspadanja: r.nacinIspadanja,
           })
           .where(and(eq(sudioniciPartije.partijaId, partijaId), eq(sudioniciPartije.igracId, r.igracId)));
@@ -113,12 +167,13 @@ export async function zakljuciPartijuUBazi(
             pobjede1v1: sql`${igraci.pobjede1v1} + ${r.plasman === 1 ? 1 : 0}`,
             eliminacije1v1: sql`${igraci.eliminacije1v1} + ${r.eliminacije}`,
             bodovi1v1: sql`${igraci.bodovi1v1} + ${r.bodovi}`,
+            iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
           })
           .where(eq(igraci.id, r.igracId))
-          .returning({ bodoviUkupno: igraci.bodovi1v1, odigrane: igraci.odigrane1v1 });
+          .returning({ bodoviUkupno: igraci.bodovi1v1, odigrane: igraci.odigrane1v1, pobjede: igraci.pobjede1v1, iskustvoUkupno: igraci.iskustvoUkupno });
 
         if (azurirani) {
-          agregati.set(r.igracId, azurirani);
+          agregati.set(r.igracId, { ...azurirani, novaDostignuca: [], dnkPrije: prije, dnkPoslije: [] });
         }
       } else if (!samoStatistika) {
         const [azurirani] = await tx
@@ -128,12 +183,13 @@ export async function zakljuciPartijuUBazi(
             pobjede: sql`${igraci.pobjede} + ${r.plasman === 1 ? 1 : 0}`,
             eliminacijeUkupno: sql`${igraci.eliminacijeUkupno} + ${r.eliminacije}`,
             bodoviUkupno: sql`${igraci.bodoviUkupno} + ${r.bodovi}`,
+            iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
           })
           .where(eq(igraci.id, r.igracId))
-          .returning({ bodoviUkupno: igraci.bodoviUkupno, odigrane: igraci.odigrane });
+          .returning({ bodoviUkupno: igraci.bodoviUkupno, odigrane: igraci.odigrane, pobjede: igraci.pobjede, iskustvoUkupno: igraci.iskustvoUkupno });
 
         if (azurirani) {
-          agregati.set(r.igracId, azurirani);
+          agregati.set(r.igracId, { ...azurirani, novaDostignuca: [], dnkPrije: prije, dnkPoslije: [] });
         }
       }
 
@@ -187,6 +243,122 @@ export async function zakljuciPartijuUBazi(
               najrjedaTier: sql`case when excluded.najrjeda_tier is not null and (${statistikeRijeciIgraca.najrjedaTier} is null or excluded.najrjeda_tier <= ${statistikeRijeciIgraca.najrjedaTier}) then excluded.najrjeda_tier else ${statistikeRijeciIgraca.najrjedaTier} end`,
             },
           });
+      }
+
+      if (statistika) {
+        await tx.insert(dnkStatistikeIgraca).values({
+          igracId: r.igracId,
+          mod,
+          prihvaceniPotezi: statistika.prihvaceniPotezi,
+          ukupnoTrajanjePrihvaceniPoteziMs: statistika.ukupnoTrajanjePrihvaceniPoteziMs,
+          najduziStreak: statistika.najduziStreak,
+          dugeRijeci: statistika.upisaneDugeRijeci,
+          srednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
+          jakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
+          rijetkeRijeci: statistika.otkriveneRijetkeGrupe,
+          srednjeRijetkeRijeci: statistika.otkriveneSrednjeRijetkeGrupe,
+          jakoRijetkeRijeci: statistika.otkriveneJakoRijetkeGrupe,
+          otkljucanAt: null,
+        }).onConflictDoUpdate({
+          target: [dnkStatistikeIgraca.igracId, dnkStatistikeIgraca.mod],
+          set: {
+            prihvaceniPotezi: sql`${dnkStatistikeIgraca.prihvaceniPotezi} + excluded.prihvaceni_potezi`,
+            ukupnoTrajanjePrihvaceniPoteziMs: sql`${dnkStatistikeIgraca.ukupnoTrajanjePrihvaceniPoteziMs} + excluded.ukupno_trajanje_prihvacenih_poteza_ms`,
+            najduziStreak: sql`greatest(${dnkStatistikeIgraca.najduziStreak}, excluded.najduzi_streak)`,
+            dugeRijeci: sql`${dnkStatistikeIgraca.dugeRijeci} + excluded.duge_rijeci`,
+            srednjeDugeRijeci: sql`${dnkStatistikeIgraca.srednjeDugeRijeci} + excluded.srednje_duge_rijeci`,
+            jakoDugeRijeci: sql`${dnkStatistikeIgraca.jakoDugeRijeci} + excluded.jako_duge_rijeci`,
+            rijetkeRijeci: sql`${dnkStatistikeIgraca.rijetkeRijeci} + excluded.rijetke_rijeci`,
+            srednjeRijetkeRijeci: sql`${dnkStatistikeIgraca.srednjeRijetkeRijeci} + excluded.srednje_rijetke_rijeci`,
+            jakoRijetkeRijeci: sql`${dnkStatistikeIgraca.jakoRijetkeRijeci} + excluded.jako_rijetke_rijeci`,
+          },
+        });
+      }
+
+      const zapisNapretka = napredakDostignuca.get(r.igracId);
+      if (zapisNapretka) {
+        const delta: DeltaNapretkaDostignuca = { ...zapisNapretka.delta };
+        if (statistika) {
+          delta.rijetkeLeksemskeGrupe = (delta.rijetkeLeksemskeGrupe ?? 0)
+            + statistika.otkriveneJakoRijetkeGrupe + statistika.otkriveneSrednjeRijetkeGrupe + statistika.otkriveneRijetkeGrupe;
+          delta.dugeRijeci = (delta.dugeRijeci ?? 0)
+            + statistika.upisaneDugeRijeci + statistika.upisaneSrednjeDugeRijeci + statistika.upisaneJakoDugeRijeci;
+          delta.najduziStreak = Math.max(delta.najduziStreak ?? 0, statistika.najduziStreak);
+        }
+        if (!samoStatistika && r.plasman === 1) delta.javnePobjede = (delta.javnePobjede ?? 0) + 1;
+
+        const [stariNapredak] = await tx.select().from(napredakDostignucaIgraca)
+          .where(eq(napredakDostignucaIgraca.igracId, r.igracId));
+        const azuriraniNapredak = await tx.insert(napredakDostignucaIgraca).values({
+          igracId: r.igracId,
+          valjaniPoteziUkupno: delta.valjaniPoteziUkupno ?? 0,
+          rijetkeLeksemskeGrupe: delta.rijetkeLeksemskeGrupe ?? 0,
+          dugeRijeci: delta.dugeRijeci ?? 0,
+          najduziStreak: delta.najduziStreak ?? 0,
+          kaladontIzvedbe: delta.kaladontIzvedbe ?? 0,
+          kaladontZrtve: delta.kaladontZrtve ?? 0,
+          izazvaneEliminacije: delta.izazvaneEliminacije ?? 0,
+          mrtvaSlovaEliminacije: delta.mrtvaSlovaEliminacije ?? 0,
+          javnePobjede: delta.javnePobjede ?? 0,
+        }).onConflictDoUpdate({
+          target: napredakDostignucaIgraca.igracId,
+          set: {
+            valjaniPoteziUkupno: sql`${napredakDostignucaIgraca.valjaniPoteziUkupno} + ${delta.valjaniPoteziUkupno ?? 0}`,
+            rijetkeLeksemskeGrupe: sql`${napredakDostignucaIgraca.rijetkeLeksemskeGrupe} + ${delta.rijetkeLeksemskeGrupe ?? 0}`,
+            dugeRijeci: sql`${napredakDostignucaIgraca.dugeRijeci} + ${delta.dugeRijeci ?? 0}`,
+            najduziStreak: sql`greatest(${napredakDostignucaIgraca.najduziStreak}, ${delta.najduziStreak ?? 0})`,
+            kaladontIzvedbe: sql`${napredakDostignucaIgraca.kaladontIzvedbe} + ${delta.kaladontIzvedbe ?? 0}`,
+            kaladontZrtve: sql`${napredakDostignucaIgraca.kaladontZrtve} + ${delta.kaladontZrtve ?? 0}`,
+            izazvaneEliminacije: sql`${napredakDostignucaIgraca.izazvaneEliminacije} + ${delta.izazvaneEliminacije ?? 0}`,
+            mrtvaSlovaEliminacije: sql`${napredakDostignucaIgraca.mrtvaSlovaEliminacije} + ${delta.mrtvaSlovaEliminacije ?? 0}`,
+            javnePobjede: sql`${napredakDostignucaIgraca.javnePobjede} + ${delta.javnePobjede ?? 0}`,
+            azurirano: new Date(),
+          },
+        }).returning();
+        const napredak = azuriraniNapredak[0] ?? stariNapredak;
+        if (napredak) {
+          const agregat = agregati.get(r.igracId);
+          const razina = stanjeIskustva(agregat?.iskustvoUkupno ?? 0).razina;
+          const nova = izracunajNovaDostignuca({
+            rijetkeLeksemskeGrupe: napredak.rijetkeLeksemskeGrupe,
+            dugeRijeci: napredak.dugeRijeci,
+            najduziStreak: napredak.najduziStreak,
+            kaladontIzvedbe: napredak.kaladontIzvedbe,
+            kaladontZrtve: napredak.kaladontZrtve,
+            izazvaneEliminacije: napredak.izazvaneEliminacije,
+            mrtvaSlovaEliminacije: napredak.mrtvaSlovaEliminacije,
+            javnePobjede: napredak.javnePobjede,
+          }, delta, razina, samoStatistika);
+          if (nova.length > 0) {
+            await tx.insert(dostignucaIgraca).values(nova.map((dostignuce) => ({
+              igracId: r.igracId,
+              dostignuceId: dostignuce.id,
+              razina: dostignuce.novaRazina,
+              prvoOtkljucano: new Date(),
+              zadnjeOtkljucavanje: new Date(),
+            }))).onConflictDoUpdate({
+              target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
+              set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
+            });
+            if (agregat) agregat.novaDostignuca = nova;
+          }
+        }
+      }
+
+      const agregatZaDnk = agregati.get(r.igracId);
+      if (agregatZaDnk) {
+        const statistika = statistike.get(r.igracId);
+        const ukupnaStatistika: ZapisStatistikeRijeci | undefined = statistika && staraStatistika ? {
+          ...statistika,
+          najduziStreak: Math.max(staraStatistika.najduziStreak, statistika.najduziStreak),
+          otkriveneJakoRijetkeGrupe: staraStatistika.otkriveneJakoRijetkeGrupe + statistika.otkriveneJakoRijetkeGrupe,
+          otkriveneSrednjeRijetkeGrupe: staraStatistika.otkriveneSrednjeRijetkeGrupe + statistika.otkriveneSrednjeRijetkeGrupe,
+          otkriveneRijetkeGrupe: staraStatistika.otkriveneRijetkeGrupe + statistika.otkriveneRijetkeGrupe,
+          upisaneDugeRijeci: staraStatistika.upisaneDugeRijeci + statistika.upisaneDugeRijeci,
+          upisaneSrednjeDugeRijeci: staraStatistika.upisaneSrednjeDugeRijeci + statistika.upisaneSrednjeDugeRijeci,
+          upisaneJakoDugeRijeci: staraStatistika.upisaneJakoDugeRijeci + statistika.upisaneJakoDugeRijeci,
+        } : statistika;
+        agregatZaDnk.dnkPoslije = dnkOs({ odigrane: agregatZaDnk.odigrane, bodovi: agregatZaDnk.bodoviUkupno, eliminacije: (stariIgrac?.eliminacije ?? 0) + r.eliminacije }, ukupnaStatistika, mod);
       }
     }
   });

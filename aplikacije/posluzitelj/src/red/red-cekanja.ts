@@ -3,6 +3,7 @@
  */
 export interface StavkaReda {
   igracId: string;
+  vrsta: 'gost' | 'registriran' | 'admin';
   nadimak: string;
   avatarId: number;
   odigrane: number;
@@ -11,6 +12,7 @@ export interface StavkaReda {
   odigrane1v1?: number;
   pobjede1v1?: number;
   bodovi1v1?: number;
+  iskustvoUkupno?: number;
   usaoU: number;
 }
 

@@ -1,9 +1,9 @@
 <svelte:head>
-  <title>Pravila privatnosti | Kaladont</title>
+  <title>Privatnost | Kaladont</title>
 </svelte:head>
 
 <main class="stranica-obavijesti">
-  <h1>Pravila privatnosti</h1>
+  <h1>Privatnost</h1>
   <p>Bit će napisano uskoro.</p>
 </main>
 

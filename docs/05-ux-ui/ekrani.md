@@ -6,7 +6,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Desktop **nije** zaseban l
 
 **Svrha:** stalna orijentacija — tko sam, brz pristup postavkama i pravilima. Prikazuje se na svim ekranima OSIM u čekaonici (`/red`) i u tijeku partije (`/partija/*`).
 
-- **Lijevo:** ikone i labele navigacije u boji osnovnog teksta (narančasto istaknuto aktivno stanje, bez podcrtavanja) — **Početna** (🏠), **Pravila** (📖), **Ljestvice** (🏆), **Postavke** (⚙).
+- **Lijevo:** ikone i labele navigacije u boji osnovnog teksta (narančasto istaknuto aktivno stanje, bez podcrtavanja) — **Početna**, **Pomoć** (`?` u krugu), **Ljestvice**, **Postavke**. Pomoć je kanonska ruta `/pomoc?tema=pravila`.
 - **Desno:** avatar korisnika ili gosta. Pokraj avatara desno u boji naslova prikazano je ime samo za ulogirane registrirane korisnike, dok gosti imaju samo avatar (s tekstualnim napisom `GOST` unutar kružnog avatara). Klik na avatar vodi na `/profil`.
 
 ## 1. Landing (`/`)
@@ -60,6 +60,8 @@ Raspored (portret):
 
 - Redoslijed 1.– 4. s bodovima razloženim na plasman + eliminacije + bonus (npr. „3 + 2 + 1 = 6").
 - Za mene: „Novi prosjek: 2,8 → **Lektor**" (registrirani) ili poruka za goste: „Ova statistika je spremljena lokalno u ovom pregledniku. Registriraj se da je zadržiš zauvijek!" (namjerno pojednostavljeno — tehnički je vezano uz gost-identitet ovog uređaja, ne doslovno preglednik, ali ovako je poruka jasnija igraču).
+- Iznad plasmana je osobni XP obračun: `LVL`, dodijeljeni XP, grupirane stavke, streak bonus i traka do sljedeće razine. Sve stavke prikazuju se odmah, bez animacije. Eliminirani promatrač dobiva samo svoj obračun i može napustiti partiju dok se trajni upis dovršava pri kraju.
+- Tijekom javne partije gornji status ostaje vidljiv i pri izboru nove riječi te završnom odbrojavanju: lijevo je trenutni streak, a desno se redom po 3,5 sekunde prikazuju autoritativne XP stavke upravo prihvaćenog poteza i izazvane eliminacije. Privatne sobe taj status nemaju jer ne dodjeljuju XP.
 - Tipke: **Igraj opet** (u red), **Povijest partije**, Na početnu.
 
 ## 5. Povijest partije (`/partija/:id/povijest`)
@@ -112,8 +114,8 @@ Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvoj
 
 ## 10. Statične stranice
 
-- `/pravila` — pravila igre razumljivim jezikom (izvor: [pravila-igre.md](../02-pravila-igre/pravila-igre.md)): cilj igre (ime "Kaladont" objašnjeno), postava (4 igrača), tijek partije, uvjeti valjane riječi, ispadanje (4 načina + razlika "mrtvih slova"), bodovanje ukratko (link na [bodovanje-i-rangovi.md](../02-pravila-igre/bodovanje-i-rangovi.md)), komunikacija (4 brze poruke).
-- `/o-igri` — priča o imenu (paste za zube, "nt" bez nastavka), **poruka o ranom pristupu**: igra je u ranom pristupu ("early access"), aktivno se testira i nadograđuje; **uvijek besplatna, bez reklama**; poveznica na javno čitljiv forum `https://forum.kaladont.hr` za dogovore i mišljenja te objašnjenje da se rječničke presude prijavljuju gumbom „Prijavi” u igri. Uz to obavezna **atribucija hrLexa** — točan tekst iz [izvor-i-licenca.md](../04-rjecnik/izvor-i-licenca.md#tekst-atribucije-za-stranicu-o-igri) mora biti citiran doslovno, ne parafraziran. Kontakt na dnu.
+- `/pomoc?tema=pravila|rangovi|napredak` — help hub s pravilima igre, tablicom rangova i obruba, XP/dostignućima, FAQ blokom i linkovima prema profilu, ljestvici i privatnim sobama. `/pravila` i `/o-igri` ostaju kompatibilni redirecti.
+- Footer popup „O igri” — priča o imenu, rani pristup, **atribucija hrLexa** prema [izvor-i-licenca.md](../04-rjecnik/izvor-i-licenca.md#tekst-atribucije-za-stranicu-o-igri), statistika rječnika i kontakt; popup povezuje na Help hub.
 - `/privatnost`, `/uvjeti` — pravni minimum (vidi [sigurnost-i-privatnost.md](../07-operacije/sigurnost-i-privatnost.md)).
 
 ## Responzivnost

@@ -6,11 +6,12 @@
     rang?: string | null;
     gost?: boolean;
     velicina?: number;
+    prikaziRangBorder?: boolean;
   }
 
-  const { avatarId, rang = null, gost = false, velicina = 48 }: Props = $props();
+  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true }: Props = $props();
 
-  const border = $derived(gost ? null : bojaBordera(rang));
+  const border = $derived(gost || !prikaziRangBorder ? null : bojaBordera(rang));
   const gostFontSize = $derived(Math.max(8, Math.round(velicina * 0.21)));
 </script>
 
@@ -18,7 +19,8 @@
   class="avatar"
   style:width="{velicina}px"
   style:height="{velicina}px"
-  style:border={border ? `3px solid ${border}` : '3px solid transparent'}
+  style:border={border ? `4px solid ${border}` : '4px solid transparent'}
+  style:--boja-rang={border ?? 'transparent'}
 >
   {#if gost}
     <div class="gost-avatar" style:font-size="{gostFontSize}px">Gost</div>
@@ -37,6 +39,7 @@
     box-sizing: border-box;
     flex-shrink: 0;
     overflow: hidden;
+    box-shadow: 0 0 0 3px var(--boja-rang, transparent);
   }
 
   .avatar img {

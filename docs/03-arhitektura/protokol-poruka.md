@@ -43,7 +43,8 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 | `partija:eliminacija` | `Eliminacija` | Netko je ispao; svi za stolom |
 | `partija:sustav-bira-rijec` | `SustavBiraRijec` | Sustav počinje birati riječ za otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta) - 5s, nitko ne može igrati |
 | `partija:runda-otvorena` | `RundaOtvorena` | Sustav je otkrio odabranu riječ; red ide na sljedećeg aktivnog igrača nakon napadača |
-| `partija:kraj` | `KrajPartije` | Konačni plasmani i bodovi |
+| `partija:kraj` | `KrajPartije` | Konačni plasmani, bodovi i privatni XP obračun primatelja |
+| `iskustvo:obracun` | `ObracunIskustvaTijekomPartije` | Privatni XP obračun eliminiranog igrača |
 | `reakcija:nova` | `{ igracId: string, poruka: BrzaPoruka }` | |
 | `greska` | `{ kod: KodGreske, poruka: string }` | Općenite greške (npr. `PREBRZO`) |
 
@@ -111,6 +112,11 @@ interface PrihvacenPotez {
   istekPotezaIso: string;
   brojIskoristenih: number;    // za prikaz napretka partije
   nagrada: NagradaZaRijec | null; // jedan efekt; null za običnu riječ
+}
+
+interface KrajPartije {
+  // Polje je personalizirano po primatelju; nikad ne sadrži tuđe XP stavke.
+  mojeIskustvo: ObracunIskustva | null; // null za privatnu sobu
 }
 
 interface NagradaZaRijec {

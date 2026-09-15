@@ -113,6 +113,7 @@
               <Avatar avatarId={clan.avatarId} rang={clan.rang} gost={!clan.rang} velicina={48} />
               <div class="clan-info">
                 <span class="clan-ime">{clan.nadimak}</span>
+                <span class="clan-rang">{clan.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {clan.razina}</span>
                 {#if clan.jeVlasnik}
                   <span class="vlasnik-bedz">Vlasnik sobe</span>
                 {/if}
@@ -333,6 +334,11 @@
 
   .clan-ime {
     font-weight: 700;
+  }
+
+  .clan-rang {
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
   }
 
   .vlasnik-bedz {
