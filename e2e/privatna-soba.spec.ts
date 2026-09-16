@@ -8,6 +8,8 @@ test('dva igrača stvaraju privatnu sobu i pokreću partiju', async ({ browser }
     const gost = igraci[1]!.stranica;
 
     await vlasnik.goto('/soba/kreiraj');
+    await expect(vlasnik.getByRole('heading', { name: 'Nova privatna soba' })).toBeVisible();
+    await vlasnik.waitForFunction(() => performance.getEntriesByType('resource').some((zapis) => zapis.name.includes('/socket.io/')));
     await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
     await expect(vlasnik).toHaveURL(/\/soba\/[A-Z0-9]+$/);
 
