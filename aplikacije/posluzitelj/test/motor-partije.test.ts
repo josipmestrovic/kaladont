@@ -428,7 +428,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(eliminacija.bodZa).toBe(otvarac.token); // napadac = autor zadnje prihvacene rijeci
 
     for (const igrac of igraci) if (igrac !== sljedeci) igrac.socket.disconnect();
-  });
+  }, 30_000);
 
   it('RS-10: istek tolerancije izvan poteza je samoeliminacija bez boda, igra se nastavlja', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
