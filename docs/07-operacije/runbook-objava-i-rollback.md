@@ -2,7 +2,7 @@
 
 Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani su u [release shemi](release-shema.md), automatika u [ci-cd.md](ci-cd.md), a ovdje je ono što radi čovjek. Pravilo: **promocija u produkciju uvijek nosi digest koji je već prošao staging** — nikad svježi build, nikad ručni SSH deploy.
 
-> **Status: djelomično izvedivo.** CI, Docker smoke test i GHCR objava postoje. Staging je ručno postavljen i ručno se ažurira digestom. Automatski staging deploy i produkcijska promocija workflowom još ne postoje; koraci koji ih pretpostavljaju ostaju ciljani budući postupak.
+> **Status: djelomično izvedivo.** CI, Docker smoke test, GHCR promotion i automatski staging deploy postoje. Produkcijska promocija workflowom još ne postoji; koraci koji je pretpostavljaju ostaju ciljani budući postupak.
 
 ## Prije svakog release kandidata
 
@@ -16,7 +16,7 @@ Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani 
 
 1. **Spoji PR u `main`** tek kada su obvezne provjere zelene. CI zatim objavljuje image u GHCR-u.
 2. **Zabilježi release kandidata** prema [release shemi](release-shema.md#predložak-zapisa-releasea): puni digest, commit SHA, workflow run, prethodni staging digest, kratak opis promjene i početni status `kandidat`.
-3. **Ručno ažuriraj staging** punim `sha256:...` digestom iz GHCR workflowa i rekreiraj samo aplikaciju. Dok automatski staging workflow ne postoji, ovo je službeni staging postupak, ne zaobilaženje procesa.
+3. **Pričekaj automatski staging workflow**. On koristi isti puni `sha256:...` digest, šalje verzionirane konfiguracije, izvršava migracije, rekreira samo aplikaciju i provjerava health.
 4. **Provjeri staging** bez Basic Autha; staging je privremeno javno dostupan uz `noindex`:
    - `/zdravlje` vraća 200;
    - landing, registracija/prijava, red i WebSocket rade;
@@ -33,9 +33,9 @@ Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani 
 10. **Provjeri produkciju:** `/zdravlje` vraća 200 i očekivani digest; landing, Pravila, O igri, Privatnost i Uvjeti rade; zatim odigraj cijelu partiju u četiri odvojene sesije. Ta partija ostaje u običnoj statistici.
 11. **Pregledaj logove** bez ispisivanja tajni:
 
-   ```bash
-   ssh kaladont@PROD_IP 'cd /opt/kaladont && docker compose -f docker-compose.prod.yml logs --since 10m aplikacija'
-   ```
+```bash
+ssh kaladont@PROD_IP 'cd /opt/kaladont && docker compose -f docker-compose.prod.yml logs --since 10m aplikacija'
+```
 
 12. U [evidenciju održavanja](odrzavanje.md#evidencija-drillova-objava-i-većih-zahvata) upiši vrijeme, status, digest, commit SHA, workflow, rezultat, trajanje prekida i identitete/ID probne produkcijske partije kako bi se mogla prepoznati u malom uzorku metrika.
 

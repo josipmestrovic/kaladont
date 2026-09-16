@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-> **Status 2026-09-16: djelomično implementirano.** `.github/workflows/ci.yml`, `.github/workflows/objavi-ghcr.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički CI fixture postoje i provjereni su. Main CI sada pushne candidate, smoke-testira njegov digest, a GHCR workflow promovira isti manifest bez rebuilda. Automatski staging workflow, produkcijski promotion workflow, backup automatika i deploy ključevi još ne postoje. Ovaj dokument razlikuje stvarni tok od ciljanog budućeg toka.
+> **Status 2026-09-16: djelomično implementirano.** `.github/workflows/ci.yml`, `.github/workflows/objavi-ghcr.yml`, `.github/workflows/objavi-staging.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički CI fixture postoje i provjereni su. Main CI sada pushne candidate, smoke-testira njegov digest, GHCR workflow promovira isti manifest bez rebuilda, a staging workflow automatski objavljuje promovirani digest i provjerava javni health. Produkcijski promotion workflow, backup automatika i deploy ključevi još ne postoje. Ovaj dokument razlikuje stvarni tok od ciljanog budućeg toka.
 
 Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
 
@@ -9,7 +9,7 @@ flowchart LR
     A[merge u main] --> B[CI: lint + test + build]
     B --> C[Smoke test Docker slike]
     C --> D[Javni GHCR - commit tag + digest]
-    D --> E[Ručno ažuriranje staginga po digestu]
+    D --> E[Automatski staging deploy po digestu]
     E --> F[Ručna provjera na stagingu]
     F --> G[Ručni produkcijski workflow]
     G --> H[Isti digest u produkciju]
@@ -83,20 +83,16 @@ Operativna pravila za release identitet, status kandidata, staging closed test c
 
 VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kratkotrajni `GITHUB_TOKEN` šalje se udaljenom `docker login --password-stdin` procesu preko zaštićene SSH veze i koristi s privremenim `DOCKER_CONFIG` direktorijem. Token se ne stavlja u argument naredbe ni log. Nakon `docker pull`/`compose pull` workflow izvršava `docker logout` i briše privremeni direktorij čak i kada deploy padne.
 
-## Staging — trenutačni ručni postupak i budući workflow
+## Staging — automatski workflow
 
-Automatski `objavi-staging.yml` još ne postoji. Trenutno operater nakon zelenog CI-ja i GHCR objave ručno upisuje puni digest u `/opt/kaladont/.env`, povlači aplikacijski image i rekreira samo aplikaciju. Taj ručni staging deploy punim digestom službeni je postupak dok workflow ne postoji. Konfiguracije se ručno kopiraju na VPS; `.env` i tajne se ne kopiraju iz repozitorija.
+`objavi-staging.yml` pokreće se nakon uspješnog GHCR promotion workflowa za `main`. Workflow iz commit SHA taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije, povlači točan image, izvršava migracije, rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. `.env` i aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
 
-1. Zapiše trenutno aktivni staging digest radi dijagnostike.
-2. Sigurno prenese verzionirane Compose/Caddy konfiguracije u `/opt/kaladont`; `.env` i tajne nikad se ne kopiraju iz repozitorija.
-3. Validira renderirani Compose i Caddy config prije primjene.
-4. Ako paket bude privatan, kratkotrajno se prijavi u GHCR i povuče točan novi digest.
-5. Jednokratnim alatom iz **novog digesta** primijeni migracije.
-6. Provjeri broj riječi. Samo pri prvom praznom rječniku pokreće puni hrLex uvoz; kod svakog kasnijeg deploya uvoz se preskače.
-7. Pokrene/zamijeni aplikaciju s točnim digestom.
-8. Odjavi GHCR i ukloni privremene vjerodajnice.
-9. Ponavlja javni `https://staging.kaladont.hr/zdravlje` do uspjeha ili zadanog kratkog roka; odgovor mora sadržavati očekivani digest.
-10. Zapisuje GitHub Deployment i sažetak s digestom, URL-om i rezultatom.
+1. Workflow koristi GitHub Environment `staging` i tajne `STAGING_HOST`, `STAGING_SSH_KLJUC` i `STAGING_SSH_KNOWN_HOSTS`.
+2. Fiksni SSH korisnik je `deploy`, a host fingerprint se provjerava s `StrictHostKeyChecking=yes`.
+3. Na VPS se šalju samo `docker-compose.staging.yml` i `Caddyfile.staging`; `.env` i tajne nikad se ne kopiraju iz repozitorija.
+4. Workflow validira Compose, povlači novi digest, izvršava migracije i pokreće aplikaciju.
+5. Ponavlja javni health do uspjeha; odgovor mora sadržavati očekivani digest i commit SHA.
+6. Zeleni staging deploy znači da je kandidat spreman za ručnu browser provjeru, ne za automatsku produkciju.
 
 Staging tijekom privremenog multiplayer testiranja nema Basic Auth kako browser ne bi izazivao ponovne promptove na Socket.IO zahtjevima. `X-Robots-Tag: noindex, nofollow` nije kontrola pristupa; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway.
 

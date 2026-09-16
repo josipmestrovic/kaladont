@@ -1,0 +1,130 @@
+name: Objaviti staging
+
+on:
+  workflow_run:
+    workflows:
+      - Objaviti Docker sliku
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  objava:
+    name: Objaviti isti digest na staging
+    runs-on: ubuntu-24.04
+    environment: staging
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Preuzeti repozitorij
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Prijaviti se u GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Postaviti Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Odrediti promovirani digest
+        id: release
+        shell: bash
+        env:
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          image="ghcr.io/josipmestrovic/kaladont:${COMMIT_SHA}"
+          digest=$(docker buildx imagetools inspect "$image" | awk '/^Digest:/ { print $2; exit }')
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/josipmestrovic/kaladont@${digest}" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Staging release'
+            echo "- Commit: \`$COMMIT_SHA\`"
+            echo "- Digest: \`$digest\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pripremiti SSH vjerodajnice
+        shell: bash
+        env:
+          SSH_KLJUC: ${{ secrets.STAGING_SSH_KLJUC }}
+          SSH_KNOWN_HOSTS: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_KLJUC"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d "$RUNNER_TEMP/ssh"
+          printf '%s\n' "$SSH_KLJUC" > "$RUNNER_TEMP/ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/ssh/id_ed25519" "$RUNNER_TEMP/ssh/known_hosts"
+
+      - name: Prenijeti staging konfiguracije
+        shell: bash
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+        run: |
+          test -n "$STAGING_HOST"
+          scp -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            docker-compose.staging.yml Caddyfile.staging \
+            "deploy@${STAGING_HOST}:/opt/kaladont/"
+
+      - name: Povuci digest i rekreiraj staging aplikaciju
+        shell: bash
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          IMAGE_REF: ${{ steps.release.outputs.image }}
+          IMAGE_DIGEST: ${{ steps.release.outputs.digest }}
+          RELEASE_VERSION: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          ssh -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            "deploy@${STAGING_HOST}" \
+            "IMAGE_REF='$IMAGE_REF' IMAGE_DIGEST='$IMAGE_DIGEST' RELEASE_VERSION='$RELEASE_VERSION' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd /opt/kaladont
+          export KALADONT_IMAGE="$IMAGE_REF"
+          export DIGEST="$IMAGE_DIGEST"
+          export VERZIJA="$RELEASE_VERSION"
+
+          docker compose -f docker-compose.staging.yml config >/dev/null
+          docker compose -f docker-compose.staging.yml pull aplikacija
+          docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
+          docker compose -f docker-compose.staging.yml up -d aplikacija
+          REMOTE
+
+      - name: Provjeriti staging health i digest
+        shell: bash
+        env:
+          EXPECTED_DIGEST: ${{ steps.release.outputs.digest }}
+          EXPECTED_VERSION: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          for pokusaj in {1..30}; do
+            odgovor=$(curl --silent --show-error --fail https://staging.kaladont.hr/zdravlje || true)
+            if echo "$odgovor" | jq -e --arg digest "$EXPECTED_DIGEST" --arg verzija "$EXPECTED_VERSION" '.ok == true and .baza == "dostupna" and .digest == $digest and .verzija == $verzija' >/dev/null; then
+              echo "$odgovor"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Staging nije postao zdrav s očekivanim digestom.'
+          exit 1
+
+      - name: Očistiti SSH vjerodajnice
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/ssh"
