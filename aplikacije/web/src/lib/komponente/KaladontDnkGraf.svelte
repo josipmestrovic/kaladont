@@ -83,6 +83,7 @@
       </div>
     </div>
   {/if}
+  <a class="dnk-pomoc" href="/pomoc?tema=napredak#dnk">Kako čitati DNK?</a>
 </section>
 
 <style>
@@ -246,6 +247,14 @@
     margin: 4px 0 0;
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mali);
+  }
+
+  .dnk-pomoc {
+    display: inline-block;
+    margin-top: 12px;
+    color: var(--boja-pozadina-primarna);
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
   }
 
   @media (max-width: 640px) {

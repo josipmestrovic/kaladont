@@ -96,6 +96,7 @@
               <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
             {/each}
           </span></p>
+          <a class="pomoc-oznake" href="/pomoc?tema=napredak#ocjena-partije">Kako se računa ocjena?</a>
         {/if}
         {#if profil.statistikaRijeci}<p class="streak-sažetak">Najduži niz bez pogreške riječi: <strong>{profil.statistikaRijeci.najduziStreak}</strong></p>{/if}
       </div>
@@ -186,6 +187,7 @@
   .stil-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.95rem; }
   .stil-igre strong { color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.1rem; text-transform: capitalize; }
   .ocjena-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
+  .pomoc-oznake { display: inline-block; margin-top: 4px; color: var(--boja-pozadina-primarna); font-size: var(--tekst-mikro); font-weight: 700; }
   .ocjena-zvjezdice {
     display: inline-flex;
     align-items: center;

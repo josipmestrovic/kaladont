@@ -564,6 +564,7 @@
     <span>Ocjena igre</span>
     <strong>{stanje.kraj.mojaOcjenaIgre ?? 0} / 5</strong>
     <span class="ocjena-zvjezdice" aria-hidden="true">{'★'.repeat(stanje.kraj.mojaOcjenaIgre ?? 0)}{'☆'.repeat(5 - (stanje.kraj.mojaOcjenaIgre ?? 0))}</span>
+    <a href="/pomoc?tema=napredak#ocjena-partije">Kako se računa?</a>
   </section>
   {#if stanje.kraj.mojDnk}
     <KaladontDnkPromjena
@@ -892,6 +893,7 @@
               disabled={slanjeUTijeku}
             />
           </div>
+          <p class="pomoc-unosa">Početak je već upisan. Dopiši ostatak.</p>
         {/key}
         <div class="potez-gumbi">
           <button type="submit" disabled={slanjeUTijeku}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
@@ -1044,6 +1046,7 @@
     color: var(--boja-tekst-sekundarni);
   }
   .ocjena-igre-zavrsna strong { color: var(--boja-tekst-naslov); font-size: 1.2rem; }
+  .ocjena-igre-zavrsna a { color: var(--boja-pozadina-primarna); font-size: var(--tekst-sitni); font-weight: 700; }
   .ocjena-zvjezdice { color: var(--boja-zuta-krema); letter-spacing: 0.1em; font-size: 1.2rem; }
   .zavrsni-dnk-zaglavlje {
     display: flex;
@@ -1565,6 +1568,12 @@
     color: var(--boja-akcent);
     font-size: var(--tekst-mali);
     font-weight: 600;
+    text-align: center;
+  }
+  .pomoc-unosa {
+    margin: 5px 0 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
     text-align: center;
   }
   @keyframes podrhtavanje-unosa {

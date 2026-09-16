@@ -61,7 +61,7 @@
         </svg>
         <span>Igraj</span>
       </a>
-      <a href="/pomoc?tema=pravila" class="nav-link" class:aktivan={$page.url.pathname === '/pomoc' || $page.url.pathname === '/pravila'}>
+      <a href="/pomoc?tema=kako-igrati" class="nav-link" class:aktivan={$page.url.pathname === '/pomoc' || $page.url.pathname === '/pravila'}>
         <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="9"></circle>
           <path d="M9.7 9a2.5 2.5 0 1 1 4.3 1.7c-.9.9-2 1.3-2 2.8"></path>

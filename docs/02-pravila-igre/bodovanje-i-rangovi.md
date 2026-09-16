@@ -51,8 +51,8 @@ Najbolji streak iz partije množi cijeli subtotal: 0–2 ×1,00; 3 ×1,10; 4 ×1
 
 Rang je u MVP-u isključivo **prikazni status** — ne utječe na uparivanje (vidi [ADR-008](../03-arhitektura/odluke/008-bez-matchmakinga-u-mvp.md)).
 
-- Prvih **10 partija** u pojedinom modu igrač nosi oznaku **Piskaralo** (kalibracija) i ne prikazuje mu se rang za taj mod.
-- Od 11. partije rang se određuje prema prosjeku bodova po partiji u tom modu.
+- Dok ima manje od **10 završenih partija** u pojedinom modu, igrač nosi oznaku **Piskaralo** (kalibracija) i ne prikazuje mu se rang za taj mod.
+- Dovršena 10. partija dodjeljuje rang prema prosjeku bodova po partiji u tom modu.
 
 | Rang | Prosjek bodova po partiji |
 |---|---|

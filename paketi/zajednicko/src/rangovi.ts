@@ -43,7 +43,7 @@ function rangoviPoModu(mod: ModPartije): readonly PragRanga[] {
   return mod === 'dva_igraca' ? RANGOVI_1V1 : RANGOVI;
 }
 
-/** Prvih 10 partija igrač je "Piskaralo" (bez ranga); poslije se rang računa iz prosjeka bodova. */
+/** Dok ima manje od 10 partija igrač je "Piskaralo"; dovršena 10. partija dodjeljuje rang. */
 export function izracunajRang(odigrane: number, prosjekBodova: number, mod: ModPartije = 'cetiri_igraca'): string {
   if (odigrane < BROJ_PARTIJA_ZA_KALIBRACIJU) return 'Piskaralo';
 

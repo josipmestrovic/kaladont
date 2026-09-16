@@ -40,6 +40,7 @@
         <a href="/soba/kreiraj" class="soba-gumb">Privatna soba</a>
       </div>
     </div>
+    <a class="prvi-put-link" href="/pomoc?tema=kako-igrati">Prvi put? Kako igrati</a>
   </div>
 
   {#if !registriran}
@@ -152,6 +153,12 @@
     margin-top: 0;
   }
 
+  .prvi-put-link {
+    margin-top: -36px;
+    color: var(--boja-tekst-sekundarni);
+    font-weight: 700;
+  }
+
   .igraj-gumb {
     display: inline-block;
     background: var(--boja-pozadina-primarna);
@@ -219,6 +226,8 @@
     .gumbi-sekcija {
       margin-top: 44px;
     }
+
+    .prvi-put-link { display: inline-block; margin-top: 18px; }
 
     footer {
       margin-top: 0;

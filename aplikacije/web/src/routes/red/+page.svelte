@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { dohvatiSocket } from '$lib/socket.js';
-  import { SAVJETI } from '$lib/savjeti.js';
+  import { dohvatiSavjete } from '$lib/savjeti.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
@@ -15,6 +15,7 @@
     $page.url.searchParams.get('mod') === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca'
   );
   const ukupnoMjesta = $derived(trazeneMod === 'dva_igraca' ? 2 : 4);
+  const savjeti = $derived(dohvatiSavjete(trazeneMod));
 
   let stanje = $state<StanjeReda>({
     mojIgracId: '',
@@ -61,7 +62,7 @@
   onMount(() => {
     pokreniSlusateljeIgre();
     sliderInterval = setInterval(() => {
-      aktivniSavjet = (aktivniSavjet + 1) % SAVJETI.length;
+      aktivniSavjet = (aktivniSavjet + 1) % savjeti.length;
     }, 8000);
     const socket = dohvatiSocket();
 
@@ -169,10 +170,10 @@
 {/if}
 
 <section class="hint-slider" aria-label="Savjeti za igru">
-  <h2 class="hint-naslov"><span aria-hidden="true">💡</span> Korisne informacije</h2>
+  <h2 class="hint-naslov"><span aria-hidden="true">💡</span> Korisne informacije <a href="/pomoc?tema=kako-igrati" target="_blank" rel="noreferrer">Otvori pomoć</a></h2>
   <div class="hint-okvir">
     <div class="hint-traka" style={`transform: translateX(-${aktivniSavjet * 100}%);`}>
-      {#each SAVJETI as savjet}
+      {#each savjeti as savjet}
         <p class="hint">{savjet}</p>
       {/each}
     </div>
@@ -285,6 +286,8 @@
     font-size: var(--tekst-mali);
     font-weight: 600;
   }
+
+  .hint-naslov a { margin-left: auto; color: var(--boja-pozadina-primarna); font-size: var(--tekst-sitni); }
 
   .hint-okvir {
     overflow: hidden;

@@ -1,170 +1,144 @@
 <script lang="ts">
-  import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { RANGOVI } from 'zajednicko';
+  import { page } from '$app/stores';
+  import { RANGOVI, RANGOVI_1V1 } from 'zajednicko';
 
-  type Tema = 'pravila' | 'javne' | 'privatne' | 'rangovi' | 'napredak' | 'dnk';
-
-  const teme: { id: Tema; puniNaziv: string; kratkiNaziv: string }[] = [
-    { id: 'pravila', puniNaziv: 'Pravila igre', kratkiNaziv: 'Pravila' },
-    { id: 'javne', puniNaziv: 'Javne igre', kratkiNaziv: 'Javne' },
-    { id: 'privatne', puniNaziv: 'Privatne igre', kratkiNaziv: 'Privatne' },
-    { id: 'rangovi', puniNaziv: 'Rangovi i obrubi', kratkiNaziv: 'Rangovi' },
-    { id: 'napredak', puniNaziv: 'Napredak', kratkiNaziv: 'Napredak' },
-    { id: 'dnk', puniNaziv: 'Kaladont DNK', kratkiNaziv: 'DNK' },
+  type Tema = 'kako-igrati' | 'pravila' | 'nacini' | 'bodovi' | 'napredak' | 'pitanja';
+  const teme: { id: Tema; naziv: string }[] = [
+    { id: 'kako-igrati', naziv: 'Kako igrati' },
+    { id: 'pravila', naziv: 'Pravila' },
+    { id: 'nacini', naziv: 'Načini igre' },
+    { id: 'bodovi', naziv: 'Bodovi i rangovi' },
+    { id: 'napredak', naziv: 'Napredak' },
+    { id: 'pitanja', naziv: 'Pitanja i problemi' },
   ];
 
   const odabranaTema = $derived(
     teme.some((tema) => tema.id === $page.url.searchParams.get('tema'))
       ? ($page.url.searchParams.get('tema') as Tema)
-      : 'pravila',
+      : 'kako-igrati',
   );
+  let probniNastavak = $state('');
+  let probniRezultat = $state<'tocno' | 'netocno' | null>(null);
 
-  function otvoriTemu(tema: Tema): void {
-    void goto(`/pomoc?tema=${tema}`, { replaceState: true, noScroll: true });
+  async function otvoriTemu(tema: Tema, sidro?: string): Promise<void> {
+    await goto(`/pomoc?tema=${tema}${sidro ? `#${sidro}` : ''}`, { replaceState: true, noScroll: true });
+    requestAnimationFrame(() => document.getElementById(sidro ?? 'sadrzaj-pomoci')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
+  function provjeriProbniPotez(): void {
+    probniRezultat = probniNastavak.trim().toLocaleLowerCase('hr-HR') === 'za' ? 'tocno' : 'netocno';
+  }
+
+  function rasponRanga(indeks: number, rangovi: readonly { minimalniProsjek: number }[]): string {
+    if (indeks === 0) return `manje od ${rangovi[1]!.minimalniProsjek.toFixed(2).replace('.', ',')}`;
+    if (indeks === rangovi.length - 1) return `${rangovi[indeks]!.minimalniProsjek.toFixed(2).replace('.', ',')} ili više`;
+    return `${rangovi[indeks]!.minimalniProsjek.toFixed(2).replace('.', ',')} – ${(rangovi[indeks + 1]!.minimalniProsjek - 0.01).toFixed(2).replace('.', ',')}`;
   }
 </script>
 
 <svelte:head>
   <title>Pomoć | Kaladont</title>
-  <meta name="description" content="Pravila igre, rangovi, obrubi avatara, XP i dostignuća u Kaladontu." />
+  <meta name="description" content="Kako igrati Kaladont, pravila, načini igre, bodovi, rangovi i napredak." />
 </svelte:head>
 
 <main class="pomoc">
   <header class="zaglavlje">
     <p class="nadnaslov">Vodič kroz Kaladont</p>
     <h1>Pomoć</h1>
-    <p>Sve što trebaš za igru, napredak i statistiku.</p>
+    <p>Od prvog poteza do rangova, dostignuća i Kaladont DNK-a.</p>
   </header>
 
   <nav class="teme" aria-label="Teme pomoći">
     {#each teme as tema}
-      <button
-        type="button"
-        class:aktivna={odabranaTema === tema.id}
-        aria-current={odabranaTema === tema.id ? 'page' : undefined}
-        onclick={() => otvoriTemu(tema.id)}
-      >
-        <span class="puni-naziv">{tema.puniNaziv}</span>
-        <span class="kratki-naziv">{tema.kratkiNaziv}</span>
-      </button>
+      <button type="button" class:aktivna={odabranaTema === tema.id} aria-current={odabranaTema === tema.id ? 'page' : undefined} onclick={() => otvoriTemu(tema.id)}>{tema.naziv}</button>
     {/each}
   </nav>
 
-  {#if odabranaTema === 'pravila'}
-    <section class="sadrzaj" aria-labelledby="pravila-naslov">
-      <h2 id="pravila-naslov">Pravila igre</h2>
+  {#if odabranaTema === 'kako-igrati'}
+    <section id="sadrzaj-pomoci" class="sadrzaj" aria-labelledby="kako-igrati-naslov">
+      <h2 id="kako-igrati-naslov">Kako igrati</h2>
+      <p class="uvod">Za prvu partiju trebaš znati samo ovo: ostani posljednji igrač i na svom potezu dovrši riječ koja počinje prikazanim slovima.</p>
+      <ol class="koraci">
+        <li><strong>Odaberi igru.</strong> U javnoj igri možeš birati dva ili četiri igrača, a možeš igrati i kao gost.</li>
+        <li><strong>Pričekaj početnu riječ.</strong> Sustav je odabire na početku svake runde.</li>
+        <li><strong>Smisli nastavak.</strong> U javnoj partiji imaš 30 sekundi po potezu.</li>
+        <li><strong>Dopiši samo ostatak riječi.</strong> Početna slova već su u polju. Pritisni <strong>Pošalji</strong> ili Enter.</li>
+        <li><strong>Ako riječ ne prođe, pokušaj ponovno.</strong> Ne ispadaš odmah, ali vrijeme nastavlja teći.</li>
+        <li><strong>„Ne znam” znači ispadanje.</strong> Nakon toga možeš promatrati ostatak partije.</li>
+      </ol>
       <section>
-        <h3>2 zadnja slova</h3>
-        <p>Odgovori riječju koja počinje na zadnja 2 slova prethodne riječi. <strong>Nj, lj i dž</strong> jedno su slovo.</p>
-        <p>Primjer: nakon <strong>kralj</strong> traži se <strong>alj</strong>; nakon <strong>ulje</strong> traži se <strong>lje</strong>. Kod riječi poput „injekcija” slova se rastavljaju kao <strong>i-n-j</strong>.</p>
+        <h3>Kako izgleda unos?</h3>
+        <div class="tablica-omotac"><table><thead><tr><th>Prethodna riječ</th><th>Već prikazano</th><th>Ti upisuješ</th><th>Šalje se</th></tr></thead><tbody><tr><td>sova</td><td><strong>VA</strong></td><td><strong>za</strong></td><td>vaza</td></tr></tbody></table></div>
+        <p>Početna slova već su tu. Ti dopiši ostatak. Ako upišeš cijelu riječ „vaza”, poslao bi „vavaza”.</p>
       </section>
-      <section>
-        <h3>Koje su riječi dopuštene?</h3>
-        <p>Riječ mora postojati u hrvatskom rječniku i početi na tražena slova. Prihvaćamo imenice, glagole, pridjeve, priloge, zamjenice, brojeve, prijedloge, veznike, čestice i usklice u svim oblicima.</p>
-        <ul>
-          <li>Dijakritici vrijede: <strong>č nije c</strong>, <strong>š nije s</strong> i tako redom.</li>
-          <li>Vlastita imena, kratice, brojke, crtice i razmaci nisu u igri.</li>
-        </ul>
+      <section class="probni-potez" aria-labelledby="proba-naslov">
+        <h3 id="proba-naslov">Probaj bez odbrojavanja</h3>
+        <p>Dovrši riječ koja počinje na <strong>VA</strong>.</p>
+        <form onsubmit={(dogadjaj) => { dogadjaj.preventDefault(); provjeriProbniPotez(); }}>
+          <div class="probni-unos"><span aria-hidden="true">va</span><input bind:value={probniNastavak} autocomplete="off" aria-label="Dovrši riječ na VA" oninput={() => (probniRezultat = null)} /></div>
+          <button type="submit">Provjeri</button>
+        </form>
+        {#if probniRezultat === 'tocno'}<p class="uspjeh" role="status"><strong>Točno: vaza.</strong> Spreman si za prvi potez.</p>{:else if probniRezultat === 'netocno'}<p class="greska" role="status">Za ovaj primjer dopiši <strong>za</strong>. Početak <strong>va</strong> već je upisan.</p>{/if}
       </section>
-      <section>
-        <h3>Jednom odigrano, potrošeno</h3>
-        <p>Riječ troši svoje leksemske grupe. Nakon „dobar” ne prolaze ni „dobra” ni „dobro”, dok su „bolji” i „najbolji” zasebne grupe. „Kaladont” i „kalodont” posebne su riječi i mogu se ponoviti.</p>
-      </section>
-      <section>
-        <h3>Kada ispadaš?</h3>
-        <ul>
-          <li>klikneš <strong>Ne znam</strong>;</li>
-          <li>istekne vrijeme prije valjane riječi;</li>
-          <li>prethodni igrač ostavi mrtva slova bez dostupnog nastavka;</li>
-          <li>ne vratiš se nakon prekida veze u roku od 10 sekundi.</li>
-        </ul>
-        <p>Pogrešna riječ te ne ruši odmah, ali pojede dragocjeno vrijeme.</p>
-      </section>
-      <section>
-        <h3>Kaladont efekt</h3>
-        <p>Kada odigraš „kaladont” ili „kalodont” na <strong>ka</strong>, ispada igrač koji ti je otvorio „ka”, ne sljedeći igrač. Ti dobivaš bod za eliminaciju, a sustav otvara novu rundu.</p>
-      </section>
-      <p class="poveznica">Želiš znati kako se računaju rang i obrub avatara? <button type="button" onclick={() => otvoriTemu('rangovi')}>Rangovi i obrubi →</button></p>
+      <aside class="napomena"><strong>Pazi na „ka”.</strong> Ako protivniku ostaviš „ka”, može odigrati „kaladont” i izbaciti te iz partije.</aside>
+      <p class="poveznica">Spreman? <a href="/">Odaberi način igre →</a> ili <button type="button" onclick={() => otvoriTemu('pravila')}>pročitaj sva pravila →</button></p>
     </section>
-  {:else if odabranaTema === 'javne'}
-    <section class="sadrzaj" aria-labelledby="javne-naslov">
-      <h2 id="javne-naslov">Javne igre</h2>
-      <p>Javne igre su glavni natjecateljski modovi. Igraš protiv drugih igrača iz reda čekanja, a rezultat se sprema u tvoju javnu statistiku.</p>
-      <section><h3>Klasični mod za 4 igrača</h3><p>Igraju točno 4 igrača. Prvi ispali završava na četvrtom mjestu, a zadnji preostali pobjeđuje. Plasman, izazvane eliminacije i pobjeda ulaze u bodovanje.</p></section>
-      <section><h3>1v1 dvoboj</h3><p>Igraju 2 igrača. Pravila riječi su ista, ali bodovanje i statistika vode se zasebno od Klasičnog moda.</p></section>
-      <section><h3>Što javni modovi dijele?</h3><p>Dijele pravila nastavaka, grafeme, rječnik, leksemske grupe i osnovni sustav igre. Ne dijele statistiku, prosjek bodova, rang ni broj odigranih igara.</p></section>
+  {:else if odabranaTema === 'pravila'}
+    <section id="sadrzaj-pomoci" class="sadrzaj" aria-labelledby="pravila-naslov">
+      <h2 id="pravila-naslov">Pravila</h2>
+      <section><h3>Kako povezujemo riječi</h3><p>Nova riječ mora početi na posljednja dva grafema prethodne riječi. Primjer: <strong>sova → vaza → zabava</strong>.</p><p><strong>Nj, lj i dž</strong> računaju se kao jedno slovo. Zato nakon „konj” tražimo <strong>onj</strong>: slovo o i grafem nj.</p></section>
+      <section><h3>Koje riječi prihvaća igra?</h3><p>Riječ mora postojati <strong>u rječniku igre</strong>, početi traženim slovima i pripadati dopuštenoj vrsti riječi. Rječnik sadrži različite vrste riječi u njihovim oblicima.</p><ul><li>Dijakritici vrijede: <strong>č nije c</strong>, <strong>š nije s</strong> i tako redom.</li><li>Vlastita imena, kratice, brojke, crtice i razmaci nisu u igri.</li></ul></section>
+      <section><h3>Oblici iste riječi</h3><p>Jednom odigrana riječ i svi njezini povezani oblici potrošeni su <strong>do kraja cijele partije, uključujući nove runde</strong>. Dobar, dobra, dobro — ista ekipa u drugoj majici. Nakon jednog oblika ostali više ne prolaze.</p><p>Stručnije: odigrani oblik troši sve svoje leksemske grupe. „Bolji” i „najbolji” mogu pripadati zasebnim grupama. „Kaladont” i „kalodont” posebne su riječi i mogu se ponoviti.</p></section>
+      <section><h3>Kaladont efekt</h3><p>Ana odigra „jabuka” i ostavi <strong>ka</strong>. Boris odgovori „kaladont”. <strong>Ana ispada</strong>, a sustav otvara novu rundu. Ne ispada igrač koji je sljedeći na redu.</p><ul><li>Ako je „ka” ostavila početna riječ sustava, nitko ne ispada i nitko ne dobiva bod za eliminaciju.</li><li>U javnoj igri za četiri igrača izvođač dobiva bod za eliminaciju. U dvoboju vrijedi fiksno bodovanje pobjede, a u privatnoj sobi bod ovisi o postavci eliminacija.</li></ul></section>
+      <section><h3>Mrtva slova</h3><p>Mrtva slova su traženi nastavak za koji više nema dopuštene riječi. To se može dogoditi zato što nastavka nema u rječniku igre ili zato što su sve dostupne riječi na taj nastavak već potrošene.</p></section>
+      <section><h3>Kada ispadaš?</h3><ul><li>odabereš <strong>Ne znam</strong> — to nije preskakanje poteza;</li><li>istekne vrijeme prije valjane riječi;</li><li>prethodni igrač ostavi mrtva slova;</li><li>protivnik izvede Kaladont na „ka” koje si mu ostavio;</li><li>ne vratiš se nakon prekida veze u roku od 10 sekundi.</li></ul><p>Odbijena riječ ne izbacuje te odmah. Probaj drugu riječ, ali sat nema razumijevanja.</p></section>
+      <details class="jezicne-iznimke"><summary>Jezične iznimke i grafemi</summary><p>Kod većine riječi nj, lj i dž čitamo kao jedan grafem. Iznimke se vode u rječniku igre: primjerice, „injekcija” počinje grafemima i-n, a ne i-nj. Server uvijek provjerava konačni potez.</p></details>
+    </section>
+  {:else if odabranaTema === 'nacini'}
+    <section id="sadrzaj-pomoci" class="sadrzaj" aria-labelledby="nacini-naslov">
+      <h2 id="nacini-naslov">Načini igre</h2>
+      <p class="uvod">Pravila riječi ista su svugdje. Razlikuju se broj igrača, napredak i tko odlučuje o postavkama.</p>
+      <div class="tablica-omotac usporedba-modova"><table><thead><tr><th></th><th>4 igrača</th><th>2 igrača</th><th>Privatna soba</th></tr></thead><tbody><tr><th>S kim igraš?</th><td>Igrači iz čekaonice</td><td>Protivnik iz čekaonice</td><td>Ekipa kojoj pošalješ link</td></tr><tr><th>Broj igrača</th><td>4</td><td>2</td><td>2–8</td></tr><tr><th>Vrijeme poteza</th><td>30 sekundi</td><td>30 sekundi</td><td>15, 30 ili 60 sekundi, ili bez tajmera</td></tr><tr><th>Javni rang</th><td>Da, za četiri igrača</td><td>Da, zaseban za dvoboj</td><td>Ne</td></tr><tr><th>XP</th><td>Da</td><td>Da</td><td>Ne</td></tr><tr><th>Bodovi sobe</th><td>—</td><td>—</td><td>Privremena ljestvica sobe</td></tr></tbody></table></div>
+      <section><h3>Igra s prijateljima</h3><p><strong>Stvori sobu → odaberi postavke → kopiraj pozivni link → pošalji ga ekipi → vlasnik pokreće igru.</strong></p><p>Vlasnik bira trajanje poteza, dopuštene vrste riječi i dodjeljuju li se bodovi za eliminacije. Rezultati ostaju na privremenoj ljestvici dok je soba aktivna.</p><p class="poveznica"><a href="/soba/kreiraj">Stvori privatnu sobu →</a></p></section>
+      <section><h3>Što napreduje u privatnoj sobi?</h3><p>Privatna igra ne mijenja javni rang, javne bodove, XP ni Kaladont DNK. Napredovati mogu jezična dostignuća <strong>Rijetkolovac</strong>, <strong>Dugometraš</strong> i <strong>Jezik u plamenu</strong>.</p></section>
+    </section>
+  {:else if odabranaTema === 'bodovi'}
+    <section id="sadrzaj-pomoci" class="sadrzaj" aria-labelledby="bodovi-naslov">
+      <h2 id="bodovi-naslov">Bodovi i rangovi</h2>
+      <section><h3>Kako dobivaš bodove?</h3><ul><li><strong>Četiri igrača:</strong> plasman donosi 3, 2, 1 ili 0 bodova; svaka izazvana eliminacija +1; pobjeda još +1.</li><li><strong>Dvoboj:</strong> pobjeda donosi 1 bod, poraz 0.</li><li><strong>Privatna soba:</strong> pobjeda donosi 2 boda na ljestvici sobe, uz opcionalni +1 za eliminaciju.</li></ul><p class="primjer-izracuna"><strong>Primjer:</strong> drugo mjesto (2) + jedna eliminacija (1) = <strong>3 boda</strong>.</p></section>
+      <section><h3>Kako dobivaš rang?</h3><p>Rang dobivaš nakon <strong>10 završenih javnih partija u tom načinu igre</strong>. Do tada se prikazuje „Piskaralo”. Rang ovisi o prosjeku bodova, može rasti i padati, a za dva i četiri igrača računa se zasebno.</p><p>Obrub avatara prikazuje tvoj rang. To je vizualni status i ne daje prednost u igri.</p></section>
+      <section><h3>Rangovi za četiri igrača</h3><div class="tablica-omotac"><table><thead><tr><th>Rang</th><th>Prosjek bodova</th></tr></thead><tbody>{#each RANGOVI as rang, indeks}<tr><td>{rang.naziv}</td><td>{rasponRanga(indeks, RANGOVI)}</td></tr>{/each}</tbody></table></div></section>
+      <section><h3>Rangovi za dvoboj</h3><div class="tablica-omotac"><table><thead><tr><th>Rang</th><th>Prosjek pobjeda</th></tr></thead><tbody>{#each RANGOVI_1V1 as rang, indeks}<tr><td>{rang.naziv}</td><td>{rasponRanga(indeks, RANGOVI_1V1)}</td></tr>{/each}</tbody></table></div></section>
       <p class="poveznica"><a href="/ljestvica">Otvori ljestvicu igrača →</a></p>
     </section>
-  {:else if odabranaTema === 'privatne'}
-    <section class="sadrzaj" aria-labelledby="privatne-naslov">
-      <h2 id="privatne-naslov">Privatne igre</h2>
-      <p>Privatna soba je tvoja igra s ekipom. Može imati od <strong>2 do 8 igrača</strong>, a ulazi se kodom ili pozivnim linkom.</p>
-      <section><h3>Vlastita pravila</h3><p>Vlasnik sobe bira trajanje poteza, dopuštene vrste riječi i želi li dodjeljivati bodove za eliminacije. Pravila nastavaka, grafema i ponavljanja ostaju ista.</p></section>
-      <section><h3>Što privatne sobe dijele s javnom igrom?</h3><p>Koriste isti rječnik, grafeme, leksemske grupe, prihvaćanje riječi, ispadanje i Kaladont efekt. Zato naučena pravila vrijede svugdje.</p></section>
-      <section><h3>Što privatne sobe ne mijenjaju?</h3><p>Privatni rezultat ne ulazi u javni rang, javne bodove, javnu statistiku ni XP. Soba ima vlastitu privremenu ljestvicu koja traje dok je soba aktivna.</p></section>
-      <p class="poveznica"><a href="/soba/kreiraj">Stvori privatnu sobu →</a></p>
-    </section>
-  {:else if odabranaTema === 'rangovi'}
-    <section class="sadrzaj" aria-labelledby="rangovi-naslov">
-      <h2 id="rangovi-naslov">Rangovi i obrubi</h2>
-      <p>Nakon prvih 10 igara u pojedinom modu dobivaš rang prema prosjeku bodova po igri. Rangovi za 4 igrača i 1v1 računaju se odvojeno.</p>
-      <div class="tablica-omotac">
-        <table>
-          <thead><tr><th>Rang</th><th>Prosjek bodova po partiji</th></tr></thead>
-          <tbody>
-            {#each RANGOVI as rang, indeks}
-              <tr><td>{rang.naziv}</td><td>{indeks === 0 ? 'manje od 1,50' : indeks === RANGOVI.length - 1 ? '5,70 ili više' : `${rang.minimalniProsjek.toFixed(2).replace('.', ',')} – ${((RANGOVI[indeks + 1]?.minimalniProsjek ?? rang.minimalniProsjek) - 0.01).toFixed(2).replace('.', ',')}`}</td></tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-      <p class="napomena">Tvoj rang mijenja boju obruba avatara. Obrub je vizualni status i ne daje prednost u igri.</p>
-      <p class="poveznica">Kako skupljaš XP i otključavaš dostignuća? <button type="button" onclick={() => otvoriTemu('napredak')}>Napredak →</button></p>
-    </section>
   {:else if odabranaTema === 'napredak'}
-    <section class="sadrzaj" aria-labelledby="napredak-naslov">
+    <section id="sadrzaj-pomoci" class="sadrzaj" aria-labelledby="napredak-naslov">
       <h2 id="napredak-naslov">Napredak</h2>
-      <section>
-        <h3>Iskustvo i razine</h3>
-        <p>Razina i rang nisu isto. Rang govori o prosjeku bodova i natjecateljskom statusu, a razina govori koliko si ukupno iskustva skupio. XP dobivaš kroz poteze, pobjede, eliminacije, duge i rijetke riječi te streakove. Nakon igre vidiš točan obračun i punjenje XP trake.</p>
-      </section>
-      <section>
-        <h3>Dostignuća</h3>
-        <p>Dostignuća imaju više razina, a zvjezdice pokazuju koliko si ih već otključao. Možeš pratiti razine, rijetke riječi, duge riječi, streak, Kaladont trenutke i pobjede.</p>
-        <p class="poveznica">Svoja dostignuća pronaći ćeš na <a href="/profil">svom profilu →</a></p>
-      </section>
-      <section>
-        <h3>Duge i rijetke riječi</h3>
-        <ul>
-          <li>Duga riječ: 10–11 grafema.</li>
-          <li>Srednje duga riječ: 12–14 grafema.</li>
-          <li>Jako duga riječ: 15+ grafema.</li>
-          <li>Rijetkost se određuje prema učestalosti riječi u rječniku.</li>
-          <li><strong>Nj, lj i dž</strong> računaju se kao jedan grafem.</li>
-        </ul>
-      </section>
+      <div class="tablica-omotac oznake-tablica"><table><tbody><tr><th>Rang</th><td>Rezultati kroz prosjek bodova u određenom načinu igre.</td></tr><tr><th>Razina / LVL</th><td>Ukupno prikupljeno iskustvo.</td></tr><tr><th>Dostignuća</th><td>Ostvareni zadaci i njihove razine.</td></tr><tr><th>Ocjena partije</th><td>Automatska ocjena završene partije, povezana s dodatnim XP-om.</td></tr><tr><th>Kaladont DNK</th><td>Šest obilježja tvog načina igranja.</td></tr></tbody></table></div>
+      <section><h3>XP i razina</h3><p>XP dobivaš u javnim partijama za prihvaćene poteze, pobjede, eliminacije te duge i rijetke riječi. Nakon partije vidiš cijeli obračun i napredak prema sljedećoj razini. Privatne sobe ne dodjeljuju XP.</p></section>
+      <section><h3>Niz bez pogreške</h3><p>Niz bez pogreške (streak) broji tvoje uzastopne prihvaćene poteze. Odbijena riječ prekida niz, ali ne izbacuje te iz partije. Dulji najbolji niz u partiji povećava osvojeni XP.</p></section>
+      <section><h3>Duge i rijetke riječi</h3><ul><li>Duge riječi imaju 10–11, srednje duge 12–14, a jako duge 15 ili više grafema.</li><li>Rijetkost ovisi o učestalosti riječi u rječniku igre.</li><li><strong>Nj, lj i dž</strong> računaju se kao jedan grafem.</li></ul></section>
+      <section><h3>Dostignuća</h3><p>Dostignuća imaju više razina. Njihove zvjezdice pokazuju koliko si razina dostignuća otključao — nisu isto što i zvjezdice ocjene partije.</p></section>
+      <section id="ocjena-partije"><h3>Ocjena partije</h3><p>Nakon javne partije igra automatski dodjeljuje od nula do pet zvjezdica prema promjeni tvojih Kaladont DNK vrijednosti i pobjedi. Viša ocjena donosi veći postotni dodatak na XP te partije. Ocjena ne mijenja bodove ni rang.</p></section>
+      <section id="dnk"><h3>Kaladont DNK</h3><p>Nakon 10 javnih partija u odabranom načinu otključavaš profil svog stila igre. Uzorak sline nije potreban. DNK za dva i četiri igrača računa se zasebno.</p><div class="dnk-osi"><p><strong>Vještina</strong><span>Prati prosjek bodova. Više znači uspješnije rezultate.</span></p><p><strong>Taktika</strong><span>Prati izazvane eliminacije po partiji.</span></p><p><strong>Fokus</strong><span>Prati najduži niz prihvaćenih riječi bez pogreške.</span></p><p><strong>Brzina</strong><span>Prati prosječno vrijeme prihvaćenog poteza. Brži odgovori podižu vrijednost.</span></p><p><strong>Duge riječi</strong><span>Prati koliko često biraš duge riječi u odnosu na broj partija.</span></p><p><strong>Rijetke riječi</strong><span>Prati koliko često pronalaziš riječi male učestalosti.</span></p></div><p class="poveznica"><a href="/profil">Otvori svoj profil i Kaladont DNK →</a></p></section>
     </section>
   {:else}
-    <section class="sadrzaj" aria-labelledby="dnk-naslov">
-      <h2 id="dnk-naslov">Kaladont DNK</h2>
-      <p>Kaladont DNK je profil tvog stila igre. Otključava se nakon 10 javnih igara u pojedinom modu i prikazuje šest odvojenih osi.</p>
-      <section><h3>Šest osi profila</h3><ul><li><strong>Vještina</strong> prati prosjek bodova.</li><li><strong>Taktika</strong> prati izazvane eliminacije po igri.</li><li><strong>Fokus</strong> prati najduži niz prihvaćenih riječi.</li><li><strong>Brzina</strong> prati prosječno trajanje prihvaćenog poteza.</li><li><strong>Duge riječi</strong> i <strong>Rijetke riječi</strong> prate tvoje jezične izbore.</li></ul></section>
-      <section><h3>Odvojeno po modu</h3><p>DNK za 4 igrača i DNK za 2 igrača računaju se zasebno, kao i rangovi i statistika. Igra u jednom modu ne mijenja profil drugog moda.</p></section>
-      <section><h3>Kada se otključa?</h3><p>Dok DNK nije otključan, vidiš napredak prema 10 javnih igara. Nakon otključavanja dobivaš radar graf sa svojim vrijednostima. Na završetku igre prikazuju se samo promjene u odnosu na prethodno stanje.</p></section>
-      <p class="poveznica"><a href="/profil">Otvori svoj profil i Kaladont DNK →</a></p>
+    <section id="sadrzaj-pomoci" class="sadrzaj faq" aria-labelledby="pitanja-naslov">
+      <h2 id="pitanja-naslov">Pitanja i problemi</h2>
+      <details><summary>Zašto moja riječ nije prihvaćena?</summary><p>Provjeri tražena slova, dijakritike, dopuštenu vrstu riječi i je li riječ ili njezin oblik već potrošen. Pokušaj drugu riječ dok vrijeme još traje.</p></details>
+      <details><summary>Zašto je drugi oblik iste riječi već iskorišten?</summary><p>Povezani oblici troše se zajedno do kraja cijele partije. Nakon „dobar” ne prolaze ni „dobra” ni „dobro”.</p></details>
+      <details><summary>Zašto sam odmah ispao?</summary><p>„Ne znam” znači ispadanje. Ispadaš i kada vrijeme istekne, ostanu mrtva slova, protivnik izvede Kaladont na tvoje „ka” ili se ne vratiš nakon prekida veze.</p></details>
+      <details><summary>Zašto više nemam niz bez pogreške?</summary><p>Svaka odbijena riječ prekida tvoj trenutni niz, iako te sama pogreška ne izbacuje iz partije.</p></details>
+      <details><summary>Zašto sam još Piskaralo?</summary><p>Rang se dodjeljuje nakon 10 završenih javnih partija u pojedinom načinu igre. Dvoboj i igra za četiri igrača računaju se zasebno.</p></details>
+      <details><summary>Zašto nisam na ljestvici?</summary><p>Za ljestvicu trebaš završiti najmanje 10 javnih partija u odabranom načinu i imati registriran profil.</p></details>
+      <details><summary>Zašto u privatnoj sobi nisam dobio XP?</summary><p>Privatne sobe imaju svoju privremenu ljestvicu, ali ne dodjeljuju XP ni javne bodove. U njima mogu napredovati Rijetkolovac, Dugometraš i Jezik u plamenu.</p></details>
+      <details><summary>Gdje su mi statistike na drugom uređaju?</summary><p>Kao gost napredak je vezan uz identitet na ovom uređaju. Registriraj se kako bi svoj profil mogao otvoriti i na drugom uređaju.</p></details>
+      <details><summary>Kako promijeniti avatar ili utišati zvuk?</summary><p>Otvori <a href="/profil?tab=postavke">postavke profila</a>. Registrirani igrači mogu promijeniti avatar, a zvuk možeš podesiti neovisno o vrsti računa.</p></details>
+      <details><summary>Kako prijaviti riječ ili problem?</summary><p>Nakon završetka partije otvori popis poteza i uz sporni potez odaberi <strong>Prijavi</strong>. Tako se prijava veže uz točnu riječ i partiju.</p></details>
+      <p class="poveznica">Nisi pronašao odgovor? <a href="https://forum.kaladont.hr">Otvori Kaladont forum →</a></p>
     </section>
   {/if}
-
-  <section class="faq" aria-labelledby="faq-naslov">
-    <h2 id="faq-naslov">Najčešća pitanja</h2>
-    <details><summary>Zašto moja riječ nije prihvaćena?</summary><p>Provjeri tražena slova, dijakritike i je li riječ već potrošila svoju leksemsku grupu. Ako je presuda čudna, prijavi je i pusti serveru da bude sudac.</p></details>
-    <details><summary>Zašto još nemam rang?</summary><p>Rang se prikazuje nakon prvih 10 igara u pojedinom modu. Do tada si u kalibraciji.</p></details>
-    <details><summary>Utječu li privatne sobe na rang i XP?</summary><p>Ne utječu na javni rang, javne bodove ni XP. Privatna soba ima svoju malu ljestvicu, a određena jezična dostignuća i dalje mogu napredovati.</p></details>
-    <details><summary>Zašto sam ispao iako nisam kliknuo „Ne znam”?</summary><p>Možda je isteklo vrijeme, ostala su mrtva slova ili se veza nije vratila na vrijeme. Igra ne kažnjava šutnju dvaput, samo je vrlo dosljedna.</p></details>
-    <details><summary>Mogu li ponovno odigrati riječ u drugom padežu?</summary><p>Ne ako dijeli istu leksemsku grupu s već odigranom riječi. Drugi oblik nije uvijek novi potez.</p></details>
-    <details><summary>Kako prijaviti riječ koja nedostaje?</summary><p>Upotrijebi gumb „Prijavi” u igri ili u povijesti igre. Tako se prijava veže uz točan potez i rječnik se može pošteno provjeriti.</p></details>
-  </section>
 </main>
 
 <style>
@@ -173,35 +147,51 @@
   .nadnaslov { margin: 0 0 4px; color: var(--boja-mint); font-size: var(--tekst-sitni); font-weight: 700; text-transform: uppercase; }
   h1, h2, h3 { font-family: var(--font-naslov); color: var(--boja-tekst-naslov); }
   h1 { margin: 0; font-size: var(--naslov-1); }
-  .zaglavlje > p:last-child { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); }
+  .zaglavlje > p:last-child, .uvod { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); }
   .teme { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; padding-bottom: 4px; }
   .teme button { flex: 0 0 auto; padding: 10px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-weight: 700; cursor: pointer; }
   .teme button.aktivna { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
-  .kratki-naziv { display: none; }
-  .sadrzaj, .faq { padding: 22px 0; }
-  .sadrzaj h2, .faq h2 { margin: 0 0 18px; font-size: var(--naslov-2); }
-  .sadrzaj section { padding: 18px 0; border-top: 1px solid #e5ddc8; }
+  #sadrzaj-pomoci { scroll-margin-top: 16px; outline: none; }
+  .sadrzaj { padding: 22px 0; }
+  .sadrzaj h2 { margin: 0 0 18px; font-size: var(--naslov-2); }
+  .sadrzaj > section { padding: 18px 0; border-top: 1px solid #e5ddc8; }
   h3 { margin: 0 0 8px; font-size: var(--naslov-3); }
-  p, li { line-height: 1.6; }
+  p, li, td, th { line-height: 1.6; }
   p { margin: 0 0 12px; }
-  ul { margin: 0 0 12px; padding-left: 22px; }
-  li + li { margin-top: 6px; }
+  ul, ol { margin: 0 0 12px; padding-left: 22px; }
+  li + li { margin-top: 7px; }
   button, a { color: var(--boja-pozadina-primarna); font-weight: 700; }
   .poveznica { margin-top: 24px; }
   .poveznica button { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+  .koraci { margin-top: 20px; }
   .tablica-omotac { overflow-x: auto; margin: 20px 0; }
   table { width: 100%; border-collapse: collapse; background: white; }
-  th, td { padding: 11px 12px; border-bottom: 1px solid #e5ddc8; text-align: left; }
+  th, td { padding: 11px 12px; border-bottom: 1px solid #e5ddc8; text-align: left; vertical-align: top; }
   th { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-sitni); }
-  .napomena { padding: 14px 16px; border-left: 4px solid var(--boja-mint); background: #fffdf5; }
-  .faq { border-top: 1px solid #e5ddc8; }
-  .faq details { padding: 14px 0; border-bottom: 1px solid #e5ddc8; }
-  .faq summary { cursor: pointer; font-weight: 700; }
-  .faq details p { margin: 10px 0 0; color: var(--boja-tekst-sekundarni); }
+  .usporedba-modova table { min-width: 700px; }
+  .napomena, .primjer-izracuna { padding: 14px 16px; border-left: 4px solid var(--boja-mint); background: #fffdf5; }
+  .probni-potez form { display: flex; gap: 10px; max-width: 520px; }
+  .probni-unos { display: flex; flex: 1; overflow: hidden; border: 2px solid #d8d0bf; border-radius: 6px; background: white; }
+  .probni-unos:focus-within { border-color: var(--boja-mint-tamni); }
+  .probni-unos span { display: grid; place-items: center; padding: 0 12px; background: #f3eee2; font-weight: 800; text-transform: uppercase; }
+  .probni-unos input { min-width: 0; flex: 1; padding: 12px; border: 0; outline: none; font: inherit; }
+  .probni-potez form > button { padding: 0 18px; border: 0; border-radius: 6px; background: var(--boja-pozadina-primarna); color: white; cursor: pointer; }
+  .uspjeh { margin-top: 12px; color: var(--boja-mint-tamni); }
+  .greska { margin-top: 12px; color: var(--boja-akcent); }
+  .jezicne-iznimke, .faq details { padding: 14px 0; border-bottom: 1px solid #e5ddc8; }
+  .jezicne-iznimke { border-top: 1px solid #e5ddc8; }
+  summary { cursor: pointer; font-weight: 700; }
+  details p { margin: 10px 0 0; color: var(--boja-tekst-sekundarni); }
+  .oznake-tablica th { width: 180px; color: var(--boja-tekst-naslov); }
+  .dnk-osi { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; }
+  .dnk-osi p { display: grid; gap: 2px; padding-bottom: 10px; border-bottom: 1px solid #e5ddc8; }
+  .dnk-osi span { color: var(--boja-tekst-sekundarni); }
   @media (max-width: 767px) {
     .pomoc { padding-top: 24px; }
-    .puni-naziv { display: none; }
-    .kratki-naziv { display: inline; }
-    .teme button { flex: 1 1 auto; }
+    .teme button { flex: 1 1 calc(50% - 4px); }
+    .probni-potez form { flex-direction: column; }
+    .probni-potez form > button { min-height: 46px; }
+    .dnk-osi { grid-template-columns: 1fr; }
+    .oznake-tablica th { width: 120px; }
   }
 </style>

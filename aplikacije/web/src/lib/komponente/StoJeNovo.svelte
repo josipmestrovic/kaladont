@@ -33,7 +33,7 @@
       <StatistikaRjecnika />
       <h4>Kontakt</h4>
       <p class="tekst">Pitanja, prijedlozi ili prijave grešaka: koristi gumb „Prijavi” u igri ili piši na <a href="mailto:kontakt@kaladont.hr">kontakt@kaladont.hr</a>.</p>
-      <p class="poveznica"><a href="/pomoc?tema=pravila">Otvori cijeli vodič Pomoć →</a></p>
+      <p class="poveznica"><a href="/pomoc?tema=kako-igrati">Otvori cijeli vodič Pomoć →</a></p>
     {:else if pogled === 'uvjeti'}
       <h2>Uvjeti</h2>
       <p class="tekst">Uvjeti korištenja bit će dopunjeni prije šireg otvaranja igre.</p>

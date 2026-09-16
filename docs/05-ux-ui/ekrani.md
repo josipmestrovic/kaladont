@@ -6,7 +6,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Desktop **nije** zaseban l
 
 **Svrha:** stalna orijentacija — tko sam, brz pristup postavkama i pravilima. Prikazuje se na svim ekranima OSIM u čekaonici (`/red`) i u tijeku partije (`/partija/*`).
 
-- **Lijevo:** ikone i labele navigacije u boji osnovnog teksta (narančasto istaknuto aktivno stanje, bez podcrtavanja) — **Početna**, **Pomoć** (`?` u krugu), **Ljestvice**, **Postavke**. Pomoć je kanonska ruta `/pomoc?tema=pravila`.
+- **Lijevo:** ikone i labele navigacije u boji osnovnog teksta (narančasto istaknuto aktivno stanje, bez podcrtavanja) — **Početna**, **Pomoć** (`?` u krugu), **Ljestvice**, **Postavke**. Pomoć je kanonska ruta `/pomoc?tema=kako-igrati`.
 - **Desno:** avatar korisnika ili gosta. Pokraj avatara desno u boji naslova prikazano je ime samo za ulogirane registrirane korisnike, dok gosti imaju samo avatar (s tekstualnim napisom `GOST` unutar kružnog avatara). Klik na avatar vodi na `/profil`.
 
 ## 1. Landing (`/`)
@@ -114,7 +114,7 @@ Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvoj
 
 ## 10. Statične stranice
 
-- `/pomoc?tema=pravila|rangovi|napredak` — help hub s pravilima igre, tablicom rangova i obruba, XP/dostignućima, FAQ blokom i linkovima prema profilu, ljestvici i privatnim sobama. `/pravila` i `/o-igri` ostaju kompatibilni redirecti.
+- `/pomoc?tema=kako-igrati|pravila|nacini|bodovi|napredak|pitanja` — pomoć kroz šest tema, od prvog poteza do pravila, načina igre, rangova, napretka i praktičnog FAQ-a. `/pravila` i `/o-igri` ostaju kompatibilni redirecti na odgovarajući sadržaj.
 - Footer popup „O igri” — priča o imenu, rani pristup, **atribucija hrLexa** prema [izvor-i-licenca.md](../04-rjecnik/izvor-i-licenca.md#tekst-atribucije-za-stranicu-o-igri), statistika rječnika i kontakt; popup povezuje na Help hub.
 - `/privatnost`, `/uvjeti` — pravni minimum (vidi [sigurnost-i-privatnost.md](../07-operacije/sigurnost-i-privatnost.md)).
 

@@ -177,6 +177,7 @@
         <span class="rang-oznaka">
            {vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'}
         </span>
+          <a class="pomoc-oznake" href="/pomoc?tema=bodovi">Kako se računa rang?</a>
         <div class="iskustvo-profila">
           <strong>LVL {profil.iskustvo.razina}</strong>
           {#if profil.iskustvo.doIduce === null}
@@ -188,6 +189,7 @@
             </div>
           {/if}
         </div>
+        <a class="pomoc-oznake" href="/pomoc?tema=napredak">Kako radi XP?</a>
         <p class="stil-igre">Stil igre: <strong>{profil.stilIgre}</strong></p>
         {#if profil.prosjecnaOcjenaIgre !== null}
           {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
@@ -196,6 +198,7 @@
               <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
             {/each}
           </span></p>
+          <a class="pomoc-oznake" href="/pomoc?tema=napredak#ocjena-partije">Kako se računa ocjena?</a>
         {/if}
         {#if profil.statistikaRijeci}
           <p class="streak-sažetak">Najduži niz bez pogreške riječi: <strong>{profil.statistikaRijeci.najduziStreak}</strong></p>
@@ -414,6 +417,7 @@
   .stil-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.95rem; }
   .stil-igre strong { color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.1rem; text-transform: capitalize; }
   .ocjena-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
+  .pomoc-oznake { display: inline-block; margin-top: 4px; color: var(--boja-pozadina-primarna); font-size: var(--tekst-mikro); font-weight: 700; }
   .ocjena-zvjezdice {
     display: inline-flex;
     align-items: center;
