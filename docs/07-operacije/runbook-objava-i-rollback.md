@@ -16,7 +16,7 @@ Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani 
 
 1. **Spoji PR u `main`** tek kada su obvezne provjere zelene. CI zatim objavljuje image u GHCR-u.
 2. **Zabilježi release kandidata** prema [release shemi](release-shema.md#predložak-zapisa-releasea): puni digest, commit SHA, workflow run, prethodni staging digest, kratak opis promjene i početni status `kandidat`.
-3. **Pričekaj automatski staging workflow**. On koristi isti puni `sha256:...` digest, šalje verzionirane konfiguracije, izvršava migracije, rekreira samo aplikaciju i provjerava health.
+3. **Pričekaj automatski staging workflow**. On koristi isti puni `sha256:...` digest, šalje verzionirane konfiguracije, izvršava migracije, rekreira aplikaciju i Caddy te provjerava health.
 4. **Provjeri staging** bez Basic Autha; staging je privremeno javno dostupan uz `noindex`:
    - `/zdravlje` vraća 200;
    - landing, registracija/prijava, red i WebSocket rade;
