@@ -24,11 +24,6 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Preuzeti repozitorij
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
       - name: Prijaviti se u GHCR
         uses: docker/login-action@v3
         with:
@@ -36,17 +31,45 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Izgraditi i objaviti amd64 sliku
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ghcr.io/josipmestrovic/kaladont:${{ github.event.workflow_run.head_sha }}
-            ghcr.io/josipmestrovic/kaladont:main
-          labels: |
-            org.opencontainers.image.title=Kaladont
-            org.opencontainers.image.description=Hrvatska višeigračka igra riječi
-            org.opencontainers.image.source=https://github.com/josipmestrovic/kaladont
-            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+      - name: Postaviti Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Provjeriti candidate manifest
+        id: candidate
+        shell: bash
+        env:
+          CANDIDATE_TAG: ci-${{ github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.id }}
+        run: |
+          candidate="ghcr.io/josipmestrovic/kaladont:${CANDIDATE_TAG}"
+          digest=$(docker buildx imagetools inspect "$candidate" | awk '/^Digest:/ { print $2; exit }')
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Docker candidate promotion'
+            echo "- Candidate: \`$candidate\`"
+            echo "- Digest: \`$digest\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Promovirati postojeći manifest
+        shell: bash
+        env:
+          CANDIDATE: ${{ steps.candidate.outputs.candidate }}
+          COMMIT_TAG: ghcr.io/josipmestrovic/kaladont:${{ github.event.workflow_run.head_sha }}
+          MAIN_TAG: ghcr.io/josipmestrovic/kaladont:main
+        run: |
+          docker buildx imagetools create --tag "$COMMIT_TAG" "$CANDIDATE"
+          docker buildx imagetools create --tag "$MAIN_TAG" "$CANDIDATE"
+
+      - name: Provjeriti promovirane digest-e
+        shell: bash
+        env:
+          EXPECTED_DIGEST: ${{ steps.candidate.outputs.digest }}
+          COMMIT_TAG: ghcr.io/josipmestrovic/kaladont:${{ github.event.workflow_run.head_sha }}
+          MAIN_TAG: ghcr.io/josipmestrovic/kaladont:main
+        run: |
+          for oznaka in "$COMMIT_TAG" "$MAIN_TAG"; do
+            digest=$(docker buildx imagetools inspect "$oznaka" | awk '/^Digest:/ { print $2; exit }')
+            test "$digest" = "$EXPECTED_DIGEST"
+            echo "$oznaka -> $digest"
+          done

@@ -8,28 +8,28 @@ services:
     networks:
       - ci
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kaladont -d kaladont_ci"]
+      test: ['CMD-SHELL', 'pg_isready -U kaladont -d kaladont_ci']
       interval: 2s
       timeout: 5s
       retries: 15
 
   aplikacija:
-    image: kaladont:ci
+    image: ${IMAGE_REF:-kaladont:ci}
     environment:
       NODE_ENV: test
       PORT: 3000
       BAZA_URL: postgresql://kaladont:kaladont@baza:5432/kaladont_ci
       SESIJA_TAJNA: ci-test-secret
-      EMAIL_API_KLJUC: ""
+      EMAIL_API_KLJUC: ''
       EMAIL_POSILJATELJ: noreply@kaladont.hr
-      STAGING_EMAIL_ALLOWLIST: ""
+      STAGING_EMAIL_ALLOWLIST: ''
       DEV_MAIL: dev@example.com
-      ONEMOGUCI_TIMER_POTEZA: "false"
-      ODGODA_POCETKA_PARTIJE_MS: "0"
-      TOLERANCIJA_PREKIDA_MS: "10000"
+      ONEMOGUCI_TIMER_POTEZA: 'false'
+      ODGODA_POCETKA_PARTIJE_MS: '0'
+      TOLERANCIJA_PREKIDA_MS: '10000'
       ADMIN_TAJNI_KLJUC: ci-admin-secret
       VERZIJA: ci
-      DIGEST: ci
+      DIGEST: ${IMAGE_DIGEST:-ci}
       SIMULACIJA_ADRESA: http://aplikacija:3000
     networks:
       - ci
@@ -37,7 +37,7 @@ services:
       baza:
         condition: service_healthy
     ports:
-      - "127.0.0.1:3000:3000"
+      - '127.0.0.1:3000:3000'
 
 networks:
   ci:

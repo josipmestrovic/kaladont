@@ -4,6 +4,8 @@ build/
 .env
 .svelte-kit/
 coverage/
+test-results/
+playwright-report/
 
 # hrLex je CC BY-SA - izvedeni podaci se ne commitaju (ADR-010)
 skripte/uvoz-rjecnika/podaci/

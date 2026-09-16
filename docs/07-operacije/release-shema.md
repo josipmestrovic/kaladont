@@ -2,7 +2,7 @@
 
 Ovaj dokument je operativni izvor istine za označavanje, provjeru i evidenciju releaseova. Arhitektonsku odluku definira [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md), CI i objavu slike opisuje [CI/CD](ci-cd.md), a ručne korake objave i rollbacka [runbook objave i rollbacka](runbook-objava-i-rollback.md).
 
-> **Status 2026-09-09:** staging je online i ažurira se ručno punim GHCR digestom nakon zelenog CI-ja i GHCR objave. Automatski staging deploy, produkcijski VPS i produkcijski promotion workflow još nisu implementirani. Ova shema zato namjerno razlikuje današnji ručni tok od ciljanog produkcijskog toka.
+> **Status 2026-09-16:** staging je online i ažurira se ručno punim GHCR digestom nakon zelenog CI-ja i promotion workflowa. Candidate se smoke-testira prije promotiona, a commit SHA i `main` tag pokazuju isti manifest. Automatski staging deploy, produkcijski VPS i produkcijski promotion workflow još nisu implementirani. Ova shema zato namjerno razlikuje današnji ručni tok od ciljanog produkcijskog toka.
 
 ## Cilj
 
@@ -18,35 +18,35 @@ Za prve zatvorene testove puni GHCR digest ostaje autoritativan tehnički identi
 
 ## Identitet releasea
 
-| Polje | Pravilo |
-| ----- | ------- |
-| Digest | Puni `sha256:...` GHCR digest je jedini autoritativni artefakt za staging, produkciju i rollback. |
-| Commit SHA | Puni Git commit SHA veže digest uz diff, PR i CI zapis. |
+| Polje            | Pravilo                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| Digest           | Puni `sha256:...` GHCR digest je jedini autoritativni artefakt za staging, produkciju i rollback.     |
+| Commit SHA       | Puni Git commit SHA veže digest uz diff, PR i CI zapis.                                               |
 | Verzija za ljude | SemVer prerelease oznaka za GitHub Release i sučelje; ne koristi se za deploy, migracije ni rollback. |
-| Ljudski opis | Jedna rečenica: što release mijenja i što posebno treba testirati. |
-| Status | Jedan od statusa iz ovog dokumenta. |
+| Ljudski opis     | Jedna rečenica: što release mijenja i što posebno treba testirati.                                    |
+| Status           | Jedan od statusa iz ovog dokumenta.                                                                   |
 
 Nije dopušteno deployati `latest`, branch tag, lokalno buildanu sliku, skraćeni digest ili digest za koji nije jasno koji ga je workflow proizveo. Produkcija, kada bude postavljena, smije dobiti samo isti digest koji je prošao staging.
 
 ## Statusi
 
-| Status | Značenje |
-| ------ | -------- |
-| `kandidat` | CI je zelen i GHCR je objavio sliku, ali staging provjera još nije završena. |
+| Status               | Značenje                                                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `kandidat`           | CI je zelen i GHCR je objavio sliku, ali staging provjera još nije završena.                                         |
 | `staging-provjereno` | Digest je na stagingu, health i ručne provjere su prošle, i može se dijeliti closed testerima ili promovirati dalje. |
-| `odbačeno` | Staging je otkrio kvar ili neprihvatljiv rizik; digest se ne promovira i ne dijeli dalje. |
-| `promovirano` | Isti digest je ručno promoviran u produkciju. |
-| `rollbackano` | Release je zamijenjen prethodnim poznato-zdravim digestom. |
+| `odbačeno`           | Staging je otkrio kvar ili neprihvatljiv rizik; digest se ne promovira i ne dijeli dalje.                            |
+| `promovirano`        | Isti digest je ručno promoviran u produkciju.                                                                        |
+| `rollbackano`        | Release je zamijenjen prethodnim poznato-zdravim digestom.                                                           |
 
 Status se zapisuje u [evidenciju održavanja](odrzavanje.md#evidencija-drillova-objava-i-većih-zahvata). Ako isti digest mijenja status, dodaje se novi redak umjesto prepisivanja starog.
 
 ## Kanali
 
-| Kanal | Kako nastaje | Tko ga vidi | Izlaz |
-| ----- | ------------ | ----------- | ----- |
-| `main` kandidat | PR je spojen u `main`, CI je zelen i GHCR objava je uspjela. | Operater. | Digest spreman za ručni staging deploy. |
-| Staging closed test | Operater ručno postavi digest na `staging.kaladont.hr` i provjeri ga. | Mali ručno odabrani krug testera. | `staging-provjereno` ili `odbačeno`. |
-| Produkcija | Operater ručno promovira isti staging-provjereni digest u vrijeme slabog prometa. | Svi korisnici. | `promovirano` ili rollback. |
+| Kanal               | Kako nastaje                                                                      | Tko ga vidi                       | Izlaz                                   |
+| ------------------- | --------------------------------------------------------------------------------- | --------------------------------- | --------------------------------------- |
+| `main` kandidat     | PR je spojen u `main`, CI je zelen i GHCR objava je uspjela.                      | Operater.                         | Digest spreman za ručni staging deploy. |
+| Staging closed test | Operater ručno postavi digest na `staging.kaladont.hr` i provjeri ga.             | Mali ručno odabrani krug testera. | `staging-provjereno` ili `odbačeno`.    |
+| Produkcija          | Operater ručno promovira isti staging-provjereni digest u vrijeme slabog prometa. | Svi korisnici.                    | `promovirano` ili rollback.             |
 
 Staging tijekom prvih closed testova ostaje bez Basic Autha zbog Socket.IO promptova. Koristi `X-Robots-Tag: noindex, nofollow`, ali to nije kontrola pristupa. Link se dijeli samo malom ručno odabranom krugu testera. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway.
 
@@ -55,7 +55,7 @@ Staging tijekom prvih closed testova ostaje bez Basic Autha zbog Socket.IO promp
 1. Napravi promjenu na radnoj grani i otvori PR prema `main`.
 2. Prije mergea potvrdi da je CI zelen i da razumiješ migracije, konfiguracijske promjene i rollback rizik.
 3. Spoji PR u `main`.
-4. Pričekaj da [GHCR workflow](../../.github/workflows/objavi-ghcr.yml) objavi sliku.
+4. Pričekaj da CI pushne candidate, provede smoke test po digestu, a zatim [GHCR promotion workflow](../../.github/workflows/objavi-ghcr.yml) promovira isti manifest.
 5. Iz workflowa zapiši puni digest, puni commit SHA i poveznicu na workflow run.
 6. Zapiši trenutno aktivni staging digest prije promjene.
 7. Na staging VPS-u ručno postavi novi digest u `/opt/kaladont/.env`, povuci sliku i rekreiraj samo aplikaciju prema [runbooku objave](runbook-objava-i-rollback.md#redovna-objava).
@@ -139,18 +139,18 @@ Ako je problem u podacima ili migraciji, to je bazni incident i rješava se prem
 
 ## Predložak zapisa releasea
 
-| Polje | Vrijednost |
-| ----- | ---------- |
-| UTC vrijeme |  |
-| Status | `kandidat` / `staging-provjereno` / `odbačeno` / `promovirano` / `rollbackano` |
-| Digest | `sha256:` |
-| Commit SHA |  |
-| Workflow |  |
-| Prethodni digest |  |
-| Okruženje | staging / produkcija |
-| Operater |  |
-| Sažetak promjene |  |
-| Ručna provjera |  |
-| Odluka i napomena |  |
+| Polje             | Vrijednost                                                                     |
+| ----------------- | ------------------------------------------------------------------------------ |
+| UTC vrijeme       |                                                                                |
+| Status            | `kandidat` / `staging-provjereno` / `odbačeno` / `promovirano` / `rollbackano` |
+| Digest            | `sha256:`                                                                      |
+| Commit SHA        |                                                                                |
+| Workflow          |                                                                                |
+| Prethodni digest  |                                                                                |
+| Okruženje         | staging / produkcija                                                           |
+| Operater          |                                                                                |
+| Sažetak promjene  |                                                                                |
+| Ručna provjera    |                                                                                |
+| Odluka i napomena |                                                                                |
 
 Za trajnu evidenciju koristi tablicu u [održavanju](odrzavanje.md#evidencija-drillova-objava-i-većih-zahvata). Ovaj predložak služi kao podsjetnik što treba prikupiti prije upisa.

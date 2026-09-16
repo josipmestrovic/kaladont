@@ -8,9 +8,33 @@ Pravila igre su srce proizvoda — greška u validaciji ili bodovanju izravno kr
 | ---------------------- | ------------------------- | ------------------------------------------------- |
 | Jedinični              | Vitest                    | `paketi/zajednicko` — grafemi, pravila, bodovanje |
 | Integracijski          | Vitest + socket.io-client | Engine partije kroz stvarne socket poruke         |
-| E2E (nakon MVP jezgre) | Playwright                | Dimni test: landing → red → partija → kraj        |
+| E2E                         | Playwright                | Kritični browser tokovi: auth, red, partija, soba, reconnect |
 
 ## Trenutačno i ciljano stanje
+
+Playwright E2E testovi žive u `e2e/` i pokreću se odvojeno od brzog Vitest ciklusa:
+
+```powershell
+# jednom po računalu
+pnpm test:e2e:install
+
+# lokalno: native PostgreSQL mora raditi, migracije i sintetički rječnik moraju biti učitani
+pnpm test:e2e
+```
+
+E2E konfiguracija automatski pokreće poslužitelj na portu `3001` i web na portu `5174`. Lokalni
+E2E koristi postojeću `.env` konfiguraciju i native PostgreSQL; u CI-ju se koriste CI varijable i
+isti sintetički fixture kao za ostale provjere. `pnpm test` namjerno ne pokreće Chromium ni E2E
+testove, pa dodavanje browsera ne usporava svakodnevni testni ciklus.
+
+Početni kritični paket ima šest testova: registracija/prijava i sesija, javni red za četiri igrača,
+javni red za dva igrača, privatna soba s dva igrača i reconnect aktivne partije. Pravila grafema,
+detaljno bodovanje i sve timer/reconnect utrke ostaju u jediničnim i Socket.IO integracijskim
+testovima; E2E potvrđuje da se web, auth, socket događaji i navigacija zajedno ponašaju ispravno.
+
+Testovi su serijalizirani s jednim workerom radi izolacije zajedničke testne baze. Očekivano trajanje
+je približno 20–60 sekundi lokalno nakon pripreme procesa i približno 1–3 minute u CI-ju, ovisno o
+instalaciji Chromiuma i pokretanju PostgreSQL-a.
 
 Postojeći Vitest i Socket.IO testovi izvršavaju se lokalno uz native PostgreSQL. GitHub CI dodatno gradi i smoke-testira stvarnu amd64 Docker sliku: pokreće PostgreSQL, migracije, sintetički fixture, health check i simulaciju četiri igrača. Lokalni Windows razvoj i dalje ne zahtijeva Docker.
 

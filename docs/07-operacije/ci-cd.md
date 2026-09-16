@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-> **Status 2026-09-09: djelomično implementirano.** `.github/workflows/ci.yml`, `.github/workflows/objavi-ghcr.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički CI fixture postoje i provjereni su. Automatski staging workflow, produkcijski promotion workflow, backup automatika i deploy ključevi još ne postoje. Ovaj dokument razlikuje stvarni tok od ciljanog budućeg toka.
+> **Status 2026-09-16: djelomično implementirano.** `.github/workflows/ci.yml`, `.github/workflows/objavi-ghcr.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički CI fixture postoje i provjereni su. Main CI sada pushne candidate, smoke-testira njegov digest, a GHCR workflow promovira isti manifest bez rebuilda. Automatski staging workflow, produkcijski promotion workflow, backup automatika i deploy ključevi još ne postoje. Ovaj dokument razlikuje stvarni tok od ciljanog budućeg toka.
 
 Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
 
@@ -59,20 +59,23 @@ Push na `main` ponavlja iste provjere prije builda i objave slike. Nije dopušte
 
 Na `main` se slika gradi jednom. Taj lokalni image ili registry digest koristi se u svim sljedećim koracima; nakon testa nema rebuilda za staging ili produkciju.
 
-1. Build multi-stage Dockerfilea za `linux/amd64`.
-2. Podizanje izoliranog Compose stacka s točno pinanom PostgreSQL slikom.
-3. Migracije jednokratnom naredbom iz aplikacijskog digesta.
-4. Uvoz **malog sintetičkog testnog rječnika** iz repozitorija; pravi hrLex ne ulazi u git ni CI fixture.
-5. Pokretanje aplikacije kao ne-root korisnika u kontejneru.
-6. `GET /zdravlje` mora vratiti 200, dostupnu bazu, `brojRijeci > 0` i očekivanu verziju/digest.
-7. Skripta `simulacija` spaja četiri Socket.IO klijenta i odigra **cijelu partiju** protiv kontejnera.
-8. Gašenje stacka i volumena čak i kada prethodni korak padne.
+1. Build multi-stage Dockerfilea za `linux/amd64` samo na uspješnom pushu u `main`.
+2. Push kandidata u GHCR pod jedinstvenim tagom `ci-<commit-sha>-<run-id>` i spremanje vraćenog digest-a.
+3. Povlačenje kandidata po punom `ghcr.io/...@sha256:<digest>` i podizanje izoliranog Compose stacka s točno pinanom PostgreSQL slikom.
+4. Migracije jednokratnom naredbom iz upravo povučenog aplikacijskog digesta.
+5. Uvoz **malog sintetičkog testnog rječnika** iz repozitorija; pravi hrLex ne ulazi u git ni CI fixture.
+6. Pokretanje aplikacije kao ne-root korisnika u kontejneru.
+7. `GET /zdravlje` mora vratiti 200, dostupnu bazu, `brojRijeci > 0` i isti digest koji je candidate build proizveo.
+8. Skripta `simulacija` spaja četiri Socket.IO klijenta i odigra **cijelu partiju** protiv kontejnera.
+9. Gašenje stacka i volumena čak i kada prethodni korak padne.
 
 Padne li bilo koji korak, slika se ne objavljuje i staging se ne dira. Ista provjera izvodi se na PR-u koji dira Dockerfile, Compose, Caddy, migracije, startup ili workflowe kako se kvar ne bi otkrio tek nakon mergea.
 
 ## GHCR i nepromjenjivi digest
 
-Nakon zelenog smoke testa workflow se prijavljuje u `ghcr.io` ugrađenim `GITHUB_TOKEN`-om i ovlašću `packages: write`. Objavljuje puni commit SHA tag i `main` tag te bilježi vraćeni `sha256:...` digest u job output. Trenutni paket je javno dostupan; ako se promijeni u privatan, VPS će trebati zaseban `read:packages` pristup.
+CI se prije smoke testa prijavljuje u `ghcr.io` ugrađenim `GITHUB_TOKEN`-om i ovlašću `packages: write`, jednom izgradi candidate i pushne ga pod `ci-<commit-sha>-<run-id>` tagom. Smoke test koristi puni digest tog kandidata. Nakon uspješnog CI-ja `objavi-ghcr.yml` ne gradi novu sliku: registry-level promotion samo dodjeljuje isti manifest punom commit SHA tagu i `main` tagu te provjerava da sva tri tag-a pokazuju isti `sha256:...` digest. Trenutni paket je javno dostupan; ako se promijeni u privatan, VPS će trebati zaseban `read:packages` pristup.
+
+Candidate tagovi su privremeni release artefakti. Treba ih zadržati dovoljno dugo za dijagnostiku i ručnu promociju, a zatim čistiti GHCR retention politikom ili zasebnim cleanupom; cleanup ne smije obrisati commit SHA tagove ili digest-e koji se koriste na stagingu/produkciji.
 
 Tag `latest` smije biti informativan, ali se nikad ne koristi za deploy, migraciju ni rollback. Jedina dopuštena referenca na serveru je `ghcr.io/<vlasnik>/kaladont@sha256:<digest>`.
 
