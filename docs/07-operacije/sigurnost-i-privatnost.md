@@ -18,13 +18,15 @@
 
 ## Rate limiting
 
-| Resurs               | Ograničenje                                         | RS    |
-| -------------------- | --------------------------------------------------- | ----- |
-| Pokušaji poteza      | 3 u sekundi po igraču                               | RS-23 |
-| Emoji reakcije       | 1 svake 2 s                                         | RS-22 |
-| Prijave grešaka      | 5 na sat po identitetu                              | —     |
-| Registracija/prijava | 5 pokušaja u 15 min po IP-u                         | —     |
-| HTTP općenito        | razuman globalni limit po IP-u (Fastify rate-limit) | —     |
+| Resurs                             | Ograničenje                                         | RS    |
+| ---------------------------------- | --------------------------------------------------- | ----- |
+| Pokušaji poteza                    | 3 u sekundi po igraču                               | RS-23 |
+| Emoji reakcije                     | 1 svake 2 s                                         | RS-22 |
+| Prijave grešaka                    | 5 na sat po identitetu                              | —     |
+| Registracija/prijava/reset lozinke | 5 pokušaja u 15 min po IP-u                         | —     |
+| Zahtjev za reset emaila            | 3 zahtjeva na sat po IP-u                           | —     |
+| Potvrda emaila                     | 10 pokušaja u 15 min po IP-u                        | —     |
+| HTTP općenito                      | razuman globalni limit po IP-u (Fastify rate-limit) | —     |
 
 ## Površina napada
 

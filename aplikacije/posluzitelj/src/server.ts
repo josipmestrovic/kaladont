@@ -14,14 +14,19 @@ import { registrirajRedCekanja } from './red/servis-reda.js';
 import { registrirajPrivatneSobe } from './soba/servis-soba.js';
 import { osvjeziProsjekCekanja } from './red/prosjek-cekanja.js';
 import { stvoriUpraviteljPartija } from './igra/motor-partije.js';
-import { registrirajRacuneRute } from './racuni/rute.js';
+import { registrirajRacuneRute, type OpcijeAuthRateLimita } from './racuni/rute.js';
 import { registrirajProfilRute } from './profil/rute.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
 import { registrirajRjecnikRute } from './rjecnik/rute.js';
 import { konfiguracija } from './konfiguracija.js';
 import { baza } from './baza/klijent.js';
-import { jeDopustenOrigin, jePouzdaniProxy, stvoriCorsOrigin, type Okruzenje } from './sigurnost/origin.js';
+import {
+  jeDopustenOrigin,
+  jePouzdaniProxy,
+  stvoriCorsOrigin,
+  type Okruzenje,
+} from './sigurnost/origin.js';
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 
 export interface PodaciSocketa {
@@ -60,17 +65,22 @@ export interface Posluzitelj {
 export interface OpcijePosluzitelja {
   postavkeMotora?: PostavkeMotoraPartije;
   okruzenjeSigurnosti?: Okruzenje;
+  authRateLimit?: Partial<OpcijeAuthRateLimita>;
 }
 
 /** Izgrađuje Fastify + Socket.IO instancu (bez pokretanja listen-a) - koristi ga i index.ts i testovi. */
 export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promise<Posluzitelj> {
   const okruzenjeSigurnosti = opcije.okruzenjeSigurnosti ?? konfiguracija.NODE_ENV;
+  const authRateLimit: OpcijeAuthRateLimita = {
+    omogucen: okruzenjeSigurnosti === 'staging' || okruzenjeSigurnosti === 'production',
+    ...opcije.authRateLimit,
+  };
   const corsOrigin = stvoriCorsOrigin(okruzenjeSigurnosti);
   const app = Fastify({ logger: true, trustProxy: jePouzdaniProxy(okruzenjeSigurnosti) });
   await app.register(cors, { origin: corsOrigin, credentials: true });
   await app.register(cookie);
   await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
-  await registrirajRacuneRute(app);
+  await registrirajRacuneRute(app, authRateLimit);
 
   const rjecnik = await ucitajRjecnik();
   app.log.info(`Rječnik učitan: ${rjecnik.brojRijeci()} riječi`);
@@ -222,10 +232,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     });
   });
 
-  registrirajRedCekanja(io, (stol, mod) => {
-    upravitelj.zapocniPartiju(stol, mod);
-    void osvjeziProsjekCekanja();
-  }, upravitelj.imaAktivnuPartiju);
+  registrirajRedCekanja(
+    io,
+    (stol, mod) => {
+      upravitelj.zapocniPartiju(stol, mod);
+      void osvjeziProsjekCekanja();
+    },
+    upravitelj.imaAktivnuPartiju,
+  );
 
   const sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
     upravitelj.zapocniPrivatnuPartiju(sudionici, postavke, kodSobe),
