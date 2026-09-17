@@ -85,7 +85,7 @@ VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kra
 
 ## Staging — automatski workflow
 
-`objavi-staging.yml` pokreće se nakon uspješnog GHCR promotion workflowa za `main`. Workflow iz commit SHA taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije, ažurira samo `KALADONT_IMAGE`, `DIGEST` i `VERZIJA` u postojećem VPS `.env`, povlači točan image, izvršava migracije, rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. Ostale aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
+`objavi-staging.yml` pokreće se nakon uspješnog GHCR promotion workflowa za `main`. Workflow iz commit SHA taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije i `skripte/objava-staging.sh`. Skripta ažurira samo `KALADONT_IMAGE`, `DIGEST` i `VERZIJA` u postojećem VPS `.env`, povlači točan image, izvršava migracije, rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. Ostale aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
 
 1. Workflow koristi GitHub Environment `staging` i tajne `STAGING_HOST`, `STAGING_SSH_KLJUC` i `STAGING_SSH_KNOWN_HOSTS`.
 2. Fiksni SSH korisnik je `deploy`, a host fingerprint se provjerava s `StrictHostKeyChecking=yes`.

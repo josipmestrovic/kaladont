@@ -79,7 +79,7 @@ jobs:
           scp -i "$RUNNER_TEMP/ssh/id_ed25519" \
             -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
             -o StrictHostKeyChecking=yes \
-            docker-compose.staging.yml Caddyfile.staging \
+            docker-compose.staging.yml Caddyfile.staging skripte/objava-staging.sh \
             "deploy@${STAGING_HOST}:/opt/kaladont/"
 
       - name: Povuci digest i rekreiraj staging aplikaciju
@@ -94,38 +94,7 @@ jobs:
             -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
             -o StrictHostKeyChecking=yes \
             "deploy@${STAGING_HOST}" \
-            "IMAGE_REF='$IMAGE_REF' IMAGE_DIGEST='$IMAGE_DIGEST' RELEASE_VERSION='$RELEASE_VERSION' bash -s" <<'REMOTE'
-          set -Eeuo pipefail
-          cd /opt/kaladont
-          export KALADONT_IMAGE="$IMAGE_REF"
-          export DIGEST="$IMAGE_DIGEST"
-          export VERZIJA="$RELEASE_VERSION"
-
-          azuriraj_env() {
-            lokalni_naziv="$1"
-            lokalna_vrijednost="$2"
-            if grep -q "^${lokalni_naziv}=" .env; then
-              sed -i "s|^${lokalni_naziv}=.*|${lokalni_naziv}=${lokalna_vrijednost}|" .env
-            else
-              printf '%s=%s\n' "$lokalni_naziv" "$lokalna_vrijednost" >> .env
-            fi
-          }
-          azuriraj_env KALADONT_IMAGE "$KALADONT_IMAGE"
-          azuriraj_env DIGEST "$DIGEST"
-          azuriraj_env VERZIJA "$VERZIJA"
-
-          docker compose -f docker-compose.staging.yml config >/dev/null
-          docker compose -f docker-compose.staging.yml pull aplikacija
-          docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
-          docker compose -f docker-compose.staging.yml stop aplikacija
-          docker compose -f docker-compose.staging.yml rm -f aplikacija
-          docker compose -f docker-compose.staging.yml up -d --wait --wait-timeout 180 --force-recreate aplikacija
-          aktivni_image=$(docker inspect kaladont-aplikacija-1 --format '{{.Config.Image}}')
-          test "$aktivni_image" = "$KALADONT_IMAGE"
-          docker compose -f docker-compose.staging.yml exec -T aplikacija node -e "fetch('http://127.0.0.1:3000/zdravlje').then((odgovor) => process.exit(odgovor.ok ? 0 : 1)).catch(() => process.exit(1))"
-          docker compose -f docker-compose.staging.yml exec -T caddy caddy validate --config /etc/caddy/Caddyfile
-          docker compose -f docker-compose.staging.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
-          REMOTE
+            "chmod 700 /opt/kaladont/objava-staging.sh && /opt/kaladont/objava-staging.sh '$IMAGE_REF' '$IMAGE_DIGEST' '$RELEASE_VERSION'"
 
       - name: Provjeriti staging health i digest
         shell: bash
