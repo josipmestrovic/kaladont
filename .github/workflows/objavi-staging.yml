@@ -117,11 +117,13 @@ jobs:
           docker compose -f docker-compose.staging.yml config >/dev/null
           docker compose -f docker-compose.staging.yml pull aplikacija
           docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
-          docker compose -f docker-compose.staging.yml rm -sf aplikacija caddy
-          docker compose -f docker-compose.staging.yml up -d --wait --wait-timeout 180 aplikacija caddy
+          docker compose -f docker-compose.staging.yml rm -sf aplikacija
+          docker compose -f docker-compose.staging.yml up -d --wait --wait-timeout 180 aplikacija
           aktivni_image=$(docker inspect kaladont-aplikacija-1 --format '{{.Config.Image}}')
           test "$aktivni_image" = "$KALADONT_IMAGE"
           docker compose -f docker-compose.staging.yml exec -T aplikacija node -e "fetch('http://127.0.0.1:3000/zdravlje').then((odgovor) => process.exit(odgovor.ok ? 0 : 1)).catch(() => process.exit(1))"
+          docker compose -f docker-compose.staging.yml exec -T caddy caddy validate --config /etc/caddy/Caddyfile
+          docker compose -f docker-compose.staging.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
           REMOTE
 
       - name: Provjeriti staging health i digest
@@ -131,9 +133,10 @@ jobs:
           EXPECTED_VERSION: ${{ github.event.workflow_run.head_sha }}
         run: |
           for pokusaj in {1..30}; do
-            odgovor=$(curl --silent --show-error --fail https://staging.kaladont.hr/zdravlje || true)
-            if echo "$odgovor" | jq -e --arg digest "$EXPECTED_DIGEST" --arg verzija "$EXPECTED_VERSION" '.ok == true and .baza == "dostupna" and .digest == $digest and .verzija == $verzija' >/dev/null; then
-              echo "$odgovor"
+            status=$(curl --silent --show-error --output odgovor.json --write-out '%{http_code}' https://staging.kaladont.hr/zdravlje || true)
+            odgovor=$(cat odgovor.json 2>/dev/null || true)
+            echo "Pokušaj ${pokusaj}: HTTP ${status:-mrežna-greška}; ${odgovor:-bez tijela}"
+            if test "$status" = '200' && echo "$odgovor" | jq -e --arg digest "$EXPECTED_DIGEST" --arg verzija "$EXPECTED_VERSION" '.ok == true and .baza == "dostupna" and .digest == $digest and .verzija == $verzija' >/dev/null; then
               exit 0
             fi
             sleep 10
