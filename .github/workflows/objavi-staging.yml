@@ -117,8 +117,9 @@ jobs:
           docker compose -f docker-compose.staging.yml config >/dev/null
           docker compose -f docker-compose.staging.yml pull aplikacija
           docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
-          docker compose -f docker-compose.staging.yml rm -sf aplikacija
-          docker compose -f docker-compose.staging.yml up -d --wait --wait-timeout 180 aplikacija
+          docker compose -f docker-compose.staging.yml stop aplikacija
+          docker compose -f docker-compose.staging.yml rm -f aplikacija
+          docker compose -f docker-compose.staging.yml up -d --wait --wait-timeout 180 --force-recreate aplikacija
           aktivni_image=$(docker inspect kaladont-aplikacija-1 --format '{{.Config.Image}}')
           test "$aktivni_image" = "$KALADONT_IMAGE"
           docker compose -f docker-compose.staging.yml exec -T aplikacija node -e "fetch('http://127.0.0.1:3000/zdravlje').then((odgovor) => process.exit(odgovor.ok ? 0 : 1)).catch(() => process.exit(1))"
