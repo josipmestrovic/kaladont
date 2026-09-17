@@ -45,7 +45,7 @@ test('lozinka se može prikazati, a nevaljani reset link se odbija', async ({ pa
   await page.goto('/prijava');
   const lozinka = page.locator('input[type="password"]');
   await lozinka.fill('vidljiva-lozinka');
-  await page.getByRole('button', { name: 'Prikaži lozinku' }).click();
+  await page.locator('.vidljivost').click();
   await expect(page.locator('input[type="text"]')).toHaveValue('vidljiva-lozinka');
 
   await page.goto('/racuni/resetiraj-lozinku');
