@@ -47,7 +47,7 @@ jobs:
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           image="ghcr.io/josipmestrovic/kaladont:${COMMIT_SHA}"
-          digest=$(docker buildx imagetools inspect "$image" | awk '/^Digest:/ { print $2; exit }')
+          digest=$(docker buildx imagetools inspect "$image" | awk '/^Digest:/ { print $2 }')
           test -n "$digest"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/josipmestrovic/kaladont@${digest}" >> "$GITHUB_OUTPUT"

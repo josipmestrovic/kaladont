@@ -41,7 +41,7 @@ jobs:
           CANDIDATE_TAG: ci-${{ github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.id }}
         run: |
           candidate="ghcr.io/josipmestrovic/kaladont:${CANDIDATE_TAG}"
-          digest=$(docker buildx imagetools inspect "$candidate" | awk '/^Digest:/ { print $2; exit }')
+          digest=$(docker buildx imagetools inspect "$candidate" | awk '/^Digest:/ { print $2 }')
           test -n "$digest"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
@@ -69,7 +69,7 @@ jobs:
           MAIN_TAG: ghcr.io/josipmestrovic/kaladont:main
         run: |
           for oznaka in "$COMMIT_TAG" "$MAIN_TAG"; do
-            digest=$(docker buildx imagetools inspect "$oznaka" | awk '/^Digest:/ { print $2; exit }')
+            digest=$(docker buildx imagetools inspect "$oznaka" | awk '/^Digest:/ { print $2 }')
             test "$digest" = "$EXPECTED_DIGEST"
             echo "$oznaka -> $digest"
           done
