@@ -101,6 +101,19 @@ jobs:
           export DIGEST="$IMAGE_DIGEST"
           export VERZIJA="$RELEASE_VERSION"
 
+          azuriraj_env() {
+            lokalni_naziv="$1"
+            lokalna_vrijednost="$2"
+            if grep -q "^${lokalni_naziv}=" .env; then
+              sed -i "s|^${lokalni_naziv}=.*|${lokalni_naziv}=${lokalna_vrijednost}|" .env
+            else
+              printf '%s=%s\n' "$lokalni_naziv" "$lokalna_vrijednost" >> .env
+            fi
+          }
+          azuriraj_env KALADONT_IMAGE "$KALADONT_IMAGE"
+          azuriraj_env DIGEST "$DIGEST"
+          azuriraj_env VERZIJA "$VERZIJA"
+
           docker compose -f docker-compose.staging.yml config >/dev/null
           docker compose -f docker-compose.staging.yml pull aplikacija
           docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
