@@ -22,11 +22,19 @@ afterAll(async () => {
   await app.close();
 });
 
-function spojiSe(token: string): Promise<ClientSocket> {
+function spojiSe(token: string, origin?: string): Promise<ClientSocket> {
   return new Promise((resolve, reject) => {
-    const socket = ioClient(adresa, { auth: { token }, forceNew: true });
+    const socket = ioClient(adresa, {
+      auth: { token },
+      forceNew: true,
+      reconnection: false,
+      extraHeaders: origin ? { origin } : undefined,
+    });
     socket.on('connect', () => resolve(socket));
-    socket.on('connect_error', reject);
+    socket.on('connect_error', (greska) => {
+      socket.disconnect();
+      reject(greska);
+    });
   });
 }
 
@@ -43,9 +51,12 @@ describe('identitet preko Socket.IO handshakea', () => {
   it('odbija spajanje s nevaljanim tokenom', async () => {
     await expect(
       new Promise((resolve, reject) => {
-        const socket = ioClient(adresa, { auth: { token: 'nije-uuid' }, forceNew: true });
+        const socket = ioClient(adresa, { auth: { token: 'nije-uuid' }, forceNew: true, reconnection: false });
         socket.on('connect', () => reject(new Error('nije trebalo uspjeti')));
-        socket.on('connect_error', (greska) => resolve(greska));
+        socket.on('connect_error', (greska) => {
+          socket.disconnect();
+          resolve(greska);
+        });
       }),
     ).resolves.toBeDefined();
   });
@@ -55,6 +66,10 @@ describe('identitet preko Socket.IO handshakea', () => {
     const socket = await spojiSe(token);
     expect(socket.connected).toBe(true);
     socket.disconnect();
+  });
+
+  it('odbija Socket.IO handshake sa stranim browser originom', async () => {
+    await expect(spojiSe(randomUUID(), 'https://nepoznata.example')).rejects.toBeDefined();
   });
 
   it('RS-18: nova veza istog identiteta odjavljuje staru', async () => {

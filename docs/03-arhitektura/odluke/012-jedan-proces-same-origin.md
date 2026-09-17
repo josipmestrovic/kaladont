@@ -12,8 +12,8 @@ U razvoju web (SvelteKit, port 5173) i poslužitelj (Fastify + Socket.IO, port 3
 U produkciji (i na stagingu) postoji **jedan Node proces**: Fastify uz igru poslužuje i SvelteKit build (adapter-node handler). Posljedično:
 
 - Klijent u produkcijskom buildu koristi **relativne adrese** (same-origin): Socket.IO se spaja bez URL-a, fetch pozivi idu na relativne putanje. `VITE_ADRESA_POSLUZITELJA` ostaje isključivo razvojna pogodnost (5173 → 3000) i ne smije se pojaviti u produkcijskom bundleu kao apsolutna adresa.
-- Fastify se konfigurira s `trustProxy` (Caddy je jedini pred njim) kako bi rate limiting i sigurnosni kolačići radili nad stvarnim IP-om igrača.
-- CORS se više ne otvara reflektiranjem origina; uz same-origin praktički nije potreban.
+- Fastify se konfigurira s `trustProxy` samo na stagingu i produkciji (Caddy je jedini pred njim) kako bi rate limiting i sigurnosni kolačići radili nad stvarnim IP-om igrača. Razvoj i test ne vjeruju `X-Forwarded-*` zaglavljima.
+- CORS se više ne otvara reflektiranjem origina. Staging i produkcija odbijaju svaki browser cross-origin zahtjev; razvoj i test dopuštaju samo lokalne Vite origin-e na portovima `5173` i `5174`. Zahtjev bez `Origin` zaglavlja ostaje dopušten radi health checkova i server-to-server prometa.
 
 ## Razmotrene alternative
 
@@ -25,5 +25,5 @@ U produkciji (i na stagingu) postoji **jedan Node proces**: Fastify uz igru posl
 
 - Jedan kontejner, jedan port, jedan log — najmanja moguća površina za održavanje na VPS-u.
 - Pad procesa ruši i web i igru — svjesno prihvaćeno; na jednom VPS-u odvojeni procesi ionako dijele sudbinu stroja.
-- Zahtijeva izmjenu koda (posluživanje handlera u Fastifyju, relativne adrese u klijentu, `trustProxy`); do te izmjene produkcijski deploy nije moguć.
+- Zahtijeva izmjenu koda (posluživanje handlera u Fastifyju, relativne adrese u klijentu, uski CORS i `trustProxy`); do te izmjene produkcijski deploy nije moguć.
 - Razvojni tok (`pnpm dev`, dva procesa, native Postgres) ostaje nepromijenjen.

@@ -21,6 +21,7 @@ import { registrirajAdminRute } from './admin/rute.js';
 import { registrirajRjecnikRute } from './rjecnik/rute.js';
 import { konfiguracija } from './konfiguracija.js';
 import { baza } from './baza/klijent.js';
+import { jeDopustenOrigin, jePouzdaniProxy, stvoriCorsOrigin, type Okruzenje } from './sigurnost/origin.js';
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 
 export interface PodaciSocketa {
@@ -58,12 +59,15 @@ export interface Posluzitelj {
 
 export interface OpcijePosluzitelja {
   postavkeMotora?: PostavkeMotoraPartije;
+  okruzenjeSigurnosti?: Okruzenje;
 }
 
 /** Izgrađuje Fastify + Socket.IO instancu (bez pokretanja listen-a) - koristi ga i index.ts i testovi. */
 export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promise<Posluzitelj> {
-  const app = Fastify({ logger: true });
-  await app.register(cors, { origin: true, credentials: true });
+  const okruzenjeSigurnosti = opcije.okruzenjeSigurnosti ?? konfiguracija.NODE_ENV;
+  const corsOrigin = stvoriCorsOrigin(okruzenjeSigurnosti);
+  const app = Fastify({ logger: true, trustProxy: jePouzdaniProxy(okruzenjeSigurnosti) });
+  await app.register(cors, { origin: corsOrigin, credentials: true });
   await app.register(cookie);
   await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
   await registrirajRacuneRute(app);
@@ -117,7 +121,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   }
 
   const io: KaladontIo = new SocketIoServer(app.server, {
-    cors: { origin: true },
+    cors: { origin: corsOrigin, credentials: true },
+    allowRequest: (zahtjev, povratniPoziv) => {
+      povratniPoziv(null, jeDopustenOrigin(okruzenjeSigurnosti, zahtjev.headers.origin));
+    },
   });
 
   const registarVeza = new RegistarVeza();

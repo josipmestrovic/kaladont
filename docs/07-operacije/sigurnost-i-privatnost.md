@@ -28,7 +28,8 @@
 
 ## Površina napada
 
-- Hetzner Cloud Firewall i UFW dopuštaju samo SSH (22), HTTP (80) i HTTPS (443). Compose javno objavljuje samo Caddyjeve 80/443; aplikacija i PostgreSQL nemaju host port jer Dockerova pravila mogu zaobići očekivano UFW filtriranje.
+- Hetzner Cloud Firewall i UFW dopuštaju samo SSH (22), HTTP (80) i HTTPS (443). Compose javno objavljuje samo Caddyjeve 80/443; aplikacija i PostgreSQL nemaju host port jer Dockerova pravila mogu zaobići očekivano UFW filtriranje. Fastify vjeruje `X-Forwarded-For` i `X-Forwarded-Proto` samo na stagingu/produkciji, gdje je Caddy jedini proxy, pa rate limit i sigurnosni kolačići koriste stvarni klijentski IP i HTTPS protokol.
+- CORS nikad ne reflektira poslani origin. Staging i produkcija dopuštaju samo same-origin browser promet; razvoj i test dopuštaju samo lokalni Vite na `localhost`/`127.0.0.1`, portovima `5173` i `5174`. Socket.IO koristi istu politiku i odbija strani handshake. Zahtjevi bez `Origin` zaglavlja ostaju dopušteni za health checkove i server-to-server promet.
 - SSH koristi samo ključeve i pinane host fingerprintove. Root prijava i prijava lozinkom su isključene; fail2ban usporava automatizirane pokušaje. `StrictHostKeyChecking=no` nije dopušten ni ljudima ni workflowima.
 - Osobni korisnik `kaladont` ima sudo. Korisnik `deploy` nema sudo, ali je član Docker grupe radi objave; Docker grupa daje praktično root-ekvivalentne ovlasti, pa svaki VPS ima zaseban deploy ključ koji služi samo GitHub Actionsu.
 - Staging (`staging.kaladont.hr`) je tijekom privremenog multiplayer testiranja bez Caddy Basic Autha jer bi HTTP Basic izazovi prekidali Socket.IO polling/upgrade tok. `X-Robots-Tag: noindex, nofollow` ostaje samo uputa tražilicama, ne sigurnosna kontrola. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi session-based gateway.

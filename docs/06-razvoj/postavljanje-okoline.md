@@ -47,6 +47,10 @@ Nakon toga:
 - Poslužitelj (HTTP + Socket.IO): `http://localhost:3000`
 - PostgreSQL: `localhost:5432` (native servis, podaci u standardnom PostgreSQL data direktoriju)
 
+Lokalni web origin-i na portovima `5173` i `5174` dopušteni su za HTTP i Socket.IO. Razvojni
+poslužitelj ne vjeruje `X-Forwarded-*` zaglavljima; `trustProxy` se uključuje samo iza Caddyja na
+stagingu i produkciji.
+
 ## Varijable okoline (`.env.primjer`)
 
 | Varijabla                   | Opis                                                                                                                                                                                                          |
