@@ -31,6 +31,7 @@ import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 
 export interface PodaciSocketa {
   igracId: string;
+  sesijaId?: string;
   vrsta: 'gost' | 'registriran' | 'admin';
   nadimak: string;
   avatarId: number;
@@ -80,7 +81,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   await app.register(cors, { origin: corsOrigin, credentials: true });
   await app.register(cookie);
   await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
-  await registrirajRacuneRute(app, authRateLimit);
+  let opozoviSocketSesije: (sesijaId: string) => void = () => {};
+  await registrirajRacuneRute(app, authRateLimit, {
+    naSesijaOpozvana: (sesijaId) => opozoviSocketSesije(sesijaId),
+  });
 
   const rjecnik = await ucitajRjecnik();
   app.log.info(`Rječnik učitan: ${rjecnik.brojRijeci()} riječi`);
@@ -138,6 +142,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   });
 
   const registarVeza = new RegistarVeza();
+
+  opozoviSocketSesije = (sesijaId) => {
+    for (const socket of io.sockets.sockets.values()) {
+      if (socket.data.sesijaId === sesijaId) socket.disconnect(true);
+    }
+  };
 
   const upravitelj = stvoriUpraviteljPartija(
     io,
@@ -197,6 +207,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     try {
       const identitet = await razrijesiIdentitet(token);
       socket.data.igracId = identitet.igracId;
+      socket.data.sesijaId = identitet.sesijaId;
       socket.data.vrsta = identitet.vrsta;
       socket.data.nadimak = identitet.nadimak;
       socket.data.avatarId = identitet.avatarId;

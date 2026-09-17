@@ -1,21 +1,20 @@
 /**
  * Razrješavanje identiteta pri Socket.IO handshakeu (gost token iz localStoragea, ili
- * potpisani sesijski token nakon prijave - racuni/tokeni.ts).
+ * serverska sesija nakon prijave - racuni/sesije.ts).
  * RS-18: dopuštena je samo jedna aktivna veza po identitetu.
  */
 import { and, eq, lt } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
-import { jePotpisaniToken, provjeriSesijskiToken } from '../racuni/tokeni.js';
+import { dohvatiSesiju, jeGostSesijskiToken, jeSesijskiToken, stvoriGostSesijuZaToken } from '../racuni/sesije.js';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const INTERVAL_AKTIVNOSTI_MS = 15 * 60 * 1000;
 
 /** Broj statičkih avatara dostupnih u web katalogu. */
 export const BROJ_AVATARA = 9;
 
 export function jeValjaniToken(token: unknown): token is string {
-  return typeof token === 'string' && (UUID_REGEX.test(token) || jePotpisaniToken(token));
+  return typeof token === 'string' && jeSesijskiToken(token);
 }
 
 export interface Identitet {
@@ -30,6 +29,7 @@ export interface Identitet {
   pobjede1v1: number;
   bodovi1v1: number;
   iskustvoUkupno: number;
+  sesijaId?: string;
 }
 
 function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
@@ -61,49 +61,23 @@ async function osvjeziZadnjuAktivnostAkoTreba(redak: typeof igraci.$inferSelect)
 
 /**
  * Razrješava identitet iz tokena poslanog u Socket.IO handshakeu.
- * - Potpisani sesijski token (nakon prijave) -> mora postojati odgovarajući red, inače baca grešku.
- * - Goli gost UUID -> create-if-missing SAMO ako red ne postoji ili je već `gost` (RS-18 + sprječava
- *   impersonaciju registriranog računa golim UUID-om bez ispravne lozinke).
+ * - Sesijski token (nakon prijave) -> mora postojati aktivni red u `sesije`, inače baca grešku.
+ * - Guest/session token -> mora postojati aktivna serverska sesija.
  */
 export async function razrijesiIdentitet(token: string): Promise<Identitet> {
-  if (jePotpisaniToken(token)) {
-    const igracId = provjeriSesijskiToken(token);
-    if (!igracId) {
-      throw new Error('Nevaljan ili istekao sesijski token');
-    }
+  if (jeSesijskiToken(token)) {
+    const sesija = await dohvatiSesiju(token) ?? (jeGostSesijskiToken(token) ? await stvoriGostSesijuZaToken(token) : null);
+    if (!sesija) throw new Error('Nevaljan ili istekao sesijski token');
+    const igracId = sesija.igracId;
     const [postojeci] = await baza.select().from(igraci).where(eq(igraci.id, igracId)).limit(1);
-    if (!postojeci) {
+    if (!postojeci || postojeci.obrisanAt) {
       throw new Error('Sesijski token ne odgovara nijednom igraču');
     }
     await osvjeziZadnjuAktivnostAkoTreba(postojeci);
-    return uIdentitet(postojeci);
+    return { ...uIdentitet(postojeci), sesijaId: 'sesijaId' in sesija ? sesija.sesijaId : sesija.id };
   }
 
-  const [postojeci] = await baza.select().from(igraci).where(eq(igraci.id, token)).limit(1);
-
-  if (postojeci) {
-    if (postojeci.vrsta !== 'gost') {
-      throw new Error('Registrirani račun zahtijeva sesijski token, ne goli identitet');
-    }
-    await osvjeziZadnjuAktivnostAkoTreba(postojeci);
-    return uIdentitet(postojeci);
-  }
-
-  const [novi] = await baza
-    .insert(igraci)
-    .values({
-      id: token,
-      vrsta: 'gost',
-      nadimak: 'Gost',
-      avatarId: 0,
-    })
-    .returning();
-
-  if (!novi) {
-    throw new Error('Stvaranje gosta nije uspjelo');
-  }
-
-  return uIdentitet(novi);
+  throw new Error('Nevaljan ili istekao gostujući sesijski token');
 }
 
 /** Registar aktivnih socket veza po igracId - za RS-18 (jedna aktivna veza po identitetu). */

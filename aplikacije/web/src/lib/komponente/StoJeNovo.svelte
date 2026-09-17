@@ -36,10 +36,15 @@
       <p class="poveznica"><a href="/pomoc?tema=kako-igrati">Otvori cijeli vodič Pomoć →</a></p>
     {:else if pogled === 'uvjeti'}
       <h2>Uvjeti</h2>
-      <p class="tekst">Uvjeti korištenja bit će dopunjeni prije šireg otvaranja igre.</p>
+      <p class="tekst">Kaladont je igra riječi u ranom pristupu. Igraš prema pravilima prikazanima u pomoći i prihvaćaš da se partije, potezi i rezultati bilježe radi rada igre, povijesti i rješavanja prijava.</p>
+      <p class="tekst">Ne pokušavaj ometati partiju, zaobilaziti autentikaciju ili koristiti automatizirane poteze koji narušavaju iskustvo drugih igrača. Možemo ukloniti sadržaj ili ograničiti račun koji zloupotrebljava uslugu.</p>
+      <p class="tekst">Za pitanja, prijavu problema ili zahtjev vezan uz račun piši na <a href="mailto:info@kaladont.hr">info@kaladont.hr</a>.</p>
     {:else}
-      <h2>Privatnost</h2>
-      <p class="tekst">Pravila privatnosti bit će dopunjena prije šireg otvaranja igre.</p>
+      <h2>Pravila privatnosti</h2>
+      <p class="tekst"><strong>Farmaceut</strong> koristi email adresu, hash lozinke, nadimak, avatar, statistiku i nužni sesijski token za rad računa. Gosti koriste nasumični UUID. IP i sigurnosni logovi koriste se za zaštitu usluge.</p>
+      <p class="tekst">Sesije traju najviše 30 dana, a IP i sigurnosni logovi čuvaju se 30 dana. Email komunikaciju o zahtjevu čuvamo 12 mjeseci. Anonimizirana povijest partija ostaje radi integriteta igre i drugih igrača.</p>
+      <p class="tekst">Za brisanje, pristup ili ispravak podataka javi se s registrirane email adrese na <a href="mailto:info@kaladont.hr">info@kaladont.hr</a>. Zahtjev obrađujemo ručno u roku do 7 dana. Kod brisanja uklanjamo privatne podatke i sesije, a zajedničke partije ostaju uz neutralni prikaz „Obrisani igrač”.</p>
+      <p class="poveznica"><a href="/privatnost">Otvori cijela pravila privatnosti →</a></p>
     {/if}
 
     {#if pogled === 'novosti' && odabrano}

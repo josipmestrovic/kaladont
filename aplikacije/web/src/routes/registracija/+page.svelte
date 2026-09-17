@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
-  import { dohvatiGostToken, spremiSesijskiToken } from '$lib/identitet.js';
+  import { spremiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import { AVATARI } from '$lib/avatari.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
@@ -32,7 +32,6 @@
       const odgovor = await api<{ sesijskiToken: string }>('/racuni/registracija', {
         method: 'POST',
         body: JSON.stringify({
-          gostToken: dohvatiGostToken(),
           email,
           lozinka,
           nadimak: nadimak.trim(),
@@ -70,7 +69,7 @@
       <input
         type="text"
         bind:value={nadimak}
-        maxlength={20}
+        maxlength={12}
         placeholder="Tvoj nadimak"
         aria-label="Tvoj nadimak"
         required

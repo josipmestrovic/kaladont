@@ -20,7 +20,7 @@ afterAll(async () => {
   await app.close();
 });
 
-function spojiSe(token = randomUUID()): Promise<ClientSocket> {
+function spojiSe(token = `gost.${randomUUID().replaceAll('-', '')}`): Promise<ClientSocket> {
   return new Promise((resolve, reject) => {
     const socket = ioClient(adresa, { auth: { token }, forceNew: true });
     socket.on('connect', () => resolve(socket));
@@ -100,7 +100,7 @@ describe('red čekanja', () => {
   });
 
   it('RS-18: zamjenska veza ponovno ulazi na kraj reda bez duplikata', async () => {
-    const tokeni = [randomUUID(), randomUUID(), randomUUID()];
+    const tokeni = [randomUUID(), randomUUID(), randomUUID()].map((token) => `gost.${token.replaceAll('-', '')}`);
     const veze = await Promise.all(tokeni.map((token) => spojiSe(token)));
     for (const veza of veze) {
       const stanjePromise = new Promise<StanjeReda>((resolve) => veza.once('red:stanje', resolve));
@@ -124,7 +124,7 @@ describe('red čekanja', () => {
   });
 
   it('RS-16: stvarni prekid oslobađa mjesto, a povratak ulazi na kraj reda', async () => {
-    const tokeni = [randomUUID(), randomUUID(), randomUUID()];
+    const tokeni = [randomUUID(), randomUUID(), randomUUID()].map((token) => `gost.${token.replaceAll('-', '')}`);
     const veze = await Promise.all(tokeni.map((token) => spojiSe(token)));
     for (const veza of veze) {
       const stanjePromise = new Promise<StanjeReda>((resolve) => veza.once('red:stanje', resolve));
@@ -154,7 +154,7 @@ describe('red čekanja', () => {
   });
 
   it('igrač iz aktivne partije ne može ponovno popuniti drugi stol', async () => {
-    const tokeniAktivnePartije = Array.from({ length: 4 }, () => randomUUID());
+    const tokeniAktivnePartije = Array.from({ length: 4 }, () => `gost.${randomUUID().replaceAll('-', '')}`);
     const aktivniIgraci = await Promise.all(tokeniAktivnePartije.map((token) => spojiSe(token)));
     const pocetakAktivne = new Promise<PocetakPartije>((resolve) => {
       aktivniIgraci[0]!.once('partija:pocetak', resolve);
@@ -162,7 +162,7 @@ describe('red čekanja', () => {
     for (const igrac of aktivniIgraci) igrac.emit('red:udji');
     await pocetakAktivne;
 
-    const noviTokeni = Array.from({ length: 4 }, () => randomUUID());
+    const noviTokeni = Array.from({ length: 4 }, () => `gost.${randomUUID().replaceAll('-', '')}`);
     const noviIgraci = await Promise.all(noviTokeni.map((token) => spojiSe(token)));
     for (const igrac of noviIgraci.slice(0, 3)) igrac.emit('red:udji');
     aktivniIgraci[0]!.emit('red:udji');

@@ -21,6 +21,45 @@ test('registracija i prijava zadržavaju sesiju nakon reloadanja', async ({ page
   await expect(page).not.toHaveURL(/\/prijava|\/registracija/);
 });
 
+test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => {
+  const email = `e2e-logout-${Date.now()}@example.com`;
+
+  await page.goto('/registracija');
+  await page.getByPlaceholder('Tvoj nadimak').fill('Logout Igrac');
+  await page.getByRole('button', { name: 'Dalje' }).click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Lozinka').fill('lozinka123');
+  await page.getByRole('button', { name: /odaberi/i }).first().click();
+  await page.getByRole('button', { name: /registriraj/i }).click();
+
+  await page.goto('/profil');
+  await expect(page.getByRole('button', { name: 'Odjavi se' })).toBeVisible();
+  await page.getByRole('button', { name: 'Odjavi se' }).click();
+  await expect(page).toHaveURL('/');
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Moj profil' })).not.toBeVisible();
+});
+
+test('stranica privatnosti prikazuje GDPR kontakt i postupak brisanja', async ({ page }) => {
+  await page.goto('/privatnost');
+  await expect(page.getByRole('heading', { name: 'Pravila privatnosti' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'info@kaladont.hr' }).first()).toBeVisible();
+  await expect(page.getByText(/roku do 7 dana/)).toBeVisible();
+  await expect(page.getByText(/piši farmaceut/)).toBeVisible();
+});
+
+test('footer uvjeti i privatnost otvaraju popup na naslovnici', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Uvjeti' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Kaladont je igra riječi');
+  await page.getByRole('button', { name: 'Zatvori' }).click();
+
+  await page.getByRole('button', { name: 'Privatnost' }).click();
+  await expect(page.getByRole('dialog')).toContainText('info@kaladont.hr');
+  await expect(page.getByRole('dialog')).toContainText('roku do 7 dana');
+});
+
 test('prijava s krivom lozinkom prikazuje grešku', async ({ page }) => {
   await page.goto('/prijava');
   await page.getByLabel('Email').fill(`ne-postoji-${Date.now()}@example.com`);

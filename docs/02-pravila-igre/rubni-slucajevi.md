@@ -76,7 +76,7 @@ Riječ stigne u istom trenutku kad timer istekne.
 
 ## Identitet i podaci
 
-**RS-19 — Gost obriše localStorage / promijeni uređaj.**
+**RS-19 — Gost obriše localStorage / promijeni uređaj.** Opaque guest token se tada gubi i server izdaje novi gostujući identitet; javni ID sam po sebi ne omogućuje povrat pristupa starom gostu.
 **Odluka:** dobiva novi identitet i novu statistiku; stara ostaje siroče u bazi (prihvatljivo — trajnost je pogodnost registracije, što UI komunicira).
 
 **RS-20 — Registracija gosta s postojećom statistikom.**

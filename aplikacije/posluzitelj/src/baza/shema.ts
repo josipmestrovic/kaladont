@@ -52,6 +52,7 @@ export const igraci = pgTable('igraci', {
   email: text('email'),
   lozinkaHash: text('lozinka_hash'),
   emailPotvrdjen: boolean('email_potvrdjen').notNull().default(false),
+  obrisanAt: timestamp('obrisan_at', { withTimezone: true }),
   odigrane: integer('odigrane').notNull().default(0),
   pobjede: integer('pobjede').notNull().default(0),
   eliminacijeUkupno: integer('eliminacije_ukupno').notNull().default(0),
@@ -64,6 +65,20 @@ export const igraci = pgTable('igraci', {
   stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
   zadnjaAktivnost: timestamp('zadnja_aktivnost', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const sesije = pgTable(
+  'sesije',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    igracId: uuid('igrac_id')
+      .notNull()
+      .references(() => igraci.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    stvorena: timestamp('stvorena', { withTimezone: true }).notNull().defaultNow(),
+    istek: timestamp('istek', { withTimezone: true }).notNull(),
+  },
+  (tablica) => [index('idx_sesije_igrac_id').on(tablica.igracId), index('idx_sesije_istek').on(tablica.istek)],
+);
 
 export const statistikeRijeciIgraca = pgTable(
   'statistike_rijeci_igraca',

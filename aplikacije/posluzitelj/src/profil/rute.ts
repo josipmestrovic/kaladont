@@ -3,7 +3,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
-import { desc, eq, gte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   DEFINICIJE_DOSTIGNUCA,
@@ -296,7 +296,7 @@ export async function registrirajProfilRute(
       .select()
       .from(igraci)
       .where(
-        sql`${igraci.id} = ${zahtjev.params.igracId} and ${igraci.vrsta} in ('registriran', 'admin')`,
+        sql`${igraci.id} = ${zahtjev.params.igracId} and ${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null`,
       )
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
@@ -435,7 +435,7 @@ export async function registrirajProfilRute(
       const kandidati = await baza
         .select()
         .from(igraci)
-        .where(gte(colOdigrane, 10))
+        .where(and(gte(colOdigrane, 10), isNull(igraci.obrisanAt)))
         .orderBy(desc(sql`${colBodovi}::float / ${colOdigrane}`))
         .limit(limit);
 

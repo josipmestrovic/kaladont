@@ -1,12 +1,17 @@
 # Sigurnost i privatnost
 
+## Voditelj obrade i kontakt
+
+Voditelj obrade je **piši farmaceut, obrt za računalno programiranje, vl. Josip Meštrović**, Braće Radić 25, 31550 Bizovac, Hrvatska, OIB 21287408231, MBS 99294702. Za zahtjeve za brisanje, pristup ili ispravak podataka koristi se `info@kaladont.hr`.
+
 > **Status:** aplikacijska pravila u ovom dokumentu jesu sigurnosni zahtjevi; dio je već implementiran, a infrastrukturne kontrole i produkcijske integracije još su ciljano stanje Faze 8. Prije servera provjeriti STOP listu u [Operacije for dummies](operacije-for-dummies.md). Operativni model definira [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md).
 
 ## Autentikacija i računi
 
 - Lozinke: **argon2id** (memorijski tvrd), nikad u logovima; minimalna duljina 8 znakova bez glupih pravila kompleksnosti.
-- Sesije: httpOnly + Secure + SameSite=Lax kolačić s potpisanim tokenom; Socket.IO handshake prima isti token.
-- Gost identitet: nasumični UUID u localStorage — ne otisak uređaja, ne kolačić za praćenje.
+- Sesije: httpOnly + Secure + SameSite=Lax kolačić s nasumičnim tokenom čiji se hash provjerava u tablici `sesije`; Socket.IO handshake provjerava istu sesiju. Token se zbog postojeće kompatibilnosti šalje i kroz Bearer zaglavlje/Socket.IO handshake.
+- Logout briše samo trenutačnu sesiju. Reset lozinke te promjena lozinke ili emaila ne opozivaju postojeće sesije. Ne pohranjujemo IP, user-agent ni druge podatke o uređaju.
+- Gost identitet: opaque nasumični token u localStorageu, čiji se hash provjerava u tablici `sesije`; javni `igrac_id` nije pristupni token.
 - Potvrda emaila poveznicom s istekom (24 h); reset lozinke istim mehanizmom, bez otkrivanja postoji li račun. Email poveznice koriste javnu adresu aktivnog okruženja, a staging šalje samo na izričito dopuštene testne adrese.
 
 ## Validacija ulaza — server ne vjeruje nikome
@@ -36,7 +41,7 @@
 - Osobni korisnik `kaladont` ima sudo. Korisnik `deploy` nema sudo, ali je član Docker grupe radi objave; Docker grupa daje praktično root-ekvivalentne ovlasti, pa svaki VPS ima zaseban deploy ključ koji služi samo GitHub Actionsu.
 - Staging (`staging.kaladont.hr`) je tijekom privremenog multiplayer testiranja bez Caddy Basic Autha jer bi HTTP Basic izazovi prekidali Socket.IO polling/upgrade tok. `X-Robots-Tag: noindex, nofollow` ostaje samo uputa tražilicama, ne sigurnosna kontrola. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi session-based gateway.
 - Staging ima vlastite sintetičke podatke, tajne i email allowlistu. Produkcijski dump, račun, email popis ni tajna nikad ne završavaju na stagingu.
-- Sigurnosna zaglavlja (Caddy/SvelteKit): CSP bez inline skripti, `X-Content-Type-Options`, `Referrer-Policy`.
+- Sigurnosna zaglavlja (Caddy): CSP s dopuštenim same-origin skriptama, stilovima koje generira SvelteKit, slikama/fontovima iz aplikacije te WebSocket vezom; `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, ograničeni `Permissions-Policy` i HSTS na stagingu/produkciji.
 - Ovisnosti: Dependabot tjedno; `pnpm audit` u CI-ju (upozorenje, ne bloker).
 - Third-party GitHub Actions pinaju se na puni commit SHA. PostgreSQL, Caddy i aplikacija pokreću se po točnoj verziji i digestu, nikad preko `latest` taga.
 
@@ -75,7 +80,8 @@ Jedan Storage Box koristi odvojene podračune za forum i produkciju, tako da kom
 | IP u logovima               | svi          | sigurnost (rate limit, zlouporaba), kratka retencija | legitimni interes          |
 
 - **Bez kolačića za praćenje**: početni MVP nema web analitiku; sesijski kolačić nužan je za rad. Nakon naknadnog uključivanja Umami je cookieless i ne profilira korisnike, pa se ne uvodi analitički kolačić.
-- **Brisanje računa**: samoposlužno na profilu — briše email/lozinku, nadimak anonimizira („ObrisaniIgrač"), potezi ostaju anonimizirani (integritet povijesti partija drugih igrača).
+- **Brisanje računa**: korisnik se javlja na `info@kaladont.hr` s registrirane email adrese. Operater zahtjev obrađuje ručno u roku do 7 dana. Uklanjaju se email, lozinka, potvrda emaila, sesije i privatni napredak; račun se anonimizira kao „Obrisani igrač”. Zajedničke partije, potezi, plasmani i prijave ostaju radi integriteta igre i drugih igrača.
+- **Rokovi**: sesije najviše 30 dana; IP i sigurnosni logovi 30 dana; email komunikacija o zahtjevu 12 mjeseci; anonimizirana povijest partija dok je potrebna za integritet; backup kopije prema redovnoj operativnoj retenciji.
 - Gosti: UUID nije izravno osobni podatak, ali se prema njemu odnosimo kao da jest (iste retencije).
 - `/privatnost` stranica piše ovo istim jezikom, ljudski i kratko; voditelj obrade i kontakt navedeni.
 
@@ -84,7 +90,7 @@ Jedan Storage Box koristi odvojene podračune za forum i produkciju, tako da kom
 | Servis          | Uloga                                                                             | Podaci                               | Napomena                                                                                                                                       |
 | --------------- | --------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hetzner (DE)    | hosting VPS-ova, pomoćni server backup i Storage Box                              | svi podaci igre; šifrirani dumpovi   | EU; DPA sklopljen pri otvaranju računa; isti pružatelj za server i backup prihvaćen je MVP rizik                                               |
-| Resend          | transakcijski email (potvrda registracije, reset lozinke, obavijesti o prijavama) | email adrese primatelja              | produkcijski pošiljatelj `noreply@kaladont.hr`; prije aktivacije provjeriti DPA/EU obradu i SPF/DKIM; ljudski kontakt je `kontakt@kaladont.hr` |
+| Resend          | transakcijski email (potvrda registracije, reset lozinke, obavijesti o prijavama) | email adrese primatelja              | produkcijski pošiljatelj `noreply@kaladont.hr`; prije aktivacije provjeriti DPA/EU obradu i SPF/DKIM; ljudski kontakt je `info@kaladont.hr` |
 | GitHub / GHCR   | kod, CI i Docker slike                                                            | bez podataka igrača                  | tajne aplikacije nikad u repozitoriju ni logovima                                                                                              |
 | UptimeRobot     | javni HTTP nadzor `/zdravlje`                                                     | javni URL, status i vrijeme odgovora | samo email alarmi; endpoint ne vraća osobne podatke                                                                                            |
 | Healthchecks.io | heartbeat backupa i provjere diska                                                | naziv posla i vrijeme pinga          | ping URL je tajna; ne šalju se logovi, dumpovi ni podaci igrača                                                                                |
@@ -95,7 +101,7 @@ Popis se održava ažurnim na `/privatnost` stranici; novi izvršitelj = izmjena
 
 ### Email po okruženju
 
-- Produkcija šalje preko Resenda s verificirane domene i pošiljatelja `noreply@kaladont.hr`; odgovori i ljudski upiti vode na `kontakt@kaladont.hr`. `JAVNA_ADRESA` je `https://kaladont.hr`, pa email potvrde i reset poveznice vode na javnu domenu.
+- Produkcija šalje preko Resenda s verificirane domene i pošiljatelja `noreply@kaladont.hr`; odgovori i ljudski upiti vode na `info@kaladont.hr`. `JAVNA_ADRESA` je `https://kaladont.hr`, pa email potvrde i reset poveznice vode na javnu domenu.
 - Staging koristi zasebnu konfiguraciju, `JAVNA_ADRESA=https://staging.kaladont.hr` i `STAGING_EMAIL_ALLOWLIST` s punim, točno dopuštenim adresama. Adapter mora fail-closed odbiti i evidentirati svaki pokušaj slanja izvan popisa. Dopuštena domena ili ljudsko obećanje nisu dovoljna kontrola.
 - Razvoj bez API ključa ispisuje testnu poruku lokalno. Takav stub nije dokaz produkcijskog slanja.
 

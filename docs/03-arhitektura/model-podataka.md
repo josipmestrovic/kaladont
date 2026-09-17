@@ -8,6 +8,7 @@ erDiagram
     partije ||--|{ sudionici_partije : ima
     partije ||--|{ potezi : sadrzi
     igraci ||--o{ potezi : odigrao
+    igraci ||--o{ sesije : ima
     partije ||--o{ prijave : "prijavljena u"
     potezi ||--o{ prijave : "oznacen potez"
     prijave ||--o{ izmjene_rjecnika : uzrokuje
@@ -19,13 +20,14 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 
 | Stupac | Tip | Opis |
 |---|---|---|
-| id | uuid PK | Trajni identitet (gost ga čuva u localStorage) |
+| id | uuid PK | Javni trajni identitet; gost ga ne koristi kao pristupni token |
 | vrsta | enum: `gost`, `registriran`, `admin` | |
 | nadimak | text | Fiksni "Gost" za goste; jedinstven za registrirane |
 | avatar_id | smallint | Stabilni ID avatara iz statičkog kataloga web aplikacije |
 | email | text, null | Samo registrirani; jedinstven |
 | lozinka_hash | text, null | argon2id |
 | email_potvrdjen | boolean | |
+| obrisan_at | timestamptz, null | Vrijeme ručne anonimizacije računa; obrisani račun više se ne može autentificirati |
 | odigrane | integer | Agregat 4p moda (izvor istine: `sudionici_partije`) |
 | pobjede | integer | Agregat 4p moda |
 | eliminacije_ukupno | integer | Agregat 4p moda |
@@ -39,6 +41,20 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | zadnja_aktivnost | timestamptz | Za čišćenje starih gostiju |
 
 Agregati se ažuriraju **transakcijski** pri završetku partije, u istoj transakciji sa zapisom rezultata. Uvijek su izračunljivi ponovno iz `sudionici_partije` (skripta za rekonstrukciju).
+
+## sesije
+
+Serverska sesija registriranog igrača. Sirovi token se ne sprema u bazu; `token_hash` je SHA-256 hash vrijednosti koju je poslužitelj izdao klijentu.
+
+| Stupac | Tip | Opis |
+|---|---|---|
+| id | uuid PK | Interni identitet sesije; ne šalje se klijentu |
+| igrac_id | uuid FK, `ON DELETE CASCADE` | Registrirani ili administratorski igrač |
+| token_hash | text, unique | Hash nasumičnog tokena sesije |
+| stvorena | timestamptz | Vrijeme izdavanja |
+| istek | timestamptz | Fiksni istek 30 dana nakon izdavanja |
+
+Logout briše samo odgovarajući red. Reset lozinke i promjene vjerodajnica ne brišu postojeće sesije. Pri brisanju računa sesije se brišu, privatni podaci se uklanjaju, a red igrača ostaje anonimiziran radi zajedničke povijesti.
 
 ### Gamifikacijski agregati igrača
 

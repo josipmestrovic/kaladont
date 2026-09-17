@@ -8,7 +8,7 @@ Pri uspostavi veze klijent u handshake šalje:
 
 ```ts
 interface PodaciVeze {
-  /** UUID gosta iz localStoragea ILI sesijski token registriranog igrača */
+  /** Opaque guest token iz localStoragea ILI sesijski token registriranog igrača */
   token: string;
 }
 ```

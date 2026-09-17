@@ -11,8 +11,9 @@ import { igraci } from '../baza/shema.js';
 import { porukaPotvrdeEmaila, porukaResetaLozinke, posaljiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
+import { dohvatiSesijuZahtjeva } from './autentikacija.js';
+import { izdajSesiju, opozoviSesiju, stvoriGostSesiju } from './sesije.js';
 import {
-  izdajSesijskiToken,
   izdajTokenPotvrdeEmaila,
   izdajTokenResetaLozinke,
   provjeriTokenPotvrdeEmaila,
@@ -25,14 +26,17 @@ export interface OpcijeAuthRateLimita {
   vremenskiProzor?: string;
 }
 
+export interface OpcijeRacuna {
+  naSesijaOpozvana?: (sesijaId: string) => void | Promise<void>;
+}
+
 const NAZIV_KOLACICA = 'kaladont_sesija';
 const TRAJANJE_KOLACICA_MS = 30 * 24 * 60 * 60 * 1000;
 
 const ShemaRegistracije = z.object({
-  gostToken: z.string().uuid().optional(),
   email: z.string().email(),
   lozinka: z.string().min(8),
-  nadimak: z.string().min(2).max(40).optional(),
+  nadimak: z.string().min(2).max(12).optional(),
   avatarId: z
     .number()
     .int()
@@ -67,6 +71,7 @@ function postaviSesijskiKolacic(odgovor: import('fastify').FastifyReply, token: 
 export async function registrirajRacuneRute(
   app: FastifyInstance,
   opcijeRateLimita: OpcijeAuthRateLimita,
+  opcijeRacuna: OpcijeRacuna = {},
 ): Promise<void> {
   const limitPokusaja = {
     max: opcijeRateLimita.maxPokusaja ?? 10,
@@ -88,7 +93,7 @@ export async function registrirajRacuneRute(
     if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
     }
-    const { gostToken, email, lozinka, nadimak, avatarId } = rezultat.data;
+    const { email, lozinka, nadimak, avatarId } = rezultat.data;
 
     const [postojeciEmail] = await baza
       .select()
@@ -100,12 +105,9 @@ export async function registrirajRacuneRute(
     }
 
     const lozinkaHash = await argonHash(lozinka);
-    const [postojeciGost] = gostToken
-      ? await baza
-          .select()
-          .from(igraci)
-          .where(and(eq(igraci.id, gostToken), eq(igraci.vrsta, 'gost')))
-          .limit(1)
+    const gostSesija = await dohvatiSesijuZahtjeva(zahtjev);
+    const [postojeciGost] = gostSesija
+      ? await baza.select().from(igraci).where(and(eq(igraci.id, gostSesija.igracId), eq(igraci.vrsta, 'gost'))).limit(1)
       : [undefined];
 
     let igracId: string;
@@ -152,10 +154,14 @@ export async function registrirajRacuneRute(
       porukaPotvrdeEmaila(javnaPoveznica(`/potvrda-emaila?token=${tokenPotvrde}`)),
     );
 
-    const sesijskiToken = izdajSesijskiToken(igracId);
-    postaviSesijskiKolacic(odgovor, sesijskiToken);
+    const sesija = await izdajSesiju(igracId);
+    postaviSesijskiKolacic(odgovor, sesija.token);
 
-    return { ok: true, igracId, nadimak: konacniNadimak, sesijskiToken };
+    return { ok: true, igracId, nadimak: konacniNadimak, sesijskiToken: sesija.token };
+  });
+
+  app.post('/racuni/gost-sesija', async (_zahtjev, odgovor) => {
+    return odgovor.send({ ok: true, ...(await stvoriGostSesiju()) });
   });
 
   app.post('/racuni/prijava', ogranicenje(limitPokusaja), async (zahtjev, odgovor) => {
@@ -177,13 +183,18 @@ export async function registrirajRacuneRute(
       return odgovor.code(401).send({ ok: false, greska: PORUKA_NEUSPJEHA });
     }
 
-    const sesijskiToken = izdajSesijskiToken(korisnik.id);
-    postaviSesijskiKolacic(odgovor, sesijskiToken);
+    const sesija = await izdajSesiju(korisnik.id);
+    postaviSesijskiKolacic(odgovor, sesija.token);
 
-    return { ok: true, igracId: korisnik.id, nadimak: korisnik.nadimak, sesijskiToken };
+    return { ok: true, igracId: korisnik.id, nadimak: korisnik.nadimak, sesijskiToken: sesija.token };
   });
 
-  app.post('/racuni/odjava', async (_zahtjev, odgovor) => {
+  app.post('/racuni/odjava', async (zahtjev, odgovor) => {
+    const sesija = await dohvatiSesijuZahtjeva(zahtjev);
+    if (sesija) {
+      await opozoviSesiju(sesija.id);
+      await opcijeRacuna.naSesijaOpozvana?.(sesija.id);
+    }
     odgovor.clearCookie(NAZIV_KOLACICA, { path: '/' });
     return { ok: true };
   });

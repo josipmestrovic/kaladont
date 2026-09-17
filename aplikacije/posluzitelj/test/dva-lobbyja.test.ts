@@ -27,7 +27,7 @@ afterAll(async () => {
 
 function spojiSe(): Promise<ClientSocket> {
   return new Promise((resolve, reject) => {
-    const socket = ioClient(adresa, { auth: { token: randomUUID() }, forceNew: true });
+    const socket = ioClient(adresa, { auth: { token: `gost.${randomUUID().replaceAll('-', '')}` }, forceNew: true });
     socket.on('connect', () => resolve(socket));
     socket.on('connect_error', reject);
   });

@@ -1,11 +1,7 @@
-/**
- * Potpisani tokeni (sesija, potvrda emaila, reset lozinke) - HMAC nad SESIJA_TAJNA.
- * Format: `${svrha}.${igracId}.${istekMs}.${potpis}` - razlikuje se od gost UUID-a (nema tocaka).
- */
+/** HMAC tokeni za potvrdu emaila i reset lozinke. Sesije su serverski provjerene u racuni/sesije.ts. */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { konfiguracija } from '../konfiguracija.js';
 
-const TRAJANJE_SESIJE_MS = 30 * 24 * 60 * 60 * 1000; // 30 dana
 const TRAJANJE_POTVRDE_MS = 24 * 60 * 60 * 1000; // 24 h (sigurnost-i-privatnost.md)
 
 function tajna(): string {
@@ -37,14 +33,6 @@ function provjeri(ocekivanaSvrha: string, token: string): string | null {
 
   return igracId;
 }
-
-/** Je li ovo format potpisanog tokena (za razliku od gost UUID-a). */
-export function jePotpisaniToken(token: string): boolean {
-  return token.includes('.');
-}
-
-export const izdajSesijskiToken = (igracId: string): string => izdaj('sesija', igracId, TRAJANJE_SESIJE_MS);
-export const provjeriSesijskiToken = (token: string): string | null => provjeri('sesija', token);
 
 export const izdajTokenPotvrdeEmaila = (igracId: string): string =>
   izdaj('potvrda-emaila', igracId, TRAJANJE_POTVRDE_MS);

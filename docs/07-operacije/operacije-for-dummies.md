@@ -948,7 +948,7 @@ Oba moraju pokazati `<PROD_IPV4>`.
 
 ### 21.2. Resend
 
-U Resendu dodaj domenu `kaladont.hr` i kao produkcijski pošiljatelj koristi `noreply@kaladont.hr`. Ljudski kontakt i Reply-To je `kontakt@kaladont.hr`.
+U Resendu dodaj domenu `kaladont.hr` i kao produkcijski pošiljatelj koristi `noreply@kaladont.hr`. Ljudski kontakt i Reply-To je `info@kaladont.hr`.
 
 Resend će prikazati DNS zapise. Nemoj ih prepisivati iz ovog dokumenta jer su vrijednosti jedinstvene. XHostingu pošalji:
 

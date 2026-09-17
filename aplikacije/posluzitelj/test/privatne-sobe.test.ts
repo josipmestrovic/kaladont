@@ -25,7 +25,7 @@ interface TestniIgrac {
   socket: ClientSocket;
 }
 
-function spojiIgraca(token = randomUUID()): Promise<TestniIgrac> {
+function spojiIgraca(token = `gost.${randomUUID().replaceAll('-', '')}`): Promise<TestniIgrac> {
   return new Promise((resolve, reject) => {
     const socket = ioClient(adresa, { auth: { token }, forceNew: true });
     socket.once('connect', () => resolve({ token, socket }));

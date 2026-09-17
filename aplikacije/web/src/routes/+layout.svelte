@@ -3,29 +3,33 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
+  import { inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { inicijalizirajAudio, inicijalizirajGlobalneUiZvukove } from '$lib/audio-manager.js';
   import Header from '$lib/komponente/Header.svelte';
 
   let { children } = $props();
+  let identitetSpreman = $state(false);
 
   // Čekaonica (/red) i aktivna partija (/partija/*) nemaju zaglavlje radi igre na punom ekranu.
   const bezHeadera = $derived(
     $page.url.pathname === '/red' || $page.url.pathname.startsWith('/partija/'),
   );
 
-  onMount(() => {
+  onMount(async () => {
+    await inicijalizirajGostSesiju();
+    identitetSpreman = true;
     inicijalizirajAudio();
     inicijalizirajGlobalneUiZvukove();
     pokreniSlusateljeIgre();
   });
 </script>
 
-{#if !bezHeadera}
+{#if identitetSpreman && !bezHeadera}
   <Header />
 {/if}
 
 <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">
-  {@render children()}
+  {#if identitetSpreman}{@render children()}{/if}
 </div>
 
 <style>

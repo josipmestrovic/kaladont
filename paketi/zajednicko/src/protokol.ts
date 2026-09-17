@@ -7,7 +7,7 @@ import type { ObracunIskustva, StavkaIskustva } from './iskustvo.js';
 import type { DnkOs } from './dnk.js';
 
 export interface PodaciVeze {
-  /** UUID gosta iz localStoragea ILI sesijski token registriranog igrača. */
+  /** Opaque guest token ILI sesijski token registriranog igrača. */
   token: string;
 }
 

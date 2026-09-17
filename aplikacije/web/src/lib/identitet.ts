@@ -1,4 +1,6 @@
-/** Gost identitet - nasumični UUID u localStorage (RS-19: brisanje localStoragea = novi identitet). */
+/** Gost identitet - opaque token u localStorageu; javni igracId nikad nije bearer token. */
+import { ADRESA_POSLUZITELJA } from './konfiguracija.js';
+
 const KLJUC_GOST_TOKEN = 'kaladont_gost_token';
 const KLJUC_SESIJSKI_TOKEN = 'kaladont_sesijski_token';
 const KLJUC_ONBORDING_ZAVRSEN = 'kaladont_onboarding_zavrsen';
@@ -6,17 +8,27 @@ const KLJUC_ONBORDING_ZAVRSEN = 'kaladont_onboarding_zavrsen';
 export function dohvatiGostToken(): string {
   if (typeof localStorage === 'undefined') {
     // SSR/build faza - vrati privremeni token, klijent ce ga zamijeniti u browseru
-    return crypto.randomUUID();
+    return `gost.${crypto.randomUUID().replaceAll('-', '')}`;
   }
   const postojeci = localStorage.getItem(KLJUC_GOST_TOKEN);
   if (postojeci) return postojeci;
 
-  const novi = crypto.randomUUID();
+  const novi = `gost.${crypto.randomUUID().replaceAll('-', '')}`;
   localStorage.setItem(KLJUC_GOST_TOKEN, novi);
   return novi;
 }
 
-/** Sprema potpisani sesijski token nakon prijave/registracije (racuni/tokeni.ts na serveru). */
+export async function inicijalizirajGostSesiju(): Promise<void> {
+  if (typeof localStorage === 'undefined' || localStorage.getItem(KLJUC_SESIJSKI_TOKEN)) return;
+  if (localStorage.getItem(KLJUC_GOST_TOKEN)?.startsWith('gost.')) return;
+
+  const odgovor = await fetch(`${ADRESA_POSLUZITELJA}/racuni/gost-sesija`, { method: 'POST' });
+  if (!odgovor.ok) throw new Error('Gostujuća sesija nije uspjela.');
+  const tijelo = (await odgovor.json()) as { token: string };
+  localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);
+}
+
+/** Sprema nečitljivi sesijski token nakon prijave/registracije (racuni/sesije.ts na serveru). */
 export function spremiSesijskiToken(token: string): void {
   localStorage.setItem(KLJUC_SESIJSKI_TOKEN, token);
   localStorage.removeItem(KLJUC_GOST_TOKEN);
@@ -33,7 +45,7 @@ export function dohvatiAuthToken(): string {
   return localStorage.getItem(KLJUC_SESIJSKI_TOKEN) ?? dohvatiGostToken();
 }
 
-/** Ima li korisnik potpisani sesijski token (registriran/admin) ili je gost. */
+/** Ima li korisnik sesijski token (registriran/admin) ili je gost. */
 export function jeRegistriranKorisnik(): boolean {
   if (typeof localStorage === 'undefined') return false;
   return localStorage.getItem(KLJUC_SESIJSKI_TOKEN) !== null;

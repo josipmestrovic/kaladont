@@ -1,18 +1,17 @@
 /**
  * Fastify preHandler hookovi za autentikaciju - čitaju Authorization: Bearer <token> (prioritet)
- * ili kaladont_sesija kolačić, verificiraju potpisani sesijski token (racuni/tokeni.ts).
- * Dualna podrška: potpisani sesijski tokeni (registrirani) i goli UUID-i (gosti).
+ * ili kaladont_sesija kolačić, verificiraju serversku sesiju (racuni/sesije.ts).
+ * Dualna podrška: serverske sesije (registrirani) i goli UUID-i (gosti).
  */
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { eq } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
-import { jePotpisaniToken, provjeriSesijskiToken } from './tokeni.js';
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { dohvatiSesiju, jeGostSesijskiToken, jeSesijskiToken } from './sesije.js';
 
 export interface ZahtjevSIgracem extends FastifyRequest {
   igrac?: typeof igraci.$inferSelect;
+  sesijaId?: string;
 }
 
 function dohvatiToken(zahtjev: FastifyRequest): string | null {
@@ -22,66 +21,69 @@ function dohvatiToken(zahtjev: FastifyRequest): string | null {
   return kolacic ?? null;
 }
 
-/** Dohvata igraca iz baze - prihvaca potpisane tokene (registrirani) ili gole UUID-e (gosti, vec kreirani pri Socket.IO). */
-async function dohvatiIgraca(zahtjev: FastifyRequest): Promise<typeof igraci.$inferSelect | null> {
+export async function dohvatiSesijuZahtjeva(zahtjev: FastifyRequest) {
+  const token = dohvatiToken(zahtjev);
+  return token && jeSesijskiToken(token) ? dohvatiSesiju(token) : null;
+}
+
+/** Dohvata igraca iz baze - prihvaca serverske sesije (registrirani) ili gole UUID-e (gosti). */
+async function dohvatiIgraca(
+  zahtjev: FastifyRequest,
+): Promise<{ igrac: typeof igraci.$inferSelect; sesijaId?: string } | null> {
   const token = dohvatiToken(zahtjev);
   if (!token) return null;
 
-  let igracId: string | null = null;
-  if (jePotpisaniToken(token)) {
-    igracId = provjeriSesijskiToken(token);
-    if (!igracId) return null;
-  } else if (UUID_REGEX.test(token)) {
-    igracId = token; // gosti - bez validacije HMAC-a
-  } else {
-    return null;
+  if (jeSesijskiToken(token)) {
+    const sesija = await dohvatiSesijuZahtjeva(zahtjev);
+    if (!sesija) return null;
+    const [redak] = await baza.select().from(igraci).where(eq(igraci.id, sesija.igracId)).limit(1);
+    if (!redak || redak.obrisanAt) return null;
+    if (jeGostSesijskiToken(token) && redak.vrsta !== 'gost') return null;
+    return { igrac: redak, sesijaId: sesija.id };
   }
-
-  const [redak] = await baza.select().from(igraci).where(eq(igraci.id, igracId)).limit(1);
-  if (!redak) return null;
-
-  // Goli UUID je dopušten samo za goste; registrirani/admin računi moraju koristiti sesijski token.
-  if (UUID_REGEX.test(token) && redak.vrsta !== 'gost') {
-    return null;
-  }
-
-  return redak;
+  return null;
 }
 
 /** Zahtijeva identifikaciju - prihvaca registrirane (potpisani token) i goste (goli UUID). */
 export async function zahtijevajIdentifikaciju(zahtjev: ZahtjevSIgracem, odgovor: FastifyReply): Promise<void> {
-  const igrac = await dohvatiIgraca(zahtjev);
-  if (!igrac) {
+  const autentikacija = await dohvatiIgraca(zahtjev);
+  if (!autentikacija) {
     await odgovor.code(401).send({ ok: false, greska: 'Potrebna je identifikacija (prijava ili gost token).' });
     return;
   }
-  zahtjev.igrac = igrac;
+  zahtjev.igrac = autentikacija.igrac;
+  zahtjev.sesijaId = autentikacija.sesijaId;
 }
 
 /** Opcionalna identifikacija - postavlja zahtjev.igrac ako je token valjan, inace tiho nastavlja bez greske. */
 export async function pokusajIdentifikaciju(zahtjev: ZahtjevSIgracem): Promise<void> {
-  const igrac = await dohvatiIgraca(zahtjev);
-  if (igrac) zahtjev.igrac = igrac;
+  const autentikacija = await dohvatiIgraca(zahtjev);
+  if (autentikacija) {
+    zahtjev.igrac = autentikacija.igrac;
+    zahtjev.sesijaId = autentikacija.sesijaId;
+  }
 }
 
 export async function zahtijevajPrijavu(zahtjev: ZahtjevSIgracem, odgovor: FastifyReply): Promise<void> {
-  const igrac = await dohvatiIgraca(zahtjev);
-  if (!igrac || igrac.vrsta === 'gost') {
+  const autentikacija = await dohvatiIgraca(zahtjev);
+  if (!autentikacija || autentikacija.igrac.vrsta === 'gost') {
     await odgovor.code(401).send({ ok: false, greska: 'Potrebna je prijava (samo registrirani).' });
     return;
   }
-  zahtjev.igrac = igrac;
+  zahtjev.igrac = autentikacija.igrac;
+  zahtjev.sesijaId = autentikacija.sesijaId;
 }
 
 export async function zahtijevajAdmina(zahtjev: ZahtjevSIgracem, odgovor: FastifyReply): Promise<void> {
-  const igrac = await dohvatiIgraca(zahtjev);
-  if (!igrac) {
+  const autentikacija = await dohvatiIgraca(zahtjev);
+  if (!autentikacija) {
     await odgovor.code(401).send({ ok: false, greska: 'Potrebna je prijava.' });
     return;
   }
-  if (igrac.vrsta !== 'admin') {
+  if (autentikacija.igrac.vrsta !== 'admin') {
     await odgovor.code(403).send({ ok: false, greska: 'Potrebne su admin ovlasti.' });
     return;
   }
-  zahtjev.igrac = igrac;
+  zahtjev.igrac = autentikacija.igrac;
+  zahtjev.sesijaId = autentikacija.sesijaId;
 }
