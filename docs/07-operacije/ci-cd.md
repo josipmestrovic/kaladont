@@ -90,7 +90,7 @@ VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kra
 1. Workflow koristi GitHub Environment `staging` i tajne `STAGING_HOST`, `STAGING_SSH_KLJUC` i `STAGING_SSH_KNOWN_HOSTS`.
 2. Fiksni SSH korisnik je `deploy`, a host fingerprint se provjerava s `StrictHostKeyChecking=yes`.
 3. Na VPS se šalju samo `docker-compose.staging.yml` i `Caddyfile.staging`; `.env` i tajne nikad se ne kopiraju iz repozitorija.
-4. Workflow validira Compose, povlači novi digest, izvršava migracije i rekreira aplikaciju i Caddy kako bi i promjene reverse-proxy konfiguracije postale aktivne.
+4. Workflow validira Compose, povlači novi digest, izvršava migracije, uklanja stare aplikacijske/Caddy kontejnere i čeka zdrave nove kontejnere kako bi i promjene reverse-proxy konfiguracije postale aktivne.
 5. Ponavlja javni health do uspjeha; odgovor mora sadržavati očekivani digest i commit SHA.
 6. Zeleni staging deploy znači da je kandidat spreman za ručnu browser provjeru, ne za automatsku produkciju.
 

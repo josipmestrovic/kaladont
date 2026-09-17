@@ -117,9 +117,11 @@ jobs:
           docker compose -f docker-compose.staging.yml config >/dev/null
           docker compose -f docker-compose.staging.yml pull aplikacija
           docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
-          docker compose -f docker-compose.staging.yml up -d --force-recreate aplikacija caddy
-          aktivni_digest=$(docker inspect kaladont-aplikacija-1 --format '{{index .Config.Labels "com.docker.compose.image"}}')
-          test "$aktivni_digest" = "${KALADONT_IMAGE#*@}"
+          docker compose -f docker-compose.staging.yml rm -sf aplikacija caddy
+          docker compose -f docker-compose.staging.yml up -d --wait --wait-timeout 180 aplikacija caddy
+          aktivni_image=$(docker inspect kaladont-aplikacija-1 --format '{{.Config.Image}}')
+          test "$aktivni_image" = "$KALADONT_IMAGE"
+          docker compose -f docker-compose.staging.yml exec -T aplikacija node -e "fetch('http://127.0.0.1:3000/zdravlje').then((odgovor) => process.exit(odgovor.ok ? 0 : 1)).catch(() => process.exit(1))"
           REMOTE
 
       - name: Provjeriti staging health i digest
