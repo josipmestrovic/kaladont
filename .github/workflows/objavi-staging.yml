@@ -118,6 +118,8 @@ jobs:
           docker compose -f docker-compose.staging.yml pull aplikacija
           docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
           docker compose -f docker-compose.staging.yml up -d --force-recreate aplikacija caddy
+          aktivni_digest=$(docker inspect kaladont-aplikacija-1 --format '{{index .Config.Labels "com.docker.compose.image"}}')
+          test "$aktivni_digest" = "${KALADONT_IMAGE#*@}"
           REMOTE
 
       - name: Provjeriti staging health i digest
