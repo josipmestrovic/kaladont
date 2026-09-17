@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { io as ioClient } from 'socket.io-client';
 import { eq } from 'drizzle-orm';
+import { izdajTokenPotvrdeEmaila, izdajTokenResetaLozinke } from '../src/racuni/tokeni.js';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { igraci } from '../src/baza/shema.js';
@@ -36,7 +37,11 @@ describe('POST /racuni/registracija', () => {
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'TestIgrac' }),
     });
     expect(odgovor.status).toBe(200);
-    const tijelo = (await odgovor.json()) as { ok: boolean; igracId: string; sesijskiToken: string };
+    const tijelo = (await odgovor.json()) as {
+      ok: boolean;
+      igracId: string;
+      sesijskiToken: string;
+    };
     expect(tijelo.ok).toBe(true);
     expect(tijelo.sesijskiToken.split('.')).toHaveLength(4);
 
@@ -104,6 +109,60 @@ describe('POST /racuni/prijava', () => {
   });
 });
 
+describe('potvrda emaila i reset lozinke', () => {
+  it('potvrđuje email POST zahtjevom i vraća preusmjeravanje za stari link', async () => {
+    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId } = (await registracija.json()) as { igracId: string };
+    const token = izdajTokenPotvrdeEmaila(igracId);
+
+    const stariLink = await fetch(`${adresa}/racuni/potvrdi-email?token=${token}`, {
+      redirect: 'manual',
+    });
+    expect(stariLink.status).toBe(302);
+    expect(stariLink.headers.get('location')).toContain('/potvrda-emaila?token=');
+
+    const potvrda = await fetch(`${adresa}/racuni/potvrdi-email`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    expect(potvrda.status).toBe(200);
+    const [igrac] = await baza
+      .select({ emailPotvrdjen: igraci.emailPotvrdjen })
+      .from(igraci)
+      .where(eq(igraci.id, igracId));
+    expect(igrac?.emailPotvrdjen).toBe(true);
+  });
+
+  it('resetira lozinku valjanim tokenom pa dopušta novu prijavu', async () => {
+    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId } = (await registracija.json()) as { igracId: string };
+    const token = izdajTokenResetaLozinke(igracId);
+
+    const reset = await fetch(`${adresa}/racuni/resetiraj-lozinku`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, novaLozinka: 'nova-lozinka123' }),
+    });
+    expect(reset.status).toBe(200);
+
+    const prijava = await fetch(`${adresa}/racuni/prijava`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka123' }),
+    });
+    expect(prijava.status).toBe(200);
+  });
+});
+
 describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim UUID-om', () => {
   it('odbija goli UUID registriranog računa za protected HTTP rute', async () => {
     const email = `http-impersonation-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
@@ -141,7 +200,10 @@ describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim 
         body: JSON.stringify({ email, lozinka: LOZINKA, nadimak: 'HttpAdmin' }),
       });
       expect(registracija.status).toBe(200);
-      const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+      const { igracId, sesijskiToken } = (await registracija.json()) as {
+        igracId: string;
+        sesijskiToken: string;
+      };
       await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, igracId));
 
       const odgovor = await fetch(`${adresa}/admin/prijave`, {

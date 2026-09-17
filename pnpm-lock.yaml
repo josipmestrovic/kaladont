@@ -84,6 +84,9 @@ importers:
 
   aplikacije/web:
     dependencies:
+      lucide-svelte:
+        specifier: ^1.0.1
+        version: 1.0.1(svelte@5.57.0(@typescript-eslint/types@8.69.0))
       socket.io-client:
         specifier: ^4.8.1
         version: 4.8.3
@@ -1827,6 +1830,12 @@ packages:
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
+
+  lucide-svelte@1.0.1:
+    resolution: {integrity: sha512-WvzZgk0pqzgda+AErLvgWxHkfg/+GgUwqKMRHvzt0IqyMdmyEDzDCk3Z+Wo/3y753oIgx8u9Q4eUbWkghFa8Jg==}
+    deprecated: Package deprecated. Please use @lucide/svelte instead.
+    peerDependencies:
+      svelte: ^3 || ^4 || ^5.0.0-next.42
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -3681,6 +3690,10 @@ snapshots:
   lodash.merge@4.6.2: {}
 
   loupe@3.2.1: {}
+
+  lucide-svelte@1.0.1(svelte@5.57.0(@typescript-eslint/types@8.69.0)):
+    dependencies:
+      svelte: 5.57.0(@typescript-eslint/types@8.69.0)
 
   magic-string@0.30.21:
     dependencies:

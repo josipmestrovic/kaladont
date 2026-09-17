@@ -7,7 +7,7 @@ let app: FastifyInstance;
 beforeAll(async () => {
   ({ app } = await izgradiPosluzitelj({
     okruzenjeSigurnosti: 'staging',
-    authRateLimit: { omogucen: true, maxPokusaja: 2, vremenskiProzor: '1 minute' },
+    authRateLimit: { omogucen: true, maxPokusaja: 10, vremenskiProzor: '1 minute' },
   }));
 });
 
@@ -26,8 +26,9 @@ async function prijaviSe(ip: string) {
 
 describe('auth rate limit', () => {
   it('ograničava pokušaje prijave po stvarnom klijentskom IP-u', async () => {
-    expect((await prijaviSe('203.0.113.10')).statusCode).toBe(401);
-    expect((await prijaviSe('203.0.113.10')).statusCode).toBe(401);
+    for (let pokusaj = 0; pokusaj < 10; pokusaj += 1) {
+      expect((await prijaviSe('203.0.113.10')).statusCode).toBe(401);
+    }
 
     const ogranicen = await prijaviSe('203.0.113.10');
     expect(ogranicen.statusCode).toBe(429);

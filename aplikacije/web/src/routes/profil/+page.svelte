@@ -86,6 +86,7 @@
   const prikazujePostavke = $derived($page.url.searchParams.get('tab') === 'postavke');
 
   async function odjaviSe(): Promise<void> {
+    await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
     obrisiSesijskiToken();
     await osvjeziSocketIdentitet();
     void goto('/');

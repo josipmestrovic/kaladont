@@ -12,6 +12,7 @@ const shemaKonfiguracije = z.object({
   EMAIL_API_KLJUC: z.string().default(''),
   EMAIL_POSILJATELJ: z.string().email().default('noreply@kaladont.hr'),
   STAGING_EMAIL_ALLOWLIST: z.string().default(''),
+  JAVNA_ADRESA: z.string().url().default('http://localhost:3000'),
   DEV_MAIL: z.string().email().default('dev@example.com'),
   UMAMI_URL: z.string().default(''),
   ONEMOGUCI_TIMER_POTEZA: z.enum(['true', 'false']).default('false'),
@@ -37,6 +38,9 @@ if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'producti
   }
   if (!konfiguracija.EMAIL_API_KLJUC) {
     throw new Error('EMAIL_API_KLJUC mora biti postavljen izvan razvoja i testiranja.');
+  }
+  if (konfiguracija.JAVNA_ADRESA.startsWith('http://')) {
+    throw new Error('JAVNA_ADRESA mora koristiti HTTPS izvan razvoja i testiranja.');
   }
 }
 

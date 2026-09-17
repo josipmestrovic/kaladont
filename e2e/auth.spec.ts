@@ -10,7 +10,10 @@ test('registracija i prijava zadržavaju sesiju nakon reloadanja', async ({ page
   await page.getByRole('button', { name: 'Dalje' }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
-  await page.getByRole('button', { name: /odaberi/i }).first().click();
+  await page
+    .getByRole('button', { name: /odaberi/i })
+    .first()
+    .click();
   await page.getByRole('button', { name: /registriraj/i }).click();
 
   await expect(page).toHaveURL('/');
@@ -25,4 +28,26 @@ test('prijava s krivom lozinkom prikazuje grešku', async ({ page }) => {
   await page.getByRole('button', { name: /prijavi se/i }).click();
 
   await expect(page.getByRole('alert')).toBeVisible();
+});
+
+test('zaboravljena lozinka skriva postojanje računa i nudi registraciju', async ({ page }) => {
+  await page.goto('/zaboravljena-lozinka');
+  await page.getByLabel('Email').fill(`ne-postoji-${Date.now()}@example.com`);
+  await page.getByRole('button', { name: 'Pošalji upute' }).click();
+
+  await expect(
+    page.getByText('Ako račun postoji, poslali smo upute na unesenu email adresu.'),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Registriraj se' })).toBeVisible();
+});
+
+test('lozinka se može prikazati, a nevaljani reset link se odbija', async ({ page }) => {
+  await page.goto('/prijava');
+  const lozinka = page.locator('input[type="password"]');
+  await lozinka.fill('vidljiva-lozinka');
+  await page.getByRole('button', { name: 'Prikaži lozinku' }).click();
+  await expect(page.locator('input[type="text"]')).toHaveValue('vidljiva-lozinka');
+
+  await page.goto('/racuni/resetiraj-lozinku');
+  await expect(page.getByRole('alert')).toHaveText('Poveznica za reset nije ispravna.');
 });

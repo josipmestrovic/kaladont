@@ -58,11 +58,17 @@ stagingu i produkciji.
 | `BAZA_URL`                  | PostgreSQL konekcijski string                                                                                                                                                                                 |
 | `SESIJA_TAJNA`              | Tajna za potpisivanje sesija                                                                                                                                                                                  |
 | `EMAIL_API_KLJUC`           | Resend ključ (u razvoju prazan → mailovi se ispisuju u konzolu)                                                                                                                                               |
+| `JAVNA_ADRESA`              | Javna osnova za email poveznice; lokalno `http://localhost:3000`, staging `https://staging.kaladont.hr`, produkcija `https://kaladont.hr`                                                                     |
 | `DEV_MAIL`                  | Adresa za notifikacije prijava                                                                                                                                                                                |
 | `UMAMI_URL`                 | Prazno u razvoju (analitika isključena)                                                                                                                                                                       |
 | `ONEMOGUCI_TIMER_POTEZA`    | **Samo za lokalno testiranje** — vidi napomenu ispod. `false` ili izbrisano u produkciji.                                                                                                                     |
 | `ODGODA_POCETKA_PARTIJE_MS` | Odgoda početka partije (odbrojavanje u čekaonici), zadano 10000 ms. Testovi postavljaju 0; ne mijenjati u produkciji. Neovisno o `ONEMOGUCI_TIMER_POTEZA` — odbrojavanje radi i s isključenim timerom poteza. |
 | `TOLERANCIJA_PREKIDA_MS`    | Tolerancija mrežnog prekida tijekom aktivne partije. Zadano 10000 ms; staging i produkcija zahtijevaju točno tu vrijednost. Timer poteza ne pauzira se.                                                       |
+
+Staging `.env` mora sadržavati `JAVNA_ADRESA=https://staging.kaladont.hr` i
+`STAGING_EMAIL_ALLOWLIST` s punim email adresama na koje smiješ primiti testnu potvrdu ili reset.
+Allowlista se ne otvara za sve adrese: staging je javno dostupan i otvoreno slanje omogućilo bi
+zlouporabu Resend računa.
 
 ### Isključivanje timera poteza tijekom testiranja
 

@@ -8,7 +8,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
-import { posaljiEmail } from '../email.js';
+import { porukaPotvrdeEmaila, porukaResetaLozinke, posaljiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
 import {
@@ -48,12 +48,17 @@ const ShemaPrijave = z.object({
 
 const ShemaZaboravljenaLozinka = z.object({ email: z.string().email() });
 const ShemaResetLozinke = z.object({ token: z.string(), novaLozinka: z.string().min(8) });
+const ShemaTokena = z.object({ token: z.string() });
+
+function javnaPoveznica(putanja: string): string {
+  return new URL(putanja, konfiguracija.JAVNA_ADRESA).toString();
+}
 
 function postaviSesijskiKolacic(odgovor: import('fastify').FastifyReply, token: string): void {
   odgovor.setCookie(NAZIV_KOLACICA, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: konfiguracija.NODE_ENV === 'production',
+    secure: konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production',
     maxAge: TRAJANJE_KOLACICA_MS / 1000,
     path: '/',
   });
@@ -64,15 +69,15 @@ export async function registrirajRacuneRute(
   opcijeRateLimita: OpcijeAuthRateLimita,
 ): Promise<void> {
   const limitPokusaja = {
-    max: opcijeRateLimita.maxPokusaja ?? 5,
+    max: opcijeRateLimita.maxPokusaja ?? 10,
     timeWindow: opcijeRateLimita.vremenskiProzor ?? '15 minutes',
   };
   const limitResetEmaila = {
-    max: Math.min(3, limitPokusaja.max),
-    timeWindow: opcijeRateLimita.vremenskiProzor ?? '1 hour',
+    max: limitPokusaja.max,
+    timeWindow: opcijeRateLimita.vremenskiProzor ?? '15 minutes',
   };
   const limitPotvrde = {
-    max: Math.max(10, limitPokusaja.max),
+    max: limitPokusaja.max,
     timeWindow: opcijeRateLimita.vremenskiProzor ?? '15 minutes',
   };
   const ogranicenje = (postavke: typeof limitPokusaja) =>
@@ -144,7 +149,7 @@ export async function registrirajRacuneRute(
     await posaljiEmail(
       app.log,
       email,
-      `Potvrdi email: /racuni/potvrdi-email?token=${tokenPotvrde}`,
+      porukaPotvrdeEmaila(javnaPoveznica(`/potvrda-emaila?token=${tokenPotvrde}`)),
     );
 
     const sesijskiToken = izdajSesijskiToken(igracId);
@@ -187,14 +192,23 @@ export async function registrirajRacuneRute(
     '/racuni/potvrdi-email',
     ogranicenje(limitPotvrde),
     async (zahtjev, odgovor) => {
-      const igracId = zahtjev.query.token ? provjeriTokenPotvrdeEmaila(zahtjev.query.token) : null;
-      if (!igracId) {
-        return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
-      }
-      await baza.update(igraci).set({ emailPotvrdjen: true }).where(eq(igraci.id, igracId));
-      return { ok: true };
+      const token = zahtjev.query.token ?? '';
+      return odgovor.redirect(`/potvrda-emaila?token=${encodeURIComponent(token)}`);
     },
   );
+
+  app.post('/racuni/potvrdi-email', ogranicenje(limitPotvrde), async (zahtjev, odgovor) => {
+    const rezultat = ShemaTokena.safeParse(zahtjev.body);
+    if (!rezultat.success) {
+      return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
+    }
+    const igracId = provjeriTokenPotvrdeEmaila(rezultat.data.token);
+    if (!igracId) {
+      return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
+    }
+    await baza.update(igraci).set({ emailPotvrdjen: true }).where(eq(igraci.id, igracId));
+    return { ok: true };
+  });
 
   app.post(
     '/racuni/zaboravljena-lozinka',
@@ -217,7 +231,7 @@ export async function registrirajRacuneRute(
         await posaljiEmail(
           app.log,
           rezultat.data.email,
-          `Resetiraj lozinku: /racuni/resetiraj-lozinku?token=${token}`,
+          porukaResetaLozinke(javnaPoveznica(`/racuni/resetiraj-lozinku?token=${token}`)),
         );
       }
 

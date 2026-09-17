@@ -5,6 +5,7 @@
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import { AVATARI } from '$lib/avatari.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
+  import UnosLozinke from '$lib/komponente/UnosLozinke.svelte';
 
   let korak = $state<1 | 2>(1);
   let nadimak = $state('');
@@ -89,10 +90,7 @@
         <input type="email" bind:value={email} required placeholder="tvoj@email.com" />
       </label>
 
-      <label class="labela">
-        Lozinka (min. 8 znakova)
-        <input type="password" bind:value={lozinka} minlength={8} required placeholder="Lozinka" />
-      </label>
+      <UnosLozinke bind:vrijednost={lozinka} oznaka="Lozinka (min. 8 znakova)" najmanjaDuljina={8} />
 
       <div class="avatar-sekcija">
         <h2>Izaberi svoj avatar</h2>

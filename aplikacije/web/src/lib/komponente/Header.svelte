@@ -20,6 +20,7 @@
   let jeGost = $state(true);
 
   async function odjaviSe() {
+    await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
     obrisiSesijskiToken();
     profil = null;
     jeGost = true;

@@ -7,7 +7,7 @@
 - Lozinke: **argon2id** (memorijski tvrd), nikad u logovima; minimalna duljina 8 znakova bez glupih pravila kompleksnosti.
 - Sesije: httpOnly + Secure + SameSite=Lax kolačić s potpisanim tokenom; Socket.IO handshake prima isti token.
 - Gost identitet: nasumični UUID u localStorage — ne otisak uređaja, ne kolačić za praćenje.
-- Potvrda emaila poveznicom s istekom (24 h); reset lozinke istim mehanizmom, bez otkrivanja postoji li račun.
+- Potvrda emaila poveznicom s istekom (24 h); reset lozinke istim mehanizmom, bez otkrivanja postoji li račun. Email poveznice koriste javnu adresu aktivnog okruženja, a staging šalje samo na izričito dopuštene testne adrese.
 
 ## Validacija ulaza — server ne vjeruje nikome
 
@@ -23,8 +23,8 @@
 | Pokušaji poteza                    | 3 u sekundi po igraču                               | RS-23 |
 | Emoji reakcije                     | 1 svake 2 s                                         | RS-22 |
 | Prijave grešaka                    | 5 na sat po identitetu                              | —     |
-| Registracija/prijava/reset lozinke | 5 pokušaja u 15 min po IP-u                         | —     |
-| Zahtjev za reset emaila            | 3 zahtjeva na sat po IP-u                           | —     |
+| Registracija/prijava/reset lozinke | 10 pokušaja u 15 min po IP-u                        | —     |
+| Zahtjev za reset emaila            | 10 zahtjeva u 15 min po IP-u                        | —     |
 | Potvrda emaila                     | 10 pokušaja u 15 min po IP-u                        | —     |
 | HTTP općenito                      | razuman globalni limit po IP-u (Fastify rate-limit) | —     |
 
@@ -95,8 +95,8 @@ Popis se održava ažurnim na `/privatnost` stranici; novi izvršitelj = izmjena
 
 ### Email po okruženju
 
-- Produkcija šalje preko Resenda s verificirane domene i pošiljatelja `noreply@kaladont.hr`; odgovori i ljudski upiti vode na `kontakt@kaladont.hr`.
-- Staging koristi zasebnu konfiguraciju i `STAGING_EMAIL_ALLOWLIST` s punim, točno dopuštenim adresama. Adapter mora fail-closed odbiti i evidentirati svaki pokušaj slanja izvan popisa. Dopuštena domena ili ljudsko obećanje nisu dovoljna kontrola.
+- Produkcija šalje preko Resenda s verificirane domene i pošiljatelja `noreply@kaladont.hr`; odgovori i ljudski upiti vode na `kontakt@kaladont.hr`. `JAVNA_ADRESA` je `https://kaladont.hr`, pa email potvrde i reset poveznice vode na javnu domenu.
+- Staging koristi zasebnu konfiguraciju, `JAVNA_ADRESA=https://staging.kaladont.hr` i `STAGING_EMAIL_ALLOWLIST` s punim, točno dopuštenim adresama. Adapter mora fail-closed odbiti i evidentirati svaki pokušaj slanja izvan popisa. Dopuštena domena ili ljudsko obećanje nisu dovoljna kontrola.
 - Razvoj bez API ključa ispisuje testnu poruku lokalno. Takav stub nije dokaz produkcijskog slanja.
 
 ### Forum zajednice
