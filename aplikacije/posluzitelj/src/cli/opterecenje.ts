@@ -224,7 +224,10 @@ async function scenarijReconnect(postavke: Postavke, tokeni: readonly string[]) 
 }
 
 async function scenarijRed(postavke: Postavke, tokeni: readonly string[]) {
-  const idleTokeni = Array.from({ length: postavke.brojIdleKlijenata }, () => randomUUID());
+  const idleTokeni = Array.from(
+    { length: postavke.brojIdleKlijenata },
+    () => `gost.${randomUUID().replaceAll('-', '')}`,
+  );
   const idle = await spojiUValovima(postavke, idleTokeni);
   const { klijenti, trajanja, greske } = await spojiUValovima(postavke, tokeni);
   const ulazakPoTokenu = new Map<string, number>();
@@ -281,7 +284,10 @@ async function scenarijRed(postavke: Postavke, tokeni: readonly string[]) {
 
 async function glavno(): Promise<void> {
   const postavke = ucitajPostavke();
-  const tokeni = Array.from({ length: postavke.brojKlijenata }, () => randomUUID());
+  const tokeni = Array.from(
+    { length: postavke.brojKlijenata },
+    () => `gost.${randomUUID().replaceAll('-', '')}`,
+  );
   const pocetak = performance.now();
 
   console.log(
