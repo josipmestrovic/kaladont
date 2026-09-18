@@ -20,7 +20,7 @@ let app: FastifyInstance;
 let adresa: string;
 
 beforeAll(async () => {
-  ({ app } = await izgradiPosluzitelj());
+  ({ app } = await izgradiPosluzitelj({ postavkeMotora: { tolerancijaPrekidaMs: 50 } }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = app.server.address();
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
