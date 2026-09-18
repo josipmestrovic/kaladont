@@ -3,10 +3,10 @@
 
   interface Props {
     profil: DnkProfil;
-    naslov?: string;
+    naslov: string;
   }
 
-  let { profil, naslov = 'Kaladont DNK' }: Props = $props();
+  let { profil, naslov }: Props = $props();
 
   const srediste = 150;
   const radijus = 105;
@@ -66,10 +66,7 @@
             <div class="dnk-traka" aria-label={`${os.naziv}: ${os.vrijednost} od 100`}>
               <span style={`width: ${os.vrijednost}%`}></span>
             </div>
-            <small>
-              {os.oznaka}
-              {#if os.kljuc !== 'duge_rijeci' && os.kljuc !== 'rijetke_rijeci'} · {os.detalj}{/if}
-            </small>
+            <small>{os.oznaka}</small>
           </div>
         {/each}
       </div>
@@ -83,7 +80,7 @@
       </div>
     </div>
   {/if}
-  <a class="dnk-pomoc" href="/pomoc?tema=napredak#dnk">Kako čitati DNK?</a>
+  <a class="dnk-pomoc" href="/pravila-kaladonta?tema=napredak#dnk">Kako čitati DNK?</a>
 </section>
 
 <style>

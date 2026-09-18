@@ -31,9 +31,11 @@
       <p class="tekst">Popis riječi izveden je iz leksikona <strong>hrLex 1.3</strong> (Nikola Ljubešić, CLARIN.SI, <a href="http://hdl.handle.net/11356/1232" target="_blank" rel="noreferrer">hdl.handle.net/11356/1232</a>), dostupnog pod licencom <strong>CC BY-SA 4.0</strong>.</p>
       <p class="tekst">Za potrebe igre popis je filtriran bez vlastitih imena i kratica te obogaćen grafemskim parovima i leksemskim grupama. Izvedeni popis dostupan je pod istom licencom na zahtjev.</p>
       <StatistikaRjecnika />
+      <h4>Zasluge i licence</h4>
+      <p class="tekst">Personalizirani avatari koriste <a href="https://www.figma.com/community/file/829741575478342595/avatar-illustration-system" target="_blank" rel="noreferrer">Avatar Illustration System</a> autora Micaha Laniera, dostupan pod licencom <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">Creative Commons Attribution 4.0 International (CC BY 4.0)</a>. Za Kaladont je sustav prilagođen razdvajanjem SVG dijelova, povezivanjem slojeva i omogućavanjem promjene podržanih boja.</p>
       <h4>Kontakt</h4>
       <p class="tekst">Pitanja, prijedlozi ili prijave grešaka: koristi gumb „Prijavi” u igri ili piši na <a href="mailto:kontakt@kaladont.hr">kontakt@kaladont.hr</a>.</p>
-      <p class="poveznica"><a href="/pomoc?tema=kako-igrati">Otvori cijeli vodič Pomoć →</a></p>
+      <p class="poveznica"><a href="/pravila-kaladonta?tema=kako-igrati">Otvori Pravila Kaladonta →</a></p>
     {:else if pogled === 'uvjeti'}
       <h2>Uvjeti</h2>
       <p class="tekst">Kaladont je igra riječi u ranom pristupu. Igraš prema pravilima prikazanima u pomoći i prihvaćaš da se partije, potezi i rezultati bilježe radi rada igre, povijesti i rješavanja prijava.</p>

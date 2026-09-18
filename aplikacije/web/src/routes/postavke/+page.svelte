@@ -83,6 +83,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Postavke | Kaladont</title>
+</svelte:head>
+
 <main class="postavke-stranica">
   <h1>Postavke</h1>
 

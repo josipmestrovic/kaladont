@@ -9,7 +9,7 @@
   import DostignuceKartica from '$lib/komponente/DostignuceKartica.svelte';
   import KaladontDnkGraf from '$lib/komponente/KaladontDnkGraf.svelte';
   import PostavkeProfila from '$lib/komponente/PostavkeProfila.svelte';
-  import { PRAGOVI_DULJINE, vratiVeciRang, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
+  import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
 
     interface StatistikaRijeci {
       najduziStreak: number;
@@ -29,6 +29,7 @@
     igracId: string;
     nadimak: string;
     avatarId: number;
+    avatarConfig: AvatarConfigV1 | null;
     email: string | null;
     emailPotvrdjen: boolean;
     odigrane: number;
@@ -43,7 +44,10 @@
     bodovi1v1: number;
     prosjekBodova1v1: number;
     rang1v1: string;
-    dnk: { cetiriIgraca: DnkProfil; dvaIgraca: DnkProfil };
+    dnk: {
+      cetiriIgraca: DnkProfil & { metrike: DnkMetrike };
+      dvaIgraca: DnkProfil & { metrike: DnkMetrike };
+    };
     prosjecnaOcjenaIgre: number | null;
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
     stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen';
@@ -51,6 +55,14 @@
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
     otkljucaneRijeci: { duge: string[]; srednjeDuge: string[]; jakoDuge: string[]; rijetke: string[]; srednjeRijetke: string[]; jakoRijetke: string[] };
     dostignuca: { ukupnoZvjezdica: number; maksimalnoZvjezdica: number; ukupnoOtkljucanih: number; dostignuca: Dostignuce[] };
+  }
+
+  interface DnkMetrike {
+    eliminacijePoPartiji: number;
+    nizPrihvacenihRijeci: number;
+    prosjekPrihvacenogPotezaMs: number;
+    dugeRijeciPoPartiji: number;
+    rijetkeRijeciPoPartiji: number;
   }
 
   interface Dostignuce {
@@ -88,13 +100,14 @@
   async function odjaviSe(): Promise<void> {
     await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
     obrisiSesijskiToken();
-    await osvjeziSocketIdentitet();
+    window.dispatchEvent(new CustomEvent('kaladont:odjava'));
+    void osvjeziSocketIdentitet().catch(() => {});
     void goto('/');
   }
 
   onMount(() => {
     const prilagodiAvatar = () => {
-      velicinaAvatara = window.innerWidth < 768 ? 136 : 216;
+      velicinaAvatara = window.innerWidth < 768 ? 160 : 248;
     };
     prilagodiAvatar();
     window.addEventListener('resize', prilagodiAvatar);
@@ -162,6 +175,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Profil | Kaladont</title>
+</svelte:head>
+
 <main class="profil-stranica">
   {#if greska}
     <p role="alert" class="greska">{greska}</p>
@@ -169,8 +186,8 @@
     {@const jeGost = !profil.email}
 
     <div class:postavke-aktivne={prikazujePostavke} class="zaglavlje-profila">
-      <a class="avatar-uredivanje" href="/profil?tab=postavke#avatar" aria-label="Uredi avatar">
-        <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost={jeGost} velicina={velicinaAvatara} />
+      <a class="avatar-uredivanje" href="/profil/avatar" aria-label="Uredi avatar">
+        <Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost={jeGost} velicina={velicinaAvatara} />
         <span class="ikona-uredi" aria-hidden="true">✎</span>
       </a>
       <div class="info-profila">
@@ -178,7 +195,6 @@
         <span class="rang-oznaka">
            {vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'}
         </span>
-          <a class="pomoc-oznake" href="/pomoc?tema=bodovi">Kako se računa rang?</a>
         <div class="iskustvo-profila">
           <strong>LVL {profil.iskustvo.razina}</strong>
           {#if profil.iskustvo.doIduce === null}
@@ -190,7 +206,6 @@
             </div>
           {/if}
         </div>
-        <a class="pomoc-oznake" href="/pomoc?tema=napredak">Kako radi XP?</a>
         <p class="stil-igre">Stil igre: <strong>{profil.stilIgre}</strong></p>
         {#if profil.prosjecnaOcjenaIgre !== null}
           {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
@@ -199,10 +214,6 @@
               <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
             {/each}
           </span></p>
-          <a class="pomoc-oznake" href="/pomoc?tema=napredak#ocjena-partije">Kako se računa ocjena?</a>
-        {/if}
-        {#if profil.statistikaRijeci}
-          <p class="streak-sažetak">Najduži niz bez pogreške riječi: <strong>{profil.statistikaRijeci.najduziStreak}</strong></p>
         {/if}
       </div>
       <div class="profil-akcije">
@@ -250,7 +261,6 @@
     {#if aktivniPogled === 'statistika' && aktivniTab === '4p'}
       <section class="statistika-sekcija">
         <h2>Statistika (4 igrača)</h2>
-        <KaladontDnkGraf profil={profil.dnk.cetiriIgraca} />
         <div class="mrezica-kartica">
           <div class="stat-kartica">
             <span class="stat-broj">{profil.odigrane}</span>
@@ -261,23 +271,25 @@
             <span class="stat-naziv">Pobjede</span>
           </div>
           <div class="stat-kartica">
-            <span class="stat-broj">{profil.bodoviUkupno}</span>
-            <span class="stat-naziv">Ukupno bodova</span>
-          </div>
-          <div class="stat-kartica">
             <span class="stat-broj">{profil.prosjekBodova.toFixed(2)}</span>
             <span class="stat-naziv">Prosjek bodova</span>
           </div>
-          <div class="stat-kartica">
-            <span class="stat-broj">{profil.eliminacijeUkupno}</span>
-            <span class="stat-naziv">Eliminacije</span>
-          </div>
+          <div class="stat-kartica"><span class="stat-broj">{profil.dnk.cetiriIgraca.metrike.eliminacijePoPartiji.toFixed(2)}</span><span class="stat-naziv">Eliminacije po partiji</span></div>
         </div>
+        <KaladontDnkGraf profil={profil.dnk.cetiriIgraca} naslov="Kaladont DNK 4 igrača" />
+        <section class="ostalo-kartica">
+          <h3>Ostalo</h3>
+          <div class="mrezica-kartica">
+          <div class="stat-kartica"><span class="stat-broj">{profil.dnk.cetiriIgraca.metrike.nizPrihvacenihRijeci}</span><span class="stat-naziv">Niz prihvaćenih riječi</span></div>
+          <div class="stat-kartica"><span class="stat-broj">{(profil.dnk.cetiriIgraca.metrike.prosjekPrihvacenogPotezaMs / 1000).toFixed(1)} s</span><span class="stat-naziv">Prosjek prihvaćenog poteza</span></div>
+          <div class="stat-kartica"><span class="stat-broj">{profil.dnk.cetiriIgraca.metrike.dugeRijeciPoPartiji.toFixed(2)}</span><span class="stat-naziv">Duge riječi po partiji</span></div>
+          <div class="stat-kartica"><span class="stat-broj">{profil.dnk.cetiriIgraca.metrike.rijetkeRijeciPoPartiji.toFixed(2)}</span><span class="stat-naziv">Rijetke riječi po partiji</span></div>
+          </div>
+        </section>
       </section>
     {:else if aktivniPogled === 'statistika'}
       <section class="statistika-sekcija">
         <h2>Statistika (2 igrača)</h2>
-        <KaladontDnkGraf profil={profil.dnk.dvaIgraca} />
         <div class="mrezica-kartica">
           <div class="stat-kartica">
             <span class="stat-broj">{profil.odigrane1v1}</span>
@@ -288,18 +300,21 @@
             <span class="stat-naziv">Pobjede</span>
           </div>
           <div class="stat-kartica">
-            <span class="stat-broj">{profil.bodovi1v1}</span>
-            <span class="stat-naziv">Bodovi</span>
-          </div>
-          <div class="stat-kartica">
             <span class="stat-broj">{profil.prosjekBodova1v1.toFixed(2)}</span>
             <span class="stat-naziv">Prosjek bodova</span>
           </div>
-          <div class="stat-kartica">
-            <span class="stat-broj">{profil.eliminacije1v1}</span>
-            <span class="stat-naziv">Eliminacije</span>
-          </div>
+          <div class="stat-kartica"><span class="stat-broj">{profil.dnk.dvaIgraca.metrike.eliminacijePoPartiji.toFixed(2)}</span><span class="stat-naziv">Eliminacije po partiji</span></div>
         </div>
+        <KaladontDnkGraf profil={profil.dnk.dvaIgraca} naslov="Kaladont DNK 2 igrača" />
+        <section class="ostalo-kartica">
+          <h3>Ostalo</h3>
+          <div class="mrezica-kartica">
+          <div class="stat-kartica"><span class="stat-broj">{profil.dnk.dvaIgraca.metrike.nizPrihvacenihRijeci}</span><span class="stat-naziv">Niz prihvaćenih riječi</span></div>
+          <div class="stat-kartica"><span class="stat-broj">{(profil.dnk.dvaIgraca.metrike.prosjekPrihvacenogPotezaMs / 1000).toFixed(1)} s</span><span class="stat-naziv">Prosjek prihvaćenog poteza</span></div>
+          <div class="stat-kartica"><span class="stat-broj">{profil.dnk.dvaIgraca.metrike.dugeRijeciPoPartiji.toFixed(2)}</span><span class="stat-naziv">Duge riječi po partiji</span></div>
+          <div class="stat-kartica"><span class="stat-broj">{profil.dnk.dvaIgraca.metrike.rijetkeRijeciPoPartiji.toFixed(2)}</span><span class="stat-naziv">Rijetke riječi po partiji</span></div>
+          </div>
+        </section>
       </section>
     {/if}
 
@@ -413,12 +428,9 @@
     gap: 24px;
   }
 
-  .streak-sažetak { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.82rem; }
-  .streak-sažetak strong { color: var(--boja-mint); }
   .stil-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.95rem; }
   .stil-igre strong { color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.1rem; text-transform: capitalize; }
   .ocjena-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
-  .pomoc-oznake { display: inline-block; margin-top: 4px; color: var(--boja-pozadina-primarna); font-size: var(--tekst-mikro); font-weight: 700; }
   .ocjena-zvjezdice {
     display: inline-flex;
     align-items: center;
@@ -485,9 +497,10 @@
 
   .avatar-uredivanje { position: relative; display: block; flex: 0 0 auto; color: inherit; text-decoration: none; }
   .ikona-uredi { position: absolute; right: 2px; bottom: 8px; display: grid; width: 28px; height: 28px; place-items: center; border: 2px solid white; border-radius: 50%; background: var(--boja-pozadina-primarna); color: white; font-size: 17px; line-height: 1; }
-  .profil-akcije { position: absolute; top: 50%; right: 0; display: flex; min-width: 112px; transform: translateY(-50%); flex-direction: column; align-items: flex-start; gap: 8px; }
-  .profil-akcija { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; color: var(--boja-pozadina-primarna); font: inherit; font-size: var(--tekst-sitni); font-weight: 800; text-decoration: none; cursor: pointer; }
+  .profil-akcije { position: absolute; top: 0; right: 0; display: flex; min-width: 112px; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .profil-akcija { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: var(--boja-pozadina-primarna); font: inherit; font-size: var(--tekst-sitni); font-weight: 800; text-decoration: none; cursor: pointer; }
   .odjava-akcija { color: var(--boja-akcent); }
+
 
   @media (max-width: 767px) {
     .zaglavlje-profila {
@@ -584,6 +597,27 @@
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: 12px;
   }
+
+  .statistika-sekcija > .mrezica-kartica { margin-bottom: 24px; }
+
+  .ostalo-kartica {
+    margin-top: 24px;
+    padding: 20px;
+    border: 1px solid #e5ddc8;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: var(--sjena-suptilna);
+  }
+
+  .ostalo-kartica h3 {
+    margin: 0 0 14px;
+    color: var(--boja-tekst-naslov);
+    font-family: var(--font-naslov);
+    font-size: var(--naslov-3);
+  }
+
+  .ostalo-kartica .stat-kartica { padding: 4px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .ostalo-kartica .stat-broj { font-size: 1.15rem; }
 
   .stat-kartica {
     background: white;

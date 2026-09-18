@@ -6,7 +6,7 @@
   import { obrisiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import Avatar from './Avatar.svelte';
-  import { vratiVeciRang } from 'zajednicko';
+  import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
 
   interface Profil {
     nadimak: string;
@@ -14,6 +14,7 @@
     rang: string | null;
     rang1v1: string | null;
     email: string | null;
+    avatarConfig: AvatarConfigV1 | null;
   }
 
   let profil = $state<Profil | null>(null);
@@ -24,16 +25,21 @@
     obrisiSesijskiToken();
     profil = null;
     jeGost = true;
-    await osvjeziSocketIdentitet();
+    void osvjeziSocketIdentitet().catch(() => {});
     void goto('/');
   }
 
   onMount(() => {
     const azurirajAvatar = (dogadaj: Event) => {
-      const avatarId = (dogadaj as CustomEvent<{ avatarId: number }>).detail.avatarId;
-      profil = profil ? { ...profil, avatarId } : profil;
+      const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1 }>).detail;
+      profil = profil ? { ...profil, avatarConfig: detalji.avatarConfig } : profil;
+    };
+    const azurirajOdjavu = () => {
+      profil = null;
+      jeGost = true;
     };
     window.addEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
+    window.addEventListener('kaladont:odjava', azurirajOdjavu);
 
     void (async () => {
       try {
@@ -46,7 +52,10 @@
       }
     })();
 
-    return () => window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
+    return () => {
+      window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
+      window.removeEventListener('kaladont:odjava', azurirajOdjavu);
+    };
   });
 </script>
 
@@ -62,13 +71,13 @@
         </svg>
         <span>Igraj</span>
       </a>
-      <a href="/pomoc?tema=kako-igrati" class="nav-link" class:aktivan={$page.url.pathname === '/pomoc' || $page.url.pathname === '/pravila'}>
+      <a href="/pravila-kaladonta" class="nav-link" class:aktivan={$page.url.pathname === '/pravila-kaladonta' || $page.url.pathname === '/pomoc' || $page.url.pathname === '/pravila'}>
         <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"></circle>
-          <path d="M9.7 9a2.5 2.5 0 1 1 4.3 1.7c-.9.9-2 1.3-2 2.8"></path>
-          <path d="M12 17h.01"></path>
+          <path d="M12 5.5C10.5 4 8.5 3 5 3v15c3.5 0 5.5 1 7 2.5"></path>
+          <path d="M12 5.5C13.5 4 15.5 3 19 3v15c-3.5 0-5.5 1-7 2.5"></path>
+          <path d="M12 5.5v15"></path>
         </svg>
-        <span>Pomoć</span>
+        <span>Pravila</span>
       </a>
       <a href="/ljestvica" class="nav-link" class:aktivan={$page.url.pathname === '/ljestvica'}>
         <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -103,12 +112,12 @@
       {#if profil}
           {#if jeGost}
             <a href="/profil" class="profil-link" class:aktivan={$page.url.pathname === '/profil'} aria-label="Moj profil">
-              <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost velicina={42} prikaziRangBorder={false} />
+              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost velicina={59} prikaziRangBorder={false} /></span>
               <span class="profil-oznaka">Profil</span>
             </a>
           {:else}
             <a href="/profil" class="profil-link registrirani-profil" class:aktivan={$page.url.pathname === '/profil'} aria-label="Moj profil">
-              <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={42} prikaziRangBorder={false} />
+              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={59} prikaziRangBorder={false} /></span>
               <span class="profil-ime">{profil.nadimak}</span>
               <span class="profil-oznaka">Profil</span>
             </a>
@@ -155,6 +164,10 @@
     gap: 16px;
   }
 
+  @media (min-width: 768px) {
+    .header-avatar { display: inline-flex; }
+  }
+
   .nav-link {
     display: flex;
     flex-direction: column;
@@ -192,16 +205,11 @@
     cursor: pointer;
   }
 
-  .profil-link :global(.avatar) {
-    width: 36px !important;
-    height: 36px !important;
-  }
-
   .profil-ime {
     color: var(--boja-tekst-osnovni);
     font-weight: 700;
     font-size: 15px;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.6px;
     line-height: 1.2;
   }
 
@@ -210,7 +218,7 @@
     color: var(--boja-tekst-osnovni);
     font-size: 15px;
     font-weight: 700;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.6px;
     line-height: 1.2;
   }
 
@@ -238,12 +246,12 @@
       flex-direction: column;
       gap: 3px;
     }
-    .profil-link :global(.avatar) {
-      width: 27px !important;
-      height: 27px !important;
-    }
     .profil-ime { display: none; }
-    .profil-oznaka { display: block; }
+    .profil-oznaka {
+      display: block;
+      font-size: 14px;
+      letter-spacing: 0.35px;
+    }
   }
 
   @media (max-width: 599px) {

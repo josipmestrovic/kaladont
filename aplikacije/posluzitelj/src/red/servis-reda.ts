@@ -38,6 +38,8 @@ export function registrirajRedCekanja(
         igracId: stavka.igracId,
         nadimak: stavka.nadimak,
         avatarId: stavka.avatarId,
+        avatarConfig: stavka.avatarConfig,
+        avatarRevision: stavka.avatarRevision,
         rang: rang === 'Piskaralo' ? null : rang,
         razina: stanjeIskustva(stavka.iskustvoUkupno ?? 0).razina,
         odigrane,
@@ -70,20 +72,23 @@ export function registrirajRedCekanja(
       socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
     });
 
-    socket.on('red:udji', (payload) => {
+    socket.on('red:udji', (payload, potvrda) => {
       const mod: 'cetiri_igraca' | 'dva_igraca' =
         payload?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
       const sobaZaUlaz = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
       const suprotnaSoba = mod === 'dva_igraca' ? SOBA_REDA_4P : SOBA_REDA_1V1;
       const red = mod === 'dva_igraca' ? red1v1 : red4p;
 
-      if (igracImaAktivnuPartiju(socket.data.igracId)) return;
+      if (igracImaAktivnuPartiju(socket.data.igracId)) {
+        potvrda?.(null);
+        return;
+      }
 
       socket.leave(suprotnaSoba);
       socket.join(sobaZaUlaz);
 
       if (red.stanje().some((s) => s.igracId === socket.data.igracId)) {
-        socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
+        potvrda?.(izracunajStanje(socket.data.igracId, mod));
         return;
       }
 
@@ -94,6 +99,8 @@ export function registrirajRedCekanja(
         vrsta: socket.data.vrsta,
         nadimak: socket.data.nadimak,
         avatarId: socket.data.avatarId,
+        avatarConfig: socket.data.avatarConfig,
+        avatarRevision: socket.data.avatarRevision,
         odigrane: socket.data.odigrane ?? 0,
         pobjede: socket.data.pobjede ?? 0,
         bodoviUkupno: socket.data.bodoviUkupno ?? 0,
@@ -103,6 +110,7 @@ export function registrirajRedCekanja(
         iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
         usaoU: Date.now(),
       });
+      potvrda?.(izracunajStanje(socket.data.igracId, mod));
       posaljiStanje(mod);
 
       const stol = red.pokusajSastaviStol();

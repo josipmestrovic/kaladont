@@ -8,9 +8,11 @@
     otkljucan: boolean;
     upravoOtkljucan: boolean;
     preostaloDoOtkljucavanja: number;
+    mod: 'cetiri_igraca' | 'dva_igraca';
   }
 
-  let { prije, poslije, odigrano, otkljucan, upravoOtkljucan, preostaloDoOtkljucavanja }: Props = $props();
+  let { prije, poslije, odigrano, otkljucan, upravoOtkljucan, preostaloDoOtkljucavanja, mod }: Props = $props();
+  const naslov = $derived(mod === 'dva_igraca' ? 'Kaladont DNK 2 igrača' : 'Kaladont DNK 4 igrača');
 
   const srediste = 120;
   const radijus = 78;
@@ -40,16 +42,16 @@
   <div class="dnk-promjena-zaglavlje">
     <div>
       <p class="dnk-natpis">Novi profil igre</p>
-      <h3 id="dnk-promjena-naslov">Kaladont DNK</h3>
+      <h3 id="dnk-promjena-naslov">{naslov}</h3>
     </div>
     {#if !otkljucan}
       <strong>{odigrano} / 10</strong>
     {/if}
   </div>
   {#if upravoOtkljucan}
-    <p class="dnk-poruka"><strong>Kaladont DNK je otključan!</strong> Profil prati tvoj stil igre kroz šest osi.</p>
+    <p class="dnk-poruka"><strong>🎉 ČESTITAMO, OTKLJUČAO SI KALADONT DNK <a href="/profil">NA SVOM PROFILU</a>! 🎊</strong></p>
   {:else if otkljucan}
-    <p class="dnk-poruka">Kaladont DNK je otključan i profil se dalje oblikuje.</p>
+    <p class="dnk-poruka">Ukupno odigrano: <strong>{odigrano}</strong></p>
   {:else}
     <p class="dnk-poruka">Do otključavanja preostaje još <strong>{preostaloDoOtkljucavanja}</strong> javnih igara.</p>
   {/if}

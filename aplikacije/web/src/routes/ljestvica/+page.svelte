@@ -72,6 +72,10 @@
   const mojeMjestoUListi = $derived(mojeMjesto && ljestvica.some((s) => s.mjesto === mojeMjesto!.mjesto && s.nadimak === mojeMjesto!.nadimak));
 </script>
 
+<svelte:head>
+  <title>Ljestvica | Kaladont</title>
+</svelte:head>
+
 <h1>Ljestvica</h1>
 
 <div class="tabovi" role="tablist">

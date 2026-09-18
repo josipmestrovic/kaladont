@@ -14,6 +14,8 @@
     "test:e2e": "playwright test",
     "test:e2e:http": "playwright test --config=playwright.http.config.ts",
     "test:e2e:install": "playwright install chromium",
+    "avatar:inventory": "node skripte/avatari/provjeri-inventory.mjs",
+    "avatar:contact-sheet": "node skripte/avatari/generiraj-kontaktnu-tablu.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

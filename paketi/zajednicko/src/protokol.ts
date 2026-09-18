@@ -5,6 +5,7 @@
 import type { VrstaRijeci } from './pravila.js';
 import type { ObracunIskustva, StavkaIskustva } from './iskustvo.js';
 import type { DnkOs } from './dnk.js';
+import type { AvatarConfigV1 } from './avatar.js';
 
 export interface PodaciVeze {
   /** Opaque guest token ILI sesijski token registriranog igrača. */
@@ -23,6 +24,11 @@ export interface PayloadReakcijaPosalji {
   poruka: BrzaPoruka;
 }
 
+export interface PayloadAvatarAzuriraj {
+  avatarConfig: AvatarConfigV1;
+  avatarRevision: number;
+}
+
 // Poslužitelj -> klijent
 
 export interface StanjeReda {
@@ -32,6 +38,8 @@ export interface StanjeReda {
     igracId: string;
     nadimak: string;
     avatarId: number;
+    avatarConfig: AvatarConfigV1 | null;
+    avatarRevision: number;
     rang: string | null;
     razina: number;
     odigrane: number;
@@ -53,6 +61,8 @@ export interface ClanSobe {
   igracId: string;
   nadimak: string;
   avatarId: number;
+  avatarConfig: AvatarConfigV1 | null;
+  avatarRevision: number;
   rang: string | null;
   razina: number;
   jeVlasnik: boolean;
@@ -83,7 +93,7 @@ export interface PocetakPartije {
   mojIgracId: string;
   /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
   pocetakIso: string;
-  sjedala: { igracId: string; nadimak: string; avatarId: number; rang: string | null; razina: number }[];
+  sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number }[];
   mod?: 'cetiri_igraca' | 'dva_igraca';
   jePrivatna?: boolean;
   kodSobe?: string;
@@ -178,7 +188,7 @@ export interface KrajPartije {
   mojNoviProsjek: number;
   mojRang: string | null;
   mojeIskustvo: ObracunIskustva | null;
-  mojaOcjenaIgre?: number;
+  mojaOcjenaIgre?: number | null;
   bonusOcjenaIgre?: number;
   novaDostignuca: { id: string; novaRazina: number; maksimalnaRazina: number }[];
   mojDnk?: {
@@ -242,9 +252,11 @@ export interface PayloadUdjiURed {
   mod?: 'cetiri_igraca' | 'dva_igraca';
 }
 
+export type PotvrdaUlaskaURed = (stanje: StanjeReda | null) => void;
+
 /** Mapa svih događaja klijent -> poslužitelj, za tipiziranu upotrebu Socket.IO. */
 export interface DogadajiKlijentPoslužitelj {
-  'red:udji': (payload?: PayloadUdjiURed) => void;
+  'red:udji': (payload: PayloadUdjiURed | undefined, potvrda?: PotvrdaUlaskaURed) => void;
   'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;
@@ -252,6 +264,7 @@ export interface DogadajiKlijentPoslužitelj {
   'potez:rijec': (payload: PayloadPotezRijec) => void;
   'potez:ne-znam': () => void;
   'reakcija:posalji': (payload: PayloadReakcijaPosalji) => void;
+  'igrac:avatar-azuriraj': (payload: PayloadAvatarAzuriraj) => void;
   'soba:stvori': (payload: PayloadStvoriSobu) => void;
   'soba:udji': (payload: PayloadUdjiUSobu) => void;
   'soba:izadji': () => void;

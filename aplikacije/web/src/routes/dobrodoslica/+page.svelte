@@ -51,6 +51,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Dobrodošlica | Kaladont</title>
+</svelte:head>
+
 <main class="dobrodoslica">
   {#if korak === 'ime'}
     <div class="korak">

@@ -21,6 +21,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Nova lozinka | Kaladont</title>
+</svelte:head>
+
 <main>
   <h1>Postavi novu lozinku</h1>
   {#if !token}

@@ -67,6 +67,8 @@ export interface SudionikPartije {
   nadimak: string;
   rang: string | null;
   avatarId: number;
+  avatarConfig: import('zajednicko').AvatarConfigV1 | null;
+  avatarRevision: number;
   sjedalo: number;
   razina: number;
 }
@@ -296,7 +298,7 @@ export function stvoriUpraviteljPartija(
     const poruka: StanjePartije = {
       partijaId: stanje.partijaId,
       mojIgracId: socket.data.igracId,
-      sjedala: stanje.sudionici.map(({ igracId, nadimak, avatarId, rang, razina }) => ({ igracId, nadimak, avatarId, rang, razina })),
+      sjedala: stanje.sudionici.map(({ igracId, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina }) => ({ igracId, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina })),
       naPotezuId: stanje.naPotezuId,
       trazenaSlova: stanje.trazenaSlova,
       istekPotezaIso: istekPotezaIso(stanje),
@@ -333,6 +335,8 @@ export function stvoriUpraviteljPartija(
         vrsta: s.vrsta,
         nadimak: s.nadimak,
         avatarId: s.avatarId,
+        avatarConfig: s.avatarConfig,
+        avatarRevision: s.avatarRevision,
         rang: rang === 'Piskaralo' ? null : rang,
         sjedalo,
         razina: stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
@@ -412,7 +416,7 @@ export function stvoriUpraviteljPartija(
       const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
         partijaId,
         pocetakIso,
-        sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, avatarId: s.avatarId, rang: s.rang, razina: s.razina })),
+        sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina })),
         mod,
       };
       for (const s of sudionici) {
@@ -534,7 +538,7 @@ export function stvoriUpraviteljPartija(
               mojNoviProsjek: 0,
               mojRang: null,
               mojeIskustvo: null,
-              mojaOcjenaIgre: agregati.get(p.igracId)?.ocjenaIgre ?? 0,
+              mojaOcjenaIgre: agregati.get(p.igracId)?.ocjenaIgre ?? null,
               bonusOcjenaIgre: agregati.get(p.igracId)?.bonusOcjenaIgre ?? 0,
               novaDostignuca: agregati.get(p.igracId)?.novaDostignuca ?? [],
               jePrivatna: true,
@@ -619,7 +623,7 @@ export function stvoriUpraviteljPartija(
               obracun.poslije = stanjeIskustva(obracun.prije.ukupno + obracun.osvojenoIskustvo);
               return obracun;
             })(),
-            mojaOcjenaIgre: agregat?.ocjenaIgre ?? 0,
+            mojaOcjenaIgre: agregat?.ocjenaIgre ?? null,
             bonusOcjenaIgre: agregat?.bonusOcjenaIgre ?? 0,
             novaDostignuca: agregat?.novaDostignuca ?? [],
             mojDnk: agregat ? {
@@ -1287,6 +1291,8 @@ export function stvoriUpraviteljPartija(
         vrsta: s.vrsta,
         nadimak: s.nadimak,
         avatarId: s.avatarId,
+        avatarConfig: s.avatarConfig,
+        avatarRevision: s.avatarRevision,
         rang: rang === 'Piskaralo' ? null : rang,
         sjedalo,
         razina: stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
@@ -1347,7 +1353,7 @@ export function stvoriUpraviteljPartija(
     const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
       partijaId,
       pocetakIso,
-      sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, avatarId: s.avatarId, rang: s.rang, razina: s.razina })),
+      sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina })),
       jePrivatna: true,
       kodSobe,
     };

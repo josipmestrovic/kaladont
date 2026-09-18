@@ -7,7 +7,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIoServer, type Socket } from 'socket.io';
-import type { DogadajiKlijentPoslužitelj, DogadajiPosluziteljKlijent } from 'zajednicko';
+import { validirajAvatarConfig, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent } from 'zajednicko';
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
@@ -39,6 +39,8 @@ export interface PodaciSocketa {
   vrsta: 'gost' | 'registriran' | 'admin';
   nadimak: string;
   avatarId: number;
+  avatarConfig: AvatarConfigV1 | null;
+  avatarRevision: number;
   odigrane: number;
   pobjede: number;
   bodoviUkupno: number;
@@ -232,6 +234,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       socket.data.vrsta = identitet.vrsta;
       socket.data.nadimak = identitet.nadimak;
       socket.data.avatarId = identitet.avatarId;
+      socket.data.avatarConfig = identitet.avatarConfig;
+      socket.data.avatarRevision = identitet.avatarRevision;
       socket.data.odigrane = identitet.odigrane;
       socket.data.pobjede = identitet.pobjede;
       socket.data.bodoviUkupno = identitet.bodoviUkupno;
@@ -248,6 +252,13 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   io.on('connection', (socket) => {
     const { igracId, nadimak } = socket.data;
+
+    socket.on('igrac:avatar-azuriraj', (payload) => {
+      if (!validirajAvatarConfig(payload?.avatarConfig) || !Number.isInteger(payload.avatarRevision)) return;
+      if (payload.avatarRevision <= socket.data.avatarRevision) return;
+      socket.data.avatarConfig = payload.avatarConfig;
+      socket.data.avatarRevision = payload.avatarRevision;
+    });
 
     // RS-18: jedna aktivna veza po identitetu - stara veza se odjavljuje
     const staraSocketId = registarVeza.zamijeni(igracId, socket.id);

@@ -5,7 +5,7 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import DostignuceKartica from '$lib/komponente/DostignuceKartica.svelte';
   import KaladontDnkGraf from '$lib/komponente/KaladontDnkGraf.svelte';
-  import { PRAGOVI_DULJINE, vratiVeciRang, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
+  import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
 
   interface StatistikaRijeci {
     najduziStreak: number;
@@ -23,6 +23,7 @@
   interface JavniProfil {
     nadimak: string;
     avatarId: number;
+    avatarConfig: AvatarConfigV1 | null;
     rang: string;
     odigrane: number;
     pobjede: number;
@@ -35,7 +36,10 @@
     bodovi1v1: number;
     prosjekBodova1v1: number;
     rang1v1: string;
-    dnk: { cetiriIgraca: DnkProfil; dvaIgraca: DnkProfil };
+    dnk: {
+      cetiriIgraca: DnkProfil & { metrike: DnkMetrike };
+      dvaIgraca: DnkProfil & { metrike: DnkMetrike };
+    };
     prosjecnaOcjenaIgre: number | null;
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
     stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen';
@@ -43,6 +47,14 @@
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
     otkljucaneRijeci: { duge: string[]; srednjeDuge: string[]; jakoDuge: string[]; rijetke: string[]; srednjeRijetke: string[]; jakoRijetke: string[] };
     dostignuca: { ukupnoZvjezdica: number; maksimalnoZvjezdica: number; ukupnoOtkljucanih: number; dostignuca: Dostignuce[] };
+  }
+
+  interface DnkMetrike {
+    eliminacijePoPartiji: number;
+    nizPrihvacenihRijeci: number;
+    prosjekPrihvacenogPotezaMs: number;
+    dugeRijeciPoPartiji: number;
+    rijetkeRijeciPoPartiji: number;
   }
 
   interface Dostignuce {
@@ -78,12 +90,16 @@
   });
 </script>
 
+<svelte:head>
+  <title>Javni profil | Kaladont</title>
+</svelte:head>
+
 <main class="javni-profil">
   {#if greska}
     <p role="alert">{greska}</p>
   {:else if profil}
     <header class="zaglavlje-profila">
-      <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={velicinaAvatara} />
+      <Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={velicinaAvatara} />
       <div>
         <h1>{profil.nadimak}</h1>
         <p class="rang-oznaka">{vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'} · {profil.odigrane + profil.odigrane1v1} odigranih igara</p>
@@ -96,9 +112,7 @@
               <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
             {/each}
           </span></p>
-          <a class="pomoc-oznake" href="/pomoc?tema=napredak#ocjena-partije">Kako se računa ocjena?</a>
         {/if}
-        {#if profil.statistikaRijeci}<p class="streak-sažetak">Najduži niz bez pogreške riječi: <strong>{profil.statistikaRijeci.najduziStreak}</strong></p>{/if}
       </div>
     </header>
 
@@ -116,14 +130,25 @@
     </div>
     <section class="statistika-sekcija">
       <h2>Rezultati ({aktivniTab === '4p' ? '4 igrača' : '2 igrača'})</h2>
-      <KaladontDnkGraf profil={aktivniTab === '4p' ? profil.dnk.cetiriIgraca : profil.dnk.dvaIgraca} />
       <div class="mrezica-kartica">
         <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.odigrane : profil.odigrane1v1}</strong><span>Odigrane igre</span></div>
         <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.pobjede : profil.pobjede1v1}</strong><span>Pobjede</span></div>
-        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.bodoviUkupno : profil.bodovi1v1}</strong><span>Ukupno bodova</span></div>
         <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.prosjekBodova : profil.prosjekBodova1v1).toFixed(2)}</strong><span>Prosjek bodova</span></div>
-        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.eliminacijeUkupno : profil.eliminacije1v1}</strong><span>Eliminacije</span></div>
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).eliminacijePoPartiji.toFixed(2)}</strong><span>Eliminacije po partiji</span></div>
       </div>
+      <KaladontDnkGraf
+        profil={aktivniTab === '4p' ? profil.dnk.cetiriIgraca : profil.dnk.dvaIgraca}
+        naslov={aktivniTab === '4p' ? 'Kaladont DNK 4 igrača' : 'Kaladont DNK 2 igrača'}
+      />
+      <section class="ostalo-kartica">
+        <h3>Ostalo</h3>
+        <div class="mrezica-kartica">
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).nizPrihvacenihRijeci}</strong><span>Niz prihvaćenih riječi</span></div>
+        <div class="stat-kartica"><strong>{((aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).prosjekPrihvacenogPotezaMs / 1000).toFixed(1)} s</strong><span>Prosjek prihvaćenog poteza</span></div>
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).dugeRijeciPoPartiji.toFixed(2)}</strong><span>Duge riječi po partiji</span></div>
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).rijetkeRijeciPoPartiji.toFixed(2)}</strong><span>Rijetke riječi po partiji</span></div>
+        </div>
+      </section>
     </section>
     {:else if aktivniPogled === 'dostignuca'}
     <section class="statistika-sekcija">
@@ -179,15 +204,15 @@
     padding: 24px 0;
   }
   .achievement-mrezica { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .statistika-sekcija > .mrezica-kartica { margin-bottom: 24px; }
+  .ostalo-kartica { margin-top: 24px; padding: 20px; border: 1px solid #e5ddc8; border-radius: 8px; background: #fff; box-shadow: var(--sjena-suptilna); }
+  .ostalo-kartica h3 { margin: 0 0 14px; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: var(--naslov-3); }
   .pogled-tabovi { display: flex; gap: 8px; overflow-x: auto; }
   .pogled-tabovi button { flex: 0 0 auto; padding: 9px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
   .pogled-tabovi button.aktivan { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
-  .streak-sažetak { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.82rem; }
-  .streak-sažetak strong { color: var(--boja-mint); }
   .stil-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.95rem; }
   .stil-igre strong { color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.1rem; text-transform: capitalize; }
   .ocjena-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
-  .pomoc-oznake { display: inline-block; margin-top: 4px; color: var(--boja-pozadina-primarna); font-size: var(--tekst-mikro); font-weight: 700; }
   .ocjena-zvjezdice {
     display: inline-flex;
     align-items: center;
@@ -211,6 +236,10 @@
   .mod-tabovi { display: flex; gap: 10px; margin: 0 0 14px; }
   .mod-tabovi button { padding: 8px 18px; border: 2px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 600; cursor: pointer; }
   .mod-tabovi button.aktivan { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
+  .ostalo-kartica { margin-top: 24px; padding: 20px; border: 1px solid #e5ddc8; border-radius: 8px; background: #fff; box-shadow: var(--sjena-suptilna); }
+  .ostalo-kartica h3 { margin: 0 0 14px; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: var(--naslov-3); }
+  .ostalo-kartica .stat-kartica { padding: 4px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .ostalo-kartica .stat-kartica strong { font-size: 1.15rem; }
   .iskustvo strong { color: var(--boja-mint); font-size: 1.35rem; }
   .achievement-polje {
     display: flex;

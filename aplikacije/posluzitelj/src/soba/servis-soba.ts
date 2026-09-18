@@ -8,6 +8,7 @@ import {
   vratiVeciRang,
   type PostavkePrivatneSobe,
   type StanjePrivatneSobe,
+  type AvatarConfigV1,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
@@ -35,6 +36,8 @@ export interface Soba {
       vrsta: 'gost' | 'registriran' | 'admin';
       nadimak: string;
       avatarId: number;
+      avatarConfig: AvatarConfigV1 | null;
+      avatarRevision: number;
       rang: string | null;
       odigrane: number;
       pobjede: number;
@@ -117,6 +120,8 @@ export function registrirajPrivatneSobe(
         igracId: c.igracId,
         nadimak: c.nadimak,
         avatarId: c.avatarId,
+        avatarConfig: c.avatarConfig,
+        avatarRevision: c.avatarRevision,
         rang: veciRang === 'Piskaralo' ? null : veciRang,
         razina: stanjeIskustva(c.iskustvoUkupno ?? 0).razina,
         jeVlasnik: c.igracId === soba.vlasnikId,
@@ -198,6 +203,8 @@ export function registrirajPrivatneSobe(
               vrsta: socket.data.vrsta,
               nadimak: socket.data.nadimak,
               avatarId: socket.data.avatarId,
+              avatarConfig: socket.data.avatarConfig,
+              avatarRevision: socket.data.avatarRevision,
               rang: null,
               odigrane: socket.data.odigrane ?? 0,
               pobjede: socket.data.pobjede ?? 0,
@@ -265,6 +272,8 @@ export function registrirajPrivatneSobe(
         vrsta: socket.data.vrsta,
         nadimak: socket.data.nadimak,
         avatarId: socket.data.avatarId,
+        avatarConfig: socket.data.avatarConfig,
+        avatarRevision: socket.data.avatarRevision,
         rang: null,
         odigrane: socket.data.odigrane ?? 0,
         pobjede: socket.data.pobjede ?? 0,
@@ -317,6 +326,8 @@ export function registrirajPrivatneSobe(
         vrsta: c.vrsta,
         nadimak: c.nadimak,
         avatarId: c.avatarId,
+        avatarConfig: c.avatarConfig,
+        avatarRevision: c.avatarRevision,
         odigrane: c.odigrane,
         pobjede: c.pobjede,
         bodoviUkupno: c.bodoviUkupno,

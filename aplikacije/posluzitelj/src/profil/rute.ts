@@ -7,6 +7,7 @@ import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   DEFINICIJE_DOSTIGNUCA,
+  validirajAvatarConfig,
   izracunajKaladontDnk,
   izracunajRang,
   izracunajRazinuDostignuca,
@@ -200,6 +201,17 @@ function izracunajDnkProfil(
     ...profil,
     odigrano,
     preostaloDoOtkljucavanja: Math.max(0, 10 - odigrano),
+    metrike: {
+      eliminacijePoPartiji,
+      nizPrihvacenihRijeci: dnkStatistika?.najduziStreak ?? 0,
+      prosjekPrihvacenogPotezaMs,
+      dugeRijeciPoPartiji: odigrano > 0
+        ? ((dnkStatistika?.dugeRijeci ?? 0) + (dnkStatistika?.srednjeDugeRijeci ?? 0) + (dnkStatistika?.jakoDugeRijeci ?? 0)) / odigrano
+        : 0,
+      rijetkeRijeciPoPartiji: odigrano > 0
+        ? ((dnkStatistika?.rijetkeRijeci ?? 0) + (dnkStatistika?.srednjeRijetkeRijeci ?? 0) + (dnkStatistika?.jakoRijetkeRijeci ?? 0)) / odigrano
+        : 0,
+    },
   };
 }
 
@@ -262,6 +274,8 @@ export async function registrirajProfilRute(
       igracId: igrac.id,
       nadimak: igrac.nadimak,
       avatarId: igrac.avatarId,
+      avatarConfig: igrac.vrsta === 'gost' ? null : igrac.avatarConfig,
+      avatarRevision: igrac.avatarRevision,
       email: igrac.email,
       emailPotvrdjen: igrac.emailPotvrdjen,
       odigrane: igrac.odigrane,
@@ -319,6 +333,8 @@ export async function registrirajProfilRute(
       igracId: igrac.id,
       nadimak: igrac.nadimak,
       avatarId: igrac.avatarId,
+      avatarConfig: igrac.avatarConfig,
+      avatarRevision: igrac.avatarRevision,
       odigrane: igrac.odigrane,
       pobjede: igrac.pobjede,
       eliminacijeUkupno: igrac.eliminacijeUkupno,
@@ -347,15 +363,24 @@ export async function registrirajProfilRute(
 
   // Onboarding dopušta i gostima da odaberu avatar (jednokratno, prvi ulazak - dobrodoslica/+page.svelte)
   app.put('/profil/avatar', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
-    const rezultat = ShemaAvatar.safeParse(zahtjev.body);
-    if (!rezultat.success) {
-      return odgovor.code(400).send({ ok: false, greska: 'Neispravan avatarId.' });
-    }
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    await baza
-      .update(igraci)
-      .set({ avatarId: rezultat.data.avatarId })
-      .where(eq(igraci.id, igrac.id));
+    const tijelo = zahtjev.body as unknown;
+    if (typeof tijelo === 'object' && tijelo !== null && 'avatarConfig' in tijelo) {
+      if (igrac.vrsta === 'gost' || !validirajAvatarConfig((tijelo as { avatarConfig?: unknown }).avatarConfig)) {
+        return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
+      }
+      const konfiguracija = (tijelo as { avatarConfig: unknown }).avatarConfig;
+      const [azurirani] = await baza
+        .update(igraci)
+        .set({ avatarConfig: konfiguracija, avatarRevision: sql`${igraci.avatarRevision} + 1` })
+        .where(eq(igraci.id, igrac.id))
+        .returning({ avatarConfig: igraci.avatarConfig, avatarRevision: igraci.avatarRevision });
+      return { ok: true, avatarConfig: azurirani?.avatarConfig ?? konfiguracija, avatarRevision: azurirani?.avatarRevision ?? igrac.avatarRevision + 1 };
+    }
+
+    const rezultat = ShemaAvatar.safeParse(tijelo);
+    if (!rezultat.success) return odgovor.code(400).send({ ok: false, greska: 'Neispravan avatarId.' });
+    await baza.update(igraci).set({ avatarId: rezultat.data.avatarId }).where(eq(igraci.id, igrac.id));
     return { ok: true, avatarId: rezultat.data.avatarId };
   });
 

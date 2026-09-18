@@ -22,7 +22,7 @@
       });
       spremiSesijskiToken(odgovor.sesijskiToken);
         await osvjeziSocketIdentitet();
-      void goto('/red');
+      void goto('/');
     } catch (greska) {
       poruka = greska instanceof Error ? greska.message : 'Prijava nije uspjela.';
     } finally {
@@ -30,6 +30,10 @@
     }
   }
 </script>
+
+<svelte:head>
+  <title>Prijava | Kaladont</title>
+</svelte:head>
 
 <main class="prijava">
   <h1>Prijava</h1>

@@ -81,6 +81,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Nova privatna soba | Kaladont</title>
+</svelte:head>
+
 <main class="kreiraj-sobu">
   <h1>Nova privatna soba</h1>
   <p class="podnaslov">

@@ -99,6 +99,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Administracija | Kaladont</title>
+</svelte:head>
+
 <h1>Admin</h1>
 
 {#if greska}

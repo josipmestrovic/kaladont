@@ -17,6 +17,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Zaboravljena lozinka | Kaladont</title>
+</svelte:head>
+
 <main>
   <h1>Reset lozinke</h1>
   {#if poslano}

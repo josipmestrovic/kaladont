@@ -2,19 +2,14 @@
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { osvjeziSocketIdentitet } from '$lib/socket.js';
-  import { AVATARI } from '$lib/avatari.js';
-  import Avatar from './Avatar.svelte';
   import AudioKontrola from './AudioKontrola.svelte';
 
   interface Profil {
-    avatarId: number;
     email: string | null;
   }
 
   let profil = $state<Profil | null>(null);
   let greska = $state<string | null>(null);
-  let spremaSe = $state(false);
   let noviEmail = $state('');
   let lozinkaZaEmail = $state('');
   let porukaEmail = $state<string | null>(null);
@@ -32,21 +27,6 @@
       greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje profilnih podataka.';
     }
   });
-
-  async function odaberiAvatar(avatarId: number) {
-    if (!profil) return;
-    spremaSe = true;
-    try {
-      await api('/profil/avatar', { method: 'PUT', body: JSON.stringify({ avatarId }) });
-      await osvjeziSocketIdentitet();
-      profil = { ...profil, avatarId };
-      window.dispatchEvent(new CustomEvent('kaladont:avatar-promijenjen', { detail: { avatarId } }));
-    } catch (e) {
-      greska = e instanceof Error ? e.message : 'Neuspjelo spremanje avatara.';
-    } finally {
-      spremaSe = false;
-    }
-  }
 
   async function promijeniEmail(event: SubmitEvent) {
     event.preventDefault();
@@ -105,13 +85,8 @@
   {:else if profil}
     <section class="sekcija" id="avatar">
       <h3>Prilagodi avatar</h3>
-      <div class="avatar-grid">
-        {#each AVATARI as avatar (avatar.id)}
-          <button type="button" class="avatar-opcija" class:odabran={profil.avatarId === avatar.id} disabled={spremaSe} aria-label={`Odaberi ${avatar.naziv}`} onclick={() => odaberiAvatar(avatar.id)}>
-            <Avatar avatarId={avatar.id} velicina={72} />
-          </button>
-        {/each}
-      </div>
+      <p class="podtekst">Sastavi svoj personalizirani avatar u zasebnom editoru.</p>
+      <a href="/profil/avatar" class="spremnik-gumb">Uredi avatar</a>
     </section>
 
     <section class="sekcija">
@@ -153,9 +128,6 @@
   .gost-napomena { border-color: #f4c95d; background: #fdf6e2; }
   .gost-napomena p, .podtekst { margin: 0; color: var(--boja-tekst-sekundarni); }
   .cta-gumb, .spremnik-gumb { align-self: flex-start; padding: 10px 20px; border: 0; border-radius: var(--radijus-pill); background: var(--boja-pozadina-primarna); color: white; font: inherit; font-size: var(--tekst-sitni); font-weight: 700; text-decoration: none; cursor: pointer; }
-  .avatar-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-  .avatar-opcija { padding: 2px; border: 3px solid transparent; border-radius: 50%; background: none; cursor: pointer; }
-  .avatar-opcija.odabran { border-color: var(--boja-pozadina-primarna); }
   .forma { display: flex; flex-direction: column; gap: 12px; }
   .labela { display: flex; flex-direction: column; gap: 6px; font-size: var(--tekst-sitni); font-weight: 600; }
   input { width: 100%; padding: 10px 14px; border: 2px solid #e5ddc8; border-radius: var(--radijus-kartica); font-size: 16px; }

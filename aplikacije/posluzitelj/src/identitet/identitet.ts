@@ -6,6 +6,7 @@
 import { and, eq, lt } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
+import { validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
 import { dohvatiSesiju, jeGostSesijskiToken, jeSesijskiToken, stvoriGostSesijuZaToken } from '../racuni/sesije.js';
 
 const INTERVAL_AKTIVNOSTI_MS = 15 * 60 * 1000;
@@ -22,6 +23,8 @@ export interface Identitet {
   nadimak: string;
   vrsta: 'gost' | 'registriran' | 'admin';
   avatarId: number;
+  avatarConfig: AvatarConfigV1 | null;
+  avatarRevision: number;
   odigrane: number;
   pobjede: number;
   bodoviUkupno: number;
@@ -38,6 +41,8 @@ function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
     nadimak: redak.nadimak,
     vrsta: redak.vrsta,
     avatarId: redak.avatarId,
+    avatarConfig: validirajAvatarConfig(redak.avatarConfig) ? redak.avatarConfig : null,
+    avatarRevision: redak.avatarRevision,
     odigrane: redak.odigrane,
     pobjede: redak.pobjede,
     bodoviUkupno: redak.bodoviUkupno,

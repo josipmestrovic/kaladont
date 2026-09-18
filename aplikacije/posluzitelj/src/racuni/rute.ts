@@ -4,7 +4,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
@@ -13,6 +13,7 @@ import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
 import { dohvatiSesijuZahtjeva } from './autentikacija.js';
 import { izdajSesiju, opozoviSesiju, stvoriGostSesiju } from './sesije.js';
+import { validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
 import {
   izdajTokenPotvrdeEmaila,
   izdajTokenResetaLozinke,
@@ -50,6 +51,7 @@ const ShemaRegistracije = z.object({
     .min(0)
     .max(BROJ_AVATARA - 1)
     .optional(),
+  avatarConfig: z.unknown().optional(),
 });
 
 const ShemaPrijave = z.object({
@@ -100,7 +102,11 @@ export async function registrirajRacuneRute(
     if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
     }
-    const { email, lozinka, nadimak, avatarId } = rezultat.data;
+    const { email, lozinka, nadimak, avatarId, avatarConfig } = rezultat.data;
+    if (avatarConfig !== undefined && !validirajAvatarConfig(avatarConfig)) {
+      return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
+    }
+    const kanonskiAvatarConfig = avatarConfig as AvatarConfigV1 | undefined;
 
     const [postojeciEmail] = await baza
       .select()
@@ -131,6 +137,7 @@ export async function registrirajRacuneRute(
           emailPotvrdjen: false,
           ...(nadimak ? { nadimak } : {}),
           ...(avatarId !== undefined ? { avatarId } : {}),
+          ...(kanonskiAvatarConfig ? { avatarConfig: kanonskiAvatarConfig, avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
         })
         .where(eq(igraci.id, postojeciGost.id));
       igracId = postojeciGost.id;
@@ -145,6 +152,7 @@ export async function registrirajRacuneRute(
           emailPotvrdjen: false,
           nadimak: nadimak ?? email.split('@')[0]!,
           avatarId: avatarId ?? Math.floor(Math.random() * BROJ_AVATARA),
+          avatarConfig: kanonskiAvatarConfig ?? null,
         })
         .returning();
       if (!novi) {

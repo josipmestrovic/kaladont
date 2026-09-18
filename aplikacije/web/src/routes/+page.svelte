@@ -23,6 +23,11 @@
   }
 </script>
 
+<svelte:head>
+  <title>Kaladont Multiplayer Online</title>
+  <meta name="description" content="Igraj Kaladont online s dva ili četiri igrača ili stvori privatnu sobu za svoju ekipu." />
+</svelte:head>
+
 <div class="landing">
   <div class="landing-glavni">
     <div class="landing-tekst">
@@ -40,7 +45,6 @@
         <a href="/soba/kreiraj" class="soba-gumb">Privatna soba</a>
       </div>
     </div>
-    <a class="prvi-put-link" href="/pomoc?tema=kako-igrati">Prvi put? Kako igrati</a>
   </div>
 
   {#if !registriran}
@@ -153,14 +157,11 @@
     margin-top: 0;
   }
 
-  .prvi-put-link {
-    margin-top: -36px;
-    color: var(--boja-tekst-sekundarni);
-    font-weight: 700;
-  }
-
   .igraj-gumb {
     display: inline-block;
+    width: 300px;
+    max-width: 100%;
+    box-sizing: border-box;
     background: var(--boja-pozadina-primarna);
     color: white;
     font-family: var(--font-naslov);
@@ -170,20 +171,25 @@
     padding: 20px 64px;
     border-radius: var(--radijus-pill);
     box-shadow: var(--sjena-suptilna);
+    text-align: center;
   }
 
   .soba-gumb {
     display: inline-block;
+    width: 300px;
+    max-width: 100%;
+    box-sizing: border-box;
     background: white;
     border: 2px solid var(--boja-pozadina-primarna);
     color: var(--boja-pozadina-primarna);
     font-family: var(--font-naslov);
-    font-size: 18px;
+    font-size: 24px;
     font-weight: 700;
     text-decoration: none;
-    padding: 12px 32px;
+    padding: 20px 64px;
     border-radius: var(--radijus-pill);
     box-shadow: var(--sjena-suptilna);
+    text-align: center;
   }
 
   .racun-linkovi {
@@ -226,8 +232,6 @@
     .gumbi-sekcija {
       margin-top: 44px;
     }
-
-    .prvi-put-link { display: inline-block; margin-top: 18px; }
 
     footer {
       margin-top: 0;

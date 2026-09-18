@@ -85,6 +85,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Privatna čekaonica | Kaladont</title>
+</svelte:head>
+
 <main class="cekaonica-sobe">
   {#if greska}
     <div class="okvir-greska">
@@ -110,7 +114,7 @@
         <div class="clanovi-lista">
           {#each stanjeSobe.clanovi as clan (clan.igracId)}
             <div class="clan-redak">
-              <Avatar avatarId={clan.avatarId} rang={clan.rang} gost={!clan.rang} velicina={48} />
+              <Avatar avatarId={clan.avatarId} avatarConfig={clan.avatarConfig} rang={clan.rang} gost={!clan.rang} velicina={48} />
               <div class="clan-info">
                 <span class="clan-ime">{clan.nadimak}</span>
                 <span class="clan-rang">{clan.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {clan.razina}</span>

@@ -1,3 +1,5 @@
+import type { AvatarConfigV1 } from 'zajednicko';
+
 /**
  * Red čekanja u memoriji - sučelje strategije uparivanja (ADR-008: MVP = prva 4).
  */
@@ -6,6 +8,8 @@ export interface StavkaReda {
   vrsta: 'gost' | 'registriran' | 'admin';
   nadimak: string;
   avatarId: number;
+  avatarConfig: AvatarConfigV1 | null;
+  avatarRevision: number;
   odigrane: number;
   pobjede: number;
   bodoviUkupno: number;

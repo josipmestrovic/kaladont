@@ -6,7 +6,6 @@
   type Tema = 'kako-igrati' | 'pravila' | 'nacini' | 'bodovi' | 'napredak' | 'pitanja';
   const teme: { id: Tema; naziv: string }[] = [
     { id: 'kako-igrati', naziv: 'Kako igrati' },
-    { id: 'pravila', naziv: 'Pravila' },
     { id: 'nacini', naziv: 'Načini igre' },
     { id: 'bodovi', naziv: 'Bodovi i rangovi' },
     { id: 'napredak', naziv: 'Napredak' },
@@ -18,16 +17,28 @@
       ? ($page.url.searchParams.get('tema') as Tema)
       : 'kako-igrati',
   );
-  let probniNastavak = $state('');
-  let probniRezultat = $state<'tocno' | 'netocno' | null>(null);
+
+  const seoNaslovi: Record<Tema, string> = {
+    'kako-igrati': 'Pravila Kaladonta - Kako se igra Kaladont',
+    nacini: 'Načini igre Kaladont - Igraj online',
+    bodovi: 'Bodovi i rangovi u Kaladontu',
+    napredak: 'Napredak i Kaladont DNK',
+    pitanja: 'Pitanja i problemi - Kaladont',
+    pravila: 'Pravila Kaladonta - Kako se igra Kaladont',
+  };
+
+  const seoOpisi: Record<Tema, string> = {
+    'kako-igrati': 'Saznaj kako se igra Kaladont online, kako povezati riječi i kada igrač ispada.',
+    nacini: 'Usporedi načine igre Kaladont: dva igrača, četiri igrača i privatne sobe.',
+    bodovi: 'Saznaj kako funkcioniraju bodovi, pobjede, rangovi i ljestvice u Kaladontu.',
+    napredak: 'Saznaj kako rade XP, dostignuća, ocjena partije i Kaladont DNK.',
+    pitanja: 'Odgovori na najčešća pitanja o riječima, potezima, rangu i Kaladontu.',
+    pravila: 'Saznaj osnovna pravila igre Kaladont i kako se povezuju riječi.',
+  };
 
   async function otvoriTemu(tema: Tema, sidro?: string): Promise<void> {
-    await goto(`/pomoc?tema=${tema}${sidro ? `#${sidro}` : ''}`, { replaceState: true, noScroll: true });
+    await goto(`/pravila-kaladonta?tema=${tema}${sidro ? `#${sidro}` : ''}`, { replaceState: true, noScroll: true });
     requestAnimationFrame(() => document.getElementById(sidro ?? 'sadrzaj-pomoci')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  }
-
-  function provjeriProbniPotez(): void {
-    probniRezultat = probniNastavak.trim().toLocaleLowerCase('hr-HR') === 'za' ? 'tocno' : 'netocno';
   }
 
   function rasponRanga(indeks: number, rangovi: readonly { minimalniProsjek: number }[]): string {
@@ -38,20 +49,20 @@
 </script>
 
 <svelte:head>
-  <title>Pomoć | Kaladont</title>
-  <meta name="description" content="Kako igrati Kaladont, pravila, načini igre, bodovi, rangovi i napredak." />
+  <title>{seoNaslovi[odabranaTema]}</title>
+  <meta name="description" content={seoOpisi[odabranaTema]} />
 </svelte:head>
 
 <main class="pomoc">
   <header class="zaglavlje">
     <p class="nadnaslov">Vodič kroz Kaladont</p>
-    <h1>Pomoć</h1>
-    <p>Od prvog poteza do rangova, dostignuća i Kaladont DNK-a.</p>
+    <h1>Pravila Kaladonta</h1>
+    <p>Kako igrati, pravila, načini igre, bodovi, rangovi i Kaladont DNK.</p>
   </header>
 
   <nav class="teme" aria-label="Teme pomoći">
     {#each teme as tema}
-      <button type="button" class:aktivna={odabranaTema === tema.id} aria-current={odabranaTema === tema.id ? 'page' : undefined} onclick={() => otvoriTemu(tema.id)}>{tema.naziv}</button>
+      <a href={`/pravila-kaladonta?tema=${tema.id}`} class:aktivna={odabranaTema === tema.id} aria-current={odabranaTema === tema.id ? 'page' : undefined}>{tema.naziv}</a>
     {/each}
   </nav>
 
@@ -67,22 +78,15 @@
         <li><strong>Ako riječ ne prođe, pokušaj ponovno.</strong> Ne ispadaš odmah, ali vrijeme nastavlja teći.</li>
         <li><strong>„Ne znam” znači ispadanje.</strong> Nakon toga možeš promatrati ostatak partije.</li>
       </ol>
-      <section>
-        <h3>Kako izgleda unos?</h3>
-        <div class="tablica-omotac"><table><thead><tr><th>Prethodna riječ</th><th>Već prikazano</th><th>Ti upisuješ</th><th>Šalje se</th></tr></thead><tbody><tr><td>sova</td><td><strong>VA</strong></td><td><strong>za</strong></td><td>vaza</td></tr></tbody></table></div>
-        <p>Početna slova već su tu. Ti dopiši ostatak. Ako upišeš cijelu riječ „vaza”, poslao bi „vavaza”.</p>
-      </section>
-      <section class="probni-potez" aria-labelledby="proba-naslov">
-        <h3 id="proba-naslov">Probaj bez odbrojavanja</h3>
-        <p>Dovrši riječ koja počinje na <strong>VA</strong>.</p>
-        <form onsubmit={(dogadjaj) => { dogadjaj.preventDefault(); provjeriProbniPotez(); }}>
-          <div class="probni-unos"><span aria-hidden="true">va</span><input bind:value={probniNastavak} autocomplete="off" aria-label="Dovrši riječ na VA" oninput={() => (probniRezultat = null)} /></div>
-          <button type="submit">Provjeri</button>
-        </form>
-        {#if probniRezultat === 'tocno'}<p class="uspjeh" role="status"><strong>Točno: vaza.</strong> Spreman si za prvi potez.</p>{:else if probniRezultat === 'netocno'}<p class="greska" role="status">Za ovaj primjer dopiši <strong>za</strong>. Početak <strong>va</strong> već je upisan.</p>{/if}
-      </section>
       <aside class="napomena"><strong>Pazi na „ka”.</strong> Ako protivniku ostaviš „ka”, može odigrati „kaladont” i izbaciti te iz partije.</aside>
-      <p class="poveznica">Spreman? <a href="/">Odaberi način igre →</a> ili <button type="button" onclick={() => otvoriTemu('pravila')}>pročitaj sva pravila →</button></p>
+      <section aria-labelledby="pravila-naslov">
+        <h2 id="pravila-naslov">Pravila igre</h2>
+        <section><h3>Kako povezujemo riječi</h3><p>Nova riječ mora početi na posljednja dva grafema prethodne riječi. Primjer: <strong>sova → vaza → zabava</strong>.</p><p><strong>Nj, lj i dž</strong> računaju se kao jedno slovo. Zato nakon „konj” tražimo <strong>onj</strong>: slovo o i grafem nj.</p></section>
+        <section><h3>Koje riječi prihvaća igra?</h3><p>Riječ mora postojati <strong>u rječniku igre</strong>, početi traženim slovima i pripadati dopuštenoj vrsti riječi.</p><ul><li>Dijakritici vrijede: <strong>č nije c</strong>, <strong>š nije s</strong> i tako redom.</li><li>Vlastita imena, kratice, brojke, crtice i razmaci nisu u igri.</li></ul></section>
+        <section><h3>Oblici iste riječi</h3><p>Jednom odigrana riječ i svi njezini povezani oblici potrošeni su <strong>do kraja cijele partije</strong>. Nakon „dobar” ne prolaze ni „dobra” ni „dobro”.</p></section>
+        <section><h3>Kaladont efekt i ispadanje</h3><p>Kada igrač ostavi „ka”, protivnik može odigrati „kaladont” i izbaciti igrača koji mu je omogućio taj potez. Ispadaš i kada odabereš „Ne znam”, istekne vrijeme, ostanu mrtva slova ili se ne vratiš nakon prekida veze.</p></section>
+      </section>
+      <p class="poveznica">Spreman? <a href="/">Odaberi način igre →</a></p>
     </section>
   {:else if odabranaTema === 'pravila'}
     <section id="sadrzaj-pomoci" class="sadrzaj" aria-labelledby="pravila-naslov">
@@ -149,8 +153,8 @@
   h1 { margin: 0; font-size: var(--naslov-1); }
   .zaglavlje > p:last-child, .uvod { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); }
   .teme { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; padding-bottom: 4px; }
-  .teme button { flex: 0 0 auto; padding: 10px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-weight: 700; cursor: pointer; }
-  .teme button.aktivna { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
+  .teme a { flex: 0 0 auto; padding: 10px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-weight: 700; text-decoration: none; }
+  .teme a.aktivna { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
   #sadrzaj-pomoci { scroll-margin-top: 16px; outline: none; }
   .sadrzaj { padding: 22px 0; }
   .sadrzaj h2 { margin: 0 0 18px; font-size: var(--naslov-2); }
@@ -160,9 +164,8 @@
   p { margin: 0 0 12px; }
   ul, ol { margin: 0 0 12px; padding-left: 22px; }
   li + li { margin-top: 7px; }
-  button, a { color: var(--boja-pozadina-primarna); font-weight: 700; }
+  a { color: var(--boja-pozadina-primarna); font-weight: 700; }
   .poveznica { margin-top: 24px; }
-  .poveznica button { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
   .koraci { margin-top: 20px; }
   .tablica-omotac { overflow-x: auto; margin: 20px 0; }
   table { width: 100%; border-collapse: collapse; background: white; }
@@ -170,14 +173,6 @@
   th { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-sitni); }
   .usporedba-modova table { min-width: 700px; }
   .napomena, .primjer-izracuna { padding: 14px 16px; border-left: 4px solid var(--boja-mint); background: #fffdf5; }
-  .probni-potez form { display: flex; gap: 10px; max-width: 520px; }
-  .probni-unos { display: flex; flex: 1; overflow: hidden; border: 2px solid #d8d0bf; border-radius: 6px; background: white; }
-  .probni-unos:focus-within { border-color: var(--boja-mint-tamni); }
-  .probni-unos span { display: grid; place-items: center; padding: 0 12px; background: #f3eee2; font-weight: 800; text-transform: uppercase; }
-  .probni-unos input { min-width: 0; flex: 1; padding: 12px; border: 0; outline: none; font: inherit; }
-  .probni-potez form > button { padding: 0 18px; border: 0; border-radius: 6px; background: var(--boja-pozadina-primarna); color: white; cursor: pointer; }
-  .uspjeh { margin-top: 12px; color: var(--boja-mint-tamni); }
-  .greska { margin-top: 12px; color: var(--boja-akcent); }
   .jezicne-iznimke, .faq details { padding: 14px 0; border-bottom: 1px solid #e5ddc8; }
   .jezicne-iznimke { border-top: 1px solid #e5ddc8; }
   summary { cursor: pointer; font-weight: 700; }
@@ -188,9 +183,7 @@
   .dnk-osi span { color: var(--boja-tekst-sekundarni); }
   @media (max-width: 767px) {
     .pomoc { padding-top: 24px; }
-    .teme button { flex: 1 1 calc(50% - 4px); }
-    .probni-potez form { flex-direction: column; }
-    .probni-potez form > button { min-height: 46px; }
+    .teme a { flex: 1 1 calc(50% - 4px); text-align: center; }
     .dnk-osi { grid-template-columns: 1fr; }
     .oznake-tablica th { width: 120px; }
   }

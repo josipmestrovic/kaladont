@@ -22,6 +22,10 @@
   });
 </script>
 
+<svelte:head>
+  <title>Potvrda emaila | Kaladont</title>
+</svelte:head>
+
 <main>
   <h1>Potvrda emaila</h1>
   <p role={uspjeh ? 'status' : 'alert'}>{poruka}</p>

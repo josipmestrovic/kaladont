@@ -8,3 +8,4 @@ export * from './nagrada-za-rijec.js';
 export * from './iskustvo.js';
 export * from './dostignuca.js';
 export * from './dnk.js';
+export * from './avatar.js';

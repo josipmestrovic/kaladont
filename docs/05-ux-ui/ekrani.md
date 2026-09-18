@@ -44,7 +44,7 @@ Raspored (portret):
 - **Aktivni igrač:** cijelo sjedalo (avatar, ime i status) dobiva debeli zeleni zaobljeni okvir, ime je zeleno, a iznad sjedala stoji label „Na redu!”. Sva sjedala rezerviraju isti prostor za label kako se raspored ne bi pomicao. Oko avatara ide **zeleni prsten koji se prazni** sinkrono s 30-sekundnim odbrojavanjem (SVG stroke, izvor vremena `istekPotezaIso`), s brojem preostalih sekundi u sredini. Prsten napravi jedan jači vizualni puls kada igrač dobije red, uključujući prvi potez partije. Zadnjih 5 s prsten pulsira, a zadnje 3 s avatar se vrlo blago pomiče lijevo-desno. Tijekom sustavskog odabira riječi nema aktivnog okvira ni labela. **Slojevi oko avatara, redom od avatara prema van: avatar → timer prsten → rang-border prsten.** Timer prsten mora biti vizualno ispred (iznad) rang-bordera, ne iza njega — mora se vidjeti neovisno o rangu igrača.
 - **Glavna zona igre:** prije prikaza sjedala prikazuje traženu riječ velikim slovima s posljednja **dva grafema otisnuta žutom kremom** (npr. medenj**AK** → traži se „ak"; k**ONJ** → traži se „onj", jer su o + nj dva grafema), prethodnu riječ i obavijest, zatim unos i gumb za slanje te statusne poruke. Sjedala igrača dolaze ispod kao sekundarni kontekst.
 - **Otvaranje runde (sustav bira riječ):** na početku partije, nakon svake eliminacije i nakon kaladont-efekta prikazuje se **10-sekundni cjelozaslonski ekran** na svijetloj podlozi — sve ostalo (ploča, unos) nestaje. U prvoj rundi prikazuje se samo poruka da je sustav dodijelio početnu riječ. Nakon eliminacije prvo se prikazuje kratko neutralno objašnjenje razloga, uzročne riječi/traženih slova i osvojenog boda ako postoji, zatim tekst „Sustav će sada nasumično odabrati novu riječ..." s brojačem 10→0. Po isteku, ekran nestaje i ploča prikazuje otkrivenu riječ kao običan „zadnji potez" autora **Sustav** (isti prikaz kao za bilo koji odigrani potez), a igrač na potezu odgovara na nju kao na normalan nastavak.
-- **Dno (zona na potezu):** polje za upis (autofokus, hrvatska tipkovnica, najviše 31 znak) i gumb pošalji. Na širini od 500 px naviše stoje u istom retku, pri čemu unos zauzima 70 %, a gumb 30 % širine; na užim zaslonima gumb je ispod unosa pune širine.
+- **Dno (zona na potezu):** polje za upis (autofokus, hrvatska tipkovnica, najviše 31 znak) i gumb pošalji. Na širini od 500 px naviše stoje u istom retku, pri čemu unos zauzima 70 %, a gumb 30 % širine; na užim zaslonima gumb je ispod unosa pune širine. Gumb „Ne znam” je sekundaran i prije predaje poteza otvara potvrdu unutar aplikacije.
 - **Zadnja riječ i izbornik brzih poruka:** zadnja prihvaćena riječ igrača prikazuje se kao jedan stabilan word bubble neposredno iznad avatara autora, s većim tekstom i narančasto istaknuta zadnja dva grafema. Bubble nestaje ili se premješta kada server prihvati novu igračku riječ; riječ sustava ostaje samo u glavnoj zoni igre. Ako je autor riječi eliminiran, njegov bubble nestaje. Duga riječ dobiva manji font na mobitelu kako bi layout ostao stabilan. Klik, Enter ili Space na **vlastitom sjedalu** otvara mali animirani izbornik s četiri predefinirane poruke (tekst + emoji, ne slobodan upis — izbjegava moderaciju): 👋 „Prijatno", 😅 „Nemoj zamjerit", 👏 „Bravo!", 😎 „Hvala". Reakcija se prikazuje ispod imena igrača, može biti vidljiva istodobno s word bubbleom i zatim nestane (1 po 2 s); rate limit je 1 poruka / 2 s.
 - **Povijest poteza:** u prvoj izvedbi dostupna je nakon završetka partije, kako se tijekom brzog tijeka poteza ne bi prekidalo praćenje stola. Bočna ploha tijekom aktivne partije ostaje planirana nadogradnja.
 
@@ -61,8 +61,11 @@ Raspored (portret):
 - Redoslijed 1.– 4. s bodovima razloženim na plasman + eliminacije + bonus (npr. „3 + 2 + 1 = 6").
 - Za mene: „Novi prosjek: 2,8 → **Lektor**" (registrirani) ili poruka za goste: „Ova statistika je spremljena lokalno u ovom pregledniku. Registriraj se da je zadržiš zauvijek!" (namjerno pojednostavljeno — tehnički je vezano uz gost-identitet ovog uređaja, ne doslovno preglednik, ali ovako je poruka jasnija igraču).
 - Iznad plasmana je osobni XP obračun: `LVL`, dodijeljeni XP, grupirane stavke, streak bonus i traka do sljedeće razine. Sve stavke prikazuju se odmah, bez animacije. Eliminirani promatrač dobiva samo svoj obračun i može napustiti partiju dok se trajni upis dovršava pri kraju.
+- Ocjena igre računa se samo kada igrač ima najmanje tri prihvaćena poteza. U suprotnom se prikazuje jasna poruka da nema dovoljno podataka, bez zvjezdica i bez XP bonusa ocjene.
 - Tijekom javne partije gornji status ostaje vidljiv i pri izboru nove riječi te završnom odbrojavanju: lijevo je trenutni streak, a desno se redom po 3,5 sekunde prikazuju autoritativne XP stavke upravo prihvaćenog poteza i izazvane eliminacije. Privatne sobe taj status nemaju jer ne dodjeljuju XP.
-- Tipke: **Igraj opet** (u red), **Povijest partije**, Na početnu.
+- Završni redoslijed je: **Završni poredak**, osobna ocjena igre, XP obračun, Kaladont DNK, nova dostignuća i akcije.
+- Povijest partije je zatvoreni accordion; potezi se dohvaćaju tek pri otvaranju i prikazuje se stanje učitavanja.
+- Tipke: **Igraj opet** (u red), **Povratak**, a gostu i registracija za trajno čuvanje statistike.
 
 ## 5. Povijest partije (`/partija/:id/povijest`)
 
@@ -74,13 +77,14 @@ Raspored (portret):
 
 - Registracija: višekoračni tijek (1. Korak: nadimak; 2. Korak: email, lozinka, odabir avatara). Kod email polja diskretna napomena: „Na tvoju email adresu nećemo slati nikakve obavijesti, isključivo je koristimo kako bi ti omogućili pristup računu ako zaboraviš lozinku."
 - Prijava: jednostavna prijava u dva odvojena retka (Email i Lozinka) s velikim zelenim gumbom.
+- Nakon uspješne registracije korisnik dolazi na javnu stranicu `/zahvala` s čestitkom, nenametljivim konfetima i izborom sljedeće akcije: javna igra za 2 ili 4 igrača, privatna soba, pravila, profil, postavke, ljestvice ili novosti.
 
 ## 7. Profil (`/profil`) — vlastiti i javni
 
 - Vlastiti profil sadrži tabove **4 Igrača** i **2 Igrača (1v1)** s odvojenim karticama rezultata (`Odigrane`, `Pobjede`, `Ukupno bodova`, `Prosjek`, `Eliminacije`, `Rang`).
 - Odjeljak „Riječi i streak” zajednički je za oba javna moda; promjena taba ne mijenja te brojke. Privatne sobe se ne računaju.
 - Registrirani igrači imaju javni read-only profil, primjerice `/profil/javni/:igracId`. Javni profil prikazuje nadimak, avatar, rang, rezultate, gamifikacijske statistike, najdužu i najrjeđu riječ, ali nikad email ili podatke za autentikaciju. Gosti nemaju javni profil.
-- Profil prikazuje najduži streak upisanih riječi bez odbijanja, kao i:
+- Profil prikazuje mode-specific DNK naslove (`Kaladont DNK 4 igrača` i `Kaladont DNK 2 igrača`). Ispod DNK grafa prikazuje mode-specific statistike: eliminacije po partiji, niz prihvaćenih riječi, prosjek prihvaćenog poteza, duge riječi po partiji i rijetke riječi po partiji.
   - `Otkriveno jako rijetkih riječi` — frekvencija `0`;
   - `Otkriveno srednje rijetkih riječi` — frekvencija `1–9`;
   - `Otkriveno rijetkih riječi` — frekvencija `10–99`;
@@ -117,6 +121,7 @@ Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvoj
 - `/pomoc?tema=kako-igrati|pravila|nacini|bodovi|napredak|pitanja` — pomoć kroz šest tema, od prvog poteza do pravila, načina igre, rangova, napretka i praktičnog FAQ-a. `/pravila` i `/o-igri` ostaju kompatibilni redirecti na odgovarajući sadržaj.
 - Footer popup „O igri” — priča o imenu, rani pristup, **atribucija hrLexa** prema [izvor-i-licenca.md](../04-rjecnik/izvor-i-licenca.md#tekst-atribucije-za-stranicu-o-igri), statistika rječnika i kontakt; popup povezuje na Help hub.
 - `/privatnost`, `/uvjeti` — pravni minimum (vidi [sigurnost-i-privatnost.md](../07-operacije/sigurnost-i-privatnost.md)).
+- `/zahvala` — javna zahvalna stranica nakon registracije s navigacijom prema glavnim akcijama i popupom „Što je novo”.
 
 ## Responzivnost
 

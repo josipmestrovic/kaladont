@@ -10,13 +10,15 @@ test('registracija i prijava zadržavaju sesiju nakon reloadanja', async ({ page
   await page.getByRole('button', { name: 'Dalje' }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
-  await page
-    .getByRole('button', { name: /odaberi/i })
-    .first()
-    .click();
+  await page.getByRole('button', { name: 'Dalje' }).click();
   await page.getByRole('button', { name: /registriraj/i }).click();
 
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/zahvala');
+  await expect(page.getByRole('heading', { name: /Legenda si/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Igrati u 2 igrača' })).toHaveAttribute('href', '/red?mod=dva_igraca');
+  await page.getByRole('button', { name: 'Vidjeti što je novo u igri' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Što je novo');
+  await page.getByRole('button', { name: 'Zatvori' }).click();
   await page.reload();
   await expect(page).not.toHaveURL(/\/prijava|\/registracija/);
 });
@@ -29,7 +31,7 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await page.getByRole('button', { name: 'Dalje' }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
-  await page.getByRole('button', { name: /odaberi/i }).first().click();
+  await page.getByRole('button', { name: 'Dalje' }).click();
   await page.getByRole('button', { name: /registriraj/i }).click();
 
   await page.goto('/profil');

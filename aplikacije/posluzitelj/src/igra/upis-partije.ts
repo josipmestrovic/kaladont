@@ -5,6 +5,7 @@
  */
 import { and, eq, sql } from 'drizzle-orm';
 import { izracunajKaladontDnk, izracunajNovaDostignuca, izracunajOcjenuIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce } from 'zajednicko';
+import { jeOcjenaIgreDostupna } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import type { SudionikPartije } from './motor-partije.js';
@@ -112,8 +113,8 @@ export async function zakljuciPartijuUBazi(
   statistike: Map<string, ZapisStatistikeRijeci> = new Map(),
   samoStatistika = false,
   napredakDostignuca: Map<string, ZapisNapretkaDostignuca> = new Map(),
-): Promise<Map<string, { bodoviUkupno: number; odigrane: number; pobjede: number; iskustvoUkupno: number; novaDostignuca: NovoDostignuce[]; dnkPrije: DnkOs[]; dnkPoslije: DnkOs[]; ocjenaIgre: number; bonusOcjenaIgre: number }>> {
-  const agregati = new Map<string, { bodoviUkupno: number; odigrane: number; pobjede: number; iskustvoUkupno: number; novaDostignuca: NovoDostignuce[]; dnkPrije: DnkOs[]; dnkPoslije: DnkOs[]; ocjenaIgre: number; bonusOcjenaIgre: number }>();
+): Promise<Map<string, { bodoviUkupno: number; odigrane: number; pobjede: number; iskustvoUkupno: number; novaDostignuca: NovoDostignuce[]; dnkPrije: DnkOs[]; dnkPoslije: DnkOs[]; ocjenaIgre: number | null; bonusOcjenaIgre: number }>> {
+  const agregati = new Map<string, { bodoviUkupno: number; odigrane: number; pobjede: number; iskustvoUkupno: number; novaDostignuca: NovoDostignuce[]; dnkPrije: DnkOs[]; dnkPoslije: DnkOs[]; ocjenaIgre: number | null; bonusOcjenaIgre: number }>();
   const modStatistike = mod;
 
   await baza.transaction(async (tx) => {
@@ -373,8 +374,11 @@ export async function zakljuciPartijuUBazi(
           upisaneJakoDugeRijeci: staraStatistika.upisaneJakoDugeRijeci + statistika.upisaneJakoDugeRijeci,
         } : statistika;
         agregatZaDnk.dnkPoslije = dnkOs({ odigrane: agregatZaDnk.odigrane, bodovi: agregatZaDnk.bodoviUkupno, eliminacije: (stariIgrac?.eliminacije ?? 0) + r.eliminacije }, ukupnaStatistika, mod);
-        agregatZaDnk.ocjenaIgre = izracunajOcjenuIgre(agregatZaDnk.dnkPrije, agregatZaDnk.dnkPoslije, r.plasman === 1);
-        agregatZaDnk.bonusOcjenaIgre = postotakXpZaOcjenu(agregatZaDnk.ocjenaIgre);
+        const brojPotezaZaOcjenu = ukupnaStatistika?.prihvaceniPotezi ?? 0;
+        agregatZaDnk.ocjenaIgre = jeOcjenaIgreDostupna(brojPotezaZaOcjenu)
+          ? izracunajOcjenuIgre(agregatZaDnk.dnkPrije, agregatZaDnk.dnkPoslije, r.plasman === 1)
+          : null;
+        agregatZaDnk.bonusOcjenaIgre = agregatZaDnk.ocjenaIgre === null ? 0 : postotakXpZaOcjenu(agregatZaDnk.ocjenaIgre);
         const bonusIskustva = Math.round(r.iskustvo * agregatZaDnk.bonusOcjenaIgre / 100);
         if (bonusIskustva > 0 && !samoStatistika) {
           const [azuriranoIskustvo] = await tx.update(igraci)
@@ -383,12 +387,14 @@ export async function zakljuciPartijuUBazi(
             .returning({ iskustvoUkupno: igraci.iskustvoUkupno });
           if (azuriranoIskustvo) agregatZaDnk.iskustvoUkupno = azuriranoIskustvo.iskustvoUkupno;
         }
-        await tx.update(dnkStatistikeIgraca)
-          .set({
-            zbrojOcjenaIgre: sql`${dnkStatistikeIgraca.zbrojOcjenaIgre} + ${agregatZaDnk.ocjenaIgre}`,
-            brojOcjenaIgre: sql`${dnkStatistikeIgraca.brojOcjenaIgre} + 1`,
-          })
-          .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)));
+        if (agregatZaDnk.ocjenaIgre !== null) {
+          await tx.update(dnkStatistikeIgraca)
+            .set({
+              zbrojOcjenaIgre: sql`${dnkStatistikeIgraca.zbrojOcjenaIgre} + ${agregatZaDnk.ocjenaIgre}`,
+              brojOcjenaIgre: sql`${dnkStatistikeIgraca.brojOcjenaIgre} + 1`,
+            })
+            .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)));
+        }
       }
     }
   });
