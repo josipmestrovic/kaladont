@@ -41,7 +41,7 @@ Voditelj obrade je **piši farmaceut, obrt za računalno programiranje, vl. Josi
 - Osobni korisnik `kaladont` ima sudo. Korisnik `deploy` nema sudo, ali je član Docker grupe radi objave; Docker grupa daje praktično root-ekvivalentne ovlasti, pa svaki VPS ima zaseban deploy ključ koji služi samo GitHub Actionsu.
 - Staging (`staging.kaladont.hr`) je tijekom privremenog multiplayer testiranja bez Caddy Basic Autha jer bi HTTP Basic izazovi prekidali Socket.IO polling/upgrade tok. `X-Robots-Tag: noindex, nofollow` ostaje samo uputa tražilicama, ne sigurnosna kontrola. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi session-based gateway.
 - Staging ima vlastite sintetičke podatke, tajne i email allowlistu. Produkcijski dump, račun, email popis ni tajna nikad ne završavaju na stagingu.
-- Sigurnosna zaglavlja (Caddy): CSP s dopuštenim same-origin skriptama, stilovima koje generira SvelteKit, slikama/fontovima iz aplikacije te WebSocket vezom; `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, ograničeni `Permissions-Policy` i HSTS na stagingu/produkciji.
+- Sigurnosna zaglavlja (Caddy): CSP dopušta same-origin skripte i nužni SvelteKit inline hydration, stilove koje generira SvelteKit te Google Fonts stylesheet/font izvore, slike/fontove iz aplikacije i WebSocket vezu; `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, ograničeni `Permissions-Policy` i HSTS na stagingu/produkciji.
 - Ovisnosti: Dependabot tjedno; `pnpm audit` u CI-ju (upozorenje, ne bloker).
 - Third-party GitHub Actions pinaju se na puni commit SHA. PostgreSQL, Caddy i aplikacija pokreću se po točnoj verziji i digestu, nikad preko `latest` taga.
 
