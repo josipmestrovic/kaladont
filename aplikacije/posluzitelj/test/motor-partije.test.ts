@@ -425,11 +425,18 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     const prihvaceno = await prihvacenoPromise;
 
     const sljedeci = igraci.find((ig) => ig.token === prihvaceno.sljedeciId)!;
-    const promatrac = igraci.find((ig) => ig !== otvarac && ig !== sljedeci)!;
-
+    const promatraci = igraci.filter((ig) => ig !== sljedeci);
     const eliminacijaPromise = new Promise<{ igracId: string; razlog: string; bodZa: string | null }>(
       (resolve) => {
-        promatrac.socket.on('partija:eliminacija', resolve);
+        const slusatelji = promatraci.map((promatrac) => {
+          const slusatelj = (eliminacija: { igracId: string; razlog: string; bodZa: string | null }) => {
+            if (eliminacija.igracId !== sljedeci.token) return;
+            for (const [socket, aktivniSlusatelj] of slusatelji) socket.off('partija:eliminacija', aktivniSlusatelj);
+            resolve(eliminacija);
+          };
+          promatrac.socket.on('partija:eliminacija', slusatelj);
+          return [promatrac.socket, slusatelj] as const;
+        });
       },
     );
 
