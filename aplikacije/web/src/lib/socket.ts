@@ -10,7 +10,10 @@ let socket: KaladontSocket | null = null;
 /** Jedinstvena Socket.IO veza prema poslužitelju (jedna aktivna veza po identitetu). */
 export function dohvatiSocket(): KaladontSocket {
   if (!socket) {
-    socket = io(ADRESA_POSLUZITELJA, { auth: { token: dohvatiAuthToken() } });
+    socket = io(ADRESA_POSLUZITELJA, {
+      auth: { token: dohvatiAuthToken() },
+      transports: ['websocket'],
+    });
   }
   return socket;
 }
