@@ -22,6 +22,7 @@ const shemaKonfiguracije = z.object({
   SIMULACIJA_ADRESA: z.string().url().default('http://localhost:3000'),
   VERZIJA: z.string().default('lokalno'),
   DIGEST: z.string().default('lokalno'),
+  POSLUZUJ_WEB: z.enum(['true', 'false']).default('false'),
 });
 
 export const konfiguracija = shemaKonfiguracije.parse(process.env);

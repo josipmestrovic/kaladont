@@ -54,7 +54,7 @@ describe('ručno brisanje računa', () => {
     expect(await baza.select().from(sesije).where(eq(sesije.igracId, igracId))).toHaveLength(0);
     expect(await baza.select().from(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igracId))).toHaveLength(0);
 
-    const profil = await fetch(`${adresa}/profil`, {
+    const profil = await fetch(`${adresa}/api/profil`, {
       headers: { authorization: `Bearer ${sesijskiToken}` },
     });
     expect(profil.status).toBe(401);

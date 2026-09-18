@@ -1,5 +1,5 @@
 /** Gost identitet - opaque token u localStorageu; javni igracId nikad nije bearer token. */
-import { ADRESA_POSLUZITELJA } from './konfiguracija.js';
+import { apiUrl } from './api-url.js';
 
 const KLJUC_GOST_TOKEN = 'kaladont_gost_token';
 const KLJUC_SESIJSKI_TOKEN = 'kaladont_sesijski_token';
@@ -22,7 +22,7 @@ export async function inicijalizirajGostSesiju(): Promise<void> {
   if (typeof localStorage === 'undefined' || localStorage.getItem(KLJUC_SESIJSKI_TOKEN)) return;
   if (localStorage.getItem(KLJUC_GOST_TOKEN)?.startsWith('gost.')) return;
 
-  const odgovor = await fetch(`${ADRESA_POSLUZITELJA}/racuni/gost-sesija`, { method: 'POST' });
+  const odgovor = await fetch(apiUrl('/racuni/gost-sesija'), { method: 'POST' });
   if (!odgovor.ok) throw new Error('Gostujuća sesija nije uspjela.');
   const tijelo = (await odgovor.json()) as { token: string };
   localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);

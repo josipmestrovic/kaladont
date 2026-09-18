@@ -2,8 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import type { KrajPartije, PocetakPartije, StanjePrivatneSobe } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
+import { baza } from '../src/baza/klijent.js';
+import { sesije } from '../src/baza/shema.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -22,13 +26,21 @@ afterAll(async () => {
 
 interface TestniIgrac {
   token: string;
+  authToken: string;
   socket: ClientSocket;
+}
+
+async function igracIdZaToken(token: string): Promise<string> {
+  const hash = createHash('sha256').update(token).digest('hex');
+  const [sesija] = await baza.select({ igracId: sesije.igracId }).from(sesije).where(eq(sesije.tokenHash, hash));
+  if (!sesija) throw new Error('Guest sesija nije pronađena');
+  return sesija.igracId;
 }
 
 function spojiIgraca(token = `gost.${randomUUID().replaceAll('-', '')}`): Promise<TestniIgrac> {
   return new Promise((resolve, reject) => {
     const socket = ioClient(adresa, { auth: { token }, forceNew: true });
-    socket.once('connect', () => resolve({ token, socket }));
+    socket.once('connect', async () => resolve({ token: await igracIdZaToken(token), authToken: token, socket }));
     socket.once('connect_error', reject);
   });
 }
@@ -182,7 +194,7 @@ describe('privatne sobe', () => {
       await udjiUSobu(clan, kod);
       clan.socket.disconnect();
 
-      const novaVeza = await spojiIgraca(clan.token);
+      const novaVeza = await spojiIgraca(clan.authToken);
       try {
         const stanje = await udjiUSobu(novaVeza, kod);
         expect(stanje.clanovi.filter((sudionik) => sudionik.igracId === clan.token)).toHaveLength(1);

@@ -31,7 +31,7 @@ afterAll(async () => {
 
 describe('POST /racuni/registracija', () => {
   it('registrira novog korisnika i vraća sesijski token', async () => {
-    const odgovor = await fetch(`${adresa}/racuni/registracija`, {
+    const odgovor = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'TestIgrac' }),
@@ -57,12 +57,12 @@ describe('POST /racuni/registracija', () => {
   });
 
   it('odbija duplikat emaila', async () => {
-    await fetch(`${adresa}/racuni/registracija`, {
+    await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
-    const drugi = await fetch(`${adresa}/racuni/registracija`, {
+    const drugi = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: 'nekaDrugaLozinka1' }),
@@ -71,7 +71,7 @@ describe('POST /racuni/registracija', () => {
   });
 
   it('odbija nadimak duži od 12 znakova', async () => {
-    const odgovor = await fetch(`${adresa}/racuni/registracija`, {
+    const odgovor = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'PredugackiNadimak' }),
@@ -82,13 +82,13 @@ describe('POST /racuni/registracija', () => {
 
 describe('POST /racuni/prijava', () => {
   it('uspješna prijava vraća sesijski token', async () => {
-    await fetch(`${adresa}/racuni/registracija`, {
+    await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
 
-    const odgovor = await fetch(`${adresa}/racuni/prijava`, {
+    const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
@@ -99,13 +99,13 @@ describe('POST /racuni/prijava', () => {
   });
 
   it('kriva lozinka vraća generičku 401 poruku', async () => {
-    await fetch(`${adresa}/racuni/registracija`, {
+    await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
 
-    const odgovor = await fetch(`${adresa}/racuni/prijava`, {
+    const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: 'kriva-lozinka' }),
@@ -114,7 +114,7 @@ describe('POST /racuni/prijava', () => {
   });
 
   it('nepostojeći račun vraća istu generičku 401 poruku (ne otkriva postojanje)', async () => {
-    const odgovor = await fetch(`${adresa}/racuni/prijava`, {
+    const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: 'ne-postoji-nikad@example.com', lozinka: 'bilo-sto-123' }),
@@ -125,13 +125,13 @@ describe('POST /racuni/prijava', () => {
 
 describe('guest identitet odvaja javni ID od pristupnog tokena', () => {
   it('poznavanje javnog igracId-a ne daje HTTP, Socket.IO ni registracijske ovlasti', async () => {
-    const gost = (await (await fetch(`${adresa}/racuni/gost-sesija`, { method: 'POST' })).json()) as {
+    const gost = (await (await fetch(`${adresa}/api/racuni/gost-sesija`, { method: 'POST' })).json()) as {
       igracId: string;
       token: string;
     };
     const email = `guest-id-${Date.now()}@example.com`;
     try {
-      const profil = await fetch(`${adresa}/profil`, {
+      const profil = await fetch(`${adresa}/api/profil`, {
         headers: { authorization: `Bearer ${gost.igracId}` },
       });
       expect(profil.status).toBe(401);
@@ -147,7 +147,7 @@ describe('guest identitet odvaja javni ID od pristupnog tokena', () => {
         }),
       ).resolves.toBeDefined();
 
-      const registracija = await fetch(`${adresa}/racuni/registracija`, {
+      const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.igracId}` },
         body: JSON.stringify({
@@ -169,7 +169,7 @@ describe('guest identitet odvaja javni ID od pristupnog tokena', () => {
 
 describe('POST /racuni/odjava', () => {
   it('opoziva samo trenutačnu sesiju i ponovljena odjava ostaje uspješna', async () => {
-    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
@@ -177,24 +177,24 @@ describe('POST /racuni/odjava', () => {
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
     const zaglavlja = { authorization: `Bearer ${sesijskiToken}` };
 
-    expect((await fetch(`${adresa}/profil`, { headers: zaglavlja })).status).toBe(200);
+    expect((await fetch(`${adresa}/api/profil`, { headers: zaglavlja })).status).toBe(200);
 
-    const odjava = await fetch(`${adresa}/racuni/odjava`, { method: 'POST', headers: zaglavlja });
+    const odjava = await fetch(`${adresa}/api/racuni/odjava`, { method: 'POST', headers: zaglavlja });
     expect(odjava.status).toBe(200);
-    expect((await fetch(`${adresa}/profil`, { headers: zaglavlja })).status).toBe(401);
+    expect((await fetch(`${adresa}/api/profil`, { headers: zaglavlja })).status).toBe(401);
 
-    const ponovljena = await fetch(`${adresa}/racuni/odjava`, { method: 'POST', headers: zaglavlja });
+    const ponovljena = await fetch(`${adresa}/api/racuni/odjava`, { method: 'POST', headers: zaglavlja });
     expect(ponovljena.status).toBe(200);
   });
 
   it('odjava jedne prijave ne opoziva drugu prijavu istog računa', async () => {
-    await fetch(`${adresa}/racuni/registracija`, {
+    await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
     const prijava = async () => {
-      const odgovor = await fetch(`${adresa}/racuni/prijava`, {
+      const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
@@ -204,22 +204,22 @@ describe('POST /racuni/odjava', () => {
     const prviToken = await prijava();
     const drugiToken = await prijava();
 
-    await fetch(`${adresa}/racuni/odjava`, {
+    await fetch(`${adresa}/api/racuni/odjava`, {
       method: 'POST',
       headers: { authorization: `Bearer ${prviToken}` },
     });
     expect(
-      (await fetch(`${adresa}/profil`, { headers: { authorization: `Bearer ${prviToken}` } })).status,
+      (await fetch(`${adresa}/api/profil`, { headers: { authorization: `Bearer ${prviToken}` } })).status,
     ).toBe(401);
     expect(
-      (await fetch(`${adresa}/profil`, { headers: { authorization: `Bearer ${drugiToken}` } })).status,
+      (await fetch(`${adresa}/api/profil`, { headers: { authorization: `Bearer ${drugiToken}` } })).status,
     ).toBe(200);
   });
 });
 
 describe('potvrda emaila i reset lozinke', () => {
   it('potvrđuje email POST zahtjevom i vraća preusmjeravanje za stari link', async () => {
-    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
@@ -233,7 +233,7 @@ describe('potvrda emaila i reset lozinke', () => {
     expect(stariLink.status).toBe(302);
     expect(stariLink.headers.get('location')).toContain('/potvrda-emaila?token=');
 
-    const potvrda = await fetch(`${adresa}/racuni/potvrdi-email`, {
+    const potvrda = await fetch(`${adresa}/api/racuni/potvrdi-email`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token }),
@@ -247,7 +247,7 @@ describe('potvrda emaila i reset lozinke', () => {
   });
 
   it('resetira lozinku valjanim tokenom pa dopušta novu prijavu', async () => {
-    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
@@ -258,20 +258,20 @@ describe('potvrda emaila i reset lozinke', () => {
     };
     const token = izdajTokenResetaLozinke(igracId);
 
-    const reset = await fetch(`${adresa}/racuni/resetiraj-lozinku`, {
+    const reset = await fetch(`${adresa}/api/racuni/resetiraj-lozinku`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token, novaLozinka: 'nova-lozinka123' }),
     });
     expect(reset.status).toBe(200);
 
-    const prijava = await fetch(`${adresa}/racuni/prijava`, {
+    const prijava = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka123' }),
     });
     expect(prijava.status).toBe(200);
-    expect((await fetch(`${adresa}/profil`, { headers: { authorization: `Bearer ${sesijskiToken}` } })).status).toBe(200);
+    expect((await fetch(`${adresa}/api/profil`, { headers: { authorization: `Bearer ${sesijskiToken}` } })).status).toBe(200);
   });
 });
 
@@ -279,7 +279,7 @@ describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim 
   it('odbija goli UUID registriranog računa za protected HTTP rute', async () => {
     const email = `http-impersonation-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
     try {
-      const registracija = await fetch(`${adresa}/racuni/registracija`, {
+      const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email, lozinka: LOZINKA, nadimak: 'HttpImposter' }),
@@ -287,13 +287,13 @@ describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim 
       expect(registracija.status).toBe(200);
       const { igracId } = (await registracija.json()) as { igracId: string };
 
-      const profil = await fetch(`${adresa}/profil`, {
+      const profil = await fetch(`${adresa}/api/profil`, {
         method: 'GET',
         headers: { authorization: `Bearer ${igracId}` },
       });
       expect(profil.status).toBe(401);
 
-      const prijave = await fetch(`${adresa}/admin/prijave`, {
+      const prijave = await fetch(`${adresa}/api/admin/prijave`, {
         method: 'GET',
         headers: { authorization: `Bearer ${igracId}` },
       });
@@ -306,7 +306,7 @@ describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim 
   it('odbija goli UUID admin računa za admin HTTP rute', async () => {
     const email = `http-admin-impersonation-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
     try {
-      const registracija = await fetch(`${adresa}/racuni/registracija`, {
+      const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email, lozinka: LOZINKA, nadimak: 'HttpAdmin' }),
@@ -318,13 +318,13 @@ describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim 
       };
       await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, igracId));
 
-      const odgovor = await fetch(`${adresa}/admin/prijave`, {
+      const odgovor = await fetch(`${adresa}/api/admin/prijave`, {
         method: 'GET',
         headers: { authorization: `Bearer ${igracId}` },
       });
       expect(odgovor.status).toBe(401);
 
-      const odgovorSesijom = await fetch(`${adresa}/admin/prijave`, {
+      const odgovorSesijom = await fetch(`${adresa}/api/admin/prijave`, {
         method: 'GET',
         headers: { authorization: `Bearer ${sesijskiToken}` },
       });
@@ -337,7 +337,7 @@ describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim 
 
 describe('Socket.IO auth sa sesijskim tokenom', () => {
   it('prihvaća valjan sesijski token nakon prijave', async () => {
-    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
@@ -354,7 +354,7 @@ describe('Socket.IO auth sa sesijskim tokenom', () => {
   });
 
   it('logout prekida socket sesije i opozvani token se ne može ponovno spojiti', async () => {
-    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
@@ -367,7 +367,7 @@ describe('Socket.IO auth sa sesijskim tokenom', () => {
     });
     const odspojen = new Promise<void>((resolve) => socket.once('disconnect', () => resolve()));
 
-    const odjava = await fetch(`${adresa}/racuni/odjava`, {
+    const odjava = await fetch(`${adresa}/api/racuni/odjava`, {
       method: 'POST',
       headers: { authorization: `Bearer ${sesijskiToken}` },
     });
@@ -391,7 +391,7 @@ describe('Socket.IO auth sa sesijskim tokenom', () => {
   });
 
   it('odbija goli UUID kao pokušaj impersonacije registriranog računa', async () => {
-    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),

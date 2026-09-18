@@ -64,6 +64,7 @@ stagingu i produkciji.
 | `ONEMOGUCI_TIMER_POTEZA`    | **Samo za lokalno testiranje** — vidi napomenu ispod. `false` ili izbrisano u produkciji.                                                                                                                     |
 | `ODGODA_POCETKA_PARTIJE_MS` | Odgoda početka partije (odbrojavanje u čekaonici), zadano 10000 ms. Testovi postavljaju 0; ne mijenjati u produkciji. Neovisno o `ONEMOGUCI_TIMER_POTEZA` — odbrojavanje radi i s isključenim timerom poteza. |
 | `TOLERANCIJA_PREKIDA_MS`    | Tolerancija mrežnog prekida tijekom aktivne partije. Zadano 10000 ms; staging i produkcija zahtijevaju točno tu vrijednost. Timer poteza ne pauzira se.                                                       |
+| `POSLUZUJ_WEB`              | `true` kada isti Fastify proces treba posluživati izgrađeni SvelteKit frontend; u lokalnom razvoju ostaje `false`.                                                                             |
 
 Staging `.env` mora sadržavati `JAVNA_ADRESA=https://staging.kaladont.hr` i
 `STAGING_EMAIL_ALLOWLIST` s punim email adresama na koje smiješ primiti testnu potvrdu ili reset.

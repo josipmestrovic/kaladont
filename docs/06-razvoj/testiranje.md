@@ -27,6 +27,10 @@ E2E koristi postojeću `.env` konfiguraciju i native PostgreSQL; u CI-ju se kori
 isti sintetički fixture kao za ostale provjere. `pnpm test` namjerno ne pokreće Chromium ni E2E
 testove, pa dodavanje browsera ne usporava svakodnevni testni ciklus.
 
+CI dodatno pokreće `pnpm test:e2e:http` protiv izgrađenog imagea na portu 3000 s
+`POSLUZUJ_WEB=true`. Taj test provjerava direktan ulazak i refresh stranica na istom Fastify
+procesu koji poslužuje API i SvelteKit, uključujući razdvajanje `/api/...` ruta od URL-ova stranica.
+
 Početni kritični paket ima šest testova: registracija/prijava i sesija, javni red za četiri igrača,
 javni red za dva igrača, privatna soba s dva igrača i reconnect aktivne partije. Pravila grafema,
 detaljno bodovanje i sve timer/reconnect utrke ostaju u jediničnim i Socket.IO integracijskim

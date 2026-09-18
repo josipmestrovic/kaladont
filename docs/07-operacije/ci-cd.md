@@ -38,7 +38,7 @@ Prije uključivanja workflowa moraju postojati i biti međusobno usklađeni:
 4. jednokratne naredbe u istoj aplikacijskoj slici za migracije, provjeru/uvoz rječnika i dodjelu prvog admina;
 5. mali licencno čist sintetički fixture rječnika za CI;
 6. prošireni `/zdravlje` koji provjerava bazu i rječnik te vraća 503 kad servis nije spreman;
-7. stvarno slanje preko Resenda i fail-closed staging email allowlista;
+7. stvarno slanje preko Resenda, fail-closed staging email allowlista i E2E provjeru buildanog same-origin web/API servera;
 8. verzionirane backup/restore skripte i pripadajuće systemd jedinice.
 
 ## PR i `main` provjere — ciljani `ci.yml`

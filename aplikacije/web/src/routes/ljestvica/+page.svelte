@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { ADRESA_POSLUZITELJA } from '$lib/konfiguracija.js';
+  import { apiUrl } from '$lib/api-url.js';
   import { dohvatiAuthToken } from '$lib/identitet.js';
 
   interface StavkaLjestvice {
@@ -36,7 +36,7 @@
   async function ucitajIgrace(limit: 10 | 100, mod = modIgraca) {
     ucitavaIgraci = true;
     try {
-      const odgovor = await fetch(`${ADRESA_POSLUZITELJA}/ljestvica?limit=${limit}&mod=${mod}`, {
+      const odgovor = await fetch(apiUrl(`/ljestvica?limit=${limit}&mod=${mod}`), {
         headers: { authorization: `Bearer ${dohvatiAuthToken()}` },
       });
       const tijelo = (await odgovor.json()) as { ljestvica: StavkaLjestvice[]; mojeMjesto: StavkaLjestvice | null };
@@ -51,7 +51,7 @@
   async function ucitajRijeci(limit: 10 | 100) {
     ucitavaRijeci = true;
     try {
-      const odgovor = await fetch(`${ADRESA_POSLUZITELJA}/rijeci/top?limit=${limit}`);
+      const odgovor = await fetch(apiUrl(`/rijeci/top?limit=${limit}`));
       const tijelo = (await odgovor.json()) as { rijeci: StavkaRijeci[] };
       topRijeci = tijelo.rijeci;
       if (limit === 100) prosirenoRijeci = true;

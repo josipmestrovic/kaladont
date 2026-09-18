@@ -76,6 +76,7 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | [ci-cd.md](07-operacije/ci-cd.md)                                               | GitHub Actions: CI, smoke test slike, staging, promocija digesta                       |
 | [nadzor-i-dnevnici.md](07-operacije/nadzor-i-dnevnici.md)                       | Logovi, sigurnosne kopije, zdravlje sustava, alarmi                                    |
 | [sigurnost-i-privatnost.md](07-operacije/sigurnost-i-privatnost.md)             | Zaštita, GDPR, rate limiting, izvršitelji obrade                                       |
+| [http-rute.md](03-arhitektura/http-rute.md)                                    | Razdvajanje poslovnog API-ja i URL-ova stranica                                        |
 | [vodic-postava-vps.md](07-operacije/vodic-postava-vps.md)                       | Početnički vodič: od praznog VPS-a do žive igre                                        |
 | [vodic-postava-discourse.md](07-operacije/vodic-postava-discourse.md)           | Postava foruma na zasebnom VPS-u                                                       |
 | [runbook-objava-i-rollback.md](07-operacije/runbook-objava-i-rollback.md)       | Postupak objave, promocije i vraćanja unatrag                                          |

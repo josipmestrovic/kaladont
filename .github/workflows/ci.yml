@@ -139,6 +139,7 @@ jobs:
           fi
 
       - name: Povuci točan image za smoke test
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: docker pull "$IMAGE_REF"
 
       - name: Validirati Caddy konfiguracije
@@ -181,6 +182,11 @@ jobs:
           docker compose -f docker-compose.ci.yml logs aplikacija
           echo 'CI image nije postao zdrav u zadanom roku.'
           exit 1
+
+      - name: Pokrenuti E2E nad izgrađenim same-origin serverom
+        env:
+          E2E_HTTP_ADRESA: http://127.0.0.1:3000
+        run: pnpm test:e2e:http
 
       - name: Pokrenuti simulaciju četiri igrača
         run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/simulacija.js

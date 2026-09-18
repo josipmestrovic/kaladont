@@ -32,26 +32,26 @@ afterAll(async () => {
 
 /** Umeće gost-zapis izravno u bazu (bez Socket.IO handshakea) za testiranje REST ruta. */
 async function stvoriGosta(): Promise<{ token: string; id: string }> {
-  const odgovor = await fetch(`${adresa}/racuni/gost-sesija`, { method: 'POST' });
+  const odgovor = await fetch(`${adresa}/api/racuni/gost-sesija`, { method: 'POST' });
   const podaci = (await odgovor.json()) as { token: string; igracId: string };
   return { token: podaci.token, id: podaci.igracId };
 }
 
 describe('GET /profil', () => {
   it('odbija neprijavljeni zahtjev', async () => {
-    const odgovor = await fetch(`${adresa}/profil`);
+    const odgovor = await fetch(`${adresa}/api/profil`);
     expect(odgovor.status).toBe(401);
   });
 
   it('vraća vlastite agregate i rang za prijavljenog korisnika', async () => {
-    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
 
-    const odgovor = await fetch(`${adresa}/profil`, {
+    const odgovor = await fetch(`${adresa}/api/profil`, {
       headers: { authorization: `Bearer ${sesijskiToken}` },
     });
     expect(odgovor.status).toBe(200);
@@ -65,7 +65,7 @@ describe('GET /profil', () => {
 
 describe('GET /ljestvica', () => {
   it('vraća listu (javno, bez prijave)', async () => {
-    const odgovor = await fetch(`${adresa}/ljestvica`);
+    const odgovor = await fetch(`${adresa}/api/ljestvica`);
     expect(odgovor.status).toBe(200);
     const tijelo = (await odgovor.json()) as { ok: boolean; ljestvica: unknown[] };
     expect(tijelo.ok).toBe(true);
@@ -75,14 +75,14 @@ describe('GET /ljestvica', () => {
 
 describe('GET /povijest/:igracId', () => {
   it('vraća praznu listu za igrača bez partija', async () => {
-    const registracija = await fetch(`${adresa}/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
     const { igracId } = (await registracija.json()) as { igracId: string };
 
-    const odgovor = await fetch(`${adresa}/povijest/${igracId}`);
+    const odgovor = await fetch(`${adresa}/api/povijest/${igracId}`);
     expect(odgovor.status).toBe(200);
     const tijelo = (await odgovor.json()) as { ok: boolean; partije: unknown[] };
     expect(tijelo.partije).toEqual([]);
@@ -91,7 +91,7 @@ describe('GET /povijest/:igracId', () => {
 
 describe('PUT /profil/avatar', () => {
   it('odbija neidentificirani zahtjev', async () => {
-    const odgovor = await fetch(`${adresa}/profil/avatar`, {
+    const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ avatarId: 1 }),
@@ -102,7 +102,7 @@ describe('PUT /profil/avatar', () => {
   it('dopušta gostu da odabere avatar (onboarding)', async () => {
     const gost = await stvoriGosta();
     try {
-      const odgovor = await fetch(`${adresa}/profil/avatar`, {
+      const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
         body: JSON.stringify({ avatarId: 3 }),
@@ -118,7 +118,7 @@ describe('PUT /profil/avatar', () => {
   it('odbija avatarId izvan raspona', async () => {
     const gost = await stvoriGosta();
     try {
-      const odgovor = await fetch(`${adresa}/profil/avatar`, {
+      const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
         body: JSON.stringify({ avatarId: 999 }),
@@ -132,7 +132,7 @@ describe('PUT /profil/avatar', () => {
 
 describe('PUT /profil/nadimak', () => {
   it('odbija neidentificirani zahtjev', async () => {
-    const odgovor = await fetch(`${adresa}/profil/nadimak`, {
+    const odgovor = await fetch(`${adresa}/api/profil/nadimak`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ nadimak: 'Ana' }),
@@ -143,7 +143,7 @@ describe('PUT /profil/nadimak', () => {
   it('dopušta gostu da postavi ime (onboarding)', async () => {
     const gost = await stvoriGosta();
     try {
-      const odgovor = await fetch(`${adresa}/profil/nadimak`, {
+      const odgovor = await fetch(`${adresa}/api/profil/nadimak`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
         body: JSON.stringify({ nadimak: 'Ana' }),
@@ -159,7 +159,7 @@ describe('PUT /profil/nadimak', () => {
   it('odbija ime kraće od 2 znaka', async () => {
     const gost = await stvoriGosta();
     try {
-      const odgovor = await fetch(`${adresa}/profil/nadimak`, {
+      const odgovor = await fetch(`${adresa}/api/profil/nadimak`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
         body: JSON.stringify({ nadimak: 'A' }),
@@ -173,7 +173,7 @@ describe('PUT /profil/nadimak', () => {
   it('odbija ime dulje od 20 znakova', async () => {
     const gost = await stvoriGosta();
     try {
-      const odgovor = await fetch(`${adresa}/profil/nadimak`, {
+      const odgovor = await fetch(`${adresa}/api/profil/nadimak`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
         body: JSON.stringify({ nadimak: 'A'.repeat(21) }),

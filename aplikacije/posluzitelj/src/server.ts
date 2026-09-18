@@ -14,7 +14,11 @@ import { registrirajRedCekanja } from './red/servis-reda.js';
 import { registrirajPrivatneSobe } from './soba/servis-soba.js';
 import { osvjeziProsjekCekanja } from './red/prosjek-cekanja.js';
 import { stvoriUpraviteljPartija } from './igra/motor-partije.js';
-import { registrirajRacuneRute, type OpcijeAuthRateLimita } from './racuni/rute.js';
+import {
+  registrirajRacuneRute,
+  registrirajStariLinkPotvrdeEmaila,
+  type OpcijeAuthRateLimita,
+} from './racuni/rute.js';
 import { registrirajProfilRute } from './profil/rute.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
@@ -82,19 +86,35 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   await app.register(cookie);
   await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
   let opozoviSocketSesije: (sesijaId: string) => void = () => {};
-  await registrirajRacuneRute(app, authRateLimit, {
-    naSesijaOpozvana: (sesijaId) => opozoviSocketSesije(sesijaId),
-  });
-
   const rjecnik = await ucitajRjecnik();
   app.log.info(`Rječnik učitan: ${rjecnik.brojRijeci()} riječi`);
 
-  await registrirajProfilRute(app, rjecnik);
-  await registrirajPrijaveRute(app);
-  await registrirajAdminRute(app, rjecnik);
-  await registrirajRjecnikRute(app, rjecnik);
+  await app.register(
+    async (apiApp) => {
+      await registrirajRacuneRute(apiApp, authRateLimit, {
+        naSesijaOpozvana: (sesijaId) => opozoviSocketSesije(sesijaId),
+      });
+      await registrirajProfilRute(apiApp, rjecnik);
+      await registrirajPrijaveRute(apiApp);
+      await registrirajAdminRute(apiApp, rjecnik);
+      await registrirajRjecnikRute(apiApp, rjecnik);
+    },
+    { prefix: '/api' },
+  );
+  registrirajStariLinkPotvrdeEmaila(app);
 
-  if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production') {
+  app.route({
+    method: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    url: '/api',
+    handler: async (_zahtjev, odgovor) => odgovor.code(404).send({ ok: false, greska: 'API ruta ne postoji.' }),
+  });
+  app.route({
+    method: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    url: '/api/*',
+    handler: async (_zahtjev, odgovor) => odgovor.code(404).send({ ok: false, greska: 'API ruta ne postoji.' }),
+  });
+
+  if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production' || konfiguracija.POSLUZUJ_WEB === 'true') {
     const direktorijServera = path.dirname(fileURLToPath(import.meta.url));
     const mogucePutanjeWebHandlera = [
       path.resolve(direktorijServera, '../web/build/handler.js'),
@@ -113,7 +133,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     const direktorijZvukova = path.join(path.dirname(putanjaWebHandlera), 'client', 'zvukovi');
     const MIME_ZVUKOVA: Record<string, string> = { '.wav': 'audio/wav', '.mp3': 'audio/mpeg' };
 
-    app.get('/zvukovi/*', async (zahtjev, odgovor) => {
+    app.get('/zvukovi/*', { config: { rateLimit: false } }, async (zahtjev, odgovor) => {
       const trazenaPutanja = (zahtjev.params as { '*': string })['*'];
       const puniPuta = path.join(direktorijZvukova, trazenaPutanja);
       if (!puniPuta.startsWith(direktorijZvukova) || !existsSync(puniPuta)) {
@@ -127,6 +147,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     app.route({
       method: ['GET', 'HEAD'],
       url: '/*',
+      config: { rateLimit: false },
       handler: async (zahtjev, odgovor) => {
         odgovor.hijack();
         await handler(zahtjev.raw, odgovor.raw);

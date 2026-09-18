@@ -1,10 +1,10 @@
 /** Mali helper za pozive prema poslužiteljevom HTTP API-ju (Authorization: Bearer <token>). */
-import { ADRESA_POSLUZITELJA } from './konfiguracija.js';
+import { apiUrl } from './api-url.js';
 import { dohvatiAuthToken } from './identitet.js';
 
 export async function api<T>(putanja: string, opcije: RequestInit = {}): Promise<T> {
   const token = dohvatiAuthToken();
-  const odgovor = await fetch(`${ADRESA_POSLUZITELJA}${putanja}`, {
+  const odgovor = await fetch(apiUrl(putanja), {
     ...opcije,
     headers: {
       'content-type': 'application/json',

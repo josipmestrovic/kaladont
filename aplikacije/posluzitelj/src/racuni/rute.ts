@@ -30,6 +30,13 @@ export interface OpcijeRacuna {
   naSesijaOpozvana?: (sesijaId: string) => void | Promise<void>;
 }
 
+export function registrirajStariLinkPotvrdeEmaila(app: FastifyInstance): void {
+  app.get<{ Querystring: { token?: string } }>(
+    '/racuni/potvrdi-email',
+    async (zahtjev, odgovor) => odgovor.redirect(`/potvrda-emaila?token=${encodeURIComponent(zahtjev.query.token ?? '')}`),
+  );
+}
+
 const NAZIV_KOLACICA = 'kaladont_sesija';
 const TRAJANJE_KOLACICA_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -202,10 +209,7 @@ export async function registrirajRacuneRute(
   app.get<{ Querystring: { token?: string } }>(
     '/racuni/potvrdi-email',
     ogranicenje(limitPotvrde),
-    async (zahtjev, odgovor) => {
-      const token = zahtjev.query.token ?? '';
-      return odgovor.redirect(`/potvrda-emaila?token=${encodeURIComponent(token)}`);
-    },
+    async (zahtjev, odgovor) => odgovor.redirect(`/potvrda-emaila?token=${encodeURIComponent(zahtjev.query.token ?? '')}`),
   );
 
   app.post('/racuni/potvrdi-email', ogranicenje(limitPotvrde), async (zahtjev, odgovor) => {

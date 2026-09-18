@@ -12,6 +12,7 @@
     "build": "pnpm --filter zajednicko build && pnpm --filter web build && pnpm --filter posluzitelj build",
     "test": "pnpm --filter zajednicko build && pnpm --recursive test",
     "test:e2e": "playwright test",
+    "test:e2e:http": "playwright test --config=playwright.http.config.ts",
     "test:e2e:install": "playwright install chromium",
     "lint": "eslint .",
     "format": "prettier --write ."
