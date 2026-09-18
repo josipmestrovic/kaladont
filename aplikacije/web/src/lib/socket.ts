@@ -12,7 +12,7 @@ export function dohvatiSocket(): KaladontSocket {
   if (!socket) {
     socket = io(ADRESA_POSLUZITELJA, {
       auth: { token: dohvatiAuthToken() },
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
     });
   }
   return socket;

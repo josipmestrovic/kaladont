@@ -20,7 +20,17 @@ export function dohvatiGostToken(): string {
 
 export async function inicijalizirajGostSesiju(): Promise<void> {
   if (typeof localStorage === 'undefined' || localStorage.getItem(KLJUC_SESIJSKI_TOKEN)) return;
-  if (localStorage.getItem(KLJUC_GOST_TOKEN)?.startsWith('gost.')) return;
+
+  const postojeci = localStorage.getItem(KLJUC_GOST_TOKEN);
+  if (postojeci?.startsWith('gost.')) {
+    const provjera = await fetch(apiUrl('/profil'), {
+      headers: { authorization: `Bearer ${postojeci}` },
+    });
+    if (provjera.ok) return;
+    if (provjera.status !== 401) throw new Error('Provjera gostujuće sesije nije uspjela.');
+    localStorage.removeItem(KLJUC_GOST_TOKEN);
+    localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
+  }
 
   const odgovor = await fetch(apiUrl('/racuni/gost-sesija'), { method: 'POST' });
   if (!odgovor.ok) throw new Error('Gostujuća sesija nije uspjela.');
