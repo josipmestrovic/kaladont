@@ -8,7 +8,6 @@ import { z } from 'zod';
 import {
   DEFINICIJE_DOSTIGNUCA,
   validirajAvatarConfig,
-  izracunajKaladontDnk,
   izracunajRang,
   izracunajRazinuDostignuca,
   stanjeIskustva,
@@ -30,6 +29,7 @@ import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { porukaPotvrdeEmaila, posaljiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { izdajTokenPotvrdeEmaila } from '../racuni/tokeni.js';
+import { izracunajDnk } from '../igra/izracun-dnk.js';
 import {
   pokusajIdentifikaciju,
   zahtijevajIdentifikaciju,
@@ -73,12 +73,12 @@ function stilIgre(
   return 'pacifist';
 }
 
-async function dohvatiStatistiku(igracId: string) {
+async function dohvatiStatistiku(igracId: string, mod: 'cetiri_igraca' | 'dva_igraca') {
   const [statistika] = await baza
     .select()
     .from(statistikeRijeciIgraca)
     .where(
-      sql`${statistikeRijeciIgraca.igracId} = ${igracId} and ${statistikeRijeciIgraca.mod} = 'cetiri_igraca'`,
+      sql`${statistikeRijeciIgraca.igracId} = ${igracId} and ${statistikeRijeciIgraca.mod} = ${mod}`,
     )
     .limit(1);
   return statistika ?? null;
@@ -163,7 +163,6 @@ function izracunajDnkProfil(
     eliminacijeUkupno: number;
     eliminacije1v1: number;
   },
-  statistika: Awaited<ReturnType<typeof dohvatiStatistiku>> | null,
   dnkStatistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
   mod: 'cetiri_igraca' | 'dva_igraca',
 ) {
@@ -172,30 +171,24 @@ function izracunajDnkProfil(
   const eliminacije = mod === 'dva_igraca' ? igrac.eliminacije1v1 : igrac.eliminacijeUkupno;
   const prosjekBodova = odigrano > 0 ? bodovi / odigrano : 0;
   const eliminacijePoPartiji = odigrano > 0 ? eliminacije / odigrano : 0;
-  const najduziStreak = statistika?.najduziStreak ?? 0;
-  const prosjekPrihvacenogPotezaMs =
-    dnkStatistika && dnkStatistika.prihvaceniPotezi > 0
-      ? dnkStatistika.ukupnoTrajanjePrihvaceniPoteziMs / dnkStatistika.prihvaceniPotezi
-      : 0;
-  const ponderiraneDuge =
-    (statistika?.upisaneDugeRijeci ?? 0) +
-    (statistika?.upisaneSrednjeDugeRijeci ?? 0) * 1.5 +
-    (statistika?.upisaneJakoDugeRijeci ?? 0) * 2;
-  const ponderiraneRijetke =
-    (statistika?.otkriveneRijetkeGrupe ?? 0) +
-    (statistika?.otkriveneSrednjeRijetkeGrupe ?? 0) * 1.5 +
-    (statistika?.otkriveneJakoRijetkeGrupe ?? 0) * 2;
-
-  const profil = izracunajKaladontDnk({
-    mod,
-    odigrano,
-    prosjekBodova,
-    eliminacijePoPartiji,
-    najduziStreak,
-    prosjekPrihvacenogPotezaMs,
-    ponderiraneDuge: ponderiraneDuge / Math.max(1, odigrano),
-    ponderiraneRijetke: ponderiraneRijetke / Math.max(1, odigrano),
-  });
+  const dnkPodaci = {
+    odigrane: odigrano,
+    bodovi,
+    eliminacije,
+    prihvaceniPotezi: dnkStatistika?.prihvaceniPotezi ?? 0,
+    ukupnoTrajanjePrihvaceniPoteziMs: dnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
+    najduziStreak: dnkStatistika?.najduziStreak ?? 0,
+    dugeRijeci: dnkStatistika?.dugeRijeci ?? 0,
+    srednjeDugeRijeci: dnkStatistika?.srednjeDugeRijeci ?? 0,
+    jakoDugeRijeci: dnkStatistika?.jakoDugeRijeci ?? 0,
+    rijetkeRijeci: dnkStatistika?.rijetkeRijeci ?? 0,
+    srednjeRijetkeRijeci: dnkStatistika?.srednjeRijetkeRijeci ?? 0,
+    jakoRijetkeRijeci: dnkStatistika?.jakoRijetkeRijeci ?? 0,
+  };
+  const profil = { osi: izracunajDnk(dnkPodaci, mod) };
+  const prosjekPrihvacenogPotezaMs = dnkPodaci.prihvaceniPotezi > 0
+    ? dnkPodaci.ukupnoTrajanjePrihvaceniPoteziMs / dnkPodaci.prihvaceniPotezi
+    : 0;
 
   return {
     ...profil,
@@ -203,13 +196,13 @@ function izracunajDnkProfil(
     preostaloDoOtkljucavanja: Math.max(0, 10 - odigrano),
     metrike: {
       eliminacijePoPartiji,
-      nizPrihvacenihRijeci: dnkStatistika?.najduziStreak ?? 0,
+      nizPrihvacenihRijeci: dnkPodaci.najduziStreak,
       prosjekPrihvacenogPotezaMs,
       dugeRijeciPoPartiji: odigrano > 0
-        ? ((dnkStatistika?.dugeRijeci ?? 0) + (dnkStatistika?.srednjeDugeRijeci ?? 0) + (dnkStatistika?.jakoDugeRijeci ?? 0)) / odigrano
+        ? (dnkPodaci.dugeRijeci + dnkPodaci.srednjeDugeRijeci + dnkPodaci.jakoDugeRijeci) / odigrano
         : 0,
       rijetkeRijeciPoPartiji: odigrano > 0
-        ? ((dnkStatistika?.rijetkeRijeci ?? 0) + (dnkStatistika?.srednjeRijetkeRijeci ?? 0) + (dnkStatistika?.jakoRijetkeRijeci ?? 0)) / odigrano
+        ? (dnkPodaci.rijetkeRijeci + dnkPodaci.srednjeRijetkeRijeci + dnkPodaci.jakoRijetkeRijeci) / odigrano
         : 0,
     },
   };
@@ -256,7 +249,7 @@ export async function registrirajProfilRute(
 
   app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    const statistikaRijeci = await dohvatiStatistiku(igrac.id);
+    const statistikaRijeci = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
     const [dnkCetiri, dnkDva] = await Promise.all([
       dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
       dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
@@ -291,8 +284,8 @@ export async function registrirajProfilRute(
       prosjekBodova1v1: prosjek1v1,
       rang1v1: izracunajRang(igrac.odigrane1v1, prosjek1v1, 'dva_igraca'),
       dnk: {
-        cetiriIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkCetiri, 'cetiri_igraca'),
-        dvaIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkDva, 'dva_igraca'),
+        cetiriIgraca: izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca'),
+        dvaIgraca: izracunajDnkProfil(igrac, dnkDva, 'dva_igraca'),
       },
       prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
@@ -315,7 +308,7 @@ export async function registrirajProfilRute(
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
 
-    const statistikaRijeci = await dohvatiStatistiku(igrac.id);
+    const statistikaRijeci = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
     const [dnkCetiri, dnkDva] = await Promise.all([
       dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
       dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
@@ -348,8 +341,8 @@ export async function registrirajProfilRute(
       prosjekBodova1v1: prosjek1v1,
       rang1v1: izracunajRang(igrac.odigrane1v1, prosjek1v1, 'dva_igraca'),
       dnk: {
-        cetiriIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkCetiri, 'cetiri_igraca'),
-        dvaIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkDva, 'dva_igraca'),
+        cetiriIgraca: izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca'),
+        dvaIgraca: izracunajDnkProfil(igrac, dnkDva, 'dva_igraca'),
       },
       prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
@@ -475,7 +468,7 @@ export async function registrirajProfilRute(
           igracId: igrac.id,
           jeJavan: igrac.vrsta !== 'gost',
           nadimak: igrac.nadimak,
-          rang: izracunajRang(odig, prosjek),
+          rang: izracunajRang(odig, prosjek, je1v1 ? 'dva_igraca' : 'cetiri_igraca'),
           prosjekBodova: prosjek,
           odigrane: odig,
           postotakPobjeda: odig > 0 ? (pobj / odig) * 100 : 0,
@@ -502,7 +495,7 @@ export async function registrirajProfilRute(
             igracId: igrac.id,
             jeJavan: igrac.vrsta !== 'gost',
             nadimak: igrac.nadimak,
-            rang: izracunajRang(odigMoj, prosjekMoj),
+            rang: izracunajRang(odigMoj, prosjekMoj, je1v1 ? 'dva_igraca' : 'cetiri_igraca'),
             prosjekBodova: prosjekMoj,
             odigrane: odigMoj,
             postotakPobjeda: (pobjMoj / odigMoj) * 100,

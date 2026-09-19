@@ -8,6 +8,7 @@ import { asc, eq, gt, and } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
 import { grafemi, zadnjaDva } from 'zajednicko';
+import { odaberiSigurnuPocetnuRijec } from './pocetne-rijeci.js';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
 
@@ -26,7 +27,7 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   /** Broj oblika po kategoriji, sortirano silazno (GET /rjecnik/statistika, naslovnica). */
   brojPoKategoriji(): KategorijaRjecnika[];
   ciljeviRijeci(): CiljeviRijeci;
-  /** Ponovno učita rječnik iz baze i zamijeni podatke in-place (RS-21: signal ponovnog učitavanja). */
+  /** Ponovno učita rječnik iz baze i zamijeni zajedničke podatke in-place. */
   ponovoUcitaj(): Promise<void>;
 }
 
@@ -195,7 +196,18 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     jeOsnovniOblik,
     postojeRijeciNa: (dvaGrafema) => (poPrefiksu.get(dvaGrafema)?.length ?? 0) > 0,
     imaSlobodnuRijecNa,
-    nasumicnaPocetnaImenickaRijec: (iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci) => {
+    nasumicnaPocetnaRijec: (iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci) => {
+      const sigurnaRijec = odaberiSigurnuPocetnuRijec({
+        iskoristeneGrupe,
+        dopusteneVrste,
+        grupeZa,
+        vrsteZa,
+        rijeciNa: (prefiks) => poPrefiksu.get(prefiks) ?? [],
+        jeIgriva: (rijec, potroseneGrupe, vrste) =>
+          jeIgriva(rijec, potroseneGrupe, vrste, samoOsnovniOblici, minDuljinaRijeci),
+      });
+      if (sigurnaRijec) return sigurnaRijec;
+
       if (!dopusteneVrste || dopusteneVrste.has('imenica')) {
         const ukupno = pocetneImenickeRijeci.length;
         if (ukupno > 0) {
@@ -210,7 +222,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
         }
       }
 
-      // Ako imenice nisu dopuštene ili nema odgovarajuće imenice, tražimo bilo koju kratku riječ iz dopuštenih vrsta
+      // Ako nema odgovarajuće imenice, tražimo bilo koju kratku riječ iz dopuštenih vrsta.
       for (const [rijec] of rijecGrupe) {
         if (rijec.length >= 6) continue;
         if (!jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) continue;

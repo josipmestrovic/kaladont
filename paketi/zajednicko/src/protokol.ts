@@ -225,6 +225,7 @@ export interface RundaOtvorena {
 }
 
 export type KodGreske =
+  | 'NEVALJAN_PAYLOAD'
   | 'PREBRZO'
   | 'NISI_U_PARTIJI'
   | 'VEC_U_REDU'
@@ -233,7 +234,11 @@ export type KodGreske =
   | 'SOBA_U_TIJEKU'
   | 'SOBA_PUNA'
   | 'NISI_VLASNIK'
-  | 'NEDOVOLJNO_IGRACA';
+  | 'NEDOVOLJNO_IGRACA'
+  | 'VEC_U_PARTIJI'
+  | 'VEC_U_SOBI'
+  | 'PREVISE_SOBA'
+  | 'PREVISE_PARTIJA';
 
 export interface PayloadGreska {
   kod: KodGreske;
@@ -287,5 +292,6 @@ export interface DogadajiPosluziteljKlijent {
   'reakcija:nova': (payload: { igracId: string; poruka: BrzaPoruka }) => void;
   'soba:stvorena': (payload: { kod: string }) => void;
   'soba:stanje': (payload: StanjePrivatneSobe) => void;
+  'soba:vlasnik-napustio': (payload: { kod: string }) => void;
   greska: (payload: PayloadGreska) => void;
 }

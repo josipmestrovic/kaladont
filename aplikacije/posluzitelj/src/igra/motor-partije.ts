@@ -47,6 +47,7 @@ import { baza } from '../baza/klijent.js';
 import { igraci, otkljucaneGrupeIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
 import { zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisStatistikeRijeci } from './upis-partije.js';
+import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50) });
 const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) });
@@ -83,6 +84,8 @@ export interface PostavkeMotoraPartije {
   trajanjePotezaMs?: number;
   tolerancijaPrekidaMs?: number;
   odgodaObradePrekidaMs?: number;
+  maksimalnoAktivnihPartija?: number;
+  provjeriDogadaj?: ProvjeriOgranicenjeDogadaja;
   naPartijaZavrsila?: (partijaId: string) => void;
   naPrivatnaPartijaZavrsila?: (kodSobe: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => void;
 }
@@ -167,6 +170,8 @@ export function stvoriUpraviteljPartija(
   const trajanjePotezaMs = postavke.trajanjePotezaMs ?? TRAJANJE_POTEZA_MS;
   const tolerancijaPrekidaMs = postavke.tolerancijaPrekidaMs ?? konfiguracija.TOLERANCIJA_PREKIDA_MS;
   const odgodaObradePrekidaMs = postavke.odgodaObradePrekidaMs ?? 0;
+  const maksimalnoAktivnihPartija = postavke.maksimalnoAktivnihPartija ?? Number.POSITIVE_INFINITY;
+  const provjeriDogadaj = postavke.provjeriDogadaj ?? (() => true);
 
   const partije = new Map<string, StanjeStola>();
   const partijaPoIgracu = new Map<string, string>(); // igracId -> partijaId
@@ -324,6 +329,7 @@ export function stvoriUpraviteljPartija(
     sudioniciUlaz: StavkaReda[],
     mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
   ): void {
+    if (partije.size >= maksimalnoAktivnihPartija) return;
     const izmjesano = [...sudioniciUlaz].sort(() => Math.random() - 0.5);
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const odigrane = mod === 'dva_igraca' ? (s.odigrane1v1 ?? 0) : s.odigrane;
@@ -474,17 +480,8 @@ export function stvoriUpraviteljPartija(
       return { igracId, plasman, bodovi, eliminacije };
     });
 
-    for (const sudionik of stanje.sudionici) {
-      const statistika = stanje.statistikeRijeci.get(sudionik.igracId);
-      if (!statistika) continue;
-      dodajNapredakDostignuca(stanje, sudionik.igracId, {
-        ...(!stanje.jePrivatna && sudionik.igracId === pobjednikId ? { javnePobjede: 1 } : {}),
-      });
-    }
-
     stanje.zadnjiPotezi.clear();
     stanje.zadnjeReakcije.clear();
-    stanje.razloziEliminacije.clear();
 
     // Soba i mapiranja žive još kratko da reakcije rade tijekom sažetka; guard štiti novu partiju istog igrača.
     setTimeout(() => {
@@ -565,6 +562,7 @@ export function stvoriUpraviteljPartija(
       obracuniIskustva.set(p.igracId, obracun);
       return { igracId: p.igracId, plasman: p.plasman as 1 | 2 | 3 | 4, bodovi: p.bodovi, eliminacije: p.eliminacije, iskustvo: obracun.osvojenoIskustvo, nacinIspadanja };
     });
+    stanje.razloziEliminacije.clear();
 
     const statistike = new Map<string, ZapisStatistikeRijeci>(
       [...stanje.statistikeRijeci].map(([igracId, statistika]) => [igracId, {
@@ -673,7 +671,7 @@ export function stvoriUpraviteljPartija(
 
   function objaviRijecSustava(stanje: StanjeStola, napadac: string | null): void {
     stanje.izborHandle = null;
-    const autoRijec = rjecnik.nasumicnaPocetnaImenickaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
+    const autoRijec = rjecnik.nasumicnaPocetnaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
     if (!autoRijec) {
       // ekstremni rubni slucaj (rjecnik iscrpljen) - sigurnosno zavrsi partiju
       zakljuciPartiju(stanje);
@@ -1184,9 +1182,12 @@ export function stvoriUpraviteljPartija(
   }
 
   function registrirajHandlere(socket: KaladontSocket): void {
-    socket.on('partija:stanje', () => posaljiStanje(socket));
+    socket.on('partija:stanje', () => {
+      if (provjeriDogadaj(socket.data.igracId, 'partija:stanje')) posaljiStanje(socket);
+    });
 
     socket.on('potez:rijec', (payload) => {
+      if (!provjeriDogadaj(socket.data.igracId, 'potez:rijec')) return;
       const rezultatSheme = ShemaPotezRijec.safeParse(payload);
       if (!rezultatSheme.success) return; // neispravan payload - tiho ignoriraj (server ne vjeruje nikome)
       const { rijec } = rezultatSheme.data;
@@ -1236,6 +1237,7 @@ export function stvoriUpraviteljPartija(
     });
 
     socket.on('potez:ne-znam', () => {
+      if (!provjeriDogadaj(socket.data.igracId, 'potez:ne-znam')) return;
       const partijaId = partijaPoIgracu.get(socket.data.igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;
       if (!stanje || stanje.zavrsena || stanje.izborUToku || stanje.naPotezuId !== socket.data.igracId) return;
@@ -1243,6 +1245,7 @@ export function stvoriUpraviteljPartija(
     });
 
     socket.on('reakcija:posalji', (payload) => {
+      if (!provjeriDogadaj(socket.data.igracId, 'reakcija:posalji')) return;
       const rezultatSheme = ShemaReakcija.safeParse(payload);
       if (!rezultatSheme.success) return;
       const { poruka } = rezultatSheme.data;
@@ -1257,6 +1260,7 @@ export function stvoriUpraviteljPartija(
     });
 
     socket.on('partija:izadji', () => {
+      if (!provjeriDogadaj(socket.data.igracId, 'partija:izadji')) return;
       const partijaId = partijaPoIgracu.get(socket.data.igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;
       if (!stanje) return;
@@ -1283,6 +1287,7 @@ export function stvoriUpraviteljPartija(
     postavkeSobe: PostavkePrivatneSobe,
     kodSobe: string,
   ): string {
+    if (partije.size >= maksimalnoAktivnihPartija) return '';
     const sudionici: SudionikPartije[] = sudioniciUlaz.map((s, sjedalo) => {
       const prosjekBodova = s.odigrane > 0 ? s.bodoviUkupno / s.odigrane : 0;
       const rang = izracunajRang(s.odigrane, prosjekBodova);

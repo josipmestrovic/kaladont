@@ -48,8 +48,8 @@ Prije produkcije još treba implementirati jednokratni CLI koji već registriran
 ## Pravila izmjena
 
 1. **Soft-delete:** riječi se nikad ne brišu, samo deaktiviraju (`aktivna = false`) — povijest odigranih partija ostaje razumljiva.
-2. **Bez retroaktivnosti:** izmjena rječnika nikad ne mijenja ishod odigranih partija (RS-21).
-3. **Ponovno učitavanje:** izmjene postaju važeće signalom za reload rječnika u memoriji; aktivne partije dovršavaju sa svojim snapshotom.
+2. **Primjena na aktivne partije:** izmjena rječnika ne mijenja već prihvaćene poteze, ali može utjecati na buduće validacije u aktivnim partijama nakon reloada.
+3. **Ponovno učitavanje:** izmjene postaju važeće signalom za reload zajedničkog rječnika u memoriji.
 4. **Iznimke digrafa** dodane kroz prijave zahtijevaju ponovni izračun `prva_dva`/`zadnja_dva` samo za tu riječ.
 
 ## Ciljevi kvalitete (pratiti od lansiranja)

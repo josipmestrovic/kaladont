@@ -20,7 +20,10 @@ let app: FastifyInstance;
 let adresa: string;
 
 beforeAll(async () => {
-  ({ app } = await izgradiPosluzitelj({ postavkeMotora: { tolerancijaPrekidaMs: 50 } }));
+  ({ app } = await izgradiPosluzitelj({
+    postavkeMotora: { tolerancijaPrekidaMs: 50 },
+    socketOgranicenja: { handshakePoIpMinuti: 1_000 },
+  }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = app.server.address();
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
@@ -371,7 +374,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     });
     const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
     for (const igrac of igraci) igrac.socket.emit('red:udji');
-    await pocetakPromise;
+    const pocetak = await pocetakPromise;
     const runda = await rundaPromise;
 
     const otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;
@@ -409,7 +412,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     });
     const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
     for (const igrac of igraci) igrac.socket.emit('red:udji');
-    await pocetakPromise;
+    const pocetak = await pocetakPromise;
     const runda = await rundaPromise;
 
     const otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;
@@ -447,7 +450,22 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(eliminacija.razlog).toBe('prekid');
     expect(eliminacija.bodZa).toBe(otvarac.token); // napadac = autor zadnje prihvacene rijeci
 
-    for (const igrac of igraci) if (igrac !== sljedeci) igrac.socket.disconnect();
+    const preostali = igraci.filter((igrac) => igrac !== sljedeci);
+    const krajPromise = new Promise<KrajPartije>((resolve) => {
+      for (const igrac of preostali) igrac.socket.once('partija:kraj', resolve);
+    });
+    preostali[0]!.socket.disconnect();
+    preostali[1]!.socket.disconnect();
+    await krajPromise;
+
+    const [spremljeniPrekid] = await baza
+      .select({ nacinIspadanja: sudioniciPartije.nacinIspadanja, iskustvo: sudioniciPartije.iskustvo })
+      .from(sudioniciPartije)
+      .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, sljedeci.igracId)));
+    expect(spremljeniPrekid?.nacinIspadanja).toBe('prekid');
+    expect(spremljeniPrekid?.iskustvo).toBe(0);
+
+    preostali[2]!.socket.disconnect();
   }, 30_000);
 
   it('RS-10: istek tolerancije izvan poteza je samoeliminacija bez boda, igra se nastavlja', async () => {

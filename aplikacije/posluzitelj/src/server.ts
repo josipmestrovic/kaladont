@@ -32,6 +32,7 @@ import {
   type Okruzenje,
 } from './sigurnost/origin.js';
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
+import { OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
 
 export interface PodaciSocketa {
   igracId: string;
@@ -73,6 +74,7 @@ export interface OpcijePosluzitelja {
   postavkeMotora?: PostavkeMotoraPartije;
   okruzenjeSigurnosti?: Okruzenje;
   authRateLimit?: Partial<OpcijeAuthRateLimita>;
+  socketOgranicenja?: Partial<PostavkeSocketOgranicenja>;
 }
 
 /** Izgrađuje Fastify + Socket.IO instancu (bez pokretanja listen-a) - koristi ga i index.ts i testovi. */
@@ -83,6 +85,20 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     ...opcije.authRateLimit,
   };
   const corsOrigin = stvoriCorsOrigin(okruzenjeSigurnosti);
+  const socketOgranicenja: PostavkeSocketOgranicenja = {
+    handshakePoIpMinuti: konfiguracija.SOCKET_HANDSHAKE_PO_IP_MINUTI,
+    maksimalnoAktivnihVeza: konfiguracija.SOCKET_MAKSIMALNO_AKTIVNIH_VEZA,
+    maksimalnoPrivatnihSoba: konfiguracija.SOCKET_MAKSIMALNO_PRIVATNIH_SOBA,
+    maksimalnoAktivnihPartija: konfiguracija.SOCKET_MAKSIMALNO_AKTIVNIH_PARTIJA,
+    prozorDogadajaMs: konfiguracija.SOCKET_PROZOR_DOGADAJA_MS,
+    dogadajiPoProzoru: konfiguracija.SOCKET_DOGADAJI_PO_PROZORU,
+    ...opcije.socketOgranicenja,
+  };
+  const ogranicivacHandshaka = new OgranicivacDogadaja(60_000);
+  const ogranicivacHttpDokumenata = new OgranicivacDogadaja(60_000);
+  const ogranicivacDogadaja = new OgranicivacDogadaja(socketOgranicenja.prozorDogadajaMs);
+  const provjeriDogadaj = (igracId: string, dogadaj: string): boolean =>
+    ogranicivacDogadaja.dopusti(`${igracId}:${dogadaj}`, socketOgranicenja.dogadajiPoProzoru);
   const app = Fastify({ logger: true, trustProxy: jePouzdaniProxy(okruzenjeSigurnosti) });
   await app.register(cors, { origin: corsOrigin, credentials: true });
   await app.register(cookie);
@@ -151,6 +167,19 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       url: '/*',
       config: { rateLimit: false },
       handler: async (zahtjev, odgovor) => {
+        const prihvat = zahtjev.headers.accept;
+        const traziDokument = typeof prihvat === 'string' && prihvat.includes('text/html');
+        if (traziDokument) {
+          const proslijedeniIp = zahtjev.headers['x-forwarded-for'];
+          const ip = (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
+            ?? zahtjev.socket.remoteAddress
+            ?? 'nepoznat';
+          const dopusten = ogranicivacHttpDokumenata.dopusti(`ip:${ip}`, konfiguracija.HTTP_DOKUMENTI_PO_IP_MINUTI);
+          if (!dopusten) {
+            odgovor.header('retry-after', '60');
+            return odgovor.code(429).send({ ok: false, greska: 'Previše zahtjeva za stranice. Pokušaj ponovno za minutu.' });
+          }
+        }
         odgovor.hijack();
         await handler(zahtjev.raw, odgovor.raw);
       },
@@ -160,7 +189,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const io: KaladontIo = new SocketIoServer(app.server, {
     cors: { origin: corsOrigin, credentials: true },
     allowRequest: (zahtjev, povratniPoziv) => {
-      povratniPoziv(null, jeDopustenOrigin(okruzenjeSigurnosti, zahtjev.headers.origin));
+      const originDopusten = jeDopustenOrigin(okruzenjeSigurnosti, zahtjev.headers.origin);
+      const proslijedeniIp = zahtjev.headers['x-forwarded-for'];
+      const ip = (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
+        ?? zahtjev.socket.remoteAddress
+        ?? 'nepoznat';
+      const handshakeDopusten = ogranicivacHandshaka.dopusti(`ip:${ip}`, socketOgranicenja.handshakePoIpMinuti);
+      const vezaDopustena = io.sockets.sockets.size < socketOgranicenja.maksimalnoAktivnihVeza;
+      povratniPoziv(null, originDopusten && handshakeDopusten && vezaDopustena);
     },
   });
 
@@ -184,6 +220,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     },
     {
       ...opcije.postavkeMotora,
+      maksimalnoAktivnihPartija: socketOgranicenja.maksimalnoAktivnihPartija,
+      provjeriDogadaj,
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
       },
@@ -275,18 +313,31 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     });
   });
 
-  registrirajRedCekanja(
+  let igracImaPrivatnuSobu = (_igracId: string) => false;
+  const redServis = registrirajRedCekanja(
     io,
     (stol, mod) => {
       upravitelj.zapocniPartiju(stol, mod);
       void osvjeziProsjekCekanja();
     },
     upravitelj.imaAktivnuPartiju,
+    (igracId) => igracImaPrivatnuSobu(igracId),
+    () => upravitelj.brojAktivnihPartija() < socketOgranicenja.maksimalnoAktivnihPartija,
+    provjeriDogadaj,
   );
 
   const sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
     upravitelj.zapocniPrivatnuPartiju(sudionici, postavke, kodSobe),
+    {
+      maksimalnoSoba: socketOgranicenja.maksimalnoPrivatnihSoba,
+      maksimalnoAktivnihPartija: socketOgranicenja.maksimalnoAktivnihPartija,
+      brojAktivnihPartija: () => upravitelj.brojAktivnihPartija(),
+      provjeriDogadaj,
+      igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
+      ukloniIzJavnogReda: redServis.ukloniIzReda,
+    },
   );
+  igracImaPrivatnuSobu = sobaServis.imaPrivatnuSobu;
 
   return { app, io };
 }

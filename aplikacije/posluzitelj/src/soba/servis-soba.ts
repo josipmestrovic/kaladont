@@ -12,6 +12,40 @@ import {
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
+import { z } from 'zod';
+import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
+
+const ShemaVrstaRijeci = z.enum([
+  'imenica',
+  'glagol',
+  'pridjev',
+  'prilog',
+  'zamjenica',
+  'broj',
+  'prijedlog',
+  'veznik',
+  'cestica',
+  'uzvik',
+]);
+
+const ShemaPostavkePrivatneSobe = z
+  .object({
+    trajanjePotezaSek: z.union([z.literal(0), z.literal(15), z.literal(30), z.literal(60)]).optional(),
+    dopusteneVrste: z.array(ShemaVrstaRijeci).max(10).optional(),
+    eliminacijskiBodovi: z.boolean().optional(),
+  })
+  .strict();
+
+const ShemaStvoriSobu = z
+  .object({ postavke: ShemaPostavkePrivatneSobe.optional() })
+  .strict()
+  .optional();
+
+const ShemaKodSobe = z
+  .object({ kod: z.string().trim().regex(/^[A-Z0-9]{6}$/i) })
+  .strict();
+
+const PORUKA_NEVALJANOG_PAYLOADA = 'Poslane postavke nisu ispravne.';
 
 const ALFABET_KODA = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -24,6 +58,7 @@ function generirajKodSobe(): string {
 }
 
 const SOBA_PREFIX = (kod: string) => `soba:${kod.toUpperCase()}`;
+const TRAJANJE_NEAKTIVNE_SOBE_MS = 15 * 60_000;
 
 export interface Soba {
   kod: string;
@@ -63,7 +98,9 @@ function normalizirajPostavke(p?: Partial<PostavkePrivatneSobe>): PostavkePrivat
 
   const dopusteniSkup = new Set(p?.dopusteneVrste ?? []);
   const filtrirane = SVE_VRSTE_RIJECI.filter((v) => dopusteniSkup.has(v));
-  const dopusteneVrste = filtrirane.length > 0 ? filtrirane : [...SVE_VRSTE_RIJECI];
+  const dopusteneVrste = filtrirane.length > 0
+    ? SVE_VRSTE_RIJECI.filter((vrsta) => vrsta === 'imenica' || dopusteniSkup.has(vrsta))
+    : [...SVE_VRSTE_RIJECI];
 
   return {
     trajanjePotezaSek,
@@ -79,6 +116,14 @@ export function registrirajPrivatneSobe(
     postavke: PostavkePrivatneSobe,
     kodSobe: string,
   ) => string,
+  opcije: {
+    maksimalnoSoba: number;
+    maksimalnoAktivnihPartija: number;
+    brojAktivnihPartija: () => number;
+    provjeriDogadaj: ProvjeriOgranicenjeDogadaja;
+    igracImaAktivnuPartiju: (igracId: string) => boolean;
+    ukloniIzJavnogReda: (igracId: string) => void;
+  },
 ) {
   const sobe = new Map<string, Soba>(); // kod -> Soba
   const sobaPoIgracu = new Map<string, string>(); // igracId -> kod
@@ -100,6 +145,22 @@ export function registrirajPrivatneSobe(
       sobe.delete(soba.kod);
     }, odgodaMs);
     soba.brisanjeTimer.unref();
+  }
+
+  function zatvoriSobuZbogVlasnika(soba: Soba): void {
+    ponistiBrisanjeSobe(soba);
+    const sobaSocketi = io.sockets.adapter.rooms.get(SOBA_PREFIX(soba.kod));
+    if (sobaSocketi) {
+      for (const socketId of sobaSocketi) {
+        const socket = io.sockets.sockets.get(socketId);
+        socket?.emit('soba:vlasnik-napustio', { kod: soba.kod });
+        socket?.leave(SOBA_PREFIX(soba.kod));
+      }
+    }
+    for (const igracId of soba.clanoviMap.keys()) {
+      if (sobaPoIgracu.get(igracId) === soba.kod) sobaPoIgracu.delete(igracId);
+    }
+    sobe.delete(soba.kod);
   }
 
   function izradiStanje(soba: Soba, mojIgracId: string): StanjePrivatneSobe {
@@ -165,28 +226,51 @@ export function registrirajPrivatneSobe(
       return;
     }
 
+    if (soba.vlasnikId === igracId && soba.status !== 'u_tijeku') {
+      zatvoriSobuZbogVlasnika(soba);
+      return;
+    }
+
     socket.leave(SOBA_PREFIX(kod));
 
-    if (eksplicitnoUkloni && soba.status !== 'u_tijeku') {
+    if (soba.status !== 'u_tijeku') {
       soba.clanoviMap.delete(igracId);
       sobaPoIgracu.delete(igracId);
     }
 
     if (soba.clanoviMap.size === 0) {
-      zakaziBrisanjeSobe(soba, 60_000);
+      zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
     } else {
-      if (soba.vlasnikId === igracId && soba.clanoviMap.size > 0) {
-        soba.vlasnikId = [...soba.clanoviMap.keys()][0]!;
-      }
+      if (soba.status === 'cekanje') zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
       emitirajStanje(soba);
     }
   }
 
   io.on('connection', (socket) => {
     socket.on('soba:stvori', (payload) => {
+      if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:stvori')) return;
+      if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {
+        socket.emit('greska', { kod: 'VEC_U_PARTIJI', poruka: 'Ne možeš stvoriti sobu dok je partija aktivna.' });
+        return;
+      }
+      if (sobaPoIgracu.has(socket.data.igracId)) {
+        socket.emit('greska', { kod: 'VEC_U_SOBI', poruka: 'Već si u privatnoj sobi.' });
+        return;
+      }
+      if (sobe.size >= opcije.maksimalnoSoba) {
+        socket.emit('greska', { kod: 'PREVISE_SOBA', poruka: 'Privremeno je dosegnut najveći broj privatnih soba.' });
+        return;
+      }
+      const rezultat = ShemaStvoriSobu.safeParse(payload);
+      if (!rezultat.success) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: PORUKA_NEVALJANOG_PAYLOADA });
+        return;
+      }
+
       izadjiIzSobe(socket, true);
 
-      const postavke = normalizirajPostavke(payload?.postavke);
+      const postavke = normalizirajPostavke(rezultat.data?.postavke);
+      opcije.ukloniIzJavnogReda(socket.data.igracId);
       let kod = generirajKodSobe();
       while (sobe.has(kod)) kod = generirajKodSobe();
 
@@ -226,15 +310,23 @@ export function registrirajPrivatneSobe(
       sobe.set(kod, soba);
       sobaPoIgracu.set(igracId, kod);
       socket.join(SOBA_PREFIX(kod));
+      zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
 
       socket.emit('soba:stvorena', { kod });
       emitirajStanje(soba);
     });
 
     socket.on('soba:udji', (payload) => {
-      const kod = payload?.kod?.toString().trim().toUpperCase();
-      if (!kod) {
-        socket.emit('greska', { kod: 'SOBA_NE_POSTOJI', poruka: 'Kod sobe nije ispravan.' });
+      if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:udji')) return;
+      const rezultat = ShemaKodSobe.safeParse(payload);
+      if (!rezultat.success) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Kod sobe nije ispravan.' });
+        return;
+      }
+      const kod = rezultat.data.kod.toUpperCase();
+
+      if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {
+        socket.emit('greska', { kod: 'VEC_U_PARTIJI', poruka: 'Ne možeš ući u sobu dok je partija aktivna.' });
         return;
       }
 
@@ -266,6 +358,7 @@ export function registrirajPrivatneSobe(
       }
 
       izadjiIzSobe(socket, true);
+      opcije.ukloniIzJavnogReda(socket.data.igracId);
 
       soba.clanoviMap.set(igracId, {
         igracId,
@@ -285,22 +378,29 @@ export function registrirajPrivatneSobe(
       });
       sobaPoIgracu.set(igracId, kod);
       socket.join(SOBA_PREFIX(kod));
+      zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
 
       emitirajStanje(soba);
     });
 
     socket.on('soba:izadji', () => {
+      if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:izadji')) return;
       izadjiIzSobe(socket, true);
     });
 
     socket.on('soba:stanje', () => {
+      if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:stanje')) return;
       const kod = sobaPoIgracu.get(socket.data.igracId);
       if (!kod) return;
       const soba = sobe.get(kod);
-      if (soba) socket.emit('soba:stanje', izradiStanje(soba, socket.data.igracId));
+      if (soba) {
+        if (soba.status === 'cekanje') zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
+        socket.emit('soba:stanje', izradiStanje(soba, socket.data.igracId));
+      }
     });
 
     socket.on('soba:pokreni', () => {
+      if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:pokreni')) return;
       const igracId = socket.data.igracId;
       const kod = sobaPoIgracu.get(igracId);
       if (!kod) return;
@@ -317,6 +417,11 @@ export function registrirajPrivatneSobe(
       }
 
       if (soba.status !== 'cekanje') return;
+
+      if (opcije.brojAktivnihPartija() >= opcije.maksimalnoAktivnihPartija) {
+        socket.emit('greska', { kod: 'PREVISE_PARTIJA', poruka: 'Privremeno je dosegnut najveći broj aktivnih partija.' });
+        return;
+      }
 
       ponistiBrisanjeSobe(soba);
       soba.status = 'u_tijeku';
@@ -346,6 +451,7 @@ export function registrirajPrivatneSobe(
   });
 
   return {
+    imaPrivatnuSobu: (igracId: string) => sobaPoIgracu.has(igracId),
     registrirajRezultatPartije: (kodSobe: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => {
       const soba = sobe.get(kodSobe);
       if (!soba) return;
@@ -364,7 +470,7 @@ export function registrirajPrivatneSobe(
           soba.status = 'cekanje';
           soba.partijaId = null;
           emitirajStanje(soba);
-          zakaziBrisanjeSobe(soba, 300_000);
+          zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
           break;
         }
       }

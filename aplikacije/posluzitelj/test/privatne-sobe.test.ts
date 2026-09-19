@@ -91,6 +91,63 @@ function cekajRunduIliKraj(
 }
 
 describe('privatne sobe', () => {
+  it('kontrolirano odbija neispravne Socket.IO payloadove bez rušenja procesa', async () => {
+    const vlasnik = await spojiIgraca();
+
+    try {
+      const greskaPostavki = cekajDogadaj<{ kod: string }>(vlasnik.socket, 'greska');
+      vlasnik.socket.emit('soba:stvori', { postavke: { dopusteneVrste: 'imenica' } });
+      expect(await greskaPostavki).toEqual(expect.objectContaining({ kod: 'NEVALJAN_PAYLOAD' }));
+
+      const greskaKoda = cekajDogadaj<{ kod: string }>(vlasnik.socket, 'greska');
+      vlasnik.socket.emit('soba:udji', { kod: 123456 });
+      expect(await greskaKoda).toEqual(expect.objectContaining({ kod: 'NEVALJAN_PAYLOAD' }));
+
+      const zdravo = await fetch(`${adresa}/zdravlje`);
+      expect(zdravo.ok).toBe(true);
+    } finally {
+      vlasnik.socket.disconnect();
+    }
+  });
+
+  it('autoritativno dodaje imenice u postavke privatne sobe', async () => {
+    const vlasnik = await spojiIgraca();
+
+    try {
+      const { stanje } = await stvoriSobu(vlasnik.socket, {
+        trajanjePotezaSek: 30,
+        dopusteneVrste: ['glagol'],
+        eliminacijskiBodovi: false,
+      });
+
+      expect(stanje.postavke.dopusteneVrste).toEqual(['imenica', 'glagol']);
+    } finally {
+      vlasnik.socket.disconnect();
+    }
+  });
+
+  it('za prazne postavke zadržava sve vrste riječi', async () => {
+    const vlasnik = await spojiIgraca();
+
+    try {
+      const { stanje } = await stvoriSobu(vlasnik.socket);
+      expect(stanje.postavke.dopusteneVrste).toEqual([
+        'imenica',
+        'glagol',
+        'pridjev',
+        'prilog',
+        'zamjenica',
+        'broj',
+        'prijedlog',
+        'veznik',
+        'cestica',
+        'uzvik',
+      ]);
+    } finally {
+      vlasnik.socket.disconnect();
+    }
+  });
+
   it('odbija nepostojeći kod i ulazak u punu sobu', async () => {
     const izvanSobe = await spojiIgraca();
     const igraci = [await spojiIgraca(), ...await Promise.all(Array.from({ length: 7 }, () => spojiIgraca()))];
@@ -120,7 +177,7 @@ describe('privatne sobe', () => {
     }
   }, 20_000);
 
-  it('predaje vlasništvo nakon izlaska vlasnika', async () => {
+  it('zatvara sobu i obavještava članove nakon izlaska vlasnika', async () => {
     const vlasnik = await spojiIgraca();
     const drugi = await spojiIgraca();
 
@@ -129,13 +186,26 @@ describe('privatne sobe', () => {
       const stanje = await udjiUSobu(drugi, kod);
       expect(stanje.vlasnikId).toBe(vlasnik.token);
 
-      const nakonIzlaska = cekajDogadaj<StanjePrivatneSobe>(drugi.socket, 'soba:stanje');
+      const vlasnikNapustio = cekajDogadaj<{ kod: string }>(drugi.socket, 'soba:vlasnik-napustio');
       vlasnik.socket.emit('soba:izadji');
-      const novoStanje = await nakonIzlaska;
-      expect(novoStanje.vlasnikId).toBe(drugi.token);
-      expect(novoStanje.clanovi).toHaveLength(1);
+      expect(await vlasnikNapustio).toEqual({ kod });
     } finally {
       vlasnik.socket.disconnect();
+      drugi.socket.disconnect();
+    }
+  });
+
+  it('zatvara sobu i obavještava članove nakon prekida veze vlasnika', async () => {
+    const vlasnik = await spojiIgraca();
+    const drugi = await spojiIgraca();
+
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket);
+      await udjiUSobu(drugi, kod);
+      const vlasnikNapustio = cekajDogadaj<{ kod: string }>(drugi.socket, 'soba:vlasnik-napustio');
+      vlasnik.socket.disconnect();
+      expect(await vlasnikNapustio).toEqual({ kod });
+    } finally {
       drugi.socket.disconnect();
     }
   });

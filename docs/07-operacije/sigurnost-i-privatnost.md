@@ -1,5 +1,22 @@
 # Sigurnost i privatnost
 
+## Socket zaštita
+
+HTTP navigacije prema dokumentima stranica također su ograničene na 30 zahtjeva po IP-u u 60 sekundi. Limit se primjenjuje samo kada `Accept` traži `text/html`, pa učitavanje JavaScript, CSS, slikovnih i zvučnih asseta ne troši kvotu. Prekoračenje vraća HTTP `429` s `Retry-After: 60`.
+
+HTTP rate limit ne štiti Socket.IO handshake ni događaje nakon spajanja. Poslužitelj zato primjenjuje ove početne limite:
+
+| Limit | Zadano | Značenje |
+|---|---:|---|
+| Handshake po IP-u | 30 / 60 s | Pokušaji otvaranja nove Socket.IO veze; ne računa normalne evente |
+| Aktivne socket veze | 1000 | Trenutno spojeni browseri/uređaji |
+| Privatne sobe | 100 | Sobe koje postoje u memoriji |
+| Aktivne partije | 500 | Partije čije stanje postoji u memoriji |
+| Jedna soba po igraču | 1 | Igrač ne može stvarati novu sobu dok je član postojeće |
+| Jedna aktivna partija po igraču | 1 | Igrač ne može ući u drugu partiju dok njegova traje |
+
+`soba:*`, `red:*` i `partija:*` događaji ograničeni su po identitetu na najviše 30 poziva u 60 sekundi. Prekoračenje se odbacuje bez promjene stanja; cap sobe ili partije vraća strukturiranu grešku. Vrijednosti se mogu podesiti varijablama `SOCKET_*` u okruženju, a testovi ih mogu nadjačati kroz `OpcijePosluzitelja`.
+
 ## Voditelj obrade i kontakt
 
 Voditelj obrade je **piši farmaceut, obrt za računalno programiranje, vl. Josip Meštrović**, Braće Radić 25, 31550 Bizovac, Hrvatska, OIB 21287408231, MBS 99294702. Za zahtjeve za brisanje, pristup ili ispravak podataka koristi se `info@kaladont.hr`.

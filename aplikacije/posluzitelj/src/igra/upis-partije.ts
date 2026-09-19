@@ -4,11 +4,12 @@
  * koji je transakcijski jer mijenja više tablica odjednom.
  */
 import { and, eq, sql } from 'drizzle-orm';
-import { izracunajKaladontDnk, izracunajNovaDostignuca, izracunajOcjenuIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajOcjenuIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce } from 'zajednicko';
 import { jeOcjenaIgreDostupna } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import type { SudionikPartije } from './motor-partije.js';
+import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
 
 export function zapisiPocetakPartije(
   partijaId: string,
@@ -81,27 +82,14 @@ export interface ZapisNapretkaDostignuca {
   delta: DeltaNapretkaDostignuca;
 }
 
-function dnkOs(
+function dnkPodaciIzRedaka(
   redak: { odigrane: number; bodovi: number; eliminacije: number },
-  statistika: ZapisStatistikeRijeci | undefined,
-  mod: 'cetiri_igraca' | 'dva_igraca',
-): DnkOs[] {
-  const odigrano = redak.odigrane;
-  const ponderiraneDuge = (statistika?.upisaneDugeRijeci ?? 0) + (statistika?.upisaneSrednjeDugeRijeci ?? 0) * 1.5 + (statistika?.upisaneJakoDugeRijeci ?? 0) * 2;
-  const ponderiraneRijetke = (statistika?.otkriveneRijetkeGrupe ?? 0) + (statistika?.otkriveneSrednjeRijetkeGrupe ?? 0) * 1.5 + (statistika?.otkriveneJakoRijetkeGrupe ?? 0) * 2;
-  const prosjekPrihvacenogPotezaMs = statistika && statistika.prihvaceniPotezi > 0
-    ? statistika.ukupnoTrajanjePrihvaceniPoteziMs / statistika.prihvaceniPotezi
-    : 0;
-  return izracunajKaladontDnk({
-    mod,
-    odigrano,
-    prosjekBodova: odigrano > 0 ? redak.bodovi / odigrano : 0,
-    eliminacijePoPartiji: odigrano > 0 ? redak.eliminacije / odigrano : 0,
-    najduziStreak: statistika?.najduziStreak ?? 0,
-    prosjekPrihvacenogPotezaMs,
-    ponderiraneDuge: ponderiraneDuge / Math.max(1, odigrano),
-    ponderiraneRijetke: ponderiraneRijetke / Math.max(1, odigrano),
-  }).osi;
+  statistika: Pick<
+    DnkPodaci,
+    'prihvaceniPotezi' | 'ukupnoTrajanjePrihvaceniPoteziMs' | 'najduziStreak' | 'dugeRijeci' | 'srednjeDugeRijeci' | 'jakoDugeRijeci' | 'rijetkeRijeci' | 'srednjeRijetkeRijeci' | 'jakoRijetkeRijeci'
+  >,
+): DnkPodaci {
+  return { ...redak, ...statistika };
 }
 
 /** Zaključuje partiju transakcijski i vraća ažurirane agregate (bodovi_ukupno, odigrane) po igraču. */
@@ -137,20 +125,22 @@ export async function zakljuciPartijuUBazi(
       const [staraDnkStatistika] = await tx.select().from(dnkStatistikeIgraca)
         .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)))
         .limit(1);
-      const prije = stariIgrac ? dnkOs(stariIgrac, staraStatistika ? {
-        igracId: r.igracId,
-        prihvaceniPotezi: staraDnkStatistika?.prihvaceniPotezi ?? 0,
-        ukupnoTrajanjePrihvaceniPoteziMs: staraDnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
-        grupe: [], otkljucaneRijeci: [],
-        najduziStreak: staraStatistika.najduziStreak,
-        otkriveneJakoRijetkeGrupe: staraStatistika.otkriveneJakoRijetkeGrupe,
-        otkriveneSrednjeRijetkeGrupe: staraStatistika.otkriveneSrednjeRijetkeGrupe,
-        otkriveneRijetkeGrupe: staraStatistika.otkriveneRijetkeGrupe,
-        upisaneDugeRijeci: staraStatistika.upisaneDugeRijeci,
-        upisaneSrednjeDugeRijeci: staraStatistika.upisaneSrednjeDugeRijeci,
-        upisaneJakoDugeRijeci: staraStatistika.upisaneJakoDugeRijeci,
-        najduzaRijec: null, najduzaRijecGrafemi: 0, najrjedaRijec: null, najrjedaRijecFrekvencija: null, najrjedaTier: null,
-      } : undefined, mod) : [];
+      const prije = stariIgrac
+        ? izracunajDnk(
+          dnkPodaciIzRedaka(stariIgrac, {
+            prihvaceniPotezi: staraDnkStatistika?.prihvaceniPotezi ?? 0,
+            ukupnoTrajanjePrihvaceniPoteziMs: staraDnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
+            najduziStreak: staraDnkStatistika?.najduziStreak ?? 0,
+            dugeRijeci: staraDnkStatistika?.dugeRijeci ?? 0,
+            srednjeDugeRijeci: staraDnkStatistika?.srednjeDugeRijeci ?? 0,
+            jakoDugeRijeci: staraDnkStatistika?.jakoDugeRijeci ?? 0,
+            rijetkeRijeci: staraDnkStatistika?.rijetkeRijeci ?? 0,
+            srednjeRijetkeRijeci: staraDnkStatistika?.srednjeRijetkeRijeci ?? 0,
+            jakoRijetkeRijeci: staraDnkStatistika?.jakoRijetkeRijeci ?? 0,
+          }),
+          mod,
+        )
+        : [];
       if (!samoStatistika) {
         await tx
           .update(sudioniciPartije)
@@ -199,7 +189,7 @@ export async function zakljuciPartijuUBazi(
       }
 
       const statistika = statistike.get(r.igracId);
-      if (statistika) {
+      if (statistika && !samoStatistika) {
         if (statistika.grupe.length > 0) {
           await tx.insert(otkljucaneGrupeIgraca)
             .values(statistika.grupe.map(({ grupa, tier }) => ({ igracId: r.igracId, grupa, tier })))
@@ -250,7 +240,7 @@ export async function zakljuciPartijuUBazi(
           });
       }
 
-      if (statistika) {
+      if (statistika && !samoStatistika) {
         await tx.insert(dnkStatistikeIgraca).values({
           igracId: r.igracId,
           mod,
@@ -363,18 +353,33 @@ export async function zakljuciPartijuUBazi(
       const agregatZaDnk = agregati.get(r.igracId);
       if (agregatZaDnk) {
         const statistika = statistike.get(r.igracId);
-        const ukupnaStatistika: ZapisStatistikeRijeci | undefined = statistika && staraStatistika ? {
-          ...statistika,
-          najduziStreak: Math.max(staraStatistika.najduziStreak, statistika.najduziStreak),
-          otkriveneJakoRijetkeGrupe: staraStatistika.otkriveneJakoRijetkeGrupe + statistika.otkriveneJakoRijetkeGrupe,
-          otkriveneSrednjeRijetkeGrupe: staraStatistika.otkriveneSrednjeRijetkeGrupe + statistika.otkriveneSrednjeRijetkeGrupe,
-          otkriveneRijetkeGrupe: staraStatistika.otkriveneRijetkeGrupe + statistika.otkriveneRijetkeGrupe,
-          upisaneDugeRijeci: staraStatistika.upisaneDugeRijeci + statistika.upisaneDugeRijeci,
-          upisaneSrednjeDugeRijeci: staraStatistika.upisaneSrednjeDugeRijeci + statistika.upisaneSrednjeDugeRijeci,
-          upisaneJakoDugeRijeci: staraStatistika.upisaneJakoDugeRijeci + statistika.upisaneJakoDugeRijeci,
-        } : statistika;
-        agregatZaDnk.dnkPoslije = dnkOs({ odigrane: agregatZaDnk.odigrane, bodovi: agregatZaDnk.bodoviUkupno, eliminacije: (stariIgrac?.eliminacije ?? 0) + r.eliminacije }, ukupnaStatistika, mod);
-        const brojPotezaZaOcjenu = ukupnaStatistika?.prihvaceniPotezi ?? 0;
+        const povijesniDnk = {
+          prihvaceniPotezi: staraDnkStatistika?.prihvaceniPotezi ?? 0,
+          ukupnoTrajanjePrihvaceniPoteziMs: staraDnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
+          najduziStreak: staraDnkStatistika?.najduziStreak ?? 0,
+          dugeRijeci: staraDnkStatistika?.dugeRijeci ?? 0,
+          srednjeDugeRijeci: staraDnkStatistika?.srednjeDugeRijeci ?? 0,
+          jakoDugeRijeci: staraDnkStatistika?.jakoDugeRijeci ?? 0,
+          rijetkeRijeci: staraDnkStatistika?.rijetkeRijeci ?? 0,
+          srednjeRijetkeRijeci: staraDnkStatistika?.srednjeRijetkeRijeci ?? 0,
+          jakoRijetkeRijeci: staraDnkStatistika?.jakoRijetkeRijeci ?? 0,
+        };
+        const ukupniDnk: DnkPodaci = {
+          odigrane: agregatZaDnk.odigrane,
+          bodovi: agregatZaDnk.bodoviUkupno,
+          eliminacije: (stariIgrac?.eliminacije ?? 0) + r.eliminacije,
+          prihvaceniPotezi: povijesniDnk.prihvaceniPotezi + (statistika?.prihvaceniPotezi ?? 0),
+          ukupnoTrajanjePrihvaceniPoteziMs: povijesniDnk.ukupnoTrajanjePrihvaceniPoteziMs + (statistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0),
+          najduziStreak: Math.max(povijesniDnk.najduziStreak, statistika?.najduziStreak ?? 0),
+          dugeRijeci: povijesniDnk.dugeRijeci + (statistika?.upisaneDugeRijeci ?? 0),
+          srednjeDugeRijeci: povijesniDnk.srednjeDugeRijeci + (statistika?.upisaneSrednjeDugeRijeci ?? 0),
+          jakoDugeRijeci: povijesniDnk.jakoDugeRijeci + (statistika?.upisaneJakoDugeRijeci ?? 0),
+          rijetkeRijeci: povijesniDnk.rijetkeRijeci + (statistika?.otkriveneRijetkeGrupe ?? 0),
+          srednjeRijetkeRijeci: povijesniDnk.srednjeRijetkeRijeci + (statistika?.otkriveneSrednjeRijetkeGrupe ?? 0),
+          jakoRijetkeRijeci: povijesniDnk.jakoRijetkeRijeci + (statistika?.otkriveneJakoRijetkeGrupe ?? 0),
+        };
+        agregatZaDnk.dnkPoslije = izracunajDnk(ukupniDnk, mod);
+        const brojPotezaZaOcjenu = ukupniDnk.prihvaceniPotezi;
         agregatZaDnk.ocjenaIgre = jeOcjenaIgreDostupna(brojPotezaZaOcjenu)
           ? izracunajOcjenuIgre(agregatZaDnk.dnkPrije, agregatZaDnk.dnkPoslije, r.plasman === 1)
           : null;

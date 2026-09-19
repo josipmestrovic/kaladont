@@ -47,9 +47,15 @@
       void goto(`/partija/${payload.partijaId}`);
     };
 
+    const naVlasnikNapustio = () => {
+      greska = 'Vlasnik je napustio sobu. Soba je zatvorena.';
+      stanjeSobe = null;
+    };
+
     socket.on('soba:stanje', naStanjeSobe);
     socket.on('greska', naGresku);
     socket.on('partija:pocetak', naPocetak);
+    socket.on('soba:vlasnik-napustio', naVlasnikNapustio);
 
     socket.emit('soba:udji', { kod: kodSobe });
 
@@ -57,6 +63,7 @@
       socket.off('soba:stanje', naStanjeSobe);
       socket.off('greska', naGresku);
       socket.off('partija:pocetak', naPocetak);
+      socket.off('soba:vlasnik-napustio', naVlasnikNapustio);
     };
   });
 

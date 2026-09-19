@@ -52,6 +52,40 @@ async function stvoriGoste(broj: number): Promise<Gost[]> {
 }
 
 describe('red čekanja', () => {
+  it('igrač u privatnoj sobi ne može ući u javni red', async () => {
+    const igrac = await spojiSe();
+    try {
+      const stvorena = new Promise<{ kod: string }>((resolve) => igrac.once('soba:stvorena', resolve));
+      igrac.emit('soba:stvori', {});
+      await stvorena;
+
+      const potvrda = new Promise<StanjeReda | null>((resolve) => igrac.emit('red:udji', undefined, resolve));
+      expect(await potvrda).toBeNull();
+    } finally {
+      igrac.disconnect();
+    }
+  });
+
+  it('stvaranje privatne sobe uklanja igrača iz javnog reda', async () => {
+    const uRedu = await spojiSe();
+    const vlasnik = await spojiSe();
+
+    try {
+      const stanjePromise = new Promise<StanjeReda>((resolve) => uRedu.once('red:stanje', resolve));
+      uRedu.emit('red:udji');
+      await stanjePromise;
+
+      const stvorena = new Promise<{ kod: string }>((resolve) => vlasnik.once('soba:stvorena', resolve));
+      const stanjeNakon = new Promise<StanjeReda>((resolve) => uRedu.once('red:stanje', resolve));
+      vlasnik.emit('soba:stvori', {});
+      await stvorena;
+      expect((await stanjeNakon).mjesta.filter(Boolean)).toHaveLength(1);
+    } finally {
+      uRedu.disconnect();
+      vlasnik.disconnect();
+    }
+  });
+
   it('sastavlja stol od 4 igrača i svima šalje partija:pocetak s istim partijaId', async () => {
     const klijenti = await Promise.all([spojiSe(), spojiSe(), spojiSe(), spojiSe()]);
 
@@ -184,6 +218,10 @@ describe('red čekanja', () => {
     });
     for (const igrac of aktivniIgraci) igrac.emit('red:udji');
     await pocetakAktivne;
+
+    const greskaPrivatneSobe = new Promise<{ kod: string }>((resolve) => aktivniIgraci[0]!.once('greska', resolve));
+    aktivniIgraci[0]!.emit('soba:stvori', {});
+    expect((await greskaPrivatneSobe).kod).toBe('VEC_U_PARTIJI');
 
     const noviGosti = await stvoriGoste(4);
     const noviIgraci = noviGosti.map((gost) => gost.socket);

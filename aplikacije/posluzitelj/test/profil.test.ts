@@ -1,9 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { igraci } from '../src/baza/shema.js';
+import { dnkStatistikeIgraca, igraci, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -23,6 +25,13 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  const [igrac] = await baza.select({ id: igraci.id }).from(igraci).where(eq(igraci.email, EMAIL));
+  if (igrac) {
+    await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.igracId, igrac.id));
+    await baza.delete(partije).where(eq(partije.pobjednikId, igrac.id));
+    await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igrac.id));
+    await baza.delete(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igrac.id));
+  }
   await baza.delete(igraci).where(eq(igraci.email, EMAIL));
 });
 
@@ -70,6 +79,81 @@ describe('GET /ljestvica', () => {
     const tijelo = (await odgovor.json()) as { ok: boolean; ljestvica: unknown[] };
     expect(tijelo.ok).toBe(true);
     expect(Array.isArray(tijelo.ljestvica)).toBe(true);
+  });
+
+  it('računa 1v1 rang i za listu i za vlastito mjesto', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    await baza
+      .update(igraci)
+      .set({ odigrane1v1: 10, bodovi1v1: 9 })
+      .where(eq(igraci.id, igracId));
+
+    const odgovor = await fetch(`${adresa}/api/ljestvica?mod=dva_igraca`, {
+      headers: { authorization: `Bearer ${sesijskiToken}` },
+    });
+    const tijelo = (await odgovor.json()) as {
+      mojeMjesto: { rang: string } | null;
+      ljestvica: { igracId: string; rang: string }[];
+    };
+
+    expect(odgovor.status).toBe(200);
+    expect(tijelo.ljestvica.find((redak) => redak.igracId === igracId)?.rang).toBe('Kaladont');
+    expect(tijelo.mojeMjesto?.rang).toBe('Kaladont');
+  });
+
+  it('zadržava isti DNK u završnom rezultatu i nakon ponovnog učitavanja profila', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    const partijaId = randomUUID();
+    await baza.insert(partije).values({ id: partijaId, mod: 'cetiri_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values({ partijaId, igracId, sjedalo: 0 });
+
+    const agregati = await zakljuciPartijuUBazi(
+      partijaId,
+      igracId,
+      [{ igracId, plasman: 1, bodovi: 3, eliminacije: 0, iskustvo: 0, nacinIspadanja: 'pobjednik' }],
+      'cetiri_igraca',
+      new Map([[igracId, {
+        igracId,
+        grupe: [],
+        otkljucaneRijeci: [],
+        prihvaceniPotezi: 3,
+        ukupnoTrajanjePrihvaceniPoteziMs: 3_000,
+        najduziStreak: 3,
+        otkriveneJakoRijetkeGrupe: 1,
+        otkriveneSrednjeRijetkeGrupe: 0,
+        otkriveneRijetkeGrupe: 0,
+        upisaneDugeRijeci: 1,
+        upisaneSrednjeDugeRijeci: 0,
+        upisaneJakoDugeRijeci: 0,
+        najduzaRijec: null,
+        najduzaRijecGrafemi: 0,
+        najrjedaRijec: null,
+        najrjedaRijecFrekvencija: null,
+        najrjedaTier: null,
+      }]]),
+      false,
+      new Map(),
+    );
+    const dnkNakonPartije = agregati.get(igracId)?.dnkPoslije;
+
+    const odgovor = await fetch(`${adresa}/api/profil`, {
+      headers: { authorization: `Bearer ${sesijskiToken}` },
+    });
+    const tijelo = (await odgovor.json()) as { dnk: { cetiriIgraca: { osi: unknown[] } } };
+
+    expect(odgovor.status).toBe(200);
+    expect(dnkNakonPartije).toBeDefined();
+    expect(tijelo.dnk.cetiriIgraca.osi).toEqual(dnkNakonPartije);
   });
 });
 

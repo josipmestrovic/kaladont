@@ -77,7 +77,7 @@ Isključeno (van opsega, ostaje dokumentirano za kasnije): CI/CD, VPS provisioni
 
 ### Faza 4.5 — Ručna administracija rječnika
 
-- `rjecnik/ucitaj.ts`: interne strukture su `let` unutar closure-a + `ponovoUcitaj()` metoda koja ih zamijeni in-place (RS-21 signal ponovnog učitavanja) bez re-wire-anja referenci koje već drži `igra/motor-partije.ts`.
+- `rjecnik/ucitaj.ts`: interne strukture su `let` unutar closure-a + `ponovoUcitaj()` metoda koja ih zamijeni in-place; aktivne partije koriste trenutno stanje zajedničkog rječnika nakon reloada.
 - `rjecnik/administracija.ts`: `dodajRijec(rijec, razlog)` — normalizacija, izračun grafema, UPSERT u `rijeci`, zapis u `izmjene_rjecnika`. Reusable primitiva — Faza 7 je poziva iz punog admin sučelja.
 - `POST /admin/rjecnik/dodaj`: privremeni shared-secret header `X-Admin-Kljuc` (env `ADMIN_TAJNI_KLJUC`) dok Faza 6/7 ne donesu pravu admin autentikaciju; odmah poziva `ponovoUcitaj()` (live, isti proces).
 - Dokumentirano u `docs/04-rjecnik/odrzavanje-rjecnika.md`.

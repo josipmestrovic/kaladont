@@ -6,7 +6,7 @@ Svaki rubni slučaj ima oznaku (RS-xx), odluku i obrazloženje. Ovaj katalog je 
 
 **RS-01 — Otvaranje runde: sustav bira riječ, ne igrač.**
 Prijašnja verzija pravila dopuštala je napadaču da sam upiše početnu riječ runde, što je omogućavalo namještanje ishoda (namjerno odabrana nejasna riječ kako bi sljedeći igrač zagarantirano ispao).
-**Odluka:** igrač nikad ne bira otvarajuću riječ. Sustav je nasumično bira (funkcija `nasumicnaValjanaRijec`, garantirano sa slobodnim nastavkom) prilikom 1. runde, nakon svake eliminacije i nakon kaladont-efekta — vidi [pravila-igre.md](pravila-igre.md#otvaranje-runde-sustav-bira-rije%C4%8D). Time je klopka u otvaranju runde strukturno nemoguća, a `KLOPKA_U_OTVARANJU` kod odbijanja poteza više ne postoji jer igrač nikad ne šalje otvarajuću riječ.
+**Odluka:** igrač nikad ne bira otvarajuću riječ. Sustav pri prvoj rundi, nakon svake eliminacije i nakon kaladont-efekta prvo nasumično bira iz [skupa sigurnih riječi](../04-rjecnik/pocetne-rijeci.md). Sigurna riječ ima dopušten nastavak, a svaki njezin trenutačno dopušten odgovor ima daljnji nastavak. Ako nema dostupne sigurne riječi, sustav koristi rezervni odabir riječi s barem jednim slobodnim nastavkom. Pravilo vrijedi u javnim i privatnim partijama — vidi [pravila-igre.md](pravila-igre.md#otvaranje-runde-sustav-bira-rije%C4%8D).
 *Obrazloženje: bez ovog pravila napadač lančano eliminira sve za stolom bez igre.*
 
 **RS-02 — Mrtva slova (baza nema riječ).**
@@ -82,8 +82,8 @@ Riječ stigne u istom trenutku kad timer istekne.
 **RS-20 — Registracija gosta s postojećom statistikom.**
 **Odluka:** gostov zapis u tablici `igraci` postaje registriran račun (UPDATE, ne INSERT) — statistika i kalibracija sačuvani.
 
-**RS-21 — Admin ukloni riječ dok traje partija koja ju je već upotrijebila.**
-**Odluka:** rječnik u memoriji mijenja se tek na eksplicitni signal ponovnog učitavanja; aktivne partije nastavljaju sa snapshotom s početka partije. Odigrani potezi se nikad retroaktivno ne poništavaju.
+**RS-21 — Admin promijeni riječ dok traje partija.**
+**Odluka:** izmjena rječnika primjenjuje se na zajednički rječnik nakon eksplicitnog ponovnog učitavanja. Aktivne partije koriste tadašnje trenutno stanje rječnika, pa se validacija budućih poteza može promijeniti tijekom partije. Već prihvaćeni potezi ostaju u povijesti i ne poništavaju se retroaktivno.
 
 ## Zaštita
 
@@ -107,7 +107,7 @@ Sustav nasumično odabere riječ za otvaranje runde čija zadnja dva grafema isp
 *Obrazloženje: otkad riječ runde uvijek bira sustav (RS-01), ovaj rubni slučaj zamjenjuje stari "slobodna otvarajuća riječ" scenarij koji više nije moguć jer igrač ne bira riječi.*
 
 **RS-27 — Rječnik iscrpljen tijekom automatskog biranja riječi.**
-Sustav pokuša odabrati nasumičnu riječ za otvaranje runde (`nasumicnaValjanaRijec`), ali nijedna neiskorištena riječ sa slobodnim nastavkom više ne postoji.
+Sustav ne pronađe kandidat ni u skupu sigurnih riječi ni u rezervnom odabiru, pa nijedna neiskorištena riječ sa slobodnim nastavkom više ne postoji.
 **Odluka:** ekstremni rubni slučaj — server sigurnosno završava partiju istog trenutka (kao da je preostali aktivni igrač pobjednik), bez dodatne poruke igračima o razlogu.
 *Obrazloženje: praktički nedostižno s rječnikom realne veličine, ali sustav mora imati siguran izlaz umjesto da zapne bez ijedne valjane riječi.*
 

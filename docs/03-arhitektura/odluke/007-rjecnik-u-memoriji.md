@@ -9,7 +9,7 @@ Svaki potez traži tri provjere: postoji li riječ, počinje li na tražena dva 
 
 ## Odluka
 
-Pri startu poslužitelja aktivne riječi se učitavaju u memorijske strukture: `Set` svih riječi + `Map<prvaDva, Set<rijec>>` po prefiksu. Sve provjere su O(1); dostupnost nastavka provjerava se brojanjem neiskorištenih riječi u skupu prefiksa. Izmjene rječnika primjenjuju se signalom ponovnog učitavanja; aktivne partije zadržavaju svoj snapshot (RS-21).
+Pri startu poslužitelja aktivne riječi se učitavaju u memorijske strukture: `Set` svih riječi + `Map<prvaDva, Set<rijec>>` po prefiksu. Sve provjere su O(1); dostupnost nastavka provjerava se brojanjem neiskorištenih riječi u skupu prefiksa. Izmjene rječnika primjenjuju se signalom ponovnog učitavanja i zamjenjuju zajedničke memorijske strukture; aktivne partije tada nastavljaju koristiti trenutno stanje rječnika, pa se validacija budućih poteza može promijeniti (RS-21).
 
 ## Razmotrene alternative
 
