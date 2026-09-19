@@ -295,7 +295,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
 
     for (const igrac of igraci) igrac.socket.emit('red:udji');
-    await pocetakPromise;
+    const pocetak = await pocetakPromise;
     const runda = await rundaPromise;
 
     const stanjePromise = new Promise<StanjePartije>((resolve) => {
