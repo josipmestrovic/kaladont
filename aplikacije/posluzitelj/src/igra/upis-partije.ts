@@ -119,9 +119,6 @@ export async function zakljuciPartijuUBazi(
         bodovi: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
         eliminacije: mod === 'dva_igraca' ? igraci.eliminacije1v1 : igraci.eliminacijeUkupno,
       }).from(igraci).where(eq(igraci.id, r.igracId));
-      const [staraStatistika] = await tx.select().from(statistikeRijeciIgraca)
-        .where(and(eq(statistikeRijeciIgraca.igracId, r.igracId), eq(statistikeRijeciIgraca.mod, mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca')))
-        .limit(1);
       const [staraDnkStatistika] = await tx.select().from(dnkStatistikeIgraca)
         .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)))
         .limit(1);

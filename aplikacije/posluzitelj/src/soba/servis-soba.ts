@@ -215,7 +215,7 @@ export function registrirajPrivatneSobe(
     }
   }
 
-  function izadjiIzSobe(socket: KaladontSocket, eksplicitnoUkloni = true) {
+  function izadjiIzSobe(socket: KaladontSocket) {
     const igracId = socket.data.igracId;
     const kod = sobaPoIgracu.get(igracId);
     if (!kod) return;
@@ -267,7 +267,7 @@ export function registrirajPrivatneSobe(
         return;
       }
 
-      izadjiIzSobe(socket, true);
+      izadjiIzSobe(socket);
 
       const postavke = normalizirajPostavke(rezultat.data?.postavke);
       opcije.ukloniIzJavnogReda(socket.data.igracId);
@@ -357,7 +357,7 @@ export function registrirajPrivatneSobe(
         return;
       }
 
-      izadjiIzSobe(socket, true);
+      izadjiIzSobe(socket);
       opcije.ukloniIzJavnogReda(socket.data.igracId);
 
       soba.clanoviMap.set(igracId, {
@@ -385,7 +385,7 @@ export function registrirajPrivatneSobe(
 
     socket.on('soba:izadji', () => {
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:izadji')) return;
-      izadjiIzSobe(socket, true);
+      izadjiIzSobe(socket);
     });
 
     socket.on('soba:stanje', () => {
@@ -446,7 +446,7 @@ export function registrirajPrivatneSobe(
     });
 
     socket.on('disconnect', () => {
-      izadjiIzSobe(socket, false);
+      izadjiIzSobe(socket);
     });
   });
 

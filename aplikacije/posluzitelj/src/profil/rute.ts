@@ -169,7 +169,6 @@ function izracunajDnkProfil(
   const odigrano = mod === 'dva_igraca' ? igrac.odigrane1v1 : igrac.odigrane;
   const bodovi = mod === 'dva_igraca' ? igrac.bodovi1v1 : igrac.bodoviUkupno;
   const eliminacije = mod === 'dva_igraca' ? igrac.eliminacije1v1 : igrac.eliminacijeUkupno;
-  const prosjekBodova = odigrano > 0 ? bodovi / odigrano : 0;
   const eliminacijePoPartiji = odigrano > 0 ? eliminacije / odigrano : 0;
   const dnkPodaci = {
     odigrane: odigrano,

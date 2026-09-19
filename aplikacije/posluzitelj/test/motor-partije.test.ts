@@ -295,7 +295,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
 
     for (const igrac of igraci) igrac.socket.emit('red:udji');
-    const pocetak = await pocetakPromise;
+    await pocetakPromise;
     const runda = await rundaPromise;
 
     const stanjePromise = new Promise<StanjePartije>((resolve) => {
@@ -374,7 +374,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     });
     const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
     for (const igrac of igraci) igrac.socket.emit('red:udji');
-    const pocetak = await pocetakPromise;
+    await pocetakPromise;
     const runda = await rundaPromise;
 
     const otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;

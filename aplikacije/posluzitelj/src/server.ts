@@ -313,7 +313,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     });
   });
 
-  let igracImaPrivatnuSobu = (_igracId: string) => false;
+  let igracImaPrivatnuSobu: (igracId: string) => boolean = () => false;
   const redServis = registrirajRedCekanja(
     io,
     (stol, mod) => {
