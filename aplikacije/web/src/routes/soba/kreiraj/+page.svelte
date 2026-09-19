@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { SVE_VRSTE_RIJECI, type PostavkePrivatneSobe, type VrstaRijeci } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
+  import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
 
   const OZNACI_VRSTA: Record<VrstaRijeci, string> = {
     imenica: 'Imenice',
@@ -20,7 +21,6 @@
   let trajanjePotezaSek = $state(30);
   let eliminacijskiBodovi = $state(true);
   let odabraneVrste = $state<Set<VrstaRijeci>>(new Set(SVE_VRSTE_RIJECI));
-  let otvorenHarmonik = $state(false);
   let poruka = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
 
@@ -33,6 +33,7 @@
   }
 
   function preklopiVrstu(v: VrstaRijeci) {
+    if (v === 'imenica') return;
     const novi = new Set(odabraneVrste);
     if (novi.has(v)) {
       if (novi.size > 1) novi.delete(v);
@@ -140,42 +141,45 @@
       </div>
     </section>
 
-    <section class="grupa harmonik-grupa">
-      <button
-        type="button"
-        class="harmonik-naslov-gumb"
-        onclick={() => (otvorenHarmonik = !otvorenHarmonik)}
-      >
-        <span>⚙ Napredne postavke</span>
-        <span>{otvorenHarmonik ? '▲' : '▼'}</span>
-      </button>
-
-      {#if otvorenHarmonik}
-        <div class="harmonik-sadrzaj">
-          <div class="vrste-sekcija">
-            <div class="naslov-redak">
-              <span class="sub-naslov">Dopuštene vrste riječi:</span>
-              <div class="brze-akcije">
-                <button type="button" class="link-gumb" onclick={ukljuciSve}>Sve</button> ·
-                <button type="button" class="link-gumb" onclick={iskljuciSve}>Samo imenice</button>
-              </div>
-            </div>
-
-            <div class="vrste-mrezica">
-              {#each SVE_VRSTE_RIJECI as vrsta (vrsta)}
-                <label class="vrsta-labela" class:aktivno={odabraneVrste.has(vrsta)}>
-                  <input
-                    type="checkbox"
-                    checked={odabraneVrste.has(vrsta)}
-                    onchange={() => preklopiVrstu(vrsta)}
-                  />
-                  <span>{OZNACI_VRSTA[vrsta]}</span>
-                </label>
-              {/each}
-            </div>
+    <section class="grupa">
+      <div class="vrste-sekcija">
+        <div class="naslov-redak">
+          <h2>Dopuštene vrste riječi</h2>
+          <div class="brze-akcije">
+            <button type="button" class="link-gumb" onclick={ukljuciSve}>Sve</button> ·
+            <button type="button" class="link-gumb" onclick={iskljuciSve}>Samo imenice</button>
           </div>
         </div>
-      {/if}
+
+        <p class="objasnjenje-imenica">Imenice su obavezne kako bi svaka runda imala dovoljno nastavaka.</p>
+        <p class="objasnjenje-skupa">
+          Sustav rundu otvara iz
+          <PojamPomoc
+            tekst="skupa sigurnih riječi"
+            opis="Zbirka riječi koja uvijek ima nastavak te njihov nastavak isto ima nastavak."
+            id="pojasnjenje-skupa-sigurnih-rijeci"
+          />.
+        </p>
+
+        <div class="vrste-mrezica">
+          {#each SVE_VRSTE_RIJECI as vrsta (vrsta)}
+            <label
+              class="vrsta-labela"
+              class:aktivno={odabraneVrste.has(vrsta)}
+              class:zakljucano={vrsta === 'imenica'}
+              title={vrsta === 'imenica' ? 'Imenice su uvijek uključene.' : undefined}
+            >
+              <input
+                type="checkbox"
+                checked={odabraneVrste.has(vrsta)}
+                disabled={vrsta === 'imenica'}
+                onchange={() => preklopiVrstu(vrsta)}
+              />
+              <span>{OZNACI_VRSTA[vrsta]}</span>
+            </label>
+          {/each}
+        </div>
+      </div>
     </section>
 
     {#if poruka}
@@ -234,6 +238,13 @@
     font-weight: 700;
     font-size: var(--tekst-sitni);
     color: var(--boja-tekst-naslov);
+  }
+
+  .objasnjenje-imenica,
+  .objasnjenje-skupa {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
   }
 
   .naslov-redak {
@@ -307,30 +318,6 @@
     gap: 8px;
   }
 
-  .harmonik-naslov-gumb {
-    background: none;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    font-family: var(--font-naslov);
-    font-size: var(--naslov-3);
-    font-weight: 700;
-    color: var(--boja-tekst-naslov);
-    cursor: pointer;
-    padding: 0;
-    text-align: left;
-  }
-
-  .harmonik-sadrzaj {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding-top: 12px;
-    border-top: 1px solid #e5ddc8;
-  }
-
   .vrste-mrezica {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -356,6 +343,15 @@
     border-color: var(--boja-pozadina-primarna);
     color: var(--boja-tekst-naslov);
     font-weight: 700;
+  }
+
+  .vrsta-labela.zakljucano {
+    opacity: 0.58;
+    cursor: not-allowed;
+  }
+
+  .vrsta-labela.zakljucano input {
+    cursor: not-allowed;
   }
 
   .glavni-gumb {

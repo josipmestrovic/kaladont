@@ -16,9 +16,7 @@
   let trenutnaLozinka = $state('');
   let novaLozinka = $state('');
   let porukaLozinka = $state<string | null>(null);
-  let spremaPromjene = $state(false);
   const registriran = jeRegistriranKorisnik();
-  const imaNespremljenihPromjena = $derived(Boolean(noviEmail.trim() || lozinkaZaEmail || trenutnaLozinka || novaLozinka));
 
   onMount(async () => {
     try {
@@ -31,43 +29,31 @@
   async function promijeniEmail(event: SubmitEvent) {
     event.preventDefault();
     porukaEmail = null;
-    porukaEmail = 'Promjena je spremna za spremanje.';
+    try {
+      await api('/profil/email', { method: 'PUT', body: JSON.stringify({ noviEmail, lozinka: lozinkaZaEmail }) });
+      porukaEmail = 'Poslali smo potvrdu na novi email.';
+      noviEmail = '';
+      lozinkaZaEmail = '';
+    } catch (e) {
+      porukaEmail = e instanceof Error ? e.message : 'Neuspjela promjena emaila.';
+    }
   }
 
   async function promijeniLozinku(event: SubmitEvent) {
     event.preventDefault();
     porukaLozinka = null;
-    porukaLozinka = 'Promjena je spremna za spremanje.';
-  }
-
-  async function spremiPromjene() {
-    if (!imaNespremljenihPromjena || spremaPromjene) return;
-    spremaPromjene = true;
     try {
-      if (noviEmail.trim() || lozinkaZaEmail) {
-        await api('/profil/email', { method: 'PUT', body: JSON.stringify({ noviEmail, lozinka: lozinkaZaEmail }) });
-      }
-      if (trenutnaLozinka || novaLozinka) {
-        await api('/profil/lozinka', { method: 'PUT', body: JSON.stringify({ trenutnaLozinka, novaLozinka }) });
-      }
-      porukaEmail = noviEmail.trim() ? 'Poslali smo potvrdu na novi email.' : null;
-      porukaLozinka = novaLozinka ? 'Lozinka uspješno promijenjena.' : null;
-      noviEmail = '';
-      lozinkaZaEmail = '';
+      await api('/profil/lozinka', { method: 'PUT', body: JSON.stringify({ trenutnaLozinka, novaLozinka }) });
+      porukaLozinka = 'Lozinka uspješno promijenjena.';
       trenutnaLozinka = '';
       novaLozinka = '';
-      window.location.reload();
     } catch (e) {
-      const poruka = e instanceof Error ? e.message : 'Neuspjelo spremanje promjena.';
-      porukaEmail = poruka;
-      porukaLozinka = poruka;
-    } finally {
-      spremaPromjene = false;
+      porukaLozinka = e instanceof Error ? e.message : 'Neuspjela promjena lozinke.';
     }
   }
 </script>
 
-<section class="postavke-prikaz" aria-labelledby="postavke-naslov">
+<section id="postavke" class="postavke-prikaz" aria-labelledby="postavke-naslov">
   <h2 id="postavke-naslov">Postavke</h2>
   <section class="sekcija">
     <h3>Zvuk i glasnoća</h3>
@@ -111,13 +97,6 @@
     </section>
   {/if}
 </section>
-{#if imaNespremljenihPromjena}
-  <div class="plutajuci-spremi">
-    <button type="button" class="spremi-promjene" disabled={spremaPromjene} onclick={spremiPromjene}>
-      {spremaPromjene ? 'Spremanje…' : 'Spremi promjene'}
-    </button>
-  </div>
-{/if}
 
 <style>
   .postavke-prikaz { max-width: 560px; padding: 8px 0 48px; display: flex; flex-direction: column; gap: 18px; }
@@ -132,8 +111,4 @@
   .labela { display: flex; flex-direction: column; gap: 6px; font-size: var(--tekst-sitni); font-weight: 600; }
   input { width: 100%; padding: 10px 14px; border: 2px solid #e5ddc8; border-radius: var(--radijus-kartica); font-size: 16px; }
   .obavijest, .greska { margin: 0; color: var(--boja-pozadina-primarna); font-weight: 700; }
-  .plutajuci-spremi { position: fixed; z-index: 20; right: 20px; bottom: 20px; }
-  .spremi-promjene { padding: 12px 20px; border: 0; border-radius: var(--radijus-pill); background: var(--boja-pozadina-primarna); color: white; box-shadow: 0 4px 18px rgb(0 0 0 / 18%); font: inherit; font-weight: 800; cursor: pointer; }
-  .spremi-promjene:disabled { opacity: 0.65; cursor: wait; }
-  @media (max-width: 600px) { .plutajuci-spremi { right: 16px; bottom: 16px; left: 16px; } .spremi-promjene { width: 100%; } }
 </style>

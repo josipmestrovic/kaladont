@@ -87,7 +87,7 @@
   <title>Postavke | Kaladont</title>
 </svelte:head>
 
-<main class="postavke-stranica">
+<main id="postavke" class="postavke-stranica">
   <h1>Postavke</h1>
 
   <section class="sekcija">

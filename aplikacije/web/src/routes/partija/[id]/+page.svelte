@@ -14,7 +14,7 @@
   import Header from '$lib/komponente/Header.svelte';
   import { pustiAudio } from '$lib/audio-manager.js';
   import { dohvatiDefinicijuDostignuca, zadnjaDva } from 'zajednicko';
-  import type { BrzaPoruka, Eliminacija, KrajPartije, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
+  import type { BrzaPoruka, Eliminacija, KrajPartije, OdbijenPotez, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
   const partijaId = $derived($page.params.id);
@@ -27,6 +27,8 @@
   let slanjeUTijeku = $state(false);
   let slanjeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let porukaPoteza = $state<string | null>(null);
+  let nepostojecaRijec = $state<string | null>(null);
+  let zadnjaPoslanaRijec = $state<string | null>(null);
   let brojGreskeUnosa = $state(0);
   let porukaPotezaTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let potezi = $state<Potez[]>([]);
@@ -73,6 +75,7 @@
     const rijec = `${prefiksRijeci}${unosNastavkaRijeci}`.trim();
     if (rijec.length <= prefiksRijeci.length || slanjeUTijeku) return;
     slanjeUTijeku = true;
+    zadnjaPoslanaRijec = rijec;
     if (slanjeTimeoutId !== null) clearTimeout(slanjeTimeoutId);
     slanjeTimeoutId = setTimeout(() => {
       slanjeUTijeku = false;
@@ -94,8 +97,9 @@
     dohvatiSocket().emit('potez:ne-znam');
   }
 
-  function prikaziGreskuPoteza(poruka: string) {
+  function prikaziGreskuPoteza(poruka: string, rijecKojaNePostoji: string | null = null) {
     porukaPoteza = poruka;
+    nepostojecaRijec = rijecKojaNePostoji;
     brojGreskeUnosa += 1;
     void tick().then(() => {
       unosInput?.focus();
@@ -333,7 +337,15 @@
   });
 
   $effect(() => {
-    if (!stanje.kraj || odbrojavanjeIntervalId !== null) return;
+    if (!stanje.kraj) return;
+    if (stanje.rezultatiPrikazaniPartijaId === stanje.kraj.partijaId) {
+      prikaziRezultate = true;
+      sekundeDoRezultata = 0;
+      if (odbrojavanjeIntervalId !== null) clearInterval(odbrojavanjeIntervalId);
+      odbrojavanjeIntervalId = null;
+      return;
+    }
+    if (odbrojavanjeIntervalId !== null) return;
     prikaziRezultate = false;
     sekundeDoRezultata = 10;
     odbrojavanjeIntervalId = setInterval(() => {
@@ -342,6 +354,7 @@
         if (odbrojavanjeIntervalId !== null) clearInterval(odbrojavanjeIntervalId);
         odbrojavanjeIntervalId = null;
         prikaziRezultate = true;
+        stanje.rezultatiPrikazaniPartijaId = stanje.kraj?.partijaId ?? null;
         pustiAudio('partija-kraj');
       }
     }, 1000);
@@ -487,14 +500,16 @@
       if (novoStanje.partijaId !== partijaId) return;
       slanjeUTijeku = false;
     };
-    const naOdbijenPotez = ({ poruka }: { poruka: string }) => {
+    const naOdbijenPotez = ({ kod, poruka }: OdbijenPotez) => {
       if (!jeAktualnaPartija()) return;
       slanjeUTijeku = false;
       if (slanjeTimeoutId !== null) {
         clearTimeout(slanjeTimeoutId);
         slanjeTimeoutId = null;
       }
-      prikaziGreskuPoteza(poruka);
+      const rijecKojaNePostoji = kod === 'RIJEC_NE_POSTOJI' ? zadnjaPoslanaRijec : null;
+      zadnjaPoslanaRijec = null;
+      prikaziGreskuPoteza(poruka, rijecKojaNePostoji);
     };
     const naGresku = ({ poruka }: { poruka: string }) => {
       if (!jeAktualnaPartija() || !slanjeUTijeku) return;
@@ -955,7 +970,13 @@
     {/if}
 
     {#if porukaPoteza ?? stanje.poruka}
-      <p class="poruka-poteza" role="alert">{porukaPoteza ?? stanje.poruka}</p>
+      <p class="poruka-poteza" role="alert">
+        {#if porukaPoteza && nepostojecaRijec}
+          <strong>{nepostojecaRijec}</strong> ne postoji u našoj bazi.
+        {:else}
+          {porukaPoteza ?? stanje.poruka}
+        {/if}
+      </p>
     {/if}
     {/if}
   </section>
@@ -1006,10 +1027,9 @@
       onkeydown={(e) => e.stopPropagation()}
     >
       <h3 id="potvrda-ne-znam-naslov">Predati potez?</h3>
-      <p>Jesi li siguran/na da želiš predati potez? Nakon potvrde ispadaš iz partije.</p>
       <div class="dijalog-gumbi">
-        <button type="button" class="sporedni-dijalog-gumb" onclick={() => (neZnamDijalog = false)}>Odustani</button>
-        <button type="button" class="potvrdi-dijalog-gumb" onclick={potvrdiNeZnam}>Potvrdi</button>
+        <button type="button" class="potvrdi-dijalog-gumb" onclick={potvrdiNeZnam}>Da</button>
+        <button type="button" class="sporedni-dijalog-gumb" onclick={() => (neZnamDijalog = false)}>Ne</button>
       </div>
     </div>
   </div>
@@ -1644,9 +1664,13 @@
   .poruka-poteza {
     margin: 8px 0;
     color: var(--boja-akcent);
-    font-size: var(--tekst-mali);
-    font-weight: 600;
+    font-size: var(--tekst-baza);
+    font-weight: 400;
     text-align: center;
+  }
+  .poruka-poteza strong {
+    font-size: 1.08em;
+    font-weight: 800;
   }
   @keyframes podrhtavanje-unosa {
     0%, 100% { transform: translateX(0); }
@@ -1983,18 +2007,24 @@
   .dijalog button:last-child:hover {
     background: #e0e0e0;
   }
-  .potvrda-ne-znam p {
-    margin: 0;
-    color: var(--boja-tekst-sekundarni);
-  }
   .potvrda-ne-znam .sporedni-dijalog-gumb {
-    border: 1px solid var(--boja-tekst-sekundarni);
-    background: white;
-    color: var(--boja-tekst-osnovni);
+    border: 1px solid var(--boja-mint);
+    background: transparent;
+    color: var(--boja-mint);
+  }
+  .potvrda-ne-znam .sporedni-dijalog-gumb:hover,
+  .potvrda-ne-znam .sporedni-dijalog-gumb:focus-visible {
+    background: transparent;
+    border-color: var(--boja-pozadina-primarna);
+    color: var(--boja-pozadina-primarna);
   }
   .potvrda-ne-znam .potvrdi-dijalog-gumb {
-    background: var(--boja-akcent);
+    background: #b42318;
     color: white;
+  }
+  .potvrda-ne-znam .potvrdi-dijalog-gumb:hover,
+  .potvrda-ne-znam .potvrdi-dijalog-gumb:focus-visible {
+    background: #8f1c13;
   }
   @media (prefers-reduced-motion: reduce) {
     .rijec-sadrzaj,

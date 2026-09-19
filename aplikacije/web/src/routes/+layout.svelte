@@ -1,6 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
+  import { beforeNavigate } from '$app/navigation';
   import { page } from '$app/stores';
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { inicijalizirajGostSesiju } from '$lib/identitet.js';
@@ -9,6 +10,11 @@
 
   let { children } = $props();
   let identitetSpreman = $state(false);
+  let prethodnaPutanja = $state<string | null>(null);
+
+  beforeNavigate(({ from, to }) => {
+    if (from && to) prethodnaPutanja = from.url.pathname;
+  });
 
   // Čekaonica (/red) i aktivna partija (/partija/*) nemaju zaglavlje radi igre na punom ekranu.
   const bezHeadera = $derived(
@@ -25,7 +31,7 @@
 </script>
 
 {#if identitetSpreman && !bezHeadera}
-  <Header />
+  <Header {prethodnaPutanja} />
 {/if}
 
 <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">

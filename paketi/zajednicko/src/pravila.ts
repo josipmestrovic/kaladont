@@ -63,8 +63,8 @@ export interface RjecnikSucelje {
     samoOsnovniOblici?: boolean,
     minDuljinaRijeci?: number,
   ): boolean;
-  /** Nasumična igriva imenička lema u nominativu kraća od 6 znakova sa slobodnim nastavkom (otvaranje runde). */
-  nasumicnaPocetnaImenickaRijec(
+  /** Sigurna početna imenica; ako je nema, rezervna igriva riječ sa slobodnim nastavkom. */
+  nasumicnaPocetnaRijec(
     iskoristeneGrupe: ReadonlySet<string>,
     dopusteneVrste?: ReadonlySet<VrstaRijeci>,
     samoOsnovniOblici?: boolean,
@@ -106,7 +106,7 @@ export function validirajPotez(params: ParametriValidacije): RezultatValidacije 
   const jePosebnaRijec = RIJECI_KALADONT.has(rijecNormalizirana);
 
   if (!jePosebnaRijec && !params.rjecnik.jePostojecaRijec(rijecNormalizirana)) {
-    return { valjano: false, kod: 'RIJEC_NE_POSTOJI', poruka: PORUKE.rijecNePostoji };
+    return { valjano: false, kod: 'RIJEC_NE_POSTOJI', poruka: PORUKE.rijecNePostoji(rijecNormalizirana) };
   }
 
   if (prvaDva(rijecNormalizirana) !== params.trazenaSlova) {

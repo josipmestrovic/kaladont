@@ -1,10 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { onMount, tick } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
-  import { obrisiSesijskiToken } from '$lib/identitet.js';
-  import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import DostignuceKartica from '$lib/komponente/DostignuceKartica.svelte';
   import KaladontDnkGraf from '$lib/komponente/KaladontDnkGraf.svelte';
@@ -97,14 +94,6 @@
   let velicinaAvatara = $state(216);
   const prikazujePostavke = $derived($page.url.searchParams.get('tab') === 'postavke');
 
-  async function odjaviSe(): Promise<void> {
-    await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
-    obrisiSesijskiToken();
-    window.dispatchEvent(new CustomEvent('kaladont:odjava'));
-    void osvjeziSocketIdentitet().catch(() => {});
-    void goto('/');
-  }
-
   onMount(() => {
     const prilagodiAvatar = () => {
       velicinaAvatara = window.innerWidth < 768 ? 160 : 248;
@@ -116,6 +105,10 @@
         profil = await api<Profil>('/profil');
         if (profil) {
           await ucitajPartije(0);
+          if (window.location.hash === '#statistika') {
+            await tick();
+            document.getElementById('statistika')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
         }
       } catch (e) {
         greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje profila.';
@@ -216,18 +209,6 @@
           </span></p>
         {/if}
       </div>
-      <div class="profil-akcije">
-        <a href="/profil?tab=postavke#avatar" class="profil-akcija postavke-akcija" aria-label="Postavke">
-          <span aria-hidden="true">⚙</span>
-          <span>Postavke</span>
-        </a>
-        {#if !jeGost}
-          <button type="button" class="profil-akcija odjava-akcija" onclick={odjaviSe} aria-label="Odjavi se">
-            <span aria-hidden="true">↪</span>
-            <span>Odjavi se</span>
-          </button>
-        {/if}
-      </div>
     </div>
 
     {#if prikazujePostavke}
@@ -259,7 +240,7 @@
     {/if}
 
     {#if aktivniPogled === 'statistika' && aktivniTab === '4p'}
-      <section class="statistika-sekcija">
+      <section id="statistika" class="statistika-sekcija">
         <h2>Statistika (4 igrača)</h2>
         <div class="mrezica-kartica">
           <div class="stat-kartica">

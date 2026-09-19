@@ -21,6 +21,7 @@ interface StanjeIgre {
   zadnjaEliminacija: Eliminacija | null;
   poruka: string | null;
   kraj: KrajPartije | null;
+  rezultatiPrikazaniPartijaId: string | null;
   obracunIskustva: ObracunIskustvaTijekomPartije | null;
   sustavBiraRijec: boolean;
   istekIzboraIso: string | null;
@@ -53,6 +54,7 @@ const stanje = $state<StanjeIgre>({
   zadnjaEliminacija: null,
   poruka: null,
   kraj: null,
+  rezultatiPrikazaniPartijaId: null,
   obracunIskustva: null,
   sustavBiraRijec: false,
   istekIzboraIso: null,
@@ -150,6 +152,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.eliminacije = [];
     stanje.zadnjaEliminacija = null;
     stanje.kraj = null;
+    stanje.rezultatiPrikazaniPartijaId = null;
     stanje.obracunIskustva = null;
     stanje.zadnjaNagrada = null;
     stanje.trenutniStreak = 0;

@@ -1,3 +1,7 @@
+<script lang="ts">
+  import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
+</script>
+
 <svelte:head>
   <title>Pravila igre | Kaladont</title>
 </svelte:head>
@@ -34,7 +38,7 @@
     <ul>
       <li>klikneš <strong>Ne znam</strong></li>
       <li>istekne vrijeme prije valjane riječi</li>
-      <li>ti prethodni igrač ostavi mrtva slova, odnosno nema nijednog dostupnog nastavka</li>
+      <li>ti prethodni igrač ostavi <PojamPomoc tekst="mrtva slova" opis="Riječi koje nemaju nastavka. Sustav automatski izbacuje sljedećeg igrača u slučaju takvih riječi." id="mrtva-slova-pravila" />, odnosno nema nijednog dostupnog nastavka</li>
       <li>se ne vratiš nakon prekida veze u roku od 10 sekundi.</li>
     </ul>
     <p>Pogrešno upisana riječ te ne ruši odmah. Samo ti pojede vrijeme što je i dovoljno poučno.</p>

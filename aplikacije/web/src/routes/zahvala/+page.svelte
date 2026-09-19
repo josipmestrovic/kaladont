@@ -1,8 +1,5 @@
 <script lang="ts">
   import Konfeti from '$lib/komponente/Konfeti.svelte';
-  import StoJeNovo from '$lib/komponente/StoJeNovo.svelte';
-
-  let otvoreneNovosti = $state(false);
 </script>
 
 <svelte:head>
@@ -29,15 +26,11 @@
         <a class="sporedna-akcija" href="/profil">Vidjeti svoj profil</a>
         <a class="sporedna-akcija" href="/postavke">Otvoriti postavke</a>
         <a class="sporedna-akcija" href="/ljestvica">Pogledati ljestvice</a>
-        <button type="button" class="sporedna-akcija" onclick={() => (otvoreneNovosti = true)}>Vidjeti što je novo u igri</button>
+        <a class="sporedna-akcija" href="/novosti">Vidjeti što je novo u igri</a>
       </div>
     </section>
   </main>
 </div>
-
-{#if otvoreneNovosti}
-  <StoJeNovo zatvori={() => (otvoreneNovosti = false)} />
-{/if}
 
 <style>
   .zahvala {

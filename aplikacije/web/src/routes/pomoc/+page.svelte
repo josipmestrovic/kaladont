@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { RANGOVI, RANGOVI_1V1 } from 'zajednicko';
+  import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
 
   type Tema = 'kako-igrati' | 'pravila' | 'nacini' | 'bodovi' | 'napredak' | 'pitanja';
   const teme: { id: Tema; naziv: string }[] = [
@@ -84,7 +85,7 @@
         <section><h3>Kako povezujemo riječi</h3><p>Nova riječ mora početi na posljednja dva grafema prethodne riječi. Primjer: <strong>sova → vaza → zabava</strong>.</p><p><strong>Nj, lj i dž</strong> računaju se kao jedno slovo. Zato nakon „konj” tražimo <strong>onj</strong>: slovo o i grafem nj.</p></section>
         <section><h3>Koje riječi prihvaća igra?</h3><p>Riječ mora postojati <strong>u rječniku igre</strong>, početi traženim slovima i pripadati dopuštenoj vrsti riječi.</p><ul><li>Dijakritici vrijede: <strong>č nije c</strong>, <strong>š nije s</strong> i tako redom.</li><li>Vlastita imena, kratice, brojke, crtice i razmaci nisu u igri.</li></ul></section>
         <section><h3>Oblici iste riječi</h3><p>Jednom odigrana riječ i svi njezini povezani oblici potrošeni su <strong>do kraja cijele partije</strong>. Nakon „dobar” ne prolaze ni „dobra” ni „dobro”.</p></section>
-        <section><h3>Kaladont efekt i ispadanje</h3><p>Kada igrač ostavi „ka”, protivnik može odigrati „kaladont” i izbaciti igrača koji mu je omogućio taj potez. Ispadaš i kada odabereš „Ne znam”, istekne vrijeme, ostanu mrtva slova ili se ne vratiš nakon prekida veze.</p></section>
+        <section><h3>Kaladont efekt i ispadanje</h3><p>Kada igrač ostavi „ka”, protivnik može odigrati „kaladont” i izbaciti igrača koji mu je omogućio taj potez. Ispadaš i kada odabereš „Ne znam”, istekne vrijeme, ostanu <PojamPomoc tekst="mrtva slova" opis="Riječi koje nemaju nastavka. Sustav automatski izbacuje sljedećeg igrača u slučaju takvih riječi." id="mrtva-slova-kako-igrati" /> ili se ne vratiš nakon prekida veze.</p></section>
       </section>
       <p class="poveznica">Spreman? <a href="/">Odaberi način igre →</a></p>
     </section>
@@ -95,8 +96,8 @@
       <section><h3>Koje riječi prihvaća igra?</h3><p>Riječ mora postojati <strong>u rječniku igre</strong>, početi traženim slovima i pripadati dopuštenoj vrsti riječi. Rječnik sadrži različite vrste riječi u njihovim oblicima.</p><ul><li>Dijakritici vrijede: <strong>č nije c</strong>, <strong>š nije s</strong> i tako redom.</li><li>Vlastita imena, kratice, brojke, crtice i razmaci nisu u igri.</li></ul></section>
       <section><h3>Oblici iste riječi</h3><p>Jednom odigrana riječ i svi njezini povezani oblici potrošeni su <strong>do kraja cijele partije, uključujući nove runde</strong>. Dobar, dobra, dobro — ista ekipa u drugoj majici. Nakon jednog oblika ostali više ne prolaze.</p><p>Stručnije: odigrani oblik troši sve svoje leksemske grupe. „Bolji” i „najbolji” mogu pripadati zasebnim grupama. „Kaladont” i „kalodont” posebne su riječi i mogu se ponoviti.</p></section>
       <section><h3>Kaladont efekt</h3><p>Ana odigra „jabuka” i ostavi <strong>ka</strong>. Boris odgovori „kaladont”. <strong>Ana ispada</strong>, a sustav otvara novu rundu. Ne ispada igrač koji je sljedeći na redu.</p><ul><li>Ako je „ka” ostavila početna riječ sustava, nitko ne ispada i nitko ne dobiva bod za eliminaciju.</li><li>U javnoj igri za četiri igrača izvođač dobiva bod za eliminaciju. U dvoboju vrijedi fiksno bodovanje pobjede, a u privatnoj sobi bod ovisi o postavci eliminacija.</li></ul></section>
-      <section><h3>Mrtva slova</h3><p>Mrtva slova su traženi nastavak za koji više nema dopuštene riječi. To se može dogoditi zato što nastavka nema u rječniku igre ili zato što su sve dostupne riječi na taj nastavak već potrošene.</p></section>
-      <section><h3>Kada ispadaš?</h3><ul><li>odabereš <strong>Ne znam</strong> — to nije preskakanje poteza;</li><li>istekne vrijeme prije valjane riječi;</li><li>prethodni igrač ostavi mrtva slova;</li><li>protivnik izvede Kaladont na „ka” koje si mu ostavio;</li><li>ne vratiš se nakon prekida veze u roku od 10 sekundi.</li></ul><p>Odbijena riječ ne izbacuje te odmah. Probaj drugu riječ, ali sat nema razumijevanja.</p></section>
+      <section><h3><PojamPomoc tekst="Mrtva slova" opis="Riječi koje nemaju nastavka. Sustav automatski izbacuje sljedećeg igrača u slučaju takvih riječi." id="mrtva-slova-naslov" /></h3><p><PojamPomoc tekst="Mrtva slova" opis="Riječi koje nemaju nastavka. Sustav automatski izbacuje sljedećeg igrača u slučaju takvih riječi." id="mrtva-slova-definicija" /> su traženi nastavak za koji više nema dopuštene riječi. To se može dogoditi zato što nastavka nema u rječniku igre ili zato što su sve dostupne riječi na taj nastavak već potrošene.</p></section>
+      <section><h3>Kada ispadaš?</h3><ul><li>odabereš <strong>Ne znam</strong> — to nije preskakanje poteza;</li><li>istekne vrijeme prije valjane riječi;</li><li>prethodni igrač ostavi <PojamPomoc tekst="mrtva slova" opis="Riječi koje nemaju nastavka. Sustav automatski izbacuje sljedećeg igrača u slučaju takvih riječi." id="mrtva-slova-ispadanje" />;</li><li>protivnik izvede Kaladont na „ka” koje si mu ostavio;</li><li>ne vratiš se nakon prekida veze u roku od 10 sekundi.</li></ul><p>Odbijena riječ ne izbacuje te odmah. Probaj drugu riječ, ali sat nema razumijevanja.</p></section>
       <details class="jezicne-iznimke"><summary>Jezične iznimke i grafemi</summary><p>Kod većine riječi nj, lj i dž čitamo kao jedan grafem. Iznimke se vode u rječniku igre: primjerice, „injekcija” počinje grafemima i-n, a ne i-nj. Server uvijek provjerava konačni potez.</p></details>
     </section>
   {:else if odabranaTema === 'nacini'}
@@ -132,7 +133,7 @@
       <h2 id="pitanja-naslov">Pitanja i problemi</h2>
       <details><summary>Zašto moja riječ nije prihvaćena?</summary><p>Provjeri tražena slova, dijakritike, dopuštenu vrstu riječi i je li riječ ili njezin oblik već potrošen. Pokušaj drugu riječ dok vrijeme još traje.</p></details>
       <details><summary>Zašto je drugi oblik iste riječi već iskorišten?</summary><p>Povezani oblici troše se zajedno do kraja cijele partije. Nakon „dobar” ne prolaze ni „dobra” ni „dobro”.</p></details>
-      <details><summary>Zašto sam odmah ispao?</summary><p>„Ne znam” znači ispadanje. Ispadaš i kada vrijeme istekne, ostanu mrtva slova, protivnik izvede Kaladont na tvoje „ka” ili se ne vratiš nakon prekida veze.</p></details>
+      <details><summary>Zašto sam odmah ispao?</summary><p>„Ne znam” znači ispadanje. Ispadaš i kada vrijeme istekne, ostanu <PojamPomoc tekst="mrtva slova" opis="Riječi koje nemaju nastavka. Sustav automatski izbacuje sljedećeg igrača u slučaju takvih riječi." id="mrtva-slova-faq" />, protivnik izvede Kaladont na tvoje „ka” ili se ne vratiš nakon prekida veze.</p></details>
       <details><summary>Zašto više nemam niz bez pogreške?</summary><p>Svaka odbijena riječ prekida tvoj trenutni niz, iako te sama pogreška ne izbacuje iz partije.</p></details>
       <details><summary>Zašto sam još Piskaralo?</summary><p>Rang se dodjeljuje nakon 10 završenih javnih partija u pojedinom načinu igre. Dvoboj i igra za četiri igrača računaju se zasebno.</p></details>
       <details><summary>Zašto nisam na ljestvici?</summary><p>Za ljestvicu trebaš završiti najmanje 10 javnih partija u odabranom načinu i imati registriran profil.</p></details>

@@ -8,7 +8,7 @@ Prikupljeno je **100 različitih riječi iz svih 10 kategorija**, provjerenih u 
 
 Ni jedna predložena riječ ne završava na **na** ili **ka**. Sve imaju barem jedan nastavak u provjerenom rječniku uz sve kategorije. Birane su poznate riječi. Poznata početna riječ ipak ne jamči poznate nastavke: primjerice „orah” otvara AH, a „topao” AO. I takve riječi treba procijeniti pri ljudskom odobrenju.
 
-**Preporuka:** A-riječi uzeti kao početnu jezgru za ljudski pregled. B-riječi ne odobriti za automatski odabir uz sve kategorije. Predstavljaju pregledanih 32 kandidata koji pokazuju gdje traženi uvjeti nisu istodobno zadovoljeni. Popis nije konačan odobreni safe pool od 100 riječi.
+**Odluka nakon pregleda:** za prvi [skup sigurnih riječi](../04-rjecnik/pocetne-rijeci.md) odobrene su 52 riječi: 38 imenica, 6 pridjeva i 8 priloga. Sve su označene s A uz sve vrste i prolaze provjeru unutar svoje kategorije. „Kruh” i „sluh” izostavljeni su zbog odgovora „uhoboljo”. B-riječi nisu odobrene za automatski odabir.
 
 ## Što znače oznake
 
@@ -51,7 +51,7 @@ Sigurnost ovisi o cijelom skupu dopuštenih kategorija, ne samo o kategoriji po�
 - „Joj” je A uz sve kategorije, ali samo s uzvicima može slijediti „oj”, nakon čega više nema slobodnog nastavka.
 - „Plav” je B uz sve kategorije zbog „avans”, ali prolazi provjeru ako su dopušteni samo pridjevi.
 
-Prema tome, svih 10 kategorija može biti zastupljeno u zajedničkom katalogu, ali to **ne znači** da svaka kategorija samostalno omogućuje dobar početak. Za nepodržanu kombinaciju ne treba izmišljati sigurnu riječ. Konačni pool mora biti odobren zajedno s granicama njegove uporabe.
+Prema tome, svih 10 kategorija može biti zastupljeno u zajedničkom katalogu, ali to **ne znači** da svaka kategorija samostalno omogućuje dobar početak. Za nepodržanu kombinaciju ne treba izmišljati sigurnu riječ. Konačni skup sigurnih riječi mora biti odobren zajedno s granicama njegove uporabe.
 
 ## Pregled raspodjele
 

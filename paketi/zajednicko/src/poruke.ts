@@ -4,7 +4,7 @@
  */
 
 export const PORUKE = {
-  rijecNePostoji: 'Ta riječ ne postoji u našoj bazi.',
+  rijecNePostoji: (rijec: string) => `${rijec} ne postoji u našoj bazi.`,
   rijecIskoristena: 'Ta riječ je već iskorištena.',
   rijecIskoristenaOblik: (oblik: string) => `Već je iskorišten oblik te riječi: '${oblik}'.`,
   nedopustenaVrsta: 'Ta vrsta riječi nije dopuštena u ovoj privatnoj sobi.',

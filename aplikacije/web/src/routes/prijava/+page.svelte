@@ -21,7 +21,8 @@
         body: JSON.stringify({ email, lozinka }),
       });
       spremiSesijskiToken(odgovor.sesijskiToken);
-        await osvjeziSocketIdentitet();
+      await osvjeziSocketIdentitet();
+      window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
       void goto('/');
     } catch (greska) {
       poruka = greska instanceof Error ? greska.message : 'Prijava nije uspjela.';
