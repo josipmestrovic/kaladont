@@ -39,6 +39,7 @@ export const vrstaPoteza = pgEnum('vrsta_poteza', [
   'sustav_rijec',
 ]);
 export const statusPrijave = pgEnum('status_prijave', ['nova', 'pregledana', 'rijesena']);
+export const statusPovratneInformacije = pgEnum('status_povratne_informacije', ['nova', 'pregledana', 'arhivirana']);
 export const akcijaIzmjeneRjecnika = pgEnum('akcija_izmjene_rjecnika', [
   'dodana',
   'uklonjena',
@@ -162,8 +163,29 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   izazvaneEliminacije: integer('izazvane_eliminacije').notNull().default(0),
   mrtvaSlovaEliminacije: integer('mrtva_slova_eliminacije').notNull().default(0),
   javnePobjede: integer('javne_pobjede').notNull().default(0),
+  povratneInformacije: integer('povratne_informacije').notNull().default(0),
+  anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
+
+export const povratneInformacije = pgTable('povratne_informacije', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  poruka: text('poruka').notNull(),
+  pravila: smallint('pravila'),
+  rjecnik: smallint('rjecnik'),
+  vrijemePoteza: smallint('vrijeme_poteza'),
+  snalazenjeUAplikaciji: smallint('snalazenje_u_aplikaciji'),
+  brzinaUcitavanja: smallint('brzina_ucitavanja'),
+  gamifikacija: smallint('gamifikacija'),
+  status: statusPovratneInformacije('status').notNull().default('nova'),
+  vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
+  pregledaoId: uuid('pregledao_id').references(() => igraci.id),
+  pregledano: timestamp('pregledano', { withTimezone: true }),
+}, (tablica) => [
+  index('idx_povratne_informacije_vrijeme').on(tablica.vrijeme),
+  index('idx_povratne_informacije_status').on(tablica.status),
+]);
 
 export const dostignucaIgraca = pgTable('dostignuca_igraca', {
   igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),

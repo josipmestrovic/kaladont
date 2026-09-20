@@ -11,6 +11,7 @@
     rang: string | null;
     rang1v1: string | null;
     email: string | null;
+    vrsta: 'gost' | 'registriran' | 'admin';
     avatarConfig: AvatarConfigV1 | null;
   }
 
@@ -56,10 +57,18 @@
 <header class="header">
   <div class="header-sadrzaj">
     {#if jeNaslovna}
-      <a href="/novosti" class="novosti-link" aria-label="Što je novo?">
-        <span class="novosti-ikona" aria-hidden="true"></span>
-        <span>Što je novo?</span>
-      </a>
+      <div class="naslovne-akcije">
+        <a href="/novosti" class="novosti-link" aria-label="Što je novo?">
+          <span class="novosti-ikona" aria-hidden="true"></span>
+          <span>Što je novo?</span>
+        </a>
+        {#if profil && !jeGost}
+          <a href="/povratne-informacije" class="novosti-link" aria-label="Pomozi poboljšati igru">
+            <span class="povratne-informacije-ikona" aria-hidden="true"></span>
+            <span>Pomozi poboljšati igru</span>
+          </a>
+        {/if}
+      </div>
     {:else}
       <div class="lijeve-akcije">
         <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
@@ -92,6 +101,14 @@
     </div>
   </div>
 </header>
+
+{#if profil?.vrsta === 'admin'}
+  <nav class="admin-navigacija" aria-label="Administracija">
+    <a href="/admin#rjecnik">Rječnik</a>
+    <a href="/admin#prijave">Prijave</a>
+    <a href="/misljenja-korisnika">Mišljenja korisnika</a>
+  </nav>
+{/if}
 
 <style>
   .header {
@@ -129,8 +146,15 @@
     font-size: 15px;
     font-weight: 700;
     line-height: 1.2;
+    white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
+  }
+
+  .naslovne-akcije {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   .novosti-ikona {
@@ -141,8 +165,18 @@
     mask: url('/ikone/sucelje/Name=GiNotebook.svg') center / 48px 48px no-repeat;
   }
 
+  .povratne-informacije-ikona {
+    width: 59px;
+    height: 59px;
+    display: block;
+    background-color: #1a1815;
+    mask: url('/ikone/sucelje/Name=GiTeamIdea.svg') center / 48px 48px no-repeat;
+  }
+
   .novosti-link:hover .novosti-ikona,
-  .novosti-link:focus-visible .novosti-ikona {
+  .novosti-link:focus-visible .novosti-ikona,
+  .novosti-link:hover .povratne-informacije-ikona,
+  .novosti-link:focus-visible .povratne-informacije-ikona {
     background-color: var(--boja-akcent);
   }
 
@@ -215,6 +249,24 @@
     gap: 16px;
   }
 
+  .admin-navigacija {
+    width: min(100% - 32px, 980px);
+    margin: -4px auto 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .admin-navigacija a {
+    padding: 6px 10px;
+    border: 1px solid var(--boja-akcent);
+    border-radius: 6px;
+    color: var(--boja-akcent);
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
   @media (min-width: 768px) {
     .header-avatar { display: inline-flex; }
   }
@@ -251,12 +303,8 @@
   }
 
   @media (max-width: 599px) {
-    .profil-link { flex-direction: row; gap: 8px; }
-    .profil-ime {
-      max-width: 112px;
-      font-size: 14px;
-      letter-spacing: 0.35px;
-    }
+    .profil-link { gap: 0; }
+    .profil-ime { display: none; }
   }
 
   @media (max-width: 599px) {
@@ -264,5 +312,8 @@
     .novosti-link, .header-akcija { font-size: 14px; }
     .lijeve-akcije { gap: 4px; }
     .header-akcija { min-width: 68px; }
+    .naslovne-akcije { display: contents; }
+    .naslovne-akcije .novosti-link { max-width: none; text-align: center; font-size: 14px; }
+    .desno { margin-left: 0; }
   }
 </style>

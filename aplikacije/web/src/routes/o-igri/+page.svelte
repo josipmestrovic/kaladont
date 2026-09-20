@@ -20,6 +20,16 @@
 
 <StatistikaRjecnika />
 
+<h2>Atribucije</h2>
+<p>
+  Avatar sustav koristi <strong>Avatar Illustration System</strong> Micaha Laniera, a ikone sučelja
+  <strong>The Ultimate Games Icons Library</strong>. Oba skupa asseta koriste se pod licencom
+  <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>:
+  <a href="https://www.figma.com/community/file/829741575478342595/avatar-illustration-system">avatari</a>
+  i
+  <a href="https://www.figma.com/community/file/1266365661823917037/the-ultimate-games-icons-library">ikone</a>.
+</p>
+
 <h2>Kontakt</h2>
 <p>Pitanja, prijedlozi ili prijave grešaka: koristi gumb „Prijavi" u igri, ili nam piši na
   <a href="mailto:kontakt@kaladont.hr">kontakt@kaladont.hr</a>.</p>

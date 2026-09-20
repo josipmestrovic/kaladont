@@ -26,7 +26,7 @@ test('naslovnica prikazuje novi header, navigaciju i modal igre', async ({ page 
   await expect(page.locator('.landing-footer').getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
   const pravila = navigacija.getByRole('link', { name: 'Pravila' });
   await expect(pravila).toHaveCSS('color', 'rgb(26, 24, 21)');
-  await expect(pravila.locator('svg')).toHaveCSS('color', 'rgb(26, 24, 21)');
+  await expect(pravila.locator('.ikona-sucelja')).toHaveCSS('background-color', 'rgb(26, 24, 21)');
   const dimenzijeStavki = await navigacija.locator('.navigacijska-stavka').evaluateAll((stavke) =>
     stavke.map((stavka) => ({ sirina: stavka.getBoundingClientRect().width, visina: stavka.getBoundingClientRect().height })),
   );
@@ -73,14 +73,15 @@ test('mobilna naslovnica skriva ilustraciju i ostavlja profil desno', async ({ p
   const headerRaspored = await page.locator('.header-sadrzaj').evaluate((header) => {
     const novostiOkvir = header.querySelector('.novosti-link')!.getBoundingClientRect();
     const avatar = header.querySelector('.header-avatar')!.getBoundingClientRect();
-    const nadimak = header.querySelector('.profil-ime')!.getBoundingClientRect();
+    const nadimakElement = header.querySelector('.profil-ime')!;
+    const nadimak = nadimakElement.getBoundingClientRect();
     return {
       visineUskladene: Math.abs(novostiOkvir.height - avatar.height) <= 1,
-      nadimakDesno: nadimak.left >= avatar.right,
+      nadimakSkriven: getComputedStyle(nadimakElement).display === 'none',
     };
   });
   expect(headerRaspored.visineUskladene).toBe(true);
-  expect(headerRaspored.nadimakDesno).toBe(true);
+  expect(headerRaspored.nadimakSkriven).toBe(true);
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija).toBeVisible();

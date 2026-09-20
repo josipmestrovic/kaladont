@@ -30,6 +30,7 @@ export default defineConfig({
         ODGODA_POCETKA_PARTIJE_MS: '0',
         ONEMOGUCI_TIMER_POTEZA: 'true',
         TOLERANCIJA_PREKIDA_MS: '10000',
+        SOCKET_HANDSHAKE_PO_IP_MINUTI: '1000',
         EMAIL_API_KLJUC: '',
         SESIJA_TAJNA: 'e2e-test-secret',
         VERZIJA: 'e2e',

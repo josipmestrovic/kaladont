@@ -4,8 +4,6 @@ export interface IzdanjeBiljeske {
   datum: string;
   uvod: string;
   novo: { naslov: string; stavke: string[] }[];
-  testirati: string[];
-  ogranicenja: string[];
 }
 
 export const IZDANJA: IzdanjeBiljeske[] = [
@@ -43,18 +41,6 @@ export const IZDANJA: IzdanjeBiljeske[] = [
           'Red čekanja ima eksplicitnu sinkronizaciju stanja za 2-player i 4-player mod.',
         ],
       },
-    ],
-    testirati: [
-      'Otvori vlastiti i javni profil te pregledaj sva četiri pogleda.',
-      'Odigraj rijetku ili dugu riječ i provjeri napredak dostignuća.',
-      'Pokreni privatnu sobu, odigraj partiju i provjeri da se XP i javni agregati ne mijenjaju.',
-      'Odigraj desetu javnu partiju i provjeri otključavanje DNK bez prikaza brojača nakon otključavanja.',
-      'Provjeri Brzinu na profilu nakon nekoliko prihvaćenih poteza.',
-      'Uđi u red nakon završetka igre i provjeri da se sadržaj učita bez refresha.',
-    ],
-    ogranicenja: [
-      'XP i dostignuća vrijede prema pravilima javnog i privatnog moda.',
-      'Razina 100 je trenutačni maksimum.',
     ],
   },
   {
@@ -105,20 +91,6 @@ export const IZDANJA: IzdanjeBiljeske[] = [
         ],
       },
     ],
-    testirati: [
-      'Odigraj dugu riječ, rijetku riječ i riječ koja je istovremeno duga i rijetka.',
-      'Napravi nekoliko prihvaćenih poteza, zatim namjerno pogriješi i provjeri reset streaka.',
-      'Odigraj istu leksemsku grupu u dvije igre i provjeri da se reward ne ponavlja.',
-      'U privatnoj sobi otključaj riječ i provjeri da se dostignuće vidi na profilu, bez promjene ranga.',
-      'Na profilu otvori odvojene popise dugih i rijetkih riječi.',
-      'Provjeri završne konfete kao pobjednik javne i privatne igre.',
-    ],
-    ogranicenja: [
-      'Ovo je i dalje closed alpha izdanje namijenjeno ograničenoj grupi testera.',
-      'Igre odigrane prije ovog izdanja nemaju retroaktivno spremljene konkretne popise otključanih riječi.',
-      'Reward zvukovi rade kada su pripadajući audio asseti dostupni u klijentu.',
-      'Produkcija nije dio ovog izdanja; staging se provjerava odvojeno.',
-    ],
   },
   {
     verzija: 'v0.1.0-closed-alpha.1',
@@ -162,22 +134,6 @@ export const IZDANJA: IzdanjeBiljeske[] = [
           'Naslovnica prikazuje oznaku closed alpha izdanja.',
         ],
       },
-    ],
-    testirati: [
-      'Registraciju novog računa, nadimak i avatar.',
-      'Prijavu i odjavu kroz izbornik avatara.',
-      'Ulazak četvero igrača u mod za 4 igrača.',
-      'Ulazak dvoje igrača u mod za 2 igrača.',
-      'Prihvaćanje i odbijanje riječi, timer, predaju poteza i eliminacije.',
-      'Bodove, statistiku i ljestvicu za oba javna moda.',
-      'Stvaranje privatne sobe, dijeljenje poveznice, prilagodbu pravila i više uzastopnih igara.',
-      'Stranice Pravila, O igri, Uvjeti korištenja i Pravila privatnosti.',
-    ],
-    ogranicenja: [
-      'Ovo je closed alpha izdanje namijenjeno ograničenoj grupi testera.',
-      'Privatne sobe i njihove ljestvice žive samo dok je soba aktivna.',
-      'Uvjeti korištenja i Pravila privatnosti bit će dopunjeni prije šireg otvaranja igre.',
-      'Produkcijsko okruženje još nije objavljeno.',
     ],
   },
 ];

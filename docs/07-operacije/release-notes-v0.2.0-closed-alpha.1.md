@@ -39,23 +39,6 @@ Drugo zatvoreno izdanje donosi prve trenutke u kojima igra slavi tvoje jezične 
 - Privatne partije ne utječu na klasične bodove, pobjede, rang ni javnu ljestvicu.
 - Pobjednik svake partije dobiva završnu proslavu s konfetima.
 
-## Što testirati
-
-1. Odigraj dugu riječ, rijetku riječ i riječ koja je istovremeno duga i rijetka.
-2. Napravi nekoliko prihvaćenih poteza, zatim namjerno pogriješi i provjeri reset streaka.
-3. Odrigraj istu leksemsku grupu u dvije partije i provjeri da se reward ne ponavlja.
-4. U privatnoj sobi otključaj riječ i provjeri da se dostignuće vidi na profilu, bez promjene ranga.
-5. Na profilu otvori popis dugih riječi i zasebno popis rijetkih riječi.
-6. Provjeri završne konfete kao pobjednik javne i privatne partije.
-7. Otvori **Što je novo** i prebaci se između ovog i prethodnog izdanja.
-
-## Poznata ograničenja
-
-- Ovo je i dalje closed alpha izdanje namijenjeno ograničenoj grupi testera.
-- Partije odigrane prije uvođenja sustava otključavanja nemaju retroaktivno spremljene konkretne popise riječi.
-- Reward zvukovi rade kada su pripadajući audio asseti dostupni u klijentu.
-- Produkcija nije dio ovog izdanja; staging se provjerava odvojeno.
-
 ## Tehnički podaci
 
 Commit SHA i GHCR digest dodaju se nakon završetka CI/GHCR objave ovog izdanja.

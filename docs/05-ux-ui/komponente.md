@@ -37,7 +37,7 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 
 | Komponenta | Opis |
 |---|---|
-| Header | na naslovnici lijevo prikazuje „Što je novo?”, a drugdje akcije „Nazad” i uvjetno „Početna”; sve tri koriste isti uzorak ikone 59 × 59 px, ukupne visine 80 px i iste tipografije; desno je horizontalni profilni blok |
+| Header | na naslovnici lijevo prikazuje „Što je novo?” te registriranom korisniku „Pomozi poboljšati igru”; drugdje akcije „Nazad” i uvjetno „Početna”. Sve koriste isti uzorak ikone 59 × 59 px, ukupne visine 80 px i iste tipografije; desno je horizontalni profilni blok. Admin dodatno vidi zasebnu navigaciju Rječnik, Prijave i Mišljenja korisnika. |
 | Stol | ovalni vektorski stol + 4 SjedaloKartica u luku + WordChip u sredini + CountdownRing na aktivnom |
 | RedCekanjaPrikaz | 4 kružna mjesta, tekst stanja, prosjek čekanja |
 | PovijestLista | redak po potezu: runda, igrač, riječ/razlog, trajanje, gumb Prijavi |

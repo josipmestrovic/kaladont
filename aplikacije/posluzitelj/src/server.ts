@@ -23,6 +23,7 @@ import { registrirajProfilRute } from './profil/rute.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
 import { registrirajRjecnikRute } from './rjecnik/rute.js';
+import { registrirajPovratneInformacijeRute } from './povratne-informacije/rute.js';
 import { konfiguracija } from './konfiguracija.js';
 import { baza } from './baza/klijent.js';
 import {
@@ -114,6 +115,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       });
       await registrirajProfilRute(apiApp, rjecnik);
       await registrirajPrijaveRute(apiApp);
+      await registrirajPovratneInformacijeRute(apiApp);
       await registrirajAdminRute(apiApp, rjecnik);
       await registrirajRjecnikRute(apiApp, rjecnik);
     },

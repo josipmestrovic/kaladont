@@ -32,21 +32,4 @@ Treće zatvoreno izdanje objedinjuje trajni XP, dostignuća, mode-aware rangove 
 - Red čekanja ima eksplicitnu sinkronizaciju stanja za 2-player i 4-player mod, što sprječava prazan ekran nakon navigacije bez refresha.
 - Dodani su pomoćni ekrani i poboljšani javni/vlastiti profil, privatne sobe i ekran „Što je novo“.
 
-## Što testirati
-
-1. Odigraj javnu partiju i provjeri XP obračun, plasmane i nova dostignuća nakon countdowna.
-2. Otvori profil nakon nekoliko igara i provjeri da se Brzina puni stvarnim prosjekom trajanja poteza.
-3. Provjeri odvojene DNK/rang statistike za 4 igrača i 1v1.
-4. Odigraj desetu javnu partiju i provjeri da se DNK otključava bez prikaza `n / 10` brojača.
-5. Nakon otključavanja provjeri kompaktni radar i delta vrijednosti na desktopu i mobitelu.
-6. Uđi u oba reda čekanja nakon završetka partije i provjeri da sadržaj nije prazan bez refresha.
-7. Otvori vlastiti i javni profil te provjeri LVL, dostignuća, DNK graf i povijest.
-8. Pokreni privatnu sobu i provjeri da se javni XP, rangovi i javni agregati ne mijenjaju.
-
-## Poznata ograničenja
-
-- XP i dostignuća vrijede prema pravilima javnog/privatnog moda; privatne sobe ne daju javne bodove ni XP.
-- Razina 100 je trenutačni maksimum.
-- Ograničenja closed alpha izdanja i dalje vrijede; staging treba provjeriti prije dijeljenja testerima.
-
 Status: `kandidat`

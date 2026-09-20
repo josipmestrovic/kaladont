@@ -9,14 +9,14 @@
 
 <svelte:head>
   <title>Što je novo | Kaladont</title>
-  <meta name="description" content="Pregled novosti, poboljšanja i poznatih ograničenja u posljednjim izdanjima Kaladonta." />
+  <meta name="description" content="Pregled novosti i poboljšanja u posljednjim izdanjima Kaladonta." />
 </svelte:head>
 
 <main class="novosti">
   <header class="zaglavlje">
     <p class="nadnaslov">Razvoj igre</p>
     <h1>Što je novo</h1>
-    <p>Novosti, poboljšanja i stvari koje vrijedi isprobati u posljednjim izdanjima.</p>
+    <p>Novosti i poboljšanja u posljednjim izdanjima.</p>
   </header>
 
   <nav class="izdanja" aria-label="Izdanja">
@@ -47,19 +47,6 @@
         {/each}
       </section>
 
-      {#if odabrano.testirati.length > 0}
-        <section>
-          <h3>Što isprobati</h3>
-          <ul>{#each odabrano.testirati as stavka}<li>{stavka}</li>{/each}</ul>
-        </section>
-      {/if}
-
-      {#if odabrano.ogranicenja.length > 0}
-        <section>
-          <h3>Poznata ograničenja</h3>
-          <ul>{#each odabrano.ogranicenja as stavka}<li>{stavka}</li>{/each}</ul>
-        </section>
-      {/if}
     </article>
   {/if}
 </main>

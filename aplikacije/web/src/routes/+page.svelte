@@ -213,8 +213,8 @@
   }
 
   .ikona-toothbrush { mask-image: url('/ikone/sucelje/Name=GiToothbrush.svg'); }
-  .ikona-spellbook { mask-image: url('/ikone/sucelje/Name=GiSpellBook.svg'); }
-  .ikona-ljestvica { mask-image: url('/ikone/sucelje/Name=GiHoleLadder.svg'); }
+  .ikona-spellbook { mask-image: url('/ikone/sucelje/Name=GiSecretBook.svg'); }
+  .ikona-ljestvica { mask-image: url('/ikone/sucelje/Name=GiTrophiesShelf.svg'); }
   .ikona-gamepad { mask-image: url('/ikone/sucelje/Name=GiGamepad.svg'); }
   .ikona-postavke { mask-image: url('/ikone/sucelje/Name=GiAutoRepair.svg'); }
   .ikona-odjava { mask-image: url('/ikone/sucelje/Name=GiExitDoor.svg'); }

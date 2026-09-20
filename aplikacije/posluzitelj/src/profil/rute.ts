@@ -265,6 +265,7 @@ export async function registrirajProfilRute(
       ok: true,
       igracId: igrac.id,
       nadimak: igrac.nadimak,
+      vrsta: igrac.vrsta,
       avatarId: igrac.avatarId,
       avatarConfig: igrac.vrsta === 'gost' ? null : igrac.avatarConfig,
       avatarRevision: igrac.avatarRevision,

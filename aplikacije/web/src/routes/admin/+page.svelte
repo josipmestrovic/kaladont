@@ -108,7 +108,7 @@
 {#if greska}
   <p role="alert">{greska}</p>
 {:else}
-  <h2>Rječnik - ručno dodavanje</h2>
+  <h2 id="rjecnik">Rječnik - ručno dodavanje</h2>
   <form onsubmit={dodajRijec}>
     <label>Riječ <input type="text" bind:value={novaRijec} required /></label>
     <label>Razlog <input type="text" bind:value={razlogRijeci} required /></label>
@@ -184,7 +184,7 @@
     {/if}
   </div>
 
-  <h2>Prijave grešaka</h2>
+  <h2 id="prijave">Prijave grešaka</h2>
   {#if prijave.length === 0}
     <p>Nema prijava.</p>
   {:else}

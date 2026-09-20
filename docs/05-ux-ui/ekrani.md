@@ -10,6 +10,8 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - **Lijevo na naslovnici:** poveznica **Što je novo?** na `/novosti`, oblikovana s notebook ikonom iznad i tekstom ispod. Ikona je zadano boje `#1a1815`, a pri hoveru/fokusu ikona i tekst postaju narančasti. Ukupna visina ikone, razmaka i teksta iznosi 80 px.
 - **Lijevo na svim drugim stranicama s headerom:** klikabilna narančasta povratna strelica s tekstom „Nazad”, koja koristi povijest preglednika. Ako prethodna ruta nije root `/` ili nije poznata, uz nju se prikazuje `GiFastBackwardButton` s tekstom „Početna” i poveznicom na `/`. Obje akcije preslikavaju uzorak „Što je novo?”: ikona 59 × 59 px, ukupna visina 80 px te ista veličina i težina fonta na desktopu i mobitelu.
 - **Desno:** avatar korisnika ili gosta i njegov nadimak u horizontalnom rasporedu na desktopu i mobitelu; klik vodi na `/profil`. Avatar je povećan tako da njegova visina odgovara ukupnoj visini notebook ikone i teksta „Što je novo?”. Dugi nadimak skraćuje se elipsom umjesto širenja headera.
+- **Naslovnica, registrirani korisnik:** uz „Što je novo?” prikazuje se akcija **Pomozi poboljšati igru** (`/povratne-informacije`) s `GiTeamIdea` ikonom iznad teksta. Ima potpuno iste dimenzije, tipografiju i hover/focus ponašanje kao notebook akcija. Gosti je ne vide.
+- **Admin:** ispod glavnog headera vidi dodatnu navigaciju sa svim admin površinama: **Rječnik**, **Prijave** i **Mišljenja korisnika**. Ta navigacija je samo pogodnost; server zasebno štiti svaku admin rutu.
 
 ## 1. Landing (`/`)
 
@@ -30,6 +32,19 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Ovisno o odabranom modu (4p ili 1v1), čekaonica prikazuje 4 ili 2 kružna mjesta.
 - Čim se skupe 4 (ili 2) igrača, pokreće se numerički countdown 3-2-1 i partija kreće.
 - Gosti idu ravno u čekaonicu klikom na odabrani mod bez zapreka ili prompta za ime.
+
+## 2b. Povratne informacije (`/povratne-informacije` i `/zahvala-za-informacije`)
+
+- Stranica je dostupna samo registriranim korisnicima. Sadrži jednu obaveznu poruku s najmanje 20 znakova i gumb **Pošalji**.
+- Pri prvom uspješnom slanju prikazuje se početno označen checkbox **Želim ocijeniti igru i time pomoći u daljnjem razvoju**. Dok je označen, svih šest ocjena od 1 do 5 zvjezdica je obavezno: Pravila, Rječnik, Vrijeme za potez, Snalaženje u aplikaciji, Brzina učitavanja i Gamifikacija.
+- Korisnik može odznačiti checkbox i poslati samo poruku. Nakon prvog uspješnog obrasca, bez obzira na odabir checkboxa, detaljna anketa se više ne prikazuje; sljedeća slanja imaju samo poruku.
+- Uspješno slanje vodi na `/zahvala-za-informacije` s porukom zahvale za aktivno sudjelovanje u poboljšanju igre.
+- Svako uspješno slanje povećava dostignuće **Glas zajednice**; pet brzih razina otključava se na 1, 2, 3, 4 i 5 obrazaca.
+
+## 2c. Mišljenja korisnika (`/misljenja-korisnika`)
+
+- Dostupno samo administratoru. Prikazuje najnovija mišljenja, filtere `sve`/`nova`/`pregledana`/`arhivirana`, detalj poruke i dostupne ocjene.
+- Admin vidi nadimak, email i vrijeme slanja te može označiti mišljenje pregledanim ili arhiviranim.
 
 ## 2a. Privatna soba (`/soba/kreiraj` i `/soba/[kod]`)
 

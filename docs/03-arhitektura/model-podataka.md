@@ -12,6 +12,8 @@ erDiagram
     partije ||--o{ prijave : "prijavljena u"
     potezi ||--o{ prijave : "oznacen potez"
     prijave ||--o{ izmjene_rjecnika : uzrokuje
+    igraci ||--o{ povratne_informacije : salje
+    igraci ||--o{ povratne_informacije : pregledava
 ```
 
 ## igraci
@@ -41,6 +43,22 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | zadnja_aktivnost | timestamptz | Za čišćenje starih gostiju |
 
 Agregati se ažuriraju **transakcijski** pri završetku partije, u istoj transakciji sa zapisom rezultata. Uvijek su izračunljivi ponovno iz `sudionici_partije` (skripta za rekonstrukciju).
+
+## povratne_informacije
+
+Registrirani igrač šalje obaveznu tekstualnu povratnu informaciju od 20 do 2000 znakova. Pri prvom uspješnom slanju može poslati i detaljnu anketu s obaveznim ocjenama 1–5 za pravila, rječnik, vrijeme poteza, snalaženje u aplikaciji, brzinu učitavanja i gamifikaciju. Server atomarno označava da je prva anketa iskorištena; kasniji zapisi imaju samo poruku.
+
+| Stupac | Tip | Opis |
+|---|---|---|
+| id | integer PK | Identitet povratne informacije |
+| igrac_id | uuid FK | Registrirani autor poruke |
+| poruka | text | Obavezna korisnička poruka |
+| pravila, rjecnik, vrijeme_poteza, snalazenje_u_aplikaciji, brzina_ucitavanja, gamifikacija | smallint, null | Ocjene 1–5, samo uz prvi obrazac ako ih korisnik odabere |
+| status | enum | `nova`, `pregledana` ili `arhivirana` |
+| vrijeme | timestamptz | Vrijeme slanja |
+| pregledao_id, pregledano | uuid FK, timestamptz | Admin koji je promijenio status i vrijeme obrade |
+
+Broj svih uspješno poslanih obrazaca vodi dostignuće **Glas zajednice** s pragovima 1, 2, 3, 4 i 5. Admin pregled vidi nadimak, email, vrijeme, poruku i ocjene; ti podaci nisu javni niti ih API vraća neadminima.
 
 ## sesije
 
