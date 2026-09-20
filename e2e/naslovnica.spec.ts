@@ -74,7 +74,6 @@ test('mobilna naslovnica skriva ilustraciju i ostavlja profil desno', async ({ p
     const novostiOkvir = header.querySelector('.novosti-link')!.getBoundingClientRect();
     const avatar = header.querySelector('.header-avatar')!.getBoundingClientRect();
     const nadimakElement = header.querySelector('.profil-ime')!;
-    const nadimak = nadimakElement.getBoundingClientRect();
     return {
       visineUskladene: Math.abs(novostiOkvir.height - avatar.height) <= 1,
       nadimakSkriven: getComputedStyle(nadimakElement).display === 'none',
