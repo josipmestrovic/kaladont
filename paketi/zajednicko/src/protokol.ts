@@ -14,6 +14,13 @@ export interface PodaciVeze {
 
 export type BrzaPoruka = 'pozdrav' | 'sorry' | 'dobro-odigrano' | 'najjaci';
 
+export type KodRazlogaVeze = 'SESIJA_ISTEKLA' | 'NEVALJAN_TOKEN' | 'DRUGA_KARTICA' | 'SERVIS_NEDOSTUPAN';
+
+export interface ZatvaranjeVeze {
+  kod: KodRazlogaVeze;
+  poruka: string;
+}
+
 // Klijent -> poslužitelj
 
 export interface PayloadPotezRijec {
@@ -106,6 +113,7 @@ export interface StanjePartije {
   naPotezuId: string;
   trazenaSlova: string | null;
   istekPotezaIso: string;
+  serverVrijemeIso: string;
   runda: number;
   brojIskoristenih: number;
   eliminacije: Eliminacija[];
@@ -115,6 +123,7 @@ export interface StanjePartije {
   zadnjaRijecIgracId: string | null;
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
   zavrsena: boolean;
+  statusSpremanja: 'nije_zavrsena' | 'spremanje_rezultata' | 'rezultati_spremljeni';
   mod?: 'cetiri_igraca' | 'dva_igraca';
   jePrivatna?: boolean;
   kodSobe?: string;
@@ -128,6 +137,7 @@ export interface PrihvacenPotez {
   trazenaSlova: string;
   sljedeciId: string;
   istekPotezaIso: string;
+  serverVrijemeIso: string;
   brojIskoristenih: number;
   streak: number;
   nagrada: NagradaZaRijec | null;
@@ -210,6 +220,16 @@ export interface ObracunIskustvaTijekomPartije {
   mojeIskustvo: ObracunIskustva;
 }
 
+export interface SpremanjeRezultataPartije {
+  partijaId: string;
+  poruka: string;
+}
+
+export interface PonistenaPartija {
+  partijaId: string;
+  poruka: string;
+}
+
 /** Sustav je pocelo birati rijec za otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta). */
 export interface SustavBiraRijec {
   istekIzboraIso: string;
@@ -221,6 +241,7 @@ export interface RundaOtvorena {
   trazenaSlova: string;
   naPotezuId: string;
   istekPotezaIso: string;
+  serverVrijemeIso: string;
   runda: number;
 }
 
@@ -238,7 +259,8 @@ export type KodGreske =
   | 'VEC_U_PARTIJI'
   | 'VEC_U_SOBI'
   | 'PREVISE_SOBA'
-  | 'PREVISE_PARTIJA';
+  | 'PREVISE_PARTIJA'
+  | 'UPIS_PARTIJE_NEUSPJEO';
 
 export interface PayloadGreska {
   kod: KodGreske;
@@ -287,11 +309,14 @@ export interface DogadajiPosluziteljKlijent {
   'partija:eliminacija': (payload: Eliminacija) => void;
   'partija:sustav-bira-rijec': (payload: SustavBiraRijec) => void;
   'partija:runda-otvorena': (payload: RundaOtvorena) => void;
+  'partija:spremanje-rezultata': (payload: SpremanjeRezultataPartije) => void;
+  'partija:ponistena': (payload: PonistenaPartija) => void;
   'partija:kraj': (payload: KrajPartije) => void;
   'iskustvo:obracun': (payload: ObracunIskustvaTijekomPartije) => void;
   'reakcija:nova': (payload: { igracId: string; poruka: BrzaPoruka }) => void;
   'soba:stvorena': (payload: { kod: string }) => void;
   'soba:stanje': (payload: StanjePrivatneSobe) => void;
   'soba:vlasnik-napustio': (payload: { kod: string }) => void;
+  'veza:zatvorena': (payload: ZatvaranjeVeze) => void;
   greska: (payload: PayloadGreska) => void;
 }

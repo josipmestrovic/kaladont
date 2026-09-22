@@ -22,7 +22,6 @@
   class="avatar"
   style:width="{velicina}px"
   style:height="{velicina}px"
-  style:border={border ? `4px solid ${border}` : '4px solid transparent'}
   style:--boja-rang={border ?? 'transparent'}
 >
   {#if avatarConfig && !gost}

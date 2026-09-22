@@ -142,6 +142,10 @@ describe('GET /zdravlje', () => {
       baza: string;
       brojRijeci: number;
       aktivnePartije: number;
+      aktivneVeze: number;
+      rssBajtovi: number;
+      heapUsedBajtovi: number;
+      heapTotalBajtovi: number;
       uptimeSekunde: number;
       verzija: string;
       digest: string;
@@ -156,6 +160,10 @@ describe('GET /zdravlje', () => {
       digest: 'lokalno',
     });
     expect(tijelo.brojRijeci).toBeGreaterThan(0);
+    expect(tijelo.aktivneVeze).toBeGreaterThanOrEqual(0);
+    expect(tijelo.rssBajtovi).toBeGreaterThan(0);
+    expect(tijelo.heapUsedBajtovi).toBeGreaterThan(0);
+    expect(tijelo.heapTotalBajtovi).toBeGreaterThanOrEqual(tijelo.heapUsedBajtovi);
     expect(tijelo.uptimeSekunde).toBeGreaterThanOrEqual(0);
   });
 });

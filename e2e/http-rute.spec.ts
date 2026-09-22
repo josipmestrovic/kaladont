@@ -36,7 +36,7 @@ test('stranice s queryjem, hashom, ljestvicom i javnim profilom rade nakon refre
 
   const email = `http-e2e-${Date.now()}@example.com`;
   const registracija = await request.post('/api/racuni/registracija', {
-    data: { email, lozinka: 'lozinka123', nadimak: 'Http E2E' },
+    data: { email, lozinka: 'lozinka123', nadimak: 'HttpE2E' },
   });
   expect(registracija.ok()).toBe(true);
   const podaci = (await registracija.json()) as { igracId: string };

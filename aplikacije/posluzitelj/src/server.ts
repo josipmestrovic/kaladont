@@ -7,7 +7,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIoServer, type Socket } from 'socket.io';
-import { validirajAvatarConfig, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent } from 'zajednicko';
+import { validirajAvatarConfig, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent, type KodRazlogaVeze } from 'zajednicko';
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
@@ -34,6 +34,7 @@ import {
 } from './sigurnost/origin.js';
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 import { OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
+import { ponistiPartijeUTijekuUBazi } from './igra/upis-partije.js';
 
 export interface PodaciSocketa {
   igracId: string;
@@ -69,6 +70,7 @@ export type KaladontSocket = Socket<
 export interface Posluzitelj {
   app: FastifyInstance;
   io: KaladontIo;
+  zaustavi: () => Promise<void>;
 }
 
 export interface OpcijePosluzitelja {
@@ -206,7 +208,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   opozoviSocketSesije = (sesijaId) => {
     for (const socket of io.sockets.sockets.values()) {
-      if (socket.data.sesijaId === sesijaId) socket.disconnect(true);
+      if (socket.data.sesijaId === sesijaId) {
+        socket.emit('veza:zatvorena', { kod: 'SESIJA_ISTEKLA', poruka: 'Sesija je istekla ili je opozvana.' });
+        socket.disconnect(true);
+      }
     }
   };
 
@@ -244,11 +249,16 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
     const brojRijeci = rjecnik.brojRijeci();
     const spreman = bazaDostupna && brojRijeci > 0;
+    const memorija = process.memoryUsage();
     const tijelo = {
       ok: spreman,
       baza: bazaDostupna ? 'dostupna' : 'nedostupna',
       brojRijeci,
       aktivnePartije: upravitelj.brojAktivnihPartija(),
+      aktivneVeze: io.sockets.sockets.size,
+      rssBajtovi: memorija.rss,
+      heapUsedBajtovi: memorija.heapUsed,
+      heapTotalBajtovi: memorija.heapTotal,
       uptimeSekunde: Math.floor(process.uptime()),
       verzija: konfiguracija.VERZIJA,
       digest: konfiguracija.DIGEST,
@@ -264,7 +274,9 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     if (!jeValjaniToken(token)) {
-      next(new Error('Nevaljan token'));
+      const pogreska = new Error('Nevaljan token') as Error & { data?: { kod: KodRazlogaVeze } };
+      pogreska.data = { kod: 'NEVALJAN_TOKEN' };
+      next(pogreska);
       return;
     }
     try {
@@ -286,7 +298,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       next();
     } catch (greska) {
       const poruka = greska instanceof Error ? greska.message : 'Interna greška';
-      next(new Error(poruka));
+      const kod: KodRazlogaVeze = poruka.includes('istekao') || poruka.includes('sesija')
+        ? 'SESIJA_ISTEKLA'
+        : 'NEVALJAN_TOKEN';
+      const pogreska = new Error(poruka) as Error & { data?: { kod: KodRazlogaVeze } };
+      pogreska.data = { kod };
+      next(pogreska);
     }
   });
 
@@ -303,7 +320,9 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     // RS-18: jedna aktivna veza po identitetu - stara veza se odjavljuje
     const staraSocketId = registarVeza.zamijeni(igracId, socket.id);
     if (staraSocketId) {
-      io.sockets.sockets.get(staraSocketId)?.disconnect(true);
+      const staraVeza = io.sockets.sockets.get(staraSocketId);
+      staraVeza?.emit('veza:zatvorena', { kod: 'DRUGA_KARTICA', poruka: 'Ova je veza zatvorena jer je isti identitet otvorio drugu karticu.' });
+      staraVeza?.disconnect(true);
     }
 
     app.log.info(`Spojen igrač ${nadimak} (${igracId})`);
@@ -318,13 +337,13 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   let igracImaPrivatnuSobu: (igracId: string) => boolean = () => false;
   const redServis = registrirajRedCekanja(
     io,
-    (stol, mod) => {
-      upravitelj.zapocniPartiju(stol, mod);
+    async (stol, mod) => {
+      await upravitelj.zapocniPartiju(stol, mod);
       void osvjeziProsjekCekanja();
     },
     upravitelj.imaAktivnuPartiju,
     (igracId) => igracImaPrivatnuSobu(igracId),
-    () => upravitelj.brojAktivnihPartija() < socketOgranicenja.maksimalnoAktivnihPartija,
+    () => upravitelj.mozePokrenutiPartiju() && upravitelj.brojAktivnihPartija() < socketOgranicenja.maksimalnoAktivnihPartija,
     provjeriDogadaj,
   );
 
@@ -334,6 +353,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       maksimalnoSoba: socketOgranicenja.maksimalnoPrivatnihSoba,
       maksimalnoAktivnihPartija: socketOgranicenja.maksimalnoAktivnihPartija,
       brojAktivnihPartija: () => upravitelj.brojAktivnihPartija(),
+      mozeStvoritiPartiju: upravitelj.mozePokrenutiPartiju,
       provjeriDogadaj,
       igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
       ukloniIzJavnogReda: redServis.ukloniIzReda,
@@ -341,5 +361,15 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   );
   igracImaPrivatnuSobu = sobaServis.imaPrivatnuSobu;
 
-  return { app, io };
+  await ponistiPartijeUTijekuUBazi();
+
+  let zatvoreno = false;
+  const zaustavi = async () => {
+    if (zatvoreno) return;
+    zatvoreno = true;
+    await upravitelj.zaustavi();
+    await app.close();
+  };
+
+  return { app, io, zaustavi };
 }

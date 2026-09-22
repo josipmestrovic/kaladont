@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "idx_otkljucane_rijeci_igraca_duga" ON "otkljucane_rijeci_igraca" USING btree ("igrac_id","duga_tier","rijec");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_otkljucane_rijeci_igraca_rijetka" ON "otkljucane_rijeci_igraca" USING btree ("igrac_id","rijetka_tier","rijec");

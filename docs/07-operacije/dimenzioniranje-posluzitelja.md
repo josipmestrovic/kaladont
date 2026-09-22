@@ -4,6 +4,18 @@ Procjena resursa po ulozi i pragovi na kojima se mijenja veličina servera ili a
 
 Početni cilj je cost-optimized **x86/amd64 CX23** (2 vCPU, 4 GB RAM-a, 40 GB NVMe). Objavljena cijena je 5,99 EUR mjesečno bez PDV-a i uključuje Primary IPv4. Hetzner ga u trenutku provjere označava ograničeno dostupnim/nedostupnim. Ako CX23 nije dostupan u istoj lokaciji kao postojeći forum, postava staje radi nove odluke o lokaciji, planu i budžetu; ne kupuje se automatski skuplji CPX22 niti ARM instanca.
 
+## Dokaz kapaciteta igre
+
+Kapacitet se ne određuje brojem otvorenih Socket.IO veza. Mjerodavna jedinica je broj istodobnih
+javnih partija koje završavaju unutar pragova p95 poteza i završnog spremanja, uz prihvatljivu stopu
+grešaka i memoriju koja se nakon čišćenja vraća unutar budžeta. Load test odvojeno izvještava igrače
+u partijama, aktivne partije i aktivne veze.
+
+Reproducibilna provjera koristi `pnpm --filter posluzitelj opterecenje -- --scenarij=igra`. Rezultat se
+čuva zajedno s commitom, verzijom migracija, fixtureom i resursima stroja. Smoke test provjerava
+nekoliko partija, srednji test desetke/stotine, a višesatni test stabilnost RSS/heap-a, PostgreSQL
+konekcija i završnih transakcija.
+
 ## Zašto je igra lagana po potezu (činjenice iz arhitekture)
 
 - Rječnik (≈ 1,2 milijuna oblika, [ADR-013](../03-arhitektura/odluke/013-sve-vrste-rijeci-leksemske-grupe.md)) živi u memoriji poslužitelja: **validacija poteza ne dira bazu**, sve provjere su O(1) ([ADR-007](../03-arhitektura/odluke/007-rjecnik-u-memoriji.md)). Zauzeće: ~150–200 MB RAM-a (izmjereno analizom uvoza).

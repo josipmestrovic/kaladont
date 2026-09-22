@@ -2,6 +2,7 @@
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik, obrisiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
+  import Kaladont2d5d from '$lib/komponente/Kaladont2d5d.svelte';
   import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
@@ -30,47 +31,50 @@
 <main class="landing">
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <header class="landing-tekst">
-      <p class="nadnaslov">Hrvatska online igra riječi</p>
-      <h1 id="naslov-kaladont"><span class="ime-igre">KALADONT</span> <span class="vrsta-igre">multiplayer</span></h1>
+      <p class="nadnaslov">Hrvatska multiplayer igra riječi</p>
+      <h1 id="naslov-kaladont"><span class="ime-igre">KALADONT</span> <span class="vrsta-igre">online</span></h1>
     </header>
 
-    <nav class="glavna-navigacija" aria-label="Glavna navigacija">
+    <div class="desktop-navigacija-red">
+      <Kaladont2d5d />
+      <nav class="glavna-navigacija" aria-label="Glavna navigacija">
       <button type="button" class="navigacijska-stavka primarna" onclick={() => (otvoreniModal = 'igra')}>
-        <span class="ikona-sucelja ikona-toothbrush" aria-hidden="true"></span>
+        <img class="ikona-sucelja" src="/ikone/07-igraj.png" alt="" aria-hidden="true" />
         <span>Igraj</span>
       </button>
       <a href="/pravila" class="navigacijska-stavka">
-        <span class="ikona-sucelja ikona-spellbook" aria-hidden="true"></span>
+        <img class="ikona-sucelja" src="/ikone/08-pravila.png" alt="" aria-hidden="true" />
         <span>Pravila</span>
       </a>
       <a href="/ljestvica" class="navigacijska-stavka">
-        <span class="ikona-sucelja ikona-ljestvica" aria-hidden="true"></span>
+        <img class="ikona-sucelja" src="/ikone/09-ljestvice.png" alt="" aria-hidden="true" />
         <span>Ljestvica</span>
       </a>
       <a href="/profil#statistika" class="navigacijska-stavka">
-        <span class="ikona-sucelja ikona-gamepad" aria-hidden="true"></span>
+        <img class="ikona-sucelja" src="/ikone/10-statistika.png" alt="" aria-hidden="true" />
         <span>Moja statistika</span>
       </a>
       {#if registriran}
         <a href="/postavke" class="navigacijska-stavka">
-          <span class="ikona-sucelja ikona-postavke" aria-hidden="true"></span>
+          <img class="ikona-sucelja" src="/ikone/11-postavke.png" alt="" aria-hidden="true" />
           <span>Postavke</span>
         </a>
         <button type="button" class="navigacijska-stavka odjava-stavka" onclick={odjaviSe}>
-          <span class="ikona-sucelja ikona-odjava" aria-hidden="true"></span>
+          <img class="ikona-sucelja" src="/ikone/12-odjavi-se.png" alt="" aria-hidden="true" />
           <span>Odjavi se</span>
         </button>
       {:else}
         <a href="/prijava" class="navigacijska-stavka">
-          <span class="ikona-sucelja ikona-racun" aria-hidden="true"></span>
+          <img class="ikona-sucelja" src="/ikone/13-prijavi-se.png" alt="" aria-hidden="true" />
           <span>Prijavi se</span>
         </a>
         <a href="/registracija" class="navigacijska-stavka">
-          <span class="ikona-sucelja ikona-racun" aria-hidden="true"></span>
+          <img class="ikona-sucelja" src="/ikone/14-registriraj-se.png" alt="" aria-hidden="true" />
           <span>Registriraj se</span>
         </a>
       {/if}
-    </nav>
+      </nav>
+    </div>
   </section>
 
   <footer class="landing-footer">
@@ -99,13 +103,13 @@
         <h2 id="modal-naslov">Kako želiš igrati?</h2>
         <div class="modal-opcije">
           <a href="/red?mod=dva_igraca" class="modal-opcija">
-            <span><strong>2 igrača</strong><small>Brzi dvoboj, jedan protiv jednog.</small></span>
+            <img src="/ikone/17-soba-2-igraca.png" alt="" aria-hidden="true" /><span><strong>2 igrača</strong><small>Brzi dvoboj, jedan protiv jednog.</small></span>
           </a>
           <a href="/red?mod=cetiri_igraca" class="modal-opcija">
-            <span><strong>4 igrača</strong><small>Klasična partija do posljednjeg igrača.</small></span>
+            <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" /><span><strong>4 igrača</strong><small>Klasična partija do posljednjeg igrača.</small></span>
           </a>
           <a href="/soba/kreiraj" class="modal-opcija">
-            <span><strong>Privatna soba</strong><small>Prilagodi pravila i pozovi svoju ekipu.</small></span>
+            <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" /><span><strong>Privatna soba</strong><small>Prilagodi pravila i pozovi svoju ekipu.</small></span>
           </a>
         </div>
       {:else}
@@ -125,6 +129,8 @@
 
 <style>
   .landing {
+    position: relative;
+    isolation: isolate;
     width: 100%;
     flex: 1;
     display: flex;
@@ -135,17 +141,23 @@
   }
 
   .izbornik {
-    width: min(100%, 720px);
+    position: relative;
+    z-index: 1;
+    width: min(100%, 980px);
     margin-top: 12px;
     text-align: center;
   }
 
-  .landing-tekst { margin-bottom: 32px; }
+  .landing-tekst {
+    display: block;
+    margin-bottom: 32px;
+    text-align: left;
+  }
 
   .nadnaslov {
     margin: 0 0 8px;
     color: var(--boja-akcent);
-    font-size: var(--tekst-sitni);
+    font-size: 16px;
     font-weight: 800;
     text-transform: uppercase;
   }
@@ -167,7 +179,14 @@
     display: grid;
     gap: 12px;
     width: min(100%, 480px);
-    margin: 0 auto;
+    margin: 0 0 0 auto;
+  }
+
+  .desktop-navigacija-red {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
   }
 
   .navigacijska-stavka {
@@ -206,22 +225,8 @@
     width: 44px;
     height: 44px;
     display: block;
-    background-color: currentColor;
-    mask-position: center;
-    mask-repeat: no-repeat;
-    mask-size: contain;
+    object-fit: contain;
   }
-
-  .ikona-toothbrush { mask-image: url('/ikone/sucelje/Name=GiToothbrush.svg'); }
-  .ikona-spellbook { mask-image: url('/ikone/sucelje/Name=GiSecretBook.svg'); }
-  .ikona-ljestvica { mask-image: url('/ikone/sucelje/Name=GiTrophiesShelf.svg'); }
-  .ikona-gamepad { mask-image: url('/ikone/sucelje/Name=GiGamepad.svg'); }
-  .ikona-postavke { mask-image: url('/ikone/sucelje/Name=GiAutoRepair.svg'); }
-  .ikona-odjava { mask-image: url('/ikone/sucelje/Name=GiExitDoor.svg'); }
-  .ikona-racun { mask-image: url('/ikone/sucelje/Name=GiTwoShadows.svg'); }
-  .ikona-dva-igraca { mask-image: url('/ikone/sucelje/Name=GiLevelTwoAdvanced.svg'); }
-  .ikona-cetiri-igraca { mask-image: url('/ikone/sucelje/Name=GiLevelFourAdvanced.svg'); }
-  .ikona-privatna-soba { mask-image: url('/ikone/sucelje/Name=GiLockedDoor.svg'); }
 
   .navigacijska-stavka:hover {
     transform: translateY(-2px);
@@ -249,6 +254,8 @@
   .navigacijska-stavka.odjava-stavka:hover { border-color: var(--boja-akcent); }
 
   .landing-footer {
+    position: relative;
+    z-index: 1;
     margin-top: auto;
     padding-top: 28px;
   }
@@ -269,12 +276,14 @@
   @media (max-width: 767px) {
     .landing {
       min-height: calc(100dvh - 96px);
-      padding: 58px 0 16px;
+      padding: 50px 0;
     }
 
     .izbornik { width: min(100%, 440px); margin: 0 auto; }
     .landing-tekst { margin-bottom: 28px; text-align: center; }
-    h1 { font-size: 48px; line-height: 0.95; }
+    .desktop-navigacija-red { display: block; }
+    .nadnaslov { font-size: 17px; }
+    h1 { font-size: 58px; line-height: 0.95; }
     .navigacijska-stavka { height: 68px; font-size: 22px; }
     .landing-footer { padding-top: 24px; }
   }
@@ -333,7 +342,7 @@
 
   .modal-opcija {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: 56px 1fr;
     align-items: center;
     gap: 13px;
     padding: 14px 16px;
@@ -347,6 +356,7 @@
 
   .modal-opcija:hover { border-color: var(--boja-mint); background: #f7fbf8; }
   .pravna-opcija { grid-template-columns: 1fr; text-align: center; }
+  .modal-opcija > img { width: 56px; height: 56px; object-fit: contain; }
   .modal-opcija span { display: grid; gap: 2px; }
   .modal-opcija strong { color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: 19px; }
   .modal-opcija small { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-sitni); line-height: 1.35; }

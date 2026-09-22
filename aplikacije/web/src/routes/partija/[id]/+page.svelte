@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
-  import { dohvatiSocket } from '$lib/socket.js';
+  import { dohvatiSocket, dohvatiStanjeVeze } from '$lib/socket.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { dohvatiStanjeIgre } from '$lib/stanje-igre.svelte.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
@@ -17,6 +17,7 @@
   import type { BrzaPoruka, Eliminacija, KrajPartije, OdbijenPotez, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
+  const stanjeVeze = dohvatiStanjeVeze();
   const partijaId = $derived($page.params.id);
 
   let unosNastavkaRijeci = $state('');
@@ -32,6 +33,8 @@
   let brojGreskeUnosa = $state(0);
   let porukaPotezaTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let potezi = $state<Potez[]>([]);
+  let imaJosPoteza = $state(false);
+  let cursorPoteza = $state<string | null>(null);
   let povijestOtvorena = $state(false);
   let ucitavanjePovijesti = $state(false);
   let greskaPovijesti = $state<string | null>(null);
@@ -240,6 +243,7 @@
   }
 
   const jeNaPotezu = $derived(stanje.naPotezuId === stanje.mojIgracId);
+  const vezaSpremna = $derived(stanjeVeze.stanje === 'spremno' || stanjeVeze.stanje === 'nepoznato');
   const jeEliminiran = $derived(stanje.eliminacije.some((e) => e.igracId === stanje.mojIgracId));
   const brojPreostalihIgraca = $derived(stanje.sjedala.length - stanje.eliminacije.length);
   const prefiksRijeci = $derived(stanje.trazenaSlova?.normalize('NFC').trim() ?? '');
@@ -261,13 +265,13 @@
   );
 
   $effect(() => {
-    const sadaJeNaPotezu = jeNaPotezu && !stanje.sustavBiraRijec && !stanje.kraj;
+    const sadaJeNaPotezu = jeNaPotezu && !stanje.ponistenaPoruka && !stanje.sustavBiraRijec && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena';
     if (sadaJeNaPotezu && !prethodnoJeNaPotezu) porukaNaPotezu = 'Na tebi je red.';
     prethodnoJeNaPotezu = sadaJeNaPotezu;
   });
 
   $effect(() => {
-    if (stanje.sustavBiraRijec || stanje.kraj) zatvoriIzbornikReakcija();
+    if (stanje.ponistenaPoruka || stanje.sustavBiraRijec || stanje.kraj || stanje.statusSpremanja !== 'nije_zavrsena') zatvoriIzbornikReakcija();
   });
 
   let unosInput: HTMLInputElement | null = $state(null);
@@ -283,7 +287,7 @@
   // ili zaključati unos bez čekanja na refresh.
   $effect(() => {
     if (stanje.partijaId !== partijaId) return;
-    const trebaBitiZakljucano = stanje.kraj || stanje.sustavBiraRijec || !jeNaPotezu;
+    const trebaBitiZakljucano = stanje.ponistenaPoruka || stanje.kraj || stanje.statusSpremanja !== 'nije_zavrsena' || stanje.sustavBiraRijec || !jeNaPotezu;
     if (!trebaBitiZakljucano) return;
     slanjeUTijeku = false;
     if (slanjeTimeoutId !== null) {
@@ -360,13 +364,18 @@
     }, 1000);
   });
 
-  async function ucitajPoteze(prikaziZadnjuRijec = true) {
+  async function ucitajPoteze(prikaziZadnjuRijec = true, ucitajJos = false) {
     if (stanje.jePrivatna || ucitavanjePovijesti) return;
     ucitavanjePovijesti = true;
     greskaPovijesti = null;
     try {
-      const odgovor = await api<{ potezi: Potez[] }>(`/partije/${partijaId}/potezi`);
-      potezi = odgovor.potezi;
+      const parametarCursora = ucitajJos && cursorPoteza ? `&cursor=${encodeURIComponent(cursorPoteza)}` : '';
+      const odgovor = await api<{ potezi: Potez[]; imaJos: boolean; sljedeciCursor: string | null }>(
+        `/partije/${partijaId}/potezi?limit=100${parametarCursora}`,
+      );
+      potezi = ucitajJos ? [...potezi, ...odgovor.potezi] : odgovor.potezi;
+      imaJosPoteza = odgovor.imaJos;
+      cursorPoteza = odgovor.sljedeciCursor;
       if (prikaziZadnjuRijec) {
         if (stanje.partijaId === partijaId && stanje.zadnjaRijec && stanje.zadnjaRijecVrsta) return;
         const sRijeci = odgovor.potezi.filter((potez) => potez.rijec);
@@ -615,7 +624,9 @@
   {/if}
   <h3 class="osobni-rezultati-naslov">Tvoja ocjena</h3>
   <section class="ocjena-igre-zavrsna" aria-label="Ocjena igre">
-    {#if stanje.kraj.mojaOcjenaIgre === null || stanje.kraj.mojaOcjenaIgre === undefined}
+    {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
+      <span>Ocjena igre se ne računa u privatnoj sobi.</span>
+    {:else if stanje.kraj.mojaOcjenaIgre === null || stanje.kraj.mojaOcjenaIgre === undefined}
       <span>Za ocjenu igre potrebna su najmanje 3 prihvaćena poteza.</span>
     {:else}
       <span>Ocjena igre</span>
@@ -684,12 +695,28 @@
             </li>
           {/each}
         </ol>
+        {#if imaJosPoteza}
+          <button type="button" class="ucitaj-jos-poteza" onclick={() => void ucitajPoteze(false, true)} disabled={ucitavanjePovijesti}>
+            {ucitavanjePovijesti ? 'Učitavanje...' : 'Učitaj još poteza'}
+          </button>
+        {/if}
       {/if}
     {/if}
   </section>
   <div class="kraj-donje-praznine" aria-hidden="true"></div>
 {:else}
   <div class="aktivna-partija-sadrzaj">
+  {#if stanje.ponistenaPoruka}
+    <aside class="obracun-promatraca" role="alert">
+      <p>{stanje.ponistenaPoruka}</p>
+      <a href="/" class="sporedni-gumb">Povratak na naslovnicu</a>
+    </aside>
+  {/if}
+  {#if stanje.statusSpremanja === 'spremanje_rezultata'}
+    <aside class="obracun-promatraca" aria-live="polite">
+      <p>Partija je završila. Konačni rezultat se još sprema; pokušavamo ponovno.</p>
+    </aside>
+  {/if}
   {#if stanje.obracunIskustva}
     <aside class="obracun-promatraca">
       <p>Rezultat je izračunat i trajno će se spremiti kada igra završi. Možeš napustiti igru.</p>
@@ -733,7 +760,7 @@
                   <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} velicina={72} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
-                  <TimerPrsten istekIso={stanje.istekPotezaIso} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
+                  <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
                 {/if}
               </span>
             </span>
@@ -788,7 +815,7 @@
                 <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} velicina={72} /></span>
               {/key}
               {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
-                <TimerPrsten istekIso={stanje.istekPotezaIso} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
+                <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
               {/if}
             </span>
           </span>
@@ -906,14 +933,14 @@
         {#if brojVatri > 0}
           <span class="streak-vatre" aria-hidden="true">
             {#if brojVatri === 100}
-              {#each Array(100) as _}<span>🔥</span>{/each}
+              {#each Array(100) as _}<img src="/ikone/19-vatra.png" alt="" />{/each}
             {:else}
-              {#each Array(brojVatri) as _}<span>🔥</span>{/each}
+              {#each Array(brojVatri) as _}<img src="/ikone/19-vatra.png" alt="" />{/each}
             {/if}
           </span>
         {/if}
         Tvoj streak: <strong>{stanje.trenutniStreak}</strong> {stanje.trenutniStreak === 1 ? 'riječ' : 'riječi'}
-        {#if brojVatri === 100}<span class="streak-vatre" aria-hidden="true">{#each Array(100) as _}<span>🔥</span>{/each}</span>{/if}
+        {#if brojVatri === 100}<span class="streak-vatre" aria-hidden="true">{#each Array(100) as _}<img src="/ikone/19-vatra.png" alt="" />{/each}</span>{/if}
       </p>
       {#if stanje.trazenaSlova}
         <div class="rijec-kartica">
@@ -940,14 +967,14 @@
               maxlength={najviseZnakovaNastavka}
               aria-label={`Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
               aria-invalid={brojGreskeUnosa > 0 && porukaPoteza !== null}
-              disabled={slanjeUTijeku}
+              disabled={slanjeUTijeku || !vezaSpremna}
             />
           </div>
         {/key}
         <div class="potez-gumbi">
-          <button type="submit" disabled={slanjeUTijeku}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
+          <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
           {#if !stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === ''}
-            <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku} onclick={posaljiNeZnam}>Ne znam</button>
+            <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku || !vezaSpremna} onclick={posaljiNeZnam}>Ne znam</button>
           {/if}
         </div>
       </form>
@@ -1429,6 +1456,12 @@
     font-size: 1rem;
   }
 
+  .streak-vatre img {
+    width: 1em;
+    height: 1em;
+    object-fit: contain;
+  }
+
   .vlastito-sjedalo {
     display: flex;
     width: 100%;
@@ -1754,6 +1787,18 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
+
+  .ucitaj-jos-poteza {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border: 1px solid #d8cdb7;
+    border-radius: 6px;
+    background: #fff;
+    color: #1d6f5c;
+    cursor: pointer;
+  }
+
+  .ucitaj-jos-poteza:disabled { cursor: wait; opacity: 0.65; }
   @media (max-width: 499px) {
     form button,
     .unos-rijeci {

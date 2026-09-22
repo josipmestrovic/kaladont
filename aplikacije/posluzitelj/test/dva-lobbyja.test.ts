@@ -8,13 +8,14 @@ import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import type { KrajPartije, PocetakPartije, RundaOtvorena } from 'zajednicko';
-import { izgradiPosluzitelj } from '../src/server.js';
+import { izgradiPosluzitelj, type KaladontIo } from '../src/server.js';
 
 let app: FastifyInstance;
+let io: KaladontIo;
 let adresa: string;
 
 beforeAll(async () => {
-  ({ app } = await izgradiPosluzitelj());
+  ({ app, io } = await izgradiPosluzitelj({ postavkeMotora: { zadrzavanjeSobeNakonKrajaMs: 50 } }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = app.server.address();
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
@@ -92,6 +93,14 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     expect(idoviDruge.size).toBe(1);
     expect(idoviDruge.has(prviPocetci[0]!.partijaId)).toBe(false);
     expect(Number.isNaN(new Date(drugiPocetci![0]!.pocetakIso).getTime())).toBe(false);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const staraSoba = io.sockets.adapter.rooms.get(`partija:${prviPocetci[0]!.partijaId}`);
+    expect(staraSoba).toBeUndefined();
+    for (const klijent of klijenti) {
+      const serverskiSocket = io.sockets.sockets.get(klijent.id!);
+      expect([...serverskiSocket?.rooms ?? []].filter((soba) => soba.startsWith('partija:'))).not.toContain(`partija:${prviPocetci[0]!.partijaId}`);
+    }
 
     for (const klijent of klijenti) klijent.disconnect();
   }, 30000);

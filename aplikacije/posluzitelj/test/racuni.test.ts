@@ -70,6 +70,25 @@ describe('POST /racuni/registracija', () => {
     expect(drugi.status).toBe(409);
   });
 
+  it('tretira email kao kanoniziran bez obzira na velika slova', async () => {
+    const prvi = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL.toUpperCase(), lozinka: LOZINKA }),
+    });
+    expect(prvi.status).toBe(200);
+
+    const drugi = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nekaDrugaLozinka1' }),
+    });
+    expect(drugi.status).toBe(409);
+
+    const [igrac] = await baza.select({ email: igraci.email }).from(igraci).where(eq(igraci.email, EMAIL));
+    expect(igrac?.email).toBe(EMAIL);
+  });
+
   it('odbija nadimak duži od 12 znakova', async () => {
     const odgovor = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',

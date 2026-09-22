@@ -3,11 +3,11 @@
  * DB pozivi iz motora partije su "fire and forget" (ne blokiraju tijek igre) osim zaključka partije,
  * koji je transakcijski jer mijenja više tablica odjednom.
  */
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { izracunajNovaDostignuca, izracunajOcjenuIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce } from 'zajednicko';
 import { jeOcjenaIgreDostupna } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
 
@@ -17,21 +17,33 @@ export function zapisiPocetakPartije(
   cekanjeMsPoIgracu: Map<string, number>,
   mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
 ): Promise<void> {
-  return baza
-    .insert(partije)
-    .values({ id: partijaId, mod, status: 'u_tijeku' })
-    .then(() =>
-      baza.insert(sudioniciPartije).values(
-        sudionici.map((s) => ({
-          partijaId,
-          igracId: s.igracId,
-          sjedalo: s.sjedalo,
-          cekanjeMs: cekanjeMsPoIgracu.get(s.igracId) ?? 0,
-        })),
-      ),
-    )
-    .then(() => undefined)
-    .catch((greska) => console.error('Neuspio upis početka partije:', greska));
+  return baza.transaction(async (tx) => {
+    await tx.insert(partije).values({ id: partijaId, mod, status: 'u_tijeku' });
+    await tx.insert(sudioniciPartije).values(
+      sudionici.map((s) => ({
+        partijaId,
+        igracId: s.igracId,
+        sjedalo: s.sjedalo,
+        cekanjeMs: cekanjeMsPoIgracu.get(s.igracId) ?? 0,
+      })),
+    );
+  }).catch((greska) => {
+    console.error('Neuspio transakcijski upis početka partije:', greska);
+    throw new Error('Početak partije nije moguće spremiti.', { cause: greska });
+  });
+}
+
+/** Restart ili kontrolirano gašenje prekida samo partije koje nisu završile. */
+export async function ponistiPartijeUTijekuUBazi(partijaIdovi?: readonly string[]): Promise<number> {
+  const uvjet = partijaIdovi && partijaIdovi.length > 0
+    ? and(eq(partije.status, 'u_tijeku'), inArray(partije.id, [...partijaIdovi]))
+    : eq(partije.status, 'u_tijeku');
+  const ponistene = await baza
+    .update(partije)
+    .set({ status: 'ponistena', kraj: new Date() })
+    .where(uvjet)
+    .returning({ id: partije.id });
+  return ponistene.length;
 }
 
 export interface ZapisPoteza {
@@ -106,11 +118,45 @@ export async function zakljuciPartijuUBazi(
   const modStatistike = mod;
 
   await baza.transaction(async (tx) => {
-    if (!samoStatistika) {
-      await tx
-        .update(partije)
+    const claim = samoStatistika
+      ? await tx.insert(obracuniPartija)
+        .values({ partijaId, vrsta: 'privatna_gamifikacija' })
+        .onConflictDoNothing()
+        .returning({ partijaId: obracuniPartija.partijaId })
+      : await tx.update(partije)
         .set({ status: 'zavrsena', kraj: new Date(), pobjednikId })
-        .where(eq(partije.id, partijaId));
+        .where(and(eq(partije.id, partijaId), eq(partije.status, 'u_tijeku')))
+        .returning({ partijaId: partije.id });
+
+    if (claim.length === 0) {
+      for (const r of rezultati) {
+        const [stanjeIgraca] = await tx
+          .select({
+            bodoviUkupno: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
+            odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
+            pobjede: mod === 'dva_igraca' ? igraci.pobjede1v1 : igraci.pobjede,
+            iskustvoUkupno: igraci.iskustvoUkupno,
+          })
+          .from(igraci)
+          .where(eq(igraci.id, r.igracId));
+        if (stanjeIgraca) {
+          agregati.set(r.igracId, {
+            ...stanjeIgraca,
+            novaDostignuca: [],
+            dnkPrije: [],
+            dnkPoslije: [],
+            ocjenaIgre: null,
+            bonusOcjenaIgre: 0,
+          });
+        }
+      }
+      return;
+    }
+
+    if (!samoStatistika) {
+      await tx.insert(obracuniPartija)
+        .values({ partijaId, vrsta: 'javna_partija' })
+        .onConflictDoNothing();
     }
 
     for (const r of rezultati) {

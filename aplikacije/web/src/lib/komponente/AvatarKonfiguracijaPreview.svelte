@@ -106,7 +106,7 @@
   });
 </script>
 
-<div class="avatar-konfiguracija" style:width={`${velicina}px`} style:height={`${velicina}px`} style:border={border ? `4px solid ${border}` : '4px solid transparent'}>
+<div class="avatar-konfiguracija" style:width={`${velicina}px`} style:height={`${velicina}px`}>
   <svg viewBox="0 0 380 380" role="img" aria-label="Sastavljeni Kaladont avatar">
     <circle cx="190" cy="190" r="190" fill="#FFEDEF" />
     {#each slojevi as sloj (sloj.kategorija)}

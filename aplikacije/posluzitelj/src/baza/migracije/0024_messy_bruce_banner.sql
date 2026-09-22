@@ -1,0 +1,3 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_igraci_email_lower" ON "igraci" USING btree (lower("email")) WHERE "igraci"."email" is not null;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_potezi_partija_id_redni_broj" ON "potezi" USING btree ("partija_id","redni_broj");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_sudionici_partije_igrac_id_partija_id" ON "sudionici_partije" USING btree ("igrac_id","partija_id");

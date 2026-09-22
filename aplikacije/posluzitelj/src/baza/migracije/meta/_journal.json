@@ -162,6 +162,27 @@
       "when": 1789898842761,
       "tag": "0022_fine_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789981160555,
+      "tag": "0024_chubby_wolfpack",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790063568104,
+      "tag": "0024_messy_bruce_banner",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790071779811,
+      "tag": "0025_worried_captain_stacy",
+      "breakpoints": true
     }
   ]
 }

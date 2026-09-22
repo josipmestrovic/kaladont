@@ -84,12 +84,12 @@ describe('identitet preko Socket.IO handshakea', () => {
     const token = `gost.${randomUUID().replaceAll('-', '')}`;
     const prvaVeza = await spojiSe(token);
 
-    const odjavaPromise = new Promise<void>((resolve) => {
-      prvaVeza.on('disconnect', () => resolve());
+    const odjavaPromise = new Promise<{ kod: string }>((resolve) => {
+      prvaVeza.on('veza:zatvorena', (poruka) => resolve({ kod: poruka.kod }));
     });
 
     const drugaVeza = await spojiSe(token);
-    await odjavaPromise;
+    await expect(odjavaPromise).resolves.toEqual({ kod: 'DRUGA_KARTICA' });
 
     expect(prvaVeza.connected).toBe(false);
     expect(drugaVeza.connected).toBe(true);

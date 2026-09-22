@@ -46,7 +46,7 @@ import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, otkljucaneGrupeIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
-import { zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisStatistikeRijeci } from './upis-partije.js';
+import { ponistiPartijeUTijekuUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisStatistikeRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50) });
@@ -60,6 +60,8 @@ const PROZOR_ISTODOBNIH_PREKIDA_MS = 25;
 const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;
 const ODGODA_POCETKA_PRIVATNE_PARTIJE_MS = 0;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
+const POCETNI_ODMAK_RETRYJA_REZULTATA_MS = 1_000;
+const MAKSIMALNI_ODMAK_RETRYJA_REZULTATA_MS = 30_000;
 const SOBA_PARTIJE = (partijaId: string) => `partija:${partijaId}`;
 
 export interface SudionikPartije {
@@ -84,6 +86,7 @@ export interface PostavkeMotoraPartije {
   trajanjePotezaMs?: number;
   tolerancijaPrekidaMs?: number;
   odgodaObradePrekidaMs?: number;
+  zadrzavanjeSobeNakonKrajaMs?: number;
   maksimalnoAktivnihPartija?: number;
   provjeriDogadaj?: ProvjeriOgranicenjeDogadaja;
   naPartijaZavrsila?: (partijaId: string) => void;
@@ -152,11 +155,16 @@ interface StanjeStola {
   dopusteneVrste?: ReadonlySet<VrstaRijeci>;
   postavkePrivatneSobe?: PostavkePrivatneSobe;
   grupeSNagradom: Map<string, Map<string, number | null>>;
+  noveGrupeSNagradom: Map<string, Map<string, number | null>>;
   streakovi: Map<string, number>;
   statistikeRijeci: Map<string, StatistikaRijeciPartije>;
   iskustvoPrije: Map<string, number>;
   stavkeIskustva: Map<string, StavkaIskustva[]>;
   napredakDostignuca: Map<string, DeltaNapretkaDostignuca>;
+  statusSpremanja: 'nije_zavrsena' | 'spremanje_rezultata' | 'rezultati_spremljeni';
+  brojPokusajaSpremanja: number;
+  retrySpremanjaHandle: NodeJS.Timeout | null;
+  zavrsnoSpremanje: (() => Promise<void>) | null;
 }
 
 export function stvoriUpraviteljPartija(
@@ -170,11 +178,13 @@ export function stvoriUpraviteljPartija(
   const trajanjePotezaMs = postavke.trajanjePotezaMs ?? TRAJANJE_POTEZA_MS;
   const tolerancijaPrekidaMs = postavke.tolerancijaPrekidaMs ?? konfiguracija.TOLERANCIJA_PREKIDA_MS;
   const odgodaObradePrekidaMs = postavke.odgodaObradePrekidaMs ?? 0;
+  const zadrzavanjeSobeNakonKrajaMs = postavke.zadrzavanjeSobeNakonKrajaMs ?? ZADRZAVANJE_SOBE_NAKON_KRAJA_MS;
   const maksimalnoAktivnihPartija = postavke.maksimalnoAktivnihPartija ?? Number.POSITIVE_INFINITY;
   const provjeriDogadaj = postavke.provjeriDogadaj ?? (() => true);
 
   const partije = new Map<string, StanjeStola>();
   const partijaPoIgracu = new Map<string, string>(); // igracId -> partijaId
+  let zaustavljanje = false;
 
   async function ucitajOtkljucaneGrupe(igraci: readonly SudionikPartije[]): Promise<Map<string, Map<string, number | null>>> {
     const igracIds = igraci.map((igrac) => igrac.igracId);
@@ -307,6 +317,7 @@ export function stvoriUpraviteljPartija(
       naPotezuId: stanje.naPotezuId,
       trazenaSlova: stanje.trazenaSlova,
       istekPotezaIso: istekPotezaIso(stanje),
+      serverVrijemeIso: new Date().toISOString(),
       runda: stanje.runda,
       brojIskoristenih: stanje.brojOdigranih,
       eliminacije: stanje.eliminacije,
@@ -321,15 +332,96 @@ export function stvoriUpraviteljPartija(
       kodSobe: stanje.kodSobe,
       trajanjePotezaSek: stanje.trajanjePotezaSek,
       dopusteneVrste: stanje.dopusteneVrste ? [...stanje.dopusteneVrste] : undefined,
+      statusSpremanja: stanje.statusSpremanja,
     };
     socket.emit('partija:stanje', poruka);
+  }
+
+  function emitirajSpremanjeRezultata(stanje: StanjeStola): void {
+    const poruka = {
+      partijaId: stanje.partijaId,
+      poruka: 'Partija je završila. Konačni rezultat se još sprema, pokušavamo ponovno.',
+    };
+    for (const sudionik of stanje.sudionici) {
+      aktivneVeze.dohvatiSocket(sudionik.igracId)?.emit('partija:spremanje-rezultata', poruka);
+    }
+  }
+
+  async function zaustavi(): Promise<void> {
+    if (zaustavljanje) return;
+    zaustavljanje = true;
+    const aktivnePartije = [...partije.values()].filter((stanje) =>
+      !stanje.zavrsena || stanje.statusSpremanja === 'spremanje_rezultata');
+    const partijaIdovi = aktivnePartije.map((stanje) => stanje.partijaId);
+    for (const stanje of aktivnePartije) {
+      stanje.zavrsena = true;
+      if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
+      if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
+      if (stanje.retrySpremanjaHandle) clearTimeout(stanje.retrySpremanjaHandle);
+      for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
+      for (const sudionik of stanje.sudionici) {
+        aktivneVeze.dohvatiSocket(sudionik.igracId)?.emit('partija:ponistena', {
+          partijaId: stanje.partijaId,
+          poruka: 'Partija je prekinuta zbog gašenja poslužitelja. Rezultat nije dodijeljen.',
+        });
+        aktivneVeze.dohvatiSocket(sudionik.igracId)?.leave(SOBA_PARTIJE(stanje.partijaId));
+        if (partijaPoIgracu.get(sudionik.igracId) === stanje.partijaId) partijaPoIgracu.delete(sudionik.igracId);
+      }
+      partije.delete(stanje.partijaId);
+    }
+    await ponistiPartijeUTijekuUBazi(partijaIdovi);
+  }
+
+  function zakaziBrisanjeNakonSpremanja(stanje: StanjeStola): void {
+    setTimeout(() => {
+      if (stanje.retrySpremanjaHandle) clearTimeout(stanje.retrySpremanjaHandle);
+      for (const s of stanje.sudionici) {
+        aktivneVeze.dohvatiSocket(s.igracId)?.leave(SOBA_PARTIJE(stanje.partijaId));
+        if (partijaPoIgracu.get(s.igracId) === stanje.partijaId) partijaPoIgracu.delete(s.igracId);
+      }
+      partije.delete(stanje.partijaId);
+    }, zadrzavanjeSobeNakonKrajaMs).unref();
+  }
+
+  function pokreniSpremanjeRezultata(
+    stanje: StanjeStola,
+    upis: () => Promise<void>,
+    nakonUspjeha: () => void,
+  ): void {
+    stanje.statusSpremanja = 'spremanje_rezultata';
+    stanje.zavrsnoSpremanje = upis;
+    stanje.brojPokusajaSpremanja = 0;
+    emitirajSpremanjeRezultata(stanje);
+
+    const pokusaj = () => {
+      if (stanje.statusSpremanja === 'rezultati_spremljeni') return;
+      stanje.brojPokusajaSpremanja += 1;
+      void upis().then(() => {
+        if (stanje.statusSpremanja === 'rezultati_spremljeni') return;
+        stanje.statusSpremanja = 'rezultati_spremljeni';
+        stanje.zavrsnoSpremanje = null;
+        stanje.retrySpremanjaHandle = null;
+        nakonUspjeha();
+      }).catch((greska) => {
+        console.error(`Neuspio završni upis partije ${stanje.partijaId} (pokušaj ${stanje.brojPokusajaSpremanja}):`, greska);
+        emitirajSpremanjeRezultata(stanje);
+        const odmak = Math.min(
+          POCETNI_ODMAK_RETRYJA_REZULTATA_MS * 2 ** (stanje.brojPokusajaSpremanja - 1),
+          MAKSIMALNI_ODMAK_RETRYJA_REZULTATA_MS,
+        );
+        stanje.retrySpremanjaHandle = setTimeout(pokusaj, odmak);
+        stanje.retrySpremanjaHandle.unref();
+      });
+    };
+
+    pokusaj();
   }
 
   function zapocniPartiju(
     sudioniciUlaz: StavkaReda[],
     mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
-  ): void {
-    if (partije.size >= maksimalnoAktivnihPartija) return;
+  ): Promise<void> {
+    if (zaustavljanje || partije.size >= maksimalnoAktivnihPartija) return Promise.resolve();
     const izmjesano = [...sudioniciUlaz].sort(() => Math.random() - 0.5);
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const odigrane = mod === 'dva_igraca' ? (s.odigrane1v1 ?? 0) : s.odigrane;
@@ -379,11 +471,16 @@ export function stvoriUpraviteljPartija(
       zadnjiPotezi: new Map(),
       zadnjeReakcije: new Map(),
       grupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      noveGrupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
       streakovi: new Map(sudionici.map((s) => [s.igracId, 0])),
       statistikeRijeci: new Map(sudionici.map((s) => [s.igracId, novaStatistikaRijeci()])),
       iskustvoPrije: new Map(sudionici.map((s) => [s.igracId, 0])),
       stavkeIskustva: new Map(sudionici.map((s) => [s.igracId, []])),
       napredakDostignuca: new Map(sudionici.map((s) => [s.igracId, {}])),
+      statusSpremanja: 'nije_zavrsena',
+      brojPokusajaSpremanja: 0,
+      retrySpremanjaHandle: null,
+      zavrsnoSpremanje: null,
       razloziEliminacije: new Map(),
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
@@ -403,7 +500,7 @@ export function stvoriUpraviteljPartija(
     const cekanjeMsPoIgracu = new Map(izmjesano.map((s) => [s.igracId, Date.now() - s.usaoU]));
     const upisPocetkaPromise = zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod);
     // Igrači dobivaju countdown tek kad je poslužitelj spreman objaviti prvu rundu.
-    void Promise.all([
+    return Promise.all([
       upisPocetkaPromise,
       ucitajOtkljucaneGrupe(sudionici).catch((greska) => {
         console.error('Neuspjelo učitavanje otključanih grupa:', greska);
@@ -415,6 +512,7 @@ export function stvoriUpraviteljPartija(
       }),
     ]).then(([, grupe, iskustvo]) => {
       stanje.grupeSNagradom = grupe;
+      stanje.noveGrupeSNagradom = new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()]));
       stanje.iskustvoPrije = iskustvo;
       if (stanje.zavrsena || stanje.izborHandle) return;
       pocetakIso = new Date(Date.now() + ODGODA_POCETKA_PARTIJE_MS).toISOString();
@@ -429,6 +527,20 @@ export function stvoriUpraviteljPartija(
         aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
       }
       stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), ODGODA_POCETKA_PARTIJE_MS);
+    }).catch((greska) => {
+      if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
+      if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
+      partije.delete(partijaId);
+      for (const sudionik of sudionici) {
+        if (partijaPoIgracu.get(sudionik.igracId) === partijaId) partijaPoIgracu.delete(sudionik.igracId);
+        const socket = aktivneVeze.dohvatiSocket(sudionik.igracId);
+        socket?.leave(SOBA_PARTIJE(partijaId));
+        socket?.emit('greska', {
+          kod: 'UPIS_PARTIJE_NEUSPJEO',
+          poruka: 'Partiju nije moguće pokrenuti zbog pogreške pri spremanju. Pokušaj ponovno.',
+        });
+      }
+      throw greska;
     });
   }
 
@@ -483,14 +595,6 @@ export function stvoriUpraviteljPartija(
     stanje.zadnjiPotezi.clear();
     stanje.zadnjeReakcije.clear();
 
-    // Soba i mapiranja žive još kratko da reakcije rade tijekom sažetka; guard štiti novu partiju istog igrača.
-    setTimeout(() => {
-      for (const s of stanje.sudionici) {
-        if (partijaPoIgracu.get(s.igracId) === stanje.partijaId) partijaPoIgracu.delete(s.igracId);
-      }
-      partije.delete(stanje.partijaId);
-    }, ZADRZAVANJE_SOBE_NAKON_KRAJA_MS).unref();
-
     if (stanje.jePrivatna) {
       if (stanje.kodSobe) {
         postavke.naPrivatnaPartijaZavrsila?.(stanje.kodSobe, pobjednikId, plasmani);
@@ -500,7 +604,7 @@ export function stvoriUpraviteljPartija(
           igracId,
           prihvaceniPotezi: statistika.prihvaceniPotezi,
           ukupnoTrajanjePrihvaceniPoteziMs: statistika.ukupnoTrajanjePrihvaceniPoteziMs,
-          grupe: [...(stanje.grupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
+          grupe: [...(stanje.noveGrupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
           otkljucaneRijeci: [...statistika.otkljucaneRijeci].map(([rijec, oznake]) => ({ rijec, ...oznake })),
           najduziStreak: statistika.najduziStreak,
           otkriveneJakoRijetkeGrupe: statistika.otkriveneJakoRijetkeGrupe.size,
@@ -524,10 +628,11 @@ export function stvoriUpraviteljPartija(
         iskustvo: 0,
         nacinIspadanja: 'pobjednik' as const,
       }));
-      void zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, privatniRezultati, stanje.mod, privatneStatistike, true, new Map(
-        [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
-      ))
-        .then((agregati) => {
+      pokreniSpremanjeRezultata(
+        stanje,
+        () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, privatniRezultati, stanje.mod, privatneStatistike, true, new Map(
+          [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
+        )).then((agregati) => {
           for (const p of plasmani) {
             const poruka: KrajPartije = {
               partijaId: stanje.partijaId,
@@ -535,8 +640,9 @@ export function stvoriUpraviteljPartija(
               mojNoviProsjek: 0,
               mojRang: null,
               mojeIskustvo: null,
-              mojaOcjenaIgre: agregati.get(p.igracId)?.ocjenaIgre ?? null,
-              bonusOcjenaIgre: agregati.get(p.igracId)?.bonusOcjenaIgre ?? 0,
+              // Privatne partije ne ulaze u javnu ocjenu igre ni XP bonus ocjene.
+              mojaOcjenaIgre: null,
+              bonusOcjenaIgre: 0,
               novaDostignuca: agregati.get(p.igracId)?.novaDostignuca ?? [],
               jePrivatna: true,
               kodSobe: stanje.kodSobe,
@@ -546,9 +652,13 @@ export function stvoriUpraviteljPartija(
               aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
             }
           }
-        })
-        .catch((greska) => console.error('Neuspio upis gamifikacije privatne partije:', greska));
-      postavke.naPartijaZavrsila?.(stanje.partijaId);
+        }),
+        () => {
+          postavke.naPrivatnaPartijaZavrsila?.(stanje.kodSobe!, pobjednikId, plasmani);
+          postavke.naPartijaZavrsila?.(stanje.partijaId);
+          zakaziBrisanjeNakonSpremanja(stanje);
+        },
+      );
       return;
     }
 
@@ -569,7 +679,7 @@ export function stvoriUpraviteljPartija(
         igracId,
         prihvaceniPotezi: statistika.prihvaceniPotezi,
         ukupnoTrajanjePrihvaceniPoteziMs: statistika.ukupnoTrajanjePrihvaceniPoteziMs,
-        grupe: [...(stanje.grupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
+        grupe: [...(stanje.noveGrupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
         otkljucaneRijeci: [...statistika.otkljucaneRijeci].map(([rijec, oznake]) => ({ rijec, ...oznake })),
         najduziStreak: statistika.najduziStreak,
         otkriveneJakoRijetkeGrupe: statistika.otkriveneJakoRijetkeGrupe.size,
@@ -586,10 +696,11 @@ export function stvoriUpraviteljPartija(
       }]),
     );
 
-    void zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod, statistike, false, new Map(
-      [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
-    ))
-      .then((agregati) => {
+    pokreniSpremanjeRezultata(
+      stanje,
+      () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod, statistike, false, new Map(
+        [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
+      )).then((agregati) => {
         for (const p of plasmani) {
           const agregat = agregati.get(p.igracId);
           const prosjek = agregat && agregat.odigrane > 0 ? agregat.bodoviUkupno / agregat.odigrane : 0;
@@ -639,8 +750,12 @@ export function stvoriUpraviteljPartija(
             aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
           }
         }
-      })
-      .catch((greska) => console.error('Neuspio zaključak partije u bazi:', greska));
+      }),
+      () => {
+        postavke.naPartijaZavrsila?.(stanje.partijaId);
+        zakaziBrisanjeNakonSpremanja(stanje);
+      },
+    );
   }
 
   function nacinIspadanjaZaIgraca(
@@ -708,6 +823,7 @@ export function stvoriUpraviteljPartija(
       trazenaSlova,
       naPotezuId: naPotezu,
       istekPotezaIso: istekPotezaIso(stanje),
+      serverVrijemeIso: new Date().toISOString(),
       runda: stanje.runda,
     };
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:runda-otvorena', poruka);
@@ -877,7 +993,12 @@ export function stvoriUpraviteljPartija(
         : izracunajNagraduZaRijec(rijecNormalizirana, frekvencija, grupe, new Set(grupeIgraca.keys()));
       if (nagrada) {
         const tier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
-        for (const grupa of grupe) grupeIgraca.set(grupa, tier);
+        const noveGrupeSNagradom = stanje.noveGrupeSNagradom.get(igracId) ?? new Map<string, number | null>();
+        for (const grupa of noveGrupe) {
+          grupeIgraca.set(grupa, tier);
+          noveGrupeSNagradom.set(grupa, tier);
+        }
+        stanje.noveGrupeSNagradom.set(igracId, noveGrupeSNagradom);
         const brojOtkljucanih = [...grupeIgraca.values()].filter((vrijednost) => vrijednost !== null).length;
         nagrada.otkljucano = brojOtkljucanih;
         nagrada.ukupno = nagrada.kategorija === 'rijetke'
@@ -940,6 +1061,7 @@ export function stvoriUpraviteljPartija(
         trazenaSlova: stanje.trazenaSlova!,
         sljedeciId: sljedeci,
         istekPotezaIso: '',
+        serverVrijemeIso: new Date().toISOString(),
         brojIskoristenih: stanje.brojOdigranih,
         streak: trenutniStreak,
         nagrada,
@@ -968,6 +1090,7 @@ export function stvoriUpraviteljPartija(
           trazenaSlova: novaTrazenaSlova,
           sljedeciId: sljedeci,
           istekPotezaIso: '',
+          serverVrijemeIso: new Date().toISOString(),
           brojIskoristenih: stanje.brojOdigranih,
           streak: trenutniStreak,
           nagrada,
@@ -991,6 +1114,7 @@ export function stvoriUpraviteljPartija(
       trazenaSlova: novaTrazenaSlova,
       sljedeciId: sljedeci,
       istekPotezaIso: istekPotezaIso(stanje),
+      serverVrijemeIso: new Date().toISOString(),
       brojIskoristenih: stanje.brojOdigranih,
       streak: trenutniStreak,
       nagrada,
@@ -1177,6 +1301,12 @@ export function stvoriUpraviteljPartija(
     ponistiCekanjePovratka(stanje, igracId);
     socket.join(SOBA_PARTIJE(stanje.partijaId));
     posaljiStanje(socket);
+    if (stanje.statusSpremanja === 'spremanje_rezultata') {
+      socket.emit('partija:spremanje-rezultata', {
+        partijaId: stanje.partijaId,
+        poruka: 'Partija je završila. Konačni rezultat se još sprema, pokušavamo ponovno.',
+      });
+    }
     const rezultatKraja = stanje.rezultatiKraja.get(igracId);
     if (rezultatKraja) socket.emit('partija:kraj', rezultatKraja);
   }
@@ -1287,7 +1417,7 @@ export function stvoriUpraviteljPartija(
     postavkeSobe: PostavkePrivatneSobe,
     kodSobe: string,
   ): string {
-    if (partije.size >= maksimalnoAktivnihPartija) return '';
+    if (zaustavljanje || partije.size >= maksimalnoAktivnihPartija) return '';
     const sudionici: SudionikPartije[] = sudioniciUlaz.map((s, sjedalo) => {
       const prosjekBodova = s.odigrane > 0 ? s.bodoviUkupno / s.odigrane : 0;
       const rang = izracunajRang(s.odigrane, prosjekBodova);
@@ -1335,11 +1465,16 @@ export function stvoriUpraviteljPartija(
       zadnjiPotezi: new Map(),
       zadnjeReakcije: new Map(),
       grupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      noveGrupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
       streakovi: new Map(sudionici.map((s) => [s.igracId, 0])),
       statistikeRijeci: new Map(sudionici.map((s) => [s.igracId, novaStatistikaRijeci()])),
       iskustvoPrije: new Map(sudionici.map((s) => [s.igracId, 0])),
       stavkeIskustva: new Map(sudionici.map((s) => [s.igracId, []])),
       napredakDostignuca: new Map(sudionici.map((s) => [s.igracId, {}])),
+      statusSpremanja: 'nije_zavrsena',
+      brojPokusajaSpremanja: 0,
+      retrySpremanjaHandle: null,
+      zavrsnoSpremanje: null,
       razloziEliminacije: new Map(),
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
@@ -1384,6 +1519,8 @@ export function stvoriUpraviteljPartija(
     zapocniPartiju,
     zapocniPrivatnuPartiju,
     registrirajHandlere,
+    zaustavi,
+    mozePokrenutiPartiju: () => !zaustavljanje,
     nadimak,
     imaAktivnuPartiju: (igracId: string) => {
       const partijaId = partijaPoIgracu.get(igracId);

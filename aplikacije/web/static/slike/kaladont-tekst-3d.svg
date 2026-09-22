@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 190" role="img" aria-labelledby="naslov opis">
+  <title id="naslov">Kaladont</title>
+  <desc id="opis">Kremi oblačić s natpisom Kaladont</desc>
+  <path d="M20 35C20 14 43 5 70 5h175c31 0 50 15 50 42v66c0 25-19 42-50 42H136l-34 29 8-29H70c-30 0-50-17-50-42z" fill="#fdf5e5" stroke="#e9ddc8" stroke-width="4"/>
+  <path d="M91 132c-4 14-13 32-27 43 22-5 39-17 48-31" fill="#fdf5e5" stroke="#e9ddc8" stroke-width="4" stroke-linejoin="round"/>
+  <text x="153" y="92" fill="#29241f" font-family="Baloo 2, sans-serif" font-size="43" font-weight="700" text-anchor="middle">Kaladont!</text>
+  <path d="M105 43c-7 10-7 18 0 25M130 34c-2 10 0 17 6 23M183 111c-4 10-4 17 2 24" fill="none" stroke="#e97950" stroke-width="7" stroke-linecap="round"/>
+</svg>

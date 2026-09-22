@@ -52,9 +52,60 @@ CLI `pnpm --filter posluzitelj opterecenje` pokreće kontrolirano opterećenje p
 pnpm --filter posluzitelj opterecenje -- --scenarij=veze --klijenti=100 --val=20 --trajanje-ms=5000
 pnpm --filter posluzitelj opterecenje -- --scenarij=red --klijenti=40 --idle=100 --val=20
 pnpm --filter posluzitelj opterecenje -- --scenarij=reconnect --klijenti=100 --val=20 --ciklusi=3
+pnpm --filter posluzitelj opterecenje -- --scenarij=igra --partije=4 --timeout-ms=120000
 ```
 
-Scenariji ispisuju JSON s p50/p95 i maksimalnim trajanjem spajanja, odnosno čekanja na sastavljanje stola. `--idle` u scenariju reda drži dodatne veze izvan čekaonice kako bi mjerenje otkrilo regresiju na globalni obilazak socketova. Nakon matchmaking mjerenja alat šalje `partija:izadji` svim uparenim klijentima i zadano čeka 16 sekundi da se stolovi uklone; čekanje se može promijeniti argumentom `--cekaj-ciscenje-ms`. Before/after mjerenje mora koristiti isti stroj, bazu, broj klijenata, veličinu vala i mrežni put. Staging test počinje malim brojem klijenata i povećava se stupnjevito uz praćenje CPU-a, memorije, PostgreSQL-a i pogrešaka.
+Scenariji ispisuju JSON s p50/p95 i maksimalnim trajanjem spajanja, odnosno čekanja na sastavljanje stola. `--idle` u scenariju reda drži dodatne veze izvan čekaonice kako bi mjerenje otkrilo regresiju na globalni obilazak socketova. Nakon matchmaking mjerenja alat šalje `partija:izadji` svim uparenim klijentima i zadano čeka 16 sekundi da se stolovi uklone; čekanje se može promijeniti argumentom `--cekaj-ciscenje-ms`. Svi scenariji automatski vraćaju non-zero izlaz kada `--maks-stopa-gresaka` bude prekoračena.
+
+### Dokaz kapaciteta igre
+
+Scenarij `igra` grupira botove po četiri, ulazi u javni red, igra stvarne partije riječima iz baze i
+računa partiju uspješnom tek nakon `partija:kraj`. Mjeri prihvaćene poteze, vrijeme od
+`partija:spremanje-rezultata` do `partija:kraj`, broj grešaka te health snapshot-e prije, tijekom i
+nakon čišćenja.
+
+Zadani kriteriji prolaza su:
+
+- sve planirane partije završavaju;
+- stopa grešaka <= `0,005`;
+- p95 prihvaćenog poteza <= `250 ms`;
+- p95 završnog spremanja <= `1 s`;
+- nakon čišćenja nema aktivnih partija;
+- RSS delta nakon čišćenja <= `256 MB`.
+
+Pragovi su podesivi parametrima `--maks-stopa-gresaka`, `--p95-potez-ms`,
+`--p95-spremanje-ms`, `--maks-aktivnih-partija-nakon-ciscenja` i `--maks-rss-delta-mb`.
+`aktivneVeze` se izvještava odvojeno od `aktivnePartije`: broj socket veza nije broj igrača koje
+igra pouzdano podržava.
+
+Timer se ne miješa u brzi bot smoke. Za zasebni timer test koristi se `--timer-test=true`; jedan bot
+namjerno šuti na potezu, a alat mjeri razliku između autoritativnog `istekPotezaIso` i eliminacije
+razlogom `istek`. Kriterij prolaza je p95 drift <= `250 ms`.
+
+Za kratki smoke koristi se 1–4 partije. Srednji test koristi desetke ili stotine partija na istom
+fixtureu i bilježi commit, verziju baze, resurse stroja i JSON rezultat. Višesatni staging test ima
+warm-up, periodično health uzorkovanje te nadzor PostgreSQL CPU-a, konekcija, lockova, Node RSS-a i
+heap-a. Nijedan test se ne usmjerava na produkciju.
+
+## Provjera indeksa
+
+CLI `pnpm --filter posluzitelj provjera-indeksa` stvara privremene PostgreSQL tablice s 50.000 igrača,
+100.000 partija, 400.000 sudionika i 800.000 poteza. Pokreće `EXPLAIN (ANALYZE, BUFFERS)` za email
+pretragu, povijest jednog igrača i poteze jedne partije. Tablice su privremene i uklanjaju se nakon
+transakcije; naredba se ne smije pokretati prema staging ili produkcijskoj bazi.
+
+Očekivanje je indeksni scan (ili bitmap index scan kod većeg broja pogodaka), bez sekvencijalnog skeniranja velikih tablica:
+`uq_igraci_email_lower`, `idx_sudionici_partije_igrac_id_partija_id` i
+`idx_potezi_partija_id_redni_broj`. Globalni upit top riječi nije obuhvaćen tim indeksima jer radi
+agregaciju preko svih poteza.
+
+Javni endpoint `/rijeci/top` koristi procesni TTL cache od 30 sekundi. Profil učitava najviše 200
+otključanih riječi po kategoriji, a povijest poteza najviše 500 redaka po stranici. Testovi trebaju
+provjeriti limite i metapodatke (`ukupno`, `imaJos`) bez ovisnosti o velikom rječniku.
+
+Velike kolekcije koriste cursor paginaciju: `/povijest/:igracId` po `(pocetak, partija_id)`,
+`/partije/:partijaId/potezi` po `(redni_broj, id)`, a `/profil/rijeci` i javna varijanta po
+`rijec`. Cursor je opaque base64url vrijednost; klijent ne koristi `OFFSET`.
 
 ## Obavezno pokriveno jediničnim testovima
 

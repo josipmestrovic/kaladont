@@ -50,7 +50,6 @@
     stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen';
     statistikaRijeci: StatistikaRijeci | null;
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
-    otkljucaneRijeci: { duge: string[]; srednjeDuge: string[]; jakoDuge: string[]; rijetke: string[]; srednjeRijetke: string[]; jakoRijetke: string[] };
     dostignuca: { ukupnoZvjezdica: number; maksimalnoZvjezdica: number; ukupnoOtkljucanih: number; dostignuca: Dostignuce[] };
   }
 
@@ -88,8 +87,11 @@
   let greska = $state<string | null>(null);
   let ucitavanjePartija = $state(false);
   let imaJosPartija = $state(true);
+  let cursorPartija = $state<string | null>(null);
   let aktivniTab = $state<'4p' | '1v1'>('4p');
   let otvoreniPopup = $state<'duge' | 'rijetke' | null>(null);
+  let rijeciPoKategoriji = $state<Record<string, string[]>>({});
+  let ucitavanjeRijeci = $state(false);
   let aktivniPogled = $state<'statistika' | 'dostignuca' | 'rijeci' | 'povijest'>('statistika');
   let velicinaAvatara = $state(216);
   const prikazujePostavke = $derived($page.url.searchParams.get('tab') === 'postavke');
@@ -104,7 +106,7 @@
       try {
         profil = await api<Profil>('/profil');
         if (profil) {
-          await ucitajPartije(0);
+          await ucitajPartije();
           if (window.location.hash === '#statistika') {
             await tick();
             document.getElementById('statistika')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -117,17 +119,17 @@
     return () => window.removeEventListener('resize', prilagodiAvatar);
   });
 
-  async function ucitajPartije(offset: number) {
+  async function ucitajPartije(cursor: string | null = null) {
     if (!profil || ucitavanjePartija) return;
     ucitavanjePartija = true;
     try {
-      const odgovor = await api<{ partije: Partija[] }>(
-        `/povijest/${profil.igracId}?limit=10&offset=${offset}`
+      const parametarCursora = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+      const odgovor = await api<{ partije: Partija[]; imaJos: boolean; sljedeciCursor: string | null }>(
+        `/povijest/${profil.igracId}?limit=10${parametarCursora}`
       );
-      if (odgovor.partije.length < 10) {
-        imaJosPartija = false;
-      }
-      if (offset === 0) {
+      imaJosPartija = odgovor.imaJos;
+      cursorPartija = odgovor.sljedeciCursor;
+      if (!cursor) {
         partije = odgovor.partije;
       } else {
         partije = [...partije, ...odgovor.partije];
@@ -140,7 +142,26 @@
   }
 
   function ucitajJos() {
-    void ucitajPartije(partije.length);
+    if (cursorPartija) void ucitajPartije(cursorPartija);
+  }
+
+  function listaRijeci(kategorija: string): string[] {
+    return rijeciPoKategoriji[kategorija] ?? [];
+  }
+
+  async function otvoriPopup(vrsta: 'duge' | 'rijetke'): Promise<void> {
+    otvoreniPopup = vrsta;
+    if (ucitavanjeRijeci || Object.keys(rijeciPoKategoriji).length > 0) return;
+    ucitavanjeRijeci = true;
+    const kategorije = vrsta === 'duge'
+      ? ['jakoDuge', 'srednjeDuge', 'duge']
+      : ['jakoRijetke', 'srednjeRijetke', 'rijetke'];
+    try {
+      const rezultati = await Promise.all(kategorije.map((kategorija) => api<{ rijeci: string[] }>(`/profil/rijeci?kategorija=${kategorija}&limit=50`)));
+      rijeciPoKategoriji = Object.fromEntries(kategorije.map((kategorija, indeks) => [kategorija, rezultati[indeks]!.rijeci]));
+    } finally {
+      ucitavanjeRijeci = false;
+    }
   }
 
   function formatirajDatum(datumStr: string): string {
@@ -321,7 +342,7 @@
               <span>Srednje duge (12–14 slova): <strong>{statistika.upisaneSrednjeDugeRijeci}</strong></span>
               <span>Jako duge (15+ slova): <strong>{statistika.upisaneJakoDugeRijeci}</strong></span>
             </div>
-            <button class="otkljucane-link" type="button" onclick={() => (otvoreniPopup = 'duge')}>Vidi otkrivene riječi →</button>
+            <button class="otkljucane-link" type="button" onclick={() => void otvoriPopup('duge')}>Vidi otkrivene riječi →</button>
             <strong class="rekord-rijeci">Najduža riječ: {statistika.najduzaRijec ?? '—'}</strong>
           </div>
           <div class="achievement-polje">
@@ -332,7 +353,7 @@
               <span>Srednje rijetke: <strong>{statistika.otkriveneSrednjeRijetkeGrupe}</strong></span>
               <span>Jako rijetke: <strong>{statistika.otkriveneJakoRijetkeGrupe}</strong></span>
             </div>
-            <button class="otkljucane-link" type="button" onclick={() => (otvoreniPopup = 'rijetke')}>Vidi otkrivene riječi →</button>
+            <button class="otkljucane-link" type="button" onclick={() => void otvoriPopup('rijetke')}>Vidi otkrivene riječi →</button>
             <strong class="rekord-rijeci">Najrjeđa riječ: {statistika.najrjedaRijec ?? '—'}</strong>
           </div>
         </div>
@@ -345,14 +366,14 @@
           <button class="popup-zatvori" type="button" onclick={() => (otvoreniPopup = null)} aria-label="Zatvori">×</button>
           {#if otvoreniPopup === 'duge'}
             <h2>Duge riječi</h2>
-            <details open><summary>Jako duge riječi ({profil?.otkljucaneRijeci.jakoDuge.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.jakoDuge.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
-            <details open><summary>Srednje duge riječi ({profil?.otkljucaneRijeci.srednjeDuge.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.srednjeDuge.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
-            <details open><summary>Duge riječi ({profil?.otkljucaneRijeci.duge.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.duge.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
+            <details open><summary>Jako duge riječi ({listaRijeci('jakoDuge').length})</summary><p class="popis-rijeci">{listaRijeci('jakoDuge').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
+            <details open><summary>Srednje duge riječi ({listaRijeci('srednjeDuge').length})</summary><p class="popis-rijeci">{listaRijeci('srednjeDuge').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
+            <details open><summary>Duge riječi ({listaRijeci('duge').length})</summary><p class="popis-rijeci">{listaRijeci('duge').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
           {:else}
             <h2>Rijetke riječi</h2>
-            <details open><summary>Jako rijetke riječi ({profil?.otkljucaneRijeci.jakoRijetke.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.jakoRijetke.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
-            <details open><summary>Srednje rijetke riječi ({profil?.otkljucaneRijeci.srednjeRijetke.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.srednjeRijetke.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
-            <details open><summary>Rijetke riječi ({profil?.otkljucaneRijeci.rijetke.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.rijetke.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
+            <details open><summary>Jako rijetke riječi ({listaRijeci('jakoRijetke').length})</summary><p class="popis-rijeci">{listaRijeci('jakoRijetke').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
+            <details open><summary>Srednje rijetke riječi ({listaRijeci('srednjeRijetke').length})</summary><p class="popis-rijeci">{listaRijeci('srednjeRijetke').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
+            <details open><summary>Rijetke riječi ({listaRijeci('rijetke').length})</summary><p class="popis-rijeci">{listaRijeci('rijetke').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
           {/if}
         </div>
       </div>

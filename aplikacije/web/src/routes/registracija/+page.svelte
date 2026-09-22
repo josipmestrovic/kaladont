@@ -5,7 +5,7 @@
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import AvatarEditor from '$lib/komponente/AvatarEditor.svelte';
   import UnosLozinke from '$lib/komponente/UnosLozinke.svelte';
-  import { ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
+  import { jeValjanNadimak, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA, ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
 
   let korak = $state<1 | 2 | 3>(1);
   let nadimak = $state('');
@@ -17,7 +17,7 @@
 
   function daljeKorak(e: SubmitEvent) {
     e.preventDefault();
-    if (nadimak.trim().length >= 2) {
+    if (jeValjanNadimak(nadimak)) {
       poruka = null;
       korak = 2;
     }
@@ -81,12 +81,15 @@
       <input
         type="text"
         bind:value={nadimak}
-        maxlength={12}
+        minlength={MINIMALNA_DULJINA_NADIMKA}
+        maxlength={MAKSIMALNA_DULJINA_NADIMKA}
+        pattern={UZORAK_NADIMKA.source}
+        title={PORUKA_NEVALJANOG_NADIMKA}
         placeholder="Tvoj nadimak"
         aria-label="Tvoj nadimak"
         required
       />
-      <button type="submit" disabled={nadimak.trim().length < 2}>
+      <button type="submit" disabled={!jeValjanNadimak(nadimak)}>
         Dalje
       </button>
     </form>

@@ -4,7 +4,7 @@
  */
 import type { Eliminacija, KrajPartije, NagradaZaRijec, ObracunIskustvaTijekomPartije, PocetakPartije, StavkaIskustva, StanjePartije } from 'zajednicko';
 import { pustiAudio, type AudioDogadaj } from './audio-manager.js';
-import { dohvatiSocket } from './socket.js';
+import { dohvatiSocket, oznaciPartijuDostupnom } from './socket.js';
 
 interface StanjeIgre {
   partijaId: string | null;
@@ -13,6 +13,7 @@ interface StanjeIgre {
   naPotezuId: string | null;
   trazenaSlova: string | null;
   istekPotezaIso: string | null;
+  serverVrijemeIso: string;
   /** Kada partija kreće — čekaonica odbrojava do ovog trenutka; null kad nema najavljene partije. */
   pocetakPartijeIso: string | null;
   runda: number;
@@ -21,6 +22,8 @@ interface StanjeIgre {
   zadnjaEliminacija: Eliminacija | null;
   poruka: string | null;
   kraj: KrajPartije | null;
+  ponistenaPoruka: string | null;
+  statusSpremanja: 'nije_zavrsena' | 'spremanje_rezultata' | 'rezultati_spremljeni';
   rezultatiPrikazaniPartijaId: string | null;
   obracunIskustva: ObracunIskustvaTijekomPartije | null;
   sustavBiraRijec: boolean;
@@ -47,6 +50,7 @@ const stanje = $state<StanjeIgre>({
   naPotezuId: null,
   trazenaSlova: null,
   istekPotezaIso: null,
+  serverVrijemeIso: new Date().toISOString(),
   pocetakPartijeIso: null,
   runda: 0,
   brojIskoristenih: 0,
@@ -54,6 +58,8 @@ const stanje = $state<StanjeIgre>({
   zadnjaEliminacija: null,
   poruka: null,
   kraj: null,
+  ponistenaPoruka: null,
+  statusSpremanja: 'nije_zavrsena',
   rezultatiPrikazaniPartijaId: null,
   obracunIskustva: null,
   sustavBiraRijec: false,
@@ -111,6 +117,7 @@ function pustiOdbijanje(): void {
 }
 
 function primijeniStanjePartije(p: StanjePartije): void {
+  oznaciPartijuDostupnom();
   stanje.partijaId = p.partijaId;
   stanje.pocetakPartijeIso = null;
   stanje.mojIgracId = p.mojIgracId;
@@ -118,6 +125,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.naPotezuId = p.naPotezuId;
   stanje.trazenaSlova = p.trazenaSlova;
   stanje.istekPotezaIso = p.istekPotezaIso;
+  stanje.serverVrijemeIso = p.serverVrijemeIso;
   stanje.runda = p.runda;
   stanje.brojIskoristenih = p.brojIskoristenih;
   stanje.eliminacije = p.eliminacije;
@@ -127,6 +135,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.zadnjaRijec = p.zadnjaRijec;
   stanje.zadnjaRijecIgracId = p.zadnjaRijecIgracId;
   stanje.zadnjaRijecVrsta = p.zadnjaRijecVrsta;
+  stanje.statusSpremanja = p.statusSpremanja;
   stanje.zadnjaNagrada = null;
   stanje.mod = p.mod ?? null;
   stanje.jePrivatna = Boolean(p.jePrivatna);
@@ -140,18 +149,22 @@ export function pokreniSlusateljeIgre(): void {
   const socket = dohvatiSocket();
 
   socket.on('partija:pocetak', (p) => {
+    oznaciPartijuDostupnom();
     brojOdbijenihNaPotezu = 0;
     stanje.partijaId = p.partijaId;
     stanje.mojIgracId = p.mojIgracId;
     stanje.sjedala = p.sjedala;
     stanje.naPotezuId = null;
     stanje.istekPotezaIso = null;
+    stanje.serverVrijemeIso = new Date().toISOString();
     stanje.pocetakPartijeIso = p.pocetakIso;
     stanje.trazenaSlova = null;
     stanje.brojIskoristenih = 0;
     stanje.eliminacije = [];
     stanje.zadnjaEliminacija = null;
     stanje.kraj = null;
+    stanje.ponistenaPoruka = null;
+    stanje.statusSpremanja = 'nije_zavrsena';
     stanje.rezultatiPrikazaniPartijaId = null;
     stanje.obracunIskustva = null;
     stanje.zadnjaNagrada = null;
@@ -173,6 +186,29 @@ export function pokreniSlusateljeIgre(): void {
 
   socket.on('partija:stanje', primijeniStanjePartije);
 
+  socket.on('disconnect', () => {
+    if (stanje.partijaId) {
+      stanje.partijaId = null;
+      stanje.naPotezuId = null;
+      stanje.istekPotezaIso = null;
+    }
+  });
+
+  socket.on('partija:spremanje-rezultata', (p) => {
+    if (p.partijaId !== stanje.partijaId) return;
+    stanje.statusSpremanja = 'spremanje_rezultata';
+    stanje.poruka = p.poruka;
+  });
+
+  socket.on('partija:ponistena', (p) => {
+    if (p.partijaId !== stanje.partijaId) return;
+    stanje.ponistenaPoruka = p.poruka;
+    stanje.poruka = p.poruka;
+    stanje.naPotezuId = null;
+    stanje.istekPotezaIso = null;
+    stanje.sustavBiraRijec = false;
+  });
+
   socket.on('potez:prihvacen', (p) => {
     const mojPotez = p.igracId === stanje.mojIgracId;
     const mojSljedeciRed = p.sljedeciId === stanje.mojIgracId;
@@ -180,6 +216,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.naPotezuId = p.sljedeciId;
     stanje.trazenaSlova = p.trazenaSlova;
     stanje.istekPotezaIso = p.istekPotezaIso;
+    stanje.serverVrijemeIso = p.serverVrijemeIso;
     stanje.brojIskoristenih = p.brojIskoristenih;
     if (p.igracId === stanje.mojIgracId) stanje.trenutniStreak = p.streak;
     stanje.poruka = null;
@@ -238,6 +275,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.naPotezuId = p.naPotezuId;
     stanje.trazenaSlova = p.trazenaSlova;
     stanje.istekPotezaIso = p.istekPotezaIso;
+    stanje.serverVrijemeIso = p.serverVrijemeIso;
     stanje.runda = p.runda;
     stanje.zadnjaRijec = p.rijec;
     stanje.zadnjaRijecIgracId = null;
@@ -249,6 +287,8 @@ export function pokreniSlusateljeIgre(): void {
     // partija-kraj zvuk pušta se tek kad se prikažu konačni rezultati (partija/[id]/+page.svelte),
     // ne ovdje - inače se preklapa sa zvukom zadnje eliminacije.
     stanje.kraj = p;
+    stanje.ponistenaPoruka = null;
+    stanje.statusSpremanja = 'rezultati_spremljeni';
     stanje.pocetakPartijeIso = null;
   });
 

@@ -120,6 +120,7 @@ export function registrirajPrivatneSobe(
     maksimalnoSoba: number;
     maksimalnoAktivnihPartija: number;
     brojAktivnihPartija: () => number;
+    mozeStvoritiPartiju: () => boolean;
     provjeriDogadaj: ProvjeriOgranicenjeDogadaja;
     igracImaAktivnuPartiju: (igracId: string) => boolean;
     ukloniIzJavnogReda: (igracId: string) => void;
@@ -249,6 +250,10 @@ export function registrirajPrivatneSobe(
   io.on('connection', (socket) => {
     socket.on('soba:stvori', (payload) => {
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:stvori')) return;
+      if (!opcije.mozeStvoritiPartiju()) {
+        socket.emit('greska', { kod: 'INTERNA', poruka: 'Poslužitelj se upravo gasi. Pokušaj ponovno malo kasnije.' });
+        return;
+      }
       if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {
         socket.emit('greska', { kod: 'VEC_U_PARTIJI', poruka: 'Ne možeš stvoriti sobu dok je partija aktivna.' });
         return;
@@ -401,6 +406,10 @@ export function registrirajPrivatneSobe(
 
     socket.on('soba:pokreni', () => {
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:pokreni')) return;
+      if (!opcije.mozeStvoritiPartiju()) {
+        socket.emit('greska', { kod: 'INTERNA', poruka: 'Poslužitelj se upravo gasi. Pokušaj ponovno malo kasnije.' });
+        return;
+      }
       const igracId = socket.data.igracId;
       const kod = sobaPoIgracu.get(igracId);
       if (!kod) return;

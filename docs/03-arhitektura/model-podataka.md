@@ -6,6 +6,7 @@ Sve tablice i stupci imenuju se hrvatski, bez dijakritika, u `snake_case`. Migra
 erDiagram
     igraci ||--o{ sudionici_partije : sudjeluje
     partije ||--|{ sudionici_partije : ima
+    partije ||--o{ obracuni_partija : obracunava
     partije ||--|{ potezi : sadrzi
     igraci ||--o{ potezi : odigrao
     igraci ||--o{ sesije : ima
@@ -43,6 +44,8 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | zadnja_aktivnost | timestamptz | Za čišćenje starih gostiju |
 
 Agregati se ažuriraju **transakcijski** pri završetku partije, u istoj transakciji sa zapisom rezultata. Uvijek su izračunljivi ponovno iz `sudionici_partije` (skripta za rekonstrukciju).
+
+Indeksi: parcijalni unique funkcionalni indeks na `lower(email)` uz `email IS NOT NULL`. Email se u aplikaciji sprema kanoniziran kao lowercase, a indeks dodatno štiti od utrke između istodobnih registracija.
 
 ## povratne_informacije
 
@@ -125,6 +128,16 @@ Rezultat svakog igrača u svakoj partiji — **temelj svih statistika i budućeg
 | nacin_ispadanja | enum, null | `ne_znam`, `istek`, `mrtva_slova`, `prekid`, `pobjednik`, `kaladont` |
 | cekanje_ms | integer | Vrijeme provedeno u redu čekanja (za prosjek zadnjih 100 partija) |
 
+## obracuni_partija
+
+Trajni idempotency zapis završnih obračuna. Jedinstveni ključ `(partija_id, vrsta)` sprečava da retry ili konkurentni poziv ponovno primijeni isti obračun. Privatne partije nemaju red u `partije`, zato `partija_id` ovdje nije strani ključ.
+
+| Stupac | Tip | Opis |
+|---|---|---|
+| partija_id | uuid | Identitet partije iz memorije; za privatne partije nije FK |
+| vrsta | enum: `javna_partija`, `privatna_gamifikacija` | Deduplikacijski namespace obračuna |
+| stvoren | timestamptz | Vrijeme prvog uspješnog claima |
+
 ## potezi
 
 Potpuna povijest — pogoni prikaz povijesti, prijave grešaka i buduće analize.
@@ -143,6 +156,8 @@ Potpuna povijest — pogoni prikaz povijesti, prijave grešaka i buduće analize
 | vrijeme | timestamptz | |
 
 Neuspjeli pokušaji (odbijene riječi) se **ne** zapisuju u `potezi` — samo prolaze kroz validaciju; brojač odbijenih po potezu može se dodati kasnije bude li potreban.
+
+Indeks: `(partija_id, redni_broj)` za dohvat i redoslijed kompletne povijesti poteza jedne partije.
 
 ## rijeci
 
@@ -196,7 +211,15 @@ Revizijski trag **ručnih** promjena rječnika. Masovni uvoz se ne bilježi ovdj
 - **Prosjek čekanja zadnjih 100 partija:** upit nad `sudionici_partije.cekanje_ms` za zadnjih 100 završenih partija; keširano u memoriji poslužitelja, osvježava se pri svakom početku partije.
 - **Rang:** računa se pri prikazu iz agregata (`bodovi_ukupno / odigrane`), nikad se ne pohranjuje — promjena pragova ne traži migraciju.
 - **Border:** izveden 1:1 iz trenutnog ranga (vidi [vizualni-identitet.md](../05-ux-ui/vizualni-identitet.md#avatari-i-borderi)); nema vlastiti stupac, korisnik ga ne bira.
-- **Top riječi:** `GET /rijeci/top` grupira `potezi.rijec` (COUNT, GROUP BY) preko svih partija — stvarna učestalost igranja, različito od statičke `rijeci.frekvencija` (korpusni uvoz). Računa se na zahtjev, bez keširanja u v1.
+- **Top riječi:** `GET /rijeci/top` koristi lokalni TTL cache od 30 sekundi za top 100 rezultata i broj partija. Podaci su stvarna učestalost igranja iz `potezi.rijec`, različita od statičke `rijeci.frekvencija` iz korpusnog uvoza. Cache je procesni i ponovno se puni nakon isteka.
 - **Nagrade za riječi:** server nakon prihvaćene riječi računa frekvencijski tier (`0`, `1–9`, `10–99`) i tier duljine (`10–11`, `12–14`, `15+` grafema). Jedan potez može imati oba svojstva, ali emitira samo jedan efekt; tekst navodi oba razloga. Ista leksemska grupa nagrađuje se najviše jednom u životu igrača, uključujući privatne sobe.
 - **Otključane grupe:** `otkljucane_grupe_igraca` je trajni jedinstveni skup `(igrac_id, grupa)` s tierom. Učitava se na početku svake partije i sprečava ponovno dobivanje iste nagrade u kasnijim partijama.
 - **Javni profil:** samo registrirani igrači imaju javni read-only profil. Ljestvica i završni sažetak smiju voditi na profil; lobby i aktivni stol ne prikazuju linkove na profile. Javni odgovor ne sadrži email ni podatke za autentikaciju.
+
+`sudionici_partije` ima dodatni indeks `(igrac_id, partija_id)` za paginiranu povijest partija po igraču. Primarni ključ `(partija_id, igrac_id)` ostaje zbog upisa i dohvaćanja sudionika poznate partije; ne zamjenjuje indeks s `igrac_id` kao prvim stupcem.
+
+Otključane riječi dohvaćaju se po kategoriji uz server-side limit od 200 riječi po kategoriji; endpoint poteza koristi cursor i limit (najviše 500 po stranici) te vraća `sljedeciCursor` i `imaJos`.
+
+Za velike kolekcije API koristi opaque cursor paginaciju: povijest igrača po `(partije.pocetak,
+partija_id)`, poteze po `(redni_broj, potez_id)`, a otključane riječi po `rijec`. `OFFSET` i ukupni
+`COUNT(*)` nisu dio novog paginiranog ugovora.

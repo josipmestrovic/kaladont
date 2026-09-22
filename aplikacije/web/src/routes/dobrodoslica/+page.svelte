@@ -6,6 +6,7 @@
   import { jeRegistriranKorisnik, jeOnboardingZavrsen, oznaciOnboardingZavrsen } from '$lib/identitet.js';
   import { AVATARI } from '$lib/avatari.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
+    import { jeValjanNadimak, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA } from 'zajednicko';
 
   let korak = $state<'ime' | 'avatar'>('ime');
   let ime = $state('');
@@ -20,8 +21,8 @@
 
   async function posaljiIme(e: SubmitEvent) {
     e.preventDefault();
-    const nadimak = ime.trim();
-    if (nadimak.length < 2 || slanjeUTijeku) return;
+    const nadimak = ime;
+    if (!jeValjanNadimak(nadimak) || slanjeUTijeku) return;
     slanjeUTijeku = true;
     greska = null;
     try {
@@ -76,12 +77,15 @@
           type="text"
           bind:value={ime}
           autocomplete="off"
-          maxlength={12}
+          minlength={MINIMALNA_DULJINA_NADIMKA}
+          maxlength={MAKSIMALNA_DULJINA_NADIMKA}
+          pattern={UZORAK_NADIMKA.source}
+          title={PORUKA_NEVALJANOG_NADIMKA}
           placeholder="Tvoje ime"
           aria-label="Tvoje ime"
           disabled={slanjeUTijeku}
         />
-        <button type="submit" disabled={ime.trim().length < 2 || slanjeUTijeku}>
+        <button type="submit" disabled={!jeValjanNadimak(ime) || slanjeUTijeku}>
           {slanjeUTijeku ? 'Spremanje...' : 'Dalje'}
         </button>
       </form>

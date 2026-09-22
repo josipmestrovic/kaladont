@@ -15,7 +15,7 @@
     avatarConfig: AvatarConfigV1 | null;
   }
 
-  let { prethodnaPutanja = null } = $props<{ prethodnaPutanja?: string | null }>();
+  let { prethodnaPutanja = null, mozeNaprijed = false } = $props<{ prethodnaPutanja?: string | null; mozeNaprijed?: boolean }>();
   let profil = $state<Profil | null>(null);
   let jeGost = $state(true);
   const jeNaslovna = $derived($page.url.pathname === '/');
@@ -23,6 +23,10 @@
 
   function vratiSe() {
     window.history.back();
+  }
+
+  function idiNaprijed() {
+    window.history.forward();
   }
 
   async function ucitajProfil() {
@@ -59,12 +63,12 @@
     {#if jeNaslovna}
       <div class="naslovne-akcije">
         <a href="/novosti" class="novosti-link" aria-label="Što je novo?">
-          <span class="novosti-ikona" aria-hidden="true"></span>
+          <img class="header-ikona" src="/ikone/01-sto-je-novo.png" alt="" aria-hidden="true" />
           <span>Što je novo?</span>
         </a>
         {#if profil && !jeGost}
           <a href="/povratne-informacije" class="novosti-link" aria-label="Pomozi poboljšati igru">
-            <span class="povratne-informacije-ikona" aria-hidden="true"></span>
+            <img class="header-ikona" src="/ikone/02-pomozi-poboljsati-igru.png" alt="" aria-hidden="true" />
             <span>Pomozi poboljšati igru</span>
           </a>
         {/if}
@@ -72,14 +76,20 @@
     {:else}
       <div class="lijeve-akcije">
         <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
-          <span class="povratak-ikona" aria-hidden="true"></span>
+          <img class="header-ikona" src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
           <span>Nazad</span>
         </button>
         {#if prikaziPovratakNaPocetnu}
           <a href="/" class="header-akcija" aria-label="Početna">
-            <span class="pocetna-ikona" aria-hidden="true"></span>
+            <img class="header-ikona" src="/ikone/04-naslovna.png" alt="" aria-hidden="true" />
             <span>Početna</span>
           </a>
+        {/if}
+        {#if mozeNaprijed}
+          <button type="button" class="header-akcija" aria-label="Naprijed" onclick={idiNaprijed}>
+            <img class="header-ikona" src="/ikone/05-naprijed.png" alt="" aria-hidden="true" />
+            <span>Naprijed</span>
+          </button>
         {/if}
       </div>
     {/if}
@@ -113,7 +123,9 @@
 <style>
   .header {
     width: 100%;
+    margin-top: 6px;
     background: transparent;
+    font-family: var(--font-naslov);
     font-size: var(--tekst-baza);
   }
 
@@ -143,7 +155,7 @@
     gap: 3px;
     padding: 0;
     color: var(--boja-tekst-osnovni);
-    font-size: 15px;
+    font-size: 25px;
     font-weight: 700;
     line-height: 1.2;
     white-space: nowrap;
@@ -154,30 +166,14 @@
   .naslovne-akcije {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 36px;
   }
 
-  .novosti-ikona {
-    width: 59px;
-    height: 59px;
+  .header-ikona {
+    width: 44px;
+    height: 44px;
     display: block;
-    background-color: #1a1815;
-    mask: url('/ikone/sucelje/Name=GiNotebook.svg') center / 48px 48px no-repeat;
-  }
-
-  .povratne-informacije-ikona {
-    width: 59px;
-    height: 59px;
-    display: block;
-    background-color: #1a1815;
-    mask: url('/ikone/sucelje/Name=GiTeamIdea.svg') center / 48px 48px no-repeat;
-  }
-
-  .novosti-link:hover .novosti-ikona,
-  .novosti-link:focus-visible .novosti-ikona,
-  .novosti-link:hover .povratne-informacije-ikona,
-  .novosti-link:focus-visible .povratne-informacije-ikona {
-    background-color: var(--boja-akcent);
+    object-fit: contain;
   }
 
   .novosti-link:hover,
@@ -206,7 +202,7 @@
     background: transparent;
     color: var(--boja-tekst-osnovni);
     font: inherit;
-    font-size: 15px;
+    font-size: 25px;
     font-weight: 700;
     line-height: 1.2;
     text-align: center;
@@ -214,33 +210,10 @@
     cursor: pointer;
   }
 
-  .povratak-ikona,
-  .pocetna-ikona {
-    width: 59px;
-    height: 59px;
-    display: block;
-    background-color: var(--boja-akcent);
-  }
-
-  .povratak-ikona {
-    mask: url('/ikone/sucelje/Name=GiReturnArrow.svg') center / 48px 48px no-repeat;
-  }
-
-  .pocetna-ikona {
-    mask: url('/ikone/sucelje/Name=GiFastBackwardButton.svg') center / 48px 48px no-repeat;
-  }
-
   .header-akcija:hover,
   .header-akcija:focus-visible {
     color: var(--boja-akcent);
     text-decoration: none;
-  }
-
-  .header-akcija:hover .povratak-ikona,
-  .header-akcija:focus-visible .povratak-ikona,
-  .header-akcija:hover .pocetna-ikona,
-  .header-akcija:focus-visible .pocetna-ikona {
-    background-color: #1a1815;
   }
 
   .desno {
@@ -285,17 +258,11 @@
     overflow: hidden;
     color: var(--boja-tekst-osnovni);
     font-weight: 700;
-    font-size: 15px;
+    font-size: 25px;
     letter-spacing: 0.6px;
     line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  @media (min-width: 600px) {
-    .profil-ime {
-      font-size: 15px;
-    }
   }
 
   .profil-link:hover .profil-ime {
@@ -309,11 +276,30 @@
 
   @media (max-width: 599px) {
     .header-sadrzaj { padding-inline: 16px; }
-    .novosti-link, .header-akcija { font-size: 14px; }
+    .novosti-link, .header-akcija { font-size: 22px; }
+    .naslovne-akcije .header-ikona {
+      width: 33px;
+      height: 33px;
+    }
     .lijeve-akcije { gap: 4px; }
     .header-akcija { min-width: 68px; }
-    .naslovne-akcije { display: contents; }
-    .naslovne-akcije .novosti-link { max-width: none; text-align: center; font-size: 14px; }
+    .naslovne-akcije {
+      height: 80px;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0;
+    }
+    .naslovne-akcije .novosti-link {
+      width: max-content;
+      height: 33px;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 6px;
+      text-align: left;
+      font-size: 16px;
+    }
     .desno { margin-left: 0; }
   }
 </style>

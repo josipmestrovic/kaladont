@@ -13,7 +13,7 @@ import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
 import { dohvatiSesijuZahtjeva } from './autentikacija.js';
 import { izdajSesiju, opozoviSesiju, stvoriGostSesiju } from './sesije.js';
-import { validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
+import { MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA, validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
 import {
   izdajTokenPotvrdeEmaila,
   izdajTokenResetaLozinke,
@@ -44,7 +44,7 @@ const TRAJANJE_KOLACICA_MS = 30 * 24 * 60 * 60 * 1000;
 const ShemaRegistracije = z.object({
   email: z.string().email(),
   lozinka: z.string().min(8),
-  nadimak: z.string().min(2).max(12).optional(),
+  nadimak: z.string().min(MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).max(MAKSIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).regex(UZORAK_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).optional(),
   avatarId: z
     .number()
     .int()
@@ -62,6 +62,10 @@ const ShemaPrijave = z.object({
 const ShemaZaboravljenaLozinka = z.object({ email: z.string().email() });
 const ShemaResetLozinke = z.object({ token: z.string(), novaLozinka: z.string().min(8) });
 const ShemaTokena = z.object({ token: z.string() });
+
+function normalizirajEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 function javnaPoveznica(putanja: string): string {
   return new URL(putanja, konfiguracija.JAVNA_ADRESA).toString();
@@ -100,9 +104,10 @@ export async function registrirajRacuneRute(
   app.post('/racuni/registracija', ogranicenje(limitPokusaja), async (zahtjev, odgovor) => {
     const rezultat = ShemaRegistracije.safeParse(zahtjev.body);
     if (!rezultat.success) {
-      return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
+      return odgovor.code(400).send({ ok: false, greska: rezultat.error.issues[0]?.message ?? 'Neispravni podaci.' });
     }
     const { email, lozinka, nadimak, avatarId, avatarConfig } = rezultat.data;
+    const normaliziraniEmail = normalizirajEmail(email);
     if (avatarConfig !== undefined && !validirajAvatarConfig(avatarConfig)) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
     }
@@ -111,7 +116,7 @@ export async function registrirajRacuneRute(
     const [postojeciEmail] = await baza
       .select()
       .from(igraci)
-      .where(eq(igraci.email, email))
+      .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
       .limit(1);
     if (postojeciEmail) {
       return odgovor.code(409).send({ ok: false, greska: 'Ta email adresa je već registrirana.' });
@@ -132,7 +137,7 @@ export async function registrirajRacuneRute(
         .update(igraci)
         .set({
           vrsta: 'registriran',
-          email,
+          email: normaliziraniEmail,
           lozinkaHash,
           emailPotvrdjen: false,
           ...(nadimak ? { nadimak } : {}),
@@ -147,10 +152,10 @@ export async function registrirajRacuneRute(
         .insert(igraci)
         .values({
           vrsta: 'registriran',
-          email,
+          email: normaliziraniEmail,
           lozinkaHash,
           emailPotvrdjen: false,
-          nadimak: nadimak ?? email.split('@')[0]!,
+          nadimak: nadimak ?? normaliziraniEmail.split('@')[0]!,
           avatarId: avatarId ?? Math.floor(Math.random() * BROJ_AVATARA),
           avatarConfig: kanonskiAvatarConfig ?? null,
         })
@@ -165,7 +170,7 @@ export async function registrirajRacuneRute(
     const tokenPotvrde = izdajTokenPotvrdeEmaila(igracId);
     await posaljiEmail(
       app.log,
-      email,
+      normaliziraniEmail,
       porukaPotvrdeEmaila(javnaPoveznica(`/potvrda-emaila?token=${tokenPotvrde}`)),
     );
 
@@ -185,10 +190,11 @@ export async function registrirajRacuneRute(
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
     }
     const { email, lozinka } = rezultat.data;
+    const normaliziraniEmail = normalizirajEmail(email);
 
     const PORUKA_NEUSPJEHA = 'Pogrešan email ili lozinka.'; // namjerno isto za oba slucaja
 
-    const [korisnik] = await baza.select().from(igraci).where(eq(igraci.email, email)).limit(1);
+    const [korisnik] = await baza.select().from(igraci).where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`).limit(1);
     if (!korisnik || !korisnik.lozinkaHash) {
       return odgovor.code(401).send({ ok: false, greska: PORUKA_NEUSPJEHA });
     }
@@ -244,16 +250,17 @@ export async function registrirajRacuneRute(
 
       const PORUKA = 'Ako račun postoji, poslali smo upute na email.'; // ne otkriva postoji li racun
 
+      const normaliziraniEmail = normalizirajEmail(rezultat.data.email);
       const [korisnik] = await baza
         .select()
         .from(igraci)
-        .where(eq(igraci.email, rezultat.data.email))
+        .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
         .limit(1);
       if (korisnik) {
         const token = izdajTokenResetaLozinke(korisnik.id);
         await posaljiEmail(
           app.log,
-          rezultat.data.email,
+          normaliziraniEmail,
           porukaResetaLozinke(javnaPoveznica(`/racuni/resetiraj-lozinku?token=${token}`)),
         );
       }

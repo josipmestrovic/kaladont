@@ -168,8 +168,25 @@ describe('GET /povijest/:igracId', () => {
 
     const odgovor = await fetch(`${adresa}/api/povijest/${igracId}`);
     expect(odgovor.status).toBe(200);
-    const tijelo = (await odgovor.json()) as { ok: boolean; partije: unknown[] };
+    const tijelo = (await odgovor.json()) as { ok: boolean; partije: unknown[]; imaJos: boolean; sljedeciCursor: string | null };
     expect(tijelo.partije).toEqual([]);
+    expect(tijelo.imaJos).toBe(false);
+    expect(tijelo.sljedeciCursor).toBeNull();
+  });
+});
+
+describe('GET /partije/:partijaId/potezi', () => {
+  it('vraća paginirani oblik i metapodatke za nepostojeću partiju', async () => {
+    const odgovor = await fetch(`${adresa}/api/partije/${randomUUID()}/potezi?limit=9999`);
+    expect(odgovor.status).toBe(200);
+    const tijelo = (await odgovor.json()) as {
+      potezi: unknown[];
+      limit: number;
+      imaJos: boolean;
+    };
+    expect(tijelo.potezi).toEqual([]);
+    expect(tijelo.limit).toBe(500);
+    expect(tijelo.imaJos).toBe(false);
   });
 });
 
@@ -246,7 +263,7 @@ describe('PUT /profil/nadimak', () => {
       const odgovor = await fetch(`${adresa}/api/profil/nadimak`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
-        body: JSON.stringify({ nadimak: 'A' }),
+        body: JSON.stringify({ nadimak: 'An' }),
       });
       expect(odgovor.status).toBe(400);
     } finally {
@@ -260,7 +277,7 @@ describe('PUT /profil/nadimak', () => {
       const odgovor = await fetch(`${adresa}/api/profil/nadimak`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
-        body: JSON.stringify({ nadimak: 'A'.repeat(21) }),
+        body: JSON.stringify({ nadimak: 'A'.repeat(13) }),
       });
       expect(odgovor.status).toBe(400);
     } finally {

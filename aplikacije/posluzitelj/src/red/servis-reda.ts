@@ -15,7 +15,7 @@ const SOBA_REDA_1V1 = 'red-cekanja-1v1';
 
 export function registrirajRedCekanja(
   io: KaladontIo,
-  naStolSastavljen: (stol: StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca') => void,
+  naStolSastavljen: (stol: StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca') => Promise<void> | void,
   igracImaAktivnuPartiju: (igracId: string) => boolean,
   igracImaPrivatnuSobu: (igracId: string) => boolean,
   mozeStvoritiPartiju: () => boolean,
@@ -134,8 +134,13 @@ export function registrirajRedCekanja(
 
       const stol = red.pokusajSastaviStol();
       if (stol) {
-        naStolSastavljen(stol, mod);
-        posaljiStanje(mod);
+        void Promise.resolve(naStolSastavljen(stol, mod))
+          .then(() => posaljiStanje(mod))
+          .catch((greska) => {
+            console.error('Neuspjelo pokretanje partije:', greska);
+            for (const stavka of stol) red.udji(stavka);
+            posaljiStanje(mod);
+          });
       }
     });
 

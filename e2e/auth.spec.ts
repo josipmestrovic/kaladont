@@ -5,8 +5,8 @@ test('registracija i prijava zadržavaju sesiju nakon reloadanja', async ({ page
 
   await page.goto('/registracija');
   const nadimak = page.getByPlaceholder('Tvoj nadimak');
-  await nadimak.fill('E2E Igrac');
-  await expect(nadimak).toHaveValue('E2E Igrac');
+  await nadimak.fill('E2EIgrac');
+  await expect(nadimak).toHaveValue('E2EIgrac');
   await page.getByRole('button', { name: 'Dalje' }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
@@ -43,7 +43,7 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   const email = `e2e-logout-${Date.now()}@example.com`;
 
   await page.goto('/registracija');
-  await page.getByPlaceholder('Tvoj nadimak').fill('Logout Igrac');
+  await page.getByPlaceholder('Tvoj nadimak').fill('LogoutIgrac');
   await page.getByRole('button', { name: 'Dalje' }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');

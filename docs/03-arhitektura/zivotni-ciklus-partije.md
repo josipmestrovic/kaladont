@@ -16,7 +16,12 @@ stateDiagram-v2
     CekanjePoteza --> Eliminacija : ne znam / istek / dobrovoljni izlazak / mrtva slova
     Eliminacija --> SustavBiraRijec : ostalo ≥ 2 igrača (sustav ponovno bira riječ)
     Eliminacija --> KrajPartije : ostao 1 igrač
-    KrajPartije --> [*] : plasmani, bodovi, upis u bazu
+    KrajPartije --> SpremanjeRezultata : igra završena, upis u bazu
+    SpremanjeRezultata --> SpremanjeRezultata : prolazna greška, ponovni pokušaj
+    SpremanjeRezultata --> [*] : upis potvrđen, partija:kraj
+    StolPopunjen --> Ponistena : restart ili kontrolirano gašenje
+    CekanjePoteza --> Ponistena : restart ili kontrolirano gašenje
+    Ponistena --> [*] : zapis ponisten, obavijest igračima
 ```
 
 Napomene:
@@ -54,6 +59,16 @@ sequenceDiagram
 
 ## Kraj partije — transakcija
 
-U jednoj transakciji: upis `plasman/bodovi/eliminacije/iskustvo/nacin_ispadanja` u `sudionici_partije` → ažuriranje agregata u `igraci`, uključujući trajni XP → status partije `zavrsena`. Tek potom se emitira personalizirani `partija:kraj`. Time podaci u bazi nikad ne zaostaju za onim što su igrači vidjeli.
+Završetak igre i spremanje rezultata su dva odvojena stanja. Motor prvo zaustavlja poteze i računa konačne plasmane, ali zadržava partiju u memoriji sa statusom `spremanje_rezultata`. Dok traje prolazni problem s bazom, ponavlja isti završni upis s eksponencijalnim odmakom i igračima šalje `partija:spremanje-rezultata`.
+
+U jednoj transakciji: upis `plasman/bodovi/eliminacije/iskustvo/nacin_ispadanja` u `sudionici_partije` → ažuriranje agregata u `igraci`, uključujući trajni XP → status partije `zavrsena`. Završni upis mora biti idempotentan za isti `partijaId`, jer pokušaj može biti ponovljen nakon prekida veze s bazom. Tek nakon potvrđene transakcije motor sprema personalizirane rezultate, emitira `partija:kraj`, zatvara privatnu sobu i zakazuje brisanje memorijskog stanja.
+
+`partija:kraj` je potvrda da su rezultati trajno spremljeni, a ne samo da je igra završila. Oporavak vrijedi dok proces radi; otpornost na restart procesa zahtijevala bi trajni outbox.
+
+## Restart i kontrolirano gašenje
+
+Pri podizanju poslužitelja svi redovi `partije` sa statusom `u_tijeku` prelaze u `ponistena`. To su partije čije je memorijsko stanje izgubljeno restartom i ne smiju ponovno izgledati kao aktivne.
+
+Pri `SIGTERM`/`SIGINT` poslužitelj prvo prestaje prihvaćati nova uparivanja i pokretanja privatnih partija, zatim aktivnim klijentima šalje `partija:ponistena`, označava njihove zapise kao `ponistena`, zaustavlja timere i tek onda zatvara Socket.IO/HTTP poslužitelj. Igrač dobiva jasnu poruku da rezultat nije dodijeljen i može se vratiti na naslovnicu.
 
 Igrač eliminiran bez dobrovoljnog izlaska može prije toga dobiti privatni `iskustvo:obracun` za konačne poteze i streak; taj prikaz ne obavlja isplatu. Stvarni zapis XP-a ostaje dio završne transakcije, pa se ne može dodijeliti dvaput reconnectom.

@@ -3,7 +3,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
-import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   DEFINICIJE_DOSTIGNUCA,
@@ -36,6 +36,7 @@ import {
   zahtijevajPrijavu,
   type ZahtjevSIgracem,
 } from '../racuni/autentikacija.js';
+import { MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA } from 'zajednicko';
 
 const ShemaAvatar = z.object({
   avatarId: z
@@ -44,7 +45,7 @@ const ShemaAvatar = z.object({
     .min(0)
     .max(BROJ_AVATARA - 1),
 });
-const ShemaNadimak = z.object({ nadimak: z.string().trim().min(2).max(12) });
+const ShemaNadimak = z.object({ nadimak: z.string().min(MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).max(MAKSIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).regex(UZORAK_NADIMKA, PORUKA_NEVALJANOG_NADIMKA) });
 const ShemaLimit = z.object({
   limit: z.coerce
     .number()
@@ -57,6 +58,71 @@ const ShemaLozinka = z.object({
   trenutnaLozinka: z.string().min(1),
   novaLozinka: z.string().min(8),
 });
+
+const MAKSIMALNO_OTKLJUCANIH_RIJECI_PO_KATEGORIJI = 200;
+const MAKSIMALNO_POTEZA_PO_STRANICI = 500;
+const ZIVOTNI_VIJEK_TOP_RIJECI_MS = 30_000;
+const MAKSIMALNO_PARTIJA_PO_STRANICI = 50;
+const MAKSIMALNO_RIJECI_PO_STRANICI = 50;
+
+type TopRijeciCache = {
+  stvoreno: number;
+  ukupnoPartija: number;
+  retci: { rijec: string | null; brojUpotreba: number; brojPartija: number }[];
+};
+
+let topRijeciCache: TopRijeciCache | null = null;
+
+type CursorPovijestiPartija = { pocetak: string; partijaId: string };
+type CursorRijeci = { rijec: string };
+const KATEGORIJE_RIJECI = ['duge', 'srednjeDuge', 'jakoDuge', 'rijetke', 'srednjeRijetke', 'jakoRijetke'] as const;
+type KategorijaRijeci = (typeof KATEGORIJE_RIJECI)[number];
+
+function kodirajCursor<T>(vrijednost: T): string {
+  return Buffer.from(JSON.stringify(vrijednost), 'utf8').toString('base64url');
+}
+
+function dekodirajCursor<T>(vrijednost: string | undefined): T | null {
+  if (!vrijednost) return null;
+  try {
+    return JSON.parse(Buffer.from(vrijednost, 'base64url').toString('utf8')) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizirajEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+async function dohvatiTopRijeci(): Promise<TopRijeciCache> {
+  const sada = Date.now();
+  if (topRijeciCache && sada - topRijeciCache.stvoreno < ZIVOTNI_VIJEK_TOP_RIJECI_MS) {
+    return topRijeciCache;
+  }
+
+  const [[redakUkupno], retci] = await Promise.all([
+    baza.select({ ukupnoPartija: sql<number>`count(*)::int` }).from(partije),
+    baza
+      .select({
+        rijec: potezi.rijec,
+        brojUpotreba: sql<number>`count(*)::int`,
+        brojPartija: sql<number>`count(distinct ${potezi.partijaId})::int`,
+      })
+      .from(potezi)
+      .where(sql`${potezi.vrsta} = 'rijec' and ${potezi.rijec} is not null`)
+      .groupBy(potezi.rijec)
+      .orderBy(desc(sql`count(*)`), asc(potezi.rijec))
+      .limit(100),
+  ]);
+
+  topRijeciCache = {
+    stvoreno: sada,
+    ukupnoPartija: redakUkupno?.ukupnoPartija ?? 0,
+    retci,
+  };
+  return topRijeciCache;
+}
 
 function prosjekBodova(bodoviUkupno: number, odigrane: number): number {
   return odigrane > 0 ? bodoviUkupno / odigrane : 0;
@@ -101,40 +167,74 @@ function prosjecnaOcjena(
 }
 
 async function dohvatiOtkljucaneRijeci(igracId: string) {
-  const retci = await baza
-    .select({
-      rijec: otkljucaneRijeciIgraca.rijec,
-      dugaTier: otkljucaneRijeciIgraca.dugaTier,
-      rijetkaTier: otkljucaneRijeciIgraca.rijetkaTier,
-    })
-    .from(otkljucaneRijeciIgraca)
-    .where(eq(otkljucaneRijeciIgraca.igracId, igracId));
+  const [duge, srednjeDuge, jakoDuge, rijetke, srednjeRijetke, jakoRijetke] = await Promise.all([
+    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.dugaTier, 0),
+    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.dugaTier, 1),
+    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.dugaTier, 2),
+    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.rijetkaTier, 2),
+    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.rijetkaTier, 1),
+    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.rijetkaTier, 0),
+  ]);
   return {
-    duge: retci
-      .filter((redak) => redak.dugaTier === 0)
-      .map((redak) => redak.rijec)
-      .sort(),
-    srednjeDuge: retci
-      .filter((redak) => redak.dugaTier === 1)
-      .map((redak) => redak.rijec)
-      .sort(),
-    jakoDuge: retci
-      .filter((redak) => redak.dugaTier === 2)
-      .map((redak) => redak.rijec)
-      .sort(),
-    rijetke: retci
-      .filter((redak) => redak.rijetkaTier === 2)
-      .map((redak) => redak.rijec)
-      .sort(),
-    srednjeRijetke: retci
-      .filter((redak) => redak.rijetkaTier === 1)
-      .map((redak) => redak.rijec)
-      .sort(),
-    jakoRijetke: retci
-      .filter((redak) => redak.rijetkaTier === 0)
-      .map((redak) => redak.rijec)
-      .sort(),
+    duge,
+    srednjeDuge,
+    jakoDuge,
+    rijetke,
+    srednjeRijetke,
+    jakoRijetke,
   };
+}
+
+function stupacZaKategoriju(kategorija: KategorijaRijeci) {
+  return kategorija === 'duge' || kategorija === 'srednjeDuge' || kategorija === 'jakoDuge'
+    ? otkljucaneRijeciIgraca.dugaTier
+    : otkljucaneRijeciIgraca.rijetkaTier;
+}
+
+function tierZaKategoriju(kategorija: KategorijaRijeci): number {
+  return kategorija === 'duge' ? 0
+    : kategorija === 'srednjeDuge' ? 1
+      : kategorija === 'jakoDuge' ? 2
+        : kategorija === 'rijetke' ? 2
+          : kategorija === 'srednjeRijetke' ? 1
+            : 0;
+}
+
+async function dohvatiStranicuRijeci(igracId: string, kategorija: KategorijaRijeci, limit: number, cursor: CursorRijeci | null) {
+  const stupac = stupacZaKategoriju(kategorija);
+  const uvjet = and(
+    eq(otkljucaneRijeciIgraca.igracId, igracId),
+    eq(stupac, tierZaKategoriju(kategorija)),
+    ...(cursor ? [sql`${otkljucaneRijeciIgraca.rijec} > ${cursor.rijec}`] : []),
+  );
+  const retci = await baza
+    .select({ rijec: otkljucaneRijeciIgraca.rijec })
+    .from(otkljucaneRijeciIgraca)
+    .where(uvjet)
+    .orderBy(asc(otkljucaneRijeciIgraca.rijec))
+    .limit(limit + 1);
+  const imaJos = retci.length > limit;
+  const rijeciZaOdgovor = imaJos ? retci.slice(0, limit) : retci;
+  const zadnja = rijeciZaOdgovor.at(-1);
+  return {
+    rijeci: rijeciZaOdgovor.map((redak) => redak.rijec),
+    imaJos,
+    sljedeciCursor: imaJos && zadnja ? kodirajCursor({ rijec: zadnja.rijec }) : null,
+  };
+}
+
+async function dohvatiRijeciPoTieru(
+  igracId: string,
+  stupac: typeof otkljucaneRijeciIgraca.dugaTier | typeof otkljucaneRijeciIgraca.rijetkaTier,
+  tier: number,
+): Promise<string[]> {
+  const retci = await baza
+    .select({ rijec: otkljucaneRijeciIgraca.rijec })
+    .from(otkljucaneRijeciIgraca)
+    .where(and(eq(otkljucaneRijeciIgraca.igracId, igracId), eq(stupac, tier)))
+    .orderBy(asc(otkljucaneRijeciIgraca.rijec))
+    .limit(MAKSIMALNO_OTKLJUCANIH_RIJECI_PO_KATEGORIJI);
+  return retci.map((redak) => redak.rijec);
 }
 
 function javnaStatistika(statistika: Awaited<ReturnType<typeof dohvatiStatistiku>>) {
@@ -241,6 +341,41 @@ export async function registrirajProfilRute(
   app: FastifyInstance,
   rjecnik: RjecnikUMemoriji,
 ): Promise<void> {
+  const dohvatiKategoriju = (vrijednost: string | undefined): KategorijaRijeci | null =>
+    KATEGORIJE_RIJECI.includes(vrijednost as KategorijaRijeci) ? vrijednost as KategorijaRijeci : null;
+
+  app.get<{ Querystring: { kategorija?: string; limit?: string; cursor?: string } }>(
+    '/profil/rijeci',
+    { preHandler: zahtijevajPrijavu },
+    async (zahtjev, odgovor) => {
+      const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+      const kategorija = dohvatiKategoriju(zahtjev.query.kategorija);
+      if (!kategorija) return odgovor.code(400).send({ ok: false, greska: 'Neispravna kategorija riječi.' });
+      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '50', 10) || 50, 1), MAKSIMALNO_RIJECI_PO_STRANICI);
+      const cursor = dekodirajCursor<CursorRijeci>(zahtjev.query.cursor);
+      if (zahtjev.query.cursor && !cursor?.rijec) return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor riječi.' });
+      return { ok: true, kategorija, ...(await dohvatiStranicuRijeci(igrac.id, kategorija, limit, cursor)) };
+    },
+  );
+
+  app.get<{ Params: { igracId: string }; Querystring: { kategorija?: string; limit?: string; cursor?: string } }>(
+    '/profil/javni/:igracId/rijeci',
+    async (zahtjev, odgovor) => {
+      const kategorija = dohvatiKategoriju(zahtjev.query.kategorija);
+      if (!kategorija) return odgovor.code(400).send({ ok: false, greska: 'Neispravna kategorija riječi.' });
+      const [igrac] = await baza.select({ id: igraci.id }).from(igraci).where(and(
+        eq(igraci.id, zahtjev.params.igracId),
+        sql`${igraci.vrsta} in ('registriran', 'admin')`,
+        isNull(igraci.obrisanAt),
+      )).limit(1);
+      if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
+      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '50', 10) || 50, 1), MAKSIMALNO_RIJECI_PO_STRANICI);
+      const cursor = dekodirajCursor<CursorRijeci>(zahtjev.query.cursor);
+      if (zahtjev.query.cursor && !cursor?.rijec) return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor riječi.' });
+      return { ok: true, kategorija, ...(await dohvatiStranicuRijeci(igrac.id, kategorija, limit, cursor)) };
+    },
+  );
+
   app.get('/dostignuca', { preHandler: zahtijevajPrijavu }, async (zahtjev) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
     return { ok: true, ...(await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno)) };
@@ -253,7 +388,6 @@ export async function registrirajProfilRute(
       dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
       dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
     ]);
-    const otkljucaneRijeci = await dohvatiOtkljucaneRijeci(igrac.id);
     const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
     const prosjek1v1 = prosjekBodova(igrac.bodovi1v1, igrac.odigrane1v1);
     const stil = stilIgre(
@@ -293,7 +427,6 @@ export async function registrirajProfilRute(
       stvoren: igrac.stvoren,
       statistikaRijeci: javnaStatistika(statistikaRijeci),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
-      otkljucaneRijeci,
       dostignuca,
     };
   });
@@ -313,7 +446,6 @@ export async function registrirajProfilRute(
       dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
       dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
     ]);
-    const otkljucaneRijeci = await dohvatiOtkljucaneRijeci(igrac.id);
     const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
     const prosjek1v1 = prosjekBodova(igrac.bodovi1v1, igrac.odigrane1v1);
     const stil = stilIgre(
@@ -349,7 +481,6 @@ export async function registrirajProfilRute(
       stilIgre: stil,
       statistikaRijeci: javnaStatistika(statistikaRijeci),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
-      otkljucaneRijeci,
       dostignuca,
     };
   });
@@ -380,7 +511,7 @@ export async function registrirajProfilRute(
   app.put('/profil/nadimak', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
     const rezultat = ShemaNadimak.safeParse(zahtjev.body);
     if (!rezultat.success) {
-      return odgovor.code(400).send({ ok: false, greska: 'Ime mora imati 2-20 znakova.' });
+      return odgovor.code(400).send({ ok: false, greska: rezultat.error.issues[0]?.message ?? PORUKA_NEVALJANOG_NADIMKA });
     }
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
     await baza
@@ -399,10 +530,11 @@ export async function registrirajProfilRute(
     if (!igrac.lozinkaHash || !(await argonVerify(igrac.lozinkaHash, rezultat.data.lozinka))) {
       return odgovor.code(401).send({ ok: false, greska: 'Pogre\u0161na lozinka.' });
     }
+    const normaliziraniEmail = normalizirajEmail(rezultat.data.noviEmail);
     const [postojeci] = await baza
       .select()
       .from(igraci)
-      .where(eq(igraci.email, rezultat.data.noviEmail))
+      .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
       .limit(1);
     if (postojeci && postojeci.id !== igrac.id) {
       return odgovor
@@ -411,14 +543,14 @@ export async function registrirajProfilRute(
     }
     await baza
       .update(igraci)
-      .set({ email: rezultat.data.noviEmail, emailPotvrdjen: false })
+      .set({ email: normaliziraniEmail, emailPotvrdjen: false })
       .where(eq(igraci.id, igrac.id));
     const tokenPotvrde = izdajTokenPotvrdeEmaila(igrac.id);
     const poveznica = new URL(
       `/potvrda-emaila?token=${tokenPotvrde}`,
       konfiguracija.JAVNA_ADRESA,
     ).toString();
-    await posaljiEmail(app.log, rezultat.data.noviEmail, porukaPotvrdeEmaila(poveznica, true));
+    await posaljiEmail(app.log, normaliziraniEmail, porukaPotvrdeEmaila(poveznica, true));
     return { ok: true };
   });
 
@@ -510,23 +642,7 @@ export async function registrirajProfilRute(
   app.get<{ Querystring: { limit?: string } }>('/rijeci/top', async (zahtjev) => {
     const rezultatLimita = ShemaLimit.safeParse(zahtjev.query);
     const limit = rezultatLimita.success ? (rezultatLimita.data.limit ?? 10) : 10;
-
-    const [redakUkupno] = await baza
-      .select({ ukupnoPartija: sql<number>`count(*)::int` })
-      .from(partije);
-    const ukupnoPartija = redakUkupno?.ukupnoPartija ?? 0;
-
-    const retci = await baza
-      .select({
-        rijec: potezi.rijec,
-        brojUpotreba: sql<number>`count(*)::int`,
-        brojPartija: sql<number>`count(distinct ${potezi.partijaId})::int`,
-      })
-      .from(potezi)
-      .where(sql`${potezi.vrsta} = 'rijec' and ${potezi.rijec} is not null`)
-      .groupBy(potezi.rijec)
-      .orderBy(desc(sql`count(*)`))
-      .limit(limit);
+    const { retci, ukupnoPartija } = await dohvatiTopRijeci();
 
     return {
       ok: true,
@@ -539,11 +655,19 @@ export async function registrirajProfilRute(
     };
   });
 
-  app.get<{ Params: { igracId: string }; Querystring: { limit?: string; offset?: string } }>(
+  app.get<{ Params: { igracId: string }; Querystring: { limit?: string; cursor?: string } }>(
     '/povijest/:igracId',
-    async (zahtjev) => {
-      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '10', 10) || 10, 1), 50);
-      const offset = Math.max(parseInt(zahtjev.query.offset ?? '0', 10) || 0, 0);
+    async (zahtjev, odgovor) => {
+      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '20', 10) || 20, 1), MAKSIMALNO_PARTIJA_PO_STRANICI);
+      const cursor = dekodirajCursor<CursorPovijestiPartija>(zahtjev.query.cursor);
+      if (zahtjev.query.cursor && (!cursor?.pocetak || !cursor.partijaId || Number.isNaN(Date.parse(cursor.pocetak)))) {
+        return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor povijesti.' });
+      }
+
+      const uvjetIgraca = eq(sudioniciPartije.igracId, zahtjev.params.igracId);
+      const uvjetCursora = cursor
+        ? sql`(${partije.pocetak} < ${new Date(cursor.pocetak)} OR (${partije.pocetak} = ${new Date(cursor.pocetak)} AND ${sudioniciPartije.partijaId} < ${cursor.partijaId}))`
+        : undefined;
 
       const retci = await baza
         .select({
@@ -557,22 +681,53 @@ export async function registrirajProfilRute(
         })
         .from(sudioniciPartije)
         .innerJoin(partije, eq(partije.id, sudioniciPartije.partijaId))
-        .where(eq(sudioniciPartije.igracId, zahtjev.params.igracId))
-        .orderBy(desc(partije.pocetak))
-        .limit(limit)
-        .offset(offset);
+        .where(uvjetCursora ? and(uvjetIgraca, uvjetCursora) : uvjetIgraca)
+        .orderBy(desc(partije.pocetak), desc(sudioniciPartije.partijaId))
+        .limit(limit + 1);
 
-      return { ok: true, partije: retci };
+      const imaJos = retci.length > limit;
+      const partijeZaOdgovor = imaJos ? retci.slice(0, limit) : retci;
+      const zadnja = partijeZaOdgovor.at(-1);
+
+      return {
+        ok: true,
+        partije: partijeZaOdgovor,
+        imaJos,
+        sljedeciCursor: imaJos && zadnja ? kodirajCursor({ pocetak: new Date(zadnja.pocetak).toISOString(), partijaId: zadnja.partijaId }) : null,
+      };
     },
   );
 
-  app.get<{ Params: { partijaId: string } }>('/partije/:partijaId/potezi', async (zahtjev) => {
-    const retci = await baza
-      .select()
-      .from(potezi)
-      .where(eq(potezi.partijaId, zahtjev.params.partijaId))
-      .orderBy(potezi.redniBroj);
+  app.get<{ Params: { partijaId: string }; Querystring: { limit?: string; cursor?: string } }>(
+    '/partije/:partijaId/potezi',
+    async (zahtjev, odgovor) => {
+      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '100', 10) || 100, 1), MAKSIMALNO_POTEZA_PO_STRANICI);
+      const cursor = dekodirajCursor<{ redniBroj: number; id: number }>(zahtjev.query.cursor);
+      if (zahtjev.query.cursor && (!cursor || !Number.isInteger(cursor.redniBroj) || !Number.isSafeInteger(cursor.id))) {
+        return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor poteza.' });
+      }
+      const osnovniUvjet = eq(potezi.partijaId, zahtjev.params.partijaId);
+      const uvjetCursora = cursor
+        ? sql`(${potezi.redniBroj} > ${cursor.redniBroj} OR (${potezi.redniBroj} = ${cursor.redniBroj} AND ${potezi.id} > ${cursor.id}))`
+        : undefined;
 
-    return { ok: true, potezi: retci };
-  });
+      const retci = await baza
+        .select()
+        .from(potezi)
+        .where(uvjetCursora ? and(osnovniUvjet, uvjetCursora) : osnovniUvjet)
+        .orderBy(asc(potezi.redniBroj), asc(potezi.id))
+        .limit(limit + 1);
+      const imaJos = retci.length > limit;
+      const poteziZaOdgovor = imaJos ? retci.slice(0, limit) : retci;
+      const zadnji = poteziZaOdgovor.at(-1);
+
+      return {
+        ok: true,
+        potezi: poteziZaOdgovor,
+        limit,
+        imaJos,
+        sljedeciCursor: imaJos && zadnji ? kodirajCursor({ redniBroj: zadnji.redniBroj, id: zadnji.id }) : null,
+      };
+    },
+  );
 }

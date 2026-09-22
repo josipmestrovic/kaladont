@@ -31,7 +31,7 @@
 <section class="dnk-kartica" aria-labelledby="dnk-naslov">
   <div class="dnk-zaglavlje">
     <div>
-      <p class="dnk-natpis">Profil igre</p>
+      <p class="dnk-natpis"><img src="/ikone/15-kaladont-dnk.png" alt="" aria-hidden="true" />Profil igre</p>
       <h3 id="dnk-naslov">{naslov}</h3>
     </div>
     <span class:otkljucan={profil.otkljucan} class="dnk-status">
@@ -101,6 +101,9 @@
   }
 
   .dnk-natpis {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     margin: 0 0 2px;
     color: var(--boja-akcent);
     font-size: var(--tekst-mikro);
@@ -108,6 +111,8 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
+
+  .dnk-natpis img { width: 24px; height: 24px; object-fit: contain; }
 
   h3 {
     margin: 0;
