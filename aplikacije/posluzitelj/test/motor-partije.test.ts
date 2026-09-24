@@ -18,9 +18,10 @@ import { partije, rijeci, sesije, sudioniciPartije } from '../src/baza/shema.js'
 
 let app: FastifyInstance;
 let adresa: string;
+let zaustavi: () => Promise<void>;
 
 beforeAll(async () => {
-  ({ app } = await izgradiPosluzitelj({
+  ({ app, zaustavi } = await izgradiPosluzitelj({
     postavkeMotora: { tolerancijaPrekidaMs: 50 },
     socketOgranicenja: { handshakePoIpMinuti: 1_000 },
   }));
@@ -31,7 +32,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app.close();
+  await zaustavi();
 });
 
 interface Igrac {
@@ -418,7 +419,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     for (const igrac of igraci) igrac.socket.disconnect();
   });
 
-  it('RS-09: istek tolerancije na potezu eliminira igrača i daje bod napadaču', async () => {
+  it('RS-09: prekid na potezu eliminira igrača i daje bod napadaču', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
 
     const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
@@ -457,7 +458,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       },
     );
 
-    sljedeci.socket.disconnect(); // prekid veze dok je na potezu (RS-09)
+    sljedeci.socket.emit('partija:izadji'); // prekid partije dok je na potezu (RS-09)
 
     const eliminacija = await eliminacijaPromise;
     expect(eliminacija.igracId).toBe(sljedeci.token);

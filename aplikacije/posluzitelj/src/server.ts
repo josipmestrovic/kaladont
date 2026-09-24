@@ -384,6 +384,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     zatvoreno = true;
     clearInterval(cistacNepotvrdjenih);
     await upravitelj.zaustavi();
+    await new Promise<void>((resolve) => io.close(() => resolve()));
     await app.close();
   };
 
