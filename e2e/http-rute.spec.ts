@@ -62,6 +62,6 @@ test('same-origin Socket.IO handshake radi u buildanom serveru', async ({ page }
   await expect(page).toHaveURL(/\/red\?mod=dva_igraca$/);
   await expect(page.locator('ul.mjesta > li.moje-sjedalo .oznaka-ti')).toBeVisible();
   await expect(page.locator('ul.mjesta > li.zauzeto')).toHaveCount(1);
-  await expect(page.getByRole('heading')).toContainText('Čekamo još 1');
+  await expect(page.getByRole('heading', { name: /Čekamo još 1/ })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
