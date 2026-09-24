@@ -38,7 +38,7 @@ beforeAll(async () => {
   ({ igracId, sesijskiToken: token } = await registracija.json() as { igracId: string; sesijskiToken: string });
   const registracijaAdmin = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: emailAdmin, lozinka, nadimak: 'Admin Misli' }),
+    body: JSON.stringify({ email: emailAdmin, lozinka, nadimak: 'AdminMisli' }),
   });
   const admin = await registracijaAdmin.json() as { igracId: string; sesijskiToken: string };
   tokenAdmin = admin.sesijskiToken;
