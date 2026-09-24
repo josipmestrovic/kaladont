@@ -349,6 +349,7 @@ interface MjerenaPartija {
   greske: string[];
   odigraniPotezi: number;
   zakazanPotez: boolean;
+  potezUObradi: boolean;
   generacijaRunde: number;
   timerCekaMs: number | null;
   timerDriftMs: number[];
@@ -380,7 +381,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
 
   const pronadjiPartiju = (partijaId: string): MjerenaPartija | undefined => partije.get(partijaId);
   const zakaziPotez = (partija: MjerenaPartija): void => {
-    if (partija.zakazanPotez || !partija.naPotezuId || !partija.trazenaSlova || partija.krajMs !== null) return;
+    if (partija.zakazanPotez || partija.potezUObradi || !partija.naPotezuId || !partija.trazenaSlova || partija.krajMs !== null) return;
     const bot = botPoIgracu.get(partija.naPotezuId);
     if (!bot) return;
     const generacijaRunde = partija.generacijaRunde;
@@ -389,6 +390,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
     setTimeout(() => {
       if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
       partija.zakazanPotez = false;
+      partija.potezUObradi = true;
       void (async () => {
         if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
         if (partija.odigraniPotezi >= MAKS_POTEZA_KONTROLIRANE_PARTIJE) {
@@ -433,6 +435,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
           greske: [],
           odigraniPotezi: 0,
           zakazanPotez: false,
+          potezUObradi: false,
           generacijaRunde: 0,
           timerCekaMs: null,
           timerDriftMs: [],
@@ -449,6 +452,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
       if (!partija) return;
       partija.generacijaRunde += 1;
       partija.zakazanPotez = false;
+      partija.potezUObradi = false;
       partija.naPotezuId = poruka.naPotezuId;
       partija.trazenaSlova = poruka.trazenaSlova;
       partija.pokusane.clear();
@@ -472,6 +476,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
     bot.socket.on('potez:prihvacen', (poruka: PrihvacenPotez) => {
       const partija = [...partije.values()].find((kandidat) => kandidat.igraci.has(poruka.igracId));
       if (!partija) return;
+      partija.potezUObradi = false;
       const poslano = partija.poslanPotezMs.get(poruka.igracId);
       if (poslano !== undefined) {
         partija.poteziMs.push(performance.now() - poslano);
@@ -489,6 +494,11 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
       const igracId = igracPoSocketu.get(bot.socket.id ?? bot.token);
       const partija = igracId ? partijaPoIgracu.get(igracId) : undefined;
       if (partija) {
+        partija.potezUObradi = false;
+        if (poruka.kod === 'RIJEC_ISKORISTENA') {
+          zakaziPotez(partija);
+          return;
+        }
         const greska = `potez odbijen: ${poruka.kod}`;
         partija.greske.push(greska);
         greske.push(greska);
