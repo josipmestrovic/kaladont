@@ -375,7 +375,6 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
   const partije = new Map<string, MjerenaPartija>();
   const greske: string[] = [...klijenti.greske];
   const pocetniBrojPartija = postavke.brojPartija;
-  let vrstaGresaka = 0;
   let zavrsenePartije = 0;
 
   const pronadjiPartiju = (partijaId: string): MjerenaPartija | undefined => partije.get(partijaId);
@@ -400,8 +399,9 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
         partija.poslanPotezMs.set(partija.naPotezuId!, performance.now());
         bot.socket.emit('potez:rijec', { rijec });
       })().catch((greska: unknown) => {
-        partija.greske.push(greska instanceof Error ? greska.message : String(greska));
-        vrstaGresaka += 1;
+        const poruka = greska instanceof Error ? greska.message : String(greska);
+        partija.greske.push(poruka);
+        greske.push(poruka);
       });
     }, ODGODA_BOT_POTEZA_MS);
   };
@@ -480,15 +480,15 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
       const igracId = igracPoSocketu.get(bot.socket.id ?? bot.token);
       const partija = igracId ? partijaPoIgracu.get(igracId) : undefined;
       if (partija) {
-        partija.greske.push(`potez odbijen: ${poruka.kod}`);
-        vrstaGresaka += 1;
+        const greska = `potez odbijen: ${poruka.kod}`;
+        partija.greske.push(greska);
+        greske.push(greska);
         zakaziPotez(partija);
       }
     });
 
     bot.socket.on('greska', (poruka) => {
       greske.push(`${poruka.kod}: ${poruka.poruka}`);
-      vrstaGresaka += 1;
     });
 
     bot.socket.on('partija:spremanje-rezultata', (poruka: SpremanjeRezultataPartije) => {
@@ -517,7 +517,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
   const svaVremenaSpremanja = svePartije.flatMap((partija) => partija.spremanjeMs !== null && partija.krajMs !== null ? [partija.krajMs - partija.spremanjeMs] : []);
   const svaVremenaPoteza = svePartije.flatMap((partija) => partija.poteziMs);
   const ukupnoPoteza = svePartije.reduce((ukupno, partija) => ukupno + partija.odigraniPotezi, 0);
-  const stopaGresaka = (vrstaGresaka + greske.length) / Math.max(1, ukupnoPoteza + klijenti.trajanja.length);
+  const stopaGresaka = greske.length / Math.max(1, ukupnoPoteza + klijenti.trajanja.length);
   const provjere = {
     svePartijeZavrsile: zavrsenePartije === pocetniBrojPartija,
     stopaGresaka: stopaGresaka <= postavke.maksStopaGresaka,
@@ -535,7 +535,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
     zavrsenePartije,
     igraciUPartijama: pocetniBrojPartija * 4,
     ukupnoPoteza,
-    brojGresaka: vrstaGresaka + greske.length,
+    brojGresaka: greske.length,
     stopaGresaka,
     p95PotezMs: percentil(svaVremenaPoteza, 0.95),
     p95SpremanjeMs: percentil(svaVremenaSpremanja, 0.95),
