@@ -250,7 +250,18 @@ jobs:
       - name: Pokrenuti E2E nad izgrađenim same-origin serverom
         env:
           E2E_HTTP_ADRESA: http://127.0.0.1:3000
-        run: pnpm test:e2e:http
+        run: |
+          set +e
+          pnpm test:e2e:http
+          izlazni_kod=$?
+          if test "$izlazni_kod" -ne 0; then
+            echo '--- Docker stanje nakon HTTP E2E pada ---'
+            docker compose -f docker-compose.ci.yml ps
+            docker compose -f docker-compose.ci.yml logs --tail 300 aplikacija
+            echo '--- Health odgovor nakon HTTP E2E pada ---'
+            curl --silent --show-error http://127.0.0.1:3000/zdravlje || true
+          fi
+          exit "$izlazni_kod"
 
       - name: Pokrenuti browser smoke cijele partije nad imageom
         env:
