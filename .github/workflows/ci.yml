@@ -182,8 +182,19 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('ghcr.io/josipmestrovic/kaladont@{0}', steps.izgradi-candidate.outputs.digest) || 'kaladont:ci' }}
+          scanners: vuln
           severity: CRITICAL
           exit-code: '1'
+          format: table
+
+      - name: Izraditi Trivy SARIF izvještaj
+        if: always()
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('ghcr.io/josipmestrovic/kaladont@{0}', steps.izgradi-candidate.outputs.digest) || 'kaladont:ci' }}
+          scanners: vuln
+          exit-code: '0'
           format: sarif
           output: trivy-image.sarif
 
