@@ -186,14 +186,6 @@ export function pokreniSlusateljeIgre(): void {
 
   socket.on('partija:stanje', primijeniStanjePartije);
 
-  socket.on('disconnect', () => {
-    if (stanje.partijaId) {
-      stanje.partijaId = null;
-      stanje.naPotezuId = null;
-      stanje.istekPotezaIso = null;
-    }
-  });
-
   socket.on('partija:spremanje-rezultata', (p) => {
     if (p.partijaId !== stanje.partijaId) return;
     stanje.statusSpremanja = 'spremanje_rezultata';

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
+  import { goto } from '$app/navigation';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import AudioKontrola from './AudioKontrola.svelte';
 
@@ -31,7 +32,7 @@
     porukaEmail = null;
     try {
       await api('/profil/email', { method: 'PUT', body: JSON.stringify({ noviEmail, lozinka: lozinkaZaEmail }) });
-      porukaEmail = 'Poslali smo potvrdu na novi email.';
+      void goto('/potvrdi-email');
       noviEmail = '';
       lozinkaZaEmail = '';
     } catch (e) {

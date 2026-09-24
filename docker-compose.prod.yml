@@ -27,7 +27,7 @@ services:
       SESIJA_TAJNA: ${SESIJA_TAJNA:?Postavi produkcijsku SESIJA_TAJNA}
       EMAIL_API_KLJUC: ${EMAIL_API_KLJUC:?Postavi produkcijski EMAIL_API_KLJUC}
       EMAIL_POSILJATELJ: ${EMAIL_POSILJATELJ:-noreply@kaladont.hr}
-      STAGING_EMAIL_ALLOWLIST: ""
+      JAVNA_ADRESA: ${JAVNA_ADRESA:-https://kaladont.hr}
       DEV_MAIL: ${DEV_MAIL:?Postavi produkcijski DEV_MAIL}
       UMAMI_URL: ${UMAMI_URL:-}
       ONEMOGUCI_TIMER_POTEZA: "false"

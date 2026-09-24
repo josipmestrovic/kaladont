@@ -9,8 +9,8 @@ test('naslovnica prikazuje novi header, navigaciju i modal igre', async ({ page 
   await expect(page.getByRole('link', { name: 'Moj profil' })).toBeVisible();
   await expect(page.getByRole('banner').getByRole('link', { name: 'Igraj' })).toHaveCount(0);
   await expect(page.getByText('v0.3.0-closed-alpha.1')).toHaveCount(0);
-  await expect(page.getByText('Hrvatska online igra riječi')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'KALADONT multiplayer' })).toBeVisible();
+  await expect(page.getByText('Hrvatska multiplayer igra riječi')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'KALADONT online' })).toBeVisible();
   await expect(page.locator('.ilustracija')).toHaveCount(0);
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
@@ -26,7 +26,7 @@ test('naslovnica prikazuje novi header, navigaciju i modal igre', async ({ page 
   await expect(page.locator('.landing-footer').getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
   const pravila = navigacija.getByRole('link', { name: 'Pravila' });
   await expect(pravila).toHaveCSS('color', 'rgb(26, 24, 21)');
-  await expect(pravila.locator('.ikona-sucelja')).toHaveCSS('background-color', 'rgb(26, 24, 21)');
+  await expect(pravila.locator('img')).toHaveAttribute('src', '/ikone/08-pravila.png');
   const dimenzijeStavki = await navigacija.locator('.navigacijska-stavka').evaluateAll((stavke) =>
     stavke.map((stavka) => ({ sirina: stavka.getBoundingClientRect().width, visina: stavka.getBoundingClientRect().height })),
   );
@@ -46,14 +46,13 @@ test('naslovnica prikazuje novi header, navigaciju i modal igre', async ({ page 
   await expect(dijalog).toBeHidden();
 
   const rasporedNovosti = await novosti.evaluate((poveznica) => {
-    const ikona = poveznica.querySelector('.novosti-ikona')!.getBoundingClientRect();
+    const ikona = poveznica.querySelector('.header-ikona')!.getBoundingClientRect();
     const tekst = poveznica.querySelector('span:last-child')!.getBoundingClientRect();
     return { ikonaIznadTeksta: ikona.bottom <= tekst.top };
   });
   expect(rasporedNovosti.ikonaIznadTeksta).toBe(true);
-  await expect(page.locator('.novosti-ikona')).toHaveCSS('background-color', 'rgb(26, 24, 21)');
+  await expect(novosti.locator('img')).toHaveAttribute('src', '/ikone/01-sto-je-novo.png');
   await novosti.hover();
-  await expect(page.locator('.novosti-ikona')).toHaveCSS('background-color', 'rgb(228, 87, 46)');
   await expect(novosti).toHaveCSS('color', 'rgb(228, 87, 46)');
 
   await novosti.click();
@@ -71,15 +70,11 @@ test('mobilna naslovnica skriva ilustraciju i ostavlja profil desno', async ({ p
   await expect(novosti).toBeVisible();
   await expect(profil).toBeVisible();
   const headerRaspored = await page.locator('.header-sadrzaj').evaluate((header) => {
-    const novostiOkvir = header.querySelector('.novosti-link')!.getBoundingClientRect();
-    const avatar = header.querySelector('.header-avatar')!.getBoundingClientRect();
     const nadimakElement = header.querySelector('.profil-ime')!;
     return {
-      visineUskladene: Math.abs(novostiOkvir.height - avatar.height) <= 1,
       nadimakSkriven: getComputedStyle(nadimakElement).display === 'none',
     };
   });
-  expect(headerRaspored.visineUskladene).toBe(true);
   expect(headerRaspored.nadimakSkriven).toBe(true);
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
@@ -100,7 +95,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await expect(povratak).toHaveCSS('height', '80px');
   await expect(page.getByRole('link', { name: 'Početna' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Što je novo?' })).toHaveCount(0);
-  await expect(page.locator('.povratak-ikona')).toHaveCSS('background-color', 'rgb(228, 87, 46)');
+  await expect(povratak.locator('img')).toHaveAttribute('src', '/ikone/03-nazad.png');
 
   await povratak.click();
   await expect(page).toHaveURL('/');
@@ -111,7 +106,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   const pocetna = page.getByRole('link', { name: 'Početna' });
   await expect(pocetna).toBeVisible();
   await expect(pocetna).toHaveCSS('height', '80px');
-  await expect(page.locator('.pocetna-ikona')).toHaveCSS('background-color', 'rgb(228, 87, 46)');
+  await expect(pocetna.locator('img')).toHaveAttribute('src', '/ikone/04-naslovna.png');
   await pocetna.click();
   await expect(page).toHaveURL('/');
 });

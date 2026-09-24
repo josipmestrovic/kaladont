@@ -183,6 +183,20 @@
       "when": 1790071779811,
       "tag": "0025_worried_captain_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790145781166,
+      "tag": "0026_motionless_yellow_claw",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790148822479,
+      "tag": "0027_many_black_tarantula",
+      "breakpoints": true
     }
   ]
 }

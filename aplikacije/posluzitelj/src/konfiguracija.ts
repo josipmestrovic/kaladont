@@ -11,7 +11,6 @@ const shemaKonfiguracije = z.object({
   SESIJA_TAJNA: z.string().min(1, 'SESIJA_TAJNA nije postavljen'),
   EMAIL_API_KLJUC: z.string().default(''),
   EMAIL_POSILJATELJ: z.string().email().default('noreply@kaladont.hr'),
-  STAGING_EMAIL_ALLOWLIST: z.string().default(''),
   JAVNA_ADRESA: z.string().url().default('http://localhost:3000'),
   DEV_MAIL: z.string().email().default('dev@example.com'),
   UMAMI_URL: z.string().default(''),
@@ -51,7 +50,3 @@ if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'producti
     throw new Error('JAVNA_ADRESA mora koristiti HTTPS izvan razvoja i testiranja.');
   }
 }
-
-export const stagingEmailAllowlista = konfiguracija.STAGING_EMAIL_ALLOWLIST.split(',')
-  .map((adresa) => adresa.trim().toLowerCase())
-  .filter(Boolean);

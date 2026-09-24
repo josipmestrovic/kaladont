@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { izgradiPosluzitelj } from '../src/server.js';
+import { baza } from '../src/baza/klijent.js';
 
 let app: FastifyInstance;
 
@@ -80,5 +81,19 @@ describe('HTTP API namespace', () => {
 
     const stariProfil = await app.inject({ method: 'GET', url: '/profil' });
     expect(stariProfil.statusCode).toBe(404);
+  });
+
+  it('health vraća 503 i razlog kada baza nije dostupna', async () => {
+    const originalExecute = baza.execute;
+    baza.execute = (async () => {
+      throw new Error('simulirani pad baze');
+    }) as typeof baza.execute;
+    try {
+      const odgovor = await app.inject({ method: 'GET', url: '/zdravlje' });
+      expect(odgovor.statusCode).toBe(503);
+      expect(odgovor.json()).toEqual(expect.objectContaining({ ok: false, baza: 'nedostupna' }));
+    } finally {
+      baza.execute = originalExecute;
+    }
   });
 });

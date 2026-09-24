@@ -244,7 +244,7 @@ describe('potvrda emaila i reset lozinke', () => {
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
     const { igracId } = (await registracija.json()) as { igracId: string };
-    const token = izdajTokenPotvrdeEmaila(igracId);
+    const token = izdajTokenPotvrdeEmaila(igracId, EMAIL);
 
     const stariLink = await fetch(`${adresa}/racuni/potvrdi-email?token=${token}`, {
       redirect: 'manual',
@@ -263,6 +263,22 @@ describe('potvrda emaila i reset lozinke', () => {
       .from(igraci)
       .where(eq(igraci.id, igracId));
     expect(igrac?.emailPotvrdjen).toBe(true);
+  });
+
+  it('nepotvrđenom računu resend potvrde vraća cooldown bez dupliciranja registracije', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
+    const resend = await fetch(`${adresa}/api/racuni/ponovno-poslati-potvrdu`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${sesijskiToken}` },
+    });
+    expect(resend.status).toBe(429);
+    const retci = await baza.select({ id: igraci.id }).from(igraci).where(eq(igraci.email, EMAIL));
+    expect(retci).toHaveLength(1);
   });
 
   it('resetira lozinku valjanim tokenom pa dopušta novu prijavu', async () => {

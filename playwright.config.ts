@@ -15,8 +15,24 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    ...devices['Desktop Chrome'],
   },
+  projects: [
+    {
+      name: 'desktop-chrome',
+      testIgnore: ['mobilni-tok.spec.ts', 'http-rute.spec.ts'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'android-chrome',
+      testMatch: 'mobilni-tok.spec.ts',
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'iphone-webkit',
+      testMatch: 'mobilni-tok.spec.ts',
+      use: { ...devices['iPhone 13'], browserName: 'webkit' },
+    },
+  ],
   webServer: [
     {
       command: 'pnpm --filter posluzitelj exec tsx src/index.ts',

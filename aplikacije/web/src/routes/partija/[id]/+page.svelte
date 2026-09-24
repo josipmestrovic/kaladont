@@ -21,10 +21,11 @@
   const partijaId = $derived($page.params.id);
 
   let unosNastavkaRijeci = $state('');
-  let prijavaDijalog = $state(false);
   let neZnamDijalog = $state(false);
-  let prijavaPoruka = $state('');
-  let prijavaPotezId: number | null = $state(null);
+  let prijavljeniPotezi = $state<Set<number>>(new Set());
+  let prijavaUTijeku = $state<Set<number>>(new Set());
+  let brojPrijava = $state(0);
+  let porukaPrijave = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
   let slanjeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let porukaPoteza = $state<string | null>(null);
@@ -196,35 +197,27 @@
     return { igrac, opis: 'je omogućio/omogućila Kaladont igraču', bodIgrac, rijec: null, slova: null };
   }
 
-  async function otstvoriDijalogZaPrijavu(potezId?: number) {
-    prijavaPoruka = '';
-    prijavaPotezId = potezId ?? null;
-    prijavaDijalog = true;
-  }
-
-  async function posaljiPrijavu() {
-    if (!prijavaPoruka.trim()) return;
+  async function prijaviRijec(potezId: number) {
+    if (prijavljeniPotezi.has(potezId) || prijavaUTijeku.has(potezId) || brojPrijava >= 3) return;
+    prijavaUTijeku = new Set(prijavaUTijeku).add(potezId);
+    porukaPrijave = null;
     try {
-      await api('/prijave', {
+      await api<{ ok: boolean }>('/prijave', {
         method: 'POST',
         body: JSON.stringify({
           partijaId,
-          potezId: prijavaPotezId,
-          poruka: prijavaPoruka.trim(),
+          potezId,
         }),
       });
-      prijavaDijalog = false;
-      alert('Hvala! Pregledat ćemo prijavu.');
-    } catch (err) {
-      console.error('Greška pri slanju prijave:', err);
-      alert('Greška pri slanju prijave.');
+      prijavljeniPotezi = new Set(prijavljeniPotezi).add(potezId);
+      brojPrijava += 1;
+    } catch (greska) {
+      porukaPrijave = greska instanceof Error ? greska.message : 'Prijava nije uspjela.';
+    } finally {
+      const novi = new Set(prijavaUTijeku);
+      novi.delete(potezId);
+      prijavaUTijeku = novi;
     }
-  }
-
-  function opisPoteza(potez: Potez): string {
-    if (potez.vrsta === 'ne_znam') return 'Ne znam';
-    if (potez.vrsta === 'sustav_rijec') return `Sustav: ${potez.rijec ?? 'automatska riječ'}`;
-    return potez.rijec ?? potez.vrsta;
   }
 
   function zadnjiPotezIgraca(igracId: string): Potez | null {
@@ -235,11 +228,6 @@
 
   function pobjednikPartije() {
     return stanje.kraj?.plasmani.find((igrac) => igrac.plasman === 1) ?? null;
-  }
-
-  function zatvoriDijlog() {
-    prijavaDijalog = false;
-    prijavaPoruka = '';
   }
 
   const jeNaPotezu = $derived(stanje.naPotezuId === stanje.mojIgracId);
@@ -365,7 +353,7 @@
   });
 
   async function ucitajPoteze(prikaziZadnjuRijec = true, ucitajJos = false) {
-    if (stanje.jePrivatna || ucitavanjePovijesti) return;
+    if (ucitavanjePovijesti) return;
     ucitavanjePovijesti = true;
     greskaPovijesti = null;
     try {
@@ -384,7 +372,7 @@
           prikazanaRijec && prikazanaRijec.vrsta !== 'sustav_rijec' ? (sRijeci.at(-2)?.rijec ?? null) : null;
       }
     } catch {
-      greskaPovijesti = 'Povijest se trenutno ne može učitati.';
+      greskaPovijesti = 'Riječi se trenutno ne mogu učitati.';
     } finally {
       ucitavanjePovijesti = false;
     }
@@ -392,7 +380,7 @@
 
   function otvoriPovijest() {
     povijestOtvorena = !povijestOtvorena;
-    if (povijestOtvorena && potezi.length === 0 && !stanje.jePrivatna) void ucitajPoteze(false);
+    if (povijestOtvorena && potezi.length === 0) void ucitajPoteze(false);
   }
 
   const REAKCIJE_EMOJI: Record<BrzaPoruka, string> = {
@@ -675,23 +663,28 @@
   {/if}
   <section class="povijest-partije">
     <button type="button" class="povijest-naslov" aria-expanded={povijestOtvorena} onclick={otvoriPovijest}>
-      <span>Povijest partije</span><span aria-hidden="true">{povijestOtvorena ? '−' : '+'}</span>
+      <span>Prijavi riječ</span><span aria-hidden="true">{povijestOtvorena ? '−' : '+'}</span>
     </button>
     {#if povijestOtvorena}
-      {#if stanje.jePrivatna}
-        <p>Povijest privatne partije nije dostupna.</p>
-      {:else if ucitavanjePovijesti}
-        <p aria-live="polite">Učitavanje povijesti...</p>
+      {#if ucitavanjePovijesti}
+        <p aria-live="polite">Učitavanje riječi...</p>
       {:else if greskaPovijesti}
         <p role="alert">{greskaPovijesti}</p>
-      {:else if potezi.length === 0}
-        <p>Potezi još nisu dostupni.</p>
       {:else}
+        <p class="prijava-brojac">Prijavljeno: {brojPrijava} / 3</p>
+        {#if porukaPrijave}<p class="greska" role="alert">{porukaPrijave}</p>{/if}
         <ol>
-          {#each potezi as potez (potez.id)}
+          {#each potezi.filter((potez) => potez.rijec) as potez (potez.id)}
             <li>
-              <span><strong>{potez.igracId ? imeIgraca(potez.igracId) : 'Sustav'}</strong>: {opisPoteza(potez)}</span>
-              <button type="button" class="prijavi-btn" onclick={() => otstvoriDijalogZaPrijavu(potez.id)}>Prijavi</button>
+              <span>{@render trenutnaRijec(potez.rijec!)}</span>
+              <button
+                type="button"
+                class="prijavi-btn"
+                onclick={() => void prijaviRijec(potez.id)}
+                disabled={prijavljeniPotezi.has(potez.id) || prijavaUTijeku.has(potez.id) || brojPrijava >= 3}
+              >
+                {#if prijavljeniPotezi.has(potez.id)}Riječ je prijavljena{:else if prijavaUTijeku.has(potez.id)}Šaljem...{:else}Prijavi riječ{/if}
+              </button>
             </li>
           {/each}
         </ol>
@@ -1009,32 +1002,6 @@
   </section>
   </div>
 
-{/if}
-
-{#if prijavaDijalog}
-  <div
-    class="dijalog-overlay"
-    role="button"
-    tabindex="0"
-    onclick={zatvoriDijlog}
-    onkeydown={(e) => e.key === 'Escape' && zatvoriDijlog()}
-  >
-    <div
-      class="dijalog"
-      role="dialog"
-      tabindex="-1"
-      aria-label="Prijavi problem"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
-    >
-      <h3>Prijavi problem</h3>
-      <textarea bind:value={prijavaPoruka} placeholder="Opiši greške ili probleme..." rows="5"></textarea>
-      <div class="dijalog-gumbi">
-        <button onclick={posaljiPrijavu}>Pošalji prijavu</button>
-        <button onclick={zatvoriDijlog}>Odustani</button>
-      </div>
-    </div>
-  </div>
 {/if}
 
 {#if neZnamDijalog}
@@ -2007,17 +1974,6 @@
   .dijalog h3 {
     margin-top: 0;
     margin-bottom: 16px;
-  }
-
-  .dijalog textarea {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: var(--tekst-baza);
-    resize: none;
-    box-sizing: border-box;
   }
 
   .dijalog-gumbi {

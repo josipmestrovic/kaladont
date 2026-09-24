@@ -57,8 +57,10 @@ export interface ZapisPoteza {
   trajanjeMs: number;
 }
 
-export function zapisiPotez(zapis: ZapisPoteza): void {
-  void baza.insert(potezi).values(zapis).catch((greska) => console.error('Neuspio upis poteza:', greska));
+export function zapisiPotez(zapis: ZapisPoteza): Promise<void> {
+  return baza.insert(potezi).values(zapis).then(() => {}).catch((greska) => {
+    console.error('Neuspio upis poteza:', greska);
+  });
 }
 
 export interface ZapisSudionika {
@@ -157,6 +159,10 @@ export async function zakljuciPartijuUBazi(
       await tx.insert(obracuniPartija)
         .values({ partijaId, vrsta: 'javna_partija' })
         .onConflictDoNothing();
+    } else {
+      await tx.update(partije)
+        .set({ status: 'zavrsena', kraj: new Date(), pobjednikId })
+        .where(and(eq(partije.id, partijaId), eq(partije.status, 'u_tijeku')));
     }
 
     for (const r of rezultati) {

@@ -57,7 +57,7 @@ Voditelj obrade je **piši farmaceut, obrt za računalno programiranje, vl. Josi
 - SSH koristi samo ključeve i pinane host fingerprintove. Root prijava i prijava lozinkom su isključene; fail2ban usporava automatizirane pokušaje. `StrictHostKeyChecking=no` nije dopušten ni ljudima ni workflowima.
 - Osobni korisnik `kaladont` ima sudo. Korisnik `deploy` nema sudo, ali je član Docker grupe radi objave; Docker grupa daje praktično root-ekvivalentne ovlasti, pa svaki VPS ima zaseban deploy ključ koji služi samo GitHub Actionsu.
 - Staging (`staging.kaladont.hr`) je tijekom privremenog multiplayer testiranja bez Caddy Basic Autha jer bi HTTP Basic izazovi prekidali Socket.IO polling/upgrade tok. `X-Robots-Tag: noindex, nofollow` ostaje samo uputa tražilicama, ne sigurnosna kontrola. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi session-based gateway.
-- Staging ima vlastite sintetičke podatke, tajne i email allowlistu. Produkcijski dump, račun, email popis ni tajna nikad ne završavaju na stagingu.
+- Staging ima vlastite sintetičke podatke i tajne. Email slanje na stagingu namjerno je otvoreno prema svim adresama radi testiranja na različitim uređajima; staging se zato ne smije dijeliti izvan testnog kruga.
 - Sigurnosna zaglavlja (Caddy): CSP dopušta same-origin skripte i nužni SvelteKit inline hydration, stilove koje generira SvelteKit te Google Fonts stylesheet/font izvore, slike/fontove iz aplikacije i WebSocket vezu; `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, ograničeni `Permissions-Policy` i HSTS na stagingu/produkciji.
 - Ovisnosti: Dependabot tjedno; `pnpm audit` u CI-ju (upozorenje, ne bloker).
 - Third-party GitHub Actions pinaju se na puni commit SHA. PostgreSQL, Caddy i aplikacija pokreću se po točnoj verziji i digestu, nikad preko `latest` taga.
@@ -119,7 +119,7 @@ Popis se održava ažurnim na `/privatnost` stranici; novi izvršitelj = izmjena
 ### Email po okruženju
 
 - Produkcija šalje preko Resenda s verificirane domene i pošiljatelja `noreply@kaladont.hr`; odgovori i ljudski upiti vode na `info@kaladont.hr`. `JAVNA_ADRESA` je `https://kaladont.hr`, pa email potvrde i reset poveznice vode na javnu domenu.
-- Staging koristi zasebnu konfiguraciju, `JAVNA_ADRESA=https://staging.kaladont.hr` i `STAGING_EMAIL_ALLOWLIST` s punim, točno dopuštenim adresama. Adapter mora fail-closed odbiti i evidentirati svaki pokušaj slanja izvan popisa. Dopuštena domena ili ljudsko obećanje nisu dovoljna kontrola.
+- Staging koristi zasebnu konfiguraciju i `JAVNA_ADRESA=https://staging.kaladont.hr`; transakcijski email namjerno se šalje na bilo koju adresu radi testiranja potvrde i reseta. To nije sigurnosna kontrola, pa staging treba zaštititi VPN-om, IP allowlistom ili drugim session-based gatewayem prije šireg dijeljenja.
 - Razvoj bez API ključa ispisuje testnu poruku lokalno. Takav stub nije dokaz produkcijskog slanja.
 
 ### Forum zajednice
@@ -141,7 +141,7 @@ Prije prvog staging/produkcijskog deploya moraju biti implementirani i testirani
 
 - Fastify iza jedinog Caddy proxyja koristi točno konfiguriran `trustProxy`; same-origin klijent ne treba široki reflektirani CORS;
 - centralna konfiguracijska shema prekida startup ako nedostaje tajna, koristi se razvojna zadana vrijednost ili je uključen `ONEMOGUCI_TIMER_POTEZA`;
-- Resend stvarno šalje, staging allowlista radi fail-closed, a SPF/DKIM provjera prolazi;
+- Resend stvarno šalje, a SPF/DKIM provjera prolazi;
 - `/zdravlje` vraća 503 za nedostupnu bazu ili prazan rječnik i ne otkriva tajne/osobne podatke;
 - jednokratni admin CLI uklanja potrebu za ručnim produkcijskim SQL-om;
 - stranice `/privatnost` i `/uvjeti` postoje i navode aktualne izvršitelje obrade;

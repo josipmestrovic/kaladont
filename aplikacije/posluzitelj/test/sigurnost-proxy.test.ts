@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { jeDopustenOrigin, jePouzdaniProxy, stvoriCorsOrigin } from '../src/sigurnost/origin.js';
 
-function provjeriCors(okruzenje: 'development' | 'test' | 'staging' | 'production', origin?: string): Promise<boolean> {
+function provjeriCors(okruzenje: 'development' | 'test' | 'staging' | 'production', origin?: string, javnaAdresaOrigin?: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
-    stvoriCorsOrigin(okruzenje)(origin, (greska, dopusten) => {
+    stvoriCorsOrigin(okruzenje, javnaAdresaOrigin)(origin, (greska, dopusten) => {
       if (greska) reject(greska);
       else resolve(dopusten);
     });
@@ -18,10 +18,14 @@ describe('CORS i trusted proxy', () => {
     await expect(provjeriCors('development', 'https://nepoznata.example')).resolves.toBe(false);
   });
 
-  it('odbija svaki browser cross-origin zahtjev na stagingu i produkciji', () => {
-    expect(jeDopustenOrigin('staging', 'https://staging.kaladont.hr')).toBe(false);
-    expect(jeDopustenOrigin('production', 'https://kaladont.hr')).toBe(false);
-    expect(jeDopustenOrigin('staging', undefined)).toBe(true);
+  it('dopušta samo canonical same-origin na stagingu i produkciji', async () => {
+    expect(jeDopustenOrigin('staging', 'https://staging.kaladont.hr', 'https://staging.kaladont.hr')).toBe(true);
+    expect(jeDopustenOrigin('production', 'https://kaladont.hr', 'https://kaladont.hr')).toBe(true);
+    expect(jeDopustenOrigin('production', 'https://www.kaladont.hr', 'https://www.kaladont.hr')).toBe(true);
+    expect(jeDopustenOrigin('staging', 'https://tudja.example', 'https://staging.kaladont.hr')).toBe(false);
+    expect(jeDopustenOrigin('staging', 'http://staging.kaladont.hr', 'https://staging.kaladont.hr')).toBe(false);
+    expect(jeDopustenOrigin('staging', undefined, 'https://staging.kaladont.hr')).toBe(true);
+    await expect(provjeriCors('staging', 'https://staging.kaladont.hr', 'https://staging.kaladont.hr')).resolves.toBe(true);
   });
 
   it('vjeruje proxy zaglavljima samo iza Caddyja', async () => {

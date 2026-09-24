@@ -59,8 +59,11 @@ export const igraci = pgTable('igraci', {
   avatarConfig: jsonb('avatar_config'),
   avatarRevision: integer('avatar_revision').notNull().default(0),
   email: text('email'),
+  emailNaCekanju: text('email_na_cekanju'),
   lozinkaHash: text('lozinka_hash'),
   emailPotvrdjen: boolean('email_potvrdjen').notNull().default(false),
+  emailPotvrdaZatrazenAt: timestamp('email_potvrda_zatrazen_at', { withTimezone: true }),
+  emailPotvrdaPoslanaAt: timestamp('email_potvrda_poslana_at', { withTimezone: true }),
   obrisanAt: timestamp('obrisan_at', { withTimezone: true }),
   odigrane: integer('odigrane').notNull().default(0),
   pobjede: integer('pobjede').notNull().default(0),
@@ -297,7 +300,10 @@ export const prijave = pgTable('prijave', {
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
   rijesioId: uuid('rijesio_id').references(() => igraci.id),
   napomenaAdmina: text('napomena_admina'),
-});
+}, (tablica) => [
+  index('idx_prijave_igrac_id_partija_id_vrijeme').on(tablica.igracId, tablica.partijaId, tablica.vrijeme),
+  uniqueIndex('uq_prijave_igrac_partija_potez').on(tablica.igracId, tablica.partijaId, tablica.potezId),
+]);
 
 export const izmjeneRjecnika = pgTable('izmjene_rjecnika', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),

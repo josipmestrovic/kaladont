@@ -43,6 +43,16 @@ describe('upis partije i javne pobjede', () => {
         false,
         napredak,
       );
+
+      const [partija] = await baza.select({ status: partije.status }).from(partije).where(eq(partije.id, partijaId));
+      const obracuni = await baza.select().from(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+      const [sudionik] = await baza
+        .select({ plasman: sudioniciPartije.plasman, nacinIspadanja: sudioniciPartije.nacinIspadanja })
+        .from(sudioniciPartije)
+        .where(and(eq(sudioniciPartije.partijaId, partijaId), eq(sudioniciPartije.igracId, igracId)));
+      expect(partija?.status).toBe('zavrsena');
+      expect(obracuni).toHaveLength(1);
+      expect(sudionik).toEqual({ plasman: 1, nacinIspadanja: 'pobjednik' });
     }
 
     const [igrac] = await baza.select({ pobjede: igraci.pobjede }).from(igraci).where(eq(igraci.id, igracId));

@@ -16,14 +16,14 @@
     slanjeUTijeku = true;
     poruka = null;
     try {
-      const odgovor = await api<{ sesijskiToken: string }>('/racuni/prijava', {
+      const odgovor = await api<{ sesijskiToken: string; emailPotvrdjen: boolean }>('/racuni/prijava', {
         method: 'POST',
         body: JSON.stringify({ email, lozinka }),
       });
       spremiSesijskiToken(odgovor.sesijskiToken);
       await osvjeziSocketIdentitet();
       window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
-      void goto('/');
+      void goto(odgovor.emailPotvrdjen ? '/' : '/potvrdi-email');
     } catch (greska) {
       poruka = greska instanceof Error ? greska.message : 'Prijava nije uspjela.';
     } finally {

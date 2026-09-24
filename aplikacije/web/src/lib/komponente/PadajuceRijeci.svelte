@@ -35,7 +35,7 @@
     left: var(--lijevo);
     color: var(--boja-mint-tamni);
     font-family: var(--font-naslov);
-    font-size: clamp(14px, 1.4vw, 22px);
+    font-size: 28px;
     font-weight: 700;
     opacity: 0;
     transform: rotate(-8deg);
@@ -51,5 +51,9 @@
 
   @media (prefers-reduced-motion: reduce) {
     .rijec { animation: none; opacity: 0.12; }
+  }
+
+  @media (min-width: 768px) {
+    .rijec { font-size: clamp(56px, 5.6vw, 88px); }
   }
 </style>

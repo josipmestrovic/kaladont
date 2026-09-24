@@ -165,6 +165,7 @@ interface StanjeStola {
   brojPokusajaSpremanja: number;
   retrySpremanjaHandle: NodeJS.Timeout | null;
   zavrsnoSpremanje: (() => Promise<void>) | null;
+  upisiPotezaUTijeku: Promise<void>[];
 }
 
 export function stvoriUpraviteljPartija(
@@ -388,15 +389,21 @@ export function stvoriUpraviteljPartija(
     upis: () => Promise<void>,
     nakonUspjeha: () => void,
   ): void {
+    if (stanje.statusSpremanja !== 'nije_zavrsena') return;
+
     stanje.statusSpremanja = 'spremanje_rezultata';
-    stanje.zavrsnoSpremanje = upis;
+    const upisSaCekanjemPoteza = async () => {
+      await Promise.all(stanje.upisiPotezaUTijeku);
+      await upis();
+    };
+    stanje.zavrsnoSpremanje = upisSaCekanjemPoteza;
     stanje.brojPokusajaSpremanja = 0;
     emitirajSpremanjeRezultata(stanje);
 
     const pokusaj = () => {
       if (stanje.statusSpremanja === 'rezultati_spremljeni') return;
       stanje.brojPokusajaSpremanja += 1;
-      void upis().then(() => {
+      void upisSaCekanjemPoteza().then(() => {
         if (stanje.statusSpremanja === 'rezultati_spremljeni') return;
         stanje.statusSpremanja = 'rezultati_spremljeni';
         stanje.zavrsnoSpremanje = null;
@@ -481,6 +488,7 @@ export function stvoriUpraviteljPartija(
       brojPokusajaSpremanja: 0,
       retrySpremanjaHandle: null,
       zavrsnoSpremanje: null,
+      upisiPotezaUTijeku: [],
       razloziEliminacije: new Map(),
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
@@ -560,9 +568,7 @@ export function stvoriUpraviteljPartija(
   }
 
   function spremiPotezAkoTreba(stanje: StanjeStola, zapis: Omit<import('./upis-partije.js').ZapisPoteza, 'partijaId'>) {
-    if (!stanje.jePrivatna) {
-      zapisiPotez({ partijaId: stanje.partijaId, ...zapis });
-    }
+    stanje.upisiPotezaUTijeku.push(zapisiPotez({ partijaId: stanje.partijaId, ...zapis }));
   }
 
   function zakljuciPartiju(stanje: StanjeStola): void {
@@ -1475,6 +1481,7 @@ export function stvoriUpraviteljPartija(
       brojPokusajaSpremanja: 0,
       retrySpremanjaHandle: null,
       zavrsnoSpremanje: null,
+      upisiPotezaUTijeku: [],
       razloziEliminacije: new Map(),
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
@@ -1489,6 +1496,12 @@ export function stvoriUpraviteljPartija(
 
     partije.set(partijaId, stanje);
     for (const s of sudionici) partijaPoIgracu.set(s.igracId, partijaId);
+    const upisPocetkaPrivatnePartije = zapisiPocetakPartije(
+      partijaId,
+      sudionici,
+      new Map(sudionici.map((s) => [s.igracId, 0])),
+      'cetiri_igraca',
+    );
 
     const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
       partijaId,
@@ -1506,11 +1519,11 @@ export function stvoriUpraviteljPartija(
       aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
     }
 
-    void ucitajOtkljucaneGrupe(sudionici).then((grupe) => {
+    void Promise.all([upisPocetkaPrivatnePartije, ucitajOtkljucaneGrupe(sudionici)]).then(([, grupe]) => {
       stanje.grupeSNagradom = grupe;
       const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - Date.now());
       stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), preostaloMs);
-    });
+    }).catch((greska) => console.error('Neuspio pripremiti privatnu partiju:', greska));
 
     return partijaId;
   }

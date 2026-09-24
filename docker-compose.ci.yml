@@ -23,7 +23,7 @@ services:
       SESIJA_TAJNA: ci-test-secret
       EMAIL_API_KLJUC: ''
       EMAIL_POSILJATELJ: noreply@kaladont.hr
-      STAGING_EMAIL_ALLOWLIST: ''
+      JAVNA_ADRESA: http://127.0.0.1:3000
       DEV_MAIL: dev@example.com
       ONEMOGUCI_TIMER_POTEZA: 'false'
       ODGODA_POCETKA_PARTIJE_MS: '0'

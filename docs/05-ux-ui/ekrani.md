@@ -86,13 +86,13 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 - Tijekom javne partije gornji status ostaje vidljiv i pri izboru nove riječi te završnom odbrojavanju: lijevo je trenutni streak, a desno se redom po 3,5 sekunde prikazuju autoritativne XP stavke upravo prihvaćenog poteza i izazvane eliminacije. Privatne sobe taj status nemaju jer ne dodjeljuju XP.
 - Završni redoslijed je: **Završni poredak**, osobna ocjena igre, XP obračun, Kaladont DNK, nova dostignuća i akcije.
 - Desetsekundni sažetak prije završnog poretka prikazuje se samo prvi put. Ako igrač nakon prikazanih rezultata ode na drugu stranicu i vrati se browser poviješću, ista partija odmah prikazuje završni poredak bez ponovnog odbrojavanja i zvuka završetka.
-- Povijest partije je zatvoreni accordion; potezi se dohvaćaju tek pri otvaranju i prikazuje se stanje učitavanja.
+- Prijava riječi je zatvoreni accordion; nakon otvaranja prikazuju se odigrane riječi i gumb „Prijavi riječ”.
 - Tipke: **Igraj opet** (u red), **Povratak**, a gostu i registracija za trajno čuvanje statistike.
 
-## 5. Povijest partije (`/partija/:id/povijest`)
+## 5. Prijava riječi (`/partija/:id/povijest`)
 
-- Kronološki popis: runda, igrač, riječ (ili „Ne znam"/istek/prekid), tražena slova, trajanje razmišljanja.
-- Uz svaki potez gumb **„Prijavi grešku"** → obrazac s porukom (potez i partija vežu se automatski).
+- Prikaz odigranih riječi iz završene javne ili privatne partije.
+- Uz svaku riječ gumb **„Prijavi riječ"**; prijava se šalje bez dodatnog teksta i može se poslati najviše tri puta po sudioniku i partiji.
 - U prvoj izvedbi dostupno trajno nakon završetka partije. Bočna ploha tijekom aktivne partije planirana je za kasniju nadogradnju.
 
 ## 6. Registracija / Prijava (`/registracija` i `/prijava`)

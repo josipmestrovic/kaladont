@@ -26,7 +26,7 @@ import {
 } from '../baza/shema.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
-import { porukaPotvrdeEmaila, posaljiEmail } from '../email.js';
+import { porukaPotvrdeEmaila, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { izdajTokenPotvrdeEmaila } from '../racuni/tokeni.js';
 import { izracunajDnk } from '../igra/izracun-dnk.js';
@@ -59,7 +59,6 @@ const ShemaLozinka = z.object({
   novaLozinka: z.string().min(8),
 });
 
-const MAKSIMALNO_OTKLJUCANIH_RIJECI_PO_KATEGORIJI = 200;
 const MAKSIMALNO_POTEZA_PO_STRANICI = 500;
 const ZIVOTNI_VIJEK_TOP_RIJECI_MS = 30_000;
 const MAKSIMALNO_PARTIJA_PO_STRANICI = 50;
@@ -166,25 +165,6 @@ function prosjecnaOcjena(
   return statistika.zbrojOcjenaIgre / statistika.brojOcjenaIgre;
 }
 
-async function dohvatiOtkljucaneRijeci(igracId: string) {
-  const [duge, srednjeDuge, jakoDuge, rijetke, srednjeRijetke, jakoRijetke] = await Promise.all([
-    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.dugaTier, 0),
-    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.dugaTier, 1),
-    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.dugaTier, 2),
-    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.rijetkaTier, 2),
-    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.rijetkaTier, 1),
-    dohvatiRijeciPoTieru(igracId, otkljucaneRijeciIgraca.rijetkaTier, 0),
-  ]);
-  return {
-    duge,
-    srednjeDuge,
-    jakoDuge,
-    rijetke,
-    srednjeRijetke,
-    jakoRijetke,
-  };
-}
-
 function stupacZaKategoriju(kategorija: KategorijaRijeci) {
   return kategorija === 'duge' || kategorija === 'srednjeDuge' || kategorija === 'jakoDuge'
     ? otkljucaneRijeciIgraca.dugaTier
@@ -221,20 +201,6 @@ async function dohvatiStranicuRijeci(igracId: string, kategorija: KategorijaRije
     imaJos,
     sljedeciCursor: imaJos && zadnja ? kodirajCursor({ rijec: zadnja.rijec }) : null,
   };
-}
-
-async function dohvatiRijeciPoTieru(
-  igracId: string,
-  stupac: typeof otkljucaneRijeciIgraca.dugaTier | typeof otkljucaneRijeciIgraca.rijetkaTier,
-  tier: number,
-): Promise<string[]> {
-  const retci = await baza
-    .select({ rijec: otkljucaneRijeciIgraca.rijec })
-    .from(otkljucaneRijeciIgraca)
-    .where(and(eq(otkljucaneRijeciIgraca.igracId, igracId), eq(stupac, tier)))
-    .orderBy(asc(otkljucaneRijeciIgraca.rijec))
-    .limit(MAKSIMALNO_OTKLJUCANIH_RIJECI_PO_KATEGORIJI);
-  return retci.map((redak) => redak.rijec);
 }
 
 function javnaStatistika(statistika: Awaited<ReturnType<typeof dohvatiStatistiku>>) {
@@ -404,6 +370,7 @@ export async function registrirajProfilRute(
       avatarConfig: igrac.vrsta === 'gost' ? null : igrac.avatarConfig,
       avatarRevision: igrac.avatarRevision,
       email: igrac.email,
+      emailNaCekanju: igrac.emailNaCekanju,
       emailPotvrdjen: igrac.emailPotvrdjen,
       odigrane: igrac.odigrane,
       pobjede: igrac.pobjede,
@@ -534,23 +501,27 @@ export async function registrirajProfilRute(
     const [postojeci] = await baza
       .select()
       .from(igraci)
-      .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
+      .where(sql`lower(${igraci.email}) = ${normaliziraniEmail} or lower(${igraci.emailNaCekanju}) = ${normaliziraniEmail}`)
       .limit(1);
     if (postojeci && postojeci.id !== igrac.id) {
       return odgovor
         .code(409)
         .send({ ok: false, greska: 'Ta email adresa je ve\u0107 registrirana.' });
     }
+    const jePotvrden = igrac.emailPotvrdjen;
     await baza
       .update(igraci)
-      .set({ email: normaliziraniEmail, emailPotvrdjen: false })
+      .set(jePotvrden
+        ? { emailNaCekanju: normaliziraniEmail, emailPotvrdaZatrazenAt: new Date(), emailPotvrdaPoslanaAt: null }
+        : { email: normaliziraniEmail, emailPotvrdaZatrazenAt: new Date(), emailPotvrdaPoslanaAt: null })
       .where(eq(igraci.id, igrac.id));
-    const tokenPotvrde = izdajTokenPotvrdeEmaila(igrac.id);
+    const tokenPotvrde = izdajTokenPotvrdeEmaila(igrac.id, normaliziraniEmail);
     const poveznica = new URL(
       `/potvrda-emaila?token=${tokenPotvrde}`,
       konfiguracija.JAVNA_ADRESA,
     ).toString();
-    await posaljiEmail(app.log, normaliziraniEmail, porukaPotvrdeEmaila(poveznica, true));
+    await pokusajPoslatiEmail(app.log, normaliziraniEmail, porukaPotvrdeEmaila(poveznica, true), `promjena-emaila:${igrac.id}`);
+    await baza.update(igraci).set({ emailPotvrdaPoslanaAt: new Date() }).where(eq(igraci.id, igrac.id));
     return { ok: true };
   });
 
@@ -646,7 +617,7 @@ export async function registrirajProfilRute(
 
     return {
       ok: true,
-      rijeci: retci.map((redak, indeks) => ({
+      rijeci: retci.slice(0, limit).map((redak, indeks) => ({
         mjesto: indeks + 1,
         rijec: redak.rijec,
         brojUpotreba: redak.brojUpotreba,

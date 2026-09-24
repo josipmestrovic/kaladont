@@ -1,6 +1,6 @@
 /** Adapter za razvojni log ili Resend slanje, ovisno o okruženju. */
 import type { FastifyBaseLogger } from 'fastify';
-import { konfiguracija, stagingEmailAllowlista } from './konfiguracija.js';
+import { konfiguracija } from './konfiguracija.js';
 
 export interface PorukaEmaila {
   predmet: string;
@@ -61,10 +61,6 @@ export async function posaljiEmail(
   }
 
   const primatelj = prima.trim().toLowerCase();
-  if (konfiguracija.NODE_ENV === 'staging' && !stagingEmailAllowlista.includes(primatelj)) {
-    log.warn({ primatelj }, 'Staging email odbijen: adresa nije na allowlisti');
-    return;
-  }
 
   const odgovor = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -85,5 +81,20 @@ export async function posaljiEmail(
     const detalji = await odgovor.text();
     log.error({ status: odgovor.status }, 'Resend nije prihvatio email');
     throw new Error(`Resend slanje nije uspjelo (HTTP ${odgovor.status}): ${detalji}`);
+  }
+}
+
+export async function pokusajPoslatiEmail(
+  log: FastifyBaseLogger,
+  prima: string,
+  poruka: PorukaEmaila | string,
+  kontekst: string,
+): Promise<boolean> {
+  try {
+    await posaljiEmail(log, prima, poruka);
+    return true;
+  } catch (greska) {
+    log.error({ greska, kontekst }, 'Email nije poslan; korisnička radnja ostaje spremljena');
+    return false;
   }
 }

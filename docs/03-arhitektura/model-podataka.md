@@ -28,8 +28,10 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | nadimak | text | Fiksni "Gost" za goste; jedinstven za registrirane |
 | avatar_id | smallint | Stabilni ID avatara iz statičkog kataloga web aplikacije |
 | email | text, null | Samo registrirani; jedinstven |
+| email_na_cekanju | text, null | Nova adresa registriranog računa dok ne bude potvrđena; stari potvrđeni email ostaje aktivan |
 | lozinka_hash | text, null | argon2id |
 | email_potvrdjen | boolean | |
+| email_potvrda_zatrazen_at, email_potvrda_poslana_at | timestamptz, null | Rok čišćenja nepotvrđenog računa i server-side cooldown ručnog ponovnog slanja |
 | obrisan_at | timestamptz, null | Vrijeme ručne anonimizacije računa; obrisani račun više se ne može autentificirati |
 | odigrane | integer | Agregat 4p moda (izvor istine: `sudionici_partije`) |
 | pobjede | integer | Agregat 4p moda |
@@ -44,6 +46,10 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | zadnja_aktivnost | timestamptz | Za čišćenje starih gostiju |
 
 Agregati se ažuriraju **transakcijski** pri završetku partije, u istoj transakciji sa zapisom rezultata. Uvijek su izračunljivi ponovno iz `sudionici_partije` (skripta za rekonstrukciju).
+
+Nepotvrđeni registrirani račun može se prijaviti i promijeniti email, ali ne može ući u javnu ni privatnu partiju. Potvrda se šalje best-effort; korisnik na ekranu potvrde vidi adresu, napomenu za Neželjenu poštu i rate-limitiranu akciju ponovnog slanja. Račun bez potvrde i bez odigranih javnih partija trajno se briše nakon 7 dana.
+
+Prijave riječi vežu se uz završenu partiju, konkretan odigrani potez i sudionika partije. Svaki sudionik, uključujući gosta, može prijaviti najviše tri različita poteza po partiji; isti potez ne može prijaviti dvaput. Privatne partije također se označavaju kao završene u `partije`, iako ne ulaze u javno bodovanje, kako bi ovaj auditni trag imao stabilnu vezu.
 
 Indeksi: parcijalni unique funkcionalni indeks na `lower(email)` uz `email IS NOT NULL`. Email se u aplikaciji sprema kanoniziran kao lowercase, a indeks dodatno štiti od utrke između istodobnih registracija.
 

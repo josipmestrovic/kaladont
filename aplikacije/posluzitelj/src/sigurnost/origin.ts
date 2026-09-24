@@ -11,13 +11,18 @@ export function jePouzdaniProxy(okruzenje: Okruzenje): boolean {
   return okruzenje === 'staging' || okruzenje === 'production';
 }
 
-export function jeDopustenOrigin(okruzenje: Okruzenje, origin: string | undefined): boolean {
+export function jeDopustenOrigin(
+  okruzenje: Okruzenje,
+  origin: string | undefined,
+  javnaAdresaOrigin?: string,
+): boolean {
   if (!origin) return true;
+  if (javnaAdresaOrigin && origin === javnaAdresaOrigin) return true;
   return (okruzenje === 'development' || okruzenje === 'test') && LOKALNI_ORIGINOVI.has(origin);
 }
 
-export function stvoriCorsOrigin(okruzenje: Okruzenje) {
+export function stvoriCorsOrigin(okruzenje: Okruzenje, javnaAdresaOrigin?: string) {
   return (origin: string | undefined, povratniPoziv: (greska: Error | null, dopusten: boolean) => void) => {
-    povratniPoziv(null, jeDopustenOrigin(okruzenje, origin));
+    povratniPoziv(null, jeDopustenOrigin(okruzenje, origin, javnaAdresaOrigin));
   };
 }

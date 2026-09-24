@@ -8,14 +8,15 @@ import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
-import { porukaPotvrdeEmaila, porukaResetaLozinke, posaljiEmail } from '../email.js';
+import { porukaPotvrdeEmaila, porukaResetaLozinke, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
-import { dohvatiSesijuZahtjeva } from './autentikacija.js';
+import { dohvatiSesijuZahtjeva, zahtijevajPrijavu } from './autentikacija.js';
 import { izdajSesiju, opozoviSesiju, stvoriGostSesiju } from './sesije.js';
 import { MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA, validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
 import {
   izdajTokenPotvrdeEmaila,
+  emailHashPotvrde,
   izdajTokenResetaLozinke,
   provjeriTokenPotvrdeEmaila,
   provjeriTokenResetaLozinke,
@@ -40,6 +41,7 @@ export function registrirajStariLinkPotvrdeEmaila(app: FastifyInstance): void {
 
 const NAZIV_KOLACICA = 'kaladont_sesija';
 const TRAJANJE_KOLACICA_MS = 30 * 24 * 60 * 60 * 1000;
+const COOLDOWN_PONOVNOG_SLanja_EMAILA_MS = 5 * 60 * 1000;
 
 const ShemaRegistracije = z.object({
   email: z.string().email(),
@@ -69,6 +71,22 @@ function normalizirajEmail(email: string): string {
 
 function javnaPoveznica(putanja: string): string {
   return new URL(putanja, konfiguracija.JAVNA_ADRESA).toString();
+}
+
+async function posaljiPotvrduEmailaSigurno(
+  app: FastifyInstance,
+  igracId: string,
+  email: string,
+  noviEmail = false,
+): Promise<void> {
+  const tokenPotvrde = izdajTokenPotvrdeEmaila(igracId, email);
+  await pokusajPoslatiEmail(
+    app.log,
+    email,
+    porukaPotvrdeEmaila(javnaPoveznica(`/potvrda-emaila?token=${tokenPotvrde}`), noviEmail),
+    `potvrda-emaila:${igracId}`,
+  );
+  await baza.update(igraci).set({ emailPotvrdaPoslanaAt: new Date() }).where(eq(igraci.id, igracId));
 }
 
 function postaviSesijskiKolacic(odgovor: import('fastify').FastifyReply, token: string): void {
@@ -140,6 +158,7 @@ export async function registrirajRacuneRute(
           email: normaliziraniEmail,
           lozinkaHash,
           emailPotvrdjen: false,
+          emailPotvrdaZatrazenAt: new Date(),
           ...(nadimak ? { nadimak } : {}),
           ...(avatarId !== undefined ? { avatarId } : {}),
           ...(kanonskiAvatarConfig ? { avatarConfig: kanonskiAvatarConfig, avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
@@ -155,6 +174,7 @@ export async function registrirajRacuneRute(
           email: normaliziraniEmail,
           lozinkaHash,
           emailPotvrdjen: false,
+          emailPotvrdaZatrazenAt: new Date(),
           nadimak: nadimak ?? normaliziraniEmail.split('@')[0]!,
           avatarId: avatarId ?? Math.floor(Math.random() * BROJ_AVATARA),
           avatarConfig: kanonskiAvatarConfig ?? null,
@@ -167,15 +187,10 @@ export async function registrirajRacuneRute(
       konacniNadimak = novi.nadimak;
     }
 
-    const tokenPotvrde = izdajTokenPotvrdeEmaila(igracId);
-    await posaljiEmail(
-      app.log,
-      normaliziraniEmail,
-      porukaPotvrdeEmaila(javnaPoveznica(`/potvrda-emaila?token=${tokenPotvrde}`)),
-    );
-
     const sesija = await izdajSesiju(igracId);
     postaviSesijskiKolacic(odgovor, sesija.token);
+
+    await posaljiPotvrduEmailaSigurno(app, igracId, normaliziraniEmail);
 
     return { ok: true, igracId, nadimak: konacniNadimak, sesijskiToken: sesija.token };
   });
@@ -207,7 +222,7 @@ export async function registrirajRacuneRute(
     const sesija = await izdajSesiju(korisnik.id);
     postaviSesijskiKolacic(odgovor, sesija.token);
 
-    return { ok: true, igracId: korisnik.id, nadimak: korisnik.nadimak, sesijskiToken: sesija.token };
+    return { ok: true, igracId: korisnik.id, nadimak: korisnik.nadimak, emailPotvrdjen: korisnik.emailPotvrdjen, sesijskiToken: sesija.token };
   });
 
   app.post('/racuni/odjava', async (zahtjev, odgovor) => {
@@ -231,12 +246,37 @@ export async function registrirajRacuneRute(
     if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
     }
-    const igracId = provjeriTokenPotvrdeEmaila(rezultat.data.token);
-    if (!igracId) {
+    const potvrda = provjeriTokenPotvrdeEmaila(rezultat.data.token);
+    if (!potvrda) {
       return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
     }
-    await baza.update(igraci).set({ emailPotvrdjen: true }).where(eq(igraci.id, igracId));
+    const [igrac] = await baza.select().from(igraci).where(eq(igraci.id, potvrda.igracId)).limit(1);
+    const emailZaPotvrdu = igrac?.emailNaCekanju ?? igrac?.email;
+    if (!igrac || !emailZaPotvrdu || emailHashPotvrde(emailZaPotvrdu) !== potvrda.emailHash) {
+      return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
+    }
+    await baza.update(igraci).set({
+      email: emailZaPotvrdu,
+      emailNaCekanju: null,
+      emailPotvrdjen: true,
+      emailPotvrdaZatrazenAt: null,
+      emailPotvrdaPoslanaAt: null,
+    }).where(eq(igraci.id, igrac.id));
     return { ok: true };
+  });
+
+  app.post('/racuni/ponovno-poslati-potvrdu', { preHandler: zahtijevajPrijavu }, async (zahtjev, odgovor) => {
+    const igrac = (zahtjev as import('./autentikacija.js').ZahtjevSIgracem).igrac!;
+    if (igrac.emailPotvrdjen) return { ok: true, poruka: 'Email adresa je već potvrđena.' };
+    const posljednjeSlanje = igrac.emailPotvrdaPoslanaAt?.getTime() ?? 0;
+    const preostaloMs = COOLDOWN_PONOVNOG_SLanja_EMAILA_MS - (Date.now() - posljednjeSlanje);
+    if (preostaloMs > 0) {
+      return odgovor.code(429).send({ ok: false, greska: `Ponovno slanje bit će dostupno za ${Math.ceil(preostaloMs / 60_000)} min.` });
+    }
+    const email = igrac.emailNaCekanju ?? igrac.email;
+    if (!email) return odgovor.code(400).send({ ok: false, greska: 'Email adresa nije dostupna.' });
+    await posaljiPotvrduEmailaSigurno(app, igrac.id, email, Boolean(igrac.emailNaCekanju));
+    return { ok: true, poruka: 'Zahtjev za potvrdu je prihvaćen. Provjeri i Neželjenu poštu.' };
   });
 
   app.post(
@@ -258,10 +298,11 @@ export async function registrirajRacuneRute(
         .limit(1);
       if (korisnik) {
         const token = izdajTokenResetaLozinke(korisnik.id);
-        await posaljiEmail(
+        await pokusajPoslatiEmail(
           app.log,
           normaliziraniEmail,
           porukaResetaLozinke(javnaPoveznica(`/racuni/resetiraj-lozinku?token=${token}`)),
+          `reset-lozinke:${korisnik.id}`,
         );
       }
 

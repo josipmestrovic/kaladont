@@ -32,6 +32,7 @@ export interface Identitet {
   pobjede1v1: number;
   bodovi1v1: number;
   iskustvoUkupno: number;
+  emailPotvrdjen: boolean;
   sesijaId?: string;
 }
 
@@ -50,6 +51,7 @@ function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
     pobjede1v1: redak.pobjede1v1,
     bodovi1v1: redak.bodovi1v1,
     iskustvoUkupno: redak.iskustvoUkupno,
+    emailPotvrdjen: redak.emailPotvrdjen,
   };
 }
 

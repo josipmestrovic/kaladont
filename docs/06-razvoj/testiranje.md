@@ -4,11 +4,11 @@ Pravila igre su srce proizvoda — greška u validaciji ili bodovanju izravno kr
 
 ## Alati
 
-| Razina                 | Alat                      | Opseg                                             |
-| ---------------------- | ------------------------- | ------------------------------------------------- |
-| Jedinični              | Vitest                    | `paketi/zajednicko` — grafemi, pravila, bodovanje |
-| Integracijski          | Vitest + socket.io-client | Engine partije kroz stvarne socket poruke         |
-| E2E                         | Playwright                | Kritični browser tokovi: auth, red, partija, soba, reconnect |
+| Razina        | Alat                      | Opseg                                                        |
+| ------------- | ------------------------- | ------------------------------------------------------------ |
+| Jedinični     | Vitest                    | `paketi/zajednicko` — grafemi, pravila, bodovanje            |
+| Integracijski | Vitest + socket.io-client | Engine partije kroz stvarne socket poruke                    |
+| E2E           | Playwright                | Kritični browser tokovi: auth, red, partija, soba, reconnect |
 
 ## Trenutačno i ciljano stanje
 
@@ -20,6 +20,9 @@ pnpm test:e2e:install
 
 # lokalno: native PostgreSQL mora raditi, migracije i sintetički rječnik moraju biti učitani
 pnpm test:e2e
+
+# samo emulirani mobilni kritični tokovi (Pixel Chromium + iPhone WebKit)
+pnpm test:e2e:mobilni
 ```
 
 E2E konfiguracija automatski pokreće poslužitelj na portu `3001` i web na portu `5174`. Lokalni
@@ -31,6 +34,11 @@ CI dodatno pokreće `pnpm test:e2e:http` protiv izgrađenog imagea na portu 3000
 `POSLUZUJ_WEB=true`. Taj test provjerava direktan ulazak i refresh stranica na istom Fastify
 procesu koji poslužuje API i SvelteKit, uključujući razdvajanje `/api/...` ruta od URL-ova stranica.
 
+CI nakon toga pokreće `pnpm test:e2e:image-smoke` protiv istog buildanog imagea. To je kratki
+real-user smoke: browser otvara privatnu sobu, pokreće partiju, završava je kroz „Ne znam”, provjerava
+završni poredak i povratak kroz „Igraj ponovno”. Cilj nije zamijeniti sve E2E testove, nego dokazati
+da stvarni produkcijski server, cookie/token stanje, SvelteKit stranice i Socket.IO rade zajedno.
+
 Početni kritični paket ima šest testova: registracija/prijava i sesija, javni red za četiri igrača,
 javni red za dva igrača, privatna soba s dva igrača i reconnect aktivne partije. Pravila grafema,
 detaljno bodovanje i sve timer/reconnect utrke ostaju u jediničnim i Socket.IO integracijskim
@@ -40,13 +48,32 @@ Testovi su serijalizirani s jednim workerom radi izolacije zajedničke testne ba
 je približno 20–60 sekundi lokalno nakon pripreme procesa i približno 1–3 minute u CI-ju, ovisno o
 instalaciji Chromiuma i pokretanju PostgreSQL-a.
 
-Postojeći Vitest i Socket.IO testovi izvršavaju se lokalno uz native PostgreSQL. GitHub CI dodatno gradi i smoke-testira stvarnu amd64 Docker sliku: pokreće PostgreSQL, migracije, sintetički fixture, health check i simulaciju četiri igrača. Lokalni Windows razvoj i dalje ne zahtijeva Docker.
+## Mobilni E2E
+
+Puni E2E paket izvršava se jednom na `desktop-chrome`. Datoteka `mobilni-tok.spec.ts` izvršava se
+samo na `android-chrome` (Pixel 7, Chromium) i `iphone-webkit` (iPhone 13, WebKit), kako se cijeli
+desktop paket ne bi nepotrebno utrostručio. Mobilni paket provjerava responsive raspored, fokus i
+tipkovničku navigaciju, privatnu partiju, offline/online reconnect te rezultat i ponovno igranje.
+
+CI instalira Chromium i WebKit. Mobilni paket dodaje četiri testa na svakom projektu; zbog jednog
+workera očekivano povećava E2E trajanje približno 1–3 minute. Trace, screenshot i video zadržavaju
+se pri neuspjehu prema Playwright konfiguraciji.
+
+Emulacija nije zamjena za stvarni uređaj. Prije releasea ručno provjeriti na Android Chromeu i
+iPhone Safariju: otvorenu virtualnu tipkovnicu tijekom poteza, Wi-Fi prema mobilnoj mreži i povratak,
+background/foreground, pinch zoom te sistemsku navigaciju naprijed/natrag.
+
+Postojeći Vitest i Socket.IO testovi izvršavaju se lokalno uz native PostgreSQL. GitHub CI dodatno gradi i smoke-testira stvarnu amd64 Docker sliku: pokreće PostgreSQL, migracije, sintetički fixture, health check, browser smoke, kratki load smoke i simulaciju četiri igrača. Lokalni Windows razvoj i dalje ne zahtijeva Docker.
 
 Na GitHubovom Ubuntu runneru stvarna amd64 slika prolazi migracije, sintetički rječnik, `/zdravlje` i simulaciju cijele partije. Nakon zelenog CI-ja zaseban workflow objavljuje image u GHCR-u s commit tagom i digestom. Stvarni hrLex uvoz izvodi se ručno na staging VPS-u, ne u CI-ju.
 
+Prije glavne CI baze pokreće se i migracijski upgrade test nad zasebnom bazom `kaladont_upgrade_ci`.
+Taj test primijeni baseline migracije, ubaci sintetičke postojeće podatke, primijeni zadnje migracije i
+provjeri da su ključni zapisi i očekivani novi stupci/indeksi očuvani.
+
 ## Baseline Socket.IO opterećenja
 
-CLI `pnpm --filter posluzitelj opterecenje` pokreće kontrolirano opterećenje prema adresi iz `SIMULACIJA_ADRESA` ili argumenta `--adresa`. Ne pokreće se automatski u CI-ju i ne smije se usmjeriti na produkciju.
+CLI `pnpm --filter posluzitelj opterecenje` pokreće kontrolirano opterećenje prema adresi iz `SIMULACIJA_ADRESA` ili argumenta `--adresa`. Kratki scenarij `igra` pokreće se automatski u CI-ju protiv buildanog imagea na svakom `main` pushu. Dulji scenariji ostaju ručni staging postupak i ne smiju se usmjeriti na produkciju.
 
 ```powershell
 pnpm --filter posluzitelj opterecenje -- --scenarij=veze --klijenti=100 --val=20 --trajanje-ms=5000
@@ -82,8 +109,9 @@ Timer se ne miješa u brzi bot smoke. Za zasebni timer test koristi se `--timer-
 namjerno šuti na potezu, a alat mjeri razliku između autoritativnog `istekPotezaIso` i eliminacije
 razlogom `istek`. Kriterij prolaza je p95 drift <= `250 ms`.
 
-Za kratki smoke koristi se 1–4 partije. Srednji test koristi desetke ili stotine partija na istom
-fixtureu i bilježi commit, verziju baze, resurse stroja i JSON rezultat. Višesatni staging test ima
+Za kratki CI smoke koristi se nekoliko partija i stroži pragovi dovoljno brzi da blokiraju loš `main`
+push bez velikog čekanja. Srednji ručni staging test koristi desetke ili stotine partija na istom
+fixtureu i bilježi commit, verziju baze, resurse stroja i rezultat. Višesatni staging test ima
 warm-up, periodično health uzorkovanje te nadzor PostgreSQL CPU-a, konekcija, lockova, Node RSS-a i
 heap-a. Nijedan test se ne usmjerava na produkciju.
 

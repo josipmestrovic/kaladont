@@ -123,6 +123,7 @@ export function registrirajPrivatneSobe(
     mozeStvoritiPartiju: () => boolean;
     provjeriDogadaj: ProvjeriOgranicenjeDogadaja;
     igracImaAktivnuPartiju: (igracId: string) => boolean;
+    igracMozeIgrati: (socket: KaladontSocket) => boolean;
     ukloniIzJavnogReda: (igracId: string) => void;
   },
 ) {
@@ -250,6 +251,10 @@ export function registrirajPrivatneSobe(
   io.on('connection', (socket) => {
     socket.on('soba:stvori', (payload) => {
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:stvori')) return;
+      if (!opcije.igracMozeIgrati(socket)) {
+        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
+        return;
+      }
       if (!opcije.mozeStvoritiPartiju()) {
         socket.emit('greska', { kod: 'INTERNA', poruka: 'Poslužitelj se upravo gasi. Pokušaj ponovno malo kasnije.' });
         return;
@@ -323,6 +328,10 @@ export function registrirajPrivatneSobe(
 
     socket.on('soba:udji', (payload) => {
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:udji')) return;
+      if (!opcije.igracMozeIgrati(socket)) {
+        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
+        return;
+      }
       const rezultat = ShemaKodSobe.safeParse(payload);
       if (!rezultat.success) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Kod sobe nije ispravan.' });
@@ -406,6 +415,10 @@ export function registrirajPrivatneSobe(
 
     socket.on('soba:pokreni', () => {
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:pokreni')) return;
+      if (!opcije.igracMozeIgrati(socket)) {
+        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
+        return;
+      }
       if (!opcije.mozeStvoritiPartiju()) {
         socket.emit('greska', { kod: 'INTERNA', poruka: 'Poslužitelj se upravo gasi. Pokušaj ponovno malo kasnije.' });
         return;

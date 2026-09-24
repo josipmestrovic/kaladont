@@ -70,7 +70,7 @@ Ako staging workflow padne, ne ponavljaj naslijepo: provjeri SSH, Compose/migrac
 - [ ] CI je zelen; Docker smoke test nije preskočen za promjene koje diraju build, startup, bazu, Caddy, Compose, migracije ili workflowe.
 - [ ] Ako postoje migracije, stara aplikacija može raditi nad novom shemom barem jedan release ciklus.
 - [ ] Ako se očekuje prekid dulji od 5 minuta, najava je objavljena najmanje 24 sata ranije kroz raniji release.
-- [ ] Za promjene emaila provjereno je da staging allowlista i dalje fail-closed odbija adrese izvan popisa.
+- [ ] Za promjene emaila potvrđeno je slanje na testne adrese s više uređaja.
 - [ ] Poznat je prethodni staging digest ili je jasno da se radi prvi deploy.
 
 ## Checklist: nakon GHCR objave

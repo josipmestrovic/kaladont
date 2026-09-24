@@ -35,6 +35,7 @@ import {
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 import { OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
 import { ponistiPartijeUTijekuUBazi } from './igra/upis-partije.js';
+import { ocistiIstekleNepotvrdjeneRacune } from './racuni/ciscenje-nepotvrdjenih.js';
 
 export interface PodaciSocketa {
   igracId: string;
@@ -51,6 +52,7 @@ export interface PodaciSocketa {
   pobjede1v1: number;
   bodovi1v1: number;
   iskustvoUkupno: number;
+  emailPotvrdjen: boolean;
 }
 
 export type KaladontIo = SocketIoServer<
@@ -83,11 +85,12 @@ export interface OpcijePosluzitelja {
 /** Izgrađuje Fastify + Socket.IO instancu (bez pokretanja listen-a) - koristi ga i index.ts i testovi. */
 export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promise<Posluzitelj> {
   const okruzenjeSigurnosti = opcije.okruzenjeSigurnosti ?? konfiguracija.NODE_ENV;
+  const javnaAdresaOrigin = new URL(konfiguracija.JAVNA_ADRESA).origin;
   const authRateLimit: OpcijeAuthRateLimita = {
     omogucen: okruzenjeSigurnosti === 'staging' || okruzenjeSigurnosti === 'production',
     ...opcije.authRateLimit,
   };
-  const corsOrigin = stvoriCorsOrigin(okruzenjeSigurnosti);
+  const corsOrigin = stvoriCorsOrigin(okruzenjeSigurnosti, javnaAdresaOrigin);
   const socketOgranicenja: PostavkeSocketOgranicenja = {
     handshakePoIpMinuti: konfiguracija.SOCKET_HANDSHAKE_PO_IP_MINUTI,
     maksimalnoAktivnihVeza: konfiguracija.SOCKET_MAKSIMALNO_AKTIVNIH_VEZA,
@@ -193,7 +196,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const io: KaladontIo = new SocketIoServer(app.server, {
     cors: { origin: corsOrigin, credentials: true },
     allowRequest: (zahtjev, povratniPoziv) => {
-      const originDopusten = jeDopustenOrigin(okruzenjeSigurnosti, zahtjev.headers.origin);
+      const originDopusten = jeDopustenOrigin(okruzenjeSigurnosti, zahtjev.headers.origin, javnaAdresaOrigin);
       const proslijedeniIp = zahtjev.headers['x-forwarded-for'];
       const ip = (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
         ?? zahtjev.socket.remoteAddress
@@ -205,6 +208,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   });
 
   const registarVeza = new RegistarVeza();
+  const igracMozeIgrati = (socket: KaladontSocket): boolean =>
+    socket.data.vrsta === 'gost' || socket.data.emailPotvrdjen;
 
   opozoviSocketSesije = (sesijaId) => {
     for (const socket of io.sockets.sockets.values()) {
@@ -270,6 +275,13 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   await app.ready();
 
   await osvjeziProsjekCekanja();
+  void ocistiIstekleNepotvrdjeneRacune().then((broj) => {
+    if (broj > 0) app.log.info({ broj }, 'Obrisani su istekli nepotvrđeni računi');
+  }).catch((greska) => app.log.error({ greska }, 'Čišćenje nepotvrđenih računa nije uspjelo'));
+  const cistacNepotvrdjenih = setInterval(() => {
+    void ocistiIstekleNepotvrdjeneRacune().catch((greska) => app.log.error({ greska }, 'Čišćenje nepotvrđenih računa nije uspjelo'));
+  }, 24 * 60 * 60 * 1000);
+  cistacNepotvrdjenih.unref();
 
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
@@ -295,6 +307,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       socket.data.pobjede1v1 = identitet.pobjede1v1;
       socket.data.bodovi1v1 = identitet.bodovi1v1;
       socket.data.iskustvoUkupno = identitet.iskustvoUkupno;
+      socket.data.emailPotvrdjen = identitet.emailPotvrdjen;
       next();
     } catch (greska) {
       const poruka = greska instanceof Error ? greska.message : 'Interna greška';
@@ -344,6 +357,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     upravitelj.imaAktivnuPartiju,
     (igracId) => igracImaPrivatnuSobu(igracId),
     () => upravitelj.mozePokrenutiPartiju() && upravitelj.brojAktivnihPartija() < socketOgranicenja.maksimalnoAktivnihPartija,
+    igracMozeIgrati,
     provjeriDogadaj,
   );
 
@@ -356,6 +370,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       mozeStvoritiPartiju: upravitelj.mozePokrenutiPartiju,
       provjeriDogadaj,
       igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
+      igracMozeIgrati,
       ukloniIzJavnogReda: redServis.ukloniIzReda,
     },
   );
@@ -367,6 +382,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const zaustavi = async () => {
     if (zatvoreno) return;
     zatvoreno = true;
+    clearInterval(cistacNepotvrdjenih);
     await upravitelj.zaustavi();
     await app.close();
   };

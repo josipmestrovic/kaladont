@@ -67,8 +67,8 @@ stagingu i produkciji.
 | `POSLUZUJ_WEB`              | `true` kada isti Fastify proces treba posluživati izgrađeni SvelteKit frontend; u lokalnom razvoju ostaje `false`.                                                                             |
 
 Staging `.env` mora sadržavati `JAVNA_ADRESA=https://staging.kaladont.hr` i
-`STAGING_EMAIL_ALLOWLIST` s punim email adresama na koje smiješ primiti testnu potvrdu ili reset.
-Allowlista se ne otvara za sve adrese: staging je javno dostupan i otvoreno slanje omogućilo bi
+Staging email slanje prema bilo kojoj adresi služi za testiranje potvrde i reseta na različitim uređajima.
+Staging se ne smije javno dijeliti niti koristiti za stvarne korisnike jer otvoreno slanje omogućuje
 zlouporabu Resend računa.
 
 ### Isključivanje timera poteza tijekom testiranja

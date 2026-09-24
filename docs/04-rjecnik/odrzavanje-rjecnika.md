@@ -18,12 +18,12 @@ flowchart TD
     I --> J[Signal ponovnog učitavanja rječnika]
 ```
 
-## Prijava greške (perspektiva igrača)
+## Prijava riječi (perspektiva igrača)
 
 1. Igrač otvori **povijest partije** (dostupna tijekom i nakon igre).
 2. Označi konkretan potez i napiše kratku poruku (npr. „riječ 'aljkavost' postoji, a nije prihvaćena").
-3. Prijava se sprema sa statusom `nova` i vezom na partiju i potez; poziva se email adapter za notifikaciju. Danas adapter poruku samo logira, a stvarna isporuka preko Resenda obvezan je preduvjet produkcijske Faze 8.
-4. Poruka igraču nakon slanja: „Hvala! Pregledat ćemo prijavu — ovako nam pomažeš da igra bude bolja."
+3. Prijava se sprema sa statusom `nova` i vezom na završenu partiju i potez; igrač može prijaviti najviše tri različite riječi po partiji. Email adapter se poziva best-effort nakon spremanja.
+4. Nakon klika gumb prelazi u stanje „Riječ je prijavljena"; ponovni klik na istu riječ nije dopušten.
 
 Tipični povodi prijave:
 

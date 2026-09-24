@@ -51,8 +51,12 @@
       void goto(`/soba/${payload.kod}`);
     };
 
-    const naGresku = (greska: { poruka: string }) => {
+    const naGresku = (greska: { kod?: string; poruka: string }) => {
       slanjeUTijeku = false;
+      if (greska.kod === 'EMAIL_NIJE_POTVRDEN') {
+        void goto('/potvrdi-email');
+        return;
+      }
       poruka = greska.poruka;
     };
 

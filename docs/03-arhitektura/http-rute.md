@@ -14,3 +14,7 @@ Poslovne HTTP rute Kaladonta imaju namespace `/api`. URL-ovi stranica ostaju bez
 - stari JSON API aliasi poput `/profil` i `/ljestvica` ne postoje.
 
 Centralni frontend helper `apiUrl()` dodaje `/api` samo poslovnim pozivima. Socket.IO zadržava postojeću adresu poslužitelja i path.
+
+## Prijava riječi
+
+`POST /api/prijave` zahtijeva identificiranog sudionika završene partije i tijelo `{ partijaId, potezId }`. Server provjerava da potez pripada partiji i da je riječ o odigranoj riječi. Jedan igrač može prijaviti najviše tri različita poteza u istoj partiji, a ponovljena prijava istog poteza vraća `409`. Dosegnut limit vraća `429`. Email obavijest administratoru šalje se best-effort nakon spremanja i ne blokira HTTP odgovor. Gosti imaju ista prava kao registrirani korisnici.

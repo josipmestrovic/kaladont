@@ -19,6 +19,7 @@ export function registrirajRedCekanja(
   igracImaAktivnuPartiju: (igracId: string) => boolean,
   igracImaPrivatnuSobu: (igracId: string) => boolean,
   mozeStvoritiPartiju: () => boolean,
+  igracMozeIgrati: (socket: import('../server.js').KaladontSocket) => boolean,
   provjeriDogadaj: ProvjeriOgranicenjeDogadaja,
 ): { ukloniIzReda: (igracId: string) => void } {
   const red4p = new RedCekanja(prvaCetvorica);
@@ -79,6 +80,11 @@ export function registrirajRedCekanja(
 
     socket.on('red:udji', (payload, potvrda) => {
       if (!provjeriDogadaj(socket.data.igracId, 'red:udji')) {
+        potvrda?.(null);
+        return;
+      }
+      if (!igracMozeIgrati(socket)) {
+        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
         potvrda?.(null);
         return;
       }

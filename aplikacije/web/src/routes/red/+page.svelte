@@ -82,6 +82,13 @@
       stanje = novoStanje;
     };
     const naGresku = (greska: PayloadGreska) => {
+      if (greska.kod === 'EMAIL_NIJE_POTVRDEN') {
+        if (cekanjeStanjaTimeout) clearTimeout(cekanjeStanjaTimeout);
+        cekanjeStanjaTimeout = null;
+        ulazakPoslan = false;
+        void goto('/potvrdi-email');
+        return;
+      }
       poruka = greska.poruka;
     };
     const naGreskuVeze = () => {

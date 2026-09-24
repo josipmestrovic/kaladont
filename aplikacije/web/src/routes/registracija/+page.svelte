@@ -48,7 +48,7 @@
       spremiSesijskiToken(odgovor.sesijskiToken);
       await osvjeziSocketIdentitet();
       window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
-      void goto('/zahvala');
+      void goto('/potvrdi-email');
     } catch (greska) {
       poruka = greska instanceof Error ? greska.message : 'Registracija nije uspjela.';
     } finally {

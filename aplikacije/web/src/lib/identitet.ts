@@ -49,6 +49,14 @@ export function obrisiSesijskiToken(): void {
   localStorage.removeItem(KLJUC_GOST_TOKEN);
 }
 
+/** Odjavljuje račun i stvara potpuno novi gostujući identitet za samostalnu igru. */
+export async function prijediNaGostujucuSesiju(): Promise<void> {
+  localStorage.removeItem(KLJUC_SESIJSKI_TOKEN);
+  localStorage.removeItem(KLJUC_GOST_TOKEN);
+  localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
+  await inicijalizirajGostSesiju();
+}
+
 /** Token koji se koristi za autentikaciju - sesijski (nakon prijave) ili gost UUID. */
 export function dohvatiAuthToken(): string {
   if (typeof localStorage === 'undefined') return dohvatiGostToken();

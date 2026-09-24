@@ -38,7 +38,11 @@
       greska = null;
     };
 
-    const naGresku = (p: { poruka: string }) => {
+    const naGresku = (p: { kod?: string; poruka: string }) => {
+      if (p.kod === 'EMAIL_NIJE_POTVRDEN') {
+        void goto('/potvrdi-email');
+        return;
+      }
       greska = p.poruka;
     };
 

@@ -25,6 +25,7 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 | Neuhvaćena iznimka                        | error  | Uvijek istražiti                             |
 | Start aplikacije + verzija/digest         | info   | Dokazuje koji je artefakt stvarno pokrenut   |
 | Rezultat migracije i uvoza                | info   | Bez SQL sadržaja i tajni; deploy trag        |
+| Neuspjelo transakcijsko slanje emaila     | error  | Samo kontekst i status; bez tokena, poruke i pune adrese |
 
 ## Health check
 

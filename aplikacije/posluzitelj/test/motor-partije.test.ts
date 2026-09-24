@@ -347,7 +347,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     }
 
     expect(krajPoruka).not.toBeNull();
-  expect(krajPoruka!.partijaId).toBe(pocetak.partijaId);
+    expect(krajPoruka!.partijaId).toBe(pocetak.partijaId);
     const plasmani = krajPoruka!.plasmani;
     expect(plasmani).toHaveLength(4);
     expect(new Set(plasmani.map((p) => p.plasman))).toEqual(new Set([1, 2, 3, 4]));
@@ -362,6 +362,20 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       .from(sudioniciPartije)
       .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, igracKrajaId!)));
     expect(spremljeniRezultat?.iskustvo).toBe(krajPoruka!.mojeIskustvo!.osvojenoIskustvo);
+
+    const spremljeniSudionici = await baza
+      .select({ igracId: sudioniciPartije.igracId, plasman: sudioniciPartije.plasman, nacinIspadanja: sudioniciPartije.nacinIspadanja, iskustvo: sudioniciPartije.iskustvo })
+      .from(sudioniciPartije)
+      .where(eq(sudioniciPartije.partijaId, pocetak.partijaId));
+    expect(spremljeniSudionici).toHaveLength(4);
+    expect(spremljeniSudionici.filter((sudionik) => sudionik.plasman !== 1).every((sudionik) => sudionik.nacinIspadanja === 'ne_znam')).toBe(true);
+    expect(spremljeniSudionici.find((sudionik) => sudionik.plasman === 1)?.nacinIspadanja).toBe('pobjednik');
+
+    const igracKraja = igraci.find((igrac) => igrac.igracId === igracKrajaId)!;
+    const profil = await fetch(`${adresa}/api/profil`, { headers: { authorization: `Bearer ${igracKraja.authToken}` } });
+    const podaciProfila = (await profil.json()) as { dnk: { cetiriIgraca: { osi: unknown[] } } };
+    expect(profil.status).toBe(200);
+    expect(krajPoruka!.mojDnk?.poslije).toEqual(podaciProfila.dnk.cetiriIgraca.osi);
 
     for (const igrac of igraci) igrac.socket.disconnect();
   });
@@ -476,7 +490,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     });
     const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
     for (const igrac of igraci) igrac.socket.emit('red:udji');
-    await pocetakPromise;
+    const pocetak = await pocetakPromise;
     const runda = await rundaPromise;
 
     const naPotezu = igraci.find((ig) => ig.token === runda.naPotezuId)!;
@@ -495,6 +509,18 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(eliminacija.igracId).toBe(izvanPoteza.token);
     expect(eliminacija.razlog).toBe('prekid');
     expect(eliminacija.bodZa).toBeNull(); // samoeliminacija - nitko ne dobiva bod
+
+    const preostali = igraci.filter((igrac) => igrac !== izvanPoteza);
+    const krajPromise = new Promise<KrajPartije>((resolve) => preostali[0]!.socket.once('partija:kraj', resolve));
+    preostali[1]!.socket.disconnect();
+    preostali[2]!.socket.disconnect();
+    await krajPromise;
+
+    const [spremljeniPrekid] = await baza
+      .select({ nacinIspadanja: sudioniciPartije.nacinIspadanja, iskustvo: sudioniciPartije.iskustvo })
+      .from(sudioniciPartije)
+      .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, izvanPoteza.igracId)));
+    expect(spremljeniPrekid).toEqual({ nacinIspadanja: 'prekid', iskustvo: 0 });
 
     for (const igrac of igraci) igrac.socket.disconnect();
   });
@@ -697,7 +723,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     });
     const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
     for (const igrac of igraci) igrac.socket.emit('red:udji');
-    await pocetakPromise;
+    const pocetak = await pocetakPromise;
     const runda = await rundaPromise;
 
     // odigraj stvaran lanac rijeci dok netko ne odigra rijec koja zavrsava na "ka"
@@ -746,6 +772,18 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     promatrac.socket.emit('partija:stanje');
     const stanje = await stanjePromise;
     expect(stanje.eliminacije).toContainEqual(eliminacija);
+
+    const preostali = igraci.filter((igrac) => igrac.token !== igracKojiJeOmoguciKa);
+    const krajPromise = new Promise<KrajPartije>((resolve) => preostali[0]!.socket.once('partija:kraj', resolve));
+    preostali[1]!.socket.disconnect();
+    preostali[2]!.socket.disconnect();
+    await krajPromise;
+
+    const [spremljeniKaladont] = await baza
+      .select({ nacinIspadanja: sudioniciPartije.nacinIspadanja })
+      .from(sudioniciPartije)
+      .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, igracKojiJeOmoguciKa)));
+    expect(spremljeniKaladont?.nacinIspadanja).toBe('kaladont');
 
     for (const igrac of igraci) igrac.socket.disconnect();
   });

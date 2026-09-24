@@ -174,7 +174,7 @@ interface KrajPartije {
   mojRang: string | null;
 }
 
-type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "INTERNA";
+type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "EMAIL_NIJE_POTVRDEN" | "INTERNA";
 ```
 
 ## Pravila protokola
@@ -183,6 +183,7 @@ type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "INTERNA";
 2. **Resinkronizacija:** nakon ponovnog spajanja istim identitetom poslužitelj vraća vezu u sobu aktivne partije i šalje `partija:stanje`; timer poteza nastavlja teći prema izvornom `istekPotezaIso`. U redu čekanja nema 10-sekundne tolerancije: svaki prekid odmah oslobađa mjesto, a klijent na `/red` nakon povratka ponovno šalje `red:udji` i ulazi na kraj reda. UI aktivne partije uvijek se može obnoviti iz jedne poruke.
 3. **Promatrači** (eliminirani igrači) primaju sve događaje stola i smiju slati `reakcija:posalji`.
 4. **Idempotentnost:** ponovljeni `red:udji` dok je igrač već u redu ponovno šalje `red:stanje` bez promjene položaja.
+5. **Potvrda emaila:** nepotvrđeni registrirani račun dobiva `EMAIL_NIJE_POTVRDEN` pri ulasku u javni red i stvaranju, ulasku ili pokretanju privatne sobe. Gost i račun s potvrđenim aktivnim emailom (i emailom na čekanju) mogu igrati.
 5. Svaka poruka poslužitelja nosi spreman hrvatski tekst (`poruka`) — klijent ne sastavlja poruke pravila sam.
 6. `nagrada` se izračunava isključivo na poslužitelju nakon prihvaćene riječi igrača. Početne i druge sustavske riječi, kao i odbijeni potezi, nemaju nagradu.
 7. Ako riječ istovremeno zadovoljava kriterij rijetkosti i duljine, šalje se jedan `NagradaZaRijec` s oba razloga. Klijent ne pušta dva zvuka i ne stvara dva odvojena efekta.
