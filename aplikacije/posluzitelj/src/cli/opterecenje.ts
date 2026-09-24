@@ -349,6 +349,7 @@ interface MjerenaPartija {
   greske: string[];
   odigraniPotezi: number;
   zakazanPotez: boolean;
+  generacijaRunde: number;
   timerCekaMs: number | null;
   timerDriftMs: number[];
   timerTestirano: boolean;
@@ -382,10 +383,14 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
     if (partija.zakazanPotez || !partija.naPotezuId || !partija.trazenaSlova || partija.krajMs !== null) return;
     const bot = botPoIgracu.get(partija.naPotezuId);
     if (!bot) return;
+    const generacijaRunde = partija.generacijaRunde;
+    const igracIdNaPotezu = partija.naPotezuId;
     partija.zakazanPotez = true;
     setTimeout(() => {
+      if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
       partija.zakazanPotez = false;
       void (async () => {
+        if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
         if (partija.odigraniPotezi >= MAKS_POTEZA_KONTROLIRANE_PARTIJE) {
           bot.socket.emit('potez:ne-znam');
           return;
@@ -395,15 +400,16 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
           bot.socket.emit('potez:ne-znam');
           return;
         }
+        if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
         partija.pokusane.add(rijec);
-        partija.poslanPotezMs.set(partija.naPotezuId!, performance.now());
+        partija.poslanPotezMs.set(igracIdNaPotezu, performance.now());
         bot.socket.emit('potez:rijec', { rijec });
       })().catch((greska: unknown) => {
         const poruka = greska instanceof Error ? greska.message : String(greska);
         partija.greske.push(poruka);
         greske.push(poruka);
       });
-    }, ODGODA_BOT_POTEZA_MS);
+    }, ODGODA_BOT_POTEZA_MS).unref();
   };
 
   for (const bot of klijenti.klijenti) {
@@ -427,6 +433,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
           greske: [],
           odigraniPotezi: 0,
           zakazanPotez: false,
+          generacijaRunde: 0,
           timerCekaMs: null,
           timerDriftMs: [],
           timerTestirano: false,
@@ -440,6 +447,8 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
       const igracId = igracPoSocketu.get(bot.socket.id ?? bot.token);
       const partija = igracId ? partijaPoIgracu.get(igracId) : undefined;
       if (!partija) return;
+      partija.generacijaRunde += 1;
+      partija.zakazanPotez = false;
       partija.naPotezuId = poruka.naPotezuId;
       partija.trazenaSlova = poruka.trazenaSlova;
       partija.pokusane.clear();
