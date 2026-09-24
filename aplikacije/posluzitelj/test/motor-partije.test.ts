@@ -570,7 +570,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     promatrac.socket.on('partija:eliminacija', (eliminacija) => eliminacije.push(eliminacija));
 
     odspojeni.socket.disconnect();
-    await odgodi(25);
+    await odgodi(5);
     const { igrac: obnovljeni, stanje } = await spojiIgracaIPricekajStanje(odspojeni.authToken);
 
     expect(stanje.partijaId).toBeDefined();

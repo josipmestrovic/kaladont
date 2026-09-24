@@ -36,6 +36,6 @@
     "fast-check": "^3.23.1",
     "socket.io-client": "^4.8.1",
     "tsx": "^4.19.2",
-    "vitest": "^2.1.5"
+    "vitest": "^3.2.7"
   }
 }
