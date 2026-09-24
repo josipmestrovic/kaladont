@@ -23,7 +23,7 @@ Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani 
    - odigraj cijelu partiju u četiri odvojene pregledničke sesije, od reda do rezultata;
    - provjeri potez, odbijanje riječi, „Ne znam”, timer/eliminaciju, reakciju, povijest, bodove i povratak na novu igru;
    - ciljano provjeri svako područje koje je promjena dirala;
-   - za email promjenu potvrdi stvarnu isporuku samo točno allowlistanoj adresi i odbijanje adrese izvan popisa;
+   - za email promjenu potvrdi stvarnu isporuku na testnim adresama i različitim uređajima;
    - za baznu promjenu pregledaj migracijski korak i potvrdi da stara aplikacija može raditi nad novom shemom barem jedan ciklus.
 5. **Zabilježi staging rezultat** kao `staging-provjereno` ili `odbačeno`. Ne promoviraj i ne dijeli closed testerima poznatu grešku uz obećanje da će se popraviti poslije.
 6. **Za closed test release** pošalji testerima samo staging link, kratku napomenu što se testira i način prijave greške. Popis testera i privatni kontakt podaci ne ulaze u git.
@@ -53,12 +53,14 @@ ssh kaladont@PROD_IP 'cd /opt/kaladont && docker compose -f docker-compose.prod.
 
 Automatskog rollbacka nema. Kada nova verzija pokaže kvar, cilj je vratiti aplikaciju unutar **15 minuta**:
 
-1. **Spremi dokaze prije restarta:** problematični digest, health odgovor, workflow sažetak i relevantne logove od trenutka deploya. Ne troši cijeli rollback cilj na dubinsku dijagnostiku.
+1. **Spremi dokaze prije restarta:** problematični digest, health odgovor, workflow sažetak, deploy fazu, snapshot datoteku i relevantne logove od trenutka deploya. Ne troši cijeli rollback cilj na dubinsku dijagnostiku.
 2. **Potvrdi prethodni digest** iz upravo završenog workflowa i GitHub Deployments zapisa. Mora biti puni digest, ne `latest` ili SHA tag.
 3. **Pokreni isti ručni produkcijski workflow** s prethodnim poznato-zdravim digestom. Ne rebuildaj i ne mijenjaj datoteke SSH-om.
 4. **Prati health check** i potvrdi da javni `/zdravlje` prikazuje vraćeni digest.
 5. **Provjeri ključne stranice i cijelu partiju** čim je servis vraćen. Ako stara verzija također ne radi, prijeđi na bazni/infrastrukturni incident umjesto ponavljanja deploya.
 6. **Zapiši incident i vremena:** detekcija, odluka, početak rollbacka i povrat usluge. Uzrok se poslije reproducira na stagingu.
+
+Deploy skripta koristi privremeni kandidat `.env` za validaciju Composea, povlačenje slike i migracije. Stvarni `.env` smije dobiti novi release zapis tek nakon uspješnih migracija; ako padne ranije, ostaje na prethodnom zapisu ili ga skripta idempotentno vrati. Nakon faze `migracije_pokrenute` crveni workflow ostaje incident za ljudsku odluku: prvo sačuvaj dijagnostiku, zatim rollback aplikacije radi samo ako je nova shema potvrđeno kompatibilna sa starom aplikacijom. Ne vraćaj bazu i ne pokreći obrnuti SQL kao dio uobičajenog rollbacka.
 
 **Važno za bazu:** rollback vraća samo aplikaciju. Migracije su dizajnirane unatrag-kompatibilno (expand/contract), pa starija aplikacija radi nad novijom shemom barem jedan ciklus. Ako je migracija sama uzrok kvara, to je incident nad bazom — vidi [runbook-backup-i-vracanje.md](runbook-backup-i-vracanje.md), ne „rollback migracije na živo".
 

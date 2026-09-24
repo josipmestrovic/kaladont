@@ -38,22 +38,22 @@ Prije uključivanja workflowa moraju postojati i biti međusobno usklađeni:
 4. jednokratne naredbe u istoj aplikacijskoj slici za migracije, provjeru/uvoz rječnika i dodjelu prvog admina;
 5. mali licencno čist sintetički fixture rječnika za CI;
 6. prošireni `/zdravlje` koji provjerava bazu i rječnik te vraća 503 kad servis nije spreman;
-7. stvarno slanje preko Resenda, fail-closed staging email allowlista i E2E provjeru buildanog same-origin web/API servera;
+7. stvarno slanje emaila preko Resenda i E2E provjeru buildanog same-origin web/API servera;
 8. verzionirane backup/restore skripte i pripadajuće systemd jedinice.
 
-## PR i `main` provjere — ciljani `ci.yml`
+## `main` provjere — ciljani `ci.yml`
 
-Promjena se radi na radnoj grani i otvara kao Pull Request prema `main`. Iako isti operater otvara i spaja PR, on daje čitljiv diff, zapis odluke i mjesto na kojem CI zaustavlja neispravnu promjenu. Branch protection zabranjuje spajanje dok obvezne provjere nisu zelene; ljudski reviewer nije obvezan.
+Projekt zasad vodi jedan operater i promjene se objavljuju direktnim pushom na `main`. Zbog toga `main` CI nije samo potvrda nakon spajanja nego glavni sigurnosni gate prije GHCR promocije i staging deploya. Ako bilo koji obvezni korak padne, slika se ne promovira i staging se ne dira.
 
-Workflow se okida na svaki PR i push na `main`:
+Workflow se okida na svaki push na `main`:
 
 1. Checkout + pnpm cache → `pnpm install --frozen-lockfile`.
-2. ESLint i Prettier check, bez automatskog prepisivanja datoteka u CI-ju.
-3. Vitest za sve pakete; testovi koji trebaju Postgres koriste service container s istom točnom PostgreSQL verzijom kao staging i produkcija.
-4. `svelte-check` i TypeScript build svih workspace paketa.
-5. Provjera relativnih Markdown poveznica za dokumentacijske promjene.
-
-Push na `main` ponavlja iste provjere prije builda i objave slike. Nije dopušten put kojim PR testira jedno, a objava gradi drugi commit.
+2. Kritični security minimum: `pnpm audit --audit-level critical`, sken tajni i sken Docker imagea. Kritični nalazi ruše CI.
+3. Migracijski upgrade test nad zasebnom sintetičkom bazom: baseline migracije + postojeći podaci + zadnje migracije + provjera očuvanja.
+4. ESLint, Vitest, `svelte-check` i TypeScript build svih workspace paketa.
+5. Playwright kritični E2E paket na dev serverima.
+6. Build i smoke stvarne Docker slike.
+7. Artefakti i dijagnostika spremaju se u GitHub Actions kada test ili deploy korak padne.
 
 ## Build i smoke test stvarne slike
 
@@ -66,10 +66,13 @@ Na `main` se slika gradi jednom. Taj lokalni image ili registry digest koristi s
 5. Uvoz **malog sintetičkog testnog rječnika** iz repozitorija; pravi hrLex ne ulazi u git ni CI fixture.
 6. Pokretanje aplikacije kao ne-root korisnika u kontejneru.
 7. `GET /zdravlje` mora vratiti 200, dostupnu bazu, `brojRijeci > 0` i isti digest koji je candidate build proizveo.
-8. Skripta `simulacija` spaja četiri Socket.IO klijenta i odigra **cijelu partiju** protiv kontejnera.
-9. Gašenje stacka i volumena čak i kada prethodni korak padne.
+8. `pnpm test:e2e:http` provjerava same-origin HTTP rute i Socket.IO handshake protiv buildanog servera.
+9. `pnpm test:e2e:image-smoke` u browseru odigra kratku stvarnu partiju protiv buildanog servera i provjeri ponovnu igru.
+10. Kratki `opterecenje --scenarij=igra` smoke provjerava da nekoliko partija završava, da p95 i RSS ostaju unutar pragova i da se stanje očisti.
+11. Skripta `simulacija` spaja četiri Socket.IO klijenta i odigra **cijelu partiju** protiv kontejnera.
+12. Gašenje stacka i volumena čak i kada prethodni korak padne.
 
-Padne li bilo koji korak, slika se ne objavljuje i staging se ne dira. Ista provjera izvodi se na PR-u koji dira Dockerfile, Compose, Caddy, migracije, startup ili workflowe kako se kvar ne bi otkrio tek nakon mergea.
+Padne li bilo koji korak, slika se ne objavljuje i staging se ne dira. Browser izvještaji, trace/screenshot/video artefakti, Docker Compose stanje, aplikacijski logovi i logovi baze spremaju se kao Actions artefakti kada postoje.
 
 ## GHCR i nepromjenjivi digest
 
@@ -85,14 +88,16 @@ VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kra
 
 ## Staging — automatski workflow
 
-`objavi-staging.yml` pokreće se nakon uspješnog GHCR promotion workflowa za `main`. Workflow iz commit SHA taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije i `skripte/objava-staging.sh`. Skripta ažurira samo `KALADONT_IMAGE`, `DIGEST` i `VERZIJA` u postojećem VPS `.env`, povlači točan image, izvršava migracije, rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. Ostale aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
+`objavi-staging.yml` pokreće se nakon uspješnog GHCR promotion workflowa za `main`. Workflow iz commit SHA taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije i `skripte/objava-staging.sh`. Skripta iz postojećeg VPS `.env` priprema privremeni kandidat zapis s novim `KALADONT_IMAGE`, `DIGEST` i `VERZIJA`, preko njega validira Compose, povlači točan image i izvršava migracije. Stvarni `.env` mijenja tek nakon uspješnih migracija, zatim rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. Ostale aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
 
 1. Workflow koristi GitHub Environment `staging` i tajne `STAGING_HOST`, `STAGING_SSH_KLJUC` i `STAGING_SSH_KNOWN_HOSTS`.
 2. Fiksni SSH korisnik je `deploy`, a host fingerprint se provjerava s `StrictHostKeyChecking=yes`.
 3. Na VPS se šalju samo `docker-compose.staging.yml` i `Caddyfile.staging`; `.env` i tajne nikad se ne kopiraju iz repozitorija.
-4. Workflow validira Compose, povlači novi digest, izvršava migracije, zamjenjuje samo aplikacijski kontejner i čeka njegov health. Caddy ostaje dostupan na portovima 80/443, zatim validira i graceful reloada novu reverse-proxy konfiguraciju bez prekida slušanja.
+4. Workflow validira Compose, povlači novi digest, izvršava migracije, tek zatim mijenja release retke u stvarnom `.env`, zamjenjuje samo aplikacijski kontejner i čeka njegov health. Deploy skripta prije izmjene `.env` sprema release snapshot i na grešku ispisuje fazu pada, prethodni zapis, aktivnu sliku, je li stvarni `.env` promijenjen i kratku dijagnostiku bez tajni. Caddy ostaje dostupan na portovima 80/443, zatim validira i graceful reloada novu reverse-proxy konfiguraciju bez prekida slušanja.
 5. Ponavlja javni health do uspjeha; odgovor mora sadržavati očekivani digest i commit SHA.
 6. Zeleni staging deploy znači da je kandidat spreman za ručnu browser provjeru, ne za automatsku produkciju.
+
+Ako staging deploy padne prije završetka migracija, stvarni `.env` ostaje na prethodnom release zapisu; skripta ga može idempotentno potvrditi ili vratiti na isti prethodni zapis. Nakon što su migracije pokrenute nema automatskog rollbacka slike: workflow završava crveno s dijagnostikom, a operater ručno odlučuje je li povrat na prethodni digest siguran s obzirom na kompatibilnost sheme.
 
 Staging tijekom privremenog multiplayer testiranja nema Basic Auth kako browser ne bi izazivao ponovne promptove na Socket.IO zahtjevima. `X-Robots-Tag: noindex, nofollow` nije kontrola pristupa; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway.
 
@@ -126,7 +131,7 @@ Automatski zeleni deploy nije dovoljan za promociju. Za svaki release kandidat o
 | `PROD_HOST`, `PROD_SSH_KLJUC`, `PROD_SSH_KNOWN_HOSTS`          | `produkcija` | SSH kao fiksni korisnik `deploy` uz pinani host fingerprint                          |
 | ugrađeni `GITHUB_TOKEN`                                        | job-scoped   | Push privatne slike i kratkotrajni udaljeni pull; nikad se ne sprema kao ručna tajna |
 
-Aplikacijske tajne (baza, email, sesije, staging allowlista, Storage Box i Healthchecks URL) žive u VPS konfiguraciji s pravima 600, dostupnoj samo računu koji je mora čitati i rootu, te u Bitwardenu prema [sigurnosnoj matrici](sigurnost-i-privatnost.md). Staging trenutno nema Basic Auth hash jer je Basic Auth uklonjen zbog Socket.IO promptova. Ne ulaze u repozitorij ni workflow logove.
+Aplikacijske tajne (baza, email, sesije, Storage Box i Healthchecks URL) žive u VPS konfiguraciji s pravima 600, dostupnoj samo računu koji je mora čitati i rootu, te u Bitwardenu prema [sigurnosnoj matrici](sigurnost-i-privatnost.md). Staging trenutno nema Basic Auth hash jer je Basic Auth uklonjen zbog Socket.IO promptova. Ne ulaze u repozitorij ni workflow logove.
 
 ## Pravila
 

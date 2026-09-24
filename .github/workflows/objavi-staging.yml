@@ -55,6 +55,7 @@ jobs:
             echo '## Staging release'
             echo "- Commit: \`$COMMIT_SHA\`"
             echo "- Digest: \`$digest\`"
+            echo '- Deploy skripta na VPS-u ispisuje snapshot i fazu pada ako objava ne uspije.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Pripremiti SSH vjerodajnice
@@ -82,7 +83,7 @@ jobs:
             docker-compose.staging.yml Caddyfile.staging skripte/objava-staging.sh \
             "deploy@${STAGING_HOST}:/opt/kaladont/"
 
-      - name: Povuci digest i rekreiraj staging aplikaciju
+      - name: Objaviti staging uz deploy snapshot
         shell: bash
         env:
           STAGING_HOST: ${{ secrets.STAGING_HOST }}
@@ -113,6 +114,48 @@ jobs:
           done
           echo 'Staging nije postao zdrav s očekivanim digestom.'
           exit 1
+
+      - name: Preuzeti deploy snapshot na neuspjeh
+        if: failure()
+        shell: bash
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/deploy-snapshot"
+          if ! test -f "$RUNNER_TEMP/ssh/id_ed25519"; then
+            echo 'SSH ključ nije dostupan; preskačem dohvat deploy snapshota.'
+            exit 0
+          fi
+
+          snapshot=$(ssh -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            "deploy@${STAGING_HOST}" \
+            "cd /opt/kaladont && ls -1t .deploy-snapshot-* 2>/dev/null | head -n 1" || true)
+
+          if test -z "$snapshot"; then
+            echo 'Deploy snapshot nije pronađen na staging VPS-u.'
+            exit 0
+          fi
+
+          if scp -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            "deploy@${STAGING_HOST}:/opt/kaladont/${snapshot}" \
+            "$RUNNER_TEMP/deploy-snapshot/${snapshot}"; then
+            echo "Preuzet deploy snapshot: ${snapshot}"
+            echo "- Snapshot: \`${snapshot}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Snapshot postoji, ali dohvat nije uspio: ${snapshot}"
+          fi
+
+      - name: Spremiti deploy snapshot artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-deploy-snapshot
+          path: ${{ runner.temp }}/deploy-snapshot/.deploy-snapshot-*
+          if-no-files-found: ignore
 
       - name: Očistiti SSH vjerodajnice
         if: always()
