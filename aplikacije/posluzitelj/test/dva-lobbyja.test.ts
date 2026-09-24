@@ -13,9 +13,10 @@ import { izgradiPosluzitelj, type KaladontIo } from '../src/server.js';
 let app: FastifyInstance;
 let io: KaladontIo;
 let adresa: string;
+let zaustavi: () => Promise<void>;
 
 beforeAll(async () => {
-  ({ app, io } = await izgradiPosluzitelj({ postavkeMotora: { zadrzavanjeSobeNakonKrajaMs: 50 } }));
+  ({ app, io, zaustavi } = await izgradiPosluzitelj({ postavkeMotora: { zadrzavanjeSobeNakonKrajaMs: 50 } }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = app.server.address();
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
@@ -23,7 +24,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await app.close();
+  await zaustavi();
 });
 
 function spojiSe(): Promise<ClientSocket> {
@@ -57,9 +58,11 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     expect(Number.isNaN(new Date(prviPocetci[0]!.pocetakIso).getTime())).toBe(false);
 
     // odigraj do kraja: tko je na potezu kaže "ne znam" dok partija ne završi
-    const krajPromise = new Promise<KrajPartije>((resolve) => {
-      klijenti[0]!.once('partija:kraj', resolve);
-    });
+    const krajPromise = Promise.all(
+      klijenti.map(
+        (klijent) => new Promise<KrajPartije>((resolve) => klijent.once('partija:kraj', resolve)),
+      ),
+    );
     const igracIdPoKlijentu = new Map<ClientSocket, string>();
     klijenti.forEach((klijent, i) => igracIdPoKlijentu.set(klijent, prviPocetci[i]!.mojIgracId));
 
@@ -76,16 +79,22 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     });
     setTimeout(posaljiNeZnam, 30);
 
-    const prviKraj = await krajPromise;
+    const [prviKraj] = await krajPromise;
     expect(prviKraj.partijaId).toBe(prviPocetci[0]!.partijaId);
 
-    // 2. partija: svi se odmah vraćaju u red ("Igraj opet" unutar prozora zadržavanja sobe)
+    // 2. partija: svi se vraćaju u red; ponovi zahtjev dok se završno spremanje prve partije ne obradi.
     const drugiPocetciPromise = cekajPocetke(klijenti);
+    const ponovnoSlanje = setInterval(() => {
+      for (const klijent of klijenti) klijent.emit('red:udji');
+    }, 100);
     for (const klijent of klijenti) klijent.emit('red:udji');
 
     const drugiPocetci = await Promise.race([
-      drugiPocetciPromise,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      drugiPocetciPromise.finally(() => clearInterval(ponovnoSlanje)),
+      new Promise<null>((resolve) => setTimeout(() => {
+        clearInterval(ponovnoSlanje);
+        resolve(null);
+      }, 3000)),
     ]);
 
     expect(drugiPocetci, 'drugi partija:pocetak nije stigao u 3 s').not.toBeNull();
