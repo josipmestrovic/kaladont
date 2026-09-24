@@ -1,12 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
-  import { obrisiSesijskiToken } from '$lib/identitet.js';
-  import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import Avatar from './Avatar.svelte';
-  import { vratiVeciRang } from 'zajednicko';
+  import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
 
   interface Profil {
     nadimak: string;
@@ -14,102 +11,100 @@
     rang: string | null;
     rang1v1: string | null;
     email: string | null;
+    vrsta: 'gost' | 'registriran' | 'admin';
+    avatarConfig: AvatarConfigV1 | null;
   }
 
+  let { prethodnaPutanja = null, mozeNaprijed = false } = $props<{ prethodnaPutanja?: string | null; mozeNaprijed?: boolean }>();
   let profil = $state<Profil | null>(null);
   let jeGost = $state(true);
+  const jeNaslovna = $derived($page.url.pathname === '/');
+  const prikaziPovratakNaPocetnu = $derived(!jeNaslovna && prethodnaPutanja !== '/');
 
-  async function odjaviSe() {
-    obrisiSesijskiToken();
-    profil = null;
-    jeGost = true;
-    await osvjeziSocketIdentitet();
-    void goto('/');
+  function vratiSe() {
+    window.history.back();
+  }
+
+  function idiNaprijed() {
+    window.history.forward();
+  }
+
+  async function ucitajProfil() {
+    try {
+      const odgovor = await api<Profil>('/profil');
+      profil = odgovor;
+      jeGost = !odgovor.email;
+    } catch {
+      profil = null;
+      jeGost = true;
+    }
   }
 
   onMount(() => {
     const azurirajAvatar = (dogadaj: Event) => {
-      const avatarId = (dogadaj as CustomEvent<{ avatarId: number }>).detail.avatarId;
-      profil = profil ? { ...profil, avatarId } : profil;
+      const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1 }>).detail;
+      profil = profil ? { ...profil, avatarConfig: detalji.avatarConfig } : profil;
     };
+    const azurirajIdentitet = () => void ucitajProfil();
     window.addEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
+    window.addEventListener('kaladont:identitet-promijenjen', azurirajIdentitet);
 
-    void (async () => {
-      try {
-        const odgovor = await api<Profil>('/profil');
-        profil = odgovor;
-        jeGost = !odgovor.email;
-      } catch {
-        // Neuspjelo dohvaćanje (npr. istekao token) - prikaži gosta bez rušenja stranice
-        jeGost = true;
-      }
-    })();
+    void ucitajProfil();
 
-    return () => window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
+    return () => {
+      window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
+      window.removeEventListener('kaladont:identitet-promijenjen', azurirajIdentitet);
+    };
   });
 </script>
 
 <header class="header">
   <div class="header-sadrzaj">
-    <nav class="lijevo">
-      <a href="/" class="nav-link igraj-link" class:aktivan={$page.url.pathname === '/'}>
-        <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M7 7h10c2.5 0 4.2 2 4.8 5l.8 4c.4 2-1.1 3.5-2.8 3.5-1.5 0-2.4-1-3.3-2.2l-.7-1H8.2l-.7 1C6.6 18.5 5.7 19.5 4.2 19.5c-1.7 0-3.2-1.5-2.8-3.5l.8-4C2.8 9 4.5 7 7 7Z"></path>
-          <path d="M7 10v5M4.5 12.5h5"></path>
-          <circle cx="16.5" cy="12" r=".75"></circle>
-          <circle cx="19" cy="14" r=".75"></circle>
-        </svg>
-        <span>Igraj</span>
-      </a>
-      <a href="/pomoc?tema=pravila" class="nav-link" class:aktivan={$page.url.pathname === '/pomoc' || $page.url.pathname === '/pravila'}>
-        <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"></circle>
-          <path d="M9.7 9a2.5 2.5 0 1 1 4.3 1.7c-.9.9-2 1.3-2 2.8"></path>
-          <path d="M12 17h.01"></path>
-        </svg>
-        <span>Pomoć</span>
-      </a>
-      <a href="/ljestvica" class="nav-link" class:aktivan={$page.url.pathname === '/ljestvica'}>
-        <svg class="ikona-svg" viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
-          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
-          <path d="M4 22h16"></path>
-          <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path>
-          <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path>
-          <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path>
-        </svg>
-        <span>Ljestvice</span>
-      </a>
-      {#if profil}
-        <a href="/profil" class="nav-link mobilni-profil-link" class:aktivan={$page.url.pathname === '/profil'} aria-label="Profil">
-          <svg class="ikona-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="8" r="3.5"></circle>
-            <path d="M5 21c.8-4 3.1-6 7-6s6.2 2 7 6"></path>
-          </svg>
-          <span>Profil</span>
+    {#if jeNaslovna}
+      <div class="naslovne-akcije">
+        <a href="/novosti" class="novosti-link" aria-label="Što je novo?">
+          <img class="header-ikona" src="/ikone/01-sto-je-novo.png" alt="" aria-hidden="true" />
+          <span>Što je novo?</span>
         </a>
-      {/if}
-      {#if false}<a href="/postavke" class="nav-link" class:aktivan={$page.url.pathname === '/postavke'} aria-label="Postavke">
-        <svg class="ikona-svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-        <span>Postavke</span>
-      </a>{/if}
-    </nav>
+        {#if profil && !jeGost}
+          <a href="/povratne-informacije" class="novosti-link" aria-label="Pomozi poboljšati igru">
+            <img class="header-ikona" src="/ikone/02-pomozi-poboljsati-igru.png" alt="" aria-hidden="true" />
+            <span>Pomozi poboljšati igru</span>
+          </a>
+        {/if}
+      </div>
+    {:else}
+      <div class="lijeve-akcije">
+        <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
+          <img class="header-ikona" src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
+          <span>Nazad</span>
+        </button>
+        {#if prikaziPovratakNaPocetnu}
+          <a href="/" class="header-akcija" aria-label="Početna">
+            <img class="header-ikona" src="/ikone/04-naslovna.png" alt="" aria-hidden="true" />
+            <span>Početna</span>
+          </a>
+        {/if}
+        {#if mozeNaprijed}
+          <button type="button" class="header-akcija" aria-label="Naprijed" onclick={idiNaprijed}>
+            <img class="header-ikona" src="/ikone/05-naprijed.png" alt="" aria-hidden="true" />
+            <span>Naprijed</span>
+          </button>
+        {/if}
+      </div>
+    {/if}
 
     <div class="desno">
       {#if profil}
           {#if jeGost}
-            <a href="/profil" class="profil-link" class:aktivan={$page.url.pathname === '/profil'} aria-label="Moj profil">
-              <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost velicina={42} prikaziRangBorder={false} />
-              <span class="profil-oznaka">Profil</span>
+            <a href="/profil" class="profil-link" aria-label="Moj profil">
+              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost velicina={80} prikaziRangBorder={false} /></span>
+              <span class="profil-ime">{profil.nadimak}</span>
             </a>
           {:else}
-            <a href="/profil" class="profil-link registrirani-profil" class:aktivan={$page.url.pathname === '/profil'} aria-label="Moj profil">
-              <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={42} prikaziRangBorder={false} />
+            <a href="/profil" class="profil-link registrirani-profil" aria-label="Moj profil">
+              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={80} prikaziRangBorder={false} /></span>
               <span class="profil-ime">{profil.nadimak}</span>
-              <span class="profil-oznaka">Profil</span>
             </a>
           {/if}
       {/if}
@@ -117,11 +112,20 @@
   </div>
 </header>
 
+{#if profil?.vrsta === 'admin'}
+  <nav class="admin-navigacija" aria-label="Administracija">
+    <a href="/admin#rjecnik">Rječnik</a>
+    <a href="/admin#prijave">Prijave</a>
+    <a href="/misljenja-korisnika">Mišljenja korisnika</a>
+  </nav>
+{/if}
+
 <style>
   .header {
     width: 100%;
-    background: white;
-    border-bottom: 1px solid #e5ddc8;
+    margin-top: 6px;
+    background: transparent;
+    font-family: var(--font-naslov);
     font-size: var(--tekst-baza);
   }
 
@@ -142,10 +146,74 @@
     }
   }
 
-  .lijevo {
+  .novosti-link {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    height: 80px;
+    gap: 3px;
+    padding: 0;
+    color: var(--boja-tekst-osnovni);
+    font-size: 25px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .naslovne-akcije {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 36px;
+  }
+
+  .header-ikona {
+    width: 44px;
+    height: 44px;
+    display: block;
+    object-fit: contain;
+  }
+
+  .novosti-link:hover,
+  .novosti-link:focus-visible {
+    color: var(--boja-akcent);
+    text-decoration: none;
+  }
+
+  .lijeve-akcije {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-akcija {
+    width: auto;
+    min-width: 80px;
+    height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 3px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
+    font-size: 25px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .header-akcija:hover,
+  .header-akcija:focus-visible {
+    color: var(--boja-akcent);
+    text-decoration: none;
   }
 
   .desno {
@@ -154,32 +222,26 @@
     gap: 16px;
   }
 
-  .nav-link {
+  .admin-navigacija {
+    width: min(100% - 32px, 980px);
+    margin: -4px auto 8px;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    color: var(--boja-tekst-osnovni);
-    text-decoration: none;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .admin-navigacija a {
+    padding: 6px 10px;
+    border: 1px solid var(--boja-akcent);
+    border-radius: 6px;
+    color: var(--boja-akcent);
+    font-size: var(--tekst-sitni);
     font-weight: 700;
-    font-size: 15px;
-    letter-spacing: 0.6px;
-    line-height: 1.1;
-    gap: 3px;
-  }
-
-  .nav-link:hover {
     text-decoration: none;
-    color: var(--boja-akcent);
   }
 
-  .nav-link.aktivan {
-    color: var(--boja-akcent);
-  }
-
-  .ikona-svg {
-    width: 22px;
-    height: 22px;
-    stroke: currentColor;
+  @media (min-width: 768px) {
+    .header-avatar { display: inline-flex; }
   }
 
   .profil-link {
@@ -191,74 +253,53 @@
     cursor: pointer;
   }
 
-  .profil-link :global(.avatar) {
-    width: 36px !important;
-    height: 36px !important;
-  }
-
   .profil-ime {
+    max-width: 150px;
+    overflow: hidden;
     color: var(--boja-tekst-osnovni);
     font-weight: 700;
-    font-size: 15px;
-    letter-spacing: 0.3px;
+    font-size: 25px;
+    letter-spacing: 0.6px;
     line-height: 1.2;
-  }
-
-  .profil-oznaka {
-    display: none;
-    color: var(--boja-tekst-osnovni);
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    line-height: 1.2;
-  }
-
-  @media (min-width: 600px) {
-    .nav-link {
-      font-size: 15px;
-    }
-
-    .lijevo > .nav-link .ikona-svg { width: 22px; height: 22px; }
-
-    .profil-ime {
-      font-size: 15px;
-    }
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .profil-link:hover .profil-ime {
     color: var(--boja-akcent);
   }
 
-  .mobilni-profil-link { display: none; }
-
   @media (max-width: 599px) {
-    .lijevo { gap: 0; }
-    .profil-link {
-      flex-direction: column;
-      gap: 3px;
-    }
-    .profil-link :global(.avatar) {
-      width: 27px !important;
-      height: 27px !important;
-    }
+    .profil-link { gap: 0; }
     .profil-ime { display: none; }
-    .profil-oznaka { display: block; }
   }
 
   @media (max-width: 599px) {
     .header-sadrzaj { padding-inline: 16px; }
-    .lijevo {
-      width: 100%;
+    .novosti-link, .header-akcija { font-size: 22px; }
+    .naslovne-akcije .header-ikona {
+      width: 33px;
+      height: 33px;
+    }
+    .lijeve-akcije { gap: 4px; }
+    .header-akcija { min-width: 68px; }
+    .naslovne-akcije {
+      height: 80px;
+      flex-direction: column;
+      align-items: flex-start;
       justify-content: space-between;
       gap: 0;
     }
-    .lijevo > .nav-link {
-      min-width: 0;
-      font-size: 14px;
-      letter-spacing: 0.35px;
+    .naslovne-akcije .novosti-link {
+      width: max-content;
+      height: 33px;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 6px;
+      text-align: left;
+      font-size: 16px;
     }
-    .lijevo > .nav-link .ikona-svg { width: 24px; height: 24px; }
-    .mobilni-profil-link { display: flex; }
-    .desno { display: none; }
+    .desno { margin-left: 0; }
   }
 </style>

@@ -8,7 +8,7 @@ Pri uspostavi veze klijent u handshake šalje:
 
 ```ts
 interface PodaciVeze {
-  /** UUID gosta iz localStoragea ILI sesijski token registriranog igrača */
+  /** Opaque guest token iz localStoragea ILI sesijski token registriranog igrača */
   token: string;
 }
 ```
@@ -43,6 +43,8 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 | `partija:eliminacija` | `Eliminacija` | Netko je ispao; svi za stolom |
 | `partija:sustav-bira-rijec` | `SustavBiraRijec` | Sustav počinje birati riječ za otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta) - 5s, nitko ne može igrati |
 | `partija:runda-otvorena` | `RundaOtvorena` | Sustav je otkrio odabranu riječ; red ide na sljedećeg aktivnog igrača nakon napadača |
+| `partija:spremanje-rezultata` | `SpremanjeRezultataPartije` | Igra je završila, ali se konačni rezultat još pokušava spremiti; šalje se pri svakom ponovnom pokušaju/reconnectu |
+| `partija:ponistena` | `PonistenaPartija` | Partija je prekinuta restartom ili kontroliranim gašenjem; rezultat nije dodijeljen |
 | `partija:kraj` | `KrajPartije` | Konačni plasmani, bodovi i privatni XP obračun primatelja |
 | `iskustvo:obracun` | `ObracunIskustvaTijekomPartije` | Privatni XP obračun eliminiranog igrača |
 | `reakcija:nova` | `{ igracId: string, poruka: BrzaPoruka }` | |
@@ -87,7 +89,8 @@ interface StanjePartije {
   zadnjaRijec: string | null;             // autoritativna zadnja riječ za obnovu prikaza
   zadnjaRijecIgracId: string | null;      // null za sustavsku riječ
   zadnjaRijecVrsta: "rijec" | "sustav_rijec" | null;
-  zavrsena: boolean;                      // završena partija zadržana radi rezultata nije aktivna
+  zavrsena: boolean;                      // završena partija nije aktivna za nove poteze
+  statusSpremanja: "nije_zavrsena" | "spremanje_rezultata" | "rezultati_spremljeni";
 }
 
 /** Sustav je počeo birati riječ za otvaranje runde. */
@@ -95,12 +98,18 @@ interface SustavBiraRijec {
   istekIzboraIso: string;      // apsolutno vrijeme kad se riječ otkriva (server je sat)
 }
 
+// Timer poteza
+// `serverVrijemeIso` je trenutak servera u kojem je poruka sastavljena. Klijent
+// koristi razliku prema vlastitom satu samo za vizualno odbrojavanje; server
+// i dalje donosi konačnu odluku o isteku.
+
 /** Sustav je otkrio nasumično odabranu riječ; igrač na potezu na nju odgovara kao na normalan nastavak. */
 interface RundaOtvorena {
   rijec: string;
   trazenaSlova: string;
   naPotezuId: string;
   istekPotezaIso: string;      // apsolutno vrijeme isteka 30s timera (server je sat)
+  serverVrijemeIso: string;
   runda: number;
 }
 
@@ -117,6 +126,16 @@ interface PrihvacenPotez {
 interface KrajPartije {
   // Polje je personalizirano po primatelju; nikad ne sadrži tuđe XP stavke.
   mojeIskustvo: ObracunIskustva | null; // null za privatnu sobu
+}
+
+interface SpremanjeRezultataPartije {
+  partijaId: string;
+  poruka: string;
+}
+
+interface PonistenaPartija {
+  partijaId: string;
+  poruka: string;
 }
 
 interface NagradaZaRijec {
@@ -155,7 +174,7 @@ interface KrajPartije {
   mojRang: string | null;
 }
 
-type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "INTERNA";
+type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "EMAIL_NIJE_POTVRDEN" | "INTERNA";
 ```
 
 ## Pravila protokola
@@ -164,6 +183,7 @@ type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "INTERNA";
 2. **Resinkronizacija:** nakon ponovnog spajanja istim identitetom poslužitelj vraća vezu u sobu aktivne partije i šalje `partija:stanje`; timer poteza nastavlja teći prema izvornom `istekPotezaIso`. U redu čekanja nema 10-sekundne tolerancije: svaki prekid odmah oslobađa mjesto, a klijent na `/red` nakon povratka ponovno šalje `red:udji` i ulazi na kraj reda. UI aktivne partije uvijek se može obnoviti iz jedne poruke.
 3. **Promatrači** (eliminirani igrači) primaju sve događaje stola i smiju slati `reakcija:posalji`.
 4. **Idempotentnost:** ponovljeni `red:udji` dok je igrač već u redu ponovno šalje `red:stanje` bez promjene položaja.
+5. **Potvrda emaila:** nepotvrđeni registrirani račun dobiva `EMAIL_NIJE_POTVRDEN` pri ulasku u javni red i stvaranju, ulasku ili pokretanju privatne sobe. Gost i račun s potvrđenim aktivnim emailom (i emailom na čekanju) mogu igrati.
 5. Svaka poruka poslužitelja nosi spreman hrvatski tekst (`poruka`) — klijent ne sastavlja poruke pravila sam.
 6. `nagrada` se izračunava isključivo na poslužitelju nakon prihvaćene riječi igrača. Početne i druge sustavske riječi, kao i odbijeni potezi, nemaju nagradu.
 7. Ako riječ istovremeno zadovoljava kriterij rijetkosti i duljine, šalje se jedan `NagradaZaRijec` s oba razloga. Klijent ne pušta dva zvuka i ne stvara dva odvojena efekta.

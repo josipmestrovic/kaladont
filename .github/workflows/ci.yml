@@ -1,7 +1,6 @@
 name: CI
 
 on:
-  pull_request:
   push:
     branches:
       - main
@@ -9,6 +8,7 @@ on:
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -64,6 +64,31 @@ jobs:
       - name: Instalirati ovisnosti
         run: pnpm install --frozen-lockfile
 
+      - name: Provjeriti kritične ranjivosti ovisnosti
+        run: pnpm audit --audit-level critical
+
+      - name: Provjeriti tajne u repozitoriju
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          severity: CRITICAL
+          exit-code: '1'
+          format: table
+
+      - name: Pripremiti bazu za migracijski upgrade test
+        run: |
+          docker run --rm --network host \
+            -e PGPASSWORD=kaladont \
+            postgres:16-alpine \
+            createdb -h 127.0.0.1 -U kaladont kaladont_upgrade_ci
+
+      - name: Provjeriti migracijski upgrade postojeće baze
+        env:
+          BAZA_URL: postgresql://kaladont:kaladont@localhost:5432/kaladont_upgrade_ci
+        run: pnpm --filter posluzitelj migracije:upgrade-test -- --zadnje=2
+
       - name: Primijeniti migracije baze
         run: pnpm --filter posluzitelj migracije
 
@@ -82,11 +107,22 @@ jobs:
       - name: Izgraditi workspace
         run: pnpm build
 
-      - name: Instalirati Chromium za E2E
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Instalirati Chromium i WebKit za E2E
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Pokrenuti kritične Playwright E2E testove
         run: pnpm test:e2e
+
+      - name: Spremiti Playwright E2E izvještaj
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-e2e-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Prijaviti se u GHCR za main candidate
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -139,7 +175,36 @@ jobs:
           fi
 
       - name: Povuci točan image za smoke test
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: docker pull "$IMAGE_REF"
+
+      - name: Provjeriti kritične ranjivosti Docker imagea
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('ghcr.io/josipmestrovic/kaladont@{0}', steps.izgradi-candidate.outputs.digest) || 'kaladont:ci' }}
+          scanners: vuln
+          severity: CRITICAL
+          exit-code: '1'
+          format: table
+
+      - name: Izraditi Trivy SARIF izvještaj
+        if: always()
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('ghcr.io/josipmestrovic/kaladont@{0}', steps.izgradi-candidate.outputs.digest) || 'kaladont:ci' }}
+          scanners: vuln
+          exit-code: '0'
+          format: sarif
+          output: trivy-image.sarif
+
+      - name: Spremiti Trivy SARIF izvještaj
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@4c50b6f6fd9dc6fe03111c2d045c8be2a724cce1 # v3.28.11
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
 
       - name: Validirati Caddy konfiguracije
         shell: bash
@@ -159,7 +224,7 @@ jobs:
         run: docker compose -f docker-compose.ci.yml up -d baza
 
       - name: Primijeniti migracije u CI imageu
-        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija pnpm migracije
+        run: docker compose -f docker-compose.ci.yml run --rm aplikacija node dist/cli/migracije.js
 
       - name: Učitati sintetički fixture u CI imageu
         run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/ci-fixture.js
@@ -182,8 +247,83 @@ jobs:
           echo 'CI image nije postao zdrav u zadanom roku.'
           exit 1
 
+      - name: Pokrenuti E2E nad izgrađenim same-origin serverom
+        env:
+          E2E_HTTP_ADRESA: http://127.0.0.1:3000
+        run: |
+          set +e
+          pnpm test:e2e:http
+          izlazni_kod=$?
+          if test "$izlazni_kod" -ne 0; then
+            echo '--- Docker stanje nakon HTTP E2E pada ---'
+            docker compose -f docker-compose.ci.yml ps
+            docker compose -f docker-compose.ci.yml logs --tail 300 aplikacija
+            echo '--- Health odgovor nakon HTTP E2E pada ---'
+            curl --silent --show-error http://127.0.0.1:3000/zdravlje || true
+          fi
+          exit "$izlazni_kod"
+
+      - name: Pokrenuti browser smoke cijele partije nad imageom
+        env:
+          E2E_HTTP_ADRESA: http://127.0.0.1:3000
+        run: pnpm test:e2e:image-smoke
+
+      - name: Pokrenuti kratki load smoke nad imageom
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-izvjestaji
+          docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija \
+            node dist/cli/opterecenje.js \
+              --scenarij=igra \
+              --partije=2 \
+              --timeout-ms=120000 \
+              --maks-stopa-gresaka=0.01 \
+              --p95-potez-ms=750 \
+              --p95-spremanje-ms=1500 \
+              --maks-rss-delta-mb=300 \
+            | tee ci-izvjestaji/load-smoke.log
+
+      - name: Spremiti load smoke izvještaj
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: load-smoke-${{ github.run_id }}
+          path: ci-izvjestaji/load-smoke.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Spremiti Playwright image E2E izvještaj
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-image-e2e-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Pokrenuti simulaciju četiri igrača
         run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/simulacija.js
+
+      - name: Prikupiti Docker logove na grešci
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p ci-dijagnostika
+          docker compose -f docker-compose.ci.yml ps > ci-dijagnostika/compose-ps.txt || true
+          docker compose -f docker-compose.ci.yml logs aplikacija > ci-dijagnostika/aplikacija.log 2>&1 || true
+          docker compose -f docker-compose.ci.yml logs baza > ci-dijagnostika/baza.log 2>&1 || true
+
+      - name: Spremiti CI dijagnostiku
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-dijagnostika-${{ github.run_id }}
+          path: ci-dijagnostika/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Ugasi CI stack i ukloni volume
         if: always()

@@ -53,26 +53,26 @@ Ako naredba ne odgovara ovom dokumentu ili ne znaš što znači rezultat, ne pok
 
 ## Pojmovnik
 
-| Pojam | Značenje |
-| --- | --- |
-| `main` | Glavna Git grana iz koje se objavljuje image za staging. |
-| commit | Spremljena verzija promjena u Git repozitoriju. |
-| CI | GitHub Actions provjera koja pokreće lint, testove, build i Docker smoke test. |
-| GHCR | GitHub Container Registry, mjesto gdje se objavljuje Docker image. |
-| image | Paket aplikacije koji se pokreće na stagingu. |
-| digest | Puni nepromjenjivi identitet imagea, oblika `sha256:...`. |
-| migracija | SQL promjena kojom se baza usklađuje s novim kodom. |
-| staging | Testno okruženje na `staging.kaladont.hr`, s vlastitom bazom i rječnikom. |
-| rollback | Vraćanje aplikacije na prethodni poznato-zdravi image. |
+| Pojam     | Značenje                                                                       |
+| --------- | ------------------------------------------------------------------------------ |
+| `main`    | Glavna Git grana iz koje se objavljuje image za staging.                       |
+| commit    | Spremljena verzija promjena u Git repozitoriju.                                |
+| CI        | GitHub Actions provjera koja pokreće lint, testove, build i Docker smoke test. |
+| GHCR      | GitHub Container Registry, mjesto gdje se objavljuje Docker image.             |
+| image     | Paket aplikacije koji se pokreće na stagingu.                                  |
+| digest    | Puni nepromjenjivi identitet imagea, oblika `sha256:...`.                      |
+| migracija | SQL promjena kojom se baza usklađuje s novim kodom.                            |
+| staging   | Testno okruženje na `staging.kaladont.hr`, s vlastitom bazom i rječnikom.      |
+| rollback  | Vraćanje aplikacije na prethodni poznato-zdravi image.                         |
 
 ## Gdje se što radi
 
-| Mjesto | Što se tamo radi |
-| --- | --- |
-| VS Code PowerShell | pregled koda, Git provjere, commit i push |
-| GitHub web | praćenje CI-ja i GHCR workflowa, kopiranje digesta |
+| Mjesto                  | Što se tamo radi                                                   |
+| ----------------------- | ------------------------------------------------------------------ |
+| VS Code PowerShell      | pregled koda, Git provjere, commit i push                          |
+| GitHub web              | praćenje CI-ja i GHCR workflowa, kopiranje digesta                 |
 | staging VPS preko SSH-a | provjera stacka, migracija baze i zamjena aplikacijskog containera |
-| preglednik | provjera staging stranice i igra u četiri sesije |
+| preglednik              | provjera staging stranice i igra u četiri sesije                   |
 
 Nikada nemoj lijepiti tajne u ovaj dokument, GitHub issue, commit, chat ili log.
 
@@ -342,7 +342,6 @@ Ne mijenjaj:
 - `SESIJA_TAJNA`;
 - `EMAIL_API_KLJUC`;
 - `ADMIN_TAJNI_KLJUC`;
-- `STAGING_EMAIL_ALLOWLIST`;
 - domenu;
 - Docker volumee;
 - PostgreSQL postavke.
@@ -381,7 +380,7 @@ Očekuješ stanje `Up` i health `healthy`. Ako baza nije zdrava, stani.
 Pokreni migraciju iz novog application imagea:
 
 ```bash
-docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
+docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija node dist/cli/migracije.js
 ```
 
 Što naredba radi:
@@ -400,9 +399,10 @@ Očekivani rezultat je poruka da su migracije uspješno primijenjene i uspješan
 1. ne pokreći novi application container;
 2. ne briši bazu ni volume;
 3. spremi poruku greške bez tajni;
-4. utvrdi je li migracija djelomično primijenjena;
-5. ne pokreći istu migraciju naslijepo više puta;
-6. zaustavi se i prijeđi na incidentni postupak.
+4. spremi deploy fazu, snapshot datoteku i prethodni release zapis koje ispiše deploy skripta;
+5. utvrdi je li migracija djelomično primijenjena;
+6. ne pokreći istu migraciju naslijepo više puta;
+7. zaustavi se i prijeđi na incidentni postupak.
 
 Migracije se ne vraćaju ručnim obrnutim SQL-om. Aplikacijski rollback moguć je samo ako je nova shema kompatibilna sa starom aplikacijom.
 
@@ -528,10 +528,15 @@ Prvo sačuvaj:
 
 - novi digest;
 - prethodni digest;
+- deploy fazu i `.deploy-snapshot-*` datoteku ako je nastala;
 - health odgovor;
 - vrijeme problema;
 - relevantne aplikacijske logove;
 - rezultat zadnje migracije.
+
+Ako je automatska staging skripta pala prije pokretanja migracija, ona vraća samo release retke u `.env` na prethodne vrijednosti i ispisuje dijagnostiku. Provjeri da se `KALADONT_IMAGE`, `DIGEST` i `VERZIJA` opet podudaraju s prethodnim zapisom prije ponavljanja objave.
+
+Ako je skripta pala u fazi `migracije_pokrenute`, `migracije_zavrsene`, `aplikacija_rekreirana` ili `health_provjeren`, nemoj pokretati rollback naslijepo. Baza je možda već promijenjena, pa se prethodni image vraća samo ako znaš da je nova shema kompatibilna sa starom aplikacijom.
 
 Vrati prethodni puni digest u `/opt/kaladont/.env`, zatim pokreni:
 
@@ -554,18 +559,19 @@ Rollback aplikacije ne vraća bazu. Ako je problem nastao u migraciji, ako baza 
 
 ## 13. Česti problemi i prva reakcija
 
-| Problem | Prva reakcija |
-| --- | --- |
-| CI je crven | Ne dirati staging; pročitati crveni korak i popraviti lokalno. |
-| GHCR nije objavio image | Ne dirati staging; provjeriti GHCR workflow i digest. |
-| `docker compose config` ne prolazi | Provjeriti samo release varijable i postojeći `.env`; ne prepisivati tajne. |
-| Image se ne može povući | Provjeriti puni digest i GHCR pristup; ne koristiti tag kao zamjenu. |
-| Migracija padne | Ne ponavljati naslijepo, ne brisati volume, sačuvati grešku. |
-| Health vraća 503 | Provjeriti status aplikacije, baze i logove; ne uvoziti rječnik naslijepo. |
-| `brojRijeci` je nula | Zaustaviti se; razlikovati prazan DB od problema učitavanja rječnika. |
-| UI radi, ali partija ne radi | Provjeriti Socket.IO i aplikacijske logove; ne mijenjati Caddy i image istovremeno. |
-| Disk je pun | Ne koristiti slijepi `prune`; prvo sačuvati aktivni i prethodni digest. |
-| TLS ne radi | Provjeriti Caddy logove, DNS i portove 80/443; ne mijenjati aplikaciju naslijepo. |
+| Problem                              | Prva reakcija                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------- |
+| CI je crven                          | Ne dirati staging; pročitati crveni korak i popraviti lokalno.                      |
+| GHCR nije objavio image              | Ne dirati staging; provjeriti GHCR workflow i digest.                               |
+| `docker compose config` ne prolazi   | Provjeriti samo release varijable i postojeći `.env`; ne prepisivati tajne.         |
+| Image se ne može povući              | Provjeriti puni digest i GHCR pristup; ne koristiti tag kao zamjenu.                |
+| Deploy skripta padne prije migracija | Provjeriti da je `.env` vraćen na prethodni release zapis i sačuvati snapshot.      |
+| Migracija padne                      | Ne ponavljati naslijepo, ne brisati volume, sačuvati grešku, fazu i snapshot.       |
+| Health vraća 503                     | Provjeriti status aplikacije, baze i logove; ne uvoziti rječnik naslijepo.          |
+| `brojRijeci` je nula                 | Zaustaviti se; razlikovati prazan DB od problema učitavanja rječnika.               |
+| UI radi, ali partija ne radi         | Provjeriti Socket.IO i aplikacijske logove; ne mijenjati Caddy i image istovremeno. |
+| Disk je pun                          | Ne koristiti slijepi `prune`; prvo sačuvati aktivni i prethodni digest.             |
+| TLS ne radi                          | Provjeriti Caddy logove, DNS i portove 80/443; ne mijenjati aplikaciju naslijepo.   |
 
 ## Završna checklista
 

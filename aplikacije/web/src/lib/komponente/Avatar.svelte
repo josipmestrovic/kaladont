@@ -1,5 +1,7 @@
 <script lang="ts">
   import { bojaBordera, nazivAvatara, putanjaAvatara } from '$lib/avatari.js';
+  import type { AvatarConfigV1 } from 'zajednicko';
+  import AvatarKonfiguracijaPreview from './AvatarKonfiguracijaPreview.svelte';
 
   interface Props {
     avatarId: number;
@@ -7,9 +9,10 @@
     gost?: boolean;
     velicina?: number;
     prikaziRangBorder?: boolean;
+    avatarConfig?: AvatarConfigV1 | null;
   }
 
-  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true }: Props = $props();
+  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null }: Props = $props();
 
   const border = $derived(gost || !prikaziRangBorder ? null : bojaBordera(rang));
   const gostFontSize = $derived(Math.max(8, Math.round(velicina * 0.21)));
@@ -19,10 +22,11 @@
   class="avatar"
   style:width="{velicina}px"
   style:height="{velicina}px"
-  style:border={border ? `4px solid ${border}` : '4px solid transparent'}
   style:--boja-rang={border ?? 'transparent'}
 >
-  {#if gost}
+  {#if avatarConfig && !gost}
+    <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} rang={prikaziRangBorder ? rang : null} />
+  {:else if gost}
     <div class="gost-avatar" style:font-size="{gostFontSize}px">Gost</div>
   {:else}
     <img src={putanjaAvatara(avatarId)} alt={nazivAvatara(avatarId)} />

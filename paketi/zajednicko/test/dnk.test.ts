@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { izracunajDnkTier, izracunajKaladontDnk, jeDnkOtkljucan } from '../src/dnk.js';
+import { izracunajDnkTier, izracunajKaladontDnk, jeDnkOtkljucan, jeOcjenaIgreDostupna } from '../src/dnk.js';
 import { izracunajRang } from '../src/rangovi.js';
 
 describe('DNK zajednicko', () => {
@@ -14,6 +14,12 @@ describe('DNK zajednicko', () => {
     expect(jeDnkOtkljucan(9)).toBe(false);
     expect(jeDnkOtkljucan(10)).toBe(true);
     expect(jeDnkOtkljucan(11)).toBe(true);
+  });
+
+  it('ocjena igre je dostupna tek nakon tri prihvaćena poteza', () => {
+    expect(jeOcjenaIgreDostupna(0)).toBe(false);
+    expect(jeOcjenaIgreDostupna(2)).toBe(false);
+    expect(jeOcjenaIgreDostupna(3)).toBe(true);
   });
 
   it('računa profil za 4 igrača i 1v1 odvojeno', () => {

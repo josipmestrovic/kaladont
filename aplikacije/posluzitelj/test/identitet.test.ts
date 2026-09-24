@@ -2,10 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { igraci } from '../src/baza/shema.js';
+import { igraci, sesije } from '../src/baza/shema.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -22,12 +23,27 @@ afterAll(async () => {
   await app.close();
 });
 
-function spojiSe(token: string): Promise<ClientSocket> {
+function spojiSe(token: string, origin?: string): Promise<ClientSocket> {
   return new Promise((resolve, reject) => {
-    const socket = ioClient(adresa, { auth: { token }, forceNew: true });
+    const socket = ioClient(adresa, {
+      auth: { token },
+      forceNew: true,
+      reconnection: false,
+      extraHeaders: origin ? { origin } : undefined,
+    });
     socket.on('connect', () => resolve(socket));
-    socket.on('connect_error', reject);
+    socket.on('connect_error', (greska) => {
+      socket.disconnect();
+      reject(greska);
+    });
   });
+}
+
+async function igracIdZaToken(token: string): Promise<string> {
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const [sesija] = await baza.select({ igracId: sesije.igracId }).from(sesije).where(eq(sesije.tokenHash, tokenHash));
+  if (!sesija) throw new Error('Testna sesija nije pronađena');
+  return sesija.igracId;
 }
 
 async function cekajBrojAktivnihVeza(veze: readonly ClientSocket[], broj: number): Promise<void> {
@@ -43,30 +59,37 @@ describe('identitet preko Socket.IO handshakea', () => {
   it('odbija spajanje s nevaljanim tokenom', async () => {
     await expect(
       new Promise((resolve, reject) => {
-        const socket = ioClient(adresa, { auth: { token: 'nije-uuid' }, forceNew: true });
+        const socket = ioClient(adresa, { auth: { token: 'nije-uuid' }, forceNew: true, reconnection: false });
         socket.on('connect', () => reject(new Error('nije trebalo uspjeti')));
-        socket.on('connect_error', (greska) => resolve(greska));
+        socket.on('connect_error', (greska) => {
+          socket.disconnect();
+          resolve(greska);
+        });
       }),
     ).resolves.toBeDefined();
   });
 
-  it('prihvaća spajanje s valjanim UUID tokenom i dodjeljuje nadimak', async () => {
-    const token = randomUUID();
+  it('prihvaća spajanje s valjanim opaque guest tokenom i dodjeljuje nadimak', async () => {
+    const token = `gost.${randomUUID().replaceAll('-', '')}`;
     const socket = await spojiSe(token);
     expect(socket.connected).toBe(true);
     socket.disconnect();
   });
 
+  it('odbija Socket.IO handshake sa stranim browser originom', async () => {
+    await expect(spojiSe(`gost.${randomUUID().replaceAll('-', '')}`, 'https://nepoznata.example')).rejects.toBeDefined();
+  });
+
   it('RS-18: nova veza istog identiteta odjavljuje staru', async () => {
-    const token = randomUUID();
+    const token = `gost.${randomUUID().replaceAll('-', '')}`;
     const prvaVeza = await spojiSe(token);
 
-    const odjavaPromise = new Promise<void>((resolve) => {
-      prvaVeza.on('disconnect', () => resolve());
+    const odjavaPromise = new Promise<{ kod: string }>((resolve) => {
+      prvaVeza.on('veza:zatvorena', (poruka) => resolve({ kod: poruka.kod }));
     });
 
     const drugaVeza = await spojiSe(token);
-    await odjavaPromise;
+    await expect(odjavaPromise).resolves.toEqual({ kod: 'DRUGA_KARTICA' });
 
     expect(prvaVeza.connected).toBe(false);
     expect(drugaVeza.connected).toBe(true);
@@ -74,46 +97,48 @@ describe('identitet preko Socket.IO handshakea', () => {
   });
 
   it('zadnju aktivnost ne ažurira češće od svakih 15 minuta', async () => {
-    const token = randomUUID();
+    const token = `gost.${randomUUID().replaceAll('-', '')}`;
     const prvaVeza = await spojiSe(token);
     prvaVeza.disconnect();
+    const igracId = await igracIdZaToken(token);
 
     const svjezaAktivnost = new Date(Date.now() - 60_000);
-    await baza.update(igraci).set({ zadnjaAktivnost: svjezaAktivnost }).where(eq(igraci.id, token));
+    await baza.update(igraci).set({ zadnjaAktivnost: svjezaAktivnost }).where(eq(igraci.id, igracId));
 
     const drugaVeza = await spojiSe(token);
     drugaVeza.disconnect();
     const [nakonSvjeze] = await baza
       .select({ zadnjaAktivnost: igraci.zadnjaAktivnost })
       .from(igraci)
-      .where(eq(igraci.id, token));
+      .where(eq(igraci.id, igracId));
     expect(nakonSvjeze!.zadnjaAktivnost.getTime()).toBe(svjezaAktivnost.getTime());
 
     const staraAktivnost = new Date(Date.now() - 16 * 60_000);
-    await baza.update(igraci).set({ zadnjaAktivnost: staraAktivnost }).where(eq(igraci.id, token));
+    await baza.update(igraci).set({ zadnjaAktivnost: staraAktivnost }).where(eq(igraci.id, igracId));
 
     const trecaVeza = await spojiSe(token);
     trecaVeza.disconnect();
     const [nakonStare] = await baza
       .select({ zadnjaAktivnost: igraci.zadnjaAktivnost })
       .from(igraci)
-      .where(eq(igraci.id, token));
+      .where(eq(igraci.id, igracId));
     expect(nakonStare!.zadnjaAktivnost.getTime()).toBeGreaterThan(staraAktivnost.getTime());
   });
 
   it('paralelni reconnectovi konkurentno sigurno osvježavaju zastarjelu aktivnost', async () => {
-    const token = randomUUID();
+    const token = `gost.${randomUUID().replaceAll('-', '')}`;
     const pocetnaVeza = await spojiSe(token);
     pocetnaVeza.disconnect();
+    const igracId = await igracIdZaToken(token);
     const staraAktivnost = new Date(Date.now() - 16 * 60_000);
-    await baza.update(igraci).set({ zadnjaAktivnost: staraAktivnost }).where(eq(igraci.id, token));
+    await baza.update(igraci).set({ zadnjaAktivnost: staraAktivnost }).where(eq(igraci.id, igracId));
 
     const veze = await Promise.all([spojiSe(token), spojiSe(token)]);
     await cekajBrojAktivnihVeza(veze, 1);
     const [nakonReconnecta] = await baza
       .select({ zadnjaAktivnost: igraci.zadnjaAktivnost })
       .from(igraci)
-      .where(eq(igraci.id, token));
+      .where(eq(igraci.id, igracId));
 
     expect(nakonReconnecta!.zadnjaAktivnost.getTime()).toBeGreaterThan(staraAktivnost.getTime());
     expect(veze.filter((veza) => veza.connected)).toHaveLength(1);

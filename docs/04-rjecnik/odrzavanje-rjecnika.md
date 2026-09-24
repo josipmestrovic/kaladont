@@ -18,12 +18,12 @@ flowchart TD
     I --> J[Signal ponovnog učitavanja rječnika]
 ```
 
-## Prijava greške (perspektiva igrača)
+## Prijava riječi (perspektiva igrača)
 
 1. Igrač otvori **povijest partije** (dostupna tijekom i nakon igre).
 2. Označi konkretan potez i napiše kratku poruku (npr. „riječ 'aljkavost' postoji, a nije prihvaćena").
-3. Prijava se sprema sa statusom `nova` i vezom na partiju i potez; poziva se email adapter za notifikaciju. Danas adapter poruku samo logira, a stvarna isporuka preko Resenda obvezan je preduvjet produkcijske Faze 8.
-4. Poruka igraču nakon slanja: „Hvala! Pregledat ćemo prijavu — ovako nam pomažeš da igra bude bolja."
+3. Prijava se sprema sa statusom `nova` i vezom na završenu partiju i potez; igrač može prijaviti najviše tri različite riječi po partiji. Email adapter se poziva best-effort nakon spremanja.
+4. Nakon klika gumb prelazi u stanje „Riječ je prijavljena"; ponovni klik na istu riječ nije dopušten.
 
 Tipični povodi prijave:
 
@@ -48,8 +48,8 @@ Prije produkcije još treba implementirati jednokratni CLI koji već registriran
 ## Pravila izmjena
 
 1. **Soft-delete:** riječi se nikad ne brišu, samo deaktiviraju (`aktivna = false`) — povijest odigranih partija ostaje razumljiva.
-2. **Bez retroaktivnosti:** izmjena rječnika nikad ne mijenja ishod odigranih partija (RS-21).
-3. **Ponovno učitavanje:** izmjene postaju važeće signalom za reload rječnika u memoriji; aktivne partije dovršavaju sa svojim snapshotom.
+2. **Primjena na aktivne partije:** izmjena rječnika ne mijenja već prihvaćene poteze, ali može utjecati na buduće validacije u aktivnim partijama nakon reloada.
+3. **Ponovno učitavanje:** izmjene postaju važeće signalom za reload zajedničkog rječnika u memoriji.
 4. **Iznimke digrafa** dodane kroz prijave zahtijevaju ponovni izračun `prva_dva`/`zadnja_dva` samo za tu riječ.
 
 ## Ciljevi kvalitete (pratiti od lansiranja)

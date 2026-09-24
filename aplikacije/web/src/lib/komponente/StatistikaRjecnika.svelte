@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { StatistikaRjecnika } from 'zajednicko';
-  import { ADRESA_POSLUZITELJA } from '$lib/konfiguracija.js';
+  import { apiUrl } from '$lib/api-url.js';
 
   /** Hrvatski nazivi kategorija u množini (redoslijed dolazi sortiran silazno s poslužitelja). */
   const NAZIVI: Record<string, string> = {
@@ -21,7 +21,7 @@
 
   onMount(async () => {
     try {
-      const odgovor = await fetch(`${ADRESA_POSLUZITELJA}/rjecnik/statistika`);
+      const odgovor = await fetch(apiUrl('/rjecnik/statistika'));
       if (odgovor.ok) statistika = (await odgovor.json()) as StatistikaRjecnika;
     } catch {
       // statistika je ukras naslovnice - bez nje stranica normalno radi

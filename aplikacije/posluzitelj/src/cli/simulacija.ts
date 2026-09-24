@@ -38,14 +38,14 @@ function odgodi(ms: number): Promise<void> {
 }
 
 interface Bot {
-  igracId: string; // gost token je istovremeno igracId (identitet.ts)
+  igracId: string | null;
   socket: ReturnType<typeof ioClient>;
 }
 
 async function glavno(): Promise<void> {
   const botovi: Bot[] = Array.from({ length: 4 }, () => {
-    const token = randomUUID();
-    return { igracId: token, socket: ioClient(ADRESA, { auth: { token }, forceNew: true }) };
+    const token = `gost.${randomUUID().replaceAll('-', '')}`;
+    return { igracId: null, socket: ioClient(ADRESA, { auth: { token }, forceNew: true }) };
   });
 
   await Promise.all(
@@ -79,6 +79,12 @@ async function glavno(): Promise<void> {
   }
 
   const glavniSocket = botovi[0]!.socket;
+
+  for (const bot of botovi) {
+    bot.socket.once('partija:pocetak', (poruka: PocetakPartije) => {
+      bot.igracId = poruka.mojIgracId;
+    });
+  }
 
   glavniSocket.on('partija:pocetak', (poruka: PocetakPartije) => {
     console.log(
@@ -123,15 +129,15 @@ async function glavno(): Promise<void> {
 
   for (const bot of botovi) {
     bot.socket.on('potez:odbijen', async (poruka: OdbijenPotez) => {
-      console.log(`${bot.igracId.slice(0, 8)} odbijen (${poruka.kod}) - pokušavam ponovno`);
+      console.log(`${bot.igracId?.slice(0, 8) ?? 'nepoznat'} odbijen (${poruka.kod}) - pokušavam ponovno`);
       await odgodi(150); // izbjegava RS-23 rate limit (max 3 pokusaja/s)
-      await odigrajAkoJeNaRedu(bot.igracId);
+      if (bot.igracId) await odigrajAkoJeNaRedu(bot.igracId);
     });
     bot.socket.on('greska', async (poruka: { kod: string; poruka: string }) => {
-      console.log(`${bot.igracId.slice(0, 8)} greška (${poruka.kod}: ${poruka.poruka}) - pokušavam kasnije`);
+      console.log(`${bot.igracId?.slice(0, 8) ?? 'nepoznat'} greška (${poruka.kod}: ${poruka.poruka}) - pokušavam kasnije`);
       if (poruka.kod === 'PREBRZO') {
         await odgodi(1100);
-        await odigrajAkoJeNaRedu(bot.igracId);
+        if (bot.igracId) await odigrajAkoJeNaRedu(bot.igracId);
       }
     });
     bot.socket.emit('red:udji');

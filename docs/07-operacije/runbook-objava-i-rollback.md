@@ -2,7 +2,7 @@
 
 Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani su u [release shemi](release-shema.md), automatika u [ci-cd.md](ci-cd.md), a ovdje je ono što radi čovjek. Pravilo: **promocija u produkciju uvijek nosi digest koji je već prošao staging** — nikad svježi build, nikad ručni SSH deploy.
 
-> **Status: djelomično izvedivo.** CI, Docker smoke test i GHCR objava postoje. Staging je ručno postavljen i ručno se ažurira digestom. Automatski staging deploy i produkcijska promocija workflowom još ne postoje; koraci koji ih pretpostavljaju ostaju ciljani budući postupak.
+> **Status: djelomično izvedivo.** CI, Docker smoke test, GHCR promotion i automatski staging deploy postoje. Produkcijska promocija workflowom još ne postoji; koraci koji je pretpostavljaju ostaju ciljani budući postupak.
 
 ## Prije svakog release kandidata
 
@@ -16,14 +16,14 @@ Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani 
 
 1. **Spoji PR u `main`** tek kada su obvezne provjere zelene. CI zatim objavljuje image u GHCR-u.
 2. **Zabilježi release kandidata** prema [release shemi](release-shema.md#predložak-zapisa-releasea): puni digest, commit SHA, workflow run, prethodni staging digest, kratak opis promjene i početni status `kandidat`.
-3. **Ručno ažuriraj staging** punim `sha256:...` digestom iz GHCR workflowa i rekreiraj samo aplikaciju. Dok automatski staging workflow ne postoji, ovo je službeni staging postupak, ne zaobilaženje procesa.
+3. **Pričekaj automatski staging workflow**. On koristi isti puni `sha256:...` digest, šalje verzionirane konfiguracije, izvršava migracije, rekreira aplikaciju i Caddy te provjerava health.
 4. **Provjeri staging** bez Basic Autha; staging je privremeno javno dostupan uz `noindex`:
    - `/zdravlje` vraća 200;
    - landing, registracija/prijava, red i WebSocket rade;
    - odigraj cijelu partiju u četiri odvojene pregledničke sesije, od reda do rezultata;
    - provjeri potez, odbijanje riječi, „Ne znam”, timer/eliminaciju, reakciju, povijest, bodove i povratak na novu igru;
    - ciljano provjeri svako područje koje je promjena dirala;
-   - za email promjenu potvrdi stvarnu isporuku samo točno allowlistanoj adresi i odbijanje adrese izvan popisa;
+   - za email promjenu potvrdi stvarnu isporuku na testnim adresama i različitim uređajima;
    - za baznu promjenu pregledaj migracijski korak i potvrdi da stara aplikacija može raditi nad novom shemom barem jedan ciklus.
 5. **Zabilježi staging rezultat** kao `staging-provjereno` ili `odbačeno`. Ne promoviraj i ne dijeli closed testerima poznatu grešku uz obećanje da će se popraviti poslije.
 6. **Za closed test release** pošalji testerima samo staging link, kratku napomenu što se testira i način prijave greške. Popis testera i privatni kontakt podaci ne ulaze u git.
@@ -33,9 +33,9 @@ Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani 
 10. **Provjeri produkciju:** `/zdravlje` vraća 200 i očekivani digest; landing, Pravila, O igri, Privatnost i Uvjeti rade; zatim odigraj cijelu partiju u četiri odvojene sesije. Ta partija ostaje u običnoj statistici.
 11. **Pregledaj logove** bez ispisivanja tajni:
 
-   ```bash
-   ssh kaladont@PROD_IP 'cd /opt/kaladont && docker compose -f docker-compose.prod.yml logs --since 10m aplikacija'
-   ```
+```bash
+ssh kaladont@PROD_IP 'cd /opt/kaladont && docker compose -f docker-compose.prod.yml logs --since 10m aplikacija'
+```
 
 12. U [evidenciju održavanja](odrzavanje.md#evidencija-drillova-objava-i-većih-zahvata) upiši vrijeme, status, digest, commit SHA, workflow, rezultat, trajanje prekida i identitete/ID probne produkcijske partije kako bi se mogla prepoznati u malom uzorku metrika.
 
@@ -53,12 +53,14 @@ Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani 
 
 Automatskog rollbacka nema. Kada nova verzija pokaže kvar, cilj je vratiti aplikaciju unutar **15 minuta**:
 
-1. **Spremi dokaze prije restarta:** problematični digest, health odgovor, workflow sažetak i relevantne logove od trenutka deploya. Ne troši cijeli rollback cilj na dubinsku dijagnostiku.
+1. **Spremi dokaze prije restarta:** problematični digest, health odgovor, workflow sažetak, deploy fazu, snapshot datoteku i relevantne logove od trenutka deploya. Ne troši cijeli rollback cilj na dubinsku dijagnostiku.
 2. **Potvrdi prethodni digest** iz upravo završenog workflowa i GitHub Deployments zapisa. Mora biti puni digest, ne `latest` ili SHA tag.
 3. **Pokreni isti ručni produkcijski workflow** s prethodnim poznato-zdravim digestom. Ne rebuildaj i ne mijenjaj datoteke SSH-om.
 4. **Prati health check** i potvrdi da javni `/zdravlje` prikazuje vraćeni digest.
 5. **Provjeri ključne stranice i cijelu partiju** čim je servis vraćen. Ako stara verzija također ne radi, prijeđi na bazni/infrastrukturni incident umjesto ponavljanja deploya.
 6. **Zapiši incident i vremena:** detekcija, odluka, početak rollbacka i povrat usluge. Uzrok se poslije reproducira na stagingu.
+
+Deploy skripta koristi privremeni kandidat `.env` za validaciju Composea, povlačenje slike i migracije. Stvarni `.env` smije dobiti novi release zapis tek nakon uspješnih migracija; ako padne ranije, ostaje na prethodnom zapisu ili ga skripta idempotentno vrati. Nakon faze `migracije_pokrenute` crveni workflow ostaje incident za ljudsku odluku: prvo sačuvaj dijagnostiku, zatim rollback aplikacije radi samo ako je nova shema potvrđeno kompatibilna sa starom aplikacijom. Ne vraćaj bazu i ne pokreći obrnuti SQL kao dio uobičajenog rollbacka.
 
 **Važno za bazu:** rollback vraća samo aplikaciju. Migracije su dizajnirane unatrag-kompatibilno (expand/contract), pa starija aplikacija radi nad novijom shemom barem jedan ciklus. Ako je migracija sama uzrok kvara, to je incident nad bazom — vidi [runbook-backup-i-vracanje.md](runbook-backup-i-vracanje.md), ne „rollback migracije na živo".
 

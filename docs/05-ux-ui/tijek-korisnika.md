@@ -36,11 +36,14 @@ flowchart LR
     A[Gost sa statistikom] -->|Registriraj se| B[Email + lozinka + nadimak]
     B --> C[Potvrdni email]
     C --> D[Račun — ista statistika, isti ID]
+    D --> E[Zahvala + izbor sljedeće akcije]
 ```
 
 - Poziv na registraciju prikazuje se **nakon partije** (najjača motivacija: „Sačuvaj svojih X bodova — registriraj se"), nikad kao prepreka prije igre.
 - Registracija je `UPDATE` gostova zapisa — statistika, kalibracija i povijest ostaju (RS-20).
 - Prijava na drugom uređaju: standardni email + lozinka.
+- Nakon uspješne registracije otvara se `/zahvala`; stranica je javno dostupna i nudi poveznice za oba javna moda, privatnu sobu, pravila, profil, postavke, ljestvice i novosti.
+- Ocjena završene partije zahtijeva najmanje tri prihvaćena poteza; partija s manje podataka ne ulazi u prosjek ocjena.
 
 ## Prijava greške
 

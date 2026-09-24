@@ -6,10 +6,10 @@ import {
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
-  it('ima devet dostignuća i 45 zvjezdica', () => {
-    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(9);
+  it('ima deset dostignuća i 50 zvjezdica', () => {
+    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(10);
     expect(DEFINICIJE_DOSTIGNUCA.every((definicija) => definicija.pragovi.length === 5)).toBe(true);
-    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(45);
+    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(50);
   });
 
   it('preskače više razina i vraća najvišu novu razinu', () => {
@@ -54,6 +54,7 @@ describe('dostignuca', () => {
       'izazvaneEliminacije',
       'mrtvaSlovaEliminacije',
       'javnePobjede',
+      'povratneInformacije',
     ] as const;
 
     const prviPrag: Record<(typeof brojači)[number], number> = {
@@ -65,6 +66,7 @@ describe('dostignuca', () => {
       izazvaneEliminacije: 1,
       mrtvaSlovaEliminacije: 1,
       javnePobjede: 1,
+      povratneInformacije: 1,
     };
 
     for (const brojac of brojači) {

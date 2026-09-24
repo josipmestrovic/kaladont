@@ -42,11 +42,11 @@ Status se zapisuje u [evidenciju održavanja](odrzavanje.md#evidencija-drillova-
 
 ## Kanali
 
-| Kanal               | Kako nastaje                                                                      | Tko ga vidi                       | Izlaz                                   |
-| ------------------- | --------------------------------------------------------------------------------- | --------------------------------- | --------------------------------------- |
-| `main` kandidat     | PR je spojen u `main`, CI je zelen i GHCR objava je uspjela.                      | Operater.                         | Digest spreman za ručni staging deploy. |
-| Staging closed test | Operater ručno postavi digest na `staging.kaladont.hr` i provjeri ga.             | Mali ručno odabrani krug testera. | `staging-provjereno` ili `odbačeno`.    |
-| Produkcija          | Operater ručno promovira isti staging-provjereni digest u vrijeme slabog prometa. | Svi korisnici.                    | `promovirano` ili rollback.             |
+| Kanal               | Kako nastaje                                                                      | Tko ga vidi                       | Izlaz                                        |
+| ------------------- | --------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------- |
+| `main` kandidat     | PR je spojen u `main`, CI je zelen i GHCR objava je uspjela.                      | Operater.                         | Digest spreman za automatski staging deploy. |
+| Staging closed test | Workflow automatski postavi digest, a operater provjeri staging.                  | Mali ručno odabrani krug testera. | `staging-provjereno` ili `odbačeno`.         |
+| Produkcija          | Operater ručno promovira isti staging-provjereni digest u vrijeme slabog prometa. | Svi korisnici.                    | `promovirano` ili rollback.                  |
 
 Staging tijekom prvih closed testova ostaje bez Basic Autha zbog Socket.IO promptova. Koristi `X-Robots-Tag: noindex, nofollow`, ali to nije kontrola pristupa. Link se dijeli samo malom ručno odabranom krugu testera. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway.
 
@@ -56,14 +56,13 @@ Staging tijekom prvih closed testova ostaje bez Basic Autha zbog Socket.IO promp
 2. Prije mergea potvrdi da je CI zelen i da razumiješ migracije, konfiguracijske promjene i rollback rizik.
 3. Spoji PR u `main`.
 4. Pričekaj da CI pushne candidate, provede smoke test po digestu, a zatim [GHCR promotion workflow](../../.github/workflows/objavi-ghcr.yml) promovira isti manifest.
-5. Iz workflowa zapiši puni digest, puni commit SHA i poveznicu na workflow run.
-6. Zapiši trenutno aktivni staging digest prije promjene.
-7. Na staging VPS-u ručno postavi novi digest u `/opt/kaladont/.env`, povuci sliku i rekreiraj samo aplikaciju prema [runbooku objave](runbook-objava-i-rollback.md#redovna-objava).
-8. Provjeri staging checklistu iz ovog dokumenta.
-9. Zapiši rezultat kao `staging-provjereno` ili `odbačeno`.
-10. Tek nakon statusa `staging-provjereno` pošalji link i napomene closed testerima.
+5. Pričekaj da [staging workflow](../../.github/workflows/objavi-staging.yml) povuče isti digest, izvrši migracije i potvrdi javni health.
+6. Iz workflowa zapiši puni digest, puni commit SHA i poveznicu na workflow run.
+7. Provjeri staging checklistu iz ovog dokumenta.
+8. Zapiši rezultat kao `staging-provjereno` ili `odbačeno`.
+9. Tek nakon statusa `staging-provjereno` pošalji link i napomene closed testerima.
 
-Automatski staging workflow je kasnija automatizacija. Dok ne postoji, ručni staging deploy punim digestom nije zaobilaženje procesa nego službeni postupak.
+Ako staging workflow padne, ne ponavljaj naslijepo: provjeri SSH, Compose/migracije, health odgovor i trenutno aktivni digest. Ručni staging deploy ostaje incidentni fallback, ne redovni put.
 
 ## Checklist: prije mergea
 
@@ -71,7 +70,7 @@ Automatski staging workflow je kasnija automatizacija. Dok ne postoji, ručni st
 - [ ] CI je zelen; Docker smoke test nije preskočen za promjene koje diraju build, startup, bazu, Caddy, Compose, migracije ili workflowe.
 - [ ] Ako postoje migracije, stara aplikacija može raditi nad novom shemom barem jedan release ciklus.
 - [ ] Ako se očekuje prekid dulji od 5 minuta, najava je objavljena najmanje 24 sata ranije kroz raniji release.
-- [ ] Za promjene emaila provjereno je da staging allowlista i dalje fail-closed odbija adrese izvan popisa.
+- [ ] Za promjene emaila potvrđeno je slanje na testne adrese s više uređaja.
 - [ ] Poznat je prethodni staging digest ili je jasno da se radi prvi deploy.
 
 ## Checklist: nakon GHCR objave

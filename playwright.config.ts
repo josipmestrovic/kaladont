@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: 'http-rute.spec.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 30_000,
@@ -14,8 +15,24 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    ...devices['Desktop Chrome'],
   },
+  projects: [
+    {
+      name: 'desktop-chrome',
+      testIgnore: ['mobilni-tok.spec.ts', 'http-rute.spec.ts'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'android-chrome',
+      testMatch: 'mobilni-tok.spec.ts',
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'iphone-webkit',
+      testMatch: 'mobilni-tok.spec.ts',
+      use: { ...devices['iPhone 13'], browserName: 'webkit' },
+    },
+  ],
   webServer: [
     {
       command: 'pnpm --filter posluzitelj exec tsx src/index.ts',
@@ -29,6 +46,7 @@ export default defineConfig({
         ODGODA_POCETKA_PARTIJE_MS: '0',
         ONEMOGUCI_TIMER_POTEZA: 'true',
         TOLERANCIJA_PREKIDA_MS: '10000',
+        SOCKET_HANDSHAKE_PO_IP_MINUTI: '1000',
         EMAIL_API_KLJUC: '',
         SESIJA_TAJNA: 'e2e-test-secret',
         VERZIJA: 'e2e',

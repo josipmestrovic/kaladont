@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "idx_prijave_igrac_id_partija_id_vrijeme" ON "prijave" USING btree ("igrac_id","partija_id","vrijeme");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_prijave_igrac_partija_potez" ON "prijave" USING btree ("igrac_id","partija_id","potez_id");

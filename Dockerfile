@@ -16,15 +16,13 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm build
-RUN pnpm deploy --filter posluzitelj --prod=false /runtime
+RUN pnpm deploy --filter posluzitelj --prod /runtime
 
 FROM node:22-alpine AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
-
-RUN npm install --global pnpm@9.15.9
 
 RUN addgroup -S kaladont \
   && adduser -S --ingroup kaladont kaladont

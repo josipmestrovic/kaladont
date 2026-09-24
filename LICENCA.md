@@ -15,6 +15,8 @@ Pregledavanje koda i tehničke rasprave (issues, prijedlozi) su dobrodošli.
 
 Napomena: ovaj repozitorij namjerno **ne sadrži** open-source licencu. Prema zadanim pravilima autorskog prava, odsutnost licence znači da nikakva prava korištenja nisu dodijeljena.
 
+Za prijavu moguće povrede ovih prava piši na [info@kaladont.hr](mailto:info@kaladont.hr).
+
 ## Podaci rječnika — CC BY-SA 4.0
 
 Baza riječi korištena u igri izvedena je iz leksikona:
@@ -22,3 +24,21 @@ Baza riječi korištena u igri izvedena je iz leksikona:
 > Ljubešić, Nikola, 2019, *Inflectional lexicon hrLex 1.3*, Slovenian language resource repository CLARIN.SI, <http://hdl.handle.net/11356/1232>
 
 Leksikon hrLex objavljen je pod licencom [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.hr). Izvedeni popis riječi stoga zadržava istu licencu i **ne nalazi se u ovom repozitoriju** — generira se lokalno skriptom za uvoz (vidi [docs/04-rjecnik/uvoz-rjecnika.md](docs/04-rjecnik/uvoz-rjecnika.md)). Atribucija izvora prikazana je i u samoj aplikaciji na stranici „O igri".
+
+## Avatar asseti — CC BY 4.0
+
+Personalizirani avatar sustav koristi **Avatar Illustration System** autora Micaha Laniera:
+
+- [Izvorni Figma Community file](https://www.figma.com/community/file/829741575478342595/avatar-illustration-system)
+- [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
+
+Za Kaladont su SVG dijelovi pripremljeni za lokalno sastavljanje i promjenu podržanih boja. Ova licenca odnosi se na navedene third-party avatar assete i ne mijenja licencu izvornog koda projekta Kaladont.
+
+## Ikone igre — CC BY 4.0
+
+Ikone sučelja igre koriste **The Ultimate Games Icons Library**:
+
+- [Izvorni Figma Community file](https://www.figma.com/community/file/1266365661823917037/the-ultimate-games-icons-library)
+- [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
+
+Ova licenca odnosi se na navedene third-party ikone i ne mijenja licencu izvornog koda projekta Kaladont.

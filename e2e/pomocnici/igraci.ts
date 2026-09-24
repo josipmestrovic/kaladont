@@ -5,7 +5,7 @@ export interface E2EIgrac {
   stranica: Page;
 }
 
-export async function stvoriIgrace(browser: Browser, broj: number): Promise<E2EIgrac[]> {
+export async function dodajIgrace(browser: Browser, broj: number): Promise<E2EIgrac[]> {
   return Promise.all(
     Array.from({ length: broj }, async () => {
       const kontekst = await browser.newContext();
@@ -13,6 +13,10 @@ export async function stvoriIgrace(browser: Browser, broj: number): Promise<E2EI
       return { kontekst, stranica };
     }),
   );
+}
+
+export async function stvoriIgrace(browser: Browser, broj: number): Promise<E2EIgrac[]> {
+  return dodajIgrace(browser, broj);
 }
 
 export async function udjiUJavniRed(igraci: readonly E2EIgrac[], mod: 'dva_igraca' | 'cetiri_igraca') {

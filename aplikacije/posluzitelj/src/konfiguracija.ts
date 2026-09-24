@@ -11,16 +11,24 @@ const shemaKonfiguracije = z.object({
   SESIJA_TAJNA: z.string().min(1, 'SESIJA_TAJNA nije postavljen'),
   EMAIL_API_KLJUC: z.string().default(''),
   EMAIL_POSILJATELJ: z.string().email().default('noreply@kaladont.hr'),
-  STAGING_EMAIL_ALLOWLIST: z.string().default(''),
+  JAVNA_ADRESA: z.string().url().default('http://localhost:3000'),
   DEV_MAIL: z.string().email().default('dev@example.com'),
   UMAMI_URL: z.string().default(''),
   ONEMOGUCI_TIMER_POTEZA: z.enum(['true', 'false']).default('false'),
   ODGODA_POCETKA_PARTIJE_MS: z.coerce.number().int().nonnegative().default(10_000),
   TOLERANCIJA_PREKIDA_MS: z.coerce.number().int().nonnegative().default(10_000),
+  HTTP_DOKUMENTI_PO_IP_MINUTI: z.coerce.number().int().positive().default(30),
+  SOCKET_HANDSHAKE_PO_IP_MINUTI: z.coerce.number().int().positive().default(30),
+  SOCKET_MAKSIMALNO_AKTIVNIH_VEZA: z.coerce.number().int().positive().default(1_000),
+  SOCKET_MAKSIMALNO_PRIVATNIH_SOBA: z.coerce.number().int().positive().default(100),
+  SOCKET_MAKSIMALNO_AKTIVNIH_PARTIJA: z.coerce.number().int().positive().default(500),
+  SOCKET_PROZOR_DOGADAJA_MS: z.coerce.number().int().positive().default(60_000),
+  SOCKET_DOGADAJI_PO_PROZORU: z.coerce.number().int().positive().default(30),
   ADMIN_TAJNI_KLJUC: z.string().default(''),
   SIMULACIJA_ADRESA: z.string().url().default('http://localhost:3000'),
   VERZIJA: z.string().default('lokalno'),
   DIGEST: z.string().default('lokalno'),
+  POSLUZUJ_WEB: z.enum(['true', 'false']).default('false'),
 });
 
 export const konfiguracija = shemaKonfiguracije.parse(process.env);
@@ -38,8 +46,7 @@ if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'producti
   if (!konfiguracija.EMAIL_API_KLJUC) {
     throw new Error('EMAIL_API_KLJUC mora biti postavljen izvan razvoja i testiranja.');
   }
+  if (konfiguracija.JAVNA_ADRESA.startsWith('http://')) {
+    throw new Error('JAVNA_ADRESA mora koristiti HTTPS izvan razvoja i testiranja.');
+  }
 }
-
-export const stagingEmailAllowlista = konfiguracija.STAGING_EMAIL_ALLOWLIST.split(',')
-  .map((adresa) => adresa.trim().toLowerCase())
-  .filter(Boolean);

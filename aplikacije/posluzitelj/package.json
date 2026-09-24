@@ -8,8 +8,11 @@
     "build": "tsc -p .",
     "start": "node dist/index.js",
     "migracije:generiraj": "drizzle-kit generate",
-    "migracije": "drizzle-kit migrate",
+    "migracije": "tsx src/cli/migracije.ts",
+    "migracije:upgrade-test": "tsx src/cli/provjera-migracijskog-upgradea.ts",
     "ci-fixture": "tsx src/cli/ci-fixture.ts",
+    "provjera-indeksa": "tsx src/cli/provjera-indeksa.ts",
+    "obrisi-racun": "tsx src/cli/obrisi-racun.ts",
     "simulacija": "tsx src/cli/simulacija.ts",
     "opterecenje": "tsx src/cli/opterecenje.ts",
     "test": "vitest run"
@@ -25,14 +28,14 @@
     "pino": "^9.5.0",
     "postgres": "^3.4.5",
     "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "zajednicko": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "drizzle-kit": "^0.28.1",
     "fast-check": "^3.23.1",
-    "socket.io-client": "^4.8.1",
     "tsx": "^4.19.2",
-    "vitest": "^2.1.5"
+    "vitest": "^3.2.7"
   }
 }

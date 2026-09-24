@@ -67,7 +67,7 @@ export function stvoriTestniRjecnik(): RjecnikSucelje {
     postojeRijeciNa: (dvaGrafema) => [...GRUPE_TEST.keys()].some((rijec) => prvaDva(rijec) === dvaGrafema),
     imaSlobodnuRijecNa: (dvaGrafema, iskoristene) =>
       [...GRUPE_TEST.keys()].some((rijec) => prvaDva(rijec) === dvaGrafema && jeIgriva(rijec, iskoristene)),
-    nasumicnaPocetnaImenickaRijec: (iskoristene) =>
+    nasumicnaPocetnaRijec: (iskoristene) =>
       [...GRUPE_TEST.keys()].find((rijec) => jeIgriva(rijec, iskoristene)) ?? null,
   };
 }

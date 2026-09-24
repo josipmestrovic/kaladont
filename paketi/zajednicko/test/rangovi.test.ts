@@ -17,4 +17,10 @@ describe('izracunajRang', () => {
   it('očekivani prosjek 2.5 daje Lektor', () => {
     expect(izracunajRang(50, 2.5)).toBe('Lektor');
   });
+
+  it('primjenjuje pragove prema modu partije', () => {
+    expect(izracunajRang(10, 0.4, 'dva_igraca')).toBe('Jezičar');
+    expect(izracunajRang(10, 0.4, 'cetiri_igraca')).toBe('Prvopisac');
+    expect(izracunajRang(10, 0.9, 'dva_igraca')).toBe('Kaladont');
+  });
 });

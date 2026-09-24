@@ -38,7 +38,11 @@
       greska = null;
     };
 
-    const naGresku = (p: { poruka: string }) => {
+    const naGresku = (p: { kod?: string; poruka: string }) => {
+      if (p.kod === 'EMAIL_NIJE_POTVRDEN') {
+        void goto('/potvrdi-email');
+        return;
+      }
       greska = p.poruka;
     };
 
@@ -47,9 +51,15 @@
       void goto(`/partija/${payload.partijaId}`);
     };
 
+    const naVlasnikNapustio = () => {
+      greska = 'Vlasnik je napustio sobu. Soba je zatvorena.';
+      stanjeSobe = null;
+    };
+
     socket.on('soba:stanje', naStanjeSobe);
     socket.on('greska', naGresku);
     socket.on('partija:pocetak', naPocetak);
+    socket.on('soba:vlasnik-napustio', naVlasnikNapustio);
 
     socket.emit('soba:udji', { kod: kodSobe });
 
@@ -57,6 +67,7 @@
       socket.off('soba:stanje', naStanjeSobe);
       socket.off('greska', naGresku);
       socket.off('partija:pocetak', naPocetak);
+      socket.off('soba:vlasnik-napustio', naVlasnikNapustio);
     };
   });
 
@@ -85,6 +96,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Privatna čekaonica | Kaladont</title>
+</svelte:head>
+
 <main class="cekaonica-sobe">
   {#if greska}
     <div class="okvir-greska">
@@ -110,7 +125,7 @@
         <div class="clanovi-lista">
           {#each stanjeSobe.clanovi as clan (clan.igracId)}
             <div class="clan-redak">
-              <Avatar avatarId={clan.avatarId} rang={clan.rang} gost={!clan.rang} velicina={48} />
+              <Avatar avatarId={clan.avatarId} avatarConfig={clan.avatarConfig} rang={clan.rang} gost={!clan.rang} velicina={48} />
               <div class="clan-info">
                 <span class="clan-ime">{clan.nadimak}</span>
                 <span class="clan-rang">{clan.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {clan.razina}</span>

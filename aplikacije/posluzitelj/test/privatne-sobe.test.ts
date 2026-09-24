@@ -2,8 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import type { KrajPartije, PocetakPartije, StanjePrivatneSobe } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
+import { baza } from '../src/baza/klijent.js';
+import { sesije } from '../src/baza/shema.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -22,13 +26,21 @@ afterAll(async () => {
 
 interface TestniIgrac {
   token: string;
+  authToken: string;
   socket: ClientSocket;
 }
 
-function spojiIgraca(token = randomUUID()): Promise<TestniIgrac> {
+async function igracIdZaToken(token: string): Promise<string> {
+  const hash = createHash('sha256').update(token).digest('hex');
+  const [sesija] = await baza.select({ igracId: sesije.igracId }).from(sesije).where(eq(sesije.tokenHash, hash));
+  if (!sesija) throw new Error('Guest sesija nije pronađena');
+  return sesija.igracId;
+}
+
+function spojiIgraca(token = `gost.${randomUUID().replaceAll('-', '')}`): Promise<TestniIgrac> {
   return new Promise((resolve, reject) => {
     const socket = ioClient(adresa, { auth: { token }, forceNew: true });
-    socket.once('connect', () => resolve({ token, socket }));
+    socket.once('connect', async () => resolve({ token: await igracIdZaToken(token), authToken: token, socket }));
     socket.once('connect_error', reject);
   });
 }
@@ -79,6 +91,63 @@ function cekajRunduIliKraj(
 }
 
 describe('privatne sobe', () => {
+  it('kontrolirano odbija neispravne Socket.IO payloadove bez rušenja procesa', async () => {
+    const vlasnik = await spojiIgraca();
+
+    try {
+      const greskaPostavki = cekajDogadaj<{ kod: string }>(vlasnik.socket, 'greska');
+      vlasnik.socket.emit('soba:stvori', { postavke: { dopusteneVrste: 'imenica' } });
+      expect(await greskaPostavki).toEqual(expect.objectContaining({ kod: 'NEVALJAN_PAYLOAD' }));
+
+      const greskaKoda = cekajDogadaj<{ kod: string }>(vlasnik.socket, 'greska');
+      vlasnik.socket.emit('soba:udji', { kod: 123456 });
+      expect(await greskaKoda).toEqual(expect.objectContaining({ kod: 'NEVALJAN_PAYLOAD' }));
+
+      const zdravo = await fetch(`${adresa}/zdravlje`);
+      expect(zdravo.ok).toBe(true);
+    } finally {
+      vlasnik.socket.disconnect();
+    }
+  });
+
+  it('autoritativno dodaje imenice u postavke privatne sobe', async () => {
+    const vlasnik = await spojiIgraca();
+
+    try {
+      const { stanje } = await stvoriSobu(vlasnik.socket, {
+        trajanjePotezaSek: 30,
+        dopusteneVrste: ['glagol'],
+        eliminacijskiBodovi: false,
+      });
+
+      expect(stanje.postavke.dopusteneVrste).toEqual(['imenica', 'glagol']);
+    } finally {
+      vlasnik.socket.disconnect();
+    }
+  });
+
+  it('za prazne postavke zadržava sve vrste riječi', async () => {
+    const vlasnik = await spojiIgraca();
+
+    try {
+      const { stanje } = await stvoriSobu(vlasnik.socket);
+      expect(stanje.postavke.dopusteneVrste).toEqual([
+        'imenica',
+        'glagol',
+        'pridjev',
+        'prilog',
+        'zamjenica',
+        'broj',
+        'prijedlog',
+        'veznik',
+        'cestica',
+        'uzvik',
+      ]);
+    } finally {
+      vlasnik.socket.disconnect();
+    }
+  });
+
   it('odbija nepostojeći kod i ulazak u punu sobu', async () => {
     const izvanSobe = await spojiIgraca();
     const igraci = [await spojiIgraca(), ...await Promise.all(Array.from({ length: 7 }, () => spojiIgraca()))];
@@ -108,7 +177,7 @@ describe('privatne sobe', () => {
     }
   }, 20_000);
 
-  it('predaje vlasništvo nakon izlaska vlasnika', async () => {
+  it('zatvara sobu i obavještava članove nakon izlaska vlasnika', async () => {
     const vlasnik = await spojiIgraca();
     const drugi = await spojiIgraca();
 
@@ -117,13 +186,26 @@ describe('privatne sobe', () => {
       const stanje = await udjiUSobu(drugi, kod);
       expect(stanje.vlasnikId).toBe(vlasnik.token);
 
-      const nakonIzlaska = cekajDogadaj<StanjePrivatneSobe>(drugi.socket, 'soba:stanje');
+      const vlasnikNapustio = cekajDogadaj<{ kod: string }>(drugi.socket, 'soba:vlasnik-napustio');
       vlasnik.socket.emit('soba:izadji');
-      const novoStanje = await nakonIzlaska;
-      expect(novoStanje.vlasnikId).toBe(drugi.token);
-      expect(novoStanje.clanovi).toHaveLength(1);
+      expect(await vlasnikNapustio).toEqual({ kod });
     } finally {
       vlasnik.socket.disconnect();
+      drugi.socket.disconnect();
+    }
+  });
+
+  it('zatvara sobu i obavještava članove nakon prekida veze vlasnika', async () => {
+    const vlasnik = await spojiIgraca();
+    const drugi = await spojiIgraca();
+
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket);
+      await udjiUSobu(drugi, kod);
+      const vlasnikNapustio = cekajDogadaj<{ kod: string }>(drugi.socket, 'soba:vlasnik-napustio');
+      vlasnik.socket.disconnect();
+      expect(await vlasnikNapustio).toEqual({ kod });
+    } finally {
       drugi.socket.disconnect();
     }
   });
@@ -182,7 +264,7 @@ describe('privatne sobe', () => {
       await udjiUSobu(clan, kod);
       clan.socket.disconnect();
 
-      const novaVeza = await spojiIgraca(clan.token);
+      const novaVeza = await spojiIgraca(clan.authToken);
       try {
         const stanje = await udjiUSobu(novaVeza, kod);
         expect(stanje.clanovi.filter((sudionik) => sudionik.igracId === clan.token)).toHaveLength(1);

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
@@ -62,7 +63,7 @@
     porukaEmail = null;
     try {
       await api('/profil/email', { method: 'PUT', body: JSON.stringify({ noviEmail, lozinka: lozinkaZaEmail }) });
-      porukaEmail = 'Poslali smo potvrdu na novi email.';
+      void goto('/potvrdi-email');
       lozinkaZaEmail = '';
     } catch (e) {
       porukaEmail = e instanceof Error ? e.message : 'Neuspjela promjena emaila.';
@@ -83,7 +84,11 @@
   }
 </script>
 
-<main class="postavke-stranica">
+<svelte:head>
+  <title>Postavke | Kaladont</title>
+</svelte:head>
+
+<main id="postavke" class="postavke-stranica">
   <h1>Postavke</h1>
 
   <section class="sekcija">

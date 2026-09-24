@@ -7,4 +7,8 @@
   });
 </script>
 
+<svelte:head>
+  <title>Povijest partija | Kaladont</title>
+</svelte:head>
+
 <p>Preusmjeravanje na profil...</p>

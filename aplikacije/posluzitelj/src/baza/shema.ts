@@ -7,6 +7,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -14,6 +15,7 @@ import {
   text,
   timestamp,
   uuid,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -38,10 +40,15 @@ export const vrstaPoteza = pgEnum('vrsta_poteza', [
   'sustav_rijec',
 ]);
 export const statusPrijave = pgEnum('status_prijave', ['nova', 'pregledana', 'rijesena']);
+export const statusPovratneInformacije = pgEnum('status_povratne_informacije', ['nova', 'pregledana', 'arhivirana']);
 export const akcijaIzmjeneRjecnika = pgEnum('akcija_izmjene_rjecnika', [
   'dodana',
   'uklonjena',
   'vracena',
+]);
+export const vrstaObracunaPartije = pgEnum('vrsta_obracuna_partije', [
+  'javna_partija',
+  'privatna_gamifikacija',
 ]);
 
 export const igraci = pgTable('igraci', {
@@ -49,9 +56,15 @@ export const igraci = pgTable('igraci', {
   vrsta: vrstaIgraca('vrsta').notNull().default('gost'),
   nadimak: text('nadimak').notNull(),
   avatarId: smallint('avatar_id').notNull().default(0),
+  avatarConfig: jsonb('avatar_config'),
+  avatarRevision: integer('avatar_revision').notNull().default(0),
   email: text('email'),
+  emailNaCekanju: text('email_na_cekanju'),
   lozinkaHash: text('lozinka_hash'),
   emailPotvrdjen: boolean('email_potvrdjen').notNull().default(false),
+  emailPotvrdaZatrazenAt: timestamp('email_potvrda_zatrazen_at', { withTimezone: true }),
+  emailPotvrdaPoslanaAt: timestamp('email_potvrda_poslana_at', { withTimezone: true }),
+  obrisanAt: timestamp('obrisan_at', { withTimezone: true }),
   odigrane: integer('odigrane').notNull().default(0),
   pobjede: integer('pobjede').notNull().default(0),
   eliminacijeUkupno: integer('eliminacije_ukupno').notNull().default(0),
@@ -63,7 +76,23 @@ export const igraci = pgTable('igraci', {
   iskustvoUkupno: integer('iskustvo_ukupno').notNull().default(0),
   stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
   zadnjaAktivnost: timestamp('zadnja_aktivnost', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (tablica) => [
+  uniqueIndex('uq_igraci_email_lower').on(sql`lower(${tablica.email})`).where(sql`${tablica.email} is not null`),
+]);
+
+export const sesije = pgTable(
+  'sesije',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    igracId: uuid('igrac_id')
+      .notNull()
+      .references(() => igraci.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    stvorena: timestamp('stvorena', { withTimezone: true }).notNull().defaultNow(),
+    istek: timestamp('istek', { withTimezone: true }).notNull(),
+  },
+  (tablica) => [index('idx_sesije_igrac_id').on(tablica.igracId), index('idx_sesije_istek').on(tablica.istek)],
+);
 
 export const statistikeRijeciIgraca = pgTable(
   'statistike_rijeci_igraca',
@@ -129,7 +158,11 @@ export const otkljucaneRijeciIgraca = pgTable(
     jakoRijetka: boolean('jako_rijetka').notNull().default(false),
     otkljucano: timestamp('otkljucano', { withTimezone: true }).notNull().defaultNow(),
   },
-  (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.rijec] })],
+  (tablica) => [
+    primaryKey({ columns: [tablica.igracId, tablica.rijec] }),
+    index('idx_otkljucane_rijeci_igraca_duga').on(tablica.igracId, tablica.dugaTier, tablica.rijec),
+    index('idx_otkljucane_rijeci_igraca_rijetka').on(tablica.igracId, tablica.rijetkaTier, tablica.rijec),
+  ],
 );
 
 export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
@@ -144,8 +177,29 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   izazvaneEliminacije: integer('izazvane_eliminacije').notNull().default(0),
   mrtvaSlovaEliminacije: integer('mrtva_slova_eliminacije').notNull().default(0),
   javnePobjede: integer('javne_pobjede').notNull().default(0),
+  povratneInformacije: integer('povratne_informacije').notNull().default(0),
+  anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
+
+export const povratneInformacije = pgTable('povratne_informacije', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  poruka: text('poruka').notNull(),
+  pravila: smallint('pravila'),
+  rjecnik: smallint('rjecnik'),
+  vrijemePoteza: smallint('vrijeme_poteza'),
+  snalazenjeUAplikaciji: smallint('snalazenje_u_aplikaciji'),
+  brzinaUcitavanja: smallint('brzina_ucitavanja'),
+  gamifikacija: smallint('gamifikacija'),
+  status: statusPovratneInformacije('status').notNull().default('nova'),
+  vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
+  pregledaoId: uuid('pregledao_id').references(() => igraci.id),
+  pregledano: timestamp('pregledano', { withTimezone: true }),
+}, (tablica) => [
+  index('idx_povratne_informacije_vrijeme').on(tablica.vrijeme),
+  index('idx_povratne_informacije_status').on(tablica.status),
+]);
 
 export const dostignucaIgraca = pgTable('dostignuca_igraca', {
   igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
@@ -164,6 +218,13 @@ export const partije = pgTable('partije', {
   pobjednikId: uuid('pobjednik_id').references(() => igraci.id),
 });
 
+/** Idempotency ključ završnog obračuna; privatne partije nemaju red u `partije`. */
+export const obracuniPartija = pgTable('obracuni_partija', {
+  partijaId: uuid('partija_id').notNull(),
+  vrsta: vrstaObracunaPartije('vrsta').notNull(),
+  stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [primaryKey({ columns: [tablica.partijaId, tablica.vrsta] })]);
+
 export const sudioniciPartije = pgTable(
   'sudionici_partije',
   {
@@ -181,7 +242,10 @@ export const sudioniciPartije = pgTable(
     nacinIspadanja: nacinIspadanja('nacin_ispadanja'),
     cekanjeMs: integer('cekanje_ms').notNull().default(0),
   },
-  (tablica) => [primaryKey({ columns: [tablica.partijaId, tablica.igracId] })],
+  (tablica) => [
+    primaryKey({ columns: [tablica.partijaId, tablica.igracId] }),
+    index('idx_sudionici_partije_igrac_id_partija_id').on(tablica.igracId, tablica.partijaId),
+  ],
 );
 
 export const potezi = pgTable('potezi', {
@@ -197,7 +261,9 @@ export const potezi = pgTable('potezi', {
   trazenaSlova: text('trazena_slova'),
   trajanjeMs: integer('trajanje_ms').notNull().default(0),
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (tablica) => [
+  index('idx_potezi_partija_id_redni_broj').on(tablica.partijaId, tablica.redniBroj),
+]);
 
 export const rijeci = pgTable(
   'rijeci',
@@ -234,7 +300,10 @@ export const prijave = pgTable('prijave', {
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
   rijesioId: uuid('rijesio_id').references(() => igraci.id),
   napomenaAdmina: text('napomena_admina'),
-});
+}, (tablica) => [
+  index('idx_prijave_igrac_id_partija_id_vrijeme').on(tablica.igracId, tablica.partijaId, tablica.vrijeme),
+  uniqueIndex('uq_prijave_igrac_partija_potez').on(tablica.igracId, tablica.partijaId, tablica.potezId),
+]);
 
 export const izmjeneRjecnika = pgTable('izmjene_rjecnika', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),

@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
-  import { dohvatiSocket } from '$lib/socket.js';
+  import { dohvatiSocket, dohvatiStanjeVeze } from '$lib/socket.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { dohvatiStanjeIgre } from '$lib/stanje-igre.svelte.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
@@ -14,21 +14,31 @@
   import Header from '$lib/komponente/Header.svelte';
   import { pustiAudio } from '$lib/audio-manager.js';
   import { dohvatiDefinicijuDostignuca, zadnjaDva } from 'zajednicko';
-  import type { BrzaPoruka, Eliminacija, KrajPartije, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
+  import type { BrzaPoruka, Eliminacija, KrajPartije, OdbijenPotez, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
+  const stanjeVeze = dohvatiStanjeVeze();
   const partijaId = $derived($page.params.id);
 
   let unosNastavkaRijeci = $state('');
-  let prijavaDijalog = $state(false);
-  let prijavaPoruka = $state('');
-  let prijavaPotezId: number | null = $state(null);
+  let neZnamDijalog = $state(false);
+  let prijavljeniPotezi = $state<Set<number>>(new Set());
+  let prijavaUTijeku = $state<Set<number>>(new Set());
+  let brojPrijava = $state(0);
+  let porukaPrijave = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
   let slanjeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let porukaPoteza = $state<string | null>(null);
+  let nepostojecaRijec = $state<string | null>(null);
+  let zadnjaPoslanaRijec = $state<string | null>(null);
   let brojGreskeUnosa = $state(0);
   let porukaPotezaTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let potezi = $state<Potez[]>([]);
+  let imaJosPoteza = $state(false);
+  let cursorPoteza = $state<string | null>(null);
+  let povijestOtvorena = $state(false);
+  let ucitavanjePovijesti = $state(false);
+  let greskaPovijesti = $state<string | null>(null);
   let prikazanaRijec = $state<Potez | null>(null);
   let prethodnaRijecStola = $state<string | null>(null);
   let prikaziRezultate = $state(false);
@@ -69,6 +79,7 @@
     const rijec = `${prefiksRijeci}${unosNastavkaRijeci}`.trim();
     if (rijec.length <= prefiksRijeci.length || slanjeUTijeku) return;
     slanjeUTijeku = true;
+    zadnjaPoslanaRijec = rijec;
     if (slanjeTimeoutId !== null) clearTimeout(slanjeTimeoutId);
     slanjeTimeoutId = setTimeout(() => {
       slanjeUTijeku = false;
@@ -81,12 +92,18 @@
 
   function posaljiNeZnam() {
     if (slanjeUTijeku) return;
+    neZnamDijalog = true;
+  }
+
+  function potvrdiNeZnam() {
+    neZnamDijalog = false;
     slanjeUTijeku = true;
     dohvatiSocket().emit('potez:ne-znam');
   }
 
-  function prikaziGreskuPoteza(poruka: string) {
+  function prikaziGreskuPoteza(poruka: string, rijecKojaNePostoji: string | null = null) {
     porukaPoteza = poruka;
+    nepostojecaRijec = rijecKojaNePostoji;
     brojGreskeUnosa += 1;
     void tick().then(() => {
       unosInput?.focus();
@@ -180,35 +197,27 @@
     return { igrac, opis: 'je omogućio/omogućila Kaladont igraču', bodIgrac, rijec: null, slova: null };
   }
 
-  async function otstvoriDijalogZaPrijavu(potezId?: number) {
-    prijavaPoruka = '';
-    prijavaPotezId = potezId ?? null;
-    prijavaDijalog = true;
-  }
-
-  async function posaljiPrijavu() {
-    if (!prijavaPoruka.trim()) return;
+  async function prijaviRijec(potezId: number) {
+    if (prijavljeniPotezi.has(potezId) || prijavaUTijeku.has(potezId) || brojPrijava >= 3) return;
+    prijavaUTijeku = new Set(prijavaUTijeku).add(potezId);
+    porukaPrijave = null;
     try {
-      await api('/prijave', {
+      await api<{ ok: boolean }>('/prijave', {
         method: 'POST',
         body: JSON.stringify({
           partijaId,
-          potezId: prijavaPotezId,
-          poruka: prijavaPoruka.trim(),
+          potezId,
         }),
       });
-      prijavaDijalog = false;
-      alert('Hvala! Pregledat ćemo prijavu.');
-    } catch (err) {
-      console.error('Greška pri slanju prijave:', err);
-      alert('Greška pri slanju prijave.');
+      prijavljeniPotezi = new Set(prijavljeniPotezi).add(potezId);
+      brojPrijava += 1;
+    } catch (greska) {
+      porukaPrijave = greska instanceof Error ? greska.message : 'Prijava nije uspjela.';
+    } finally {
+      const novi = new Set(prijavaUTijeku);
+      novi.delete(potezId);
+      prijavaUTijeku = novi;
     }
-  }
-
-  function opisPoteza(potez: Potez): string {
-    if (potez.vrsta === 'ne_znam') return 'Ne znam';
-    if (potez.vrsta === 'sustav_rijec') return `Sustav: ${potez.rijec ?? 'automatska riječ'}`;
-    return potez.rijec ?? potez.vrsta;
   }
 
   function zadnjiPotezIgraca(igracId: string): Potez | null {
@@ -221,12 +230,8 @@
     return stanje.kraj?.plasmani.find((igrac) => igrac.plasman === 1) ?? null;
   }
 
-  function zatvoriDijlog() {
-    prijavaDijalog = false;
-    prijavaPoruka = '';
-  }
-
   const jeNaPotezu = $derived(stanje.naPotezuId === stanje.mojIgracId);
+  const vezaSpremna = $derived(stanjeVeze.stanje === 'spremno' || stanjeVeze.stanje === 'nepoznato');
   const jeEliminiran = $derived(stanje.eliminacije.some((e) => e.igracId === stanje.mojIgracId));
   const brojPreostalihIgraca = $derived(stanje.sjedala.length - stanje.eliminacije.length);
   const prefiksRijeci = $derived(stanje.trazenaSlova?.normalize('NFC').trim() ?? '');
@@ -248,13 +253,13 @@
   );
 
   $effect(() => {
-    const sadaJeNaPotezu = jeNaPotezu && !stanje.sustavBiraRijec && !stanje.kraj;
+    const sadaJeNaPotezu = jeNaPotezu && !stanje.ponistenaPoruka && !stanje.sustavBiraRijec && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena';
     if (sadaJeNaPotezu && !prethodnoJeNaPotezu) porukaNaPotezu = 'Na tebi je red.';
     prethodnoJeNaPotezu = sadaJeNaPotezu;
   });
 
   $effect(() => {
-    if (stanje.sustavBiraRijec || stanje.kraj) zatvoriIzbornikReakcija();
+    if (stanje.ponistenaPoruka || stanje.sustavBiraRijec || stanje.kraj || stanje.statusSpremanja !== 'nije_zavrsena') zatvoriIzbornikReakcija();
   });
 
   let unosInput: HTMLInputElement | null = $state(null);
@@ -270,7 +275,7 @@
   // ili zaključati unos bez čekanja na refresh.
   $effect(() => {
     if (stanje.partijaId !== partijaId) return;
-    const trebaBitiZakljucano = stanje.kraj || stanje.sustavBiraRijec || !jeNaPotezu;
+    const trebaBitiZakljucano = stanje.ponistenaPoruka || stanje.kraj || stanje.statusSpremanja !== 'nije_zavrsena' || stanje.sustavBiraRijec || !jeNaPotezu;
     if (!trebaBitiZakljucano) return;
     slanjeUTijeku = false;
     if (slanjeTimeoutId !== null) {
@@ -324,7 +329,15 @@
   });
 
   $effect(() => {
-    if (!stanje.kraj || odbrojavanjeIntervalId !== null) return;
+    if (!stanje.kraj) return;
+    if (stanje.rezultatiPrikazaniPartijaId === stanje.kraj.partijaId) {
+      prikaziRezultate = true;
+      sekundeDoRezultata = 0;
+      if (odbrojavanjeIntervalId !== null) clearInterval(odbrojavanjeIntervalId);
+      odbrojavanjeIntervalId = null;
+      return;
+    }
+    if (odbrojavanjeIntervalId !== null) return;
     prikaziRezultate = false;
     sekundeDoRezultata = 10;
     odbrojavanjeIntervalId = setInterval(() => {
@@ -333,16 +346,24 @@
         if (odbrojavanjeIntervalId !== null) clearInterval(odbrojavanjeIntervalId);
         odbrojavanjeIntervalId = null;
         prikaziRezultate = true;
+        stanje.rezultatiPrikazaniPartijaId = stanje.kraj?.partijaId ?? null;
         pustiAudio('partija-kraj');
       }
     }, 1000);
   });
 
-  async function ucitajPoteze(prikaziZadnjuRijec = true) {
-    if (stanje.jePrivatna) return;
+  async function ucitajPoteze(prikaziZadnjuRijec = true, ucitajJos = false) {
+    if (ucitavanjePovijesti) return;
+    ucitavanjePovijesti = true;
+    greskaPovijesti = null;
     try {
-      const odgovor = await api<{ potezi: Potez[] }>(`/partije/${partijaId}/potezi`);
-      potezi = odgovor.potezi;
+      const parametarCursora = ucitajJos && cursorPoteza ? `&cursor=${encodeURIComponent(cursorPoteza)}` : '';
+      const odgovor = await api<{ potezi: Potez[]; imaJos: boolean; sljedeciCursor: string | null }>(
+        `/partije/${partijaId}/potezi?limit=100${parametarCursora}`,
+      );
+      potezi = ucitajJos ? [...potezi, ...odgovor.potezi] : odgovor.potezi;
+      imaJosPoteza = odgovor.imaJos;
+      cursorPoteza = odgovor.sljedeciCursor;
       if (prikaziZadnjuRijec) {
         if (stanje.partijaId === partijaId && stanje.zadnjaRijec && stanje.zadnjaRijecVrsta) return;
         const sRijeci = odgovor.potezi.filter((potez) => potez.rijec);
@@ -351,8 +372,15 @@
           prikazanaRijec && prikazanaRijec.vrsta !== 'sustav_rijec' ? (sRijeci.at(-2)?.rijec ?? null) : null;
       }
     } catch {
-      // prolazna greška - zadrži postojeću povijest umjesto brisanja
+      greskaPovijesti = 'Riječi se trenutno ne mogu učitati.';
+    } finally {
+      ucitavanjePovijesti = false;
     }
+  }
+
+  function otvoriPovijest() {
+    povijestOtvorena = !povijestOtvorena;
+    if (povijestOtvorena && potezi.length === 0) void ucitajPoteze(false);
   }
 
   const REAKCIJE_EMOJI: Record<BrzaPoruka, string> = {
@@ -372,8 +400,6 @@
   const REAKCIJE_TEKST_PROSIRENE: Record<VrstaReakcije, string> = { ...REAKCIJE_TEKST, tuzan: 'Ne znam' };
 
   onMount(() => {
-    void ucitajPoteze();
-
     const socket = dohvatiSocket();
 
     const naReakciju = ({ igracId, poruka }: { igracId: string; poruka: BrzaPoruka }) => {
@@ -466,20 +492,21 @@
     const naKraj = (kraj: KrajPartije) => {
       if (kraj.partijaId !== partijaId) return;
       slanjeUTijeku = false;
-      void ucitajPoteze(false);
     };
     const naStanjePartije = (novoStanje: StanjePartije) => {
       if (novoStanje.partijaId !== partijaId) return;
       slanjeUTijeku = false;
     };
-    const naOdbijenPotez = ({ poruka }: { poruka: string }) => {
+    const naOdbijenPotez = ({ kod, poruka }: OdbijenPotez) => {
       if (!jeAktualnaPartija()) return;
       slanjeUTijeku = false;
       if (slanjeTimeoutId !== null) {
         clearTimeout(slanjeTimeoutId);
         slanjeTimeoutId = null;
       }
-      prikaziGreskuPoteza(poruka);
+      const rijecKojaNePostoji = kod === 'RIJEC_NE_POSTOJI' ? zadnjaPoslanaRijec : null;
+      zadnjaPoslanaRijec = null;
+      prikaziGreskuPoteza(poruka, rijecKojaNePostoji);
     };
     const naGresku = ({ poruka }: { poruka: string }) => {
       if (!jeAktualnaPartija() || !slanjeUTijeku) return;
@@ -518,6 +545,10 @@
   });
 </script>
 
+<svelte:head>
+  <title>Partija | Kaladont</title>
+</svelte:head>
+
 <svelte:window onclick={zatvoriIzbornikKlikomIzvan} />
 
 <div class="sr-samo" aria-live="polite" aria-atomic="true">{porukaNaPotezu}</div>
@@ -551,20 +582,50 @@
   {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
     <Konfeti intenzitet="veliki" />
   {/if}
-  <h2>Konačni rezultati</h2>
+  <h2>Završni poredak</h2>
   {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
     <p class="privatna-obavijest">
       🔒 Prijateljska privatna igra (bodovi nisu dodijeljeni i ne utječu na ljestvicu).
     </p>
   {/if}
+  <ol class="plasmani-lista">
+    {#each [...stanje.kraj.plasmani].sort((a, b) => a.plasman - b.plasman) as igrac (igrac.igracId)}
+      <li class:pobjednik={igrac.plasman === 1}>
+        <span class="plasman-broj">{igrac.plasman}.</span>
+        <span class="plasman-ime">{imeIgraca(igrac.igracId)}</span>
+        <span class="plasman-bodovi">{igrac.bodovi} bodova ({igrac.eliminacije} elim.)</span>
+      </li>
+    {/each}
+  </ol>
+  {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
+    {@const kodSobe = stanje.kraj.kodSobe ?? stanje.kodSobe}
+    <div class="kraj-akcije">
+      <a href={kodSobe ? `/soba/${kodSobe}` : '/soba/kreiraj'} class="igraj-opet-gumb">Igraj ponovno</a>
+      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
+    </div>
+  {:else}
+    {@const modPartije = stanje.kraj.mod ?? stanje.mod}
+    <div class="kraj-akcije">
+      <a href={modPartije === 'dva_igraca' ? '/red?mod=dva_igraca' : '/red?mod=cetiri_igraca'} class="igraj-opet-gumb">Igraj opet</a>
+      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
+    </div>
+  {/if}
+  <h3 class="osobni-rezultati-naslov">Tvoja ocjena</h3>
+  <section class="ocjena-igre-zavrsna" aria-label="Ocjena igre">
+    {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
+      <span>Ocjena igre se ne računa u privatnoj sobi.</span>
+    {:else if stanje.kraj.mojaOcjenaIgre === null || stanje.kraj.mojaOcjenaIgre === undefined}
+      <span>Za ocjenu igre potrebna su najmanje 3 prihvaćena poteza.</span>
+    {:else}
+      <span>Ocjena igre</span>
+      <strong>{stanje.kraj.mojaOcjenaIgre} / 5</strong>
+      <span class="ocjena-zvjezdice" aria-hidden="true">{'★'.repeat(stanje.kraj.mojaOcjenaIgre)}{'☆'.repeat(5 - stanje.kraj.mojaOcjenaIgre)}</span>
+      <a href="/pravila-kaladonta?tema=napredak#ocjena-partije">Kako se računa?</a>
+    {/if}
+  </section>
   {#if stanje.kraj.mojeIskustvo}
     <IskustvoPartije obracun={stanje.kraj.mojeIskustvo} />
   {/if}
-  <section class="ocjena-igre-zavrsna" aria-label="Ocjena igre">
-    <span>Ocjena igre</span>
-    <strong>{stanje.kraj.mojaOcjenaIgre ?? 0} / 5</strong>
-    <span class="ocjena-zvjezdice" aria-hidden="true">{'★'.repeat(stanje.kraj.mojaOcjenaIgre ?? 0)}{'☆'.repeat(5 - (stanje.kraj.mojaOcjenaIgre ?? 0))}</span>
-  </section>
   {#if stanje.kraj.mojDnk}
     <KaladontDnkPromjena
       prije={stanje.kraj.mojDnk.prije}
@@ -573,6 +634,7 @@
       otkljucan={stanje.kraj.mojDnk.otkljucan}
       upravoOtkljucan={stanje.kraj.mojDnk.upravoOtkljucan}
       preostaloDoOtkljucavanja={stanje.kraj.mojDnk.preostaloDoOtkljucavanja}
+      mod={stanje.kraj.mod ?? stanje.mod ?? 'cetiri_igraca'}
     />
   {/if}
   {#if stanje.kraj.novaDostignuca.length > 0}
@@ -593,52 +655,61 @@
       </div>
     </section>
   {/if}
-  <ol class="plasmani-lista">
-    {#each [...stanje.kraj.plasmani].sort((a, b) => a.plasman - b.plasman) as igrac (igrac.igracId)}
-      <li class:pobjednik={igrac.plasman === 1}>
-        <span class="plasman-broj">{igrac.plasman}.</span>
-        <span class="plasman-ime">{imeIgraca(igrac.igracId)}</span>
-        <span class="plasman-bodovi">{igrac.bodovi} bodova ({igrac.eliminacije} elim.)</span>
-      </li>
-    {/each}
-  </ol>
   {#if !jeRegistriranKorisnik() && !stanje.kraj.jePrivatna && !stanje.jePrivatna}
     <p class="gost-poruka">
       Ova statistika je spremljena lokalno u ovom pregledniku. Registriraj se da je zadržiš zauvijek!
     </p>
     <a href="/registracija">Registriraj se</a>
   {/if}
-  {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
-    {@const kodSobe = stanje.kraj.kodSobe ?? stanje.kodSobe}
-    <div class="kraj-akcije">
-      <a href={kodSobe ? `/soba/${kodSobe}` : '/soba/kreiraj'} class="igraj-opet-gumb">Igraj ponovno</a>
-      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
-    </div>
-  {:else}
-    {@const modPartije = stanje.kraj.mod ?? stanje.mod}
-    <div class="kraj-akcije">
-      <a href={modPartije === 'dva_igraca' ? '/red?mod=dva_igraca' : '/red?mod=cetiri_igraca'} class="igraj-opet-gumb">Igraj opet</a>
-      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
-    </div>
-  {/if}
   <section class="povijest-partije">
-    <h3>Povijest igre</h3>
-    {#if potezi.length === 0}
-      <p>Potezi još nisu dostupni.</p>
-    {:else}
-      <ol>
-        {#each potezi as potez (potez.id)}
-          <li>
-            <span><strong>{potez.igracId ? imeIgraca(potez.igracId) : 'Sustav'}</strong>: {opisPoteza(potez)}</span>
-            <button type="button" class="prijavi-btn" onclick={() => otstvoriDijalogZaPrijavu(potez.id)}>Prijavi</button>
-          </li>
-        {/each}
-      </ol>
+    <button type="button" class="povijest-naslov" aria-expanded={povijestOtvorena} onclick={otvoriPovijest}>
+      <span>Prijavi riječ</span><span aria-hidden="true">{povijestOtvorena ? '−' : '+'}</span>
+    </button>
+    {#if povijestOtvorena}
+      {#if ucitavanjePovijesti}
+        <p aria-live="polite">Učitavanje riječi...</p>
+      {:else if greskaPovijesti}
+        <p role="alert">{greskaPovijesti}</p>
+      {:else}
+        <p class="prijava-brojac">Prijavljeno: {brojPrijava} / 3</p>
+        {#if porukaPrijave}<p class="greska" role="alert">{porukaPrijave}</p>{/if}
+        <ol>
+          {#each potezi.filter((potez) => potez.rijec) as potez (potez.id)}
+            <li>
+              <span>{@render trenutnaRijec(potez.rijec!)}</span>
+              <button
+                type="button"
+                class="prijavi-btn"
+                onclick={() => void prijaviRijec(potez.id)}
+                disabled={prijavljeniPotezi.has(potez.id) || prijavaUTijeku.has(potez.id) || brojPrijava >= 3}
+              >
+                {#if prijavljeniPotezi.has(potez.id)}Riječ je prijavljena{:else if prijavaUTijeku.has(potez.id)}Šaljem...{:else}Prijavi riječ{/if}
+              </button>
+            </li>
+          {/each}
+        </ol>
+        {#if imaJosPoteza}
+          <button type="button" class="ucitaj-jos-poteza" onclick={() => void ucitajPoteze(false, true)} disabled={ucitavanjePovijesti}>
+            {ucitavanjePovijesti ? 'Učitavanje...' : 'Učitaj još poteza'}
+          </button>
+        {/if}
+      {/if}
     {/if}
   </section>
   <div class="kraj-donje-praznine" aria-hidden="true"></div>
 {:else}
   <div class="aktivna-partija-sadrzaj">
+  {#if stanje.ponistenaPoruka}
+    <aside class="obracun-promatraca" role="alert">
+      <p>{stanje.ponistenaPoruka}</p>
+      <a href="/" class="sporedni-gumb">Povratak na naslovnicu</a>
+    </aside>
+  {/if}
+  {#if stanje.statusSpremanja === 'spremanje_rezultata'}
+    <aside class="obracun-promatraca" aria-live="polite">
+      <p>Partija je završila. Konačni rezultat se još sprema; pokušavamo ponovno.</p>
+    </aside>
+  {/if}
   {#if stanje.obracunIskustva}
     <aside class="obracun-promatraca">
       <p>Rezultat je izračunat i trajno će se spremiti kada igra završi. Možeš napustiti igru.</p>
@@ -679,10 +750,10 @@
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                 {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} rang={sjedalo.rang} velicina={72} /></span>
+                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} velicina={72} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
-                  <TimerPrsten istekIso={stanje.istekPotezaIso} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
+                  <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
                 {/if}
               </span>
             </span>
@@ -734,10 +805,10 @@
             {/if}
             <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
               {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} rang={sjedalo.rang} velicina={72} /></span>
+                <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} velicina={72} /></span>
               {/key}
               {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
-                <TimerPrsten istekIso={stanje.istekPotezaIso} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
+                <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
               {/if}
             </span>
           </span>
@@ -855,14 +926,14 @@
         {#if brojVatri > 0}
           <span class="streak-vatre" aria-hidden="true">
             {#if brojVatri === 100}
-              {#each Array(100) as _}<span>🔥</span>{/each}
+              {#each Array(100) as _}<img src="/ikone/19-vatra.png" alt="" />{/each}
             {:else}
-              {#each Array(brojVatri) as _}<span>🔥</span>{/each}
+              {#each Array(brojVatri) as _}<img src="/ikone/19-vatra.png" alt="" />{/each}
             {/if}
           </span>
         {/if}
         Tvoj streak: <strong>{stanje.trenutniStreak}</strong> {stanje.trenutniStreak === 1 ? 'riječ' : 'riječi'}
-        {#if brojVatri === 100}<span class="streak-vatre" aria-hidden="true">{#each Array(100) as _}<span>🔥</span>{/each}</span>{/if}
+        {#if brojVatri === 100}<span class="streak-vatre" aria-hidden="true">{#each Array(100) as _}<img src="/ikone/19-vatra.png" alt="" />{/each}</span>{/if}
       </p>
       {#if stanje.trazenaSlova}
         <div class="rijec-kartica">
@@ -889,14 +960,14 @@
               maxlength={najviseZnakovaNastavka}
               aria-label={`Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
               aria-invalid={brojGreskeUnosa > 0 && porukaPoteza !== null}
-              disabled={slanjeUTijeku}
+              disabled={slanjeUTijeku || !vezaSpremna}
             />
           </div>
         {/key}
         <div class="potez-gumbi">
-          <button type="submit" disabled={slanjeUTijeku}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
+          <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
           {#if !stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === ''}
-            <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku} onclick={posaljiNeZnam}>Ne znam</button>
+            <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku || !vezaSpremna} onclick={posaljiNeZnam}>Ne znam</button>
           {/if}
         </div>
       </form>
@@ -919,7 +990,13 @@
     {/if}
 
     {#if porukaPoteza ?? stanje.poruka}
-      <p class="poruka-poteza" role="alert">{porukaPoteza ?? stanje.poruka}</p>
+      <p class="poruka-poteza" role="alert">
+        {#if porukaPoteza && nepostojecaRijec}
+          <strong>{nepostojecaRijec}</strong> ne postoji u našoj bazi.
+        {:else}
+          {porukaPoteza ?? stanje.poruka}
+        {/if}
+      </p>
     {/if}
     {/if}
   </section>
@@ -927,27 +1004,26 @@
 
 {/if}
 
-{#if prijavaDijalog}
+{#if neZnamDijalog}
   <div
     class="dijalog-overlay"
-    role="button"
-    tabindex="0"
-    onclick={zatvoriDijlog}
-    onkeydown={(e) => e.key === 'Escape' && zatvoriDijlog()}
+    role="presentation"
+    onclick={() => (neZnamDijalog = false)}
+    onkeydown={(e) => e.key === 'Escape' && (neZnamDijalog = false)}
   >
     <div
-      class="dijalog"
+      class="dijalog potvrda-ne-znam"
       role="dialog"
+      aria-modal="true"
+      aria-labelledby="potvrda-ne-znam-naslov"
       tabindex="-1"
-      aria-label="Prijavi problem"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
     >
-      <h3>Prijavi problem</h3>
-      <textarea bind:value={prijavaPoruka} placeholder="Opiši greške ili probleme..." rows="5"></textarea>
+      <h3 id="potvrda-ne-znam-naslov">Predati potez?</h3>
       <div class="dijalog-gumbi">
-        <button onclick={posaljiPrijavu}>Pošalji prijavu</button>
-        <button onclick={zatvoriDijlog}>Odustani</button>
+        <button type="button" class="potvrdi-dijalog-gumb" onclick={potvrdiNeZnam}>Da</button>
+        <button type="button" class="sporedni-dijalog-gumb" onclick={() => (neZnamDijalog = false)}>Ne</button>
       </div>
     </div>
   </div>
@@ -955,12 +1031,12 @@
 
 <style>
   .zavrsni-header {
-    width: 100%;
-    margin-left: 0;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
   }
 
   .zavrsni-header + h2 {
-    margin-top: 32px;
+    margin-top: 48px;
   }
 
   .status-iskustva { display: none; position: fixed; z-index: 40; top: 0; right: 0; left: 0; width: auto; background: white; border-block: 1px solid #e5ddc8; box-shadow: 0 2px 8px rgb(26 24 21 / 8%); }
@@ -1023,8 +1099,8 @@
   }
   .zavrsni-dnk,
   .zavrsna-dostignuca {
-    max-width: 680px;
-    margin: 20px auto 0;
+    max-width: none;
+    margin: 24px auto 0;
     padding: 18px;
     border: 1px solid #e5ddc8;
     border-radius: 8px;
@@ -1034,16 +1110,19 @@
   .ocjena-igre-zavrsna {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 12px;
-    margin: 28px auto 0;
+    max-width: none;
+    margin: 24px auto 0;
     padding: 14px 18px;
     border: 1px solid #e5ddc8;
     border-radius: 8px;
     background: #fffdf5;
     color: var(--boja-tekst-sekundarni);
+    text-align: left;
   }
   .ocjena-igre-zavrsna strong { color: var(--boja-tekst-naslov); font-size: 1.2rem; }
+  .ocjena-igre-zavrsna a { color: var(--boja-pozadina-primarna); font-size: var(--tekst-sitni); font-weight: 700; }
   .ocjena-zvjezdice { color: var(--boja-zuta-krema); letter-spacing: 0.1em; font-size: 1.2rem; }
   .zavrsni-dnk-zaglavlje {
     display: flex;
@@ -1064,6 +1143,14 @@
     color: var(--boja-tekst-naslov);
     font-family: var(--font-naslov);
     font-size: 1.35rem;
+  }
+  .osobni-rezultati-naslov {
+    max-width: none;
+    margin: 24px auto 0;
+    color: var(--boja-tekst-naslov);
+    font-family: var(--font-naslov);
+    font-size: 1.35rem;
+    text-align: left;
   }
   .zavrsni-dnk-zaglavlje > strong {
     color: var(--boja-akcent);
@@ -1096,6 +1183,14 @@
   .zavrsna-dostignuca-mrezica {
     display: grid;
     gap: 10px;
+  }
+  .zavrsna-dostignuca,
+  .ocjena-igre-zavrsna,
+  .osobni-rezultati-naslov,
+  .iskustvo-partije,
+  .dnk-promjena {
+    width: 100%;
+    max-width: none;
   }
   .zavrsno-dostignuce {
     display: flex;
@@ -1326,6 +1421,12 @@
     gap: 0;
     line-height: 1;
     font-size: 1rem;
+  }
+
+  .streak-vatre img {
+    width: 1em;
+    height: 1em;
+    object-fit: contain;
   }
 
   .vlastito-sjedalo {
@@ -1563,9 +1664,13 @@
   .poruka-poteza {
     margin: 8px 0;
     color: var(--boja-akcent);
-    font-size: var(--tekst-mali);
-    font-weight: 600;
+    font-size: var(--tekst-baza);
+    font-weight: 400;
     text-align: center;
+  }
+  .poruka-poteza strong {
+    font-size: 1.08em;
+    font-weight: 800;
   }
   @keyframes podrhtavanje-unosa {
     0%, 100% { transform: translateX(0); }
@@ -1596,7 +1701,11 @@
     font-size: var(--tekst-baza);
   }
   .potez-gumbi button.ne-znam-gumb {
-    background: #e4572e;
+    background: transparent;
+    border: 1px solid var(--boja-akcent);
+    color: var(--boja-akcent);
+    font-size: var(--tekst-sitni);
+    font-weight: 600;
   }
   form button:disabled,
   .unos-rijeci:has(input:disabled) {
@@ -1610,8 +1719,23 @@
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.45);
   }
-  .povijest-partije h3 {
-    margin-bottom: 8px;
+  .povijest-naslov {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--boja-tekst-naslov);
+    font: inherit;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+  }
+  .povijest-naslov span:last-child {
+    color: var(--boja-akcent);
+    font-size: 1.35rem;
   }
   .povijest-partije ol {
     margin: 0;
@@ -1630,6 +1754,18 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
+
+  .ucitaj-jos-poteza {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border: 1px solid #d8cdb7;
+    border-radius: 6px;
+    background: #fff;
+    color: #1d6f5c;
+    cursor: pointer;
+  }
+
+  .ucitaj-jos-poteza:disabled { cursor: wait; opacity: 0.65; }
   @media (max-width: 499px) {
     form button,
     .unos-rijeci {
@@ -1743,7 +1879,7 @@
   }
   .plasmani-lista {
     list-style: none;
-    margin: 28px 0 0;
+    margin: 24px 0 0;
     padding: 0;
   }
   .plasmani-lista li {
@@ -1776,8 +1912,8 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 12px;
-    margin-top: 28px;
-    margin-bottom: 20px;
+    margin-top: 24px;
+    margin-bottom: 0;
   }
   .kraj-donje-praznine { height: 100px; }
   .igraj-opet-gumb {
@@ -1840,17 +1976,6 @@
     margin-bottom: 16px;
   }
 
-  .dijalog textarea {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: var(--tekst-baza);
-    resize: none;
-    box-sizing: border-box;
-  }
-
   .dijalog-gumbi {
     display: flex;
     gap: 8px;
@@ -1882,6 +2007,25 @@
 
   .dijalog button:last-child:hover {
     background: #e0e0e0;
+  }
+  .potvrda-ne-znam .sporedni-dijalog-gumb {
+    border: 1px solid var(--boja-mint);
+    background: transparent;
+    color: var(--boja-mint);
+  }
+  .potvrda-ne-znam .sporedni-dijalog-gumb:hover,
+  .potvrda-ne-znam .sporedni-dijalog-gumb:focus-visible {
+    background: transparent;
+    border-color: var(--boja-pozadina-primarna);
+    color: var(--boja-pozadina-primarna);
+  }
+  .potvrda-ne-znam .potvrdi-dijalog-gumb {
+    background: #b42318;
+    color: white;
+  }
+  .potvrda-ne-znam .potvrdi-dijalog-gumb:hover,
+  .potvrda-ne-znam .potvrdi-dijalog-gumb:focus-visible {
+    background: #8f1c13;
   }
   @media (prefers-reduced-motion: reduce) {
     .rijec-sadrzaj,

@@ -11,7 +11,7 @@ Ovaj dokument je autoritativan opis pravila. Sve druge datoteke, uključujući k
 
 ## Tijek partije
 
-1. Sustav nasumično odabire prvu riječ. Igrač nikada ne bira otvarajuću riječ.
+1. Sustav nasumično odabire prvu riječ iz skupa sigurnih riječi. Igrač nikada ne bira otvarajuću riječ.
 2. Igrač na potezu odgovara riječju koja počinje na zadnja dva grafema prethodne riječi. U javnim modovima ima 30 sekundi; privatna soba može imati 15, 30 ili 60 sekundi, odnosno igru bez tajmera.
 3. Nakon svake eliminacije sustav bira novu početnu riječ i igra se nastavlja s preostalim igračima.
 4. Partija završava kada ostane jedan igrač. U Dvoboju prvi koji ispadne odmah gubi.
@@ -56,7 +56,9 @@ Riječi kraće od dva grafema nisu valjane jer se svaki potez mora poklapati s d
 
 ## Otvaranje runde
 
-Sustav bira početnu riječ pri početku partije, nakon eliminacije i nakon kaladont-efekta. Odabrana riječ je aktivna imenička lema u nominativu kraća od šest znakova koja ima barem jedan slobodan nastavak. Time se početak runde ne može pretvoriti u namještenu klopku.
+Sustav bira početnu riječ pri početku partije, nakon eliminacije i nakon kaladont-efekta. Prvo bira iz [skupa sigurnih riječi](../04-rjecnik/pocetne-rijeci.md): kandidat mora imati dopušten nastavak, a svaki dopušten odgovor na njega mora imati daljnji nastavak. Provjera uzima u obzir dopuštene vrste riječi i sve leksemske grupe potrošene tijekom partije.
+
+Ako u trenutačnom stanju nema dostupne sigurne riječi, sustav se vraća na rezervni odabir kratke aktivne riječi koja ima barem jedan slobodan nastavak.
 
 Nakon objave riječi na potez dolazi sljedeći aktivni igrač. Tek tada započinje tajmer poteza.
 

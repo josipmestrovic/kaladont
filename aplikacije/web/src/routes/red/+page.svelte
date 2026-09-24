@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { dohvatiSocket } from '$lib/socket.js';
-  import { SAVJETI } from '$lib/savjeti.js';
+  import { dohvatiSavjete } from '$lib/savjeti.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
@@ -15,6 +15,7 @@
     $page.url.searchParams.get('mod') === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca'
   );
   const ukupnoMjesta = $derived(trazeneMod === 'dva_igraca' ? 2 : 4);
+  const savjeti = $derived(dohvatiSavjete(trazeneMod));
 
   let stanje = $state<StanjeReda>({
     mojIgracId: '',
@@ -23,10 +24,12 @@
     prosjekCekanjaSek: 0,
   });
   let poruka = $state<string | null>(null);
+  let savjet = $state('');
   let countdown = $state<number | null>(null);
-  let aktivniSavjet = $state(0);
-  let sliderInterval: ReturnType<typeof setInterval> | undefined;
   let odbrojavanjePartije: ReturnType<typeof setInterval> | null = null;
+  let cekanjeStanjaTimeout: ReturnType<typeof setTimeout> | null = null;
+  let ulazakPoslan = false;
+  let brojPokusajaUlaska = 0;
   let prethodniIgraci: Set<string> | null = null;
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
   const preostaloIgraca = $derived(Math.max(0, ukupnoMjesta - brojIgraca));
@@ -60,12 +63,14 @@
 
   onMount(() => {
     pokreniSlusateljeIgre();
-    sliderInterval = setInterval(() => {
-      aktivniSavjet = (aktivniSavjet + 1) % SAVJETI.length;
-    }, 8000);
+    savjet = savjeti[Math.floor(Math.random() * savjeti.length)] ?? '';
     const socket = dohvatiSocket();
 
     const naStanjeReda = (novoStanje: StanjeReda) => {
+      if (!novoStanje.mjesta.some((mjesto) => mjesto?.igracId === novoStanje.mojIgracId)) return;
+      if (cekanjeStanjaTimeout) clearTimeout(cekanjeStanjaTimeout);
+      cekanjeStanjaTimeout = null;
+      brojPokusajaUlaska = 0;
       const noviIgraci = new Set(
         novoStanje.mjesta.filter(Boolean).map((mjesto) => `${mjesto!.nadimak}:${mjesto!.avatarId}`),
       );
@@ -77,7 +82,21 @@
       stanje = novoStanje;
     };
     const naGresku = (greska: PayloadGreska) => {
+      if (greska.kod === 'EMAIL_NIJE_POTVRDEN') {
+        if (cekanjeStanjaTimeout) clearTimeout(cekanjeStanjaTimeout);
+        cekanjeStanjaTimeout = null;
+        ulazakPoslan = false;
+        void goto('/potvrdi-email');
+        return;
+      }
       poruka = greska.poruka;
+    };
+    const naGreskuVeze = () => {
+      ulazakPoslan = false;
+      poruka = 'Dogodila se pogreška prilikom stavljanja u red čekanja. Pokušaj osvježiti stranicu.';
+    };
+    const naPrekidVeze = () => {
+      ulazakPoslan = false;
     };
     const naStanjePartije = (stanjePartije: StanjePartije) => {
       if (!stanjePartije.zavrsena) void goto(`/partija/${stanjePartije.partijaId}`);
@@ -93,10 +112,32 @@
     socket.on('partija:stanje', naStanjePartije);
     socket.on('partija:runda-otvorena', naRunduOtvorenu);
     socket.on('greska', naGresku);
+    socket.on('connect_error', naGreskuVeze);
+    socket.on('disconnect', naPrekidVeze);
     const udjiURed = () => {
+      if (ulazakPoslan) return;
+      ulazakPoslan = true;
       socket.emit('partija:stanje');
-      socket.emit('red:stanje', { mod: trazeneMod });
-      socket.emit('red:udji', { mod: trazeneMod });
+      if (cekanjeStanjaTimeout) clearTimeout(cekanjeStanjaTimeout);
+      cekanjeStanjaTimeout = setTimeout(() => {
+        if (brojPokusajaUlaska === 0) {
+          ulazakPoslan = false;
+          brojPokusajaUlaska = 1;
+          poruka = null;
+          udjiURed();
+          return;
+        }
+        ulazakPoslan = false;
+        poruka = 'Dogodila se pogreška prilikom stavljanja u red čekanja. Pokušaj osvježiti stranicu.';
+        cekanjeStanjaTimeout = null;
+      }, 5000);
+      socket.emit('red:udji', { mod: trazeneMod }, (potvrdenoStanje) => {
+        if (potvrdenoStanje) {
+          naStanjeReda(potvrdenoStanje);
+        } else {
+          naGreskuVeze();
+        }
+      });
     };
     socket.on('connect', udjiURed);
     if (socket.connected) udjiURed();
@@ -104,17 +145,19 @@
     pustiAudio('ulazak-u-sobu');
 
     return () => {
+      if (cekanjeStanjaTimeout) clearTimeout(cekanjeStanjaTimeout);
       socket.off('connect', udjiURed);
       socket.off('red:stanje', naStanjeReda);
       socket.off('partija:pocetak', naPocetakPartije);
       socket.off('partija:stanje', naStanjePartije);
       socket.off('partija:runda-otvorena', naRunduOtvorenu);
       socket.off('greska', naGresku);
+      socket.off('connect_error', naGreskuVeze);
+      socket.off('disconnect', naPrekidVeze);
     };
   });
 
   onDestroy(() => {
-    if (sliderInterval) clearInterval(sliderInterval);
     if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
     dohvatiSocket().emit('red:izadji');
   });
@@ -123,6 +166,10 @@
     goto('/');
   }
 </script>
+
+<svelte:head>
+  <title>Čekaonica | Kaladont</title>
+</svelte:head>
 
 <main class="red-sadrzaj">
 {#if countdown !== null}
@@ -145,7 +192,7 @@
       class:moje-sjedalo={mjesto?.igracId === stanje.mojIgracId}
     >
       {#if mjesto}
-        <Avatar avatarId={mjesto.avatarId} rang={mjesto.rang} velicina={84} />
+        <Avatar avatarId={mjesto.avatarId} avatarConfig={mjesto.avatarConfig} rang={mjesto.rang} velicina={84} />
         <div class="podaci">
           <strong>
             {mjesto.nadimak}
@@ -163,20 +210,12 @@
 </ul>
 
 {#if countdown === null}
-  <button type="button" class="odustani-gumb" onclick={odustani}>
-    Odustani
-  </button>
+  <button type="button" class="odustani-gumb" onclick={odustani}>Odustani</button>
 {/if}
 
-<section class="hint-slider" aria-label="Savjeti za igru">
+<section class="korisne-informacije" aria-label="Korisne informacije">
   <h2 class="hint-naslov"><span aria-hidden="true">💡</span> Korisne informacije</h2>
-  <div class="hint-okvir">
-    <div class="hint-traka" style={`transform: translateX(-${aktivniSavjet * 100}%);`}>
-      {#each SAVJETI as savjet}
-        <p class="hint">{savjet}</p>
-      {/each}
-    </div>
-  </div>
+  <p class="hint">{savjet}</p>
 </section>
 </main>
 
@@ -270,7 +309,7 @@
     font-size: var(--tekst-mali);
   }
 
-  .hint-slider {
+  .korisne-informacije {
     margin: 28px 0 0;
   }
 
@@ -286,22 +325,12 @@
     font-weight: 600;
   }
 
-  .hint-okvir {
-    overflow: hidden;
-  }
-
-  .hint-traka {
-    display: flex;
-    transition: transform 300ms ease;
-  }
-
   .hint {
-    flex: 0 0 100%;
     width: 100%;
     min-height: 48px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     margin: 0;
     padding: 0 12px;
     color: var(--boja-tekst-sekundarni);
@@ -318,8 +347,9 @@
     border: 1px solid var(--boja-akcent);
     color: var(--boja-akcent);
     border-radius: var(--radijus-pill);
-    padding: 6px 16px;
-    font-size: inherit;
+    padding: 10px 24px;
+    font-size: var(--tekst-baza);
+    font-weight: 700;
     cursor: pointer;
   }
 </style>

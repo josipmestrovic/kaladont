@@ -3,10 +3,10 @@
 
   interface Props {
     profil: DnkProfil;
-    naslov?: string;
+    naslov: string;
   }
 
-  let { profil, naslov = 'Kaladont DNK' }: Props = $props();
+  let { profil, naslov }: Props = $props();
 
   const srediste = 150;
   const radijus = 105;
@@ -31,7 +31,7 @@
 <section class="dnk-kartica" aria-labelledby="dnk-naslov">
   <div class="dnk-zaglavlje">
     <div>
-      <p class="dnk-natpis">Profil igre</p>
+      <p class="dnk-natpis"><img src="/ikone/15-kaladont-dnk.png" alt="" aria-hidden="true" />Profil igre</p>
       <h3 id="dnk-naslov">{naslov}</h3>
     </div>
     <span class:otkljucan={profil.otkljucan} class="dnk-status">
@@ -66,10 +66,7 @@
             <div class="dnk-traka" aria-label={`${os.naziv}: ${os.vrijednost} od 100`}>
               <span style={`width: ${os.vrijednost}%`}></span>
             </div>
-            <small>
-              {os.oznaka}
-              {#if os.kljuc !== 'duge_rijeci' && os.kljuc !== 'rijetke_rijeci'} · {os.detalj}{/if}
-            </small>
+            <small>{os.oznaka}</small>
           </div>
         {/each}
       </div>
@@ -83,6 +80,7 @@
       </div>
     </div>
   {/if}
+  <a class="dnk-pomoc" href="/pravila-kaladonta?tema=napredak#dnk">Kako čitati DNK?</a>
 </section>
 
 <style>
@@ -103,6 +101,9 @@
   }
 
   .dnk-natpis {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     margin: 0 0 2px;
     color: var(--boja-akcent);
     font-size: var(--tekst-mikro);
@@ -110,6 +111,8 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
+
+  .dnk-natpis img { width: 24px; height: 24px; object-fit: contain; }
 
   h3 {
     margin: 0;
@@ -246,6 +249,14 @@
     margin: 4px 0 0;
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mali);
+  }
+
+  .dnk-pomoc {
+    display: inline-block;
+    margin-top: 12px;
+    color: var(--boja-pozadina-primarna);
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
   }
 
   @media (max-width: 640px) {

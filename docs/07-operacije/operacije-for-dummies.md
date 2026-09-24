@@ -8,7 +8,7 @@ Autoritativne odluke su u [ADR-u 014](../03-arhitektura/odluke/014-operativni-mo
 > **Stanje 2026-09-09.** Docker/Compose/Caddy artefakti, CI smoke test i GHCR objava postoje. Staging VPS je ručno postavljen i radi s HTTPS-om, privatnom bazom i stvarnim hrLex rječnikom. Automatski staging deploy, produkcijski VPS/deploy, trustProxy/CORS učvršćivanje, prvi-admin CLI i backup/restore automatika još nisu implementirani. Ne tretiraj staging kao privatno okruženje: privremeno je javno uz `noindex`.
 
 > [!IMPORTANT]
-> U ovaj repozitorij nikada ne upisuj stvarnu IP adresu, lozinku, API ključ, privatni SSH ključ, Basic Auth hash, Storage Box pristup, email allowlistu ni Healthchecks URL. Primjeri koriste vrijednosti poput `<STAGING_IPV4>` koje moraš zamijeniti privatno tijekom stvarne postave.
+> U ovaj repozitorij nikada ne upisuj stvarnu IP adresu, lozinku, API ključ, privatni SSH ključ, Basic Auth hash, Storage Box pristup ni Healthchecks URL. Primjeri koriste vrijednosti poput `<STAGING_IPV4>` koje moraš zamijeniti privatno tijekom stvarne postave.
 
 ## 1. Kako koristiti ovaj vodič
 
@@ -81,7 +81,7 @@ Ovo je najvažniji odjeljak. Kućica se označava tek kada postoji konkretan art
 - [ ] Centralna runtime provjera prekida staging/produkcijski startup s non-zero izlazom kada je `ONEMOGUCI_TIMER_POTEZA=true`; CI ima negativni test koji to dokazuje.
 - [ ] `/zdravlje` provjerava bazu i rječnik, vraća 503 kada nisu spremni te prikazuje aktivne partije, uptime i digest bez tajni.
 - [ ] Resend adapter stvarno šalje email; trenutačni log-only stub je uklonjen.
-- [ ] Staging email allowlista točnih adresa radi fail-closed.
+- [ ] Staging email slanje radi prema testnoj adresi na više uređaja.
 - [ ] Postoji jednokratni CLI za dodjelu prvog administratora; nije potreban ručni SQL.
 - [ ] Postoje i pregledane su stranice `/privatnost` i `/uvjeti`.
 
@@ -852,7 +852,7 @@ Ako išta ne radi, staging kandidat nije spreman za produkciju čak i ako je CI 
 
 ### 18.5. Email i prvi admin
 
-Staging Resend konfiguracija mora poslati samo adresama iz `STAGING_EMAIL_ALLOWLIST`. Pokušaj registracije s jednom dopuštenom i jednom nedopuštenom adresom. Dopuštena prima poruku; nedopuštena ne prima ništa, a server bilježi siguran razlog bez sadržaja/tajni.
+Staging Resend konfiguracija namjerno šalje na bilo koju testnu adresu. Registraciju i promjenu emaila provjeri s više uređaja, uključujući potvrdu i reset lozinke.
 
 Prvi admin nastaje budućim jednokratnim CLI alatom iz istog digesta. Ciljani Compose servis `alati` nije drugi stalni proces: koristi **isti aplikacijski image/digest**, pokreće zadanu administrativnu naredbu i briše se nakon završetka (`run --rm`). Njegov stvarni naziv i argumenti moraju biti implementirani i testirani prije uporabe:
 
@@ -910,7 +910,7 @@ Ponovi staging odjeljke 9–16, ali s ovim razlikama:
 | Basic Auth           | nema ga                                                |
 | Podaci               | vlastita prazna produkcijska baza; ništa sa staginga   |
 | Storage Box          | trajni zasebni produkcijski podračun                   |
-| Email                | pravi Resend, bez staging allowliste                   |
+| Email                | pravi Resend, bez ograničenja primatelja na stagingu   |
 | Monitoring           | UptimeRobot + Healthchecks.io                          |
 
 Produkcijski VPS mora biti Ubuntu 24.04 x86 u odabranoj lokaciji i koristiti zaštićenu produkcijsku Primary IPv4. Ne klonira git i ne dobiva trajni GHCR token.
@@ -948,7 +948,7 @@ Oba moraju pokazati `<PROD_IPV4>`.
 
 ### 21.2. Resend
 
-U Resendu dodaj domenu `kaladont.hr` i kao produkcijski pošiljatelj koristi `noreply@kaladont.hr`. Ljudski kontakt i Reply-To je `kontakt@kaladont.hr`.
+U Resendu dodaj domenu `kaladont.hr` i kao produkcijski pošiljatelj koristi `noreply@kaladont.hr`. Ljudski kontakt i Reply-To je `info@kaladont.hr`.
 
 Resend će prikazati DNS zapise. Nemoj ih prepisivati iz ovog dokumenta jer su vrijednosti jedinstvene. XHostingu pošalji:
 
@@ -1238,7 +1238,7 @@ Ako naredba sadrži `-v`, `--volumes`, `rm`, `prune`, `drop`, `delete`, `reset` 
 - [ ] Merge u `main` automatski deploya staging.
 - [ ] `/zdravlje` je javno i zdravo; staging ima `noindex`, bez Basic Autha za prvi mali closed test krug.
 - [ ] Cijela partija prolazi u četiri izolirana browser konteksta.
-- [ ] Email stiže allowlistanoj i ne stiže nedopuštenoj adresi.
+- [ ] Email stiže na testne adrese na više uređaja.
 - [ ] Admin CLI radi bez ručnog SQL-a.
 - [ ] Staging dump je šifriran, prenesen i vraćen u praznu izoliranu bazu.
 

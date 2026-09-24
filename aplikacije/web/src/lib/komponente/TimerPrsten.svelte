@@ -1,39 +1,45 @@
 <script lang="ts">
   /**
-   * SVG prsten koji se prazni sinkrono s 30s odbrojavanjem (istekPotezaIso je izvor istine - server je sat).
-   * Zadnjih 5s pulsira (ekrani.md §3).
+  * SVG prsten koji se prazni prema serverovom roku i stvarnom trajanju poteza.
+  * Zadnjih 5s pulsira (ekrani.md §3).
    */
   import { pustiAudio } from '$lib/audio-manager.js';
 
   interface Props {
     istekIso: string;
+    serverVrijemeIso: string;
+    trajanjeSek: number;
     velicina?: number;
     promijeniNemirAvatara?: (nemiran: boolean) => void;
   }
 
-  const { istekIso, velicina = 56, promijeniNemirAvatara = () => undefined }: Props = $props();
-  const TRAJANJE_MS = 30_000;
+  const { istekIso, serverVrijemeIso, trajanjeSek, velicina = 56, promijeniNemirAvatara = () => undefined }: Props = $props();
   const POLUMJER = 46;
   const OPSEG = 2 * Math.PI * POLUMJER;
 
   let preostaliUdio = $state(1);
-  let preostaleSekunde = $state(Math.ceil(TRAJANJE_MS / 1000));
+  let preostaleSekunde = $state(0);
   let pulsPusten = false;
 
   $effect(() => {
     const istek = new Date(istekIso).getTime();
+    const serverSada = new Date(serverVrijemeIso).getTime();
+    const pomakSataMs = serverSada - Date.now();
+    const trajanjeMs = Math.max(1, trajanjeSek * 1000);
+    const serverNow = () => Date.now() + pomakSataMs;
     pulsPusten = false;
     const interval = setInterval(() => {
-      const preostaloMs = istek - Date.now();
-      preostaliUdio = Math.max(0, Math.min(1, preostaloMs / TRAJANJE_MS));
+      const preostaloMs = istek - serverNow();
+      preostaliUdio = Math.max(0, Math.min(1, preostaloMs / trajanjeMs));
       preostaleSekunde = Math.max(0, Math.ceil(preostaloMs / 1000));
     }, 200);
-    preostaleSekunde = Math.max(0, Math.ceil((istek - Date.now()) / 1000));
+    preostaleSekunde = Math.max(0, Math.ceil((istek - serverNow()) / 1000));
     return () => clearInterval(interval);
   });
 
-  const pulsira = $derived(preostaliUdio > 0 && preostaliUdio < 5 / 30);
-  const avatarJeNemiran = $derived(preostaliUdio > 0 && preostaliUdio < 3 / 30);
+  const preostaloMs = $derived(preostaliUdio * Math.max(1, trajanjeSek * 1000));
+  const pulsira = $derived(preostaloMs > 0 && preostaloMs < 5_000);
+  const avatarJeNemiran = $derived(preostaloMs > 0 && preostaloMs < 3_000);
 
   $effect(() => {
     promijeniNemirAvatara(avatarJeNemiran);

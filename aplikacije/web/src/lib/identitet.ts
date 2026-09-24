@@ -1,4 +1,6 @@
-/** Gost identitet - nasumični UUID u localStorage (RS-19: brisanje localStoragea = novi identitet). */
+/** Gost identitet - opaque token u localStorageu; javni igracId nikad nije bearer token. */
+import { apiUrl } from './api-url.js';
+
 const KLJUC_GOST_TOKEN = 'kaladont_gost_token';
 const KLJUC_SESIJSKI_TOKEN = 'kaladont_sesijski_token';
 const KLJUC_ONBORDING_ZAVRSEN = 'kaladont_onboarding_zavrsen';
@@ -6,17 +8,37 @@ const KLJUC_ONBORDING_ZAVRSEN = 'kaladont_onboarding_zavrsen';
 export function dohvatiGostToken(): string {
   if (typeof localStorage === 'undefined') {
     // SSR/build faza - vrati privremeni token, klijent ce ga zamijeniti u browseru
-    return crypto.randomUUID();
+    return `gost.${crypto.randomUUID().replaceAll('-', '')}`;
   }
   const postojeci = localStorage.getItem(KLJUC_GOST_TOKEN);
   if (postojeci) return postojeci;
 
-  const novi = crypto.randomUUID();
+  const novi = `gost.${crypto.randomUUID().replaceAll('-', '')}`;
   localStorage.setItem(KLJUC_GOST_TOKEN, novi);
   return novi;
 }
 
-/** Sprema potpisani sesijski token nakon prijave/registracije (racuni/tokeni.ts na serveru). */
+export async function inicijalizirajGostSesiju(): Promise<void> {
+  if (typeof localStorage === 'undefined' || localStorage.getItem(KLJUC_SESIJSKI_TOKEN)) return;
+
+  const postojeci = localStorage.getItem(KLJUC_GOST_TOKEN);
+  if (postojeci?.startsWith('gost.')) {
+    const provjera = await fetch(apiUrl('/profil'), {
+      headers: { authorization: `Bearer ${postojeci}` },
+    });
+    if (provjera.ok) return;
+    if (provjera.status !== 401) throw new Error('Provjera gostujuće sesije nije uspjela.');
+    localStorage.removeItem(KLJUC_GOST_TOKEN);
+    localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
+  }
+
+  const odgovor = await fetch(apiUrl('/racuni/gost-sesija'), { method: 'POST' });
+  if (!odgovor.ok) throw new Error('Gostujuća sesija nije uspjela.');
+  const tijelo = (await odgovor.json()) as { token: string };
+  localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);
+}
+
+/** Sprema nečitljivi sesijski token nakon prijave/registracije (racuni/sesije.ts na serveru). */
 export function spremiSesijskiToken(token: string): void {
   localStorage.setItem(KLJUC_SESIJSKI_TOKEN, token);
   localStorage.removeItem(KLJUC_GOST_TOKEN);
@@ -27,13 +49,21 @@ export function obrisiSesijskiToken(): void {
   localStorage.removeItem(KLJUC_GOST_TOKEN);
 }
 
+/** Odjavljuje račun i stvara potpuno novi gostujući identitet za samostalnu igru. */
+export async function prijediNaGostujucuSesiju(): Promise<void> {
+  localStorage.removeItem(KLJUC_SESIJSKI_TOKEN);
+  localStorage.removeItem(KLJUC_GOST_TOKEN);
+  localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
+  await inicijalizirajGostSesiju();
+}
+
 /** Token koji se koristi za autentikaciju - sesijski (nakon prijave) ili gost UUID. */
 export function dohvatiAuthToken(): string {
   if (typeof localStorage === 'undefined') return dohvatiGostToken();
   return localStorage.getItem(KLJUC_SESIJSKI_TOKEN) ?? dohvatiGostToken();
 }
 
-/** Ima li korisnik potpisani sesijski token (registriran/admin) ili je gost. */
+/** Ima li korisnik sesijski token (registriran/admin) ili je gost. */
 export function jeRegistriranKorisnik(): boolean {
   if (typeof localStorage === 'undefined') return false;
   return localStorage.getItem(KLJUC_SESIJSKI_TOKEN) !== null;

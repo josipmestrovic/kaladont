@@ -127,7 +127,7 @@ sudo -u deploy touch /opt/kaladont/.env
 sudo chmod 600 /opt/kaladont/.env
 ```
 
-Konačan popis varijabli mora potjecati iz implementirane centralne konfiguracijske sheme. Najmanje obuhvaća internu `BAZA_URL`, jedinstvenu `SESIJA_TAJNA`, oznaku okruženja, digest/verziju, Resend konfiguraciju i staging email allowlistu. Privremeni multiplayer staging nema Caddy Basic Auth jer bi izazivao ponavljajuće promptove na Socket.IO prometu; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway. `ONEMOGUCI_TIMER_POTEZA` ne postavlja se; aplikacija mora odbiti produkcijski/staging start ako je uključena.
+Konačan popis varijabli mora potjecati iz implementirane centralne konfiguracijske sheme. Najmanje obuhvaća internu `BAZA_URL`, jedinstvenu `SESIJA_TAJNA`, oznaku okruženja, digest/verziju i Resend konfiguraciju. Privremeni multiplayer staging nema Caddy Basic Auth jer bi izazivao ponavljajuće promptove na Socket.IO prometu; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway. `ONEMOGUCI_TIMER_POTEZA` ne postavlja se; aplikacija mora odbiti produkcijski/staging start ako je uključena.
 
 PostgreSQL i Caddy navode se točnom verzijom i digestom, bez `latest`. Aplikacija se navodi isključivo punim GHCR digestom.
 
@@ -166,7 +166,7 @@ Rezultat mora sadržavati točno sačuvanu staging Primary IPv4. Caddy ne može 
 3. Puni hrLex uvoz izveden je jednokratno na stagingu; kasniji deployi ga ne ponavljaju.
 4. Staging mora imati javni `/zdravlje` 200 s dostupnom bazom, `brojRijeci > 0` i očekivanim digestom.
 5. Staging je privremeno bez Basic Autha zbog Socket.IO prometa; prije šireg dijeljenja treba uvesti gateway zaštitu.
-6. Ručno odigraj cijelu partiju u četiri odvojene sesije, testiraj Resend samo prema točnoj staging allowlisti i jednokratnim CLI alatom dodijeli prvi admin račun.
+6. Ručno odigraj cijelu partiju u četiri odvojene sesije, testiraj Resend na više testnih adresa i jednokratnim CLI alatom dodijeli prvi admin račun.
 7. Napravi šifrirani staging dump na privremeni Storage Box podračun i vrati ga u praznu izoliranu bazu.
 8. Tek nakon svih zelenih koraka ponovi provisioning za produkciju i ručno promoviraj staging digest.
 

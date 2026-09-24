@@ -59,7 +59,7 @@ Za svaki oblik: pohlepno parsiranje digrafa (dž, lj, nj) uz **listu iznimaka** 
 
 Uz to se za svaki redak izračunava **ključ leksemske grupe** iz leme: `vrsta:lema`, a za pridjeve i priloge `vrsta:lema:stupanj` (stupanj iz `Degree=Cmp/Sup`, inače pozitiv). Oblik koji pripada većem broju kategorija dobiva **uniju** grupa u stupcu `grupe` (vidi [pravila-igre.md](../02-pravila-igre/pravila-igre.md#leksemske-grupe-zabrana-ponavljanja)).
 
-Pri učitavanju u memoriju poslužitelj iz tih grupa izvodi zaseban pool za otvaranje runde: aktivne oblike s grupom `imenica:<riječ>` i manje od 6 znakova. To su imeničke leme u nominativu; pool se ne sprema u zasebnu tablicu niti ograničava valjanost poteza igrača.
+Pri učitavanju u memoriju poslužitelj iz tih grupa izvodi zaseban skup za rezervno otvaranje runde: aktivne oblike s grupom `imenica:<riječ>` i manje od 6 znakova. To su imeničke leme u nominativu; skup se ne sprema u zasebnu tablicu niti ograničava valjanost poteza igrača. Primarni odabir koristi dokumentirani [skup sigurnih riječi](pocetne-rijeci.md).
 
 ### 5. Upis u bazu
 

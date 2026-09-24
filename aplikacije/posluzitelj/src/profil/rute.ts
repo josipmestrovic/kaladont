@@ -3,33 +3,134 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
-import { desc, eq, gte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { DEFINICIJE_DOSTIGNUCA, izracunajKaladontDnk, izracunajRang, izracunajRazinuDostignuca, stanjeIskustva } from 'zajednicko';
+import {
+  DEFINICIJE_DOSTIGNUCA,
+  validirajAvatarConfig,
+  izracunajRang,
+  izracunajRazinuDostignuca,
+  stanjeIskustva,
+} from 'zajednicko';
 import { baza } from '../baza/klijent.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import {
+  dostignucaIgraca,
+  dnkStatistikeIgraca,
+  igraci,
+  napredakDostignucaIgraca,
+  otkljucaneRijeciIgraca,
+  partije,
+  potezi,
+  statistikeRijeciIgraca,
+  sudioniciPartije,
+} from '../baza/shema.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
-import { posaljiEmail } from '../email.js';
+import { porukaPotvrdeEmaila, pokusajPoslatiEmail } from '../email.js';
+import { konfiguracija } from '../konfiguracija.js';
 import { izdajTokenPotvrdeEmaila } from '../racuni/tokeni.js';
+import { izracunajDnk } from '../igra/izracun-dnk.js';
 import {
   pokusajIdentifikaciju,
   zahtijevajIdentifikaciju,
   zahtijevajPrijavu,
   type ZahtjevSIgracem,
 } from '../racuni/autentikacija.js';
+import { MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA } from 'zajednicko';
 
-const ShemaAvatar = z.object({ avatarId: z.number().int().min(0).max(BROJ_AVATARA - 1) });
-const ShemaNadimak = z.object({ nadimak: z.string().trim().min(2).max(12) });
-const ShemaLimit = z.object({ limit: z.coerce.number().int().refine((n) => n === 10 || n === 100, 'limit mora biti 10 ili 100').optional() });
+const ShemaAvatar = z.object({
+  avatarId: z
+    .number()
+    .int()
+    .min(0)
+    .max(BROJ_AVATARA - 1),
+});
+const ShemaNadimak = z.object({ nadimak: z.string().min(MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).max(MAKSIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).regex(UZORAK_NADIMKA, PORUKA_NEVALJANOG_NADIMKA) });
+const ShemaLimit = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .refine((n) => n === 10 || n === 100, 'limit mora biti 10 ili 100')
+    .optional(),
+});
 const ShemaEmail = z.object({ noviEmail: z.string().email(), lozinka: z.string().min(1) });
-const ShemaLozinka = z.object({ trenutnaLozinka: z.string().min(1), novaLozinka: z.string().min(8) });
+const ShemaLozinka = z.object({
+  trenutnaLozinka: z.string().min(1),
+  novaLozinka: z.string().min(8),
+});
+
+const MAKSIMALNO_POTEZA_PO_STRANICI = 500;
+const ZIVOTNI_VIJEK_TOP_RIJECI_MS = 30_000;
+const MAKSIMALNO_PARTIJA_PO_STRANICI = 50;
+const MAKSIMALNO_RIJECI_PO_STRANICI = 50;
+
+type TopRijeciCache = {
+  stvoreno: number;
+  ukupnoPartija: number;
+  retci: { rijec: string | null; brojUpotreba: number; brojPartija: number }[];
+};
+
+let topRijeciCache: TopRijeciCache | null = null;
+
+type CursorPovijestiPartija = { pocetak: string; partijaId: string };
+type CursorRijeci = { rijec: string };
+const KATEGORIJE_RIJECI = ['duge', 'srednjeDuge', 'jakoDuge', 'rijetke', 'srednjeRijetke', 'jakoRijetke'] as const;
+type KategorijaRijeci = (typeof KATEGORIJE_RIJECI)[number];
+
+function kodirajCursor<T>(vrijednost: T): string {
+  return Buffer.from(JSON.stringify(vrijednost), 'utf8').toString('base64url');
+}
+
+function dekodirajCursor<T>(vrijednost: string | undefined): T | null {
+  if (!vrijednost) return null;
+  try {
+    return JSON.parse(Buffer.from(vrijednost, 'base64url').toString('utf8')) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizirajEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+async function dohvatiTopRijeci(): Promise<TopRijeciCache> {
+  const sada = Date.now();
+  if (topRijeciCache && sada - topRijeciCache.stvoreno < ZIVOTNI_VIJEK_TOP_RIJECI_MS) {
+    return topRijeciCache;
+  }
+
+  const [[redakUkupno], retci] = await Promise.all([
+    baza.select({ ukupnoPartija: sql<number>`count(*)::int` }).from(partije),
+    baza
+      .select({
+        rijec: potezi.rijec,
+        brojUpotreba: sql<number>`count(*)::int`,
+        brojPartija: sql<number>`count(distinct ${potezi.partijaId})::int`,
+      })
+      .from(potezi)
+      .where(sql`${potezi.vrsta} = 'rijec' and ${potezi.rijec} is not null`)
+      .groupBy(potezi.rijec)
+      .orderBy(desc(sql`count(*)`), asc(potezi.rijec))
+      .limit(100),
+  ]);
+
+  topRijeciCache = {
+    stvoreno: sada,
+    ukupnoPartija: redakUkupno?.ukupnoPartija ?? 0,
+    retci,
+  };
+  return topRijeciCache;
+}
 
 function prosjekBodova(bodoviUkupno: number, odigrane: number): number {
   return odigrane > 0 ? bodoviUkupno / odigrane : 0;
 }
 
-function stilIgre(odigrane: number, eliminacije: number): 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen' {
+function stilIgre(
+  odigrane: number,
+  eliminacije: number,
+): 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen' {
   if (odigrane === 0) return 'neodređen';
   const eliminacijePoPartiji = odigrane > 0 ? eliminacije / odigrane : 0;
   if (eliminacijePoPartiji > 0.4) return 'agresivan';
@@ -37,11 +138,13 @@ function stilIgre(odigrane: number, eliminacije: number): 'agresivan' | 'uravnot
   return 'pacifist';
 }
 
-async function dohvatiStatistiku(igracId: string) {
+async function dohvatiStatistiku(igracId: string, mod: 'cetiri_igraca' | 'dva_igraca') {
   const [statistika] = await baza
     .select()
     .from(statistikeRijeciIgraca)
-    .where(sql`${statistikeRijeciIgraca.igracId} = ${igracId} and ${statistikeRijeciIgraca.mod} = 'cetiri_igraca'`)
+    .where(
+      sql`${statistikeRijeciIgraca.igracId} = ${igracId} and ${statistikeRijeciIgraca.mod} = ${mod}`,
+    )
     .limit(1);
   return statistika ?? null;
 }
@@ -55,23 +158,48 @@ async function dohvatiDnkStatistiku(igracId: string, mod: 'cetiri_igraca' | 'dva
   return statistika ?? null;
 }
 
-function prosjecnaOcjena(statistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null): number | null {
+function prosjecnaOcjena(
+  statistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
+): number | null {
   if (!statistika || statistika.brojOcjenaIgre === 0) return null;
   return statistika.zbrojOcjenaIgre / statistika.brojOcjenaIgre;
 }
 
-async function dohvatiOtkljucaneRijeci(igracId: string) {
+function stupacZaKategoriju(kategorija: KategorijaRijeci) {
+  return kategorija === 'duge' || kategorija === 'srednjeDuge' || kategorija === 'jakoDuge'
+    ? otkljucaneRijeciIgraca.dugaTier
+    : otkljucaneRijeciIgraca.rijetkaTier;
+}
+
+function tierZaKategoriju(kategorija: KategorijaRijeci): number {
+  return kategorija === 'duge' ? 0
+    : kategorija === 'srednjeDuge' ? 1
+      : kategorija === 'jakoDuge' ? 2
+        : kategorija === 'rijetke' ? 2
+          : kategorija === 'srednjeRijetke' ? 1
+            : 0;
+}
+
+async function dohvatiStranicuRijeci(igracId: string, kategorija: KategorijaRijeci, limit: number, cursor: CursorRijeci | null) {
+  const stupac = stupacZaKategoriju(kategorija);
+  const uvjet = and(
+    eq(otkljucaneRijeciIgraca.igracId, igracId),
+    eq(stupac, tierZaKategoriju(kategorija)),
+    ...(cursor ? [sql`${otkljucaneRijeciIgraca.rijec} > ${cursor.rijec}`] : []),
+  );
   const retci = await baza
-    .select({ rijec: otkljucaneRijeciIgraca.rijec, dugaTier: otkljucaneRijeciIgraca.dugaTier, rijetkaTier: otkljucaneRijeciIgraca.rijetkaTier })
+    .select({ rijec: otkljucaneRijeciIgraca.rijec })
     .from(otkljucaneRijeciIgraca)
-    .where(eq(otkljucaneRijeciIgraca.igracId, igracId));
+    .where(uvjet)
+    .orderBy(asc(otkljucaneRijeciIgraca.rijec))
+    .limit(limit + 1);
+  const imaJos = retci.length > limit;
+  const rijeciZaOdgovor = imaJos ? retci.slice(0, limit) : retci;
+  const zadnja = rijeciZaOdgovor.at(-1);
   return {
-    duge: retci.filter((redak) => redak.dugaTier === 0).map((redak) => redak.rijec).sort(),
-    srednjeDuge: retci.filter((redak) => redak.dugaTier === 1).map((redak) => redak.rijec).sort(),
-    jakoDuge: retci.filter((redak) => redak.dugaTier === 2).map((redak) => redak.rijec).sort(),
-    rijetke: retci.filter((redak) => redak.rijetkaTier === 2).map((redak) => redak.rijec).sort(),
-    srednjeRijetke: retci.filter((redak) => redak.rijetkaTier === 1).map((redak) => redak.rijec).sort(),
-    jakoRijetke: retci.filter((redak) => redak.rijetkaTier === 0).map((redak) => redak.rijec).sort(),
+    rijeci: rijeciZaOdgovor.map((redak) => redak.rijec),
+    imaJos,
+    sljedeciCursor: imaJos && zadnja ? kodirajCursor({ rijec: zadnja.rijec }) : null,
   };
 }
 
@@ -101,50 +229,65 @@ function izracunajDnkProfil(
     eliminacijeUkupno: number;
     eliminacije1v1: number;
   },
-  statistika: Awaited<ReturnType<typeof dohvatiStatistiku>> | null,
   dnkStatistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
   mod: 'cetiri_igraca' | 'dva_igraca',
 ) {
   const odigrano = mod === 'dva_igraca' ? igrac.odigrane1v1 : igrac.odigrane;
   const bodovi = mod === 'dva_igraca' ? igrac.bodovi1v1 : igrac.bodoviUkupno;
   const eliminacije = mod === 'dva_igraca' ? igrac.eliminacije1v1 : igrac.eliminacijeUkupno;
-  const prosjekBodova = odigrano > 0 ? bodovi / odigrano : 0;
   const eliminacijePoPartiji = odigrano > 0 ? eliminacije / odigrano : 0;
-  const najduziStreak = statistika?.najduziStreak ?? 0;
-  const prosjekPrihvacenogPotezaMs = dnkStatistika && dnkStatistika.prihvaceniPotezi > 0
-    ? dnkStatistika.ukupnoTrajanjePrihvaceniPoteziMs / dnkStatistika.prihvaceniPotezi
+  const dnkPodaci = {
+    odigrane: odigrano,
+    bodovi,
+    eliminacije,
+    prihvaceniPotezi: dnkStatistika?.prihvaceniPotezi ?? 0,
+    ukupnoTrajanjePrihvaceniPoteziMs: dnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
+    najduziStreak: dnkStatistika?.najduziStreak ?? 0,
+    dugeRijeci: dnkStatistika?.dugeRijeci ?? 0,
+    srednjeDugeRijeci: dnkStatistika?.srednjeDugeRijeci ?? 0,
+    jakoDugeRijeci: dnkStatistika?.jakoDugeRijeci ?? 0,
+    rijetkeRijeci: dnkStatistika?.rijetkeRijeci ?? 0,
+    srednjeRijetkeRijeci: dnkStatistika?.srednjeRijetkeRijeci ?? 0,
+    jakoRijetkeRijeci: dnkStatistika?.jakoRijetkeRijeci ?? 0,
+  };
+  const profil = { osi: izracunajDnk(dnkPodaci, mod) };
+  const prosjekPrihvacenogPotezaMs = dnkPodaci.prihvaceniPotezi > 0
+    ? dnkPodaci.ukupnoTrajanjePrihvaceniPoteziMs / dnkPodaci.prihvaceniPotezi
     : 0;
-  const ponderiraneDuge = (statistika?.upisaneDugeRijeci ?? 0) + (statistika?.upisaneSrednjeDugeRijeci ?? 0) * 1.5 + (statistika?.upisaneJakoDugeRijeci ?? 0) * 2;
-  const ponderiraneRijetke = (statistika?.otkriveneRijetkeGrupe ?? 0) + (statistika?.otkriveneSrednjeRijetkeGrupe ?? 0) * 1.5 + (statistika?.otkriveneJakoRijetkeGrupe ?? 0) * 2;
-
-  const profil = izracunajKaladontDnk({
-    mod,
-    odigrano,
-    prosjekBodova,
-    eliminacijePoPartiji,
-    najduziStreak,
-    prosjekPrihvacenogPotezaMs,
-    ponderiraneDuge: ponderiraneDuge / Math.max(1, odigrano),
-    ponderiraneRijetke: ponderiraneRijetke / Math.max(1, odigrano),
-  });
 
   return {
     ...profil,
     odigrano,
     preostaloDoOtkljucavanja: Math.max(0, 10 - odigrano),
+    metrike: {
+      eliminacijePoPartiji,
+      nizPrihvacenihRijeci: dnkPodaci.najduziStreak,
+      prosjekPrihvacenogPotezaMs,
+      dugeRijeciPoPartiji: odigrano > 0
+        ? (dnkPodaci.dugeRijeci + dnkPodaci.srednjeDugeRijeci + dnkPodaci.jakoDugeRijeci) / odigrano
+        : 0,
+      rijetkeRijeciPoPartiji: odigrano > 0
+        ? (dnkPodaci.rijetkeRijeci + dnkPodaci.srednjeRijetkeRijeci + dnkPodaci.jakoRijetkeRijeci) / odigrano
+        : 0,
+    },
   };
 }
 
 async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number) {
   const [napredak, otkljucana] = await Promise.all([
-    baza.select().from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracId)).limit(1),
+    baza
+      .select()
+      .from(napredakDostignucaIgraca)
+      .where(eq(napredakDostignucaIgraca.igracId, igracId))
+      .limit(1),
     baza.select().from(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igracId)),
   ]);
   const brojac = napredak[0];
   const razinaIskustva = stanjeIskustva(iskustvoUkupno).razina;
   const razine = new Map(otkljucana.map((redak) => [redak.dostignuceId, redak.razina]));
   const dostignuca = DEFINICIJE_DOSTIGNUCA.map((definicija) => {
-    const vrijednost = definicija.brojac === 'razina' ? razinaIskustva : Number(brojac?.[definicija.brojac] ?? 0);
+    const vrijednost =
+      definicija.brojac === 'razina' ? razinaIskustva : Number(brojac?.[definicija.brojac] ?? 0);
     const izracunataRazina = izracunajRazinuDostignuca(definicija, vrijednost);
     const razina = Math.max(razine.get(definicija.id) ?? 0, izracunataRazina);
     return { ...definicija, razina, vrijednost, sljedeciPrag: definicija.pragovi[razina] ?? null };
@@ -152,12 +295,53 @@ async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number
   return {
     ukupnoZvjezdica: dostignuca.reduce((zbroj, dostignuce) => zbroj + dostignuce.razina, 0),
     ukupnoOtkljucanih: dostignuca.filter((dostignuce) => dostignuce.razina > 0).length,
-    maksimalnoZvjezdica: DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0),
+    maksimalnoZvjezdica: DEFINICIJE_DOSTIGNUCA.reduce(
+      (zbroj, definicija) => zbroj + definicija.pragovi.length,
+      0,
+    ),
     dostignuca,
   };
 }
 
-export async function registrirajProfilRute(app: FastifyInstance, rjecnik: RjecnikUMemoriji): Promise<void> {
+export async function registrirajProfilRute(
+  app: FastifyInstance,
+  rjecnik: RjecnikUMemoriji,
+): Promise<void> {
+  const dohvatiKategoriju = (vrijednost: string | undefined): KategorijaRijeci | null =>
+    KATEGORIJE_RIJECI.includes(vrijednost as KategorijaRijeci) ? vrijednost as KategorijaRijeci : null;
+
+  app.get<{ Querystring: { kategorija?: string; limit?: string; cursor?: string } }>(
+    '/profil/rijeci',
+    { preHandler: zahtijevajPrijavu },
+    async (zahtjev, odgovor) => {
+      const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+      const kategorija = dohvatiKategoriju(zahtjev.query.kategorija);
+      if (!kategorija) return odgovor.code(400).send({ ok: false, greska: 'Neispravna kategorija riječi.' });
+      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '50', 10) || 50, 1), MAKSIMALNO_RIJECI_PO_STRANICI);
+      const cursor = dekodirajCursor<CursorRijeci>(zahtjev.query.cursor);
+      if (zahtjev.query.cursor && !cursor?.rijec) return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor riječi.' });
+      return { ok: true, kategorija, ...(await dohvatiStranicuRijeci(igrac.id, kategorija, limit, cursor)) };
+    },
+  );
+
+  app.get<{ Params: { igracId: string }; Querystring: { kategorija?: string; limit?: string; cursor?: string } }>(
+    '/profil/javni/:igracId/rijeci',
+    async (zahtjev, odgovor) => {
+      const kategorija = dohvatiKategoriju(zahtjev.query.kategorija);
+      if (!kategorija) return odgovor.code(400).send({ ok: false, greska: 'Neispravna kategorija riječi.' });
+      const [igrac] = await baza.select({ id: igraci.id }).from(igraci).where(and(
+        eq(igraci.id, zahtjev.params.igracId),
+        sql`${igraci.vrsta} in ('registriran', 'admin')`,
+        isNull(igraci.obrisanAt),
+      )).limit(1);
+      if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
+      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '50', 10) || 50, 1), MAKSIMALNO_RIJECI_PO_STRANICI);
+      const cursor = dekodirajCursor<CursorRijeci>(zahtjev.query.cursor);
+      if (zahtjev.query.cursor && !cursor?.rijec) return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor riječi.' });
+      return { ok: true, kategorija, ...(await dohvatiStranicuRijeci(igrac.id, kategorija, limit, cursor)) };
+    },
+  );
+
   app.get('/dostignuca', { preHandler: zahtijevajPrijavu }, async (zahtjev) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
     return { ok: true, ...(await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno)) };
@@ -165,22 +349,28 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
 
   app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    const statistikaRijeci = await dohvatiStatistiku(igrac.id);
+    const statistikaRijeci = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
     const [dnkCetiri, dnkDva] = await Promise.all([
       dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
       dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
     ]);
-    const otkljucaneRijeci = await dohvatiOtkljucaneRijeci(igrac.id);
     const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
     const prosjek1v1 = prosjekBodova(igrac.bodovi1v1, igrac.odigrane1v1);
-    const stil = stilIgre(igrac.odigrane + igrac.odigrane1v1, igrac.eliminacijeUkupno + igrac.eliminacije1v1);
+    const stil = stilIgre(
+      igrac.odigrane + igrac.odigrane1v1,
+      igrac.eliminacijeUkupno + igrac.eliminacije1v1,
+    );
     const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
     return {
       ok: true,
       igracId: igrac.id,
       nadimak: igrac.nadimak,
+      vrsta: igrac.vrsta,
       avatarId: igrac.avatarId,
+      avatarConfig: igrac.vrsta === 'gost' ? null : igrac.avatarConfig,
+      avatarRevision: igrac.avatarRevision,
       email: igrac.email,
+      emailNaCekanju: igrac.emailNaCekanju,
       emailPotvrdjen: igrac.emailPotvrdjen,
       odigrane: igrac.odigrane,
       pobjede: igrac.pobjede,
@@ -195,8 +385,8 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
       prosjekBodova1v1: prosjek1v1,
       rang1v1: izracunajRang(igrac.odigrane1v1, prosjek1v1, 'dva_igraca'),
       dnk: {
-        cetiriIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkCetiri, 'cetiri_igraca'),
-        dvaIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkDva, 'dva_igraca'),
+        cetiriIgraca: izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca'),
+        dvaIgraca: izracunajDnkProfil(igrac, dnkDva, 'dva_igraca'),
       },
       prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
@@ -204,7 +394,6 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
       stvoren: igrac.stvoren,
       statistikaRijeci: javnaStatistika(statistikaRijeci),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
-      otkljucaneRijeci,
       dostignuca,
     };
   });
@@ -213,25 +402,31 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
     const [igrac] = await baza
       .select()
       .from(igraci)
-      .where(sql`${igraci.id} = ${zahtjev.params.igracId} and ${igraci.vrsta} in ('registriran', 'admin')`)
+      .where(
+        sql`${igraci.id} = ${zahtjev.params.igracId} and ${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null`,
+      )
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
 
-    const statistikaRijeci = await dohvatiStatistiku(igrac.id);
+    const statistikaRijeci = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
     const [dnkCetiri, dnkDva] = await Promise.all([
       dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
       dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
     ]);
-    const otkljucaneRijeci = await dohvatiOtkljucaneRijeci(igrac.id);
     const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
     const prosjek1v1 = prosjekBodova(igrac.bodovi1v1, igrac.odigrane1v1);
-    const stil = stilIgre(igrac.odigrane + igrac.odigrane1v1, igrac.eliminacijeUkupno + igrac.eliminacije1v1);
+    const stil = stilIgre(
+      igrac.odigrane + igrac.odigrane1v1,
+      igrac.eliminacijeUkupno + igrac.eliminacije1v1,
+    );
     const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
     return {
       ok: true,
       igracId: igrac.id,
       nadimak: igrac.nadimak,
       avatarId: igrac.avatarId,
+      avatarConfig: igrac.avatarConfig,
+      avatarRevision: igrac.avatarRevision,
       odigrane: igrac.odigrane,
       pobjede: igrac.pobjede,
       eliminacijeUkupno: igrac.eliminacijeUkupno,
@@ -245,26 +440,37 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
       prosjekBodova1v1: prosjek1v1,
       rang1v1: izracunajRang(igrac.odigrane1v1, prosjek1v1, 'dva_igraca'),
       dnk: {
-        cetiriIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkCetiri, 'cetiri_igraca'),
-        dvaIgraca: izracunajDnkProfil(igrac, statistikaRijeci, dnkDva, 'dva_igraca'),
+        cetiriIgraca: izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca'),
+        dvaIgraca: izracunajDnkProfil(igrac, dnkDva, 'dva_igraca'),
       },
       prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
       stilIgre: stil,
       statistikaRijeci: javnaStatistika(statistikaRijeci),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
-      otkljucaneRijeci,
       dostignuca,
     };
   });
 
   // Onboarding dopušta i gostima da odaberu avatar (jednokratno, prvi ulazak - dobrodoslica/+page.svelte)
   app.put('/profil/avatar', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
-    const rezultat = ShemaAvatar.safeParse(zahtjev.body);
-    if (!rezultat.success) {
-      return odgovor.code(400).send({ ok: false, greska: 'Neispravan avatarId.' });
-    }
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+    const tijelo = zahtjev.body as unknown;
+    if (typeof tijelo === 'object' && tijelo !== null && 'avatarConfig' in tijelo) {
+      if (igrac.vrsta === 'gost' || !validirajAvatarConfig((tijelo as { avatarConfig?: unknown }).avatarConfig)) {
+        return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
+      }
+      const konfiguracija = (tijelo as { avatarConfig: unknown }).avatarConfig;
+      const [azurirani] = await baza
+        .update(igraci)
+        .set({ avatarConfig: konfiguracija, avatarRevision: sql`${igraci.avatarRevision} + 1` })
+        .where(eq(igraci.id, igrac.id))
+        .returning({ avatarConfig: igraci.avatarConfig, avatarRevision: igraci.avatarRevision });
+      return { ok: true, avatarConfig: azurirani?.avatarConfig ?? konfiguracija, avatarRevision: azurirani?.avatarRevision ?? igrac.avatarRevision + 1 };
+    }
+
+    const rezultat = ShemaAvatar.safeParse(tijelo);
+    if (!rezultat.success) return odgovor.code(400).send({ ok: false, greska: 'Neispravan avatarId.' });
     await baza.update(igraci).set({ avatarId: rezultat.data.avatarId }).where(eq(igraci.id, igrac.id));
     return { ok: true, avatarId: rezultat.data.avatarId };
   });
@@ -272,10 +478,13 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
   app.put('/profil/nadimak', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
     const rezultat = ShemaNadimak.safeParse(zahtjev.body);
     if (!rezultat.success) {
-      return odgovor.code(400).send({ ok: false, greska: 'Ime mora imati 2-20 znakova.' });
+      return odgovor.code(400).send({ ok: false, greska: rezultat.error.issues[0]?.message ?? PORUKA_NEVALJANOG_NADIMKA });
     }
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    await baza.update(igraci).set({ nadimak: rezultat.data.nadimak }).where(eq(igraci.id, igrac.id));
+    await baza
+      .update(igraci)
+      .set({ nadimak: rezultat.data.nadimak })
+      .where(eq(igraci.id, igrac.id));
     return { ok: true, nadimak: rezultat.data.nadimak };
   });
 
@@ -288,16 +497,31 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
     if (!igrac.lozinkaHash || !(await argonVerify(igrac.lozinkaHash, rezultat.data.lozinka))) {
       return odgovor.code(401).send({ ok: false, greska: 'Pogre\u0161na lozinka.' });
     }
-    const [postojeci] = await baza.select().from(igraci).where(eq(igraci.email, rezultat.data.noviEmail)).limit(1);
+    const normaliziraniEmail = normalizirajEmail(rezultat.data.noviEmail);
+    const [postojeci] = await baza
+      .select()
+      .from(igraci)
+      .where(sql`lower(${igraci.email}) = ${normaliziraniEmail} or lower(${igraci.emailNaCekanju}) = ${normaliziraniEmail}`)
+      .limit(1);
     if (postojeci && postojeci.id !== igrac.id) {
-      return odgovor.code(409).send({ ok: false, greska: 'Ta email adresa je ve\u0107 registrirana.' });
+      return odgovor
+        .code(409)
+        .send({ ok: false, greska: 'Ta email adresa je ve\u0107 registrirana.' });
     }
+    const jePotvrden = igrac.emailPotvrdjen;
     await baza
       .update(igraci)
-      .set({ email: rezultat.data.noviEmail, emailPotvrdjen: false })
+      .set(jePotvrden
+        ? { emailNaCekanju: normaliziraniEmail, emailPotvrdaZatrazenAt: new Date(), emailPotvrdaPoslanaAt: null }
+        : { email: normaliziraniEmail, emailPotvrdaZatrazenAt: new Date(), emailPotvrdaPoslanaAt: null })
       .where(eq(igraci.id, igrac.id));
-    const tokenPotvrde = izdajTokenPotvrdeEmaila(igrac.id);
-    await posaljiEmail(app.log, rezultat.data.noviEmail, `Potvrdi novi email: /racuni/potvrdi-email?token=${tokenPotvrde}`);
+    const tokenPotvrde = izdajTokenPotvrdeEmaila(igrac.id, normaliziraniEmail);
+    const poveznica = new URL(
+      `/potvrda-emaila?token=${tokenPotvrde}`,
+      konfiguracija.JAVNA_ADRESA,
+    ).toString();
+    await pokusajPoslatiEmail(app.log, normaliziraniEmail, porukaPotvrdeEmaila(poveznica, true), `promjena-emaila:${igrac.id}`);
+    await baza.update(igraci).set({ emailPotvrdaPoslanaAt: new Date() }).where(eq(igraci.id, igrac.id));
     return { ok: true };
   });
 
@@ -307,7 +531,10 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
     }
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    if (!igrac.lozinkaHash || !(await argonVerify(igrac.lozinkaHash, rezultat.data.trenutnaLozinka))) {
+    if (
+      !igrac.lozinkaHash ||
+      !(await argonVerify(igrac.lozinkaHash, rezultat.data.trenutnaLozinka))
+    ) {
       return odgovor.code(401).send({ ok: false, greska: 'Pogre\u0161na trenutna lozinka.' });
     }
     const lozinkaHash = await argonHash(rezultat.data.novaLozinka);
@@ -315,92 +542,82 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
     return { ok: true };
   });
 
-  app.get<{ Querystring: { limit?: string; mod?: string } }>('/ljestvica', { preHandler: pokusajIdentifikaciju }, async (zahtjev) => {
-    const rezultatLimita = ShemaLimit.safeParse(zahtjev.query);
-    const limit = rezultatLimita.success ? (rezultatLimita.data.limit ?? 10) : 10;
-    const je1v1 = zahtjev.query.mod === 'dva_igraca' || zahtjev.query.mod === '1v1';
+  app.get<{ Querystring: { limit?: string; mod?: string } }>(
+    '/ljestvica',
+    { preHandler: pokusajIdentifikaciju },
+    async (zahtjev) => {
+      const rezultatLimita = ShemaLimit.safeParse(zahtjev.query);
+      const limit = rezultatLimita.success ? (rezultatLimita.data.limit ?? 10) : 10;
+      const je1v1 = zahtjev.query.mod === 'dva_igraca' || zahtjev.query.mod === '1v1';
 
-    const colOdigrane = je1v1 ? igraci.odigrane1v1 : igraci.odigrane;
-    const colBodovi = je1v1 ? igraci.bodovi1v1 : igraci.bodoviUkupno;
+      const colOdigrane = je1v1 ? igraci.odigrane1v1 : igraci.odigrane;
+      const colBodovi = je1v1 ? igraci.bodovi1v1 : igraci.bodoviUkupno;
 
-    const kandidati = await baza
-      .select()
-      .from(igraci)
-      .where(gte(colOdigrane, 10))
-      .orderBy(desc(sql`${colBodovi}::float / ${colOdigrane}`))
-      .limit(limit);
+      const kandidati = await baza
+        .select()
+        .from(igraci)
+        .where(and(gte(colOdigrane, 10), isNull(igraci.obrisanAt)))
+        .orderBy(desc(sql`${colBodovi}::float / ${colOdigrane}`))
+        .limit(limit);
 
-    const ljestvica = kandidati.map((igrac, indeks) => {
-      const odig = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
-      const bod = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
-      const pobj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
-      const prosjek = prosjekBodova(bod, odig);
+      const ljestvica = kandidati.map((igrac, indeks) => {
+        const odig = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
+        const bod = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
+        const pobj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
+        const prosjek = prosjekBodova(bod, odig);
 
-      return {
-        mjesto: indeks + 1,
-        igracId: igrac.id,
-        jeJavan: igrac.vrsta !== 'gost',
-        nadimak: igrac.nadimak,
-        rang: izracunajRang(odig, prosjek),
-        prosjekBodova: prosjek,
-        odigrane: odig,
-        postotakPobjeda: odig > 0 ? (pobj / odig) * 100 : 0,
-      };
-    });
-
-    let mojeMjesto: (typeof ljestvica)[number] | null = null;
-    const igrac = (zahtjev as ZahtjevSIgracem).igrac;
-    if (igrac) {
-      const odigMoj = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
-      const bodMoj = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
-      const pobjMoj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
-
-      if (odigMoj >= 10) {
-        const prosjekMoj = prosjekBodova(bodMoj, odigMoj);
-        const [redakBoljih] = await baza
-          .select({ boljihOdMene: sql<number>`count(*)::int` })
-          .from(igraci)
-          .where(sql`${colOdigrane} >= 10 and ${colBodovi}::float / ${colOdigrane} > ${prosjekMoj}`);
-        mojeMjesto = {
-          mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
+        return {
+          mjesto: indeks + 1,
           igracId: igrac.id,
           jeJavan: igrac.vrsta !== 'gost',
           nadimak: igrac.nadimak,
-          rang: izracunajRang(odigMoj, prosjekMoj),
-          prosjekBodova: prosjekMoj,
-          odigrane: odigMoj,
-          postotakPobjeda: (pobjMoj / odigMoj) * 100,
+          rang: izracunajRang(odig, prosjek, je1v1 ? 'dva_igraca' : 'cetiri_igraca'),
+          prosjekBodova: prosjek,
+          odigrane: odig,
+          postotakPobjeda: odig > 0 ? (pobj / odig) * 100 : 0,
         };
-      }
-    }
+      });
 
-    return { ok: true, ljestvica, mojeMjesto };
-  });
+      let mojeMjesto: (typeof ljestvica)[number] | null = null;
+      const igrac = (zahtjev as ZahtjevSIgracem).igrac;
+      if (igrac) {
+        const odigMoj = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
+        const bodMoj = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
+        const pobjMoj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
+
+        if (odigMoj >= 10) {
+          const prosjekMoj = prosjekBodova(bodMoj, odigMoj);
+          const [redakBoljih] = await baza
+            .select({ boljihOdMene: sql<number>`count(*)::int` })
+            .from(igraci)
+            .where(
+              sql`${colOdigrane} >= 10 and ${colBodovi}::float / ${colOdigrane} > ${prosjekMoj}`,
+            );
+          mojeMjesto = {
+            mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
+            igracId: igrac.id,
+            jeJavan: igrac.vrsta !== 'gost',
+            nadimak: igrac.nadimak,
+            rang: izracunajRang(odigMoj, prosjekMoj, je1v1 ? 'dva_igraca' : 'cetiri_igraca'),
+            prosjekBodova: prosjekMoj,
+            odigrane: odigMoj,
+            postotakPobjeda: (pobjMoj / odigMoj) * 100,
+          };
+        }
+      }
+
+      return { ok: true, ljestvica, mojeMjesto };
+    },
+  );
 
   app.get<{ Querystring: { limit?: string } }>('/rijeci/top', async (zahtjev) => {
     const rezultatLimita = ShemaLimit.safeParse(zahtjev.query);
     const limit = rezultatLimita.success ? (rezultatLimita.data.limit ?? 10) : 10;
-
-    const [redakUkupno] = await baza
-      .select({ ukupnoPartija: sql<number>`count(*)::int` })
-      .from(partije);
-    const ukupnoPartija = redakUkupno?.ukupnoPartija ?? 0;
-
-    const retci = await baza
-      .select({
-        rijec: potezi.rijec,
-        brojUpotreba: sql<number>`count(*)::int`,
-        brojPartija: sql<number>`count(distinct ${potezi.partijaId})::int`,
-      })
-      .from(potezi)
-      .where(sql`${potezi.vrsta} = 'rijec' and ${potezi.rijec} is not null`)
-      .groupBy(potezi.rijec)
-      .orderBy(desc(sql`count(*)`))
-      .limit(limit);
+    const { retci, ukupnoPartija } = await dohvatiTopRijeci();
 
     return {
       ok: true,
-      rijeci: retci.map((redak, indeks) => ({
+      rijeci: retci.slice(0, limit).map((redak, indeks) => ({
         mjesto: indeks + 1,
         rijec: redak.rijec,
         brojUpotreba: redak.brojUpotreba,
@@ -409,37 +626,79 @@ export async function registrirajProfilRute(app: FastifyInstance, rjecnik: Rjecn
     };
   });
 
-  app.get<{ Params: { igracId: string }; Querystring: { limit?: string; offset?: string } }>('/povijest/:igracId', async (zahtjev) => {
-    const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '10', 10) || 10, 1), 50);
-    const offset = Math.max(parseInt(zahtjev.query.offset ?? '0', 10) || 0, 0);
+  app.get<{ Params: { igracId: string }; Querystring: { limit?: string; cursor?: string } }>(
+    '/povijest/:igracId',
+    async (zahtjev, odgovor) => {
+      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '20', 10) || 20, 1), MAKSIMALNO_PARTIJA_PO_STRANICI);
+      const cursor = dekodirajCursor<CursorPovijestiPartija>(zahtjev.query.cursor);
+      if (zahtjev.query.cursor && (!cursor?.pocetak || !cursor.partijaId || Number.isNaN(Date.parse(cursor.pocetak)))) {
+        return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor povijesti.' });
+      }
 
-    const retci = await baza
-      .select({
-        partijaId: sudioniciPartije.partijaId,
-        plasman: sudioniciPartije.plasman,
-        bodovi: sudioniciPartije.bodovi,
-        eliminacije: sudioniciPartije.eliminacije,
-        nacinIspadanja: sudioniciPartije.nacinIspadanja,
-        pocetak: partije.pocetak,
-        kraj: partije.kraj,
-      })
-      .from(sudioniciPartije)
-      .innerJoin(partije, eq(partije.id, sudioniciPartije.partijaId))
-      .where(eq(sudioniciPartije.igracId, zahtjev.params.igracId))
-      .orderBy(desc(partije.pocetak))
-      .limit(limit)
-      .offset(offset);
+      const uvjetIgraca = eq(sudioniciPartije.igracId, zahtjev.params.igracId);
+      const uvjetCursora = cursor
+        ? sql`(${partije.pocetak} < ${new Date(cursor.pocetak)} OR (${partije.pocetak} = ${new Date(cursor.pocetak)} AND ${sudioniciPartije.partijaId} < ${cursor.partijaId}))`
+        : undefined;
 
-    return { ok: true, partije: retci };
-  });
+      const retci = await baza
+        .select({
+          partijaId: sudioniciPartije.partijaId,
+          plasman: sudioniciPartije.plasman,
+          bodovi: sudioniciPartije.bodovi,
+          eliminacije: sudioniciPartije.eliminacije,
+          nacinIspadanja: sudioniciPartije.nacinIspadanja,
+          pocetak: partije.pocetak,
+          kraj: partije.kraj,
+        })
+        .from(sudioniciPartije)
+        .innerJoin(partije, eq(partije.id, sudioniciPartije.partijaId))
+        .where(uvjetCursora ? and(uvjetIgraca, uvjetCursora) : uvjetIgraca)
+        .orderBy(desc(partije.pocetak), desc(sudioniciPartije.partijaId))
+        .limit(limit + 1);
 
-  app.get<{ Params: { partijaId: string } }>('/partije/:partijaId/potezi', async (zahtjev) => {
-    const retci = await baza
-      .select()
-      .from(potezi)
-      .where(eq(potezi.partijaId, zahtjev.params.partijaId))
-      .orderBy(potezi.redniBroj);
+      const imaJos = retci.length > limit;
+      const partijeZaOdgovor = imaJos ? retci.slice(0, limit) : retci;
+      const zadnja = partijeZaOdgovor.at(-1);
 
-    return { ok: true, potezi: retci };
-  });
+      return {
+        ok: true,
+        partije: partijeZaOdgovor,
+        imaJos,
+        sljedeciCursor: imaJos && zadnja ? kodirajCursor({ pocetak: new Date(zadnja.pocetak).toISOString(), partijaId: zadnja.partijaId }) : null,
+      };
+    },
+  );
+
+  app.get<{ Params: { partijaId: string }; Querystring: { limit?: string; cursor?: string } }>(
+    '/partije/:partijaId/potezi',
+    async (zahtjev, odgovor) => {
+      const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '100', 10) || 100, 1), MAKSIMALNO_POTEZA_PO_STRANICI);
+      const cursor = dekodirajCursor<{ redniBroj: number; id: number }>(zahtjev.query.cursor);
+      if (zahtjev.query.cursor && (!cursor || !Number.isInteger(cursor.redniBroj) || !Number.isSafeInteger(cursor.id))) {
+        return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor poteza.' });
+      }
+      const osnovniUvjet = eq(potezi.partijaId, zahtjev.params.partijaId);
+      const uvjetCursora = cursor
+        ? sql`(${potezi.redniBroj} > ${cursor.redniBroj} OR (${potezi.redniBroj} = ${cursor.redniBroj} AND ${potezi.id} > ${cursor.id}))`
+        : undefined;
+
+      const retci = await baza
+        .select()
+        .from(potezi)
+        .where(uvjetCursora ? and(osnovniUvjet, uvjetCursora) : osnovniUvjet)
+        .orderBy(asc(potezi.redniBroj), asc(potezi.id))
+        .limit(limit + 1);
+      const imaJos = retci.length > limit;
+      const poteziZaOdgovor = imaJos ? retci.slice(0, limit) : retci;
+      const zadnji = poteziZaOdgovor.at(-1);
+
+      return {
+        ok: true,
+        potezi: poteziZaOdgovor,
+        limit,
+        imaJos,
+        sljedeciCursor: imaJos && zadnji ? kodirajCursor({ redniBroj: zadnji.redniBroj, id: zadnji.id }) : null,
+      };
+    },
+  );
 }

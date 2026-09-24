@@ -5,7 +5,7 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import DostignuceKartica from '$lib/komponente/DostignuceKartica.svelte';
   import KaladontDnkGraf from '$lib/komponente/KaladontDnkGraf.svelte';
-  import { PRAGOVI_DULJINE, vratiVeciRang, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
+  import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
 
   interface StatistikaRijeci {
     najduziStreak: number;
@@ -23,6 +23,7 @@
   interface JavniProfil {
     nadimak: string;
     avatarId: number;
+    avatarConfig: AvatarConfigV1 | null;
     rang: string;
     odigrane: number;
     pobjede: number;
@@ -35,14 +36,24 @@
     bodovi1v1: number;
     prosjekBodova1v1: number;
     rang1v1: string;
-    dnk: { cetiriIgraca: DnkProfil; dvaIgraca: DnkProfil };
+    dnk: {
+      cetiriIgraca: DnkProfil & { metrike: DnkMetrike };
+      dvaIgraca: DnkProfil & { metrike: DnkMetrike };
+    };
     prosjecnaOcjenaIgre: number | null;
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
     stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen';
     statistikaRijeci: StatistikaRijeci | null;
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
-    otkljucaneRijeci: { duge: string[]; srednjeDuge: string[]; jakoDuge: string[]; rijetke: string[]; srednjeRijetke: string[]; jakoRijetke: string[] };
     dostignuca: { ukupnoZvjezdica: number; maksimalnoZvjezdica: number; ukupnoOtkljucanih: number; dostignuca: Dostignuce[] };
+  }
+
+  interface DnkMetrike {
+    eliminacijePoPartiji: number;
+    nizPrihvacenihRijeci: number;
+    prosjekPrihvacenogPotezaMs: number;
+    dugeRijeciPoPartiji: number;
+    rijetkeRijeciPoPartiji: number;
   }
 
   interface Dostignuce {
@@ -54,6 +65,8 @@
   let profil = $state<JavniProfil | null>(null);
   let greska = $state<string | null>(null);
   let otvoreniPopup = $state<'duge' | 'rijetke' | null>(null);
+  let rijeciPoKategoriji = $state<Record<string, string[]>>({});
+  let ucitavanjeRijeci = $state(false);
   let aktivniTab = $state<'4p' | '1v1'>('4p');
   let aktivniPogled = $state<'statistika' | 'dostignuca' | 'rijeci' | 'povijest'>('statistika');
   let partije = $state<Partija[]>([]);
@@ -68,7 +81,7 @@
     void (async () => {
       try {
         profil = await api<JavniProfil>(`/profil/javni/${$page.params.igracId}`);
-        const povijest = await api<{ partije: Partija[] }>(`/povijest/${$page.params.igracId}?limit=10&offset=0`);
+        const povijest = await api<{ partije: Partija[] }>(`/povijest/${$page.params.igracId}?limit=10`);
         partije = povijest.partije;
       } catch (e) {
         greska = e instanceof Error ? e.message : 'Profil nije moguće učitati.';
@@ -76,14 +89,37 @@
     })();
     return () => window.removeEventListener('resize', prilagodiAvatar);
   });
+
+  function listaRijeci(kategorija: string): string[] {
+    return rijeciPoKategoriji[kategorija] ?? [];
+  }
+
+  async function otvoriPopup(vrsta: 'duge' | 'rijetke'): Promise<void> {
+    otvoreniPopup = vrsta;
+    if (ucitavanjeRijeci || Object.keys(rijeciPoKategoriji).length > 0) return;
+    ucitavanjeRijeci = true;
+    const kategorije = vrsta === 'duge'
+      ? ['jakoDuge', 'srednjeDuge', 'duge']
+      : ['jakoRijetke', 'srednjeRijetke', 'rijetke'];
+    try {
+      const rezultati = await Promise.all(kategorije.map((kategorija) => api<{ rijeci: string[] }>(`/profil/javni/${$page.params.igracId}/rijeci?kategorija=${kategorija}&limit=50`)));
+      rijeciPoKategoriji = Object.fromEntries(kategorije.map((kategorija, indeks) => [kategorija, rezultati[indeks]!.rijeci]));
+    } finally {
+      ucitavanjeRijeci = false;
+    }
+  }
 </script>
+
+<svelte:head>
+  <title>Javni profil | Kaladont</title>
+</svelte:head>
 
 <main class="javni-profil">
   {#if greska}
     <p role="alert">{greska}</p>
   {:else if profil}
     <header class="zaglavlje-profila">
-      <Avatar avatarId={profil.avatarId} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={velicinaAvatara} />
+      <Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={velicinaAvatara} />
       <div>
         <h1>{profil.nadimak}</h1>
         <p class="rang-oznaka">{vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'} · {profil.odigrane + profil.odigrane1v1} odigranih igara</p>
@@ -97,7 +133,6 @@
             {/each}
           </span></p>
         {/if}
-        {#if profil.statistikaRijeci}<p class="streak-sažetak">Najduži niz bez pogreške riječi: <strong>{profil.statistikaRijeci.najduziStreak}</strong></p>{/if}
       </div>
     </header>
 
@@ -115,14 +150,25 @@
     </div>
     <section class="statistika-sekcija">
       <h2>Rezultati ({aktivniTab === '4p' ? '4 igrača' : '2 igrača'})</h2>
-      <KaladontDnkGraf profil={aktivniTab === '4p' ? profil.dnk.cetiriIgraca : profil.dnk.dvaIgraca} />
       <div class="mrezica-kartica">
         <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.odigrane : profil.odigrane1v1}</strong><span>Odigrane igre</span></div>
         <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.pobjede : profil.pobjede1v1}</strong><span>Pobjede</span></div>
-        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.bodoviUkupno : profil.bodovi1v1}</strong><span>Ukupno bodova</span></div>
         <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.prosjekBodova : profil.prosjekBodova1v1).toFixed(2)}</strong><span>Prosjek bodova</span></div>
-        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.eliminacijeUkupno : profil.eliminacije1v1}</strong><span>Eliminacije</span></div>
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).eliminacijePoPartiji.toFixed(2)}</strong><span>Eliminacije po partiji</span></div>
       </div>
+      <KaladontDnkGraf
+        profil={aktivniTab === '4p' ? profil.dnk.cetiriIgraca : profil.dnk.dvaIgraca}
+        naslov={aktivniTab === '4p' ? 'Kaladont DNK 4 igrača' : 'Kaladont DNK 2 igrača'}
+      />
+      <section class="ostalo-kartica">
+        <h3>Ostalo</h3>
+        <div class="mrezica-kartica">
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).nizPrihvacenihRijeci}</strong><span>Niz prihvaćenih riječi</span></div>
+        <div class="stat-kartica"><strong>{((aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).prosjekPrihvacenogPotezaMs / 1000).toFixed(1)} s</strong><span>Prosjek prihvaćenog poteza</span></div>
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).dugeRijeciPoPartiji.toFixed(2)}</strong><span>Duge riječi po partiji</span></div>
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).rijetkeRijeciPoPartiji.toFixed(2)}</strong><span>Rijetke riječi po partiji</span></div>
+        </div>
+      </section>
     </section>
     {:else if aktivniPogled === 'dostignuca'}
     <section class="statistika-sekcija">
@@ -136,8 +182,8 @@
       <section class="statistika-sekcija">
         <h2>Riječi i streak</h2>
         <div class="mrezica-kartica achievement-mrezica">
-            <div class="achievement-polje"><h3>Duge riječi</h3><strong class="napredak-broj">{Math.min(statistika.upisaneDugeRijeci + statistika.upisaneSrednjeDugeRijeci + statistika.upisaneJakoDugeRijeci, profil.ciljeviRijeci.duge.ukupno)} / {profil.ciljeviRijeci.duge.ukupno}</strong><div class="tier-retci"><span>Duge (10–11 slova): <strong>{statistika.upisaneDugeRijeci}</strong></span><span>Srednje duge (12–14 slova): <strong>{statistika.upisaneSrednjeDugeRijeci}</strong></span><span>Jako duge (15+ slova): <strong>{statistika.upisaneJakoDugeRijeci}</strong></span></div><strong class="rekord-rijeci">Najduža riječ: {statistika.najduzaRijec ?? '—'}</strong><button class="otkljucane-link" type="button" onclick={() => (otvoreniPopup = 'duge')}>Vidi otkrivene riječi →</button></div>
-            <div class="achievement-polje"><h3>Rijetke riječi</h3><strong class="napredak-broj">{Math.min(statistika.otkriveneJakoRijetkeGrupe + statistika.otkriveneSrednjeRijetkeGrupe + statistika.otkriveneRijetkeGrupe, profil.ciljeviRijeci.rijetke.ukupno)} / {profil.ciljeviRijeci.rijetke.ukupno}</strong><div class="tier-retci"><span>Rijetke: <strong>{statistika.otkriveneRijetkeGrupe}</strong></span><span>Srednje rijetke: <strong>{statistika.otkriveneSrednjeRijetkeGrupe}</strong></span><span>Jako rijetke: <strong>{statistika.otkriveneJakoRijetkeGrupe}</strong></span></div><strong class="rekord-rijeci">Najrjeđa riječ: {statistika.najrjedaRijec ?? '—'}</strong><button class="otkljucane-link" type="button" onclick={() => (otvoreniPopup = 'rijetke')}>Vidi otkrivene riječi →</button></div>
+            <div class="achievement-polje"><h3>Duge riječi</h3><strong class="napredak-broj">{Math.min(statistika.upisaneDugeRijeci + statistika.upisaneSrednjeDugeRijeci + statistika.upisaneJakoDugeRijeci, profil.ciljeviRijeci.duge.ukupno)} / {profil.ciljeviRijeci.duge.ukupno}</strong><div class="tier-retci"><span>Duge (10–11 slova): <strong>{statistika.upisaneDugeRijeci}</strong></span><span>Srednje duge (12–14 slova): <strong>{statistika.upisaneSrednjeDugeRijeci}</strong></span><span>Jako duge (15+ slova): <strong>{statistika.upisaneJakoDugeRijeci}</strong></span></div><strong class="rekord-rijeci">Najduža riječ: {statistika.najduzaRijec ?? '—'}</strong><button class="otkljucane-link" type="button" onclick={() => void otvoriPopup('duge')}>Vidi otkrivene riječi →</button></div>
+            <div class="achievement-polje"><h3>Rijetke riječi</h3><strong class="napredak-broj">{Math.min(statistika.otkriveneJakoRijetkeGrupe + statistika.otkriveneSrednjeRijetkeGrupe + statistika.otkriveneRijetkeGrupe, profil.ciljeviRijeci.rijetke.ukupno)} / {profil.ciljeviRijeci.rijetke.ukupno}</strong><div class="tier-retci"><span>Rijetke: <strong>{statistika.otkriveneRijetkeGrupe}</strong></span><span>Srednje rijetke: <strong>{statistika.otkriveneSrednjeRijetkeGrupe}</strong></span><span>Jako rijetke: <strong>{statistika.otkriveneJakoRijetkeGrupe}</strong></span></div><strong class="rekord-rijeci">Najrjeđa riječ: {statistika.najrjedaRijec ?? '—'}</strong><button class="otkljucane-link" type="button" onclick={() => void otvoriPopup('rijetke')}>Vidi otkrivene riječi →</button></div>
         </div>
       </section>
     {/if}
@@ -153,14 +199,14 @@
           <button class="popup-zatvori" type="button" onclick={() => (otvoreniPopup = null)} aria-label="Zatvori">×</button>
           {#if otvoreniPopup === 'duge'}
             <h2>Duge riječi</h2>
-            <details open><summary>Jako duge riječi ({profil?.otkljucaneRijeci.jakoDuge.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.jakoDuge.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
-            <details open><summary>Srednje duge riječi ({profil?.otkljucaneRijeci.srednjeDuge.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.srednjeDuge.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
-            <details open><summary>Duge riječi ({profil?.otkljucaneRijeci.duge.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.duge.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
+            <details open><summary>Jako duge riječi ({listaRijeci('jakoDuge').length})</summary><p class="popis-rijeci">{listaRijeci('jakoDuge').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
+            <details open><summary>Srednje duge riječi ({listaRijeci('srednjeDuge').length})</summary><p class="popis-rijeci">{listaRijeci('srednjeDuge').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
+            <details open><summary>Duge riječi ({listaRijeci('duge').length})</summary><p class="popis-rijeci">{listaRijeci('duge').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
           {:else}
             <h2>Rijetke riječi</h2>
-            <details open><summary>Jako rijetke riječi ({profil?.otkljucaneRijeci.jakoRijetke.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.jakoRijetke.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
-            <details open><summary>Srednje rijetke riječi ({profil?.otkljucaneRijeci.srednjeRijetke.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.srednjeRijetke.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
-            <details open><summary>Rijetke riječi ({profil?.otkljucaneRijeci.rijetke.length})</summary><p class="popis-rijeci">{profil?.otkljucaneRijeci.rijetke.join(', ') || 'Još nema otkrivenih riječi.'}</p></details>
+            <details open><summary>Jako rijetke riječi ({listaRijeci('jakoRijetke').length})</summary><p class="popis-rijeci">{listaRijeci('jakoRijetke').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
+            <details open><summary>Srednje rijetke riječi ({listaRijeci('srednjeRijetke').length})</summary><p class="popis-rijeci">{listaRijeci('srednjeRijetke').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
+            <details open><summary>Rijetke riječi ({listaRijeci('rijetke').length})</summary><p class="popis-rijeci">{listaRijeci('rijetke').join(', ') || (ucitavanjeRijeci ? 'Učitavanje...' : 'Još nema otkrivenih riječi.')}</p></details>
           {/if}
         </div>
       </div>
@@ -178,11 +224,12 @@
     padding: 24px 0;
   }
   .achievement-mrezica { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .statistika-sekcija > .mrezica-kartica { margin-bottom: 24px; }
+  .ostalo-kartica { margin-top: 24px; padding: 20px; border: 1px solid #e5ddc8; border-radius: 8px; background: #fff; box-shadow: var(--sjena-suptilna); }
+  .ostalo-kartica h3 { margin: 0 0 14px; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: var(--naslov-3); }
   .pogled-tabovi { display: flex; gap: 8px; overflow-x: auto; }
   .pogled-tabovi button { flex: 0 0 auto; padding: 9px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
   .pogled-tabovi button.aktivan { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
-  .streak-sažetak { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.82rem; }
-  .streak-sažetak strong { color: var(--boja-mint); }
   .stil-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.95rem; }
   .stil-igre strong { color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.1rem; text-transform: capitalize; }
   .ocjena-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
@@ -209,6 +256,10 @@
   .mod-tabovi { display: flex; gap: 10px; margin: 0 0 14px; }
   .mod-tabovi button { padding: 8px 18px; border: 2px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 600; cursor: pointer; }
   .mod-tabovi button.aktivan { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
+  .ostalo-kartica { margin-top: 24px; padding: 20px; border: 1px solid #e5ddc8; border-radius: 8px; background: #fff; box-shadow: var(--sjena-suptilna); }
+  .ostalo-kartica h3 { margin: 0 0 14px; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: var(--naslov-3); }
+  .ostalo-kartica .stat-kartica { padding: 4px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .ostalo-kartica .stat-kartica strong { font-size: 1.15rem; }
   .iskustvo strong { color: var(--boja-mint); font-size: 1.35rem; }
   .achievement-polje {
     display: flex;

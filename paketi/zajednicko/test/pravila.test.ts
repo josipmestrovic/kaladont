@@ -28,6 +28,7 @@ describe('validirajPotez', () => {
       rjecnik,
     });
     expect(rezultat.kod).toBe('RIJEC_NE_POSTOJI');
+    expect(rezultat.poruka).toBe('nepostojecarijec ne postoji u našoj bazi.');
   });
 
   it('odbija rijec koja ne pocinje na trazena slova', () => {

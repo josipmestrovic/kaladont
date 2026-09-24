@@ -8,14 +8,19 @@ import { izracunajRang, stanjeIskustva } from 'zajednicko';
 import type { KaladontIo } from '../server.js';
 import { RedCekanja, prvaCetvorica, prviPar, type StavkaReda } from './red-cekanja.js';
 import { dohvatiProsjekCekanjaSek } from './prosjek-cekanja.js';
+import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 
 const SOBA_REDA_4P = 'red-cekanja-4p';
 const SOBA_REDA_1V1 = 'red-cekanja-1v1';
 
 export function registrirajRedCekanja(
   io: KaladontIo,
-  naStolSastavljen: (stol: StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca') => void,
+  naStolSastavljen: (stol: StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca') => Promise<void> | void,
   igracImaAktivnuPartiju: (igracId: string) => boolean,
+  igracImaPrivatnuSobu: (igracId: string) => boolean,
+  mozeStvoritiPartiju: () => boolean,
+  igracMozeIgrati: (socket: import('../server.js').KaladontSocket) => boolean,
+  provjeriDogadaj: ProvjeriOgranicenjeDogadaja,
 ): { ukloniIzReda: (igracId: string) => void } {
   const red4p = new RedCekanja(prvaCetvorica);
   const red1v1 = new RedCekanja(prviPar);
@@ -38,6 +43,8 @@ export function registrirajRedCekanja(
         igracId: stavka.igracId,
         nadimak: stavka.nadimak,
         avatarId: stavka.avatarId,
+        avatarConfig: stavka.avatarConfig,
+        avatarRevision: stavka.avatarRevision,
         rang: rang === 'Piskaralo' ? null : rang,
         razina: stanjeIskustva(stavka.iskustvoUkupno ?? 0).razina,
         odigrane,
@@ -65,25 +72,48 @@ export function registrirajRedCekanja(
 
   io.on('connection', (socket) => {
     socket.on('red:stanje', (payload) => {
+      if (!provjeriDogadaj(socket.data.igracId, 'red:stanje')) return;
       const mod: 'cetiri_igraca' | 'dva_igraca' =
         payload?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
       socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
     });
 
-    socket.on('red:udji', (payload) => {
+    socket.on('red:udji', (payload, potvrda) => {
+      if (!provjeriDogadaj(socket.data.igracId, 'red:udji')) {
+        potvrda?.(null);
+        return;
+      }
+      if (!igracMozeIgrati(socket)) {
+        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
+        potvrda?.(null);
+        return;
+      }
       const mod: 'cetiri_igraca' | 'dva_igraca' =
         payload?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
       const sobaZaUlaz = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
       const suprotnaSoba = mod === 'dva_igraca' ? SOBA_REDA_4P : SOBA_REDA_1V1;
       const red = mod === 'dva_igraca' ? red1v1 : red4p;
 
-      if (igracImaAktivnuPartiju(socket.data.igracId)) return;
+      if (igracImaAktivnuPartiju(socket.data.igracId)) {
+        potvrda?.(null);
+        return;
+      }
+
+      if (igracImaPrivatnuSobu(socket.data.igracId)) {
+        potvrda?.(null);
+        return;
+      }
+
+      if (!mozeStvoritiPartiju()) {
+        potvrda?.(null);
+        return;
+      }
 
       socket.leave(suprotnaSoba);
       socket.join(sobaZaUlaz);
 
       if (red.stanje().some((s) => s.igracId === socket.data.igracId)) {
-        socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
+        potvrda?.(izracunajStanje(socket.data.igracId, mod));
         return;
       }
 
@@ -94,6 +124,8 @@ export function registrirajRedCekanja(
         vrsta: socket.data.vrsta,
         nadimak: socket.data.nadimak,
         avatarId: socket.data.avatarId,
+        avatarConfig: socket.data.avatarConfig,
+        avatarRevision: socket.data.avatarRevision,
         odigrane: socket.data.odigrane ?? 0,
         pobjede: socket.data.pobjede ?? 0,
         bodoviUkupno: socket.data.bodoviUkupno ?? 0,
@@ -103,16 +135,23 @@ export function registrirajRedCekanja(
         iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
         usaoU: Date.now(),
       });
+      potvrda?.(izracunajStanje(socket.data.igracId, mod));
       posaljiStanje(mod);
 
       const stol = red.pokusajSastaviStol();
       if (stol) {
-        naStolSastavljen(stol, mod);
-        posaljiStanje(mod);
+        void Promise.resolve(naStolSastavljen(stol, mod))
+          .then(() => posaljiStanje(mod))
+          .catch((greska) => {
+            console.error('Neuspjelo pokretanje partije:', greska);
+            for (const stavka of stol) red.udji(stavka);
+            posaljiStanje(mod);
+          });
       }
     });
 
     socket.on('red:izadji', () => {
+      if (!provjeriDogadaj(socket.data.igracId, 'red:izadji')) return;
       ukloniIzSvihRedova(socket.data.igracId);
       socket.leave(SOBA_REDA_4P);
       socket.leave(SOBA_REDA_1V1);
@@ -130,6 +169,12 @@ export function registrirajRedCekanja(
   return {
     ukloniIzReda: (igracId: string) => {
       ukloniIzSvihRedova(igracId);
+      for (const socket of io.sockets.sockets.values()) {
+        if (socket.data.igracId === igracId) {
+          socket.leave(SOBA_REDA_4P);
+          socket.leave(SOBA_REDA_1V1);
+        }
+      }
       posaljiStanje('cetiri_igraca');
       posaljiStanje('dva_igraca');
     },

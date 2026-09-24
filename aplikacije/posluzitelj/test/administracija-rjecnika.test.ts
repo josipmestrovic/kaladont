@@ -26,7 +26,7 @@ beforeAll(async () => {
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
   adresa = `http://127.0.0.1:${port}`;
 
-  const registracijaAdmin = await fetch(`${adresa}/racuni/registracija`, {
+  const registracijaAdmin = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL_ADMIN, lozinka: LOZINKA }),
@@ -39,7 +39,7 @@ beforeAll(async () => {
   // rucna promocija u admina - jedini nacin u ovoj fazi (nema self-service)
   await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, adminId));
 
-  const registracijaObican = await fetch(`${adresa}/racuni/registracija`, {
+  const registracijaObican = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL_OBICAN, lozinka: LOZINKA }),
@@ -60,7 +60,7 @@ afterAll(async () => {
 
 describe('POST /admin/rjecnik/dodaj', () => {
   it('odbija neprijavljeni zahtjev', async () => {
-    const odgovor = await fetch(`${adresa}/admin/rjecnik/dodaj`, {
+    const odgovor = await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'test' }),
@@ -69,7 +69,7 @@ describe('POST /admin/rjecnik/dodaj', () => {
   });
 
   it('odbija prijavljenog korisnika koji nije admin', async () => {
-    const odgovor = await fetch(`${adresa}/admin/rjecnik/dodaj`, {
+    const odgovor = await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${obicanToken}` },
       body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'test' }),
@@ -78,7 +78,7 @@ describe('POST /admin/rjecnik/dodaj', () => {
   });
 
   it('admin dodaje riječ i odmah je vidljiva u rječniku bez restarta (live reload)', async () => {
-    const odgovor = await fetch(`${adresa}/admin/rjecnik/dodaj`, {
+    const odgovor = await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'ručni test', vrsta: 'imenica' }),
@@ -98,7 +98,7 @@ describe('POST /admin/rjecnik/dodaj', () => {
   });
 
   it('odbija dodavanje bez vrste riječi (ADR-013)', async () => {
-    const odgovor = await fetch(`${adresa}/admin/rjecnik/dodaj`, {
+    const odgovor = await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'bez vrste' }),
@@ -108,13 +108,13 @@ describe('POST /admin/rjecnik/dodaj', () => {
 
   // 3 admin operacije = 3 puna reloada rjecnika od ~1,2 M redaka - treba vise od zadanih 15 s
   it('admin deaktivira pa vraća riječ', { timeout: 90_000 }, async () => {
-    await fetch(`${adresa}/admin/rjecnik/dodaj`, {
+    await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'priprema testa', vrsta: 'imenica' }),
     });
 
-    const deaktivacija = await fetch(`${adresa}/admin/rjecnik/deaktiviraj`, {
+    const deaktivacija = await fetch(`${adresa}/api/admin/rjecnik/deaktiviraj`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'test deaktivacije' }),
@@ -123,7 +123,7 @@ describe('POST /admin/rjecnik/dodaj', () => {
     const [poslijeDeaktivacije] = await baza.select().from(rijeci).where(eq(rijeci.rijec, TESTNA_RIJEC));
     expect(poslijeDeaktivacije?.aktivna).toBe(false);
 
-    const vracanje = await fetch(`${adresa}/admin/rjecnik/vrati`, {
+    const vracanje = await fetch(`${adresa}/api/admin/rjecnik/vrati`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'test vracanja' }),
@@ -142,6 +142,10 @@ describe('GET /zdravlje', () => {
       baza: string;
       brojRijeci: number;
       aktivnePartije: number;
+      aktivneVeze: number;
+      rssBajtovi: number;
+      heapUsedBajtovi: number;
+      heapTotalBajtovi: number;
       uptimeSekunde: number;
       verzija: string;
       digest: string;
@@ -156,13 +160,17 @@ describe('GET /zdravlje', () => {
       digest: 'lokalno',
     });
     expect(tijelo.brojRijeci).toBeGreaterThan(0);
+    expect(tijelo.aktivneVeze).toBeGreaterThanOrEqual(0);
+    expect(tijelo.rssBajtovi).toBeGreaterThan(0);
+    expect(tijelo.heapUsedBajtovi).toBeGreaterThan(0);
+    expect(tijelo.heapTotalBajtovi).toBeGreaterThanOrEqual(tijelo.heapUsedBajtovi);
     expect(tijelo.uptimeSekunde).toBeGreaterThanOrEqual(0);
   });
 });
 
 describe('GET /rjecnik/statistika', () => {
   it('javno vraća broj oblika po kategoriji sortirano silazno', async () => {
-    const odgovor = await fetch(`${adresa}/rjecnik/statistika`);
+    const odgovor = await fetch(`${adresa}/api/rjecnik/statistika`);
     expect(odgovor.status).toBe(200);
     const tijelo = (await odgovor.json()) as {
       ukupno: number;

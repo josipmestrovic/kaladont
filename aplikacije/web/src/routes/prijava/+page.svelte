@@ -3,6 +3,7 @@
   import { api } from '$lib/api.js';
   import { spremiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
+  import UnosLozinke from '$lib/komponente/UnosLozinke.svelte';
 
   let email = $state('');
   let lozinka = $state('');
@@ -15,13 +16,14 @@
     slanjeUTijeku = true;
     poruka = null;
     try {
-      const odgovor = await api<{ sesijskiToken: string }>('/racuni/prijava', {
+      const odgovor = await api<{ sesijskiToken: string; emailPotvrdjen: boolean }>('/racuni/prijava', {
         method: 'POST',
         body: JSON.stringify({ email, lozinka }),
       });
       spremiSesijskiToken(odgovor.sesijskiToken);
-        await osvjeziSocketIdentitet();
-      void goto('/red');
+      await osvjeziSocketIdentitet();
+      window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
+      void goto(odgovor.emailPotvrdjen ? '/' : '/potvrdi-email');
     } catch (greska) {
       poruka = greska instanceof Error ? greska.message : 'Prijava nije uspjela.';
     } finally {
@@ -29,6 +31,10 @@
     }
   }
 </script>
+
+<svelte:head>
+  <title>Prijava | Kaladont</title>
+</svelte:head>
 
 <main class="prijava">
   <h1>Prijava</h1>
@@ -39,10 +45,7 @@
       <input type="email" bind:value={email} required placeholder="tvoj@email.com" />
     </label>
 
-    <label class="labela">
-      Lozinka
-      <input type="password" bind:value={lozinka} required placeholder="Lozinka" />
-    </label>
+    <UnosLozinke bind:vrijednost={lozinka} />
 
     <button type="submit" disabled={!email || !lozinka || slanjeUTijeku}>
       {slanjeUTijeku ? 'Prijava...' : 'Prijavi se'}
@@ -56,6 +59,7 @@
   <p class="registracija-link">
     Nemaš račun? <a href="/registracija">Registriraj se</a>
   </p>
+  <p class="registracija-link"><a href="/zaboravljena-lozinka">Zaboravio/la si lozinku?</a></p>
 </main>
 
 <style>

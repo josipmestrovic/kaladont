@@ -1,46 +1,54 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
-  import { dohvatiGostToken, spremiSesijskiToken } from '$lib/identitet.js';
+  import { spremiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
-  import { AVATARI } from '$lib/avatari.js';
-  import Avatar from '$lib/komponente/Avatar.svelte';
+  import AvatarEditor from '$lib/komponente/AvatarEditor.svelte';
+  import UnosLozinke from '$lib/komponente/UnosLozinke.svelte';
+  import { jeValjanNadimak, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA, ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
 
-  let korak = $state<1 | 2>(1);
+  let korak = $state<1 | 2 | 3>(1);
   let nadimak = $state('');
   let email = $state('');
   let lozinka = $state('');
-  let odabraniAvatar = $state<number | null>(null);
+  let avatarConfig = $state<AvatarConfigV1>(ZADANI_AVATAR_CONFIG);
   let slanjeUTijeku = $state(false);
   let poruka = $state<string | null>(null);
 
   function daljeKorak(e: SubmitEvent) {
     e.preventDefault();
-    if (nadimak.trim().length >= 2) {
+    if (jeValjanNadimak(nadimak)) {
       poruka = null;
       korak = 2;
     }
   }
 
-  async function dovrsiregistraciju(e: SubmitEvent) {
+  function idiNaAvatar(e: SubmitEvent) {
     e.preventDefault();
-    if (odabraniAvatar === null || slanjeUTijeku) return;
+    if (email && lozinka.length >= 8) {
+      poruka = null;
+      korak = 3;
+    }
+  }
+
+  async function dovrsiregistraciju(novaKonfiguracija: AvatarConfigV1): Promise<void> {
+    if (slanjeUTijeku) return;
     slanjeUTijeku = true;
     poruka = null;
     try {
       const odgovor = await api<{ sesijskiToken: string }>('/racuni/registracija', {
         method: 'POST',
         body: JSON.stringify({
-          gostToken: dohvatiGostToken(),
           email,
           lozinka,
           nadimak: nadimak.trim(),
-          avatarId: odabraniAvatar,
+          avatarConfig: novaKonfiguracija,
         }),
       });
       spremiSesijskiToken(odgovor.sesijskiToken);
       await osvjeziSocketIdentitet();
-      void goto('/');
+      window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
+      void goto('/potvrdi-email');
     } catch (greska) {
       poruka = greska instanceof Error ? greska.message : 'Registracija nije uspjela.';
     } finally {
@@ -48,6 +56,10 @@
     }
   }
 </script>
+
+<svelte:head>
+  <title>Registracija | Kaladont</title>
+</svelte:head>
 
 <main class="registracija">
   <h1>Registriraj se u Kaladontu</h1>
@@ -69,52 +81,45 @@
       <input
         type="text"
         bind:value={nadimak}
-        maxlength={20}
+        minlength={MINIMALNA_DULJINA_NADIMKA}
+        maxlength={MAKSIMALNA_DULJINA_NADIMKA}
+        pattern={UZORAK_NADIMKA.source}
+        title={PORUKA_NEVALJANOG_NADIMKA}
         placeholder="Tvoj nadimak"
         aria-label="Tvoj nadimak"
         required
       />
-      <button type="submit" disabled={nadimak.trim().length < 2}>
+      <button type="submit" disabled={!jeValjanNadimak(nadimak)}>
         Dalje
       </button>
     </form>
-  {:else}
+  {:else if korak === 2}
     <p class="napomena">
       Na tvoju email adresu nećemo slati nikakve obavijesti, isključivo je koristimo kako bi ti omogućili pristup računu ako zaboraviš lozinku.
     </p>
 
-    <form onsubmit={dovrsiregistraciju}>
+    <form onsubmit={idiNaAvatar}>
       <label class="labela">
         Email
         <input type="email" bind:value={email} required placeholder="tvoj@email.com" />
       </label>
 
-      <label class="labela">
-        Lozinka (min. 8 znakova)
-        <input type="password" bind:value={lozinka} minlength={8} required placeholder="Lozinka" />
-      </label>
+      <UnosLozinke bind:vrijednost={lozinka} oznaka="Lozinka (min. 8 znakova)" najmanjaDuljina={8} />
 
-      <div class="avatar-sekcija">
-        <h2>Izaberi svoj avatar</h2>
-        <div class="avatar-grid">
-          {#each AVATARI as avatar (avatar.id)}
-            <button
-              type="button"
-              class="avatar-opcija"
-              class:odabran={odabraniAvatar === avatar.id}
-              aria-label={`Odaberi ${avatar.naziv}`}
-              onclick={() => (odabraniAvatar = avatar.id)}
-            >
-              <Avatar avatarId={avatar.id} velicina={72} />
-            </button>
-          {/each}
-        </div>
-      </div>
-
-      <button type="submit" class="glavni-gumb" disabled={!email || lozinka.length < 8 || odabraniAvatar === null || slanjeUTijeku}>
-        {slanjeUTijeku ? 'Spremanje...' : 'Registriraj se'}
-      </button>
+      <button type="submit" class="glavni-gumb" disabled={!email || lozinka.length < 8 || slanjeUTijeku}>Dalje</button>
     </form>
+  {:else}
+    <AvatarEditor
+      naslov="Stvori avatar"
+      pocetnaKonfiguracija={avatarConfig}
+      tekstSpremanja="Registriraj se"
+      spremanje={slanjeUTijeku}
+      spremiBezPromjene
+      onSpremi={async (konfiguracija) => {
+        avatarConfig = konfiguracija;
+        await dovrsiregistraciju(konfiguracija);
+      }}
+    />
   {/if}
 
   {#if poruka}
@@ -138,11 +143,6 @@
     font-family: var(--font-naslov);
     line-height: 1.15;
     margin: 0;
-  }
-
-  h2 {
-    font-size: var(--naslov-3);
-    margin: 8px 0 12px;
   }
 
   .uvod {
@@ -202,29 +202,6 @@
   button:disabled {
     opacity: 0.5;
     cursor: default;
-  }
-
-  .avatar-sekcija {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-  }
-
-  .avatar-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .avatar-opcija {
-    background: none;
-    border: 3px solid transparent;
-    border-radius: 50%;
-    padding: 2px;
-  }
-
-  .avatar-opcija.odabran {
-    border-color: var(--boja-pozadina-primarna);
   }
 
   .greska {

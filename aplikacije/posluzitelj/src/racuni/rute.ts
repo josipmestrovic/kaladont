@@ -4,30 +4,56 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { baza } from '../baza/klijent.js';
 import { igraci } from '../baza/shema.js';
-import { posaljiEmail } from '../email.js';
+import { porukaPotvrdeEmaila, porukaResetaLozinke, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
+import { dohvatiSesijuZahtjeva, zahtijevajPrijavu } from './autentikacija.js';
+import { izdajSesiju, opozoviSesiju, stvoriGostSesiju } from './sesije.js';
+import { MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA, validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
 import {
-  izdajSesijskiToken,
   izdajTokenPotvrdeEmaila,
+  emailHashPotvrde,
   izdajTokenResetaLozinke,
   provjeriTokenPotvrdeEmaila,
   provjeriTokenResetaLozinke,
 } from './tokeni.js';
 
+export interface OpcijeAuthRateLimita {
+  omogucen: boolean;
+  maxPokusaja?: number;
+  vremenskiProzor?: string;
+}
+
+export interface OpcijeRacuna {
+  naSesijaOpozvana?: (sesijaId: string) => void | Promise<void>;
+}
+
+export function registrirajStariLinkPotvrdeEmaila(app: FastifyInstance): void {
+  app.get<{ Querystring: { token?: string } }>(
+    '/racuni/potvrdi-email',
+    async (zahtjev, odgovor) => odgovor.redirect(`/potvrda-emaila?token=${encodeURIComponent(zahtjev.query.token ?? '')}`),
+  );
+}
+
 const NAZIV_KOLACICA = 'kaladont_sesija';
 const TRAJANJE_KOLACICA_MS = 30 * 24 * 60 * 60 * 1000;
+const COOLDOWN_PONOVNOG_SLanja_EMAILA_MS = 5 * 60 * 1000;
 
 const ShemaRegistracije = z.object({
-  gostToken: z.string().uuid().optional(),
   email: z.string().email(),
   lozinka: z.string().min(8),
-  nadimak: z.string().min(2).max(40).optional(),
-  avatarId: z.number().int().min(0).max(BROJ_AVATARA - 1).optional(),
+  nadimak: z.string().min(MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).max(MAKSIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).regex(UZORAK_NADIMKA, PORUKA_NEVALJANOG_NADIMKA).optional(),
+  avatarId: z
+    .number()
+    .int()
+    .min(0)
+    .max(BROJ_AVATARA - 1)
+    .optional(),
+  avatarConfig: z.unknown().optional(),
 });
 
 const ShemaPrijave = z.object({
@@ -37,33 +63,87 @@ const ShemaPrijave = z.object({
 
 const ShemaZaboravljenaLozinka = z.object({ email: z.string().email() });
 const ShemaResetLozinke = z.object({ token: z.string(), novaLozinka: z.string().min(8) });
+const ShemaTokena = z.object({ token: z.string() });
+
+function normalizirajEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function javnaPoveznica(putanja: string): string {
+  return new URL(putanja, konfiguracija.JAVNA_ADRESA).toString();
+}
+
+async function posaljiPotvrduEmailaSigurno(
+  app: FastifyInstance,
+  igracId: string,
+  email: string,
+  noviEmail = false,
+): Promise<void> {
+  const tokenPotvrde = izdajTokenPotvrdeEmaila(igracId, email);
+  await pokusajPoslatiEmail(
+    app.log,
+    email,
+    porukaPotvrdeEmaila(javnaPoveznica(`/potvrda-emaila?token=${tokenPotvrde}`), noviEmail),
+    `potvrda-emaila:${igracId}`,
+  );
+  await baza.update(igraci).set({ emailPotvrdaPoslanaAt: new Date() }).where(eq(igraci.id, igracId));
+}
 
 function postaviSesijskiKolacic(odgovor: import('fastify').FastifyReply, token: string): void {
   odgovor.setCookie(NAZIV_KOLACICA, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: konfiguracija.NODE_ENV === 'production',
+    secure: konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production',
     maxAge: TRAJANJE_KOLACICA_MS / 1000,
     path: '/',
   });
 }
 
-export async function registrirajRacuneRute(app: FastifyInstance): Promise<void> {
-  app.post('/racuni/registracija', async (zahtjev, odgovor) => {
+export async function registrirajRacuneRute(
+  app: FastifyInstance,
+  opcijeRateLimita: OpcijeAuthRateLimita,
+  opcijeRacuna: OpcijeRacuna = {},
+): Promise<void> {
+  const limitPokusaja = {
+    max: opcijeRateLimita.maxPokusaja ?? 10,
+    timeWindow: opcijeRateLimita.vremenskiProzor ?? '15 minutes',
+  };
+  const limitResetEmaila = {
+    max: limitPokusaja.max,
+    timeWindow: opcijeRateLimita.vremenskiProzor ?? '15 minutes',
+  };
+  const limitPotvrde = {
+    max: limitPokusaja.max,
+    timeWindow: opcijeRateLimita.vremenskiProzor ?? '15 minutes',
+  };
+  const ogranicenje = (postavke: typeof limitPokusaja) =>
+    opcijeRateLimita.omogucen ? { config: { rateLimit: postavke } } : {};
+
+  app.post('/racuni/registracija', ogranicenje(limitPokusaja), async (zahtjev, odgovor) => {
     const rezultat = ShemaRegistracije.safeParse(zahtjev.body);
     if (!rezultat.success) {
-      return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
+      return odgovor.code(400).send({ ok: false, greska: rezultat.error.issues[0]?.message ?? 'Neispravni podaci.' });
     }
-    const { gostToken, email, lozinka, nadimak, avatarId } = rezultat.data;
+    const { email, lozinka, nadimak, avatarId, avatarConfig } = rezultat.data;
+    const normaliziraniEmail = normalizirajEmail(email);
+    if (avatarConfig !== undefined && !validirajAvatarConfig(avatarConfig)) {
+      return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
+    }
+    const kanonskiAvatarConfig = avatarConfig as AvatarConfigV1 | undefined;
 
-    const [postojeciEmail] = await baza.select().from(igraci).where(eq(igraci.email, email)).limit(1);
+    const [postojeciEmail] = await baza
+      .select()
+      .from(igraci)
+      .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
+      .limit(1);
     if (postojeciEmail) {
       return odgovor.code(409).send({ ok: false, greska: 'Ta email adresa je već registrirana.' });
     }
 
     const lozinkaHash = await argonHash(lozinka);
-    const [postojeciGost] = gostToken
-      ? await baza.select().from(igraci).where(and(eq(igraci.id, gostToken), eq(igraci.vrsta, 'gost'))).limit(1)
+    const gostSesija = await dohvatiSesijuZahtjeva(zahtjev);
+    const [postojeciGost] = gostSesija
+      ? await baza.select().from(igraci).where(and(eq(igraci.id, gostSesija.igracId), eq(igraci.vrsta, 'gost'))).limit(1)
       : [undefined];
 
     let igracId: string;
@@ -75,11 +155,13 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
         .update(igraci)
         .set({
           vrsta: 'registriran',
-          email,
+          email: normaliziraniEmail,
           lozinkaHash,
           emailPotvrdjen: false,
+          emailPotvrdaZatrazenAt: new Date(),
           ...(nadimak ? { nadimak } : {}),
           ...(avatarId !== undefined ? { avatarId } : {}),
+          ...(kanonskiAvatarConfig ? { avatarConfig: kanonskiAvatarConfig, avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
         })
         .where(eq(igraci.id, postojeciGost.id));
       igracId = postojeciGost.id;
@@ -89,11 +171,13 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
         .insert(igraci)
         .values({
           vrsta: 'registriran',
-          email,
+          email: normaliziraniEmail,
           lozinkaHash,
           emailPotvrdjen: false,
-          nadimak: nadimak ?? email.split('@')[0]!,
+          emailPotvrdaZatrazenAt: new Date(),
+          nadimak: nadimak ?? normaliziraniEmail.split('@')[0]!,
           avatarId: avatarId ?? Math.floor(Math.random() * BROJ_AVATARA),
+          avatarConfig: kanonskiAvatarConfig ?? null,
         })
         .returning();
       if (!novi) {
@@ -103,25 +187,29 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
       konacniNadimak = novi.nadimak;
     }
 
-    const tokenPotvrde = izdajTokenPotvrdeEmaila(igracId);
-    await posaljiEmail(app.log, email, `Potvrdi email: /racuni/potvrdi-email?token=${tokenPotvrde}`);
+    const sesija = await izdajSesiju(igracId);
+    postaviSesijskiKolacic(odgovor, sesija.token);
 
-    const sesijskiToken = izdajSesijskiToken(igracId);
-    postaviSesijskiKolacic(odgovor, sesijskiToken);
+    await posaljiPotvrduEmailaSigurno(app, igracId, normaliziraniEmail);
 
-    return { ok: true, igracId, nadimak: konacniNadimak, sesijskiToken };
+    return { ok: true, igracId, nadimak: konacniNadimak, sesijskiToken: sesija.token };
   });
 
-  app.post('/racuni/prijava', async (zahtjev, odgovor) => {
+  app.post('/racuni/gost-sesija', async (_zahtjev, odgovor) => {
+    return odgovor.send({ ok: true, ...(await stvoriGostSesiju()) });
+  });
+
+  app.post('/racuni/prijava', ogranicenje(limitPokusaja), async (zahtjev, odgovor) => {
     const rezultat = ShemaPrijave.safeParse(zahtjev.body);
     if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
     }
     const { email, lozinka } = rezultat.data;
+    const normaliziraniEmail = normalizirajEmail(email);
 
     const PORUKA_NEUSPJEHA = 'Pogrešan email ili lozinka.'; // namjerno isto za oba slucaja
 
-    const [korisnik] = await baza.select().from(igraci).where(eq(igraci.email, email)).limit(1);
+    const [korisnik] = await baza.select().from(igraci).where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`).limit(1);
     if (!korisnik || !korisnik.lozinkaHash) {
       return odgovor.code(401).send({ ok: false, greska: PORUKA_NEUSPJEHA });
     }
@@ -131,44 +219,98 @@ export async function registrirajRacuneRute(app: FastifyInstance): Promise<void>
       return odgovor.code(401).send({ ok: false, greska: PORUKA_NEUSPJEHA });
     }
 
-    const sesijskiToken = izdajSesijskiToken(korisnik.id);
-    postaviSesijskiKolacic(odgovor, sesijskiToken);
+    const sesija = await izdajSesiju(korisnik.id);
+    postaviSesijskiKolacic(odgovor, sesija.token);
 
-    return { ok: true, igracId: korisnik.id, nadimak: korisnik.nadimak, sesijskiToken };
+    return { ok: true, igracId: korisnik.id, nadimak: korisnik.nadimak, emailPotvrdjen: korisnik.emailPotvrdjen, sesijskiToken: sesija.token };
   });
 
-  app.post('/racuni/odjava', async (_zahtjev, odgovor) => {
+  app.post('/racuni/odjava', async (zahtjev, odgovor) => {
+    const sesija = await dohvatiSesijuZahtjeva(zahtjev);
+    if (sesija) {
+      await opozoviSesiju(sesija.id);
+      await opcijeRacuna.naSesijaOpozvana?.(sesija.id);
+    }
     odgovor.clearCookie(NAZIV_KOLACICA, { path: '/' });
     return { ok: true };
   });
 
-  app.get<{ Querystring: { token?: string } }>('/racuni/potvrdi-email', async (zahtjev, odgovor) => {
-    const igracId = zahtjev.query.token ? provjeriTokenPotvrdeEmaila(zahtjev.query.token) : null;
-    if (!igracId) {
+  app.get<{ Querystring: { token?: string } }>(
+    '/racuni/potvrdi-email',
+    ogranicenje(limitPotvrde),
+    async (zahtjev, odgovor) => odgovor.redirect(`/potvrda-emaila?token=${encodeURIComponent(zahtjev.query.token ?? '')}`),
+  );
+
+  app.post('/racuni/potvrdi-email', ogranicenje(limitPotvrde), async (zahtjev, odgovor) => {
+    const rezultat = ShemaTokena.safeParse(zahtjev.body);
+    if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
     }
-    await baza.update(igraci).set({ emailPotvrdjen: true }).where(eq(igraci.id, igracId));
+    const potvrda = provjeriTokenPotvrdeEmaila(rezultat.data.token);
+    if (!potvrda) {
+      return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
+    }
+    const [igrac] = await baza.select().from(igraci).where(eq(igraci.id, potvrda.igracId)).limit(1);
+    const emailZaPotvrdu = igrac?.emailNaCekanju ?? igrac?.email;
+    if (!igrac || !emailZaPotvrdu || emailHashPotvrde(emailZaPotvrdu) !== potvrda.emailHash) {
+      return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
+    }
+    await baza.update(igraci).set({
+      email: emailZaPotvrdu,
+      emailNaCekanju: null,
+      emailPotvrdjen: true,
+      emailPotvrdaZatrazenAt: null,
+      emailPotvrdaPoslanaAt: null,
+    }).where(eq(igraci.id, igrac.id));
     return { ok: true };
   });
 
-  app.post('/racuni/zaboravljena-lozinka', async (zahtjev, odgovor) => {
-    const rezultat = ShemaZaboravljenaLozinka.safeParse(zahtjev.body);
-    if (!rezultat.success) {
-      return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
+  app.post('/racuni/ponovno-poslati-potvrdu', { preHandler: zahtijevajPrijavu }, async (zahtjev, odgovor) => {
+    const igrac = (zahtjev as import('./autentikacija.js').ZahtjevSIgracem).igrac!;
+    if (igrac.emailPotvrdjen) return { ok: true, poruka: 'Email adresa je već potvrđena.' };
+    const posljednjeSlanje = igrac.emailPotvrdaPoslanaAt?.getTime() ?? 0;
+    const preostaloMs = COOLDOWN_PONOVNOG_SLanja_EMAILA_MS - (Date.now() - posljednjeSlanje);
+    if (preostaloMs > 0) {
+      return odgovor.code(429).send({ ok: false, greska: `Ponovno slanje bit će dostupno za ${Math.ceil(preostaloMs / 60_000)} min.` });
     }
-
-    const PORUKA = 'Ako račun postoji, poslali smo upute na email.'; // ne otkriva postoji li racun
-
-    const [korisnik] = await baza.select().from(igraci).where(eq(igraci.email, rezultat.data.email)).limit(1);
-    if (korisnik) {
-      const token = izdajTokenResetaLozinke(korisnik.id);
-      await posaljiEmail(app.log, rezultat.data.email, `Resetiraj lozinku: /racuni/resetiraj-lozinku?token=${token}`);
-    }
-
-    return { ok: true, poruka: PORUKA };
+    const email = igrac.emailNaCekanju ?? igrac.email;
+    if (!email) return odgovor.code(400).send({ ok: false, greska: 'Email adresa nije dostupna.' });
+    await posaljiPotvrduEmailaSigurno(app, igrac.id, email, Boolean(igrac.emailNaCekanju));
+    return { ok: true, poruka: 'Zahtjev za potvrdu je prihvaćen. Provjeri i Neželjenu poštu.' };
   });
 
-  app.post('/racuni/resetiraj-lozinku', async (zahtjev, odgovor) => {
+  app.post(
+    '/racuni/zaboravljena-lozinka',
+    ogranicenje(limitResetEmaila),
+    async (zahtjev, odgovor) => {
+      const rezultat = ShemaZaboravljenaLozinka.safeParse(zahtjev.body);
+      if (!rezultat.success) {
+        return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
+      }
+
+      const PORUKA = 'Ako račun postoji, poslali smo upute na email.'; // ne otkriva postoji li racun
+
+      const normaliziraniEmail = normalizirajEmail(rezultat.data.email);
+      const [korisnik] = await baza
+        .select()
+        .from(igraci)
+        .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
+        .limit(1);
+      if (korisnik) {
+        const token = izdajTokenResetaLozinke(korisnik.id);
+        await pokusajPoslatiEmail(
+          app.log,
+          normaliziraniEmail,
+          porukaResetaLozinke(javnaPoveznica(`/racuni/resetiraj-lozinku?token=${token}`)),
+          `reset-lozinke:${korisnik.id}`,
+        );
+      }
+
+      return { ok: true, poruka: PORUKA };
+    },
+  );
+
+  app.post('/racuni/resetiraj-lozinku', ogranicenje(limitPokusaja), async (zahtjev, odgovor) => {
     const rezultat = ShemaResetLozinke.safeParse(zahtjev.body);
     if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
