@@ -380,7 +380,7 @@ Očekuješ stanje `Up` i health `healthy`. Ako baza nije zdrava, stani.
 Pokreni migraciju iz novog application imagea:
 
 ```bash
-docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija pnpm migracije
+docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija node dist/cli/migracije.js
 ```
 
 Što naredba radi:

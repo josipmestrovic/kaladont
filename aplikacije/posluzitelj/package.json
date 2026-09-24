@@ -8,7 +8,7 @@
     "build": "tsc -p .",
     "start": "node dist/index.js",
     "migracije:generiraj": "drizzle-kit generate",
-    "migracije": "drizzle-kit migrate",
+    "migracije": "tsx src/cli/migracije.ts",
     "migracije:upgrade-test": "tsx src/cli/provjera-migracijskog-upgradea.ts",
     "ci-fixture": "tsx src/cli/ci-fixture.ts",
     "provjera-indeksa": "tsx src/cli/provjera-indeksa.ts",

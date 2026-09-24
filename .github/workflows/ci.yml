@@ -224,7 +224,7 @@ jobs:
         run: docker compose -f docker-compose.ci.yml up -d baza
 
       - name: Primijeniti migracije u CI imageu
-        run: docker compose -f docker-compose.ci.yml run --rm aplikacija pnpm migracije
+        run: docker compose -f docker-compose.ci.yml run --rm aplikacija node dist/cli/migracije.js
 
       - name: Učitati sintetički fixture u CI imageu
         run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/ci-fixture.js

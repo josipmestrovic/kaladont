@@ -139,7 +139,7 @@ docker compose --env-file "$kandidat_env" -f "$compose_datoteka" pull aplikacija
 faza='slika_povucena'
 migracije_pokrenute='da'
 faza='migracije_pokrenute'
-docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija pnpm migracije
+docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/migracije.js
 faza='migracije_zavrsene'
 zapisi_env "$novi_release_zapis"
 env_stvarni_promijenjen='da'
