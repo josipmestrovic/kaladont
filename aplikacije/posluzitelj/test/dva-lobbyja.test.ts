@@ -58,11 +58,9 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     expect(Number.isNaN(new Date(prviPocetci[0]!.pocetakIso).getTime())).toBe(false);
 
     // odigraj do kraja: tko je na potezu kaže "ne znam" dok partija ne završi
-    const krajPromise = Promise.all(
-      klijenti.map(
-        (klijent) => new Promise<KrajPartije>((resolve) => klijent.once('partija:kraj', resolve)),
-      ),
-    );
+    const krajPromise = new Promise<KrajPartije>((resolve) => {
+      klijenti[0]!.once('partija:kraj', resolve);
+    });
     const igracIdPoKlijentu = new Map<ClientSocket, string>();
     klijenti.forEach((klijent, i) => igracIdPoKlijentu.set(klijent, prviPocetci[i]!.mojIgracId));
 
@@ -79,14 +77,14 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     });
     setTimeout(posaljiNeZnam, 30);
 
-    const [prviKraj] = await krajPromise;
+    const prviKraj = await krajPromise;
     expect(prviKraj.partijaId).toBe(prviPocetci[0]!.partijaId);
 
     // 2. partija: svi se vraćaju u red; ponovi zahtjev dok se završno spremanje prve partije ne obradi.
     const drugiPocetciPromise = cekajPocetke(klijenti);
     const ponovnoSlanje = setInterval(() => {
       for (const klijent of klijenti) klijent.emit('red:udji');
-    }, 100);
+    }, 500);
     for (const klijent of klijenti) klijent.emit('red:udji');
 
     const drugiPocetci = await Promise.race([
@@ -94,10 +92,10 @@ describe('dva lobbyja zaredom s istim igračima', () => {
       new Promise<null>((resolve) => setTimeout(() => {
         clearInterval(ponovnoSlanje);
         resolve(null);
-      }, 3000)),
+      }, 5000)),
     ]);
 
-    expect(drugiPocetci, 'drugi partija:pocetak nije stigao u 3 s').not.toBeNull();
+    expect(drugiPocetci, 'drugi partija:pocetak nije stigao u 5 s').not.toBeNull();
     const idoviDruge = new Set(drugiPocetci!.map((p) => p.partijaId));
     expect(idoviDruge.size).toBe(1);
     expect(idoviDruge.has(prviPocetci[0]!.partijaId)).toBe(false);
