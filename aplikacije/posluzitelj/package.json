@@ -28,13 +28,13 @@
     "pino": "^9.5.0",
     "postgres": "^3.4.5",
     "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "zajednicko": "workspace:*",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "drizzle-kit": "^0.28.1",
     "fast-check": "^3.23.1",
-    "socket.io-client": "^4.8.1",
     "tsx": "^4.19.2",
     "vitest": "^3.2.7"
   }
