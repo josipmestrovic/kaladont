@@ -229,7 +229,7 @@ describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
-    const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    const { igracId } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
     const javnaPartijaId = randomUUID();
     const privatnaPartijaId = randomUUID();
     const kraj = new Date();

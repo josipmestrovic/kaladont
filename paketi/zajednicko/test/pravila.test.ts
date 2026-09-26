@@ -35,6 +35,7 @@ describe('validirajPotez', () => {
     const rjecnikSImenom = {
       ...rjecnik,
       jeVlastitoIme: (rijec: string) => rijec === 'italija',
+      grupeZa: (rijec: string) => rijec === 'italija' ? ['vlastito_ime:italija'] : rjecnik.grupeZa(rijec),
     };
     const rezultat = validirajPotez({
       rijec: 'italija',

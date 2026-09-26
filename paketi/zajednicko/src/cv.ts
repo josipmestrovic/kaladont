@@ -150,7 +150,6 @@ function prikazaniStaz(podaci: CvPodaciIgraca): Pick<KaladontCvDto, 'datum' | 's
   const vrijemeRegistracije = registriranAt instanceof Date ? registriranAt : registriranAt ? new Date(registriranAt) : null;
   const vrijemeStvaranja = podaci.stvoren instanceof Date ? podaci.stvoren : new Date(podaci.stvoren);
   const datumRegistracije = datumIso(registriranAt);
-  const datumStvaranja = datumIso(podaci.stvoren);
   const referentniDatum = datumIso(podaci.referentniDatum);
 
   if (
@@ -572,7 +571,7 @@ function sastaviRecenice(
   let s2 = sastaviS2(podaci, kvalifikacija);
   let osobine = [...stil.osobine];
   let s3 = sastaviS3(podaci, stil, osobine);
-  let saljiva = saljiviTekst(podaci.igracId, stil);
+  const saljiva = saljiviTekst(podaci.igracId, stil);
   let odabraniDokaz = dokaz;
   let tekst = [s1, s2, s3, ...(odabraniDokaz ? [odabraniDokaz.recenica] : []), saljiva].join(' ');
 
