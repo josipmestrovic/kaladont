@@ -3,11 +3,11 @@
  * DB pozivi iz motora partije su "fire and forget" (ne blokiraju tijek igre) osim zaključka partije,
  * koji je transakcijski jer mijenja više tablica odjednom.
  */
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { izracunajNovaDostignuca, izracunajOcjenuIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce } from 'zajednicko';
-import { jeOcjenaIgreDostupna } from 'zajednicko';
+import { bonusPobjednickogNiza, izracunajFormu, jeOcjenaIgreDostupna } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
 
@@ -23,6 +23,7 @@ export function zapisiPocetakPartije(
       sudionici.map((s) => ({
         partijaId,
         igracId: s.igracId,
+        nadimak: s.nadimak,
         sjedalo: s.sjedalo,
         cekanjeMs: cekanjeMsPoIgracu.get(s.igracId) ?? 0,
       })),
@@ -63,6 +64,53 @@ export function zapisiPotez(zapis: ZapisPoteza): Promise<void> {
   });
 }
 
+export function spremiRaniPorazUBazi(zapis: {
+  partijaId: string;
+  igracId: string;
+  mod: 'cetiri_igraca' | 'dva_igraca';
+  plasman: 1 | 2 | 3 | 4;
+  bodovi: number;
+  eliminacije: number;
+  nacinIspadanja: 'ne_znam' | 'istek' | 'mrtva_slova' | 'prekid' | 'kaladont';
+}): Promise<void> {
+  return baza.transaction(async (tx) => {
+    await tx.update(sudioniciPartije).set({
+      plasman: zapis.plasman,
+      bodovi: zapis.bodovi,
+      eliminacije: zapis.eliminacije,
+      nacinIspadanja: zapis.nacinIspadanja,
+    }).where(and(
+      eq(sudioniciPartije.partijaId, zapis.partijaId),
+      eq(sudioniciPartije.igracId, zapis.igracId),
+      sql`${sudioniciPartije.plasman} is null`,
+    ));
+    await tx.insert(rezultatiFormeIgraca).values({
+      igracId: zapis.igracId,
+      partijaId: zapis.partijaId,
+      mod: zapis.mod,
+      plasman: zapis.plasman,
+      bodovi: zapis.bodovi,
+      eliminacije: zapis.eliminacije,
+    }).onConflictDoNothing();
+    await tx.insert(nizoviPobjedaIgraca).values({
+      igracId: zapis.igracId,
+      mod: zapis.mod,
+      trenutniNiz: 0,
+      najboljiNiz: 0,
+      zadnjaObradenaPartijaId: zapis.partijaId,
+    }).onConflictDoUpdate({
+      target: [nizoviPobjedaIgraca.igracId, nizoviPobjedaIgraca.mod],
+      set: {
+        trenutniNiz: sql`case when ${nizoviPobjedaIgraca.zadnjaObradenaPartijaId} = ${zapis.partijaId} then ${nizoviPobjedaIgraca.trenutniNiz} else 0 end`,
+        zadnjaObradenaPartijaId: zapis.partijaId,
+        azurirano: new Date(),
+      },
+    });
+  }).then(() => {}).catch((greska) => {
+    console.error('Neuspjelo rano spremanje poraza:', greska);
+  });
+}
+
 export interface ZapisSudionika {
   igracId: string;
   plasman: 1 | 2 | 3 | 4;
@@ -96,6 +144,25 @@ export interface ZapisNapretkaDostignuca {
   delta: DeltaNapretkaDostignuca;
 }
 
+interface AgregatZakljucka {
+  bodoviUkupno: number;
+  odigrane: number;
+  pobjede: number;
+  iskustvoUkupno: number;
+  novaDostignuca: NovoDostignuce[];
+  dnkPrije: DnkOs[];
+  dnkPoslije: DnkOs[];
+  ocjenaIgre: number | null;
+  bonusOcjenaIgre: number;
+  nizPrije: number;
+  nizPoslije: number;
+  najboljiNiz: number;
+  osnovniXp: number;
+  bonusPobjednickogNizaPostotak: number;
+  bonusPobjednickogNizaXp: number;
+  forma: ReturnType<typeof izracunajFormu> | null;
+}
+
 function dnkPodaciIzRedaka(
   redak: { odigrane: number; bodovi: number; eliminacije: number },
   statistika: Pick<
@@ -115,8 +182,8 @@ export async function zakljuciPartijuUBazi(
   statistike: Map<string, ZapisStatistikeRijeci> = new Map(),
   samoStatistika = false,
   napredakDostignuca: Map<string, ZapisNapretkaDostignuca> = new Map(),
-): Promise<Map<string, { bodoviUkupno: number; odigrane: number; pobjede: number; iskustvoUkupno: number; novaDostignuca: NovoDostignuce[]; dnkPrije: DnkOs[]; dnkPoslije: DnkOs[]; ocjenaIgre: number | null; bonusOcjenaIgre: number }>> {
-  const agregati = new Map<string, { bodoviUkupno: number; odigrane: number; pobjede: number; iskustvoUkupno: number; novaDostignuca: NovoDostignuce[]; dnkPrije: DnkOs[]; dnkPoslije: DnkOs[]; ocjenaIgre: number | null; bonusOcjenaIgre: number }>();
+): Promise<Map<string, AgregatZakljucka>> {
+  const agregati = new Map<string, AgregatZakljucka>();
   const modStatistike = mod;
 
   await baza.transaction(async (tx) => {
@@ -149,6 +216,13 @@ export async function zakljuciPartijuUBazi(
             dnkPoslije: [],
             ocjenaIgre: null,
             bonusOcjenaIgre: 0,
+            nizPrije: 0,
+            nizPoslije: 0,
+            najboljiNiz: 0,
+            osnovniXp: 0,
+            bonusPobjednickogNizaPostotak: 0,
+            bonusPobjednickogNizaXp: 0,
+            forma: null,
           });
         }
       }
@@ -167,6 +241,7 @@ export async function zakljuciPartijuUBazi(
 
     for (const r of rezultati) {
       const [stariIgrac] = await tx.select({
+        vrsta: igraci.vrsta,
         odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
         bodovi: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
         eliminacije: mod === 'dva_igraca' ? igraci.eliminacije1v1 : igraci.eliminacijeUkupno,
@@ -190,6 +265,60 @@ export async function zakljuciPartijuUBazi(
           mod,
         )
         : [];
+      const [stariNiz] = !samoStatistika
+        ? await tx.select().from(nizoviPobjedaIgraca).where(and(
+          eq(nizoviPobjedaIgraca.igracId, r.igracId),
+          eq(nizoviPobjedaIgraca.mod, mod),
+        )).limit(1)
+        : [];
+      const [azuriraniNiz] = !samoStatistika
+        ? await tx.insert(nizoviPobjedaIgraca).values({
+          igracId: r.igracId,
+          mod,
+          trenutniNiz: r.plasman === 1 ? 1 : 0,
+          najboljiNiz: r.plasman === 1 ? 1 : 0,
+          zadnjaObradenaPartijaId: partijaId,
+        }).onConflictDoUpdate({
+          target: [nizoviPobjedaIgraca.igracId, nizoviPobjedaIgraca.mod],
+          set: {
+            trenutniNiz: sql`case when ${nizoviPobjedaIgraca.zadnjaObradenaPartijaId} = ${partijaId} then ${nizoviPobjedaIgraca.trenutniNiz} when ${r.plasman === 1} then ${nizoviPobjedaIgraca.trenutniNiz} + 1 else 0 end`,
+            najboljiNiz: sql`case when ${nizoviPobjedaIgraca.zadnjaObradenaPartijaId} = ${partijaId} then ${nizoviPobjedaIgraca.najboljiNiz} when ${r.plasman === 1} then greatest(${nizoviPobjedaIgraca.najboljiNiz}, ${nizoviPobjedaIgraca.trenutniNiz} + 1) else ${nizoviPobjedaIgraca.najboljiNiz} end`,
+            zadnjaObradenaPartijaId: partijaId,
+            azurirano: new Date(),
+          },
+        }).returning()
+        : [];
+      const nizPrije = stariNiz?.trenutniNiz ?? 0;
+      const nizPoslije = azuriraniNiz?.trenutniNiz ?? nizPrije;
+      const najboljiNiz = azuriraniNiz?.najboljiNiz ?? stariNiz?.najboljiNiz ?? 0;
+      const osnovniXp = r.iskustvo;
+      const bonusPobjednickogNizaPostotak = !samoStatistika && r.plasman === 1 ? bonusPobjednickogNiza(nizPoslije, mod) : 0;
+      const bonusPobjednickogNizaXp = Math.round(osnovniXp * bonusPobjednickogNizaPostotak / 100);
+      r.iskustvo += bonusPobjednickogNizaXp;
+      if (!samoStatistika) {
+        await tx.insert(rezultatiFormeIgraca).values({
+          igracId: r.igracId,
+          partijaId,
+          mod,
+          plasman: r.plasman,
+          bodovi: r.bodovi,
+          eliminacije: r.eliminacije,
+        }).onConflictDoNothing();
+      }
+      let forma: ReturnType<typeof izracunajFormu> | null = null;
+      if (!samoStatistika) {
+        const rezultatiForme = await tx.select({
+          partijaId: rezultatiFormeIgraca.partijaId,
+          kraj: rezultatiFormeIgraca.zavrseno,
+          plasman: rezultatiFormeIgraca.plasman,
+          bodovi: rezultatiFormeIgraca.bodovi,
+          eliminacije: rezultatiFormeIgraca.eliminacije,
+        }).from(rezultatiFormeIgraca).where(and(
+          eq(rezultatiFormeIgraca.igracId, r.igracId),
+          eq(rezultatiFormeIgraca.mod, mod),
+        )).orderBy(desc(rezultatiFormeIgraca.zavrseno), desc(rezultatiFormeIgraca.partijaId)).limit(20);
+        forma = izracunajFormu(rezultatiForme.map((rezultat) => ({ ...rezultat, kraj: rezultat.kraj.toISOString() })), mod);
+      }
       if (!samoStatistika) {
         await tx
           .update(sudioniciPartije)
@@ -217,7 +346,7 @@ export async function zakljuciPartijuUBazi(
           .returning({ bodoviUkupno: igraci.bodovi1v1, odigrane: igraci.odigrane1v1, pobjede: igraci.pobjede1v1, iskustvoUkupno: igraci.iskustvoUkupno });
 
         if (azurirani) {
-          agregati.set(r.igracId, { ...azurirani, novaDostignuca: [], dnkPrije: prije, dnkPoslije: [], ocjenaIgre: 0, bonusOcjenaIgre: 0 });
+          agregati.set(r.igracId, { ...azurirani, novaDostignuca: [], dnkPrije: prije, dnkPoslije: [], ocjenaIgre: 0, bonusOcjenaIgre: 0, nizPrije, nizPoslije, najboljiNiz, osnovniXp, bonusPobjednickogNizaPostotak, bonusPobjednickogNizaXp, forma });
         }
       } else if (!samoStatistika) {
         const [azurirani] = await tx
@@ -233,12 +362,12 @@ export async function zakljuciPartijuUBazi(
           .returning({ bodoviUkupno: igraci.bodoviUkupno, odigrane: igraci.odigrane, pobjede: igraci.pobjede, iskustvoUkupno: igraci.iskustvoUkupno });
 
         if (azurirani) {
-          agregati.set(r.igracId, { ...azurirani, novaDostignuca: [], dnkPrije: prije, dnkPoslije: [], ocjenaIgre: 0, bonusOcjenaIgre: 0 });
+          agregati.set(r.igracId, { ...azurirani, novaDostignuca: [], dnkPrije: prije, dnkPoslije: [], ocjenaIgre: 0, bonusOcjenaIgre: 0, nizPrije, nizPoslije, najboljiNiz, osnovniXp, bonusPobjednickogNizaPostotak, bonusPobjednickogNizaXp, forma });
         }
       }
 
       const statistika = statistike.get(r.igracId);
-      if (statistika && !samoStatistika) {
+      if (statistika) {
         if (statistika.grupe.length > 0) {
           await tx.insert(otkljucaneGrupeIgraca)
             .values(statistika.grupe.map(({ grupa, tier }) => ({ igracId: r.igracId, grupa, tier })))
@@ -252,7 +381,7 @@ export async function zakljuciPartijuUBazi(
               set: { jakoDuga: sql`otkljucane_rijeci_igraca.jako_duga or excluded.jako_duga`, jakoRijetka: sql`otkljucane_rijeci_igraca.jako_rijetka or excluded.jako_rijetka`, dugaTier: sql`coalesce(otkljucane_rijeci_igraca.duga_tier, excluded.duga_tier)`, rijetkaTier: sql`coalesce(otkljucane_rijeci_igraca.rijetka_tier, excluded.rijetka_tier)` },
             });
         }
-        await tx
+        if (!samoStatistika) await tx
           .insert(statistikeRijeciIgraca)
           .values({
             igracId: r.igracId,
@@ -320,15 +449,8 @@ export async function zakljuciPartijuUBazi(
       }
 
       const zapisNapretka = napredakDostignuca.get(r.igracId);
-      if (zapisNapretka) {
+      if (zapisNapretka && stariIgrac?.vrsta !== 'gost') {
         const delta: DeltaNapretkaDostignuca = { ...zapisNapretka.delta };
-        if (statistika) {
-          delta.rijetkeLeksemskeGrupe = (delta.rijetkeLeksemskeGrupe ?? 0)
-            + statistika.otkriveneJakoRijetkeGrupe + statistika.otkriveneSrednjeRijetkeGrupe + statistika.otkriveneRijetkeGrupe;
-          delta.dugeRijeci = (delta.dugeRijeci ?? 0)
-            + statistika.upisaneDugeRijeci + statistika.upisaneSrednjeDugeRijeci + statistika.upisaneJakoDugeRijeci;
-          delta.najduziStreak = Math.max(delta.najduziStreak ?? 0, statistika.najduziStreak);
-        }
         if (!samoStatistika && r.plasman === 1) delta.javnePobjede = (delta.javnePobjede ?? 0) + 1;
 
         const [stariNapredak] = await tx.select().from(napredakDostignucaIgraca)

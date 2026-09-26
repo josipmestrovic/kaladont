@@ -192,7 +192,7 @@
       class:moje-sjedalo={mjesto?.igracId === stanje.mojIgracId}
     >
       {#if mjesto}
-        <Avatar avatarId={mjesto.avatarId} avatarConfig={mjesto.avatarConfig} rang={mjesto.rang} velicina={84} />
+        <Avatar avatarId={mjesto.avatarId} avatarConfig={mjesto.avatarConfig} rang={mjesto.rang} velicina={84} razinaVatre={mjesto.razinaVatre} nizPobjeda={mjesto.trenutniNiz} />
         <div class="podaci">
           <strong>
             {mjesto.nadimak}

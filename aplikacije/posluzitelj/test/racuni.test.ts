@@ -49,11 +49,49 @@ describe('POST /racuni/registracija', () => {
     expect(redak?.vrsta).toBe('registriran');
     expect(redak?.lozinkaHash).not.toBe(LOZINKA); // hashirano, ne plaintext
     expect(redak?.emailPotvrdjen).toBe(false);
+    expect(redak?.registriranAt?.toISOString()).toBe(redak?.stvoren.toISOString());
 
     const korisnickeSesije = await baza.select().from(sesije).where(eq(sesije.igracId, tijelo.igracId));
     expect(korisnickeSesije).toHaveLength(1);
     expect(korisnickeSesije[0]?.tokenHash).not.toBe(tijelo.sesijskiToken);
     expect(korisnickeSesije[0]?.tokenHash).toHaveLength(64);
+  });
+
+  it('nadograđuje gosta jednom, čuvajući ID, nastanak i postojeću statistiku', async () => {
+    const gostOdgovor = await fetch(`${adresa}/api/racuni/gost-sesija`, { method: 'POST' });
+    const gost = (await gostOdgovor.json()) as { igracId: string; token: string };
+    await baza.update(igraci).set({ odigrane: 7, pobjede: 3 }).where(eq(igraci.id, gost.igracId));
+    const [prije] = await baza.select().from(igraci).where(eq(igraci.id, gost.igracId));
+
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'CvIgrac' }),
+    });
+    expect(registracija.status).toBe(200);
+    const odgovor = (await registracija.json()) as { igracId: string };
+    expect(odgovor.igracId).toBe(gost.igracId);
+
+    const [nakon] = await baza.select().from(igraci).where(eq(igraci.id, gost.igracId));
+    expect(nakon?.vrsta).toBe('registriran');
+    expect(nakon?.stvoren.toISOString()).toBe(prije?.stvoren.toISOString());
+    expect(nakon?.registriranAt?.getTime()).toBeGreaterThanOrEqual(prije?.stvoren.getTime() ?? 0);
+    expect(nakon?.odigrane).toBe(7);
+    expect(nakon?.pobjede).toBe(3);
+
+    const ponovljeniEmail = `ponovljena-${EMAIL}`;
+    try {
+      const ponovljeniPokusaj = await fetch(`${adresa}/api/racuni/registracija`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
+        body: JSON.stringify({ email: ponovljeniEmail, lozinka: LOZINKA }),
+      });
+      expect(ponovljeniPokusaj.status).toBe(409);
+      const duplikati = await baza.select({ id: igraci.id }).from(igraci).where(eq(igraci.email, ponovljeniEmail));
+      expect(duplikati).toHaveLength(0);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.email, ponovljeniEmail));
+    }
   });
 
   it('odbija duplikat emaila', async () => {
@@ -101,11 +139,13 @@ describe('POST /racuni/registracija', () => {
 
 describe('POST /racuni/prijava', () => {
   it('uspješna prijava vraća sesijski token', async () => {
-    await fetch(`${adresa}/api/racuni/registracija`, {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
+    const registrirani = (await registracija.json()) as { igracId: string };
+    const [prijePrijave] = await baza.select({ registriranAt: igraci.registriranAt }).from(igraci).where(eq(igraci.id, registrirani.igracId));
 
     const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
@@ -115,6 +155,8 @@ describe('POST /racuni/prijava', () => {
     expect(odgovor.status).toBe(200);
     const tijelo = (await odgovor.json()) as { ok: boolean; sesijskiToken: string };
     expect(tijelo.ok).toBe(true);
+    const [nakonPrijave] = await baza.select({ registriranAt: igraci.registriranAt }).from(igraci).where(eq(igraci.id, registrirani.igracId));
+    expect(nakonPrijave?.registriranAt?.toISOString()).toBe(prijePrijave?.registriranAt?.toISOString());
   });
 
   it('kriva lozinka vraća generičku 401 poruku', async () => {

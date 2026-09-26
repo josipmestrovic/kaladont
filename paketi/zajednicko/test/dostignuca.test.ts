@@ -3,6 +3,7 @@ import {
   DEFINICIJE_DOSTIGNUCA,
   UKUPNO_ZVJEZDICA_DOSTIGNUCA,
   izracunajNovaDostignuca,
+  jeDostignuceNovo,
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
@@ -44,6 +45,17 @@ describe('dostignuca', () => {
     });
   });
 
+  it('ne smanjuje trajni niz kada je trenutni niz kraći', () => {
+    const nova = izracunajNovaDostignuca(
+      { najduziStreak: 10 },
+      { najduziStreak: 4 },
+      1,
+      false,
+    );
+
+    expect(nova).toEqual([]);
+  });
+
   it('otključava zvjezdicu za svaki brojač koji dosegne prvi prag', () => {
     const brojači = [
       'rijetkeLeksemskeGrupe',
@@ -73,5 +85,12 @@ describe('dostignuca', () => {
       const [novo] = izracunajNovaDostignuca({}, { [brojac]: prviPrag[brojac] }, 1, false);
       expect(novo?.novaRazina, brojac).toBe(1);
     }
+  });
+
+  it('označuje dostignuće kao novo ako je otključano unutar zadnjih 24 sata', () => {
+    const sada = new Date();
+    expect(jeDostignuceNovo(new Date(sada.getTime() - 60 * 60 * 1000))).toBe(true);
+    expect(jeDostignuceNovo(new Date(sada.getTime() - 2 * 24 * 60 * 60 * 1000))).toBe(false);
+    expect(jeDostignuceNovo(null)).toBe(false);
   });
 });

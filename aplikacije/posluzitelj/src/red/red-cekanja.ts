@@ -17,6 +17,8 @@ export interface StavkaReda {
   pobjede1v1?: number;
   bodovi1v1?: number;
   iskustvoUkupno?: number;
+  trenutniNiz4p?: number;
+  trenutniNiz1v1?: number;
   usaoU: number;
 }
 

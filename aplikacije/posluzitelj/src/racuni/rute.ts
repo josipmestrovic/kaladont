@@ -145,16 +145,20 @@ export async function registrirajRacuneRute(
     const [postojeciGost] = gostSesija
       ? await baza.select().from(igraci).where(and(eq(igraci.id, gostSesija.igracId), eq(igraci.vrsta, 'gost'))).limit(1)
       : [undefined];
+    if (gostSesija && !postojeciGost) {
+      return odgovor.code(409).send({ ok: false, greska: 'Registracija nije uspjela jer se stanje računa promijenilo.' });
+    }
 
     let igracId: string;
     let konacniNadimak: string;
 
     if (postojeciGost) {
       // RS-20: gost -> registriran je UPDATE istog retka, statistika ostaje
-      await baza
+      const [azuriraniGost] = await baza
         .update(igraci)
         .set({
           vrsta: 'registriran',
+          registriranAt: sql`now()`,
           email: normaliziraniEmail,
           lozinkaHash,
           emailPotvrdjen: false,
@@ -163,7 +167,11 @@ export async function registrirajRacuneRute(
           ...(avatarId !== undefined ? { avatarId } : {}),
           ...(kanonskiAvatarConfig ? { avatarConfig: kanonskiAvatarConfig, avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
         })
-        .where(eq(igraci.id, postojeciGost.id));
+        .where(and(eq(igraci.id, postojeciGost.id), eq(igraci.vrsta, 'gost')))
+        .returning({ id: igraci.id });
+      if (!azuriraniGost) {
+        return odgovor.code(409).send({ ok: false, greska: 'Registracija nije uspjela jer se stanje računa promijenilo.' });
+      }
       igracId = postojeciGost.id;
       konacniNadimak = nadimak ?? postojeciGost.nadimak;
     } else {
@@ -175,6 +183,8 @@ export async function registrirajRacuneRute(
           lozinkaHash,
           emailPotvrdjen: false,
           emailPotvrdaZatrazenAt: new Date(),
+          registriranAt: sql`now()`,
+          stvoren: sql`now()`,
           nadimak: nadimak ?? normaliziraniEmail.split('@')[0]!,
           avatarId: avatarId ?? Math.floor(Math.random() * BROJ_AVATARA),
           avatarConfig: kanonskiAvatarConfig ?? null,

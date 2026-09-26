@@ -10,3 +10,6 @@ export * from './dostignuca.js';
 export * from './dnk.js';
 export * from './avatar.js';
 export * from './nadimak.js';
+export * from './forma.js';
+export * from './cv-datumi.js';
+export * from './cv.js';

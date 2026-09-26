@@ -109,11 +109,13 @@ export function izvjestajMarkdown(naslov: string, rezultat: RezultatAgregacije, 
   redci.push('| Metrika | Broj |');
   redci.push('|---|---|');
   redci.push(`| Redaka u hrLexu | ${fmt(rezultat.ukupnoRedaka)} |`);
-  redci.push(`| Odbačeno (UPOS: PROPN/X/SYM/PUNCT) | ${fmt(rezultat.odbaceniUpos)} |`);
+  redci.push(`| Redaka PROPN | ${fmt(rezultat.ukupnoPropnRedaka)} |`);
+  redci.push(`| Odbačeno (UPOS: X/SYM/PUNCT) | ${fmt(rezultat.odbaceniUpos)} |`);
   redci.push(`| Odbačeno (rimski brojevi) | ${fmt(rezultat.odbaceniRimski)} |`);
   redci.push(`| Odbačeno (čišćenje: znakovi/velika slova) | ${fmt(rezultat.odbaceniCiscenje)} |`);
   redci.push(`| Odbačeno (< 2 grafema) | ${fmt(rezultat.odbaceniMaloGrafema)} |`);
   redci.push(`| **Jedinstvenih oblika** | **${fmt(statistika.ukupnoOblika)}** |`);
+  redci.push(`| **Jedinstvenih PROPN oblika** | **${fmt(rezultat.vlastitaImena.size)}** |`);
   redci.push(`| Jedinstvenih grupa (leksem·stupanj) | ${fmt(statistika.ukupnoGrupa)} |`);
   redci.push(`| Redaka kroz stari filtar (Nc.sn) | ${fmt(rezultat.stariFiltar)} |`);
   redci.push('');

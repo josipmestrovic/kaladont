@@ -197,6 +197,48 @@
       "when": 1790148822479,
       "tag": "0027_many_black_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1790317897304,
+      "tag": "0028_exotic_psynapse",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790318550516,
+      "tag": "0029_curious_bug",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790322576888,
+      "tag": "0030_groovy_nemesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790349636572,
+      "tag": "0031_cheerful_patch",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790349897983,
+      "tag": "0032_conscious_forge",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790395838085,
+      "tag": "0033_silky_jamie_braddock",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,7 @@
  * RS-17: sastavljanje stola je atomarno (RedCekanja.pokusajSastaviStol).
  */
 import type { StanjeReda } from 'zajednicko';
-import { izracunajRang, stanjeIskustva } from 'zajednicko';
+import { izracunajRang, razinaVatre, stanjeIskustva } from 'zajednicko';
 import type { KaladontIo } from '../server.js';
 import { RedCekanja, prvaCetvorica, prviPar, type StavkaReda } from './red-cekanja.js';
 import { dohvatiProsjekCekanjaSek } from './prosjek-cekanja.js';
@@ -50,6 +50,8 @@ export function registrirajRedCekanja(
         odigrane,
         prosjekBodova,
         postotakPobjeda: odigrane > 0 ? (pobjede / odigrane) * 100 : 0,
+        trenutniNiz: mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0),
+        razinaVatre: razinaVatre(mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0), mod),
       };
     });
     return { mojIgracId, mod, mjesta, prosjekCekanjaSek: dohvatiProsjekCekanjaSek() };
@@ -133,6 +135,8 @@ export function registrirajRedCekanja(
         pobjede1v1: socket.data.pobjede1v1 ?? 0,
         bodovi1v1: socket.data.bodovi1v1 ?? 0,
         iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
+        trenutniNiz4p: socket.data.trenutniNiz4p ?? 0,
+        trenutniNiz1v1: socket.data.trenutniNiz1v1 ?? 0,
         usaoU: Date.now(),
       });
       potvrda?.(izracunajStanje(socket.data.igracId, mod));

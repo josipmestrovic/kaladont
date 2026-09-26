@@ -15,7 +15,8 @@ export type VrstaRijeci =
   | 'prijedlog'
   | 'veznik'
   | 'cestica'
-  | 'uzvik';
+  | 'uzvik'
+  | 'vlastito_ime';
 
 export const SVE_VRSTE_RIJECI: readonly VrstaRijeci[] = [
   'imenica',
@@ -28,6 +29,7 @@ export const SVE_VRSTE_RIJECI: readonly VrstaRijeci[] = [
   'veznik',
   'cestica',
   'uzvik',
+  'vlastito_ime',
 ];
 
 export type StupanjRijeci = 'poz' | 'komp' | 'sup';
@@ -40,14 +42,29 @@ export function kljucGrupe(vrsta: VrstaRijeci, lema: string, stupanj?: StupanjRi
   return `${vrsta}:${lema}`;
 }
 
+/** Ključ koji korisnik vidi kao jednu osnovnu riječ; stupnjevi pridjeva/priloga se spajaju. */
+export function kolekcijskiKljucGrupe(grupa: string): string {
+  const [vrsta, lema] = grupa.split(':');
+  return vrsta && lema ? `${vrsta}:${lema}` : grupa;
+}
+
+/** Lema iz tehničkog ključa grupe, za korisnički prikaz. */
+export function osnovnaRijecIzGrupe(grupa: string): string {
+  return grupa.split(':')[1] ?? grupa;
+}
+
 /** Sučelje prema rječniku - implementira ga poslužitelj (strukture u memoriji, ADR-007 + ADR-013). */
 export interface RjecnikSucelje {
   /** Postoji li riječ u bazi (aktivna, neovisno o potrošenosti u partiji). */
   jePostojecaRijec(rijec: string): boolean;
+  /** Je li riječ poznata kao vlastito ime, ali namjerno nije igriva. */
+  jeVlastitoIme?(rijec: string): boolean;
   /** Leksemske grupe kojima oblik pripada; prazan niz ako riječ nije u bazi. */
   grupeZa(rijec: string): readonly string[];
   /** Korpusna frekvencija oblika; vraća null za riječ koja nije u rječniku. */
   frekvencijaZa?(rijec: string): number | null;
+  brojKolekcijskihGrupa?(): number;
+  brojKolekcijskihGrupaPoVrsti?(): Map<VrstaRijeci, number>;
   ciljeviRijeci?(): { rijetke: { ukupno: number }; duge: { ukupno: number } };
   /** Vrste riječi kojima oblik pripada (npr. ['imenica']). */
   vrsteZa?(rijec: string): readonly VrstaRijeci[];
@@ -74,6 +91,7 @@ export interface RjecnikSucelje {
 
 export type KodOdbijenogPoteza =
   | 'RIJEC_NE_POSTOJI'
+  | 'VLASTITO_IME'
   | 'KRIVA_SLOVA'
   | 'RIJEC_ISKORISTENA'
   | 'NEDOPUSTENA_VRSTA'
@@ -106,6 +124,9 @@ export function validirajPotez(params: ParametriValidacije): RezultatValidacije 
   const jePosebnaRijec = RIJECI_KALADONT.has(rijecNormalizirana);
 
   if (!jePosebnaRijec && !params.rjecnik.jePostojecaRijec(rijecNormalizirana)) {
+    if (params.rjecnik.jeVlastitoIme?.(rijecNormalizirana) && params.rjecnik.grupeZa(rijecNormalizirana).length > 0) {
+      return { valjano: false, kod: 'VLASTITO_IME', poruka: PORUKE.vlastitoImeNijeDopusteno(rijecNormalizirana) };
+    }
     return { valjano: false, kod: 'RIJEC_NE_POSTOJI', poruka: PORUKE.rijecNePostoji(rijecNormalizirana) };
   }
 

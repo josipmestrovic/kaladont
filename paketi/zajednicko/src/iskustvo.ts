@@ -18,7 +18,7 @@ export interface StanjeIskustva {
 }
 
 export interface StavkaIskustva {
-  vrsta: 'potezi' | 'duge_rijeci' | 'rijetke_rijeci' | 'kaladont' | 'eliminacije' | 'pobjeda' | 'streak';
+  vrsta: 'potezi' | 'duge_rijeci' | 'rijetke_rijeci' | 'kaladont' | 'eliminacije' | 'pobjeda' | 'pobjednicki_niz' | 'streak';
   naziv: string;
   kolicina: number;
   poStavci: number | null;

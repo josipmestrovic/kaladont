@@ -37,9 +37,6 @@
   let spremljeno = $state<AvatarConfigV1>(kopirajKonfiguraciju(ZADANI_AVATAR_CONFIG));
   let inicijalizirano = false;
   let aktivniIndeks = $state(0);
-  let otvorenPicker = $state<'skin' | 'aktivni' | null>(null);
-  let pickerKoze = $state<HTMLInputElement | null>(null);
-  let pickerAktivni = $state<HTMLInputElement | null>(null);
   $effect(() => {
     if (inicijalizirano) return;
     draft = kopirajKonfiguraciju(pocetnaKonfiguracija);
@@ -171,12 +168,6 @@
     promijeniBoju(uloga, `#${vrijednost}`);
   }
 
-  function otvoriPicker(vrsta: 'skin' | 'aktivni') {
-    otvorenPicker = otvorenPicker === vrsta ? null : vrsta;
-    if (otvorenPicker !== vrsta) return;
-    requestAnimationFrame(() => (vrsta === 'skin' ? pickerKoze : pickerAktivni)?.click());
-  }
-
   async function spremi() {
     if ((!izmijenjeno && !spremiBezPromjene) || spremanje) return;
     await onSpremi(kopirajKonfiguraciju(draft));
@@ -197,18 +188,26 @@
 
     <div class="kontrole">
       <div class="navigator" aria-label="Odabir elementa avatara">
-        <button type="button" class="strelica" aria-label="Prethodni element" onclick={() => idiNaKategoriju(-1)}>‹</button>
+        <button type="button" class="strelica" aria-label="Prethodni element" onclick={() => idiNaKategoriju(-1)}>
+          <img src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
+        </button>
         <div class="navigator-sredina">
           <h2>{aktivnaKategorija.naziv}</h2>
         </div>
-        <button type="button" class="strelica" aria-label="Sljedeći element" onclick={() => idiNaKategoriju(1)}>›</button>
+        <button type="button" class="strelica" aria-label="Sljedeći element" onclick={() => idiNaKategoriju(1)}>
+          <img src="/ikone/05-naprijed.png" alt="" aria-hidden="true" />
+        </button>
       </div>
 
       {#if aktivnaKategorija.kljuc !== 'base'}
         <div class="izbor-navigator" aria-label={`Varijanta za ${aktivnaKategorija.naziv}`}>
-          <button type="button" class="strelica mala" aria-label="Prethodna varijanta" onclick={() => idiNaVrijednost(-1)}>‹</button>
+          <button type="button" class="strelica mala" aria-label="Prethodna varijanta" onclick={() => idiNaVrijednost(-1)}>
+            <img src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
+          </button>
           <div class="aktivni-izbor" aria-live="polite">{nazivDijela(aktivnaKategorija.kljuc, aktivnaVrijednost)}</div>
-          <button type="button" class="strelica mala" aria-label="Sljedeća varijanta" onclick={() => idiNaVrijednost(1)}>›</button>
+          <button type="button" class="strelica mala" aria-label="Sljedeća varijanta" onclick={() => idiNaVrijednost(1)}>
+            <img src="/ikone/05-naprijed.png" alt="" aria-hidden="true" />
+          </button>
         </div>
       {/if}
 
@@ -218,14 +217,8 @@
           {#each presetiBoja.skin as preset (preset)}
             <button type="button" class="preset" style={`background:${preset}`} aria-label={`Odaberi boju kože ${preset}`} class:odabrano={draft.colors.skin === preset} onclick={() => odaberiPresetZa('skin', preset)}></button>
           {/each}
+          <button type="button" class="random-boja" aria-label="Nasumična boja kože" onclick={() => iznenadiBoju('skin')}>🎲</button>
         </div>
-        <div class="boja-akcije">
-          <button type="button" class="dodaj-boju" onclick={() => otvoriPicker('skin')}>{otvorenPicker === 'skin' ? 'Zatvori birač' : 'Dodaj svoju boju'}</button>
-          <button type="button" class="iznenadi-boju" onclick={() => iznenadiBoju('skin')}>Iznenadi me s bojom</button>
-        </div>
-        {#if otvorenPicker === 'skin'}
-          <input bind:this={pickerKoze} class="picker" type="color" value={draft.colors.skin ?? '#AC6651'} aria-label="Odaberi boju kože" oninput={(event) => promijeniBoju('skin', event.currentTarget.value)} />
-        {/if}
       </div>
       {/if}
 
@@ -235,14 +228,8 @@
             {#each aktivniPreseti as preset (preset)}
               <button type="button" class="preset" style={`background:${preset}`} aria-label={`Odaberi boju ${preset}`} class:odabrano={aktivnaBoja === preset} onclick={() => odaberiPreset(preset)}></button>
             {/each}
+            <button type="button" class="random-boja" aria-label="Nasumična boja" onclick={() => iznenadiBoju(ulogaAktivneBoje!)}>🎲</button>
           </div>
-          <div class="boja-akcije">
-            <button type="button" class="dodaj-boju" onclick={() => otvoriPicker('aktivni')}>{otvorenPicker === 'aktivni' ? 'Zatvori birač' : 'Dodaj svoju boju'}</button>
-            <button type="button" class="iznenadi-boju" onclick={() => iznenadiBoju(ulogaAktivneBoje!)}>Iznenadi me s bojom</button>
-          </div>
-          {#if otvorenPicker === 'aktivni'}
-            <input bind:this={pickerAktivni} class="picker" type="color" value={aktivnaBoja ?? '#000000'} aria-label="Dodaj svoju boju" oninput={(event) => promijeniBoju(ulogaAktivneBoje!, event.currentTarget.value)} />
-          {/if}
         </div>
       {/if}
     </div>
@@ -259,28 +246,29 @@
   .editor-zaglavlje { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   h1 { margin: 0; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); }
   .radni-prostor { display: grid; gap: 20px; }
-  .preview { display: grid; place-items: center; min-height: 300px; padding: 16px; border: 1px solid #e5ddc8; border-radius: 8px; background: white; }
+  .preview { display: grid; place-items: center; min-height: 300px; padding: 16px; }
   .kontrole { display: grid; align-content: start; gap: 14px; }
-  .navigator, .izbor-navigator { display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; gap: 10px; }
-  .navigator { min-height: 82px; padding: 10px; border: 1px solid #e5ddc8; border-radius: 8px; background: white; }
+  .navigator, .izbor-navigator { display: grid; align-items: center; gap: 10px; }
+  .navigator { grid-template-columns: 52px 1fr 52px; }
+  .izbor-navigator { grid-template-columns: 34px 1fr 34px; }
+  .navigator { min-height: 82px; padding: 10px; }
   .navigator-sredina { min-width: 0; text-align: center; }
-  .navigator h2 { margin: 0; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: 1.35rem; }
-  .strelica { display: inline-grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 1px solid #e5ddc8; border-radius: 50%; background: #faf8f0; color: var(--boja-tekst-naslov); font-size: 30px; line-height: 1; cursor: pointer; }
-  .strelica.mala { width: 34px; height: 34px; font-size: 24px; }
-  .aktivni-izbor { display: grid; place-items: center; min-height: 40px; padding: 9px 14px; border: 1px solid var(--boja-pozadina-primarna); border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-weight: 700; text-align: center; }
+  .navigator h2 { margin: 0; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: 1.5rem; }
+  .strelica { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+  .strelica img { width: 40px; height: 40px; object-fit: contain; }
+  .strelica.mala { width: 30px; height: 30px; }
+  .strelica.mala img { width: 30px; height: 30px; }
+  .aktivni-izbor { display: grid; place-items: center; min-height: 40px; padding: 9px 14px; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: 1.05rem; font-weight: 700; text-align: center; }
   .nasumicno, .odustani, .spremi { padding: 9px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
   .nasumicno { border-color: #4f9d69; color: #3d8154; }
-  .boje { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 14px; border: 1px solid #e5ddc8; border-radius: 8px; background: white; }
-  .picker { width: 48px; height: 40px; padding: 2px; border: 1px solid #e5ddc8; border-radius: 8px; background: white; cursor: pointer; }
+  .boje { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 14px; }
   .preseti { display: flex; gap: 7px; }
   .preset { width: 26px; height: 26px; padding: 0; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 0 1px #cfc7b5; cursor: pointer; }
   .preset.odabrano { box-shadow: 0 0 0 2px var(--boja-pozadina-primarna); }
-  .boja-akcije { display: flex; flex-wrap: nowrap; gap: 12px; }
-  .dodaj-boju, .iznenadi-boju { padding: 8px 12px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; white-space: nowrap; }
-  .iznenadi-boju { border-color: #4f9d69; color: #3d8154; }
+  .random-boja { display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; background: transparent; font-size: 1.2rem; line-height: 1; cursor: pointer; }
   .akcije { display: flex; justify-content: flex-end; gap: 10px; }
   .spremi { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
   button:disabled { cursor: wait; opacity: .55; }
   @media (min-width: 1000px) { .radni-prostor { grid-template-columns: minmax(360px, 1fr) minmax(420px, 1fr); align-items: start; gap: 32px; } .preview { position: sticky; top: 20px; } }
-  @media (max-width: 600px) { .editor-zaglavlje { flex-direction: column; } .nasumicno { align-self: flex-start; } .izbor-navigator { grid-template-columns: 34px 1fr 34px; gap: 5px; } .akcije { flex-direction: column-reverse; } .akcije button { width: 100%; } }
+  @media (max-width: 600px) { .editor-zaglavlje { flex-direction: column; } .nasumicno { align-self: flex-start; } .navigator { grid-template-columns: 46px 1fr 46px; } .izbor-navigator { grid-template-columns: 34px 1fr 34px; gap: 5px; } .akcije { flex-direction: column-reverse; } .akcije button { width: 100%; } }
 </style>

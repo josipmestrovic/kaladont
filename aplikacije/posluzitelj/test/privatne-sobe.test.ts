@@ -8,6 +8,7 @@ import type { KrajPartije, PocetakPartije, StanjePrivatneSobe } from 'zajednicko
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { sesije } from '../src/baza/shema.js';
+import { dodijeliRezultatSobeAkoNijeObraden } from '../src/soba/servis-soba.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -91,6 +92,31 @@ function cekajRunduIliKraj(
 }
 
 describe('privatne sobe', () => {
+  it('isti završetak privatne partije dodjeljuje pobjedu i bodove samo jednom', () => {
+    const soba = {
+      obradenePartije: new Set<string>(),
+      pobjedeUSeriji: new Map<string, number>(),
+      bodoviUSeriji: new Map<string, number>(),
+    };
+    const rezultati = [
+      { igracId: 'igrac-a', bodovi: 2 },
+      { igracId: 'igrac-b', bodovi: 0 },
+    ];
+
+    dodijeliRezultatSobeAkoNijeObraden(soba, 'partija-1', 'igrac-a', rezultati);
+    dodijeliRezultatSobeAkoNijeObraden(soba, 'partija-1', 'igrac-a', rezultati);
+
+    expect(soba.pobjedeUSeriji.get('igrac-a')).toBe(1);
+    expect(soba.bodoviUSeriji.get('igrac-a')).toBe(2);
+    expect(soba.bodoviUSeriji.get('igrac-b')).toBe(0);
+
+    dodijeliRezultatSobeAkoNijeObraden(soba, 'partija-2', 'igrac-b', rezultati);
+
+    expect(soba.pobjedeUSeriji.get('igrac-b')).toBe(1);
+    expect(soba.bodoviUSeriji.get('igrac-a')).toBe(4);
+    expect(soba.bodoviUSeriji.get('igrac-b')).toBe(0);
+  });
+
   it('kontrolirano odbija neispravne Socket.IO payloadove bez rušenja procesa', async () => {
     const vlasnik = await spojiIgraca();
 

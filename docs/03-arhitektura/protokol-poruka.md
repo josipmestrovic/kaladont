@@ -22,8 +22,8 @@ Poslužitelj razrješava identitet (ili stvara novog gosta) i veže socket uz `i
 | `red:udji` | `{}` | Ulazak u red čekanja |
 | `red:izadji` | `{}` | Dobrovoljni izlazak iz reda |
 | `partija:stanje` | `{}` | Zahtjev za trenutačnim stanjem partije nakon ponovnog spajanja |
-| `potez:rijec` | `{ rijec: string }` | Pokušaj poteza |
-| `potez:ne-znam` | `{}` | Predaja poteza (klijent traži potvrdu prije slanja) |
+| `potez:rijec` | `{ rijec: string, turnToken?: string }` | Pokušaj poteza vezan uz trenutačni potez |
+| `potez:ne-znam` | `{ turnToken?: string }` | Predaja poteza (klijent traži potvrdu prije slanja) |
 | `reakcija:posalji` | `{ poruka: BrzaPoruka }` | Predefinirana brza poruka (rate limit 1/2 s) |
 
 ```ts
@@ -69,7 +69,7 @@ interface StanjeReda {
 interface PocetakPartije {
   partijaId: string;
   mojIgracId: string; // identitet primatelja; poruka se šalje pojedinačno svakom socketu
-  sjedala: { igracId: string; nadimak: string; avatarId: number; rang: string | null }[]; // redom 0-3
+    sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[]; // redom 0-3
   // naPotezuId/istekPotezaIso više se ne šalju ovdje - dolaze tek u RundaOtvorena, nakon
   // što sustav odabere prvu riječ (vidi partija:sustav-bira-rijec / partija:runda-otvorena)
 }
@@ -78,6 +78,7 @@ interface StanjePartije {
   partijaId: string;
   mojIgracId: string;
   sjedala: { igracId: string; nadimak: string; avatarId: number; rang: string | null }[];
+  turnToken: string;                         // jedinstveni identifikator ove instance poteza
   naPotezuId: string;
   trazenaSlova: string | null;
   istekPotezaIso: string;
@@ -108,6 +109,7 @@ interface RundaOtvorena {
   rijec: string;
   trazenaSlova: string;
   naPotezuId: string;
+  turnToken: string;                          // isti token vrijedi do promjene poteza
   istekPotezaIso: string;      // apsolutno vrijeme isteka 30s timera (server je sat)
   serverVrijemeIso: string;
   runda: number;
@@ -118,6 +120,7 @@ interface PrihvacenPotez {
   rijec: string;
   trazenaSlova: string;        // dva grafema za sljedećeg
   sljedeciId: string;
+  turnToken: string;                          // token novog poteza
   istekPotezaIso: string;
   brojIskoristenih: number;    // za prikaz napretka partije
   nagrada: NagradaZaRijec | null; // jedan efekt; null za običnu riječ
@@ -147,7 +150,7 @@ interface NagradaZaRijec {
 }
 
 interface OdbijenPotez {
-  kod: "RIJEC_NE_POSTOJI" | "KRIVA_SLOVA" | "RIJEC_ISKORISTENA" | "NIJE_TVOJ_POTEZ" | "SUSTAV_BIRA_RIJEC";
+  kod: "RIJEC_NE_POSTOJI" | "KRIVA_SLOVA" | "RIJEC_ISKORISTENA" | "NIJE_TVOJ_POTEZ" | "STARI_TURN_TOKEN" | "SUSTAV_BIRA_RIJEC";
   poruka: string;              // spreman UI tekst na hrvatskom
 }
 
@@ -180,11 +183,12 @@ type KodGreske = "PREBRZO" | "NISI_U_PARTIJI" | "VEC_U_REDU" | "EMAIL_NIJE_POTVR
 ## Pravila protokola
 
 1. **Server je sat.** Klijent prikazuje odbrojavanje prema `istekPotezaIso`, ali presudu donosi isključivo server (RS-14).
-2. **Resinkronizacija:** nakon ponovnog spajanja istim identitetom poslužitelj vraća vezu u sobu aktivne partije i šalje `partija:stanje`; timer poteza nastavlja teći prema izvornom `istekPotezaIso`. U redu čekanja nema 10-sekundne tolerancije: svaki prekid odmah oslobađa mjesto, a klijent na `/red` nakon povratka ponovno šalje `red:udji` i ulazi na kraj reda. UI aktivne partije uvijek se može obnoviti iz jedne poruke.
-3. **Promatrači** (eliminirani igrači) primaju sve događaje stola i smiju slati `reakcija:posalji`.
-4. **Idempotentnost:** ponovljeni `red:udji` dok je igrač već u redu ponovno šalje `red:stanje` bez promjene položaja.
-5. **Potvrda emaila:** nepotvrđeni registrirani račun dobiva `EMAIL_NIJE_POTVRDEN` pri ulasku u javni red i stvaranju, ulasku ili pokretanju privatne sobe. Gost i račun s potvrđenim aktivnim emailom (i emailom na čekanju) mogu igrati.
-5. Svaka poruka poslužitelja nosi spreman hrvatski tekst (`poruka`) — klijent ne sastavlja poruke pravila sam.
-6. `nagrada` se izračunava isključivo na poslužitelju nakon prihvaćene riječi igrača. Početne i druge sustavske riječi, kao i odbijeni potezi, nemaju nagradu.
-7. Ako riječ istovremeno zadovoljava kriterij rijetkosti i duljine, šalje se jedan `NagradaZaRijec` s oba razloga. Klijent ne pušta dva zvuka i ne stvara dva odvojena efekta.
-8. Nagrada se može prikazati svim klijentima u sobi, ali se ista leksemska grupa nagrađuje najviše jednom u jednoj partiji.
+2. **Token poteza:** `turnToken` se mijenja pri svakoj promjeni instance poteza. Timer i klijentske akcije vezani su uz token; zakašnjeli timer ili payload sa starim tokenom ne smije promijeniti stanje i dobiva `STARI_TURN_TOKEN`.
+3. **Resinkronizacija:** nakon ponovnog spajanja istim identitetom poslužitelj vraća vezu u sobu aktivne partije i šalje `partija:stanje`; timer poteza nastavlja teći prema izvornom `istekPotezaIso`. U redu čekanja nema 10-sekundne tolerancije: svaki prekid odmah oslobađa mjesto, a klijent na `/red` nakon povratka ponovno šalje `red:udji` i ulazi na kraj reda. UI aktivne partije uvijek se može obnoviti iz jedne poruke.
+4. **Promatrači** (eliminirani igrači) primaju sve događaje stola i smiju slati `reakcija:posalji`.
+5. **Idempotentnost:** ponovljeni `red:udji` dok je igrač već u redu ponovno šalje `red:stanje` bez promjene položaja.
+6. **Potvrda emaila:** nepotvrđeni registrirani račun dobiva `EMAIL_NIJE_POTVRDEN` pri ulasku u javni red i stvaranju, ulasku ili pokretanju privatne sobe. Gost i račun s potvrđenim aktivnim emailom (i emailom na čekanju) mogu igrati.
+7. Svaka poruka poslužitelja nosi spreman hrvatski tekst (`poruka`) — klijent ne sastavlja poruke pravila sam.
+8. `nagrada` se izračunava isključivo na poslužitelju nakon prihvaćene riječi igrača. Početne i druge sustavske riječi, kao i odbijeni potezi, nemaju nagradu.
+9. Ako riječ istovremeno zadovoljava kriterij rijetkosti i duljine, šalje se jedan `NagradaZaRijec` s oba razloga. Klijent ne pušta dva zvuka i ne stvara dva odvojena efekta.
+10. Nagrada se može prikazati svim klijentima u sobi, ali se ista leksemska grupa nagrađuje najviše jednom u jednoj partiji.

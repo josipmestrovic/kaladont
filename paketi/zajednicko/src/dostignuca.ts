@@ -68,6 +68,8 @@ export function izracunajNovaDostignuca(
       : (trajniNapredak[definicija.brojac] ?? 0);
     const novaVrijednost = definicija.brojac === 'razina'
       ? razinaIskustva
+      : definicija.brojac === 'najduziStreak'
+        ? Math.max(staraVrijednost, delta[definicija.brojac] ?? 0)
       : staraVrijednost + (delta[definicija.brojac] ?? 0);
     const staraRazina = izracunajRazinuDostignuca(definicija, staraVrijednost);
     const novaRazina = izracunajRazinuDostignuca(definicija, novaVrijednost);
@@ -75,6 +77,13 @@ export function izracunajNovaDostignuca(
       ? [{ id: definicija.id, novaRazina, maksimalnaRazina: definicija.pragovi.length }]
       : [];
   });
+}
+
+export function jeDostignuceNovo(zadnjeOtkljucavanje: Date | string | null | undefined): boolean {
+  if (!zadnjeOtkljucavanje) return false;
+  const vrijeme = new Date(zadnjeOtkljucavanje).getTime();
+  if (Number.isNaN(vrijeme)) return false;
+  return Date.now() - vrijeme <= 24 * 60 * 60 * 1000;
 }
 
 export function dohvatiDefinicijuDostignuca(id: string): DefinicijaDostignuca | undefined {

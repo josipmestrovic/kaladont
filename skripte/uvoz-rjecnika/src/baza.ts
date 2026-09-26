@@ -33,6 +33,12 @@ export const rijeci = pgTable('rijeci', {
   napomena: text('napomena'),
 });
 
+export const vlastitaImena = pgTable('vlastita_imena', {
+  rijec: text('rijec').primaryKey(),
+  leme: text('leme').array().notNull().default([]),
+  frekvencija: integer('frekvencija').notNull().default(0),
+});
+
 export const izmjeneRjecnika = pgTable('izmjene_rjecnika', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   rijec: text('rijec').notNull(),

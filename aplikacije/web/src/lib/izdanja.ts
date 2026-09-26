@@ -8,6 +8,89 @@ export interface IzdanjeBiljeske {
 
 export const IZDANJA: IzdanjeBiljeske[] = [
   {
+    verzija: 'v0.5.0-closed-alpha',
+    naslov: 'Kaladont Multiplayer v0.5.0 – Closed Alpha',
+    datum: '26. rujna 2026.',
+    uvod: 'Peto zatvoreno izdanje završava profilni CV i biografsko razmišljanje o igraču, uvodi stabilnije prikaze staza i formi te dodatno usklađuje javni i privatni profil s novim sadržajem.',
+    novo: [
+      {
+        naslov: 'CV profil je sada čisti biografski odlomak',
+        stavke: [
+          'U sažetku profila ostaje samo jedan biografski paragraf bez naslova, rangova, razina, forme i rezultata.',
+          'Staž se prikazuje kao završna rečenica na kraju teksta, a ne kao zaseban blok u headeru.',
+          'Kod gostiju i nekompletnog profila prikazuje se samo odgovarajuća poruka bez dodatnog sadržaja.',
+          'Dodana je i pravilna logika razvrstavanja 28+ dana, s tjednima i 30-dnevnim mjesečnim prijelazima.',
+        ],
+      },
+      {
+        naslov: 'Jasnije i sigurnije poslovanje s profilom',
+        stavke: [
+          'Poboljšan je javni i privatni prikaz CV-a, uključujući ispravno poravnanje i responzivno ponašanje na mobilu.',
+          'Rijetka riječ ostaje podržana kao fallback, a najduža riječ i dalje je primarni dokaz u biografiji.',
+          'Odbacene su poslovne i “CV” reference u opisima: tekst više zvuči kao biografija igrača nego kao poslovni profil.',
+        ],
+      },
+      {
+        naslov: 'Dodatni stabilizacijski i sigurnosni rad',
+        stavke: [
+          'Ažurirane su migracije, validacije i profilni endpointi uz novi model podataka i dodatna provjera registriranog staža.',
+          'Pojačana je stabilnost reda čekanja, privatnih soba i load-bot tokova.',
+          'Dodane su i dopunske testne pokrivenosti za CV, formu, DNK, profil i rječnik.',
+        ],
+      },
+    ],
+  },
+  {
+    verzija: 'v0.4.0-closed-alpha.1',
+    naslov: 'Kaladont Multiplayer v0.4.0 – Closed Alpha 1',
+    datum: '25. rujna 2026.',
+    uvod: 'Četvrto zatvoreno izdanje donosi osobnije avatare, dodatni XP za pobjednički niz i pravednije početke rundi. Sada možeš poslati i svoje mišljenje o igri te napredovati kroz novo dostignuće Glas zajednice.',
+    novo: [
+      {
+        naslov: 'Avatar po tvojoj mjeri',
+        stavke: [
+          'Pri registraciji možeš sastaviti vlastiti avatar birajući izgled i boje.',
+          'Avatar možeš uređivati i kasnije u profilu.',
+          'Gumb Nasumično predlaže novu kombinaciju.',
+        ],
+      },
+      {
+        naslov: 'Niz pobjeda donosi dodatni XP',
+        stavke: [
+          'Uzastopne pobjede donose sve veći postotni bonus na XP za pobjedničku partiju.',
+          'Bonus počinje od druge pobjede zaredom: +10% u igri za četiri igrača i +5% u dvoboju.',
+          'Nizovi se prate zasebno za svaki način igre, a bonus može narasti do +100%.',
+          'U profilu i redu možeš vidjeti svoj niz i bonus koji donosi sljedeća pobjeda.',
+          'Ovaj bonus vrijedi za niz pobjeda i odvojen je od niza prihvaćenih riječi tijekom partije.',
+        ],
+      },
+      {
+        naslov: 'Lakši povratak u račun',
+        stavke: [
+          'Ako zaboraviš lozinku, možeš zatražiti poveznicu za njezinu promjenu.',
+          'Lozinku tijekom upisa možeš privremeno prikazati ili sakriti.',
+          'Potvrda emaila dovršava se kroz jasnu stranicu u igri.',
+        ],
+      },
+      {
+        naslov: 'Pošteniji početak runde',
+        stavke: [
+          'Od 52 odobrene početne riječi bira se ona čiji svaki dopušteni prvi odgovor ima barem jedan slobodan nastavak.',
+          'Ako nijedna nije dostupna, pričuvna riječ jamči barem jedan valjani odgovor, ali ne i nastavak nakon svakog odgovora.',
+          'Provjera uzima u obzir već odigrane oblike i vrijedi i u privatnim partijama.',
+        ],
+      },
+      {
+        naslov: 'Pošalji svoje mišljenje',
+        stavke: [
+          'Registrirani igrači mogu poslati povratnu informaciju iz igre.',
+          'Pri prvom slanju mogu ocijeniti pravila, rječnik, vrijeme za potez, snalaženje, brzinu učitavanja i gamifikaciju.',
+          'Svaka poslana povratna informacija napreduje dostignuće Glas zajednice, koje ima pet razina.',
+        ],
+      },
+    ],
+  },
+  {
     verzija: 'v0.3.0-closed-alpha.1',
     naslov: 'Kaladont Multiplayer v0.3.0 – Closed Alpha 1',
     datum: '15. rujna 2026.',

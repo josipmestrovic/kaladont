@@ -4,15 +4,21 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { baza } from '../baza/klijent.js';
-import { igraci, partije, potezi, prijave, sudioniciPartije } from '../baza/shema.js';
+import { igraci, obracuniPartija, partije, potezi, prijave, prijaveIgraca, sudioniciPartije } from '../baza/shema.js';
 import { pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { zahtijevajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
-import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull, notExists } from 'drizzle-orm';
 
 const ShemaPrijave = z.object({
   partijaId: z.string().uuid(),
   potezId: z.number().int().positive(),
+  poruka: z.string().trim().max(1000).optional(),
+});
+const ShemaPrijavaIgraca = z.object({
+  partijaId: z.string().uuid(),
+  prijavljeniIgracId: z.string().uuid(),
+  razlog: z.enum(['pogrdan_nadimak', 'neprimjereno_ponasanje', 'drugo']),
   poruka: z.string().trim().max(1000).optional(),
 });
 
@@ -103,5 +109,55 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
       ok: true,
       poruka: 'Hvala! Pregledat ćemo prijavu — ovako nam pomažeš da igra bude bolja.',
     };
+  });
+
+  app.post('/prijave-igraca', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
+    const rezultat = ShemaPrijavaIgraca.safeParse(zahtjev.body);
+    if (!rezultat.success) return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci za prijavu igrača.' });
+    const prijavitelj = (zahtjev as ZahtjevSIgracem).igrac!;
+    if (prijavitelj.id === rezultat.data.prijavljeniIgracId) {
+      return odgovor.code(400).send({ ok: false, greska: 'Ne možeš prijaviti samoga/samu sebe.' });
+    }
+
+    try {
+      await baza.transaction(async (tx) => {
+        const [partija] = await tx.select({ id: partije.id }).from(partije).where(and(
+          eq(partije.id, rezultat.data.partijaId),
+          eq(partije.status, 'zavrsena'),
+          notExists(tx.select({ partijaId: obracuniPartija.partijaId }).from(obracuniPartija).where(and(
+            eq(obracuniPartija.partijaId, partije.id),
+            eq(obracuniPartija.vrsta, 'privatna_gamifikacija'),
+          ))),
+        )).limit(1);
+        if (!partija) throw new GreskaPrijave(404, 'Javna završena partija nije pronađena.');
+
+        const [sudionik] = await tx.select({ igracId: sudioniciPartije.igracId }).from(sudioniciPartije).where(and(
+          eq(sudioniciPartije.partijaId, rezultat.data.partijaId),
+          eq(sudioniciPartije.igracId, prijavitelj.id),
+        )).limit(1);
+        if (!sudionik) throw new GreskaPrijave(403, 'Samo sudionici partije mogu prijaviti igrača.');
+
+        const [prijavljeni] = await tx.select({ igracId: sudioniciPartije.igracId }).from(sudioniciPartije).where(and(
+          eq(sudioniciPartije.partijaId, rezultat.data.partijaId),
+          eq(sudioniciPartije.igracId, rezultat.data.prijavljeniIgracId),
+        )).limit(1);
+        if (!prijavljeni) throw new GreskaPrijave(404, 'Igrač nije sudjelovao u toj partiji.');
+
+        await tx.insert(prijaveIgraca).values({
+          partijaId: rezultat.data.partijaId,
+          prijaviteljId: prijavitelj.id,
+          prijavljeniIgracId: rezultat.data.prijavljeniIgracId,
+          razlog: rezultat.data.razlog,
+          poruka: rezultat.data.poruka || 'Igrač prijavljen na provjeru.',
+        });
+      });
+    } catch (greska) {
+      if (greska instanceof GreskaPrijave) return odgovor.code(greska.status).send({ ok: false, greska: greska.message });
+      if (typeof greska === 'object' && greska !== null && 'code' in greska && greska.code === '23505') {
+        return odgovor.code(409).send({ ok: false, greska: 'Ovog si igrača već prijavio/la za tu partiju.' });
+      }
+      throw greska;
+    }
+    return { ok: true, poruka: 'Hvala! Prijava je spremljena za pregled.' };
   });
 }

@@ -31,8 +31,10 @@
 <section class="dnk-kartica" aria-labelledby="dnk-naslov">
   <div class="dnk-zaglavlje">
     <div>
-      <p class="dnk-natpis"><img src="/ikone/15-kaladont-dnk.png" alt="" aria-hidden="true" />Profil igre</p>
-      <h3 id="dnk-naslov">{naslov}</h3>
+      <div class="dnk-naslov-redak">
+        <img class="dnk-ikona" src="/ikone/15-kaladont-dnk.png" alt="" aria-hidden="true" />
+        <h3 id="dnk-naslov">{naslov}</h3>
+      </div>
     </div>
     <span class:otkljucan={profil.otkljucan} class="dnk-status">
       {profil.otkljucan ? `${profil.odigrano} igara` : `Otključava se nakon 10 igara`}
@@ -80,7 +82,7 @@
       </div>
     </div>
   {/if}
-  <a class="dnk-pomoc" href="/pravila-kaladonta?tema=napredak#dnk">Kako čitati DNK?</a>
+  <a class="dnk-pomoc" href="/pravila-kaladonta?tema=napredak#dnk">Što je Kaladont DNK?</a>
 </section>
 
 <style>
@@ -100,19 +102,13 @@
     gap: 12px;
   }
 
-  .dnk-natpis {
+  .dnk-naslov-redak {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    margin: 0 0 2px;
-    color: var(--boja-akcent);
-    font-size: var(--tekst-mikro);
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    gap: 10px;
   }
 
-  .dnk-natpis img { width: 24px; height: 24px; object-fit: contain; }
+  .dnk-ikona { width: 88px; height: 88px; object-fit: contain; transform: rotate(90deg); }
 
   h3 {
     margin: 0;

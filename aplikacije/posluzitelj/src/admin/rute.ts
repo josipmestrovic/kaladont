@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { SVE_VRSTE_RIJECI } from 'zajednicko';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { dodajRijec, deaktivirajRijec, vratiRijec, NevaljanaRijecError } from '../rjecnik/administracija.js';
-import { prijave, rijeci, izmjeneRjecnika } from '../baza/shema.js';
+import { prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza/shema.js';
 import { baza } from '../baza/klijent.js';
 import { zahtijevajAdmina, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
 
@@ -57,6 +57,31 @@ export async function registrirajAdminRute(app: FastifyInstance, rjecnik: Rjecni
           rijesioId: admin.id,
         })
         .where(eq(prijave.id, Number(zahtjev.params.id)));
+      return { ok: true };
+    },
+  );
+
+  app.get('/admin/prijave-igraca', { preHandler: zahtijevajAdmina }, async () => {
+    const retci = await baza
+      .select()
+      .from(prijaveIgraca)
+      .orderBy(desc(prijaveIgraca.vrijeme))
+      .limit(200);
+    return { ok: true, prijave: retci };
+  });
+
+  app.post<{ Params: { id: string } }>(
+    '/admin/prijave-igraca/:id/rijesi',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev, odgovor) => {
+      const rezultat = ShemaRijesiPrijavu.safeParse(zahtjev.body);
+      if (!rezultat.success) return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
+      const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+      await baza.update(prijaveIgraca).set({
+        status: rezultat.data.status,
+        napomenaAdmina: rezultat.data.napomenaAdmina ?? null,
+        rijesioId: admin.id,
+      }).where(eq(prijaveIgraca.id, Number(zahtjev.params.id)));
       return { ok: true };
     },
   );

@@ -125,13 +125,24 @@ export const DNK_PRAGOVI = {
   },
 } as const;
 
+function izracunajPragZaVrijednost<T extends { min: number; max: number }>(vrijednost: number, pragovi: readonly T[]): T {
+  const prvi = pragovi[0]!;
+  const zadnji = pragovi[pragovi.length - 1]!;
+
+  if (vrijednost <= prvi.min) return prvi;
+  if (vrijednost >= zadnji.max) return zadnji;
+
+  for (const prag of pragovi) {
+    if (vrijednost >= prag.min && vrijednost <= prag.max) return prag;
+  }
+
+  return zadnji;
+}
+
 export function izracunajDnkTier(vrijednost: number, pragovi: readonly { min: number; max: number; naziv: string; oznaka: string }[]): number {
   const clipped = Math.max(0, Math.min(vrijednost, 100));
-  for (let i = pragovi.length - 1; i >= 0; i -= 1) {
-    const prag = pragovi[i]!;
-    if (clipped >= prag.min && clipped <= prag.max) return i + 1;
-  }
-  return 1;
+  const match = izracunajPragZaVrijednost(clipped, pragovi);
+  return pragovi.findIndex((prag) => prag === match) + 1;
 }
 
 export function jeDnkOtkljucan(odigrano: number): boolean {
@@ -216,10 +227,7 @@ export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
   for (let i = 0; i < osi.length; i += 1) {
     const os = osi[i]!;
     if (os.kljuc === 'vjestina') {
-      let match: DnkPrag = vjestinaPrag[0]!;
-      for (const prag of vjestinaPrag) {
-        if (prosjekBodova >= prag.min && prosjekBodova <= prag.max) match = prag;
-      }
+      const match = izracunajPragZaVrijednost(prosjekBodova, vjestinaPrag);
       os.oznaka = match.oznaka;
       os.detalj = `Prosjek bodova: ${prosjekBodova.toFixed(2)}`;
       os.vrijednost = Math.max(10, Math.min(100, Math.round((prosjekBodova / (ulaz.mod === 'dva_igraca' ? 0.89 : 5.7)) * 100)));
@@ -228,20 +236,14 @@ export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
     }
     if (os.kljuc === 'taktika') {
       const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.taktika[ulaz.mod];
-      let match: DnkPrag = pragovi[0]!;
-      for (const prag of pragovi) {
-        if (eliminacijePoPartiji >= prag.min && eliminacijePoPartiji <= prag.max) match = prag;
-      }
+      const match = izracunajPragZaVrijednost(eliminacijePoPartiji, pragovi);
       os.oznaka = match.oznaka;
       os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
       continue;
     }
     if (os.kljuc === 'fokus') {
       const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.fokus[ulaz.mod];
-      let match: DnkPrag = pragovi[0]!;
-      for (const prag of pragovi) {
-        if (najduziStreak >= prag.min && najduziStreak <= prag.max) match = prag;
-      }
+      const match = izracunajPragZaVrijednost(najduziStreak, pragovi);
       os.oznaka = match.oznaka;
       os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
       continue;
@@ -264,20 +266,14 @@ export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
     }
     if (os.kljuc === 'duge_rijeci') {
       const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.duge_rijeci[ulaz.mod];
-      let match: DnkPrag = pragovi[0]!;
-      for (const prag of pragovi) {
-        if (ponderiraneDuge >= prag.min && ponderiraneDuge <= prag.max) match = prag;
-      }
+      const match = izracunajPragZaVrijednost(ponderiraneDuge, pragovi);
       os.oznaka = match.oznaka;
       os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
       continue;
     }
     if (os.kljuc === 'rijetke_rijeci') {
       const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.rijetke_rijeci[ulaz.mod];
-      let match: DnkPrag = pragovi[0]!;
-      for (const prag of pragovi) {
-        if (ponderiraneRijetke >= prag.min && ponderiraneRijetke <= prag.max) match = prag;
-      }
+      const match = izracunajPragZaVrijednost(ponderiraneRijetke, pragovi);
       os.oznaka = match.oznaka;
       os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
     }

@@ -31,6 +31,71 @@ describe('validirajPotez', () => {
     expect(rezultat.poruka).toBe('nepostojecarijec ne postoji u našoj bazi.');
   });
 
+  it('odbija poznato vlastito ime posebnom porukom', () => {
+    const rjecnikSImenom = {
+      ...rjecnik,
+      jeVlastitoIme: (rijec: string) => rijec === 'italija',
+    };
+    const rezultat = validirajPotez({
+      rijec: 'italija',
+      trazenaSlova: 'it',
+      ...BEZ_POTROSNJE,
+      rjecnik: rjecnikSImenom,
+    });
+    expect(rezultat.kod).toBe('VLASTITO_IME');
+    expect(rezultat.poruka).toBe(PORUKE.vlastitoImeNijeDopusteno('italija'));
+  });
+
+  it('prihvaca preklopljenu rijec ako postoji i kao dopustena opca rijec', () => {
+    const rjecnikSPreklapanjem = {
+      ...rjecnik,
+      jeVlastitoIme: (rijec: string) => rijec === 'kula',
+    };
+    const rezultat = validirajPotez({
+      rijec: 'kula',
+      trazenaSlova: 'ku',
+      ...BEZ_POTROSNJE,
+      rjecnik: rjecnikSPreklapanjem,
+    });
+    expect(rezultat.valjano).toBe(true);
+  });
+
+  it('PROPN padezni oblik dijeli grupu s osnovnim oblikom', () => {
+    const rezultat = validirajPotez({
+      rijec: 'ana',
+      trazenaSlova: 'an',
+      iskoristeneGrupe: new Set(['vlastito_ime:ana']),
+      potrosioGrupu: new Map([['vlastito_ime:ana', 'ane']]),
+      rjecnik,
+    });
+    expect(rezultat.kod).toBe('RIJEC_ISKORISTENA');
+    expect(rezultat.poruka).toBe(PORUKE.rijecIskoristenaOblik('ane'));
+  });
+
+  it('PROPN oblik s dvije leme trosi obje grupe', () => {
+    const rezultat = validirajPotez({
+      rijec: 'ivanu',
+      trazenaSlova: 'iv',
+      iskoristeneGrupe: new Set(['vlastito_ime:ivan']),
+      potrosioGrupu: new Map([['vlastito_ime:ivan', 'ivan']]),
+      rjecnik,
+    });
+    expect(rezultat.kod).toBe('RIJEC_ISKORISTENA');
+
+    const nakonIvane = new Set(['vlastito_ime:ivan', 'vlastito_ime:ivana']);
+    const rezultatNakonIvane = validirajPotez({
+      rijec: 'ivan',
+      trazenaSlova: 'iv',
+      iskoristeneGrupe: nakonIvane,
+      potrosioGrupu: new Map([
+        ['vlastito_ime:ivan', 'ivana'],
+        ['vlastito_ime:ivana', 'ivana'],
+      ]),
+      rjecnik,
+    });
+    expect(rezultatNakonIvane.kod).toBe('RIJEC_ISKORISTENA');
+  });
+
   it('odbija rijec koja ne pocinje na trazena slova', () => {
     const rezultat = validirajPotez({
       rijec: 'kula',

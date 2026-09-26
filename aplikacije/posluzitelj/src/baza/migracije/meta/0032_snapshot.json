@@ -1,0 +1,2394 @@
+{
+  "id": "83c9bb0a-8112-441b-8fde-ddc48e394547",
+  "prevId": "ede8ff3e-12d9-48a6-93fa-f13d20929617",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.dnk_statistike_igraca": {
+      "name": "dnk_statistike_igraca",
+      "schema": "",
+      "columns": {
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mod": {
+          "name": "mod",
+          "type": "mod_partije",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prihvaceni_potezi": {
+          "name": "prihvaceni_potezi",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "ukupno_trajanje_prihvacenih_poteza_ms": {
+          "name": "ukupno_trajanje_prihvacenih_poteza_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "najduzi_streak": {
+          "name": "najduzi_streak",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "duge_rijeci": {
+          "name": "duge_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "srednje_duge_rijeci": {
+          "name": "srednje_duge_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "jako_duge_rijeci": {
+          "name": "jako_duge_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "rijetke_rijeci": {
+          "name": "rijetke_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "srednje_rijetke_rijeci": {
+          "name": "srednje_rijetke_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "jako_rijetke_rijeci": {
+          "name": "jako_rijetke_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "zbroj_ocjena_igre": {
+          "name": "zbroj_ocjena_igre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "broj_ocjena_igre": {
+          "name": "broj_ocjena_igre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "otkljucan_at": {
+          "name": "otkljucan_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "dnk_statistike_igraca_igrac_id_igraci_id_fk": {
+          "name": "dnk_statistike_igraca_igrac_id_igraci_id_fk",
+          "tableFrom": "dnk_statistike_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "dnk_statistike_igraca_igrac_id_mod_pk": {
+          "name": "dnk_statistike_igraca_igrac_id_mod_pk",
+          "columns": [
+            "igrac_id",
+            "mod"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dostignuca_igraca": {
+      "name": "dostignuca_igraca",
+      "schema": "",
+      "columns": {
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dostignuce_id": {
+          "name": "dostignuce_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "razina": {
+          "name": "razina",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "prvo_otkljucano": {
+          "name": "prvo_otkljucano",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "zadnje_otkljucavanje": {
+          "name": "zadnje_otkljucavanje",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "dostignuca_igraca_igrac_id_igraci_id_fk": {
+          "name": "dostignuca_igraca_igrac_id_igraci_id_fk",
+          "tableFrom": "dostignuca_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "dostignuca_igraca_igrac_id_dostignuce_id_pk": {
+          "name": "dostignuca_igraca_igrac_id_dostignuce_id_pk",
+          "columns": [
+            "igrac_id",
+            "dostignuce_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.igraci": {
+      "name": "igraci",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "vrsta": {
+          "name": "vrsta",
+          "type": "vrsta_igraca",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'gost'"
+        },
+        "nadimak": {
+          "name": "nadimak",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "avatar_id": {
+          "name": "avatar_id",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "avatar_config": {
+          "name": "avatar_config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avatar_revision": {
+          "name": "avatar_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_na_cekanju": {
+          "name": "email_na_cekanju",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lozinka_hash": {
+          "name": "lozinka_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_potvrdjen": {
+          "name": "email_potvrdjen",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "email_potvrda_zatrazen_at": {
+          "name": "email_potvrda_zatrazen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_potvrda_poslana_at": {
+          "name": "email_potvrda_poslana_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "obrisan_at": {
+          "name": "obrisan_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "odigrane": {
+          "name": "odigrane",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pobjede": {
+          "name": "pobjede",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "eliminacije_ukupno": {
+          "name": "eliminacije_ukupno",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "bodovi_ukupno": {
+          "name": "bodovi_ukupno",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "odigrane_1v1": {
+          "name": "odigrane_1v1",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pobjede_1v1": {
+          "name": "pobjede_1v1",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "eliminacije_1v1": {
+          "name": "eliminacije_1v1",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "bodovi_1v1": {
+          "name": "bodovi_1v1",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "iskustvo_ukupno": {
+          "name": "iskustvo_ukupno",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "stvoren": {
+          "name": "stvoren",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "zadnja_aktivnost": {
+          "name": "zadnja_aktivnost",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_igraci_email_lower": {
+          "name": "uq_igraci_email_lower",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"igraci\".\"email\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.izmjene_rjecnika": {
+      "name": "izmjene_rjecnika",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "izmjene_rjecnika_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "rijec": {
+          "name": "rijec",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "akcija": {
+          "name": "akcija",
+          "type": "akcija_izmjene_rjecnika",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "razlog": {
+          "name": "razlog",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prijava_id": {
+          "name": "prijava_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vrijeme": {
+          "name": "vrijeme",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "izmjene_rjecnika_prijava_id_prijave_id_fk": {
+          "name": "izmjene_rjecnika_prijava_id_prijave_id_fk",
+          "tableFrom": "izmjene_rjecnika",
+          "tableTo": "prijave",
+          "columnsFrom": [
+            "prijava_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "izmjene_rjecnika_admin_id_igraci_id_fk": {
+          "name": "izmjene_rjecnika_admin_id_igraci_id_fk",
+          "tableFrom": "izmjene_rjecnika",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.napredak_dostignuca_igraca": {
+      "name": "napredak_dostignuca_igraca",
+      "schema": "",
+      "columns": {
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valjani_potezi_ukupno": {
+          "name": "valjani_potezi_ukupno",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "rang": {
+          "name": "rang",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "rijetke_leksemske_grupe": {
+          "name": "rijetke_leksemske_grupe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "duge_rijeci": {
+          "name": "duge_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "najduzi_streak": {
+          "name": "najduzi_streak",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "kaladont_izvedbe": {
+          "name": "kaladont_izvedbe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "kaladont_zrtve": {
+          "name": "kaladont_zrtve",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "izazvane_eliminacije": {
+          "name": "izazvane_eliminacije",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "mrtva_slova_eliminacije": {
+          "name": "mrtva_slova_eliminacije",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "javne_pobjede": {
+          "name": "javne_pobjede",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "povratne_informacije": {
+          "name": "povratne_informacije",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "anketa_ispunjena": {
+          "name": "anketa_ispunjena",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "azurirano": {
+          "name": "azurirano",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "napredak_dostignuca_igraca_igrac_id_igraci_id_fk": {
+          "name": "napredak_dostignuca_igraca_igrac_id_igraci_id_fk",
+          "tableFrom": "napredak_dostignuca_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "napredak_dostignuca_igraca_igrac_id_pk": {
+          "name": "napredak_dostignuca_igraca_igrac_id_pk",
+          "columns": [
+            "igrac_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.nizovi_pobjeda_igraca": {
+      "name": "nizovi_pobjeda_igraca",
+      "schema": "",
+      "columns": {
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mod": {
+          "name": "mod",
+          "type": "mod_partije",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trenutni_niz": {
+          "name": "trenutni_niz",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "najbolji_niz": {
+          "name": "najbolji_niz",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "zadnja_obradena_partija_id": {
+          "name": "zadnja_obradena_partija_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "azurirano": {
+          "name": "azurirano",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_nizovi_pobjeda_zadnja_partija": {
+          "name": "idx_nizovi_pobjeda_zadnja_partija",
+          "columns": [
+            {
+              "expression": "zadnja_obradena_partija_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "nizovi_pobjeda_igraca_igrac_id_igraci_id_fk": {
+          "name": "nizovi_pobjeda_igraca_igrac_id_igraci_id_fk",
+          "tableFrom": "nizovi_pobjeda_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "nizovi_pobjeda_igraca_igrac_id_mod_pk": {
+          "name": "nizovi_pobjeda_igraca_igrac_id_mod_pk",
+          "columns": [
+            "igrac_id",
+            "mod"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.obracuni_partija": {
+      "name": "obracuni_partija",
+      "schema": "",
+      "columns": {
+        "partija_id": {
+          "name": "partija_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vrsta": {
+          "name": "vrsta",
+          "type": "vrsta_obracuna_partije",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stvoren": {
+          "name": "stvoren",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "obracuni_partija_partija_id_vrsta_pk": {
+          "name": "obracuni_partija_partija_id_vrsta_pk",
+          "columns": [
+            "partija_id",
+            "vrsta"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.otkljucane_grupe_igraca": {
+      "name": "otkljucane_grupe_igraca",
+      "schema": "",
+      "columns": {
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grupa": {
+          "name": "grupa",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tier": {
+          "name": "tier",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "otkljucano": {
+          "name": "otkljucano",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "otkljucane_grupe_igraca_igrac_id_igraci_id_fk": {
+          "name": "otkljucane_grupe_igraca_igrac_id_igraci_id_fk",
+          "tableFrom": "otkljucane_grupe_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "otkljucane_grupe_igraca_igrac_id_grupa_pk": {
+          "name": "otkljucane_grupe_igraca_igrac_id_grupa_pk",
+          "columns": [
+            "igrac_id",
+            "grupa"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.otkljucane_rijeci_igraca": {
+      "name": "otkljucane_rijeci_igraca",
+      "schema": "",
+      "columns": {
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rijec": {
+          "name": "rijec",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duga_tier": {
+          "name": "duga_tier",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rijetka_tier": {
+          "name": "rijetka_tier",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "jako_duga": {
+          "name": "jako_duga",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "jako_rijetka": {
+          "name": "jako_rijetka",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "otkljucano": {
+          "name": "otkljucano",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_otkljucane_rijeci_igraca_duga": {
+          "name": "idx_otkljucane_rijeci_igraca_duga",
+          "columns": [
+            {
+              "expression": "igrac_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "duga_tier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "rijec",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_otkljucane_rijeci_igraca_rijetka": {
+          "name": "idx_otkljucane_rijeci_igraca_rijetka",
+          "columns": [
+            {
+              "expression": "igrac_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "rijetka_tier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "rijec",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "otkljucane_rijeci_igraca_igrac_id_igraci_id_fk": {
+          "name": "otkljucane_rijeci_igraca_igrac_id_igraci_id_fk",
+          "tableFrom": "otkljucane_rijeci_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "otkljucane_rijeci_igraca_igrac_id_rijec_pk": {
+          "name": "otkljucane_rijeci_igraca_igrac_id_rijec_pk",
+          "columns": [
+            "igrac_id",
+            "rijec"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.partije": {
+      "name": "partije",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "mod": {
+          "name": "mod",
+          "type": "mod_partije",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'cetiri_igraca'"
+        },
+        "pocetak": {
+          "name": "pocetak",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "kraj": {
+          "name": "kraj",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_partije",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'u_tijeku'"
+        },
+        "pobjednik_id": {
+          "name": "pobjednik_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "partije_pobjednik_id_igraci_id_fk": {
+          "name": "partije_pobjednik_id_igraci_id_fk",
+          "tableFrom": "partije",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "pobjednik_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.potezi": {
+      "name": "potezi",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "potezi_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "partija_id": {
+          "name": "partija_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "runda": {
+          "name": "runda",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "redni_broj": {
+          "name": "redni_broj",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vrsta": {
+          "name": "vrsta",
+          "type": "vrsta_poteza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rijec": {
+          "name": "rijec",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trazena_slova": {
+          "name": "trazena_slova",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trajanje_ms": {
+          "name": "trajanje_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "vrijeme": {
+          "name": "vrijeme",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_potezi_partija_id_redni_broj": {
+          "name": "idx_potezi_partija_id_redni_broj",
+          "columns": [
+            {
+              "expression": "partija_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "redni_broj",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "potezi_partija_id_partije_id_fk": {
+          "name": "potezi_partija_id_partije_id_fk",
+          "tableFrom": "potezi",
+          "tableTo": "partije",
+          "columnsFrom": [
+            "partija_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "potezi_igrac_id_igraci_id_fk": {
+          "name": "potezi_igrac_id_igraci_id_fk",
+          "tableFrom": "potezi",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.povratne_informacije": {
+      "name": "povratne_informacije",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "povratne_informacije_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poruka": {
+          "name": "poruka",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pravila": {
+          "name": "pravila",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rjecnik": {
+          "name": "rjecnik",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vrijeme_poteza": {
+          "name": "vrijeme_poteza",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "snalazenje_u_aplikaciji": {
+          "name": "snalazenje_u_aplikaciji",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "brzina_ucitavanja": {
+          "name": "brzina_ucitavanja",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gamifikacija": {
+          "name": "gamifikacija",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "status_povratne_informacije",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'nova'"
+        },
+        "vrijeme": {
+          "name": "vrijeme",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "pregledao_id": {
+          "name": "pregledao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pregledano": {
+          "name": "pregledano",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_povratne_informacije_vrijeme": {
+          "name": "idx_povratne_informacije_vrijeme",
+          "columns": [
+            {
+              "expression": "vrijeme",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_povratne_informacije_status": {
+          "name": "idx_povratne_informacije_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "povratne_informacije_igrac_id_igraci_id_fk": {
+          "name": "povratne_informacije_igrac_id_igraci_id_fk",
+          "tableFrom": "povratne_informacije",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "povratne_informacije_pregledao_id_igraci_id_fk": {
+          "name": "povratne_informacije_pregledao_id_igraci_id_fk",
+          "tableFrom": "povratne_informacije",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "pregledao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.prijave": {
+      "name": "prijave",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "prijave_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "partija_id": {
+          "name": "partija_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "potez_id": {
+          "name": "potez_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poruka": {
+          "name": "poruka",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "status_prijave",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'nova'"
+        },
+        "vrijeme": {
+          "name": "vrijeme",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "rijesio_id": {
+          "name": "rijesio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "napomena_admina": {
+          "name": "napomena_admina",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_prijave_igrac_id_partija_id_vrijeme": {
+          "name": "idx_prijave_igrac_id_partija_id_vrijeme",
+          "columns": [
+            {
+              "expression": "igrac_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "partija_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "vrijeme",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_prijave_igrac_partija_potez": {
+          "name": "uq_prijave_igrac_partija_potez",
+          "columns": [
+            {
+              "expression": "igrac_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "partija_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "potez_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "prijave_partija_id_partije_id_fk": {
+          "name": "prijave_partija_id_partije_id_fk",
+          "tableFrom": "prijave",
+          "tableTo": "partije",
+          "columnsFrom": [
+            "partija_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prijave_potez_id_potezi_id_fk": {
+          "name": "prijave_potez_id_potezi_id_fk",
+          "tableFrom": "prijave",
+          "tableTo": "potezi",
+          "columnsFrom": [
+            "potez_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prijave_igrac_id_igraci_id_fk": {
+          "name": "prijave_igrac_id_igraci_id_fk",
+          "tableFrom": "prijave",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prijave_rijesio_id_igraci_id_fk": {
+          "name": "prijave_rijesio_id_igraci_id_fk",
+          "tableFrom": "prijave",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "rijesio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.prijave_igraca": {
+      "name": "prijave_igraca",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "prijave_igraca_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "partija_id": {
+          "name": "partija_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prijavitelj_id": {
+          "name": "prijavitelj_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prijavljeni_igrac_id": {
+          "name": "prijavljeni_igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "razlog": {
+          "name": "razlog",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poruka": {
+          "name": "poruka",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "status_prijave",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'nova'"
+        },
+        "vrijeme": {
+          "name": "vrijeme",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "rijesio_id": {
+          "name": "rijesio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "napomena_admina": {
+          "name": "napomena_admina",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_prijave_igraca_vrijeme": {
+          "name": "idx_prijave_igraca_vrijeme",
+          "columns": [
+            {
+              "expression": "vrijeme",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_prijave_igraca_partija_prijavitelj_igrac": {
+          "name": "uq_prijave_igraca_partija_prijavitelj_igrac",
+          "columns": [
+            {
+              "expression": "partija_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prijavitelj_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "prijavljeni_igrac_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "prijave_igraca_partija_id_partije_id_fk": {
+          "name": "prijave_igraca_partija_id_partije_id_fk",
+          "tableFrom": "prijave_igraca",
+          "tableTo": "partije",
+          "columnsFrom": [
+            "partija_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prijave_igraca_prijavitelj_id_igraci_id_fk": {
+          "name": "prijave_igraca_prijavitelj_id_igraci_id_fk",
+          "tableFrom": "prijave_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "prijavitelj_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prijave_igraca_prijavljeni_igrac_id_igraci_id_fk": {
+          "name": "prijave_igraca_prijavljeni_igrac_id_igraci_id_fk",
+          "tableFrom": "prijave_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "prijavljeni_igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prijave_igraca_rijesio_id_igraci_id_fk": {
+          "name": "prijave_igraca_rijesio_id_igraci_id_fk",
+          "tableFrom": "prijave_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "rijesio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rezultati_forme_igraca": {
+      "name": "rezultati_forme_igraca",
+      "schema": "",
+      "columns": {
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "partija_id": {
+          "name": "partija_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mod": {
+          "name": "mod",
+          "type": "mod_partije",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "zavrseno": {
+          "name": "zavrseno",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "plasman": {
+          "name": "plasman",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bodovi": {
+          "name": "bodovi",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eliminacije": {
+          "name": "eliminacije",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_rezultati_forme_igraca_mod_zavrseno": {
+          "name": "idx_rezultati_forme_igraca_mod_zavrseno",
+          "columns": [
+            {
+              "expression": "igrac_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "mod",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "zavrseno",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rezultati_forme_igraca_igrac_id_igraci_id_fk": {
+          "name": "rezultati_forme_igraca_igrac_id_igraci_id_fk",
+          "tableFrom": "rezultati_forme_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "rezultati_forme_igraca_igrac_id_partija_id_pk": {
+          "name": "rezultati_forme_igraca_igrac_id_partija_id_pk",
+          "columns": [
+            "igrac_id",
+            "partija_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rijeci": {
+      "name": "rijeci",
+      "schema": "",
+      "columns": {
+        "rijec": {
+          "name": "rijec",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "prva_dva": {
+          "name": "prva_dva",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "zadnja_dva": {
+          "name": "zadnja_dva",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vrste": {
+          "name": "vrste",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"imenica\"}'"
+        },
+        "grupe": {
+          "name": "grupe",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "frekvencija": {
+          "name": "frekvencija",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "aktivna": {
+          "name": "aktivna",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "dodana": {
+          "name": "dodana",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "napomena": {
+          "name": "napomena",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_rijeci_prva_dva": {
+          "name": "idx_rijeci_prva_dva",
+          "columns": [
+            {
+              "expression": "prva_dva",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "aktivna",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_rijeci_zadnja_dva": {
+          "name": "idx_rijeci_zadnja_dva",
+          "columns": [
+            {
+              "expression": "zadnja_dva",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "aktivna",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sesije": {
+      "name": "sesije",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stvorena": {
+          "name": "stvorena",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "istek": {
+          "name": "istek",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_sesije_igrac_id": {
+          "name": "idx_sesije_igrac_id",
+          "columns": [
+            {
+              "expression": "igrac_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_sesije_istek": {
+          "name": "idx_sesije_istek",
+          "columns": [
+            {
+              "expression": "istek",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sesije_igrac_id_igraci_id_fk": {
+          "name": "sesije_igrac_id_igraci_id_fk",
+          "tableFrom": "sesije",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sesije_token_hash_unique": {
+          "name": "sesije_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.statistike_rijeci_igraca": {
+      "name": "statistike_rijeci_igraca",
+      "schema": "",
+      "columns": {
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mod": {
+          "name": "mod",
+          "type": "mod_partije",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "najduzi_streak": {
+          "name": "najduzi_streak",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "otkrivene_jako_rijetke_grupe": {
+          "name": "otkrivene_jako_rijetke_grupe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "otkrivene_srednje_rijetke_grupe": {
+          "name": "otkrivene_srednje_rijetke_grupe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "otkrivene_rijetke_grupe": {
+          "name": "otkrivene_rijetke_grupe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "upisane_duge_rijeci": {
+          "name": "upisane_duge_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "upisane_srednje_duge_rijeci": {
+          "name": "upisane_srednje_duge_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "upisane_jako_duge_rijeci": {
+          "name": "upisane_jako_duge_rijeci",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "najduza_rijec": {
+          "name": "najduza_rijec",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "najduza_rijec_grafemi": {
+          "name": "najduza_rijec_grafemi",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "najrjeda_rijec": {
+          "name": "najrjeda_rijec",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "najrjeda_rijec_frekvencija": {
+          "name": "najrjeda_rijec_frekvencija",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "najrjeda_tier": {
+          "name": "najrjeda_tier",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "statistike_rijeci_igraca_igrac_id_igraci_id_fk": {
+          "name": "statistike_rijeci_igraca_igrac_id_igraci_id_fk",
+          "tableFrom": "statistike_rijeci_igraca",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "statistike_rijeci_igraca_igrac_id_mod_pk": {
+          "name": "statistike_rijeci_igraca_igrac_id_mod_pk",
+          "columns": [
+            "igrac_id",
+            "mod"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sudionici_partije": {
+      "name": "sudionici_partije",
+      "schema": "",
+      "columns": {
+        "partija_id": {
+          "name": "partija_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "igrac_id": {
+          "name": "igrac_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nadimak": {
+          "name": "nadimak",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Gost'"
+        },
+        "sjedalo": {
+          "name": "sjedalo",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plasman": {
+          "name": "plasman",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bodovi": {
+          "name": "bodovi",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "eliminacije": {
+          "name": "eliminacije",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "iskustvo": {
+          "name": "iskustvo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "nacin_ispadanja": {
+          "name": "nacin_ispadanja",
+          "type": "nacin_ispadanja",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cekanje_ms": {
+          "name": "cekanje_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "idx_sudionici_partije_igrac_id_partija_id": {
+          "name": "idx_sudionici_partije_igrac_id_partija_id",
+          "columns": [
+            {
+              "expression": "igrac_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "partija_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sudionici_partije_partija_id_partije_id_fk": {
+          "name": "sudionici_partije_partija_id_partije_id_fk",
+          "tableFrom": "sudionici_partije",
+          "tableTo": "partije",
+          "columnsFrom": [
+            "partija_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "sudionici_partije_igrac_id_igraci_id_fk": {
+          "name": "sudionici_partije_igrac_id_igraci_id_fk",
+          "tableFrom": "sudionici_partije",
+          "tableTo": "igraci",
+          "columnsFrom": [
+            "igrac_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "sudionici_partije_partija_id_igrac_id_pk": {
+          "name": "sudionici_partije_partija_id_igrac_id_pk",
+          "columns": [
+            "partija_id",
+            "igrac_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vlastita_imena": {
+      "name": "vlastita_imena",
+      "schema": "",
+      "columns": {
+        "rijec": {
+          "name": "rijec",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "leme": {
+          "name": "leme",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "frekvencija": {
+          "name": "frekvencija",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.akcija_izmjene_rjecnika": {
+      "name": "akcija_izmjene_rjecnika",
+      "schema": "public",
+      "values": [
+        "dodana",
+        "uklonjena",
+        "vracena"
+      ]
+    },
+    "public.mod_partije": {
+      "name": "mod_partije",
+      "schema": "public",
+      "values": [
+        "cetiri_igraca",
+        "dva_igraca"
+      ]
+    },
+    "public.nacin_ispadanja": {
+      "name": "nacin_ispadanja",
+      "schema": "public",
+      "values": [
+        "ne_znam",
+        "istek",
+        "mrtva_slova",
+        "prekid",
+        "pobjednik",
+        "kaladont"
+      ]
+    },
+    "public.status_partije": {
+      "name": "status_partije",
+      "schema": "public",
+      "values": [
+        "u_tijeku",
+        "zavrsena",
+        "ponistena"
+      ]
+    },
+    "public.status_povratne_informacije": {
+      "name": "status_povratne_informacije",
+      "schema": "public",
+      "values": [
+        "nova",
+        "pregledana",
+        "arhivirana"
+      ]
+    },
+    "public.status_prijave": {
+      "name": "status_prijave",
+      "schema": "public",
+      "values": [
+        "nova",
+        "pregledana",
+        "rijesena"
+      ]
+    },
+    "public.vrsta_igraca": {
+      "name": "vrsta_igraca",
+      "schema": "public",
+      "values": [
+        "gost",
+        "registriran",
+        "admin"
+      ]
+    },
+    "public.vrsta_obracuna_partije": {
+      "name": "vrsta_obracuna_partije",
+      "schema": "public",
+      "values": [
+        "javna_partija",
+        "privatna_gamifikacija"
+      ]
+    },
+    "public.vrsta_poteza": {
+      "name": "vrsta_poteza",
+      "schema": "public",
+      "values": [
+        "rijec",
+        "ne_znam",
+        "istek",
+        "prekid",
+        "auto_kraj",
+        "kaladont",
+        "sustav_rijec"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

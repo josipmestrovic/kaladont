@@ -65,6 +65,7 @@ export const igraci = pgTable('igraci', {
   emailPotvrdaZatrazenAt: timestamp('email_potvrda_zatrazen_at', { withTimezone: true }),
   emailPotvrdaPoslanaAt: timestamp('email_potvrda_poslana_at', { withTimezone: true }),
   obrisanAt: timestamp('obrisan_at', { withTimezone: true }),
+  registriranAt: timestamp('registriran_at', { withTimezone: true }),
   odigrane: integer('odigrane').notNull().default(0),
   pobjede: integer('pobjede').notNull().default(0),
   eliminacijeUkupno: integer('eliminacije_ukupno').notNull().default(0),
@@ -92,6 +93,39 @@ export const sesije = pgTable(
     istek: timestamp('istek', { withTimezone: true }).notNull(),
   },
   (tablica) => [index('idx_sesije_igrac_id').on(tablica.igracId), index('idx_sesije_istek').on(tablica.istek)],
+);
+
+export const nizoviPobjedaIgraca = pgTable(
+  'nizovi_pobjeda_igraca',
+  {
+    igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+    mod: modPartije('mod').notNull(),
+    trenutniNiz: integer('trenutni_niz').notNull().default(0),
+    najboljiNiz: integer('najbolji_niz').notNull().default(0),
+    zadnjaObradenaPartijaId: uuid('zadnja_obradena_partija_id'),
+    azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (tablica) => [
+    primaryKey({ columns: [tablica.igracId, tablica.mod] }),
+    index('idx_nizovi_pobjeda_zadnja_partija').on(tablica.zadnjaObradenaPartijaId),
+  ],
+);
+
+export const rezultatiFormeIgraca = pgTable(
+  'rezultati_forme_igraca',
+  {
+    igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+    partijaId: uuid('partija_id').notNull(),
+    mod: modPartije('mod').notNull(),
+    zavrseno: timestamp('zavrseno', { withTimezone: true }).notNull().defaultNow(),
+    plasman: smallint('plasman').notNull(),
+    bodovi: smallint('bodovi').notNull(),
+    eliminacije: smallint('eliminacije').notNull(),
+  },
+  (tablica) => [
+    primaryKey({ columns: [tablica.igracId, tablica.partijaId] }),
+    index('idx_rezultati_forme_igraca_mod_zavrseno').on(tablica.igracId, tablica.mod, tablica.zavrseno),
+  ],
 );
 
 export const statistikeRijeciIgraca = pgTable(
@@ -234,6 +268,7 @@ export const sudioniciPartije = pgTable(
     igracId: uuid('igrac_id')
       .notNull()
       .references(() => igraci.id),
+    nadimak: text('nadimak').notNull().default('Gost'),
     sjedalo: smallint('sjedalo').notNull(),
     plasman: smallint('plasman'),
     bodovi: smallint('bodovi').notNull().default(0),
@@ -286,6 +321,12 @@ export const rijeci = pgTable(
   ],
 );
 
+export const vlastitaImena = pgTable('vlastita_imena', {
+  rijec: text('rijec').primaryKey(),
+  leme: text('leme').array().notNull().default([]),
+  frekvencija: integer('frekvencija').notNull().default(0),
+});
+
 export const prijave = pgTable('prijave', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   partijaId: uuid('partija_id')
@@ -303,6 +344,22 @@ export const prijave = pgTable('prijave', {
 }, (tablica) => [
   index('idx_prijave_igrac_id_partija_id_vrijeme').on(tablica.igracId, tablica.partijaId, tablica.vrijeme),
   uniqueIndex('uq_prijave_igrac_partija_potez').on(tablica.igracId, tablica.partijaId, tablica.potezId),
+]);
+
+export const prijaveIgraca = pgTable('prijave_igraca', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  partijaId: uuid('partija_id').notNull().references(() => partije.id),
+  prijaviteljId: uuid('prijavitelj_id').notNull().references(() => igraci.id),
+  prijavljeniIgracId: uuid('prijavljeni_igrac_id').notNull().references(() => igraci.id),
+  razlog: text('razlog').notNull(),
+  poruka: text('poruka').notNull(),
+  status: statusPrijave('status').notNull().default('nova'),
+  vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
+  rijesioId: uuid('rijesio_id').references(() => igraci.id),
+  napomenaAdmina: text('napomena_admina'),
+}, (tablica) => [
+  index('idx_prijave_igraca_vrijeme').on(tablica.vrijeme),
+  uniqueIndex('uq_prijave_igraca_partija_prijavitelj_igrac').on(tablica.partijaId, tablica.prijaviteljId, tablica.prijavljeniIgracId),
 ]);
 
 export const izmjeneRjecnika = pgTable('izmjene_rjecnika', {

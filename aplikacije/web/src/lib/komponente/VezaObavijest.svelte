@@ -10,7 +10,7 @@
   const trebaPrikazati = $derived(stanjeVeze.partijaNedostupna || prikazivaStanja.includes(stanjeVeze.stanje));
 
   $effect(() => {
-    if (!$page.url.pathname.startsWith('/partija/')) {
+    if (!$page.url.pathname.startsWith('/partija/') || $page.url.pathname.startsWith('/partija/arhiva/')) {
       stanjeVeze.partijaNedostupna = false;
       return;
     }

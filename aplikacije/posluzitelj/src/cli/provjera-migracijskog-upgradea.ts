@@ -80,9 +80,10 @@ async function provjeriPodatke(veza: postgres.Sql): Promise<void> {
       email_potvrda_zatrazen_at: Date | null;
       email_potvrda_poslana_at: Date | null;
       iskustvo_ukupno: number;
+      registriran_at: Date | null;
     }[]
   >(`
-    SELECT nadimak, email, email_na_cekanju, email_potvrda_zatrazen_at, email_potvrda_poslana_at, iskustvo_ukupno
+    SELECT nadimak, email, email_na_cekanju, email_potvrda_zatrazen_at, email_potvrda_poslana_at, iskustvo_ukupno, registriran_at
     FROM igraci
     WHERE id = '00000000-0000-4000-8000-000000000101';
   `);
@@ -100,6 +101,9 @@ async function provjeriPodatke(veza: postgres.Sql): Promise<void> {
     igrac.email_potvrda_poslana_at !== null
   ) {
     throw new Error('Novi email stupci nemaju očekivane početne vrijednosti.');
+  }
+  if (igrac.registriran_at !== null) {
+    throw new Error('Migracija je izvela datum registracije za postojeći račun.');
   }
 
   const [brojevi] = await veza.unsafe<

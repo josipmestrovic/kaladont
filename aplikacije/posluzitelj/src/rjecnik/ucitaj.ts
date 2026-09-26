@@ -6,8 +6,8 @@
 import type { RjecnikSucelje, VrstaRijeci } from 'zajednicko';
 import { asc, eq, gt, and } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
-import { rijeci } from '../baza/shema.js';
-import { grafemi, zadnjaDva } from 'zajednicko';
+import { rijeci, vlastitaImena } from '../baza/shema.js';
+import { grafemi, prvaDva, zadnjaDva } from 'zajednicko';
 import { odaberiSigurnuPocetnuRijec } from './pocetne-rijeci.js';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
@@ -24,6 +24,13 @@ export interface CiljeviRijeci {
 
 export interface RjecnikUMemoriji extends RjecnikSucelje {
   brojRijeci(): number;
+  brojKolekcijskihGrupa(): number;
+  brojKolekcijskihGrupaPoVrsti(): Map<VrstaRijeci, number>;
+  brojKolekcijskihGrupaZaVrste(vrste: readonly VrstaRijeci[]): number;
+  brojDugihOblika(): number;
+  brojRijetkihOblika(): number;
+  brojDugihOblikaPoTieru(): readonly number[];
+  brojRijetkihOblikaPoTieru(): readonly number[];
   /** Broj oblika po kategoriji, sortirano silazno (GET /rjecnik/statistika, naslovnica). */
   brojPoKategoriji(): KategorijaRjecnika[];
   ciljeviRijeci(): CiljeviRijeci;
@@ -37,19 +44,31 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
   let rijecGrupe = new Map<string, string | readonly string[]>();
   let rijecFrekvencija = new Map<string, number>();
   let rijecVrste = new Map<string, VrstaRijeci | readonly VrstaRijeci[]>();
+  let skupVlastitihImena = new Set<string>();
   let poPrefiksu = new Map<string, string[]>();
   let pocetneImenickeRijeci: string[] = [];
   let kategorije: KategorijaRjecnika[] = [];
+  let brojKolekcijskih = 0;
+  let kolekcijskihPoVrsti = new Map<VrstaRijeci, number>();
+  let kolekcijskihKljuceviPoVrsti = new Map<VrstaRijeci, Set<string>>();
+  let brojDugih = 0;
+  let brojRijetkih = 0;
+  let brojDugihPoTieru: readonly number[] = [0, 0, 0];
+  let brojRijetkihPoTieru: readonly number[] = [0, 0, 0];
   let ciljevi: CiljeviRijeci = { rijetke: { ukupno: 0, niska: 0, srednja: 0, jaka: 0 }, duge: { ukupno: 0, duga: 0, srednja: 0, jaka: 0 } };
 
   async function ucitaj(): Promise<void> {
     const novoRijecGrupe = new Map<string, string | readonly string[]>();
     const novoRijecFrekvencija = new Map<string, number>();
     const novoRijecVrste = new Map<string, VrstaRijeci | readonly VrstaRijeci[]>();
+    const noviSkupVlastitihImena = new Set<string>();
     const novoPoPrefiksu = new Map<string, string[]>();
     const novePocetneImenickeRijeci: string[] = [];
     const noviBrojPoVrsti = new Map<VrstaRijeci, number>();
+    const noveKolekcijske = new Set<string>();
+    const noveKolekcijskePoVrsti = new Map<VrstaRijeci, Set<string>>();
     const rijetkeGrupe = [new Set<string>(), new Set<string>(), new Set<string>()];
+    const rijetkiOblici = [new Set<string>(), new Set<string>(), new Set<string>()];
     const dugeRijeci = [new Set<string>(), new Set<string>(), new Set<string>()];
     const kanon = new Map<string, string>();
     const kanoniziraj = (vrijednost: string): string => {
@@ -58,6 +77,30 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
       kanon.set(vrijednost, vrijednost);
       return vrijednost;
     };
+
+    const propnRetci = await baza.select({ rijec: vlastitaImena.rijec, leme: vlastitaImena.leme, frekvencija: vlastitaImena.frekvencija }).from(vlastitaImena);
+    for (const redak of propnRetci) {
+      noviSkupVlastitihImena.add(redak.rijec);
+      if (novoRijecGrupe.has(redak.rijec)) continue;
+      const svi = grafemi(redak.rijec);
+      if (svi.length < 2) continue;
+      const grupe = (redak.leme.length > 0 ? redak.leme : [redak.rijec]).map((lema) => kanoniziraj(`vlastito_ime:${lema}`));
+      for (const grupa of grupe) {
+        const kljuc = grupa.split(':').slice(0, 2).join(':');
+        noveKolekcijske.add(kljuc);
+        const skup = noveKolekcijskePoVrsti.get('vlastito_ime') ?? new Set<string>();
+        skup.add(kljuc);
+        noveKolekcijskePoVrsti.set('vlastito_ime', skup);
+      }
+      novoRijecGrupe.set(redak.rijec, grupe.length === 1 ? grupe[0]! : grupe);
+      novoRijecFrekvencija.set(redak.rijec, redak.frekvencija);
+      novoRijecVrste.set(redak.rijec, 'vlastito_ime');
+      noviBrojPoVrsti.set('vlastito_ime', (noviBrojPoVrsti.get('vlastito_ime') ?? 0) + 1);
+      const prefiks = kanoniziraj(prvaDva(redak.rijec));
+      const lista = novoPoPrefiksu.get(prefiks);
+      if (lista) lista.push(redak.rijec);
+      else novoPoPrefiksu.set(prefiks, [redak.rijec]);
+    }
 
     let zadnjaRijec = '';
     for (;;) {
@@ -72,9 +115,21 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
 
       for (const redak of stranica) {
         const grupe = redak.grupe.map(kanoniziraj);
+        for (const grupa of grupe) {
+          const kljuc = grupa.split(':').slice(0, 2).join(':');
+          noveKolekcijske.add(kljuc);
+          for (const vrsta of redak.vrste as VrstaRijeci[]) {
+            const skup = noveKolekcijskePoVrsti.get(vrsta) ?? new Set<string>();
+            skup.add(kljuc);
+            noveKolekcijskePoVrsti.set(vrsta, skup);
+          }
+        }
         const brojGrafema = grafemi(redak.rijec).length;
         const rarityTier = redak.frekvencija === 0 && brojGrafema >= 4 ? 2 : redak.frekvencija <= 9 ? 1 : redak.frekvencija <= 99 ? 0 : -1;
-        if (rarityTier >= 0) for (const grupa of grupe) rijetkeGrupe[rarityTier]!.add(grupa);
+        if (rarityTier >= 0) {
+          rijetkiOblici[rarityTier]!.add(redak.rijec);
+          for (const grupa of grupe) rijetkeGrupe[rarityTier]!.add(grupa);
+        }
         const duljinaTier = brojGrafema >= 15 ? 2 : brojGrafema >= 12 ? 1 : brojGrafema >= 10 ? 0 : -1;
         if (duljinaTier >= 0) dugeRijeci[duljinaTier]!.add(redak.rijec);
         const vrste = (redak.vrste as VrstaRijeci[]).map(kanoniziraj) as VrstaRijeci[];
@@ -98,11 +153,19 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     rijecGrupe = novoRijecGrupe;
     rijecFrekvencija = novoRijecFrekvencija;
     rijecVrste = novoRijecVrste;
+    skupVlastitihImena = noviSkupVlastitihImena;
     poPrefiksu = novoPoPrefiksu;
     pocetneImenickeRijeci = novePocetneImenickeRijeci;
     kategorije = [...noviBrojPoVrsti.entries()]
       .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
       .sort((a, b) => b.brojOblika - a.brojOblika);
+    brojKolekcijskih = noveKolekcijske.size;
+    kolekcijskihPoVrsti = new Map([...noveKolekcijskePoVrsti.entries()].map(([vrsta, skup]) => [vrsta, skup.size]));
+    kolekcijskihKljuceviPoVrsti = noveKolekcijskePoVrsti;
+    brojDugih = dugeRijeci.reduce((zbroj, skup) => zbroj + skup.size, 0);
+    brojRijetkih = rijetkiOblici.reduce((zbroj, skup) => zbroj + skup.size, 0);
+    brojDugihPoTieru = dugeRijeci.map((skup) => skup.size);
+    brojRijetkihPoTieru = rijetkiOblici.map((skup) => skup.size);
     ciljevi = {
       rijetke: { niska: rijetkeGrupe[0]!.size, srednja: rijetkeGrupe[1]!.size, jaka: rijetkeGrupe[2]!.size, ukupno: 81037 },
       duge: { duga: dugeRijeci[0]!.size, srednja: dugeRijeci[1]!.size, jaka: dugeRijeci[2]!.size, ukupno: 379193 },
@@ -117,6 +180,10 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
 
   function frekvencijaZa(rijec: string): number | null {
     return rijecFrekvencija.get(rijec) ?? null;
+  }
+
+  function jeVlastitoIme(rijec: string): boolean {
+    return skupVlastitihImena.has(rijec);
   }
 
   function vrsteZa(rijec: string): readonly VrstaRijeci[] {
@@ -187,9 +254,17 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
 
   return {
     brojRijeci: () => rijecGrupe.size,
+    brojKolekcijskihGrupa: () => brojKolekcijskih,
+    brojKolekcijskihGrupaPoVrsti: () => new Map(kolekcijskihPoVrsti),
+    brojKolekcijskihGrupaZaVrste: (vrste) => new Set(vrste.flatMap((vrsta) => [...(kolekcijskihKljuceviPoVrsti.get(vrsta) ?? [])])).size,
+    brojDugihOblika: () => brojDugih,
+    brojRijetkihOblika: () => brojRijetkih,
+    brojDugihOblikaPoTieru: () => [...brojDugihPoTieru],
+    brojRijetkihOblikaPoTieru: () => [...brojRijetkihPoTieru],
     brojPoKategoriji: () => kategorije,
     ciljeviRijeci: () => ciljevi,
     jePostojecaRijec: (rijec) => rijecGrupe.has(rijec),
+    jeVlastitoIme,
     grupeZa,
     frekvencijaZa,
     vrsteZa,

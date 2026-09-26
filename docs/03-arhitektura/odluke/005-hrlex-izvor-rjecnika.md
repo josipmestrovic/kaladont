@@ -5,7 +5,7 @@
 
 ## Kontekst
 
-Igra treba strojno čitljiv popis hrvatskih općih imenica u nominativu jednine, bez vlastitih imena i kratica. Ručno sastavljanje ne dolazi u obzir; komercijalni rječnici (HJP) nemaju otvorene licence.
+Igra treba strojno čitljiv popis hrvatskih riječi s morfološkim oznakama; početna verzija bila je ograničena na opće imenice u nominativu jednine, bez vlastitih imena i kratica. Ručno sastavljanje ne dolazi u obzir; komercijalni rječnici (HJP) nemaju otvorene licence.
 
 ## Odluka
 

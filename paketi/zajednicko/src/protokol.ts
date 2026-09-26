@@ -6,6 +6,7 @@ import type { VrstaRijeci } from './pravila.js';
 import type { ObracunIskustva, StavkaIskustva } from './iskustvo.js';
 import type { DnkOs } from './dnk.js';
 import type { AvatarConfigV1 } from './avatar.js';
+import type { FormaIgraca } from './forma.js';
 
 export interface PodaciVeze {
   /** Opaque guest token ILI sesijski token registriranog igrača. */
@@ -25,6 +26,11 @@ export interface ZatvaranjeVeze {
 
 export interface PayloadPotezRijec {
   rijec: string;
+  turnToken?: string;
+}
+
+export interface PayloadNeznam {
+  turnToken?: string;
 }
 
 export interface PayloadReakcijaPosalji {
@@ -52,6 +58,8 @@ export interface StanjeReda {
     odigrane: number;
     prosjekBodova: number;
     postotakPobjeda: number;
+    trenutniNiz: number;
+    razinaVatre: 0 | 1 | 2 | 3;
   } | null)[];
   prosjekCekanjaSek: number;
 }
@@ -100,7 +108,7 @@ export interface PocetakPartije {
   mojIgracId: string;
   /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
   pocetakIso: string;
-  sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number }[];
+  sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[];
   mod?: 'cetiri_igraca' | 'dva_igraca';
   jePrivatna?: boolean;
   kodSobe?: string;
@@ -110,6 +118,7 @@ export interface StanjePartije {
   partijaId: string;
   mojIgracId: string;
   sjedala: PocetakPartije['sjedala'];
+  turnToken: string;
   naPotezuId: string;
   trazenaSlova: string | null;
   istekPotezaIso: string;
@@ -136,6 +145,7 @@ export interface PrihvacenPotez {
   rijec: string;
   trazenaSlova: string;
   sljedeciId: string;
+  turnToken: string;
   istekPotezaIso: string;
   serverVrijemeIso: string;
   brojIskoristenih: number;
@@ -143,6 +153,18 @@ export interface PrihvacenPotez {
   nagrada: NagradaZaRijec | null;
   /** Autoritativne XP stavke koje je autor poteza upravo ostvario; nema konačnog obračuna. */
   iskustvo?: StavkaIskustva[];
+}
+
+export interface OtkljucavanjeRijeci {
+  partijaId: string;
+  oblik: string;
+  osnovneRijeci: string[];
+  novaOsnovnaRijec: boolean;
+  dugaKategorija: 'duga' | 'srednje_duga' | 'jako_duga' | null;
+  rijetkaKategorija: 'rijetka' | 'srednje_rijetka' | 'jako_rijetka' | null;
+  noviDugiOblik: boolean;
+  noviRijetkiOblik: boolean;
+  iskustvo: StavkaIskustva[];
 }
 
 export interface NagradaZaRijec {
@@ -158,9 +180,11 @@ export interface NagradaZaRijec {
 export interface OdbijenPotez {
   kod:
     | 'RIJEC_NE_POSTOJI'
+    | 'VLASTITO_IME'
     | 'KRIVA_SLOVA'
     | 'RIJEC_ISKORISTENA'
     | 'NIJE_TVOJ_POTEZ'
+    | 'STARI_TURN_TOKEN'
     | 'SUSTAV_BIRA_RIJEC'
     | 'NEDOPUSTENA_VRSTA'
     | 'NIJE_OSNOVNI_OBLIK'
@@ -176,6 +200,25 @@ export type RazlogEliminacije =
   | 'prekid'
   | 'kaladont';
 
+export type NacinIspadanja = RazlogEliminacije | 'mrtva_slova' | 'pobjednik';
+
+export interface PlasmanPartije {
+  igracId: string;
+  nadimak: string;
+  plasman: number;
+  bodovi: number;
+  eliminacije: number;
+  nacinIspadanja: NacinIspadanja | null;
+}
+
+export interface ArhivaPartije {
+  partijaId: string;
+  mod: 'cetiri_igraca' | 'dva_igraca';
+  pocetak: string;
+  kraj: string;
+  plasmani: PlasmanPartije[];
+}
+
 export interface Eliminacija {
   igracId: string;
   plasman: number;
@@ -189,18 +232,15 @@ export interface Eliminacija {
 
 export interface KrajPartije {
   partijaId: string;
-  plasmani: {
-    igracId: string;
-    plasman: number;
-    bodovi: number;
-    eliminacije: number;
-  }[];
+  plasmani: PlasmanPartije[];
   mojNoviProsjek: number;
   mojRang: string | null;
   mojeIskustvo: ObracunIskustva | null;
   mojaOcjenaIgre?: number | null;
   bonusOcjenaIgre?: number;
   novaDostignuca: { id: string; novaRazina: number; maksimalnaRazina: number }[];
+  mojNiz?: { prije: number; poslije: number; najbolji: number };
+  mojaForma?: FormaIgraca;
   mojDnk?: {
     odigrano: number;
     preostaloDoOtkljucavanja: number;
@@ -209,9 +249,22 @@ export interface KrajPartije {
     prije: DnkOs[];
     poslije: DnkOs[];
   };
+  kolekcija?: {
+    dodaneKategorije: { vrsta: VrstaRijeci | 'pridjev_prilog'; broj: number; rijeci: string[] }[];
+    ukupnoOtkljucano: number;
+    ukupnoDostupno: number;
+    trenutnaRazina: string;
+    sljedecaRazina: string | null;
+    doSljedece: number | null;
+  };
   mod?: 'cetiri_igraca' | 'dva_igraca';
   jePrivatna?: boolean;
   kodSobe?: string;
+}
+
+export interface NovoDostignuceTijekomPartije {
+  partijaId: string;
+  dostignuca: { id: string; naziv: string; novaRazina: number; maksimalnaRazina: number }[];
 }
 
 /** Privatni obračun eliminiranog igrača; trajni upis slijedi pri završetku partije. */
@@ -240,6 +293,7 @@ export interface RundaOtvorena {
   rijec: string;
   trazenaSlova: string;
   naPotezuId: string;
+  turnToken: string;
   istekPotezaIso: string;
   serverVrijemeIso: string;
   runda: number;
@@ -290,7 +344,7 @@ export interface DogadajiKlijentPoslužitelj {
   'partija:izadji': () => void;
   'partija:stanje': () => void;
   'potez:rijec': (payload: PayloadPotezRijec) => void;
-  'potez:ne-znam': () => void;
+  'potez:ne-znam': (payload?: PayloadNeznam) => void;
   'reakcija:posalji': (payload: PayloadReakcijaPosalji) => void;
   'igrac:avatar-azuriraj': (payload: PayloadAvatarAzuriraj) => void;
   'soba:stvori': (payload: PayloadStvoriSobu) => void;
@@ -306,6 +360,7 @@ export interface DogadajiPosluziteljKlijent {
   'partija:pocetak': (payload: PocetakPartije) => void;
   'partija:stanje': (payload: StanjePartije) => void;
   'potez:prihvacen': (payload: PrihvacenPotez) => void;
+  'rijec:otkljucana': (payload: OtkljucavanjeRijeci) => void;
   'potez:odbijen': (payload: OdbijenPotez) => void;
   'partija:eliminacija': (payload: Eliminacija) => void;
   'partija:sustav-bira-rijec': (payload: SustavBiraRijec) => void;
@@ -313,6 +368,7 @@ export interface DogadajiPosluziteljKlijent {
   'partija:spremanje-rezultata': (payload: SpremanjeRezultataPartije) => void;
   'partija:ponistena': (payload: PonistenaPartija) => void;
   'partija:kraj': (payload: KrajPartije) => void;
+  'dostignuce:otkljucano': (payload: NovoDostignuceTijekomPartije) => void;
   'iskustvo:obracun': (payload: ObracunIskustvaTijekomPartije) => void;
   'reakcija:nova': (payload: { igracId: string; poruka: BrzaPoruka }) => void;
   'soba:stvorena': (payload: { kod: string }) => void;

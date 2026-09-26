@@ -1,0 +1,1 @@
+ALTER TABLE "igraci" ADD COLUMN "registriran_at" timestamp with time zone;

@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { dnkStatistikeIgraca, igraci, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { dnkStatistikeIgraca, igraci, obracuniPartija, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 
 let app: FastifyInstance;
@@ -69,6 +69,53 @@ describe('GET /profil', () => {
     expect(tijelo.odigrane).toBe(0);
     expect(tijelo.rang).toBe('Piskaralo');
     expect(tijelo.iskustvo).toEqual({ razina: 1, ukupno: 0, uRazini: 0, doIduce: 100 });
+  });
+
+  it('vraća isti inline CV vlasniku i javnom profilu bez privatnih polja', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'CvTestIgrac' }),
+    });
+    const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+
+    const privatniOdgovor = await fetch(`${adresa}/api/profil`, {
+      headers: { authorization: `Bearer ${sesijskiToken}` },
+    });
+    const javniOdgovor = await fetch(`${adresa}/api/profil/javni/${igracId}`);
+    const privatni = (await privatniOdgovor.json()) as { kaladontCv: unknown };
+    const javni = (await javniOdgovor.json()) as Record<string, unknown> & { kaladontCv: unknown };
+
+    expect(privatniOdgovor.status).toBe(200);
+    expect(javniOdgovor.status).toBe(200);
+    expect(privatni.kaladontCv).toEqual(javni.kaladontCv);
+    expect(javni.kaladontCv).toMatchObject({
+      biografija: {
+        tip: 'nedovoljno_informacija',
+        tekst: 'Još nemamo dovoljno informacija za opis ovog igrača.',
+      },
+    });
+    expect(javni).not.toHaveProperty('email');
+    expect(javni).not.toHaveProperty('lozinkaHash');
+    expect(javni).not.toHaveProperty('registriranAt');
+  });
+
+  it('ne generira CV gostu i ne otvara mu javni profil', async () => {
+    const gost = await stvoriGosta();
+    try {
+      const privatniOdgovor = await fetch(`${adresa}/api/profil`, {
+        headers: { authorization: `Bearer ${gost.token}` },
+      });
+      const privatni = (await privatniOdgovor.json()) as { kaladontCv: unknown; email: string | null };
+      const javniOdgovor = await fetch(`${adresa}/api/profil/javni/${gost.id}`);
+
+      expect(privatniOdgovor.status).toBe(200);
+      expect(privatni.email).toBeNull();
+      expect(privatni.kaladontCv).toBeNull();
+      expect(javniOdgovor.status).toBe(404);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.id, gost.id));
+    }
   });
 });
 
@@ -172,6 +219,40 @@ describe('GET /povijest/:igracId', () => {
     expect(tijelo.partije).toEqual([]);
     expect(tijelo.imaJos).toBe(false);
     expect(tijelo.sljedeciCursor).toBeNull();
+  });
+});
+
+describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
+  it('vraća javni plasman, filtrira mod i izuzima privatnu gamifikaciju', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    const javnaPartijaId = randomUUID();
+    const privatnaPartijaId = randomUUID();
+    const kraj = new Date();
+    await baza.insert(partije).values([
+      { id: javnaPartijaId, mod: 'dva_igraca', status: 'zavrsena', pocetak: new Date(kraj.getTime() - 1_000), kraj, pobjednikId: igracId },
+      { id: privatnaPartijaId, mod: 'cetiri_igraca', status: 'zavrsena', pocetak: new Date(kraj.getTime() - 2_000), kraj, pobjednikId: igracId },
+    ]);
+    await baza.insert(sudioniciPartije).values([
+      { partijaId: javnaPartijaId, igracId, nadimak: 'Povijesni Nadimak', sjedalo: 0, plasman: 1, bodovi: 2, eliminacije: 0, nacinIspadanja: 'pobjednik' },
+      { partijaId: privatnaPartijaId, igracId, nadimak: 'Povijesni Nadimak', sjedalo: 0, plasman: 1, bodovi: 2, eliminacije: 0, nacinIspadanja: 'pobjednik' },
+    ]);
+    await baza.insert(obracuniPartija).values({ partijaId: privatnaPartijaId, vrsta: 'privatna_gamifikacija' });
+
+    const aktivnostOdgovor = await fetch(`${adresa}/api/aktivnost/${igracId}?mod=dva_igraca&limit=20`);
+    const aktivnost = (await aktivnostOdgovor.json()) as { aktivnost: { partijaId: string; mod: string; plasman: number }[] };
+    expect(aktivnostOdgovor.status).toBe(200);
+    expect(aktivnost.aktivnost).toEqual(expect.arrayContaining([expect.objectContaining({ partijaId: javnaPartijaId, mod: 'dva_igraca', plasman: 1 })]));
+    expect(aktivnost.aktivnost.some((stavka) => stavka.partijaId === privatnaPartijaId)).toBe(false);
+
+    const arhivaOdgovor = await fetch(`${adresa}/api/partije/${javnaPartijaId}/plasmani`);
+    const arhiva = (await arhivaOdgovor.json()) as { partija: { plasmani: { igracId: string; nadimak: string; plasman: number; bodovi: number }[] } };
+    expect(arhivaOdgovor.status).toBe(200);
+    expect(arhiva.partija.plasmani).toEqual([{ igracId, nadimak: 'Povijesni Nadimak', plasman: 1, bodovi: 2, eliminacije: 0, nacinIspadanja: 'pobjednik', javniProfil: true }]);
   });
 });
 

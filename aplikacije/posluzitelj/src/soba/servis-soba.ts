@@ -26,12 +26,13 @@ const ShemaVrstaRijeci = z.enum([
   'veznik',
   'cestica',
   'uzvik',
+  'vlastito_ime',
 ]);
 
 const ShemaPostavkePrivatneSobe = z
   .object({
     trajanjePotezaSek: z.union([z.literal(0), z.literal(15), z.literal(30), z.literal(60)]).optional(),
-    dopusteneVrste: z.array(ShemaVrstaRijeci).max(10).optional(),
+    dopusteneVrste: z.array(ShemaVrstaRijeci).max(11).optional(),
     eliminacijskiBodovi: z.boolean().optional(),
   })
   .strict();
@@ -88,6 +89,25 @@ export interface Soba {
   brisanjeTimer: NodeJS.Timeout | null;
   pobjedeUSeriji: Map<string, number>;
   bodoviUSeriji: Map<string, number>;
+  obradenePartije: Set<string>;
+}
+
+export function dodijeliRezultatSobeAkoNijeObraden(
+  soba: Pick<Soba, 'obradenePartije' | 'pobjedeUSeriji' | 'bodoviUSeriji'>,
+  partijaId: string,
+  pobjednikId: string,
+  rezultati: { igracId: string; bodovi: number }[],
+): void {
+  if (soba.obradenePartije.has(partijaId)) return;
+  soba.obradenePartije.add(partijaId);
+
+  const trenutnePobjede = (soba.pobjedeUSeriji.get(pobjednikId) ?? 0) + 1;
+  soba.pobjedeUSeriji.set(pobjednikId, trenutnePobjede);
+
+  for (const rezultat of rezultati) {
+    const stariBodovi = soba.bodoviUSeriji.get(rezultat.igracId) ?? 0;
+    soba.bodoviUSeriji.set(rezultat.igracId, stariBodovi + rezultat.bodovi);
+  }
 }
 
 function normalizirajPostavke(p?: Partial<PostavkePrivatneSobe>): PostavkePrivatneSobe {
@@ -315,6 +335,7 @@ export function registrirajPrivatneSobe(
         brisanjeTimer: null,
         pobjedeUSeriji: new Map(),
         bodoviUSeriji: new Map(),
+        obradenePartije: new Set(),
       };
 
       sobe.set(kod, soba);
@@ -474,17 +495,10 @@ export function registrirajPrivatneSobe(
 
   return {
     imaPrivatnuSobu: (igracId: string) => sobaPoIgracu.has(igracId),
-    registrirajRezultatPartije: (kodSobe: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => {
+    registrirajRezultatPartije: (kodSobe: string, partijaId: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => {
       const soba = sobe.get(kodSobe);
       if (!soba) return;
-
-      const trenutnePobjede = (soba.pobjedeUSeriji.get(pobjednikId) ?? 0) + 1;
-      soba.pobjedeUSeriji.set(pobjednikId, trenutnePobjede);
-
-      for (const r of rezultati) {
-        const StariBodovi = soba.bodoviUSeriji.get(r.igracId) ?? 0;
-        soba.bodoviUSeriji.set(r.igracId, StariBodovi + r.bodovi);
-      }
+      dodijeliRezultatSobeAkoNijeObraden(soba, partijaId, pobjednikId, rezultati);
     },
     naPartijaZavrsila: (partijaId: string) => {
       for (const soba of sobe.values()) {

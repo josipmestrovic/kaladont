@@ -38,9 +38,10 @@ Od [ADR-013](../03-arhitektura/odluke/013-sve-vrste-rijeci-leksemske-grupe.md) u
 | CCONJ, SCONJ | veznik |
 | PART | čestica |
 | INTJ | uzvik |
-| PROPN, X, SYM, PUNCT | **otpada** (vlastita imena, strano, simboli) |
+| PROPN | ulazi u igrivu tablicu `rijeci` kao `vlastito_ime`; svaka lema daje grupu `vlastito_ime:lema` |
+| X, SYM, PUNCT | **otpada** (strano, simboli, interpunkcija) |
 
-Kratice i vlastita imena ne prolaze filtar; interpunkcija i brojke otpadaju i na čišćenju.
+Kratice i ostali nepoznati oblici ne prolaze filtar; vlastita imena se normaliziraju u mala slova kako bi `Italija` iz izvora odgovarala unosu `italija`. Svi padeži, jednina i množina mogu biti igrivi, ali se ponavljanje sprječava po svim lemama oblika.
 
 ### 3. Čišćenje oblika
 

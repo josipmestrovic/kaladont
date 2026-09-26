@@ -2,7 +2,7 @@
  * Globalno reaktivno stanje igre - slušatelji se registriraju jednom (u root layoutu)
  * jer partija:pocetak stiže dok je korisnik još na /red, prije nego /partija/[id] postoji.
  */
-import type { Eliminacija, KrajPartije, NagradaZaRijec, ObracunIskustvaTijekomPartije, PocetakPartije, StavkaIskustva, StanjePartije } from 'zajednicko';
+import type { Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, ObracunIskustvaTijekomPartije, OtkljucavanjeRijeci, PocetakPartije, StavkaIskustva, StanjePartije } from 'zajednicko';
 import { pustiAudio, type AudioDogadaj } from './audio-manager.js';
 import { dohvatiSocket, oznaciPartijuDostupnom } from './socket.js';
 
@@ -10,6 +10,7 @@ interface StanjeIgre {
   partijaId: string | null;
   mojIgracId: string | null;
   sjedala: PocetakPartije['sjedala'];
+  turnToken: string | null;
   naPotezuId: string | null;
   trazenaSlova: string | null;
   istekPotezaIso: string | null;
@@ -39,6 +40,10 @@ interface StanjeIgre {
   trenutniStreak: number;
   stavkeIskustva: StavkaIskustva[];
   oznakaStavkiIskustva: number;
+  novaDostignucaTijekomPartije: NovoDostignuceTijekomPartije['dostignuca'];
+  oznakaNovaDostignuca: number;
+  otkljucavanjeRijeci: OtkljucavanjeRijeci | null;
+  oznakaOtkljucavanjaRijeci: number;
   intenzitetKonfetaIskustva: 'mali' | 'srednji' | 'veliki' | null;
   oznakaKonfetaIskustva: number;
 }
@@ -47,6 +52,7 @@ const stanje = $state<StanjeIgre>({
   partijaId: null,
   mojIgracId: null,
   sjedala: [],
+  turnToken: null,
   naPotezuId: null,
   trazenaSlova: null,
   istekPotezaIso: null,
@@ -75,6 +81,10 @@ const stanje = $state<StanjeIgre>({
   trenutniStreak: 0,
   stavkeIskustva: [],
   oznakaStavkiIskustva: 0,
+  novaDostignucaTijekomPartije: [],
+  oznakaNovaDostignuca: 0,
+  otkljucavanjeRijeci: null,
+  oznakaOtkljucavanjaRijeci: 0,
   intenzitetKonfetaIskustva: null,
   oznakaKonfetaIskustva: 0,
 });
@@ -82,6 +92,8 @@ const stanje = $state<StanjeIgre>({
 let pokrenuto = false;
 let brojOdbijenihNaPotezu = 0;
 let timerStavkiIskustva: ReturnType<typeof setTimeout> | null = null;
+let timerNagradePoteza: ReturnType<typeof setTimeout> | null = null;
+let timerNovaDostignuca: ReturnType<typeof setTimeout> | null = null;
 let timerKonfetaIskustva: ReturnType<typeof setTimeout> | null = null;
 
 function prikaziKonfeteIskustva(stavke: readonly StavkaIskustva[]): void {
@@ -104,9 +116,23 @@ function prikaziStavkeIskustva(stavke: readonly StavkaIskustva[]): void {
     timerStavkiIskustva = null;
     return;
   }
-  timerStavkiIskustva = setTimeout(() => {
+  if (timerNagradePoteza) clearTimeout(timerNagradePoteza);
+  timerNagradePoteza = setTimeout(() => {
     stanje.stavkeIskustva = [];
+    stanje.otkljucavanjeRijeci = null;
     timerStavkiIskustva = null;
+    timerNagradePoteza = null;
+  }, 5_000);
+  timerStavkiIskustva = timerNagradePoteza;
+}
+
+function prikaziNovaDostignuca(dostignuca: NovoDostignuceTijekomPartije['dostignuca']): void {
+  stanje.novaDostignucaTijekomPartije = [...dostignuca];
+  stanje.oznakaNovaDostignuca += 1;
+  if (timerNovaDostignuca) clearTimeout(timerNovaDostignuca);
+  timerNovaDostignuca = setTimeout(() => {
+    stanje.novaDostignucaTijekomPartije = [];
+    timerNovaDostignuca = null;
   }, 5_000);
 }
 
@@ -122,6 +148,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.pocetakPartijeIso = null;
   stanje.mojIgracId = p.mojIgracId;
   stanje.sjedala = p.sjedala;
+  stanje.turnToken = p.turnToken ?? null;
   stanje.naPotezuId = p.naPotezuId;
   stanje.trazenaSlova = p.trazenaSlova;
   stanje.istekPotezaIso = p.istekPotezaIso;
@@ -154,6 +181,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.partijaId = p.partijaId;
     stanje.mojIgracId = p.mojIgracId;
     stanje.sjedala = p.sjedala;
+    stanje.turnToken = null;
     stanje.naPotezuId = null;
     stanje.istekPotezaIso = null;
     stanje.serverVrijemeIso = new Date().toISOString();
@@ -170,6 +198,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.zadnjaNagrada = null;
     stanje.trenutniStreak = 0;
     prikaziStavkeIskustva([]);
+    prikaziNovaDostignuca([]);
     stanje.intenzitetKonfetaIskustva = null;
     if (timerKonfetaIskustva) clearTimeout(timerKonfetaIskustva);
     timerKonfetaIskustva = null;
@@ -205,6 +234,7 @@ export function pokreniSlusateljeIgre(): void {
     const mojPotez = p.igracId === stanje.mojIgracId;
     const mojSljedeciRed = p.sljedeciId === stanje.mojIgracId;
     stanje.zadnjaEliminacija = null;
+    stanje.turnToken = p.turnToken ?? stanje.turnToken;
     stanje.naPotezuId = p.sljedeciId;
     stanje.trazenaSlova = p.trazenaSlova;
     stanje.istekPotezaIso = p.istekPotezaIso;
@@ -264,6 +294,7 @@ export function pokreniSlusateljeIgre(): void {
       pustiAudio('tvoj-red');
     }
     stanje.sustavBiraRijec = false;
+    stanje.turnToken = p.turnToken ?? null;
     stanje.naPotezuId = p.naPotezuId;
     stanje.trazenaSlova = p.trazenaSlova;
     stanje.istekPotezaIso = p.istekPotezaIso;
@@ -282,6 +313,22 @@ export function pokreniSlusateljeIgre(): void {
     stanje.ponistenaPoruka = null;
     stanje.statusSpremanja = 'rezultati_spremljeni';
     stanje.pocetakPartijeIso = null;
+  });
+
+  socket.on('dostignuce:otkljucano', (p) => {
+    if (p.partijaId === stanje.partijaId) prikaziNovaDostignuca(p.dostignuca);
+  });
+
+  socket.on('rijec:otkljucana', (p) => {
+    if (p.partijaId !== stanje.partijaId) return;
+    stanje.otkljucavanjeRijeci = p;
+    stanje.oznakaOtkljucavanjaRijeci += 1;
+    if (timerNagradePoteza) clearTimeout(timerNagradePoteza);
+    timerNagradePoteza = setTimeout(() => {
+      stanje.otkljucavanjeRijeci = null;
+      stanje.stavkeIskustva = [];
+      timerNagradePoteza = null;
+    }, 5_000);
   });
 
   socket.on('iskustvo:obracun', (p) => {

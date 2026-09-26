@@ -36,6 +36,11 @@ export const RIJECNIK_TEST: readonly string[] = [
   'vaza',
   'zavjesa',
   'sat',
+  'ana',
+  'ane',
+  'ivan',
+  'ivana',
+  'ivanu',
 ];
 
 /** Obitelji oblika za testove leksemskih grupa (RS-28/RS-29). */
@@ -48,6 +53,11 @@ const OBITELJI: Record<string, readonly string[]> = {
   najbolji: ['pridjev:dobar:sup'],
   pisati: ['glagol:pisati'],
   napisati: ['glagol:napisati'],
+  ana: ['vlastito_ime:ana'],
+  ane: ['vlastito_ime:ana'],
+  ivan: ['vlastito_ime:ivan'],
+  ivana: ['vlastito_ime:ivan', 'vlastito_ime:ivana'],
+  ivanu: ['vlastito_ime:ivan', 'vlastito_ime:ivana'],
 };
 
 /** Riječ -> grupe: obitelji gore, sve ostalo vlastita jednočlana grupa. */
@@ -62,6 +72,7 @@ export function stvoriTestniRjecnik(): RjecnikSucelje {
 
   return {
     jePostojecaRijec: (rijec) => GRUPE_TEST.has(rijec),
+    jeVlastitoIme: () => false,
     grupeZa: (rijec) => GRUPE_TEST.get(rijec) ?? [],
       vrsteZa: () => ['imenica'],
     postojeRijeciNa: (dvaGrafema) => [...GRUPE_TEST.keys()].some((rijec) => prvaDva(rijec) === dvaGrafema),

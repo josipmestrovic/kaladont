@@ -419,6 +419,31 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     for (const igrac of igraci) igrac.socket.disconnect();
   });
 
+  it('odbija potez sa starim turn tokenom nakon promjene poteza', async () => {
+    const { igraci, runda } = await pokreniPartiju();
+    const otvarac = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
+    const rijecZaIgru = await pronadjiRijecNaPrefiks(
+      runda.trazenaSlova,
+      new Set(await grupeRijeci(runda.rijec)),
+    );
+    const prihvacenoPromise = new Promise<{ sljedeciId: string }>((resolve) => {
+      otvarac.socket.on('potez:prihvacen', (poruka: { igracId: string; sljedeciId: string }) => {
+        if (poruka.igracId === otvarac.token) resolve(poruka);
+      });
+    });
+    otvarac.socket.emit('potez:rijec', { rijec: rijecZaIgru, turnToken: runda.turnToken });
+    const prihvaceno = await prihvacenoPromise;
+    const sljedeci = igraci.find((igrac) => igrac.token === prihvaceno.sljedeciId)!;
+    const odbijenoPromise = new Promise<{ kod: string }>((resolve) => {
+      sljedeci.socket.once('potez:odbijen', resolve);
+    });
+
+    sljedeci.socket.emit('potez:rijec', { rijec: rijecZaIgru, turnToken: runda.turnToken });
+
+    await expect(odbijenoPromise).resolves.toMatchObject({ kod: 'STARI_TURN_TOKEN' });
+    odspojiIgrace(igraci);
+  });
+
   it('RS-09: prekid na potezu eliminira igrača i daje bod napadaču', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
 

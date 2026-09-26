@@ -1,6 +1,6 @@
 # Početne riječi sustava
 
-Sustav otvara svaku rundu riječju koju igrač nije birao. Primarni izvor je **skup sigurnih riječi**: zbirka riječi koja uvijek ima nastavak te njihov nastavak isto ima nastavak.
+Sustav otvara svaku rundu riječju koju igrač nije birao. Primarni izvor je **skup sigurnih riječi**: odobreni početni kandidati iz kojih se u trenutačnom stanju partije može nastaviti najmanje dva poteza — početna riječ ima valjani odgovor, a svaki mogući valjani prvi odgovor ima barem jedan slobodan nastavak.
 
 ## Odobreni skup sigurnih riječi
 
@@ -18,7 +18,7 @@ velik, lijep, loš, suh, gluh i duhovit.
 
 jučer, navečer, prekjučer, naprijed, unaprijed, još, blizu i noću.
 
-„Kruh” i „sluh” nisu u skupu jer u igri samo s imenicama dopuštaju odgovor „uhoboljo”, nakon kojeg nema nastavka.
+„Kruh” i „sluh” nisu u skupu jer u igri samo s imenicama dopuštaju odgovor „uhoboljo”, nakon kojeg nema nastavka. To pokazuje zašto nije dovoljno provjeriti samo postoji li prvi odgovor: moraju se provjeriti svi dopušteni prvi odgovori.
 
 ## Pravilo odabira
 
@@ -30,6 +30,6 @@ Pri svakom otvaranju runde sustav nasumičnim redoslijedom provjerava riječi iz
 
 Provjera poštuje vrste riječi dopuštene u privatnoj sobi i sve leksemske grupe potrošene u ranijim rundama iste partije. Riječi iz skupa nemaju ograničenje od šest znakova.
 
-Ako trenutačno nema sigurnog kandidata iz odobrenog skupa, sustav koristi postojeći rezervni odabir: kratku aktivnu riječ koja ima barem jedan slobodan nastavak. Ako ni rezervni odabir nema kandidata, primjenjuje se RS-27 i partija sigurnosno završava.
+Ako trenutačno nema sigurnog kandidata iz odobrenog skupa, sustav koristi rezervni odabir: kratku aktivnu riječ koja ima barem jedan slobodan nastavak. Za razliku od sigurnog kandidata, rezervna riječ ne jamči da će svaki mogući odgovor imati vlastiti nastavak; sljedeći igrač ipak dobiva barem jedan valjan potez. Ako ni rezervni odabir nema kandidata, primjenjuje se RS-27 i partija se sigurnosno završava.
 
 Skup se primjenjuje u javnim i privatnim partijama, pri početku partije te nakon eliminacije ili Kaladont efekta. Promjena skupa zahtijeva sadržajni pregled, ažuriranje ovog dokumenta i pripadajućih testova.

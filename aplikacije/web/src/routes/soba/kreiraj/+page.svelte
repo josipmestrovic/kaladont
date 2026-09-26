@@ -16,6 +16,7 @@
     veznik: 'Veznici',
     cestica: 'Čestice',
     uzvik: 'Usklici',
+    vlastito_ime: 'Vlastita imena',
   };
 
   let trajanjePotezaSek = $state(30);

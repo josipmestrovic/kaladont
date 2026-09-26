@@ -48,9 +48,16 @@ export interface AgregiraniOblik {
   brojGrafema: number;
 }
 
+export interface AgregiranoVlastitoIme {
+  frekvencija: number;
+  leme: Set<string>;
+}
+
 export interface RezultatAgregacije {
   agregat: Map<string, AgregiraniOblik>;
+  vlastitaImena: Map<string, AgregiranoVlastitoIme>;
   ukupnoRedaka: number;
+  ukupnoPropnRedaka: number;
   odbaceniUpos: number;
   odbaceniCiscenje: number;
   odbaceniMaloGrafema: number;
@@ -114,7 +121,9 @@ function ravno(s: string): string {
 /** Parsira cijeli hrLex i agregira po jedinstvenom obliku (unija vrsta i grupa, zbroj frekvencija). */
 export async function agregirajHrLex(): Promise<RezultatAgregacije> {
   const agregat = new Map<string, AgregiraniOblik>();
+  const vlastitaImena = new Map<string, AgregiranoVlastitoIme>();
   let ukupnoRedaka = 0;
+  let ukupnoPropnRedaka = 0;
   let odbaceniUpos = 0;
   let odbaceniCiscenje = 0;
   let odbaceniMaloGrafema = 0;
@@ -130,6 +139,50 @@ export async function agregirajHrLex(): Promise<RezultatAgregacije> {
 
     if (msd && /^Nc.sn/.test(msd) && oblik.length >= 2 && DOPUSTENA_SLOVA.test(oblik)) {
       stariFiltar += 1;
+    }
+
+    if (upos === 'PROPN') {
+      ukupnoPropnRedaka += 1;
+      const oblikNormaliziran = oblik.normalize('NFC').toLowerCase();
+      if (!DOPUSTENA_SLOVA.test(oblikNormaliziran)) {
+        odbaceniCiscenje += 1;
+        continue;
+      }
+      const oblikRavan = ravno(oblikNormaliziran);
+      const lemaRavan = ravno((lema || oblik).toLowerCase());
+      const postojeci = vlastitaImena.get(oblikNormaliziran);
+      if (postojeci) {
+        postojeci.frekvencija += Number(frekvencija) || 0;
+        postojeci.leme.add(lemaRavan);
+      } else {
+        if (grafemi(oblikNormaliziran).length < 2) {
+          odbaceniMaloGrafema += 1;
+          continue;
+        }
+        vlastitaImena.set(oblikRavan, { frekvencija: Number(frekvencija) || 0, leme: new Set([lemaRavan]) });
+      }
+      const grupa = ravno(`vlastito_ime:${lemaRavan}`);
+      const postojeciOblik = agregat.get(oblikNormaliziran);
+      if (postojeciOblik) {
+        postojeciOblik.frekvencija += Number(frekvencija) || 0;
+        postojeciOblik.vrste.add('vlastito_ime');
+        postojeciOblik.grupe.add(grupa);
+      } else {
+        const svi = grafemi(oblikNormaliziran);
+        if (svi.length < 2) {
+          odbaceniMaloGrafema += 1;
+          continue;
+        }
+        agregat.set(oblikRavan, {
+          frekvencija: Number(frekvencija) || 0,
+          vrste: new Set(['vlastito_ime']),
+          grupe: new Set([grupa]),
+          prvaDva: ravno(svi.slice(0, 2).join('')),
+          zadnjaDva: ravno(svi.slice(-2).join('')),
+          brojGrafema: svi.length,
+        });
+      }
+      continue;
     }
 
     const vrsta = UPOS_U_VRSTU[upos] ?? null;
@@ -172,5 +225,15 @@ export async function agregirajHrLex(): Promise<RezultatAgregacije> {
     }
   }
 
-  return { agregat, ukupnoRedaka, odbaceniUpos, odbaceniCiscenje, odbaceniMaloGrafema, odbaceniRimski, stariFiltar };
+  return {
+    agregat,
+    vlastitaImena,
+    ukupnoRedaka,
+    ukupnoPropnRedaka,
+    odbaceniUpos,
+    odbaceniCiscenje,
+    odbaceniMaloGrafema,
+    odbaceniRimski,
+    stariFiltar,
+  };
 }

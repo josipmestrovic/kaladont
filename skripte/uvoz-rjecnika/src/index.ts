@@ -6,7 +6,7 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { sql } from 'drizzle-orm';
-import { baza, rijeci } from './baza.js';
+import { baza, rijeci, vlastitaImena } from './baza.js';
 import { agregirajHrLex, preuzmiAkoNedostaje, provjeriMd5, PODACI_DIR } from './hrlex.js';
 import { fmt, izracunajStatistiku, izvjestajMarkdown } from './statistika.js';
 
@@ -55,15 +55,37 @@ async function uvezi(): Promise<void> {
     if (upisano % 100000 < VELICINA_CHUNKA) console.log(`  ... upisano ${fmt(upisano)}`);
   }
 
+  const svaVlastitaImena = [...rezultat.vlastitaImena.entries()];
+  let upisanoVlastitihImena = 0;
+  for (let i = 0; i < svaVlastitaImena.length; i += VELICINA_CHUNKA) {
+    const chunk = svaVlastitaImena.slice(i, i + VELICINA_CHUNKA).map(([rijec, podaci]) => ({
+      rijec,
+      leme: [...podaci.leme],
+      frekvencija: podaci.frekvencija,
+    }));
+    await baza
+      .insert(vlastitaImena)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: vlastitaImena.rijec,
+        set: {
+          leme: sql`excluded.leme`,
+          frekvencija: sql`excluded.frekvencija`,
+        },
+      });
+    upisanoVlastitihImena += chunk.length;
+  }
+
   const trajanjeS = ((Date.now() - pocetak) / 1000).toFixed(0);
   const izvjestaj =
     izvjestajMarkdown('Izvještaj uvoza hrLexa u tablicu rijeci (ADR-013)', rezultat, statistika) +
-    `\n\n## Upis\n\nUpisano/ažurirano **${fmt(upisano)}** redaka u ${trajanjeS} s.\n`;
+    `\n\n## Upis\n\nUpisano/ažurirano **${fmt(upisano)}** igrivih redaka i **${fmt(upisanoVlastitihImena)}** PROPN oblika u ${trajanjeS} s.\n`;
   await writeFile(PUTANJA_IZVJESTAJA, izvjestaj, 'utf8');
 
   console.log('');
   console.log(`=== UVOZ GOTOV (${trajanjeS} s) — izvještaj: podaci/izvjestaj-uvoza.md ===`);
   console.log(`Upisano/ažurirano ${fmt(upisano)} oblika u ${fmt(statistika.ukupnoGrupa)} grupa.`);
+  console.log(`Upisano/ažurirano ${fmt(upisanoVlastitihImena)} PROPN oblika.`);
   for (const { vrsta, oblika } of statistika.kategorije) console.log(`  ${vrsta.padEnd(10)} ${fmt(oblika)}`);
   console.log(`Mrtvih parova: ${fmt(statistika.mrtviParovi.length)} · „nt" mrtav: ${statistika.ntJeMrtav ? 'DA' : 'NE!!!'}`);
 }

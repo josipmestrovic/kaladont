@@ -119,7 +119,7 @@
 </div>
 
 <style>
-  .avatar-konfiguracija { display: inline-flex; overflow: hidden; flex-shrink: 0; border-radius: 50%; box-sizing: border-box; box-shadow: 0 0 0 3px rgb(0 0 0 / 12%); }
+  .avatar-konfiguracija { display: inline-flex; overflow: hidden; flex-shrink: 0; border-radius: 50%; box-sizing: border-box; }
   svg { display: block; width: 100%; height: 100%; }
   image { overflow: visible; }
 </style>

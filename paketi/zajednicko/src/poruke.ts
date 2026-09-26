@@ -5,6 +5,8 @@
 
 export const PORUKE = {
   rijecNePostoji: (rijec: string) => `${rijec} ne postoji u našoj bazi.`,
+  vlastitoImeNijeDopusteno: (rijec: string) =>
+    `Riječ ${rijec} je odbijena jer prema pravilima igre imena i nazivi nisu dopušteni.`,
   rijecIskoristena: 'Ta riječ je već iskorištena.',
   rijecIskoristenaOblik: (oblik: string) => `Već je iskorišten oblik te riječi: '${oblik}'.`,
   nedopustenaVrsta: 'Ta vrsta riječi nije dopuštena u ovoj privatnoj sobi.',

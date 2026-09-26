@@ -2,12 +2,12 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIoServer, type Socket } from 'socket.io';
-import { validirajAvatarConfig, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent, type KodRazlogaVeze } from 'zajednicko';
+import { razinaVatre, validirajAvatarConfig, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent, type KodRazlogaVeze } from 'zajednicko';
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
@@ -36,6 +36,7 @@ import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 import { OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
 import { ponistiPartijeUTijekuUBazi } from './igra/upis-partije.js';
 import { ocistiIstekleNepotvrdjeneRacune } from './racuni/ciscenje-nepotvrdjenih.js';
+import { nizoviPobjedaIgraca } from './baza/shema.js';
 
 export interface PodaciSocketa {
   igracId: string;
@@ -53,6 +54,8 @@ export interface PodaciSocketa {
   bodovi1v1: number;
   iskustvoUkupno: number;
   emailPotvrdjen: boolean;
+  trenutniNiz4p: number;
+  trenutniNiz1v1: number;
 }
 
 export type KaladontIo = SocketIoServer<
@@ -237,8 +240,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
       },
-      naPrivatnaPartijaZavrsila: (kodSobe, pobjednikId, rezultati) => {
-        sobaServis?.registrirajRezultatPartije(kodSobe, pobjednikId, rezultati);
+      naPrivatnaPartijaZavrsila: (kodSobe, partijaId, pobjednikId, rezultati) => {
+        sobaServis?.registrirajRezultatPartije(kodSobe, partijaId, pobjednikId, rezultati);
       },
     },
   );
@@ -308,6 +311,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       socket.data.bodovi1v1 = identitet.bodovi1v1;
       socket.data.iskustvoUkupno = identitet.iskustvoUkupno;
       socket.data.emailPotvrdjen = identitet.emailPotvrdjen;
+      const nizovi = await baza.select({ mod: nizoviPobjedaIgraca.mod, trenutniNiz: nizoviPobjedaIgraca.trenutniNiz })
+        .from(nizoviPobjedaIgraca).where(eq(nizoviPobjedaIgraca.igracId, identitet.igracId));
+      socket.data.trenutniNiz4p = nizovi.find((niz) => niz.mod === 'cetiri_igraca')?.trenutniNiz ?? 0;
+      socket.data.trenutniNiz1v1 = nizovi.find((niz) => niz.mod === 'dva_igraca')?.trenutniNiz ?? 0;
       next();
     } catch (greska) {
       const poruka = greska instanceof Error ? greska.message : 'Interna greška';

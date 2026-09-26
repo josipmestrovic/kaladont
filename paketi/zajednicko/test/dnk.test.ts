@@ -66,6 +66,24 @@ describe('DNK zajednicko', () => {
     expect(profil(0.45, 'dva_igraca').osi.find((os) => os.kljuc === 'taktika')?.oznaka).toBe('Napadač');
     expect(profil(0.65, 'dva_igraca').osi.find((os) => os.kljuc === 'taktika')?.oznaka).toBe('Agresivac');
   });
+
+  it('drži najviši taktika prag kad vrijednost premaši gornju granicu', () => {
+    const cetiri = izracunajKaladontDnk({
+      mod: 'cetiri_igraca',
+      odigrano: 20,
+      eliminacijePoPartiji: 3,
+    });
+    const dvoja = izracunajKaladontDnk({
+      mod: 'dva_igraca',
+      odigrano: 20,
+      eliminacijePoPartiji: 0.9,
+    });
+
+    expect(cetiri.osi.find((os) => os.kljuc === 'taktika')?.oznaka).toBe('Agresivac');
+    expect(cetiri.osi.find((os) => os.kljuc === 'taktika')?.vrijednost).toBe(100);
+    expect(dvoja.osi.find((os) => os.kljuc === 'taktika')?.oznaka).toBe('Agresivac');
+    expect(dvoja.osi.find((os) => os.kljuc === 'taktika')?.vrijednost).toBe(100);
+  });
 });
 
 describe('1v1 rangovi', () => {

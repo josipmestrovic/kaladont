@@ -5,8 +5,13 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import DostignuceKartica from '$lib/komponente/DostignuceKartica.svelte';
   import KaladontDnkGraf from '$lib/komponente/KaladontDnkGraf.svelte';
+  import FormaIgraca from '$lib/komponente/FormaIgraca.svelte';
   import PostavkeProfila from '$lib/komponente/PostavkeProfila.svelte';
-  import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
+  import AktivnostPartije from '$lib/komponente/AktivnostPartije.svelte';
+  import KaladontCvSazetak from '$lib/komponente/KaladontCvSazetak.svelte';
+  import KolekcijaRijeci from '$lib/komponente/KolekcijaRijeci.svelte';
+  import Podizbornik from '$lib/komponente/Podizbornik.svelte';
+  import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil, type KaladontCvDto } from 'zajednicko';
 
     interface StatistikaRijeci {
       najduziStreak: number;
@@ -45,10 +50,12 @@
       cetiriIgraca: DnkProfil & { metrike: DnkMetrike };
       dvaIgraca: DnkProfil & { metrike: DnkMetrike };
     };
+    forma: { cetiriIgraca: FormaProfil; dvaIgraca: FormaProfil };
     prosjecnaOcjenaIgre: number | null;
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
     stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen';
     statistikaRijeci: StatistikaRijeci | null;
+    kaladontCv: KaladontCvDto | null;
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
     dostignuca: { ukupnoZvjezdica: number; maksimalnoZvjezdica: number; ukupnoOtkljucanih: number; dostignuca: Dostignuce[] };
   }
@@ -59,6 +66,21 @@
     prosjekPrihvacenogPotezaMs: number;
     dugeRijeciPoPartiji: number;
     rijetkeRijeciPoPartiji: number;
+  }
+
+  interface FormaProfil {
+    status: 'nema_podataka' | 'prikupljanje' | 'pocetna_procjena' | 'puna_procjena';
+    naziv: string | null;
+    razina: number | null;
+    vrijednost: number | null;
+    brojPobjeda: number;
+    brojPartija: number;
+    trend: { smjer: 'gore' | 'dolje' | 'isto'; razlika: number; prethodnaVrijednost: number } | null;
+    rezultati: { partijaId: string; kraj: string; plasman: number; bodovi: number; eliminacije: number }[];
+    trenutniNiz: number;
+    najboljiNiz: number;
+    razinaVatre: 0 | 1 | 2 | 3;
+    sljedeciBonusPostotak: number;
   }
 
   interface Dostignuce {
@@ -72,23 +94,12 @@
     razina: number;
     vrijednost: number;
     sljedeciPrag: number | null;
-  }
-
-  interface Partija {
-    partijaId: string;
-    plasman: number;
-    bodovi: number;
-    eliminacije: number;
-    pocetak: string;
+    novo?: boolean;
   }
 
   let profil = $state<Profil | null>(null);
-  let partije = $state<Partija[]>([]);
   let greska = $state<string | null>(null);
-  let ucitavanjePartija = $state(false);
-  let imaJosPartija = $state(true);
-  let cursorPartija = $state<string | null>(null);
-  let aktivniTab = $state<'4p' | '1v1'>('4p');
+  let aktivniTab = $state<'4p' | '1v1'>('1v1');
   let otvoreniPopup = $state<'duge' | 'rijetke' | null>(null);
   let rijeciPoKategoriji = $state<Record<string, string[]>>({});
   let ucitavanjeRijeci = $state(false);
@@ -106,7 +117,6 @@
       try {
         profil = await api<Profil>('/profil');
         if (profil) {
-          await ucitajPartije();
           if (window.location.hash === '#statistika') {
             await tick();
             document.getElementById('statistika')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -118,32 +128,6 @@
     })();
     return () => window.removeEventListener('resize', prilagodiAvatar);
   });
-
-  async function ucitajPartije(cursor: string | null = null) {
-    if (!profil || ucitavanjePartija) return;
-    ucitavanjePartija = true;
-    try {
-      const parametarCursora = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
-      const odgovor = await api<{ partije: Partija[]; imaJos: boolean; sljedeciCursor: string | null }>(
-        `/povijest/${profil.igracId}?limit=10${parametarCursora}`
-      );
-      imaJosPartija = odgovor.imaJos;
-      cursorPartija = odgovor.sljedeciCursor;
-      if (!cursor) {
-        partije = odgovor.partije;
-      } else {
-        partije = [...partije, ...odgovor.partije];
-      }
-    } catch (e) {
-      greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje povijesti igara.';
-    } finally {
-      ucitavanjePartija = false;
-    }
-  }
-
-  function ucitajJos() {
-    if (cursorPartija) void ucitajPartije(cursorPartija);
-  }
 
   function listaRijeci(kategorija: string): string[] {
     return rijeciPoKategoriji[kategorija] ?? [];
@@ -164,29 +148,6 @@
     }
   }
 
-  function formatirajDatum(datumStr: string): string {
-    const d = new Date(datumStr);
-    return d.toLocaleDateString('hr-HR', {
-      day: 'numeric',
-      month: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
-  function formatirajPlasman(plasman: number): string {
-    switch (plasman) {
-      case 1:
-        return '🥇 1. mjesto';
-      case 2:
-        return '🥈 2. mjesto';
-      case 3:
-        return '🥉 3. mjesto';
-      default:
-        return `${plasman}. mjesto`;
-    }
-  }
 </script>
 
 <svelte:head>
@@ -199,37 +160,53 @@
   {:else if profil}
     {@const jeGost = !profil.email}
 
-    <div class:postavke-aktivne={prikazujePostavke} class="zaglavlje-profila">
-      <a class="avatar-uredivanje" href="/profil/avatar" aria-label="Uredi avatar">
-        <Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost={jeGost} velicina={velicinaAvatara} />
-        <span class="ikona-uredi" aria-hidden="true">✎</span>
-      </a>
-      <div class="info-profila">
-        <h1>{profil.nadimak}</h1>
-        <span class="rang-oznaka">
-           {vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'}
-        </span>
-        <div class="iskustvo-profila">
-          <strong>LVL {profil.iskustvo.razina}</strong>
-          {#if profil.iskustvo.doIduce === null}
-            <span>MAX</span>
-          {:else}
-            <span>{profil.iskustvo.uRazini} / {profil.iskustvo.doIduce} XP</span>
-            <div class="traka-iskustva" aria-label={`Napredak do sljedeće razine: ${profil.iskustvo.uRazini} od ${profil.iskustvo.doIduce} XP`}>
-              <span style={`width: ${(profil.iskustvo.uRazini / profil.iskustvo.doIduce) * 100}%`}></span>
-            </div>
+    <div class:ima-cv={!prikazujePostavke} class="profil-zaglavlje-red">
+      <div class:postavke-aktivne={prikazujePostavke} class="zaglavlje-profila">
+        <a class="avatar-uredivanje" href="/profil/avatar" aria-label="Uredi avatar">
+          <Avatar
+            avatarId={profil.avatarId}
+            avatarConfig={profil.avatarConfig}
+            rang={vratiVeciRang(profil.rang, profil.rang1v1)}
+            gost={jeGost}
+            velicina={velicinaAvatara}
+            razinaVatre={aktivniTab === '4p' ? profil.forma.cetiriIgraca.razinaVatre : profil.forma.dvaIgraca.razinaVatre}
+            nizPobjeda={aktivniTab === '4p' ? profil.forma.cetiriIgraca.trenutniNiz : profil.forma.dvaIgraca.trenutniNiz}
+          />
+          <span class="ikona-uredi" aria-hidden="true">✎</span>
+        </a>
+        <div class="info-profila">
+          <h1>{profil.nadimak}</h1>
+          <span class="rang-oznaka">
+             {vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'}
+          </span>
+          <div class="iskustvo-profila">
+            <strong>LVL {profil.iskustvo.razina}</strong>
+            {#if profil.iskustvo.doIduce === null}
+              <span>MAX</span>
+            {:else}
+              <span>{profil.iskustvo.uRazini} / {profil.iskustvo.doIduce} XP</span>
+              <div class="traka-iskustva" aria-label={`Napredak do sljedeće razine: ${profil.iskustvo.uRazini} od ${profil.iskustvo.doIduce} XP`}>
+                <span style={`width: ${(profil.iskustvo.uRazini / profil.iskustvo.doIduce) * 100}%`}></span>
+              </div>
+            {/if}
+          </div>
+          <p class="stil-igre">Stil igre: <strong>{profil.stilIgre}</strong></p>
+          {#if profil.prosjecnaOcjenaIgre !== null}
+            {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
+            <p class="ocjena-igre">Prosječna ocjena: <span class="ocjena-zvjezdice" aria-label={`Prosječna ocjena ${ocjena} od 5`}>
+              {#each Array.from({ length: 5 }, (_, i) => i < ocjena) as jeIspunjena}
+                <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
+              {/each}
+            </span></p>
           {/if}
         </div>
-        <p class="stil-igre">Stil igre: <strong>{profil.stilIgre}</strong></p>
-        {#if profil.prosjecnaOcjenaIgre !== null}
-          {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
-          <p class="ocjena-igre">Prosječna ocjena: <span class="ocjena-zvjezdice" aria-label={`Prosječna ocjena ${ocjena} od 5`}>
-            {#each Array.from({ length: 5 }, (_, i) => i < ocjena) as jeIspunjena}
-              <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
-            {/each}
-          </span></p>
-        {/if}
       </div>
+      {#if !prikazujePostavke}
+        <KaladontCvSazetak
+          cv={profil.kaladontCv}
+          gost={jeGost}
+        />
+      {/if}
     </div>
 
     {#if prikazujePostavke}
@@ -249,15 +226,17 @@
     <nav class="pogled-tabovi" aria-label="Sadržaj profila">
       <button type="button" class:aktivan={aktivniPogled === 'statistika'} onclick={() => (aktivniPogled = 'statistika')}>Statistika</button>
       <button type="button" class:aktivan={aktivniPogled === 'dostignuca'} onclick={() => (aktivniPogled = 'dostignuca')}>Dostignuća</button>
-      <button type="button" class:aktivan={aktivniPogled === 'rijeci'} onclick={() => (aktivniPogled = 'rijeci')}>Riječi</button>
-      <button type="button" class:aktivan={aktivniPogled === 'povijest'} onclick={() => (aktivniPogled = 'povijest')}>Povijest</button>
+      <button type="button" class:aktivan={aktivniPogled === 'rijeci'} onclick={() => (aktivniPogled = 'rijeci')}>Kolekcija riječi</button>
+      <button type="button" class:aktivan={aktivniPogled === 'povijest'} onclick={() => (aktivniPogled = 'povijest')}>Aktivnost</button>
     </nav>
 
     {#if aktivniPogled === 'statistika'}
-      <div class="mod-tabovi">
-        <button type="button" class="mod-tab-gumb" class:aktivan={aktivniTab === '4p'} onclick={() => (aktivniTab = '4p')}>4 igrača</button>
-        <button type="button" class="mod-tab-gumb" class:aktivan={aktivniTab === '1v1'} onclick={() => (aktivniTab = '1v1')}>2 igrača</button>
-      </div>
+      <Podizbornik
+        stavke={[{ kljuc: '1v1', naziv: '2 igrača' }, { kljuc: '4p', naziv: '4 igrača' }]}
+        aktivna={aktivniTab}
+        ariaLabel="Način igre"
+        promijeni={(kljuc) => (aktivniTab = kljuc as '4p' | '1v1')}
+      />
     {/if}
 
     {#if aktivniPogled === 'statistika' && aktivniTab === '4p'}
@@ -278,7 +257,8 @@
           </div>
           <div class="stat-kartica"><span class="stat-broj">{profil.dnk.cetiriIgraca.metrike.eliminacijePoPartiji.toFixed(2)}</span><span class="stat-naziv">Eliminacije po partiji</span></div>
         </div>
-        <KaladontDnkGraf profil={profil.dnk.cetiriIgraca} naslov="Kaladont DNK 4 igrača" />
+        <KaladontDnkGraf profil={profil.dnk.cetiriIgraca} naslov="Tvoj Kaladont DNK za 4 igrača" />
+        <FormaIgraca forma={profil.forma.cetiriIgraca} mod="cetiri_igraca" />
         <section class="ostalo-kartica">
           <h3>Ostalo</h3>
           <div class="mrezica-kartica">
@@ -307,7 +287,8 @@
           </div>
           <div class="stat-kartica"><span class="stat-broj">{profil.dnk.dvaIgraca.metrike.eliminacijePoPartiji.toFixed(2)}</span><span class="stat-naziv">Eliminacije po partiji</span></div>
         </div>
-        <KaladontDnkGraf profil={profil.dnk.dvaIgraca} naslov="Kaladont DNK 2 igrača" />
+        <KaladontDnkGraf profil={profil.dnk.dvaIgraca} naslov="Tvoj Kaladont DNK za 2 igrača" />
+        <FormaIgraca forma={profil.forma.dvaIgraca} mod="dva_igraca" />
         <section class="ostalo-kartica">
           <h3>Ostalo</h3>
           <div class="mrezica-kartica">
@@ -329,35 +310,8 @@
           {/each}
         </div>
       </section>
-    {:else if aktivniPogled === 'rijeci' && profil.statistikaRijeci}
-      {@const statistika = profil.statistikaRijeci}
-      <section class="statistika-sekcija gamifikacija-sekcija">
-        <h2>Riječi i streak</h2>
-        <div class="mrezica-kartica achievement-mrezica">
-          <div class="achievement-polje">
-            <h3>Duge riječi</h3>
-            <p class="napredak-broj">{Math.min(statistika.upisaneDugeRijeci + statistika.upisaneSrednjeDugeRijeci + statistika.upisaneJakoDugeRijeci, profil.ciljeviRijeci.duge.ukupno)} / {profil.ciljeviRijeci.duge.ukupno}</p>
-            <div class="tier-retci">
-              <span>Duge (10–11 slova): <strong>{statistika.upisaneDugeRijeci}</strong></span>
-              <span>Srednje duge (12–14 slova): <strong>{statistika.upisaneSrednjeDugeRijeci}</strong></span>
-              <span>Jako duge (15+ slova): <strong>{statistika.upisaneJakoDugeRijeci}</strong></span>
-            </div>
-            <button class="otkljucane-link" type="button" onclick={() => void otvoriPopup('duge')}>Vidi otkrivene riječi →</button>
-            <strong class="rekord-rijeci">Najduža riječ: {statistika.najduzaRijec ?? '—'}</strong>
-          </div>
-          <div class="achievement-polje">
-            <h3>Rijetke riječi</h3>
-            <p class="napredak-broj">{Math.min(statistika.otkriveneJakoRijetkeGrupe + statistika.otkriveneSrednjeRijetkeGrupe + statistika.otkriveneRijetkeGrupe, profil.ciljeviRijeci.rijetke.ukupno)} / {profil.ciljeviRijeci.rijetke.ukupno}</p>
-            <div class="tier-retci">
-              <span>Rijetke: <strong>{statistika.otkriveneRijetkeGrupe}</strong></span>
-              <span>Srednje rijetke: <strong>{statistika.otkriveneSrednjeRijetkeGrupe}</strong></span>
-              <span>Jako rijetke: <strong>{statistika.otkriveneJakoRijetkeGrupe}</strong></span>
-            </div>
-            <button class="otkljucane-link" type="button" onclick={() => void otvoriPopup('rijetke')}>Vidi otkrivene riječi →</button>
-            <strong class="rekord-rijeci">Najrjeđa riječ: {statistika.najrjedaRijec ?? '—'}</strong>
-          </div>
-        </div>
-      </section>
+    {:else if aktivniPogled === 'rijeci'}
+      <KolekcijaRijeci igracId={profil.igracId} igracNaziv={profil.nadimak} />
     {/if}
 
     {#if otvoreniPopup}
@@ -380,41 +334,7 @@
     {/if}
 
     {#if aktivniPogled === 'povijest'}
-    <section class="povijest-sekcija">
-      <h2>Povijest igara</h2>
-      {#if partije.length === 0}
-        <p class="prazno">Još nema odigranih igara.</p>
-      {:else}
-        <div class="tablica-omotač">
-          <table class="povijest-tablica">
-            <thead>
-              <tr>
-                <th>Datum</th>
-                <th>Plasman</th>
-                <th>Bodovi</th>
-                <th>Eliminacije</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each partije as p (p.partijaId)}
-                <tr>
-                  <td>{formatirajDatum(p.pocetak)}</td>
-                  <td class="plasman-stupac">{formatirajPlasman(p.plasman)}</td>
-                  <td class="broj-stupac">{p.bodovi}</td>
-                  <td class="broj-stupac">{p.eliminacije}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-
-        {#if imaJosPartija}
-          <button type="button" class="ucitaj-jos-gumb" disabled={ucitavanjePartija} onclick={ucitajJos}>
-            {ucitavanjePartija ? 'Učitavanje...' : 'Učitaj još igara'}
-          </button>
-        {/if}
-      {/if}
-    </section>
+    <AktivnostPartije igracId={profil.igracId} />
     {/if}
     {/if}
   {:else}
@@ -423,6 +343,13 @@
 </main>
 
 <style>
+  .profil-zaglavlje-red { display: grid; gap: 20px; min-width: 0; }
+
+  @media (min-width: 1000px) {
+    .profil-zaglavlje-red.ima-cv { grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr); align-items: start; }
+    .profil-zaglavlje-red > .zaglavlje-profila { padding-right: 0; }
+  }
+
   .profil-stranica {
     padding: 24px 0;
     display: flex;

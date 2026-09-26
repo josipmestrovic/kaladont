@@ -19,6 +19,7 @@
     veznik: 'Veznici',
     cestica: 'Čestice',
     uzvik: 'Usklici',
+    vlastito_ime: 'Vlastita imena',
   };
 
   let stanjeSobe = $state<StanjePrivatneSobe | null>(null);

@@ -18,7 +18,7 @@ hrLex je objavljen pod [Creative Commons Imenovanje-Dijeli pod istim uvjetima 4.
 |---|---|
 | **Imenovanje (BY)** | Citat izvora na stranici „O igri" u aplikaciji + u ovom dokumentu + u `LICENCA.md` |
 | **Dijeli pod istim uvjetima (SA)** | Izvedeni popis riječi zadržava CC BY-SA 4.0 |
-| Naznaka izmjena | Stranica „O igri" navodi da je popis filtriran (bez vlastitih imena i kratica) i obogaćen stupcima za igru (grafemski parovi, leksemske grupe) |
+| Naznaka izmjena | Stranica „O igri” navodi da je igrivi popis filtriran (bez kratica, interpunkcije i stranih znakova), a PROPN oblici su uključeni kao zasebna igriva vrsta i obogaćeni grafemskim parovima i leksemskim grupama |
 
 ## Odnos prema kodu projekta
 
@@ -30,4 +30,4 @@ Kod projekta **nije** pod CC BY-SA — SA obveza veže samo izvedene podatke, ne
 
 ## Tekst atribucije za stranicu „O igri"
 
-> Popis riječi izveden je iz leksikona **hrLex 1.3** (Nikola Ljubešić, CLARIN.SI, <http://hdl.handle.net/11356/1232>), dostupnog pod licencom CC BY-SA 4.0. Popis je za potrebe igre filtriran (bez vlastitih imena i kratica) te obogaćen podacima za tijek igre (grafemski parovi, leksemske grupe); izvedeni popis dostupan je pod istom licencom na zahtjev.
+> Popis riječi izveden je iz leksikona **hrLex 1.3** (Nikola Ljubešić, CLARIN.SI, <http://hdl.handle.net/11356/1232>), dostupnog pod licencom CC BY-SA 4.0. Igrivi popis je za potrebe igre filtriran (bez kratica, interpunkcije i stranih znakova), a vlastita imena (`PROPN`) uključena su kao zasebna vrsta i obogaćena podacima za tijek igre (grafemski parovi, leksemske grupe). Izvedeni popis dostupan je pod istom licencom na zahtjev.

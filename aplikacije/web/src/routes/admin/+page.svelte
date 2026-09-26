@@ -11,6 +11,17 @@
     vrijeme: string;
   }
 
+  interface PrijavaIgraca {
+    id: number;
+    partijaId: string;
+    prijaviteljId: string;
+    prijavljeniIgracId: string;
+    razlog: string;
+    poruka: string;
+    status: 'nova' | 'pregledana' | 'rijesena';
+    vrijeme: string;
+  }
+
   interface IzmjenaRjecnika {
     id: number;
     rijec: string;
@@ -34,6 +45,7 @@
   }
 
   let prijave = $state<Prijava[]>([]);
+  let prijaveIgraca = $state<PrijavaIgraca[]>([]);
   let rucnoDodane = $state<IzmjenaRjecnika[]>([]);
   let greska = $state<string | null>(null);
   let novaRijec = $state('');
@@ -49,10 +61,12 @@
     try {
       const odgovori = await Promise.all([
         api<{ prijave: Prijava[] }>('/admin/prijave'),
+        api<{ prijave: PrijavaIgraca[] }>('/admin/prijave-igraca'),
         api<{ izmjene: IzmjenaRjecnika[] }>('/admin/rjecnik/rucno-dodano'),
       ]);
       prijave = odgovori[0].prijave;
-      rucnoDodane = odgovori[1].izmjene;
+      prijaveIgraca = odgovori[1].prijave;
+      rucnoDodane = odgovori[2].izmjene;
     } catch (e) {
       greska = e instanceof Error ? e.message : 'Nemaš pristup admin stranici.';
     }
@@ -62,6 +76,11 @@
 
   async function rijesi(id: number, status: 'pregledana' | 'rijesena') {
     await api(`/admin/prijave/${id}/rijesi`, { method: 'POST', body: JSON.stringify({ status }) });
+    await ucitaj();
+  }
+
+  async function rijesiIgraca(id: number, status: 'pregledana' | 'rijesena') {
+    await api(`/admin/prijave-igraca/${id}/rijesi`, { method: 'POST', body: JSON.stringify({ status }) });
     await ucitaj();
   }
 
@@ -210,6 +229,24 @@
         </ol>
       </section>
     {/if}
+  {/if}
+
+  <h2>Prijave igrača</h2>
+  {#if prijaveIgraca.length === 0}
+    <p>Nema prijava igrača.</p>
+  {:else}
+    <ul>
+      {#each prijaveIgraca as prijava (prijava.id)}
+        <li>
+          #{prijava.id} [{prijava.status}] {prijava.razlog}: {prijava.poruka}
+          <small>Partija: {prijava.partijaId} · Prijavitelj: {prijava.prijaviteljId} · Igrač: {prijava.prijavljeniIgracId}</small>
+          {#if prijava.status !== 'rijesena'}
+            <button type="button" onclick={() => rijesiIgraca(prijava.id, 'pregledana')}>Označi pregledano</button>
+            <button type="button" onclick={() => rijesiIgraca(prijava.id, 'rijesena')}>Riješi</button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
   {/if}
 {/if}
 
