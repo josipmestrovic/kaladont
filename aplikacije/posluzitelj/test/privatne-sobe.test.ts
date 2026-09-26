@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import type { KrajPartije, PocetakPartije, StanjePrivatneSobe } from 'zajednicko';
+import { SVE_VRSTE_RIJECI, type KrajPartije, type PocetakPartije, type StanjePrivatneSobe } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { sesije } from '../src/baza/shema.js';
@@ -157,18 +157,7 @@ describe('privatne sobe', () => {
 
     try {
       const { stanje } = await stvoriSobu(vlasnik.socket);
-      expect(stanje.postavke.dopusteneVrste).toEqual([
-        'imenica',
-        'glagol',
-        'pridjev',
-        'prilog',
-        'zamjenica',
-        'broj',
-        'prijedlog',
-        'veznik',
-        'cestica',
-        'uzvik',
-      ]);
+      expect(stanje.postavke.dopusteneVrste).toEqual(SVE_VRSTE_RIJECI);
     } finally {
       vlasnik.socket.disconnect();
     }
