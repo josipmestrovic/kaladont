@@ -52,6 +52,9 @@ describe('dva lobbyja zaredom s istim igračima', () => {
 
     // 1. partija
     const prviPocetciPromise = cekajPocetke(klijenti);
+    const prvaRundaPromise = new Promise<string>((resolve) => {
+      klijenti[0]!.once('partija:runda-otvorena', (runda: RundaOtvorena) => resolve(runda.naPotezuId));
+    });
     for (const klijent of klijenti) klijent.emit('red:udji');
     const prviPocetci = await prviPocetciPromise;
     expect(new Set(prviPocetci.map((p) => p.partijaId)).size).toBe(1);
@@ -64,9 +67,7 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     const igracIdPoKlijentu = new Map<ClientSocket, string>();
     klijenti.forEach((klijent, i) => igracIdPoKlijentu.set(klijent, prviPocetci[i]!.mojIgracId));
 
-    let naPotezuId = await new Promise<string>((resolve) => {
-      klijenti[0]!.once('partija:runda-otvorena', (runda: RundaOtvorena) => resolve(runda.naPotezuId));
-    });
+    let naPotezuId = await prvaRundaPromise;
     const posaljiNeZnam = () => {
       const naPotezu = klijenti.find((k) => igracIdPoKlijentu.get(k) === naPotezuId);
       naPotezu?.emit('potez:ne-znam');
