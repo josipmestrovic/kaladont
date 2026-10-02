@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
@@ -14,6 +14,7 @@
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
   import Header from '$lib/komponente/Header.svelte';
   import { pustiAudio } from '$lib/audio-manager.js';
+  import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, OdbijenPotez, PrihvacenPotez, RundaOtvorena, StanjePartije } from 'zajednicko';
@@ -43,6 +44,7 @@
   let greskaPovijesti = $state<string | null>(null);
   let prikazanaRijec = $state<Potez | null>(null);
   let prethodnaRijecStola = $state<string | null>(null);
+  let prethodnoIzgovorenaRijec: { id: number; rijec: string } | null = null;
   let prikaziRezultate = $state(false);
   let sekundeDoRezultata = $state(10);
   let odbrojavanjeIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -251,7 +253,7 @@
 
   const jeNaPotezu = $derived(stanje.naPotezuId === stanje.mojIgracId);
   const prikazanaSjedala = $derived(
-    izvediLokalniRedSjedala(stanje.sjedala, stanje.mojIgracId, stanje.naPotezuId ?? ''),
+    izvediLokalniRedSjedala(stanje.sjedala, stanje.mojIgracId),
   );
   const vezaSpremna = $derived(stanjeVeze.stanje === 'spremno' || stanjeVeze.stanje === 'nepoznato');
   const jeEliminiran = $derived(stanje.eliminacije.some((e) => e.igracId === stanje.mojIgracId));
@@ -321,6 +323,14 @@
       trazenaSlova: stanje.trazenaSlova,
       vrijeme: new Date().toISOString(),
     };
+  });
+
+  $effect(() => {
+    const potez = prikazanaRijec;
+    if (!potez?.rijec || !$glasUkljucen) return;
+    if (prethodnoIzgovorenaRijec?.id === potez.id && prethodnoIzgovorenaRijec.rijec === potez.rijec) return;
+    prethodnoIzgovorenaRijec = { id: potez.id, rijec: potez.rijec };
+    izgovoriRijec(potez.rijec);
   });
 
   let sustavBrojac = $state(5);
@@ -560,6 +570,8 @@
       socket.off('greska', naGresku);
     };
   });
+
+  onDestroy(zaustaviGovor);
 </script>
 
 <svelte:head>
@@ -635,7 +647,9 @@
           {imeIgraca(igrac.igracId)}
           {#if igrac.igracId === stanje.mojIgracId && stanje.kraj.mojaOcjenaIgre !== null && stanje.kraj.mojaOcjenaIgre !== undefined}
             <span class="plasman-ocjena" aria-label={`Moja ocjena: ${stanje.kraj.mojaOcjenaIgre} od 5 zvjezdica`}>
-              {'★'.repeat(stanje.kraj.mojaOcjenaIgre)}{'☆'.repeat(5 - stanje.kraj.mojaOcjenaIgre)}
+              {#each Array.from({ length: 5 }, (_, indeks) => indeks < (stanje.kraj?.mojaOcjenaIgre ?? 0)) as ispunjena}
+                <img src={ispunjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />
+              {/each}
             </span>
           {/if}
         </span>
@@ -666,7 +680,9 @@
     {:else}
       <strong>Tvoja ocjena</strong>
       <span class="ocjena-zvjezdice" aria-label={`Moja ocjena: ${stanje.kraj.mojaOcjenaIgre} od 5 zvjezdica`}>
-        {'★'.repeat(stanje.kraj.mojaOcjenaIgre)}{'☆'.repeat(5 - stanje.kraj.mojaOcjenaIgre)}
+        {#each Array.from({ length: 5 }, (_, indeks) => indeks < (stanje.kraj?.mojaOcjenaIgre ?? 0)) as ispunjena}
+          <img src={ispunjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />
+        {/each}
       </span>
       <PojamPomoc
         tekst="?"
@@ -779,7 +795,7 @@
         {#each stanje.kraj.novaDostignuca as dostignuce (dostignuce.id)}
           {@const detalji = opisDostignuca(dostignuce.id)}
           <article class="zavrsno-dostignuce" aria-label={`${detalji.naziv}: novo otključano dostignuće`}>
-            <span class="zavrsno-dostignuce-ikona" aria-hidden="true">★</span>
+            <span class="zavrsno-dostignuce-ikona" aria-hidden="true"><img src="/ikone/27-zvjezdica-puna.png" alt="" /></span>
             <div class="zavrsno-dostignuce-sadrzaj">
               <div class="zavrsno-dostignuce-zaglavlje">
                 <strong>{detalji.naziv}</strong>
@@ -855,6 +871,7 @@
       <a href="/" class="sporedni-gumb">Napusti partiju</a>
     </aside>
   {/if}
+  {#if prikazanaSjedala.length > 0}
   <ul class="igraci-red">
       {#each prikazanaSjedala as sjedalo (sjedalo.igracId)}
       {@const eliminacija = eliminacijaIgraca(sjedalo.igracId)}
@@ -889,7 +906,7 @@
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                 {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} /></span>
+                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                   <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
@@ -944,7 +961,7 @@
             {/if}
             <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
               {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} /></span>
+                <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} /></span>
               {/key}
               {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                 <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} promijeniNemirAvatara={(nemiran) => (avatarJeNemiran = nemiran)} />
@@ -972,6 +989,7 @@
       </li>
     {/each}
   </ul>
+  {/if}
 
   <section class="bijela-zona-igre">
     {#if stanje.kraj}
@@ -1175,19 +1193,19 @@
     margin-top: 48px;
   }
 
-  .status-iskustva { display: none; position: fixed; z-index: 40; top: 0; right: 0; left: 0; width: auto; background: white; border-block: 1px solid #e5ddc8; box-shadow: 0 2px 8px rgb(26 24 21 / 8%); }
+  .status-iskustva { display: none; position: fixed; z-index: 40; top: 0; right: 0; left: 0; width: auto; background: var(--boja-povrsina); border-block: 1px solid var(--boja-obrub); box-shadow: var(--sjena-suptilna); }
   .status-iskustva.vidljiv { display: block; }
   .dobitak-iskustva { display: flex; width: min(960px, calc(100% - 32px)); align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 20px; min-height: 42px; margin: 0 auto; padding: 8px 0; font-size: var(--tekst-sitni); animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
-  .dobitak-iskustva strong { color: var(--boja-mint); font-size: var(--tekst-baza); }
+  .dobitak-iskustva strong { color: var(--boja-isticanje-tekst); font-size: var(--tekst-baza); }
   .dobitak-iskustva-tekst { color: var(--boja-tekst-sekundarni); }
-  .status-dostignuca { display: none; position: fixed; z-index: 41; top: 42px; right: 0; left: 0; width: auto; border-block: 1px solid #e58b24; background: #fff1d8; box-shadow: 0 2px 8px rgb(26 24 21 / 10%); }
+  .status-dostignuca { display: none; position: fixed; z-index: 41; top: 42px; right: 0; left: 0; width: auto; border-block: 1px solid var(--boja-zlato-obrub); background: var(--boja-zlato-pozadina); box-shadow: var(--sjena-suptilna); }
   .status-dostignuca.vidljiv { display: block; }
-  .dobitak-dostignuca { display: flex; width: min(960px, calc(100% - 32px)); align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px 16px; min-height: 42px; margin: 0 auto; padding: 8px 0; color: #8a4d00; font-size: var(--tekst-sitni); animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
-  .dobitak-dostignuca strong { color: #b45d00; font-size: var(--tekst-baza); }
+  .dobitak-dostignuca { display: flex; width: min(960px, calc(100% - 32px)); align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px 16px; min-height: 42px; margin: 0 auto; padding: 8px 0; color: var(--boja-zlato-tekst); font-size: var(--tekst-sitni); animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
+  .dobitak-dostignuca strong { color: var(--boja-zlato-tekst); font-size: var(--tekst-baza); }
   .dobitak-dostignuca span { font-weight: 800; }
   @keyframes ulaz-dobitka { 0% { opacity: 0; transform: translateY(-28px) scale(.94); } 65% { opacity: 1; transform: translateY(2px) scale(1.04); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
   @media (prefers-reduced-motion: reduce) { .dobitak-iskustva { animation: none; } }
-  @media (max-width: 500px) { .dobitak-iskustva, .dobitak-dostignuca { width: calc(100% - 24px); justify-content: flex-start; gap: 5px 14px; } }
+  @media (max-width: 999px) { .dobitak-iskustva, .dobitak-dostignuca { width: calc(100% - 24px); justify-content: flex-start; gap: 5px 14px; } }
   .sr-samo {
     position: absolute;
     width: 1px;
@@ -1226,7 +1244,7 @@
   }
   .pobjednik-sazetak {
     margin: 20px 0 12px;
-    color: var(--boja-mint-tamni);
+    color: var(--boja-isticanje-slova);
     font-family: var(--font-naslov);
     font-size: 21px;
   }
@@ -1236,16 +1254,16 @@
     font-size: inherit;
   }
   .odbrojavanje-najava strong {
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
   }
   .zavrsni-dnk,
   .zavrsna-dostignuca {
     max-width: none;
     margin: 24px auto 0;
     padding: 18px;
-    border: 1px solid #e5ddc8;
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: #fff;
+    background: var(--boja-povrsina);
     text-align: left;
   }
   .ocjena-igre-zavrsna {
@@ -1260,14 +1278,14 @@
     text-align: left;
   }
   .ocjena-igre-zavrsna strong { color: var(--boja-tekst-naslov); font-size: 1.05rem; }
-  .ocjena-igre-zavrsna a { color: var(--boja-pozadina-primarna); font-size: var(--tekst-sitni); font-weight: 700; }
+  .ocjena-igre-zavrsna a { color: var(--boja-isticanje-tekst); font-size: var(--tekst-sitni); font-weight: 700; }
   .ocjena-zvjezdice {
-    color: #8a5a00;
-    letter-spacing: 0.08em;
-    font-size: 1.45rem;
-    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.08em;
     line-height: 1;
   }
+  .ocjena-zvjezdice img { width: 1.45rem; height: 1.45rem; object-fit: contain; }
   .zavrsni-dnk-zaglavlje {
     display: flex;
     align-items: center;
@@ -1276,7 +1294,7 @@
   }
   .zavrsni-dnk-natpis {
     margin: 0 0 2px;
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
     font-size: var(--tekst-mikro);
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -1297,7 +1315,7 @@
     text-align: left;
   }
   .zavrsni-dnk-zaglavlje > strong {
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
     font-size: 1.35rem;
     white-space: nowrap;
   }
@@ -1307,43 +1325,43 @@
     color: var(--boja-tekst-sekundarni);
   }
   .dnk-otkljucan-poruka strong {
-    color: var(--boja-mint-tamni);
+    color: var(--boja-tekst-osnovni);
   }
   .dnk-napredak-traka {
     height: 10px;
     overflow: hidden;
     border-radius: var(--radijus-pill);
-    background: #eee8dc;
+    background: var(--boja-obrub);
   }
   .dnk-napredak-traka span {
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: var(--boja-mint);
+    background: var(--boja-isticanje-slova);
   }
   .zavrsni-niz {
     width: 100%;
     padding: 16px;
-    border: 1px solid #e5ddc8;
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: #fffdf5;
+    background: var(--boja-povrsina-2);
   }
   .zavrsni-niz h3 { margin: 0 0 6px; }
   .zavrsni-niz p { margin: 4px 0; color: var(--boja-tekst-sekundarni); }
-  .zavrsni-niz strong { color: var(--boja-pozadina-primarna); }
+  .zavrsni-niz strong { color: var(--boja-isticanje-tekst); }
   .zavrsni-niz .trenutna-forma { font-size: 1.15rem; }
   .zavrsna-mini-povijest { display: grid; gap: 8px; margin-top: 14px; }
   .zavrsni-rezultati { display: flex; flex-wrap: wrap; gap: 6px; }
   .zavrsni-rezultati span { display: grid; width: 28px; height: 28px; place-items: center; border: 2px solid transparent; border-radius: 50%; font-weight: 800; }
-  .zavrsni-rezultati .pobjeda { background: #dcefe2; color: #176342; }
-  .zavrsni-rezultati .poraz { background: #f8dfd8; color: #a33d32; }
+  .zavrsni-rezultati .pobjeda { background: var(--boja-uspjeh-pozadina); color: var(--boja-uspjeh-tekst); }
+  .zavrsni-rezultati .poraz { background: var(--boja-poraz-pozadina); color: var(--boja-poraz-tekst); }
   .zavrsna-kolekcija {
     width: 100%;
     max-width: none;
     padding: 18px;
-    border: 1px solid #e5ddc8;
+    border: 1px solid var(--boja-obrub);
     border-radius: 12px;
-    background: #fffdf5;
+    background: var(--boja-povrsina-2);
   }
   .zavrsna-kolekcija h3,
   .zavrsna-kolekcija h4 {
@@ -1364,7 +1382,7 @@
     font-size: var(--tekst-sitni);
   }
   .zavrsna-kolekcija-napredak strong {
-    color: var(--boja-pozadina-primarna);
+    color: var(--boja-isticanje-tekst);
     font-size: 1.2rem;
   }
   .zavrsna-kolekcija-sljedeca {
@@ -1373,7 +1391,7 @@
   .zavrsna-kolekcija-dodano {
     margin-top: 18px;
     padding-top: 16px;
-    border-top: 1px solid #e5ddc8;
+    border-top: 1px solid var(--boja-obrub);
   }
   .zavrsna-kolekcija-kategorije {
     display: flex;
@@ -1384,8 +1402,8 @@
     border: 0;
     padding: 7px 10px;
     border-radius: 6px;
-    background: #e8f3ed;
-    color: var(--boja-pozadina-primarna);
+    background: var(--boja-povrsina-3);
+    color: var(--boja-isticanje-tekst);
     cursor: pointer;
     font: inherit;
     font-size: var(--tekst-sitni);
@@ -1393,7 +1411,7 @@
   }
   .zavrsna-kolekcija-kategorije button:hover,
   .zavrsna-kolekcija-kategorije button:focus-visible {
-    background: #d5eadf;
+    background: var(--boja-obrub);
   }
   .kolekcija-modal-pozadina {
     position: fixed;
@@ -1402,7 +1420,7 @@
     display: grid;
     place-items: center;
     padding: 20px;
-    background: rgb(26 24 21 / 42%);
+    background: var(--boja-zastor);
   }
   .kolekcija-modal {
     position: relative;
@@ -1412,8 +1430,8 @@
     padding: 24px;
     border: 0;
     border-radius: 10px;
-    background: #fff;
-    box-shadow: 0 18px 60px rgb(0 0 0 / 22%);
+    background: var(--boja-povrsina);
+    box-shadow: var(--sjena-modal);
   }
   .kolekcija-modal h3 {
     margin: 0;
@@ -1429,6 +1447,7 @@
     right: 14px;
     border: 0;
     background: transparent;
+    color: var(--boja-tekst-osnovni);
     font-size: 1.8rem;
     line-height: 1;
     cursor: pointer;
@@ -1444,7 +1463,7 @@
   .kolekcija-modal-rijeci li {
     padding: 5px 9px;
     border-radius: 5px;
-    background: #f2f2ec;
+    background: var(--boja-povrsina-3);
   }
   .zavrsna-dostignuca h3 {
     margin-bottom: 12px;
@@ -1466,10 +1485,10 @@
     align-items: flex-start;
     gap: 12px;
     padding: 12px 14px;
-    border: 1.5px solid #f2b14a;
+    border: 1.5px solid var(--boja-zlato-obrub);
     border-radius: 12px;
-    background: linear-gradient(135deg, #fffaf1 0%, #fff1d8 100%);
-    box-shadow: 0 8px 20px rgba(185, 110, 0, 0.12);
+    background: var(--boja-zlato-pozadina);
+    box-shadow: var(--sjena-suptilna);
   }
   .zavrsno-dostignuce-sadrzaj {
     flex: 1;
@@ -1487,20 +1506,18 @@
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: rgba(242, 177, 74, 0.18);
-    color: #b86300;
-    font-size: 1.3rem;
-    line-height: 1;
+    background: color-mix(in srgb, var(--boja-zlato-obrub) 18%, transparent);
   }
+  .zavrsno-dostignuce-ikona img { width: 22px; height: 22px; object-fit: contain; }
   .zavrsno-dostignuce-status {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 4px 8px;
-    border: 1px solid #f2b14a;
+    border: 1px solid var(--boja-zlato-obrub);
     border-radius: 999px;
-    background: #fff7e8;
-    color: #9b5700;
+    background: transparent;
+    color: var(--boja-zlato-tekst);
     font-size: 0.7rem;
     font-weight: 800;
     letter-spacing: 0.04em;
@@ -1515,10 +1532,10 @@
     font-size: var(--tekst-sitni);
   }
   .zavrsno-dostignuce small {
-    color: #9b5700;
+    color: var(--boja-zlato-tekst);
     font-weight: 700;
   }
-  @media (max-width: 520px) {
+  @media (max-width: 999px) {
     .zavrsni-dnk,
     .zavrsna-dostignuca,
     .zavrsna-kolekcija { padding: 14px; }
@@ -1527,15 +1544,15 @@
   }
   .naPotezu {
     font-weight: bold;
-    border-color: var(--boja-mint);
+    border-color: var(--boja-isticanje-slova);
     border-radius: 16px;
-    background: rgba(47, 169, 140, 0.1);
+    background: var(--boja-povrsina-2);
     animation: sjedalo-na-potezu 420ms ease-out;
   }
   .eliminiran {
     border-color: var(--boja-akcent);
     border-radius: 16px;
-    background: rgba(228, 87, 46, 0.08);
+    background: var(--boja-poraz-pozadina);
     opacity: 0.5;
   }
   .igraci-red li.izbornik-otvoren {
@@ -1584,22 +1601,22 @@
     line-height: 18px;
   }
   .red-label.vidljiv {
-    color: var(--boja-mint-tamni);
+    color: var(--boja-isticanje-slova);
   }
   .red-label.ispao {
     color: var(--boja-akcent);
   }
   .ime-igraca.aktivno {
-    color: var(--boja-mint-tamni);
+    color: var(--boja-isticanje-slova);
   }
   .oznaka-ti {
     display: inline-block;
     margin-left: 6px;
     padding: 2px 6px;
-    border: 1px solid var(--boja-mint-tamni);
+    border: 1px solid var(--boja-isticanje-slova);
     border-radius: var(--radijus-pill);
-    background: var(--boja-mint-tamni);
-    color: #faf3e3;
+    background: var(--boja-isticanje-slova);
+    color: #1a1815;
     font-size: var(--tekst-mikro);
     font-weight: 700;
     line-height: 1;
@@ -1634,12 +1651,12 @@
     transform: translateX(-50%);
   }
   @keyframes sjedalo-na-potezu {
-    0% { box-shadow: 0 0 0 0 rgba(47, 169, 140, 0.45); }
-    100% { box-shadow: 0 0 0 8px rgba(47, 169, 140, 0); }
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--boja-isticanje-slova) 45%, transparent); }
+    100% { box-shadow: 0 0 0 8px transparent; }
   }
   .igraci-red li.naPotezu .avatar-omot {
     border-radius: 50%;
-    box-shadow: 0 0 0 4px rgba(47, 169, 140, 0.2);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--boja-isticanje-slova) 30%, transparent);
   }
   .avatar-omot {
     position: relative;
@@ -1671,7 +1688,7 @@
     padding: 8px 12px;
     border: 1px solid var(--boja-isticanje-slova);
     border-radius: 8px;
-    background: color-mix(in srgb, var(--boja-isticanje-slova) 35%, white);
+    background: color-mix(in srgb, var(--boja-isticanje-slova) 22%, transparent);
     color: var(--boja-tekst-osnovni);
     text-align: center;
     font-weight: 700;
@@ -1680,8 +1697,8 @@
     border-color: var(--boja-mint);
   }
   .nagrada-veliki {
-    border-color: var(--boja-crvena);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--boja-crvena) 18%, transparent);
+    border-color: var(--boja-akcent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--boja-akcent) 18%, transparent);
   }
   .nagrada-streak {
     display: block;
@@ -1747,7 +1764,7 @@
     cursor: pointer;
   }
   .vlastito-sjedalo:focus-visible {
-    outline: 3px solid var(--boja-mint-tamni);
+    outline: 3px solid var(--boja-fokus);
     outline-offset: 4px;
   }
   .izbornik-brzih-poruka {
@@ -1760,10 +1777,10 @@
     gap: var(--razmak-4);
     width: min(216px, calc(100vw - 24px));
     padding: var(--razmak-8);
-    border: 1px solid rgba(122, 114, 100, 0.45);
+    border: 1px solid var(--boja-obrub-jaci);
     border-radius: 8px;
-    background: white;
-    box-shadow: var(--sjena-suptilna);
+    background: var(--boja-povrsina);
+    box-shadow: var(--sjena-modal);
     transform: translateX(-50%);
     animation: otvaranje-izbornika-reakcija 160ms ease-out;
   }
@@ -1771,9 +1788,9 @@
     min-width: 0;
     min-height: 44px;
     padding: 4px 6px;
-    border: 1px solid rgba(122, 114, 100, 0.45);
+    border: 1px solid var(--boja-obrub-jaci);
     border-radius: var(--radijus-pill);
-    background: var(--boja-pozadina-podloga);
+    background: var(--boja-povrsina-3);
     color: var(--boja-tekst-osnovni);
     font: inherit;
     font-size: var(--tekst-sitni);
@@ -1781,8 +1798,8 @@
   }
   .izbornik-brzih-poruka button:hover,
   .izbornik-brzih-poruka button:focus-visible {
-    border-color: var(--boja-mint);
-    background: rgba(47, 169, 140, 0.1);
+    border-color: var(--boja-isticanje-slova);
+    background: var(--boja-povrsina-2);
   }
   @keyframes otvaranje-izbornika-reakcija {
     from { opacity: 0; transform: translateX(-50%) translateY(-4px) scale(0.96); }
@@ -1818,7 +1835,7 @@
     gap: var(--razmak-12);
     margin: 16px 0 0;
     padding: 10px 12px;
-    border: 1px solid rgba(122, 114, 100, 0.45);
+    border: 1px solid var(--boja-obrub-jaci);
     border-radius: 8px;
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mali);
@@ -1829,14 +1846,14 @@
     border: 0;
     border-radius: var(--radijus-pill);
     background: var(--boja-akcent);
-    color: white;
+    color: #1a1815;
     font: inherit;
     font-weight: 700;
     cursor: pointer;
   }
   .promatranje-traka button:hover,
   .promatranje-traka button:focus-visible {
-    background: #c94321;
+    background: var(--boja-akcent-tekst);
   }
   .bijela-zona-igre {
     margin: 0 -16px;
@@ -1850,7 +1867,7 @@
   }
   .trazena-slova strong {
     color: var(--boja-isticanje-slova);
-    background: var(--boja-tekst);
+    background: #1a1815;
     padding: 2px 8px;
     border-radius: 6px;
   }
@@ -1858,7 +1875,7 @@
     display: inline-block;
     margin-left: 4px;
     color: var(--boja-isticanje-slova);
-    background: var(--boja-tekst);
+    background: #1a1815;
     padding: 2px 8px;
     border-radius: 6px;
     font-family: var(--font-naslov);
@@ -1882,7 +1899,7 @@
     line-height: 1.2;
   }
   .trenutna-rijec-zavrsetak {
-    color: var(--boja-akcent);
+    color: var(--boja-isticanje-slova);
   }
   .sustav-bira-inline {
     position: fixed;
@@ -1911,7 +1928,7 @@
   .igrac-bod {
     display: block;
     margin-top: 8px;
-    color: var(--boja-mint-tamni);
+    color: var(--boja-isticanje-slova);
   }
   .sustav-bira-tekst {
     margin: 0;
@@ -1920,7 +1937,7 @@
     font-size: var(--tekst-baza);
   }
   .sustav-bira-tekst strong {
-    color: var(--boja-mint-tamni);
+    color: var(--boja-isticanje-slova);
     display: block;
     margin-top: var(--razmak-8);
     font-size: var(--naslov-1);
@@ -1935,16 +1952,16 @@
     width: 100%;
     height: 44px;
     padding: 0 16px;
-    border: 1px solid var(--boja-tekst-sekundarni);
+    border: 1px solid var(--boja-obrub-jaci);
     border-radius: var(--radijus-pill);
-    background: white;
+    background: var(--boja-povrsina-3);
     font-family: var(--font-naslov);
     font-size: var(--tekst-rijec-stola);
     letter-spacing: 0.08em;
   }
   .prefiks-unosa {
     flex: 0 0 auto;
-    color: var(--boja-akcent);
+    color: var(--boja-isticanje-slova);
     font-weight: 700;
   }
   .unos-rijeci input {
@@ -1955,18 +1972,18 @@
     border: 0;
     outline: 0;
     background: transparent;
-    color: #2fa98c;
+    color: var(--boja-tekst-osnovni);
     font: inherit;
     letter-spacing: inherit;
   }
   .unos-rijeci.unos-ima-gresku {
     border-color: var(--boja-akcent);
-    background: rgba(228, 87, 46, 0.08);
+    background: var(--boja-poraz-pozadina);
     animation: podrhtavanje-unosa 220ms ease-in-out;
   }
   .poruka-poteza {
     margin: 8px 0;
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
     font-size: var(--tekst-baza);
     font-weight: 400;
     text-align: center;
@@ -1986,8 +2003,8 @@
     margin-top: 8px;
     border: 0;
     border-radius: var(--radijus-pill);
-    background: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     font-weight: 600;
     cursor: pointer;
   }
@@ -2006,7 +2023,7 @@
   .potez-gumbi button.ne-znam-gumb {
     background: transparent;
     border: 1px solid var(--boja-akcent);
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
     font-size: var(--tekst-sitni);
     font-weight: 600;
   }
@@ -2018,9 +2035,9 @@
   .povijest-partije {
     margin: 12px 0 20px;
     padding: 12px 16px;
-    border: 1px solid rgba(122, 114, 100, 0.35);
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.45);
+    background: var(--boja-povrsina-2);
   }
   .povijest-naslov {
     display: flex;
@@ -2037,7 +2054,7 @@
     cursor: pointer;
   }
   .povijest-naslov span:last-child {
-    color: var(--boja-akcent);
+    color: var(--boja-isticanje-slova);
     font-size: 1.35rem;
   }
   .povijest-partije ol {
@@ -2050,7 +2067,7 @@
     justify-content: space-between;
     gap: 8px;
     padding: 6px 0;
-    border-bottom: 1px solid rgba(122, 114, 100, 0.15);
+    border-bottom: 1px solid var(--boja-obrub);
     font-size: var(--tekst-mali);
   }
   .povijest-partije li span {
@@ -2061,21 +2078,21 @@
   .ucitaj-jos-poteza {
     margin-top: 12px;
     padding: 8px 12px;
-    border: 1px solid #d8cdb7;
+    border: 1px solid var(--boja-obrub-jaci);
     border-radius: 6px;
-    background: #fff;
-    color: #1d6f5c;
+    background: var(--boja-povrsina);
+    color: var(--boja-tekst-osnovni);
     cursor: pointer;
   }
 
   .ucitaj-jos-poteza:disabled { cursor: wait; opacity: 0.65; }
-  @media (max-width: 499px) {
+  @media (max-width: 999px) {
     form button,
     .unos-rijeci {
       width: 100%;
     }
   }
-  @media (min-width: 500px) {
+  @media (min-width: 1000px) {
     form {
       display: grid;
       grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
@@ -2096,9 +2113,9 @@
     width: max-content;
     max-width: min(180px, calc(50vw - 24px));
     padding: 5px 9px;
-    border: 1px solid rgba(122, 114, 100, 0.45);
+    border: 1px solid var(--boja-obrub-jaci);
     border-radius: 12px;
-    background: white;
+    background: var(--boja-povrsina);
     color: var(--boja-tekst-osnovni);
     font-size: var(--tekst-mikro);
     white-space: normal;
@@ -2135,9 +2152,9 @@
     top: -5px;
     width: 8px;
     height: 8px;
-    border-left: 1px solid rgba(122, 114, 100, 0.45);
-    border-top: 1px solid rgba(122, 114, 100, 0.45);
-    background: white;
+    border-left: 1px solid var(--boja-obrub-jaci);
+    border-top: 1px solid var(--boja-obrub-jaci);
+    background: var(--boja-povrsina);
     transform: translateX(-50%) rotate(45deg);
   }
   .rijec-oblak::after {
@@ -2147,9 +2164,9 @@
     bottom: -5px;
     width: 8px;
     height: 8px;
-    border-right: 1px solid rgba(122, 114, 100, 0.45);
-    border-bottom: 1px solid rgba(122, 114, 100, 0.45);
-    background: white;
+    border-right: 1px solid var(--boja-obrub-jaci);
+    border-bottom: 1px solid var(--boja-obrub-jaci);
+    background: var(--boja-povrsina);
     transform: translateX(-50%) rotate(45deg);
   }
   @keyframes reakcija-dolazak {
@@ -2162,20 +2179,20 @@
     to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
   }
   .gost-poruka {
-    background: #f4c95d;
-    color: #26221b;
+    background: var(--boja-isticanje-slova);
+    color: #1a1815;
     padding: 8px 12px;
     border-radius: 6px;
   }
   .privatna-obavijest {
-    background: #fdf6e2;
-    border: 1px solid #f4c95d;
-    color: #5c554a;
+    background: var(--boja-zlato-pozadina);
+    border: 1px solid var(--boja-zlato-obrub);
+    color: var(--boja-zlato-tekst);
     padding: 10px 14px;
     border-radius: 8px;
     font-weight: 600;
   }
-  @media (min-width: 601px) {
+  @media (min-width: 1000px) {
     .igraci-red {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
@@ -2189,13 +2206,14 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    background: white;
+    background: var(--boja-povrsina);
     border-radius: var(--radijus-kartica);
     padding: 12px 16px;
     margin-bottom: 8px;
   }
   .plasmani-lista li.pobjednik {
     background: var(--boja-isticanje-slova);
+    color: #1a1815;
     font-weight: bold;
   }
   .plasman-broj {
@@ -2208,20 +2226,19 @@
     min-width: 0;
   }
   .plasman-ocjena {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
     margin-left: 8px;
-    color: #8a5a00;
-    font-size: 0.9rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
     white-space: nowrap;
   }
+  .plasman-ocjena img { width: 14px; height: 14px; object-fit: contain; }
   .plasman-bodovi {
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mali);
     white-space: nowrap;
   }
-  @media (max-width: 500px) {
+  @media (max-width: 999px) {
     .plasmani-lista li {
       flex-wrap: wrap;
       gap: 6px 10px;
@@ -2249,8 +2266,8 @@
   .kraj-donje-praznine { height: 100px; }
   .igraj-opet-gumb {
     display: inline-block;
-    background: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     text-decoration: none;
     padding: 10px 24px;
     border-radius: var(--radijus-pill);
@@ -2258,8 +2275,8 @@
   }
   .sporedni-gumb {
     display: inline-block;
-    background: white;
-    border: 2px solid var(--boja-tekst-sekundarni);
+    background: transparent;
+    border: 2px solid var(--boja-obrub-jaci);
     color: var(--boja-tekst-osnovni);
     text-decoration: none;
     padding: 10px 24px;
@@ -2270,14 +2287,14 @@
     margin-left: 8px;
     padding: 4px 8px;
     font-size: var(--tekst-sitni);
-    background: #ff6b6b;
-    color: white;
+    background: var(--boja-akcent);
+    color: #1a1815;
     border: none;
     border-radius: 4px;
     cursor: pointer;
   }
   .prijavi-btn:hover {
-    background: #ff5252;
+    background: var(--boja-akcent-tekst);
   }
 
   .dijalog-overlay {
@@ -2286,7 +2303,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--boja-zastor);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2294,12 +2311,12 @@
   }
 
   .dijalog {
-    background: white;
+    background: var(--boja-povrsina);
     border-radius: 8px;
     padding: 20px;
     max-width: 400px;
     width: 90%;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--sjena-modal);
   }
 
   .dijalog h3 {
@@ -2323,40 +2340,40 @@
   }
 
   .dijalog button:first-child {
-    background: #0066cc;
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
   }
 
   .dijalog button:first-child:hover {
-    background: #0052a3;
+    opacity: 0.85;
   }
 
   .dijalog button:last-child {
-    background: #f0f0f0;
-    color: #333;
+    background: var(--boja-povrsina-3);
+    color: var(--boja-tekst-osnovni);
   }
 
   .dijalog button:last-child:hover {
-    background: #e0e0e0;
+    background: var(--boja-obrub);
   }
   .potvrda-ne-znam .sporedni-dijalog-gumb {
-    border: 1px solid var(--boja-mint);
+    border: 1px solid var(--boja-obrub-jaci);
     background: transparent;
-    color: var(--boja-mint);
+    color: var(--boja-tekst-osnovni);
   }
   .potvrda-ne-znam .sporedni-dijalog-gumb:hover,
   .potvrda-ne-znam .sporedni-dijalog-gumb:focus-visible {
     background: transparent;
-    border-color: var(--boja-pozadina-primarna);
-    color: var(--boja-pozadina-primarna);
+    border-color: var(--boja-isticanje-slova);
+    color: var(--boja-isticanje-slova);
   }
   .potvrda-ne-znam .potvrdi-dijalog-gumb {
-    background: #b42318;
-    color: white;
+    background: var(--boja-akcent);
+    color: #1a1815;
   }
   .potvrda-ne-znam .potvrdi-dijalog-gumb:hover,
   .potvrda-ne-znam .potvrdi-dijalog-gumb:focus-visible {
-    background: #8f1c13;
+    background: var(--boja-akcent-tekst);
   }
   @media (prefers-reduced-motion: reduce) {
     .rijec-sadrzaj,

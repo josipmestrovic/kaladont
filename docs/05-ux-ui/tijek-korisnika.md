@@ -26,7 +26,7 @@ flowchart TD
 Ključna svojstva:
 
 - **Jedan klik do reda:** bez lobbyja, bez odabira sobe, bez postavki.
-- Gost ID stvara se tiho — igrač ne ispunjava ništa za to. Ime i avatar bira jednom, pri prvom ulasku (`/dobrodoslica`), prije prvog reda čekanja.
+- Gost ID stvara se tiho — igrač ne ispunjava ništa za to. Avatar nije uvjet za ulazak u red; gost ga može urediti kad god želi u `/profil/avatar`, istom editoru koji koriste i registrirani igrači.
 - „Igraj opet" vraća u red čekanja s istim identitetom.
 
 ## Registracija (u bilo kojem trenutku)

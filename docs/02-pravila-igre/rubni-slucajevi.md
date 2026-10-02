@@ -123,3 +123,8 @@ U partiji je odigrano „dobar"; igrač kasnije pokuša „dobra" (ili „dobrom
 **Odluka:** prihvaćanjem „dobro" troše se **sve** grupe kojima oblik pripada — kasnije se odbijaju i „dobra" (pridjev) i svi drugi oblici svih triju leksema. Provjera dostupnosti nastavka (RS-02/RS-03) također radi po grupama: nastavak postoji samo ako postoji oblik čija **nijedna** grupa nije potrošena.
 *Obrazloženje: igračima su „dobro" i „dobra" ista riječ; dopuštanje obojega osjeća se kao ponavljanje.*
 
+**RS-30 — Lokalni prikaz sjedala ostaje stabilan.**
+Partija sadrži kanonski uređeni niz sjedala koji je poslužitelj nasumično dodijelio na njezinu početku. Svaki klijent prikazuje taj niz zakrenut tako da je lokalni igrač prvi.
+**Odluka:** lokalni prikaz izvodi se samo iz kanonskog niza i lokalnog `igracId`; ne mijenja se kad se promijeni igrač na potezu. Potez i timer ističu sjedalo prema ID-u igrača, a eliminirani igrači ostaju na mjestu. Prikaz sjedala čeka dok nisu dostupni i lokalni identitet i njegov zapis sjedala; reconnect koristi isti kanonski niz.
+*Obrazloženje: promjena aktivnog igrača ne smije premještati sjedala ni avatare i otežavati praćenje poteza.*
+

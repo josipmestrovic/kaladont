@@ -19,8 +19,8 @@
     <section class="izbor-akcija" aria-labelledby="izbor-akcija-naslov">
       <h2 id="izbor-akcija-naslov">Što želiš sada?</h2>
       <div class="akcije">
-        <a class="glavna-akcija" href="/red?mod=dva_igraca">Igrati u 2 igrača</a>
-        <a class="glavna-akcija" href="/red?mod=cetiri_igraca">Igrati u 4 igrača</a>
+        <a class="glavna-akcija" href="/red?mod=dva_igraca">Igrati Dvoboj</a>
+        <a class="glavna-akcija" href="/red?mod=cetiri_igraca">Igrati Četveroboj</a>
         <a class="sporedna-akcija" href="/soba/kreiraj">Stvoriti privatnu sobu</a>
         <a class="sporedna-akcija" href="/pravila">Pročitati pravila</a>
         <a class="sporedna-akcija" href="/profil">Vidjeti svoj profil</a>
@@ -122,7 +122,7 @@
     color: var(--boja-tekst-naslov);
   }
 
-  @media (min-width: 600px) {
+  @media (min-width: 1000px) {
     .akcije {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }

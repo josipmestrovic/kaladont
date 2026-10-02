@@ -224,8 +224,8 @@
   }
 
   .grupa {
-    background: white;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina);
+    border: 1px solid var(--boja-obrub);
     border-radius: var(--radijus-kartica);
     padding: 20px;
     box-shadow: var(--sjena-suptilna);
@@ -283,8 +283,8 @@
   }
 
   .odabir-gumb {
-    background: #faf8f0;
-    border: 2px solid #e5ddc8;
+    background: var(--boja-povrsina-2);
+    border: 2px solid var(--boja-obrub);
     color: var(--boja-tekst-osnovni);
     padding: 8px 16px;
     border-radius: var(--radijus-pill);
@@ -294,9 +294,9 @@
   }
 
   .odabir-gumb.odabran {
-    background: var(--boja-pozadina-primarna);
-    border-color: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    border-color: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     font-weight: 700;
   }
 
@@ -313,7 +313,7 @@
   input[type='checkbox'] {
     width: 20px;
     height: 20px;
-    accent-color: var(--boja-pozadina-primarna);
+    accent-color: var(--boja-isticanje-slova);
     cursor: pointer;
   }
 
@@ -333,8 +333,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #faf8f0;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina-2);
+    border: 1px solid var(--boja-obrub);
     padding: 8px 12px;
     border-radius: 8px;
     cursor: pointer;
@@ -344,9 +344,9 @@
   }
 
   .vrsta-labela.aktivno {
-    background: white;
-    border-color: var(--boja-pozadina-primarna);
-    color: var(--boja-tekst-naslov);
+    background: var(--boja-povrsina-3);
+    border-color: var(--boja-isticanje-slova);
+    color: var(--boja-isticanje-tekst);
     font-weight: 700;
   }
 
@@ -367,8 +367,8 @@
     border: none;
     border-radius: var(--radijus-pill);
     padding: 14px 32px;
-    background: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     cursor: pointer;
     align-self: flex-start;
   }
@@ -379,14 +379,14 @@
   }
 
   .greska {
-    color: #c0392b;
+    color: var(--boja-poraz-tekst);
     margin: 0;
     font-weight: 600;
   }
 
   .grupa {
-    background: white;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina);
+    border: 1px solid var(--boja-obrub);
     border-radius: var(--radijus-kartica);
     padding: 20px;
     box-shadow: var(--sjena-suptilna);
@@ -431,8 +431,8 @@
   }
 
   .odabir-gumb {
-    background: #faf8f0;
-    border: 2px solid #e5ddc8;
+    background: var(--boja-povrsina-2);
+    border: 2px solid var(--boja-obrub);
     color: var(--boja-tekst-osnovni);
     padding: 8px 16px;
     border-radius: var(--radijus-pill);
@@ -442,9 +442,9 @@
   }
 
   .odabir-gumb.odabran {
-    background: var(--boja-pozadina-primarna);
-    border-color: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    border-color: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     font-weight: 700;
   }
 
@@ -458,8 +458,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #faf8f0;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina-2);
+    border: 1px solid var(--boja-obrub);
     padding: 8px 12px;
     border-radius: 8px;
     cursor: pointer;
@@ -469,9 +469,9 @@
   }
 
   .vrsta-labela.aktivno {
-    background: white;
-    border-color: var(--boja-pozadina-primarna);
-    color: var(--boja-tekst-naslov);
+    background: var(--boja-povrsina-3);
+    border-color: var(--boja-isticanje-slova);
+    color: var(--boja-isticanje-tekst);
     font-weight: 700;
   }
 
@@ -483,8 +483,8 @@
     border: none;
     border-radius: var(--radijus-pill);
     padding: 14px 32px;
-    background: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     cursor: pointer;
     align-self: flex-start;
   }
@@ -495,7 +495,7 @@
   }
 
   .greska {
-    color: #c0392b;
+    color: var(--boja-poraz-tekst);
     margin: 0;
     font-weight: 600;
   }

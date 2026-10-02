@@ -4,8 +4,6 @@
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
-  import { AVATARI } from '$lib/avatari.js';
-  import Avatar from '$lib/komponente/Avatar.svelte';
   import AudioKontrola from '$lib/komponente/AudioKontrola.svelte';
 
   interface Profil {
@@ -23,7 +21,6 @@
 
   let profil = $state<Profil | null>(null);
   let greska = $state<string | null>(null);
-  let spremaSe = $state(false);
 
   let noviEmail = $state('');
   let lozinkaZaEmail = $state('');
@@ -42,21 +39,6 @@
       greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje profilnih podataka.';
     }
   });
-
-  async function odaberiAvatar(avatarId: number) {
-    if (!profil) return;
-    spremaSe = true;
-    try {
-      await api('/profil/avatar', { method: 'PUT', body: JSON.stringify({ avatarId }) });
-        await osvjeziSocketIdentitet();
-      profil = { ...profil, avatarId };
-      window.dispatchEvent(new CustomEvent('kaladont:avatar-promijenjen', { detail: { avatarId } }));
-    } catch (e) {
-      greska = e instanceof Error ? e.message : 'Neuspjelo spremanje avatara.';
-    } finally {
-      spremaSe = false;
-    }
-  }
 
   async function promijeniEmail(e: SubmitEvent) {
     e.preventDefault();
@@ -102,7 +84,7 @@
     <section class="sekcija gost-napomena">
       <h2>Dodatne postavke računa</h2>
       <p>
-        Igraš kao gost. Za prilagodbu avatara, promjenu email adrese ili lozinke, registriraj svoj račun.
+        Igraš kao gost. Za promjenu email adrese ili lozinke, registriraj svoj račun.
       </p>
       <a href="/registracija" class="cta-gumb">Registriraj se</a>
     </section>
@@ -111,20 +93,7 @@
   {:else if profil}
     <section class="sekcija">
       <h2>Prilagodi avatar</h2>
-      <div class="avatar-grid">
-        {#each AVATARI as avatar (avatar.id)}
-          <button
-            type="button"
-            class="avatar-opcija"
-            class:odabran={profil.avatarId === avatar.id}
-            disabled={spremaSe}
-            aria-label={`Odaberi ${avatar.naziv}`}
-            onclick={() => odaberiAvatar(avatar.id)}
-          >
-            <Avatar avatarId={avatar.id} velicina={72} />
-          </button>
-        {/each}
-      </div>
+      <a href="/profil/avatar" class="cta-gumb">Uredi avatar</a>
     </section>
 
     <section class="sekcija">
@@ -178,8 +147,8 @@
   }
 
   .sekcija {
-    background: white;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina);
+    border: 1px solid var(--boja-obrub);
     border-radius: var(--radijus-kartica);
     padding: 20px;
     box-shadow: var(--sjena-suptilna);
@@ -198,20 +167,20 @@
   }
 
   .gost-napomena {
-    background: #fdf6e2;
-    border-color: #f4c95d;
+    background: var(--boja-zlato-pozadina);
+    border-color: var(--boja-zlato-obrub);
   }
 
   .gost-napomena p {
     margin: 0;
-    color: #5c554a;
+    color: var(--boja-zlato-tekst);
   }
 
   .cta-gumb {
     display: inline-block;
     align-self: flex-start;
-    background: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     font-weight: 700;
     text-decoration: none;
     padding: 10px 20px;
@@ -223,24 +192,6 @@
     margin: 0;
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-sitni);
-  }
-
-  .avatar-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .avatar-opcija {
-    background: none;
-    border: 3px solid transparent;
-    border-radius: 50%;
-    padding: 2px;
-    cursor: pointer;
-  }
-
-  .avatar-opcija.odabran {
-    border-color: var(--boja-pozadina-primarna);
   }
 
   .forma {
@@ -261,14 +212,16 @@
     font-size: 16px;
     padding: 10px 14px;
     border-radius: var(--radijus-kartica);
-    border: 2px solid #e5ddc8;
+    border: 2px solid var(--boja-obrub);
+    background: var(--boja-povrsina-3);
+    color: var(--boja-tekst-osnovni);
     width: 100%;
   }
 
   .spremnik-gumb {
     align-self: flex-start;
-    background: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     font-family: var(--font-naslov);
     font-weight: 700;
     font-size: 16px;
@@ -286,7 +239,7 @@
   }
 
   .greska {
-    color: #c0392b;
+    color: var(--boja-poraz-tekst);
     font-weight: 600;
   }
 </style>

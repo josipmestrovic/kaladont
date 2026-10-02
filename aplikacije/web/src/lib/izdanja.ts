@@ -8,10 +8,10 @@ export interface IzdanjeBiljeske {
 
 export const IZDANJA: IzdanjeBiljeske[] = [
   {
-    verzija: 'v0.5.0-closed-alpha',
-    naslov: 'Kaladont Multiplayer v0.5.0 – Closed Alpha',
+    verzija: 'v0.5.0-closed-alpha.1',
+    naslov: 'Kaladont Multiplayer v0.5.0 – Closed Alpha 1',
     datum: '26. rujna 2026.',
-    uvod: 'Peto zatvoreno izdanje završava profilni CV i biografsko razmišljanje o igraču, uvodi stabilnije prikaze staza i formi te dodatno usklađuje javni i privatni profil s novim sadržajem.',
+    uvod: 'Peto zatvoreno izdanje donosi biografski profil Kaladont, pregledniju formu i dostignuća, jasniju ocjenu partije te stabilniji red sjedala. Uključuje i pristupačne opcije fonta i čitanja novih riječi naglas.',
     novo: [
       {
         naslov: 'CV profil je sada čisti biografski odlomak',
@@ -36,6 +36,29 @@ export const IZDANJA: IzdanjeBiljeske[] = [
           'Ažurirane su migracije, validacije i profilni endpointi uz novi model podataka i dodatna provjera registriranog staža.',
           'Pojačana je stabilnost reda čekanja, privatnih soba i load-bot tokova.',
           'Dodane su i dopunske testne pokrivenosti za CV, formu, DNK, profil i rječnik.',
+        ],
+      },
+      {
+        naslov: 'Jasnija ocjena i stabilniji red poteza',
+        stavke: [
+          'Javna partija s dodijeljenim XP-om dobiva ocjenu od dvije do pet zvjezdica; pobjeda dodaje dvije zvjezdice.',
+          'Za ocjenu više nije potreban minimalni broj prihvaćenih poteza, a postojeće ocjene ostaju nepromijenjene.',
+          'Sjedala se nasumično dodijele na početku partije pa ostaju na istim mjestima tijekom poteza, eliminacija i ponovnog spajanja.',
+        ],
+      },
+      {
+        naslov: 'Pristupačnost po izboru',
+        stavke: [
+          'Font za disleksiju uključuje OpenDyslexic za tekst cijelog sučelja.',
+          'Čitanje naglas opcionalno izgovara novu riječ na stolu hrvatskim glasom ako ga preglednik i uređaj nude.',
+          'Oba prekidača dostupna su gostima i registriranim igračima na naslovnici i u Postavkama, a izbor se pamti lokalno u pregledniku.',
+        ],
+      },
+      {
+        naslov: 'Prijavi igrača',
+        stavke: [
+          'Nakon završene javne partije sudionik može prijaviti drugog igrača na administratorsku provjeru.',
+          'Prijava se ne može ponoviti za istog igrača u istoj partiji; privatne partije nisu obuhvaćene.',
         ],
       },
     ],

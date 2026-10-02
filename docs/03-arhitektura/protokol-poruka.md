@@ -69,7 +69,7 @@ interface StanjeReda {
 interface PocetakPartije {
   partijaId: string;
   mojIgracId: string; // identitet primatelja; poruka se šalje pojedinačno svakom socketu
-    sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[]; // redom 0-3
+  sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[]; // kanonski redom, sjedala 0..N-1; javno N=2 ili 4, privatno N=2..8
   // naPotezuId/istekPotezaIso više se ne šalju ovdje - dolaze tek u RundaOtvorena, nakon
   // što sustav odabere prvu riječ (vidi partija:sustav-bira-rijec / partija:runda-otvorena)
 }

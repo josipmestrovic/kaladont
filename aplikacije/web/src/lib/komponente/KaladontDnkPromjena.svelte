@@ -12,7 +12,7 @@
   }
 
   let { prije, poslije, odigrano, otkljucan, upravoOtkljucan, preostaloDoOtkljucavanja, mod }: Props = $props();
-  const naslov = $derived(mod === 'dva_igraca' ? 'Kaladont DNK 2 igrača' : 'Kaladont DNK 4 igrača');
+  const naslov = $derived(mod === 'dva_igraca' ? 'Kaladont DNK — Dvoboj' : 'Kaladont DNK — Četveroboj');
 
   const srediste = 120;
   const radijus = 78;
@@ -96,9 +96,9 @@
     max-width: none;
     margin: 32px auto 0;
     padding: 18px;
-    border: 1px solid #e5ddc8;
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: #fff;
+    background: var(--boja-povrsina);
     text-align: left;
   }
 
@@ -115,7 +115,7 @@
     align-items: center;
     gap: 6px;
     margin: 0 0 2px;
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
     font-size: var(--tekst-mikro);
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -131,9 +131,9 @@
     font-size: 1.35rem;
   }
 
-  .dnk-promjena-zaglavlje > strong { color: var(--boja-akcent); font-size: 1.35rem; white-space: nowrap; }
+  .dnk-promjena-zaglavlje > strong { color: var(--boja-akcent-tekst); font-size: 1.35rem; white-space: nowrap; }
   .dnk-poruka { margin: 10px 0 4px; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mikro); }
-  .dnk-poruka strong { color: var(--boja-mint-tamni); }
+  .dnk-poruka strong { color: var(--boja-tekst-osnovni); }
 
   .dnk-promjena-sadrzaj {
     display: grid;
@@ -155,10 +155,10 @@
     overflow: visible;
   }
 
-  .dnk-prsten { fill: none; stroke: #eadfca; stroke-width: 1; }
-  .dnk-os { stroke: #dfd5c2; stroke-width: 1; }
+  .dnk-prsten { fill: none; stroke: var(--boja-graf-mreza); stroke-width: 1; }
+  .dnk-os { stroke: var(--boja-graf-os); stroke-width: 1; }
   .dnk-oznaka { fill: var(--boja-tekst-sekundarni); font-size: 8px; font-weight: 700; }
-  .dnk-podrucje { fill: rgb(228 87 46 / 22%); stroke: var(--boja-akcent); stroke-width: 2.5; stroke-linejoin: round; }
+  .dnk-podrucje { fill: color-mix(in srgb, var(--boja-akcent) 22%, transparent); stroke: var(--boja-akcent); stroke-width: 2.5; stroke-linejoin: round; }
 
   .dnk-promjene-lista {
     display: grid;
@@ -168,7 +168,7 @@
   .dnk-promjena-redak {
     min-height: 30px;
     padding-bottom: 6px;
-    border-bottom: 1px solid #eee8dc;
+    border-bottom: 1px solid var(--boja-obrub);
     font-size: var(--tekst-sitni);
   }
 
@@ -179,7 +179,7 @@
   .strelica { color: var(--boja-akcent); font-size: 1.15rem; font-weight: 800; line-height: 1; }
   .strelica.pad { color: var(--boja-mint-tamni); }
 
-  @media (max-width: 600px) {
+  @media (max-width: 999px) {
     .dnk-promjena { padding: 14px; }
     .dnk-promjena-zaglavlje { align-items: flex-start; flex-direction: column; }
     .dnk-promjena-sadrzaj { grid-template-columns: 1fr; gap: 10px; }

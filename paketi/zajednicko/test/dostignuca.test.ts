@@ -4,6 +4,7 @@ import {
   UKUPNO_ZVJEZDICA_DOSTIGNUCA,
   izracunajNovaDostignuca,
   jeDostignuceNovo,
+  odaberiTopTriDostignuca,
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
@@ -85,6 +86,54 @@ describe('dostignuca', () => {
       const [novo] = izracunajNovaDostignuca({}, { [brojac]: prviPrag[brojac] }, 1, false);
       expect(novo?.novaRazina, brojac).toBe(1);
     }
+  });
+
+  it('bira najviše tri dostignuća uz Iskunjaru nakon razina 4 i prioritet za jednake razine', () => {
+    const odabrana = odaberiTopTriDostignuca([
+      { id: 'iskusnjara', razina: 2 },
+      { id: 'kaladont', razina: 4 },
+      { id: 'glas_zajednice', razina: 4 },
+      { id: 'rijetkolovac', razina: 4 },
+      { id: 'dugometras', razina: 3 },
+    ]);
+
+    expect(odabrana.map(({ id }) => id)).toEqual(['glas_zajednice', 'kaladont', 'rijetkolovac']);
+  });
+
+  it('daje Iskunjari prednost i primjenjuje tie-break redoslijed svih dostignuća', () => {
+    const prioriteti = [
+      'iskusnjara', 'glas_zajednice', 'kaladont', 'rijetkolovac', 'dugometras',
+      'slijepa_ulica', 'lovac_na_glave', 'zavrsna_rijec', 'ka_zna', 'jezik_u_plamenu',
+    ];
+    const odabrana = odaberiTopTriDostignuca([
+      { id: 'jezik_u_plamenu', razina: 3 },
+      { id: 'ka_zna', razina: 3 },
+      { id: 'zavrsna_rijec', razina: 3 },
+      { id: 'lovac_na_glave', razina: 3 },
+      { id: 'slijepa_ulica', razina: 3 },
+      { id: 'dugometras', razina: 3 },
+      { id: 'rijetkolovac', razina: 3 },
+      { id: 'kaladont', razina: 3 },
+      { id: 'glas_zajednice', razina: 3 },
+      { id: 'iskusnjara', razina: 2 },
+    ]);
+
+    expect(odabrana.map(({ id }) => id)).toEqual(['iskusnjara', 'glas_zajednice', 'kaladont']);
+    for (let indeks = 0; indeks < prioriteti.length - 1; indeks += 1) {
+      const par = prioriteti.slice(indeks, indeks + 2).map((id) => ({ id, razina: 3 }));
+      expect(odaberiTopTriDostignuca(par).map(({ id }) => id)).toEqual(prioriteti.slice(indeks, indeks + 2));
+    }
+  });
+
+  it('izostavlja nepoznata i neotključana dostignuća', () => {
+    const odabrana = odaberiTopTriDostignuca([
+      { id: 'nepoznato', razina: 5 },
+      { id: 'kaladont', razina: 1 },
+      { id: 'glas_zajednice', razina: 6 },
+      { id: 'rijetkolovac', razina: 2 },
+    ]);
+
+    expect(odabrana.map(({ id }) => id)).toEqual(['rijetkolovac']);
   });
 
   it('označuje dostignuće kao novo ako je otključano unutar zadnjih 24 sata', () => {

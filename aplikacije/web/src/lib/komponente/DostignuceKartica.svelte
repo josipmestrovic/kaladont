@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DefinicijaDostignuca } from 'zajednicko';
+  import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
 
   interface Dostignuce extends DefinicijaDostignuca {
     razina: number;
@@ -14,11 +15,10 @@
       ? 100
       : Math.min(100, dostignuce.vrijednost / dostignuce.sljedeciPrag * 100),
   );
-  const oznaka = $derived(dostignuce.naziv.slice(0, 1));
 </script>
 
 <article class:otkljucano={dostignuce.razina > 0} class:novo={Boolean(dostignuce.novo)} class="dostignuce-kartica">
-  <div class="medaljon" aria-hidden="true"><span>{oznaka}</span></div>
+  <div class="medaljon" aria-hidden="true"><img src={ikonaDostignuca(dostignuce.id)} alt="" /></div>
   <div class="sadrzaj">
     <header>
       <div>
@@ -33,7 +33,11 @@
     </header>
     <div class="zvjezdice" aria-label={`${dostignuce.razina} od ${dostignuce.pragovi.length} razina`}>
       {#each dostignuce.pragovi as _, indeks}
-        <span class:ispunjena={indeks < dostignuce.razina}>★</span>
+        <img
+          src={indeks < dostignuce.razina ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'}
+          alt=""
+          aria-hidden="true"
+        />
       {/each}
     </div>
     <p class="opis">{dostignuce.opis}</p>
@@ -52,9 +56,9 @@
     gap: 16px;
     min-width: 0;
     padding: 18px;
-    border: 1px solid var(--boja-obrub, #e5ddc8);
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: var(--boja-pozadina-kartica, #fffdf5);
+    background: var(--boja-povrsina-2);
     box-shadow: var(--sjena-suptilna);
   }
 
@@ -73,6 +77,7 @@
     font-size: 28px;
     font-weight: 700;
   }
+  .medaljon img { width: 56px; height: 56px; object-fit: contain; }
 
   .sadrzaj { min-width: 0; flex: 1; }
   header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -82,31 +87,32 @@
     align-items: center;
     justify-content: center;
     padding: 3px 7px;
-    border: 1px solid #f2b14a;
+    border: 1px solid var(--boja-zlato-obrub);
     border-radius: 999px;
-    background: #fff1d8;
-    color: #9b5700;
+    background: var(--boja-zlato-pozadina);
+    color: var(--boja-zlato-tekst);
     font-size: 0.65rem;
     font-weight: 800;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
   h2 { margin: 0; font-family: var(--font-naslov); font-size: 1.25rem; }
-  .razina { white-space: nowrap; color: var(--boja-mint); font-variant-numeric: tabular-nums; }
-  .zvjezdice { display: flex; gap: 3px; margin: 10px 0 7px; color: #d7d1c0; font-size: 1.1rem; letter-spacing: 0; }
-  .zvjezdice .ispunjena { color: #d9a441; }
+  .razina { white-space: nowrap; color: var(--boja-isticanje-tekst); font-variant-numeric: tabular-nums; }
+  .zvjezdice { display: flex; gap: 3px; margin: 10px 0 7px; }
+  .zvjezdice img { width: 1.1rem; height: 1.1rem; object-fit: contain; }
   .opis, .cilj { margin: 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
   .cilj { margin-top: 10px; color: var(--boja-tekst-osnovni); font-weight: 700; }
   .cilj span { color: var(--boja-tekst-sekundarni); font-weight: 400; }
-  .traka { height: 6px; margin-top: 7px; overflow: hidden; border-radius: 3px; background: #e5ddc8; }
-  .traka span { display: block; height: 100%; background: var(--boja-mint); transition: width 300ms ease; }
+  .traka { height: 6px; margin-top: 7px; overflow: hidden; border-radius: 3px; background: var(--boja-obrub); }
+  .traka span { display: block; height: 100%; background: var(--boja-isticanje-slova); transition: width 300ms ease; }
+  :global(html[data-tema='svijetla']) .traka span { background: var(--boja-mint); }
   .dostignuce-kartica.novo {
-    border-color: #f2b14a;
-    background: linear-gradient(135deg, #fffaf1 0%, #fff3d9 100%);
+    border-color: var(--boja-zlato-obrub);
+    background: var(--boja-zlato-pozadina);
   }
   .dostignuce-kartica:not(.otkljucano) .medaljon { filter: grayscale(0.8); opacity: 0.6; }
 
-  @media (max-width: 420px) {
+  @media (max-width: 999px) {
     .dostignuce-kartica { gap: 12px; padding: 14px; }
     .medaljon { width: 56px; height: 56px; flex-basis: 56px; font-size: 23px; }
   }

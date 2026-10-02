@@ -9,31 +9,11 @@ type Sjedalo = PocetakPartije['sjedala'][number];
 export function izvediLokalniRedSjedala(
   sjedala: readonly Sjedalo[],
   mojIgracId: string | null,
-  naPotezuId: string | null,
 ): Sjedalo[] {
-  if (sjedala.length === 0) return [];
-  if (mojIgracId === null) return [...sjedala];
+  if (sjedala.length === 0 || mojIgracId === null) return [];
 
   const lokalniIndeks = sjedala.findIndex((sjedalo) => sjedalo.igracId === mojIgracId);
-  if (lokalniIndeks === -1) return [...sjedala];
+  if (lokalniIndeks === -1) return [];
 
-  const lokalni = sjedala[lokalniIndeks];
-  const aktivniIndeks = sjedala.findIndex((sjedalo) => sjedalo.igracId === naPotezuId);
-  const sidroIndeks = aktivniIndeks >= 0 && aktivniIndeks !== lokalniIndeks
-    ? aktivniIndeks
-    : (lokalniIndeks + 1) % sjedala.length;
-
-  const red: Sjedalo[] = [lokalni];
-  const dodani = new Set([lokalni.igracId]);
-
-  for (let pomak = 0; pomak < sjedala.length; pomak += 1) {
-    const indeks = (sidroIndeks + pomak) % sjedala.length;
-    const sjedalo = sjedala[indeks];
-    if (!dodani.has(sjedalo.igracId)) {
-      red.push(sjedalo);
-      dodani.add(sjedalo.igracId);
-    }
-  }
-
-  return red;
+  return [...sjedala.slice(lokalniIndeks), ...sjedala.slice(0, lokalniIndeks)];
 }

@@ -2,9 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
+import { validirajAvatarConfig, ZADANI_AVATAR_CONFIG } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { dnkStatistikeIgraca, igraci, obracuniPartija, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { dnkStatistikeIgraca, igraci, obracuniPartija, otkljucaneGrupeIgraca, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 
 let app: FastifyInstance;
@@ -71,6 +72,38 @@ describe('GET /profil', () => {
     expect(tijelo.iskustvo).toEqual({ razina: 1, ukupno: 0, uRazini: 0, doIduce: 100 });
   });
 
+  it('klasificira stil prema eliminacijama po partiji u oba načina', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+
+    const slucajevi = [
+      { odigrane: 0, eliminacijeUkupno: 0, odigrane1v1: 0, eliminacije1v1: 0, stil: 'neodređen' },
+      { odigrane: 4, eliminacijeUkupno: 1, odigrane1v1: 1, eliminacije1v1: 0, stil: 'uravnotežen' },
+      { odigrane: 4, eliminacijeUkupno: 3, odigrane1v1: 1, eliminacije1v1: 1, stil: 'uravnotežen' },
+      { odigrane: 4, eliminacijeUkupno: 4, odigrane1v1: 2, eliminacije1v1: 1, stil: 'agresivan' },
+      { odigrane: 5, eliminacijeUkupno: 0, odigrane1v1: 1, eliminacije1v1: 1, stil: 'dobrica' },
+    ] as const;
+
+    for (const slucaj of slucajevi) {
+      await baza.update(igraci).set({
+        odigrane: slucaj.odigrane,
+        eliminacijeUkupno: slucaj.eliminacijeUkupno,
+        odigrane1v1: slucaj.odigrane1v1,
+        eliminacije1v1: slucaj.eliminacije1v1,
+      }).where(eq(igraci.id, igracId));
+
+      const odgovor = await fetch(`${adresa}/api/profil`, {
+        headers: { authorization: `Bearer ${sesijskiToken}` },
+      });
+      const tijelo = (await odgovor.json()) as { stilIgre: string };
+      expect(tijelo.stilIgre).toBe(slucaj.stil);
+    }
+  });
+
   it('vraća isti inline CV vlasniku i javnom profilu bez privatnih polja', async () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
@@ -91,29 +124,49 @@ describe('GET /profil', () => {
     expect(privatni.kaladontCv).toEqual(javni.kaladontCv);
     expect(javni.kaladontCv).toMatchObject({
       biografija: {
-        tip: 'nedovoljno_informacija',
-        tekst: 'Još nemamo dovoljno informacija za opis ovog igrača.',
+        tip: 'opis',
+        recenice: [
+          'CvTestIgrac još nije završio nijednu javnu partiju.',
+          'Rang se dodjeljuje nakon 10 javnih partija u Dvoboju ili Četveroboju.',
+        ],
       },
+      istaknuto: [],
     });
     expect(javni).not.toHaveProperty('email');
     expect(javni).not.toHaveProperty('lozinkaHash');
     expect(javni).not.toHaveProperty('registriranAt');
   });
 
-  it('ne generira CV gostu i ne otvara mu javni profil', async () => {
+  it('generira CV iz postojećih statistika gosta, ali mu ne otvara javni profil', async () => {
     const gost = await stvoriGosta();
     try {
+      await baza.update(igraci)
+        .set({ odigrane1v1: 10, pobjede1v1: 8, bodovi1v1: 8 })
+        .where(eq(igraci.id, gost.id));
+      await baza.insert(otkljucaneGrupeIgraca).values(Array.from({ length: 10 }, (_, indeks) => ({
+        igracId: gost.id,
+        grupa: `imenica:rijec_${indeks}`,
+      })));
       const privatniOdgovor = await fetch(`${adresa}/api/profil`, {
         headers: { authorization: `Bearer ${gost.token}` },
       });
-      const privatni = (await privatniOdgovor.json()) as { kaladontCv: unknown; email: string | null };
+      const privatni = (await privatniOdgovor.json()) as {
+        kaladontCv: { biografija: { recenice: readonly [string, string] }; istaknuto: readonly string[] } | null;
+        email: string | null;
+      };
       const javniOdgovor = await fetch(`${adresa}/api/profil/javni/${gost.id}`);
 
       expect(privatniOdgovor.status).toBe(200);
       expect(privatni.email).toBeNull();
-      expect(privatni.kaladontCv).toBeNull();
+      expect(privatni.kaladontCv).not.toBeNull();
+      expect(privatni.kaladontCv?.biografija.recenice).toEqual([
+        'Gost je završio 10 Dvoboja, a Četveroboj još nije odigrao.',
+        expect.stringContaining('Najvišu trenutačnu titulu'),
+      ]);
+      expect(privatni.kaladontCv?.istaknuto).toContain('kolekcijom od 10 riječi');
       expect(javniOdgovor.status).toBe(404);
     } finally {
+      await baza.delete(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, gost.id));
       await baza.delete(igraci).where(eq(igraci.id, gost.id));
     }
   });
@@ -137,10 +190,10 @@ describe('GET /ljestvica', () => {
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
     await baza
       .update(igraci)
-      .set({ odigrane1v1: 10, bodovi1v1: 9 })
+      .set({ odigrane1v1: 10, bodovi1v1: 10 })
       .where(eq(igraci.id, igracId));
 
-    const odgovor = await fetch(`${adresa}/api/ljestvica?mod=dva_igraca`, {
+    const odgovor = await fetch(`${adresa}/api/ljestvica?mod=dva_igraca&limit=100`, {
       headers: { authorization: `Bearer ${sesijskiToken}` },
     });
     const tijelo = (await odgovor.json()) as {
@@ -292,6 +345,22 @@ describe('PUT /profil/avatar', () => {
       expect(odgovor.status).toBe(200);
       const tijelo = (await odgovor.json()) as { ok: boolean; avatarId: number };
       expect(tijelo.avatarId).toBe(3);
+    } finally {
+      await baza.delete(igraci).where(eq(igraci.id, gost.id));
+    }
+  });
+
+  it('dopušta gostu da spremi konfiguraciju avatara', async () => {
+    const gost = await stvoriGosta();
+    try {
+      const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
+        body: JSON.stringify({ avatarConfig: ZADANI_AVATAR_CONFIG }),
+      });
+      expect(odgovor.status).toBe(200);
+      const tijelo = (await odgovor.json()) as { ok: boolean; avatarConfig: unknown };
+      expect(validirajAvatarConfig(tijelo.avatarConfig)).toBe(true);
     } finally {
       await baza.delete(igraci).where(eq(igraci.id, gost.id));
     }

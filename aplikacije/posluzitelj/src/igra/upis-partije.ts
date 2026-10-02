@@ -550,9 +550,8 @@ export async function zakljuciPartijuUBazi(
           jakoRijetkeRijeci: povijesniDnk.jakoRijetkeRijeci + (statistika?.otkriveneJakoRijetkeGrupe ?? 0),
         };
         agregatZaDnk.dnkPoslije = izracunajDnk(ukupniDnk, mod);
-        const brojPotezaZaOcjenu = ukupniDnk.prihvaceniPotezi;
-        agregatZaDnk.ocjenaIgre = jeOcjenaIgreDostupna(brojPotezaZaOcjenu)
-          ? izracunajOcjenuIgre(agregatZaDnk.dnkPrije, agregatZaDnk.dnkPoslije, r.plasman === 1)
+        agregatZaDnk.ocjenaIgre = jeOcjenaIgreDostupna(r.iskustvo)
+          ? izracunajOcjenuIgre(agregatZaDnk.dnkPrije, agregatZaDnk.dnkPoslije, r.plasman === 1, r.iskustvo)
           : null;
         agregatZaDnk.bonusOcjenaIgre = agregatZaDnk.ocjenaIgre === null ? 0 : postotakXpZaOcjenu(agregatZaDnk.ocjenaIgre);
         const bonusIskustva = Math.round(r.iskustvo * agregatZaDnk.bonusOcjenaIgre / 100);

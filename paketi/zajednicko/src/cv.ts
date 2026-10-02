@@ -9,13 +9,12 @@ import { BROJ_PARTIJA_ZA_KALIBRACIJU, izracunajRang, vratiVeciRang } from './ran
 export type CvMod = 'dva_igraca' | 'cetiri_igraca';
 export type CvOsnovaStaza = 'registracija' | 'nepoznato';
 type CvOs = Exclude<DnkKljuc, 'vjestina'>;
-export type CvRecenice =
-  | readonly [string, string, string, string]
-  | readonly [string, string, string, string, string];
+export type CvRecenice = readonly [string, string];
 
-export type CvBiografija =
-  | { tip: 'opis'; recenice: CvRecenice }
-  | { tip: 'nedovoljno_informacija'; tekst: string };
+export interface CvBiografija {
+  tip: 'opis';
+  recenice: CvRecenice;
+}
 
 export interface KaladontCvDto {
   verzijaPredlozaka: 1;
@@ -32,6 +31,7 @@ export interface KaladontCvDto {
     razina: number;
   };
   biografija: CvBiografija;
+  istaknuto: readonly string[];
 }
 
 export interface CvStatistikaRijeci {
@@ -66,6 +66,7 @@ export interface CvPodaciIgraca {
   igracId: string;
   nadimak: string;
   iskustvoUkupno: number;
+  kolekcijaRijeci: number;
   stvoren: Date | string;
   registriranAt: Date | string | null;
   referentniDatum: string;
@@ -82,7 +83,6 @@ export class NevaljaniCvPodaci extends Error {
 }
 
 const MIN_PRIHVACENIH_POTEZA_ZA_STIL = 10;
-const DOMINANTNI_UDIO = 0.6;
 const MIN_ISTAKNUTA_OS = 60;
 const MAKS_RAZLIKA_DRUGE_OSI = 20;
 const MIN_RAZINA_DOSTIGNUCA = 2;
@@ -101,19 +101,17 @@ const REDOSLIJED_DOSTIGNUCA = [
 ] as const;
 
 type Dokaz =
-  | { vrsta: 'dostignuce'; recenica: string }
-  | { vrsta: 'najduza_rijec'; recenica: string }
-  | { vrsta: 'rijetka_rijec'; recenica: string }
-  | { vrsta: 'streak'; recenica: string }
-  | { vrsta: 'pobjede'; recenica: string };
+  | { vrsta: 'dostignuce'; tekst: string }
+  | { vrsta: 'najduza_rijec'; tekst: string }
+  | { vrsta: 'rijetka_rijec'; tekst: string }
+  | { vrsta: 'streak'; tekst: string }
+  | { vrsta: 'brzina'; tekst: string }
+  | { vrsta: 'duge_rijeci'; tekst: string }
+  | { vrsta: 'kolekcija'; tekst: string }
+  | { vrsta: 'pobjede'; tekst: string };
 
 interface RezultatStila {
-  mod: CvMod | null;
   osobine: CvOs[];
-  primarnaOs: CvOs | null;
-  zakljucan: boolean;
-  nedostajeUzorak: boolean;
-  nevaljaniOpcionalniPodaci: boolean;
 }
 
 interface Kvalifikacija {
@@ -185,49 +183,36 @@ function oblikBroja(broj: number): 0 | 1 | 2 {
   return 2;
 }
 
-function formatirajBrojIgru(broj: number): string {
-  const oblici = ['igru', 'igre', 'igara'];
+function formatirajBrojCetveroboja(broj: number): string {
+  const oblici = ['Četveroboj', 'Četveroboja', 'Četveroboja'];
   return `${formatirajBroj(broj)} ${oblici[oblikBroja(broj)]!}`;
 }
 
 function formatirajBrojDvoboja(broj: number): string {
-  const oblici = ['dvoboj', 'dvoboja', 'dvoboja'];
+  const oblici = ['Dvoboj', 'Dvoboja', 'Dvoboja'];
   return `${formatirajBroj(broj)} ${oblici[oblikBroja(broj)]!}`;
-}
-
-function formatirajNedostajuceIgre(broj: number): string {
-  const oblik = oblikBroja(broj);
-  const glagol = oblik === 1 ? 'nedostaju' : 'nedostaje';
-  const naziv = oblik === 0 ? 'javna igra' : oblik === 1 ? 'javne igre' : 'javnih igara';
-  return `${glagol} mu još ${formatirajBroj(broj)} ${naziv}`;
 }
 
 function sastaviS1(podaci: CvPodaciIgraca): string {
   const dvoboji = podaci.dvaIgraca.odigrane;
   const cetvero = podaci.cetiriIgraca.odigrane;
   const ukupno = dvoboji + cetvero;
-  const nadimak = `Igrač ${podaci.nadimak}`;
+  const nadimak = podaci.nadimak;
 
-  if (ukupno === 0) return `${nadimak} još nije završio nijednu javnu igru.`;
+  if (ukupno === 0) return `${nadimak} još nije završio nijednu javnu partiju.`;
   if (dvoboji > 0 && cetvero === 0) {
-    return `${nadimak} dosad je završio ${formatirajBrojDvoboja(dvoboji)}, a javnu igru učetvero još nije odigrao.`;
+    return `${nadimak} je završio ${formatirajBrojDvoboja(dvoboji)}, a Četveroboj još nije odigrao.`;
   }
   if (cetvero > 0 && dvoboji === 0) {
-    return `${nadimak} dosad je završio ${formatirajBrojIgru(cetvero)} učetvero, a javni dvoboj još nije odigrao.`;
-  }
-  if (ukupno < BROJ_PARTIJA_ZA_KALIBRACIJU) {
-    return `${nadimak} dosad je završio ${formatirajBrojDvoboja(dvoboji)} i ${formatirajBrojIgru(cetvero)} učetvero u javnim igrama.`;
+    return `${nadimak} je završio ${formatirajBrojCetveroboja(cetvero)}, a Dvoboj još nije odigrao.`;
   }
   if (dvoboji === cetvero) {
-    return `${nadimak} ima podjednak broj javnih igara u oba načina: završio je ${formatirajBrojDvoboja(dvoboji)} i ${formatirajBrojIgru(cetvero)} učetvero.`;
+    return `${nadimak} je završio ${formatirajBrojDvoboja(dvoboji)} i ${formatirajBrojCetveroboja(cetvero)}.`;
   }
-  if (dvoboji / ukupno >= DOMINANTNI_UDIO) {
-    return `${nadimak} više javnih igara odigrao je u dvobojima: završio je ${formatirajBrojDvoboja(dvoboji)} i ${formatirajBrojIgru(cetvero)} učetvero.`;
+  if (dvoboji > cetvero) {
+    return `${nadimak} je više javnih partija odigrao u Dvoboju: završio je ${formatirajBrojDvoboja(dvoboji)} i ${formatirajBrojCetveroboja(cetvero)}.`;
   }
-  if (cetvero / ukupno >= DOMINANTNI_UDIO) {
-    return `${nadimak} više javnih igara odigrao je učetvero: završio je ${formatirajBrojIgru(cetvero)} učetvero i ${formatirajBrojDvoboja(dvoboji)}.`;
-  }
-  return `${nadimak} igra oba javna načina: završio je ${formatirajBrojDvoboja(dvoboji)} i ${formatirajBrojIgru(cetvero)} učetvero.`;
+  return `${nadimak} je više javnih partija odigrao u Četveroboju: završio je ${formatirajBrojDvoboja(dvoboji)} i ${formatirajBrojCetveroboja(cetvero)}.`;
 }
 
 function rangZaMod(podaci: CvPodaciModa, mod: CvMod): string {
@@ -256,22 +241,15 @@ function odaberiKvalifikaciju(podaci: CvPodaciIgraca): Kvalifikacija {
 }
 
 function lokacijaRanga(modovi: readonly CvMod[]): string {
-  if (modovi.length === 2) return 'koji ima u oba načina igre';
-  return modovi[0] === 'dva_igraca' ? 'ostvaren u dvobojima' : 'ostvaren u igri učetvero';
+  if (modovi.length === 2) return 'u oba načina igre';
+  return modovi[0] === 'dva_igraca' ? 'u Dvoboju' : 'u Četveroboju';
 }
 
-function sastaviS2(podaci: CvPodaciIgraca, kvalifikacija: Kvalifikacija): string {
+function sastaviS2(kvalifikacija: Kvalifikacija): string {
   if (kvalifikacija.kalibriran) {
-    return `Njegov je najviši trenutačni rang „${kvalifikacija.rang}”, ${lokacijaRanga(kvalifikacija.nacini)}.`;
+    return `Najvišu trenutačnu titulu „${kvalifikacija.rang}” ostvario je ${lokacijaRanga(kvalifikacija.nacini)}.`;
   }
-
-  const dvoboji = podaci.dvaIgraca.odigrane;
-  const cetvero = podaci.cetiriIgraca.odigrane;
-  if (dvoboji + cetvero === 0) return 'Trenutačno ima početnu oznaku „Piskaralo”, a prvi rang tek treba steći.';
-
-  const cilj = dvoboji >= cetvero ? 'dvobojima' : 'igri učetvero';
-  const preostalo = BROJ_PARTIJA_ZA_KALIBRACIJU - Math.max(dvoboji, cetvero);
-  return `Trenutačno ima početnu oznaku „Piskaralo”, a do prvog ranga ${formatirajNedostajuceIgre(preostalo)} u ${cilj}.`;
+  return `Rang se dodjeljuje nakon ${formatirajBroj(BROJ_PARTIJA_ZA_KALIBRACIJU)} javnih partija u Dvoboju ili Četveroboju.`;
 }
 
 function jeValjanBrojacOpcionalni(vrijednost: number): boolean {
@@ -341,27 +319,14 @@ function kandidatiModa(podaci: CvPodaciIgraca): { mod: CvMod; vrijednosti: CvPod
 
 function odaberiStil(podaci: CvPodaciIgraca): RezultatStila {
   const ukupno = podaci.dvaIgraca.odigrane + podaci.cetiriIgraca.odigrane;
-  if (ukupno === 0) return { mod: null, osobine: [], primarnaOs: null, zakljucan: false, nedostajeUzorak: true, nevaljaniOpcionalniPodaci: false };
+  if (ukupno === 0) return { osobine: [] };
 
-  const jeOtkljucanNacin = jeDnkOtkljucan(podaci.dvaIgraca.odigrane) || jeDnkOtkljucan(podaci.cetiriIgraca.odigrane);
   const listaKandidata = kandidatiModa(podaci);
-  if (listaKandidata.length === 0) {
-    const nevaljani = [podaci.dvaIgraca.dnk, podaci.cetiriIgraca.dnk]
-      .some((dnk) => dnk !== null && validirajDnk(dnk).nevaljaniPodaci);
-    return {
-      mod: null,
-      osobine: [],
-      primarnaOs: null,
-      zakljucan: !jeOtkljucanNacin,
-      nedostajeUzorak: jeOtkljucanNacin,
-      nevaljaniOpcionalniPodaci: nevaljani,
-    };
-  }
+  if (listaKandidata.length === 0) return { osobine: [] };
 
   const kandidat = listaKandidata[0]!;
   const dnk = kandidat.vrijednosti.dnk;
   const eliminacije = kandidat.vrijednosti.eliminacijeUkupno;
-  const nevaljaniOpcionalniPodaci = validirajDnk(dnk).nevaljaniPodaci;
   const jaki = dnk.osi
     .filter(jeOpisivaOs)
     .filter((os) => Number.isFinite(os.vrijednost) && os.vrijednost >= 0 && os.vrijednost <= 100)
@@ -373,44 +338,11 @@ function odaberiStil(podaci: CvPodaciIgraca): RezultatStila {
   const osobine = jaki.length > 0
     ? jaki.slice(0, 2).filter((os, indeks) => indeks === 0 || jaki[0]!.vrijednost - os.vrijednost <= MAKS_RAZLIKA_DRUGE_OSI).map((os) => os.kljuc)
     : [];
-  return {
-    mod: kandidat.mod,
-    osobine,
-    primarnaOs: osobine[0] ?? null,
-    zakljucan: false,
-    nedostajeUzorak: false,
-    nevaljaniOpcionalniPodaci,
-  };
-}
-
-function modInstrumental(mod: CvMod): string {
-  return mod === 'dva_igraca' ? 'U dvobojima' : 'U igri učetvero';
+  return { osobine };
 }
 
 function modLokativ(mod: CvMod): string {
-  return mod === 'dva_igraca' ? 'u dvobojima' : 'u igri učetvero';
-}
-
-const FRAGMENTI_OSI: Readonly<Record<CvOs, string>> = {
-  taktika: 'izazvanim eliminacijama',
-  fokus: 'dugim nizom prihvaćenih riječi',
-  brzina: 'brzim prihvaćenim potezima',
-  duge_rijeci: 'uporabom dugih riječi',
-  rijetke_rijeci: 'otkrivanjem rijetkih riječi',
-};
-
-function sastaviS3(podaci: CvPodaciIgraca, stil: RezultatStila, osobine: readonly CvOs[] = stil.osobine): string {
-  const ukupno = podaci.dvaIgraca.odigrane + podaci.cetiriIgraca.odigrane;
-  if (ukupno === 0) return 'Za opis njegova stila u javnim igrama tek treba prikupiti podatke.';
-  if (stil.zakljucan) return 'Njegov stil još se oblikuje, a DNK profil otključava nakon deset javnih igara u istom načinu.';
-  if (stil.nedostajeUzorak || stil.mod === null) return 'Za pouzdan opis njegova stila još nedostaje zabilježenih podataka o potezima.';
-  if (osobine.length === 0) {
-    return stil.nevaljaniOpcionalniPodaci
-      ? 'Za pouzdan opis njegova stila još nedostaje zabilježenih podataka o potezima.'
-      : `Njegov DNK ${modLokativ(stil.mod)} zasad ne izdvaja jednu jasnu specijalnost.`;
-  }
-  const fragmenti = osobine.map((os) => FRAGMENTI_OSI[os]).join(' i ');
-  return `${modInstrumental(stil.mod)} njegov se DNK ističe ${fragmenti}.`;
+  return mod === 'dva_igraca' ? 'u Dvoboju' : 'u Četveroboju';
 }
 
 function oblikSlova(broj: number): string {
@@ -439,7 +371,7 @@ function dokazDostignuca(podaci: CvPodaciIgraca): Dokaz | null {
   if (!odabrano) return null;
   return {
     vrsta: 'dostignuce',
-    recenica: `Među njegovim dostignućima ističe se „${odabrano.definicija.naziv}”, s osvojenih ${odabrano.razina} od ${odabrano.definicija.pragovi.length} zvjezdica.`,
+    tekst: `dostignućem „${odabrano.definicija.naziv}” (${formatirajBroj(odabrano.razina)} od ${formatirajBroj(odabrano.definicija.pragovi.length)} razina)`,
   };
 }
 
@@ -466,7 +398,7 @@ function dokazNajduzeRijeci(podaci: CvPodaciIgraca): Dokaz | null {
   if (!odabrano) return null;
   return {
     vrsta: 'najduza_rijec',
-    recenica: `U javnim igrama njegova najduža zabilježena riječ glasi „${odabrano.rijec}” (${oblikSlova(odabrano.duljina)}).`,
+    tekst: `dugom riječju „${odabrano.rijec}” (${oblikSlova(odabrano.duljina)})`,
   };
 }
 
@@ -484,7 +416,7 @@ function dokazRijetkeRijeci(podaci: CvPodaciIgraca): Dokaz | null {
   if (!odabrano) return null;
   return {
     vrsta: 'rijetka_rijec',
-    recenica: `Među njegovim zabilježenim rijetkim riječima nalazi se „${odabrano.rijec}”.`,
+    tekst: `riječju „${odabrano.rijec}” iz rijetkog frekvencijskog razreda`,
   };
 }
 
@@ -496,128 +428,90 @@ function dokazStreak(podaci: CvPodaciIgraca, stil: RezultatStila): Dokaz | null 
     .filter((streak) => jeNenegativanCijeliBroj(streak));
   const najduzi = Math.max(0, ...streaki);
   if (najduzi < MIN_NIZ_RIJECI) return null;
-  return { vrsta: 'streak', recenica: `Njegov najdulji niz obuhvaća ${formatirajBroj(najduzi)} uzastopno prihvaćenih riječi.` };
+  return { vrsta: 'streak', tekst: `dugim nizom prihvaćenih riječi (${formatirajBroj(najduzi)})` };
+}
+
+function dokazBrzine(podaci: CvPodaciIgraca): Dokaz | null {
+  const kandidati = (['dva_igraca', 'cetiri_igraca'] as const).flatMap((mod) => {
+    const vrijednosti = mod === 'dva_igraca' ? podaci.dvaIgraca : podaci.cetiriIgraca;
+    const dnk = vrijednosti.dnk;
+    if (
+      vrijednosti.odigrane === 0 ||
+      !dnk ||
+      !validirajDnk(dnk).valjani ||
+      validirajDnk(dnk).nevaljaniPodaci ||
+      dnk.prihvaceniPotezi < MIN_PRIHVACENIH_POTEZA_ZA_STIL ||
+      dnk.ukupnoTrajanjePrihvaceniPoteziMs <= 0
+    ) return [];
+    const prosjekMs = dnk.ukupnoTrajanjePrihvaceniPoteziMs / dnk.prihvaceniPotezi;
+    if (prosjekMs > 10_000) return [];
+    return [{ mod, prosjekMs }];
+  }).sort((prvi, drugi) => prvi.prosjekMs - drugi.prosjekMs || (prvi.mod === 'dva_igraca' ? -1 : 1));
+  const odabrano = kandidati[0];
+  if (!odabrano) return null;
+  const sekunde = new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(odabrano.prosjekMs / 1000);
+  return { vrsta: 'brzina', tekst: `prihvaćenim potezima od prosječno ${sekunde} s ${modLokativ(odabrano.mod)}` };
+}
+
+function dokazDugihRijeci(podaci: CvPodaciIgraca): Dokaz | null {
+  const kandidati = (['dva_igraca', 'cetiri_igraca'] as const).flatMap((mod) => {
+    const vrijednosti = mod === 'dva_igraca' ? podaci.dvaIgraca : podaci.cetiriIgraca;
+    const dnk = vrijednosti.dnk;
+    if (!dnk || vrijednosti.odigrane === 0 || !validirajDnk(dnk).valjani || validirajDnk(dnk).nevaljaniPodaci) return [];
+    const ukupno = dnk.dugeRijeci + dnk.srednjeDugeRijeci + dnk.jakoDugeRijeci;
+    if (!jeNenegativanCijeliBroj(ukupno) || ukupno === 0 || ukupno > dnk.prihvaceniPotezi) return [];
+    return [{ mod, ukupno }];
+  }).sort((prvi, drugi) => drugi.ukupno - prvi.ukupno || (prvi.mod === 'dva_igraca' ? -1 : 1));
+  const odabrano = kandidati[0];
+  if (!odabrano) return null;
+  return { vrsta: 'duge_rijeci', tekst: `zabilježenim dugim riječima (${formatirajBroj(odabrano.ukupno)}) ${modLokativ(odabrano.mod)}` };
 }
 
 function dokazPobjeda(podaci: CvPodaciIgraca): Dokaz | null {
   const pobjede = podaci.dvaIgraca.pobjede + podaci.cetiriIgraca.pobjede;
   if (pobjede < 1) return null;
-  const oblici = ['pobjedu', 'pobjede', 'pobjeda'];
-  return { vrsta: 'pobjede', recenica: `U javnim igrama dosad je ostvario ${formatirajBroj(pobjede)} ${oblici[oblikBroja(pobjede)]!}.` };
+  return { vrsta: 'pobjede', tekst: `javnim pobjedama (${formatirajBroj(pobjede)})` };
 }
 
-function odaberiDokaz(podaci: CvPodaciIgraca, stil: RezultatStila): Dokaz | null {
-  return dokazDostignuca(podaci) ?? dokazNajduzeRijeci(podaci) ?? dokazRijetkeRijeci(podaci) ?? dokazStreak(podaci, stil) ?? dokazPobjeda(podaci);
+function dokazKolekcije(podaci: CvPodaciIgraca): Dokaz | null {
+  if (podaci.kolekcijaRijeci < 10) return null;
+  return { vrsta: 'kolekcija', tekst: `kolekcijom od ${formatirajBroj(podaci.kolekcijaRijeci)} riječi` };
 }
 
-function saljivaKategorija(stil: RezultatStila): 'bez_igara' | CvOs | 'neutralno' {
-  if (podaciBezJavnihIgara(stil)) return 'bez_igara';
-  return stil.primarnaOs ?? 'neutralno';
+function odaberiIstaknuto(podaci: CvPodaciIgraca, stil: RezultatStila): string[] {
+  const kandidati = [
+    dokazDostignuca(podaci),
+    dokazStreak(podaci, stil),
+    dokazNajduzeRijeci(podaci),
+    dokazBrzine(podaci),
+    dokazDugihRijeci(podaci),
+    dokazRijetkeRijeci(podaci),
+    dokazKolekcije(podaci),
+    dokazPobjeda(podaci),
+  ].filter((dokaz): dokaz is Dokaz => dokaz !== null);
+  return kandidati.length >= 2 ? kandidati.slice(0, 3).map((dokaz) => dokaz.tekst) : [];
 }
 
-function podaciBezJavnihIgara(stil: RezultatStila): boolean {
-  return stil.mod === null && stil.nedostajeUzorak && !stil.zakljucan;
-}
-
-const SALE: Readonly<Record<string, readonly [string, string]>> = {
-  bez_igara: [
-    'Prva javna igra još čeka da otvori ovu priču.',
-    'Početak njegove javne statistike još je prazan list.',
-  ],
-  brzina: [
-    'Kad se pojavi prava riječ, njegov odgovor ne čeka dugo.',
-    'Ponekad potez stigne prije nego što protivnik završi misao.',
-  ],
-  duge_rijeci: [
-    'U njegovoj igračkoj priči duge riječi zauzimaju posebno mjesto.',
-    'Kad riječ potraje, i potez dobije svoju malu priču.',
-  ],
-  rijetke_rijeci: [
-    'U njegovim se igrama katkad pojavi riječ koju protivnik nije očekivao.',
-    'Rijetka riječ ponekad postane najpamtljiviji dio njegove igre.',
-  ],
-  taktika: [
-    'Timski je igrač, sve dok ostali ne sjednu za suprotnu stranu stola.',
-    'Protivnik ne zna uvijek kamo vodi njegov sljedeći potez.',
-  ],
-  fokus: [
-    'Kad uhvati niz prihvaćenih riječi, teško ga je prekinuti.',
-    'Njegovi nizovi riječi znaju potrajati dulje od očekivanog.',
-  ],
-  neutralno: [
-    'Svaka igra njegove priče započinje s dva nova slova.',
-    'Njegova igra piše se potez po potez.',
-  ],
-};
-
-function saljiviTekst(igracId: string, stil: RezultatStila): string {
-  const kategorija = saljivaKategorija(stil);
-  const zadnjiZnak = igracId.at(-1)?.toLowerCase() ?? '0';
-  const varijanta = Number.parseInt(zadnjiZnak, 16) % 2;
-  return SALE[kategorija]![varijanta]!;
-}
-
-function brojRijeci(tekst: string): number {
-  return tekst.trim().split(/\s+/).filter(Boolean).length;
-}
-
-function sastaviRecenice(
-  podaci: CvPodaciIgraca,
-  kvalifikacija: Kvalifikacija,
-  stil: RezultatStila,
-  dokaz: Dokaz | null,
-): CvRecenice {
-  let s1 = sastaviS1(podaci);
-  let s2 = sastaviS2(podaci, kvalifikacija);
-  let osobine = [...stil.osobine];
-  let s3 = sastaviS3(podaci, stil, osobine);
-  const saljiva = saljiviTekst(podaci.igracId, stil);
-  let odabraniDokaz = dokaz;
-  let tekst = [s1, s2, s3, ...(odabraniDokaz ? [odabraniDokaz.recenica] : []), saljiva].join(' ');
-
-  if (brojRijeci(tekst) > 120 && odabraniDokaz) {
-    odabraniDokaz = null;
-    tekst = [s1, s2, s3, saljiva].join(' ');
-  }
-  if (brojRijeci(tekst) > 120 && osobine.length > 1) {
-    osobine = osobine.slice(0, 1);
-    s3 = sastaviS3(podaci, stil, osobine);
-    tekst = [s1, s2, s3, ...(odabraniDokaz ? [odabraniDokaz.recenica] : []), saljiva].join(' ');
-  }
-  if (brojRijeci(tekst) > 120) {
-    const dvoboji = podaci.dvaIgraca.odigrane;
-    const cetvero = podaci.cetiriIgraca.odigrane;
-    if (dvoboji > 0 && cetvero > 0) {
-      s1 = `Igrač ${podaci.nadimak} ima ${formatirajBrojDvoboja(dvoboji)} i ${formatirajBrojIgru(cetvero)} učetvero u javnim igrama.`;
-    }
-    if (kvalifikacija.kalibriran) {
-      s2 = `Njegov najviši trenutačni rang je „${kvalifikacija.rang}” (${lokacijaRanga(kvalifikacija.nacini)}).`;
-    }
-    tekst = [s1, s2, s3, ...(odabraniDokaz ? [odabraniDokaz.recenica] : []), saljiva].join(' ');
-  }
-
-  if (odabraniDokaz) return [s1, s2, s3, odabraniDokaz.recenica, saljiva];
-  return [s1, s2, s3, saljiva];
+function sastaviRecenice(podaci: CvPodaciIgraca, kvalifikacija: Kvalifikacija): CvRecenice {
+  return [sastaviS1(podaci), sastaviS2(kvalifikacija)];
 }
 
 export function sastaviKaladontCv(podaci: CvPodaciIgraca): KaladontCvDto {
   validirajMod(podaci.dvaIgraca, 'dva_igraca');
   validirajMod(podaci.cetiriIgraca, 'cetiri_igraca');
-  if (!jeNenegativanCijeliBroj(podaci.iskustvoUkupno) || podaci.nadimak.length === 0) throw new NevaljaniCvPodaci();
+  if (!jeNenegativanCijeliBroj(podaci.iskustvoUkupno) || !jeNenegativanCijeliBroj(podaci.kolekcijaRijeci) || podaci.nadimak.length === 0) throw new NevaljaniCvPodaci();
 
   const kalendarskiStaz = prikazaniStaz(podaci);
   const kvalifikacija = odaberiKvalifikaciju(podaci);
   const stil = odaberiStil(podaci);
-  const dokaz = odaberiDokaz(podaci, stil);
-  const ukupnoJavnihIgara = podaci.dvaIgraca.odigrane + podaci.cetiriIgraca.odigrane;
-  const biografija: CvBiografija = ukupnoJavnihIgara === 0 && !dokaz
-    ? { tip: 'nedovoljno_informacija', tekst: 'Još nemamo dovoljno informacija za opis ovog igrača.' }
-    : { tip: 'opis', recenice: sastaviRecenice(podaci, kvalifikacija, stil, dokaz) };
+  const biografija: CvBiografija = { tip: 'opis', recenice: sastaviRecenice(podaci, kvalifikacija) };
+  const istaknuto = odaberiIstaknuto(podaci, stil);
 
   return {
     verzijaPredlozaka: 1,
     ...kalendarskiStaz,
     kvalifikacija,
     biografija,
+    istaknuto,
   };
 }

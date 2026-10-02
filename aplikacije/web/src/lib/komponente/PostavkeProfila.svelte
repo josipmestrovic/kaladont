@@ -4,6 +4,8 @@
   import { goto } from '$app/navigation';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import AudioKontrola from './AudioKontrola.svelte';
+  import KontrolePristupacnosti from './KontrolePristupacnosti.svelte';
+  import PrekidacTeme from './PrekidacTeme.svelte';
 
   interface Profil {
     email: string | null;
@@ -61,10 +63,20 @@
     <div class="zvuk-okvir"><AudioKontrola /></div>
   </section>
 
+  <section class="sekcija">
+    <h3>Izgled</h3>
+    <PrekidacTeme />
+  </section>
+
+  <section class="sekcija">
+    <h3>Pristupačnost</h3>
+    <KontrolePristupacnosti ugradeno />
+  </section>
+
   {#if !registriran}
     <section class="sekcija gost-napomena">
       <h3>Dodatne postavke računa</h3>
-      <p>Igraš kao gost. Za prilagodbu avatara, promjenu email adrese ili lozinke registriraj svoj račun.</p>
+        <p>Igraš kao gost. Za promjenu email adrese ili lozinke registriraj svoj račun.</p>
       <a href="/registracija" class="cta-gumb">Registriraj se</a>
     </section>
   {:else if greska}
@@ -103,13 +115,13 @@
   .postavke-prikaz { max-width: 560px; padding: 8px 0 48px; display: flex; flex-direction: column; gap: 18px; }
   h2 { margin: 0 0 4px; font-family: var(--font-naslov); font-size: var(--naslov-2); }
   h3 { margin: 0; font-family: var(--font-naslov); font-size: var(--naslov-3); }
-  .sekcija { display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid #e5ddc8; border-radius: var(--radijus-kartica); background: white; box-shadow: var(--sjena-suptilna); }
+  .sekcija { display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--boja-obrub); border-radius: var(--radijus-kartica); background: var(--boja-povrsina); box-shadow: var(--sjena-suptilna); }
   .zvuk-okvir { padding: 4px 0; }
-  .gost-napomena { border-color: #f4c95d; background: #fdf6e2; }
+  .gost-napomena { border-color: var(--boja-zlato-obrub); background: var(--boja-zlato-pozadina); }
   .gost-napomena p, .podtekst { margin: 0; color: var(--boja-tekst-sekundarni); }
-  .cta-gumb, .spremnik-gumb { align-self: flex-start; padding: 10px 20px; border: 0; border-radius: var(--radijus-pill); background: var(--boja-pozadina-primarna); color: white; font: inherit; font-size: var(--tekst-sitni); font-weight: 700; text-decoration: none; cursor: pointer; }
+  .cta-gumb, .spremnik-gumb { align-self: flex-start; padding: 10px 20px; border: 0; border-radius: var(--radijus-pill); background: var(--boja-cta-pozadina); color: var(--boja-cta-tekst); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; text-decoration: none; cursor: pointer; }
   .forma { display: flex; flex-direction: column; gap: 12px; }
   .labela { display: flex; flex-direction: column; gap: 6px; font-size: var(--tekst-sitni); font-weight: 600; }
-  input { width: 100%; padding: 10px 14px; border: 2px solid #e5ddc8; border-radius: var(--radijus-kartica); font-size: 16px; }
-  .obavijest, .greska { margin: 0; color: var(--boja-pozadina-primarna); font-weight: 700; }
+  input { width: 100%; padding: 10px 14px; border: 2px solid var(--boja-obrub); border-radius: var(--radijus-kartica); background: var(--boja-povrsina-3); color: var(--boja-tekst-osnovni); font-size: 16px; }
+  .obavijest, .greska { margin: 0; color: var(--boja-isticanje-tekst); font-weight: 700; }
 </style>

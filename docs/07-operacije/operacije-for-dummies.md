@@ -5,7 +5,7 @@ Ovaj vodič namijenjen je osobi koja nikada nije samostalno postavila aplikaciju
 Autoritativne odluke su u [ADR-u 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Ovaj vodič objašnjava **kako** ih jednog dana provesti. Stručni sažeci i incidentni postupci ostaju u ostalim dokumentima ove mape.
 
 > [!CAUTION]
-> **Stanje 2026-09-09.** Docker/Compose/Caddy artefakti, CI smoke test i GHCR objava postoje. Staging VPS je ručno postavljen i radi s HTTPS-om, privatnom bazom i stvarnim hrLex rječnikom. Automatski staging deploy, produkcijski VPS/deploy, trustProxy/CORS učvršćivanje, prvi-admin CLI i backup/restore automatika još nisu implementirani. Ne tretiraj staging kao privatno okruženje: privremeno je javno uz `noindex`.
+> **Stanje 2026-10-01.** CI smoke test, GHCR promotion i automatski staging deploy postoje; operater nakon toga ručno provodi staging checklistu. Staging VPS je ručno inicijalno postavljen i radi s HTTPS-om, privatnom bazom i vlastitim hrLex rječnikom. Produkcijski VPS/promotion i backup/restore automatika nisu potvrđeni kao implementirani. Ne tretiraj staging kao privatno okruženje: privremeno je javno uz `noindex`.
 
 > [!IMPORTANT]
 > U ovaj repozitorij nikada ne upisuj stvarnu IP adresu, lozinku, API ključ, privatni SSH ključ, Basic Auth hash, Storage Box pristup ni Healthchecks URL. Primjeri koriste vrijednosti poput `<STAGING_IPV4>` koje moraš zamijeniti privatno tijekom stvarne postave.
@@ -14,7 +14,7 @@ Autoritativne odluke su u [ADR-u 014](../03-arhitektura/odluke/014-operativni-mo
 
 Za svaku novu objavu postoje dva različita postupka:
 
-1. [Objava staginga za početnike](objava-staginga-za-pocetnike.md) je svakodnevni runbook za već postavljeni staging. Koristi se za provjeru promjena, direktni push na `main`, ručnu migraciju staging baze, provjeru nove verzije i rollback staging aplikacije.
+1. [Objava staginga za početnike](objava-staginga-za-pocetnike.md) opisuje standardni automatski tok i operatersku provjeru već postavljenog staginga; ručni deploy postupci u njemu služe samo kao fallback kada workflow ne uspije.
 2. [Release shema](release-shema.md) definira identitet digesta, statuse releasea i evidenciju.
 
 Ovaj dokument ostaje širi vodič od praznog VPS-a do produkcije, uključujući početnu postavu, backup, recovery i ciljano produkcijsko stanje. Produkcija nije dio svakodnevnog staging postupka.

@@ -64,10 +64,10 @@
     top: calc(100% + 8px);
     width: min(280px, calc(100vw - 32px));
     padding: 12px 14px;
-    border: 1px solid #d8cfb8;
+    border: 1px solid var(--boja-obrub-jaci);
     border-radius: 8px;
-    background: #fffdf7;
-    box-shadow: 0 10px 28px rgb(45 39 25 / 18%);
+    background: var(--boja-povrsina-2);
+    box-shadow: var(--sjena-modal);
     color: var(--boja-tekst-osnovni);
     font-family: var(--font-tekst);
     font-size: var(--tekst-sitni);
@@ -75,7 +75,7 @@
     line-height: 1.45;
   }
 
-  @media (max-width: 600px) {
+  @media (max-width: 999px) {
     .pojasnjenje {
       position: fixed;
       inset: auto 16px 16px;

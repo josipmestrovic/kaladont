@@ -164,6 +164,8 @@ Za profilno uređivanje napravi zaštitu izlaska samo kad postoji izmijenjen dra
 
 ## 8. Registracijski wizard i pravilo gostiju
 
+> **Nadiđeno 2026-10-01.** Mjerodavan je [vizualni-identitet.md](../05-ux-ui/vizualni-identitet.md). Postoji samo jedan editor na `/profil/avatar`. Račun se stvara nakon koraka s emailom i lozinkom, a izrada avatara je zadnji korak tijeka na toj ruti (`?registracija=1`). Gosti koriste isti editor i imaju vlastiti `avatarConfig`, uz oznaku „GOST" i bez bordera.
+
 Preporučeni osnovni tok radi najmanje složenosti:
 
 1. Nadimak.
@@ -182,7 +184,7 @@ Sačuvaj postojeći prijelaz gost → registrirani račun i njegove statistike. 
 
 Nakon registracije token/promjenu identiteta obradi postojećim auth tokom. Ako taj tok treba reconnect zato što se promijenio auth token, to je odvojeno od običnog uređivanja avatara. Za samo spremanje izgleda postojećeg računa reconnect nije potreban.
 
-Gostima u svim prikazima proslijedi eksplicitni `jeGost` ili `vrsta` iz servera. Nemoj zaključivati gost status iz ranga, nedostatka konfiguracije, nadimka ili javno slanog emaila. Registrirani početnik bez ranga i dalje ima avatar. Za goste koristi postojeći neutralni Gost prikaz; ne prikazuj generirani ili stari personalizirani portret. Ukloni olovku za uređivanje uz gostov avatar; link prema registraciji može ostati drugdje u profilu.
+Gostima u svim prikazima proslijedi eksplicitni `jeGost` ili `vrsta` iz servera. Nemoj zaključivati gost status iz ranga, nedostatka konfiguracije, nadimka ili javno slanog emaila. Registrirani početnik bez ranga i dalje ima avatar. ~~Za goste koristi postojeći neutralni Gost prikaz; ne prikazuj generirani ili stari personalizirani portret. Ukloni olovku za uređivanje uz gostov avatar~~ — nadiđeno: gost ima vlastiti avatar i pristup editoru; neutralni natpis „Gost" ostaje samo dok konfiguracija ne postoji.
 
 ## 9. Model podataka i API kompatibilnost
 

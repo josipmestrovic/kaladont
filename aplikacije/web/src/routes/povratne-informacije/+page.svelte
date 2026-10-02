@@ -102,7 +102,11 @@
                     aria-label={`${ocjena} od 5`}
                     aria-pressed={ocjene[pitanje.kljuc] === ocjena}
                     onclick={() => postaviOcjenu(pitanje.kljuc, ocjena)}
-                  >★</button>
+                  ><img
+                    src={(ocjene[pitanje.kljuc] ?? 0) >= ocjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'}
+                    alt=""
+                    aria-hidden="true"
+                  /></button>
                 {/each}
               </div>
             </fieldset>
@@ -133,10 +137,10 @@
   fieldset { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0; border: 0; }
   legend { font-weight: 700; }
   .zvjezdice { display: flex; gap: 4px; }
-  .zvjezdice button { padding: 0; border: 0; background: transparent; color: #c8c0a9; font-size: 28px; line-height: 1; cursor: pointer; }
-  .zvjezdice button.odabrana { color: var(--boja-akcent); }
+  .zvjezdice button { display: grid; width: 28px; height: 28px; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
+  .zvjezdice button img { width: 24px; height: 24px; object-fit: contain; }
   .greska { color: #b3261e; font-weight: 700; }
   form > button { justify-self: start; padding: 11px 20px; border: 0; border-radius: 6px; background: var(--boja-mint); color: white; font: inherit; font-weight: 800; cursor: pointer; }
   form > button:disabled { opacity: .65; cursor: wait; }
-  @media (max-width: 599px) { fieldset { display: grid; } }
+  @media (max-width: 999px) { fieldset { display: grid; } }
 </style>

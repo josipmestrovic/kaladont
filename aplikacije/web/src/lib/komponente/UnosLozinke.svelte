@@ -36,7 +36,7 @@
 <style>
   .labela { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: var(--tekst-sitni); }
   .unos-omot { position: relative; display: block; }
-  input { box-sizing: border-box; width: 100%; padding: 12px 48px 12px 16px; font-size: 18px; border: 2px solid #e5ddc8; border-radius: var(--radijus-kartica); }
+  input { box-sizing: border-box; width: 100%; padding: 12px 48px 12px 16px; font-size: 18px; border: 2px solid var(--boja-obrub); border-radius: var(--radijus-kartica); background: var(--boja-povrsina-3); color: var(--boja-tekst-osnovni); }
   .vidljivost { position: absolute; top: 50%; right: 8px; display: grid; width: 36px; height: 36px; border-radius: 50%; place-items: center; color: var(--boja-tekst-sekundarni); cursor: pointer; transform: translateY(-50%); }
   .skrivena-kontrola { position: absolute; width: 1px; height: 1px; opacity: 0; }
 </style>

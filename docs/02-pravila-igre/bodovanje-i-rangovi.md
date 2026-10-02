@@ -4,7 +4,7 @@ Ova stranica opisuje što igrač dobiva za rezultat, kako se računaju javni ran
 
 ## Bodovi po partiji
 
-### Klasični mod za 4 igrača
+### Četveroboj (4 igrača)
 
 | Rezultat | Bodovi za plasman |
 |---|---:|
@@ -20,10 +20,10 @@ Uz bodove za plasman:
 - Maksimum je **7 bodova**: 3 za prvo mjesto, 1 bonus za pobjedu i najviše 3 za eliminacije.
 - Prekid veze izvan igračeva poteza samoeliminira igrača i ne daje nikome eliminacijski bod. Prekid na potezu može donijeti bod igraču koji je otvorio traženi nastavak; pogledaj [Pravila igre](pravila-igre.md#ispadanje).
 
-### Dvoboj za 2 igrača
+### Dvoboj (2 igrača)
 
 - Pobjednik dobiva **1 bod**, a poraženi **0 bodova**.
-- Bodovanje je fiksno: plasman i eliminacije ne dodaju dvoboju bodova.
+- Bodovanje je fiksno: plasman i eliminacije ne dodaju Dvoboju bodova.
 
 ### Privatna soba
 
@@ -34,19 +34,19 @@ Uz bodove za plasman:
 
 ## Javne statistike i ljestvice
 
-Javni modovi imaju zaseban broj partija, pobjeda i eliminacija, prosjek bodova, rang, formu i niz pobjeda. Rezultat igre za četiri igrača ne prenosi se u dvoboj, ni obratno. XP i trajni napredak u dostignućima zajednički su za oba javna moda.
+Javni modovi imaju zaseban broj partija, pobjeda i eliminacija, prosjek bodova, rang, formu i niz pobjeda. Rezultat Četveroboja ne prenosi se u Dvoboj, ni obratno. XP i trajni napredak u dostignućima zajednički su za oba javna moda.
 
 Javna ljestvica prikazuje do 100 registriranih igrača s najmanje **10 završenih javnih partija u odabranom modu**. Statistika i poredak računaju se samo za odabrani način igre.
 
 ## Rangovi
 
-Rang je **prikazni status** izračunat iz rezultata javnih partija. Ne utječe na prihvaćanje riječi, odabir protivnika ni ishod partije; može rasti ili padati s novim rezultatima. Četveroigračka igra i dvoboj imaju zasebne rangove i kalibraciju.
+Rang je **prikazni status** izračunat iz rezultata javnih partija. Ne utječe na prihvaćanje riječi, odabir protivnika ni ishod partije; može rasti ili padati s novim rezultatima. Četveroboj i Dvoboj imaju zasebne rangove i kalibraciju.
 
 Dok igrač ne završi 10 javnih partija u pojedinom modu, njegov je status **Piskaralo**. Nakon desete partije rang odgovara prosjeku bodova tog moda.
 
-### Rangovi za četiri igrača
+### Rangovi za Četveroboj
 
-Prosjek se računa kao zbroj bodova u javnim četveroigračkim partijama podijeljen njihovim brojem.
+Prosjek se računa kao zbroj bodova u javnim partijama Četveroboja podijeljen njihovim brojem.
 
 | Rang | Prosjek bodova |
 |---|---:|
@@ -61,9 +61,9 @@ Prosjek se računa kao zbroj bodova u javnim četveroigračkim partijama podijel
 | Gospodar rječnika | 5,00–manje od 5,70 |
 | Kaladont | 5,70 ili više |
 
-### Rangovi u dvoboju
+### Rangovi u Dvoboju
 
-Budući da pobjeda u dvoboju donosi 1 bod, a poraz 0, prosjek bodova odgovara udjelu pobjeda. Rang se računa iz nezaokružene vrijednosti, ne iz zaokruženog postotka prikazanog na zaslonu.
+Budući da pobjeda u Dvoboju donosi 1 bod, a poraz 0, prosjek bodova odgovara udjelu pobjeda. Rang se računa iz nezaokružene vrijednosti, ne iz zaokruženog postotka prikazanog na zaslonu.
 
 | Rang | Udio pobjeda |
 |---|---:|
@@ -120,11 +120,11 @@ Množitelj se primjenjuje na zbroj osnovnih XP stavki u toj partiji. To nije ist
 
 ### Niz pobjeda kroz partije
 
-Niz pobjeda čine uzastopne **javne pobjede** u istom modu. Niz za četiri igrača i niz za dvoboj odvojeni su. Poraz prekida niz u tom modu. Privatne partije ne povećavaju i ne prekidaju javni niz.
+Niz pobjeda čine uzastopne **javne pobjede** u istom modu. Niz za Četveroboj i niz za Dvoboj odvojeni su. Poraz prekida niz u tom modu. Privatne partije ne povećavaju i ne prekidaju javni niz.
 
 Bonus niza pobjeda dodaje se samo XP-u za osvojenu javnu partiju. Počinje od druge uzastopne pobjede; jedna pobjeda sama po sebi ne donosi bonus.
 
-| Uzastopne pobjede u modu | 4 igrača | Dvoboj |
+| Uzastopne pobjede u modu | Četveroboj | Dvoboj |
 |---:|---:|---:|
 | 1 | +0 % | +0 % |
 | 2 | +10 % | +5 % |
@@ -148,13 +148,13 @@ Bonus niza pobjeda dodaje se samo XP-u za osvojenu javnu partiju. Počinje od dr
 | 20 | +100 % | +95 % |
 | 21 ili više | +100 % | +100 % |
 
-Formula je `min(100 %, (broj uzastopnih pobjeda − 1) × 10 %)` za četiri igrača, odnosno `min(100 %, (broj uzastopnih pobjeda − 1) × 5 %)` za dvoboj. Primjerice, treća uzastopna pobjeda u igri za četiri igrača donosi +20 %, a treća pobjeda u dvoboju +10 % dodatnog XP-a prije bonusa ocjene partije.
+Formula je `min(100 %, (broj uzastopnih pobjeda − 1) × 10 %)` za Četveroboj, odnosno `min(100 %, (broj uzastopnih pobjeda − 1) × 5 %)` za Dvoboj. Primjerice, treća uzastopna pobjeda u Četveroboju donosi +20 %, a treća pobjeda u Dvoboju +10 % dodatnog XP-a prije bonusa ocjene partije.
 
 ### Ocjena partije i njezin XP-bonus
 
-Javna partija može dobiti ocjenu od 0 do 5 zvjezdica ako je igrač u njoj imao najmanje **3 prihvaćena poteza**. Ocjena se temelji na prosječnoj promjeni šest osi Kaladont DNK-a; pobjeda dodaje jednu zvjezdicu. Privatne partije ne dobivaju ocjenu.
+Javna partija s dodijeljenim osnovnim XP-om većim od nule dobiva ocjenu od 2 do 5 zvjezdica. Partija bez XP-a dobiva 0 zvjezdica, uključujući i pobjedu. Više nije potreban minimalan broj prihvaćenih poteza. Privatne partije ne dobivaju ocjenu.
 
-Za svaku os računa se razlika između vrijednosti nakon i prije partije, a zatim prosjek tih razlika. Osnovna ocjena je zaokruženi rezultat `(prosječna promjena + 20) / 10`, ograničen na raspon 0–4. Pobjedniku se dodaje još jedna zvjezdica, a konačna je ocjena ograničena na 0–5. Ako nakon partije nema nijedne osi, osnovna ocjena je 0; pobjeda i dalje može dodati jednu zvjezdicu.
+Za svaku os računa se razlika između vrijednosti nakon i prije partije, a zatim prosjek tih razlika. Osnovna ocjena je zaokruženi rezultat `(prosječna promjena + 20) / 10`, ograničen na raspon 0–4. Ako je dodijeljen XP, osnovna ocjena ne može biti manja od 2. Pobjedniku se dodaju dvije zvjezdice, a konačna je ocjena ograničena na 5. Ako nakon partije nema nijedne osi, osnovna ocjena je 0; uz dodijeljen XP partija zato dobiva 2 zvjezdice, odnosno pobjeda 4.
 
 | Ocjena partije | XP-bonus |
 |---:|---:|
@@ -166,30 +166,32 @@ Za svaku os računa se razlika između vrijednosti nakon i prije partije, a zati
 
 Ocjena ne mijenja bodove ni rang. Njezin XP-bonus dodaje se nakon ostalih XP bonusa.
 
+Postojeće spremljene ocjene ne preračunavaju se. Prosjek igrača zato može sadržavati ocjene izračunate po ranijem i novom pravilu.
+
 ### Redoslijed obračuna XP-a i primjer
 
 1. Zbrajaju se XP stavke za prihvaćene riječi, njihovu duljinu i rijetkost, eliminacije, pobjedu i Kaladont.
 2. Zbroj osnovnih XP stavki množi se faktorom niza prihvaćenih riječi u toj partiji.
 3. Ako je igrač osvojio javnu partiju, dodaje se bonus njegova niza pobjeda.
-4. Ako je igrač imao dovoljno prihvaćenih poteza, dodaje se bonus ocjene partije.
+4. Ako je igrač dobio ocjenu partije, dodaje se ocjeni pripadajući XP-bonus.
 5. Na kraju se primjenjuje ograničenje razine 100. Zato stvarno dodijeljeni XP može biti manji od obračunate sume.
 
-Primjer: osnovne XP stavke iznose 200 XP, faktor niza prihvaćenih riječi je ×1,00, riječ je o trećoj uzastopnoj pobjedi u igri za četiri igrača (+20 %), a ocjena partije je pet zvjezdica (+20 %). Niz pobjeda dodaje 40 XP. Bonus ocjene zatim se računa na 240 XP i dodaje 48 XP. Prije ograničenja razine, partija ukupno donosi 288 XP.
+Primjer: osnovne XP stavke iznose 200 XP, faktor niza prihvaćenih riječi je ×1,00, riječ je o trećoj uzastopnoj pobjedi u Četveroboju (+20 %), a ocjena partije je pet zvjezdica (+20 %). Niz pobjeda dodaje 40 XP. Bonus ocjene zatim se računa na 240 XP i dodaje 48 XP. Prije ograničenja razine, igra ukupno donosi 288 XP.
 
 Odbijena riječ prekida niz prihvaćenih riječi unutar partije; poraz prekida javni niz pobjeda u tom modu. To su različiti nizovi, a oba su odvojena od ocjene partije. Igrač koji dobrovoljno napusti partiju ili se ne vrati nakon prekida veze ne dobiva XP za tu partiju.
 
 ## Forma i vizualni prikaz niza pobjeda
 
-Forma opisuje najviše posljednjih 10 završenih javnih partija u odabranom modu. U igri za četiri igrača mjeri prosjek bodova, a u dvoboju udio pobjeda. Modovi se ne miješaju.
+Forma opisuje najviše posljednjih 10 završenih javnih partija u odabranom modu. U Četveroboju mjeri prosjek bodova, a u Dvoboju udio pobjeda. Modovi se ne miješaju.
 
 - S manje od 5 partija prikazuje se prikupljanje podataka, bez naziva forme.
 - Nakon 5–9 partija prikazuje se početna procjena na temelju dostupnih rezultata.
 - Nakon 10 partija procjena se temelji na punom uzorku od 10 partija.
 - Kada postoji 20 rezultata, zadnjih 10 uspoređuje se s prethodnih 10 radi prikaza trenda.
 
-Svaka razina forme određena je pragovima u tablici. U dvoboju se broj pobjeda dijeli brojem partija; u igri za četiri igrača zbroj osvojenih bodova dijeli se brojem partija. Primjerice, 5 pobjeda u 10 dvoboja daje 50 % i formu **Odlična**. Prosjek od 2,50 boda u zadnjih 10 igara za četiri igrača također je **Odlična**.
+Svaka razina forme određena je pragovima u tablici. U Dvoboju se broj pobjeda dijeli brojem partija; u Četveroboju zbroj osvojenih bodova dijeli se brojem partija. Primjerice, 5 pobjeda u 10 igara Dvoboja daje 50 % i formu **Odlična**. Prosjek od 2,50 boda u zadnjih 10 igara Četveroboja također je **Odlična**.
 
-| Forma | Udio pobjeda u dvoboju | Prosjek bodova za četiri igrača |
+| Forma | Udio pobjeda u Dvoboju | Prosjek bodova u Četveroboju |
 |---|---:|---:|
 | Loša | manje od 10 % | manje od 0,75 |
 | Slaba | 10–manje od 20 % | 0,75–manje od 1,25 |
@@ -200,7 +202,7 @@ Svaka razina forme određena je pragovima u tablici. U dvoboju se broj pobjeda d
 | Sjajna | 80–manje od 90 % | 4,00–manje od 5,00 |
 | Top forma | 90 % ili više | 5,00 ili više |
 
-Vatra ovisi o trenutačnom javnom nizu pobjeda, a ne o formi. U igri za četiri igrača razine vatre 1/2/3 počinju na 3/5/8 uzastopnih pobjeda; u dvoboju na 4/8/14 pobjeda. Vatra i obrub ranga samo su vizualni prikazi: ne mijenjaju bodove i ne dodaju poseban XP-bonus.
+Vatra ovisi o trenutačnom javnom nizu pobjeda, a ne o formi. U Četveroboju razine vatre 1/2/3 počinju na 3/5/8 uzastopnih pobjeda; u Dvoboju na 4/8/14 pobjeda. Vatra i obrub ranga samo su vizualni prikazi: ne mijenjaju bodove i ne dodaju poseban XP-bonus.
 
 ## Dostignuća
 

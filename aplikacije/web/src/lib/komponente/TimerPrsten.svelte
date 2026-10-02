@@ -63,13 +63,13 @@
   role="img"
   aria-label={`Preostalo vrijeme: ${preostaleSekunde} sekundi`}
 >
-  <circle cx="50" cy="50" r={POLUMJER} fill="none" stroke="#e5ddc8" stroke-width="6" />
+  <circle cx="50" cy="50" r={POLUMJER} fill="none" class="timer-staza" stroke-width="6" />
   <circle
     cx="50"
     cy="50"
     r={POLUMJER}
     fill="none"
-    stroke="#2fa98c"
+    class="timer-napredak"
     stroke-width="6"
     stroke-linecap="round"
     stroke-dasharray={OPSEG}
@@ -94,14 +94,26 @@
     transition: stroke-dashoffset 0.2s linear;
   }
 
+  .timer-staza {
+    stroke: var(--boja-obrub-jaci);
+  }
+
+  .timer-napredak {
+    stroke: var(--boja-isticanje-slova);
+  }
+
+  :global(html[data-tema='svijetla']) .timer-napredak {
+    stroke: #2fa98c;
+  }
+
   .timer-broj-podloga {
-    fill: #1d6f5c;
-    stroke: #faf3e3;
+    fill: var(--boja-mint);
+    stroke: var(--boja-krem);
     stroke-width: 2;
   }
 
   .timer-broj {
-    fill: #faf3e3;
+    fill: var(--boja-krem);
     font-family: var(--font-naslov);
     font-size: 19px;
     font-weight: 700;

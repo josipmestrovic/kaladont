@@ -65,3 +65,11 @@ Prva implementacija pokriva ulaz/izlaz, svaku sekundu odbrojavanja u čekaonici,
 ## Pristupačnost i privatnost
 
 Zvuk nikad nije jedini način razumijevanja stanja. Sve informacije moraju ostati dostupne kroz postojeći tekst, boju, animaciju ili stanje kontrole. Audio postavke su lokalne i ne šalju se analitici. Stanje „na potezu” dodatno je vidljivo kroz okvir cijelog aktivnog sjedala, label „Na redu!” i numerički prikaz preostalih sekundi; vizualni signal i pristupačna live poruka rade i kada je zvuk utišan ili blokiran.
+
+### Čitanje riječi naglas
+
+Čitanje naglas je zasebno od zvučnih efekata i koristi Web Speech API. Zadano je isključeno; kada je uključeno, izgovara samo novu riječ na stolu uz jezik `hr-HR`, ne i ostale poruke sučelja. Postavka se sprema lokalno u pregledniku, a govor se prekida isključivanjem ili napuštanjem partije. Dostupnost hrvatskog glasa ovisi o pregledniku i uređaju; web-aplikacija ne može pouzdano očitati jezik operacijskog sustava niti jamčiti da preglednik koristi sistemski zadani glas.
+
+Dok je čitanje uključeno, globalna statusna kartica navodi procijenjenu platformu, jezike preglednika i jezike glasova izložene kroz `speechSynthesis.getVoices()`. Popis se osvježava na događaj `voiceschanged`, jer ga preglednik može dostaviti naknadno. Detekcija ostaje lokalna u pregledniku i ne šalje se poslužitelju. Ako sinteza nije dostupna ili nema hrvatskog glasa, kartica to objašnjava, ali ne blokira prekidač ni partiju. Gumb „Razumijem” sprema potvrdu lokalno; potvrda traje kroz osvježavanje i navigaciju dok je čitanje uključeno. Isključivanje briše potvrdu, pa se pri idućem uključivanju kartica vrati. Obavijest vodi na `/pomoc?tema=pristupacnost` i, kada je platforma prepoznata, na odgovarajući odjeljak.
+
+Govorna sinteza riječi u Kaladontu nije čitač zaslona i ne čita ostali tekst sučelja. Postavke sustava za TalkBack, VoiceOver, Narrator ili Orca zasebne su značajke pristupačnosti. Platformna uputa ne jamči da će preglednik izložiti isti glas koji koristi čitač zaslona.

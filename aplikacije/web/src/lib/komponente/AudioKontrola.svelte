@@ -67,10 +67,10 @@
     right: 12px;
     z-index: 20;
     padding: 6px 8px;
-    border: 1px solid var(--boja-obrub, #e5ddc8);
+    border: 1px solid var(--boja-obrub);
     border-radius: 999px;
-    background: white;
-    box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+    background: var(--boja-povrsina);
+    box-shadow: var(--sjena-suptilna);
   }
 
   button {
@@ -85,6 +85,6 @@
 
   input {
     width: 72px;
-    accent-color: var(--boja-primarna, #2b8a78);
+    accent-color: var(--boja-isticanje-slova);
   }
 </style>

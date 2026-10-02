@@ -3,6 +3,7 @@
   import { jeRegistriranKorisnik, obrisiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import Kaladont2d5d from '$lib/komponente/Kaladont2d5d.svelte';
+  import KontrolePristupacnosti from '$lib/komponente/KontrolePristupacnosti.svelte';
   import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
@@ -25,16 +26,17 @@
 
 <svelte:head>
   <title>Kaladont Multiplayer Online</title>
-  <meta name="description" content="Igraj Kaladont online s dva ili četiri igrača ili stvori privatnu sobu za svoju ekipu." />
+  <meta name="description" content="Igraj Kaladont online u Dvoboju, Četveroboju ili privatnoj sobi sa svojom ekipom." />
 </svelte:head>
 
 <main class="landing">
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <header class="landing-tekst">
-      <p class="nadnaslov">Hrvatska multiplayer igra riječi</p>
+      <img class="demo-oznaka" src="/slike/demo-slika.png" alt="Demo verzija igre" />
       <h1 id="naslov-kaladont"><span class="ime-igre">KALADONT</span> <span class="vrsta-igre">online</span></h1>
     </header>
 
+    <div class="navigacijski-blok">
     <div class="desktop-navigacija-red">
       <Kaladont2d5d />
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
@@ -42,23 +44,23 @@
         <img class="ikona-sucelja" src="/ikone/07-igraj.png" alt="" aria-hidden="true" />
         <span>Igraj</span>
       </button>
+      <a href="/profil" class="navigacijska-stavka">
+        <img class="ikona-sucelja" src="/ikone/31-moj-profil.png" alt="" aria-hidden="true" />
+        <span>Moj profil</span>
+      </a>
+      <a href="/ljestvica" class="navigacijska-stavka">
+        <img class="ikona-sucelja" src="/ikone/09-ljestvice.png" alt="" aria-hidden="true" />
+        <span>Ljestvice</span>
+      </a>
       <a href="/pravila" class="navigacijska-stavka">
         <img class="ikona-sucelja" src="/ikone/08-pravila.png" alt="" aria-hidden="true" />
         <span>Pravila</span>
       </a>
-      <a href="/ljestvica" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src="/ikone/09-ljestvice.png" alt="" aria-hidden="true" />
-        <span>Ljestvica</span>
-      </a>
-      <a href="/profil#statistika" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src="/ikone/10-statistika.png" alt="" aria-hidden="true" />
-        <span>Moja statistika</span>
+      <a href="/postavke" class="navigacijska-stavka">
+        <img class="ikona-sucelja" src="/ikone/11-postavke.png" alt="" aria-hidden="true" />
+        <span>Postavke</span>
       </a>
       {#if registriran}
-        <a href="/postavke" class="navigacijska-stavka">
-          <img class="ikona-sucelja" src="/ikone/11-postavke.png" alt="" aria-hidden="true" />
-          <span>Postavke</span>
-        </a>
         <button type="button" class="navigacijska-stavka odjava-stavka" onclick={odjaviSe}>
           <img class="ikona-sucelja" src="/ikone/12-odjavi-se.png" alt="" aria-hidden="true" />
           <span>Odjavi se</span>
@@ -75,10 +77,22 @@
       {/if}
       </nav>
     </div>
+    <div class="kontrole-pristupacnosti-naslovnica">
+      <KontrolePristupacnosti />
+    </div>
+    </div>
   </section>
 
   <footer class="landing-footer">
-    <button type="button" onclick={() => (otvoreniModal = 'pravno')}>Uvjeti i privatnost</button>
+    <nav aria-label="Dodatne poveznice">
+      <a href="/novosti">
+        <span>Što je novo?</span>
+      </a>
+      <a href="/povratne-informacije">
+        <span>Pomozi poboljšati igru</span>
+      </a>
+      <button type="button" onclick={() => (otvoreniModal = 'pravno')}>Uvjeti i privatnost</button>
+    </nav>
   </footer>
 </main>
 
@@ -103,10 +117,10 @@
         <h2 id="modal-naslov">Kako želiš igrati?</h2>
         <div class="modal-opcije">
           <a href="/red?mod=dva_igraca" class="modal-opcija">
-            <img src="/ikone/17-soba-2-igraca.png" alt="" aria-hidden="true" /><span><strong>2 igrača</strong><small>Brzi dvoboj, jedan protiv jednog.</small></span>
+            <img src="/ikone/17-soba-2-igraca.png" alt="" aria-hidden="true" /><span><strong>Dvoboj</strong><small>2 igrača</small></span>
           </a>
           <a href="/red?mod=cetiri_igraca" class="modal-opcija">
-            <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" /><span><strong>4 igrača</strong><small>Klasična partija do posljednjeg igrača.</small></span>
+            <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" /><span><strong>Četveroboj</strong><small>4 igrača</small></span>
           </a>
           <a href="/soba/kreiraj" class="modal-opcija">
             <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" /><span><strong>Privatna soba</strong><small>Prilagodi pravila i pozovi svoju ekipu.</small></span>
@@ -128,7 +142,18 @@
 {/if}
 
 <style>
+  /* Sve vertikalne mjere skaliraju se s visinom ekrana kako bi naslovnica stala bez scrolla (do ~560px). */
   .landing {
+    --landing-padding: clamp(8px, 3dvh, 40px);
+    --landing-razmak: clamp(8px, 2.5dvh, 32px);
+    --visina-stavke: clamp(44px, 7dvh, 72px);
+    --razmak-stavki: clamp(6px, 1.2dvh, 12px);
+    --velicina-ikone: calc(var(--visina-stavke) * 0.6);
+    --font-stavke: clamp(18px, 3dvh, 25px);
+    --velicina-naslova: clamp(52px, 10dvh, 92px);
+    --visina-kontrole: clamp(40px, 6dvh, 56px);
+    --visina-ilustracije: min(470px, calc(7 * var(--visina-stavke) + 6 * var(--razmak-stavki)));
+
     position: relative;
     isolation: isolate;
     width: 100%;
@@ -136,36 +161,50 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: calc(100dvh - 82px);
-    padding: 64px 0 20px;
+    justify-content: space-between;
+    gap: var(--landing-razmak);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-block: var(--landing-padding);
   }
 
   .izbornik {
     position: relative;
     z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: clamp(6px, 1.2dvh, 14px);
     width: min(100%, 980px);
-    margin-top: 12px;
     text-align: center;
   }
 
   .landing-tekst {
     display: block;
-    margin-bottom: 32px;
+    padding-top: clamp(16px, 3dvh, 36px);
     text-align: left;
   }
 
-  .nadnaslov {
-    margin: 0 0 8px;
-    color: var(--boja-akcent);
-    font-size: 16px;
-    font-weight: 800;
-    text-transform: uppercase;
+  .demo-oznaka {
+    display: inline-block;
+    width: clamp(88px, 10vw, 128px);
+    height: auto;
+    margin: 0 0 4px 6px;
+    transform: rotate(-4deg);
+    object-fit: contain;
+    vertical-align: middle;
   }
 
   h1 {
     margin: 0;
-    font-size: 92px;
+    font-size: var(--velicina-naslova);
     line-height: 0.88;
+  }
+
+  .navigacijski-blok {
+    display: grid;
+    gap: var(--razmak-stavki);
   }
 
   .ime-igre,
@@ -175,9 +214,29 @@
 
   .vrsta-igre { font-size: 0.72em; }
 
+  @media (min-width: 1000px) {
+    .landing { gap: 0; }
+
+    .izbornik {
+      justify-content: flex-start;
+      gap: 0;
+    }
+
+    .navigacijski-blok {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: var(--landing-razmak);
+    }
+
+    .ime-igre,
+    .vrsta-igre { display: inline; }
+  }
+
   .glavna-navigacija {
     display: grid;
-    gap: 12px;
+    gap: var(--razmak-stavki);
     width: min(100%, 480px);
     margin: 0 0 0 auto;
   }
@@ -189,22 +248,28 @@
     gap: 32px;
   }
 
+  .kontrole-pristupacnosti-naslovnica {
+    display: flex;
+    width: min(100%, 480px);
+    margin: 0 0 0 auto;
+  }
+
   .navigacijska-stavka {
     width: 100%;
-    height: 72px;
+    height: var(--visina-stavke);
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) 24px;
+    grid-template-columns: calc(var(--velicina-ikone) + 4px) minmax(0, 1fr) 24px;
     align-items: center;
     justify-items: start;
     gap: 12px;
-    padding: 13px 20px;
-    border: 1px solid #d8cfb8;
+    padding: 0 20px;
+    border: 1px solid var(--boja-plocica-obrub);
     border-radius: 8px;
-    background: rgb(255 255 255 / 82%);
-    box-shadow: 0 5px 16px rgb(38 34 27 / 7%);
-    color: var(--boja-tekst-osnovni);
+    background: var(--boja-plocica);
+    box-shadow: var(--sjena-suptilna);
+    color: var(--boja-plocica-tekst);
     font-family: var(--font-naslov);
-    font-size: 25px;
+    font-size: var(--font-stavke);
     font-weight: 700;
     line-height: 1.2;
     text-decoration: none;
@@ -222,8 +287,8 @@
   }
 
   .ikona-sucelja {
-    width: 44px;
-    height: 44px;
+    width: var(--velicina-ikone);
+    height: var(--velicina-ikone);
     display: block;
     object-fit: contain;
   }
@@ -231,10 +296,16 @@
   .navigacijska-stavka:hover {
     transform: translateY(-2px);
     border-color: var(--boja-mint);
-    box-shadow: 0 9px 24px rgb(38 34 27 / 11%);
+    box-shadow: var(--sjena-modal);
   }
 
   .navigacijska-stavka.primarna {
+    border-color: var(--boja-zuta-krema);
+    background: var(--boja-zuta-krema);
+    color: #1a1815;
+  }
+
+  :global(html[data-tema='svijetla']) .navigacijska-stavka.primarna {
     border-color: var(--boja-mint);
     background: var(--boja-mint);
     color: white;
@@ -242,26 +313,38 @@
 
   .navigacijska-stavka > span { text-align: left; }
 
-  .navigacijska-stavka.primarna::after { color: var(--boja-zuta-krema); }
+  .navigacijska-stavka.primarna::after { color: var(--boja-mint); }
+
+  :global(html[data-tema='svijetla']) .navigacijska-stavka.primarna::after { color: var(--boja-zuta-krema); }
 
   .navigacijska-stavka.odjava-stavka {
     border-color: rgb(228 87 46 / 42%);
-    background: rgb(228 87 46 / 9%);
-    color: var(--boja-akcent);
+    background: var(--boja-plocica);
+    color: var(--boja-crvena);
   }
 
-  .navigacijska-stavka.odjava-stavka::after { color: var(--boja-akcent); }
-  .navigacijska-stavka.odjava-stavka:hover { border-color: var(--boja-akcent); }
+  .navigacijska-stavka.odjava-stavka::after { color: var(--boja-crvena); }
+  .navigacijska-stavka.odjava-stavka:hover { border-color: var(--boja-crvena); }
 
   .landing-footer {
     position: relative;
     z-index: 1;
-    margin-top: auto;
-    padding-top: 28px;
   }
 
+  .landing-footer nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 18px;
+  }
+
+  .landing-footer a,
   .landing-footer button {
-    padding: 8px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: clamp(4px, 1dvh, 8px) 10px;
     border: 0;
     background: transparent;
     color: var(--boja-tekst-sekundarni);
@@ -271,21 +354,38 @@
     cursor: pointer;
   }
 
-  .landing-footer button:hover { color: var(--boja-akcent); }
+  .landing-footer a { text-decoration: underline; }
+  .landing-footer a:hover,
+  .landing-footer button:hover { color: var(--boja-akcent-tekst); }
 
-  @media (max-width: 767px) {
+  @media (max-width: 999px) {
+    .izbornik {
+      justify-content: flex-start;
+      gap: 40px;
+    }
+
+    .kontrole-pristupacnosti-naslovnica {
+      margin-inline: auto;
+    }
+
     .landing {
-      min-height: calc(100dvh - 96px);
-      padding: 50px 0;
+      --landing-padding: clamp(8px, 3dvh, 50px);
+      --landing-razmak: clamp(8px, 2.5dvh, 28px);
+      --visina-stavke: clamp(40px, 7dvh, 68px);
+      --razmak-stavki: clamp(5px, 1.2dvh, 12px);
+      --font-stavke: clamp(17px, 2.8dvh, 22px);
+      --velicina-naslova: clamp(34px, 6.5dvh, 58px);
     }
 
     .izbornik { width: min(100%, 440px); margin: 0 auto; }
-    .landing-tekst { margin-bottom: 28px; text-align: center; }
+    .landing-tekst { text-align: center; }
     .desktop-navigacija-red { display: block; }
-    .nadnaslov { font-size: 17px; }
-    h1 { font-size: 58px; line-height: 0.95; }
-    .navigacijska-stavka { height: 68px; font-size: 22px; }
-    .landing-footer { padding-top: 24px; }
+    h1 { line-height: 0.95; }
+    :global(html[data-font-disleksiju]) h1 { font-size: calc(var(--velicina-naslova) * 0.7); }
+    :global(html[data-font-disleksiju]) .vrsta-igre { margin-top: clamp(4px, 1dvh, 8px); }
+    .landing-footer nav { gap: 0 8px; }
+    .landing-footer a,
+    .landing-footer button { padding: clamp(2px, 0.6dvh, 8px) 6px; font-size: clamp(12px, 2dvh, var(--tekst-sitni)); line-height: 1.2; }
   }
 
   .modal-podloga {
@@ -295,7 +395,7 @@
     display: grid;
     place-items: center;
     padding: 16px;
-    background: rgb(26 24 21 / 38%);
+    background: var(--boja-zastor);
     backdrop-filter: blur(8px);
   }
 
@@ -304,10 +404,10 @@
     max-width: 480px;
     width: 100%;
     padding: 30px;
-    border: 1px solid #ded4bd;
+    border: 1px solid var(--boja-obrub-jaci);
     border-radius: 12px;
-    background: var(--boja-krem);
-    box-shadow: 0 20px 64px rgb(26 24 21 / 25%);
+    background: var(--boja-povrsina);
+    box-shadow: var(--sjena-modal);
     text-align: center;
   }
 
@@ -327,11 +427,11 @@
     cursor: pointer;
   }
 
-  .zatvori-modal:hover { background: #efe9da; color: var(--boja-tekst-osnovni); }
+  .zatvori-modal:hover { background: var(--boja-obrub); color: var(--boja-tekst-osnovni); }
 
   .modal-nadnaslov {
     margin: 0 0 4px;
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
     font-size: var(--tekst-sitni);
     font-weight: 800;
     text-transform: uppercase;
@@ -346,22 +446,22 @@
     align-items: center;
     gap: 13px;
     padding: 14px 16px;
-    border: 1px solid #d8cfb8;
+    border: 1px solid var(--boja-plocica-obrub);
     border-radius: 8px;
-    background: white;
-    color: var(--boja-tekst-osnovni);
+    background: var(--boja-plocica);
+    color: var(--boja-plocica-tekst);
     text-align: left;
     text-decoration: none;
   }
 
-  .modal-opcija:hover { border-color: var(--boja-mint); background: #f7fbf8; }
+  .modal-opcija:hover { border-color: var(--boja-mint); }
   .pravna-opcija { grid-template-columns: 1fr; text-align: center; }
   .modal-opcija > img { width: 56px; height: 56px; object-fit: contain; }
   .modal-opcija span { display: grid; gap: 2px; }
-  .modal-opcija strong { color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: 19px; }
-  .modal-opcija small { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-sitni); line-height: 1.35; }
+  .modal-opcija strong { color: var(--boja-mint-tamni); font-family: var(--font-naslov); font-size: 19px; }
+  .modal-opcija small { color: #5c554a; font-size: var(--tekst-sitni); line-height: 1.35; }
 
-  @media (max-width: 420px) {
+  @media (max-width: 999px) {
     .modal-sadrzaj { padding: 26px 18px 20px; }
     .modal-sadrzaj h2 { font-size: 27px; }
   }

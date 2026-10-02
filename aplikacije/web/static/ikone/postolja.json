@@ -1,0 +1,50 @@
+{
+  "dva_igraca": {
+    "file": "png/59-postolje-2-igraca.png",
+    "canvas": 320,
+    "slots": [
+      {
+        "rank": 2,
+        "x": 92,
+        "surfaceY": 230,
+        "avatarSize": 80
+      },
+      {
+        "rank": 1,
+        "x": 224,
+        "surfaceY": 205,
+        "avatarSize": 80
+      }
+    ]
+  },
+  "cetiri_igraca": {
+    "file": "png/60-postolje-4-igraca.png",
+    "canvas": 320,
+    "slots": [
+      {
+        "rank": 2,
+        "x": 49,
+        "surfaceY": 214,
+        "avatarSize": 56
+      },
+      {
+        "rank": 1,
+        "x": 124,
+        "surfaceY": 194,
+        "avatarSize": 56
+      },
+      {
+        "rank": 3,
+        "x": 198,
+        "surfaceY": 225,
+        "avatarSize": 56
+      },
+      {
+        "rank": 4,
+        "x": 268,
+        "surfaceY": 239,
+        "avatarSize": 56
+      }
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { izracunajDnkTier, izracunajKaladontDnk, jeDnkOtkljucan, jeOcjenaIgreDostupna } from '../src/dnk.js';
+import { izracunajDnkTier, izracunajKaladontDnk, izracunajOcjenuIgre, jeDnkOtkljucan, jeOcjenaIgreDostupna } from '../src/dnk.js';
 import { izracunajRang } from '../src/rangovi.js';
 
 describe('DNK zajednicko', () => {
@@ -16,10 +16,23 @@ describe('DNK zajednicko', () => {
     expect(jeDnkOtkljucan(11)).toBe(true);
   });
 
-  it('ocjena igre je dostupna tek nakon tri prihvaćena poteza', () => {
+  it('ocjena igre dostupna je samo kad je dodijeljen XP', () => {
     expect(jeOcjenaIgreDostupna(0)).toBe(false);
-    expect(jeOcjenaIgreDostupna(2)).toBe(false);
-    expect(jeOcjenaIgreDostupna(3)).toBe(true);
+    expect(jeOcjenaIgreDostupna(-1)).toBe(false);
+    expect(jeOcjenaIgreDostupna(1)).toBe(true);
+  });
+
+  it('ocjena igre daje najmanje dvije zvjezdice za pozitivan XP i dvije za pobjedu', () => {
+    const bezOsa = [];
+    expect(izracunajOcjenuIgre(bezOsa, bezOsa, false, 1)).toBe(2);
+    expect(izracunajOcjenuIgre(bezOsa, bezOsa, true, 1)).toBe(4);
+    expect(izracunajOcjenuIgre(bezOsa, bezOsa, true, 0)).toBe(0);
+  });
+
+  it('ograničava ocjenu pobjede na pet zvjezdica', () => {
+    const prije = [{ kljuc: 'vjestina' as const, naziv: '', vrijednost: 0, tier: 0, oznaka: '', detalj: '' }];
+    const poslije = [{ ...prije[0]!, vrijednost: 100 }];
+    expect(izracunajOcjenuIgre(prije, poslije, true, 1)).toBe(5);
   });
 
   it('računa profil za 4 igrača i 1v1 odvojeno', () => {

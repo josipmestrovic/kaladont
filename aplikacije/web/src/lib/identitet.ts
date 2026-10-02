@@ -3,6 +3,7 @@ import { apiUrl } from './api-url.js';
 
 const KLJUC_GOST_TOKEN = 'kaladont_gost_token';
 const KLJUC_SESIJSKI_TOKEN = 'kaladont_sesijski_token';
+// Naslijedeni kljuc ukinutog onboardinga gostiju; brise se da ne ostane u pregledniku.
 const KLJUC_ONBORDING_ZAVRSEN = 'kaladont_onboarding_zavrsen';
 
 export function dohvatiGostToken(): string {
@@ -67,15 +68,5 @@ export function dohvatiAuthToken(): string {
 export function jeRegistriranKorisnik(): boolean {
   if (typeof localStorage === 'undefined') return false;
   return localStorage.getItem(KLJUC_SESIJSKI_TOKEN) !== null;
-}
-
-/** Je li gost prošao onboarding (odabir imena i avatara) - vidi routes/dobrodoslica. */
-export function jeOnboardingZavrsen(): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  return localStorage.getItem(KLJUC_ONBORDING_ZAVRSEN) !== null;
-}
-
-export function oznaciOnboardingZavrsen(): void {
-  localStorage.setItem(KLJUC_ONBORDING_ZAVRSEN, '1');
 }
 

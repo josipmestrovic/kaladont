@@ -2,7 +2,7 @@
 
 Ovaj dokument je operativni izvor istine za označavanje, provjeru i evidenciju releaseova. Arhitektonsku odluku definira [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md), CI i objavu slike opisuje [CI/CD](ci-cd.md), a ručne korake objave i rollbacka [runbook objave i rollbacka](runbook-objava-i-rollback.md).
 
-> **Status 2026-09-16:** staging je online i ažurira se ručno punim GHCR digestom nakon zelenog CI-ja i promotion workflowa. Candidate se smoke-testira prije promotiona, a commit SHA i `main` tag pokazuju isti manifest. Automatski staging deploy, produkcijski VPS i produkcijski promotion workflow još nisu implementirani. Ova shema zato namjerno razlikuje današnji ručni tok od ciljanog produkcijskog toka.
+> **Stanje automatike (2026-10-01):** CI gradi i smoke-testira Docker candidate, GHCR promotion dodjeljuje commit SHA i `main` tag istom manifestu, a `objavi-staging.yml` automatski deploya isti digest i provjerava health. Operater i dalje ručno provodi staging checklistu. Produkcijski VPS i produkcijski promotion workflow nisu potvrđeni kao implementirani; ova napomena ne potvrđuje trenutačni staging digest ni status pojedinog izdanja.
 
 ## Cilj
 
@@ -14,7 +14,7 @@ Release mora odgovoriti na pet pitanja bez gledanja u privatne bilješke:
 4. koja je odluka donesena nakon provjere;
 5. na koji se prethodni poznato-zdravi digest možemo vratiti.
 
-Za prve zatvorene testove puni GHCR digest ostaje autoritativan tehnički identitet releasea. Uz njega se smije koristiti SemVer prerelease oznaka radi GitHub Releasea i komunikacije s testerima. Prvo izdanje nosilo je oznaku `v0.1.0-closed-alpha.1`; ovo izdanje nosi oznaku `v0.2.0-closed-alpha.1`.
+Za zatvorene testove puni GHCR digest ostaje autoritativan tehnički identitet releasea. SemVer prerelease oznaka služi ljudskoj komunikaciji i GitHub Releaseu, ali sama po sebi ne dokazuje deploy ili staging provjeru. U release bilješkama koristimo oznake `v0.1.0-closed-alpha.1`, `v0.2.0-closed-alpha.1`, `v0.3.0-closed-alpha.1`, `v0.4.0-closed-alpha.1` i `v0.5.0-closed-alpha.1`; svaki status i digest i dalje se evidentiraju zasebno.
 
 ## Identitet releasea
 

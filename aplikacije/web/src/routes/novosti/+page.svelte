@@ -105,7 +105,7 @@
   ul { margin: 0; padding-left: 22px; }
   li { margin: 7px 0; line-height: 1.55; }
 
-  @media (max-width: 767px) {
+  @media (max-width: 999px) {
     .novosti { padding: 28px 0 48px; }
     .biljeske h2 { font-size: 28px; }
   }

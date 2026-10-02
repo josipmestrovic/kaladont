@@ -1,10 +1,10 @@
 # Produkcija i objava
 
-> **Status 2026-09-09: staging ručno radi, produkcija nije postavljena.** Dockerfile, CI smoke test, GHCR objava, Compose i Caddy konfiguracije postoje. Staging VPS `staging.kaladont.hr` ručno je postavljen s HTTPS-om, privatnom bazom i stvarnim hrLex rječnikom. Automatski deploy workflow, produkcijski VPS, produkcijski deploy i backup automatika još nisu implementirani. Ovaj dokument definira preostali operativni ugovor.
+> **Status 2026-10-01: staging deploy je automatiziran, produkcija nije postavljena.** CI smoke test, GHCR promotion i `objavi-staging.yml` koriste isti image digest; staging health provjerava verziju i digest nakon deploya. Staging VPS `staging.kaladont.hr` ručno je inicijalno postavljen s HTTPS-om, privatnom bazom i vlastitim hrLex rječnikom. Produkcijski VPS/promotion i backup automatika nisu potvrđeni kao implementirani. Ovaj dokument opisuje postojeći staging tok i preostalu produkcijsku pripremu.
 
 Izvor odluke je [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Lokalni Windows razvoj ostaje odvojen i opisan u [postavljanju razvojne okoline](../06-razvoj/postavljanje-okoline.md).
 
-**Stvarno stanje:** CI koristi mali sintetički fixture, dok ručno postavljeni staging ima vlastiti stvarni hrLex uvoz. Aplikacijski deploy na staging trenutno je ručan: nakon GHCR objave operater mijenja puni digest u `/opt/kaladont/.env` i rekreira aplikaciju. Automatski staging i produkcijski workflow još nisu implementirani.
+**Stvarno stanje:** CI koristi mali sintetički fixture, dok staging ima vlastiti stvarni hrLex uvoz. Nakon zelenog CI-ja GHCR objavi candidate i promovira isti manifest; staging workflow zatim automatski deploya puni digest i provjerava javni health. Operater ručno obavlja staging checklistu. Produkcijski VPS i promocija ostaju izvan potvrđenog automatiziranog toka.
 
 ## Okruženja
 
@@ -12,7 +12,7 @@ Aplikacija živi na **dva odvojena Hetzner VPS-a**; postojeći treći VPS nosi D
 
 | Okruženje  | Domena                | VPS                                              | Objava                                                                   |
 | ---------- | --------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ |
-| Staging    | `staging.kaladont.hr` | ručno postavljeni x86 VPS; aplikacija + vlastiti Postgres | ručno ažuriranje digestom nakon zelenog CI-ja i GHCR objave |
+| Staging    | `staging.kaladont.hr` | ručno inicijalno postavljeni x86 VPS; aplikacija + vlastiti Postgres | automatski deploy istog GHCR digesta nakon zelenog CI-ja; ručna checklist provjera |
 | Produkcija | `kaladont.hr`         | vlastiti x86 VPS; aplikacija + vlastiti Postgres | ručna promocija **istog image digesta** sa staginga                      |
 | Forum      | `forum.kaladont.hr`   | postojeći zasebni VPS (Discourse + njegova baza) | neovisno o igri — [vodič postave Discoursea](vodic-postava-discourse.md) |
 
@@ -95,7 +95,7 @@ Detaljni koraci za početnika nalaze se u [Operacije for dummies](operacije-for-
 
 ## Objava nove verzije
 
-Identitet releasea, statusi, staging closed test checklist i evidencija opisani su u [release shemi](release-shema.md). Automatika i njezin ciljani ugovor opisani su u [CI/CD dokumentu](ci-cd.md); ljudski postupci su u [runbooku objave i rollbacka](runbook-objava-i-rollback.md). Trenutačni tok je: radna grana → Pull Request → zeleni CI → merge u `main` → GHCR objava → ručno ažuriranje staginga punim digestom → ručna provjera. Ciljani produkcijski tok nastavlja se ručno pokrenutom promocijom **istog digesta** u produkciju.
+Identitet releasea, statusi, staging closed test checklist i evidencija opisani su u [release shemi](release-shema.md). Automatika i njezin ugovor opisani su u [CI/CD dokumentu](ci-cd.md); ljudski postupci su u [runbooku objave i rollbacka](runbook-objava-i-rollback.md). Trenutačni tok je: radna grana → Pull Request → zeleni CI → merge u `main` → GHCR objava → automatski staging deploy punim digestom → ručna staging provjera. Produkcijska promocija ostaje zaseban korak i nije potvrđena kao automatizirana.
 
 - Postoji jedan stvarni operater. Nema obveznog drugog reviewera ni dodatnog GitHub Environment approval koraka; ručno pokretanje produkcijskog workflowa kontrolna je točka.
 - Redovni deploy može prekinuti aktivne partije i ne blokira se automatski. Radi se u doba slabog prometa. Očekivani prekid dulji od 5 minuta najavljuje se najmanje 24 sata unaprijed na forumu i bannerom objavljenim prethodnim izdanjem.

@@ -1,38 +1,35 @@
 # Objava nove verzije na staging
 
-Ovo je **privremeni početnički runbook za svaku novu objavu na staging**.
+Ovo je početnički runbook za staging. Standardni deploy sada pokreću GitHub Actions workflowi; ručni SSH/Docker koraci niže služe samo kao incidentni fallback kada automatska objava ne uspije i operater odluči nastaviti ručno.
 
-Dokument opisuje postupak koji danas stvarno radi na postojećem staging VPS-u. Nije konačni deployment model i ne uvodi automatski staging workflow, posebnog deploy korisnika ni produkciju. Kada se operativni model promijeni, ovaj dokument treba ažurirati prije sljedeće objave.
+Staging workflow nakon uspješnog CI-ja i GHCR promotiona preuzima puni digest, pokreće migracije, deploya aplikaciju i provjerava javni health. Operater i dalje ručno provodi staging checklistu. Ovaj dokument zadržava ručne korake za dijagnostiku i odobreni fallback; identitet i standardni release tok definirani su u [release shemi](release-shema.md) i [CI/CD dokumentu](ci-cd.md).
 
 Primjenjuje se na:
 
 - `staging.kaladont.hr`;
-- direktni push na `main`;
+- commit na `main`;
 - GitHub Actions CI;
 - objavu Docker slike u GHCR;
-- ručnu migraciju staging baze;
+- automatski staging deploy punim digestom;
 - ručnu provjeru nove verzije;
-- rollback staging aplikacije ako nova verzija ne radi.
+- incidentni rollback staging aplikacije ako nova verzija ne radi.
 
 Ovaj dokument **ne objavljuje produkciju**. Produkcija ne postoji u ovom postupku i ne smije se dirati.
 
 ## Najkraća verzija postupka
 
 ```text
-1. Provjeriti lokalne promjene.
-2. Usporediti lokalni kod i migracije s GitHubom.
-3. Napraviti commit.
-4. Direktno pushati commit na `main`.
-5. Pričekati zeleni CI.
-6. Pričekati GHCR objavu i zapisati puni digest.
-7. Zapisati trenutni staging digest.
-8. Na stagingu primijeniti migracije iz novog imagea.
-9. Pokrenuti novi application container.
-10. Provjeriti health, stranice i igru.
-11. Zapisati rezultat ili vratiti prethodni digest.
+1. Pregledati lokalne promjene i pripremiti commit prema projektnom toku.
+2. Objaviti commit na `main`.
+3. Pričekati zeleni CI, uključujući Docker smoke test.
+4. Pričekati GHCR promotion istog image manifesta i staging workflow.
+5. Iz workflowa zabilježiti puni commit SHA i digest kandidata.
+6. Pričekati staging deploy i health provjeru očekivane verzije/digesta.
+7. Operater ručno provodi staging checklistu i ciljano provjerava promijenjene dijelove.
+8. Zabilježiti rezultat kao `staging-provjereno` ili `odbačeno` prema release-shemi.
 ```
 
-`main` je u ovom projektu kontrolirana ulazna točka za staging release. Push na `main` nije obična sigurnosna kopija koda: on pokreće službeni CI i, nakon uspjeha, objavu imagea u GHCR.
+`main` je kontrolirana ulazna točka za staging release. Push na `main` pokreće službeni CI, a uspješan CI pokreće GHCR promotion i automatski staging workflow. Zeleni workflow ne zamjenjuje ručnu staging checklistu.
 
 ## Crvene zabrane
 
@@ -75,6 +72,10 @@ Ako naredba ne odgovara ovom dokumentu ili ne znaš što znači rezultat, ne pok
 | preglednik | provjera staging stranice i igra u četiri sesije |
 
 Nikada nemoj lijepiti tajne u ovaj dokument, GitHub issue, commit, chat ili log.
+
+## Ručni fallback
+
+Sljedeći postupci služe samo za odobreni incidentni fallback ako automatski workflow ne uspije. Ne ponavljaj migracije niti mijenjaj staging `.env` naslijepo; prvo sačuvaj workflow logove, provjeri aktivni digest i slijedi [runbook objave i rollbacka](runbook-objava-i-rollback.md).
 
 ## 1. Priprema prije objave
 

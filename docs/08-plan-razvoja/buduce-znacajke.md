@@ -21,7 +21,7 @@ Ništa odavde ne ulazi u MVP. Redoslijed će odrediti stvarni podaci ([metrike-u
 ## Srednji prioritet
 
 - **Suptilni zvukovi** — bez pozadinske glazbe: ulazak/izlazak, svaka sekunda čekaonice + početak partije, upozorenje pred istek poteza, osobni potezi/red te zajednički eliminacija, nova runda i kraj partije (tek na prikazu konačnih rezultata), plus UI klik/hover na gumbima; `mute + slider` spremljen po uređaju. Specifikacija: [zvukovi.md](../05-ux-ui/zvukovi.md). Implementirano.
-- **Tamna tema** — druga paleta identiteta.
+- **Tamna tema** — ~~druga paleta identiteta~~ isporučeno; vidi [vizualni-identitet.md](../05-ux-ui/vizualni-identitet.md).
 - **Napredne statistike riječi** — omiljeni završeci, „kaladont" izvedbe, kolekcije otkrivenih riječi i povijest osobnih rekorda. Osnovne statistike najduže/najrjeđe riječi, streaka te rijetkih i dugih tierova ulaze u MVP.
 - **Oporavak gost-računa** vezanjem emaila bez pune registracije.
 - **Brojač odbijenih pokušaja** po potezu (podatak za balans i anti-cheat).

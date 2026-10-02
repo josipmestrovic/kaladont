@@ -26,34 +26,31 @@
     inset: 0;
     overflow: hidden;
     pointer-events: none;
-    opacity: 0.55;
   }
 
+  /* Pune boje bez prozirnosti - preklapanje dviju rijeci inace postaje vidljivo. */
   .rijec {
     position: absolute;
     top: -30px;
     left: var(--lijevo);
-    color: var(--boja-mint-tamni);
+    color: #3f8474;
     font-family: var(--font-naslov);
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
-    opacity: 0;
     transform: rotate(-8deg);
     animation: padanje var(--trajanje) linear var(--odgoda) infinite;
   }
 
+  :global(html[data-tema='svijetla']) .rijec {
+    color: #bfd4c9;
+  }
+
   @keyframes padanje {
-    0% { opacity: 0; transform: translateY(-30px) rotate(-8deg); }
-    12% { opacity: 0.5; }
-    82% { opacity: 0.22; }
-    100% { opacity: 0; transform: translateY(calc(100vh + 80px)) rotate(8deg); }
+    0% { transform: translateY(-30px) rotate(-8deg); }
+    100% { transform: translateY(calc(100vh + 80px)) rotate(8deg); }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .rijec { animation: none; opacity: 0.12; }
-  }
-
-  @media (min-width: 768px) {
-    .rijec { font-size: clamp(56px, 5.6vw, 88px); }
+    .rijec { animation: none; }
   }
 </style>

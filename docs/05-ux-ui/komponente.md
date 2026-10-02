@@ -16,7 +16,7 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 |---|---|---|
 | Gumb | primary (mint), secondary (obrub), danger (crvena) | default, hover, disabled, loading |
 | Input tekst | jednoredni | default, focus, error (crveni obrub, blaga podloga, podrhtavanje + poruka ispod) |
-| Avatar | 8 dizajna × s/bez GOST oznake | s borderom (10 varijanti po rangu), bez bordera |
+| Avatar | prikazuje spremljeni sastavljeni izgled (`avatarConfig`); gost bez vlastite konfiguracije prikazuje oznaku GOST umjesto statičnog avatara, a gost s konfiguracijom zadržava oznaku GOST i nema rang-border | s borderom (10 varijanti po rangu), bez bordera |
 | RangBadge | 10 rangova + „Piskaralo" | — |
 | WordChip | riječ + istaknuta zadnja dva grafema (žuta krema) | — |
 | Ikona | sat, pošalji, ne-znam, izlaz, prijavi, zatvori, postavke, provjeri | 24px, jedna boja (nasljeđuje tekst boju) |
@@ -29,6 +29,7 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 | WordBubble | Jedan bubble za zadnju prihvaćenu igračku riječ, sidren neposredno iznad avatara autora; veći tekst, narančasto istaknuta zadnja dva grafema, stabilan prikaz i manji font za duge riječi |
 | CountdownRing | SVG prsten oko avatara, prazni se 30s, prikazuje preostale sekunde u kontrastnoj sredini, prati zelenu shemu aktivnog sjedala, jače se oglasi pri dolasku reda i pulsira zadnjih 5 s |
 | SjedaloKartica | avatar + rang bedž + ime + status; aktivno sjedalo ima debeli zeleni okvir i label „Na redu!”, reakcija je sidrena neposredno iznad avatara s visokim slojem, vlastito sjedalo jedna je klikabilna cjelina, a primljena reakcija nakratko podigne avatar |
+| GlobalneObavijesti | plutajući stupac s VezaObavijest i CitanjeNaglasObavijest; poruke ostaju zasebne, jedna ispod druge, a govorna obavijest prikazuje procjenu platforme, dostupnost hrvatskog glasa, poveznicu na pomoć i akciju „Razumijem” |
 | Toast/Alert | uspjeh (mint), greška (crvena), info (neutralno) — auto-nestaje 2s ili traje dok se ne zatvori |
 | Modal/Dijalog | naslov + tijelo + 2 akcije (potvrdi/odustani) — koristi se za potvrdu izlaska i prijavu greške |
 | EliminacijaKartica | poruka + tko dobiva bod + gumb Prijavi |
@@ -37,11 +38,11 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 
 | Komponenta | Opis |
 |---|---|
-| Header | na naslovnici lijevo prikazuje „Što je novo?” te registriranom korisniku „Pomozi poboljšati igru”; drugdje akcije „Nazad” i uvjetno „Početna”. Sve koriste isti uzorak ikone 59 × 59 px, ukupne visine 80 px i iste tipografije; desno je horizontalni profilni blok. Admin dodatno vidi zasebnu navigaciju Rječnik, Prijave i Mišljenja korisnika. |
+| Header | ne prikazuje se na naslovnici, čekaonici ni ruti partije; drugdje prikazuje akcije „Nazad” i uvjetno „Početna”, a desno horizontalni profilni blok. Admin dodatno vidi zasebnu navigaciju Rječnik, Prijave i Mišljenja korisnika. |
 | Stol | ovalni vektorski stol + 4 SjedaloKartica u luku + WordChip u sredini + CountdownRing na aktivnom; klijent vlastito sjedalo prikazuje prvo, a sjedalo igrača na potezu neposredno desno od njega |
 | RedCekanjaPrikaz | 4 kružna mjesta, tekst stanja, prosjek čekanja |
 | PovijestLista | redak po potezu: runda, igrač, riječ/razlog, trajanje, gumb Prijavi |
-| AvatarPicker | grid 8 avatara, klik odabire, prikaz trenutnog bordera informativno |
+| AvatarEditor | jedini editor avatara, na `/profil/avatar`. Lijevo lijepljiv stupac: avatar, osam nativnih biračâ boja i akcije (Nasumični avatar, Odustani, Spremi). Desno kategorije dijelova s brojačem i mrežica izbora u kojoj svaka kartica prikazuje cijeli avatar s tim dijelom; kartice nemaju vidljiv tekst, naziv ide u `aria-label` i tooltip. Neobavezne kategorije imaju karticu „Bez dodatka”, a Naušnice nestaju dok su uši „Odvojene”. Uz `?registracija=1` nosi naslov „Stvori avatar” i gumb „Završi registraciju”. |
 
 ## Asseti (van standardnih Figma shapeova)
 

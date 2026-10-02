@@ -10,11 +10,13 @@ Aktualni `origin/main` dohvaćen je tijekom ovog pregleda i pokazuje na commit `
 
 Prije implementacije pročitaj lokalne projektne upute, provjeri aktualni HEAD i prilagodi putanje ako su se promijenile. Očuvaj korisnikove postojeće izmjene. Prethodne upute za timer i održavanje zaseban su zadatak; ovaj dokument ih ne zamjenjuje.
 
-**Cilj:** inline Kaladont CV uz zaglavlje vlastitog i javnog profila registriranog igrača, s kalendarskim stažem od registracije i kratkom dinamičkom biografijom od 4–5 rečenica. Na desktopu sadržaj je desno od zaglavlja profila, a na mobitelu ispod njega. Tekst je na hrvatskom, u trećem licu muškog roda, s jednom blagom šalom o igri na kraju. Gost na vlastitom profilu vidi samo poruku da opis postaje dostupan nakon registracije; gosti nemaju javni profil ni javni CV.
+**Cilj:** prikaz uz zaglavlje vlastitog i javnog profila s dvorečeničnim uvodom i zasebnim popisom provjerljivih istaknutosti. Uvod navodi raspodjelu javnih partija te najvišu trenutačnu titulu i način na kojem je ostvarena. Popis „Ističe se po” ima dvije ili tri odvojene činjenice, a skriva se ako ih ima manje od dvije. Na desktopu lista stoji ispod stila i ocjene, desno od avatara; na mobitelu stil i ocjena ostaju gore desno, a lista ispod njih. Gosti koriste iste dostupne statistike kao registrirani igrači; zaseban poziv na registraciju ostaje. Gostu se ne prikazuje staž registracije i nema javni profil.
+
+**Ažuriranje specifikacije (27. 9. 2026.):** ovo pravilo zamjenjuje niže starije upute o biografiji od 4–5 rečenica, tekstu bez naslova, jednoj zanimljivosti unutar odlomka i CV-u dostupnom samo registriranima. Za implementaciju su mjerodavni odjeljci 4.1, 4.2 i 4.4; detaljna pravila starog S3/E/H predloška niže su povijesni nacrt i ne primjenjuju se na novi prikaz.
 
 **Ne graditi:** AI servis, vanjske pozive za generiranje teksta, bazu spremljenih biografija, novu analitiku, novi izračun forme ili nizova pobjeda, izvoz PDF-a/slike, CV editor, administraciju predložaka, zasebnu CV adresu, gumb/modal za otvaranje ili promjenu pravila bodovanja. Reuse-ati postojeći izračun forme i postojeće javne rezultate po načinu igre. Nema podataka sa staginga za uvoz u produkciju.
 
-Sva pravila i pragovi označeni kao CV pravila u nastavku novi su produktni prijedlog za ovaj feature; nisu tvrdnja da već postoje u igri.
+Sva pravila i pragovi označeni kao CV pravila u nastavku novi su produktni prijedlog za ovu značajku; nisu tvrdnja da već postoje u igri.
 
 ## 2. Nazivi
 
@@ -58,42 +60,35 @@ Rijetke riječi u DNK-u uključuju brojače leksemskih grupa. Ne pretvarati taj 
 
 ### 4.1. Na profilu
 
-Prikazati inline blok odmah uz profilno zaglavlje na vlastitom `/profil` i javnom `/profil/javni/[igracId]`. Na desktopu blok stoji desno od avatara i ostalih podataka zaglavlja; na mobitelu se slaže ispod zaglavlja, prije tabova. Nema gumba, modala ni zasebne `/cv/:igracId` stranice. Blok je skriven kad vlasnik otvori Postavke.
+Prikazati inline sadržaj u profilnom zaglavlju na vlastitom `/profil` i javnom `/profil/javni/[igracId]`. Na desktopu stil/ocjena i kompaktne ikone najviše triju dostignuća nalaze se desno od avatara; dvije rečenice „O igraču” ispod imena, ranga i XP-a. Na mobitelu avatar je gore lijevo, stil/ocjena gore desno, ikone dostignuća neposredno ispod njih, a ime/XP i dvorečenični uvod slijede ispod gornjeg reda. Klik/dodir na ikonu dostignuća otvara objašnjenje; nema zasebne `/cv/:igracId` stranice. Cijeli zaglavni opis skriven je kad vlasnik otvori Postavke.
 
-Registrirani igrač na vlastitom i javnom profilu dobiva isti sadržaj. Javni profil već dopušta samo registrirane/admin račune; ne mijenjati ga da izlaže goste. Na vlastitom gostujućem profilu prikazati samo: „Ovaj igrač igra kao gost. Opis će biti dostupan nakon registracije.” Ne generirati gostu CV ni prikazivati njegov sadržaj javno.
+Registrirani igrač na vlastitom i javnom profilu dobiva isti sadržaj. Gost na vlastitom profilu dobiva isti tip dvorečeničnog uvoda i istaknutosti na temelju raspoloživih podataka te zaseban poziv na registraciju. Javni profil i dalje dopušta samo registrirane/admin račune; ne mijenjati ga da izlaže goste. Gostu bez podataka ne izmišljati zanimljivosti; ako nema barem dvije pouzdane istaknutosti, sakriti cijeli popis.
 
 CV uvijek obuhvaća oba javna načina, neovisno o odabranom tabu Statistika. Sažetak forme i rezultata prikazuje oba načina odvojeno. Greška dohvaćanja povijesti ne smije sakriti već uspješno dohvaćen profil ni inline sažetak; razdvojiti postojeće greške profila i povijesti gdje je potrebno.
 
-### 4.2. Sadržaj inline bloka
+### 4.2. Sadržaj zaglavnog opisa
 
-Redoslijed:
-
-1. Oznaka staža i proteklo vrijeme od registracije; ne prikazivati točan datum.
-2. Nadimak/rang prema postojećem zaglavlju ne duplicirati bez potrebe; u CV sažetku navesti način na kojem vrijedi najviši rang i razinu iskustva.
-3. Jedan odlomak od 4–5 rečenica za registrirane, bez zasebnog vidljivog naslova.
-4. Činjenični sažetak forme i zadnjih do 10 javnih rezultata, odvojeno za dvoboje i igre učetvero. Uključiti trenutni i najbolji pobjednički niz po načinu. Zadržati detaljnu postojeću karticu forme u pogledu Statistika.
-5. Prazan biografski tekst, kad nema javnih igara ni trajnih dostignuća: „Još nemamo dovoljno informacija za opis ovog igrača.” Ostali činjenični podaci i prazna stanja ostaju prikazani.
-
-Za rezultate prikazati stvaran broj do 10. U dvoboju ishod je pobjeda/poraz; u igri učetvero prikazati plasman 1–4. Jedan način bez rezultata dobiva svoje prazno stanje, a drugi način i dalje se prikazuje. Trend je dostupan tek kada postoje najmanje 20 rezultata tog načina, prema postojećem helperu.
-
-Ne stavljati email, adminsko stanje, tokene ili privatne rezultate u inline sadržaj. Koristiti običan tekstovni render; nadimak i dinamička riječ ne smiju se tumačiti kao HTML.
-
-Staž govori samo o vremenu od registracije, ne o aktivnosti ili vremenu provedenom u igri. Gostu se ne prikazuje gostujući staž.
+- Pod naslovom „O igraču” prikazati točno dvije rečenice. Prva navodi nadimak, dominantni način (onaj s više javnih partija) i broj dovršenih Dvoboja i Četveroboja. Ako je broj partija jednak, navesti oba načina bez proglašavanja dominantnog.
+- Druga navodi najvišu trenutačnu titulu i način na kojem je ostvarena. Ako rang nije kalibriran ni u jednom načinu, navesti da se dodjeljuje nakon 10 javnih partija u Dvoboju ili Četveroboju. Ne izvoditi rang iz razine iskustva.
+- Tekstualni popis „Ističe se po:” zadržava dvije ili tri stavke i postojeći redoslijed kandidata: dostignuće i njegova razina, najdulji niz prihvaćenih riječi, najduža riječ, brzina prihvaćenog poteza, duge riječi, rijetka riječ, kolekcija riječi, pobjede. Prikazuje se na dnu „Ostalo” statistike, ne u zaglavlju. Prikazivati samo spremljene i provjerljive činjenice; ne ponavljati uvodni podatak. Ako je valjanih kandidata manje od dva, sakriti naslov i cijeli popis.
+- Zaglavni izbor dostignuća obuhvaća svih 10 definicija i prikazuje najviše tri dostignuća s najmanje dvije zvjezdice. Sortirati prvo razine 4–5 po broju zvjezdica silazno, zatim Iskusnjaru razine 2–3, pa ostale razine 2–3 po zvjezdicama. Izjednačenja: Iskusnjara, Glas zajednice, Kaladont!, Rijetkolovac, Dugometraš, Slijepa ulica, Lovac na glave, Završna riječ, KA-zna, Jezik u plamenu. Na taj način je Iskusnjara 2.–3. razine prva samo ako nema dostignuća 4+ razine.
+- Nadimak i dinamički tekst prikazivati kao običan tekst, nikad kao HTML. Ne stavljati email, tokene, administratorsko stanje, privatne rezultate ili staž u uvod/listu.
+- Gost i registrirani igrač koriste iste podatke koje imaju na profilu. Gostu se ne prikazuje registracijski staž; zasebna poruka/akcija za registraciju ostaje odvojena od opisa.
 
 ### 4.3. Vizualni detalji
 
-- Reuse tokena iz `aplikacije/web/src/app.css`: krem podloga, zeleni detalj i postojeća tipografija; ne dodavati naslov u inline blok.
-- Desktop inline blok treba stati desno od cijelog zaglavlja; ispod 768 px slagati ga ispod avatara i podataka. Koristiti CSS grid s `min-width: 0` i responsive prebacivanje u jedan stupac.
-- Koristiti postojeće tipografske tokene. Odlomak ima `line-height: 1.65`, normalno prelamanje i nikakav `line-clamp`.
-- Biografski tekst treba biti kompaktan i prirodan uz profil; koristiti samo činjenice iz igre i blagu igračku šalu. Bez razgovora za posao, radnog iskustva, poslodavaca, ugovora, intervjua, preporuka ili drugih poslovnih metafora.
-- Rezultati moraju ostati čitljivi na 320/375 px i pri povećanom tekstu; ne dopustiti horizontalno pomicanje zbog nadimka, teksta ili oznaka rezultata.
+- Ponovno upotrijebiti tokene iz `aplikacije/web/src/app.css`: krem podlogu, zeleni detalj i postojeću tipografiju; vidljivi zeleni naslov uvoda je „O igraču”.
+- Na desktopu red ikona dostignuća ostaje u desnom gornjem kutu ispod stila i ocjene, desno od avatara. Na mobitelu stil i ocjena ostaju gore desno uz avatar, ikone idu ispod njih, a ime/XP i dvorečenični uvod u donji dio zaglavlja. Koristiti CSS grid s `min-width: 0`; bez preklapanja ni horizontalnog pomicanja pri 375 px. Svaka ikona je tipkovnicom fokusabilna; klik/dodir/Enter otvara kratko objašnjenje s nazivom, opisom i napretkom do sljedeće zvjezdice. Escape i klik izvan zatvaraju ga; na mobitelu je objašnjenje fiksirano pri dnu.
+- Koristiti postojeće tipografske tokene. Dvije uvodne rečenice imaju `line-height: 1.65`, normalno prelamanje i nikakav `line-clamp`.
+- Uvod i istaknutosti trebaju biti kompaktni i činjenični. Ne umetati istaknutosti u uvod i ne dodavati šalu ili izmišljene tvrdnje.
+- Uvod i istaknutosti moraju ostati čitljivi na 320/375 px i pri povećanom tekstu; ne dopustiti horizontalno pomicanje zbog nadimka ili dugačke činjenice.
 - Nema modalnih loading/error/focus stanja. API pogreška ne smije pretvoriti igrača u nultu statistiku: koristiti postojeći profilni error tok, a ako profil već postoji, zadržati ga i jasno prikazati da sažetak nije dostupan.
 
 ### 4.4. Privatnost i granice gostiju
 
 Javni profil registriranog igrača prikazuje isti CV kao vlastiti profil. Endpointi profila moraju zadržati postojeću zaštitu: javni profil vraća samo `registriran`/`admin` igrače koji nisu obrisani, a privatni `/profil` zahtijeva identitet i vraća samo pripadajućeg igrača. Ne dodavati javni dohvat CV-a po proizvoljnom UUID-u.
 
-Gost vidi samo dogovorenu poruku na vlastitom `/profil`. Javni profil, aktivnost i druge javne rute i dalje isključuju goste. Ne stvarati gostujući identitet za javni prikaz i ne dodavati popis gostiju.
+Za vlastiti profil gosta generirati dvorečenični uvod i dostupne istaknutosti iz njegovih stvarnih statistika, dostignuća, rekorda i kolekcije. Poziv na registraciju ostaje zaseban profilni element. Gostujući staž se nikad ne prikazuje. Javni profil, aktivnost i druge javne rute i dalje isključuju goste; ne stvarati javni prikaz gostujućeg identiteta.
 
 ## 5. Datum registracije i staž
 
@@ -140,7 +135,7 @@ Primjeri: isti dan = Prvi dan; sljedeći kalendarski dan = 1 dan; 31. 1. → 28.
 
 ### 6.1. Postojeći profilni API
 
-Ne dodavati CV endpoint. Proširiti `GET /api/profil` i postojeći `GET /api/profil/javni/:igracId` samo potrebnim registracijskim stažem i CV rečenicama; `api.ts` već šalje identitetski token za privatni profil. Javni profil mora zadržati postojeće ograničenje na registrirane/admin račune i `obrisanAt IS NULL`. Privatni profil ostaje vezan uz autentificiranog igrača. Nikad ne dodavati javni CV dohvat po proizvoljnom UUID-u.
+Ne dodavati CV endpoint. Proširiti `GET /api/profil` i postojeći `GET /api/profil/javni/:igracId` potrebnim poljima dvorečeničnog uvoda i istaknutosti; `GET /api/profil` računa ih i za gosta iz njegovih dostupnih agregata. Javni profil mora zadržati postojeće ograničenje na registrirane/admin račune i `obrisanAt IS NULL`. Privatni profil ostaje vezan uz autentificiranog igrača. Nikad ne dodavati javni CV dohvat po proizvoljnom UUID-u.
 
 - Javni profil ne smije dobiti email, hash, tokene, IP, `zadnjaAktivnost` ili oznaku adminsko/registrirano stanje izvan već definiranog DTO-a.
 - Registracijski `registriranAt` može biti null za stare račune; API vraća nedostupan staž, nikad zamjenski `stvoren` datum.
@@ -155,12 +150,8 @@ Predloženi shared ugovor u `paketi/zajednicko/src/cv.ts` (imenovanja se mogu us
 ```ts
 export type CvMod = 'dva_igraca' | 'cetiri_igraca';
 export type CvOsnovaStaza = 'registracija' | 'nepoznato';
-export type CvRecenice =
-  | readonly [string, string, string, string]
-  | readonly [string, string, string, string, string];
-export type CvBiografija =
-  | { tip: 'opis'; recenice: CvRecenice }
-  | { tip: 'nedovoljno_informacija'; tekst: string };
+export type CvRecenice = readonly [string, string];
+export interface CvBiografija { tip: 'opis'; recenice: CvRecenice }
 
 export interface KaladontCvDto {
   verzijaPredlozaka: 1;
@@ -183,12 +174,13 @@ export interface KaladontCvDto {
     razina: number; // iz stanjeIskustva
   };
   biografija: CvBiografija;
+  istaknuto: readonly string[];
 }
 ```
 
-Profilni odgovor već sadrži identitet i avatar; ne duplicirati ih u CV podobjektu. Ne slati detaljne interne odluke/SQL izvore u javni odgovor. Za testove generator može vratiti dodatne `templateId`, `stilMod`, `primarnaOs`, `dokazId` u internoj strukturi, ali ih profilni API ne serializira.
+Profilni odgovor već sadrži identitet i avatar; ne duplicirati ih u CV podobjektu. Ne slati detaljne interne odluke/SQL izvore u javni odgovor. Generator vraća najviše tri `istaknuto` retka, a profilna komponenta skriva cijeli popis kad ih je manje od dva.
 
-Server/shared generator sastavlja tekst. Frontend prikazuje `biografija.recenice.join(' ')` kao običan tekst kad je `biografija.tip === 'opis'`, ili `biografija.tekst` za no-info stanje; nema `{@html}`, markdown parsiranja ili interpolacije u HTML. Ne brojati rečenice dijeljenjem po točki; broj elemenata tuplea je izvor istine.
+Generator sastavlja dvije uvodne rečenice. Frontend ih prikazuje odvojeno i `istaknuto` prikazuje kao običan tekst; nema `{@html}`, markdown parsiranja ili interpolacije u HTML. Ne brojati rečenice dijeljenjem po točki; duljina tuplea je izvor istine.
 
 ### 6.3. Čista logika, jedan izvor pravila
 
@@ -196,15 +188,17 @@ Server/shared generator sastavlja tekst. Frontend prikazuje `biografija.recenice
 - `odaberiRaspodjeluIgara`: odabir S1 prema pravilima niže.
 - `odaberiKvalifikaciju`: rangovi postojećim funkcijama, bez kopiranih pragova.
 - `odaberiStil`: javni DNK određenog načina, bez spajanja skala.
-- `odaberiDokaz`: najviše jedna zanimljivost.
-- `sastaviKaladontCv`: stabilni predlošci, vraća 4–5 rečenica i interne odluke za test.
+- `odaberiIstaknuto`: deterministički bira 2–3 istaknutosti ili vraća prazan niz kad ima manje od dvije pouzdane stavke.
+- `sastaviKaladontCv`: vraća stabilan dvorečenični uvod i odvojen popis istaknutosti.
 - `izracunajKalendarskiStaz` i hrvatski numerali odvojeni su čisti helperi.
 
 Predložena podjela: čisti hrvatski formatteri/generator u shared paketu, DB adapter unutar postojećih profilnih ruta i inline Svelte komponenta u webu. Renderer ne importira DB, Socket.IO ili browser storage. Generator ne poziva mrežu i ne zapisuje ništa.
 
 Ako nedostaje cijeli opcionalni DNK/statistika redak, to znači „nema pouzdanog podatka za tu osobinu”, a ne automatski nula. U DB-u valjana spremljena nula jest nula. Ne koristiti `value || default` za brojke. Brojila javnih igara moraju biti nenegativni sigurni cijeli brojevi; ako su temeljna brojila oštećena, vratiti nedostupan CV i internu dijagnostiku, ne generirati lažan CV početnika. Neispravna opcionalna metrika isključuje samo tu osobinu/dokaz. Ne popravljati bazu pri GET zahtjevu.
 
-## 7. Potpuna pravila za biografiju
+## 7. Arhivirana specifikacija starog biografskog odlomka
+
+Odjeljci 7.1–7.8 ispod opisuju stariji nacrt biografije od 4–5 rečenica i služe samo kao povijest dizajna. **Ne primjenjivati ih na trenutačni profil.** Mjerodavan je ažurirani ugovor iz odjeljaka 4.1–4.4: dvije uvodne rečenice te zaseban popis od dvije ili tri istaknutosti, koji se skriva ako nema barem dvije pouzdane stavke. Gostov privatni profil koristi njegove postojeće statistike istom logikom kao registrirani profil, ali mu se ne prikazuje staž i ne postoji javni gostujući profil.
 
 ### 7.1. Struktura, duljina i stabilnost
 
@@ -504,7 +498,7 @@ Minimalni povezani popravak:
 
 ### 10.2. Izvor ranga i oznake DNK-a nisu zamjenjivi
 
-`rangovi.ts` koristi rastuće minimalne pragove; pojedine label-tablice u `dnk.ts` koriste min/max intervale. Ne kopirati raspon rangova iz DNK-a. Za CV rang uvijek `izracunajRang`, za izbor osobina kanonska numerička DNK vrijednost i ručno provjereni fragmenti. U ovom featureu ne prepravljati sve DNK pragove i ne uvoditi treći sustav bodovanja. Ako se pri testu utvrdi nesklad grafičke oznake i vrijednosti, prijaviti zaseban nalaz; ne „popraviti” ga lažnom biografijom.
+`rangovi.ts` koristi rastuće minimalne pragove; pojedine tablice oznaka u `dnk.ts` koriste raspone min/max. Ne kopirati raspon rangova iz DNK-a. Za CV rang uvijek koristiti `izracunajRang`, a za izbor osobina kanonsku brojčanu DNK vrijednost i ručno provjerene fragmente. U ovoj značajci ne prepravljati sve DNK pragove i ne uvoditi treći sustav bodovanja. Ako se pri testu utvrdi nesklad grafičke oznake i vrijednosti, prijaviti zaseban nalaz; ne „popravljati” ga lažnom biografijom.
 
 ### 10.3. Javni profil ne otvara gostujuće podatke
 
@@ -670,7 +664,7 @@ Integracijske testove pokretati samo uz projektnu namjensku testnu bazu i fixtur
 
 ## 14. Prioritet i granice
 
-Prioriteti su unutar ovog featurea, ne zamjenjuju raniji redoslijed kritičnih popravaka igre.
+Prioriteti su unutar ove značajke i ne zamjenjuju raniji redoslijed kritičnih popravaka igre.
 
 | Paket | Prioritet | Kompleksnost | Rizik | Dugoročna vrijednost |
 |---|---|---|---|---|

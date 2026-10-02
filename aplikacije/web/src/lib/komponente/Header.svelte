@@ -140,7 +140,7 @@
     gap: 12px;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1000px) {
     .header-sadrzaj {
       max-width: 980px;
     }
@@ -240,7 +240,7 @@
     text-decoration: none;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1000px) {
     .header-avatar { display: inline-flex; }
   }
 
@@ -269,12 +269,12 @@
     color: var(--boja-akcent);
   }
 
-  @media (max-width: 599px) {
+  @media (max-width: 999px) {
     .profil-link { gap: 0; }
     .profil-ime { display: none; }
   }
 
-  @media (max-width: 599px) {
+  @media (max-width: 999px) {
     .header-sadrzaj { padding-inline: 16px; }
     .novosti-link, .header-akcija { font-size: 22px; }
     .naslovne-akcije .header-ikona {

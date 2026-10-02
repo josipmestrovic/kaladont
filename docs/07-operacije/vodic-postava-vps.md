@@ -2,9 +2,9 @@
 
 Ovo je **sažeti tehnički checklist** za postavu aplikacijskog VPS-a. Potpuno početničko objašnjenje svake naredbe, očekivanog rezultata i sigurne reakcije na grešku nalazi se u [Operacije for dummies](operacije-for-dummies.md). Kontekst i arhitektura definirani su u [produkciji i objavi](produkcija-i-objava.md) te [ADR-u 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md).
 
-> **Status 2026-09-09:** Docker/Compose/Caddy artefakti, CI smoke test i GHCR objava postoje. Staging VPS je ručno postavljen na `staging.kaladont.hr`, s HTTPS-om, privatnom bazom i stvarnim hrLex rječnikom. Automatski deploy, produkcijski VPS, prvi-admin CLI i backup/restore automatika još nisu implementirani; ovaj vodič za njih ostaje budući postupak.
+> **Status 2026-10-01:** Docker/Compose/Caddy artefakti, CI smoke test, GHCR promotion i automatski staging deploy postoje. Staging VPS je ručno inicijalno postavljen na `staging.kaladont.hr`, s HTTPS-om, privatnom bazom i vlastitim hrLex rječnikom. Produkcijski VPS/promotion i backup/restore automatika nisu potvrđeni kao implementirani; ovaj vodič opisuje početnu postavu i preostale produkcijske korake.
 
-> **Zlatna pravila:** produkcija se ne deploya ručno i nikad ne dobiva svježi build; staging se zasad ručno ažurira isključivo punim GHCR digestom prema [release shemi](release-shema.md); VPS ne klonira git repozitorij; stvarne IP adrese, ključevi, hashovi i lozinke nikad se ne zapisuju u repozitorij.
+> **Zlatna pravila:** produkcija se ne deploya ručno i nikad ne dobiva svježi build; staging workflow deploya puni GHCR digest, a operater zasebno provodi checklistu prema [release shemi](release-shema.md); VPS ne klonira git repozitorij; stvarne IP adrese, ključevi, hashovi i lozinke nikad se ne zapisuju u repozitorij.
 
 ## Pojmovnik (60 sekundi)
 

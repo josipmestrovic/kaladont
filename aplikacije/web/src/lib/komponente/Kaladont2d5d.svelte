@@ -11,11 +11,12 @@
 </div>
 
 <style>
+  /* Slojevi su pozicionirani u postotcima izvorne scene 390x470 pa se skaliraju s visinom. */
   .scena-2d5d {
     position: relative;
-    width: 390px;
-    height: 470px;
-    flex: 0 0 390px;
+    height: var(--visina-ilustracije, 470px);
+    aspect-ratio: 390 / 470;
+    flex: 0 0 auto;
     overflow: hidden;
     perspective: 900px;
   }
@@ -36,37 +37,37 @@
   }
 
   .tijelo {
-    right: 93px;
+    right: 23.85%;
     bottom: 0;
-    width: 350px;
+    width: 89.74%;
   }
 
   .kapa {
-    top: -1px;
-    right: 177px;
+    top: -0.21%;
+    right: 45.38%;
     z-index: 0;
-    width: 303px;
+    width: 77.69%;
     rotate: -21deg;
     animation: lebdenje-kape 3.8s ease-in-out infinite;
   }
 
   .ruka {
-    top: 192px;
-    right: 122px;
+    top: 40.85%;
+    right: 31.28%;
     z-index: 3;
-    width: 182px;
+    width: 46.67%;
     transform-origin: 20% 80%;
     animation: dizanje-palca 2.8s ease-in-out infinite;
   }
 
   .oblak {
-    top: -28px;
-    right: -7px;
+    top: -5.96%;
+    right: -1.79%;
     z-index: 4;
-    width: 330px;
+    width: 84.62%;
     transform-origin: 35% 80%;
     animation: lebdenje-oblaka 4s ease-in-out infinite;
-    filter: drop-shadow(7px 10px 4px rgb(38 34 27 / 16%));
+    filter: drop-shadow(7px 10px 4px rgb(0 0 0 / 28%));
   }
 
   @keyframes lagano-preturanje {
@@ -96,7 +97,7 @@
     .ruka { animation: none; }
   }
 
-  @media (max-width: 767px) {
+  @media (max-width: 999px), (max-height: 520px) {
     .scena-2d5d { display: none; }
   }
 </style>

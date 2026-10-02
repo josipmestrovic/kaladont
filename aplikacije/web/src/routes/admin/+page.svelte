@@ -72,7 +72,17 @@
     }
   }
 
-  onMount(ucitaj);
+  onMount(() => {
+    void ucitaj();
+
+    // Admin sucelje ima vlastitu paletu i uvijek se prikazuje u svijetloj temi.
+    const prethodnaTema = document.documentElement.getAttribute('data-tema');
+    document.documentElement.setAttribute('data-tema', 'svijetla');
+    return () => {
+      if (prethodnaTema) document.documentElement.setAttribute('data-tema', prethodnaTema);
+      else document.documentElement.removeAttribute('data-tema');
+    };
+  });
 
   async function rijesi(id: number, status: 'pregledana' | 'rijesena') {
     await api(`/admin/prijave/${id}/rijesi`, { method: 'POST', body: JSON.stringify({ status }) });

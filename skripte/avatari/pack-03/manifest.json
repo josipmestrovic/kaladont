@@ -1,0 +1,1128 @@
+{
+  "pack": "Kaladont avatar SVG pack 03",
+  "assetCount": 52,
+  "schemaVersion": 1,
+  "compatibleAssetVersion": "figma-avatar-v1",
+  "referencePack": "Kaladont-avatar-SVG-pack-02",
+  "referenceRevision": "87bf60439cda67ab921e4a33683ea2f858c01dbe",
+  "canvas": {
+    "width": 380,
+    "height": 380
+  },
+  "layerOrder": [
+    "background",
+    "base",
+    "ears",
+    "shirt",
+    "eyes",
+    "eyebrows",
+    "nose",
+    "facialHair",
+    "mouth",
+    "earrings",
+    "glasses",
+    "hair"
+  ],
+  "defaultLayers": {
+    "base": {
+      "x": 90,
+      "y": 43,
+      "width": 200,
+      "height": 320
+    },
+    "ears": {
+      "x": 94,
+      "y": 174,
+      "width": 48,
+      "height": 48
+    },
+    "shirt": {
+      "x": 47,
+      "y": 290,
+      "width": 281,
+      "height": 93
+    },
+    "eyes": {
+      "x": 152,
+      "y": 139,
+      "width": 96,
+      "height": 48
+    },
+    "eyebrows": {
+      "x": 115,
+      "y": 122,
+      "width": 149,
+      "height": 51
+    },
+    "nose": {
+      "x": 188,
+      "y": 167,
+      "width": 32,
+      "height": 40
+    },
+    "facialHair": {
+      "x": 124,
+      "y": 150,
+      "width": 164,
+      "height": 154
+    },
+    "mouth": {
+      "x": 172,
+      "y": 194,
+      "width": 72,
+      "height": 64
+    },
+    "earrings": {
+      "x": 89,
+      "y": 207,
+      "width": 52,
+      "height": 52
+    },
+    "glasses": {
+      "x": 116,
+      "y": 132,
+      "width": 151,
+      "height": 65
+    },
+    "hair": {
+      "x": 59,
+      "y": 28,
+      "width": 240,
+      "height": 203
+    }
+  },
+  "integrationRequired": true,
+  "assets": [
+    {
+      "category": "hair",
+      "id": "k3-long-straight",
+      "labelHr": "Duga ravna kosa",
+      "file": "kosa/Hair-k3-long-straight.svg",
+      "productionFile": "Hair-k3-long-straight.svg",
+      "viewBox": "0 0 240 300",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-long-waves",
+      "labelHr": "Dugi valovi",
+      "file": "kosa/Hair-k3-long-waves.svg",
+      "productionFile": "Hair-k3-long-waves.svg",
+      "viewBox": "0 0 240 300",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-pigtails",
+      "labelHr": "Dva duga repića",
+      "file": "kosa/Hair-k3-pigtails.svg",
+      "productionFile": "Hair-k3-pigtails.svg",
+      "viewBox": "0 0 240 300",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-twin-braids",
+      "labelHr": "Dvije pletenice",
+      "file": "kosa/Hair-k3-twin-braids.svg",
+      "productionFile": "Hair-k3-twin-braids.svg",
+      "viewBox": "0 0 240 300",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-side-braid",
+      "labelHr": "Pletenica sa strane",
+      "file": "kosa/Hair-k3-side-braid.svg",
+      "productionFile": "Hair-k3-side-braid.svg",
+      "viewBox": "0 0 240 300",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-high-ponytail",
+      "labelHr": "Visoki rep",
+      "file": "kosa/Hair-k3-high-ponytail.svg",
+      "productionFile": "Hair-k3-high-ponytail.svg",
+      "viewBox": "0 0 240 300",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-low-ponytail",
+      "labelHr": "Niski rep",
+      "file": "kosa/Hair-k3-low-ponytail.svg",
+      "productionFile": "Hair-k3-low-ponytail.svg",
+      "viewBox": "0 0 240 300",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-curtain-bangs",
+      "labelHr": "Duga kosa sa zavjesa šiškama",
+      "file": "kosa/Hair-k3-curtain-bangs.svg",
+      "productionFile": "Hair-k3-curtain-bangs.svg",
+      "viewBox": "0 0 240 300",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-curly-lob",
+      "labelHr": "Kovrčavi dugi bob",
+      "file": "kosa/Hair-k3-curly-lob.svg",
+      "productionFile": "Hair-k3-curly-lob.svg",
+      "viewBox": "0 0 240 260",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 260
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-space-buns-loose",
+      "labelHr": "Punđice i pramenovi",
+      "file": "kosa/Hair-k3-space-buns-loose.svg",
+      "productionFile": "Hair-k3-space-buns-loose.svg",
+      "viewBox": "0 0 240 225",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 225
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-bow-bob",
+      "labelHr": "Bob s mašnom",
+      "file": "kosa/Hair-k3-bow-bob.svg",
+      "productionFile": "Hair-k3-bow-bob.svg",
+      "viewBox": "0 0 240 220",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 220
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "hair",
+      "id": "k3-sleek-bun",
+      "labelHr": "Glatka kosa s niskom punđom",
+      "file": "kosa/Hair-k3-sleek-bun.svg",
+      "productionFile": "Hair-k3-sleek-bun.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 203
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "eyes",
+      "id": "k3-long-lashes",
+      "labelHr": "Duge trepavice",
+      "file": "oci/Eyes-k3-long-lashes.svg",
+      "productionFile": "Eyes-k3-long-lashes.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false,
+      "frame": {
+        "x": 152,
+        "y": 139,
+        "width": 96,
+        "height": 48
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "eyes",
+      "id": "k3-winged-liner",
+      "labelHr": "Naglašene oči",
+      "file": "oci/Eyes-k3-winged-liner.svg",
+      "productionFile": "Eyes-k3-winged-liner.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false,
+      "frame": {
+        "x": 152,
+        "y": 139,
+        "width": 96,
+        "height": 48
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "eyes",
+      "id": "k3-wink-lashes",
+      "labelHr": "Namig s trepavicama",
+      "file": "oci/Eyes-k3-wink-lashes.svg",
+      "productionFile": "Eyes-k3-wink-lashes.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false,
+      "frame": {
+        "x": 152,
+        "y": 139,
+        "width": 96,
+        "height": 48
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "eyes",
+      "id": "k3-dreamy-lashes",
+      "labelHr": "Sanjive oči",
+      "file": "oci/Eyes-k3-dreamy-lashes.svg",
+      "productionFile": "Eyes-k3-dreamy-lashes.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false,
+      "frame": {
+        "x": 152,
+        "y": 139,
+        "width": 96,
+        "height": 48
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "eyes",
+      "id": "k3-starry",
+      "labelHr": "Zvjezdice u očima",
+      "file": "oci/Eyes-k3-starry.svg",
+      "productionFile": "Eyes-k3-starry.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false,
+      "frame": {
+        "x": 152,
+        "y": 139,
+        "width": 96,
+        "height": 48
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "eyebrows",
+      "id": "k3-slender-arch",
+      "labelHr": "Tanke lučne obrve",
+      "file": "obrve/Eyebrows-k3-slender-arch.svg",
+      "productionFile": "Eyebrows-k3-slender-arch.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true,
+      "frame": {
+        "x": 115,
+        "y": 122,
+        "width": 149,
+        "height": 51
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "eyebrows",
+      "id": "k3-swoop",
+      "labelHr": "Izdužene obrve",
+      "file": "obrve/Eyebrows-k3-swoop.svg",
+      "productionFile": "Eyebrows-k3-swoop.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true,
+      "frame": {
+        "x": 115,
+        "y": 122,
+        "width": 149,
+        "height": 51
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "eyebrows",
+      "id": "k3-zigzag",
+      "labelHr": "Cik-cak obrve",
+      "file": "obrve/Eyebrows-k3-zigzag.svg",
+      "productionFile": "Eyebrows-k3-zigzag.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true,
+      "frame": {
+        "x": 115,
+        "y": 122,
+        "width": 149,
+        "height": 51
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "nose",
+      "id": "k3-giant-button",
+      "labelHr": "Veliki okrugli nos",
+      "file": "nos/Nose-k3-giant-button.svg",
+      "productionFile": "Nose-k3-giant-button.svg",
+      "viewBox": "0 0 64 52",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "nose",
+      "id": "k3-trumpet",
+      "labelHr": "Nos truba",
+      "file": "nos/Nose-k3-trumpet.svg",
+      "productionFile": "Nose-k3-trumpet.svg",
+      "viewBox": "0 0 64 52",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "nose",
+      "id": "k3-curly",
+      "labelHr": "Zavrnuti nos",
+      "file": "nos/Nose-k3-curly.svg",
+      "productionFile": "Nose-k3-curly.svg",
+      "viewBox": "0 0 64 52",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "nose",
+      "id": "k3-zigzag",
+      "labelHr": "Cik-cak nos",
+      "file": "nos/Nose-k3-zigzag.svg",
+      "productionFile": "Nose-k3-zigzag.svg",
+      "viewBox": "0 0 64 52",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "nose",
+      "id": "k3-piggy",
+      "labelHr": "Praščić nos",
+      "file": "nos/Nose-k3-piggy.svg",
+      "productionFile": "Nose-k3-piggy.svg",
+      "viewBox": "0 0 64 52",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "mouth",
+      "id": "k3-toothless-laugh",
+      "labelHr": "Bezub smijeh",
+      "file": "usta/Mouth-k3-toothless-laugh.svg",
+      "productionFile": "Mouth-k3-toothless-laugh.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 172,
+        "y": 194,
+        "width": 72,
+        "height": 64
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "mouth",
+      "id": "k3-toothless-wide",
+      "labelHr": "Široki bezubi osmijeh",
+      "file": "usta/Mouth-k3-toothless-wide.svg",
+      "productionFile": "Mouth-k3-toothless-wide.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 172,
+        "y": 194,
+        "width": 72,
+        "height": 64
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "mouth",
+      "id": "k3-gummy",
+      "labelHr": "Desni bez zuba",
+      "file": "usta/Mouth-k3-gummy.svg",
+      "productionFile": "Mouth-k3-gummy.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 172,
+        "y": 194,
+        "width": 72,
+        "height": 64
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "mouth",
+      "id": "k3-lipstick-smile",
+      "labelHr": "Osmijeh s ružem",
+      "file": "usta/Mouth-k3-lipstick-smile.svg",
+      "productionFile": "Mouth-k3-lipstick-smile.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 172,
+        "y": 194,
+        "width": 72,
+        "height": 64
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "mouth",
+      "id": "k3-lipstick-pout",
+      "labelHr": "Napučene usne s ružem",
+      "file": "usta/Mouth-k3-lipstick-pout.svg",
+      "productionFile": "Mouth-k3-lipstick-pout.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 172,
+        "y": 194,
+        "width": 72,
+        "height": 64
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "mouth",
+      "id": "k3-crooked-grin",
+      "labelHr": "Šašavi osmijeh",
+      "file": "usta/Mouth-k3-crooked-grin.svg",
+      "productionFile": "Mouth-k3-crooked-grin.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false,
+      "frame": {
+        "x": 172,
+        "y": 194,
+        "width": 72,
+        "height": 64
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "ears",
+      "id": "k3-elephant",
+      "labelHr": "Ogromne klempave uši",
+      "file": "usi/Ear-k3-elephant.svg",
+      "productionFile": "Ear-k3-elephant.svg",
+      "viewBox": "0 0 100 92",
+      "colorRole": "skin",
+      "recolorStroke": false,
+      "frame": {
+        "x": 36,
+        "y": 148,
+        "width": 100,
+        "height": 92
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "ears",
+      "id": "k3-fan",
+      "labelHr": "Uši lepeze",
+      "file": "usi/Ear-k3-fan.svg",
+      "productionFile": "Ear-k3-fan.svg",
+      "viewBox": "0 0 100 92",
+      "colorRole": "skin",
+      "recolorStroke": false,
+      "frame": {
+        "x": 36,
+        "y": 148,
+        "width": 100,
+        "height": 92
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "ears",
+      "id": "k3-long-pointed",
+      "labelHr": "Duge vilenjačke uši",
+      "file": "usi/Ear-k3-long-pointed.svg",
+      "productionFile": "Ear-k3-long-pointed.svg",
+      "viewBox": "0 0 100 92",
+      "colorRole": "skin",
+      "recolorStroke": false,
+      "frame": {
+        "x": 36,
+        "y": 148,
+        "width": 100,
+        "height": 92
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "ears",
+      "id": "k3-floppy",
+      "labelHr": "Viseće komične uši",
+      "file": "usi/Ear-k3-floppy.svg",
+      "productionFile": "Ear-k3-floppy.svg",
+      "viewBox": "0 0 100 128",
+      "colorRole": "skin",
+      "recolorStroke": false,
+      "frame": {
+        "x": 36,
+        "y": 148,
+        "width": 100,
+        "height": 128
+      },
+      "requiresFrameOverride": true
+    },
+    {
+      "category": "glasses",
+      "id": "k3-sun-cat",
+      "labelHr": "Sunčane mačkaste",
+      "file": "naocale/Glasses-k3-sun-cat.svg",
+      "productionFile": "Glasses-k3-sun-cat.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true,
+      "frame": {
+        "x": 116,
+        "y": 132,
+        "width": 151,
+        "height": 65
+      },
+      "requiresFrameOverride": false,
+      "note": "Opaque fixed dark lenses; only frame is recolored."
+    },
+    {
+      "category": "glasses",
+      "id": "k3-sun-round",
+      "labelHr": "Velike okrugle sunčane",
+      "file": "naocale/Glasses-k3-sun-round.svg",
+      "productionFile": "Glasses-k3-sun-round.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true,
+      "frame": {
+        "x": 116,
+        "y": 132,
+        "width": 151,
+        "height": 65
+      },
+      "requiresFrameOverride": false,
+      "note": "Opaque fixed dark lenses; only frame is recolored."
+    },
+    {
+      "category": "glasses",
+      "id": "k3-sun-butterfly",
+      "labelHr": "Sunčane leptir",
+      "file": "naocale/Glasses-k3-sun-butterfly.svg",
+      "productionFile": "Glasses-k3-sun-butterfly.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true,
+      "frame": {
+        "x": 116,
+        "y": 132,
+        "width": 151,
+        "height": 65
+      },
+      "requiresFrameOverride": false,
+      "note": "Opaque fixed dark lenses; only frame is recolored."
+    },
+    {
+      "category": "glasses",
+      "id": "k3-sun-visor",
+      "labelHr": "Sunčani vizir",
+      "file": "naocale/Glasses-k3-sun-visor.svg",
+      "productionFile": "Glasses-k3-sun-visor.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true,
+      "frame": {
+        "x": 116,
+        "y": 132,
+        "width": 151,
+        "height": 65
+      },
+      "requiresFrameOverride": false,
+      "note": "One opaque continuous lens."
+    },
+    {
+      "category": "glasses",
+      "id": "k3-sun-heart",
+      "labelHr": "Srcolike sunčane",
+      "file": "naocale/Glasses-k3-sun-heart.svg",
+      "productionFile": "Glasses-k3-sun-heart.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true,
+      "frame": {
+        "x": 116,
+        "y": 132,
+        "width": 151,
+        "height": 65
+      },
+      "requiresFrameOverride": false,
+      "note": "Opaque fixed dark lenses; only frame is recolored."
+    },
+    {
+      "category": "glasses",
+      "id": "k3-sun-pixel",
+      "labelHr": "Piksel sunčane",
+      "file": "naocale/Glasses-k3-sun-pixel.svg",
+      "productionFile": "Glasses-k3-sun-pixel.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true,
+      "frame": {
+        "x": 116,
+        "y": 132,
+        "width": 151,
+        "height": 65
+      },
+      "requiresFrameOverride": false,
+      "note": "Opaque fixed dark lenses; only frame is recolored."
+    },
+    {
+      "category": "earrings",
+      "id": "k3-heart-drop",
+      "labelHr": "Srce naušnica",
+      "file": "nausnice/EarRing-k3-heart-drop.svg",
+      "productionFile": "EarRing-k3-heart-drop.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true,
+      "frame": {
+        "x": 89,
+        "y": 207,
+        "width": 52,
+        "height": 52
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "earrings",
+      "id": "k3-moon-drop",
+      "labelHr": "Mjesec naušnica",
+      "file": "nausnice/EarRing-k3-moon-drop.svg",
+      "productionFile": "EarRing-k3-moon-drop.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true,
+      "frame": {
+        "x": 89,
+        "y": 207,
+        "width": 52,
+        "height": 52
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "earrings",
+      "id": "k3-flower",
+      "labelHr": "Cvijet naušnica",
+      "file": "nausnice/EarRing-k3-flower.svg",
+      "productionFile": "EarRing-k3-flower.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true,
+      "frame": {
+        "x": 89,
+        "y": 207,
+        "width": 52,
+        "height": 52
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "earrings",
+      "id": "k3-triple-drop",
+      "labelHr": "Tri viseća kruga",
+      "file": "nausnice/EarRing-k3-triple-drop.svg",
+      "productionFile": "EarRing-k3-triple-drop.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true,
+      "frame": {
+        "x": 89,
+        "y": 207,
+        "width": 52,
+        "height": 52
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "earrings",
+      "id": "k3-star-drop",
+      "labelHr": "Zvijezda naušnica",
+      "file": "nausnice/EarRing-k3-star-drop.svg",
+      "productionFile": "EarRing-k3-star-drop.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true,
+      "frame": {
+        "x": 89,
+        "y": 207,
+        "width": 52,
+        "height": 52
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "shirt",
+      "id": "k3-peter-pan",
+      "labelHr": "Bluza s okruglim ovratnikom",
+      "file": "odjeca/Shirt-k3-peter-pan.svg",
+      "productionFile": "Shirt-k3-peter-pan.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false,
+      "frame": {
+        "x": 47,
+        "y": 290,
+        "width": 281,
+        "height": 93
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "shirt",
+      "id": "k3-ruffle",
+      "labelHr": "Bluza s volanima",
+      "file": "odjeca/Shirt-k3-ruffle.svg",
+      "productionFile": "Shirt-k3-ruffle.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false,
+      "frame": {
+        "x": 47,
+        "y": 290,
+        "width": 281,
+        "height": 93
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "shirt",
+      "id": "k3-sweetheart",
+      "labelHr": "Srcoliki izrez",
+      "file": "odjeca/Shirt-k3-sweetheart.svg",
+      "productionFile": "Shirt-k3-sweetheart.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false,
+      "frame": {
+        "x": 47,
+        "y": 290,
+        "width": 281,
+        "height": 93
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "shirt",
+      "id": "k3-bow-blouse",
+      "labelHr": "Bluza s mašnom",
+      "file": "odjeca/Shirt-k3-bow-blouse.svg",
+      "productionFile": "Shirt-k3-bow-blouse.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false,
+      "frame": {
+        "x": 47,
+        "y": 290,
+        "width": 281,
+        "height": 93
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "facialHair",
+      "id": "k3-curly-handlebar",
+      "labelHr": "Zavrnuti brkovi",
+      "file": "brada-i-brkovi/FacialHair-k3-curly-handlebar.svg",
+      "productionFile": "FacialHair-k3-curly-handlebar.svg",
+      "viewBox": "0 0 164 154",
+      "colorRole": "facialHair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 124,
+        "y": 150,
+        "width": 164,
+        "height": 154
+      },
+      "requiresFrameOverride": false
+    },
+    {
+      "category": "facialHair",
+      "id": "k3-three-whiskers",
+      "labelHr": "Tri smiješne dlačice",
+      "file": "brada-i-brkovi/FacialHair-k3-three-whiskers.svg",
+      "productionFile": "FacialHair-k3-three-whiskers.svg",
+      "viewBox": "0 0 164 154",
+      "colorRole": "facialHair",
+      "recolorStroke": false,
+      "frame": {
+        "x": 124,
+        "y": 150,
+        "width": 164,
+        "height": 154
+      },
+      "requiresFrameOverride": false
+    }
+  ],
+  "frameOverrides": {
+    "hair": {
+      "k3-long-straight": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "k3-long-waves": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "k3-pigtails": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "k3-twin-braids": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "k3-side-braid": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "k3-high-ponytail": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "k3-low-ponytail": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "k3-curtain-bangs": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 300
+      },
+      "k3-curly-lob": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 260
+      },
+      "k3-space-buns-loose": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 225
+      },
+      "k3-bow-bob": {
+        "x": 59,
+        "y": 28,
+        "width": 240,
+        "height": 220
+      }
+    },
+    "nose": {
+      "k3-giant-button": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "k3-trumpet": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "k3-curly": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "k3-zigzag": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      },
+      "k3-piggy": {
+        "x": 176,
+        "y": 163,
+        "width": 64,
+        "height": 52
+      }
+    },
+    "ears": {
+      "k3-elephant": {
+        "x": 36,
+        "y": 148,
+        "width": 100,
+        "height": 92
+      },
+      "k3-fan": {
+        "x": 36,
+        "y": 148,
+        "width": 100,
+        "height": 92
+      },
+      "k3-long-pointed": {
+        "x": 36,
+        "y": 148,
+        "width": 100,
+        "height": 92
+      },
+      "k3-floppy": {
+        "x": 36,
+        "y": 148,
+        "width": 100,
+        "height": 128
+      }
+    }
+  },
+  "fixedColors": {
+    "sunglassLenses": "rgb(23,25,33)",
+    "specularHighlights": "rgb(255,255,255)",
+    "why": "v1 regex recolors six-digit hex fills/strokes; rgb preserves opaque dark lenses and fixed highlights."
+  },
+  "attribution": {
+    "originalSystem": "Avatar Illustration System",
+    "author": "Micah Lanier",
+    "source": "https://www.figma.com/community/file/829741575478342595/avatar-illustration-system",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "52 new vector avatar parts; larger local frames for long hair and comic ears/noses; opaque sunglass lenses."
+  }
+}

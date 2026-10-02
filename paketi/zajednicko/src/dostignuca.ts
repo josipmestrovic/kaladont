@@ -55,6 +55,36 @@ export function izracunajRazinuDostignuca(definicija: DefinicijaDostignuca, vrij
   return definicija.pragovi.reduce((razina, prag, indeks) => (vrijednost >= prag ? indeks + 1 : razina), 0);
 }
 
+const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
+  'iskusnjara',
+  'glas_zajednice',
+  'kaladont',
+  'rijetkolovac',
+  'dugometras',
+  'slijepa_ulica',
+  'lovac_na_glave',
+  'zavrsna_rijec',
+  'ka_zna',
+  'jezik_u_plamenu',
+] as const;
+
+export function odaberiTopTriDostignuca<T extends { id: string; razina: number }>(dostignuca: readonly T[]): T[] {
+  const prioritetPoId = new Map<string, number>(PRIORITETI_ISTAKNUTIH_DOSTIGNUCA.map((id, indeks) => [id, indeks]));
+  const definicijaPoId = new Map(DEFINICIJE_DOSTIGNUCA.map((definicija) => [definicija.id, definicija]));
+
+  return [...dostignuca]
+    .filter((dostignuce) => {
+      const definicija = definicijaPoId.get(dostignuce.id);
+      return definicija !== undefined && Number.isInteger(dostignuce.razina) && dostignuce.razina >= 2 && dostignuce.razina <= definicija.pragovi.length;
+    })
+    .sort((prvo, drugo) => {
+      const grupaPrvog = prvo.razina >= 4 ? 0 : prvo.id === 'iskusnjara' ? 1 : 2;
+      const grupaDrugog = drugo.razina >= 4 ? 0 : drugo.id === 'iskusnjara' ? 1 : 2;
+      return grupaPrvog - grupaDrugog || drugo.razina - prvo.razina || (prioritetPoId.get(prvo.id) ?? Infinity) - (prioritetPoId.get(drugo.id) ?? Infinity);
+    })
+    .slice(0, 3);
+}
+
 export function izracunajNovaDostignuca(
   trajniNapredak: Readonly<Record<string, number>>,
   delta: DeltaNapretkaDostignuca,

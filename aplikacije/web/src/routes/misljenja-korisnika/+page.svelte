@@ -99,5 +99,5 @@
   .popis button { display: grid; gap: 3px; padding: 12px; border: 1px solid #d8cfb8; border-radius: 6px; background: white; text-align: left; } .popis button.odabrano { border-color: var(--boja-mint); }
   .popis span, .popis small, .meta { color: var(--boja-tekst-sekundarni); } .detalj { padding: 18px; border: 1px solid #d8cfb8; border-radius: 6px; } .poruka { white-space: pre-wrap; line-height: 1.6; }
   dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } dt { font-weight: 700; } dd { margin: 2px 0 0; color: var(--boja-akcent); } .detalj button { margin: 10px 8px 0 0; padding: 8px 11px; border: 1px solid var(--boja-mint); border-radius: 6px; background: white; }
-  .greska { color: #b3261e; font-weight: 700; } @media (max-width: 699px) { .sadrzaj { grid-template-columns: 1fr; } }
+  .greska { color: #b3261e; font-weight: 700; } @media (max-width: 999px) { .sadrzaj { grid-template-columns: 1fr; } }
 </style>

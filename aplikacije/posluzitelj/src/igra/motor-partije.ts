@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { inArray } from 'drizzle-orm';
 import { konfiguracija } from '../konfiguracija.js';
+import { promijesajNiz } from './raspored-sjedala.js';
 import {
   validirajPotez,
   odrediRazlogMrtvihSlova,
@@ -445,7 +446,7 @@ export function stvoriUpraviteljPartija(
     const poruka: StanjePartije = {
       partijaId: stanje.partijaId,
       mojIgracId: socket.data.igracId,
-      sjedala: stanje.sudionici.map(({ igracId, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre }) => ({ igracId, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre })),
+      sjedala: stanje.sudionici.map(({ igracId, vrsta, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre }) => ({ igracId, nadimak, jeGost: vrsta === 'gost', avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre })),
       turnToken: stanje.turnToken,
       naPotezuId: stanje.naPotezuId,
       trazenaSlova: stanje.trazenaSlova,
@@ -561,7 +562,7 @@ export function stvoriUpraviteljPartija(
     mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
   ): Promise<void> {
     if (zaustavljanje || partije.size >= maksimalnoAktivnihPartija) return Promise.resolve();
-    const izmjesano = [...sudioniciUlaz].sort(() => Math.random() - 0.5);
+    const izmjesano = promijesajNiz(sudioniciUlaz);
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const odigrane = mod === 'dva_igraca' ? (s.odigrane1v1 ?? 0) : s.odigrane;
       const bodoviUkupno = mod === 'dva_igraca' ? (s.bodovi1v1 ?? 0) : s.bodoviUkupno;
@@ -681,7 +682,7 @@ export function stvoriUpraviteljPartija(
       const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
         partijaId,
         pocetakIso,
-        sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
+        sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, jeGost: s.vrsta === 'gost', avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
         mod,
       };
       for (const s of sudionici) {
@@ -1667,7 +1668,8 @@ export function stvoriUpraviteljPartija(
     kodSobe: string,
   ): string {
     if (zaustavljanje || partije.size >= maksimalnoAktivnihPartija) return '';
-    const sudionici: SudionikPartije[] = sudioniciUlaz.map((s, sjedalo) => {
+    const izmjesano = promijesajNiz(sudioniciUlaz);
+    const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const prosjekBodova = s.odigrane > 0 ? s.bodoviUkupno / s.odigrane : 0;
       const rang = izracunajRang(s.odigrane, prosjekBodova);
       return {
@@ -1755,7 +1757,7 @@ export function stvoriUpraviteljPartija(
     const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
       partijaId,
       pocetakIso,
-      sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
+      sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, jeGost: s.vrsta === 'gost', avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
       jePrivatna: true,
       kodSobe,
     };

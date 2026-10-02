@@ -99,7 +99,9 @@
     font-size: 18px;
     padding: 12px 16px;
     border-radius: var(--radijus-kartica);
-    border: 2px solid #e5ddc8;
+    border: 2px solid var(--boja-obrub);
+    background: var(--boja-povrsina-3);
+    color: var(--boja-tekst-osnovni);
     width: 100%;
   }
 
@@ -111,8 +113,8 @@
     border: none;
     border-radius: var(--radijus-pill);
     padding: 14px 32px;
-    background: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     cursor: pointer;
     margin-top: 8px;
   }
@@ -134,7 +136,7 @@
   }
 
   .greska {
-    color: #c0392b;
+    color: var(--boja-poraz-tekst);
     margin: 0;
     font-weight: 600;
   }

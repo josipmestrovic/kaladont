@@ -50,15 +50,15 @@
   </section>
 
   <section>
-    <h2>Klasični mod 4 igrača</h2>
+    <h2>Četveroboj</h2>
     <p>Igraju točno 4 igrača, nasumično odabrana. Sustav bira početnu riječ, svi imate 30 sekundi po potezu, a nakon svake eliminacije, sustav postavlja novu početnu riječ. Prvi ispali je četvrti, zadnji preostali pobjeđuje.</p>
     <p>Bodovi: plasman donosi 0, 1, 2 ili 3 boda, svaka izazvana eliminacija još 1 bod (ukupno je moguće 3 boda za eliminaciju - slučaj kada izbaciš nekoga ako nema ili taj igrač ne zna riječ sastavljenu od zadnja 2 slova prethodne riječi), a pobjednik dobiva dodatni bod. Najviše možeš uzeti 7 bodova u jednoj igri.</p>
   </section>
 
   <section>
-    <h2>1 vs 1 dvoboj</h2>
+    <h2>Dvoboj</h2>
     <p>2 igrača, nasumično odabrana, isti nastavci riječi, nema skrivanja iza trećeg čovjeka. Tko prvi ispadne, gubi; pobjednik dobiva 1 bod.</p>
-    <p>Dvoboj ima zasebne statistike, rang i <a href="/ljestvica">ljestvicu</a>. Rezultati Klasičnog moda i Dvoboja ne miješaju se.</p>
+    <p>Dvoboj ima zasebne statistike, rang i <a href="/ljestvica">ljestvicu</a>. Rezultati Četveroboja i Dvoboja ne miješaju se.</p>
   </section>
 
   <section>

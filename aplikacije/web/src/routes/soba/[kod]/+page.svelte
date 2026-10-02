@@ -126,7 +126,7 @@
         <div class="clanovi-lista">
           {#each stanjeSobe.clanovi as clan (clan.igracId)}
             <div class="clan-redak">
-              <Avatar avatarId={clan.avatarId} avatarConfig={clan.avatarConfig} rang={clan.rang} gost={!clan.rang} velicina={48} />
+              <Avatar avatarId={clan.avatarId} avatarConfig={clan.avatarConfig} rang={clan.rang} gost={clan.jeGost} velicina={48} />
               <div class="clan-info">
                 <span class="clan-ime">{clan.nadimak}</span>
                 <span class="clan-rang">{clan.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {clan.razina}</span>
@@ -160,17 +160,17 @@
 
       <section class="kartica pravila-sekcija">
           <h2>🏆 Ljestvica sobe</h2>
-          <table class="ljestvica-tablica">
+          <table class="ljestvica-tablica tablica-mobilni-retci">
             <thead>
-              <tr><th>#</th><th>Igrač</th><th>Pob.</th><th>Bod.</th></tr>
+              <tr><th scope="col">Mjesto</th><th scope="col">Igrač</th><th scope="col">Pobjede</th><th scope="col">Bodovi</th></tr>
             </thead>
             <tbody>
               {#each stanjeSobe.clanovi as clan, i (clan.igracId)}
                 <tr class:vodeci={i === 0 && (clan.bodoviUSobi > 0 || clan.pobjedeUSobi > 0)}>
-                  <td>{i === 0 && (clan.bodoviUSobi > 0 || clan.pobjedeUSobi > 0) ? '👑 1.' : `${i + 1}.`}</td>
-                  <td><strong>{clan.nadimak}</strong></td>
-                  <td>{clan.pobjedeUSobi}</td>
-                  <td class="istaknuto">{clan.bodoviUSobi}</td>
+                  <td data-label="Mjesto">{i === 0 && (clan.bodoviUSobi > 0 || clan.pobjedeUSobi > 0) ? '👑 1.' : `${i + 1}.`}</td>
+                  <th scope="row"><strong>{clan.nadimak}</strong></th>
+                  <td data-label="Pobjede">{clan.pobjedeUSobi}</td>
+                  <td class="istaknuto" data-label="Bodovi">{clan.bodoviUSobi}</td>
                 </tr>
               {/each}
             </tbody>
@@ -222,8 +222,8 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 16px;
-    background: white;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina);
+    border: 1px solid var(--boja-obrub);
     border-radius: var(--radijus-kartica);
     padding: 20px;
     box-shadow: var(--sjena-suptilna);
@@ -241,9 +241,9 @@
   }
 
   .kopiraj-gumb {
-    background: #faf8f0;
-    border: 2px solid var(--boja-pozadina-primarna);
-    color: var(--boja-pozadina-primarna);
+    background: var(--boja-cta-pozadina);
+    border: 2px solid var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     font-weight: 700;
     padding: 10px 20px;
     border-radius: var(--radijus-pill);
@@ -257,15 +257,15 @@
     gap: 20px;
   }
 
-  @media (min-width: 640px) {
+  @media (min-width: 1000px) {
     .mrezica-cekaonice {
       grid-template-columns: 3fr 2fr;
     }
   }
 
   .kartica {
-    background: white;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina);
+    border: 1px solid var(--boja-obrub);
     border-radius: var(--radijus-kartica);
     padding: 20px;
     box-shadow: var(--sjena-suptilna);
@@ -292,7 +292,7 @@
     gap: 12px;
     padding: 8px 12px;
     border-radius: 12px;
-    background: #faf8f0;
+    background: var(--boja-povrsina-2);
   }
 
   .clan-rezultat {
@@ -320,7 +320,7 @@
     .ljestvica-tablica th,
     .ljestvica-tablica td {
       padding: 8px 4px;
-      border-bottom: 1px solid #e5ddc8;
+      border-bottom: 1px solid var(--boja-obrub);
       text-align: right;
     }
 
@@ -334,13 +334,21 @@
       font-weight: 600;
     }
 
-    .ljestvica-tablica tr.vodeci {
-      background: #fdf6e2;
+    .ljestvica-tablica tbody tr.vodeci {
+      background: var(--boja-zlato-pozadina);
     }
 
     .ljestvica-tablica .istaknuto {
-      color: var(--boja-pozadina-primarna);
+      color: var(--boja-isticanje-tekst);
       font-weight: 700;
+  }
+
+  @media (max-width: 999px) {
+    .ljestvica-tablica tbody tr { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+    .ljestvica-tablica tbody th, .ljestvica-tablica tbody td { padding: 5px 0; }
+    .ljestvica-tablica tbody th { align-self: center; color: var(--boja-tekst-osnovni); }
+    .ljestvica-tablica tbody td:first-child { align-self: center; padding-right: 12px; }
+    .ljestvica-tablica tbody td:not(:first-child) { grid-column: 1 / -1; }
   }
 
   .clan-info {
@@ -359,7 +367,7 @@
 
   .vlasnik-bedz {
     font-size: 11px;
-    color: var(--boja-pozadina-primarna);
+    color: var(--boja-isticanje-tekst);
     font-weight: 700;
   }
 
@@ -375,8 +383,8 @@
     border: none;
     border-radius: var(--radijus-pill);
     padding: 12px 28px;
-    background: var(--boja-pozadina-primarna);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     cursor: pointer;
     width: 100%;
   }
@@ -411,8 +419,8 @@
   }
 
   .vrsta-tag {
-    background: #faf8f0;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina-2);
+    border: 1px solid var(--boja-obrub);
     padding: 2px 8px;
     border-radius: 4px;
     font-weight: 600;
@@ -421,20 +429,20 @@
 
   .napomena-bodovi {
     color: var(--boja-tekst-sekundarni);
-    border-top: 1px solid #e5ddc8;
+    border-top: 1px solid var(--boja-obrub);
     padding-top: 10px;
     margin-top: 6px;
   }
 
   .okvir-greska {
-    background: white;
+    background: var(--boja-povrsina);
     padding: 24px;
     border-radius: var(--radijus-kartica);
     box-shadow: var(--sjena-suptilna);
   }
 
   .greska {
-    color: #c0392b;
+    color: var(--boja-poraz-tekst);
     font-weight: 700;
   }
 

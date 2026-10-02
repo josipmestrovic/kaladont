@@ -1,24 +1,105 @@
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('/fontovi/OpenDyslexic-Regular.otf') format('opentype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('/fontovi/OpenDyslexic-Bold.otf') format('opentype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('/fontovi/OpenDyslexic-Italic.otf') format('opentype');
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('/fontovi/OpenDyslexic-BoldItalic.otf') format('opentype');
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+
 /**
  * Design tokeni (docs/05-ux-ui/vizualni-identitet.md) - odgovaraju Figma varijablama
  * na Foundations stranici. Jedini izvor CSS custom properties za cijelu aplikaciju.
+ *
+ * Tamna tema je zadana i zivi u :root; svijetla je override pod html[data-tema='svijetla'].
+ * Tako posluzitelj odmah isporucuje tamnu temu i nema bljeska pri ucitavanju.
  */
 :root {
+  color-scheme: dark;
+
   /* Boje - primitivi */
   --boja-krem: #fdfaf2;
   --boja-mint: #1d6f5c;
   --boja-mint-tamni: #1d6f5c;
   --boja-crvena: #e4572e;
-  --boja-tekst: #1a1815;
-  --boja-tekst-sekundarni: #5c554a;
+  --boja-tekst: #ffffff;
+  --boja-tekst-sekundarni: rgb(255 255 255 / 82%);
   --boja-zuta-krema: #f4c95d;
 
   /* Boje - semanticki slojevi */
-  --boja-pozadina-podloga: var(--boja-krem);
-  --boja-pozadina-primarna: var(--boja-mint);
-  --boja-tekst-naslov: var(--boja-mint-tamni);
-  --boja-akcent: var(--boja-crvena);
+  --boja-pozadina-podloga: var(--boja-mint);
+  --boja-pozadina-primarna: var(--boja-krem);
+  --boja-tekst-naslov: #ffffff;
+  --boja-akcent: #ffb3a0;
   --boja-tekst-osnovni: var(--boja-tekst);
   --boja-isticanje-slova: var(--boja-zuta-krema);
+
+  /*
+   * Kontrast na podlozi #1d6f5c: bijela 6.0:1, #f8dd9a 4.5:1, #ffd9cc 4.6:1.
+   * Zasiceni tonovi (#e4572e 1.6:1) ne prolaze pa postoje posebni tokeni za sitni tekst.
+   */
+  --boja-akcent-tekst: #ffd9cc;
+  --boja-isticanje-tekst: #f8dd9a;
+
+  /* Plohe - u tamnoj temi idu tamnije od podloge jer bijeli tekst tako ima vise prostora */
+  --boja-povrsina: #175a4b;
+  --boja-povrsina-2: #16614f;
+  --boja-povrsina-3: #134a3e;
+  --boja-obrub: rgb(255 255 255 / 18%);
+  --boja-obrub-jaci: rgb(255 255 255 / 32%);
+
+  /* Primarna akcija (gumb Igraj): mint na mintu nestaje, pa je ispuna krem */
+  --boja-cta-pozadina: var(--boja-krem);
+  --boja-cta-tekst: #0f3b31;
+  --boja-tekst-na-primarnoj: #0f3b31;
+
+  /* Stanja */
+  --boja-uspjeh-pozadina: #16614f;
+  --boja-uspjeh-tekst: #8fe0bd;
+  --boja-poraz-pozadina: #5c2b23;
+  --boja-poraz-tekst: #ffb3a0;
+  --boja-zlato-pozadina: #4a3a14;
+  --boja-zlato-obrub: #f2b14a;
+  --boja-zlato-tekst: #f8dd9a;
+
+  /* Preklapanja i grafovi */
+  --boja-zastor: rgb(8 28 23 / 72%);
+  --boja-graf-mreza: rgb(255 255 255 / 14%);
+  --boja-graf-os: rgb(255 255 255 / 24%);
+
+  /* Mint outline je na mint podlozi nevidljiv */
+  --boja-fokus: #f8dd9a;
+
+  /*
+   * Plocica: svijetla podloga ispod PNG ikona iz /static/ikone (crtane krem+mint paletom).
+   * Mora ostati svijetla i u tamnoj temi jer ikone nemaju tamnu varijantu.
+   */
+  --boja-plocica: var(--boja-krem);
+  --boja-plocica-tekst: #1a1815;
+  --boja-plocica-obrub: rgb(26 24 21 / 18%);
 
   /* Razmaci */
   --razmak-4: 4px;
@@ -38,7 +119,7 @@
   --font-tijelo: 'Inter', sans-serif;
 
   /*
-   * Tipografija - responzivne veličine (vrijednosti za mobitel; desktop u @media 768px).
+  * Tipografija - responzivne veličine (vrijednosti za mobitel; desktop u @media 1000px).
    * Sav tekst u aplikaciji koristi ove tokene — nove veličine dodavati ovdje, ne po komponentama.
    */
   --tekst-baza: 16px; /* osnovni tekst */
@@ -52,11 +133,64 @@
   --naslov-3: 18px;
 
   /* Sjena */
-  --sjena-suptilna: 0 2px 8px rgba(38, 34, 27, 0.12);
+  --sjena-suptilna: 0 2px 8px rgb(0 0 0 / 35%);
+  --sjena-modal: 0 18px 60px rgb(0 0 0 / 45%);
+}
+
+/* Svijetla tema - izvorni retro „pasta za zube" identitet. */
+html[data-tema='svijetla'] {
+  color-scheme: light;
+
+  --boja-tekst: #1a1815;
+  --boja-tekst-sekundarni: #5c554a;
+
+  --boja-pozadina-podloga: var(--boja-krem);
+  --boja-pozadina-primarna: var(--boja-mint);
+  --boja-tekst-naslov: var(--boja-mint-tamni);
+  --boja-akcent: var(--boja-crvena);
+
+  --boja-akcent-tekst: var(--boja-crvena);
+  --boja-isticanje-tekst: #8a6400;
+
+  --boja-povrsina: #ffffff;
+  --boja-povrsina-2: #fffdf5;
+  --boja-povrsina-3: #f3eee2;
+  --boja-obrub: #e5ddc8;
+  --boja-obrub-jaci: #d8cfb8;
+
+  --boja-cta-pozadina: var(--boja-mint);
+  --boja-cta-tekst: #ffffff;
+  --boja-tekst-na-primarnoj: #ffffff;
+
+  --boja-uspjeh-pozadina: #dcefe2;
+  --boja-uspjeh-tekst: #176342;
+  --boja-poraz-pozadina: #f8dfd8;
+  --boja-poraz-tekst: #a33d32;
+  --boja-zlato-pozadina: #fff1d8;
+  --boja-zlato-obrub: #f2b14a;
+  --boja-zlato-tekst: #9b5700;
+
+  --boja-zastor: rgb(26 24 21 / 42%);
+  --boja-graf-mreza: #eadfca;
+  --boja-graf-os: #dfd5c2;
+
+  --boja-fokus: var(--boja-mint);
+
+  --boja-plocica: rgb(255 255 255 / 82%);
+  --boja-plocica-tekst: var(--boja-tekst);
+  --boja-plocica-obrub: #d8cfb8;
+
+  --sjena-suptilna: 0 2px 8px rgb(38 34 27 / 12%);
+  --sjena-modal: 0 18px 60px rgb(0 0 0 / 22%);
+}
+
+html[data-font-disleksiju] {
+  --font-naslov: 'OpenDyslexic', 'Baloo 2', sans-serif;
+  --font-tijelo: 'OpenDyslexic', 'Inter', sans-serif;
 }
 
 /* Tablet/desktop: tipografska skala raste na jednom mjestu. */
-@media (min-width: 768px) {
+@media (min-width: 1000px) {
   :root {
     --tekst-baza: 18px;
     --tekst-mali: 17px;
@@ -76,12 +210,13 @@
 
 html {
   font-size: var(--tekst-baza);
-  overflow-x: hidden;
+  /* clip umjesto hidden: hidden bi stvorio scroll spremnik i onemogucio position: sticky */
+  overflow-x: clip;
 }
 
 body {
   margin: 0;
-  overflow-x: hidden;
+  overflow-x: clip;
   background: var(--boja-pozadina-podloga);
   color: var(--boja-tekst-osnovni);
   font-family: var(--font-tijelo);
@@ -125,4 +260,61 @@ button:not(:disabled) {
 a:hover,
 button:not(:disabled):hover {
   opacity: 0.8;
+}
+
+@media (max-width: 999px) {
+  table.tablica-mobilni-retci,
+  .tablica-mobilni-retci tbody,
+  .tablica-mobilni-retci tr {
+    display: block;
+    min-width: 0;
+  }
+
+  .tablica-mobilni-retci thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tablica-mobilni-retci tbody {
+    display: grid;
+    gap: 8px;
+  }
+
+  .tablica-mobilni-retci tbody tr {
+    padding: 10px 12px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 6px;
+    background: var(--boja-povrsina);
+  }
+
+  .tablica-mobilni-retci tbody tr:nth-child(odd) {
+    background: var(--boja-povrsina-2);
+  }
+
+  .tablica-mobilni-retci tbody th,
+  .tablica-mobilni-retci tbody td {
+    display: block;
+    min-width: 0;
+    padding: 5px 0;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+
+  .tablica-mobilni-retci tbody td:not(:first-child) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    border-top: 1px solid var(--boja-obrub);
+  }
+
+  .tablica-mobilni-retci tbody td:not(:first-child)::before {
+    content: attr(data-label);
+    color: var(--boja-tekst-sekundarni);
+    font-weight: 600;
+  }
 }

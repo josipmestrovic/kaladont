@@ -4,10 +4,13 @@
   import { api } from '$lib/api.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import DostignuceKartica from '$lib/komponente/DostignuceKartica.svelte';
+  import DostignucaIstaknuta from '$lib/komponente/DostignucaIstaknuta.svelte';
   import KaladontDnkGraf from '$lib/komponente/KaladontDnkGraf.svelte';
   import FormaIgraca from '$lib/komponente/FormaIgraca.svelte';
   import AktivnostPartije from '$lib/komponente/AktivnostPartije.svelte';
   import KaladontCvSazetak from '$lib/komponente/KaladontCvSazetak.svelte';
+  import KaladontCvIstaknuto from '$lib/komponente/KaladontCvIstaknuto.svelte';
+  import StilIgrePojasnjenje from '$lib/komponente/StilIgrePojasnjenje.svelte';
   import KolekcijaRijeci from '$lib/komponente/KolekcijaRijeci.svelte';
   import Podizbornik from '$lib/komponente/Podizbornik.svelte';
   import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil, type KaladontCvDto } from 'zajednicko';
@@ -49,7 +52,7 @@
     forma: { cetiriIgraca: FormaProfil; dvaIgraca: FormaProfil };
     prosjecnaOcjenaIgre: number | null;
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
-    stilIgre: 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen';
+    stilIgre: 'agresivan' | 'uravnotežen' | 'dobrica' | 'neodređen';
     statistikaRijeci: StatistikaRijeci | null;
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
     dostignuca: { ukupnoZvjezdica: number; maksimalnoZvjezdica: number; ukupnoOtkljucanih: number; dostignuca: Dostignuce[] };
@@ -93,7 +96,7 @@
 
   onMount(() => {
     const prilagodiAvatar = () => {
-      velicinaAvatara = window.innerWidth < 768 ? 136 : 240;
+      velicinaAvatara = window.innerWidth < 1000 ? 136 : 240;
     };
     prilagodiAvatar();
     window.addEventListener('resize', prilagodiAvatar);
@@ -145,24 +148,21 @@
           razinaVatre={aktivniTab === '4p' ? profil.forma.cetiriIgraca.razinaVatre : profil.forma.dvaIgraca.razinaVatre}
           nizPobjeda={aktivniTab === '4p' ? profil.forma.cetiriIgraca.trenutniNiz : profil.forma.dvaIgraca.trenutniNiz}
         />
-        <div>
-          <h1>{profil.nadimak}</h1>
-          <p class="rang-oznaka">{vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'} · {profil.odigrane + profil.odigrane1v1} odigranih igara</p>
-          <p class="iskustvo"><strong>LVL {profil.iskustvo.razina}</strong>{profil.iskustvo.doIduce === null ? ' · MAX' : ` · ${profil.iskustvo.uRazini} / ${profil.iskustvo.doIduce} XP`}</p>
-          <p class="stil-igre">Stil igre: <strong>{profil.stilIgre}</strong></p>
-          {#if profil.prosjecnaOcjenaIgre !== null}
-            {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
-            <p class="ocjena-igre">Prosječna ocjena: <span class="ocjena-zvjezdice" aria-label={`Prosječna ocjena ${ocjena} od 5`}>
-              {#each Array.from({ length: 5 }, (_, i) => i < ocjena) as jeIspunjena}
-                <span class:ispunjena={jeIspunjena} class:neispunjena={!jeIspunjena}>{jeIspunjena ? '★' : '☆'}</span>
-              {/each}
-            </span></p>
-          {/if}
+        <div class="info-profila">
+          <div class="profil-gornji-red">
+            <div class="profil-identitet">
+              <h1>{profil.nadimak}</h1>
+              <p class="rang-oznaka">{vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'} · {profil.odigrane + profil.odigrane1v1} odigranih igara</p>
+              <p class="iskustvo"><strong>LVL {profil.iskustvo.razina}</strong>{profil.iskustvo.doIduce === null ? ' · MAX' : ` · ${profil.iskustvo.uRazini} / ${profil.iskustvo.doIduce} XP`}</p>
+            </div>
+            <div class="profil-sazetak">
+              <DostignucaIstaknuta dostignuca={profil.dostignuca.dostignuca} />
+              <StilIgrePojasnjenje stilIgre={profil.stilIgre} id="stil-igre-javni" />
+            </div>
+          </div>
+          <KaladontCvSazetak cv={profil.kaladontCv} />
         </div>
       </header>
-      <KaladontCvSazetak
-        cv={profil.kaladontCv}
-      />
     </div>
 
     <nav class="pogled-tabovi" aria-label="Sadržaj profila">
@@ -174,22 +174,21 @@
 
     {#if aktivniPogled === 'statistika'}
     <Podizbornik
-      stavke={[{ kljuc: '1v1', naziv: '2 igrača' }, { kljuc: '4p', naziv: '4 igrača' }]}
+      stavke={[{ kljuc: '1v1', naziv: 'Dvoboj' }, { kljuc: '4p', naziv: 'Četveroboj' }]}
       aktivna={aktivniTab}
       ariaLabel="Način igre"
       promijeni={(kljuc) => (aktivniTab = kljuc as '4p' | '1v1')}
     />
     <section class="statistika-sekcija">
-      <h2>Rezultati ({aktivniTab === '4p' ? '4 igrača' : '2 igrača'})</h2>
+      <h2>Rezultati — {aktivniTab === '4p' ? 'Četveroboj' : 'Dvoboj'}</h2>
       <div class="mrezica-kartica">
         <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.odigrane : profil.odigrane1v1}</strong><span>Odigrane igre</span></div>
         <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.pobjede : profil.pobjede1v1}</strong><span>Pobjede</span></div>
-        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.prosjekBodova : profil.prosjekBodova1v1).toFixed(2)}</strong><span>Prosjek bodova</span></div>
-        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).eliminacijePoPartiji.toFixed(2)}</strong><span>Eliminacije po partiji</span></div>
+        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.odigrane - profil.pobjede : profil.odigrane1v1 - profil.pobjede1v1}</strong><span>Porazi</span></div>
       </div>
       <KaladontDnkGraf
         profil={aktivniTab === '4p' ? profil.dnk.cetiriIgraca : profil.dnk.dvaIgraca}
-        naslov={aktivniTab === '4p' ? 'Kaladont DNK za 4 igrača' : 'Kaladont DNK za 2 igrača'}
+        naslov={aktivniTab === '4p' ? 'Kaladont DNK — Četveroboj' : 'Kaladont DNK — Dvoboj'}
       />
       <FormaIgraca
         forma={aktivniTab === '4p' ? profil.forma.cetiriIgraca : profil.forma.dvaIgraca}
@@ -198,11 +197,19 @@
       <section class="ostalo-kartica">
         <h3>Ostalo</h3>
         <div class="mrezica-kartica">
+        {#if profil.prosjecnaOcjenaIgre !== null}
+          {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
+          <div class="stat-kartica"><strong class="stat-broj"><span class="ocjena-zvjezdice" aria-label={`Prosječna ocjena ${ocjena} od 5`}>{#each Array.from({ length: 5 }, (_, i) => i < ocjena) as jeIspunjena}<img src={jeIspunjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />{/each}</span></strong><span>Prosječna ocjena igre</span></div>
+        {/if}
+        {#if aktivniTab === '4p'}
+          <div class="stat-kartica"><strong>{profil.dnk.cetiriIgraca.metrike.eliminacijePoPartiji.toFixed(2)}</strong><span>Eliminacije po igri</span></div>
+        {/if}
         <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).nizPrihvacenihRijeci}</strong><span>Niz prihvaćenih riječi</span></div>
         <div class="stat-kartica"><strong>{((aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).prosjekPrihvacenogPotezaMs / 1000).toFixed(1)} s</strong><span>Prosjek prihvaćenog poteza</span></div>
-        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).dugeRijeciPoPartiji.toFixed(2)}</strong><span>Duge riječi po partiji</span></div>
-        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).rijetkeRijeciPoPartiji.toFixed(2)}</strong><span>Rijetke riječi po partiji</span></div>
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).dugeRijeciPoPartiji.toFixed(2)}</strong><span>Duge riječi po igri</span></div>
+        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).rijetkeRijeciPoPartiji.toFixed(2)}</strong><span>Rijetke riječi po igri</span></div>
         </div>
+        <KaladontCvIstaknuto stavke={profil.kaladontCv.istaknuto} />
       </section>
     </section>
     {:else if aktivniPogled === 'dostignuca'}
@@ -239,10 +246,7 @@
 </main>
 
 <style>
-  .javni-zaglavlje-red { display: grid; gap: 20px; min-width: 0; }
-  @media (min-width: 1000px) {
-    .javni-zaglavlje-red.ima-cv { grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr); align-items: start; }
-  }
+  .javni-zaglavlje-red { min-width: 0; }
 
   .javni-profil {
     display: flex;
@@ -252,42 +256,36 @@
   }
   .achievement-mrezica { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
   .statistika-sekcija > .mrezica-kartica { margin-bottom: 24px; }
-  .ostalo-kartica { margin-top: 24px; padding: 20px; border: 1px solid #e5ddc8; border-radius: 8px; background: #fff; box-shadow: var(--sjena-suptilna); }
+  .ostalo-kartica { margin-top: 24px; padding: 20px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina); box-shadow: var(--sjena-suptilna); }
   .ostalo-kartica h3 { margin: 0 0 14px; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: var(--naslov-3); }
   .pogled-tabovi { display: flex; gap: 8px; overflow-x: auto; }
-  .pogled-tabovi button { flex: 0 0 auto; padding: 9px 14px; border: 1px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
-  .pogled-tabovi button.aktivan { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
-  .stil-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: 0.95rem; }
-  .stil-igre strong { color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.1rem; text-transform: capitalize; }
-  .ocjena-igre { margin: 8px 0 0; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
+  .pogled-tabovi button { flex: 0 0 auto; padding: 9px 14px; border: 1px solid var(--boja-obrub); border-radius: var(--radijus-pill); background: var(--boja-povrsina-2); color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
+  .pogled-tabovi button.aktivan { border-color: var(--boja-cta-pozadina); background: var(--boja-cta-pozadina); color: var(--boja-cta-tekst); }
   .ocjena-zvjezdice {
     display: inline-flex;
     align-items: center;
     gap: 0.08em;
-    margin-left: 0.3rem;
-    font-family: var(--font-naslov);
+    margin-left: 0;
     font-size: 1.45rem;
-    font-weight: 800;
     line-height: 1;
-    letter-spacing: 0.06em;
     vertical-align: middle;
   }
-  .ocjena-zvjezdice .ispunjena { color: var(--boja-zuta-krema); }
-  .ocjena-zvjezdice .neispunjena { color: rgb(196 170 89 / 0.45); }
+  .ocjena-zvjezdice img { width: 1em; height: 1em; object-fit: contain; }
+  .ostalo-kartica .ocjena-zvjezdice { font-size: 1.1rem; }
   .rang-oznaka { margin: 6px 0 0; color: var(--boja-akcent); font-family: var(--font-naslov); font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
   .dostignuca-sažetak { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-  .dostignuca-sažetak strong { color: var(--boja-mint); font-size: 1.25rem; }
+  .dostignuca-sažetak strong { color: var(--boja-isticanje-tekst); font-size: 1.25rem; }
   .dostignuca-sažetak span { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
   .dostignuca-mrezica { display: grid; gap: 14px; }
-  @media (min-width: 768px) { .dostignuca-mrezica { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1000px) { .dostignuca-mrezica { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .mod-tabovi { display: flex; gap: 10px; margin: 0 0 14px; }
-  .mod-tabovi button { padding: 8px 18px; border: 2px solid #e5ddc8; border-radius: var(--radijus-pill); background: #faf8f0; color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 600; cursor: pointer; }
-  .mod-tabovi button.aktivan { border-color: var(--boja-pozadina-primarna); background: var(--boja-pozadina-primarna); color: white; }
-  .ostalo-kartica { margin-top: 24px; padding: 20px; border: 1px solid #e5ddc8; border-radius: 8px; background: #fff; box-shadow: var(--sjena-suptilna); }
+  .mod-tabovi button { padding: 8px 18px; border: 2px solid var(--boja-obrub); border-radius: var(--radijus-pill); background: var(--boja-povrsina-2); color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 600; cursor: pointer; }
+  .mod-tabovi button.aktivan { border-color: var(--boja-cta-pozadina); background: var(--boja-cta-pozadina); color: var(--boja-cta-tekst); }
+  .ostalo-kartica { margin-top: 24px; padding: 20px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina); box-shadow: var(--sjena-suptilna); }
   .ostalo-kartica h3 { margin: 0 0 14px; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: var(--naslov-3); }
   .ostalo-kartica .stat-kartica { padding: 4px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
   .ostalo-kartica .stat-kartica strong { font-size: 1.15rem; }
-  .iskustvo strong { color: var(--boja-mint); font-size: 1.35rem; }
+  .iskustvo strong { color: var(--boja-isticanje-tekst); font-size: 1.35rem; }
   .achievement-polje {
     display: flex;
     min-height: 150px;
@@ -295,9 +293,9 @@
     justify-content: flex-start;
     gap: 6px;
     padding: 16px;
-    border: 1px solid #e5ddc8;
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: white;
+    background: var(--boja-povrsina);
   }
   .achievement-polje { position: relative; }
   .achievement-polje h3 { margin: 0; font-family: var(--font-naslov); font-size: 20px; padding-right: 96px; }
@@ -305,12 +303,12 @@
   .achievement-polje strong { font-size: 1.25rem; }
   .achievement-polje .napredak-broj { font-size: 1.2rem; }
   .achievement-polje span { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }
-  .otkljucane-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--boja-mint); font: inherit; font-size: var(--tekst-mali); font-weight: 700; cursor: pointer; }
-  .popup-pozadina { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(26 24 21 / 42%); }
-  .popup-rijeci { position: relative; width: min(640px, 100%); max-height: min(80vh, 720px); overflow: auto; padding: 24px; border-radius: 12px; background: var(--boja-krem); box-shadow: 0 12px 40px rgb(0 0 0 / 24%); }
+  .otkljucane-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--boja-isticanje-tekst); font: inherit; font-size: var(--tekst-mali); font-weight: 700; cursor: pointer; }
+  .popup-pozadina { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 20px; background: var(--boja-zastor); }
+  .popup-rijeci { position: relative; width: min(640px, 100%); max-height: min(80vh, 720px); overflow: auto; padding: 24px; border-radius: 12px; background: var(--boja-povrsina); box-shadow: var(--sjena-modal); }
   .popup-rijeci h2 { margin-top: 0; }
-  .popup-zatvori { position: absolute; top: 12px; right: 16px; border: 0; background: none; font-size: 28px; cursor: pointer; }
-  .popup-rijeci details { padding: 12px 0; border-top: 1px solid #e5ddc8; }
+  .popup-zatvori { position: absolute; top: 12px; right: 16px; border: 0; background: none; color: var(--boja-tekst-osnovni); font-size: 28px; cursor: pointer; }
+  .popup-rijeci details { padding: 12px 0; border-top: 1px solid var(--boja-obrub); }
   .popup-rijeci summary { cursor: pointer; font-weight: 700; }
   .popis-rijeci { line-height: 1.7; color: var(--boja-tekst-sekundarni); }
   .tier-retci { display: flex; flex-direction: column; gap: 4px; }
@@ -322,10 +320,29 @@
   }
   .zaglavlje-profila {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 16px;
+    min-width: 0;
   }
-  @media (max-width: 767px) { .zaglavlje-profila { flex-direction: column; align-items: flex-start; gap: 12px; } }
+  .info-profila { flex: 1 1 auto; min-width: 0; }
+  .profil-gornji-red { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 0.9fr); align-items: start; gap: 16px; min-width: 0; }
+  .profil-identitet { min-width: 0; }
+  .profil-sazetak { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 0; padding-top: 2px; }
+  .profil-identitet h1 { margin: 0; font-family: var(--font-naslov); font-size: 54px; line-height: 1.1; }
+  :global(html[data-font-disleksiju]) .profil-identitet h1 { font-size: 36px; }
+  @media (max-width: 999px) {
+    .zaglavlje-profila { display: grid; grid-template-columns: minmax(120px, 136px) minmax(0, 1fr); grid-template-rows: auto auto auto; align-items: start; column-gap: 12px; row-gap: 10px; }
+    .zaglavlje-profila > :first-child { grid-column: 1; grid-row: 1; }
+    .info-profila, .profil-gornji-red { display: contents; }
+    .profil-identitet { grid-column: 1 / -1; grid-row: 2; }
+    .profil-sazetak { grid-column: 2; grid-row: 1; align-items: flex-start; }
+    .cv-sazetak { grid-column: 1 / -1; grid-row: 3; }
+  }
+  @media (max-width: 999px) { .zaglavlje-profila { grid-template-columns: minmax(112px, 128px) minmax(0, 1fr); } .profil-sazetak { gap: 6px; } }
+  @media (max-width: 999px) {
+    :global(html[data-font-disleksiju]) .profil-identitet h1 { font-size: 28.8px; }
+    :global(html[data-font-disleksiju]) .rang-oznaka { font-size: 1.2rem; }
+  }
   h1, h2 { font-family: var(--font-naslov); }
   h1 { margin: 0; }
   h2 { margin: 0 0 12px; }
@@ -342,9 +359,9 @@
     justify-content: center;
     gap: 4px;
     padding: 12px;
-    border: 1px solid #e5ddc8;
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: white;
+    background: var(--boja-povrsina);
   }
   .stat-kartica strong { font-size: 1.25rem; }
   .stat-kartica span { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mali); }

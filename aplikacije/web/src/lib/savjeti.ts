@@ -10,14 +10,14 @@ const SAVJETI_ZAJEDNICKI = [
 ] as const;
 
 const SAVJETI_CETIRI_IGRACA = [
-  'U igri za četiri igrača plasman, eliminacije i pobjednički bonus ulaze u bodovanje.',
-  'Savršena partija za četiri igrača nosi 7 bodova: pobjeda, bonus i sve 3 eliminacije.',
-  'Najviši rang za četiri igrača zove se Kaladont i traži prosjek 5,70 ili više.',
+  'U Četveroboju plasman, eliminacije i pobjednički bonus ulaze u bodovanje.',
+  'Savršena igra u Četveroboju nosi 7 bodova: pobjeda, bonus i sve 3 eliminacije.',
+  'Najviši rang u Četveroboju zove se Kaladont i traži prosjek 5,70 ili više.',
 ] as const;
 
 const SAVJETI_DVA_IGRACA = [
   'U dvoboju pobjeda donosi 1 bod, a poraz 0 bodova.',
-  'Dvoboj ima vlastiti rang i statistiku, odvojene od igre za četiri igrača.',
+  'Dvoboj ima vlastiti rang i statistiku, odvojene od Četveroboja.',
   'Najviši rang u dvoboju zove se Kaladont i traži prosjek 0,89 ili više.',
 ] as const;
 

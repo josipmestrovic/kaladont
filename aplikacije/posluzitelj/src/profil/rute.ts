@@ -161,12 +161,12 @@ function prosjekBodova(bodoviUkupno: number, odigrane: number): number {
 function stilIgre(
   odigrane: number,
   eliminacije: number,
-): 'agresivan' | 'uravnotežen' | 'pacifist' | 'neodređen' {
+): 'agresivan' | 'uravnotežen' | 'dobrica' | 'neodređen' {
   if (odigrane === 0) return 'neodređen';
   const eliminacijePoPartiji = odigrane > 0 ? eliminacije / odigrane : 0;
-  if (eliminacijePoPartiji > 0.4) return 'agresivan';
+  if (eliminacijePoPartiji > 0.8) return 'agresivan';
   if (eliminacijePoPartiji >= 0.2) return 'uravnotežen';
-  return 'pacifist';
+  return 'dobrica';
 }
 
 async function dohvatiStatistiku(igracId: string, mod: 'cetiri_igraca' | 'dva_igraca') {
@@ -469,6 +469,13 @@ async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number
   };
 }
 
+async function dohvatiBrojRijeciUKolekciji(igracId: string): Promise<number> {
+  const [redak] = await baza.select({
+    ukupno: sql<number>`count(distinct (split_part(${otkljucaneGrupeIgraca.grupa}, ':', 1) || ':' || split_part(${otkljucaneGrupeIgraca.grupa}, ':', 2)))::int`,
+  }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
+  return redak?.ukupno ?? 0;
+}
+
 function cvDnkStatistika(
   statistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
   profil: DnkProfil & { metrike: { eliminacijePoPartiji: number; nizPrihvacenihRijeci: number; prosjekPrihvacenogPotezaMs: number; dugeRijeciPoPartiji: number; rijetkeRijeciPoPartiji: number } },
@@ -512,7 +519,7 @@ function cvModPodaci(
   };
 }
 
-function sastaviCvZaRegistriranog(
+function sastaviCvZaIgraca(
   igrac: typeof igraci.$inferSelect,
   dnkCetiri: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
   dnkDva: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
@@ -521,6 +528,7 @@ function sastaviCvZaRegistriranog(
   statistikaCetiri: Awaited<ReturnType<typeof dohvatiStatistiku>> | null,
   statistikaDva: Awaited<ReturnType<typeof dohvatiStatistiku>> | null,
   dostignuca: Awaited<ReturnType<typeof dohvatiDostignucaZaIgraca>>,
+  kolekcijaRijeci: number,
 ): CvPodaciIgraca {
   const referentniDatum = datumZagrebacki(new Date());
   if (!referentniDatum) throw new Error('Nije moguće odrediti zagrebački datum.');
@@ -528,6 +536,7 @@ function sastaviCvZaRegistriranog(
     igracId: igrac.id,
     nadimak: igrac.nadimak,
     iskustvoUkupno: igrac.iskustvoUkupno,
+    kolekcijaRijeci,
     stvoren: igrac.stvoren,
     registriranAt: igrac.registriranAt,
     referentniDatum,
@@ -630,28 +639,30 @@ export async function registrirajProfilRute(
       igrac.odigrane + igrac.odigrane1v1,
       igrac.eliminacijeUkupno + igrac.eliminacije1v1,
     );
-    const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
+    const [dostignuca, kolekcijaRijeci] = await Promise.all([
+      dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
+      dohvatiBrojRijeciUKolekciji(igrac.id),
+    ]);
     const profilDnkCetiri = izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca');
     const profilDnkDva = izracunajDnkProfil(igrac, dnkDva, 'dva_igraca');
-    const kaladontCv = igrac.vrsta === 'gost'
-      ? null
-      : sastaviKaladontCv(sastaviCvZaRegistriranog(
-        igrac,
-        dnkCetiri,
-        dnkDva,
-        profilDnkCetiri,
-        profilDnkDva,
-        statistikaCetiri,
-        statistikaDva,
-        dostignuca,
-      ));
+    const kaladontCv = sastaviKaladontCv(sastaviCvZaIgraca(
+      igrac,
+      dnkCetiri,
+      dnkDva,
+      profilDnkCetiri,
+      profilDnkDva,
+      statistikaCetiri,
+      statistikaDva,
+      dostignuca,
+      kolekcijaRijeci,
+    ));
     return {
       ok: true,
       igracId: igrac.id,
       nadimak: igrac.nadimak,
       vrsta: igrac.vrsta,
       avatarId: igrac.avatarId,
-      avatarConfig: igrac.vrsta === 'gost' ? null : igrac.avatarConfig,
+      avatarConfig: igrac.avatarConfig,
       avatarRevision: igrac.avatarRevision,
       email: igrac.email,
       emailNaCekanju: igrac.emailNaCekanju,
@@ -712,10 +723,13 @@ export async function registrirajProfilRute(
       igrac.odigrane + igrac.odigrane1v1,
       igrac.eliminacijeUkupno + igrac.eliminacije1v1,
     );
-    const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
+    const [dostignuca, kolekcijaRijeci] = await Promise.all([
+      dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
+      dohvatiBrojRijeciUKolekciji(igrac.id),
+    ]);
     const profilDnkCetiri = izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca');
     const profilDnkDva = izracunajDnkProfil(igrac, dnkDva, 'dva_igraca');
-    const kaladontCv = sastaviKaladontCv(sastaviCvZaRegistriranog(
+    const kaladontCv = sastaviKaladontCv(sastaviCvZaIgraca(
       igrac,
       dnkCetiri,
       dnkDva,
@@ -724,6 +738,7 @@ export async function registrirajProfilRute(
       statistikaCetiri,
       statistikaDva,
       dostignuca,
+      kolekcijaRijeci,
     ));
     return {
       ok: true,
@@ -759,12 +774,12 @@ export async function registrirajProfilRute(
     };
   });
 
-  // Onboarding dopušta i gostima da odaberu avatar (jednokratno, prvi ulazak - dobrodoslica/+page.svelte)
+  // Isti editor avatara koriste gosti i registrirani igraci; avatarId ostaje radi starih racuna.
   app.put('/profil/avatar', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
     const tijelo = zahtjev.body as unknown;
     if (typeof tijelo === 'object' && tijelo !== null && 'avatarConfig' in tijelo) {
-      if (igrac.vrsta === 'gost' || !validirajAvatarConfig((tijelo as { avatarConfig?: unknown }).avatarConfig)) {
+      if (!validirajAvatarConfig((tijelo as { avatarConfig?: unknown }).avatarConfig)) {
         return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
       }
       const konfiguracija = (tijelo as { avatarConfig: unknown }).avatarConfig;

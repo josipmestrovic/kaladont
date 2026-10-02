@@ -99,7 +99,7 @@
         ucitajIgrace(10, 'cetiri_igraca');
       }}
     >
-        4 igrača
+        Četveroboj
     </button>
     <button
       type="button"
@@ -111,34 +111,34 @@
         ucitajIgrace(10, 'dva_igraca');
       }}
     >
-        2 igrača
+        Dvoboj
     </button>
   </div>
 
-  <p>Top {prosirenoIgraci ? '100' : '10'} igrača po prosjeku bodova u modu {modIgraca === 'dva_igraca' ? '2 igrača' : '4 igrača'} (min. 10 igara).</p>
+  <p>Top {prosirenoIgraci ? '100' : '10'} igrača po prosjeku bodova u modu {modIgraca === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj'} (min. 10 igara).</p>
 
   {#if ljestvica.length === 0 && !ucitavaIgraci}
     <p>Odigraj 10 igara da uđeš na ljestvicu.</p>
   {:else}
-    <table>
+    <table class="tablica-mobilni-retci tablica-igraca">
       <thead>
-        <tr><th>#</th><th>Nadimak</th><th>Rang</th><th>Prosjek</th><th>Igre</th><th>% pobjeda</th></tr>
+        <tr><th scope="col">Mjesto</th><th scope="col">Nadimak</th><th scope="col">Rang</th><th scope="col">Prosjek</th><th scope="col">Igre</th><th scope="col">% pobjeda</th></tr>
       </thead>
       <tbody>
         {#each ljestvica as stavka (stavka.mjesto)}
           <tr>
-            <td>{stavka.mjesto}</td>
-            <td>
+            <td data-label="Mjesto">{stavka.mjesto}.</td>
+            <th scope="row">
               {#if stavka.jeJavan}
                 <a href={`/profil/javni/${stavka.igracId}`}>{stavka.nadimak}</a>
               {:else}
                 {stavka.nadimak}
               {/if}
-            </td>
-            <td>{stavka.rang}</td>
-            <td>{stavka.prosjekBodova.toFixed(2)}</td>
-            <td>{stavka.odigrane}</td>
-            <td>{stavka.postotakPobjeda.toFixed(0)}%</td>
+            </th>
+            <td data-label="Rang">{stavka.rang}</td>
+            <td data-label="Prosjek">{stavka.prosjekBodova.toFixed(2)}</td>
+            <td data-label="Igre">{stavka.odigrane}</td>
+            <td data-label="% pobjeda">{stavka.postotakPobjeda.toFixed(0)}%</td>
           </tr>
         {/each}
       </tbody>
@@ -160,17 +160,17 @@
   {#if topRijeci.length === 0 && !ucitavaRijeci}
     <p>Još nema dovoljno odigranih igara.</p>
   {:else}
-    <table>
+    <table class="tablica-mobilni-retci tablica-rijeci">
       <thead>
-        <tr><th>#</th><th>Riječ</th><th>Broj upotreba</th><th>% igara</th></tr>
+        <tr><th scope="col">Mjesto</th><th scope="col">Riječ</th><th scope="col">Broj upotreba</th><th scope="col">% igara</th></tr>
       </thead>
       <tbody>
         {#each topRijeci as stavka (stavka.mjesto)}
           <tr>
-            <td>{stavka.mjesto}</td>
-            <td>{stavka.rijec}</td>
-            <td>{stavka.brojUpotreba}</td>
-            <td>{stavka.postotakPartija.toFixed(0)}%</td>
+            <td data-label="Mjesto">{stavka.mjesto}.</td>
+            <th scope="row">{stavka.rijec}</th>
+            <td data-label="Broj upotreba">{stavka.brojUpotreba}</td>
+            <td data-label="% igara">{stavka.postotakPartija.toFixed(0)}%</td>
           </tr>
         {/each}
       </tbody>
@@ -188,7 +188,7 @@
     display: flex;
     gap: 8px;
     margin-bottom: 16px;
-    border-bottom: 1px solid #e5ddc8;
+    border-bottom: 1px solid var(--boja-obrub);
   }
 
   .tabovi button {
@@ -197,14 +197,14 @@
     padding: 8px 16px;
     cursor: pointer;
     font-size: var(--tekst-baza);
-    color: #7a7264;
+    color: var(--boja-tekst-sekundarni);
     border-bottom: 2px solid transparent;
   }
 
   .tabovi button.aktivan {
-    color: #1d6f5c;
+    color: var(--boja-isticanje-tekst);
     font-weight: bold;
-    border-bottom-color: #2fa98c;
+    border-bottom-color: var(--boja-isticanje-slova);
   }
 
   .pod-tabovi {
@@ -214,8 +214,8 @@
   }
 
   .pod-tab-gumb {
-    background: #faf8f0;
-    border: 1px solid #e5ddc8;
+    background: var(--boja-povrsina-2);
+    border: 1px solid var(--boja-obrub);
     color: var(--boja-tekst-osnovni);
     padding: 6px 14px;
     border-radius: var(--radijus-pill);
@@ -225,9 +225,9 @@
   }
 
   .pod-tab-gumb.aktivan {
-    background: var(--boja-tekst-naslov);
-    border-color: var(--boja-tekst-naslov);
-    color: white;
+    background: var(--boja-cta-pozadina);
+    border-color: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     font-weight: 700;
   }
 
@@ -236,13 +236,14 @@
     padding: 8px 12px;
     background: var(--boja-isticanje-slova);
     border-radius: 6px;
+    color: #1a1815;
     font-size: var(--tekst-mali);
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--boja-povrsina);
     border-radius: var(--radijus-kartica);
     overflow: hidden;
   }
@@ -252,8 +253,10 @@
     padding: 10px 12px;
     font-size: var(--tekst-sitni);
     color: var(--boja-tekst-sekundarni);
-    border-bottom: 1px solid #e5ddc8;
+    border-bottom: 1px solid var(--boja-obrub);
   }
+
+  tbody th { padding: 10px 12px; color: var(--boja-tekst-osnovni); font-size: var(--tekst-baza); }
 
   td {
     padding: 10px 12px;
@@ -261,15 +264,23 @@
   }
 
   tbody tr:nth-child(odd) {
-    background: #fbf7ee;
+    background: var(--boja-povrsina-2);
+  }
+
+  @media (max-width: 999px) {
+    .tablica-igraca tr, .tablica-rijeci tr { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+    .tablica-igraca tbody th, .tablica-rijeci tbody th { align-self: center; }
+    .tablica-igraca td:not(:first-child), .tablica-rijeci td:not(:first-child) { grid-column: 1 / -1; }
+    .tablica-igraca td:first-child { align-self: center; padding-right: 12px; font-weight: 700; }
+    .tablica-rijeci td:first-child { align-self: center; padding-right: 12px; font-weight: 700; }
   }
 
   .ucitaj-vise-gumb {
     display: block;
     margin: 16px auto 0;
     background: none;
-    border: 1px solid var(--boja-pozadina-primarna);
-    color: var(--boja-pozadina-primarna);
+    border: 1px solid var(--boja-obrub-jaci);
+    color: var(--boja-tekst-osnovni);
     padding: 8px 24px;
     border-radius: var(--radijus-pill);
     cursor: pointer;

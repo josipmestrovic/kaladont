@@ -32,7 +32,7 @@ Personalizirani avatar sustav koristi **Avatar Illustration System** autora Mica
 - [Izvorni Figma Community file](https://www.figma.com/community/file/829741575478342595/avatar-illustration-system)
 - [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
 
-Za Kaladont su SVG dijelovi pripremljeni za lokalno sastavljanje i promjenu podržanih boja. Ova licenca odnosi se na navedene third-party avatar assete i ne mijenja licencu izvornog koda projekta Kaladont.
+Za Kaladont su SVG dijelovi pripremljeni za lokalno sastavljanje i promjenu podržanih boja. Sustav je proširen paketom od 60 novih modularnih dijelova nacrtanih za Kaladont (prefiks `k2-`, vidi `skripte/avatari/pack-02/`); oni su izvorno djelo i ne potječu iz Figma predloška. Ova licenca odnosi se na navedene third-party avatar assete i ne mijenja licencu izvornog koda projekta Kaladont.
 
 ## Ikone igre — CC BY 4.0
 

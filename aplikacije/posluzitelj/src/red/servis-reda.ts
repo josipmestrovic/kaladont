@@ -42,6 +42,7 @@ export function registrirajRedCekanja(
       mjesta[indeks] = {
         igracId: stavka.igracId,
         nadimak: stavka.nadimak,
+        jeGost: stavka.vrsta === 'gost',
         avatarId: stavka.avatarId,
         avatarConfig: stavka.avatarConfig,
         avatarRevision: stavka.avatarRevision,

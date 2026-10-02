@@ -4,11 +4,13 @@ Ovaj dokument je autoritativan opis pravila. Sve druge datoteke, uključujući k
 
 ## Postava i modovi
 
-- **Klasični mod** igraju točno 4 igrača. Sjedala se dodjeljuju nasumično, a igra ide u krug.
-- **1v1 Dvoboj** igraju točno 2 igrača. Nakon svakog poteza na redu je protivnik.
+- **Četveroboj** igraju točno 4 igrača. Na početku svake partije sjedala se nepristrano nasumično promiješaju, a igra ide u krug prema tom fiksnom redoslijedu.
+- **Dvoboj** igraju točno 2 igrača. Početna sjedala i prvi igrač odabiru se nasumično; nakon svakog poteza na redu je protivnik.
 - Gosti i registrirani igrači igraju pod istim pravilima.
-- **Privatna soba** prima 2 do 8 igrača. Vlasnik može odabrati trajanje poteza (15, 30 ili 60 sekundi ili bez tajmera), dopuštene vrste riječi i želi li bodove za izazvane eliminacije. Imenice su uvijek dopuštene. Pravila nastavaka, grafema, ponavljanja i Kaladont-efekta ostaju ista.
+- **Privatna soba** prima 2 do 8 igrača. Sjedala se nepristrano nasumično promiješaju na početku svake partije i zatim ostaju fiksna. Vlasnik može odabrati trajanje poteza (15, 30 ili 60 sekundi ili bez tajmera), dopuštene vrste riječi i želi li bodove za izazvane eliminacije. Imenice su uvijek dopuštene. Pravila nastavaka, grafema, ponavljanja i Kaladont-efekta ostaju ista.
 - Javni modovi koriste javni red čekanja, bodovanje, rangove i ljestvice. Privatna soba koristi samo svoju privremenu ljestvicu; njezin rezultat ne mijenja javne bodove ni rang.
+
+Redoslijed sjedala dodjeljuje se jednom na početku partije i određuje kružni red poteza; sjedalo 0 započinje prvi potez. Svaki igrač vidi isti red sjedala iz vlastite perspektive, zakrenut tako da je njegovo sjedalo prvo. Ta je zakrenuta projekcija samo prikaz: potez, timer i eliminacije i dalje se određuju prema identitetu koji pošalje poslužitelj. Eliminirani igrači ostaju na svojem mjestu do kraja partije.
 
 ## Tijek partije
 
@@ -94,16 +96,16 @@ Ako je `ka` otvorio sustav, nema igrača koji bi ispao: nitko ne dobiva bod, a s
 | **Prekid veze** | Igrač se ne vrati u 10 sekundi od prekida | Samo ako je bio na potezu |
 | **Kaladont** | Primjenjuje se posebno pravilo iznad | Da |
 
-Ako rječnik nema riječ koja počinje traženim grafemima, sljedeći igrač ispada odmah, bez čekanja da istekne vrijeme. Igrač koji je otvorio taj par dobiva bod za eliminaciju u javnom Klasičnom modu, a moguću rupu u rječniku može prijaviti. Ako riječi postoje, ali su sve njihove leksemske grupe već potrošene, sljedeći igrač također odmah ispada; to je uobičajena taktička situacija i ne prijavljuje se kao rupa u rječniku.
+Ako rječnik nema riječ koja počinje traženim grafemima, sljedeći igrač ispada odmah, bez čekanja da istekne vrijeme. Igrač koji je otvorio taj par dobiva bod za eliminaciju u javnom Četveroboju, a moguću rupu u rječniku može prijaviti. Ako riječi postoje, ali su sve njihove leksemske grupe već potrošene, sljedeći igrač također odmah ispada; to je uobičajena taktička situacija i ne prijavljuje se kao rupa u rječniku.
 
 Igrač se nakon prekida veze može vratiti u roku od 10 sekundi od trenutka kada igra utvrdi prekid, koristeći isti identitet. Vrijeme poteza nastavlja teći i tijekom prekida. Ako igrač nije bio na potezu, ispada bez boda za protivnika; ako je bio na potezu, bod može dobiti igrač koji mu je ostavio tražena slova. Namjerni izlazak iz partije odmah eliminira igrača i nema razdoblja za povratak.
 
-U Klasičnom modu prvi ispali zauzima četvrto mjesto, sljedeći treće, a zatim drugi; posljednji preostali igrač pobjeđuje. Eliminirani igrači ostaju promatrači do kraja partije. U Dvoboju prva eliminacija završava partiju.
+U Četveroboju prvi ispali zauzima četvrto mjesto, sljedeći treće, a zatim drugi; posljednji preostali igrač pobjeđuje. Eliminirani igrači ostaju promatrači do kraja partije. U Dvoboju prva eliminacija završava partiju.
 
 ## Bodovanje
 
-- **Klasični mod:** plasman donosi 0, 1, 2 ili 3 boda; svaka izazvana eliminacija donosi 1 bod; pobjednik dobiva dodatni bod. Maksimum je 7 bodova po partiji.
-- **1v1 Dvoboj:** pobjednik dobiva 1 bod, poraženi 0. Dvoboj ima zasebne statistike, rang, kalibraciju i ljestvicu od Klasičnog moda.
+- **Četveroboj:** plasman donosi 0, 1, 2 ili 3 boda; svaka izazvana eliminacija donosi 1 bod; pobjednik dobiva dodatni bod. Maksimum je 7 bodova po partiji.
+- **Dvoboj:** pobjednik dobiva 1 bod, poraženi 0. Dvoboj ima zasebne statistike, rang, kalibraciju i ljestvicu od Četveroboja.
 - **Privatne sobe:** vlasnik bira dodjeljuju li se bodovi za izazvane eliminacije. Bodovi i pobjede zbrajaju se samo na privremenoj ljestvici aktivne sobe; privatni rezultat ne mijenja javne bodove, javni rang ni ljestvicu.
 
 Detaljna pravila bodova, XP-a, ocjene partije, rangova, niza pobjeda i dostignuća nalaze se na stranici [Bodovanje i rangovi](bodovanje-i-rangovi.md).

@@ -19,6 +19,7 @@
 
   const border = $derived(gost || !prikaziRangBorder ? null : bojaBordera(rang));
   const gostFontSize = $derived(Math.max(8, Math.round(velicina * 0.21)));
+  const oznakaFontSize = $derived(Math.max(7, Math.round(velicina * 0.15)));
 </script>
 
 <div
@@ -29,14 +30,17 @@
 >
     <AvatarVatra razina={razinaVatre} niz={nizPobjeda} />
     <div class="avatar-sadrzaj">
-      {#if avatarConfig && !gost}
-        <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} rang={prikaziRangBorder ? rang : null} />
+      {#if avatarConfig}
+        <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} rang={prikaziRangBorder && !gost ? rang : null} />
       {:else if gost}
         <div class="gost-avatar" style:font-size="{gostFontSize}px">Gost</div>
       {:else}
         <img src={putanjaAvatara(avatarId)} alt={nazivAvatara(avatarId)} />
       {/if}
     </div>
+    {#if gost && avatarConfig}
+      <span class="gost-oznaka" style:font-size="{oznakaFontSize}px">Gost</span>
+    {/if}
 </div>
 
 <style>
@@ -73,7 +77,7 @@
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: #1d6f5c;
+    background: var(--boja-povrsina-3);
     color: #ffffff;
     font-weight: 700;
     display: flex;
@@ -83,5 +87,30 @@
     letter-spacing: 0.2px;
     user-select: none;
     padding: 0 2px;
+  }
+
+  :global(html[data-tema='svijetla']) .gost-avatar {
+    background: var(--boja-mint);
+  }
+
+  .gost-oznaka {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: 4%;
+    left: 0;
+    margin: 0 auto;
+    width: fit-content;
+    max-width: 86%;
+    padding: 1px 6px;
+    border-radius: var(--radijus-pill);
+    background: rgb(26 24 21 / 72%);
+    color: #ffffff;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    line-height: 1.3;
+    text-transform: uppercase;
+    user-select: none;
+    pointer-events: none;
   }
 </style>

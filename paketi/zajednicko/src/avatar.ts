@@ -1,18 +1,56 @@
 export const AVATAR_SHEMA_VERZIJA = 1 as const;
 export const AVATAR_ASSET_VERZIJA = 'figma-avatar-v1' as const;
 
+// Dijelovi s prefiksom k2- dolaze iz paketa 02, k3- iz paketa 03 (skripte/avatari/).
 export const AVATAR_DIJELOVI = {
   base: ['base-1'],
-  ears: ['attached', 'detached'],
-  mouth: ['surprised', 'laughing', 'smile', 'smirk', 'sad', 'frown', 'pucker', 'nervous'],
-  hair: ['fonze', 'mr-t', 'doug-funny', 'mr-clean', 'danny-phantom', 'full', 'turban', 'pixie'],
-  eyes: ['eyes', 'smiling', 'eyeshadow', 'round'],
-  eyebrows: ['up', 'down', 'eyelashes-up', 'eyelashes-down'],
-  nose: ['curve', 'pointed', 'round'],
-  shirt: ['open', 'crew', 'collared'],
-  glasses: ['round', 'square'],
-  earrings: ['hoop', 'stud'],
-  facialHair: ['beard', 'scruff'],
+  ears: [
+    'attached', 'detached', 'k2-compact', 'k2-rounded', 'k2-pointed', 'k2-angular',
+    'k3-elephant', 'k3-fan', 'k3-long-pointed', 'k3-floppy',
+  ],
+  mouth: [
+    'surprised', 'laughing', 'smile', 'smirk', 'sad', 'frown', 'pucker', 'nervous',
+    'k2-grin', 'k2-tooth-gap', 'k2-tongue-out', 'k2-braces', 'k2-gentle', 'k2-whistle', 'k2-determined', 'k2-small-oh',
+    'k3-toothless-laugh', 'k3-toothless-wide', 'k3-gummy', 'k3-lipstick-smile', 'k3-lipstick-pout', 'k3-crooked-grin',
+  ],
+  hair: [
+    'fonze', 'mr-t', 'doug-funny', 'mr-clean', 'danny-phantom', 'full', 'turban', 'pixie',
+    'k2-crop', 'k2-side-part', 'k2-waves', 'k2-curls', 'k2-high-puff', 'k2-double-bun', 'k2-spiky', 'k2-bob', 'k2-short-fringe', 'k2-topknot',
+    'k3-long-straight', 'k3-long-waves', 'k3-pigtails', 'k3-twin-braids', 'k3-side-braid', 'k3-high-ponytail',
+    'k3-low-ponytail', 'k3-curtain-bangs', 'k3-curly-lob', 'k3-space-buns-loose', 'k3-bow-bob', 'k3-sleek-bun',
+  ],
+  eyes: [
+    'eyes', 'smiling', 'eyeshadow', 'round',
+    'k2-wink', 'k2-closed', 'k2-sleepy', 'k2-wide', 'k2-look-left', 'k2-look-right',
+    'k3-long-lashes', 'k3-winged-liner', 'k3-wink-lashes', 'k3-dreamy-lashes', 'k3-starry',
+  ],
+  eyebrows: [
+    'up', 'down', 'eyelashes-up', 'eyelashes-down',
+    'k2-straight', 'k2-bold', 'k2-one-up', 'k2-concerned', 'k2-soft-arch', 'k2-split',
+    'k3-slender-arch', 'k3-swoop', 'k3-zigzag',
+  ],
+  nose: [
+    'curve', 'pointed', 'round', 'k2-button', 'k2-bridge', 'k2-wide', 'k2-angular-soft',
+    'k3-giant-button', 'k3-trumpet', 'k3-curly', 'k3-zigzag', 'k3-piggy',
+  ],
+  shirt: [
+    'open', 'crew', 'collared',
+    'k2-v-neck', 'k2-hoodie', 'k2-turtleneck', 'k2-jersey', 'k2-bomber', 'k2-striped',
+    'k3-peter-pan', 'k3-ruffle', 'k3-sweetheart', 'k3-bow-blouse',
+  ],
+  glasses: [
+    'round', 'square',
+    'k2-hexagon', 'k2-oval', 'k2-cat-eye', 'k2-aviator', 'k2-browline', 'k2-sport', 'k2-rimless', 'k2-heart',
+    'k3-sun-cat', 'k3-sun-round', 'k3-sun-butterfly', 'k3-sun-visor', 'k3-sun-heart', 'k3-sun-pixel',
+  ],
+  earrings: [
+    'hoop', 'stud', 'k2-drop', 'k2-diamond', 'k2-double-hoop', 'k2-bar',
+    'k3-heart-drop', 'k3-moon-drop', 'k3-flower', 'k3-triple-drop', 'k3-star-drop',
+  ],
+  facialHair: [
+    'beard', 'scruff', 'k2-moustache', 'k2-goatee', 'k2-chin-patch', 'k2-sideburns',
+    'k3-curly-handlebar', 'k3-three-whiskers',
+  ],
   background: ['background'],
 } as const;
 

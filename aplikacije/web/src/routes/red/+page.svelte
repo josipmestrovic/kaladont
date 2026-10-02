@@ -7,6 +7,7 @@
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
+  import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import type { PayloadGreska, PocetakPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
 
   const igra = dohvatiStanjeIgre();
@@ -26,6 +27,7 @@
   let poruka = $state<string | null>(null);
   let savjet = $state('');
   let countdown = $state<number | null>(null);
+  let stanjeUcitano = $state(false);
   let odbrojavanjePartije: ReturnType<typeof setInterval> | null = null;
   let cekanjeStanjaTimeout: ReturnType<typeof setTimeout> | null = null;
   let ulazakPoslan = false;
@@ -33,6 +35,7 @@
   let prethodniIgraci: Set<string> | null = null;
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
   const preostaloIgraca = $derived(Math.max(0, ukupnoMjesta - brojIgraca));
+  const stanjeUskladjeno = $derived(stanje.mod === trazeneMod);
 
   function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {
     if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
@@ -67,10 +70,11 @@
     const socket = dohvatiSocket();
 
     const naStanjeReda = (novoStanje: StanjeReda) => {
-      if (!novoStanje.mjesta.some((mjesto) => mjesto?.igracId === novoStanje.mojIgracId)) return;
+      if (novoStanje.mod !== trazeneMod || !novoStanje.mjesta.some((mjesto) => mjesto?.igracId === novoStanje.mojIgracId)) return;
       if (cekanjeStanjaTimeout) clearTimeout(cekanjeStanjaTimeout);
       cekanjeStanjaTimeout = null;
       brojPokusajaUlaska = 0;
+      stanjeUcitano = true;
       const noviIgraci = new Set(
         novoStanje.mjesta.filter(Boolean).map((mjesto) => `${mjesto!.nadimak}:${mjesto!.avatarId}`),
       );
@@ -90,10 +94,12 @@
         return;
       }
       poruka = greska.poruka;
+      stanjeUcitano = true;
     };
     const naGreskuVeze = () => {
       ulazakPoslan = false;
       poruka = 'Dogodila se pogreška prilikom stavljanja u red čekanja. Pokušaj osvježiti stranicu.';
+      stanjeUcitano = true;
     };
     const naPrekidVeze = () => {
       ulazakPoslan = false;
@@ -129,6 +135,7 @@
         }
         ulazakPoslan = false;
         poruka = 'Dogodila se pogreška prilikom stavljanja u red čekanja. Pokušaj osvježiti stranicu.';
+        stanjeUcitano = true;
         cekanjeStanjaTimeout = null;
       }, 5000);
       socket.emit('red:udji', { mod: trazeneMod }, (potvrdenoStanje) => {
@@ -171,6 +178,9 @@
   <title>Čekaonica | Kaladont</title>
 </svelte:head>
 
+{#if !stanjeUcitano || !stanjeUskladjeno}
+  <RedCekanjaKostur ukupnoMjesta={ukupnoMjesta} />
+{:else}
 <main class="red-sadrzaj">
 {#if countdown !== null}
   <h1 aria-live="polite">Svi igrači su tu! Igra kreće za {countdown}…</h1>
@@ -192,7 +202,7 @@
       class:moje-sjedalo={mjesto?.igracId === stanje.mojIgracId}
     >
       {#if mjesto}
-        <Avatar avatarId={mjesto.avatarId} avatarConfig={mjesto.avatarConfig} rang={mjesto.rang} velicina={84} razinaVatre={mjesto.razinaVatre} nizPobjeda={mjesto.trenutniNiz} />
+        <Avatar avatarId={mjesto.avatarId} avatarConfig={mjesto.avatarConfig} rang={mjesto.rang} gost={mjesto.jeGost} velicina={84} razinaVatre={mjesto.razinaVatre} nizPobjeda={mjesto.trenutniNiz} />
         <div class="podaci">
           <strong>
             {mjesto.nadimak}
@@ -218,6 +228,7 @@
   <p class="hint">{savjet}</p>
 </section>
 </main>
+{/if}
 
 <style>
   .mjesta {
@@ -238,12 +249,12 @@
   }
 
   .mjesta li.zauzeto {
-    background: white;
+    background: var(--boja-povrsina);
   }
 
   .mjesta li.moje-sjedalo {
-    border: 2px solid var(--boja-mint-tamni);
-    background: rgba(47, 169, 140, 0.08);
+    border: 2px solid var(--boja-isticanje-slova);
+    background: var(--boja-povrsina-2);
   }
 
   .oznaka-ti {
@@ -251,8 +262,8 @@
     margin-left: 6px;
     padding: 2px 6px;
     border-radius: var(--radijus-pill);
-    background: var(--boja-mint-tamni);
-    color: #faf3e3;
+    background: var(--boja-isticanje-slova);
+    color: #1a1815;
     font-size: var(--tekst-mikro);
     line-height: 1;
     letter-spacing: 0.04em;
@@ -274,9 +285,9 @@
 
   .rang-i-razina { color: var(--boja-tekst-sekundarni); }
   .statistika-lobbyja { display: flex; gap: 8px; color: var(--boja-tekst-sekundarni); }
-  .razina-oznaka { position: absolute; right: 14px; bottom: 12px; color: var(--boja-mint); font-size: var(--tekst-mikro); font-weight: 700; }
+  .razina-oznaka { position: absolute; right: 14px; bottom: 12px; color: var(--boja-isticanje-tekst); font-size: var(--tekst-mikro); font-weight: 700; }
 
-  @media (max-width: 767px) {
+  @media (max-width: 999px) {
     .statistika-lobbyja { flex-direction: column; gap: 1px; margin-top: 3px; }
   }
 
@@ -291,7 +302,7 @@
     padding-top: 16px;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1000px) {
     .red-sadrzaj {
       max-width: 100%;
     }

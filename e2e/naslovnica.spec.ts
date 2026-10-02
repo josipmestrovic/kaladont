@@ -1,38 +1,30 @@
 import { expect, test } from '@playwright/test';
 
-test('naslovnica prikazuje novi header, navigaciju i modal igre', async ({ page }) => {
+test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', async ({ page }) => {
   await page.goto('/');
 
-  const novosti = page.getByRole('link', { name: 'Što je novo?' });
-  await expect(novosti).toBeVisible();
-  await expect(novosti).toHaveAttribute('href', '/novosti');
-  await expect(page.getByRole('link', { name: 'Moj profil' })).toBeVisible();
-  await expect(page.getByRole('banner').getByRole('link', { name: 'Igraj' })).toHaveCount(0);
+  await expect(page.locator('.header')).toHaveCount(0);
+  await expect(page.locator('.avatar')).toHaveCount(0);
   await expect(page.getByText('v0.3.0-closed-alpha.1')).toHaveCount(0);
-  await expect(page.getByText('Hrvatska multiplayer igra riječi')).toBeVisible();
+  await expect(page.getByText('Hrvatska multiplayer igra riječi')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'KALADONT online' })).toBeVisible();
   await expect(page.locator('.ilustracija')).toHaveCount(0);
+
+  const footer = page.locator('.landing-footer');
+  const novosti = footer.getByRole('link', { name: 'Što je novo?' });
+  await expect(novosti).toHaveAttribute('href', '/novosti');
+  await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toHaveAttribute('href', '/povratne-informacije');
+  await expect(footer.getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByRole('button', { name: 'Igraj' })).toBeVisible();
   await expect(navigacija.getByRole('link', { name: 'Pravila' })).toHaveAttribute('href', '/pravila');
-  await expect(navigacija.getByRole('link', { name: 'Ljestvica' })).toHaveAttribute('href', '/ljestvica');
-  await expect(navigacija.getByRole('link', { name: 'Moja statistika' })).toHaveAttribute('href', '/profil#statistika');
+  await expect(navigacija.getByRole('link', { name: 'Ljestvice' })).toHaveAttribute('href', '/ljestvica');
+  await expect(navigacija.getByRole('link', { name: 'Moj profil' })).toHaveAttribute('href', '/profil');
   await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toHaveAttribute('href', '/prijava');
   await expect(navigacija.getByRole('link', { name: 'Registriraj se' })).toHaveAttribute('href', '/registracija');
-  await expect(navigacija.getByRole('link', { name: 'Postavke' })).toHaveCount(0);
+  await expect(navigacija.getByRole('link', { name: 'Postavke' })).toHaveAttribute('href', '/postavke');
   await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
-  await expect(navigacija.getByRole('button', { name: 'Uvjeti i privatnost' })).toHaveCount(0);
-  await expect(page.locator('.landing-footer').getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
-  const pravila = navigacija.getByRole('link', { name: 'Pravila' });
-  await expect(pravila).toHaveCSS('color', 'rgb(26, 24, 21)');
-  await expect(pravila.locator('img')).toHaveAttribute('src', '/ikone/08-pravila.png');
-  const dimenzijeStavki = await navigacija.locator('.navigacijska-stavka').evaluateAll((stavke) =>
-    stavke.map((stavka) => ({ sirina: stavka.getBoundingClientRect().width, visina: stavka.getBoundingClientRect().height })),
-  );
-  expect(dimenzijeStavki).toHaveLength(6);
-  expect(new Set(dimenzijeStavki.map(({ sirina }) => sirina)).size).toBe(1);
-  expect(new Set(dimenzijeStavki.map(({ visina }) => visina)).size).toBe(1);
 
   await navigacija.getByRole('button', { name: 'Igraj' }).click();
   const dijalog = page.getByRole('dialog', { name: 'Kako želiš igrati?' });
@@ -45,37 +37,22 @@ test('naslovnica prikazuje novi header, navigaciju i modal igre', async ({ page 
   await page.keyboard.press('Escape');
   await expect(dijalog).toBeHidden();
 
-  const rasporedNovosti = await novosti.evaluate((poveznica) => {
-    const ikona = poveznica.querySelector('.header-ikona')!.getBoundingClientRect();
-    const tekst = poveznica.querySelector('span:last-child')!.getBoundingClientRect();
-    return { ikonaIznadTeksta: ikona.bottom <= tekst.top };
-  });
-  expect(rasporedNovosti.ikonaIznadTeksta).toBe(true);
-  await expect(novosti.locator('img')).toHaveAttribute('src', '/ikone/01-sto-je-novo.png');
-  await novosti.hover();
-  await expect(novosti).toHaveCSS('color', 'rgb(228, 87, 46)');
-
   await novosti.click();
   await expect(page).toHaveURL('/novosti');
   await expect(page.getByRole('heading', { name: 'Što je novo' })).toBeVisible();
 });
 
-test('mobilna naslovnica skriva ilustraciju i ostavlja profil desno', async ({ page }) => {
+test('mobilna naslovnica skriva header i prikazuje poveznice u footeru', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
 
   await expect(page.locator('.ilustracija')).toHaveCount(0);
-  const novosti = page.getByRole('link', { name: 'Što je novo?' });
-  const profil = page.getByRole('link', { name: 'Moj profil' });
-  await expect(novosti).toBeVisible();
-  await expect(profil).toBeVisible();
-  const headerRaspored = await page.locator('.header-sadrzaj').evaluate((header) => {
-    const nadimakElement = header.querySelector('.profil-ime')!;
-    return {
-      nadimakSkriven: getComputedStyle(nadimakElement).display === 'none',
-    };
-  });
-  expect(headerRaspored.nadimakSkriven).toBe(true);
+  await expect(page.locator('.header')).toHaveCount(0);
+  await expect(page.locator('.avatar')).toHaveCount(0);
+  const footer = page.locator('.landing-footer');
+  await expect(footer.getByRole('link', { name: 'Što je novo?' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toBeVisible();
+  await expect(footer.getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija).toBeVisible();
@@ -83,6 +60,43 @@ test('mobilna naslovnica skriva ilustraciju i ostavlja profil desno', async ({ p
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
   );
   expect(nemaHorizontalnogPrelijevanja).toBe(true);
+});
+
+const viewportiBezScrolla = [
+  { width: 360, height: 640 },
+  { width: 375, height: 667 },
+  { width: 390, height: 844 },
+  { width: 412, height: 915 },
+  { width: 1280, height: 720 },
+  { width: 1366, height: 657 },
+  { width: 1440, height: 900 },
+  { width: 1920, height: 1080 },
+];
+
+for (const fontZaDisleksiju of [false, true]) {
+  for (const viewport of viewportiBezScrolla) {
+    test(`naslovnica stane u ekran bez scrolla ${viewport.width}x${viewport.height}${fontZaDisleksiju ? ' (font za disleksiju)' : ''}`, async ({ page }) => {
+      if (fontZaDisleksiju) {
+        await page.addInitScript(() => window.localStorage.setItem('kaladont_font_postavke_v1', 'true'));
+      }
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+      await expect(page.locator('.landing-footer')).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+
+      const { scrollHeight, clientHeight } = await page.evaluate(() => ({
+        scrollHeight: document.documentElement.scrollHeight,
+        clientHeight: document.documentElement.clientHeight,
+      }));
+      expect(scrollHeight).toBeLessThanOrEqual(clientHeight);
+    });
+  }
+}
+
+test('na niskom desktop ekranu ilustracija se skriva', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 500 });
+  await page.goto('/');
+  await expect(page.locator('.scena-2d5d')).toBeHidden();
 });
 
 test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page }) => {

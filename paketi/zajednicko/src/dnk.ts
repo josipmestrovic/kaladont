@@ -1,4 +1,3 @@
-export const MIN_PRIHVACENIH_POTEZA_ZA_OCJENU = 3;
 /**
  * Kaladont DNK: stil igre i profilni pregled za javne partije.
  * Server je kanonski izvor izračuna; klijent prima gotov profil.
@@ -155,20 +154,22 @@ export function izracunajOcjenuDnk(osi: readonly DnkOs[]): number {
   return Math.max(0, Math.min(5, Math.round(prosjek / 20)));
 }
 
-export function jeOcjenaIgreDostupna(prihvaceniPotezi: number): boolean {
-  return prihvaceniPotezi >= MIN_PRIHVACENIH_POTEZA_ZA_OCJENU;
+export function jeOcjenaIgreDostupna(iskustvo: number): boolean {
+  return Number.isFinite(iskustvo) && iskustvo > 0;
 }
 
 export function izracunajOcjenuIgre(
   prije: readonly DnkOs[],
   poslije: readonly DnkOs[],
   pobjeda: boolean,
+  iskustvo: number,
 ): number {
+  if (!jeOcjenaIgreDostupna(iskustvo)) return 0;
   const deltaProsjek = poslije.length === 0
     ? 0
     : poslije.reduce((zbroj, os) => zbroj + (os.vrijednost - (prije.find((staro) => staro.kljuc === os.kljuc)?.vrijednost ?? os.vrijednost)), 0) / poslije.length;
   const osnovneZvjezdice = Math.max(0, Math.min(4, Math.round((deltaProsjek + 20) / 10)));
-  return Math.max(0, Math.min(5, osnovneZvjezdice + (pobjeda ? 1 : 0)));
+  return Math.min(5, Math.max(2, osnovneZvjezdice) + (pobjeda ? 2 : 0));
 }
 
 export function postotakXpZaOcjenu(ocjena: number): number {

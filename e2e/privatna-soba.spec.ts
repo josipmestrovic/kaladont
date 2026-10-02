@@ -36,6 +36,16 @@ test('dva igrača stvaraju privatnu sobu i pokreću partiju', async ({ browser }
 
     await expect(vlasnik).toHaveURL(/\/partija\/[0-9a-f-]+$/);
     await expect(gost).toHaveURL(vlasnik.url());
+
+    for (const stranica of [vlasnik, gost]) {
+      const sjedala = stranica.locator('.igraci-red > li');
+      await expect(sjedala).toHaveCount(2);
+      const mojeSjedalo = stranica.locator('.igraci-red > li:has(.oznaka-ti)');
+      await expect(mojeSjedalo).toHaveAttribute(
+        'data-igrac-id',
+        (await sjedala.first().getAttribute('data-igrac-id')) ?? '',
+      );
+    }
   } finally {
     await zatvoriIgrace(igraci);
   }

@@ -50,6 +50,7 @@ export interface StanjeReda {
   mjesta: ({
     igracId: string;
     nadimak: string;
+    jeGost: boolean;
     avatarId: number;
     avatarConfig: AvatarConfigV1 | null;
     avatarRevision: number;
@@ -75,6 +76,7 @@ export interface PostavkePrivatneSobe {
 export interface ClanSobe {
   igracId: string;
   nadimak: string;
+  jeGost: boolean;
   avatarId: number;
   avatarConfig: AvatarConfigV1 | null;
   avatarRevision: number;
@@ -108,7 +110,7 @@ export interface PocetakPartije {
   mojIgracId: string;
   /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
   pocetakIso: string;
-  sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[];
+  sjedala: { igracId: string; nadimak: string; jeGost: boolean; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[];
   mod?: 'cetiri_igraca' | 'dva_igraca';
   jePrivatna?: boolean;
   kodSobe?: string;

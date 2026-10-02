@@ -69,27 +69,23 @@
 
 <style>
   .veza-obavijest {
-    position: fixed;
-    z-index: 20;
-    top: 12px;
-    left: 50%;
     display: flex;
-    width: min(620px, calc(100vw - 24px));
+    width: 100%;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    transform: translateX(-50%);
     padding: 12px 16px;
-    border: 1px solid #d6a348;
+    border: 1px solid var(--boja-zlato-obrub);
     border-radius: 8px;
-    background: #fff8e7;
-    color: #493b20;
-    box-shadow: 0 8px 24px rgb(44 35 20 / 16%);
+    background: var(--boja-zlato-pozadina);
+    color: var(--boja-zlato-tekst);
+    box-shadow: var(--sjena-modal);
   }
 
   .veza-obavijest.kriticno {
-    border-color: #c95f49;
-    background: #fff0ec;
+    border-color: var(--boja-poraz-tekst);
+    background: var(--boja-poraz-pozadina);
+    color: var(--boja-poraz-tekst);
   }
 
   .veza-obavijest div {
@@ -104,14 +100,14 @@
   .veza-obavijest button {
     flex: 0 0 auto;
     padding: 7px 12px;
-    border: 1px solid #1d6f5c;
+    border: 1px solid var(--boja-cta-pozadina);
     border-radius: 6px;
-    background: #1d6f5c;
-    color: white;
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     cursor: pointer;
   }
 
-  @media (max-width: 520px) {
+  @media (max-width: 999px) {
     .veza-obavijest {
       align-items: flex-start;
       flex-direction: column;

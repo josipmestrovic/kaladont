@@ -79,7 +79,7 @@
     <header>
       <p class="oznaka-stanja">Odigrana stara igra</p>
       <h1>Završni poredak</h1>
-      <p>{arhiva.mod === 'dva_igraca' ? '2 igrača' : '4 igrača'} · {formatirajDatum(arhiva.kraj)}</p>
+      <p>{arhiva.mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj'} · {formatirajDatum(arhiva.kraj)}</p>
     </header>
 
     <section class="plasmani" aria-label="Završni poredak">
@@ -132,22 +132,22 @@
 
 <style>
   .arhiva-stranica { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
-  .oznaka-stanja { color: #6b716d; font-size: .9rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .oznaka-stanja { color: var(--boja-tekst-sekundarni); font-size: .9rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
   .arhiva-stranica h1 { margin: 8px 0; }
   .plasmani { display: grid; gap: 8px; margin-top: 28px; }
-  .plasman-red { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid #deded6; border-radius: 8px; background: #fff; }
-  .plasman-broj { font-size: 1.25rem; color: #1c5c4a; }
+  .plasman-red { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina); }
+  .plasman-broj { font-size: 1.25rem; color: var(--boja-isticanje-tekst); }
   .igrac-podaci { display: grid; gap: 3px; }
-  .igrac-podaci a { color: #1c5c4a; font-weight: 700; }
-  .igrac-podaci small { color: #6b716d; }
-  .prijavi-gumb { border: 0; background: transparent; color: #7b5145; font-size: 1.2rem; cursor: pointer; }
-  .greska { color: #a33d32; }
-  .poruka { margin-top: 16px; padding: 12px; border-radius: 6px; background: #eef6ef; }
-  .modal-pozadina { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 35%); }
-  .modal { width: min(100%, 480px); display: grid; gap: 14px; padding: 24px; border-radius: 8px; background: #fff; }
+  .igrac-podaci a { color: var(--boja-tekst-naslov); font-weight: 700; }
+  .igrac-podaci small { color: var(--boja-tekst-sekundarni); }
+  .prijavi-gumb { border: 0; background: transparent; color: var(--boja-akcent-tekst); font-size: 1.2rem; cursor: pointer; }
+  .greska { color: var(--boja-poraz-tekst); }
+  .poruka { margin-top: 16px; padding: 12px; border-radius: 6px; background: var(--boja-uspjeh-pozadina); color: var(--boja-uspjeh-tekst); }
+  .modal-pozadina { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; background: var(--boja-zastor); }
+  .modal { width: min(100%, 480px); display: grid; gap: 14px; padding: 24px; border-radius: 8px; background: var(--boja-povrsina); }
   .modal label { display: grid; gap: 6px; font-weight: 700; }
-  .modal select, .modal textarea { width: 100%; box-sizing: border-box; padding: 9px; border: 1px solid #cfcfc6; border-radius: 6px; font: inherit; }
+  .modal select, .modal textarea { width: 100%; box-sizing: border-box; padding: 9px; border: 1px solid var(--boja-obrub-jaci); border-radius: 6px; background: var(--boja-povrsina-3); color: var(--boja-tekst-osnovni); font: inherit; }
   .modal-akcije { display: flex; justify-content: end; gap: 8px; }
-  .modal-akcije button { padding: 9px 13px; border: 1px solid #cfcfc6; border-radius: 6px; background: #fff; cursor: pointer; }
-  .modal-akcije button:last-child { border-color: #1c5c4a; background: #1c5c4a; color: #fff; }
+  .modal-akcije button { padding: 9px 13px; border: 1px solid var(--boja-obrub-jaci); border-radius: 6px; background: transparent; color: var(--boja-tekst-osnovni); cursor: pointer; }
+  .modal-akcije button:last-child { border-color: var(--boja-cta-pozadina); background: var(--boja-cta-pozadina); color: var(--boja-cta-tekst); }
 </style>

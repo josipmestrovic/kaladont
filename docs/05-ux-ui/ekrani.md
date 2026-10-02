@@ -4,27 +4,34 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 
 ## 0. Header / navigacija (trajna traka)
 
-**Svrha:** brz pristup novostima, povratku i profilu. Prikazuje se na svim ekranima OSIM u čekaonici (`/red`) i na cijeloj ruti partije (`/partija/*`), uključujući završni poredak.
+**Svrha:** brz pristup povratku i profilu. Prikazuje se na svim ekranima OSIM na naslovnici (`/`), u čekaonici (`/red`) i na cijeloj ruti partije (`/partija/*`), uključujući završni poredak.
 
 - Traka je potpuno transparentna, bez donjeg obruba i bez sjene, tako da se vizualno stapa s pozadinom stranice.
-- **Lijevo na naslovnici:** poveznica **Što je novo?** na `/novosti`, oblikovana s notebook ikonom iznad i tekstom ispod. Ikona je zadano boje `#1a1815`, a pri hoveru/fokusu ikona i tekst postaju narančasti. Ukupna visina ikone, razmaka i teksta iznosi 80 px.
+- Naslovnica nema zajednički header ni avatar, neovisno o širini zaslona ili vrsti korisnika.
 - **Lijevo na svim drugim stranicama s headerom:** klikabilna narančasta povratna strelica s tekstom „Nazad”, koja koristi povijest preglednika. Ako prethodna ruta nije root `/` ili nije poznata, uz nju se prikazuje `GiFastBackwardButton` s tekstom „Početna” i poveznicom na `/`. Obje akcije preslikavaju uzorak „Što je novo?”: ikona 59 × 59 px, ukupna visina 80 px te ista veličina i težina fonta na desktopu i mobitelu.
 - **Desno:** avatar korisnika ili gosta i njegov nadimak u horizontalnom rasporedu na desktopu i mobitelu; klik vodi na `/profil`. Avatar je povećan tako da njegova visina odgovara ukupnoj visini notebook ikone i teksta „Što je novo?”. Dugi nadimak skraćuje se elipsom umjesto širenja headera.
-- **Naslovnica, registrirani korisnik:** uz „Što je novo?” prikazuje se akcija **Pomozi poboljšati igru** (`/povratne-informacije`) s `GiTeamIdea` ikonom iznad teksta. Ima potpuno iste dimenzije, tipografiju i hover/focus ponašanje kao notebook akcija. Gosti je ne vide.
 - **Admin:** ispod glavnog headera vidi dodatnu navigaciju sa svim admin površinama: **Rječnik**, **Prijave** i **Mišljenja korisnika**. Ta navigacija je samo pogodnost; server zasebno štiti svaku admin rutu.
+
+## Globalne obavijesti
+
+- Status veze i upozorenje o čitanju naglas prikazuju se kao plutajuće kartice u zajedničkom stupcu, jedna ispod druge.
+- Dok je čitanje naglas uključeno, obavijest objašnjava da govor ovisi o glasovima koje preglednik izlaže, prikazuje procijenjenu platformu te jezike preglednika i glasova, i vodi na temu **Pristupačnost** u `/pomoc`. Jezik preglednika nije nužno jezik operacijskog sustava. Ti se podaci koriste samo u pregledniku i ne šalju poslužitelju.
+- **Razumijem** skriva govornu obavijest i potvrdu čuva lokalno dok je čitanje uključeno. Isključivanje čitanja briše potvrdu; iduće uključivanje ponovno prikazuje obavijest. Nedostupan hrvatski glas upozorava, ali ne blokira prekidač.
 
 ## 1. Landing (`/`)
 
 **Svrha:** jedan pogled → odabir glavne akcije ili informativne stranice.
 
 - Ilustracija Kaladonta nije prikazana ni na desktopu ni na mobitelu. Naslov i navigacija centrirani su u jednoj koloni po sredini ekrana.
-- Iznad glavnog naslova stoji „Hrvatska online igra riječi”, a H1 vrlo velikim slovima prikazuje „KALADONT multiplayer”. Oznaka verzije nije prikazana. Naslov i navigacija nalaze se u gornjoj polovici dostupnog prostora.
+- H1 prikazuje „KALADONT online”; na desktopu su riječi u istom retku, a na mobitelu u dva retka. Oznaka verzije nije prikazana.
 - Uža glavna navigacija ima osnovne retke **Igraj**, **Pravila**, **Ljestvica** i **Moja statistika**. „Moja statistika” vodi na zadani statistički prikaz `/profil#statistika`. Sekundarne stavke imaju tamni standardni tekst i ikone, zelenu strelicu te tekst lijevo poravnat uz ikonu.
 - Glavna navigacija koristi vlastite SVG assete: `GiToothbrush` za Igraj, `GiSpellBook` za Pravila, `GiHoleLadder` za Ljestvicu, `GiGamepad` za Moju statistiku, `GiAutoRepair` za Postavke, `GiExitDoor` za Odjavu te `GiTwoShadows` za Prijavu i Registraciju. Modal igre koristi `GiLevelTwoAdvanced`, `GiLevelFourAdvanced` i `GiLockedDoor`.
-- Registrirani korisnik dodatno vidi **Postavke** (`/postavke`, uz preusmjeravanje i scroll na `/profil?tab=postavke#postavke`) i blago narančastu akciju **Odjavi se**. Gost ne vidi Postavke ni Odjavu, nego uzastopno vidi **Prijavi se** i ispod nje **Registriraj se**.
-- **Igraj** otvara modal sa slijedom: **2 igrača** (`/red?mod=dva_igraca`), **4 igrača** (`/red?mod=cetiri_igraca`) i **Privatna soba** (`/soba/kreiraj`). Modal zamućuje pozadinu.
+- Svi korisnici vide **Postavke** (`/postavke`, uz preusmjeravanje na `/profil?tab=postavke#postavke`); promjena teme dostupna je isključivo ondje. Registrirani korisnik dodatno vidi blago narančastu akciju **Odjavi se**. Gost vidi **Prijavi se** i **Registriraj se**. Editor avatara (`/profil/avatar`) dostupan je i gostima.
+- **Igraj** otvara modal sa slijedom: **Dvoboj** (`/red?mod=dva_igraca`, opis „2 igrača”), **Četveroboj** (`/red?mod=cetiri_igraca`, opis „4 igrača”) i **Privatna soba** (`/soba/kreiraj`). Modal zamućuje pozadinu.
 - **Pravila** vode na `/pravila`, a **Ljestvica** na `/ljestvica`.
-- **Uvjeti i privatnost** nalazi se u footeru na dnu naslovnice i otvara modal bez ikona i nadnaslova, s naslovom „Što te zanima?” te dvije tekstualne opcije s kratkim opisima: **Uvjeti korištenja** (`/uvjeti`) i **Pravila privatnosti** (`/privatnost`).
+- Footer na dnu naslovnice sadrži poveznice **Što je novo?** (`/novosti`) i **Pomozi poboljšati igru** (`/povratne-informacije`) te gumb **Uvjeti i privatnost** koji otvara modal bez ikona i nadnaslova, s naslovom „Što te zanima?” i opcijama **Uvjeti korištenja** (`/uvjeti`) i **Pravila privatnosti** (`/privatnost`). Poveznice su vidljive gostima i prijavljenim korisnicima.
+- Font za disleksiju i čitanje naglas nalaze se u **Postavkama** za goste i registrirane korisnike. Font mijenja tipografiju cijelog sučelja; čitanje naglas izgovara novu riječ na stolu Web Speech API-jem uz `hr-HR`. Postavke se spremaju lokalno u pregledniku. Uključeno čitanje naglas prikazuje globalnu obavijest koju korisnik može potvrditi.
+- Pomoć (`/pomoc?tema=pristupacnost`) objašnjava govornu mogućnost i vodi na upute za Android, iPhone/iPad, Windows, Mac i Linux. Ista tema opisuje disleksiju i moguću vrijednost jezične igre bez terapijskih tvrdnji.
 - Zaseban red poveznica Prijavi se / Registriraj se ispod navigacije ne prikazuje se; te su akcije dio jedinstvene navigacije gosta.
 
 ## 2. Red čekanja (`/red?mod=cetiri_igraca|dva_igraca`)
@@ -60,6 +67,8 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 Raspored (portret):
 
 - **Vrh:** četiri avatara u luku (protivnici) — krug, ime, značka ranga; eliminirani posive uz oznaku plasmana. Vlastito sjedalo, uključujući avatar, ime i status ispod njega, jedna je klikabilna cjelina koja otvara izbornik brzih poruka; protivnička sjedala nisu interaktivna.
+- **Stabilan lokalni red:** sjedala se prikazuju u kanonskom kružnom redoslijedu partije, zakrenutom tako da lokalni igrač uvijek bude prvi. Red se računa iz sjedala i lokalnog ID-a, nikada iz igrača na potezu. Dok identitet ili sjedala nisu stigli, mjesta se ne prikazuju; nakon spremnog prikaza promjene poteza, timeri i eliminacije ne mijenjaju red ni položaj kartica. Eliminirani ostaju na svojem mjestu.
+- **Čitanje riječi:** ako je uključeno, preglednik izgovara početnu riječ, svaku novu prihvaćenu riječ te sistemsku riječ na početku nove runde. Ne čita poruke sučelja ni ponovljena stanja; isključivanje ili napuštanje partije prekida govor. Dostupnost i glas ovise o pregledniku i instaliranim glasovima uređaja.
 - **Aktivni igrač:** cijelo sjedalo (avatar, ime i status) dobiva debeli zeleni zaobljeni okvir, ime je zeleno, a iznad sjedala stoji label „Na redu!”. Sva sjedala rezerviraju isti prostor za label kako se raspored ne bi pomicao. Oko avatara ide **zeleni prsten koji se prazni** sinkrono sa stvarnim trajanjem poteza (15, 30 ili 60 sekundi u privatnoj sobi; SVG stroke, rok `istekPotezaIso`, serverov clock anchor `serverVrijemeIso`), s brojem preostalih sekundi u sredini. Prsten napravi jedan jači vizualni puls kada igrač dobije red, uključujući prvi potez partije. Zadnjih 5 s prsten pulsira, a zadnje 3 s avatar se vrlo blago pomiče lijevo-desno. Tijekom sustavskog odabira riječi nema aktivnog okvira ni labela. **Slojevi oko avatara, redom od avatara prema van: avatar → timer prsten → rang-border prsten.** Timer prsten mora biti vizualno ispred (iznad) rang-bordera, ne iza njega — mora se vidjeti neovisno o rangu igrača.
 - **Glavna zona igre:** prije prikaza sjedala prikazuje traženu riječ velikim slovima s posljednja **dva grafema otisnuta žutom kremom** (npr. medenj**AK** → traži se „ak"; k**ONJ** → traži se „onj", jer su o + nj dva grafema), prethodnu riječ i obavijest, zatim unos i gumb za slanje te statusne poruke. Sjedala igrača dolaze ispod kao sekundarni kontekst.
 - **Otvaranje runde (sustav bira riječ):** na početku partije, nakon svake eliminacije i nakon kaladont-efekta prikazuje se **10-sekundni cjelozaslonski ekran** na svijetloj podlozi — sve ostalo (ploča, unos) nestaje. U prvoj rundi prikazuje se samo poruka da je sustav dodijelio početnu riječ. Nakon eliminacije prvo se prikazuje kratko neutralno objašnjenje razloga, uzročne riječi/traženih slova i osvojenog boda ako postoji, zatim tekst „Sustav će sada nasumično odabrati novu riječ..." s brojačem 10→0. Po isteku, ekran nestaje i ploča prikazuje otkrivenu riječ kao običan „zadnji potez" autora **Sustav** (isti prikaz kao za bilo koji odigrani potez), a igrač na potezu odgovara na nju kao na normalan nastavak.
@@ -99,15 +108,19 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 
 - Registracija: višekoračni tijek (1. Korak: nadimak; 2. Korak: email, lozinka, odabir avatara). Kod email polja diskretna napomena: „Na tvoju email adresu nećemo slati nikakve obavijesti, isključivo je koristimo kako bi ti omogućili pristup računu ako zaboraviš lozinku."
 - Prijava: jednostavna prijava u dva odvojena retka (Email i Lozinka) s velikim zelenim gumbom.
-- Nakon uspješne registracije korisnik dolazi na javnu stranicu `/zahvala` s čestitkom, nenametljivim konfetima i izborom sljedeće akcije: javna igra za 2 ili 4 igrača, privatna soba, pravila, profil, postavke, ljestvice ili zasebna stranica novosti `/novosti`.
+- Nakon uspješne registracije korisnik dolazi na javnu stranicu `/zahvala` s čestitkom, nenametljivim konfetima i izborom sljedeće akcije: Dvoboj, Četveroboj, privatna soba, pravila, profil, postavke, ljestvice ili zasebna stranica novosti `/novosti`.
 
 ## 7. Profil (`/profil`) — vlastiti i javni
 
-- Vlastiti profil u gornjem desnom bloku više ne ponavlja akcije Postavke i Odjavi se jer su dostupne na naslovnici. **Prosječna ocjena** i **Stil igre** ostaju u svom dosadašnjem informativnom bloku, s nepromijenjenom tipografijom i vizualnim stilom.
-- Vlastiti profil sadrži tabove **4 Igrača** i **2 Igrača (1v1)** s odvojenim karticama rezultata (`Odigrane`, `Pobjede`, `Ukupno bodova`, `Prosjek`, `Eliminacije`, `Rang`).
+- Vlastiti i javni profil u zaglavlju prikazuju **Istaknuta dostignuća** pa **Stil igre**, desno od avatara. Stil je „agresivan” iznad prosjeka 0,8 eliminacije po partiji, „uravnotežen” od 0,2 do uključivo 0,8, a „dobrica” ispod 0,2; bez partija je „neodređen”. Agresivan igrač traži priliku odigrati riječ koja će eliminirati sljedećeg igrača; uravnotežen nekad eliminira druge, ali mu to nije glavni prioritet; dobrica ne voli kad drugi ispadaju zbog njegove riječi. Stil „agresivan” je crven, „uravnotežen” neutralan, a „dobrica” zelen. Klik na podcrtani naziv stila ili gumb s upitnikom otvara objašnjenje iznad naziva; gumb X, klik izvan objašnjenja, pomicanje stranice ili Escape zatvaraju ga. **Prosječna ocjena igre** prikazuje se u statističkoj kartici „Ostalo” za oba načina.
+- Ispod stila i ocjene prikazuje se kompaktni izbor najviše triju istaknutih dostignuća, s njihovim ikonama i osvojenim zvjezdicama. Prikazuju se razine 2–5; prvo idu sva dostignuća s 4–5 zvjezdica, a zatim Iskusnjara razine 2–3 prije ostalih razina 2–3. Unutar skupine s jednakim brojem zvjezdica vrijedi prioritet: Iskusnjara, Glas zajednice, Kaladont!, Rijetkolovac, Dugometraš, Slijepa ulica, Lovac na glave, Završna riječ, KA-zna, Jezik u plamenu. Klik/dodir na ikonu prikazuje naziv, opis i napredak do sljedeće zvjezdice; Escape i klik izvan zatvaraju objašnjenje, a na mobitelu se prikazuje pri dnu zaslona.
+- Tekstualni CV popis **Ističe se po:** ostaje nepromijenjen i prikazuje se na dnu „Ostalo” u statistici Dvoboja i Četveroboja. Zadržava dva ili tri provjerljiva podatka i isto objedinjeno računanje za oba načina.
+- Ispod XP-trake prikazuje se zeleni podnaslov **O igraču** i točno dvije rečenice: broj javnih partija po načinu te najviša trenutačna titula i način u kojem je ostvarena. Ako rang još nije kalibriran, druga rečenica navodi da se dodjeljuje nakon 10 javnih partija u Dvoboju ili Četveroboju. Opis se proteže punom širinom ispod podataka igrača.
+- Gostu se prikazuju iste dostupne statistike, rekordi, dostignuća i kolekcija kao registriranom igraču; zaseban poziv na registraciju ostaje ispod zaglavlja. Gostu se ne prikazuje registracijski staž i javni profil gosta ne postoji. Na mobitelu istaknuta dostignuća pa stil igre ostaju uz avatar, a ime/XP i dvorečenični uvod ispod gornjeg reda. Prosječna ocjena dostupna je u „Ostalo” statistike. Vlastiti profil ne ponavlja akcije Postavke i Odjavi se, a cijeli zaglavni opis skriven je u Postavkama.
+- Vlastiti i javni profil koriste tabove **Četveroboj** i **Dvoboj** za statistiku. Sažetak svakog moda prikazuje `Odigrane`, `Pobjede` i `Porazi`; Aktivnost koristi ista imena modova. Modovi imaju odvojene rezultate, a broj sudionika je četiri odnosno dva.
 - Odjeljak „Riječi i streak” zajednički je za oba javna moda; promjena taba ne mijenja te brojke. Privatne sobe se ne računaju.
 - Registrirani igrači imaju javni read-only profil, primjerice `/profil/javni/:igracId`. Javni profil prikazuje nadimak, avatar, rang, rezultate, gamifikacijske statistike, najdužu i najrjeđu riječ, ali nikad email ili podatke za autentikaciju. Gosti nemaju javni profil.
-- Profil prikazuje mode-specific DNK naslove (`Kaladont DNK 4 igrača` i `Kaladont DNK 2 igrača`). Ispod DNK grafa prikazuje mode-specific statistike: eliminacije po partiji, niz prihvaćenih riječi, prosjek prihvaćenog poteza, duge riječi po partiji i rijetke riječi po partiji.
+- Profil prikazuje mode-specific DNK naslove (`Kaladont DNK — Četveroboj` i `Kaladont DNK — Dvoboj`). U „Ostalo” Četveroboj prikazuje eliminacije po igri; oba moda prikazuju niz prihvaćenih riječi, prosjek prihvaćenog poteza, duge riječi po igri i rijetke riječi po igri.
   - `Otkriveno jako rijetkih riječi` — frekvencija `0`;
   - `Otkriveno srednje rijetkih riječi` — frekvencija `1–9`;
   - `Otkriveno rijetkih riječi` — frekvencija `10–99`;
@@ -122,13 +135,14 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 ## 7a. Postavke (`/postavke`)
 
 - Zvučne kontrole (`AudioKontrola`) dostupne su svim korisnicima.
+- Zajednička grupa **Pristupačnost** sadrži prekidače **Font za disleksiju** i **Čitanje naglas**. Prvi primjenjuje OpenDyslexic kroz cijelu aplikaciju, drugi govori samo novu riječ na stolu; obje postavke dostupne su gostima i registriranima te se pamte lokalno u pregledniku, ne na računu.
 - Registrirani igrači vide izbor avatara, izmjenu email adrese i lozinke.
 - Gosti vide obavijest da su napredne postavke rezervirane za registrirane korisnike uz gumb za registraciju.
 
 ## 8. Ljestvica (`/ljestvica?tab=igraci|rijeci`)
 
 Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvojene stranice.
-- Pod-tabovi **4 Igrača** i **2 Igrača (1v1)** omogućuju neovisni pregled ljestvice po modovima.
+- Pod-tabovi **Četveroboj** i **Dvoboj** omogućuju neovisni pregled ljestvice po modovima.
 - **Zadano učitavanje:** prikazuje top 10 igrača, uz gumb "Učitaj do 100" koji dohvaća cijelu top 100 listu s poslužitelja.
 - **Tab „Riječi":** Top 10 zadano najučestalijih odigranih riječi u svim partijama (stvarna upotreba iz `potezi`, ne statička frekvencija iz uvoznog korpusa). Stupci: mjesto, riječ (WordChip s istaknuta zadnja dva grafema), broj upotreba, % partija u kojima se pojavila. Isti gumb **„Učitaj do 100"** s loading indikatorom — nema koncepta „tvoje riječi" pa nema dodatnog retka.
 - Tab „Igrači" vraća identitet igrača samo za registrirane profile. Nadimak/avatar vode na javni profil. Linkovi se ne prikazuju u lobbyju ni tijekom aktivne partije; na završnom sažetku partije profili sudionika mogu biti otvoreni.
@@ -141,7 +155,7 @@ Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvoj
 
 ## 10. Statične stranice
 
-- `/pomoc?tema=kako-igrati|pravila|nacini|bodovi|napredak|pitanja` — pomoć kroz šest tema, od prvog poteza do pravila, načina igre, rangova, napretka i praktičnog FAQ-a. `/pravila` i `/o-igri` ostaju kompatibilni redirecti na odgovarajući sadržaj.
+- `/pomoc?tema=kako-igrati|pravila|nacini|bodovi|napredak|dnk|pristupacnost|pitanja` — pomoć kroz teme od prvog poteza do pravila, brojnosti rječnika, napretka, zasebnog vodiča za DNK i pristupačnost te praktičnog FAQ-a. Broj oblika po vrsti i jedinstveni ukupni broj dolaze iz `/api/rjecnik/statistika`; zbroj kategorija može biti veći od ukupnog broja jer jedan oblik može pripadati više vrsta. DNK vodič objašnjava što mjeri svaka os i što utječe na njezin rast. `/pravila` i `/o-igri` ostaju kompatibilni redirecti na odgovarajući sadržaj.
 - Footer popup „O igri” — priča o imenu, rani pristup, **atribucija hrLexa** prema [izvor-i-licenca.md](../04-rjecnik/izvor-i-licenca.md#tekst-atribucije-za-stranicu-o-igri), statistika rječnika i kontakt; popup povezuje na Help hub.
 - `/privatnost`, `/uvjeti` — pravni minimum (vidi [sigurnost-i-privatnost.md](../07-operacije/sigurnost-i-privatnost.md)).
 - `/zahvala` — javna zahvalna stranica nakon registracije s navigacijom prema glavnim akcijama i stranici `/novosti`.
@@ -150,4 +164,12 @@ Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvoj
 ## Responzivnost
 
 - **Mobile-first** je jedini dizajnirani layout — sve komponente/ekrani grade se za portret mobilni zaslon.
+- Svi širinski prijelazi koriste jedinstveni prag: `max-width: 999px` za mobilni prikaz i `min-width: 1000px` za desktop prikaz.
 - **Desktop nije zaseban dizajn.** Cijeli sadržaj se centrira unutar kontejnera `max-width: 1000px; margin: 0 auto` — isti raspored, iste komponente, samo više praznog prostora lijevo/desno na širim ekranima. Ne graditi alternativne desktop-specifične rasporede (npr. sidebar, višestupčani grid) u v1.
+
+### HTML tablice na mobitelu
+
+- Svaka tablica zadržava stvarne elemente `<table>`, `<thead>`, `<tbody>` i zaglavlja `<th scope="col">` odnosno `<th scope="row">` gdje su primjenjiva. Zaglavlje se u presloženom prikazu skriva samo vizualno, ne uklanja iz pristupačnog stabla.
+- Tablice s više stupaca na mobilnom prikazu preslažu retke pomoću opt-in klase `tablica-mobilni-retci` iz `app.css`. Primarni podatak retka ostaje vidljiv na vrhu. Svaka ostala vrijednosna ćelija (`<td>`) ima hrvatski `data-label` koji opisuje njezin stupac, primjerice `<td data-label="Bodovi">5</td>`; CSS prikazuje oznaku kroz `::before { content: attr(data-label) }`. Kod usporedbe modova oznaka mora navesti i mod ako bi sama mjera bila nejasna.
+- Pregledne dvostupčane tablice mogu ostati vodoravne ako cijeli sadržaj stane i pri 320 px, dugim nazivima te povećanom fontu. Popise pojmova i objašnjenja prikazati kao `<dl>`, ne kao tablice. Ne skrivati bitne stupce, ne odrezivati vrijednosti i ne koristiti vodoravno pomicanje tablice ili stranice kao mobilno rješenje.
+- Provjeriti 320, 360, 390, 768 i 999 px te desktop od 1000 px; obje teme, dugačke vrijednosti, povećan/disleksijski font, tipkovnicu i čitač zaslona. Uz širinu stranice provjeriti i širinu svake tablice ili omotača jer `overflow-x: clip` na stranici može prikriti odsječen sadržaj.

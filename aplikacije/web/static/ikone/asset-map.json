@@ -1,0 +1,14 @@
+{
+  "igra_ispadanje": "png/49-ispadanje.png",
+  "igra_istek_vremena": "png/50-istek-vremena.png",
+  "igra_ne_znam": "png/51-ne-znam.png",
+  "igra_cekanje": "png/52-cekanje-igraca.png",
+  "igra_nova_runda": "png/53-nova-runda.png",
+  "igra_ponovno_povezivanje": "png/54-ponovno-povezivanje.png",
+  "igra_nedostupna": "png/55-igra-nedostupna.png",
+  "igra_nova_razina": "png/56-nova-razina.png",
+  "igra_novo_dostignuce": "png/57-novo-dostignuce.png",
+  "igra_promatranje": "png/58-promatranje-igre.png",
+  "postolje_dva_igraca": "png/59-postolje-2-igraca.png",
+  "postolje_cetiri_igraca": "png/60-postolje-4-igraca.png"
+}

@@ -82,16 +82,16 @@
       </div>
     </div>
   {/if}
-  <a class="dnk-pomoc" href="/pravila-kaladonta?tema=napredak#dnk">Što je Kaladont DNK?</a>
+  <a class="dnk-pomoc" href="/pravila-kaladonta?tema=dnk#sadrzaj-pomoci">Što je Kaladont DNK?</a>
 </section>
 
 <style>
   .dnk-kartica {
     margin-bottom: 20px;
     padding: 20px;
-    border: 1px solid #e5ddc8;
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: #fff;
+    background: var(--boja-povrsina);
   }
 
   .dnk-zaglavlje,
@@ -120,7 +120,7 @@
   .dnk-status {
     padding: 5px 10px;
     border-radius: var(--radijus-pill);
-    background: #f3eee2;
+    background: var(--boja-povrsina-3);
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mikro);
     font-weight: 700;
@@ -128,8 +128,8 @@
   }
 
   .dnk-status.otkljucan {
-    background: #e1f1e9;
-    color: var(--boja-mint-tamni);
+    background: var(--boja-uspjeh-pozadina);
+    color: var(--boja-uspjeh-tekst);
   }
 
   .dnk-sadrzaj {
@@ -154,12 +154,12 @@
 
   .dnk-prsten {
     fill: none;
-    stroke: #eadfca;
+    stroke: var(--boja-graf-mreza);
     stroke-width: 1;
   }
 
   .dnk-os {
-    stroke: #dfd5c2;
+    stroke: var(--boja-graf-os);
     stroke-width: 1;
   }
 
@@ -170,7 +170,7 @@
   }
 
   .dnk-podrucje {
-    fill: rgb(228 87 46 / 22%);
+    fill: color-mix(in srgb, var(--boja-akcent) 22%, transparent);
     stroke: var(--boja-akcent);
     stroke-width: 2.5;
     stroke-linejoin: round;
@@ -178,7 +178,7 @@
 
   .dnk-tocka {
     fill: var(--boja-akcent);
-    stroke: #fff;
+    stroke: var(--boja-povrsina);
     stroke-width: 2;
   }
 
@@ -194,7 +194,7 @@
   }
 
   .dnk-redak-zaglavlje span {
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
     font-weight: 800;
   }
 
@@ -203,14 +203,14 @@
     margin-top: 5px;
     overflow: hidden;
     border-radius: var(--radijus-pill);
-    background: #eee8dc;
+    background: var(--boja-povrsina-3);
   }
 
   .dnk-traka span {
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: var(--boja-mint);
+    background: var(--boja-akcent-tekst);
   }
 
   .dnk-redak small {
@@ -226,7 +226,8 @@
     gap: 16px;
     margin-top: 16px;
     padding: 18px;
-    background: #faf7ef;
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
   }
 
   .zakljucani-graf {
@@ -255,7 +256,7 @@
     font-weight: 700;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 999px) {
     .dnk-kartica { padding: 16px; }
     .dnk-zaglavlje { flex-direction: column; }
     .dnk-status { align-self: flex-start; }

@@ -23,7 +23,7 @@
   let cursor = $state<string | null>(null);
   let prethodniCursori = $state<string[]>([]);
   let imaJos = $state(false);
-  let ucitavanje = $state(false);
+  let ucitavanje = $state(true);
   let greska = $state<string | null>(null);
 
   async function ucitaj(noviMod = mod, noviCursor: string | null = null) {
@@ -73,36 +73,43 @@
   });
 </script>
 
-<section class="aktivnost-sekcija" aria-labelledby="aktivnost-naslov">
+<section class="aktivnost-sekcija" aria-label="Aktivnost">
   <Podizbornik
-    stavke={[{ kljuc: 'dva_igraca', naziv: '2 igrača' }, { kljuc: 'cetiri_igraca', naziv: '4 igrača' }]}
+    stavke={[{ kljuc: 'dva_igraca', naziv: 'Dvoboj' }, { kljuc: 'cetiri_igraca', naziv: 'Četveroboj' }]}
     aktivna={mod}
     ariaLabel="Način igre"
     promijeni={(kljuc) => promijeniMod(kljuc as 'cetiri_igraca' | 'dva_igraca')}
   />
   <div class="aktivnost-zaglavlje">
     <div>
-      <h2 id="aktivnost-naslov">Aktivnost</h2>
-      <p class="aktivnost-opis">Prikazane su samo javne partije. Privatne partije se ne računaju.</p>
+      <p class="aktivnost-opis">Prikazane su samo javne igre. Privatne igre se ne računaju.</p>
     </div>
   </div>
 
   {#if greska}
     <p class="aktivnost-greska" role="alert">{greska}</p>
+  {:else if stavke.length === 0 && ucitavanje}
+    <div class="aktivnost-kostur" role="status" aria-label="Učitavanje aktivnosti" aria-busy="true">
+      <div class="aktivnost-kostur-redak"></div>
+      <div class="aktivnost-kostur-redak"></div>
+      <div class="aktivnost-kostur-redak"></div>
+      <div class="aktivnost-kostur-redak"></div>
+      <div class="aktivnost-kostur-redak"></div>
+    </div>
   {:else if stavke.length === 0 && !ucitavanje}
-    <p class="aktivnost-prazno">Još nema javnih partija u ovom načinu igre.</p>
+    <p class="aktivnost-prazno">Još nema javnih igara u ovom načinu igre.</p>
   {:else}
     <div class="aktivnost-tablica-omotac">
-      <table class="aktivnost-tablica">
-        <thead><tr><th>Datum</th><th>Mod</th><th>Plasman</th><th>Bodovi</th><th></th></tr></thead>
+      <table class="aktivnost-tablica tablica-mobilni-retci">
+        <thead><tr><th scope="col">Datum</th><th scope="col">Mod</th><th scope="col">Plasman</th><th scope="col">Bodovi</th><th scope="col">Povijest</th></tr></thead>
         <tbody>
           {#each stavke as stavka (stavka.partijaId)}
             <tr>
-              <td>{formatirajDatum(stavka.kraj)}</td>
-              <td>{stavka.mod === 'dva_igraca' ? '2 igrača' : '4 igrača'}</td>
-              <td>{stavka.plasman}. mjesto</td>
-              <td>{stavka.bodovi}</td>
-              <td><a href={`/partija/arhiva/${stavka.partijaId}`}>Vidi igru</a></td>
+              <th scope="row">{formatirajDatum(stavka.kraj)}</th>
+              <td data-label="Mod">{stavka.mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj'}</td>
+              <td data-label="Plasman">{stavka.plasman}. mjesto</td>
+              <td data-label="Bodovi">{stavka.bodovi}</td>
+              <td data-label="Povijest"><a href={`/partija/arhiva/${stavka.partijaId}`}>Vidi igru</a></td>
             </tr>
           {/each}
         </tbody>
@@ -117,19 +124,23 @@
 </section>
 
 <style>
-  .aktivnost-sekcija { margin-top: 24px; }
   .aktivnost-zaglavlje { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; }
-  .aktivnost-zaglavlje h2 { margin: 0; }
-  .aktivnost-opis { margin: 6px 0 0; color: #5d625f; }
+  .aktivnost-opis { margin: 6px 0 0; color: var(--boja-tekst-sekundarni); }
   .aktivnost-sekcija > :global(.podizbornik) { margin-bottom: 18px; }
-  .aktivnost-tablica-omotac { overflow-x: auto; margin-top: 16px; }
+  .aktivnost-kostur { display: grid; gap: 8px; min-height: 250px; margin-top: 16px; }
+  .aktivnost-kostur-redak { min-height: 40px; border-bottom: 1px solid var(--boja-obrub); border-radius: 4px; background: var(--boja-povrsina-2); }
+  .aktivnost-tablica-omotac { margin-top: 16px; }
   .aktivnost-tablica { width: 100%; border-collapse: collapse; }
-  .aktivnost-tablica th, .aktivnost-tablica td { padding: 11px 10px; border-bottom: 1px solid #e3e3dc; text-align: left; white-space: nowrap; }
-  .aktivnost-tablica th { color: #5d625f; font-size: 0.86rem; }
-  .aktivnost-tablica a { color: #1c5c4a; font-weight: 700; }
+  .aktivnost-tablica th, .aktivnost-tablica td { padding: 11px 10px; border-bottom: 1px solid var(--boja-obrub); text-align: left; }
+  .aktivnost-tablica th { color: var(--boja-tekst-sekundarni); font-size: 0.86rem; }
+  .aktivnost-tablica a { color: var(--boja-tekst-naslov); font-weight: 700; }
+  @media (max-width: 999px) {
+    .aktivnost-tablica tbody th, .aktivnost-tablica tbody td { padding: 5px 0; }
+    .aktivnost-tablica tbody th { color: var(--boja-tekst-osnovni); font-size: var(--tekst-baza); }
+  }
   .aktivnost-paginacija { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 16px; }
-  .aktivnost-paginacija button { border-color: #d8d8d2; background: #fff; }
+  .aktivnost-paginacija button { border-color: var(--boja-obrub-jaci); background: var(--boja-povrsina); color: var(--boja-tekst-osnovni); }
   .aktivnost-paginacija button:disabled { cursor: not-allowed; opacity: 0.45; }
-  .aktivnost-greska { color: #a33d32; }
+  .aktivnost-greska { color: var(--boja-poraz-tekst); }
   .aktivnost-prazno { color: #5d625f; }
 </style>

@@ -1,0 +1,705 @@
+{
+  "pack": "Kaladont avatar SVG pack 02",
+  "sourceRevision": "87bf60439cda67ab921e4a33683ea2f858c01dbe",
+  "schemaVersion": 1,
+  "compatibleAssetVersion": "figma-avatar-v1",
+  "assetCount": 60,
+  "canvas": {
+    "width": 380,
+    "height": 380
+  },
+  "assets": [
+    {
+      "category": "eyes",
+      "id": "k2-wink",
+      "labelHr": "Namigivanje",
+      "file": "oci/Eyes-k2-wink.svg",
+      "productionFile": "Eyes-k2-wink.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false
+    },
+    {
+      "category": "eyes",
+      "id": "k2-closed",
+      "labelHr": "Zatvorene oči",
+      "file": "oci/Eyes-k2-closed.svg",
+      "productionFile": "Eyes-k2-closed.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false
+    },
+    {
+      "category": "eyes",
+      "id": "k2-sleepy",
+      "labelHr": "Pospane oči",
+      "file": "oci/Eyes-k2-sleepy.svg",
+      "productionFile": "Eyes-k2-sleepy.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false
+    },
+    {
+      "category": "eyes",
+      "id": "k2-wide",
+      "labelHr": "Razrogačene oči",
+      "file": "oci/Eyes-k2-wide.svg",
+      "productionFile": "Eyes-k2-wide.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false
+    },
+    {
+      "category": "eyes",
+      "id": "k2-look-left",
+      "labelHr": "Pogled ulijevo",
+      "file": "oci/Eyes-k2-look-left.svg",
+      "productionFile": "Eyes-k2-look-left.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false
+    },
+    {
+      "category": "eyes",
+      "id": "k2-look-right",
+      "labelHr": "Pogled udesno",
+      "file": "oci/Eyes-k2-look-right.svg",
+      "productionFile": "Eyes-k2-look-right.svg",
+      "viewBox": "0 0 96 48",
+      "colorRole": "eyes",
+      "recolorStroke": false
+    },
+    {
+      "category": "eyebrows",
+      "id": "k2-straight",
+      "labelHr": "Ravne obrve",
+      "file": "obrve/Eyebrows-k2-straight.svg",
+      "productionFile": "Eyebrows-k2-straight.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true
+    },
+    {
+      "category": "eyebrows",
+      "id": "k2-bold",
+      "labelHr": "Guste obrve",
+      "file": "obrve/Eyebrows-k2-bold.svg",
+      "productionFile": "Eyebrows-k2-bold.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true
+    },
+    {
+      "category": "eyebrows",
+      "id": "k2-one-up",
+      "labelHr": "Jedna podignuta",
+      "file": "obrve/Eyebrows-k2-one-up.svg",
+      "productionFile": "Eyebrows-k2-one-up.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true
+    },
+    {
+      "category": "eyebrows",
+      "id": "k2-concerned",
+      "labelHr": "Zabrinute obrve",
+      "file": "obrve/Eyebrows-k2-concerned.svg",
+      "productionFile": "Eyebrows-k2-concerned.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true
+    },
+    {
+      "category": "eyebrows",
+      "id": "k2-soft-arch",
+      "labelHr": "Blagi luk",
+      "file": "obrve/Eyebrows-k2-soft-arch.svg",
+      "productionFile": "Eyebrows-k2-soft-arch.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true
+    },
+    {
+      "category": "eyebrows",
+      "id": "k2-split",
+      "labelHr": "Obrve s prorezom",
+      "file": "obrve/Eyebrows-k2-split.svg",
+      "productionFile": "Eyebrows-k2-split.svg",
+      "viewBox": "0 0 149 51",
+      "colorRole": "eyebrows",
+      "recolorStroke": true
+    },
+    {
+      "category": "nose",
+      "id": "k2-button",
+      "labelHr": "Gumbić",
+      "file": "nos/Nose-k2-button.svg",
+      "productionFile": "Nose-k2-button.svg",
+      "viewBox": "0 0 32 40",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "nose",
+      "id": "k2-bridge",
+      "labelHr": "Izduženi nos",
+      "file": "nos/Nose-k2-bridge.svg",
+      "productionFile": "Nose-k2-bridge.svg",
+      "viewBox": "0 0 32 40",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "nose",
+      "id": "k2-wide",
+      "labelHr": "Širi nos",
+      "file": "nos/Nose-k2-wide.svg",
+      "productionFile": "Nose-k2-wide.svg",
+      "viewBox": "0 0 32 40",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "nose",
+      "id": "k2-angular-soft",
+      "labelHr": "Blago uglati nos",
+      "file": "nos/Nose-k2-angular-soft.svg",
+      "productionFile": "Nose-k2-angular-soft.svg",
+      "viewBox": "0 0 32 40",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "mouth",
+      "id": "k2-grin",
+      "labelHr": "Široki zubati osmijeh",
+      "file": "usta/Mouth-k2-grin.svg",
+      "productionFile": "Mouth-k2-grin.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "mouth",
+      "id": "k2-tooth-gap",
+      "labelHr": "Osmijeh s razmakom",
+      "file": "usta/Mouth-k2-tooth-gap.svg",
+      "productionFile": "Mouth-k2-tooth-gap.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "mouth",
+      "id": "k2-tongue-out",
+      "labelHr": "Isplažen jezik",
+      "file": "usta/Mouth-k2-tongue-out.svg",
+      "productionFile": "Mouth-k2-tongue-out.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "mouth",
+      "id": "k2-braces",
+      "labelHr": "Osmijeh s aparatićem",
+      "file": "usta/Mouth-k2-braces.svg",
+      "productionFile": "Mouth-k2-braces.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "mouth",
+      "id": "k2-gentle",
+      "labelHr": "Mali osmijeh",
+      "file": "usta/Mouth-k2-gentle.svg",
+      "productionFile": "Mouth-k2-gentle.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "mouth",
+      "id": "k2-whistle",
+      "labelHr": "Zviždanje",
+      "file": "usta/Mouth-k2-whistle.svg",
+      "productionFile": "Mouth-k2-whistle.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "mouth",
+      "id": "k2-determined",
+      "labelHr": "Odlučan izraz",
+      "file": "usta/Mouth-k2-determined.svg",
+      "productionFile": "Mouth-k2-determined.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "mouth",
+      "id": "k2-small-oh",
+      "labelHr": "Malo iznenađenje",
+      "file": "usta/Mouth-k2-small-oh.svg",
+      "productionFile": "Mouth-k2-small-oh.svg",
+      "viewBox": "0 0 72 64",
+      "colorRole": null,
+      "recolorStroke": false
+    },
+    {
+      "category": "ears",
+      "id": "k2-compact",
+      "labelHr": "Male uši",
+      "file": "usi/Ear-k2-compact.svg",
+      "productionFile": "Ear-k2-compact.svg",
+      "viewBox": "0 0 48 48",
+      "colorRole": "skin",
+      "recolorStroke": false
+    },
+    {
+      "category": "ears",
+      "id": "k2-rounded",
+      "labelHr": "Okrugle uši",
+      "file": "usi/Ear-k2-rounded.svg",
+      "productionFile": "Ear-k2-rounded.svg",
+      "viewBox": "0 0 48 48",
+      "colorRole": "skin",
+      "recolorStroke": false
+    },
+    {
+      "category": "ears",
+      "id": "k2-pointed",
+      "labelHr": "Šiljaste uši",
+      "file": "usi/Ear-k2-pointed.svg",
+      "productionFile": "Ear-k2-pointed.svg",
+      "viewBox": "0 0 48 48",
+      "colorRole": "skin",
+      "recolorStroke": false
+    },
+    {
+      "category": "ears",
+      "id": "k2-angular",
+      "labelHr": "Uglate uši",
+      "file": "usi/Ear-k2-angular.svg",
+      "productionFile": "Ear-k2-angular.svg",
+      "viewBox": "0 0 48 48",
+      "colorRole": "skin",
+      "recolorStroke": false
+    },
+    {
+      "category": "glasses",
+      "id": "k2-hexagon",
+      "labelHr": "Šesterokutne naočale",
+      "file": "naocale/Glasses-k2-hexagon.svg",
+      "productionFile": "Glasses-k2-hexagon.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true
+    },
+    {
+      "category": "glasses",
+      "id": "k2-oval",
+      "labelHr": "Ovalne naočale",
+      "file": "naocale/Glasses-k2-oval.svg",
+      "productionFile": "Glasses-k2-oval.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true
+    },
+    {
+      "category": "glasses",
+      "id": "k2-cat-eye",
+      "labelHr": "Mačkaste naočale",
+      "file": "naocale/Glasses-k2-cat-eye.svg",
+      "productionFile": "Glasses-k2-cat-eye.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true
+    },
+    {
+      "category": "glasses",
+      "id": "k2-aviator",
+      "labelHr": "Pilot naočale",
+      "file": "naocale/Glasses-k2-aviator.svg",
+      "productionFile": "Glasses-k2-aviator.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true
+    },
+    {
+      "category": "glasses",
+      "id": "k2-browline",
+      "labelHr": "Naglašen gornji okvir",
+      "file": "naocale/Glasses-k2-browline.svg",
+      "productionFile": "Glasses-k2-browline.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true
+    },
+    {
+      "category": "glasses",
+      "id": "k2-sport",
+      "labelHr": "Sportske naočale",
+      "file": "naocale/Glasses-k2-sport.svg",
+      "productionFile": "Glasses-k2-sport.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true
+    },
+    {
+      "category": "glasses",
+      "id": "k2-rimless",
+      "labelHr": "Naočale s tankim okvirom",
+      "file": "naocale/Glasses-k2-rimless.svg",
+      "productionFile": "Glasses-k2-rimless.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true
+    },
+    {
+      "category": "glasses",
+      "id": "k2-heart",
+      "labelHr": "Srcolike naočale",
+      "file": "naocale/Glasses-k2-heart.svg",
+      "productionFile": "Glasses-k2-heart.svg",
+      "viewBox": "0 0 151 65",
+      "colorRole": "glasses",
+      "recolorStroke": true
+    },
+    {
+      "category": "earrings",
+      "id": "k2-drop",
+      "labelHr": "Kapljica",
+      "file": "nausnice/EarRing-k2-drop.svg",
+      "productionFile": "EarRing-k2-drop.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true
+    },
+    {
+      "category": "earrings",
+      "id": "k2-diamond",
+      "labelHr": "Romb",
+      "file": "nausnice/EarRing-k2-diamond.svg",
+      "productionFile": "EarRing-k2-diamond.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true
+    },
+    {
+      "category": "earrings",
+      "id": "k2-double-hoop",
+      "labelHr": "Dvostruka karika",
+      "file": "nausnice/EarRing-k2-double-hoop.svg",
+      "productionFile": "EarRing-k2-double-hoop.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true
+    },
+    {
+      "category": "earrings",
+      "id": "k2-bar",
+      "labelHr": "Viseći štapić",
+      "file": "nausnice/EarRing-k2-bar.svg",
+      "productionFile": "EarRing-k2-bar.svg",
+      "viewBox": "0 0 52 52",
+      "colorRole": "earrings",
+      "recolorStroke": true
+    },
+    {
+      "category": "facialHair",
+      "id": "k2-moustache",
+      "labelHr": "Brkovi",
+      "file": "brada-i-brkovi/FacialHair-k2-moustache.svg",
+      "productionFile": "FacialHair-k2-moustache.svg",
+      "viewBox": "0 0 164 154",
+      "colorRole": "facialHair",
+      "recolorStroke": false
+    },
+    {
+      "category": "facialHair",
+      "id": "k2-goatee",
+      "labelHr": "Kozja bradica",
+      "file": "brada-i-brkovi/FacialHair-k2-goatee.svg",
+      "productionFile": "FacialHair-k2-goatee.svg",
+      "viewBox": "0 0 164 154",
+      "colorRole": "facialHair",
+      "recolorStroke": false
+    },
+    {
+      "category": "facialHair",
+      "id": "k2-chin-patch",
+      "labelHr": "Mala bradica",
+      "file": "brada-i-brkovi/FacialHair-k2-chin-patch.svg",
+      "productionFile": "FacialHair-k2-chin-patch.svg",
+      "viewBox": "0 0 164 154",
+      "colorRole": "facialHair",
+      "recolorStroke": false
+    },
+    {
+      "category": "facialHair",
+      "id": "k2-sideburns",
+      "labelHr": "Zalisci",
+      "file": "brada-i-brkovi/FacialHair-k2-sideburns.svg",
+      "productionFile": "FacialHair-k2-sideburns.svg",
+      "viewBox": "0 0 164 154",
+      "colorRole": "facialHair",
+      "recolorStroke": false
+    },
+    {
+      "category": "shirt",
+      "id": "k2-v-neck",
+      "labelHr": "V-izrez",
+      "file": "odjeca/Shirt-k2-v-neck.svg",
+      "productionFile": "Shirt-k2-v-neck.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false
+    },
+    {
+      "category": "shirt",
+      "id": "k2-hoodie",
+      "labelHr": "Duks s kapuljačom",
+      "file": "odjeca/Shirt-k2-hoodie.svg",
+      "productionFile": "Shirt-k2-hoodie.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false
+    },
+    {
+      "category": "shirt",
+      "id": "k2-turtleneck",
+      "labelHr": "Dolčevita",
+      "file": "odjeca/Shirt-k2-turtleneck.svg",
+      "productionFile": "Shirt-k2-turtleneck.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false
+    },
+    {
+      "category": "shirt",
+      "id": "k2-jersey",
+      "labelHr": "Sportski dres",
+      "file": "odjeca/Shirt-k2-jersey.svg",
+      "productionFile": "Shirt-k2-jersey.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false
+    },
+    {
+      "category": "shirt",
+      "id": "k2-bomber",
+      "labelHr": "Jakna",
+      "file": "odjeca/Shirt-k2-bomber.svg",
+      "productionFile": "Shirt-k2-bomber.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false
+    },
+    {
+      "category": "shirt",
+      "id": "k2-striped",
+      "labelHr": "Prugasta majica",
+      "file": "odjeca/Shirt-k2-striped.svg",
+      "productionFile": "Shirt-k2-striped.svg",
+      "viewBox": "0 0 281 93",
+      "colorRole": "shirt",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-crop",
+      "labelHr": "Kratko ošišana",
+      "file": "kosa/Hair-k2-crop.svg",
+      "productionFile": "Hair-k2-crop.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-side-part",
+      "labelHr": "Razdjeljak sa strane",
+      "file": "kosa/Hair-k2-side-part.svg",
+      "productionFile": "Hair-k2-side-part.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-waves",
+      "labelHr": "Valovita kratka kosa",
+      "file": "kosa/Hair-k2-waves.svg",
+      "productionFile": "Hair-k2-waves.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-curls",
+      "labelHr": "Kratke kovrče",
+      "file": "kosa/Hair-k2-curls.svg",
+      "productionFile": "Hair-k2-curls.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-high-puff",
+      "labelHr": "Visoki oblak kovrča",
+      "file": "kosa/Hair-k2-high-puff.svg",
+      "productionFile": "Hair-k2-high-puff.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-double-bun",
+      "labelHr": "Dvije punđice",
+      "file": "kosa/Hair-k2-double-bun.svg",
+      "productionFile": "Hair-k2-double-bun.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-spiky",
+      "labelHr": "Razbarušena kosa",
+      "file": "kosa/Hair-k2-spiky.svg",
+      "productionFile": "Hair-k2-spiky.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-bob",
+      "labelHr": "Ravni bob",
+      "file": "kosa/Hair-k2-bob.svg",
+      "productionFile": "Hair-k2-bob.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-short-fringe",
+      "labelHr": "Kratke šiške",
+      "file": "kosa/Hair-k2-short-fringe.svg",
+      "productionFile": "Hair-k2-short-fringe.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    },
+    {
+      "category": "hair",
+      "id": "k2-topknot",
+      "labelHr": "Punđa na vrhu",
+      "file": "kosa/Hair-k2-topknot.svg",
+      "productionFile": "Hair-k2-topknot.svg",
+      "viewBox": "0 0 240 203",
+      "colorRole": "hair",
+      "recolorStroke": false
+    }
+  ],
+  "layerOrder": [
+    "background",
+    "base",
+    "ears",
+    "shirt",
+    "eyes",
+    "eyebrows",
+    "nose",
+    "facialHair",
+    "mouth",
+    "earrings",
+    "glasses",
+    "hair"
+  ],
+  "layers": {
+    "base": {
+      "x": 90,
+      "y": 43,
+      "width": 200,
+      "height": 320
+    },
+    "ears": {
+      "x": 94,
+      "y": 174,
+      "width": 48,
+      "height": 48
+    },
+    "shirt": {
+      "x": 47,
+      "y": 290,
+      "width": 281,
+      "height": 93
+    },
+    "eyes": {
+      "x": 152,
+      "y": 139,
+      "width": 96,
+      "height": 48
+    },
+    "eyebrows": {
+      "x": 115,
+      "y": 122,
+      "width": 149,
+      "height": 51
+    },
+    "nose": {
+      "x": 188,
+      "y": 167,
+      "width": 32,
+      "height": 40
+    },
+    "facialHair": {
+      "x": 124,
+      "y": 150,
+      "width": 164,
+      "height": 154
+    },
+    "mouth": {
+      "x": 172,
+      "y": 194,
+      "width": 72,
+      "height": 64
+    },
+    "earrings": {
+      "x": 89,
+      "y": 207,
+      "width": 52,
+      "height": 52
+    },
+    "glasses": {
+      "x": 116,
+      "y": 132,
+      "width": 151,
+      "height": 65
+    },
+    "hair": {
+      "x": 59,
+      "y": 28,
+      "width": 240,
+      "height": 203
+    }
+  },
+  "integrationRequired": true,
+  "earBehavior": "New ears are attached variants; preserve the existing detached behavior and allow earrings with k2-* ears.",
+  "attribution": {
+    "originalSystem": "Avatar Illustration System",
+    "author": "Micah Lanier",
+    "source": "https://www.figma.com/community/file/829741575478342595/avatar-illustration-system",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "60 new modular SVG parts drawn for Kaladont, adapted to the existing component frames and recoloring rules."
+  }
+}

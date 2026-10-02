@@ -71,6 +71,10 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | [operacije-for-dummies.md](07-operacije/operacije-for-dummies.md)               | Linearni vodič od nule: preduvjeti, staging, produkcija, backup, održavanje i recovery |
 | [objava-staginga-za-pocetnike.md](07-operacije/objava-staginga-za-pocetnike.md) | Svakodnevna staging objava: provjera, direktni push, migracija, test i rollback         |
 | [release-shema.md](07-operacije/release-shema.md)                               | Identitet releasea, staging closed test checklist, promocija i rollback pravila        |
+| [release-notes-v0.5.0-closed-alpha.1.md](07-operacije/release-notes-v0.5.0-closed-alpha.1.md) | Novosti i provjere za peto zatvoreno alpha izdanje |
+| [release-notes-v0.4.0-closed-alpha.1.md](07-operacije/release-notes-v0.4.0-closed-alpha.1.md) | Novosti i provjere za četvrto zatvoreno alpha izdanje |
+| [release-notes-v0.3.0-closed-alpha.1.md](07-operacije/release-notes-v0.3.0-closed-alpha.1.md) | Novosti za treće zatvoreno alpha izdanje |
+| [release-notes-v0.2.0-closed-alpha.1.md](07-operacije/release-notes-v0.2.0-closed-alpha.1.md) | Novosti za drugo zatvoreno alpha izdanje |
 | [produkcija-i-objava.md](07-operacije/produkcija-i-objava.md)                   | Okruženja (staging/produkcija), Hetzner, Docker, Caddy, DNS                            |
 | [dimenzioniranje-posluzitelja.md](07-operacije/dimenzioniranje-posluzitelja.md) | Procjena resursa i veličine servera po ulozi                                           |
 | [ci-cd.md](07-operacije/ci-cd.md)                                               | GitHub Actions: CI, smoke test slike, staging, promocija digesta                       |

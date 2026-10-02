@@ -70,7 +70,7 @@
 </section>
 
 <style>
-  .forma-igraca { display: grid; gap: 12px; margin-top: 18px; padding: 16px; border: 1px solid #e5ddc8; border-radius: 8px; background: #fffdf5; }
+  .forma-igraca { display: grid; gap: 12px; margin-top: 18px; padding: 16px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
   .forma-zaglavlje { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   h3 { margin: 0 0 4px; }
   .forma-zaglavlje strong { color: var(--boja-pozadina-primarna); font-family: var(--font-naslov); font-size: 1.35rem; }
@@ -83,7 +83,7 @@
   .mini-povijest { display: grid; gap: 8px; }
   .rezultati { display: flex; flex-wrap: wrap; gap: 6px; }
   .rezultati span { display: grid; width: 28px; height: 28px; place-items: center; border: 2px solid transparent; border-radius: 50%; font-weight: 800; }
-  .rezultati .pobjeda { background: #dcefe2; color: #176342; }
-  .rezultati .poraz { background: #f8dfd8; color: #a33d32; }
-  @media (max-width: 520px) { .forma-zaglavlje { flex-direction: column; } }
+  .rezultati .pobjeda { background: var(--boja-uspjeh-pozadina); color: var(--boja-uspjeh-tekst); }
+  .rezultati .poraz { background: var(--boja-poraz-pozadina); color: var(--boja-poraz-tekst); }
+  @media (max-width: 999px) { .forma-zaglavlje { flex-direction: column; } }
 </style>

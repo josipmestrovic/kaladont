@@ -202,6 +202,7 @@ export function registrirajPrivatneSobe(
       return {
         igracId: c.igracId,
         nadimak: c.nadimak,
+        jeGost: c.vrsta === 'gost',
         avatarId: c.avatarId,
         avatarConfig: c.avatarConfig,
         avatarRevision: c.avatarRevision,

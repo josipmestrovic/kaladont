@@ -11,16 +11,18 @@ test('registracija i prijava zadržavaju sesiju nakon reloadanja', async ({ page
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
   await page.getByRole('button', { name: 'Dalje' }).click();
-  await page.getByRole('button', { name: /registriraj/i }).click();
 
-  await expect(page).toHaveURL('/potvrdi-email');
-  await expect(page.getByRole('heading', { name: 'Potvrdi email adresu' })).toBeVisible();
+  await expect(page).toHaveURL('/profil/avatar?registracija=1');
+  await page.getByRole('button', { name: 'Završi registraciju' }).click();
+
+  await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
+  await expect(page.getByRole('heading', { name: 'Dobrodošao/la u Kaladont!' })).toBeVisible();
   await expect(page.getByText(email)).toBeVisible();
   await expect(page.getByText(/Neželjena pošta/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ponovno pošalji potvrdu' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Igraj kao gost' })).toBeVisible();
   await page.reload();
-  await expect(page).toHaveURL('/potvrdi-email');
+  await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 });
 
 test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => {
@@ -32,8 +34,9 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
   await page.getByRole('button', { name: 'Dalje' }).click();
-  await page.getByRole('button', { name: /registriraj/i }).click();
-  await expect(page).toHaveURL('/potvrdi-email');
+  await expect(page).toHaveURL('/profil/avatar?registracija=1');
+  await page.getByRole('button', { name: 'Završi registraciju' }).click();
+  await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 
   await page.goto('/');
   const odjava = page.getByRole('navigation', { name: 'Glavna navigacija' }).getByRole('button', { name: 'Odjavi se' });

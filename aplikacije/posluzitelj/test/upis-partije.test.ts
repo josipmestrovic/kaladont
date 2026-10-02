@@ -14,6 +14,8 @@ describe('upis partije i javne pobjede', () => {
     for (const partijaId of obracuniZaBrisanje.splice(0)) {
       await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
     }
+    await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igracId));
+    await baza.delete(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igracId));
     await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.igracId, igracId));
     await baza.delete(partije).where(eq(partije.pobjednikId, igracId));
     await baza.delete(igraci).where(eq(igraci.id, igracId));
@@ -70,6 +72,60 @@ describe('upis partije i javne pobjede', () => {
     expect(napredak?.javnePobjede).toBe(5);
     expect(dostignuce?.razina).toBe(izracunajRazinuDostignuca(definicija, 5));
     expect(dostignuce?.razina).toBe(2);
+  });
+
+  it('ocjenjuje partiju s jednim prihvaćenim potezom samo kad je dodijeljen XP', async () => {
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Test Ocjene' });
+    let ocjenaSPozitivnimXp: number | null = null;
+
+    for (const iskustvo of [1, 0]) {
+      const partijaId = randomUUID();
+      obracuniZaBrisanje.push(partijaId);
+      await baza.insert(partije).values({ id: partijaId, mod: 'cetiri_igraca', status: 'u_tijeku' });
+      await baza.insert(sudioniciPartije).values({ partijaId, igracId, sjedalo: 0 });
+
+      const agregati = await zakljuciPartijuUBazi(
+        partijaId,
+        igracId,
+        [{ igracId, plasman: 1, bodovi: 3, eliminacije: 0, iskustvo, nacinIspadanja: 'pobjednik' }],
+        'cetiri_igraca',
+        new Map([[igracId, {
+          igracId,
+          grupe: [],
+          otkljucaneRijeci: [],
+          prihvaceniPotezi: 1,
+          ukupnoTrajanjePrihvaceniPoteziMs: 1_000,
+          najduziStreak: 1,
+          otkriveneJakoRijetkeGrupe: 0,
+          otkriveneSrednjeRijetkeGrupe: 0,
+          otkriveneRijetkeGrupe: 0,
+          upisaneDugeRijeci: 0,
+          upisaneSrednjeDugeRijeci: 0,
+          upisaneJakoDugeRijeci: 0,
+          najduzaRijec: null,
+          najduzaRijecGrafemi: 0,
+          najrjedaRijec: null,
+          najrjedaRijecFrekvencija: null,
+          najrjedaTier: null,
+        }]]),
+        false,
+        new Map(),
+      );
+      const ocjena = agregati.get(igracId)?.ocjenaIgre ?? null;
+      if (iskustvo > 0) {
+        expect(ocjena).toBeGreaterThanOrEqual(4);
+        expect(ocjena).toBeLessThanOrEqual(5);
+        ocjenaSPozitivnimXp = ocjena;
+      } else {
+        expect(ocjena).toBeNull();
+      }
+    }
+
+    const [statistika] = await baza.select({
+      zbrojOcjenaIgre: dnkStatistikeIgraca.zbrojOcjenaIgre,
+      brojOcjenaIgre: dnkStatistikeIgraca.brojOcjenaIgre,
+    }).from(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igracId));
+    expect(statistika).toEqual({ zbrojOcjenaIgre: ocjenaSPozitivnimXp, brojOcjenaIgre: 1 });
   });
 
   it('privatna partija ne zapisuje statistiku javnog moda', async () => {

@@ -29,9 +29,9 @@
     flex-wrap: wrap;
     gap: 4px;
     padding: 4px;
-    border: 1px solid #d8d8d2;
+    border: 1px solid var(--boja-obrub);
     border-radius: 8px;
-    background: #f6f6f1;
+    background: var(--boja-povrsina-3);
   }
 
   .podizbornik button {
@@ -46,9 +46,9 @@
   }
 
   .podizbornik button.aktivno {
-    border-color: #1c5c4a;
-    background: #fff;
-    color: #1c5c4a;
+    border-color: var(--boja-obrub-jaci);
+    background: var(--boja-povrsina);
+    color: var(--boja-tekst-osnovni);
     font-weight: 700;
   }
 </style>

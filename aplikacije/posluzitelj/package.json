@@ -11,6 +11,7 @@
     "migracije": "tsx src/cli/migracije.ts",
     "migracije:upgrade-test": "tsx src/cli/provjera-migracijskog-upgradea.ts",
     "ci-fixture": "tsx src/cli/ci-fixture.ts",
+    "testni-podaci-ljestvice": "tsx src/cli/testni-podaci-ljestvice.ts",
     "provjera-indeksa": "tsx src/cli/provjera-indeksa.ts",
     "obrisi-racun": "tsx src/cli/obrisi-racun.ts",
     "simulacija": "tsx src/cli/simulacija.ts",

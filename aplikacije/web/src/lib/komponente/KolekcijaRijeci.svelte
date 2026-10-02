@@ -17,6 +17,7 @@
   let cursor = $state<string | null>(null);
   let prethodniCursori = $state<string[]>([]);
   let imaJos = $state(false);
+  let ucitavanjeKolekcije = $state(true);
   let ucitavanje = $state(false);
   let greska = $state<string | null>(null);
 
@@ -41,6 +42,7 @@
   async function ucitaj() {
     try { kolekcija = await api<Kolekcija>(putanja); }
     catch (e) { greska = e instanceof Error ? e.message : 'Kolekciju nije moguće učitati.'; }
+    finally { ucitavanjeKolekcije = false; }
   }
 
   async function ucitajRijeci() {
@@ -82,8 +84,7 @@
   onMount(() => { void ucitaj(); });
 </script>
 
-<section class="kolekcija" aria-labelledby="kolekcija-naslov">
-  <h2 id="kolekcija-naslov">Kolekcija riječi</h2>
+<section class="kolekcija" aria-label="Kolekcija riječi">
   {#if greska}
     <p class="greska" role="alert">{greska}</p>
   {:else if kolekcija}
@@ -122,8 +123,22 @@
         </button>
       {/each}
     </div>
+  {:else if ucitavanjeKolekcije}
+    <div class="kolekcija-kostur" role="status" aria-label="Učitavanje kolekcije" aria-busy="true">
+      <div class="kolekcija-kostur-sažetak">
+        <div class="kolekcija-kostur-polje"></div>
+        <div class="kolekcija-kostur-polje"></div>
+      </div>
+      <div class="kolekcija-kostur-kategorije">
+        <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
+        <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
+        <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
+        <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
+        <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
+      </div>
+    </div>
   {:else}
-    <p>Učitavanje kolekcije...</p>
+    <p>Kolekciju nije moguće učitati.</p>
   {/if}
 </section>
 
@@ -150,35 +165,38 @@
 {/if}
 
 <style>
-  .kolekcija { margin-top: 20px; }
-  .kolekcija h2 { margin-bottom: 6px; }
-  .razina { display: grid; gap: 12px; margin: 18px 0; padding: 18px; border: 1px solid #e5ddc8; border-radius: 8px; background: #fffdf5; }
+  .razina { display: grid; gap: 12px; margin: 18px 0; padding: 18px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
+  .kolekcija-kostur { display: grid; gap: 12px; }
+  .kolekcija-kostur-sažetak { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; min-height: 112px; margin: 18px 0; padding: 18px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
+  .kolekcija-kostur-kategorije { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kolekcija-kostur-polje { min-height: 92px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
   .razina-sazetak { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
   .razina-sljedeca, .ukupno-otkljucano { display: grid; gap: 5px; }
-  .razina strong { font-family: var(--font-naslov); font-size: 1.6rem; color: var(--boja-pozadina-primarna); }
+  .razina strong { font-family: var(--font-naslov); font-size: 1.6rem; color: var(--boja-isticanje-tekst); }
   .razina b { font-size: 1.2rem; }
   .razina small { color: var(--boja-tekst-sekundarni); }
   .napredak-kolekcije { display: grid; gap: 5px; }
   .brojac-napretka { color: var(--boja-tekst-sekundarni); font-size: .9rem; font-weight: 700; }
-  .traka-kolekcije { width: 100%; height: 8px; overflow: hidden; border-radius: 999px; background: #e4eadf; }
-  .traka-kolekcije span { display: block; height: 100%; border-radius: inherit; background: var(--boja-mint-tamni); transition: width .25s ease; }
-  .kategorije { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 18px; }
-  .kategorije button { display: grid; gap: 5px; padding: 14px; border: 1px solid #e5ddc8; border-radius: 8px; background: white; text-align: left; cursor: pointer; font: inherit; }
-  .kategorije strong { color: var(--boja-pozadina-primarna); }
-  .tercijarni-gumb { width: fit-content; margin-top: 3px; color: var(--boja-pozadina-primarna); font-size: .82rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-  .kategorije button:hover .tercijarni-gumb, .kategorije button:focus-visible .tercijarni-gumb { color: var(--boja-mint-tamni); }
-  .modal-pozadina { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 35%); }
-  .modal { position: relative; width: min(620px, 100%); max-height: min(680px, calc(100vh - 40px)); overflow: auto; padding: 24px; border: 0; border-radius: 10px; background: #fff; box-shadow: 0 18px 60px rgb(0 0 0 / 22%); }
-  .zatvori { position: absolute; top: 12px; right: 14px; border: 0; background: transparent; font-size: 1.8rem; line-height: 1; cursor: pointer; }
+  .traka-kolekcije { width: 100%; height: 8px; overflow: hidden; border-radius: 999px; background: var(--boja-obrub); }
+  .traka-kolekcije span { display: block; height: 100%; border-radius: inherit; background: var(--boja-isticanje-slova); transition: width .25s ease; }
+  .kategorije { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+  .kategorije button { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina); color: var(--boja-tekst-osnovni); text-align: left; cursor: pointer; font: inherit; }
+  .kategorije strong { color: var(--boja-isticanje-tekst); }
+  .tercijarni-gumb { width: fit-content; margin-top: 3px; color: var(--boja-isticanje-tekst); font-size: .82rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .kategorije button:hover .tercijarni-gumb, .kategorije button:focus-visible .tercijarni-gumb { color: var(--boja-tekst-osnovni); }
+  .modal-pozadina { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: var(--boja-zastor); }
+  .modal { position: relative; width: min(620px, 100%); max-height: min(680px, calc(100vh - 40px)); overflow: auto; padding: 24px; border: 0; border-radius: 10px; background: var(--boja-povrsina); box-shadow: var(--sjena-modal); }
+  .zatvori { position: absolute; top: 12px; right: 14px; border: 0; background: transparent; color: var(--boja-tekst-osnovni); font-size: 1.8rem; line-height: 1; cursor: pointer; }
   .modal h3 { margin: 0; padding-right: 36px; }
   .modal-opis { margin: 6px 0 18px; color: var(--boja-tekst-sekundarni); }
   .rijeci { display: flex; flex-wrap: wrap; gap: 8px; }
-  .rijeci span { padding: 5px 9px; border-radius: 5px; background: #f2f2ec; }
+  .rijeci span { padding: 5px 9px; border-radius: 5px; background: var(--boja-povrsina-3); }
   .paginacija { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 22px; }
-  .paginacija button { padding: 8px 12px; border: 1px solid #d5d5cc; border-radius: 6px; background: white; cursor: pointer; }
+  .paginacija button { padding: 8px 12px; border: 1px solid var(--boja-obrub-jaci); border-radius: 6px; background: var(--boja-povrsina); color: var(--boja-tekst-osnovni); cursor: pointer; }
   .paginacija button:disabled { cursor: not-allowed; opacity: .45; }
-  .greska { color: #a33d32; }
-  @media (max-width: 520px) {
+  .greska { color: var(--boja-poraz-tekst); }
+  @media (max-width: 999px) {
     .razina-sazetak { align-items: start; flex-direction: column; gap: 12px; }
+    .kolekcija-kostur-sažetak { grid-template-columns: 1fr; }
   }
 </style>

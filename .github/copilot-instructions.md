@@ -24,3 +24,4 @@ Sve odluke o pravilima, bodovanju, arhitekturi i UX-u zapisane su u `docs/` — 
 - TypeScript strict svugdje; logika pravila igre živi u `paketi/zajednicko` i mora biti pokrivena Vitest testovima.
 - PostgreSQL + Drizzle; nazivi tablica i stupaca na hrvatskom bez dijakritika (`rijeci.prva_dva`).
 - Popis riječi (derivat hrLexa, CC BY-SA 4.0) **ne commita se** u repozitorij.
+- Nove HTML tablice moraju imati semantička zaglavlja i mobilni prikaz bez vodoravnog pomicanja. Za presložene retke koristi hrvatski `data-label` na svakoj vrijednosnoj ćeliji prema obrascu u `docs/05-ux-ui/ekrani.md#html-tablice-na-mobitelu`; pregledne dvostupčane tablice mogu ostati vodoravne tek nakon provjere na uskom zaslonu.

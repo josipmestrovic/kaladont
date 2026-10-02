@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { api } from '$lib/api.js';
   import { obrisiSesijskiToken, prijediNaGostujucuSesiju } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
@@ -17,6 +18,7 @@
   let saljeSe = $state(false);
 
   const emailZaPotvrdu = $derived(profil?.emailNaCekanju ?? profil?.email ?? '');
+  const tekStigao = $derived($page.url.searchParams.get('dobrodosao') === '1');
 
   onMount(async () => {
     try {
@@ -57,8 +59,14 @@
 </svelte:head>
 
 <main class="potvrda-emaila">
-  <p class="nadnaslov">Još jedan korak</p>
-  <h1>Potvrdi email adresu</h1>
+  {#if tekStigao}
+    <p class="nadnaslov">Registracija je gotova</p>
+    <h1>Dobrodošao/la u Kaladont!</h1>
+    <p class="cestitka">Račun i avatar su spremni. Ostao je još samo jedan korak.</p>
+  {:else}
+    <p class="nadnaslov">Još jedan korak</p>
+    <h1>Potvrdi email adresu</h1>
+  {/if}
   {#if profil}
     <p>Poslali smo poveznicu za potvrdu na:</p>
     <strong class="email">{emailZaPotvrdu}</strong>
@@ -82,10 +90,11 @@
   .nadnaslov { margin: 0 0 8px; color: var(--boja-akcent); font-weight: 800; text-transform: uppercase; }
   h1 { margin: 0 0 20px; font-family: var(--font-naslov); font-size: var(--naslov-1); line-height: 1.05; }
   .potvrda-emaila > p { color: var(--boja-tekst-sekundarni); line-height: 1.6; }
+  .cestitka { margin: -8px 0 20px; font-size: var(--tekst-veliki); }
   .email { display: block; margin: 8px 0 20px; overflow-wrap: anywhere; font-size: var(--tekst-veliki); }
   .akcije { display: grid; gap: 12px; margin-top: 28px; }
-  button, a { padding: 12px 16px; border: 1px solid var(--boja-pozadina-primarna); border-radius: var(--radijus-kartica); background: var(--boja-pozadina-primarna); color: white; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
-  .sporedno, a { background: transparent; color: var(--boja-pozadina-primarna); }
-  .obavijest { color: var(--boja-pozadina-primarna) !important; font-weight: 700; }
-  .greska { color: var(--boja-akcent) !important; font-weight: 700; }
+  button, a { padding: 12px 16px; border: 1px solid var(--boja-cta-pozadina); border-radius: var(--radijus-kartica); background: var(--boja-cta-pozadina); color: var(--boja-cta-tekst); font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .sporedno, a { background: transparent; color: var(--boja-tekst-osnovni); }
+  .obavijest { color: var(--boja-isticanje-tekst) !important; font-weight: 700; }
+  .greska { color: var(--boja-poraz-tekst) !important; font-weight: 700; }
 </style>
