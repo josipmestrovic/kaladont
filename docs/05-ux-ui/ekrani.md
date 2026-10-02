@@ -28,7 +28,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Glavna navigacija koristi vlastite SVG assete: `GiToothbrush` za Igraj, `GiSpellBook` za Pravila, `GiHoleLadder` za Ljestvicu, `GiGamepad` za Moju statistiku, `GiAutoRepair` za Postavke, `GiExitDoor` za Odjavu te `GiTwoShadows` za Prijavu i Registraciju. Modal igre koristi `GiLevelTwoAdvanced`, `GiLevelFourAdvanced` i `GiLockedDoor`.
 - Svi korisnici vide **Postavke** (`/postavke`, uz preusmjeravanje na `/profil?tab=postavke#postavke`); promjena teme dostupna je isključivo ondje. Registrirani korisnik dodatno vidi blago narančastu akciju **Odjavi se**. Gost vidi **Prijavi se** i **Registriraj se**. Editor avatara (`/profil/avatar`) dostupan je i gostima.
 - **Igraj** otvara modal sa slijedom: **Dvoboj** (`/red?mod=dva_igraca`, opis „2 igrača”), **Četveroboj** (`/red?mod=cetiri_igraca`, opis „4 igrača”) i **Privatna soba** (`/soba/kreiraj`). Modal zamućuje pozadinu.
-- **Pravila** vode na `/pravila`, a **Ljestvica** na `/ljestvica`.
+- **Pravila** vode na `/pravila`, a **Ljestvice** na `/ljestvice`.
 - Footer na dnu naslovnice sadrži poveznice **Što je novo?** (`/novosti`) i **Pomozi poboljšati igru** (`/povratne-informacije`) te gumb **Uvjeti i privatnost** koji otvara modal bez ikona i nadnaslova, s naslovom „Što te zanima?” i opcijama **Uvjeti korištenja** (`/uvjeti`) i **Pravila privatnosti** (`/privatnost`). Poveznice su vidljive gostima i prijavljenim korisnicima.
 - Font za disleksiju i čitanje naglas nalaze se u **Postavkama** za goste i registrirane korisnike. Font mijenja tipografiju cijelog sučelja; čitanje naglas izgovara novu riječ na stolu Web Speech API-jem uz `hr-HR`. Postavke se spremaju lokalno u pregledniku. Uključeno čitanje naglas prikazuje globalnu obavijest koju korisnik može potvrditi.
 - Pomoć (`/pomoc?tema=pristupacnost`) objašnjava govornu mogućnost i vodi na upute za Android, iPhone/iPad, Windows, Mac i Linux. Ista tema opisuje disleksiju i moguću vrijednost jezične igre bez terapijskih tvrdnji.
@@ -139,14 +139,17 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 - Registrirani igrači vide izbor avatara, izmjenu email adrese i lozinke.
 - Gosti vide obavijest da su napredne postavke rezervirane za registrirane korisnike uz gumb za registraciju.
 
-## 8. Ljestvica (`/ljestvica?tab=igraci|rijeci`)
+## 8. Ljestvice (`/ljestvice?kategorija&mod&metrika&razdoblje&prikaz`)
 
-Dva taba unutar iste rute — jedan mentalni koncept "ljestvice", ne dvije odvojene stranice.
-- Pod-tabovi **Četveroboj** i **Dvoboj** omogućuju neovisni pregled ljestvice po modovima.
-- **Zadano učitavanje:** prikazuje top 10 igrača, uz gumb "Učitaj do 100" koji dohvaća cijelu top 100 listu s poslužitelja.
-- **Tab „Riječi":** Top 10 zadano najučestalijih odigranih riječi u svim partijama (stvarna upotreba iz `potezi`, ne statička frekvencija iz uvoznog korpusa). Stupci: mjesto, riječ (WordChip s istaknuta zadnja dva grafema), broj upotreba, % partija u kojima se pojavila. Isti gumb **„Učitaj do 100"** s loading indikatorom — nema koncepta „tvoje riječi" pa nema dodatnog retka.
-- Tab „Igrači" vraća identitet igrača samo za registrirane profile. Nadimak/avatar vode na javni profil. Linkovi se ne prikazuju u lobbyju ni tijekom aktivne partije; na završnom sažetku partije profili sudionika mogu biti otvoreni.
-- Prebacivanje tabova bez ponovnog učitavanja cijele stranice (isti header/podnožje); učitana proširena lista (100) pamti se dok je tab otvoren, ne treba ponovno učitavati pri povratku na isti tab.
+Jedna stranica s odabirima u URL-u (Natrag/Naprijed vraća odabir). Pravila poretka: [bodovanje-i-rangovi.md](../02-pravila-igre/bodovanje-i-rangovi.md#vremenske-ljestvice). Stara adresa `/ljestvica` preusmjerava ovamo.
+- Redoslijed od vrha: kategorija **Igrači | Riječi**, način **Četveroboj | Dvoboj**, metrika (**Prosjek bodova | Niz pobjeda**), pet kartica razdoblja, okvir s pravilima i odbrojavanjem, **Top 10 | Oko mene**, tablica.
+- Svaka kartica razdoblja pokazuje kratak status: „Tvoja pozicija: 500” (bez ukupnog broja), „Nije odigrano danas / ovaj tjedan / ovaj mjesec / ove godine”, „Još 3 igre do poretka” ili „Dostupno od …” za zaključano Svih vremena.
+- Okvir s pravilima stoji neposredno uz tablicu: kriterij, minimum, izjednačenje i odbrojavanje „Resetira se za 05:55:12” (ispod dana) ili „3 d 4 h”; Godišnja piše „Zaključava se za”, Svih vremena nema odbrojavanja. Odbrojavanje teče u pregledniku prema serverskom satu; na nuli se ljestvica jednom ponovno učita.
+- Tablica: Mjesto · Igrač · vrijednost metrike · Odigrane igre; najviše 10 redaka. Vlastiti redak (prema ID-u, ne nadimku) ima narančasti okvir i oznaku **Ovo si ti**. „Oko mene” pokazuje četiri iznad i pet ispod uz globalna mjesta; nerangiranom igraču prikazuje razlog i Top 10.
+- Greška učitavanja prikazuje poruku i gumb „Pokušaj ponovno”, nikad „nije odigrano”.
+- Na mobitelu se kartice razdoblja slažu u dva stupca, tablica u retke s `data-label` oznakama bez vodoravnog pomicanja.
+- Kategorija **Riječi** (Najčešće riječi): Top 10 zadano najučestalijih odigranih riječi u svim partijama (stvarna upotreba iz `potezi`, ne statička frekvencija iz uvoznog korpusa). Stupci: mjesto, riječ, broj upotreba, % partija u kojima se pojavila. Gumb **„Učitaj do 100"** s loading indikatorom; nema osobnih pozicija.
+- Nadimak vodi na javni profil samo za registrirane igrače; gost nema link.
 
 ## 9. Admin (`/admin`) — zaštićena uloga
 

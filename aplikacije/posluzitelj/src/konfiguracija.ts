@@ -30,6 +30,7 @@ const shemaKonfiguracije = z.object({
   VERZIJA: z.string().default('lokalno'),
   DIGEST: z.string().default('lokalno'),
   POSLUZUJ_WEB: z.enum(['true', 'false']).default('false'),
+  LJESTVICE_POCETAK: z.string().datetime({ offset: true }).default('2026-01-01T00:00:00+01:00'),
 });
 
 export const konfiguracija = shemaKonfiguracije.parse(process.env);
@@ -50,4 +51,8 @@ if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'producti
   if (konfiguracija.JAVNA_ADRESA.startsWith('http://')) {
     throw new Error('JAVNA_ADRESA mora koristiti HTTPS izvan razvoja i testiranja.');
   }
+}
+
+if (konfiguracija.NODE_ENV === 'production' && !process.env.LJESTVICE_POCETAK) {
+  throw new Error('LJESTVICE_POCETAK mora biti izričito postavljen u produkciji (početak javnog praćenja).');
 }

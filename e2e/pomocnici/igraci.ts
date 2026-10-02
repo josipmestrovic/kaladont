@@ -34,6 +34,20 @@ export async function cekajIstuPartiju(igraci: readonly E2EIgrac[]): Promise<str
   return partijaIdovi[0]!;
 }
 
+export async function cekajIgracaNaPotezu(igraci: readonly E2EIgrac[]): Promise<E2EIgrac> {
+  let igracNaPotezu: E2EIgrac | null = null;
+  await expect.poll(async () => {
+    for (const igrac of igraci) {
+      if (await igrac.stranica.getByRole('textbox', { name: /Dovrši riječ na/ }).isVisible()) {
+        igracNaPotezu = igrac;
+        return true;
+      }
+    }
+    return false;
+  }, { timeout: 15_000 }).toBe(true);
+  return igracNaPotezu!;
+}
+
 export async function zatvoriIgrace(igraci: readonly E2EIgrac[]): Promise<void> {
   await Promise.all(igraci.map(({ kontekst }) => kontekst.close()));
 }

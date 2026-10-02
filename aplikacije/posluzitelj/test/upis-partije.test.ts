@@ -194,4 +194,107 @@ describe('upis partije i javne pobjede', () => {
     expect(partija?.status).toBe('ponistena');
     await baza.delete(partije).where(eq(partije.id, partijaId));
   });
+
+  it('sprema sažetak igre za ljestvice i zadržava stvarni kraj pri ponovljenom upisu', async () => {
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Test Sažetka' });
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'cetiri_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values({ partijaId, igracId, sjedalo: 0 });
+
+    const zavrsenoU = new Date('2026-10-01T21:59:30.000Z');
+    const rezultati = [{ igracId, plasman: 1 as const, bodovi: 3, eliminacije: 0, iskustvo: 0, nacinIspadanja: 'pobjednik' as const }];
+    const statistike = new Map([[igracId, {
+      igracId,
+      grupe: [],
+      otkljucaneRijeci: [],
+      prihvaceniPotezi: 5,
+      ukupnoTrajanjePrihvaceniPoteziMs: 12_345,
+      najduziStreak: 3,
+      otkriveneJakoRijetkeGrupe: 0,
+      otkriveneSrednjeRijetkeGrupe: 0,
+      otkriveneRijetkeGrupe: 0,
+      upisaneDugeRijeci: 0,
+      upisaneSrednjeDugeRijeci: 0,
+      upisaneJakoDugeRijeci: 0,
+      najduzaRijec: 'njuškalo',
+      najduzaRijecGrafemi: 7,
+      najrjedaRijec: null,
+      najrjedaRijecFrekvencija: null,
+      najrjedaTier: null,
+    }]]);
+
+    await zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', statistike, false, new Map(), zavrsenoU);
+    await zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', statistike, false, new Map(), new Date());
+
+    const [partija] = await baza.select({ kraj: partije.kraj }).from(partije).where(eq(partije.id, partijaId));
+    const [sudionik] = await baza.select({
+      metrikeVerzija: sudioniciPartije.metrikeVerzija,
+      prihvaceneRijeci: sudioniciPartije.prihvaceneRijeci,
+      trajanjePrihvacenihMs: sudioniciPartije.trajanjePrihvacenihMs,
+      najduziNizRijeci: sudioniciPartije.najduziNizRijeci,
+      najduzaRijec: sudioniciPartije.najduzaRijec,
+      najduzaRijecGrafemi: sudioniciPartije.najduzaRijecGrafemi,
+    }).from(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+    const [igrac] = await baza.select({ odigrane: igraci.odigrane }).from(igraci).where(eq(igraci.id, igracId));
+
+    expect(partija?.kraj?.toISOString()).toBe(zavrsenoU.toISOString());
+    expect(sudionik).toEqual({
+      metrikeVerzija: 1,
+      prihvaceneRijeci: 5,
+      trajanjePrihvacenihMs: 12_345,
+      najduziNizRijeci: 3,
+      najduzaRijec: 'njuškalo',
+      najduzaRijecGrafemi: 7,
+    });
+    expect(igrac?.odigrane).toBe(1);
+  });
+
+  it('igra bez prihvaćenih riječi ima nulti sažetak, a bez statistike ostaje nepoznat', async () => {
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Test Bez Riječi' });
+    const prazna = {
+      igracId,
+      grupe: [],
+      otkljucaneRijeci: [],
+      prihvaceniPotezi: 0,
+      ukupnoTrajanjePrihvaceniPoteziMs: 0,
+      najduziStreak: 0,
+      otkriveneJakoRijetkeGrupe: 0,
+      otkriveneSrednjeRijetkeGrupe: 0,
+      otkriveneRijetkeGrupe: 0,
+      upisaneDugeRijeci: 0,
+      upisaneSrednjeDugeRijeci: 0,
+      upisaneJakoDugeRijeci: 0,
+      najduzaRijec: null,
+      najduzaRijecGrafemi: 0,
+      najrjedaRijec: null,
+      najrjedaRijecFrekvencija: null,
+      najrjedaTier: null,
+    };
+    const ocekivano: unknown[] = [];
+    for (const statistike of [new Map([[igracId, prazna]]), new Map()]) {
+      const partijaId = randomUUID();
+      obracuniZaBrisanje.push(partijaId);
+      await baza.insert(partije).values({ id: partijaId, mod: 'dva_igraca', status: 'u_tijeku' });
+      await baza.insert(sudioniciPartije).values({ partijaId, igracId, sjedalo: 0 });
+      await zakljuciPartijuUBazi(
+        partijaId,
+        igracId,
+        [{ igracId, plasman: 1, bodovi: 1, eliminacije: 0, iskustvo: 0, nacinIspadanja: 'pobjednik' }],
+        'dva_igraca',
+        statistike,
+      );
+      const [sudionik] = await baza.select({
+        metrikeVerzija: sudioniciPartije.metrikeVerzija,
+        prihvaceneRijeci: sudioniciPartije.prihvaceneRijeci,
+        najduzaRijec: sudioniciPartije.najduzaRijec,
+      }).from(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+      ocekivano.push(sudionik);
+    }
+
+    expect(ocekivano).toEqual([
+      { metrikeVerzija: 1, prihvaceneRijeci: 0, najduzaRijec: null },
+      { metrikeVerzija: null, prihvaceneRijeci: null, najduzaRijec: null },
+    ]);
+  });
 });

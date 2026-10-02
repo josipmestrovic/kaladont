@@ -13,3 +13,4 @@ export * from './nadimak.js';
 export * from './forma.js';
 export * from './cv-datumi.js';
 export * from './cv.js';
+export * from './ljestvice.js';

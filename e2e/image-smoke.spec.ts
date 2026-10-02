@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { dodajIgrace, zatvoriIgrace, type E2EIgrac } from './pomocnici/igraci.js';
+import { cekajIgracaNaPotezu, dodajIgrace, zatvoriIgrace, type E2EIgrac } from './pomocnici/igraci.js';
 
 test('buildani image podržava kratku partiju i ponovnu igru', async ({
   browser,
@@ -27,8 +27,9 @@ test('buildani image podržava kratku partiju i ponovnu igru', async ({
     await expect(vlasnik).toHaveURL(/\/partija\/[0-9a-f-]+$/);
     await expect(gost).toHaveURL(vlasnik.url());
 
-    await vlasnik.getByRole('button', { name: 'Ne znam' }).click();
-    const dijalog = vlasnik.getByRole('dialog', { name: 'Predati potez?' });
+    const igracNaPotezu = await cekajIgracaNaPotezu(igraci);
+    await igracNaPotezu.stranica.getByRole('button', { name: 'Ne znam' }).click();
+    const dijalog = igracNaPotezu.stranica.getByRole('dialog', { name: 'Predati potez?' });
     await expect(dijalog).toBeVisible();
     await dijalog.getByRole('button', { name: 'Da' }).click();
 

@@ -15,6 +15,8 @@ export default defineConfig({
       ONEMOGUCI_TIMER_POTEZA: 'true',
       ODGODA_POCETKA_PARTIJE_MS: '0',
       TOLERANCIJA_PREKIDA_MS: '300',
+      // Praćenje počinje pri pokretanju testova, pa je svih vremena uvijek još zaključano.
+      LJESTVICE_POCETAK: new Date().toISOString(),
     },
   },
 });

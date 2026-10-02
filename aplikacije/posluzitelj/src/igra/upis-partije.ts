@@ -173,6 +173,25 @@ function dnkPodaciIzRedaka(
   return { ...redak, ...statistika };
 }
 
+/** Sažetak igre za vremenske ljestvice; bez statistike ostaje NULL (nepoznato), nikad 0. */
+export function sazetakMetrika(statistika: ZapisStatistikeRijeci | undefined) {
+  if (!statistika) return {};
+  const imaRijeci = statistika.prihvaceniPotezi > 0;
+  if (imaRijeci && (!statistika.najduzaRijec || statistika.najduzaRijecGrafemi <= 0)) {
+    // Nekonzistentan sažetak ne smije srušiti upis rezultata; ostaje nepoznat.
+    console.error(`Nepotpun sažetak metrika za igrača ${statistika.igracId}; ne upisuje se.`);
+    return {};
+  }
+  return {
+    metrikeVerzija: 1,
+    prihvaceneRijeci: statistika.prihvaceniPotezi,
+    trajanjePrihvacenihMs: imaRijeci ? Math.max(0, Math.round(statistika.ukupnoTrajanjePrihvaceniPoteziMs)) : 0,
+    najduziNizRijeci: imaRijeci ? Math.min(Math.max(1, statistika.najduziStreak), statistika.prihvaceniPotezi) : 0,
+    najduzaRijec: imaRijeci ? statistika.najduzaRijec : null,
+    najduzaRijecGrafemi: imaRijeci ? statistika.najduzaRijecGrafemi : null,
+  };
+}
+
 /** Zaključuje partiju transakcijski i vraća ažurirane agregate (bodovi_ukupno, odigrane) po igraču. */
 export async function zakljuciPartijuUBazi(
   partijaId: string,
@@ -182,6 +201,7 @@ export async function zakljuciPartijuUBazi(
   statistike: Map<string, ZapisStatistikeRijeci> = new Map(),
   samoStatistika = false,
   napredakDostignuca: Map<string, ZapisNapretkaDostignuca> = new Map(),
+  zavrsenoU: Date = new Date(),
 ): Promise<Map<string, AgregatZakljucka>> {
   const agregati = new Map<string, AgregatZakljucka>();
   const modStatistike = mod;
@@ -193,7 +213,7 @@ export async function zakljuciPartijuUBazi(
         .onConflictDoNothing()
         .returning({ partijaId: obracuniPartija.partijaId })
       : await tx.update(partije)
-        .set({ status: 'zavrsena', kraj: new Date(), pobjednikId })
+        .set({ status: 'zavrsena', kraj: zavrsenoU, pobjednikId })
         .where(and(eq(partije.id, partijaId), eq(partije.status, 'u_tijeku')))
         .returning({ partijaId: partije.id });
 
@@ -235,7 +255,7 @@ export async function zakljuciPartijuUBazi(
         .onConflictDoNothing();
     } else {
       await tx.update(partije)
-        .set({ status: 'zavrsena', kraj: new Date(), pobjednikId })
+        .set({ status: 'zavrsena', kraj: zavrsenoU, pobjednikId })
         .where(and(eq(partije.id, partijaId), eq(partije.status, 'u_tijeku')));
     }
 
@@ -328,6 +348,7 @@ export async function zakljuciPartijuUBazi(
             eliminacije: r.eliminacije,
             iskustvo: r.iskustvo,
             nacinIspadanja: r.nacinIspadanja,
+            ...sazetakMetrika(statistike.get(r.igracId)),
           })
           .where(and(eq(sudioniciPartije.partijaId, partijaId), eq(sudioniciPartije.igracId, r.igracId)));
       }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { dodajIgrace, zatvoriIgrace, type E2EIgrac } from './pomocnici/igraci.js';
+import { cekajIgracaNaPotezu, dodajIgrace, zatvoriIgrace, type E2EIgrac } from './pomocnici/igraci.js';
 
 test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomicanja', async ({
   page,
@@ -93,22 +93,44 @@ test('dvostupčana statistika rječnika stane na uski mobitel', async ({ page })
 });
 
 test('mobilne ljestvice prikazuju oznake i dugačke nazive bez pomicanja', async ({ page }) => {
-  await page.route(/\/ljestvica\?/, (ruta) =>
+  const pozicija = { status: 'rangiran', mjesto: 1, odigraneIgre: 45, minimumIgara: 10, nedostajeIgara: 0 };
+  await page.route(/\/api\/ljestvice\?/, (ruta) =>
     ruta.fulfill({
       json: {
-        ljestvica: [
+        ok: true,
+        mod: 'cetiri_igraca',
+        metrika: 'prosjek_bodova',
+        prikaz: 'top',
+        razdoblje: {
+          vrsta: 'dnevno',
+          od: '2026-10-01T22:00:00.000Z',
+          do: '2026-10-02T22:00:00.000Z',
+          podaciOd: '2026-01-01T00:00:00.000Z',
+          stanje: 'aktivno',
+          otkljucavaSe: null,
+        },
+        minimumIgara: 10,
+        redci: [
           {
             mjesto: 1,
             igracId: 'test',
-            jeJavan: true,
-            nadimak: 'JakoDugackoImeIgraca',
-            rang: 'Gospodar rječnika',
-            prosjekBodova: 5.12,
-            odigrane: 45,
-            postotakPobjeda: 70,
+            nadimak: 'JakoDugackoImeIgracaBezRazmaka',
+            jeJavanProfil: true,
+            jeJa: true,
+            odigraneIgre: 45,
+            vrijednost: { vrsta: 'prosjek_bodova', prosjek: 5.12, bodoviUkupno: 230 },
           },
         ],
-        mojeMjesto: null,
+        mojaPozicija: pozicija,
+        pozicijePoRazdobljima: {
+          dnevno: pozicija,
+          tjedno: { ...pozicija, status: 'nedovoljan_broj_igara', mjesto: null, minimumIgara: 20, nedostajeIgara: 3 },
+          mjesecno: { ...pozicija, status: 'nije_igrano', mjesto: null, odigraneIgre: 0 },
+          godisnje: pozicija,
+          svih_vremena: { ...pozicija, status: 'zakljucano', mjesto: null },
+        },
+        svihVremenaOtkljucavaSe: '2027-01-01T00:00:00.000Z',
+        izracunatoU: '2026-10-02T10:00:00.000Z',
       },
     }),
   );
@@ -124,7 +146,8 @@ test('mobilne ljestvice prikazuju oznake i dugačke nazive bez pomicanja', async
 
   for (const sirina of [320, 390, 999]) {
     await page.setViewportSize({ width: sirina, height: 760 });
-    await page.goto('/ljestvica');
+    await page.goto('/ljestvice');
+    await expect(page.getByText('Ovo si ti')).toBeVisible();
     for (const tab of ['Igrači', 'Riječi']) {
       await page.getByRole('tab', { name: tab }).click();
       const tablica = page.locator('table.tablica-mobilni-retci');
@@ -246,7 +269,8 @@ test('mobilni igrač ulazi u privatnu partiju i vidi aktivni input', async ({
     await expect(vlasnik).toHaveURL(/\/partija\/[0-9a-f-]+$/);
     await expect(gost).toHaveURL(vlasnik.url());
 
-    const aktivniUnos = vlasnik.getByRole('textbox', { name: /Dovrši riječ na/ });
+    const igracNaPotezu = await cekajIgracaNaPotezu(igraci);
+    const aktivniUnos = igracNaPotezu.stranica.getByRole('textbox', { name: /Dovrši riječ na/ });
     await expect(aktivniUnos).toBeVisible();
     await aktivniUnos.scrollIntoViewIfNeeded();
     await aktivniUnos.focus();
@@ -276,7 +300,7 @@ test('mobilni prekid mreže zaključava potez i reconnect vraća stanje partije'
     await vlasnik.getByRole('button', { name: 'Započni igru' }).click();
     await expect(vlasnik).toHaveURL(/\/partija\/[0-9a-f-]+$/);
 
-    const igrac = igraci[0]!;
+    const igrac = await cekajIgracaNaPotezu(igraci);
     await expect(igrac.stranica.getByRole('button', { name: 'Pošalji' })).toBeVisible();
     await igrac.kontekst.setOffline(true);
     await expect(igrac.stranica.getByText('Veza je prekinuta.')).toBeVisible();
@@ -310,8 +334,9 @@ test('mobilna privatna partija završava i Igraj ponovno vraća u sobu', async (
     await vlasnik.getByRole('button', { name: 'Započni igru' }).click();
     await expect(vlasnik).toHaveURL(/\/partija\/[0-9a-f-]+$/);
 
-    await vlasnik.getByRole('button', { name: 'Ne znam' }).click();
-    const dijalog = vlasnik.getByRole('dialog', { name: 'Predati potez?' });
+    const igracNaPotezu = await cekajIgracaNaPotezu(igraci);
+    await igracNaPotezu.stranica.getByRole('button', { name: 'Ne znam' }).click();
+    const dijalog = igracNaPotezu.stranica.getByRole('dialog', { name: 'Predati potez?' });
     await expect(dijalog).toBeVisible();
     await dijalog.getByRole('button', { name: 'Da' }).click();
 

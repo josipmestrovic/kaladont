@@ -114,7 +114,7 @@ Streak raste nakon prihvaćenog igračevog poteza i prekida ga samo odbijena rij
 | id | uuid PK | |
 | mod | enum: `cetiri_igraca`, `dva_igraca` | Način igre |
 | pocetak | timestamptz | |
-| kraj | timestamptz, null | |
+| kraj | timestamptz, null | Stvarni trenutak kraja igre, zabilježen jednom u motoru; ponovljeni upis ga ne mijenja. Određuje razdoblje vremenskih ljestvica. |
 | status | enum: `u_tijeku`, `zavrsena`, `ponistena` | `ponistena` je rezerva za tehničke incidente |
 | pobjednik_id | uuid FK → igraci, null | |
 
@@ -133,6 +133,14 @@ Rezultat svakog igrača u svakoj partiji — **temelj svih statistika i budućeg
 | iskustvo | integer | XP stvarno dodijeljen za tu javnu partiju |
 | nacin_ispadanja | enum, null | `ne_znam`, `istek`, `mrtva_slova`, `prekid`, `pobjednik`, `kaladont` |
 | cekanje_ms | integer | Vrijeme provedeno u redu čekanja (za prosjek zadnjih 100 partija) |
+| metrike_verzija | smallint, null | `1` = sažetak ispod je pouzdano spremljen; `null` = nepoznato (starije igre), nikad ne znači 0 |
+| prihvacene_rijeci | integer, null | Broj prihvaćenih riječi igrača u toj igri |
+| trajanje_prihvacenih_ms | bigint, null | Zbroj serverski izmjerenih trajanja prihvaćenih poteza |
+| najduzi_niz_rijeci | integer, null | Najduži niz prihvaćenih riječi u igri (prekida ga odbijena riječ) |
+| najduza_rijec | text, null | Najduža prihvaćena riječ u igri; `null` ako nema prihvaćenih riječi |
+| najduza_rijec_grafemi | integer, null | Duljina najduže riječi u grafemima (`grafemi()`) |
+
+Sažetak se upisuje samo za javne igre, u istoj transakciji kao konačni rezultat. CHECK `chk_sudionici_metrike_v1` jamči konzistentnost kad je `metrike_verzija = 1`. Izvor je za vremenske ljestvice (vidi `docs/09-brainstorm/Kaladont-ljestvice-specifikacija-agentu.md`).
 
 ## obracuni_partija
 

@@ -58,7 +58,7 @@
   <section>
     <h2>Dvoboj</h2>
     <p>2 igrača, nasumično odabrana, isti nastavci riječi, nema skrivanja iza trećeg čovjeka. Tko prvi ispadne, gubi; pobjednik dobiva 1 bod.</p>
-    <p>Dvoboj ima zasebne statistike, rang i <a href="/ljestvica">ljestvicu</a>. Rezultati Četveroboja i Dvoboja ne miješaju se.</p>
+    <p>Dvoboj ima zasebne statistike, rang i <a href="/ljestvice">ljestvice</a>. Rezultati Četveroboja i Dvoboja ne miješaju se.</p>
   </section>
 
   <section>

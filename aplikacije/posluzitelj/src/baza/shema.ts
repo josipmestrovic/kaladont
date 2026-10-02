@@ -5,6 +5,7 @@
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -250,7 +251,11 @@ export const partije = pgTable('partije', {
   kraj: timestamp('kraj', { withTimezone: true }),
   status: statusPartije('status').notNull().default('u_tijeku'),
   pobjednikId: uuid('pobjednik_id').references(() => igraci.id),
-});
+}, (tablica) => [
+  index('idx_partije_zavrsene_mod_kraj')
+    .on(tablica.mod, tablica.kraj, tablica.id)
+    .where(sql`${tablica.status} = 'zavrsena'`),
+]);
 
 /** Idempotency ključ završnog obračuna; privatne partije nemaju red u `partije`. */
 export const obracuniPartija = pgTable('obracuni_partija', {
@@ -276,10 +281,33 @@ export const sudioniciPartije = pgTable(
     iskustvo: integer('iskustvo').notNull().default(0),
     nacinIspadanja: nacinIspadanja('nacin_ispadanja'),
     cekanjeMs: integer('cekanje_ms').notNull().default(0),
+    // NULL = sažetak nije zabilježen (stare igre); 1 = svi stupci ispod su pouzdani.
+    metrikeVerzija: smallint('metrike_verzija'),
+    prihvaceneRijeci: integer('prihvacene_rijeci'),
+    trajanjePrihvacenihMs: bigint('trajanje_prihvacenih_ms', { mode: 'number' }),
+    najduziNizRijeci: integer('najduzi_niz_rijeci'),
+    najduzaRijec: text('najduza_rijec'),
+    najduzaRijecGrafemi: integer('najduza_rijec_grafemi'),
   },
   (tablica) => [
     primaryKey({ columns: [tablica.partijaId, tablica.igracId] }),
     index('idx_sudionici_partije_igrac_id_partija_id').on(tablica.igracId, tablica.partijaId),
+    check('chk_sudionici_metrike_v1', sql`${tablica.metrikeVerzija} is null or (
+      ${tablica.metrikeVerzija} = 1
+      and ${tablica.prihvaceneRijeci} is not null
+      and ${tablica.trajanjePrihvacenihMs} is not null
+      and ${tablica.najduziNizRijeci} is not null
+      and ${tablica.prihvaceneRijeci} >= 0
+      and ${tablica.trajanjePrihvacenihMs} >= 0
+      and ${tablica.najduziNizRijeci} >= 0
+      and ${tablica.najduziNizRijeci} <= ${tablica.prihvaceneRijeci}
+      and (
+        (${tablica.prihvaceneRijeci} = 0 and ${tablica.trajanjePrihvacenihMs} = 0 and ${tablica.najduziNizRijeci} = 0
+          and ${tablica.najduzaRijec} is null and ${tablica.najduzaRijecGrafemi} is null)
+        or (${tablica.prihvaceneRijeci} > 0 and ${tablica.najduziNizRijeci} >= 1
+          and ${tablica.najduzaRijec} is not null and ${tablica.najduzaRijecGrafemi} > 0)
+      )
+    )`),
   ],
 );
 

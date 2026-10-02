@@ -36,7 +36,21 @@ Uz bodove za plasman:
 
 Javni modovi imaju zaseban broj partija, pobjeda i eliminacija, prosjek bodova, rang, formu i niz pobjeda. Rezultat Četveroboja ne prenosi se u Dvoboj, ni obratno. XP i trajni napredak u dostignućima zajednički su za oba javna moda.
 
-Javna ljestvica prikazuje do 100 registriranih igrača s najmanje **10 završenih javnih partija u odabranom modu**. Statistika i poredak računaju se samo za odabrani način igre.
+Stari ukupni poredak (`GET /api/ljestvica`, najmanje **10 završenih javnih partija u odabranom modu**) ostaje privremeno radi kompatibilnosti; stranica ga više ne prikazuje.
+
+### Vremenske ljestvice
+
+Stranica `/ljestvice` ima zasebne poretke za Četveroboj i Dvoboj, po metrici i razdoblju. Prva faza: **Prosjek bodova** i **Niz pobjeda**; Niz riječi, Najduža riječ i Najbrži igrači dolaze u sljedećoj fazi.
+
+- **Razdoblja:** Dnevna, Tjedna (ponedjeljak–ponedjeljak), Mjesečna, Godišnja (kalendarska) i Svih vremena. Granice su ponoći po zoni `Europe/Zagreb`, interval `[početak, kraj)`.
+- **Pripadnost:** cijela igra pripada razdoblju u kojem je **završila** (`partije.kraj`). Ulaze samo završene javne igre; privatne, aktivne i poništene ne.
+- **Minimum:** 10 igara u danu; 20 igara unutar svakog duljeg razdoblja posebno. Današnje igre pridonose svim duljim razdobljima, ali rang se dobiva tek kad je minimum tog razdoblja ispunjen.
+- **Prosjek bodova:** zbroj bodova / broj igara, veći je bolji; prosjek 0 je valjan rezultat.
+- **Niz pobjeda:** najduži niz uzastopnih pobjeda (plasman 1) unutar razdoblja; svaki drugi plasman ga prekida. Igre se slažu redom **ulaska** (`partije.pocetak`, zatim ID), a ne redom završetka stolova. Pobjede izvan razdoblja se ne pribrajaju. Igrač bez pobjede nema rezultat.
+- **Izjednačenje:** glavni rezultat → više odigranih igara u razdoblju → ranije ostvaren rezultat → stabilni ID. Mjesta su jedinstvena (1, 2, 3…); isti poredak koriste tablica, „Oko mene” i vlastita pozicija.
+- **Početak praćenja:** `LJESTVICE_POCETAK` (obavezno u produkciji). Razdoblje koje počinje prije njega reže se na taj trenutak, bez smanjenja minimuma. Svih vremena otključava se na prvu kalendarsku godišnjicu tog trenutka (29. 2. → 28. 2.).
+- Obrisani igrači ne ulaze u žive poretke. Gosti ulaze kao i dosad, bez javnog profila.
+- Igra s nepotpunim konačnim zapisom (bez plasmana) označava rezultat igrača kao nepotpun umjesto da ga tiho izostavi.
 
 ## Rangovi
 

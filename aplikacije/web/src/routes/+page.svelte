@@ -48,7 +48,7 @@
         <img class="ikona-sucelja" src="/ikone/31-moj-profil.png" alt="" aria-hidden="true" />
         <span>Moj profil</span>
       </a>
-      <a href="/ljestvica" class="navigacijska-stavka">
+      <a href="/ljestvice" class="navigacijska-stavka">
         <img class="ikona-sucelja" src="/ikone/09-ljestvice.png" alt="" aria-hidden="true" />
         <span>Ljestvice</span>
       </a>
@@ -215,7 +215,7 @@
   .vrsta-igre { font-size: 0.72em; }
 
   @media (min-width: 1000px) {
-    .landing { gap: 0; }
+    .landing { gap: 0; --landing-padding: clamp(8px, 2dvh, 24px); }
 
     .izbornik {
       justify-content: flex-start;
@@ -361,7 +361,7 @@
   @media (max-width: 999px) {
     .izbornik {
       justify-content: flex-start;
-      gap: 40px;
+      gap: clamp(8px, 1.5dvh, 14px);
     }
 
     .kontrole-pristupacnosti-naslovnica {
@@ -369,7 +369,7 @@
     }
 
     .landing {
-      --landing-padding: clamp(8px, 3dvh, 50px);
+      --landing-padding: clamp(6px, 1dvh, 10px);
       --landing-razmak: clamp(8px, 2.5dvh, 28px);
       --visina-stavke: clamp(40px, 7dvh, 68px);
       --razmak-stavki: clamp(5px, 1.2dvh, 12px);

@@ -29,10 +29,16 @@ test('stranice s queryjem, hashom, ljestvicom i javnim profilom rade nakon refre
   await page.reload();
   await expect(page).toHaveURL(/\/profil\?tab=postavke#avatar$/);
 
-  await page.goto('/ljestvica');
-  await expect(page.getByRole('heading', { name: 'Ljestvica' })).toBeVisible();
+  await page.goto('/ljestvica?tab=rijeci');
+  await expect(page).toHaveURL(/\/ljestvice\?kategorija=rijeci$/);
+  await expect(page.getByRole('heading', { name: 'Ljestvice' })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Ljestvica' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ljestvice' })).toBeVisible();
+  const stariApi = await request.get('/api/ljestvica');
+  expect(stariApi.headers()['content-type']).toContain('application/json');
+  const noviApi = await request.get('/api/ljestvice?razdoblje=tjedno');
+  expect(noviApi.ok()).toBe(true);
+  expect((await noviApi.json()) as { razdoblje: { vrsta: string } }).toMatchObject({ razdoblje: { vrsta: 'tjedno' } });
 
   const email = `http-e2e-${Date.now()}@example.com`;
   const registracija = await request.post('/api/racuni/registracija', {

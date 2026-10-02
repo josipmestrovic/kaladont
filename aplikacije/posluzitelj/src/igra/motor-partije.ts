@@ -727,6 +727,8 @@ export function stvoriUpraviteljPartija(
 
   function zakljuciPartiju(stanje: StanjeStola): void {
     stanje.zavrsena = true;
+    // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.
+    const zavrsenoU = new Date();
     if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
     if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
     for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
@@ -867,7 +869,7 @@ export function stvoriUpraviteljPartija(
       stanje,
       () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod, statistike, false, new Map(
         [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
-      )).then((agregati) => {
+      ), zavrsenoU).then((agregati) => {
         for (const p of plasmani) {
           const agregat = agregati.get(p.igracId);
           const prosjek = agregat && agregat.odigrane > 0 ? agregat.bodoviUkupno / agregat.odigrane : 0;

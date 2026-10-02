@@ -99,7 +99,7 @@ test('registrirani CV je isti na vlastitom i javnom profilu', async ({ page }) =
   const ocjenaIgre = page.locator('.ostalo-kartica .stat-kartica').filter({ hasText: 'Prosječna ocjena igre' });
   await expect(ocjenaIgre).toBeVisible();
   const ocjenaOkvir = await ocjenaIgre.boundingBox();
-  const istaknutostiOkvir = await istaknutaDostignuca.boundingBox();
+  const istaknutostiOkvir = await istaknutoCv.boundingBox();
   expect(ocjenaOkvir).not.toBeNull();
   expect(istaknutostiOkvir).not.toBeNull();
   expect(istaknutostiOkvir!.y).toBeGreaterThanOrEqual(ocjenaOkvir!.y + ocjenaOkvir!.height);
