@@ -65,7 +65,6 @@ test('profili prikazuju istaknuta dostignuća i tooltip na osobnom i javnom prof
 
   await page.setViewportSize({ width: 375, height: 812 });
   await page.reload();
-  const header = page.locator('.zaglavlje-profila');
   const avatar = await page.locator('.zaglavlje-profila > :first-child').boundingBox();
   const sazetak = await page.locator('.profil-sazetak').boundingBox();
   expect(avatar).not.toBeNull();
