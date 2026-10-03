@@ -50,6 +50,14 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 | `reakcija:nova` | `{ igracId: string, poruka: BrzaPoruka }` | |
 | `greska` | `{ kod: KodGreske, poruka: string }` | Općenite greške (npr. `PREBRZO`) |
 
+## Validacija ulaznih događaja
+
+Tipovi klijenta nisu validacija mrežnih podataka. Poslužitelj svaki ulazni payload provjerava u runtimeu prije izmjene stanja; nevaljani payload, dodatni argumenti i callback koji nije funkcija odbijaju se bez mutacije. Odbijanje payload-a šalje `greska` s kodom `NEVALJAN_PAYLOAD`; neočekivana interna pogreška vraća samo generičku poruku s kodom `INTERNA`, zapisuje događaj, ID veze i tip pogreške bez tokena ili payloada te zatvara pogođenu vezu kako se ona ne bi nastavila koristiti nakon mogućeg djelomičnog neuspjeha.
+
+Ack za `red:udji` je opcionalan: poziv bez callbacka podržan je za fire-and-forget klijente. Ako je callback poslan, mora biti funkcija; poslužitelj ga poziva najviše jednom s `StanjeReda` ili `null`. Klijent koji želi zadani mod uz ack šalje `{}` kao payload; ne šalje eksplicitni `undefined` jer se na žici serijalizira kao `null`. Svi ostali događaji su jednosmjerni i ne prihvaćaju dodatni callback.
+
+Socket.IO ograničava pojedinačnu ulaznu poruku na najviše **16 KiB**. Valjane sheme i najveći dopušteni avatar/room payload moraju ostati ispod te granice; povećanje limita zahtijeva mjerenje i odgovarajuću promjenu dokumentacije.
+
 ## Tipovi payloada
 
 ```ts

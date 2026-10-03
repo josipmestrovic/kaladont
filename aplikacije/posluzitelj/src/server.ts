@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -35,9 +36,18 @@ import {
 } from './sigurnost/origin.js';
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 import { OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
+import type { ZapisSocketHandlerGreske } from './sigurnost/socket-handler.js';
 import { ponistiPartijeUTijekuUBazi } from './igra/upis-partije.js';
 import { ocistiIstekleNepotvrdjeneRacune } from './racuni/ciscenje-nepotvrdjenih.js';
 import { nizoviPobjedaIgraca } from './baza/shema.js';
+import { omotajSocketHandler } from './sigurnost/socket-handler.js';
+
+export const MAX_SOCKET_PORUKA_BAJTOVA = 16 * 1024;
+
+const ShemaAvatarAzuriraj = z.object({
+  avatarConfig: z.custom<AvatarConfigV1>(validirajAvatarConfig),
+  avatarRevision: z.number().int().nonnegative().safe(),
+}).strict();
 
 export interface PodaciSocketa {
   igracId: string;
@@ -110,6 +120,9 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const provjeriDogadaj = (igracId: string, dogadaj: string): boolean =>
     ogranicivacDogadaja.dopusti(`${igracId}:${dogadaj}`, socketOgranicenja.dogadajiPoProzoru);
   const app = Fastify({ logger: true, trustProxy: jePouzdaniProxy(okruzenjeSigurnosti) });
+  const zapisSocketHandlerGreske: ZapisSocketHandlerGreske = ({ dogadaj, socketId, tipGreske }) => {
+    app.log.error({ dogadaj, socketId, tipGreske }, 'Neobrađena pogreška u Socket.IO handleru');
+  };
   await app.register(cors, { origin: corsOrigin, credentials: true });
   await app.register(cookie);
   await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
@@ -200,6 +213,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   const io: KaladontIo = new SocketIoServer(app.server, {
     cors: { origin: corsOrigin, credentials: true },
+    maxHttpBufferSize: MAX_SOCKET_PORUKA_BAJTOVA,
     allowRequest: (zahtjev, povratniPoziv) => {
       const originDopusten = jeDopustenOrigin(okruzenjeSigurnosti, zahtjev.headers.origin, javnaAdresaOrigin);
       const proslijedeniIp = zahtjev.headers['x-forwarded-for'];
@@ -239,6 +253,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       ...opcije.postavkeMotora,
       maksimalnoAktivnihPartija: socketOgranicenja.maksimalnoAktivnihPartija,
       provjeriDogadaj,
+      zapisSocketHandlerGreske,
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
       },
@@ -332,12 +347,16 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   io.on('connection', (socket) => {
     const { igracId, nadimak } = socket.data;
 
-    socket.on('igrac:avatar-azuriraj', (payload) => {
-      if (!validirajAvatarConfig(payload?.avatarConfig) || !Number.isInteger(payload.avatarRevision)) return;
-      if (payload.avatarRevision <= socket.data.avatarRevision) return;
-      socket.data.avatarConfig = payload.avatarConfig;
-      socket.data.avatarRevision = payload.avatarRevision;
-    });
+    socket.on('igrac:avatar-azuriraj', omotajSocketHandler(socket, 'igrac:avatar-azuriraj', zapisSocketHandlerGreske, (payload: unknown, ...dodatniArgumenti: unknown[]) => {
+      const rezultat = ShemaAvatarAzuriraj.safeParse(payload);
+      if (!rezultat.success || dodatniArgumenti.length > 0) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        return;
+      }
+      if (rezultat.data.avatarRevision <= socket.data.avatarRevision) return;
+      socket.data.avatarConfig = rezultat.data.avatarConfig;
+      socket.data.avatarRevision = rezultat.data.avatarRevision;
+    }));
 
     // RS-18: jedna aktivna veza po identitetu - stara veza se odjavljuje
     const staraSocketId = registarVeza.zamijeni(igracId, socket.id);
@@ -351,9 +370,9 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
     upravitelj.registrirajHandlere(socket);
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', omotajSocketHandler(socket, 'disconnect', zapisSocketHandlerGreske, () => {
       registarVeza.ukloni(igracId, socket.id);
-    });
+    }));
   });
 
   let igracImaPrivatnuSobu: (igracId: string) => boolean = () => false;
@@ -368,6 +387,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     () => upravitelj.mozePokrenutiPartiju() && upravitelj.brojAktivnihPartija() < socketOgranicenja.maksimalnoAktivnihPartija,
     igracMozeIgrati,
     provjeriDogadaj,
+    zapisSocketHandlerGreske,
   );
 
   const sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
@@ -378,6 +398,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       brojAktivnihPartija: () => upravitelj.brojAktivnihPartija(),
       mozeStvoritiPartiju: upravitelj.mozePokrenutiPartiju,
       provjeriDogadaj,
+      zapisSocketHandlerGreske,
       igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
       igracMozeIgrati,
       ukloniIzJavnogReda: redServis.ukloniIzReda,

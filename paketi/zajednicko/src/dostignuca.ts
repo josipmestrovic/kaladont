@@ -68,7 +68,10 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   'jezik_u_plamenu',
 ] as const;
 
-export function odaberiTopTriDostignuca<T extends { id: string; razina: number }>(dostignuca: readonly T[]): T[] {
+export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(
+  dostignuca: readonly T[],
+  maksimalanBroj = 3,
+): T[] {
   const prioritetPoId = new Map<string, number>(PRIORITETI_ISTAKNUTIH_DOSTIGNUCA.map((id, indeks) => [id, indeks]));
   const definicijaPoId = new Map(DEFINICIJE_DOSTIGNUCA.map((definicija) => [definicija.id, definicija]));
 
@@ -82,7 +85,11 @@ export function odaberiTopTriDostignuca<T extends { id: string; razina: number }
       const grupaDrugog = drugo.razina >= 4 ? 0 : drugo.id === 'iskusnjara' ? 1 : 2;
       return grupaPrvog - grupaDrugog || drugo.razina - prvo.razina || (prioritetPoId.get(prvo.id) ?? Infinity) - (prioritetPoId.get(drugo.id) ?? Infinity);
     })
-    .slice(0, 3);
+    .slice(0, maksimalanBroj);
+}
+
+export function odaberiTopTriDostignuca<T extends { id: string; razina: number }>(dostignuca: readonly T[]): T[] {
+  return odaberiIstaknutaDostignuca(dostignuca, 3);
 }
 
 export function izracunajNovaDostignuca(

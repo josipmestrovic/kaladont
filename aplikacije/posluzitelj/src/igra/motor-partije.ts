@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost/socket-handler.js';
 import { inArray } from 'drizzle-orm';
 import { konfiguracija } from '../konfiguracija.js';
 import { promijesajNiz } from './raspored-sjedala.js';
@@ -56,9 +57,9 @@ import type { StavkaReda } from '../red/red-cekanja.js';
 import { ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisStatistikeRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 
-const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50), turnToken: z.string().min(1).optional() });
-const ShemaNeznam = z.object({ turnToken: z.string().min(1).optional() });
-const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) });
+const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50), turnToken: z.string().min(1).max(64).optional() }).strict();
+const ShemaNeznam = z.object({ turnToken: z.string().min(1).max(64).optional() }).strict().optional();
+const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) }).strict();
 
 const TRAJANJE_POTEZA_MS = konfiguracija.TRAJANJE_POTEZA_MS;
 const TRAJANJE_IZBORA_SUSTAVA_MS = 10_000;
@@ -111,6 +112,7 @@ export interface PostavkeMotoraPartije {
   zadrzavanjeSobeNakonKrajaMs?: number;
   maksimalnoAktivnihPartija?: number;
   provjeriDogadaj?: ProvjeriOgranicenjeDogadaja;
+  zapisSocketHandlerGreske?: ZapisSocketHandlerGreske;
   naPartijaZavrsila?: (partijaId: string) => void;
   naPrivatnaPartijaZavrsila?: (kodSobe: string, partijaId: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => void;
 }
@@ -208,6 +210,7 @@ export function stvoriUpraviteljPartija(
   const zadrzavanjeSobeNakonKrajaMs = postavke.zadrzavanjeSobeNakonKrajaMs ?? ZADRZAVANJE_SOBE_NAKON_KRAJA_MS;
   const maksimalnoAktivnihPartija = postavke.maksimalnoAktivnihPartija ?? Number.POSITIVE_INFINITY;
   const provjeriDogadaj = postavke.provjeriDogadaj ?? (() => true);
+  const zapisSocketHandlerGreske = postavke.zapisSocketHandlerGreske ?? ((greska) => console.error('Neobrađena pogreška u Socket.IO handleru:', greska));
 
   const partije = new Map<string, StanjeStola>();
   const partijaPoIgracu = new Map<string, string>(); // igracId -> partijaId
@@ -1553,14 +1556,21 @@ export function stvoriUpraviteljPartija(
   }
 
   function registrirajHandlere(socket: KaladontSocket): void {
-    socket.on('partija:stanje', () => {
+    socket.on('partija:stanje', omotajSocketHandler(socket, 'partija:stanje', zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+      if (argumenti.length > 0) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        return;
+      }
       if (provjeriDogadaj(socket.data.igracId, 'partija:stanje')) posaljiStanje(socket);
-    });
+    }));
 
-    socket.on('potez:rijec', (payload) => {
-      if (!provjeriDogadaj(socket.data.igracId, 'potez:rijec')) return;
+    socket.on('potez:rijec', omotajSocketHandler(socket, 'potez:rijec', zapisSocketHandlerGreske, (payload: unknown, ...dodatniArgumenti: unknown[]) => {
       const rezultatSheme = ShemaPotezRijec.safeParse(payload);
-      if (!rezultatSheme.success) return; // neispravan payload - tiho ignoriraj (server ne vjeruje nikome)
+      if (!rezultatSheme.success || dodatniArgumenti.length > 0) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        return;
+      }
+      if (!provjeriDogadaj(socket.data.igracId, 'potez:rijec')) return;
       const { rijec, turnToken } = rezultatSheme.data;
 
       const partijaId = partijaPoIgracu.get(socket.data.igracId);
@@ -1602,34 +1612,35 @@ export function stvoriUpraviteljPartija(
         return;
       }
 
-      try {
-        obradiPrihvacenPotez(stanje, socket.data.igracId, rijecNormalizirana, socket);
-      } catch (greska) {
-        console.error('Neuspjela obrada prihvaćenog poteza:', { rijec: rijecNormalizirana, greska });
-        stanje.streakovi.set(socket.data.igracId, 0);
-        socket.emit('greska', { kod: 'INTERNA', poruka: 'Potez nije obrađen. Pokušaj ponovno.' });
-      }
-    });
+      obradiPrihvacenPotez(stanje, socket.data.igracId, rijecNormalizirana, socket);
+    }));
 
-    socket.on('potez:ne-znam', (payload) => {
+    socket.on('potez:ne-znam', omotajSocketHandler(socket, 'potez:ne-znam', zapisSocketHandlerGreske, (payload: unknown, ...dodatniArgumenti: unknown[]) => {
+      const rezultatSheme = ShemaNeznam.safeParse(payload);
+      if (!rezultatSheme.success || dodatniArgumenti.length > 0) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        return;
+      }
       if (!provjeriDogadaj(socket.data.igracId, 'potez:ne-znam')) return;
-      const rezultatSheme = ShemaNeznam.safeParse(payload ?? {});
-      if (!rezultatSheme.success) return;
       const partijaId = partijaPoIgracu.get(socket.data.igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;
       if (!stanje || stanje.zavrsena) return;
-      if (rezultatSheme.data.turnToken && rezultatSheme.data.turnToken !== stanje.turnToken) {
+      const turnToken = rezultatSheme.data?.turnToken;
+      if (turnToken && turnToken !== stanje.turnToken) {
         socket.emit('potez:odbijen', { kod: 'STARI_TURN_TOKEN', poruka: 'Potez je zastario. Osvježi stanje i pokušaj ponovno.' });
         return;
       }
       if (stanje.izborUToku || stanje.naPotezuId !== socket.data.igracId) return;
       eliminirajIgraca(stanje, socket.data.igracId, 'ne_znam');
-    });
+    }));
 
-    socket.on('reakcija:posalji', (payload) => {
-      if (!provjeriDogadaj(socket.data.igracId, 'reakcija:posalji')) return;
+    socket.on('reakcija:posalji', omotajSocketHandler(socket, 'reakcija:posalji', zapisSocketHandlerGreske, (payload: unknown, ...dodatniArgumenti: unknown[]) => {
       const rezultatSheme = ShemaReakcija.safeParse(payload);
-      if (!rezultatSheme.success) return;
+      if (!rezultatSheme.success || dodatniArgumenti.length > 0) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        return;
+      }
+      if (!provjeriDogadaj(socket.data.igracId, 'reakcija:posalji')) return;
       const { poruka } = rezultatSheme.data;
 
       const stanje = dohvatiPartijuZaSocket(socket);
@@ -1639,9 +1650,13 @@ export function stvoriUpraviteljPartija(
       if (sada - zadnja < 2000) return; // RS-22: tiho ignoriraj
       stanje.zadnjeReakcije.set(socket.data.igracId, sada);
       io.to(SOBA_PARTIJE(stanje.partijaId)).emit('reakcija:nova', { igracId: socket.data.igracId, poruka });
-    });
+    }));
 
-    socket.on('partija:izadji', () => {
+    socket.on('partija:izadji', omotajSocketHandler(socket, 'partija:izadji', zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+      if (argumenti.length > 0) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        return;
+      }
       if (!provjeriDogadaj(socket.data.igracId, 'partija:izadji')) return;
       const partijaId = partijaPoIgracu.get(socket.data.igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;
@@ -1655,11 +1670,11 @@ export function stvoriUpraviteljPartija(
       if (partijaPoIgracu.get(socket.data.igracId) === stanje.partijaId) {
         partijaPoIgracu.delete(socket.data.igracId);
       }
-    });
+    }));
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', omotajSocketHandler(socket, 'disconnect', zapisSocketHandlerGreske, () => {
       pokreniCekanjePovratka(socket);
-    });
+    }));
 
     obnoviVezuPartije(socket);
   }

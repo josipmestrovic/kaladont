@@ -24,12 +24,12 @@ export default defineConfig({
     },
     {
       name: 'android-chrome',
-      testMatch: 'mobilni-tok.spec.ts',
+      testMatch: ['mobilni-tok.spec.ts', 'kursori.spec.ts'],
       use: { ...devices['Pixel 7'] },
     },
     {
       name: 'iphone-webkit',
-      testMatch: 'mobilni-tok.spec.ts',
+      testMatch: ['mobilni-tok.spec.ts', 'kursori.spec.ts'],
       use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },
   ],

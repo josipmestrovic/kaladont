@@ -11,6 +11,11 @@ describe('AvatarConfigV1', () => {
     expect(validirajAvatarConfig({ ...ZADANI_AVATAR_CONFIG, colors: { skin: 'red' } })).toBe(false);
   });
 
+  it('odbija neočekivana polja u konfiguraciji i dijelovima', () => {
+    expect(validirajAvatarConfig({ ...ZADANI_AVATAR_CONFIG, token: 'ne smije se prihvatiti' })).toBe(false);
+    expect(validirajAvatarConfig({ ...ZADANI_AVATAR_CONFIG, parts: { ...ZADANI_AVATAR_CONFIG.parts, dodatno: 'vrijednost' } })).toBe(false);
+  });
+
   it('dopušta opcionalne dijelove Bez', () => {
     expect(validirajAvatarConfig({
       ...ZADANI_AVATAR_CONFIG,

@@ -92,7 +92,7 @@
 </span>
 
 <style>
-  .stil-omotac { position: relative; display: inline-flex; max-width: 100%; align-items: center; gap: 5px; color: var(--boja-tekst-osnovni); font-size: var(--tekst-mali); }
+  .stil-omotac { position: relative; display: inline-flex; max-width: 100%; align-items: center; gap: 5px; margin-top: 16px; color: var(--boja-tekst-osnovni); font-size: var(--tekst-mali); }
   .stil-omotac.otvoreno { z-index: 1000; }
   .stil-natpis { white-space: nowrap; }
   .stil-naziv, .stil-pomoc, .stil-zatvori { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
@@ -106,4 +106,8 @@
   .stil-objasnjenje { position: fixed; z-index: 1001; width: min(300px, calc(100vw - 32px)); max-height: calc(100vh - 16px); overflow-y: auto; padding: 14px 38px 14px 14px; border: 1px solid var(--boja-obrub-jaci); border-radius: 8px; background: var(--boja-povrsina-2); box-shadow: var(--sjena-modal); color: var(--boja-tekst-osnovni); font-size: var(--tekst-sitni); line-height: 1.5; }
   .stil-objasnjenje p { margin: 0; }
   .stil-zatvori { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; }
+
+  @media (max-width: 999px) {
+    .stil-omotac { margin-top: 8px; }
+  }
 </style>

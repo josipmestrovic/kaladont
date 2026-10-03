@@ -178,48 +178,32 @@ test('mobilna ljestvica privatne sobe prikazuje označene rezultate', async ({ p
   ).toBe(true);
 });
 
-test('mobilna aktivnost javnog profila prikazuje sve podatke partije', async ({ page }) => {
+test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', async ({ page }) => {
   const odgovor = await page.request.post('http://127.0.0.1:3001/api/racuni/registracija', {
     data: {
-      email: `tablica-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+      email: `aktivnost-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
       lozinka: 'lozinka123',
-      nadimak: 'TablicaIgrac',
+      nadimak: 'AktivIgrac',
     },
   });
   expect(odgovor.ok()).toBe(true);
-  const { igracId } = (await odgovor.json()) as { igracId: string };
-  await page.route(/\/api\/aktivnost\//, (ruta) =>
-    ruta.fulfill({
-      json: {
-        aktivnost: [
-          {
-            partijaId: 'test-partija',
-            pocetak: '2026-09-30T10:00:00Z',
-            kraj: '2026-09-30T10:10:00Z',
-            mod: 'dva_igraca',
-            plasman: 1,
-            bodovi: 1,
-            eliminacije: 0,
-          },
-        ],
-        imaJos: false,
-        sljedeciCursor: null,
-      },
-    }),
-  );
+  const { igracId, sesijskiToken } = (await odgovor.json()) as { igracId: string; sesijskiToken: string };
+  await page.addInitScript((token) => {
+    localStorage.setItem('kaladont_sesijski_token', token);
+  }, sesijskiToken);
   await page.setViewportSize({ width: 320, height: 760 });
+
+  await page.goto('/profil');
+  await expect(page.getByRole('navigation', { name: 'Sadržaj profila' }).getByRole('button', { name: 'Aktivnost' })).toHaveCount(0);
+
   await page.goto(`/profil/javni/${igracId}`);
-  await page
-    .getByRole('navigation', { name: 'Sadržaj profila' })
-    .getByRole('button', { name: 'Aktivnost' })
-    .click();
-  const tablica = page.locator('.aktivnost-tablica');
-  await expect(tablica.locator('tbody tr')).toHaveCount(1);
-  await expect(tablica.locator('td[data-label="Bodovi"]')).toHaveText('1');
-  await expect(tablica.getByRole('link', { name: 'Vidi igru' })).toBeVisible();
-  expect(await tablica.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
-    true,
-  );
+  await expect(page.getByRole('navigation', { name: 'Sadržaj profila' }).getByRole('button', { name: 'Aktivnost' })).toHaveCount(0);
+
+  const zaglavlja = { authorization: `Bearer ${sesijskiToken}` };
+  const aktivnost = await page.request.get(`http://127.0.0.1:3001/api/aktivnost/${igracId}`, { headers: zaglavlja });
+  const povijest = await page.request.get(`http://127.0.0.1:3001/api/povijest/${igracId}`, { headers: zaglavlja });
+  expect(aktivnost.status()).toBe(403);
+  expect(povijest.status()).toBe(403);
 });
 
 test('mobilni tok registracije čuva fokus, tipkovničku navigaciju i raspored', async ({ page }) => {

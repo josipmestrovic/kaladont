@@ -1,0 +1,190 @@
+{
+  "pack": "Kaladont cursors",
+  "version": 1,
+  "size": {
+    "width": 80,
+    "height": 80
+  },
+  "format": "PNG RGBA",
+  "defaultMode": "persistent-hand",
+  "automaticHoverSwitch": false,
+  "behavior": {
+    "persistentHand": {
+      "idle": "hover",
+      "pressed": "klik",
+      "released": "hover"
+    },
+    "arrowOption": {
+      "idle": "normal",
+      "pressed": "klik",
+      "released": "normal"
+    }
+  },
+  "sets": [
+    {
+      "id": "01-klasik",
+      "name": "Klasik",
+      "states": {
+        "normal": {
+          "file": "01-klasik/normal.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 15,
+            "y": 4
+          }
+        },
+        "hover": {
+          "file": "01-klasik/hover.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 19,
+            "y": 4
+          }
+        },
+        "klik": {
+          "file": "01-klasik/klik.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 19,
+            "y": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "02-vitez",
+      "name": "Vitez",
+      "states": {
+        "normal": {
+          "file": "02-vitez/normal.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 12,
+            "y": 4
+          }
+        },
+        "hover": {
+          "file": "02-vitez/hover.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 19,
+            "y": 4
+          }
+        },
+        "klik": {
+          "file": "02-vitez/klik.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 19,
+            "y": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "03-cudoviste",
+      "name": "Čudovište",
+      "states": {
+        "normal": {
+          "file": "03-cudoviste/normal.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 14,
+            "y": 4
+          }
+        },
+        "hover": {
+          "file": "03-cudoviste/hover.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 17,
+            "y": 4
+          }
+        },
+        "klik": {
+          "file": "03-cudoviste/klik.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 17,
+            "y": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "04-carobnjak",
+      "name": "Čarobnjak",
+      "states": {
+        "normal": {
+          "file": "04-carobnjak/normal.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 17,
+            "y": 4
+          }
+        },
+        "hover": {
+          "file": "04-carobnjak/hover.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 18,
+            "y": 4
+          }
+        },
+        "klik": {
+          "file": "04-carobnjak/klik.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 18,
+            "y": 4
+          }
+        }
+      }
+    },
+    {
+      "id": "05-kaladont",
+      "name": "Kaladont",
+      "states": {
+        "normal": {
+          "file": "05-kaladont/normal.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 14,
+            "y": 4
+          }
+        },
+        "hover": {
+          "file": "05-kaladont/hover.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 21,
+            "y": 4
+          }
+        },
+        "klik": {
+          "file": "05-kaladont/klik.png",
+          "width": 80,
+          "height": 80,
+          "hotspot": {
+            "x": 21,
+            "y": 4
+          }
+        }
+      }
+    }
+  ]
+}

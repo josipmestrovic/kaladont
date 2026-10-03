@@ -19,11 +19,7 @@ import {
   izracunajFormu,
   jeDnkOtkljucan,
   razinaVatre,
-  sastaviKaladontCv,
-  datumZagrebacki,
   type DnkProfil,
-  type CvDnkStatistika,
-  type CvPodaciIgraca,
 } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import {
@@ -49,6 +45,7 @@ import { izdajTokenPotvrdeEmaila } from '../racuni/tokeni.js';
 import { izracunajDnk } from '../igra/izracun-dnk.js';
 import {
   pokusajIdentifikaciju,
+  zahtijevajAdmina,
   zahtijevajIdentifikaciju,
   zahtijevajPrijavu,
   type ZahtjevSIgracem,
@@ -469,83 +466,6 @@ async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number
   };
 }
 
-async function dohvatiBrojRijeciUKolekciji(igracId: string): Promise<number> {
-  const [redak] = await baza.select({
-    ukupno: sql<number>`count(distinct (split_part(${otkljucaneGrupeIgraca.grupa}, ':', 1) || ':' || split_part(${otkljucaneGrupeIgraca.grupa}, ':', 2)))::int`,
-  }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
-  return redak?.ukupno ?? 0;
-}
-
-function cvDnkStatistika(
-  statistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
-  profil: DnkProfil & { metrike: { eliminacijePoPartiji: number; nizPrihvacenihRijeci: number; prosjekPrihvacenogPotezaMs: number; dugeRijeciPoPartiji: number; rijetkeRijeciPoPartiji: number } },
-): CvDnkStatistika | null {
-  if (!statistika) return null;
-  return {
-    prihvaceniPotezi: statistika.prihvaceniPotezi,
-    ukupnoTrajanjePrihvaceniPoteziMs: statistika.ukupnoTrajanjePrihvaceniPoteziMs,
-    najduziStreak: statistika.najduziStreak,
-    dugeRijeci: statistika.dugeRijeci,
-    srednjeDugeRijeci: statistika.srednjeDugeRijeci,
-    jakoDugeRijeci: statistika.jakoDugeRijeci,
-    rijetkeRijeci: statistika.rijetkeRijeci,
-    srednjeRijetkeRijeci: statistika.srednjeRijetkeRijeci,
-    jakoRijetkeRijeci: statistika.jakoRijetkeRijeci,
-    osi: profil.osi.map((os) => ({ kljuc: os.kljuc, vrijednost: os.vrijednost })),
-  };
-}
-
-function cvModPodaci(
-  igrac: typeof igraci.$inferSelect,
-  mod: 'cetiri_igraca' | 'dva_igraca',
-  dnkStatistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
-  profilDnk: DnkProfil & { metrike: { eliminacijePoPartiji: number; nizPrihvacenihRijeci: number; prosjekPrihvacenogPotezaMs: number; dugeRijeciPoPartiji: number; rijetkeRijeciPoPartiji: number } },
-  statistikaRijeci: Awaited<ReturnType<typeof dohvatiStatistiku>> | null,
-) {
-  const jeDvoboj = mod === 'dva_igraca';
-  return {
-    odigrane: jeDvoboj ? igrac.odigrane1v1 : igrac.odigrane,
-    pobjede: jeDvoboj ? igrac.pobjede1v1 : igrac.pobjede,
-    bodoviUkupno: jeDvoboj ? igrac.bodovi1v1 : igrac.bodoviUkupno,
-    eliminacijeUkupno: jeDvoboj ? igrac.eliminacije1v1 : igrac.eliminacijeUkupno,
-    dnk: cvDnkStatistika(dnkStatistika, profilDnk),
-    statistikaRijeci: statistikaRijeci
-      ? {
-        najduzaRijec: statistikaRijeci.najduzaRijec,
-        najduzaRijecGrafemi: statistikaRijeci.najduzaRijecGrafemi,
-        najrjedaRijec: statistikaRijeci.najrjedaRijec,
-      }
-      : null,
-  };
-}
-
-function sastaviCvZaIgraca(
-  igrac: typeof igraci.$inferSelect,
-  dnkCetiri: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
-  dnkDva: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
-  profilDnkCetiri: DnkProfil & { metrike: { eliminacijePoPartiji: number; nizPrihvacenihRijeci: number; prosjekPrihvacenogPotezaMs: number; dugeRijeciPoPartiji: number; rijetkeRijeciPoPartiji: number } },
-  profilDnkDva: DnkProfil & { metrike: { eliminacijePoPartiji: number; nizPrihvacenihRijeci: number; prosjekPrihvacenogPotezaMs: number; dugeRijeciPoPartiji: number; rijetkeRijeciPoPartiji: number } },
-  statistikaCetiri: Awaited<ReturnType<typeof dohvatiStatistiku>> | null,
-  statistikaDva: Awaited<ReturnType<typeof dohvatiStatistiku>> | null,
-  dostignuca: Awaited<ReturnType<typeof dohvatiDostignucaZaIgraca>>,
-  kolekcijaRijeci: number,
-): CvPodaciIgraca {
-  const referentniDatum = datumZagrebacki(new Date());
-  if (!referentniDatum) throw new Error('Nije moguće odrediti zagrebački datum.');
-  return {
-    igracId: igrac.id,
-    nadimak: igrac.nadimak,
-    iskustvoUkupno: igrac.iskustvoUkupno,
-    kolekcijaRijeci,
-    stvoren: igrac.stvoren,
-    registriranAt: igrac.registriranAt,
-    referentniDatum,
-    dvaIgraca: cvModPodaci(igrac, 'dva_igraca', dnkDva, profilDnkDva, statistikaDva),
-    cetiriIgraca: cvModPodaci(igrac, 'cetiri_igraca', dnkCetiri, profilDnkCetiri, statistikaCetiri),
-    dostignuca: dostignuca.dostignuca.map(({ id, razina }) => ({ id, razina })),
-  };
-}
-
 export async function registrirajProfilRute(
   app: FastifyInstance,
   rjecnik: RjecnikUMemoriji,
@@ -621,10 +541,7 @@ export async function registrirajProfilRute(
 
   app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    const [statistikaCetiri, statistikaDva] = await Promise.all([
-      dohvatiStatistiku(igrac.id, 'cetiri_igraca'),
-      dohvatiStatistiku(igrac.id, 'dva_igraca'),
-    ]);
+    const statistikaCetiri = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
     const [dnkCetiri, dnkDva] = await Promise.all([
       dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
       dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
@@ -639,23 +556,9 @@ export async function registrirajProfilRute(
       igrac.odigrane + igrac.odigrane1v1,
       igrac.eliminacijeUkupno + igrac.eliminacije1v1,
     );
-    const [dostignuca, kolekcijaRijeci] = await Promise.all([
-      dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
-      dohvatiBrojRijeciUKolekciji(igrac.id),
-    ]);
+    const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
     const profilDnkCetiri = izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca');
     const profilDnkDva = izracunajDnkProfil(igrac, dnkDva, 'dva_igraca');
-    const kaladontCv = sastaviKaladontCv(sastaviCvZaIgraca(
-      igrac,
-      dnkCetiri,
-      dnkDva,
-      profilDnkCetiri,
-      profilDnkDva,
-      statistikaCetiri,
-      statistikaDva,
-      dostignuca,
-      kolekcijaRijeci,
-    ));
     return {
       ok: true,
       igracId: igrac.id,
@@ -687,15 +590,15 @@ export async function registrirajProfilRute(
       prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
       stilIgre: stil,
-      stvoren: igrac.stvoren,
       statistikaRijeci: javnaStatistika(statistikaCetiri),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
       dostignuca,
-      kaladontCv,
     };
   });
 
   app.get<{ Params: { igracId: string } }>('/profil/javni/:igracId', async (zahtjev, odgovor) => {
+    await pokusajIdentifikaciju(zahtjev as ZahtjevSIgracem);
+    odgovor.header('Cache-Control', 'private, no-store');
     const [igrac] = await baza
       .select()
       .from(igraci)
@@ -705,10 +608,7 @@ export async function registrirajProfilRute(
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
 
-    const [statistikaCetiri, statistikaDva] = await Promise.all([
-      dohvatiStatistiku(igrac.id, 'cetiri_igraca'),
-      dohvatiStatistiku(igrac.id, 'dva_igraca'),
-    ]);
+    const statistikaCetiri = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
     const [dnkCetiri, dnkDva] = await Promise.all([
       dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
       dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
@@ -723,25 +623,12 @@ export async function registrirajProfilRute(
       igrac.odigrane + igrac.odigrane1v1,
       igrac.eliminacijeUkupno + igrac.eliminacije1v1,
     );
-    const [dostignuca, kolekcijaRijeci] = await Promise.all([
-      dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
-      dohvatiBrojRijeciUKolekciji(igrac.id),
-    ]);
+    const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
     const profilDnkCetiri = izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca');
     const profilDnkDva = izracunajDnkProfil(igrac, dnkDva, 'dva_igraca');
-    const kaladontCv = sastaviKaladontCv(sastaviCvZaIgraca(
-      igrac,
-      dnkCetiri,
-      dnkDva,
-      profilDnkCetiri,
-      profilDnkDva,
-      statistikaCetiri,
-      statistikaDva,
-      dostignuca,
-      kolekcijaRijeci,
-    ));
     return {
       ok: true,
+      mozeVidjetiAktivnost: (zahtjev as ZahtjevSIgracem).igrac?.vrsta === 'admin',
       igracId: igrac.id,
       nadimak: igrac.nadimak,
       avatarId: igrac.avatarId,
@@ -770,7 +657,6 @@ export async function registrirajProfilRute(
       statistikaRijeci: javnaStatistika(statistikaCetiri),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
       dostignuca,
-      kaladontCv,
     };
   });
 
@@ -1002,7 +888,7 @@ export async function registrirajProfilRute(
   };
 
   const registrirajAktivnostRutu = (putanja: '/aktivnost/:igracId' | '/povijest/:igracId') => {
-    app.get<{ Params: { igracId: string }; Querystring: { limit?: string; cursor?: string; mod?: string } }>(putanja, async (zahtjev, odgovor) => {
+    app.get<{ Params: { igracId: string }; Querystring: { limit?: string; cursor?: string; mod?: string } }>(putanja, { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
       const mod = zahtjev.query.mod === 'cetiri_igraca' || zahtjev.query.mod === 'dva_igraca' ? zahtjev.query.mod : undefined;
       const rezultat = await dohvatiAktivnost(zahtjev.params.igracId, mod, zahtjev.query.limit, zahtjev.query.cursor, odgovor);
       if (putanja === '/povijest/:igracId' && typeof rezultat === 'object' && rezultat !== null && 'aktivnost' in rezultat) {

@@ -132,8 +132,10 @@ function jeObjekt(vrijednost: unknown): vrijednost is Record<string, unknown> {
 
 export function validirajAvatarConfig(vrijednost: unknown): vrijednost is AvatarConfigV1 {
   if (!jeObjekt(vrijednost)) return false;
+  if (Object.keys(vrijednost).length !== 4) return false;
   if (vrijednost.schemaVersion !== AVATAR_SHEMA_VERZIJA || vrijednost.assetVersion !== AVATAR_ASSET_VERZIJA) return false;
   if (!jeObjekt(vrijednost.parts) || !jeObjekt(vrijednost.colors)) return false;
+  if (Object.keys(vrijednost.parts).length !== Object.keys(AVATAR_DIJELOVI).length) return false;
 
   for (const [kljuc, izbori] of Object.entries(AVATAR_DIJELOVI)) {
     const dio = vrijednost.parts[kljuc];
@@ -148,7 +150,7 @@ export function validirajAvatarConfig(vrijednost: unknown): vrijednost is Avatar
 
   const boje = vrijednost.colors;
   for (const [uloga, boja] of Object.entries(boje)) {
-    if (!AVATAR_BOJNE_ULOGE.includes(uloga as AvatarBojnaUloga) || !HEX_BOJA.test(String(boja))) return false;
+    if (!AVATAR_BOJNE_ULOGE.includes(uloga as AvatarBojnaUloga) || typeof boja !== 'string' || !HEX_BOJA.test(boja)) return false;
   }
   return true;
 }

@@ -37,6 +37,59 @@
  * Tamna tema je zadana i zivi u :root; svijetla je override pod html[data-tema='svijetla'].
  * Tako posluzitelj odmah isporucuje tamnu temu i nema bljeska pri ucitavanju.
  */
+:root[data-kursor-set='01-klasik'] {
+  --kursor-normal: url('/kursori/01-klasik/normal.png') 15 4;
+  --kursor-hover: url('/kursori/01-klasik/hover.png') 19 4;
+  --kursor-klik: url('/kursori/01-klasik/klik.png') 19 4;
+}
+
+:root[data-kursor-set='02-vitez'] {
+  --kursor-normal: url('/kursori/02-vitez/normal.png') 12 4;
+  --kursor-hover: url('/kursori/02-vitez/hover.png') 19 4;
+  --kursor-klik: url('/kursori/02-vitez/klik.png') 19 4;
+}
+
+:root[data-kursor-set='03-cudoviste'] {
+  --kursor-normal: url('/kursori/03-cudoviste/normal.png') 14 4;
+  --kursor-hover: url('/kursori/03-cudoviste/hover.png') 17 4;
+  --kursor-klik: url('/kursori/03-cudoviste/klik.png') 17 4;
+}
+
+:root[data-kursor-set='04-carobnjak'] {
+  --kursor-normal: url('/kursori/04-carobnjak/normal.png') 17 4;
+  --kursor-hover: url('/kursori/04-carobnjak/hover.png') 18 4;
+  --kursor-klik: url('/kursori/04-carobnjak/klik.png') 18 4;
+}
+
+:root[data-kursor-set='05-kaladont'] {
+  --kursor-normal: url('/kursori/05-kaladont/normal.png') 14 4;
+  --kursor-hover: url('/kursori/05-kaladont/hover.png') 21 4;
+  --kursor-klik: url('/kursori/05-kaladont/klik.png') 21 4;
+}
+
+@media (pointer: fine) and (hover: hover) {
+  :root[data-kursor-set][data-kursor-rezim='ruka'][data-kursor-stanje='mirno'],
+  :root[data-kursor-set][data-kursor-rezim='ruka'][data-kursor-stanje='mirno'] *,
+  :root[data-kursor-set][data-kursor-rezim='ruka'][data-kursor-stanje='mirno'] *::before,
+  :root[data-kursor-set][data-kursor-rezim='ruka'][data-kursor-stanje='mirno'] *::after {
+    cursor: var(--kursor-hover), auto !important;
+  }
+
+  :root[data-kursor-set][data-kursor-rezim='strelica'][data-kursor-stanje='mirno'],
+  :root[data-kursor-set][data-kursor-rezim='strelica'][data-kursor-stanje='mirno'] *,
+  :root[data-kursor-set][data-kursor-rezim='strelica'][data-kursor-stanje='mirno'] *::before,
+  :root[data-kursor-set][data-kursor-rezim='strelica'][data-kursor-stanje='mirno'] *::after {
+    cursor: var(--kursor-normal), auto !important;
+  }
+
+  :root[data-kursor-set][data-kursor-stanje='klik'],
+  :root[data-kursor-set][data-kursor-stanje='klik'] *,
+  :root[data-kursor-set][data-kursor-stanje='klik'] *::before,
+  :root[data-kursor-set][data-kursor-stanje='klik'] *::after {
+    cursor: var(--kursor-klik), auto !important;
+  }
+}
+
 :root {
   color-scheme: dark;
 

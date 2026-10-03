@@ -7,6 +7,7 @@
   import PadajuceRijeci from '$lib/komponente/PadajuceRijeci.svelte';
   import { inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { inicijalizirajAudio, inicijalizirajGlobalneUiZvukove } from '$lib/audio-manager.js';
+  import { inicijalizirajKursor } from '$lib/postavke-kursora.js';
   import { inicijalizirajFontPostavku } from '$lib/postavke-fonta.js';
   import { inicijalizirajTemu } from '$lib/postavke-teme.js';
   import { inicijalizirajGlas } from '$lib/glasovni-manager.js';
@@ -61,6 +62,7 @@
 
   onMount(async () => {
     inicijalizirajTemu();
+    inicijalizirajKursor();
     inicijalizirajFontPostavku();
     inicijalizirajGlas();
     await inicijalizirajGostSesiju();

@@ -9,12 +9,10 @@
   import FormaIgraca from '$lib/komponente/FormaIgraca.svelte';
   import PostavkeProfila from '$lib/komponente/PostavkeProfila.svelte';
   import AktivnostPartije from '$lib/komponente/AktivnostPartije.svelte';
-  import KaladontCvSazetak from '$lib/komponente/KaladontCvSazetak.svelte';
-  import KaladontCvIstaknuto from '$lib/komponente/KaladontCvIstaknuto.svelte';
   import StilIgrePojasnjenje from '$lib/komponente/StilIgrePojasnjenje.svelte';
   import KolekcijaRijeci from '$lib/komponente/KolekcijaRijeci.svelte';
   import Podizbornik from '$lib/komponente/Podizbornik.svelte';
-  import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil, type KaladontCvDto } from 'zajednicko';
+  import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
 
     interface StatistikaRijeci {
       najduziStreak: number;
@@ -33,6 +31,7 @@
   interface Profil {
     igracId: string;
     nadimak: string;
+    vrsta: 'gost' | 'registriran' | 'admin';
     avatarId: number;
     avatarConfig: AvatarConfigV1 | null;
     email: string | null;
@@ -58,7 +57,6 @@
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
     stilIgre: 'agresivan' | 'uravnotežen' | 'dobrica' | 'neodređen';
     statistikaRijeci: StatistikaRijeci | null;
-    kaladontCv: KaladontCvDto | null;
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
     dostignuca: { ukupnoZvjezdica: number; maksimalnoZvjezdica: number; ukupnoOtkljucanih: number; dostignuca: Dostignuce[] };
   }
@@ -114,6 +112,7 @@
   const prikazujePostavke = $derived($page.url.searchParams.get('tab') === 'postavke');
 
   function promijeniPogled(pogled: PogledProfila) {
+    if (pogled === 'povijest' && profil?.vrsta !== 'admin') return;
     aktivniPogled = pogled;
     ucitaniPogledi = new Set([...ucitaniPogledi, pogled]);
   }
@@ -171,7 +170,7 @@
   {:else if profil}
     {@const jeGost = !profil.email}
 
-      <div class:ima-cv={!prikazujePostavke} class="profil-zaglavlje-red">
+      <div class="profil-zaglavlje-red">
         <div class:postavke-aktivne={prikazujePostavke} class="zaglavlje-profila">
           <a class="avatar-uredivanje" href="/profil/avatar" aria-label="Uredi avatar">
             <Avatar
@@ -203,15 +202,12 @@
                     </div>
                   {/if}
                 </div>
+                <StilIgrePojasnjenje stilIgre={profil.stilIgre} id="stil-igre-vlastiti" />
               </div>
               <div class="profil-sazetak">
                 <DostignucaIstaknuta dostignuca={profil.dostignuca.dostignuca} />
-                <StilIgrePojasnjenje stilIgre={profil.stilIgre} id="stil-igre-vlastiti" />
               </div>
             </div>
-            {#if !prikazujePostavke}
-              <KaladontCvSazetak cv={profil.kaladontCv} />
-            {/if}
           </div>
         </div>
       </div>
@@ -234,7 +230,9 @@
       <button type="button" class:aktivan={aktivniPogled === 'statistika'} onclick={() => promijeniPogled('statistika')}>Statistika</button>
       <button type="button" class:aktivan={aktivniPogled === 'dostignuca'} onclick={() => promijeniPogled('dostignuca')}>Dostignuća</button>
       <button type="button" class:aktivan={aktivniPogled === 'rijeci'} onclick={() => promijeniPogled('rijeci')}>Kolekcija riječi</button>
-      <button type="button" class:aktivan={aktivniPogled === 'povijest'} onclick={() => promijeniPogled('povijest')}>Aktivnost</button>
+      {#if profil.vrsta === 'admin'}
+        <button type="button" class:aktivan={aktivniPogled === 'povijest'} onclick={() => promijeniPogled('povijest')}>Aktivnost</button>
+      {/if}
     </nav>
 
     {#if aktivniPogled === 'statistika'}
@@ -277,7 +275,6 @@
           <div class="stat-kartica"><span class="stat-broj">{profil.dnk.cetiriIgraca.metrike.dugeRijeciPoPartiji.toFixed(2)}</span><span class="stat-naziv">Duge riječi po igri</span></div>
           <div class="stat-kartica"><span class="stat-broj">{profil.dnk.cetiriIgraca.metrike.rijetkeRijeciPoPartiji.toFixed(2)}</span><span class="stat-naziv">Rijetke riječi po igri</span></div>
           </div>
-          <KaladontCvIstaknuto stavke={profil.kaladontCv?.istaknuto ?? []} />
         </section>
       </section>
     {:else if aktivniPogled === 'statistika'}
@@ -310,7 +307,6 @@
           <div class="stat-kartica"><span class="stat-broj">{profil.dnk.dvaIgraca.metrike.dugeRijeciPoPartiji.toFixed(2)}</span><span class="stat-naziv">Duge riječi po igri</span></div>
           <div class="stat-kartica"><span class="stat-broj">{profil.dnk.dvaIgraca.metrike.rijetkeRijeciPoPartiji.toFixed(2)}</span><span class="stat-naziv">Rijetke riječi po igri</span></div>
           </div>
-          <KaladontCvIstaknuto stavke={profil.kaladontCv?.istaknuto ?? []} />
         </section>
       </section>
     {/if}
@@ -351,7 +347,7 @@
       </div>
     {/if}
 
-    {#if ucitaniPogledi.has('povijest')}
+    {#if profil.vrsta === 'admin' && ucitaniPogledi.has('povijest')}
       <div hidden={aktivniPogled !== 'povijest'}>
         <AktivnostPartije igracId={profil.igracId} />
       </div>
@@ -505,8 +501,7 @@
     .avatar-uredivanje { grid-column: 1; grid-row: 1; }
     .info-profila, .profil-gornji-red { display: contents; }
     .profil-identitet { grid-column: 1 / -1; grid-row: 2; }
-    .profil-sazetak { grid-column: 2; grid-row: 1; align-items: flex-start; }
-    .cv-sazetak { grid-column: 1 / -1; grid-row: 3; }
+    .profil-sazetak { grid-column: 2; grid-row: 1; align-items: flex-end; }
     .profil-akcije { position: absolute; top: 0; right: 0; transform: none; }
   }
 

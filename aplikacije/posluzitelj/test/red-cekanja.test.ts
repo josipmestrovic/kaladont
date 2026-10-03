@@ -13,7 +13,7 @@ let app: FastifyInstance;
 let adresa: string;
 
 beforeAll(async () => {
-  ({ app } = await izgradiPosluzitelj());
+  ({ app } = await izgradiPosluzitelj({ socketOgranicenja: { handshakePoIpMinuti: 1_000 } }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = app.server.address();
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
@@ -52,14 +52,44 @@ async function stvoriGoste(broj: number): Promise<Gost[]> {
 }
 
 describe('red čekanja', () => {
+  it('odbija nefunkcijski ack bez mutacije i veza zatim može ući bez acka', async () => {
+    const igrac = await spojiSe();
+    try {
+      const greskaPromise = new Promise<{ kod: string }>((resolve) => igrac.once('greska', resolve));
+      igrac.emit('red:udji', { mod: 'dva_igraca' }, { nijeFunkcija: true });
+      expect(await greskaPromise).toMatchObject({ kod: 'NEVALJAN_PAYLOAD' });
+      expect(igrac.connected).toBe(true);
+
+      const stanjePrijeUlaska = new Promise<StanjeReda>((resolve) => igrac.once('red:stanje', resolve));
+      igrac.emit('red:stanje', { mod: 'dva_igraca' });
+      expect((await stanjePrijeUlaska).mjesta.filter(Boolean)).toHaveLength(0);
+
+      const stanjeNakonUlaska = new Promise<StanjeReda>((resolve) => igrac.once('red:stanje', resolve));
+      igrac.emit('red:udji');
+      expect((await stanjeNakonUlaska).mjesta.filter(Boolean)).toHaveLength(1);
+    } finally {
+      igrac.disconnect();
+    }
+  });
+
   it('igrač u privatnoj sobi ne može ući u javni red', async () => {
     const igrac = await spojiSe();
     try {
-      const stvorena = new Promise<{ kod: string }>((resolve) => igrac.once('soba:stvorena', resolve));
+      const stvorena = new Promise<{ kod: string }>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Poslužitelj nije odgovorio na soba:stvori.')), 5_000);
+        igrac.once('soba:stvorena', (poruka) => {
+          clearTimeout(timeout);
+          resolve(poruka);
+        });
+        igrac.once('greska', (poruka) => {
+          clearTimeout(timeout);
+          reject(new Error(`soba:stvori je odbijen: ${JSON.stringify(poruka)}`));
+        });
+      });
       igrac.emit('soba:stvori', {});
       await stvorena;
 
-      const potvrda = new Promise<StanjeReda | null>((resolve) => igrac.emit('red:udji', undefined, resolve));
+      const potvrda = new Promise<StanjeReda | null>((resolve) => igrac.emit('red:udji', {}, resolve));
       expect(await potvrda).toBeNull();
     } finally {
       igrac.disconnect();

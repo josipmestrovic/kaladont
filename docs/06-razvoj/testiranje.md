@@ -135,6 +135,9 @@ Velike kolekcije koriste cursor paginaciju: `/povijest/:igracId` po `(pocetak, p
 `/partije/:partijaId/potezi` po `(redni_broj, id)`, a `/profil/rijeci` i javna varijanta po
 `rijec`. Cursor je opaque base64url vrijednost; klijent ne koristi `OFFSET`.
 
+Profilna aktivnost (`/aktivnost/:igracId` i `/povijest/:igracId`) dostupna je samo administratoru.
+Testirati `401` bez prijave, `403` za ne-admin sesiju i uspješan dohvat s admin sesijom.
+
 ## Obavezno pokriveno jediničnim testovima
 
 ### Grafemi (`grafemi.ts`)

@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { validirajAvatarConfig, ZADANI_AVATAR_CONFIG } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { dnkStatistikeIgraca, igraci, obracuniPartija, otkljucaneGrupeIgraca, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { dnkStatistikeIgraca, igraci, obracuniPartija, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 
 let app: FastifyInstance;
@@ -104,71 +104,58 @@ describe('GET /profil', () => {
     }
   });
 
-  it('vraća isti inline CV vlasniku i javnom profilu bez privatnih polja', async () => {
+  it('dopušta pregled aktivnosti samo administratoru', async () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'CvTestIgrac' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    const headers = { authorization: `Bearer ${sesijskiToken}` };
 
-    const privatniOdgovor = await fetch(`${adresa}/api/profil`, {
-      headers: { authorization: `Bearer ${sesijskiToken}` },
-    });
-    const javniOdgovor = await fetch(`${adresa}/api/profil/javni/${igracId}`);
-    const privatni = (await privatniOdgovor.json()) as { kaladontCv: unknown };
-    const javni = (await javniOdgovor.json()) as Record<string, unknown> & { kaladontCv: unknown };
+    const javniProfil = await fetch(`${adresa}/api/profil/javni/${igracId}`, { headers });
+    expect((await javniProfil.json()).mozeVidjetiAktivnost).toBe(false);
+    expect((await fetch(`${adresa}/api/aktivnost/${igracId}`, { headers })).status).toBe(403);
+    expect((await fetch(`${adresa}/api/povijest/${igracId}`, { headers })).status).toBe(403);
 
-    expect(privatniOdgovor.status).toBe(200);
-    expect(javniOdgovor.status).toBe(200);
-    expect(privatni.kaladontCv).toEqual(javni.kaladontCv);
-    expect(javni.kaladontCv).toMatchObject({
-      biografija: {
-        tip: 'opis',
-        recenice: [
-          'CvTestIgrac još nije završio nijednu javnu partiju.',
-          'Rang se dodjeljuje nakon 10 javnih partija u Dvoboju ili Četveroboju.',
-        ],
-      },
-      istaknuto: [],
-    });
-    expect(javni).not.toHaveProperty('email');
-    expect(javni).not.toHaveProperty('lozinkaHash');
-    expect(javni).not.toHaveProperty('registriranAt');
+    await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, igracId));
+
+    const javniProfilAdmina = await fetch(`${adresa}/api/profil/javni/${igracId}`, { headers });
+    expect((await javniProfilAdmina.json()).mozeVidjetiAktivnost).toBe(true);
+    expect((await fetch(`${adresa}/api/aktivnost/${igracId}`, { headers })).status).toBe(200);
+    expect((await fetch(`${adresa}/api/povijest/${igracId}`, { headers })).status).toBe(200);
   });
 
-  it('generira CV iz postojećih statistika gosta, ali mu ne otvara javni profil', async () => {
-    const gost = await stvoriGosta();
-    try {
-      await baza.update(igraci)
-        .set({ odigrane1v1: 10, pobjede1v1: 8, bodovi1v1: 8 })
-        .where(eq(igraci.id, gost.id));
-      await baza.insert(otkljucaneGrupeIgraca).values(Array.from({ length: 10 }, (_, indeks) => ({
-        igracId: gost.id,
-        grupa: `imenica:rijec_${indeks}`,
-      })));
-      const privatniOdgovor = await fetch(`${adresa}/api/profil`, {
-        headers: { authorization: `Bearer ${gost.token}` },
-      });
-      const privatni = (await privatniOdgovor.json()) as {
-        kaladontCv: { biografija: { recenice: readonly [string, string] }; istaknuto: readonly string[] } | null;
-        email: string | null;
-      };
-      const javniOdgovor = await fetch(`${adresa}/api/profil/javni/${gost.id}`);
+});
 
-      expect(privatniOdgovor.status).toBe(200);
-      expect(privatni.email).toBeNull();
-      expect(privatni.kaladontCv).not.toBeNull();
-      expect(privatni.kaladontCv?.biografija.recenice).toEqual([
-        'Gost je završio 10 Dvoboja, a Četveroboj još nije odigrao.',
-        expect.stringContaining('Najvišu trenutačnu titulu'),
-      ]);
-      expect(privatni.kaladontCv?.istaknuto).toContain('kolekcijom od 10 riječi');
-      expect(javniOdgovor.status).toBe(404);
-    } finally {
-      await baza.delete(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, gost.id));
-      await baza.delete(igraci).where(eq(igraci.id, gost.id));
-    }
+describe('GET /aktivnost i /povijest', () => {
+  it('dopušta pregled aktivnosti samo administratoru', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    const headers = { authorization: `Bearer ${sesijskiToken}` };
+
+    expect((await fetch(`${adresa}/api/aktivnost/${igracId}`)).status).toBe(401);
+    expect((await fetch(`${adresa}/api/povijest/${igracId}`)).status).toBe(401);
+
+    const javniProfil = await fetch(`${adresa}/api/profil/javni/${igracId}`, { headers });
+    expect((await javniProfil.json()).mozeVidjetiAktivnost).toBe(false);
+    expect((await fetch(`${adresa}/api/aktivnost/${igracId}`, { headers })).status).toBe(403);
+    expect((await fetch(`${adresa}/api/povijest/${igracId}`, { headers })).status).toBe(403);
+
+    await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, igracId));
+
+    const javniProfilAdmina = await fetch(`${adresa}/api/profil/javni/${igracId}`, { headers });
+    expect((await javniProfilAdmina.json()).mozeVidjetiAktivnost).toBe(true);
+    const aktivnost = await fetch(`${adresa}/api/aktivnost/${igracId}`, { headers });
+    const povijest = await fetch(`${adresa}/api/povijest/${igracId}`, { headers });
+    expect(aktivnost.status).toBe(200);
+    expect(povijest.status).toBe(200);
+    expect((await aktivnost.json()).aktivnost).toEqual([]);
+    expect((await povijest.json()).partije).toEqual([]);
   });
 });
 
@@ -257,24 +244,6 @@ describe('GET /ljestvica', () => {
   });
 });
 
-describe('GET /povijest/:igracId', () => {
-  it('vraća praznu listu za igrača bez partija', async () => {
-    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
-    });
-    const { igracId } = (await registracija.json()) as { igracId: string };
-
-    const odgovor = await fetch(`${adresa}/api/povijest/${igracId}`);
-    expect(odgovor.status).toBe(200);
-    const tijelo = (await odgovor.json()) as { ok: boolean; partije: unknown[]; imaJos: boolean; sljedeciCursor: string | null };
-    expect(tijelo.partije).toEqual([]);
-    expect(tijelo.imaJos).toBe(false);
-    expect(tijelo.sljedeciCursor).toBeNull();
-  });
-});
-
 describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
   it('vraća javni plasman, filtrira mod i izuzima privatnu gamifikaciju', async () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
@@ -282,7 +251,8 @@ describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
     });
-    const { igracId } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, igracId));
     const javnaPartijaId = randomUUID();
     const privatnaPartijaId = randomUUID();
     const kraj = new Date();
@@ -296,7 +266,9 @@ describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
     ]);
     await baza.insert(obracuniPartija).values({ partijaId: privatnaPartijaId, vrsta: 'privatna_gamifikacija' });
 
-    const aktivnostOdgovor = await fetch(`${adresa}/api/aktivnost/${igracId}?mod=dva_igraca&limit=20`);
+    const aktivnostOdgovor = await fetch(`${adresa}/api/aktivnost/${igracId}?mod=dva_igraca&limit=20`, {
+      headers: { authorization: `Bearer ${sesijskiToken}` },
+    });
     const aktivnost = (await aktivnostOdgovor.json()) as { aktivnost: { partijaId: string; mod: string; plasman: number }[] };
     expect(aktivnostOdgovor.status).toBe(200);
     expect(aktivnost.aktivnost).toEqual(expect.arrayContaining([expect.objectContaining({ partijaId: javnaPartijaId, mod: 'dva_igraca', plasman: 1 })]));
