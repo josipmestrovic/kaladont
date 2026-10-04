@@ -16,6 +16,7 @@
     "obrisi-racun": "tsx src/cli/obrisi-racun.ts",
     "simulacija": "tsx src/cli/simulacija.ts",
     "opterecenje": "tsx src/cli/opterecenje.ts",
+    "test:opterecenje": "tsx src/cli/opterecenje.ts --staging",
     "test": "vitest run"
   },
   "dependencies": {

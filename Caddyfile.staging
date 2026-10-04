@@ -16,10 +16,14 @@ staging.kaladont.hr {
 
     @zdravlje path /zdravlje
     handle @zdravlje {
-        reverse_proxy aplikacija:3000
+        reverse_proxy aplikacija:3000 {
+            header_up X-Kaladont-IP-Klijenta {remote_host}
+        }
     }
 
     handle {
-        reverse_proxy aplikacija:3000
+        reverse_proxy aplikacija:3000 {
+            header_up X-Kaladont-IP-Klijenta {remote_host}
+        }
     }
 }

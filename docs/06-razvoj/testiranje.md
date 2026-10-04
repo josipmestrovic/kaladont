@@ -75,6 +75,22 @@ provjeri da su ključni zapisi i očekivani novi stupci/indeksi očuvani.
 
 CLI `pnpm --filter posluzitelj opterecenje` pokreće kontrolirano opterećenje prema adresi iz `SIMULACIJA_ADRESA` ili argumenta `--adresa`. Kratki scenarij `igra` pokreće se automatski u CI-ju protiv buildanog imagea na svakom `main` pushu. Dulji scenariji ostaju ručni staging postupak i ne smiju se usmjeriti na produkciju.
 
+### Ručni test staging veza
+
+Naredba `test:opterecenje` je odvojena od standardnih testova, CI-ja i objave. Zahtijeva ciljnu adresu, broj klijenata i trajanje, dopušta samo `https://staging.kaladont.hr`, ograničava trajanje na jednu minutu do dva sata i prihvaća samo razine 100, 500, 1000 ili 10000. Trajanje uključuje postupno spajanje; valovi su zadano 10 klijenata u sekundi, najviše 100 u sekundi. Potvrda uspjeha čuva se na računalu generatora sedam dana: 500 traži uspješnih 100, 1000 traži uspješnih 500, a 10000 traži uspješnih 1000 i dodatnu potvrdu. Neuspješan ponovljeni test poništava potvrdu te i viših razina. Produkcijska domena odbija se i preko stare naredbe `opterecenje`.
+
+Početna ručna inačica podržava samo scenarij veza. Ona održava Socket.IO veze, ali **ne dokazuje kapacitet aktivne igre ni cilj 7000 igrača i 3000 posjetitelja**. Primjer za 100 veza tijekom minute:
+
+```powershell
+pnpm --filter posluzitelj test:opterecenje -- --scenarij=veze --adresa=https://staging.kaladont.hr --klijenti=100 --trajanje-ms=60000
+```
+
+Za 10000 klijenata naredbi se mora dodati `--potvrdi-10000=DA`. Pokretati samo jedan korak odjednom; prelazak na višu razinu traži pregled rezultata prethodne razine. Ostali scenariji odbijaju se u ovoj naredbi dok ne dobiju sigurnu podršku za dogovoreni omjer Dvoboja, javnih i privatnih Četveroboja te HTTP posjetitelja.
+
+Lokalna brava sprječava paralelne testove prema istom stagingu s istog računala. Privremena IP iznimka postoji samo u stagingu. Caddy postavlja `X-Kaladont-IP-Klijenta` prema adresi spajanja; poslužitelj zanemaruje ograničenje novih veza i HTTP dokumenata samo kad `STAGING_TEST_IP` točno odgovara toj adresi. Postavka se odbija izvan staginga. U staging `.env` iznimku postaviti samo za dogovoreni testni termin, a nakon testa je ukloniti i vratiti uobičajene limite. `docker-compose.staging.yml` podržava privremeno povećanje limita preko `STAGING_TEST_MAKSIMALNO_VEZA`, `STAGING_TEST_MAKSIMALNO_SOBA`, `STAGING_TEST_MAKSIMALNO_PARTIJA` i `STAGING_TEST_DOGADAJI_PO_PROZORU`; bez tih varijabli ostaju dosadašnje vrijednosti. Ne mijenjati produkcijske postavke.
+
+Testni računi i partije ostaju u staging bazi. Nakon svakog testa provjeriti `/zdravlje`, stanje aplikacije i baze te ukloniti privremenu IP iznimku i povećane limite. Staging test ne pokretati tijekom uobičajene provjere izmjena; potreban je izričit zahtjev korisnika.
+
 ```powershell
 pnpm --filter posluzitelj opterecenje -- --scenarij=veze --klijenti=100 --val=20 --trajanje-ms=5000
 pnpm --filter posluzitelj opterecenje -- --scenarij=red --klijenti=40 --idle=100 --val=20

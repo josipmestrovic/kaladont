@@ -35,7 +35,7 @@ import {
   type Okruzenje,
 } from './sigurnost/origin.js';
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
-import { OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
+import { jeDopustenaTestnaIp, OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
 import type { ZapisSocketHandlerGreske } from './sigurnost/socket-handler.js';
 import { ponistiPartijeUTijekuUBazi } from './igra/upis-partije.js';
 import { ocistiIstekleNepotvrdjeneRacune } from './racuni/ciscenje-nepotvrdjenih.js';
@@ -195,11 +195,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
         const prihvat = zahtjev.headers.accept;
         const traziDokument = typeof prihvat === 'string' && prihvat.includes('text/html');
         if (traziDokument) {
+          const testnaIp = zahtjev.headers['x-kaladont-ip-klijenta'];
           const proslijedeniIp = zahtjev.headers['x-forwarded-for'];
-          const ip = (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
+          const ip = (Array.isArray(testnaIp) ? testnaIp[0] : testnaIp)
+            ?? (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
             ?? zahtjev.socket.remoteAddress
             ?? 'nepoznat';
-          const dopusten = ogranicivacHttpDokumenata.dopusti(`ip:${ip}`, konfiguracija.HTTP_DOKUMENTI_PO_IP_MINUTI);
+          const testnaIpDopustena = jeDopustenaTestnaIp(okruzenjeSigurnosti, konfiguracija.STAGING_TEST_IP, ip);
+          const dopusten = testnaIpDopustena || ogranicivacHttpDokumenata.dopusti(`ip:${ip}`, konfiguracija.HTTP_DOKUMENTI_PO_IP_MINUTI);
           if (!dopusten) {
             odgovor.header('retry-after', '60');
             return odgovor.code(429).send({ ok: false, greska: 'Previše zahtjeva za stranice. Pokušaj ponovno za minutu.' });
@@ -216,11 +219,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     maxHttpBufferSize: MAX_SOCKET_PORUKA_BAJTOVA,
     allowRequest: (zahtjev, povratniPoziv) => {
       const originDopusten = jeDopustenOrigin(okruzenjeSigurnosti, zahtjev.headers.origin, javnaAdresaOrigin);
+      const testnaIp = zahtjev.headers['x-kaladont-ip-klijenta'];
       const proslijedeniIp = zahtjev.headers['x-forwarded-for'];
-      const ip = (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
+      const ip = (Array.isArray(testnaIp) ? testnaIp[0] : testnaIp)
+        ?? (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
         ?? zahtjev.socket.remoteAddress
         ?? 'nepoznat';
-      const handshakeDopusten = ogranicivacHandshaka.dopusti(`ip:${ip}`, socketOgranicenja.handshakePoIpMinuti);
+      const testnaIpDopustena = jeDopustenaTestnaIp(okruzenjeSigurnosti, konfiguracija.STAGING_TEST_IP, ip);
+      const handshakeDopusten = testnaIpDopustena || ogranicivacHandshaka.dopusti(`ip:${ip}`, socketOgranicenja.handshakePoIpMinuti);
       const vezaDopustena = io.sockets.sockets.size < socketOgranicenja.maksimalnoAktivnihVeza;
       povratniPoziv(null, originDopusten && handshakeDopusten && vezaDopustena);
     },

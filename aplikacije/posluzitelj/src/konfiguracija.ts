@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { isIP } from 'node:net';
 import { config as ucitajDotenv } from 'dotenv';
 import { z } from 'zod';
 
@@ -25,6 +26,7 @@ const shemaKonfiguracije = z.object({
   SOCKET_MAKSIMALNO_AKTIVNIH_PARTIJA: z.coerce.number().int().positive().default(500),
   SOCKET_PROZOR_DOGADAJA_MS: z.coerce.number().int().positive().default(60_000),
   SOCKET_DOGADAJI_PO_PROZORU: z.coerce.number().int().positive().default(30),
+  STAGING_TEST_IP: z.string().default(''),
   ADMIN_TAJNI_KLJUC: z.string().default(''),
   SIMULACIJA_ADRESA: z.string().url().default('http://localhost:3000'),
   VERZIJA: z.string().default('lokalno'),
@@ -34,6 +36,10 @@ const shemaKonfiguracije = z.object({
 });
 
 export const konfiguracija = shemaKonfiguracije.parse(process.env);
+
+if (konfiguracija.STAGING_TEST_IP && (konfiguracija.NODE_ENV !== 'staging' || !isIP(konfiguracija.STAGING_TEST_IP))) {
+  throw new Error('STAGING_TEST_IP smije biti valjana IP adresa samo u staging okruženju.');
+}
 
 if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production') {
   if (konfiguracija.SESIJA_TAJNA === 'promijeni-me') {

@@ -8,12 +8,24 @@ import { and, eq } from 'drizzle-orm';
 import type { Eliminacija, KrajPartije, PrihvacenPotez, PocetakPartije, RundaOtvorena, SpremanjeRezultataPartije } from 'zajednicko';
 import { baza, zatvoriBazu } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
+import {
+  MAKS_TRAJANJE_STAGING_TESTA_MS,
+  odbijProdukcijskuAdresu,
+  provjeriNacinPokretanja,
+  provjeriRampuStagingTesta,
+  provjeriPrethodnuRazinuStagingTesta,
+  provjeriScenarijStagingTesta,
+  zakljucajStagingTest,
+  validirajZahtjevStagingTesta,
+  zabiljeziRezultatStagingTesta,
+} from './opterecenje-postavke.js';
 
 type Scenarij = 'veze' | 'red' | 'reconnect' | 'igra';
 
 interface Postavke {
   scenarij: Scenarij;
   adresa: string;
+  stagingTest: boolean;
   brojKlijenata: number;
   velicinaVala: number;
   razmakValaMs: number;
@@ -45,6 +57,8 @@ interface RezultatSpajanja {
 const otvoreniSocketi = new Set<Socket>();
 const ODGODA_BOT_POTEZA_MS = 400;
 const MAKS_POTEZA_KONTROLIRANE_PARTIJE = 24;
+let signalPrekida: AbortSignal | undefined;
+let rokStagingTestaMs: number | undefined;
 
 const argumenti = new Map(
   process.argv.slice(2).map((argument) => {
@@ -72,6 +86,14 @@ function decimalniArgument(naziv: string, zadano: number, najmanje = 0): number 
 }
 
 function ucitajPostavke(): Postavke {
+  const stagingTest = argumenti.has('staging');
+  const adresaArgumenta = argumenti.get('adresa');
+  const klijentiArgument = argumenti.get('klijenti');
+  const trajanjeArgument = argumenti.get('trajanje-ms');
+  if (stagingTest && (!adresaArgumenta || !klijentiArgument || !trajanjeArgument)) {
+    throw new Error('Staging test zahtijeva --adresa, --klijenti i --trajanje-ms.');
+  }
+
   const scenarij = (argumenti.get('scenarij') ?? 'veze') as Scenarij;
   if (!['veze', 'red', 'reconnect', 'igra'].includes(scenarij)) {
     throw new Error('--scenarij mora biti veze, red, reconnect ili igra.');
@@ -79,10 +101,11 @@ function ucitajPostavke(): Postavke {
 
   const postavke: Postavke = {
     scenarij,
-    adresa: argumenti.get('adresa') ?? process.env.SIMULACIJA_ADRESA ?? 'http://localhost:3000',
+    adresa: adresaArgumenta ?? process.env.SIMULACIJA_ADRESA ?? 'http://localhost:3000',
+    stagingTest,
     brojKlijenata: brojArgumenta('klijenti', 100, 1),
-    velicinaVala: brojArgumenta('val', 20, 1),
-    razmakValaMs: brojArgumenta('razmak-vala-ms', 50),
+    velicinaVala: brojArgumenta('val', stagingTest ? 10 : 20, 1),
+    razmakValaMs: brojArgumenta('razmak-vala-ms', stagingTest ? 1_000 : 50),
     trajanjeMs: brojArgumenta('trajanje-ms', 5_000),
     brojCiklusa: brojArgumenta('ciklusi', 3, 1),
     timeoutMs: brojArgumenta('timeout-ms', 30_000, 1),
@@ -97,6 +120,23 @@ function ucitajPostavke(): Postavke {
     timerTest: argumenti.get('timer-test') === 'true',
   };
 
+  odbijProdukcijskuAdresu(postavke.adresa);
+  provjeriNacinPokretanja(postavke.adresa, stagingTest);
+
+  if (stagingTest) {
+    provjeriScenarijStagingTesta(postavke.scenarij);
+    provjeriRampuStagingTesta(postavke.velicinaVala, postavke.razmakValaMs);
+    if (postavke.trajanjeMs > MAKS_TRAJANJE_STAGING_TESTA_MS) {
+      throw new Error('Staging test može trajati najviše 2 sata.');
+    }
+    validirajZahtjevStagingTesta({
+      adresa: postavke.adresa,
+      brojKorisnika: postavke.brojKlijenata,
+      trajanjeMs: postavke.trajanjeMs,
+      potvrdaDesetTisuca: argumenti.get('potvrdi-10000'),
+    });
+  }
+
   if (postavke.scenarij === 'igra') postavke.brojKlijenata = postavke.brojPartija * 4;
 
   if ((postavke.scenarij === 'red' || postavke.scenarij === 'igra') && postavke.brojKlijenata % 4 !== 0) {
@@ -106,23 +146,43 @@ function ucitajPostavke(): Postavke {
 }
 
 function odgodi(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    if (signalPrekida?.aborted) {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(() => {
+      signalPrekida?.removeEventListener('abort', prekid);
+      resolve();
+    }, ms);
+    const prekid = () => {
+      clearTimeout(timer);
+      signalPrekida?.removeEventListener('abort', prekid);
+      resolve();
+    };
+    signalPrekida?.addEventListener('abort', prekid, { once: true });
+  });
 }
 
 function sOgranicenjem<T>(obecanje: Promise<T>, timeoutMs: number, opis: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
+    const prekid = () => zavrsi(() => reject(new Error('Test je prekinut.')));
     const timer = setTimeout(
-      () => reject(new Error(`${opis}: isteklo ${timeoutMs} ms.`)),
+      () => zavrsi(() => reject(new Error(`${opis}: isteklo ${timeoutMs} ms.`))),
       timeoutMs,
     );
+    function zavrsi(dovrsi: () => void): void {
+      clearTimeout(timer);
+      signalPrekida?.removeEventListener('abort', prekid);
+      dovrsi();
+    }
+    signalPrekida?.addEventListener('abort', prekid, { once: true });
     obecanje.then(
       (vrijednost) => {
-        clearTimeout(timer);
-        resolve(vrijednost);
+        zavrsi(() => resolve(vrijednost));
       },
       (greska: unknown) => {
-        clearTimeout(timer);
-        reject(greska);
+        zavrsi(() => reject(greska));
       },
     );
   });
@@ -152,7 +212,11 @@ interface HealthSnapshot {
 }
 
 async function dohvatiHealth(adresa: string): Promise<HealthSnapshot> {
-  const odgovor = await fetch(`${adresa}/zdravlje`);
+  const odgovor = await fetch(`${adresa}/zdravlje`, { redirect: 'manual' });
+  if (!odgovor.ok) throw new Error(`Health zahtjev nije uspio: HTTP ${odgovor.status}.`);
+  if (new URL(odgovor.url).hostname !== new URL(adresa).hostname) {
+    throw new Error('Health zahtjev preusmjeren je na drugi host.');
+  }
   const tijelo = (await odgovor.json()) as Partial<HealthSnapshot>;
   if (!Number.isFinite(tijelo.aktivnePartije) || !Number.isFinite(tijelo.aktivneVeze) || !Number.isFinite(tijelo.rssBajtovi) || !Number.isFinite(tijelo.heapUsedBajtovi)) {
     throw new Error('Health odgovor nema očekivane load-test metrike.');
@@ -204,9 +268,16 @@ async function spojiUValovima(
   const greske: string[] = [];
 
   for (let pocetak = 0; pocetak < tokeni.length; pocetak += postavke.velicinaVala) {
+    if (signalPrekida?.aborted) break;
+    if (rokStagingTestaMs !== undefined && Date.now() >= rokStagingTestaMs) break;
     const val = tokeni.slice(pocetak, pocetak + postavke.velicinaVala);
     const ishodi = await Promise.allSettled(
-      val.map((token) => spojiKlijenta(postavke.adresa, token, postavke.timeoutMs)),
+      val.map((token) => {
+        const preostaloMs = rokStagingTestaMs === undefined
+          ? postavke.timeoutMs
+          : Math.max(1, Math.min(postavke.timeoutMs, rokStagingTestaMs - Date.now()));
+        return spojiKlijenta(postavke.adresa, token, preostaloMs);
+      }),
     );
     for (const ishod of ishodi) {
       if (ishod.status === 'fulfilled') {
@@ -216,6 +287,10 @@ async function spojiUValovima(
         greske.push(ishod.reason instanceof Error ? ishod.reason.message : String(ishod.reason));
       }
     }
+    if (
+      postavke.stagingTest &&
+      greske.length / Math.max(1, klijenti.length + greske.length) > postavke.maksStopaGresaka
+    ) break;
     if (pocetak + postavke.velicinaVala < tokeni.length) await odgodi(postavke.razmakValaMs);
   }
 
@@ -239,12 +314,23 @@ function odspojiSveOtvorene(): void {
 }
 
 async function scenarijVeze(postavke: Postavke, tokeni: readonly string[]) {
+  const pocetak = Date.now();
   const { klijenti, trajanja, greske } = await spojiUValovima(postavke, tokeni);
-  await odgodi(postavke.trajanjeMs);
+  const brojNeostvarenih = Math.max(0, tokeni.length - klijenti.length - greske.length);
+  const brojGresaka = greske.length + brojNeostvarenih;
+  if (brojNeostvarenih > 0) greske.push(`${brojNeostvarenih} pokušaja nije pokrenuto prije isteka roka.`);
+  const stopaGresaka = brojGresaka / Math.max(1, tokeni.length);
+  const cekanjeMs = postavke.stagingTest && stopaGresaka > postavke.maksStopaGresaka
+    ? 0
+    : postavke.stagingTest
+    ? Math.max(0, postavke.trajanjeMs - (Date.now() - pocetak))
+    : postavke.trajanjeMs;
+  await odgodi(cekanjeMs);
   odspojiSve(klijenti);
   return {
     spajanje: statistika(trajanja),
-    brojGresaka: greske.length,
+    brojGresaka,
+    brojPokusaja: tokeni.length,
     greske,
     trajanjeDrzanjaMs: postavke.trajanjeMs,
   };
@@ -261,6 +347,7 @@ async function scenarijReconnect(postavke: Postavke, tokeni: readonly string[]) 
     [];
 
   for (let ciklus = 1; ciklus <= postavke.brojCiklusa; ciklus += 1) {
+    if (signalPrekida?.aborted) break;
     odspojiSve(spojeni.klijenti);
     await odgodi(postavke.razmakValaMs);
     spojeni = await spojiUValovima(postavke, tokeni);
@@ -272,7 +359,13 @@ async function scenarijReconnect(postavke: Postavke, tokeni: readonly string[]) 
   }
 
   odspojiSve(spojeni.klijenti);
-  return { pocetnoSpajanje, ciklusi };
+  const brojGresaka = pocetnoSpajanje.brojGresaka + ciklusi.reduce((zbroj, ciklus) => zbroj + ciklus.brojGresaka, 0);
+  return {
+    pocetnoSpajanje,
+    ciklusi,
+    brojGresaka,
+    brojPokusaja: tokeni.length * (postavke.brojCiklusa + 1),
+  };
 }
 
 async function scenarijRed(postavke: Postavke, tokeni: readonly string[]) {
@@ -302,6 +395,7 @@ async function scenarijRed(postavke: Postavke, tokeni: readonly string[]) {
     );
 
     for (let pocetak = 0; pocetak < klijenti.length; pocetak += postavke.velicinaVala) {
+      if (signalPrekida?.aborted) break;
       const val = klijenti.slice(pocetak, pocetak + postavke.velicinaVala);
       for (const klijent of val) {
         ulazakPoTokenu.set(klijent.token, performance.now());
@@ -323,6 +417,7 @@ async function scenarijRed(postavke: Postavke, tokeni: readonly string[]) {
       idleSpajanje: statistika(idle.trajanja),
       cekanjeNaStol: statistika(cekanja),
       brojGresaka: greske.length + idle.greske.length,
+      brojPokusaja: tokeni.length + idleTokeni.length,
       greske: [...idle.greske, ...greske],
       neupareni: klijenti.length - brojZaStolove,
     };
@@ -456,12 +551,16 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
       partija.naPotezuId = poruka.naPotezuId;
       partija.trazenaSlova = poruka.trazenaSlova;
       partija.pokusane.clear();
-      if (postavke.timerTest && !partija.timerTestirano) {
+      if (
+        postavke.timerTest &&
+        !partija.timerTestirano &&
+        partija.naPotezuId === igracId
+      ) {
         partija.timerTestirano = true;
         partija.timerCekaMs = performance.now() + Math.max(0, Date.parse(poruka.istekPotezaIso) - Date.now());
         return;
       }
-      zakaziPotez(partija);
+      if (partija.naPotezuId === igracId) zakaziPotez(partija);
     });
 
     bot.socket.on('partija:eliminacija', (poruka: Eliminacija) => {
@@ -525,10 +624,33 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
 
   for (const bot of klijenti.klijenti) bot.socket.emit('red:udji');
 
-  const cekanje = Date.now() + postavke.timeoutMs * Math.max(1, pocetniBrojPartija);
-  while (zavrsenePartije < pocetniBrojPartija && Date.now() < cekanje) await odgodi(100);
+  const cekanje = Date.now() + postavke.timeoutMs;
+  let peak = baseline;
+  let brojHealthUzoraka = 0;
+  let sljedeciHealthUzorak = Date.now();
+  while (zavrsenePartije < pocetniBrojPartija && Date.now() < cekanje && !signalPrekida?.aborted) {
+    await odgodi(100);
+    if (Date.now() < sljedeciHealthUzorak) continue;
+    sljedeciHealthUzorak = Date.now() + 1_000;
+    try {
+      const uzorak = await dohvatiHealth(postavke.adresa);
+      peak = {
+        aktivnePartije: Math.max(peak.aktivnePartije, uzorak.aktivnePartije),
+        aktivneVeze: Math.max(peak.aktivneVeze, uzorak.aktivneVeze),
+        rssBajtovi: Math.max(peak.rssBajtovi, uzorak.rssBajtovi),
+        heapUsedBajtovi: Math.max(peak.heapUsedBajtovi, uzorak.heapUsedBajtovi),
+      };
+      brojHealthUzoraka += 1;
+    } catch (greska) {
+      greske.push(greska instanceof Error ? greska.message : String(greska));
+      break;
+    }
+  }
 
-  const peak = await dohvatiHealth(postavke.adresa);
+  if (brojHealthUzoraka === 0 && !signalPrekida?.aborted) {
+    peak = await dohvatiHealth(postavke.adresa);
+    brojHealthUzoraka = 1;
+  }
   odspojiSve(klijenti.klijenti);
   await odgodi(postavke.cekanjeCiscenjaMs);
   const finalno = await dohvatiHealth(postavke.adresa);
@@ -536,15 +658,21 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
   const svaVremenaSpremanja = svePartije.flatMap((partija) => partija.spremanjeMs !== null && partija.krajMs !== null ? [partija.krajMs - partija.spremanjeMs] : []);
   const svaVremenaPoteza = svePartije.flatMap((partija) => partija.poteziMs);
   const ukupnoPoteza = svePartije.reduce((ukupno, partija) => ukupno + partija.odigraniPotezi, 0);
+  const timerUzorci = svePartije.flatMap((partija) => partija.timerDriftMs);
   const stopaGresaka = greske.length / Math.max(1, ukupnoPoteza + klijenti.trajanja.length);
   const provjere = {
-    svePartijeZavrsile: zavrsenePartije === pocetniBrojPartija,
+    svePartijeZavrsile: zavrsenePartije === pocetniBrojPartija && svePartije.length === pocetniBrojPartija,
     stopaGresaka: stopaGresaka <= postavke.maksStopaGresaka,
-    p95Potez: percentil(svaVremenaPoteza, 0.95) <= postavke.p95PotezMs,
-    p95Spremanje: percentil(svaVremenaSpremanja, 0.95) <= postavke.p95SpremanjeMs,
+    imaPrihvacenihPoteza: ukupnoPoteza > 0 && svaVremenaPoteza.length > 0,
+    p95Potez: svaVremenaPoteza.length > 0 && percentil(svaVremenaPoteza, 0.95) <= postavke.p95PotezMs,
+    p95Spremanje: svaVremenaSpremanja.length === zavrsenePartije && svaVremenaSpremanja.length > 0 && percentil(svaVremenaSpremanja, 0.95) <= postavke.p95SpremanjeMs,
     nemaAktivnihPartija: finalno.aktivnePartije <= postavke.maksAktivnihPartijaNakonCiscenja,
     memorija: (finalno.rssBajtovi - baseline.rssBajtovi) / 1024 / 1024 <= postavke.maksRssDeltaMb,
-    timer: !postavke.timerTest || svePartije.some((partija) => partija.timerDriftMs.length > 0 && percentil(partija.timerDriftMs, 0.95) <= 250),
+    timer: !postavke.timerTest || (
+      svePartije.length === pocetniBrojPartija &&
+      svePartije.every((partija) => partija.timerDriftMs.length > 0 && percentil(partija.timerDriftMs, 0.95) <= 250)
+    ),
+    imaHealthUzorke: brojHealthUzoraka > 0,
   };
   return {
     baseline,
@@ -560,6 +688,8 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
     p95SpremanjeMs: percentil(svaVremenaSpremanja, 0.95),
     p95TimerDriftMs: percentil(svePartije.flatMap((partija) => partija.timerDriftMs), 0.95),
     timerTestirano: svePartije.some((partija) => partija.timerDriftMs.length > 0),
+    brojTimerUzoraka: timerUzorci.length,
+    brojHealthUzoraka,
     provjere,
     greske: greske.slice(0, 20),
   };
@@ -567,17 +697,36 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
 
 async function glavno(): Promise<void> {
   const postavke = ucitajPostavke();
-  const tokeni = Array.from(
-    { length: postavke.brojKlijenata },
-    () => `gost.${randomUUID().replaceAll('-', '')}`,
-  );
+  if (postavke.stagingTest) {
+    await provjeriPrethodnuRazinuStagingTesta(postavke.adresa, postavke.brojKlijenata);
+  }
+  const oslobodiZakljucavanje = postavke.stagingTest
+    ? await zakljucajStagingTest(postavke.adresa)
+    : undefined;
+  const kontrolerPrekida = postavke.stagingTest ? new AbortController() : undefined;
+  const prekini = () => {
+    if (!kontrolerPrekida || kontrolerPrekida.signal.aborted) return;
+    kontrolerPrekida.abort();
+    odspojiSveOtvorene();
+    console.error('Prekidam test i zatvaram sve otvorene veze...');
+  };
   const pocetak = performance.now();
+  let stagingTestProsao = false;
+  rokStagingTestaMs = postavke.stagingTest ? Date.now() + postavke.trajanjeMs : undefined;
 
-  console.log(
-    `Scenarij=${postavke.scenarij} adresa=${postavke.adresa} klijenti=${postavke.brojKlijenata} idle=${postavke.brojIdleKlijenata}`,
-  );
-
+  signalPrekida = kontrolerPrekida?.signal;
+  if (kontrolerPrekida) {
+    process.once('SIGINT', prekini);
+    process.once('SIGTERM', prekini);
+  }
   try {
+    const tokeni = Array.from(
+      { length: postavke.brojKlijenata },
+      () => `gost.${randomUUID().replaceAll('-', '')}`,
+    );
+    console.log(
+      `Scenarij=${postavke.scenarij} adresa=${postavke.adresa} klijenti=${postavke.brojKlijenata} idle=${postavke.brojIdleKlijenata}`,
+    );
     const rezultat =
       postavke.scenarij === 'veze'
         ? await scenarijVeze(postavke, tokeni)
@@ -612,16 +761,33 @@ async function glavno(): Promise<void> {
       }
     } else {
       const brojGresaka = (rezultat as { brojGresaka?: number }).brojGresaka ?? 0;
-      const stopaGresaka = brojGresaka / Math.max(1, postavke.brojKlijenata);
+      const brojPokusaja = (rezultat as { brojPokusaja?: number }).brojPokusaja ?? postavke.brojKlijenata;
+      const stopaGresaka = brojGresaka / Math.max(1, brojPokusaja);
       const prosao = stopaGresaka <= postavke.maksStopaGresaka;
+      stagingTestProsao = prosao;
       console.log(`${prosao ? 'PASS' : 'FAIL'} stopaGresaka (${stopaGresaka.toFixed(4)} <= ${postavke.maksStopaGresaka})`);
       if (!prosao) {
         console.error('Load test nije prošao prag stope grešaka.');
         process.exitCode = 1;
       }
     }
+    if (kontrolerPrekida?.signal.aborted) process.exitCode = 130;
+  } catch (greska) {
+    if (!kontrolerPrekida?.signal.aborted) throw greska;
+    process.exitCode = 130;
   } finally {
+    process.off('SIGINT', prekini);
+    process.off('SIGTERM', prekini);
+    signalPrekida = undefined;
+    rokStagingTestaMs = undefined;
     odspojiSveOtvorene();
+    try {
+      if (postavke.stagingTest) {
+        await zabiljeziRezultatStagingTesta(postavke.adresa, postavke.brojKlijenata, stagingTestProsao);
+      }
+    } finally {
+      await oslobodiZakljucavanje?.();
+    }
   }
 }
 

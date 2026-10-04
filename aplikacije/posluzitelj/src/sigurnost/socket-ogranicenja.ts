@@ -7,6 +7,10 @@ export interface PostavkeSocketOgranicenja {
   dogadajiPoProzoru: number;
 }
 
+export function jeDopustenaTestnaIp(okruzenje: string, testnaIp: string, ipZahtjeva: string): boolean {
+  return okruzenje === 'staging' && testnaIp !== '' && ipZahtjeva === testnaIp;
+}
+
 export class OgranicivacDogadaja {
   private readonly pozivi = new Map<string, number[]>();
   private readonly cistac: NodeJS.Timeout;
