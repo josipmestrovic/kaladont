@@ -77,7 +77,7 @@ export async function razrijesiIdentitet(token: string): Promise<Identitet> {
     if (!sesija) throw new Error('Nevaljan ili istekao sesijski token');
     const igracId = sesija.igracId;
     const [postojeci] = await baza.select().from(igraci).where(eq(igraci.id, igracId)).limit(1);
-    if (!postojeci || postojeci.obrisanAt) {
+    if (!postojeci || postojeci.obrisanAt || postojeci.upravljac === 'bot') {
       throw new Error('Sesijski token ne odgovara nijednom igraču');
     }
     await osvjeziZadnjuAktivnostAkoTreba(postojeci);

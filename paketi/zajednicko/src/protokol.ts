@@ -105,6 +105,9 @@ export interface PayloadUdjiUSobu {
   kod: string;
 }
 
+/** Javna partija (bodovi, rang, XP), privatna soba ili trening u kojem se ništa ne bilježi. */
+export type KontekstPartije = 'javna' | 'privatna' | 'trening';
+
 export interface PocetakPartije {
   partijaId: string;
   mojIgracId: string;
@@ -112,6 +115,7 @@ export interface PocetakPartije {
   pocetakIso: string;
   sjedala: { igracId: string; nadimak: string; jeGost: boolean; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[];
   mod?: 'cetiri_igraca' | 'dva_igraca';
+  kontekst?: KontekstPartije;
   jePrivatna?: boolean;
   kodSobe?: string;
 }
@@ -136,6 +140,7 @@ export interface StanjePartije {
   zavrsena: boolean;
   statusSpremanja: 'nije_zavrsena' | 'spremanje_rezultata' | 'rezultati_spremljeni';
   mod?: 'cetiri_igraca' | 'dva_igraca';
+  kontekst?: KontekstPartije;
   jePrivatna?: boolean;
   kodSobe?: string;
   trajanjePotezaSek?: number;
@@ -260,6 +265,7 @@ export interface KrajPartije {
     doSljedece: number | null;
   };
   mod?: 'cetiri_igraca' | 'dva_igraca';
+  kontekst?: KontekstPartije;
   jePrivatna?: boolean;
   kodSobe?: string;
 }
@@ -317,7 +323,8 @@ export type KodGreske =
   | 'EMAIL_NIJE_POTVRDEN'
   | 'PREVISE_SOBA'
   | 'PREVISE_PARTIJA'
-  | 'UPIS_PARTIJE_NEUSPJEO';
+  | 'UPIS_PARTIJE_NEUSPJEO'
+  | 'TRENING_NEDOSTUPAN';
 
 export interface PayloadGreska {
   kod: KodGreske;
@@ -338,9 +345,13 @@ export interface PayloadUdjiURed {
 
 export type PotvrdaUlaskaURed = (stanje: StanjeReda | null) => void;
 
+/** Potvrda pokretanja treninga: partija kreće kroz redovne `partija:*` događaje. */
+export type PotvrdaTreninga = (ishod: { pokrenut: true } | { pokrenut: false; kod: KodGreske; poruka: string }) => void;
+
 /** Mapa svih događaja klijent -> poslužitelj, za tipiziranu upotrebu Socket.IO. */
 export interface DogadajiKlijentPoslužitelj {
   'red:udji': (payload: PayloadUdjiURed | undefined, potvrda?: PotvrdaUlaskaURed) => void;
+  'trening:zapocni': (potvrda?: PotvrdaTreninga) => void;
   'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;

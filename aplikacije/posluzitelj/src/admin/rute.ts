@@ -11,6 +11,15 @@ import { dodajRijec, deaktivirajRijec, vratiRijec, NevaljanaRijecError } from '.
 import { prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza/shema.js';
 import { baza } from '../baza/klijent.js';
 import { zahtijevajAdmina, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
+import { izracunajStatistikuCekanja } from './statistika-cekanja.js';
+
+/** Živi brojači iz memorije procesa; nisu trajni i vrijede od zadnjeg pokretanja. */
+export interface ZivoStanjeBotova {
+  fond: { ukupno: number; slobodni: number; rezervirani: number; uPartiji: number; iscrpljenja: number };
+  bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number };
+  trening: { aktivni: number; zapoceti: number; odbijeni: number; neuspjeli: number };
+  zastavice: { trening: boolean; botoviDvoboj: boolean; botoviCetveroboj: boolean };
+}
 
 const ShemaRijec = z.object({ rijec: z.string().min(2), razlog: z.string().min(1) });
 const ShemaDodajRijec = ShemaRijec.extend({
@@ -22,7 +31,24 @@ const ShemaRijesiPrijavu = z.object({
   napomenaAdmina: z.string().optional(),
 });
 
-export async function registrirajAdminRute(app: FastifyInstance, rjecnik: RjecnikUMemoriji): Promise<void> {
+export async function registrirajAdminRute(
+  app: FastifyInstance,
+  rjecnik: RjecnikUMemoriji,
+  dohvatiZivoStanje: () => ZivoStanjeBotova | null = () => null,
+): Promise<void> {
+  app.get<{ Querystring: { dani?: string } }>(
+    '/admin/statistike/cekanje',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev, odgovor) => {
+      const dani = Number(zahtjev.query.dani ?? 7);
+      if (!Number.isInteger(dani) || dani < 1 || dani > 90) {
+        return odgovor.code(400).send({ ok: false, greska: 'Razdoblje mora biti od 1 do 90 dana.' });
+      }
+      const statistika = await izracunajStatistikuCekanja(dani);
+      return { ok: true, ...statistika, zivo: dohvatiZivoStanje() };
+    },
+  );
+
   app.get<{ Querystring: { status?: string } }>(
     '/admin/prijave',
     { preHandler: zahtijevajAdmina },

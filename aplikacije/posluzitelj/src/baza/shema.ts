@@ -21,6 +21,8 @@ import {
 import { sql } from 'drizzle-orm';
 
 export const vrstaIgraca = pgEnum('vrsta_igraca', ['gost', 'registriran', 'admin']);
+/** Tko upravlja identitetom (ADR-017); odvojeno od prava prijave i uloge. */
+export const upravljacIgraca = pgEnum('upravljac_igraca', ['covjek', 'bot']);
 export const statusPartije = pgEnum('status_partije', ['u_tijeku', 'zavrsena', 'ponistena']);
 export const modPartije = pgEnum('mod_partije', ['cetiri_igraca', 'dva_igraca']);
 export const nacinIspadanja = pgEnum('nacin_ispadanja', [
@@ -55,6 +57,7 @@ export const vrstaObracunaPartije = pgEnum('vrsta_obracuna_partije', [
 export const igraci = pgTable('igraci', {
   id: uuid('id').primaryKey().defaultRandom(),
   vrsta: vrstaIgraca('vrsta').notNull().default('gost'),
+  upravljac: upravljacIgraca('upravljac').notNull().default('covjek'),
   nadimak: text('nadimak').notNull(),
   avatarId: smallint('avatar_id').notNull().default(0),
   avatarConfig: jsonb('avatar_config'),
@@ -244,6 +247,15 @@ export const dostignucaIgraca = pgTable('dostignuca_igraca', {
   zadnjeOtkljucavanje: timestamp('zadnje_otkljucavanje', { withTimezone: true }),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.dostignuceId] })]);
 
+/** Konfiguracija javnog bota (ADR-017); identitet i statistika žive u `igraci`. */
+export const botovi = pgTable('botovi', {
+  igracId: uuid('igrac_id').primaryKey().references(() => igraci.id),
+  kljucSeeda: text('kljuc_seeda').notNull(),
+  aktivan: boolean('aktivan').notNull().default(true),
+  verzijaProfila: smallint('verzija_profila').notNull().default(1),
+  stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [uniqueIndex('uq_botovi_kljuc_seeda').on(tablica.kljucSeeda)]);
+
 export const partije = pgTable('partije', {
   id: uuid('id').primaryKey().defaultRandom(),
   mod: modPartije('mod').notNull().default('cetiri_igraca'),
@@ -251,6 +263,8 @@ export const partije = pgTable('partije', {
   kraj: timestamp('kraj', { withTimezone: true }),
   status: statusPartije('status').notNull().default('u_tijeku'),
   pobjednikId: uuid('pobjednik_id').references(() => igraci.id),
+  /** Koliko je mjesta za stolom popunio bot (ADR-017); za statistiku čekanja. */
+  brojBotova: smallint('broj_botova').notNull().default(0),
 }, (tablica) => [
   index('idx_partije_zavrsene_mod_kraj')
     .on(tablica.mod, tablica.kraj, tablica.id)

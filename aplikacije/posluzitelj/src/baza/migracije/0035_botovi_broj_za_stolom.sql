@@ -1,0 +1,1 @@
+ALTER TABLE "partije" ADD COLUMN "broj_botova" smallint DEFAULT 0 NOT NULL;

@@ -33,6 +33,11 @@ const shemaKonfiguracije = z.object({
   DIGEST: z.string().default('lokalno'),
   POSLUZUJ_WEB: z.enum(['true', 'false']).default('false'),
   LJESTVICE_POCETAK: z.string().datetime({ offset: true }).default('2026-01-01T00:00:00+01:00'),
+  // ADR-017: zasebne zastavice; javni botovi su isključeni dok operater ne odluči drukčije.
+  TRENING_OMOGUCEN: z.enum(['true', 'false']).default('true'),
+  BOTOVI_DVOBOJ: z.enum(['true', 'false']).default('false'),
+  BOTOVI_CETVEROBOJ: z.enum(['true', 'false']).default('false'),
+  MAKSIMALNO_AKTIVNIH_TRENINGA: z.coerce.number().int().positive().default(100),
 });
 
 export const konfiguracija = shemaKonfiguracije.parse(process.env);

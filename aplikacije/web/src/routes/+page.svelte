@@ -122,6 +122,9 @@
           <a href="/red?mod=cetiri_igraca" class="modal-opcija">
             <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" /><span><strong>Četveroboj</strong><small>4 igrača</small></span>
           </a>
+          <a href="/zagrijavanje" class="modal-opcija">
+            <img src="/ikone/19-vatra.png" alt="" aria-hidden="true" /><span><strong>Zagrijavanje</strong><small>Igraj dvoboj protiv računala.</small></span>
+          </a>
           <a href="/soba/kreiraj" class="modal-opcija">
             <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" /><span><strong>Privatna soba</strong><small>Prilagodi pravila i pozovi svoju ekipu.</small></span>
           </a>

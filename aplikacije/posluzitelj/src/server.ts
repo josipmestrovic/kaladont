@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createReadStream, existsSync } from 'node:fs';
 import path from 'node:path';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { eq, sql } from 'drizzle-orm';
 import cors from '@fastify/cors';
@@ -35,7 +36,12 @@ import {
   type Okruzenje,
 } from './sigurnost/origin.js';
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
-import { jeDopustenaTestnaIp, OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
+import { BotKontroler } from './bot/kontroler.js';
+import { ucitajKonfiguracijuBota } from './bot/konfiguracija-bota.js';
+import { FondBotova, ucitajIdentiteteBotova } from './bot/fond.js';
+import { registrirajTrening } from './trening/servis-treninga.js';
+import { dohvatiIpKlijenta, jeDopustenaTestnaIp, OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
+import { obradiLeaseStaginga, type LeaseStaginga } from './sigurnost/staging-opterecenja.js';
 import type { ZapisSocketHandlerGreske } from './sigurnost/socket-handler.js';
 import { ponistiPartijeUTijekuUBazi } from './igra/upis-partije.js';
 import { ocistiIstekleNepotvrdjeneRacune } from './racuni/ciscenje-nepotvrdjenih.js';
@@ -87,6 +93,9 @@ export interface Posluzitelj {
   app: FastifyInstance;
   io: KaladontIo;
   zaustavi: () => Promise<void>;
+  brojaciTreninga: import('./trening/servis-treninga.js').BrojaciTreninga;
+  brojaciBota: import('./bot/kontroler.js').BrojaciBota;
+  fondBotova: FondBotova;
 }
 
 export interface OpcijePosluzitelja {
@@ -94,6 +103,8 @@ export interface OpcijePosluzitelja {
   okruzenjeSigurnosti?: Okruzenje;
   authRateLimit?: Partial<OpcijeAuthRateLimita>;
   socketOgranicenja?: Partial<PostavkeSocketOgranicenja>;
+  /** Samo testovi: prisilno uključi popunu botovima i skrati pragove. */
+  popunaBotovima?: { dvoboj?: boolean; cetveroboj?: boolean; pragoviMs?: Partial<Record<'cetiri_igraca' | 'dva_igraca', readonly number[]>> };
 }
 
 /** Izgrađuje Fastify + Socket.IO instancu (bez pokretanja listen-a) - koristi ga i index.ts i testovi. */
@@ -117,6 +128,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const ogranicivacHandshaka = new OgranicivacDogadaja(60_000);
   const ogranicivacHttpDokumenata = new OgranicivacDogadaja(60_000);
   const ogranicivacDogadaja = new OgranicivacDogadaja(socketOgranicenja.prozorDogadajaMs);
+  let stagingLease: LeaseStaginga | null = null;
   const provjeriDogadaj = (igracId: string, dogadaj: string): boolean =>
     ogranicivacDogadaja.dopusti(`${igracId}:${dogadaj}`, socketOgranicenja.dogadajiPoProzoru);
   const app = Fastify({ logger: true, trustProxy: jePouzdaniProxy(okruzenjeSigurnosti) });
@@ -127,6 +139,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   await app.register(cookie);
   await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
   let opozoviSocketSesije: (sesijaId: string) => void = () => {};
+  let dohvatiZivoStanjeBotova: () => import('./admin/rute.js').ZivoStanjeBotova | null = () => null;
   const rjecnik = await ucitajRjecnik();
   app.log.info(`Rječnik učitan: ${rjecnik.brojRijeci()} riječi`);
 
@@ -139,7 +152,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       await registrirajLjestviceRute(apiApp);
       await registrirajPrijaveRute(apiApp);
       await registrirajPovratneInformacijeRute(apiApp);
-      await registrirajAdminRute(apiApp, rjecnik);
+      await registrirajAdminRute(apiApp, rjecnik, () => dohvatiZivoStanjeBotova());
       await registrirajRjecnikRute(apiApp, rjecnik);
     },
     { prefix: '/api' },
@@ -195,12 +208,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
         const prihvat = zahtjev.headers.accept;
         const traziDokument = typeof prihvat === 'string' && prihvat.includes('text/html');
         if (traziDokument) {
-          const testnaIp = zahtjev.headers['x-kaladont-ip-klijenta'];
-          const proslijedeniIp = zahtjev.headers['x-forwarded-for'];
-          const ip = (Array.isArray(testnaIp) ? testnaIp[0] : testnaIp)
-            ?? (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
-            ?? zahtjev.socket.remoteAddress
-            ?? 'nepoznat';
+          const ip = dohvatiIpKlijenta(
+            okruzenjeSigurnosti,
+            zahtjev.headers['x-kaladont-ip-klijenta'],
+            zahtjev.headers['x-forwarded-for'],
+            zahtjev.socket.remoteAddress,
+          );
           const testnaIpDopustena = jeDopustenaTestnaIp(okruzenjeSigurnosti, konfiguracija.STAGING_TEST_IP, ip);
           const dopusten = testnaIpDopustena || ogranicivacHttpDokumenata.dopusti(`ip:${ip}`, konfiguracija.HTTP_DOKUMENTI_PO_IP_MINUTI);
           if (!dopusten) {
@@ -219,12 +232,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     maxHttpBufferSize: MAX_SOCKET_PORUKA_BAJTOVA,
     allowRequest: (zahtjev, povratniPoziv) => {
       const originDopusten = jeDopustenOrigin(okruzenjeSigurnosti, zahtjev.headers.origin, javnaAdresaOrigin);
-      const testnaIp = zahtjev.headers['x-kaladont-ip-klijenta'];
-      const proslijedeniIp = zahtjev.headers['x-forwarded-for'];
-      const ip = (Array.isArray(testnaIp) ? testnaIp[0] : testnaIp)
-        ?? (Array.isArray(proslijedeniIp) ? proslijedeniIp[0] : proslijedeniIp)?.split(',')[0]?.trim()
-        ?? zahtjev.socket.remoteAddress
-        ?? 'nepoznat';
+      const ip = dohvatiIpKlijenta(
+        okruzenjeSigurnosti,
+        zahtjev.headers['x-kaladont-ip-klijenta'],
+        zahtjev.headers['x-forwarded-for'],
+        zahtjev.socket.remoteAddress,
+      );
       const testnaIpDopustena = jeDopustenaTestnaIp(okruzenjeSigurnosti, konfiguracija.STAGING_TEST_IP, ip);
       const handshakeDopusten = testnaIpDopustena || ogranicivacHandshaka.dopusti(`ip:${ip}`, socketOgranicenja.handshakePoIpMinuti);
       const vezaDopustena = io.sockets.sockets.size < socketOgranicenja.maksimalnoAktivnihVeza;
@@ -245,6 +258,18 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     }
   };
 
+  let naJavnaPartijaZavrsila: () => void = () => undefined;
+  const eventLoop = monitorEventLoopDelay({ resolution: 20 });
+  eventLoop.enable();
+  const popunaDvobojUkljucena = () => opcije.popunaBotovima?.dvoboj ?? konfiguracija.BOTOVI_DVOBOJ === 'true';
+  const popunaCetverobojUkljucena = () => opcije.popunaBotovima?.cetveroboj ?? konfiguracija.BOTOVI_CETVEROBOJ === 'true';
+  // Kontroler i motor referenciraju se međusobno samo kroz zatvaranja, pa redoslijed stvaranja nije bitan.
+  const botKontroler = new BotKontroler({
+    rjecnik,
+    izvrsiNaredbu: (partijaId, igracId, naredba) => upravitelj.naredbaBota(partijaId, igracId, naredba),
+    konfiguracija: ucitajKonfiguracijuBota(),
+    zapisi: (poruka, podaci) => app.log.warn(podaci, poruka),
+  });
   const upravitelj = stvoriUpraviteljPartija(
     io,
     rjecnik,
@@ -258,10 +283,13 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     {
       ...opcije.postavkeMotora,
       maksimalnoAktivnihPartija: socketOgranicenja.maksimalnoAktivnihPartija,
+      maksimalnoAktivnihTreninga: konfiguracija.MAKSIMALNO_AKTIVNIH_TRENINGA,
       provjeriDogadaj,
       zapisSocketHandlerGreske,
+      naPromjenuPoteza: (dogadaj) => botKontroler.naPromjenuPoteza(dogadaj),
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
+        naJavnaPartijaZavrsila();
       },
       naPrivatnaPartijaZavrsila: (kodSobe, partijaId, pobjednikId, rezultati) => {
         sobaServis?.registrirajRezultatPartije(kodSobe, partijaId, pobjednikId, rezultati);
@@ -281,6 +309,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     const brojRijeci = rjecnik.brojRijeci();
     const spreman = bazaDostupna && brojRijeci > 0;
     const memorija = process.memoryUsage();
+    // Lag se očitava i resetira po zahtjevu: vrijednost pokriva razdoblje od prošlog health poziva.
+    const eventLoopP95Ms = eventLoop.count > 0 ? eventLoop.percentile(95) / 1e6 : 0;
+    eventLoop.reset();
+    const fond = fondBotova.stanje();
     const tijelo = {
       ok: spreman,
       baza: bazaDostupna ? 'dostupna' : 'nedostupna',
@@ -290,6 +322,15 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       rssBajtovi: memorija.rss,
       heapUsedBajtovi: memorija.heapUsed,
       heapTotalBajtovi: memorija.heapTotal,
+      eventLoopP95Ms: Math.round(eventLoopP95Ms * 100) / 100,
+      aktivniTreninzi: upravitelj.brojAktivnihTreninga(),
+      botoviUPartiji: fond.uPartiji,
+      fondSlobodni: fond.slobodni,
+      fondIscrpljenja: fond.iscrpljenja,
+      botIsteci: upravitelj.brojIstekaBota(),
+      botTehnickeGreske: botKontroler.brojaci.tehnickeGreske,
+      botoviDvoboj: popunaDvobojUkljucena(),
+      botoviCetveroboj: popunaCetverobojUkljucena(),
       uptimeSekunde: Math.floor(process.uptime()),
       verzija: konfiguracija.VERZIJA,
       digest: konfiguracija.DIGEST,
@@ -297,6 +338,47 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
     return odgovor.code(spreman ? 200 : 503).send(tijelo);
   });
+
+  if (okruzenjeSigurnosti === 'staging') {
+    app.post('/_staging/opterecenje/lease', async (zahtjev, odgovor) => {
+      const ip = dohvatiIpKlijenta(
+        okruzenjeSigurnosti,
+        zahtjev.headers['x-kaladont-ip-klijenta'],
+        zahtjev.headers['x-forwarded-for'],
+        zahtjev.socket.remoteAddress,
+      );
+      if (!jeDopustenaTestnaIp(okruzenjeSigurnosti, konfiguracija.STAGING_TEST_IP, ip)) {
+        return odgovor.code(403).send({ ok: false, greska: 'Staging test lease nije dopušten s ove IP adrese.' });
+      }
+
+      const tijelo = zahtjev.body as { akcija?: unknown; runId?: unknown } | undefined;
+      if (
+        !tijelo ||
+        !['acquire', 'renew', 'release'].includes(String(tijelo.akcija)) ||
+        typeof tijelo.runId !== 'string' ||
+        !/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(tijelo.runId)
+      ) {
+        return odgovor.code(400).send({ ok: false, greska: 'Zahtjev staging leasea nije valjan.' });
+      }
+
+      const ishod = obradiLeaseStaginga(
+        stagingLease,
+        { akcija: tijelo.akcija as 'acquire' | 'renew' | 'release', runId: tijelo.runId },
+        Date.now(),
+        30_000,
+      );
+      stagingLease = ishod.lease;
+      if (!ishod.uspio) {
+        return odgovor.code(ishod.zauzet ? 409 : 410).send({
+          ok: false,
+          zauzet: ishod.zauzet,
+          greska: ishod.zauzet ? 'Drugi test već drži staging lease.' : 'Staging lease je istekao ili više nije u vlasništvu ovog testa.',
+        });
+      }
+
+      return odgovor.send({ ok: true, runId: tijelo.runId, istjeceU: ishod.lease?.istjeceU ?? null });
+    });
+  }
 
   await app.ready();
 
@@ -382,11 +464,17 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   });
 
   let igracImaPrivatnuSobu: (igracId: string) => boolean = () => false;
+  const fondBotova = new FondBotova(await ucitajIdentiteteBotova().catch((greska: unknown) => {
+    app.log.error({ greska }, 'Učitavanje javnih botova nije uspjelo; popuna reda ostaje bez botova');
+    return [];
+  }));
+  app.log.info({ brojBotova: fondBotova.stanje().ukupno }, 'Fond javnih botova učitan');
   const redServis = registrirajRedCekanja(
     io,
     async (stol, mod) => {
-      await upravitelj.zapocniPartiju(stol, mod);
-      void osvjeziProsjekCekanja();
+      const rezultat = await upravitelj.zapocniPartiju(stol, mod);
+      if (rezultat === 'pokrenuta') void osvjeziProsjekCekanja();
+      return rezultat;
     },
     upravitelj.imaAktivnuPartiju,
     (igracId) => igracImaPrivatnuSobu(igracId),
@@ -394,7 +482,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     igracMozeIgrati,
     provjeriDogadaj,
     zapisSocketHandlerGreske,
+    {
+      fond: fondBotova,
+      omogucena: (mod) => mod === 'dva_igraca' ? popunaDvobojUkljucena() : popunaCetverobojUkljucena(),
+      botJeZauzet: upravitelj.imaNezavrsenuObradu,
+      pragoviMs: opcije.popunaBotovima?.pragoviMs,
+    },
   );
+  naJavnaPartijaZavrsila = () => redServis.osvjeziPopunu();
 
   const sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
     upravitelj.zapocniPrivatnuPartiju(sudionici, postavke, kodSobe),
@@ -412,17 +507,41 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   );
   igracImaPrivatnuSobu = sobaServis.imaPrivatnuSobu;
 
+  const treningServis = registrirajTrening(io, {
+    omogucen: () => konfiguracija.TRENING_OMOGUCEN === 'true' && upravitelj.mozePokrenutiPartiju(),
+    zapocniTrening: (sudionici) => upravitelj.zapocniPartiju(sudionici, 'dva_igraca', { kontekst: 'trening' }),
+    igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
+    igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
+    ukloniIzJavnogReda: redServis.ukloniIzReda,
+    provjeriDogadaj,
+    zapisSocketHandlerGreske,
+  });
+
   await ponistiPartijeUTijekuUBazi();
+
+  dohvatiZivoStanjeBotova = () => ({
+    fond: fondBotova.stanje(),
+    bot: { ...botKontroler.brojaci },
+    trening: { aktivni: upravitelj.brojAktivnihTreninga(), ...treningServis.brojaci },
+    zastavice: {
+      trening: konfiguracija.TRENING_OMOGUCEN === 'true',
+      botoviDvoboj: konfiguracija.BOTOVI_DVOBOJ === 'true',
+      botoviCetveroboj: konfiguracija.BOTOVI_CETVEROBOJ === 'true',
+    },
+  });
 
   let zatvoreno = false;
   const zaustavi = async () => {
     if (zatvoreno) return;
     zatvoreno = true;
     clearInterval(cistacNepotvrdjenih);
+    eventLoop.disable();
+    redServis.zaustaviPopunu();
+    botKontroler.zaustavi();
     await upravitelj.zaustavi();
     await new Promise<void>((resolve) => io.close(() => resolve()));
     await app.close();
   };
 
-  return { app, io, zaustavi };
+  return { app, io, zaustavi, brojaciTreninga: treningServis.brojaci, brojaciBota: botKontroler.brojaci, fondBotova };
 }

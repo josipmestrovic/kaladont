@@ -24,6 +24,7 @@ export interface CiljeviRijeci {
 
 export interface RjecnikUMemoriji extends RjecnikSucelje {
   brojRijeci(): number;
+  frekvencijaZa(rijec: string): number | null;
   brojKolekcijskihGrupa(): number;
   brojKolekcijskihGrupaPoVrsti(): Map<VrstaRijeci, number>;
   brojKolekcijskihGrupaZaVrste(vrste: readonly VrstaRijeci[]): number;
@@ -34,6 +35,16 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   /** Broj oblika po kategoriji, sortirano silazno (GET /rjecnik/statistika, naslovnica). */
   brojPoKategoriji(): KategorijaRjecnika[];
   ciljeviRijeci(): CiljeviRijeci;
+  /** Igrive riječi na prefiks, bez kopiranja indeksa; redoslijed je redoslijed indeksa, ne rang. */
+  igriviKandidati(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): Iterable<string>;
+  /** Raste pri svakom ponovnom učitavanju; potez odabran pod starom verzijom treba ponovno provjeriti. */
+  verzijaRjecnika(): number;
   /** Ponovno učita rječnik iz baze i zamijeni zajedničke podatke in-place. */
   ponovoUcitaj(): Promise<void>;
 }
@@ -56,6 +67,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
   let brojDugihPoTieru: readonly number[] = [0, 0, 0];
   let brojRijetkihPoTieru: readonly number[] = [0, 0, 0];
   let ciljevi: CiljeviRijeci = { rijetke: { ukupno: 0, niska: 0, srednja: 0, jaka: 0 }, duge: { ukupno: 0, duga: 0, srednja: 0, jaka: 0 } };
+  let verzija = 0;
 
   async function ucitaj(): Promise<void> {
     const novoRijecGrupe = new Map<string, string | readonly string[]>();
@@ -170,6 +182,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
       rijetke: { niska: rijetkeGrupe[0]!.size, srednja: rijetkeGrupe[1]!.size, jaka: rijetkeGrupe[2]!.size, ukupno: 81037 },
       duge: { duga: dugeRijeci[0]!.size, srednja: dugeRijeci[1]!.size, jaka: dugeRijeci[2]!.size, ukupno: 379193 },
     };
+    verzija += 1;
   }
 
   function grupeZa(rijec: string): readonly string[] {
@@ -250,6 +263,20 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     return false;
   }
 
+  function* igriviKandidati(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): Generator<string> {
+    const lista = poPrefiksu.get(dvaGrafema);
+    if (!lista) return;
+    for (const rijec of lista) {
+      if (jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) yield rijec;
+    }
+  }
+
   await ucitaj();
 
   return {
@@ -271,6 +298,8 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     jeOsnovniOblik,
     postojeRijeciNa: (dvaGrafema) => (poPrefiksu.get(dvaGrafema)?.length ?? 0) > 0,
     imaSlobodnuRijecNa,
+    igriviKandidati,
+    verzijaRjecnika: () => verzija,
     nasumicnaPocetnaRijec: (iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci) => {
       const sigurnaRijec = odaberiSigurnuPocetnuRijec({
         iskoristeneGrupe,

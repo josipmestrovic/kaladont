@@ -77,9 +77,9 @@ CLI `pnpm --filter posluzitelj opterecenje` pokreće kontrolirano opterećenje p
 
 ### Ručni test staging veza
 
-Naredba `test:opterecenje` je odvojena od standardnih testova, CI-ja i objave. Zahtijeva ciljnu adresu, broj klijenata i trajanje, dopušta samo `https://staging.kaladont.hr`, ograničava trajanje na jednu minutu do dva sata i prihvaća samo razine 100, 500, 1000 ili 10000. Trajanje uključuje postupno spajanje; valovi su zadano 10 klijenata u sekundi, najviše 100 u sekundi. Potvrda uspjeha čuva se na računalu generatora sedam dana: 500 traži uspješnih 100, 1000 traži uspješnih 500, a 10000 traži uspješnih 1000 i dodatnu potvrdu. Neuspješan ponovljeni test poništava potvrdu te i viših razina. Produkcijska domena odbija se i preko stare naredbe `opterecenje`.
+Naredba `test:opterecenje` je odvojena od standardnih testova, CI-ja i objave. Zahtijeva ciljnu adresu, broj klijenata i vrijeme držanja, dopušta samo `https://staging.kaladont.hr`, ograničava vrijeme držanja na jednu minutu do dva sata i prihvaća razine 100, 500, 1000, 2000, 5000 i 10000. Valovi su zadano 10 klijenata u sekundi, najviše 100 u sekundi. `trajanje-ms` označava vrijeme držanja nakon rampe; ukupno vrijeme staging testa, uključujući rampu, ograničeno je na dvije ure. Potvrda uspjeha čuva se na računalu generatora sedam dana, a svaka razina traži uspješnu prethodnu razinu. Za 10000 klijenata potrebna je i dodatna potvrda. Neuspješan ili prekinut test poništava potvrdu te i viših razina. Produkcijska domena odbija se i preko stare naredbe `opterecenje`.
 
-Početna ručna inačica podržava samo scenarij veza. Ona održava Socket.IO veze, ali **ne dokazuje kapacitet aktivne igre ni cilj 7000 igrača i 3000 posjetitelja**. Primjer za 100 veza tijekom minute:
+Početna ručna inačica podržava samo scenarij veza. Ona mjeri stvarno trajanje držanja veza, broj neočekivanih prekida i najmanji broj istodobno aktivnih veza. Prolaz traži dovršene pokušaje, stopu pogrešaka unutar praga, održavanje najmanje `ceil(klijenti * (1 - maks-stopa-gresaka))` veza te dovršeno nenulto vrijeme držanja. Planirano zatvaranje nakon mjerenja ne računa se kao neočekivan prekid. Ovaj scenarij **ne dokazuje kapacitet aktivne igre ni cilj 7000 igrača i 3000 posjetitelja**. Primjer za 100 veza tijekom minute:
 
 ```powershell
 pnpm --filter posluzitelj test:opterecenje -- --scenarij=veze --adresa=https://staging.kaladont.hr --klijenti=100 --trajanje-ms=60000
@@ -87,9 +87,89 @@ pnpm --filter posluzitelj test:opterecenje -- --scenarij=veze --adresa=https://s
 
 Za 10000 klijenata naredbi se mora dodati `--potvrdi-10000=DA`. Pokretati samo jedan korak odjednom; prelazak na višu razinu traži pregled rezultata prethodne razine. Ostali scenariji odbijaju se u ovoj naredbi dok ne dobiju sigurnu podršku za dogovoreni omjer Dvoboja, javnih i privatnih Četveroboja te HTTP posjetitelja.
 
-Lokalna brava sprječava paralelne testove prema istom stagingu s istog računala. Privremena IP iznimka postoji samo u stagingu. Caddy postavlja `X-Kaladont-IP-Klijenta` prema adresi spajanja; poslužitelj zanemaruje ograničenje novih veza i HTTP dokumenata samo kad `STAGING_TEST_IP` točno odgovara toj adresi. Postavka se odbija izvan staginga. U staging `.env` iznimku postaviti samo za dogovoreni testni termin, a nakon testa je ukloniti i vratiti uobičajene limite. `docker-compose.staging.yml` podržava privremeno povećanje limita preko `STAGING_TEST_MAKSIMALNO_VEZA`, `STAGING_TEST_MAKSIMALNO_SOBA`, `STAGING_TEST_MAKSIMALNO_PARTIJA` i `STAGING_TEST_DOGADAJI_PO_PROZORU`; bez tih varijabli ostaju dosadašnje vrijednosti. Ne mijenjati produkcijske postavke.
+Lokalna brava sprječava paralelne testove s istog računala. Za miješani test dodatni staging lease dopušta samo jedan `runId` na cijelom stagingu; obnavlja se svakih 10 sekundi, istječe nakon 30 sekundi i test se prekida ako se obnova izgubi. Lease ruta postoji samo u stagingu i prihvaća zahtjev samo s točne `STAGING_TEST_IP` adrese koju postavlja Caddy. Privremena IP iznimka također postoji samo u stagingu. Staging Caddy prepisuje `X-Kaladont-IP-Klijenta` adresom spajanja, a poslužitelj je koristi samo u stagingu. Produkcijski Caddy uklanja takvo ulazno zaglavlje, a produkcijski poslužitelj ga zanemaruje. Izvan staging/produkcijskog proxy puta poslužitelj ne vjeruje proslijeđenim IP zaglavljima. Iznimka obuhvaća samo ograničenje novih veza i HTML dokumenata, ne opće API rute. U staging `.env` iznimku postaviti samo za dogovoreni termin, a nakon testa ukloniti je i vratiti uobičajene limite. `docker-compose.staging.yml` podržava privremeno povećanje limita preko `STAGING_TEST_MAKSIMALNO_VEZA`, `STAGING_TEST_MAKSIMALNO_SOBA`, `STAGING_TEST_MAKSIMALNO_PARTIJA` i `STAGING_TEST_DOGADAJI_PO_PROZORU`; bez tih varijabli ostaju dosadašnje vrijednosti. Ne mijenjati produkcijske limite.
 
 Testni računi i partije ostaju u staging bazi. Nakon svakog testa provjeriti `/zdravlje`, stanje aplikacije i baze te ukloniti privremenu IP iznimku i povećane limite. Staging test ne pokretati tijekom uobičajene provjere izmjena; potreban je izričit zahtjev korisnika.
+
+### Miješani test igre i javnih stranica
+
+`test:opterecenje:mijesano` je zaseban, ručni CLI; nije pozvan iz `pnpm test`, CI-ja ni objave. Na stagingu zahtijeva lokalni k6 i interaktivni terminal. Botovi koriste Socket.IO polling s nadogradnjom na WebSocket, a HTTP korisnici šalju javne GET zahtjeve na naslovnicu (60%), ljestvice (20%), novosti (10%) i `/pravila-kaladonta?tema=pravila` (10%). Svaki pokus dobiva svoju trajnu mapu `%LOCALAPPDATA%\Kaladont\opterecenje\<runId>` na Windowsu, odnosno `~/.kaladont/opterecenje/<runId>` na drugim sustavima. Izvještaji i snimka rječnika ne spremaju se u repozitorij.
+
+Snimku pripremiti jednokratno na staging VPS-u, unutar aplikacijskog kontejnera, i prenijeti je na generator samo odobrenim SSH/SCP kanalom. Ne otvarati PostgreSQL prema internetu. Primjer izvoza:
+
+```powershell
+docker compose exec aplikacija node dist/cli/izvezi-opterecenje-rjecnika.js --izlaz=/tmp/kaladont-opterecenje-rjecnik.jsonl.gz
+```
+
+Na generatoru pokreni razinu po razinu. Primjer za 100 ukupnih virtualnih korisnika:
+
+```powershell
+pnpm --filter posluzitelj test:opterecenje:mijesano -- --adresa=https://staging.kaladont.hr --klijenti=100 --trajanje-ms=600000 --rjecnik-snimka="C:\Temp\kaladont-opterecenje-rjecnik.jsonl.gz"
+```
+
+`--trajanje-ms` je vrijeme punog miješanog opterećenja nakon rampi botova i HTTP VU-a; ukupno trajanje s rampama i čišćenjem mora ostati kraće od dva sata. Razina 10000 zahtijeva dodatno `--potvrdi-10000=DA` te uspješne prethodne razine za isti profil i digest. Prekid, HTTP prag, health pogreška, promjena digesta ili nedostatan broj igrača ne spremaju potvrdu uspjeha.
+
+Naredba nakon nužnih read-only provjera prikazuje cilj, razinu, stvarnu raspodjelu, profil, digest, prethodni `runId`, vremena i mapu izvještaja. Prije leasea, botova i k6-a zahtijeva točan unos `POKRENI 100` (ili broj tražene razine). To vrijedi i za prvu razinu. Pogrešan ili prazan unos, EOF i Ctrl+C otkazuju bez opterećenja i bez poništavanja prethodnih potvrda. Nema `yes` opcije ni CI iznimke. Nakon unosa ponovno se provjeravaju aktualni digest i prethodni prolaz; promjena prekida pripremu. Pokretanje bez interaktivnog ulaza odbija se prije kontakta sa stagingom.
+
+Terminal prikazuje faze pripreme, rampe igrača i HTTP korisnika, mjerenja, dovršavanja partija i čišćenja. Otprilike svakih deset sekundi ispisuje stvarne veze, aktivne sudionike, red, ispale igrače, rezultate, partije, završene igre po načinu, pogreške i starost health provjere. HTTP broj u živom statusu je **plan**, ne mjerenje; stvarni VU-i, zahtjevi i latencije dostupni su u završnom k6 sažetku. Zdravstvena provjera starija od 15 sekundi označava se zastarjelom.
+
+U mapi pokusa nalaze se `rezultat.json`, hrvatski `sazetak.txt`, `dnevnik.txt` (najviše 4000 zapisa od po 2048 znakova) i `k6-sazetak.json` kada je k6 korišten i uspio ga zapisati. Dnevnik se trajno zapisuje pri završavanju; prisilno gašenje procesa ili računala može ostaviti nepotpunu mapu. Konačan ishod nastaje nakon čišćenja botova, čekanja HTTP generatora i oslobađanja leasea/brave. Pogreške obveznih završnih koraka ruše prolaz. JSON s `zakljuceno: false` nije dokaz kapaciteta. Neuspjela priprema s `pokrenuto: false` odvojena je od pada pokrenutog testa i ne poništava ranije potvrde.
+
+Nove potvrde miješanog testa nalaze se u podmapi `potvrde`, imaju verziju 2 i vežu razinu uz cilj, profil, digest, vrijeme, `runId` i putanju dovršenog PASS izvještaja. Vrijede sedam dana. Stare potvrde samo s vremenom završetka, test veza i lokalni smoke ne otključavaju miješani staging profil. Prolaz je tehnički preduvjet, **ne odobrenje sljedeće razine**. Svaka razina završava CLI proces; sljedeća zahtijeva novu naredbu i novi unos nakon pregleda rezultata i VPS metrika.
+
+Lokalni pregled posljednjih 20 mapa pokusa i najviše valjane potvrde posljednjeg staging profila:
+
+```powershell
+pnpm --filter posluzitelj opterecenje:status
+```
+
+Status ništa ne zapisuje, ne šalje mrežne zahtjeve i ne stječe lease. Zna samo pohranjeni digest; ne zna je li staging u međuvremenu objavljen. Nedostajući, nepotpuni, istekli ili nepodudarni dokaz ne dopušta nastavak. Operativni pregled u dva terminala opisan je u [nadzor-i-dnevnici.md](../07-operacije/nadzor-i-dnevnici.md#praćenje-ručnog-staging-pokusa).
+
+Bez Dockera lokalni smoke koristi `pnpm --filter posluzitelj test:opterecenje:lokalno -- --adresa=http://localhost:3000 --web-adresa=http://localhost:5173 --trajanje-ms=90000 --rjecnik-snimka="C:\Temp\kaladont-opterecenje-rjecnik.jsonl.gz"`. Pokreni lokalni server i Vite (`pnpm dev`) prvo; lokalni profil je fiksnih 11 igraćih korisnika (2 dvoboj, 4 javni četveroboj, 4 privatni četveroboj, 1 trening protiv Računala) i 3 HTTP korisnika, traje 15 do 120 sekundi, zadano ne koristi k6, staging lease ni gateove i ne zapisuje potvrdu razine. Za provjeru stvarnog k6 procesa dodaj `--http-generator=k6`; ako Vite sluša samo IPv6, koristi `--web-adresa=http://[::1]:5173`. Kratko trajanje ne jamči da će svaki način dovršiti igru. Trening zahtijeva `TRENING_OMOGUCEN=true` (zadano) na lokalnom poslužitelju; popuna javnog reda botovima nije dio ovog profila.
+
+Početni pragovi miješanog testa: p95 poteza do 250 ms, p95 spremanja do 1 s, HTTP p95 do 1 s i manje od 0,5% tehničkih/HTTP pogrešaka. Rezultat vrijedi samo ako generator dosegne zadane VU-e, k6 i botovi uspješno završe te se uzmu health uzorci. CPU/RAM PostgreSQL-a i Caddyja pratiti zasebno na VPS-u; lokalni izvještaj mjeri TypeScript generatora, ne cijelog k6 procesa.
+
+Potvrđeni profil od 9. 10. 2026. jest fiksnih 10.000 korisnika: 7.000 igraćih korisnika prolazi realan ciklus igranja, a 3.000 pregledava javne HTML stranice. To nije zahtjev za 7.000 neprekidno aktivnih sudionika partija. Red, eliminirani igrači i rezultati prikazuju se odvojeno od stvarno aktivnih igrača; nema rezervnih botova ni skrivenog povećavanja ukupnog broja korisnika. U držanju treba održati najmanje 99,5% zadanih igraćih korisnika povezanima i mjeriti aktivnost. Provjeravaju se latencije ukupno i za svaki način, valjani nenulti uzorci, dovršeno držanje te završetak svih načina igre. Izostanak napretka bota ili partije dulji od 60 sekundi prekida test. Staging botovi razmišljaju 3–10 sekundi; lokalni smoke koristi brže poteze (1–3 s) i kraće igre. Tempo VU-a mora ostati ispod poslužiteljskog limita od 30 događaja u minuti po igraču i vrsti događaja (`SOCKET_DOGADAJI_PO_PROZORU`): višak se tiho odbacuje i VU čeka istek poteza, što izgleda kao zastoj.
+
+#### Profil v5: računalni protivnici u stres testu
+
+Profil `mijesani-k6-socket-v5` (lokalno `lokalni-smoke-v5`) uključuje Zagrijavanje iz [ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md): dio igraćih korisnika igra trening protiv poslužiteljskog „Računala” umjesto javnih partija. Na 10.000 korisnika to je 100 istodobnih treninga (ulaze u 7.000 igraćih, ukupno ostaje 10.000); manje razine skaliraju broj (100 → 2, 500 → 6, 1000 → 10, 2000 → 20, 5000 → 50), a ostatak igraćih dijeli se 45/45/10 na Dvoboj, javni i privatni Četveroboj. Trening VU nakon svakog `partija:kraj` odmah traži novi `trening:zapocni`; odbijanje poslužitelja (limit `MAKSIMALNO_AKTIVNIH_TRENINGA`, isključeno Zagrijavanje) ruši provjeru `treninziPrihvaceni`, nikad se ne prikriva. Trening se ne sprema u bazu, pa za njega nema mjerenja spremanja ni provjere `partijeBezSpremanja`. Javni fond botova se u ovom profilu ne forsira: popuna reda provjerava se zasebnim predtestom (dolje).
+
+Dodatni kriteriji prolaza (uz postojeće): bar jedan završen trening kad su planirani; medijan istodobnih treninga tijekom držanja ≥ 90 % planiranih; **0** eliminacija računalnog protivnika istekom vremena (health `botIsteci` delta i brojanje generatora); **0** tehničkih grešaka bot kontrolera (`botTehnickeGreske` delta); p95 poteza VU-a u treningu ≤ 250 ms; p95 event-loop laga poslužitelja (`eventLoopP95Ms` iz health uzoraka) ≤ 100 ms. Informativno se bilježe p50/p95 vremena odgovora Računala i broj vanjskih sudionika u javnim partijama (očekivano 0 kad je popuna isključena). Priprema odbija poslužitelj čiji `/zdravlje` ne izlaže metrike botova; potvrde profila v4 ne otključavaju v5.
+
+#### Predtest popune reda botovima
+
+`pnpm --filter posluzitelj test:opterecenje:popuna` zaseban je ručni CLI koji provjerava pragove popune iz [botovi.md](../02-pravila-igre/botovi.md): zadano 10 VU-a u Dvoboju i 10 u Četveroboju (`--broj=1..10`). Unutar moda VU-ovi ulaze **strogo serijski** (sljedeći tek kad prethodni dobije `partija:pocetak`), pa u redu nikad nisu dva čovjeka; modovi teku usporedno jer imaju odvojene redove. Mjeri se vrijeme od potvrde `red:udji` do `partija:pocetak` (očekivano 30 s za Dvoboj, 40 s za Četveroboj, tolerancija ±3 s), broj sudionika koji nisu VU (1 odnosno 3), pojava rezerviranih botova u `red:stanje` četveroboja (20 s i 30 s ±3 s), da botovi odigraju poteze u svakoj partiji te delte health brojača `botIsteci`, `botTehnickeGreske` i `fondIscrpljenja` (sve moraju biti 0). VU odigra dvije riječi i preda; botovi zatim sami dovršavaju partiju, a CLI čeka krajeve do `--rok-kraja-ms` (zadano 4 min) i upozorava ako fond nije vraćen na početnu vrijednost. Preduvjeti: health s metrikama botova, `botoviDvoboj` i `botoviCetveroboj` uključeni, najmanje 4 slobodna bota i miran poslužitelj bez aktivnih partija. Na stagingu traži interaktivnu potvrdu `POKRENI 20`, lokalnu bravu i staging lease kao miješani test; lokalno `--lokalno=DA` prema `http://localhost:3000`. Izvještaj (`vrsta: 'popuna'`) sprema se u istu mapu pokusa, ali **ne zapisuje potvrdu razine** i ne otključava miješani test.
+
+```powershell
+pnpm --filter posluzitelj test:opterecenje:popuna -- --adresa=https://staging.kaladont.hr --rjecnik-snimka="C:\Temp\kaladont-opterecenje-rjecnik.jsonl.gz"
+```
+
+K6 skript zahtijeva HTTP 200, rok zahtjeva od 3 sekunde i stvarne aktivne VU-e tijekom držanja. Parser podržava izravni JSON iz `--summary-export` i format s `values`; nedostajuće metrike su greška. Potvrde profila v5 uključuju SHA-256 snimke i vrijeme držanja uz digest servera, pa starije potvrde ne otključavaju novu ocjenu. Na svim stepenicama koristi iste postavke i vrijeme držanja. Health i zastoji nadziru se i tijekom rampe. Nakon mjerenja zaustavljaju se nove partije i postojeće dobivaju najviše 60 sekundi lokalno, odnosno 180 sekundi na stagingu, za dovršetak (četveroboj započet pred kraj treba tri eliminacije uz 10 s izbora riječi sustava, oko 40 s). Čišćenje se prikazuje zasebno i ne produljuje prikazano puno opterećenje. Ukupni rok uključuje i taj završetak.
+
+K6 je moguće instalirati bez Dockera i administratorskih prava raspakiravanjem službenog Windows ZIP izdanja uz SHA-256 provjeru iz službene checksums datoteke. Korisnička instalacija nalazi se u `%LOCALAPPDATA%\Programs\k6`, a njezina mapa s `k6.exe` dodaje se u korisnički PATH. Već otvoreni VS Code možda treba ponovno pokrenuti da naslijedi novi PATH.
+
+Mali pokus stvarnog k6 skripta može se pokrenuti zasebno i samo lokalno (najviše 3 VU-a, najviše 120 sekundi držanja). Primjer za Vite koji sluša IPv6 loopback:
+
+```powershell
+k6 run --summary-export "$env:TEMP\kaladont-k6-http-lokalno.json" -e LOKALNI_SMOKE=DA -e CILJNA_ADRESA=http://[::1]:5173 -e BROJ_POSJETITELJA=3 -e RAMPA_MS=1000 -e DRZANJE_MS=15000 skripte/testiranje/opterecenje-http.js
+```
+
+Izvještaj se sprema i pri neuspjehu ili prekidu. Sigurnosni timer zaustavlja dugotrajni test, a botovi nakon signala prekida ne smiju poslati novi potez. Ovi lokalni pokusi ne spremaju staging potvrde. Ne uključivati ih u automatsku objavu.
+
+### Priprema staging pokusa
+
+1. Pregledati promjene i pokrenuti CI. Push na main može objaviti novi staging digest, ali ne smije pokrenuti veliki test. Test se ne pokreće dok objava i migracije nisu završene.
+2. Pripremiti snimku stvarnog staging rječnika i prenijeti je sigurnim kanalom. Staging mora imati svoju bazu; ne kopirati produkcijske račune. Ne mijenjati rječnik ili objavljivati aplikaciju tijekom pokusa.
+3. Postaviti točan `STAGING_TEST_IP`, potvrditi da aplikacijski port nije javno izložen i provjeriti acquire/renew/release leasea kroz Caddy. Lokalni unit test leasea nije dokaz postavki proxyja na VPS-u.
+4. Za termin s računalnim protivnicima u `/opt/kaladont/.env` staginga privremeno postaviti `TRENING_OMOGUCEN=true`, `BOTOVI_DVOBOJ=true`, `BOTOVI_CETVEROBOJ=true` i `MAKSIMALNO_AKTIVNIH_TRENINGA=100`, uz staging limite `STAGING_TEST_MAKSIMALNO_PARTIJA` ≥ 4000, `STAGING_TEST_MAKSIMALNO_VEZA` ≥ 8000 i `STAGING_TEST_MAKSIMALNO_SOBA` ≥ 200; zatim `docker compose -f docker-compose.staging.yml up -d --no-deps aplikacija` i seed fonda `docker compose -f docker-compose.staging.yml exec aplikacija node dist/cli/seed-botova.js --broj=40`. Provjeriti `/zdravlje`: `fondSlobodni` 40, `botoviDvoboj`/`botoviCetveroboj` `true`, `botIsteci` i `botTehnickeGreske` zabilježiti kao početne vrijednosti.
+5. Pratiti CPU, RAM i disk VPS-a, PostgreSQL i aplikacijske dnevnike te računalo generatora. Za mali početni profil koristiti postojeće limite; za više razine povećati samo staging limite uz rezervu za kratko zadržane završene partije. Ni jedan limit nije dokaz kapaciteta hardvera.
+6. Redoslijed termina: najprije predtest popune (`test:opterecenje:popuna`, `POKRENI 20`), pregled sažetka i `/admin` statistike čekanja; tek potom, na izričit zahtjev, miješani test 100 korisnika uz 10 minuta držanja. Nakon pregleda rezultata zasebno nastaviti na 500, 1000, 2000, 5000 i 10000, bez automatskog skoka; nakon svake razine pregledati sažetak (treninzi, isteci Računala, event-loop), `/admin` i VPS metrike. Deset tisuća je test granice; najveća stabilna razina može biti niža.
+7. Poslije pokusa vratiti IP iznimku, limite i zastavice botova na uobičajene vrijednosti, provjeriti health, preostale veze/sobe i rezultate u bazi. Testni podaci ostaju na stagingu; treninzi se ne upisuju, a javne partije predtesta imaju `broj_botova` > 0. Prvi staging pokus provjerava i operativne postavke, ne samo brzinu.
+
+Caddy konfiguracije mogu se validirati nativnim službenim Caddyjem 2.9.1 (`caddy validate --config Caddyfile --adapter caddyfile` i isti poziv za staging datoteku), bez pokretanja poslužitelja i bez lokalnog Dockera. Kontrolnu sumu izdanja provjeriti prema službenoj checksum datoteci; ovo izdanje koristi SHA-512. U CI-ju ostaje obvezna validacija Linux Docker slike i mali postojeći test.
+
+HTTP profil mjeri HTML zahtjeve, ne izvođenje JavaScripta preglednika ni sve njegove API-je i statičke resurse. Izvještaj ne dokazuje 10.000 punih browser sesija niti oporavak aktivnih partija nakon restarta. Spremanje u botovu izvještaju potvrđeno je događajem `partija:kraj`; pregled trajnih zapisa, duplikata i VPS resursa dodatna je operativna provjera prije zaključka o kapacitetu.
 
 ```powershell
 pnpm --filter posluzitelj opterecenje -- --scenarij=veze --klijenti=100 --val=20 --trajanje-ms=5000
@@ -130,6 +210,22 @@ push bez velikog čekanja. Srednji ručni staging test koristi desetke ili stoti
 fixtureu i bilježi commit, verziju baze, resurse stroja i rezultat. Višesatni staging test ima
 warm-up, periodično health uzorkovanje te nadzor PostgreSQL CPU-a, konekcija, lockova, Node RSS-a i
 heap-a. Nijedan test se ne usmjerava na produkciju.
+
+## Botovi i Zagrijavanje (ADR-017)
+
+Obvezni testovi i njihovi rizici:
+
+| Datoteka | Što dokazuje |
+| --- | --- |
+| `test/bot-odabir.test.ts` | Vrećice poštuju udjele; cijeli popis kandidata dostupan (i riječ bez frekvencije); isti RNG daje isti izbor neovisno o protivnikovim nastavcima; propust nemoguć na lakom prefiksu i najviše jedan na teškom; KA odgovor i rijetko ostavljanje KA; tempo unutar roka; kontroler ne igra sa starim tokenom, nakon kraja ni tijekom izbora sustava; promjena rječnika ponovno bira riječ. |
+| `test/trening.test.ts` | Gost igra protiv Računala; `partija:kraj` bez XP/forme/DNK/kolekcije; **snimka svih tablica igre i napretka identična prije i poslije**; drugi trening odbijen dok prvi traje. |
+| `test/botovi-identitet.test.ts` | Bot ne dobiva sesiju ni razrješenje identiteta; nije na ljestvici iako ima partije; fond nadimaka valjan; avatar generator ponovljiv; fond rezervacija bez duplikata, generacija štiti novu rezervaciju. |
+| `test/raspored-popune.test.ts` | Lani sat: granice 19 999/20 000, 29 999/30 000, 39 999/40 000 ms; drugi čovjek prije praga oslobađa bota; izlazak najstarijeg ponovno računa; iscrpljen fond čeka; neuspjeli start oslobađa; isključena zastavica; nikad partija bez čovjeka. |
+| `test/popuna-reda.test.ts` | Integracija s kratkim pragovima (`popunaBotovima` opcija poslužitelja): bot ulazi nakon praga, `partije.broj_botova = 1`, čekanje bota 0, isti javni obračun ljudima, fond oslobođen nakon spremanja; četveroboj prikazuje rezerviranog bota u čekaonici; dva čovjeka prije praga igraju bez bota. |
+| `test/admin-statistika.test.ts` | 401/403/400/200 i izračun čekanja samo ljudima, raspodjela po broju botova, pobjede po sastavu i načini ispadanja botova na fiksturi. |
+| `e2e/zagrijavanje.spec.ts` | Kartica → partija s Računalom → kraj treninga bez napretka → novi trening u stvarnom pregledniku. |
+
+Produkcijske zastavice `BOTOVI_*` zadano su isključene, pa postojeći CI smoke i testovi reda rade bez botova; testovi popune uključuju botove isključivo opcijom `izgradiPosluzitelj({ popunaBotovima })`. Lokalno ručno testiranje popune: `pnpm --filter posluzitelj seed-botova -- --broj=40`, zatim `BOTOVI_DVOBOJ=true` u `.env` i jedan preglednik u Dvoboju; bot ulazi nakon 30 s.
 
 ## Provjera indeksa
 

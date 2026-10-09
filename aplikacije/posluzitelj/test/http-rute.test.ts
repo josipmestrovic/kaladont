@@ -96,4 +96,17 @@ describe('HTTP API namespace', () => {
       baza.execute = originalExecute;
     }
   });
+
+  it('health izlaže metrike botova i event-loopa kao nenegativne brojeve bez identiteta', async () => {
+    const odgovor = await app.inject({ method: 'GET', url: '/zdravlje' });
+    expect(odgovor.statusCode).toBe(200);
+    const tijelo = odgovor.json() as Record<string, unknown>;
+    for (const polje of ['eventLoopP95Ms', 'aktivniTreninzi', 'botoviUPartiji', 'fondSlobodni', 'fondIscrpljenja', 'botIsteci', 'botTehnickeGreske']) {
+      expect(typeof tijelo[polje], polje).toBe('number');
+      expect(tijelo[polje] as number, polje).toBeGreaterThanOrEqual(0);
+    }
+    expect(typeof tijelo.botoviDvoboj).toBe('boolean');
+    expect(typeof tijelo.botoviCetveroboj).toBe('boolean');
+    expect(JSON.stringify(tijelo)).not.toMatch(/nadimak|igracId|email/);
+  });
 });

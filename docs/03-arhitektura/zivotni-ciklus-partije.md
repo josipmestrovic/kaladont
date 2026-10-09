@@ -57,6 +57,14 @@ sequenceDiagram
 - Klijent dobiva apsolutni `istekPotezaIso` pa ni kašnjenje mreže ne pomiče prikaz.
 - Istek na poslužitelju okida eliminaciju čak i ako klijent šuti ili je privremeno odspojen. Ponovno spajanje ne resetira niti pomiče `istekPotezaIso`.
 
+## Kontekst partije i politika učinaka (ADR-017)
+
+Stol pri stvaranju dobiva `kontekst: javna | privatna | trening` i iz njega izvedenu `PolitikaUcinkaPartije` (`zapisujePovijest`, `dajeNapredak`, `dajeDostignucaIKolekcije`). Javna partija piše sve; privatna piše povijest i dostignuća, ali ne XP/bodove; trening ne piše ništa i ne emitira nagrade. Svaki upis u bazu i svaka obavijest o napretku prolazi kroz tu politiku, uključujući rani upis poraza i napredak usred igre. Trening završava bez transakcije: rezultat je odmah „spremljen” i `partija:kraj` nosi samo plasmane.
+
+Potezi ljudi i botova prolaze iste autoritativne naredbe `odigrajRijec` / `odustani` (turnToken, red na potezu, faza izbora sustava, validacija). Socket handleri su tanki omotači koji identitet uzimaju iz sesije; `naredbaBota` prihvaća samo sudionike s `upravljac = bot`. Pokretanje partije vraća eksplicitan rezultat (`pokrenuta`, `limit`, `zaustavljanje`, `greska`), pa servis reda vraća u red samo ljude koji još čekaju, s izvornim `usaoU`.
+
+Bot kontroler sluša `naPromjenuPoteza` i za bota na potezu planira točno jednu akciju po `(partijaId, igracId, turnToken)`. Pri buđenju ponovno provjerava token, verziju rječnika i legalnost; zakaanjeli callback ne igra u novoj rundi. Namjerni propust ide kroz redovnu naredbu „ne znam”; odbijena riječ je tehnička greška i broji se zasebno. Fond javnih botova drži rezervacije s generacijom; bot se oslobađa tek kad motor više ne drži njegovu partiju (`imaNezavrsenuObradu` = false), ne pri eliminaciji.
+
 ## Kraj partije — transakcija
 
 Završetak igre i spremanje rezultata su dva odvojena stanja. Motor prvo zaustavlja poteze i računa konačne plasmane, ali zadržava partiju u memoriji sa statusom `spremanje_rezultata`. Dok traje prolazni problem s bazom, ponavlja isti završni upis s eksponencijalnim odmakom i igračima šalje `partija:spremanje-rezultata`.

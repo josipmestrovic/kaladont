@@ -626,9 +626,12 @@ export async function registrirajProfilRute(
     const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
     const profilDnkCetiri = izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca');
     const profilDnkDva = izracunajDnkProfil(igrac, dnkDva, 'dva_igraca');
+    const jeAdmin = (zahtjev as ZahtjevSIgracem).igrac?.vrsta === 'admin';
     return {
       ok: true,
-      mozeVidjetiAktivnost: (zahtjev as ZahtjevSIgracem).igrac?.vrsta === 'admin',
+      mozeVidjetiAktivnost: jeAdmin,
+      // Oznaka bota vidljiva je samo administratoru (ADR-017); javni DTO je ne sadrži.
+      ...(jeAdmin ? { jeBot: igrac.upravljac === 'bot' } : {}),
       igracId: igrac.id,
       nadimak: igrac.nadimak,
       avatarId: igrac.avatarId,

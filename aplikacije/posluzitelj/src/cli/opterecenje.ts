@@ -10,13 +10,11 @@ import { baza, zatvoriBazu } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
 import {
   MAKS_TRAJANJE_STAGING_TESTA_MS,
-  odbijProdukcijskuAdresu,
-  provjeriNacinPokretanja,
-  provjeriRampuStagingTesta,
+  ocijeniOdrzaneVeze,
   provjeriPrethodnuRazinuStagingTesta,
-  provjeriScenarijStagingTesta,
   zakljucajStagingTest,
-  validirajZahtjevStagingTesta,
+  validirajCiljPokretanja,
+  validirajUlazStagingTesta,
   zabiljeziRezultatStagingTesta,
 } from './opterecenje-postavke.js';
 
@@ -90,9 +88,6 @@ function ucitajPostavke(): Postavke {
   const adresaArgumenta = argumenti.get('adresa');
   const klijentiArgument = argumenti.get('klijenti');
   const trajanjeArgument = argumenti.get('trajanje-ms');
-  if (stagingTest && (!adresaArgumenta || !klijentiArgument || !trajanjeArgument)) {
-    throw new Error('Staging test zahtijeva --adresa, --klijenti i --trajanje-ms.');
-  }
 
   const scenarij = (argumenti.get('scenarij') ?? 'veze') as Scenarij;
   if (!['veze', 'red', 'reconnect', 'igra'].includes(scenarij)) {
@@ -120,21 +115,19 @@ function ucitajPostavke(): Postavke {
     timerTest: argumenti.get('timer-test') === 'true',
   };
 
-  odbijProdukcijskuAdresu(postavke.adresa);
-  provjeriNacinPokretanja(postavke.adresa, stagingTest);
-
   if (stagingTest) {
-    provjeriScenarijStagingTesta(postavke.scenarij);
-    provjeriRampuStagingTesta(postavke.velicinaVala, postavke.razmakValaMs);
-    if (postavke.trajanjeMs > MAKS_TRAJANJE_STAGING_TESTA_MS) {
-      throw new Error('Staging test može trajati najviše 2 sata.');
-    }
-    validirajZahtjevStagingTesta({
-      adresa: postavke.adresa,
-      brojKorisnika: postavke.brojKlijenata,
-      trajanjeMs: postavke.trajanjeMs,
+    const stagingAdresa = validirajUlazStagingTesta({
+      adresa: adresaArgumenta,
+      brojKorisnika: klijentiArgument === undefined ? undefined : postavke.brojKlijenata,
+      trajanjeMs: trajanjeArgument === undefined ? undefined : postavke.trajanjeMs,
+      scenarij: postavke.scenarij,
+      velicinaVala: postavke.velicinaVala,
+      razmakValaMs: postavke.razmakValaMs,
       potvrdaDesetTisuca: argumenti.get('potvrdi-10000'),
     });
+    postavke.adresa = stagingAdresa.origin;
+  } else {
+    validirajCiljPokretanja(postavke.adresa, false);
   }
 
   if (postavke.scenarij === 'igra') postavke.brojKlijenata = postavke.brojPartija * 4;
@@ -316,23 +309,62 @@ function odspojiSveOtvorene(): void {
 async function scenarijVeze(postavke: Postavke, tokeni: readonly string[]) {
   const pocetak = Date.now();
   const { klijenti, trajanja, greske } = await spojiUValovima(postavke, tokeni);
-  const brojNeostvarenih = Math.max(0, tokeni.length - klijenti.length - greske.length);
-  const brojGresaka = greske.length + brojNeostvarenih;
+  const brojObradenihPokusaja = klijenti.length + greske.length;
+  const brojNeostvarenih = Math.max(0, tokeni.length - brojObradenihPokusaja);
   if (brojNeostvarenih > 0) greske.push(`${brojNeostvarenih} pokušaja nije pokrenuto prije isteka roka.`);
-  const stopaGresaka = brojGresaka / Math.max(1, tokeni.length);
-  const cekanjeMs = postavke.stagingTest && stopaGresaka > postavke.maksStopaGresaka
-    ? 0
-    : postavke.stagingTest
-    ? Math.max(0, postavke.trajanjeMs - (Date.now() - pocetak))
-    : postavke.trajanjeMs;
-  await odgodi(cekanjeMs);
+
+  const neocekivanoOdspojeni = new Set<Socket>();
+  let planiranoZatvaranje = false;
+  for (const klijent of klijenti) {
+    if (!klijent.socket.connected) neocekivanoOdspojeni.add(klijent.socket);
+    klijent.socket.on('disconnect', () => {
+      if (!planiranoZatvaranje && !signalPrekida?.aborted) neocekivanoOdspojeni.add(klijent.socket);
+    });
+  }
+
+  const pocetakDrzanjaMs = Date.now();
+  const ciljanoDrzanjeMs = postavke.trajanjeMs;
+  const krajnjiRokMs = postavke.stagingTest
+    ? rokStagingTestaMs ?? pocetakDrzanjaMs
+    : pocetakDrzanjaMs + ciljanoDrzanjeMs;
+  const ciljaniKrajMs = Math.min(pocetakDrzanjaMs + ciljanoDrzanjeMs, krajnjiRokMs);
+  const aktivnePoUzorku = [klijenti.filter((klijent) => klijent.socket.connected).length];
+  const najmanjePotrebnoAktivnih = Math.ceil(tokeni.length * (1 - postavke.maksStopaGresaka));
+
+  while (Date.now() < ciljaniKrajMs && !signalPrekida?.aborted) {
+    const aktivnih = klijenti.filter((klijent) => klijent.socket.connected).length;
+    aktivnePoUzorku.push(aktivnih);
+    if (aktivnih < najmanjePotrebnoAktivnih) break;
+    await odgodi(Math.min(1_000, ciljaniKrajMs - Date.now()));
+  }
+
+  const trajanjeDrzanjaMs = Date.now() - pocetakDrzanjaMs;
+  const najmanjeAktivnihVeza = Math.min(...aktivnePoUzorku);
+  const brojGresaka = greske.length + neocekivanoOdspojeni.size;
+  const ocjena = ocijeniOdrzaneVeze({
+    brojCiljanihKlijenata: tokeni.length,
+    brojObradenihPokusaja,
+    brojUspjesnihSpajanja: klijenti.length,
+    brojGresaka,
+    najmanjeAktivnihVeza,
+    trajanjeDrzanjaMs,
+    ciljanoDrzanjeMs,
+    maksStopaGresaka: postavke.maksStopaGresaka,
+  });
+  planiranoZatvaranje = true;
   odspojiSve(klijenti);
   return {
     spajanje: statistika(trajanja),
     brojGresaka,
     brojPokusaja: tokeni.length,
-    greske,
-    trajanjeDrzanjaMs: postavke.trajanjeMs,
+    brojNeocekivanihPrekida: neocekivanoOdspojeni.size,
+    najmanjeAktivnihVeza,
+    trajanjeRampeMs: Math.max(0, pocetakDrzanjaMs - pocetak),
+    ciljanoDrzanjeMs,
+    trajanjeDrzanjaMs,
+    stopaGresaka: ocjena.stopaGresaka,
+    provjere: ocjena.provjere,
+    greske: [...greske, ...[...neocekivanoOdspojeni].map(() => 'Veza je neočekivano prekinuta tijekom mjerenja.')].slice(0, 20),
   };
 }
 
@@ -711,8 +743,10 @@ async function glavno(): Promise<void> {
     console.error('Prekidam test i zatvaram sve otvorene veze...');
   };
   const pocetak = performance.now();
-  let stagingTestProsao = false;
-  rokStagingTestaMs = postavke.stagingTest ? Date.now() + postavke.trajanjeMs : undefined;
+  let stagingTestIshod: 'PASS' | 'FAIL' | 'ABORTED' = 'FAIL';
+  rokStagingTestaMs = postavke.stagingTest
+    ? Date.now() + MAKS_TRAJANJE_STAGING_TESTA_MS
+    : undefined;
 
   signalPrekida = kontrolerPrekida?.signal;
   if (kontrolerPrekida) {
@@ -749,7 +783,23 @@ async function glavno(): Promise<void> {
       ),
     );
 
-    if (postavke.scenarij === 'igra') {
+    if (postavke.scenarij === 'veze') {
+      const rezultatVeza = rezultat as {
+        brojGresaka: number;
+        brojPokusaja: number;
+        stopaGresaka: number;
+        provjere: Record<string, boolean>;
+      };
+      for (const [naziv, prolaz] of Object.entries(rezultatVeza.provjere)) {
+        console.log(`${prolaz ? 'PASS' : 'FAIL'} ${naziv}`);
+      }
+      const prosao = Object.values(rezultatVeza.provjere).every(Boolean);
+      if (postavke.stagingTest) stagingTestIshod = prosao ? 'PASS' : 'FAIL';
+      if (!prosao) {
+        console.error('Load test nije održao zadani broj aktivnih veza ili trajanje.');
+        process.exitCode = 1;
+      }
+    } else if (postavke.scenarij === 'igra') {
       const provjere = (rezultat as { provjere: Record<string, boolean> }).provjere;
       const neuspjesne = Object.entries(provjere).filter(([, prolaz]) => !prolaz).map(([naziv]) => naziv);
       for (const [naziv, prolaz] of Object.entries(provjere)) {
@@ -764,16 +814,22 @@ async function glavno(): Promise<void> {
       const brojPokusaja = (rezultat as { brojPokusaja?: number }).brojPokusaja ?? postavke.brojKlijenata;
       const stopaGresaka = brojGresaka / Math.max(1, brojPokusaja);
       const prosao = stopaGresaka <= postavke.maksStopaGresaka;
-      stagingTestProsao = prosao;
       console.log(`${prosao ? 'PASS' : 'FAIL'} stopaGresaka (${stopaGresaka.toFixed(4)} <= ${postavke.maksStopaGresaka})`);
       if (!prosao) {
         console.error('Load test nije prošao prag stope grešaka.');
         process.exitCode = 1;
       }
     }
-    if (kontrolerPrekida?.signal.aborted) process.exitCode = 130;
+    if (kontrolerPrekida?.signal.aborted) {
+      stagingTestIshod = 'ABORTED';
+      process.exitCode = 130;
+    }
   } catch (greska) {
-    if (!kontrolerPrekida?.signal.aborted) throw greska;
+    if (!kontrolerPrekida?.signal.aborted) {
+      stagingTestIshod = 'FAIL';
+      throw greska;
+    }
+    stagingTestIshod = 'ABORTED';
     process.exitCode = 130;
   } finally {
     process.off('SIGINT', prekini);
@@ -783,7 +839,11 @@ async function glavno(): Promise<void> {
     odspojiSveOtvorene();
     try {
       if (postavke.stagingTest) {
-        await zabiljeziRezultatStagingTesta(postavke.adresa, postavke.brojKlijenata, stagingTestProsao);
+        await zabiljeziRezultatStagingTesta(
+          postavke.adresa,
+          postavke.brojKlijenata,
+          stagingTestIshod,
+        );
       }
     } finally {
       await oslobodiZakljucavanje?.();

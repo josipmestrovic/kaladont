@@ -33,6 +33,7 @@ interface StanjeIgre {
   zadnjaRijecIgracId: string | null;
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
   mod: 'cetiri_igraca' | 'dva_igraca' | null;
+  kontekst: 'javna' | 'privatna' | 'trening' | null;
   jePrivatna: boolean;
   kodSobe: string | null;
   trajanjePotezaSek: number | null;
@@ -74,6 +75,7 @@ const stanje = $state<StanjeIgre>({
   zadnjaRijecIgracId: null,
   zadnjaRijecVrsta: null,
   mod: null,
+  kontekst: null,
   jePrivatna: false,
   kodSobe: null,
   trajanjePotezaSek: null,
@@ -165,6 +167,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.statusSpremanja = p.statusSpremanja;
   stanje.zadnjaNagrada = null;
   stanje.mod = p.mod ?? null;
+  stanje.kontekst = p.kontekst ?? (p.jePrivatna ? 'privatna' : 'javna');
   stanje.jePrivatna = Boolean(p.jePrivatna);
   stanje.kodSobe = p.kodSobe ?? null;
   stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
@@ -209,6 +212,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.zadnjaRijecIgracId = null;
     stanje.zadnjaRijecVrsta = null;
     stanje.mod = p.mod ?? null;
+    stanje.kontekst = p.kontekst ?? (p.jePrivatna ? 'privatna' : 'javna');
     stanje.jePrivatna = Boolean(p.jePrivatna);
     stanje.kodSobe = p.kodSobe ?? null;
   });

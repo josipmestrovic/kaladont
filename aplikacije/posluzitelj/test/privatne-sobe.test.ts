@@ -3,18 +3,21 @@ import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { SVE_VRSTE_RIJECI, type KrajPartije, type PocetakPartije, type StanjePrivatneSobe } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { sesije } from '../src/baza/shema.js';
+import { rijeci, sesije } from '../src/baza/shema.js';
 import { dodijeliRezultatSobeAkoNijeObraden } from '../src/soba/servis-soba.js';
+import { izradiGrupuBotova, SimulatorMijesanihBotova } from '../src/cli/opterecenje-mijesani-botovi.js';
+import type { SnimkaRjecnika } from '../src/cli/opterecenje-rjecnik.js';
 
 let app: FastifyInstance;
 let adresa: string;
 
 beforeAll(async () => {
-  ({ app } = await izgradiPosluzitelj());
+  // Datoteka otvara desetke gostiju s iste IP adrese; produkcijski limit handshakea nije predmet ovih testova.
+  ({ app } = await izgradiPosluzitelj({ socketOgranicenja: { handshakePoIpMinuti: 1_000 } }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = app.server.address();
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
@@ -358,5 +361,63 @@ describe('privatne sobe', () => {
       gost.socket.disconnect();
     }
   }, 20_000);
+
+  it('bot manager odigra Dvoboj, javni Četveroboj, privatni Četveroboj i trening protiv Računala', async () => {
+    const grupePoRijeci = new Map<string, string[]>();
+    const rjecnikTesta: SnimkaRjecnika = {
+      brojRijeci: 1,
+      sha256: 'test-snimka',
+      async nasumicnaRijec(prefiks, potroseneGrupe, pokusaneRijeci) {
+        const kandidati = await baza
+          .select({ rijec: rijeci.rijec, grupe: rijeci.grupe })
+          .from(rijeci)
+          .where(and(eq(rijeci.aktivna, true), eq(rijeci.prvaDva, prefiks)))
+          .limit(100);
+        const kandidat = kandidati.find((zapis) =>
+          !pokusaneRijeci.has(zapis.rijec) &&
+          zapis.grupe.every((grupa) => !potroseneGrupe.has(grupa)),
+        );
+        if (!kandidat) return null;
+        grupePoRijeci.set(kandidat.rijec, kandidat.grupe);
+        return kandidat.rijec;
+      },
+      grupeZaRijec: (rijec) => grupePoRijeci.get(rijec) ?? [],
+    };
+    const prekid = new AbortController();
+    const simulator = new SimulatorMijesanihBotova({
+      adresa,
+      timeoutMs: 5_000,
+      cekanjePotezaMinMs: 5,
+      cekanjePotezaMaksMs: 15,
+      maksPotezaPoPartiji: 1,
+    }, rjecnikTesta, () => prekid.abort());
+
+    try {
+      await Promise.all([
+        simulator.pokreniGrupu(izradiGrupuBotova('dvoboj'), prekid.signal),
+        simulator.pokreniGrupu(izradiGrupuBotova('javni_cetveroboj'), prekid.signal),
+        simulator.pokreniGrupu(izradiGrupuBotova('privatni_cetveroboj'), prekid.signal),
+        simulator.pokreniGrupu(izradiGrupuBotova('trening'), prekid.signal),
+      ]);
+
+      const rok = Date.now() + 30_000;
+      while (!Object.values(simulator.sazetak().zavrsenePoVrsti).every((broj) => broj >= 2) && Date.now() < rok && !prekid.signal.aborted) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      await simulator.dovrsiPartije(5_000, prekid.signal);
+      expect(simulator.uzorak().aktivnePartije).toBe(0);
+      const sazetak = simulator.sazetak();
+      expect(sazetak.zavrsenePartije).toBeGreaterThanOrEqual(4);
+      expect(Object.values(sazetak.zavrsenePoVrsti).every((broj) => broj >= 2)).toBe(true);
+      expect(sazetak.partijeBezSpremanja).toBe(0);
+      expect(sazetak.brojPoteza).toBeGreaterThan(0);
+      expect(sazetak.odbijeniTreninzi).toBe(0);
+      expect(sazetak.istekRacunala).toBe(0);
+      expect(sazetak.vanjskiSudioniciJavnih).toBe(0);
+    } finally {
+      await simulator.zatvori();
+    }
+  }, 60_000);
 
 });

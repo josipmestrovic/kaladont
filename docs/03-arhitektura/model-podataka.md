@@ -25,6 +25,7 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 |---|---|---|
 | id | uuid PK | Javni trajni identitet; gost ga ne koristi kao pristupni token |
 | vrsta | enum: `gost`, `registriran`, `admin` | |
+| upravljac | enum: `covjek`, `bot` | Tko upravlja identitetom (ADR-017). Bot nikad ne dobiva sesiju; zadano `covjek` |
 | nadimak | text | Fiksni "Gost" za goste; jedinstven za registrirane |
 | avatar_id | smallint | Stabilni ID avatara iz statičkog kataloga web aplikacije |
 | email | text, null | Samo registrirani; jedinstven |
@@ -52,6 +53,18 @@ Nepotvrđeni registrirani račun može se prijaviti i promijeniti email, ali ne 
 Prijave riječi vežu se uz završenu partiju, konkretan odigrani potez i sudionika partije. Svaki sudionik, uključujući gosta, može prijaviti najviše tri različita poteza po partiji; isti potez ne može prijaviti dvaput. Privatne partije također se označavaju kao završene u `partije`, iako ne ulaze u javno bodovanje, kako bi ovaj auditni trag imao stabilnu vezu.
 
 Indeksi: parcijalni unique funkcionalni indeks na `lower(email)` uz `email IS NOT NULL`. Email se u aplikaciji sprema kanoniziran kao lowercase, a indeks dodatno štiti od utrke između istodobnih registracija.
+
+## botovi
+
+Konfiguracija javnog bota (ADR-017). Identitet, avatar i statistika žive u `igraci` (`vrsta = registriran`, `upravljac = bot`, bez e-maila i lozinke). Stvara ih idempotentan seed po stabilnom ključu; ponovni seed ne mijenja postojeće. Javni botovi imaju javni profil, ali se isključuju iz ljestvica (`upravljac = 'covjek'` u upitu). Privremeno „Računalo” u Zagrijavanju nema redak ni ovdje ni u `igraci`.
+
+| Stupac | Tip | Opis |
+|---|---|---|
+| igrac_id | uuid PK, FK → igraci | |
+| kljuc_seeda | text, unique | Stabilan ključ (`bot-001` …) za idempotentan seed |
+| aktivan | boolean | Neaktivan bot ne ulazi u fond popune |
+| verzija_profila | smallint | Verzija ponašanja/konfiguracije radi usporedbe rezultata |
+| stvoren | timestamptz | |
 
 ## povratne_informacije
 
@@ -117,6 +130,7 @@ Streak raste nakon prihvaćenog igračevog poteza i prekida ga samo odbijena rij
 | kraj | timestamptz, null | Stvarni trenutak kraja igre, zabilježen jednom u motoru; ponovljeni upis ga ne mijenja. Određuje razdoblje vremenskih ljestvica. |
 | status | enum: `u_tijeku`, `zavrsena`, `ponistena` | `ponistena` je rezerva za tehničke incidente |
 | pobjednik_id | uuid FK → igraci, null | |
+| broj_botova | smallint | Koliko je mjesta za stolom popunio bot (ADR-017); za admin statistiku čekanja. Trening se ne zapisuje |
 
 ## sudionici_partije
 

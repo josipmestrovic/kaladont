@@ -6,6 +6,8 @@ import type { AvatarConfigV1 } from 'zajednicko';
 export interface StavkaReda {
   igracId: string;
   vrsta: 'gost' | 'registriran' | 'admin';
+  /** Tko upravlja identitetom; izostanak znači čovjek (ADR-017). */
+  upravljac?: 'covjek' | 'bot';
   nadimak: string;
   avatarId: number;
   avatarConfig: AvatarConfigV1 | null;

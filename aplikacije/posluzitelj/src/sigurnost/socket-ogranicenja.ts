@@ -1,3 +1,5 @@
+import { jePouzdaniProxy, type Okruzenje } from './origin.js';
+
 export interface PostavkeSocketOgranicenja {
   handshakePoIpMinuti: number;
   maksimalnoAktivnihVeza: number;
@@ -9,6 +11,24 @@ export interface PostavkeSocketOgranicenja {
 
 export function jeDopustenaTestnaIp(okruzenje: string, testnaIp: string, ipZahtjeva: string): boolean {
   return okruzenje === 'staging' && testnaIp !== '' && ipZahtjeva === testnaIp;
+}
+
+export function dohvatiIpKlijenta(
+  okruzenje: string,
+  testnaIpZaglavlje: string | string[] | undefined,
+  proslijedenaIpZaglavlje: string | string[] | undefined,
+  udaljenaAdresa: string | undefined,
+): string {
+  const testnaIp = okruzenje === 'staging' ? prvaIp(testnaIpZaglavlje) : undefined;
+  const proslijedenaIp = jePouzdaniProxy(okruzenje as Okruzenje)
+    ? prvaIp(proslijedenaIpZaglavlje)
+    : undefined;
+  return testnaIp ?? proslijedenaIp ?? udaljenaAdresa ?? 'nepoznat';
+}
+
+function prvaIp(zaglavlje: string | string[] | undefined): string | undefined {
+  const vrijednost = Array.isArray(zaglavlje) ? zaglavlje[0] : zaglavlje;
+  return vrijednost?.split(',')[0]?.trim() || undefined;
 }
 
 export class OgranicivacDogadaja {

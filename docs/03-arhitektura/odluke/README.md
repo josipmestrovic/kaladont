@@ -37,3 +37,6 @@ ADR (engl. _Architecture Decision Record_) je kratak zapis jedne značajne odluk
 | [012](012-jedan-proces-same-origin.md)         | Jedan Node proces i same-origin klijent u produkciji        |
 | [013](013-sve-vrste-rijeci-leksemske-grupe.md) | Sve vrste riječi u rječniku i potrošnja po leksemskoj grupi |
 | [014](014-operativni-model-mvp-a.md)           | Operativni model MVP-a                                      |
+| [015](015-pojedinacne-sesije.md)               | Pojedinačne sesije                                          |
+| [016](016-gdpr-minimum-i-rucno-brisanje.md)    | GDPR minimum i ručno brisanje računa                        |
+| [017](017-botovi-i-zagrijavanje.md)            | Serverski botovi za popunu reda i trening „Zagrijavanje”    |

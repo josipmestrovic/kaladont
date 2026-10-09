@@ -16,9 +16,10 @@ export function zapisiPocetakPartije(
   sudionici: SudionikPartije[],
   cekanjeMsPoIgracu: Map<string, number>,
   mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
+  brojBotova = 0,
 ): Promise<void> {
   return baza.transaction(async (tx) => {
-    await tx.insert(partije).values({ id: partijaId, mod, status: 'u_tijeku' });
+    await tx.insert(partije).values({ id: partijaId, mod, status: 'u_tijeku', brojBotova });
     await tx.insert(sudioniciPartije).values(
       sudionici.map((s) => ({
         partijaId,

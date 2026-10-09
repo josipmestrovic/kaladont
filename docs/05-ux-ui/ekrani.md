@@ -27,7 +27,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Uža glavna navigacija ima osnovne retke **Igraj**, **Pravila**, **Ljestvica** i **Moja statistika**. „Moja statistika” vodi na zadani statistički prikaz `/profil#statistika`. Sekundarne stavke imaju tamni standardni tekst i ikone, zelenu strelicu te tekst lijevo poravnat uz ikonu.
 - Glavna navigacija koristi vlastite SVG assete: `GiToothbrush` za Igraj, `GiSpellBook` za Pravila, `GiHoleLadder` za Ljestvicu, `GiGamepad` za Moju statistiku, `GiAutoRepair` za Postavke, `GiExitDoor` za Odjavu te `GiTwoShadows` za Prijavu i Registraciju. Modal igre koristi `GiLevelTwoAdvanced`, `GiLevelFourAdvanced` i `GiLockedDoor`.
 - Svi korisnici vide **Postavke** (`/postavke`, uz preusmjeravanje na `/profil?tab=postavke#postavke`); promjena teme dostupna je isključivo ondje. Registrirani korisnik dodatno vidi blago narančastu akciju **Odjavi se**. Gost vidi **Prijavi se** i **Registriraj se**. Editor avatara (`/profil/avatar`) dostupan je i gostima.
-- **Igraj** otvara modal sa slijedom: **Dvoboj** (`/red?mod=dva_igraca`, opis „2 igrača”), **Četveroboj** (`/red?mod=cetiri_igraca`, opis „4 igrača”) i **Privatna soba** (`/soba/kreiraj`). Modal zamućuje pozadinu.
+- **Igraj** otvara modal sa slijedom: **Dvoboj** (`/red?mod=dva_igraca`, opis „2 igrača”), **Četveroboj** (`/red?mod=cetiri_igraca`, opis „4 igrača”), **Zagrijavanje** (`/zagrijavanje`, podnaslov „Igraj dvoboj protiv računala.”, ikona `19-vatra.png`) i **Privatna soba** (`/soba/kreiraj`). Modal zamućuje pozadinu.
 - **Pravila** vode na `/pravila`, a **Ljestvice** na `/ljestvice`.
 - Footer na dnu naslovnice sadrži poveznice **Što je novo?** (`/novosti`) i **Pomozi poboljšati igru** (`/povratne-informacije`) te gumb **Uvjeti i privatnost** koji otvara modal bez ikona i nadnaslova, s naslovom „Što te zanima?” i opcijama **Uvjeti korištenja** (`/uvjeti`) i **Pravila privatnosti** (`/privatnost`). Poveznice su vidljive gostima i prijavljenim korisnicima.
 - Font za disleksiju i čitanje naglas nalaze se u **Postavkama** za goste i registrirane korisnike. Font mijenja tipografiju cijelog sučelja; čitanje naglas izgovara novu riječ na stolu Web Speech API-jem uz `hr-HR`. Postavke se spremaju lokalno u pregledniku. Uključeno čitanje naglas prikazuje globalnu obavijest koju korisnik može potvrditi.
@@ -38,7 +38,14 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 
 - Ovisno o odabranom modu (4p ili 1v1), čekaonica prikazuje 4 ili 2 kružna mjesta.
 - Čim se skupe 4 (ili 2) igrača, pokreće se numerički countdown 3-2-1 i partija kreće.
+- Kad je popuna botovima uključena ([botovi.md](../02-pravila-igre/botovi.md)), rezervirani bot pojavljuje se na praznom mjestu kao sudionik koji čeka od trenutka rezervacije (Četveroboj: 20/30/40 s); u Dvoboju bot ulazi i partija kreće u istom trenutku (30 s). Prikaz ne nosi oznaku bota ni odbrojavanje do praga.
 - Gosti idu ravno u čekaonicu klikom na odabrani mod bez zapreka ili prompta za ime.
+
+## 2d. Zagrijavanje (`/zagrijavanje`)
+
+- Stranica odmah šalje `trening:zapocni`, prikazuje „Pripremamo dvoboj protiv računala…”, napomenu da se ništa ne bilježi i gumb **Odustani**. Nakon `partija:pocetak` odbrojava kao čekaonica i vodi na `/partija/:id`.
+- Greška (zauzet poslužitelj, isključen trening, aktivna partija ili soba) prikazuje poruku i **Pokušaj ponovno**; igrač koji već ima partiju preusmjerava se na nju.
+- Protivnik je uvijek „Računalo” s jednim stalnim avatarom (`AVATAR_RACUNALA`). Stol, timer i potezi identični su javnom Dvoboju; XP, nagrade za riječi, kolekcija i dostignuća nisu prikazani ni tijekom igre.
 
 ## 2b. Povratne informacije (`/povratne-informacije` i `/zahvala-za-informacije`)
 
@@ -97,6 +104,7 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 - Desetsekundni sažetak prije završnog poretka prikazuje se samo prvi put. Ako igrač nakon prikazanih rezultata ode na drugu stranicu i vrati se browser poviješću, ista partija odmah prikazuje završni poredak bez ponovnog odbrojavanja i zvuka završetka.
 - Prijava riječi je zatvoreni accordion; nakon otvaranja prikazuju se odigrane riječi i gumb „Prijavi riječ”.
 - Tipke: **Igraj opet** (u red), **Povratak**, a gostu i registracija za trajno čuvanje statistike.
+- **Kraj treninga** (kontekst `trening`): naslov „Kraj treninga”, obavijest „Ovo je trening. Rezultat se ne bilježi i ne utječe na tvoju statistiku, dostignuća ni formu.”, poredak s oznakom Pobjeda/Poraz bez bodova; nema ocjene igre, XP-a, forme, DNK-a, kolekcije, dostignuća ni poruke za goste. Tipke: **Igraj novi trening** (`/zagrijavanje`) i **Povratak na odabir igre**.
 
 ## 5. Prijava riječi (`/partija/:id/povijest`)
 
@@ -154,6 +162,7 @@ Jedna stranica s odabirima u URL-u (Natrag/Naprijed vraća odabir). Pravila pore
 
 - **Prijave:** tablica s filtrima po statusu; klik otvara povijest partije s označenim spornim potezom; akcije: dodaj riječ / deaktiviraj riječ / dodaj iznimku digrafa / odbij — sve uz obaveznu napomenu.
 - **Rječnik:** pretraga riječi, stanje (aktivna/neaktivna), povijest izmjena.
+- **Statistika čekanja i botova** (`GET /admin/statistike/cekanje?dani=1|7|30|90`): živo stanje zastavica, fonda botova (slobodni/rezervirani/u partiji/iscrpljenja), brojači bota i treninga od pokretanja; tablica po danu i modu s prosjekom, medijanom i P95 čekanja ljudi te raspodjelom partija po broju botova (0/1/2/3); pobjede ljudi po sastavu stola; načini ispadanja botova. Tablice koriste `tablica-mobilni-retci` s hrvatskim `data-label`. Javni profil bota administratoru vraća `jeBot: true`; običan korisnik tu oznaku ne dobiva.
 
 ## 10. Statične stranice
 

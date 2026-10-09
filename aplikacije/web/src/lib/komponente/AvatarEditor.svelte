@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     AVATAR_DIJELOVI,
+    PRESETI_BOJA_AVATARA,
     ZADANI_AVATAR_CONFIG,
     type AvatarConfigV1,
     type AvatarDijelovi,
@@ -85,16 +86,7 @@
     ears: { attached: 'Priljubljene', detached: 'Odvojene', 'k2-compact': 'Male uši', 'k2-rounded': 'Okrugle uši', 'k2-pointed': 'Šiljaste uši', 'k2-angular': 'Uglate uši', 'k3-elephant': 'Ogromne klempave uši', 'k3-fan': 'Uši lepeze', 'k3-long-pointed': 'Duge vilenjačke uši', 'k3-floppy': 'Viseće komične uši' },
   };
 
-  const presetiBoja: Record<string, string[]> = {
-    skin: ['#AC6651', '#F1B28D', '#F6D2B8', '#8D4F3D', '#5C342B', '#D98B6C', '#7B4538', '#F0C7A8'],
-    hair: ['#171921', '#5A3825', '#B97945', '#E7C05B', '#E77979', '#A33B59', '#3D6B8C', '#D7D7D7'],
-    shirt: ['#6BD9E9', '#7774E8', '#F08A9D', '#7ACB86', '#F2C14E', '#F28F3B', '#4D8CBE', '#A66DD4'],
-    eyes: ['#171921', '#2B6CB0', '#319795', '#6B46C1', '#9B2C2C', '#2F855A', '#B7791F', '#805AD5'],
-    eyebrows: ['#171921', '#5A3825', '#B97945', '#E77979', '#3D6B8C'],
-    glasses: ['#171921', '#2B6CB0', '#B7791F', '#9B2C2C', '#7B4538', '#4A5568'],
-    earrings: ['#F4D150', '#E77979', '#2B6CB0', '#171921', '#7ACB86', '#F28F3B'],
-    facialHair: ['#171921', '#5A3825', '#B97945', '#E77979', '#3D6B8C'],
-  };
+  const presetiBoja: Record<string, readonly string[]> = PRESETI_BOJA_AVATARA;
 
   // Naušnice nemaju smisla uz odvojene uši jer se tada taj sloj uopće ne crta.
   const vidljiveKategorije = $derived(

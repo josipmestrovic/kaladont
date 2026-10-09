@@ -9,6 +9,7 @@ Ovaj dokument je autoritativan opis pravila. Sve druge datoteke, uključujući k
 - Gosti i registrirani igrači igraju pod istim pravilima.
 - **Privatna soba** prima 2 do 8 igrača. Sjedala se nepristrano nasumično promiješaju na početku svake partije i zatim ostaju fiksna. Vlasnik može odabrati trajanje poteza (15, 30 ili 60 sekundi ili bez tajmera), dopuštene vrste riječi i želi li bodove za izazvane eliminacije. Imenice su uvijek dopuštene. Pravila nastavaka, grafema, ponavljanja i Kaladont-efekta ostaju ista.
 - Javni modovi koriste javni red čekanja, bodovanje, rangove i ljestvice. Privatna soba koristi samo svoju privremenu ljestvicu; njezin rezultat ne mijenja javne bodove ni rang.
+- U javnom redu ljudi imaju prednost; prazna mjesta nakon isteka pragova popunjavaju **botovi** koji igraju po istim pravilima, a ljudima vrijedi isti obračun kao i bez botova. **Zagrijavanje** je Dvoboj protiv računala u kojem se ništa ne bilježi. Detalji su u [botovi.md](botovi.md).
 
 Redoslijed sjedala dodjeljuje se jednom na početku partije i određuje kružni red poteza; sjedalo 0 započinje prvi potez. Svaki igrač vidi isti red sjedala iz vlastite perspektive, zakrenut tako da je njegovo sjedalo prvo. Ta je zakrenuta projekcija samo prikaz: potez, timer i eliminacije i dalje se određuju prema identitetu koji pošalje poslužitelj. Eliminirani igrači ostaju na svojem mjestu do kraja partije.
 

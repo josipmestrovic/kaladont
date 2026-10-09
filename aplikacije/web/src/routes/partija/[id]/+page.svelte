@@ -46,6 +46,7 @@
   let prethodnaRijecStola = $state<string | null>(null);
   let prethodnoIzgovorenaRijec: { id: number; rijec: string } | null = null;
   let prikaziRezultate = $state(false);
+  const jeTrening = $derived(stanje.kontekst === 'trening' || stanje.kraj?.kontekst === 'trening');
   let sekundeDoRezultata = $state(10);
   let odbrojavanjeIntervalId: ReturnType<typeof setInterval> | null = null;
   type VrstaReakcije = BrzaPoruka | 'tuzan';
@@ -587,7 +588,7 @@
   <strong class="trenutna-rijec">{rijec.slice(0, rijec.length - zavrsetak.length)}<span class="trenutna-rijec-zavrsetak">{zavrsetak}</span></strong>
 {/snippet}
 
-{#if !stanje.jePrivatna}
+{#if !stanje.jePrivatna && !jeTrening}
   {#if stanje.intenzitetKonfetaIskustva}
     {#key stanje.oznakaKonfetaIskustva}
       <Konfeti intenzitet={stanje.intenzitetKonfetaIskustva} />
@@ -632,8 +633,12 @@
   {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
     <Konfeti intenzitet="veliki" />
   {/if}
-  <h2>Završni poredak</h2>
-  {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
+  <h2>{jeTrening ? 'Kraj treninga' : 'Završni poredak'}</h2>
+  {#if jeTrening}
+    <p class="privatna-obavijest" data-testid="trening-obavijest">
+      Ovo je trening. Rezultat se ne bilježi i ne utječe na tvoju statistiku, dostignuća ni formu.
+    </p>
+  {:else if stanje.kraj.jePrivatna || stanje.jePrivatna}
     <p class="privatna-obavijest">
       🔒 Prijateljska privatna igra (bodovi nisu dodijeljeni i ne utječu na ljestvicu).
     </p>
@@ -654,12 +659,17 @@
           {/if}
         </span>
         <span class="plasman-bodovi">
-          {igrac.bodovi} bodova{#if modZavrsnePartije === 'cetiri_igraca'} ({igrac.eliminacije} elim.){/if}
+          {#if jeTrening}{igrac.plasman === 1 ? 'Pobjeda' : 'Poraz'}{:else}{igrac.bodovi} bodova{#if modZavrsnePartije === 'cetiri_igraca'} ({igrac.eliminacije} elim.){/if}{/if}
         </span>
       </li>
     {/each}
   </ol>
-  {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
+  {#if jeTrening}
+    <div class="kraj-akcije">
+      <a href="/zagrijavanje" class="igraj-opet-gumb">Igraj novi trening</a>
+      <a href="/" class="sporedni-gumb">Povratak na odabir igre</a>
+    </div>
+  {:else if stanje.kraj.jePrivatna || stanje.jePrivatna}
     {@const kodSobe = stanje.kraj.kodSobe ?? stanje.kodSobe}
     <div class="kraj-akcije">
       <a href={kodSobe ? `/soba/${kodSobe}` : '/soba/kreiraj'} class="igraj-opet-gumb">Igraj ponovno</a>
@@ -672,6 +682,7 @@
       <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
     </div>
   {/if}
+  {#if !jeTrening}
   <section class="ocjena-igre-zavrsna" aria-label="Ocjena igre">
     {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
       <span>Ocjena igre se ne računa u privatnoj sobi.</span>
@@ -692,6 +703,7 @@
       <a href="/pravila-kaladonta?tema=napredak#ocjena-partije">Kako se računa?</a>
     {/if}
   </section>
+  {/if}
   {#if stanje.kraj.mojeIskustvo}
     <IskustvoPartije obracun={stanje.kraj.mojeIskustvo} />
   {/if}
@@ -809,7 +821,7 @@
       </div>
     </section>
   {/if}
-  {#if !jeRegistriranKorisnik() && !stanje.kraj.jePrivatna && !stanje.jePrivatna}
+  {#if !jeRegistriranKorisnik() && !stanje.kraj.jePrivatna && !stanje.jePrivatna && !jeTrening}
     <p class="gost-poruka">
       Ova statistika je spremljena lokalno u ovom pregledniku. Registriraj se da je zadržiš zauvijek!
     </p>

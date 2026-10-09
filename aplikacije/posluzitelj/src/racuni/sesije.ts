@@ -26,6 +26,9 @@ function hashirajToken(token: string): string {
 }
 
 async function izdajSesijuSvrhe(igracId: string, svrha: 'sesija' | 'gost'): Promise<IzdanaSesija> {
+  // ADR-017: bot identitet nikad ne dobiva sesiju, neovisno o putu (prijava, reset, preuzimanje).
+  const [igrac] = await baza.select({ upravljac: igraci.upravljac }).from(igraci).where(eq(igraci.id, igracId)).limit(1);
+  if (!igrac || igrac.upravljac === 'bot') throw new Error('Ovom identitetu nije moguće izdati sesiju.');
   const token = `${svrha}.${randomBytes(32).toString('base64url')}`;
   const istek = new Date(Date.now() + TRAJANJE_SESIJE_MS);
 

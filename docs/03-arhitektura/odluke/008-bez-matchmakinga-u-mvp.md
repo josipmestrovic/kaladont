@@ -1,6 +1,6 @@
 # ADR-008: Bez matchmakinga u MVP-u
 
-- **Status:** prihvaćen
+- **Status:** djelomično zamijenjen [ADR-om 017](017-botovi-i-zagrijavanje.md) — odluka „čeka se isključivo ljude” više ne vrijedi; zajednički red bez rang-uparivanja ostaje
 - **Datum:** 2026-08-20
 
 ## Kontekst

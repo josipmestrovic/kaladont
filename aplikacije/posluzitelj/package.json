@@ -12,11 +12,17 @@
     "migracije:upgrade-test": "tsx src/cli/provjera-migracijskog-upgradea.ts",
     "ci-fixture": "tsx src/cli/ci-fixture.ts",
     "testni-podaci-ljestvice": "tsx src/cli/testni-podaci-ljestvice.ts",
+    "seed-botova": "tsx src/cli/seed-botova.ts",
+    "opterecenje:izvezi-rjecnik": "tsx src/cli/izvezi-opterecenje-rjecnika.ts",
+    "opterecenje:status": "tsx src/cli/opterecenje-status.ts",
     "provjera-indeksa": "tsx src/cli/provjera-indeksa.ts",
     "obrisi-racun": "tsx src/cli/obrisi-racun.ts",
     "simulacija": "tsx src/cli/simulacija.ts",
     "opterecenje": "tsx src/cli/opterecenje.ts",
     "test:opterecenje": "tsx src/cli/opterecenje.ts --staging",
+    "test:opterecenje:mijesano": "tsx src/cli/opterecenje-mijesano.ts",
+    "test:opterecenje:lokalno": "tsx src/cli/opterecenje-mijesano.ts --lokalno=DA",
+    "test:opterecenje:popuna": "tsx src/cli/opterecenje-popuna.ts",
     "test": "vitest run"
   },
   "dependencies": {

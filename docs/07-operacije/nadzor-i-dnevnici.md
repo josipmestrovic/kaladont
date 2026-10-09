@@ -2,7 +2,7 @@
 
 Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni logovi, javni health check, dnevne kopije baze i heartbeat periodičnih poslova.
 
-> **Status:** Pino logovi i osnovni `/zdravlje` postoje. Prošireni health ugovor, Docker rotacija, UptimeRobot, Healthchecks.io te systemd poslovi još su ciljano stanje Faze 8. Ne postavljati monitor prema zamišljenom payloadu dok endpoint nije implementiran i testiran.
+> **Status:** Pino logovi i prošireni `/zdravlje` postoje. Docker rotacija, UptimeRobot, Healthchecks.io te systemd poslovi još su ciljano stanje Faze 8. Pokuse opterećenja nadzirati postojećim alatima; ne uvoditi novu monitoring infrastrukturu radi njih.
 
 ## Dnevnici (logovi)
 
@@ -29,9 +29,7 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 
 ## Health check
 
-**Danas:** `GET /zdravlje` vraća samo `{ "ok": true, "brojRijeci": N }`, uvijek sa statusom 200. Ne provjerava bazu, broj aktivnih partija, uptime ni digest. To nije dovoljno za deploy ili produkcijski monitoring.
-
-**Ciljani javni ugovor:** endpoint ne traži staging Basic Auth i vraća sigurna, strojno stabilna polja:
+**Implementirani javni ugovor:** `GET /zdravlje` provjerava bazu i učitani rječnik te vraća sigurna, strojno stabilna polja. Endpoint ne traži staging Basic Auth:
 
 ```json
 {
@@ -39,6 +37,19 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
   "baza": "dostupna",
   "brojRijeci": 32846,
   "aktivnePartije": 0,
+  "aktivneVeze": 0,
+  "rssBajtovi": 268435456,
+  "heapUsedBajtovi": 134217728,
+  "heapTotalBajtovi": 201326592,
+  "eventLoopP95Ms": 4.2,
+  "aktivniTreninzi": 0,
+  "botoviUPartiji": 0,
+  "fondSlobodni": 40,
+  "fondIscrpljenja": 0,
+  "botIsteci": 0,
+  "botTehnickeGreske": 0,
+  "botoviDvoboj": false,
+  "botoviCetveroboj": false,
   "uptimeSekunde": 1234,
   "verzija": "sha-0123456789abcdef",
   "digest": "sha256:PLACEHOLDER"
@@ -49,8 +60,65 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 - HTTP 503 znači: proces je živ, ali baza nije dostupna ili je rječnik prazan/neučitan. Tijelo zadržava istu shemu, `ok: false` i siguran opis komponente; ne vraća stack trace, konekcijski string ni SQL grešku.
 - Neočekivana shema, pogrešan digest ili timeout također ruše deploy check čak i ako je HTTP status 200.
 - Broj aktivnih partija je informacija operateru, ali produkcijski workflow prema odluci ne blokira deploy na temelju te brojke.
+- Metrike računalnih protivnika ([ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md)) su samo brojevi bez identiteta: `eventLoopP95Ms` je p95 kašnjenja event-loopa od prošlog health poziva (resetira se po zahtjevu), `aktivniTreninzi` broj tekućih Zagrijavanja, `botoviUPartiji`/`fondSlobodni`/`fondIscrpljenja` stanje javnog fonda (iscrpljenja su kumulativni broj neuspjelih rezervacija), `botIsteci` kumulativne eliminacije bota istekom vremena, `botTehnickeGreske` kumulativne greške bot kontrolera, a `botoviDvoboj`/`botoviCetveroboj` jesu li popune reda uključene. Stres test (profil v5) i predtest popune odbijaju poslužitelj bez tih polja i ocjenjuju delte od početnog uzorka; `botIsteci` i `botTehnickeGreske` koji rastu izvan testa znak su zagušenja ili kvara i traže pregled dnevnika.
 
 Endpoint koriste CI smoke test, staging/produkcijski deploy i UptimeRobot. Prazan rječnik je pad: živi HTTP bez valjanih riječi nije zdrava igra.
+
+## Praćenje ručnog staging pokusa
+
+Veliki pokus nije dio običnih testova, CI-ja, pusha ni objave. Pokretati ga samo na izričit nalog, po jednu razinu: **100 → 500 → 1000 → 2000 → 5000 → 10000**. Najviša stabilna razina može biti manja od 10000. Ne objavljivati aplikaciju ni mijenjati rječnik tijekom mjerenja.
+
+### Prvi terminal: lokalni generator
+
+Prije pokusa pregledati `pnpm --filter posluzitelj opterecenje:status`, prethodni TXT/JSON i spremljeni digest. To je lokalna evidencija, ne dohvat aktualnog staginga. Detaljni preduvjeti i naredbe nalaze se u [testiranje.md](../06-razvoj/testiranje.md#priprema-staging-pokusa).
+
+Prvi staging pokus ima 100 ukupnih korisnika i deset minuta držanja nakon rampe. Pokreće se zasebnom naredbom `test:opterecenje:mijesano`, zatim unosom `POKRENI 100`. Sljedeći pokus zahtijeva zasebnu naredbu i `POKRENI 500`, i tako dalje. Razina 10000 uz to zahtijeva `--potvrdi-10000=DA`. Ne unositi potvrdu prije pregleda prethodnog izvještaja i VPS metrika.
+
+Kad su za termin uključeni računalni protivnici, redoslijed je: predtest popune reda (`test:opterecenje:popuna`, `POKRENI 20`, oko 10 minuta) → pregled sažetka i `/admin/statistike/cekanje` → miješani test razina po razina. Miješani profil v5 uključuje treninge protiv Računala (100 na razini 10000); živi status prikazuje redak `Treninzi x/y; Računalo u partijama; isteci Računala; event-loop p95`. Rast isteka Računala ili event-loop p95 iznad 100 ms tijekom držanja znak je da je poslužitelj zagušen i razina ne prolazi, bez obzira na HTTP metrike.
+
+Generator prikazuje faze i periodični status, ali **ne mjeri živi HTTP promet ni CPU cijelog VPS-a**. `Veze` su stvarni Socket.IO korisnici; `aktivni sudionici` isključuju čekanje, eliminirane igrače i rezultate. Ne dodavati rezervne botove radi umjetnog održavanja 7000 aktivnih sudionika. Finalni HTTP dokaz dolazi iz k6-a, a CPU/RAM generatora iz Node procesa.
+
+### Drugi terminal: VPS preko SSH-a
+
+Koristiti provjereni SSH pristup iz sigurnog spremišta. Trenutačni staging postupak koristi `root`, direktorij `/opt/kaladont` i servise `aplikacija`, `baza`, `caddy`; vidi [objava-staginga-za-pocetnike.md](objava-staginga-za-pocetnike.md#5-provjeriti-staging-prije-promjene). Ovdje ne pretpostavljamo da je SSH pristup uspješno provjeren niti ga automatski otvaramo.
+
+Na staging VPS-u najprije potvrditi host, zdravlje servisa, točno izdanje i slobodne resurse, bez ispisivanja cijelog `.env`:
+
+```bash
+cd /opt/kaladont
+hostname
+docker compose -f docker-compose.staging.yml ps
+grep -E '^(KALADONT_IMAGE|VERZIJA|DIGEST)=' .env
+free -h
+df -h
+```
+
+Za žive CPU, RAM, mrežne i diskovne pokazatelje postojećih kontejnera:
+
+```bash
+docker compose -f docker-compose.staging.yml stats aplikacija baza caddy
+```
+
+`Ctrl+C` u ovom SSH prikazu zaustavlja **prikaz statistike**, ne lokalni generator. Za pregled grešaka prekinuti prikaz statistike pa provjeriti dnevnike; ne ispisivati tajne ili sadržaj računa:
+
+```bash
+docker compose -f docker-compose.staging.yml logs --since 10m --tail 200 aplikacija baza caddy
+```
+
+Po potrebi kratko provjeriti konekcije i čekanje na zaključavanja stvarne **staging** baze; ove naredbe ne mijenjaju podatke:
+
+```bash
+docker compose -f docker-compose.staging.yml exec -T baza psql -U kaladont -d kaladont_staging -c "SELECT state, count(*) FROM pg_stat_activity WHERE datname = current_database() GROUP BY state;"
+docker compose -f docker-compose.staging.yml exec -T baza psql -U kaladont -d kaladont_staging -c "SELECT pid, state, wait_event_type, wait_event FROM pg_stat_activity WHERE datname = current_database() AND (wait_event_type = 'Lock' OR state = 'idle in transaction');"
+```
+
+Prije početka potvrditi zasebnu staging bazu, važeći rječnik, točan `STAGING_TEST_IP`, lease i samo staging limite. Za svaku razinu sačuvati opažanja VPS statistike i relevantne greške uz `runId`; generator ih ne prikuplja automatski. Pino/Caddy/SQL izlaze ne objavljivati bez pregleda osjetljivih podataka.
+
+### Završetak i odluka
+
+Pročitati `sazetak.txt` i neuspjele provjere u `rezultat.json` iz `%LOCALAPPDATA%\Kaladont\opterecenje\<runId>` (na drugim sustavima `~/.kaladont/opterecenje/<runId>`). Provjeriti sva tri načina igre, HTTP držanje, latencije, trajne rezultate, duplikate i preostale veze/sobe. Povratak u uobičajene limite i uklanjanje privremene IP iznimke obvezni su nakon dogovorenog termina; ne mijenjati produkciju.
+
+PROŠAO znači samo da je određeni profil i izdanje zadovoljilo tehničke kriterije. Nova veća razina **nije automatski odobrena**. NIJE PROŠAO ili PREKINUT znače da povećanje nije dopušteno; prvo provjeriti razlog, dnevnike i zasićenje resursa. Kasni prekid ili neuspješno čišćenje/zapis ne smiju se smatrati prolazom. Nepotpuna mapa nakon prisilnog gašenja nije dokaz kapaciteta. Lokalni smoke od 13 korisnika provjerava generator, ne kapacitet staginga.
 
 ## Vanjski nadzor
 

@@ -20,6 +20,7 @@ Poslužitelj razrješava identitet (ili stvara novog gosta) i veže socket uz `i
 | Događaj | Payload | Opis |
 |---|---|---|
 | `red:udji` | `{}` | Ulazak u red čekanja |
+| `trening:zapocni` | bez payloada, opcionalni ack | Pokreće Zagrijavanje (dvoboj protiv „Računala”); napušta javni red, odbija se uz aktivnu partiju ili sobu |
 | `red:izadji` | `{}` | Dobrovoljni izlazak iz reda |
 | `partija:stanje` | `{}` | Zahtjev za trenutačnim stanjem partije nakon ponovnog spajanja |
 | `potez:rijec` | `{ rijec: string, turnToken?: string }` | Pokušaj poteza vezan uz trenutačni potez |
@@ -55,6 +56,10 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 Tipovi klijenta nisu validacija mrežnih podataka. Poslužitelj svaki ulazni payload provjerava u runtimeu prije izmjene stanja; nevaljani payload, dodatni argumenti i callback koji nije funkcija odbijaju se bez mutacije. Odbijanje payload-a šalje `greska` s kodom `NEVALJAN_PAYLOAD`; neočekivana interna pogreška vraća samo generičku poruku s kodom `INTERNA`, zapisuje događaj, ID veze i tip pogreške bez tokena ili payloada te zatvara pogođenu vezu kako se ona ne bi nastavila koristiti nakon mogućeg djelomičnog neuspjeha.
 
 Ack za `red:udji` je opcionalan: poziv bez callbacka podržan je za fire-and-forget klijente. Ako je callback poslan, mora biti funkcija; poslužitelj ga poziva najviše jednom s `StanjeReda` ili `null`. Klijent koji želi zadani mod uz ack šalje `{}` kao payload; ne šalje eksplicitni `undefined` jer se na žici serijalizira kao `null`. Svi ostali događaji su jednosmjerni i ne prihvaćaju dodatni callback.
+
+Iznimka je `trening:zapocni`: šalje se bez payloada, a opcionalni ack prima `{ pokrenut: true }` ili `{ pokrenut: false, kod, poruka }` (kodovi `VEC_U_PARTIJI`, `VEC_U_SOBI`, `PREVISE_PARTIJA`, `TRENING_NEDOSTUPAN`, `INTERNA`). Sama partija kreće redovnim `partija:pocetak`.
+
+`PocetakPartije`, `StanjePartije` i `KrajPartije` nose `kontekst: 'javna' | 'privatna' | 'trening'`; klijent ga ne može promijeniti. U treningu `partija:kraj` nema XP, formu, niz, DNK ni kolekciju, a `rijec:otkljucana`, `iskustvo:obracun` i `dostignuce:otkljucano` se ne šalju. Rezervirani botovi u čekaonici pojavljuju se u `red:stanje` kao sudionici koji čekaju; rokove popune određuje isključivo poslužitelj.
 
 Socket.IO ograničava pojedinačnu ulaznu poruku na najviše **16 KiB**. Valjane sheme i najveći dopušteni avatar/room payload moraju ostati ispod te granice; povećanje limita zahtijeva mjerenje i odgovarajuću promjenu dokumentacije.
 

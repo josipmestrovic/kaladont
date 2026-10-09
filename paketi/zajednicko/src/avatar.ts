@@ -122,6 +122,79 @@ export const ZADANI_AVATAR_CONFIG: AvatarConfigV1 = {
 
 const HEX_BOJA = /^#[0-9A-Fa-f]{6}$/;
 
+const NEOBAVEZNI_DIJELOVI = ['hair', 'eyebrows', 'nose', 'shirt', 'glasses', 'earrings', 'facialHair'] as const;
+
+/** Palete iz editora avatara; dijele ih web i seed botova. */
+export const PRESETI_BOJA_AVATARA: Record<AvatarBojnaUloga, readonly string[]> = {
+  skin: ['#AC6651', '#F1B28D', '#F6D2B8', '#8D4F3D', '#5C342B', '#D98B6C', '#7B4538', '#F0C7A8'],
+  hair: ['#171921', '#5A3825', '#B97945', '#E7C05B', '#E77979', '#A33B59', '#3D6B8C', '#D7D7D7'],
+  shirt: ['#6BD9E9', '#7774E8', '#F08A9D', '#7ACB86', '#F2C14E', '#F28F3B', '#4D8CBE', '#A66DD4'],
+  eyes: ['#171921', '#2B6CB0', '#319795', '#6B46C1', '#9B2C2C', '#2F855A', '#B7791F', '#805AD5'],
+  eyebrows: ['#171921', '#5A3825', '#B97945', '#E77979', '#3D6B8C'],
+  glasses: ['#171921', '#2B6CB0', '#B7791F', '#9B2C2C', '#7B4538', '#4A5568'],
+  earrings: ['#F4D150', '#E77979', '#2B6CB0', '#171921', '#7ACB86', '#F28F3B'],
+  facialHair: ['#171921', '#5A3825', '#B97945', '#E77979', '#3D6B8C'],
+};
+
+/** Nasumična valjana konfiguracija; `rng` vraća [0, 1) pa je uz predani generator ponovljiva. */
+export function nasumicnaKonfiguracijaAvatara(rng: () => number = Math.random): AvatarConfigV1 {
+  const izaberi = <T,>(izbori: readonly T[]): T => izbori[Math.floor(rng() * izbori.length)]!;
+  const parts: AvatarDijelovi = {
+    base: 'base-1',
+    ears: izaberi(AVATAR_DIJELOVI.ears),
+    mouth: izaberi(AVATAR_DIJELOVI.mouth),
+    eyes: izaberi(AVATAR_DIJELOVI.eyes),
+    hair: null,
+    eyebrows: null,
+    nose: null,
+    shirt: null,
+    glasses: null,
+    earrings: null,
+    facialHair: null,
+    background: 'background',
+  };
+  for (const kljuc of NEOBAVEZNI_DIJELOVI) {
+    if (rng() < 0.45) continue;
+    (parts as unknown as Record<string, string | null>)[kljuc] = izaberi(AVATAR_DIJELOVI[kljuc] as readonly string[]);
+  }
+  if (parts.ears === 'detached') parts.earrings = null;
+  const colors: AvatarBoje = { skin: izaberi(PRESETI_BOJA_AVATARA.skin) };
+  for (const uloga of AVATAR_BOJNE_ULOGE) {
+    if (uloga === 'skin') continue;
+    if (parts[uloga] === null) continue;
+    colors[uloga] = izaberi(PRESETI_BOJA_AVATARA[uloga]);
+  }
+  return { schemaVersion: AVATAR_SHEMA_VERZIJA, assetVersion: AVATAR_ASSET_VERZIJA, parts, colors };
+}
+
+/** Jedan stalni izgled računalnog protivnika u Zagrijavanju (ADR-017); nije javni profil. */
+export const AVATAR_RACUNALA: AvatarConfigV1 = {
+  schemaVersion: AVATAR_SHEMA_VERZIJA,
+  assetVersion: AVATAR_ASSET_VERZIJA,
+  parts: {
+    base: 'base-1',
+    ears: 'k2-angular',
+    mouth: 'k2-determined',
+    hair: 'k2-crop',
+    eyes: 'k3-starry',
+    eyebrows: 'k2-straight',
+    nose: 'k2-angular-soft',
+    shirt: 'k2-turtleneck',
+    glasses: 'k2-rimless',
+    earrings: null,
+    facialHair: null,
+    background: 'background',
+  },
+  colors: {
+    skin: '#C8CDD6',
+    hair: '#3A4A5F',
+    shirt: '#2B2F3A',
+    eyes: '#1F7A8C',
+    eyebrows: '#3A4A5F',
+    glasses: '#1F7A8C',
+  },
+};
+
 function jeJedanOd<T extends readonly string[]>(vrijednost: unknown, izbori: T): vrijednost is T[number] {
   return typeof vrijednost === 'string' && izbori.includes(vrijednost);
 }

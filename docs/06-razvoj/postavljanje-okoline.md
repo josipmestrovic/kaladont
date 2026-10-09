@@ -65,6 +65,12 @@ stagingu i produkciji.
 | `ODGODA_POCETKA_PARTIJE_MS` | Odgoda početka partije (odbrojavanje u čekaonici), zadano 10000 ms. Testovi postavljaju 0; ne mijenjati u produkciji. Neovisno o `ONEMOGUCI_TIMER_POTEZA` — odbrojavanje radi i s isključenim timerom poteza. |
 | `TOLERANCIJA_PREKIDA_MS`    | Tolerancija mrežnog prekida tijekom aktivne partije. Zadano 10000 ms; staging i produkcija zahtijevaju točno tu vrijednost. Timer poteza ne pauzira se.                                                       |
 | `POSLUZUJ_WEB`              | `true` kada isti Fastify proces treba posluživati izgrađeni SvelteKit frontend; u lokalnom razvoju ostaje `false`.                                                                             |
+| `TRENING_OMOGUCEN`          | Zagrijavanje protiv „Računala” (ADR-017). Zadano `true`; `false` isključuje pokretanje novih treninga.                                                                                              |
+| `BOTOVI_DVOBOJ`, `BOTOVI_CETVEROBOJ` | Popuna javnog reda botovima po modu (30 s odnosno 20/30/40 s). Zadano `false`; uključiti tek nakon seeda identiteta i staging provjere. Isključivanje zaustavlja nove rezervacije. |
+| `MAKSIMALNO_AKTIVNIH_TRENINGA` | Gornja granica istodobnih treninga, odvojena od javnog limita partija. Zadano 100.                                                                                                             |
+| `BOT_UDIO_PARTIJA_S_PROPUSTOM`, `BOT_VJEROJATNOST_KA`, `BOT_PRAG_TESKOG_PREFIKSA` | Fino podešavanje ponaanja bota; zadano 0.1, 0.05 i 3. Vidi [botovi.md](../02-pravila-igre/botovi.md).                                                                   |
+
+Javne bot identitete stvara `pnpm --filter posluzitelj seed-botova -- --broj=40` (idempotentno, najviše 100). Ponovno pokretanje ne mijenja postojeće botove ni ljudske račune. Bez seeda popuna reda ostaje bez botova iako je zastavica uključena.
 
 Staging `.env` mora sadržavati `JAVNA_ADRESA=https://staging.kaladont.hr` i
 Staging email slanje prema bilo kojoj adresi služi za testiranje potvrde i reseta na različitim uređajima.
