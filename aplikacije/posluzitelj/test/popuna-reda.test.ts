@@ -1,27 +1,36 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { KrajPartije, PocetakPartije, PrihvacenPotez, RundaOtvorena, StanjeReda } from 'zajednicko';
 import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { partije, sudioniciPartije } from '../src/baza/shema.js';
+import { botovi, igraci, partije, sudioniciPartije } from '../src/baza/shema.js';
+import { ucitajIdentiteteBotova } from '../src/bot/fond.js';
 
 let posluzitelj: Posluzitelj;
 let adresa: string;
+const testniBotovi = Array.from({ length: 3 }, () => randomUUID());
 
 beforeAll(async () => {
+  await baza.insert(igraci).values(testniBotovi.map((id) => ({
+    id, vrsta: 'registriran' as const, upravljac: 'bot' as const,
+    nadimak: `Bot${id.slice(0, 6)}`, emailPotvrdjen: true,
+  })));
+  await baza.insert(botovi).values(testniBotovi.map((igracId) => ({ igracId, kljucSeeda: `test-${igracId}` })));
   posluzitelj = await izgradiPosluzitelj({
     socketOgranicenja: { handshakePoIpMinuti: 1_000 },
     popunaBotovima: { dvoboj: true, cetveroboj: true, pragoviMs: { dva_igraca: [1_000], cetiri_igraca: [1_000, 1_500, 2_000] } },
   });
+  posluzitelj.fondBotova.postaviIdentitete((await ucitajIdentiteteBotova()).filter((bot) => testniBotovi.includes(bot.igracId)));
   await posluzitelj.app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = posluzitelj.app.server.address();
   adresa = `http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`;
 });
 
 afterAll(async () => {
-  await posluzitelj.zaustavi();
+  await posluzitelj?.zaustavi();
+  await baza.delete(botovi).where(inArray(botovi.igracId, testniBotovi));
 });
 
 function spoji(): Promise<ClientSocket> {
@@ -114,7 +123,6 @@ describe('popuna javnog reda botovima', () => {
       expect(pocetak.sjedala).toHaveLength(4);
       expect(pocetak.sjedala.filter((s) => s.igracId !== pocetak.mojIgracId)).toHaveLength(3);
       socket.emit('partija:izadji');
-      await cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 60_000).catch(() => undefined);
     } finally {
       socket.disconnect();
     }
@@ -125,12 +133,13 @@ describe('popuna javnog reda botovima', () => {
     const drugi = await spoji();
     try {
       const pocetakPromise = cekaj<PocetakPartije>(prvi, 'partija:pocetak');
+      const rundaPromise = cekaj<RundaOtvorena>(prvi, 'partija:runda-otvorena');
       const krajPromise = cekaj<KrajPartije>(prvi, 'partija:kraj', () => true, 30_000);
       await new Promise<void>((resolve) => prvi.emit('red:udji', { mod: 'dva_igraca' }, () => resolve()));
       drugi.emit('red:udji', { mod: 'dva_igraca' });
       const pocetak = await pocetakPromise;
       expect(pocetak.sjedala.every((s) => s.jeGost)).toBe(true);
-      const runda = await cekaj<RundaOtvorena>(prvi, 'partija:runda-otvorena');
+      const runda = await rundaPromise;
       const naPotezu = runda.naPotezuId === pocetak.mojIgracId ? prvi : drugi;
       naPotezu.emit('potez:ne-znam', { turnToken: runda.turnToken });
       const kraj = await krajPromise;

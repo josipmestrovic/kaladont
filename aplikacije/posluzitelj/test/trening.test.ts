@@ -60,33 +60,30 @@ function cekaj<T>(socket: ClientSocket, dogadaj: string, filter: (p: T) => boole
 
 async function odigrajTreningDoKraja(socket: ClientSocket): Promise<{ pocetak: PocetakPartije; kraj: KrajPartije; botIgrao: boolean }> {
   const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
-  const rundaPromise = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena');
   const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
-  const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => socket.emit('trening:zapocni', resolve));
-  expect(potvrda.pokrenut).toBe(true);
-  const pocetak = await pocetakPromise;
-  const mojId = pocetak.mojIgracId;
-  let botIgrao = false;
-  const runda = await rundaPromise;
-  let naPotezu = runda.naPotezuId;
-  let turnToken = runda.turnToken;
-  // Čovjek uvijek odustaje; ako je Računalo na potezu, čekamo njegovu prihvaćenu riječ ili eliminaciju.
-  for (let korak = 0; korak < 6; korak += 1) {
-    if (naPotezu === mojId) {
-      socket.emit('potez:ne-znam', { turnToken });
-      break;
-    }
-    const ishod = await Promise.race([
-      cekaj<PrihvacenPotez>(socket, 'potez:prihvacen', (p) => p.igracId === naPotezu).then((p) => ({ vrsta: 'potez' as const, p })),
-      krajPromise.then(() => ({ vrsta: 'kraj' as const })),
-    ]);
-    if (ishod.vrsta === 'kraj') break;
-    botIgrao = true;
-    naPotezu = ishod.p.sljedeciId;
-    turnToken = ishod.p.turnToken;
+  const brojRijeciPrije = posluzitelj.brojaciBota.odigranihRijeci;
+  let mojId: string | null = null;
+  const naPocetak = (poruka: PocetakPartije) => { mojId = poruka.mojIgracId; };
+  const naRundu = (poruka: RundaOtvorena) => {
+    if (poruka.naPotezuId === mojId) socket.emit('potez:ne-znam', { turnToken: poruka.turnToken });
+  };
+  const naPotez = (poruka: PrihvacenPotez) => {
+    if (poruka.sljedeciId === mojId && poruka.istekPotezaIso) socket.emit('potez:ne-znam', { turnToken: poruka.turnToken });
+  };
+  socket.on('partija:pocetak', naPocetak);
+  socket.on('partija:runda-otvorena', naRundu);
+  socket.on('potez:prihvacen', naPotez);
+  try {
+    const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => socket.emit('trening:zapocni', resolve));
+    expect(potvrda.pokrenut).toBe(true);
+    const pocetak = await pocetakPromise;
+    const kraj = await krajPromise;
+    return { pocetak, kraj, botIgrao: posluzitelj.brojaciBota.odigranihRijeci > brojRijeciPrije };
+  } finally {
+    socket.off('partija:pocetak', naPocetak);
+    socket.off('partija:runda-otvorena', naRundu);
+    socket.off('potez:prihvacen', naPotez);
   }
-  const kraj = await krajPromise;
-  return { pocetak, kraj, botIgrao };
 }
 
 describe('Zagrijavanje', () => {
