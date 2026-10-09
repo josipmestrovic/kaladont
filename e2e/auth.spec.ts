@@ -41,10 +41,15 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await page.goto('/');
   const odjava = page.getByRole('navigation', { name: 'Glavna navigacija' }).getByRole('button', { name: 'Odjavi se' });
   await expect(odjava).toBeVisible();
-  await odjava.click();
+  await Promise.all([
+    page.waitForEvent('load'),
+    odjava.click(),
+  ]);
   await expect(page).toHaveURL('/');
   await page.reload();
-  await expect(page.getByRole('link', { name: 'Moj profil' })).not.toBeVisible();
+  const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
+  await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toBeVisible();
+  await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
 });
 
 test('stranica privatnosti prikazuje GDPR kontakt i postupak brisanja', async ({ page }) => {

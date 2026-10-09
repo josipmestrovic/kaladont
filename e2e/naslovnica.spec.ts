@@ -29,10 +29,11 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   await navigacija.getByRole('button', { name: 'Igraj' }).click();
   const dijalog = page.getByRole('dialog', { name: 'Kako želiš igrati?' });
   const opcije = dijalog.getByRole('link');
-  await expect(opcije).toHaveCount(3);
+  await expect(opcije).toHaveCount(4);
   await expect(opcije.nth(0)).toHaveAttribute('href', '/red?mod=dva_igraca');
   await expect(opcije.nth(1)).toHaveAttribute('href', '/red?mod=cetiri_igraca');
-  await expect(opcije.nth(2)).toHaveAttribute('href', '/soba/kreiraj');
+  await expect(opcije.nth(2)).toHaveAttribute('href', '/zagrijavanje');
+  await expect(opcije.nth(3)).toHaveAttribute('href', '/soba/kreiraj');
 
   await page.keyboard.press('Escape');
   await expect(dijalog).toBeHidden();
