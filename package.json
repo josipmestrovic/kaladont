@@ -6,6 +6,11 @@
     "node": ">=22"
   },
   "packageManager": "pnpm@9.15.9",
+  "pnpm": {
+    "overrides": {
+      "vitest@3>tinypool": "2.1.2"
+    }
+  },
   "scripts": {
     "predev": "pnpm --filter zajednicko build",
     "dev": "pnpm --parallel --filter web --filter posluzitelj dev",

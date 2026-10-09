@@ -45,6 +45,7 @@ jobs:
       TOLERANCIJA_PREKIDA_MS: '10000'
       ADMIN_TAJNI_KLJUC: ci-admin-secret
       CANDIDATE_TAG: ci-${{ github.sha }}-${{ github.run_id }}
+      IMAGE_REF: ''
 
     steps:
       - name: Preuzeti repozitorij
@@ -188,11 +189,11 @@ jobs:
           format: table
 
       - name: Izraditi Trivy SARIF izvještaj
-        if: always()
+        if: ${{ always() && env.IMAGE_REF != '' }}
         continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('ghcr.io/josipmestrovic/kaladont@{0}', steps.izgradi-candidate.outputs.digest) || 'kaladont:ci' }}
+          image-ref: ${{ env.IMAGE_REF }}
           scanners: vuln
           exit-code: '0'
           format: sarif
