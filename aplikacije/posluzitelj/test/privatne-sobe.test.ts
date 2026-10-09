@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
@@ -415,6 +415,14 @@ describe('privatne sobe', () => {
       expect(sazetak.odbijeniTreninzi).toBe(0);
       expect(sazetak.istekRacunala).toBe(0);
       expect(sazetak.vanjskiSudioniciJavnih).toBe(0);
+      const buduceVrijeme = performance.now() + 60_001;
+      const sat = vi.spyOn(performance, 'now').mockReturnValue(buduceVrijeme);
+      try {
+        expect(simulator.uzorak().aktivnePartije).toBe(0);
+        expect(prekid.signal.aborted).toBe(false);
+      } finally {
+        sat.mockRestore();
+      }
     } finally {
       await simulator.zatvori();
     }

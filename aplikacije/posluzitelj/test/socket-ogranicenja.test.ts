@@ -17,6 +17,12 @@ describe('socket ograničenja', () => {
     expect(jeDopustenaTestnaIp('production', '203.0.113.10', '203.0.113.10')).toBe(false);
     expect(jeDopustenaTestnaIp('staging', '203.0.113.10', '203.0.113.11')).toBe(false);
     expect(jeDopustenaTestnaIp('staging', '', '203.0.113.10')).toBe(false);
+    const adrese = '203.0.113.10, 203.0.113.11';
+    expect(jeDopustenaTestnaIp('staging', adrese, '203.0.113.10')).toBe(true);
+    expect(jeDopustenaTestnaIp('staging', adrese, '203.0.113.11')).toBe(true);
+    expect(jeDopustenaTestnaIp('staging', adrese, '203.0.113.12')).toBe(false);
+    expect(jeDopustenaTestnaIp('production', adrese, '203.0.113.11')).toBe(false);
+    expect(jeDopustenaTestnaIp('staging', '203.0.113.10,', '')).toBe(false);
   });
 
   it('ignorira testno IP zaglavlje u produkciji i bez pouzdanog proxyja', () => {

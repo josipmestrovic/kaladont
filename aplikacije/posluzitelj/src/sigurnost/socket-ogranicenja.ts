@@ -10,7 +10,10 @@ export interface PostavkeSocketOgranicenja {
 }
 
 export function jeDopustenaTestnaIp(okruzenje: string, testnaIp: string, ipZahtjeva: string): boolean {
-  return okruzenje === 'staging' && testnaIp !== '' && ipZahtjeva === testnaIp;
+  return okruzenje === 'staging' && testnaIp.split(',').some((adresa) => {
+    const tocnaAdresa = adresa.trim();
+    return tocnaAdresa !== '' && ipZahtjeva === tocnaAdresa;
+  });
 }
 
 export function dohvatiIpKlijenta(

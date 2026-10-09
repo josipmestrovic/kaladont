@@ -18,6 +18,8 @@ import {
   odobriRazinuPokusa,
   OtkazanoPokretanje,
   sljedecaRazina,
+  validirajPreskakanjePrethodneRazine,
+  validirajTransportOpterecenja,
 } from './opterecenje-postavke.js';
 import { ucitajSnimkuRjecnika } from './opterecenje-rjecnik.js';
 import { SimulatorMijesanihBotova, izradiGrupeBotova } from './opterecenje-mijesani-botovi.js';
@@ -42,6 +44,8 @@ interface PostavkeMijesanogTesta {
   putanjaRjecnika: string;
   lokalniSmoke: boolean;
   lokalniK6: boolean;
+  prethodnaRazinaPreskocena: boolean;
+  transport: 'polling-websocket' | 'websocket';
 }
 
 interface UzorakHealtha {
@@ -64,6 +68,8 @@ function ucitajPostavke(): PostavkeMijesanogTesta {
   const putanjaRjecnika = argumenti.get('rjecnik-snimka');
   const lokalniSmoke = argumenti.get('lokalno') === 'DA';
   const lokalniK6 = argumenti.get('http-generator') === 'k6';
+  const prethodnaRazinaPreskocena = validirajPreskakanjePrethodneRazine(argumenti.get('preskoci-prethodnu-razinu'), lokalniSmoke);
+  const transport = validirajTransportOpterecenja(argumenti.get('transport'));
   if (argumenti.has('http-generator') && (!lokalniSmoke || !lokalniK6)) {
     throw new Error('--http-generator=k6 dopušten je samo kao izričit lokalni pokus.');
   }
@@ -91,6 +97,8 @@ function ucitajPostavke(): PostavkeMijesanogTesta {
       putanjaRjecnika,
       lokalniSmoke: true,
       lokalniK6,
+      prethodnaRazinaPreskocena,
+      transport,
     };
   }
 
@@ -116,6 +124,8 @@ function ucitajPostavke(): PostavkeMijesanogTesta {
     putanjaRjecnika,
     lokalniSmoke: false,
     lokalniK6: false,
+    prethodnaRazinaPreskocena,
+    transport,
   };
 }
 
@@ -277,7 +287,7 @@ async function glavno(): Promise<void> {
   if (!imaMetrikeBotova(baseline)) {
     throw new Error(PORUKA_BEZ_METRIKA_BOTOVA);
   }
-  const profilId = `${postavke.lokalniSmoke ? 'lokalni-smoke-v5' : 'mijesani-k6-socket-v5'}:${rjecnik.sha256}:${postavke.trajanjeMs}`;
+  const profilId = `${postavke.lokalniSmoke ? 'lokalni-smoke-v5' : 'mijesani-k6-socket-v5'}:${rjecnik.sha256}:${postavke.trajanjeMs}${postavke.transport === 'websocket' ? ':websocket' : ''}`;
   const runId = randomUUID();
   const direktorijIzvjestaja = path.join(korijenIzvjestaja(), runId);
   const summaryPutanja = path.join(direktorijIzvjestaja, 'k6-sazetak.json');
@@ -289,23 +299,25 @@ async function glavno(): Promise<void> {
       Date.now(),
       profilId,
       baseline.digest,
+      postavke.prethodnaRazinaPreskocena,
     );
   console.log([
     `Okolina: ${postavke.lokalniSmoke ? 'LOKALNI SMOKE, samo provjera generatora' : 'STAGING'}`,
     `Cilj: ${postavke.adresa}; razina: ${postavke.brojKorisnika}; pokus: ${runId}`,
     `Izdanje: ${baseline.verzija}; digest: ${baseline.digest}`,
     `Profil: ${profilId}`,
+    `Transport: ${postavke.transport}`,
     `Raspodjela: ${raspodjela.brojIgracaDvoboja} dvoboj, ${raspodjela.brojIgracaJavnogCetveroboja} javni četveroboj, ${raspodjela.brojIgracaPrivatnogCetveroboja} privatni četveroboj, ${raspodjela.brojTreninga} trening protiv Računala, ${raspodjela.brojPosjetitelja} HTTP`,
     `Botovi na poslužitelju: fond slobodnih ${baseline.fondSlobodni}, u partiji ${baseline.botoviUPartiji}, popuna dvoboj ${baseline.botoviDvoboj === true ? 'uključena' : 'isključena'}, četveroboj ${baseline.botoviCetveroboj === true ? 'uključena' : 'isključena'}`,
     `Rampa igrača ${prikaziTrajanje(trajanjeRampeBotovaMs)}, HTTP ${prikaziTrajanje(trajanjeRampeHttpMs)}; držanje ${prikaziTrajanje(postavke.trajanjeMs)}`,
-    `Prethodni prolaz: ${prethodnaPotvrda ? `${prethodnaPotvrda.brojKorisnika}, runId ${prethodnaPotvrda.runId}, ${new Date(prethodnaPotvrda.zavrsenoU).toISOString()}` : 'nije potreban za početnu razinu / lokalni smoke'}`,
+    `Prethodni prolaz: ${postavke.prethodnaRazinaPreskocena ? 'RUČNO PRESKOČEN; niže razine nisu potvrđene' : prethodnaPotvrda ? `${prethodnaPotvrda.brojKorisnika}, runId ${prethodnaPotvrda.runId}, ${new Date(prethodnaPotvrda.zavrsenoU).toISOString()}` : 'nije potreban za početnu razinu / lokalni smoke'}`,
     `Izvještaji: ${direktorijIzvjestaja}`,
   ].map(ocistiTerminalTekst).join('\n'));
   if (!postavke.lokalniSmoke) {
     await odobriRazinuPokusa(postavke.brojKorisnika, async () => {
       const trenutniHealth = await dohvatiHealth(postavke.adresa);
       if (trenutniHealth.digest !== baseline.digest) throw new Error('Izdanje je promijenjeno tijekom čekanja potvrde. Ponovno pokreni pripremu.');
-      const trenutnaPotvrda = await provjeriPrethodnuRazinuStagingTesta(postavke.adresa, postavke.brojKorisnika, undefined, Date.now(), profilId, baseline.digest);
+      const trenutnaPotvrda = await provjeriPrethodnuRazinuStagingTesta(postavke.adresa, postavke.brojKorisnika, undefined, Date.now(), profilId, baseline.digest, postavke.prethodnaRazinaPreskocena);
       if (trenutnaPotvrda?.runId !== prethodnaPotvrda?.runId) throw new Error('Prethodni prolaz promijenio se tijekom čekanja. Ponovno pregledaj rezultat.');
     });
   }
@@ -329,9 +341,15 @@ async function glavno(): Promise<void> {
     pokrenuto: false,
     digest: baseline.digest, ishod: 'FAIL', razlog: null, provjere: {},
     prethodniRunId: prethodnaPotvrda?.runId ?? null, raspodjela, direktorijIzvjestaja,
+    prethodnaRazinaPreskocena: postavke.prethodnaRazinaPreskocena,
+    transport: postavke.transport,
     sljedecaRazina: postavke.lokalniSmoke ? null : sljedecaRazina(postavke.brojKorisnika),
     odobrenoU: postavke.lokalniSmoke ? null : new Date().toISOString(),
-    upozorenja: ['CPU vrijeme i RSS odnose se samo na Node generator, ne k6 ili cijeli VPS. PostgreSQL, Caddy i VPS CPU/I/O pratiti zasebno.'],
+    upozorenja: [
+      'CPU vrijeme i RSS odnose se samo na Node generator, ne k6 ili cijeli VPS. PostgreSQL, Caddy i VPS CPU/I/O pratiti zasebno.',
+      ...(postavke.prethodnaRazinaPreskocena ? ['Operater je ručno preskočio prethodnu razinu; niže razine nisu potvrđene. Raniji rezultati nisu promijenjeni.'] : []),
+      ...(postavke.transport === 'websocket' ? ['Dijagnostički profil koristi izravni WebSocket; ne provjerava polling ni nadogradnju transporta i ne otključava standardni profil.'] : []),
+    ],
   };
   const dnevnik: string[] = [];
   const zabiljezi = (tekst: string) => {
@@ -359,6 +377,7 @@ async function glavno(): Promise<void> {
     cekanjePotezaMinMs: postavke.lokalniSmoke ? 1_000 : 3_000,
     cekanjePotezaMaksMs: postavke.lokalniSmoke ? 3_000 : 10_000,
     maksPotezaPoPartiji: postavke.lokalniSmoke ? 4 : 24,
+    transport: postavke.transport,
   }, rjecnik, (razlog) => {
     razlogPrekida = razlog;
     kontroler.abort();

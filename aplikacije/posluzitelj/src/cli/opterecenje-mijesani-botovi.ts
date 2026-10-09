@@ -75,6 +75,7 @@ export interface OpcijeSimulatoraBotova {
   cekanjePotezaMinMs: number;
   cekanjePotezaMaksMs: number;
   maksPotezaPoPartiji: number;
+  transport?: 'polling-websocket' | 'websocket';
 }
 
 export interface UzorakBotova {
@@ -200,7 +201,7 @@ export class SimulatorMijesanihBotova {
     if (!this.planiranoZatvaranje && !this.signalPrekida?.aborted) {
       const sada = performance.now();
       if ([...this.botovi].some((bot) => bot.stanje === 'red' && sada - bot.cekaOdMs > 60_000) ||
-          [...this.partije.values()].some((partija) => sada - partija.zadnjiDogadajMs > 60_000)) {
+          [...this.partije.values()].some((partija) => partija.zavrsenoU === null && sada - partija.zadnjiDogadajMs > 60_000)) {
         this.prekini('Bot ili partija nema napretka dulje od 60 sekundi.');
       }
     }
@@ -281,7 +282,7 @@ export class SimulatorMijesanihBotova {
       auth: { token: bot.token },
       forceNew: true,
       reconnection: false,
-      transports: ['polling', 'websocket'],
+      transports: this.opcije.transport === 'websocket' ? ['websocket'] : ['polling', 'websocket'],
       timeout: this.opcije.timeoutMs,
     });
     bot.socket = socket;
@@ -592,17 +593,25 @@ export class SimulatorMijesanihBotova {
     bot.stanje = 'red';
     bot.cekaOdMs = performance.now();
     await new Promise<void>((resolve, reject) => {
+      let dovrseno = false;
       const zavrsi = (greska?: Error) => {
+        if (dovrseno) return;
+        dovrseno = true;
         clearTimeout(timer);
         signal?.removeEventListener('abort', prekid);
         bot.socket.off('disconnect', odspojen);
+        bot.socket.off('partija:pocetak', partijaPokrenuta);
         if (greska) reject(greska); else resolve();
       };
       const prekid = () => zavrsi(new Error('Test je prekinut.'));
       const odspojen = () => zavrsi(new Error('Veza je prekinuta prije potvrde ulaska u red.'));
-      const timer = setTimeout(() => zavrsi(new Error('Ulazak bota u javni red nije potvrđen.')), this.opcije.timeoutMs);
+      const partijaPokrenuta = (poruka: PocetakPartije) => {
+        if (poruka.kontekst === 'javna' && poruka.mod === bot.mod) zavrsi();
+      };
+      const timer = setTimeout(() => zavrsi(new Error(`Ulazak bota u javni red nije potvrđen: mod=${bot.mod}, stanje=${bot.stanje}, partija=${bot.partijaId ?? 'nema'}, veza=${bot.socket.connected}, transport=${bot.socket.io.engine.transport.name}.`)), this.opcije.timeoutMs);
       signal?.addEventListener('abort', prekid, { once: true });
       bot.socket.once('disconnect', odspojen);
+      bot.socket.on('partija:pocetak', partijaPokrenuta);
       bot.socket.emit('red:udji', { mod: bot.mod }, (stanje: unknown) => {
         if (!stanje) {
           zavrsi(new Error('Poslužitelj je odbio ulazak bota u javni red.'));

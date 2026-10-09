@@ -284,6 +284,20 @@ export function provjeriRampuStagingTesta(velicinaVala: number, razmakValaMs: nu
   }
 }
 
+export function validirajTransportOpterecenja(vrijednost: string | undefined): 'polling-websocket' | 'websocket' {
+  if (vrijednost === undefined || vrijednost === 'polling-websocket') return 'polling-websocket';
+  if (vrijednost === 'websocket') return 'websocket';
+  throw new Error('--transport mora biti polling-websocket ili websocket.');
+}
+
+export function validirajPreskakanjePrethodneRazine(vrijednost: string | undefined, lokalniSmoke: boolean): boolean {
+  if (vrijednost === undefined) return false;
+  if (vrijednost !== 'DA' || lokalniSmoke) {
+    throw new Error('--preskoci-prethodnu-razinu=DA dopušten je samo za ručni staging test.');
+  }
+  return true;
+}
+
 export async function provjeriPrethodnuRazinuStagingTesta(
   adresa: string,
   brojKorisnika: number,
@@ -291,7 +305,12 @@ export async function provjeriPrethodnuRazinuStagingTesta(
   sada = Date.now(),
   profilId = 'veze-v1',
   digest = 'nepoznat',
+  preskociPrethodnuRazinu = false,
 ): Promise<PotvrdaPokusa | undefined> {
+  if (preskociPrethodnuRazinu) {
+    validirajAdresuStaginga(adresa);
+    return;
+  }
   const indeks = NIZ_RAZINA_KLIJENATA.indexOf(brojKorisnika as (typeof NIZ_RAZINA_KLIJENATA)[number]);
   if (indeks <= 0) return;
 

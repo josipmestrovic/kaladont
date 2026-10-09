@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -24,6 +24,8 @@ import {
   validirajUlazMijesanogTesta,
   validirajUlazStagingTesta,
   validirajZahtjevStagingTesta,
+  validirajPreskakanjePrethodneRazine,
+  validirajTransportOpterecenja,
   zakljucajStagingTest,
   zabiljeziRezultatStagingTesta,
 } from '../src/cli/opterecenje-postavke.js';
@@ -153,6 +155,34 @@ describe('validirajAdresuStaginga', () => {
       await oslobodi();
       const oslobodiPonovno = await zakljucajStagingTest('https://staging.kaladont.hr', direktorij);
       await oslobodiPonovno();
+    } finally {
+      await rm(direktorij, { recursive: true, force: true });
+    }
+  });
+
+  it('prihvaća override samo uz izričito DA i samo za staging', () => {
+    expect(validirajTransportOpterecenja(undefined)).toBe('polling-websocket');
+    expect(validirajTransportOpterecenja('polling-websocket')).toBe('polling-websocket');
+    expect(validirajTransportOpterecenja('websocket')).toBe('websocket');
+    expect(() => validirajTransportOpterecenja('nepoznat')).toThrow();
+    expect(validirajPreskakanjePrethodneRazine(undefined, false)).toBe(false);
+    expect(validirajPreskakanjePrethodneRazine('DA', false)).toBe(true);
+    expect(() => validirajPreskakanjePrethodneRazine('', false)).toThrow();
+    expect(() => validirajPreskakanjePrethodneRazine('NE', false)).toThrow();
+    expect(() => validirajPreskakanjePrethodneRazine('DA', true)).toThrow();
+  });
+
+  it('ručno preskače prethodnu razinu bez pisanja potvrde ili izmjene ranijeg FAIL-a', async () => {
+    const direktorij = await mkdtemp(path.join(tmpdir(), 'kaladont-override-'));
+    const putanja = path.join(direktorij, 'raniji-izvjestaj.json');
+    const ranijiIzvjestaj = JSON.stringify({ ishod: 'FAIL', razina: 100 });
+    try {
+      await writeFile(putanja, ranijiIzvjestaj);
+      await expect(provjeriPrethodnuRazinuStagingTesta('https://staging.kaladont.hr', 500, direktorij, Date.now(), 'mijesani-test', 'digest')).rejects.toThrow();
+      await expect(provjeriPrethodnuRazinuStagingTesta('https://staging.kaladont.hr', 500, direktorij, Date.now(), 'mijesani-test', 'digest', true)).resolves.toBeUndefined();
+      await expect(provjeriPrethodnuRazinuStagingTesta('https://kaladont.hr', 500, direktorij, Date.now(), 'mijesani-test', 'digest', true)).rejects.toThrow();
+      expect(await readdir(direktorij)).toEqual(['raniji-izvjestaj.json']);
+      expect(await readFile(putanja, 'utf8')).toBe(ranijiIzvjestaj);
     } finally {
       await rm(direktorij, { recursive: true, force: true });
     }

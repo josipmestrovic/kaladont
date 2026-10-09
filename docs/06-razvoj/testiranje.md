@@ -117,6 +117,10 @@ U mapi pokusa nalaze se `rezultat.json`, hrvatski `sazetak.txt`, `dnevnik.txt` (
 
 Nove potvrde miješanog testa nalaze se u podmapi `potvrde`, imaju verziju 2 i vežu razinu uz cilj, profil, digest, vrijeme, `runId` i putanju dovršenog PASS izvještaja. Vrijede sedam dana. Stare potvrde samo s vremenom završetka, test veza i lokalni smoke ne otključavaju miješani staging profil. Prolaz je tehnički preduvjet, **ne odobrenje sljedeće razine**. Svaka razina završava CLI proces; sljedeća zahtijeva novu naredbu i novi unos nakon pregleda rezultata i VPS metrika.
 
+Operater može iznimno dodati `--preskoci-prethodnu-razinu=DA` za ručno preskakanje provjere prethodne razine. Zadano ostaje strogi redoslijed. Override je dopušten samo za staging; ne preskače interaktivni `POKRENI <razina>`, dodatnu potvrdu za 10000, provjeru ciljne adrese i digesta, lokalnu bravu, staging lease ni kriterije PASS-a. Konzola i TXT izvještaj prikazuju upozorenje, a JSON bilježi `prethodnaRazinaPreskocena: true`. Raniji FAIL izvještaji i potvrde nižih razina ne mijenjaju se niti se stvaraju umjetne potvrde. Novi pokus ocjenjuje se po istim kriterijima; stvarni PASS vrijedi samo za njegovu razinu.
+
+Za dijagnostiku zastoja polling transporta može se dodati `--transport=websocket`. Zadano je `polling-websocket`, kao u web klijentu. Izravni WebSocket ima zaseban profil (sufiks `:websocket`), bilježi transport u JSON-u i upozorenje u TXT-u te ne otključava standardni profil. Taj pokus mjeri igru i HTTP opterećenje, ali nije dokaz rada polling putanje ili nadogradnje na WebSocket. Sigurnosni gateovi, pragovi i rokovi ostaju isti.
+
 Lokalni pregled posljednjih 20 mapa pokusa i najviše valjane potvrde posljednjeg staging profila:
 
 ```powershell
@@ -158,6 +162,8 @@ k6 run --summary-export "$env:TEMP\kaladont-k6-http-lokalno.json" -e LOKALNI_SMO
 Izvještaj se sprema i pri neuspjehu ili prekidu. Sigurnosni timer zaustavlja dugotrajni test, a botovi nakon signala prekida ne smiju poslati novi potez. Ovi lokalni pokusi ne spremaju staging potvrde. Ne uključivati ih u automatsku objavu.
 
 ### Priprema staging pokusa
+
+`STAGING_TEST_IP` prihvaća jednu IP adresu ili popis točnih IP adresa odvojenih zarezom. Ako mreža generatora koristi više javnih izlaznih adresa, dopustiti samo pojedinačno potvrđene adrese za termin, primjerice `203.0.113.10,203.0.113.11`. Svaka se adresa validira; CIDR rasponi, zamjenski znakovi i produkcijska iznimka nisu dopušteni. Acquire, renew i release leasea mogu doći s različitih dopuštenih adresa, ali vlasnik ostaje isti `runId`. Nakon termina ukloniti cijeli popis. Promjena izlazne adrese izvan popisa i dalje prekida test.
 
 1. Pregledati promjene i pokrenuti CI. Push na main može objaviti novi staging digest, ali ne smije pokrenuti veliki test. Test se ne pokreće dok objava i migracije nisu završene.
 2. Pripremiti snimku stvarnog staging rječnika i prenijeti je sigurnim kanalom. Staging mora imati svoju bazu; ne kopirati produkcijske račune. Ne mijenjati rječnik ili objavljivati aplikaciju tijekom pokusa.

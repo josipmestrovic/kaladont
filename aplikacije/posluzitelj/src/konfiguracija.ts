@@ -42,8 +42,8 @@ const shemaKonfiguracije = z.object({
 
 export const konfiguracija = shemaKonfiguracije.parse(process.env);
 
-if (konfiguracija.STAGING_TEST_IP && (konfiguracija.NODE_ENV !== 'staging' || !isIP(konfiguracija.STAGING_TEST_IP))) {
-  throw new Error('STAGING_TEST_IP smije biti valjana IP adresa samo u staging okruženju.');
+if (konfiguracija.STAGING_TEST_IP && (konfiguracija.NODE_ENV !== 'staging' || konfiguracija.STAGING_TEST_IP.split(',').some((adresa) => !isIP(adresa.trim())))) {
+  throw new Error('STAGING_TEST_IP smije sadržavati samo valjane IP adrese odvojene zarezom i samo u staging okruženju.');
 }
 
 if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production') {
