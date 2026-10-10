@@ -96,7 +96,7 @@
   };
 
   function posaljiPotez() {
-    const rijec = `${prefiksRijeci}${unosNastavkaRijeci}`.trim();
+    const rijec = `${prefiksRijeci}${unosNastavkaRijeci}`.normalize('NFC').toLocaleLowerCase('hr-HR').trim();
     if (rijec.length <= prefiksRijeci.length || slanjeUTijeku) return;
     porukaPoteza = null;
     nepostojecaRijec = null;
@@ -111,6 +111,36 @@
     }, 5000);
     dohvatiSocket().emit('potez:rijec', { rijec, turnToken: stanje.turnToken ?? undefined });
     unosNastavkaRijeci = '';
+  }
+
+  function prilagodiOblak(element: HTMLElement) {
+    let okvir = 0;
+    const izmjeri = () => {
+      cancelAnimationFrame(okvir);
+      okvir = requestAnimationFrame(() => {
+        element.style.whiteSpace = 'nowrap';
+        const stil = getComputedStyle(element);
+        const sirina = element.clientWidth - parseFloat(stil.paddingLeft) - parseFloat(stil.paddingRight);
+        const tekst = element.querySelector('strong');
+        for (const velicina of [16, 15, 14, 13, 12]) {
+          element.style.fontSize = `${velicina}px`;
+          if (!tekst || tekst.getBoundingClientRect().width <= sirina) break;
+        }
+        element.style.whiteSpace = 'normal';
+      });
+    };
+    const promjene = new MutationObserver(izmjeri);
+    promjene.observe(element, { childList: true, subtree: true, characterData: true });
+    const dimenzije = new ResizeObserver(izmjeri);
+    if (element.parentElement) dimenzije.observe(element.parentElement);
+    document.fonts.addEventListener('loadingdone', izmjeri);
+    izmjeri();
+    return { destroy() {
+      cancelAnimationFrame(okvir);
+      promjene.disconnect();
+      dimenzije.disconnect();
+      document.fonts.removeEventListener('loadingdone', izmjeri);
+    } };
   }
 
   function posaljiNeZnam() {
@@ -306,6 +336,101 @@
   });
 
   let unosInput: HTMLInputElement | null = $state(null);
+  let preostaloVrijemePoteza = $state<number | null>(null);
+
+  $effect(() => {
+    if (!jeNaPotezu || !stanje.istekPotezaIso) {
+      preostaloVrijemePoteza = null;
+      return;
+    }
+    const rok = Date.parse(stanje.istekPotezaIso);
+    const pomak = stanje.serverVrijemeIso ? Date.parse(stanje.serverVrijemeIso) - Date.now() : 0;
+    const osvjezi = () => { preostaloVrijemePoteza = Math.max(0, Math.ceil((rok - Date.now() - pomak) / 1_000)); };
+    osvjezi();
+    const interval = setInterval(osvjezi, 250);
+    return () => clearInterval(interval);
+  });
+
+  function normalizirajUnos(element: HTMLInputElement) {
+    const pocetak = element.selectionStart;
+    const kraj = element.selectionEnd;
+    const vrijednost = element.value;
+    const pretvori = (tekst: string) => tekst.normalize('NFC').toLocaleLowerCase('hr-HR');
+    unosNastavkaRijeci = pretvori(vrijednost);
+    if (element.value === unosNastavkaRijeci) return;
+    element.value = unosNastavkaRijeci;
+    if (pocetak !== null && kraj !== null) element.setSelectionRange(pretvori(vrijednost.slice(0, pocetak)).length, pretvori(vrijednost.slice(0, kraj)).length);
+  }
+
+  function pratiMobilniUnos(element: HTMLElement, dijalog = false) {
+    const vidljiviZaslon = window.visualViewport;
+    const mobitel = window.matchMedia('(max-width: 999px)');
+    let okvir = 0;
+    let otpustanje = 0;
+    let zadrziPolozaj = false;
+    const pritisni = () => { zadrziPolozaj = element.classList.contains('mobilni-potez'); };
+    const otpusti = () => {
+      cancelAnimationFrame(otpustanje);
+      otpustanje = requestAnimationFrame(() => { zadrziPolozaj = false; osvjezi(); });
+    };
+    const ocisti = () => {
+      element.classList.remove('mobilni-potez');
+      for (const svojstvo of ['top', 'left', 'width', 'height', 'max-height']) element.style.removeProperty(svojstvo);
+    };
+    const osvjezi = () => {
+      cancelAnimationFrame(okvir);
+      okvir = requestAnimationFrame(() => {
+        const fokusiran = dijalog || zadrziPolozaj || element.contains(document.activeElement);
+        if (!mobitel.matches || !fokusiran || (vidljiviZaslon && Math.abs(vidljiviZaslon.scale - 1) > 0.01)) {
+          ocisti();
+          return;
+        }
+        if (!vidljiviZaslon) {
+          if (!dijalog) unosInput?.scrollIntoView({ block: 'nearest' });
+          return;
+        }
+        if (dijalog) {
+          element.style.top = `${vidljiviZaslon.offsetTop}px`;
+          element.style.left = `${vidljiviZaslon.offsetLeft}px`;
+          element.style.width = `${vidljiviZaslon.width}px`;
+          element.style.height = `${vidljiviZaslon.height}px`;
+          return;
+        }
+        element.classList.add('mobilni-potez');
+        element.style.left = `${vidljiviZaslon.offsetLeft + 8}px`;
+        element.style.width = `${Math.max(0, vidljiviZaslon.width - 16)}px`;
+        element.style.maxHeight = `${Math.max(0, vidljiviZaslon.height - 16)}px`;
+        element.style.top = `${Math.max(vidljiviZaslon.offsetTop + 8, vidljiviZaslon.offsetTop + vidljiviZaslon.height - element.offsetHeight - 8)}px`;
+      });
+    };
+    const dimenzije = new ResizeObserver(osvjezi);
+    dimenzije.observe(element);
+    element.addEventListener('focusin', osvjezi);
+    element.addEventListener('focusout', osvjezi);
+    element.addEventListener('pointerdown', pritisni);
+    window.addEventListener('pointerup', otpusti);
+    window.addEventListener('pointercancel', otpusti);
+    vidljiviZaslon?.addEventListener('resize', osvjezi);
+    vidljiviZaslon?.addEventListener('scroll', osvjezi);
+    window.addEventListener('resize', osvjezi);
+    mobitel.addEventListener('change', osvjezi);
+    osvjezi();
+    return { destroy() {
+      cancelAnimationFrame(okvir);
+      cancelAnimationFrame(otpustanje);
+      dimenzije.disconnect();
+      element.removeEventListener('focusin', osvjezi);
+      element.removeEventListener('focusout', osvjezi);
+      element.removeEventListener('pointerdown', pritisni);
+      window.removeEventListener('pointerup', otpusti);
+      window.removeEventListener('pointercancel', otpusti);
+      vidljiviZaslon?.removeEventListener('resize', osvjezi);
+      vidljiviZaslon?.removeEventListener('scroll', osvjezi);
+      window.removeEventListener('resize', osvjezi);
+      mobitel.removeEventListener('change', osvjezi);
+      ocisti();
+    } };
+  }
 
   $effect(() => {
     if (!jeNaPotezu || !prefiksRijeci) return;
@@ -921,7 +1046,7 @@
               {#if zadnjiPotezIgraca(sjedalo.igracId)}
                 <span
                   class="rijec-oblak"
-                  class:rijec-oblak-duga={zadnjiPotezIgraca(sjedalo.igracId)!.rijec!.length > 10}
+                  use:prilagodiOblak
                 >{@render trenutnaRijec(zadnjiPotezIgraca(sjedalo.igracId)!.rijec!)}</span>
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
@@ -976,7 +1101,7 @@
             {#if zadnjiPotezIgraca(sjedalo.igracId)}
               <span
                 class="rijec-oblak"
-                class:rijec-oblak-duga={zadnjiPotezIgraca(sjedalo.igracId)!.rijec!.length > 10}
+                use:prilagodiOblak
               >{@render trenutnaRijec(zadnjiPotezIgraca(sjedalo.igracId)!.rijec!)}</span>
             {/if}
             <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
@@ -1085,28 +1210,42 @@
       {/if}
 
     {#if jeNaPotezu}
-      <form onsubmit={(e) => { e.preventDefault(); posaljiPotez(); }}>
-        {#key brojGreskeUnosa}
+      <form class="zona-poteza" use:pratiMobilniUnos onsubmit={(e) => { e.preventDefault(); posaljiPotez(); }}>
+        <div class="mobilni-kontekst">
+          {#if prikazanaRijec?.rijec}
+            <span>{prikazanaRijec.igracId ? imeIgraca(prikazanaRijec.igracId) : 'Sustav'}: {@render trenutnaRijec(prikazanaRijec.rijec)}</span>
+          {/if}
+          <span>Na redu si · <strong>{prefiksRijeci.toUpperCase()}</strong>{#if preostaloVrijemePoteza !== null} · {preostaloVrijemePoteza} s{/if}</span>
+        </div>
           <div class="unos-rijeci" class:unos-ima-gresku={brojGreskeUnosa > 0 && porukaPoteza !== null}>
             <span class="prefiks-unosa" aria-hidden="true">{prefiksRijeci}</span>
             <input
               bind:this={unosInput}
               type="text"
               bind:value={unosNastavkaRijeci}
+              oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
+              oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
               autocomplete="off"
+              autocapitalize="none"
+              autocorrect="off"
+              spellcheck={false}
+              inputmode="text"
+              enterkeyhint="send"
               maxlength={najviseZnakovaNastavka}
               aria-label={`Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
               aria-invalid={brojGreskeUnosa > 0 && porukaPoteza !== null}
               disabled={slanjeUTijeku || !vezaSpremna}
             />
           </div>
-        {/key}
         <div class="potez-gumbi">
           <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
           {#if !stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === ''}
             <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku || !vezaSpremna} onclick={posaljiNeZnam}>Ne znam</button>
           {/if}
         </div>
+        {#if porukaPoteza}
+          <p class="poruka-poteza" role="alert">{porukaPoteza}</p>
+        {/if}
       </form>
     {:else if jeEliminiran}
       <aside class="promatranje-traka" aria-live="polite">
@@ -1126,7 +1265,7 @@
       </p>
     {/if}
 
-    {#if porukaPoteza}
+    {#if porukaPoteza && !jeNaPotezu}
       <p class="poruka-poteza" role="alert">
         {#if porukaPoteza && vlastitoImeRijec}
           Riječ <strong>{vlastitoImeRijec}</strong> je odbijena jer prema pravilima igre imena i nazivi nisu dopušteni.
@@ -1146,6 +1285,7 @@
 {#if neZnamDijalog}
   <div
     class="dijalog-overlay"
+    use:pratiMobilniUnos={true}
     role="presentation"
     onclick={() => (neZnamDijalog = false)}
     onkeydown={(e) => e.key === 'Escape' && (neZnamDijalog = false)}
@@ -1552,7 +1692,7 @@
     box-sizing: border-box;
     min-width: 0;
     width: 100%;
-    height: 200px;
+    height: 212px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1605,10 +1745,10 @@
   }
   .avatar-s-bubbleom {
     position: relative;
-    width: 84px;
+    width: 100%;
     height: 84px;
     flex: none;
-    margin-top: 28px;
+    margin-top: 40px;
     margin-bottom: 4px;
     display: flex;
     align-items: center;
@@ -1927,6 +2067,32 @@
   form {
     display: block;
   }
+  .mobilni-kontekst { display: none; }
+  .zona-poteza:global(.mobilni-potez) {
+    position: fixed;
+    z-index: 1100;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    margin: 0;
+    padding: 8px;
+    overflow-y: auto;
+    border: 1px solid var(--boja-obrub-jaci);
+    border-radius: 8px;
+    background: var(--boja-pozadina-podloga);
+    box-shadow: var(--sjena-modal);
+  }
+  :global(.mobilni-potez) .mobilni-kontekst {
+    display: grid;
+    gap: 2px;
+    font-size: 12px;
+    line-height: 16px;
+    overflow-wrap: anywhere;
+  }
+  :global(.mobilni-potez) .potez-gumbi { margin: 0; }
+  :global(.mobilni-potez) .potez-gumbi button { margin: 0; }
+  :global(.mobilni-potez) .poruka-poteza { margin: 0; font-size: 12px; line-height: 16px; }
   .unos-rijeci {
     display: flex;
     align-items: center;
@@ -1937,8 +2103,8 @@
     border-radius: var(--radijus-pill);
     background: var(--boja-povrsina-3);
     font-family: var(--font-naslov);
-    font-size: var(--tekst-rijec-stola);
-    letter-spacing: 0.08em;
+    font-size: 18px;
+    letter-spacing: 0;
   }
   .prefiks-unosa {
     flex: 0 0 auto;
@@ -2113,18 +2279,17 @@
     left: 50%;
     bottom: calc(100% + 4px);
     z-index: 1000;
-    max-width: min(200px, calc(50vw - 40px));
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
     padding: 3px 6px;
     font-family: var(--font-naslov);
     font-size: 16px;
     font-weight: 700;
-    line-height: 1.05;
+    line-height: 1.2;
     text-align: center;
     transform: translateX(-50%);
     animation: rijec-oblak-dolazak 220ms ease-out both;
-  }
-  .rijec-oblak-duga {
-    font-size: 10px;
   }
   .reakcija-oblak::after {
     content: '';
@@ -2180,6 +2345,9 @@
   }
   .igraci-red.dvoboj {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (min-width: 1000px) {
+    .unos-rijeci { font-size: 20px; }
   }
   @media (max-height: 500px) and (min-width: 500px) {
     .igraci-red { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -2294,7 +2462,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: 2000;
   }
 
   .dijalog {

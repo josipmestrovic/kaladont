@@ -1,5 +1,107 @@
 import { expect, test } from '@playwright/test';
-import { cekajIgracaNaPotezu, dodajIgrace, zatvoriIgrace, type E2EIgrac } from './pomocnici/igraci.js';
+import { cekajIgracaNaPotezu, cekajIstuPartiju, dodajIgrace, udjiUJavniRed, zatvoriIgrace, type E2EIgrac } from './pomocnici/igraci.js';
+
+for (const brojSjedala of [2, 4, 8]) {
+  test(`mobilni unos prati tipkovnicu za ${brojSjedala} sjedala`, async ({ browser }, podaciTesta) => {
+    test.setTimeout(60_000);
+    const igraci = await dodajIgrace(browser, 2);
+    const stranica = igraci[0]!.stranica;
+    try {
+      await stranica.setViewportSize({ width: 390, height: 844 });
+      await stranica.addInitScript(() => {
+        const viewport = Object.assign(new EventTarget(), {
+          width: innerWidth, height: innerHeight, offsetTop: 0, offsetLeft: 0, scale: 1,
+        });
+        Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true });
+      });
+      await udjiUJavniRed(igraci, 'dva_igraca');
+      await cekajIstuPartiju(igraci);
+      await stranica.evaluate(async (broj) => {
+        const putanjaStanja = '/src/lib/stanje-igre.svelte.ts';
+        const putanjaSocketa = '/src/lib/socket.ts';
+        const { dohvatiStanjeIgre } = await import(putanjaStanja);
+        const { dohvatiSocket } = await import(putanjaSocketa);
+        const stanje = dohvatiStanjeIgre();
+        const sjedalo = stanje.sjedala.find((igrac: { igracId: string }) => igrac.igracId === stanje.mojIgracId);
+        dohvatiSocket().emitEvent(['partija:stanje', {
+          ...JSON.parse(JSON.stringify(stanje)),
+          sjedala: Array.from({ length: broj }, (_, indeks) => ({ ...sjedalo, igracId: indeks === 0 ? stanje.mojIgracId : `protivnik-${indeks}`, nadimak: `Igrac${indeks}` })),
+          naPotezuId: stanje.mojIgracId, jePrivatna: broj === 8, sustavBiraRijec: false,
+          zadnjaRijec: 'prepoznavanje', zadnjaRijecIgracId: 'protivnik-1', zadnjaRijecVrsta: 'rijec',
+          trazenaSlova: 'ča', istekPotezaIso: '', eliminacije: [], statusSpremanja: 'nije_zavrsena',
+        }]);
+      }, brojSjedala);
+      const unos = stranica.getByRole('textbox', { name: 'Dovrši riječ na ČA' });
+      await expect(unos).toBeVisible();
+      await unos.focus();
+      await expect(unos).toHaveCSS('font-size', '18px');
+      await expect(unos).toHaveAttribute('autocapitalize', 'none');
+      await expect(unos).toHaveAttribute('autocorrect', 'off');
+      await unos.fill('ŠAČĆŽĐ');
+      await expect(unos).toHaveValue('šačćžđ');
+      await unos.evaluate((element) => {
+        element.value = 'Ž';
+        element.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+      });
+      await expect(unos).toHaveValue('Ž');
+      await unos.evaluate((element) => element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })));
+      await expect(unos).toHaveValue('ž');
+      await unos.fill('ŠAČĆŽĐ');
+      await unos.evaluate((element) => { element.dataset.provjera = 'isti-input'; element.setSelectionRange(2, 2); });
+      for (const geometrija of [{ height: 320, offsetTop: 0 }, { height: 260, offsetTop: 75 }, { height: 420, offsetTop: 15 }]) {
+        await stranica.evaluate((dimenzije) => {
+          Object.assign(window.visualViewport!, { ...dimenzije, width: innerWidth });
+          window.visualViewport!.dispatchEvent(new Event('resize'));
+          window.visualViewport!.dispatchEvent(new Event('scroll'));
+        }, geometrija);
+        await expect.poll(async () => {
+          const pravokutnik = await stranica.locator('.zona-poteza').boundingBox();
+          return pravokutnik !== null && pravokutnik.y >= geometrija.offsetTop && pravokutnik.y + pravokutnik.height <= geometrija.offsetTop + geometrija.height - 7;
+        }).toBe(true);
+        await expect(unos).toHaveAttribute('data-provjera', 'isti-input');
+        expect(await unos.evaluate((element) => element.selectionStart)).toBe(2);
+      }
+      await stranica.evaluate(async () => {
+        const putanja = '/src/lib/socket.ts';
+        const { dohvatiSocket } = await import(putanja);
+        dohvatiSocket().emitEvent(['potez:odbijen', { kod: 'RIJEC_NE_POSTOJI', poruka: 'Ta riječ ne postoji u rječniku.' }]);
+      });
+      await expect(unos).toHaveAttribute('data-provjera', 'isti-input');
+      await expect(unos).toHaveValue('šačćžđ');
+      const oblak = stranica.locator('.rijec-oblak');
+      const sirine = await oblak.evaluate((element) => ({ oblak: element.getBoundingClientRect().width, roditelj: element.parentElement!.getBoundingClientRect().width }));
+      expect(Math.abs(sirine.oblak - sirine.roditelj)).toBeLessThanOrEqual(1);
+      await expect(oblak).toHaveText('prepoznavanje');
+      await stranica.screenshot({ path: podaciTesta.outputPath('mobilni-unos.png') });
+      await stranica.locator('.ne-znam-gumb').click();
+      await expect(stranica.getByRole('dialog').getByRole('button', { name: 'Ne', exact: true })).toBeVisible();
+      await stranica.getByRole('dialog').getByRole('button', { name: 'Ne', exact: true }).click();
+      await stranica.evaluate(() => {
+        Object.assign(window.visualViewport!, { height: innerHeight, width: innerWidth, offsetTop: 0 });
+        window.visualViewport!.dispatchEvent(new Event('resize'));
+      });
+      await unos.blur();
+      await expect(stranica.locator('.zona-poteza')).not.toHaveClass(/mobilni-potez/);
+      const poslano = await stranica.evaluate(async () => {
+        const putanja = '/src/lib/socket.ts';
+        const { dohvatiSocket } = await import(putanja);
+        const socket = dohvatiSocket();
+        const izvorno = socket.emit;
+        let potez: { rijec: string } | null = null;
+        socket.emit = (dogadaj: string, ...argumenti: unknown[]) => {
+          if (dogadaj === 'potez:rijec') { potez = argumenti[0] as { rijec: string }; return socket; }
+          return izvorno.call(socket, dogadaj, ...argumenti);
+        };
+        (document.querySelector('.zona-poteza') as HTMLFormElement).requestSubmit();
+        socket.emit = izvorno;
+        return potez;
+      });
+      expect(poslano).toMatchObject({ rijec: 'čašačćžđ' });
+    } finally {
+      await zatvoriIgrace(igraci);
+    }
+  });
+}
 
 test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomicanja', async ({
   page,

@@ -55,6 +55,8 @@ instalaciji Chromiuma i pokretanju PostgreSQL-a.
 
 ## Mobilni E2E
 
+Mobilni unos pokriva `mobilni-tok.spec.ts` s kontroliranom geometrijom `visualViewport` na Chromiumu i WebKitu: 2/4/8 sjedala, različite visine tipkovnice i `offsetTop`, isti input i kursor kroz resize i grešku, mala hrvatska slova i IME, poslani prefiks s nastavkom te dodir „Ne znam”. Oblačić mora koristiti punu širinu sjedala; input ima 18 px na mobitelu i 20 px na desktopu. Ovo simulira tipkovnicu, ne zamjenjuje ručnu provjeru stvarnog Android Chromea i iPhone Safarija.
+
 Stabilnost avatara pokriva `red.spec.ts` za Dvoboj i Četveroboj na zaslonima 1440×900, 390×844, 320×568 i 844×390. Testovi uspoređuju stvarne koordinate svih avatara kroz šest razloga eliminacije, obnovu stanja, novu rundu, XP obavijesti i spremanje/čekanje rezultata; provjeravaju vidljivost oblačića, jednoredne statuse i odsutnost prekrivanja. Kontrolirani sat provjerava završno odbrojavanje 8→5→rezultati. `motor-partije.test.ts` dodatno provjerava stvarni rok od 8 s, da riječ ne stiže prerano te da dodatna eliminacija i reconnect ne resetiraju rok. Browser emulacija ne potvrđuje ponašanje fizičke mobilne tipkovnice.
 
 Puni E2E paket izvršava se jednom na `desktop-chrome`. Datoteka `mobilni-tok.spec.ts` izvršava se
