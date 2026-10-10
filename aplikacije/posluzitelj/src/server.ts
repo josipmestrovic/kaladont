@@ -47,6 +47,9 @@ import { ponistiPartijeUTijekuUBazi } from './igra/upis-partije.js';
 import { ocistiIstekleNepotvrdjeneRacune } from './racuni/ciscenje-nepotvrdjenih.js';
 import { nizoviPobjedaIgraca } from './baza/shema.js';
 import { omotajSocketHandler } from './sigurnost/socket-handler.js';
+import { MetrikeNadzora } from './nadzor/metrike.js';
+import { AlarmiNadzora } from './nadzor/alarmi.js';
+import { pokusajPoslatiEmail } from './email.js';
 
 export const MAX_SOCKET_PORUKA_BAJTOVA = 16 * 1024;
 
@@ -132,6 +135,20 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const provjeriDogadaj = (igracId: string, dogadaj: string): boolean =>
     ogranicivacDogadaja.dopusti(`${igracId}:${dogadaj}`, socketOgranicenja.dogadajiPoProzoru);
   const app = Fastify({ logger: true, trustProxy: jePouzdaniProxy(okruzenjeSigurnosti) });
+  let zatvoreno = false;
+  let zatvoriNadzor = () => {};
+  app.addHook('onClose', async () => { zatvoreno = true; zatvoriNadzor(); });
+  const metrike = new MetrikeNadzora();
+  const alarmi = new AlarmiNadzora(
+    konfiguracija.NADZOR_EMAIL_OMOGUCEN === 'true' && (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production'),
+    { cpuPostotak: konfiguracija.NADZOR_CPU_PRAG, rssMiB: konfiguracija.NADZOR_RSS_MIB_PRAG, eventLoopMs: konfiguracija.NADZOR_EVENT_LOOP_MS_PRAG, httpMs: konfiguracija.NADZOR_HTTP_MS_PRAG },
+    (predmet, tekst) => pokusajPoslatiEmail(app.log, konfiguracija.DEV_MAIL, { predmet, tekst: `${tekst}\nIzdanje: ${konfiguracija.VERZIJA}\nDigest: ${konfiguracija.DIGEST}` }, 'alarm-nadzora'),
+  );
+  app.addHook('onResponse', async (zahtjev, odgovor) => {
+    const putanja = zahtjev.routeOptions.url ?? zahtjev.url;
+    if (!putanja.startsWith('/api/') || putanja.startsWith('/api/admin/')) return;
+    metrike.zabiljeziHttp(odgovor.statusCode, odgovor.elapsedTime);
+  });
   const zapisSocketHandlerGreske: ZapisSocketHandlerGreske = ({ dogadaj, socketId, tipGreske }) => {
     app.log.error({ dogadaj, socketId, tipGreske }, 'Neobrađena pogreška u Socket.IO handleru');
   };
@@ -152,7 +169,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       await registrirajLjestviceRute(apiApp);
       await registrirajPrijaveRute(apiApp);
       await registrirajPovratneInformacijeRute(apiApp);
-      await registrirajAdminRute(apiApp, rjecnik, () => dohvatiZivoStanjeBotova());
+      await registrirajAdminRute(apiApp, rjecnik, () => dohvatiZivoStanjeBotova(), {
+        pregled: () => ({ ok: true, verzija: konfiguracija.VERZIJA, digest: konfiguracija.DIGEST, uptimeSekunde: process.uptime(), trenutno: metrike.dohvatiTrenutno(), povijest: metrike.dohvatiPovijest(), alarmi: alarmi.dohvatiStanja(), emailOmogucen: alarmi.omogucen }),
+        probnaObavijest: () => alarmi.posaljiProbnu(),
+      });
       await registrirajRjecnikRute(apiApp, rjecnik);
     },
     { prefix: '/api' },
@@ -241,6 +261,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       const testnaIpDopustena = jeDopustenaTestnaIp(okruzenjeSigurnosti, konfiguracija.STAGING_TEST_IP, ip);
       const handshakeDopusten = testnaIpDopustena || ogranicivacHandshaka.dopusti(`ip:${ip}`, socketOgranicenja.handshakePoIpMinuti);
       const vezaDopustena = io.sockets.sockets.size < socketOgranicenja.maksimalnoAktivnihVeza;
+      metrike.zabiljeziPrihvat(originDopusten, handshakeDopusten, vezaDopustena);
       povratniPoziv(null, originDopusten && handshakeDopusten && vezaDopustena);
     },
   });
@@ -309,9 +330,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     const brojRijeci = rjecnik.brojRijeci();
     const spreman = bazaDostupna && brojRijeci > 0;
     const memorija = process.memoryUsage();
-    // Lag se očitava i resetira po zahtjevu: vrijednost pokriva razdoblje od prošlog health poziva.
-    const eventLoopP95Ms = eventLoop.count > 0 ? eventLoop.percentile(95) / 1e6 : 0;
-    eventLoop.reset();
+    const eventLoopP95Ms = metrike.dohvatiTrenutno()?.eventLoopP95Ms ?? 0;
     const fond = fondBotova.stanje();
     const tijelo = {
       ok: spreman,
@@ -392,8 +411,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   cistacNepotvrdjenih.unref();
 
   io.use(async (socket, next) => {
+    const pocetakAutorizacije = performance.now();
     const token = socket.handshake.auth?.token;
     if (!jeValjaniToken(token)) {
+      metrike.zabiljeziAutorizaciju(false, performance.now() - pocetakAutorizacije);
       const pogreska = new Error('Nevaljan token') as Error & { data?: { kod: KodRazlogaVeze } };
       pogreska.data = { kod: 'NEVALJAN_TOKEN' };
       next(pogreska);
@@ -420,8 +441,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
         .from(nizoviPobjedaIgraca).where(eq(nizoviPobjedaIgraca.igracId, identitet.igracId));
       socket.data.trenutniNiz4p = nizovi.find((niz) => niz.mod === 'cetiri_igraca')?.trenutniNiz ?? 0;
       socket.data.trenutniNiz1v1 = nizovi.find((niz) => niz.mod === 'dva_igraca')?.trenutniNiz ?? 0;
+      metrike.zabiljeziAutorizaciju(true, performance.now() - pocetakAutorizacije);
       next();
     } catch (greska) {
+      metrike.zabiljeziAutorizaciju(false, performance.now() - pocetakAutorizacije);
       const poruka = greska instanceof Error ? greska.message : 'Interna greška';
       const kod: KodRazlogaVeze = poruka.includes('istekao') || poruka.includes('sesija')
         ? 'SESIJA_ISTEKLA'
@@ -459,6 +482,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     upravitelj.registrirajHandlere(socket);
 
     socket.on('disconnect', omotajSocketHandler(socket, 'disconnect', zapisSocketHandlerGreske, () => {
+      metrike.zabiljeziPrekid();
       registarVeza.ukloni(igracId, socket.id);
     }));
   });
@@ -530,12 +554,55 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     },
   });
 
-  let zatvoreno = false;
+  let bazaUTijeku = false;
+  let bazaTimeout: NodeJS.Timeout | undefined;
+  let bazaIstekla = false;
+  const provjeriBazu = () => {
+    if (zatvoreno) return;
+    if (bazaUTijeku) {
+      if (bazaIstekla) metrike.zabiljeziBazu(false, 3_000);
+      return;
+    }
+    bazaUTijeku = true;
+    bazaIstekla = false;
+    const pocetakProvjere = performance.now();
+    let istekao = false;
+    bazaTimeout = setTimeout(() => {
+      istekao = true;
+      bazaIstekla = true;
+      if (!zatvoreno) metrike.zabiljeziBazu(false, performance.now() - pocetakProvjere);
+    }, 3_000);
+    bazaTimeout.unref();
+    void baza.execute(sql`select 1`).then(() => {
+      if (!zatvoreno && !istekao) metrike.zabiljeziBazu(true, performance.now() - pocetakProvjere);
+    }, () => {
+      if (!zatvoreno && !istekao) metrike.zabiljeziBazu(false, performance.now() - pocetakProvjere);
+    }).finally(() => { clearTimeout(bazaTimeout); bazaUTijeku = false; });
+  };
+  const uzorkujNadzor = () => {
+    const fond = fondBotova.stanje();
+    metrike.uzorkuj({ veze: io.sockets.sockets.size, partije: upravitelj.brojAktivnihPartija(), treninzi: upravitelj.brojAktivnihTreninga(), slobodniBotovi: fond.slobodni, botoviUPartiji: fond.uPartiji, isteciBotova: upravitelj.brojIstekaBota(), greskeBotova: botKontroler.brojaci.tehnickeGreske }, eventLoop.count > 0 ? eventLoop.percentile(95) / 1e6 : 0);
+    eventLoop.reset();
+    void alarmi.provjeri(metrike.dohvatiPovijest());
+  };
+  const timerNadzora = setInterval(uzorkujNadzor, 5_000);
+  const timerBaze = setInterval(provjeriBazu, 10_000);
+  timerNadzora.unref();
+  timerBaze.unref();
+  provjeriBazu();
+  uzorkujNadzor();
+  zatvoriNadzor = () => {
+    clearInterval(timerNadzora);
+    clearInterval(timerBaze);
+    clearTimeout(bazaTimeout);
+    alarmi.zaustavi();
+    eventLoop.disable();
+  };
   const zaustavi = async () => {
     if (zatvoreno) return;
     zatvoreno = true;
     clearInterval(cistacNepotvrdjenih);
-    eventLoop.disable();
+    zatvoriNadzor();
     redServis.zaustaviPopunu();
     botKontroler.zaustavi();
     await upravitelj.zaustavi();

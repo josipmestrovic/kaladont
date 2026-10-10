@@ -1,3 +1,8 @@
+# Admin nadzor poslužitelja
+
+Admin ima zaseban odjeljak za CPU jedne jezgre aplikacijskog procesa, RSS/heap, event-loop p95, HTTP p95 i 4xx/5xx, Socket.IO pokušaje/odbijanja/autorizaciju, partije/treninge i bazu. Brojači spajanja i botova vrijede od pokretanja; HTTP metrike pokrivaju petosekundni prozor. Prikazuje se vrijeme uzorka, zastarjelost nakon 15 s, izdanje i ograničena povijest CPU/RAM od 15 minuta. Povijest se briše restartom. Na uskom zaslonu vrijednosti i trendovi slažu se u jedan stupac, bez horizontalnog pomicanja.
+
+Automatsko osvježavanje radi samo u vidljivoj kartici i ne preklapa zahtjeve. Greška dohvaćanja ne skriva posljednji uzorak. Alarm prikazuje aktivnost, zadnji uspješan prihvat emaila i grešku slanja; probnu obavijest pokreće samo izričit admin klik i dostupna je samo kada su email alarmi uključeni. Nema javne rute za ove podatke niti tipke za reset brojača.
 # Specifikacija ekrana
 
 Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza centrira isti sadržaj unutar `max-width: 1000px` kontejnera; naslovnica je namjerna iznimka s dvije kolone na desktopu i jednom kolonom na mobitelu. Ovdje je funkcionalna specifikacija — vizualni jezik definira [vizualni-identitet.md](vizualni-identitet.md).

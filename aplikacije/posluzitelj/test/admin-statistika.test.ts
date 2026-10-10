@@ -5,6 +5,7 @@ import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { igraci, partije, sudioniciPartije } from '../src/baza/shema.js';
 import { izracunajStatistikuCekanja } from '../src/admin/statistika-cekanja.js';
+import type { PregledNadzora } from 'zajednicko';
 
 let posluzitelj: Posluzitelj;
 let adresa: string;
@@ -44,6 +45,28 @@ afterAll(async () => {
 });
 
 describe('GET /admin/statistike/cekanje', () => {
+  it('privatni nadzor zahtijeva admina, ne izlaže identitete i ne resetira health uzorak', async () => {
+    const putanja = `${adresa}/api/admin/statistike/posluzitelj`;
+    expect((await fetch(putanja)).status).toBe(401);
+    expect((await fetch(putanja, { headers: { authorization: `Bearer ${obicanToken}` } })).status).toBe(403);
+    const odgovor = await fetch(putanja, { headers: { authorization: `Bearer ${adminToken}` } });
+    expect(odgovor.status).toBe(200);
+    expect(odgovor.headers.get('cache-control')).toBe('no-store');
+    const pregled = await odgovor.json() as PregledNadzora;
+    expect(pregled.trenutno?.rssBajtovi).toBeGreaterThan(0);
+    expect(pregled.povijest.length).toBeLessThanOrEqual(180);
+    expect(pregled.emailOmogucen).toBe(false);
+    const json = JSON.stringify(pregled);
+    expect(json).not.toContain(adminToken);
+    expect(json).not.toContain('remoteAddress');
+    expect(json).not.toContain('@example.com');
+    const prvi = (await posluzitelj.app.inject('/zdravlje')).json();
+    const drugi = (await posluzitelj.app.inject('/zdravlje')).json();
+    expect(drugi.eventLoopP95Ms).toBe(prvi.eventLoopP95Ms);
+    expect((await posluzitelj.app.inject({ method: 'POST', url: '/api/admin/nadzor/probna-obavijest', remoteAddress: '203.0.113.20' })).statusCode).toBe(401);
+    expect((await fetch(`${adresa}/api/admin/nadzor/probna-obavijest`, { method: 'POST', headers: { authorization: `Bearer ${adminToken}` } })).status).toBe(409);
+  });
+
   it('traži administratora', async () => {
     expect((await fetch(`${adresa}/api/admin/statistike/cekanje`)).status).toBe(401);
     expect((await fetch(`${adresa}/api/admin/statistike/cekanje`, { headers: { authorization: `Bearer ${obicanToken}` } })).status).toBe(403);

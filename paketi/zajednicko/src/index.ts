@@ -12,3 +12,4 @@ export * from './avatar.js';
 export * from './nadimak.js';
 export * from './forma.js';
 export * from './ljestvice.js';
+export * from './nadzor.js';

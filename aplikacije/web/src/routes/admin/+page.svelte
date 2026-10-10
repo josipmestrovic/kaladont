@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
+  import NadzorPosluzitelja from '$lib/komponente/NadzorPosluzitelja.svelte';
 
   interface Prijava {
     id: number;
@@ -170,6 +171,7 @@
 {#if greska}
   <p role="alert">{greska}</p>
 {:else}
+  <NadzorPosluzitelja />
   <h2 id="statistika-cekanja">Statistika čekanja i botova</h2>
   <p class="opis-statistike">Čekanje se mjeri samo ljudima (najdulje čekanje za stolom). Broj botova je broj mjesta koja je popunio bot. Služi podeavanju pragova i fonda prema ADR-017.</p>
   <label class="izbor-razdoblja">Razdoblje

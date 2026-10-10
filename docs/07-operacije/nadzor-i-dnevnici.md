@@ -4,6 +4,24 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 
 > **Status:** Pino logovi i prošireni `/zdravlje` postoje. Docker rotacija, UptimeRobot, Healthchecks.io te systemd poslovi još su ciljano stanje Faze 8. Pokuse opterećenja nadzirati postojećim alatima; ne uvoditi novu monitoring infrastrukturu radi njih.
 
+## Admin nadzor aplikacije
+
+`GET /api/admin/statistike/posluzitelj` zahtijeva admin sesiju i vraća `Cache-Control: no-store`. Pregled se osvježava svakih 5 s dok je kartica vidljiva. Povijest čuva najviše 180 uzoraka (15 minuta) u memoriji; restart briše povijest i brojače. Ne sadrži tokene, IP adrese, sadržaj zahtjeva ni korisničke identitete.
+
+CPU je potrošnja Node procesa izražena u postotku jednog jezgrenog procesora (može prijeći 100 %); RSS, heap i vanjska memorija također pripadaju aplikaciji, ne cijelom VPS-u. HTTP p95 i 5xx odnose se na završene poslovne `/api/` zahtjeve u prozoru; javni health, HTML/statičke datoteke i admin rute ne ulaze u taj prozor. Socket.IO brojači prate prihvat/odbijanje transporta, autorizaciju i prekide, ali ne vide mrežni timeout koji nikad ne stigne do servera. Baza se provjerava periodično, bez upita pri svakom admin osvježavanju. Javna health shema ostaje kompatibilna; event-loop p95 čita dovršeni petosekundni uzorak i poziv ga ne resetira.
+
+Email alarmi su izričito uključivi preko `NADZOR_EMAIL_OMOGUCEN=true`, samo na stagingu/produkciji, i šalju se na `DEV_MAIL` postojećim servisom. Prvih 60 s nakon pokretanja nema alarma. Zadani pragovi: CPU > 90 % jednog jezgrenog procesora, RSS > 1024 MiB, event-loop p95 > 100 ms i poslovni HTTP p95 > 1000 ms ili 5xx >= 1 %. Degradacija mora trajati 2 minute; HTTP alarm traži najmanje 20 zahtjeva u svakoj minuti. Dvije uzastopne neuspjele DB provjere i novi botovi isteci/tehničke greške također stvaraju alarm. Pragovi CPU/RSS/latencija su konfigurabilni. Isti alarm ponavlja se najviše jednom u 15 minuta; oporavak šalje zasebnu poruku. Neuspjelo slanje prikazuje se u adminu i zapisuje bez tajni; ograničeni ponovni pokušaj ne blokira zahtjeve. Admin može izričito poslati probnu obavijest (najviše jednom u minuti); prihvat mail servisa nije dokaz primitka u inboxu.
+
+Alarm iz aplikacije ne može javiti potpuno gašenje procesa/VPS-a, prekid mreže ili kvar samog mail servisa. Za to je potrebna zasebna vanjska provjera `/zdravlje` (npr. UptimeRobot). Ona nije automatski konfigurirana ovom implementacijom. Prije produkcije uključiti vanjsku provjeru i potvrditi primitak probnog emaila.
+
+### VPS preko konzole
+
+HTTP alarm latencije traži da barem polovica zahtjeva posljednje minute pripada petosekundnim intervalima s p95 iznad praga; ne radi se o izračunu jedinstvenog minutnog p95. DB provjera ima rok 3 s; dok jedan upit ne završi, novi se ne otvara, a svako sljedeće desetosekundno opažanje isteklog upita računa se kao nedostupnost. Time su provjere ograničene i kod neodgovarajuće baze.
+
+Spojiti se postojećim SSH ključem uz `StrictHostKeyChecking=yes`, zatim koristiti `docker stats` za CPU/RAM pojedinih kontejnera i `top` za cijeli VPS. `free -h` prikazuje raspoloživu memoriju (`available`, ne samo `free` jer Linux koristi cache); `df -h` pokazuje slobodan disk. Aplikaciji se ne daje Docker socket niti administratorske ovlasti. Dnevnici: `docker compose -f docker-compose.staging.yml logs -f --tail 100 aplikacija` (za produkciju odgovarajući Compose). `Ctrl+C` zatvara samo pregled. Ne restartati server tijekom aktivnih partija samo radi zatvaranja konzole.
+
+Kod alarma pregledati vrijeme/izdanje i trend, zatim `docker stats`, `top`, dostupni RAM/disk i aplikacijske/DB dnevnike. Ne povećavati limite niti proglašavati kapacitet samo zbog niskog CPU-a. Visoki CPU po jezgru ne mora značiti da je cijeli VPS zauzet. Podaci admina nisu trajna evidencija performansi.
+
 ## Dnevnici (logovi)
 
 - **pino** strukturirani JSON logovi na stdout; ciljna Compose konfiguracija koristi Dockerov `local` logging driver ili izričita ograničenja `max-size`/`max-file`.

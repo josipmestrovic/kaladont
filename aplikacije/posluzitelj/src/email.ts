@@ -64,6 +64,7 @@ export async function posaljiEmail(
 
   const odgovor = await fetch('https://api.resend.com/emails', {
     method: 'POST',
+    signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: `Bearer ${konfiguracija.EMAIL_API_KLJUC}`,
       'Content-Type': 'application/json',

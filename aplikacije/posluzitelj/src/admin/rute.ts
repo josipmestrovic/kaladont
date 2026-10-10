@@ -5,7 +5,7 @@
 import type { FastifyInstance } from 'fastify';
 import { desc, eq, and, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { SVE_VRSTE_RIJECI } from 'zajednicko';
+import { SVE_VRSTE_RIJECI, type PregledNadzora } from 'zajednicko';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { dodajRijec, deaktivirajRijec, vratiRijec, NevaljanaRijecError } from '../rjecnik/administracija.js';
 import { prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza/shema.js';
@@ -35,7 +35,24 @@ export async function registrirajAdminRute(
   app: FastifyInstance,
   rjecnik: RjecnikUMemoriji,
   dohvatiZivoStanje: () => ZivoStanjeBotova | null = () => null,
+  nadzor?: { pregled: () => PregledNadzora; probnaObavijest: () => Promise<boolean> },
 ): Promise<void> {
+  app.get('/admin/statistike/posluzitelj', { preHandler: zahtijevajAdmina }, async (_zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    if (!nadzor) return odgovor.code(503).send({ ok: false, greska: 'Nadzor nije dostupan.' });
+    return nadzor.pregled();
+  });
+  app.post('/admin/nadzor/probna-obavijest', { preHandler: zahtijevajAdmina, config: { rateLimit: { max: 1, timeWindow: '1 minute' } } }, async (_zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    if (!nadzor || !nadzor.pregled().emailOmogucen) return odgovor.code(409).send({ ok: false, greska: 'Email alarmi nisu uključeni.' });
+    try {
+      const prihvaceno = await nadzor.probnaObavijest();
+      if (!prihvaceno) return odgovor.code(502).send({ ok: false, greska: 'Mail servis nije prihvatio obavijest.' });
+      return { ok: true, poruka: 'Mail servis je prihvatio obavijest. Provjeri inbox.' };
+    } catch {
+      return odgovor.code(429).send({ ok: false, greska: 'Pričekaj minutu prije ponovnog slanja.' });
+    }
+  });
   app.get<{ Querystring: { dani?: string } }>(
     '/admin/statistike/cekanje',
     { preHandler: zahtijevajAdmina },
