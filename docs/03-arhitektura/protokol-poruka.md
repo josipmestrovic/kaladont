@@ -42,11 +42,11 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 | `potez:prihvacen` | `PrihvacenPotez` | Valjan potez; svi za stolom |
 | `potez:odbijen` | `OdbijenPotez` | Samo igraču koji je pokušao |
 | `partija:eliminacija` | `Eliminacija` | Netko je ispao; svi za stolom |
-| `partija:sustav-bira-rijec` | `SustavBiraRijec` | Sustav počinje birati riječ za otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta) - 5s, nitko ne može igrati |
+| `partija:sustav-bira-rijec` | `SustavBiraRijec` | Jedan prijelaz od 8 s nakon eliminacije ili Kaladont-efekta; nitko ne može igrati, rok je `istekIzboraIso`, bez zasebnog splash ekrana |
 | `partija:runda-otvorena` | `RundaOtvorena` | Sustav je otkrio odabranu riječ; red ide na sljedećeg aktivnog igrača nakon napadača |
 | `partija:spremanje-rezultata` | `SpremanjeRezultataPartije` | Igra je završila, ali se konačni rezultat još pokušava spremiti; šalje se pri svakom ponovnom pokušaju/reconnectu |
 | `partija:ponistena` | `PonistenaPartija` | Partija je prekinuta restartom ili kontroliranim gašenjem; rezultat nije dodijeljen |
-| `partija:kraj` | `KrajPartije` | Konačni plasmani, bodovi i privatni XP obračun primatelja |
+| `partija:kraj` | `KrajPartije` | Konačni plasmani, bodovi i privatni XP obračun primatelja; opcionalni `prikazRezultataOdIso` je zajednički rok prikaza detalja, 8 s od završetka igre, ne mijenja se pri reconnectu |
 | `iskustvo:obracun` | `ObracunIskustvaTijekomPartije` | Privatni XP obračun eliminiranog igrača |
 | `reakcija:nova` | `{ igracId: string, poruka: BrzaPoruka }` | |
 | `greska` | `{ kod: KodGreske, poruka: string }` | Općenite greške (npr. `PREBRZO`) |

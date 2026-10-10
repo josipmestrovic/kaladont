@@ -239,6 +239,7 @@ export interface Eliminacija {
 
 export interface KrajPartije {
   partijaId: string;
+  prikazRezultataOdIso?: string;
   plasmani: PlasmanPartije[];
   mojNoviProsjek: number;
   mojRang: string | null;

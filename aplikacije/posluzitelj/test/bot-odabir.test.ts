@@ -3,6 +3,31 @@ import type { DogadajPoteza, RezultatNaredbe } from '../src/igra/politika-ucinka
 import { BotKontroler } from '../src/bot/kontroler.js';
 import { ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
 import { Vrecica, odaberiPotez, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
+import { dopustenoBotova, pragoviPopuneZaOkruzenje } from '../src/red/raspored-popune.js';
+
+describe('lokalni tempo javnih botova', () => {
+  it('u development puni oba reda na 1 s i igra na 2 s, bez promjene treninga', () => {
+    const konfiguracija = ucitajKonfiguracijuBota({ NODE_ENV: 'development', BOT_VJEROJATNOST_ISTEKA: '1' });
+    const pragovi = pragoviPopuneZaOkruzenje('development');
+    for (const mod of ['dva_igraca', 'cetiri_igraca'] as const) {
+      expect(dopustenoBotova(0, 999, pragovi[mod])).toBe(0);
+      expect(dopustenoBotova(0, 1_000, pragovi[mod])).toBe(mod === 'dva_igraca' ? 1 : 3);
+    }
+    for (const nasumicno of [0, 0.5, 1]) {
+      expect(trajanjeRazmisljanjaMs(5_000, konfiguracija, () => nasumicno, 'javna')).toBe(2_000);
+      expect(trajanjeRazmisljanjaMs(null, konfiguracija, () => nasumicno, 'trening')).toBe(3_000);
+    }
+    expect(konfiguracija.vjerojatnostIsteka).toBe(0);
+  });
+
+  it.each(['test', 'staging', 'production'])('ne ubrzava okruženje %s', (okruzenje) => {
+    const konfiguracija = ucitajKonfiguracijuBota({ NODE_ENV: okruzenje });
+    expect(konfiguracija.javnoRazmisljanjeMinMs).toBe(5_000);
+    expect(konfiguracija.javnoRazmisljanjeMaksMs).toBe(14_000);
+    expect(konfiguracija.vjerojatnostIsteka).toBe(0.005);
+    expect(pragoviPopuneZaOkruzenje(okruzenje)).toEqual({ dva_igraca: [30_000], cetiri_igraca: [20_000, 30_000, 40_000] });
+  });
+});
 
 /** Deterministički RNG (mulberry32). */
 function rng(seed: number): () => number {

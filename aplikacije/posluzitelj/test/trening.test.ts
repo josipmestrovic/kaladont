@@ -58,15 +58,36 @@ function cekaj<T>(socket: ClientSocket, dogadaj: string, filter: (p: T) => boole
   });
 }
 
-async function odigrajTreningDoKraja(socket: ClientSocket): Promise<{ pocetak: PocetakPartije; kraj: KrajPartije; botIgrao: boolean }> {
+async function odigrajTreningDoKraja(socket: ClientSocket, zahtijevajPotezBota = false): Promise<{ pocetak: PocetakPartije; kraj: KrajPartije; botIgrao: boolean }> {
   const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
   const rundaPromise = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena');
   const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
   const brojRijeciPrije = posluzitelj.brojaciBota.odigranihRijeci;
   let mojId: string | null = null;
+  let odbijPrviPotez: (greska: unknown) => void = () => undefined;
+  const greskaPrvogPoteza = new Promise<never>((_resolve, reject) => { odbijPrviPotez = reject; });
   const naPocetak = (poruka: PocetakPartije) => { mojId = poruka.mojIgracId; };
   const naRundu = (poruka: RundaOtvorena) => {
-    if (poruka.naPotezuId === mojId) socket.emit('potez:ne-znam', { turnToken: poruka.turnToken });
+    if (poruka.naPotezuId !== mojId) return;
+    if (!zahtijevajPotezBota || posluzitelj.brojaciBota.odigranihRijeci > brojRijeciPrije) {
+      socket.emit('potez:ne-znam', { turnToken: poruka.turnToken });
+      return;
+    }
+    void baza.execute<{ rijec: string }>(sql`
+      select kandidat.rijec from rijeci kandidat
+      join rijeci pocetna on pocetna.rijec = ${poruka.rijec}
+      where kandidat.aktivna and kandidat.prva_dva = ${poruka.trazenaSlova}
+        and not (kandidat.grupe && pocetna.grupe)
+        and exists (
+          select 1 from rijeci nastavak
+          where nastavak.aktivna and nastavak.prva_dva = kandidat.zadnja_dva
+            and not (nastavak.grupe && (pocetna.grupe || kandidat.grupe))
+        )
+      order by kandidat.rijec limit 1
+    `).then(([kandidat]) => {
+      if (!kandidat) throw new Error(`Nema testnog poteza sa slobodnim nastavkom na ${poruka.trazenaSlova}`);
+      socket.emit('potez:rijec', { rijec: kandidat.rijec, turnToken: poruka.turnToken });
+    }).catch(odbijPrviPotez);
   };
   const naPotez = (poruka: PrihvacenPotez) => {
     if (poruka.sljedeciId === mojId && poruka.istekPotezaIso !== undefined) socket.emit('potez:ne-znam', { turnToken: poruka.turnToken });
@@ -79,7 +100,7 @@ async function odigrajTreningDoKraja(socket: ClientSocket): Promise<{ pocetak: P
     expect(potvrda.pokrenut).toBe(true);
     const pocetak = await pocetakPromise;
     expect((await rundaPromise).istekPotezaIso).toBe('');
-    const kraj = await krajPromise;
+    const kraj = await Promise.race([krajPromise, greskaPrvogPoteza]);
     return { pocetak, kraj, botIgrao: posluzitelj.brojaciBota.odigranihRijeci > brojRijeciPrije };
   } finally {
     socket.off('partija:pocetak', naPocetak);
@@ -115,13 +136,11 @@ describe('Zagrijavanje', () => {
   it('Računalo odigra legalnu riječ kad je na potezu i isti igrač može odmah u novi trening', async () => {
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
-      let botIgrao = false;
-      for (let pokusaj = 0; pokusaj < 4 && !botIgrao; pokusaj += 1) {
-        const ishod = await odigrajTreningDoKraja(socket);
-        botIgrao = ishod.botIgrao;
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-      expect(botIgrao).toBe(true);
+      const prvi = await odigrajTreningDoKraja(socket, true);
+      expect(prvi.botIgrao).toBe(true);
+      const drugi = await odigrajTreningDoKraja(socket, true);
+      expect(drugi.botIgrao).toBe(true);
+      expect(drugi.pocetak.partijaId).not.toBe(prvi.pocetak.partijaId);
       expect(posluzitelj.brojaciBota.odigranihRijeci).toBeGreaterThan(0);
       expect(posluzitelj.brojaciBota.tehnickeGreske).toBe(0);
     } finally {

@@ -25,6 +25,8 @@ Rezervirani bot prikazuje se u čekaonici kao sudionik koji čeka od trenutka re
 
 ## Pravila za bota u partiji
 
+Samo u lokalnom razvojnom okruženju (`NODE_ENV=development`), radi bržeg testiranja javnog Dvoboja i Četveroboja, sva potrebna mjesta popunjavaju se botovima nakon 1 s čekanja, a javni botovi odigravaju nakon 2 s bez namjernog isteka. Popuna i dalje mora biti uključena za pojedini mod. Trening ostaje bez timera s odgovorom nakon 3 s. Staging, produkcija i automatizirano okruženje `test` zadržavaju redovne pragove i tempo opisane ovdje; eksplicitni pragovi pojedinačnih testova imaju prednost.
+
 - Bot igra po **istim pravilima** kao čovjek: isti potez, timer, validacija, leksemske grupe, eliminacija i Kaladont-efekt. Potezi ljudi i botova prolaze istu obradu na poslužitelju.
 - Bot koristi **cijeli aktivni rječnik** dopušten pravilima partije. Nema legalne riječi koja je trajno nedostupna zbog položaja u popisu.
 - **Nenapadačka politika:** bot ne traži mrtve nastavke, ne gleda protivnikove mogućnosti i ne bira riječ prema broju protivnikovih nastavaka. Slučajan mrtvi nastavak smije se dogoditi. Pravilo je isto neovisno o tome je li sljedeći igrač čovjek ili bot.

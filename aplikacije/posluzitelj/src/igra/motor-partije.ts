@@ -64,7 +64,7 @@ const ShemaNeznam = z.object({ turnToken: z.string().min(1).max(64).optional() }
 const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) }).strict();
 
 const TRAJANJE_POTEZA_MS = konfiguracija.TRAJANJE_POTEZA_MS;
-const TRAJANJE_IZBORA_SUSTAVA_MS = 10_000;
+const TRAJANJE_IZBORA_SUSTAVA_MS = 8_000;
 const PROZOR_ISTODOBNIH_PREKIDA_MS = 25;
 // UX ekran mora trajati 5 s u razvoju, stagingu i produkciji. Samo testno okruženje
 // preskače čekanje kako integracijski testovi ne bi čekali stvarno vrijeme.
@@ -110,6 +110,7 @@ export interface AktivneVezeIgraca {
 export interface PostavkeMotoraPartije {
   timerOnemogucen?: boolean;
   trajanjePotezaMs?: number;
+  trajanjeIzboraSustavaMs?: number;
   tolerancijaPrekidaMs?: number;
   odgodaObradePrekidaMs?: number;
   zadrzavanjeSobeNakonKrajaMs?: number;
@@ -804,6 +805,7 @@ export function stvoriUpraviteljPartija(
     stanje.zavrsena = true;
     // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.
     const zavrsenoU = new Date();
+    const prikazRezultataOdIso = new Date(zavrsenoU.getTime() + 8_000).toISOString();
     if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
     if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
     for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
@@ -848,6 +850,7 @@ export function stvoriUpraviteljPartija(
       for (const p of plasmani) {
         const poruka: KrajPartije = {
           partijaId: stanje.partijaId,
+          prikazRezultataOdIso,
           plasmani,
           mojNoviProsjek: 0,
           mojRang: null,
@@ -909,6 +912,7 @@ export function stvoriUpraviteljPartija(
           for (const p of plasmani) {
             const poruka: KrajPartije = {
               partijaId: stanje.partijaId,
+              prikazRezultataOdIso,
               plasmani,
               mojNoviProsjek: 0,
               mojRang: null,
@@ -994,6 +998,7 @@ export function stvoriUpraviteljPartija(
           }
           const poruka: KrajPartije = {
             partijaId: stanje.partijaId,
+            prikazRezultataOdIso,
             plasmani,
             mojNoviProsjek: prosjek,
             mojRang: null,
@@ -1058,18 +1063,19 @@ export function stvoriUpraviteljPartija(
   /**
    * Otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta): sustav - ne igrac - bira
    * rijec, sprjecavajuci namjestanje ishoda odabirom "zamke" za konkretnog protivnika.
-   * Prikazuje se 10s ekran igracima dok sustav "razmislja" (dovoljno da procitaju razlog eliminacije), pa tek onda kreće potez i 30s timer.
+  * Prijelaz od 8s ostavlja vrijeme za razlog eliminacije; timer poteza kreće nakon dodjele riječi.
    * napadac = igrac nakon kojeg sustav preuzima red (null za 1. rundu partije).
    */
   function zapocniIzborRijeciSustava(stanje: StanjeStola, napadac: string | null): void {
+    const izvorniRok = stanje.izborUToku ? stanje.istekIzboraIso : null;
+    const trajanje = postavke.trajanjeIzboraSustavaMs ?? (konfiguracija.NODE_ENV === 'test' ? 0 : TRAJANJE_IZBORA_SUSTAVA_MS);
     if (stanje.izborHandle) clearTimeout(stanje.izborHandle); // moze se dogoditi ako netko napusti partiju dok sustav vec bira
     stanje.izborUToku = true;
     stanje.napadacId = null;
-    const trajanje = konfiguracija.NODE_ENV === 'test' ? 0 : TRAJANJE_IZBORA_SUSTAVA_MS;
-    stanje.istekIzboraIso = new Date(Date.now() + trajanje).toISOString();
+    stanje.istekIzboraIso = izvorniRok || new Date(Date.now() + trajanje).toISOString();
     const poruka: SustavBiraRijec = { istekIzboraIso: stanje.istekIzboraIso };
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:sustav-bira-rijec', poruka);
-    stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, napadac), trajanje);
+    stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, napadac), Math.max(0, Date.parse(stanje.istekIzboraIso) - Date.now()));
     objaviPromjenuPoteza(stanje);
   }
 

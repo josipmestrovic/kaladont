@@ -55,6 +55,8 @@ instalaciji Chromiuma i pokretanju PostgreSQL-a.
 
 ## Mobilni E2E
 
+Stabilnost avatara pokriva `red.spec.ts` za Dvoboj i Četveroboj na zaslonima 1440×900, 390×844, 320×568 i 844×390. Testovi uspoređuju stvarne koordinate svih avatara kroz šest razloga eliminacije, obnovu stanja, novu rundu, XP obavijesti i spremanje/čekanje rezultata; provjeravaju vidljivost oblačića, jednoredne statuse i odsutnost prekrivanja. Kontrolirani sat provjerava završno odbrojavanje 8→5→rezultati. `motor-partije.test.ts` dodatno provjerava stvarni rok od 8 s, da riječ ne stiže prerano te da dodatna eliminacija i reconnect ne resetiraju rok. Browser emulacija ne potvrđuje ponašanje fizičke mobilne tipkovnice.
+
 Puni E2E paket izvršava se jednom na `desktop-chrome`. Datoteka `mobilni-tok.spec.ts` izvršava se
 samo na `android-chrome` (Pixel 7, Chromium) i `iphone-webkit` (iPhone 13, WebKit), kako se cijeli
 desktop paket ne bi nepotrebno utrostručio. Mobilni paket provjerava responsive raspored, fokus i

@@ -38,6 +38,7 @@ import {
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 import { BotKontroler } from './bot/kontroler.js';
 import { ucitajKonfiguracijuBota } from './bot/konfiguracija-bota.js';
+import { pragoviPopuneZaOkruzenje } from './red/raspored-popune.js';
 import { FondBotova, ucitajIdentiteteBotova } from './bot/fond.js';
 import { registrirajTrening } from './trening/servis-treninga.js';
 import { dohvatiIpKlijenta, jeDopustenaTestnaIp, OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
@@ -289,7 +290,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     rjecnik,
     izvrsiNaredbu: (partijaId, igracId, naredba) => upravitelj.naredbaBota(partijaId, igracId, naredba),
     oznaciNamjerniIstek: (partijaId, igracId, turnToken) => upravitelj.oznaciNamjerniIstek(partijaId, igracId, turnToken),
-    konfiguracija: ucitajKonfiguracijuBota(),
+    konfiguracija: ucitajKonfiguracijuBota({ ...process.env, NODE_ENV: konfiguracija.NODE_ENV }),
     zapisi: (poruka, podaci) => app.log.warn(podaci, poruka),
   });
   const upravitelj = stvoriUpraviteljPartija(
@@ -512,7 +513,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       fond: fondBotova,
       omogucena: (mod) => mod === 'dva_igraca' ? popunaDvobojUkljucena() : popunaCetverobojUkljucena(),
       botJeZauzet: upravitelj.imaNezavrsenuObradu,
-      pragoviMs: opcije.popunaBotovima?.pragoviMs,
+      pragoviMs: opcije.popunaBotovima?.pragoviMs ?? pragoviPopuneZaOkruzenje(konfiguracija.NODE_ENV),
     },
   );
   naJavnaPartijaZavrsila = () => redServis.osvjeziPopunu();

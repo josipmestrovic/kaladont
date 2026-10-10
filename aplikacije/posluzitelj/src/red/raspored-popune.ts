@@ -12,6 +12,12 @@ export const PRAGOVI_POPUNE_MS: Record<'dva_igraca' | 'cetiri_igraca', readonly 
   cetiri_igraca: [20_000, 30_000, 40_000],
 };
 
+export function pragoviPopuneZaOkruzenje(okruzenje: string): typeof PRAGOVI_POPUNE_MS {
+  return okruzenje === 'development'
+    ? { dva_igraca: [1_000], cetiri_igraca: [1_000, 1_000, 1_000] }
+    : PRAGOVI_POPUNE_MS;
+}
+
 export function dopustenoBotova(najstarijiUsaoU: number, sada: number, pragovi: readonly number[]): number {
   const proteklo = sada - najstarijiUsaoU;
   return pragovi.filter((prag) => proteklo >= prag).length;

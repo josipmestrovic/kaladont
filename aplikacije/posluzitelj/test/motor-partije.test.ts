@@ -688,6 +688,60 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     odspojiIgrace(igraci);
   });
 
+  it('prijelaz traje 8 sekundi, dodatna eliminacija i reconnect ne resetiraju rok', async () => {
+    const posluzitelj = await izgradiPosluzitelj({
+      postavkeMotora: { trajanjeIzboraSustavaMs: 8_000, tolerancijaPrekidaMs: 1_000 },
+      socketOgranicenja: { handshakePoIpMinuti: 1_000 },
+    });
+    let igraci: Igrac[] = [];
+    let obnovljeni: Igrac | null = null;
+    try {
+      await posluzitelj.app.listen({ port: 0, host: '127.0.0.1' });
+      const podaci = posluzitelj.app.server.address();
+      const cilj = `http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`;
+      const partija = await pokreniPartiju(cilj);
+      igraci = partija.igraci;
+      const naPotezu = igraci.find((igrac) => igrac.igracId === partija.runda.naPotezuId)!;
+      const ostali = igraci.filter((igrac) => igrac !== naPotezu);
+      const promatrac = ostali[0]!;
+      const rokovi: string[] = [];
+      promatrac.socket.on('partija:sustav-bira-rijec', (poruka: { istekIzboraIso: string }) => rokovi.push(poruka.istekIzboraIso));
+      const izborPromise = new Promise<{ istekIzboraIso: string }>((resolve) => promatrac.socket.once('partija:sustav-bira-rijec', resolve));
+      let otvorenaU = 0;
+      const novaRunda = new Promise<RundaOtvorena>((resolve) => {
+        const slusajRundu = (poruka: RundaOtvorena) => {
+          if (poruka.runda <= partija.runda.runda) return;
+          promatrac.socket.off('partija:runda-otvorena', slusajRundu);
+          otvorenaU = Date.now();
+          resolve(poruka);
+        };
+        promatrac.socket.on('partija:runda-otvorena', slusajRundu);
+      });
+      const pocetakPrijelaza = Date.now();
+      naPotezu.socket.emit('potez:ne-znam', { turnToken: partija.runda.turnToken });
+      const izbor = await izborPromise;
+      const rok = Date.parse(izbor.istekIzboraIso);
+      expect(rok - pocetakPrijelaza).toBeGreaterThanOrEqual(8_000);
+      expect(rok - pocetakPrijelaza).toBeLessThan(8_500);
+      await odgodi(200);
+      expect(otvorenaU).toBe(0);
+      ostali[1]!.socket.emit('partija:izadji');
+      naPotezu.socket.disconnect();
+      const povratak = await spojiIgracaIPricekajStanje(naPotezu.authToken, cilj);
+      obnovljeni = povratak.igrac;
+      expect(povratak.stanje.sustavBiraRijec).toBe(true);
+      expect(povratak.stanje.istekIzboraIso).toBe(izbor.istekIzboraIso);
+      expect(povratak.stanje.eliminacije.some((eliminacija) => eliminacija.igracId === naPotezu.igracId)).toBe(true);
+      await novaRunda;
+      expect(otvorenaU).toBeGreaterThanOrEqual(rok - 10);
+      expect(otvorenaU).toBeLessThan(rok + 1_000);
+      expect(rokovi.every((vrijednost) => vrijednost === izbor.istekIzboraIso)).toBe(true);
+    } finally {
+      odspojiIgrace([...igraci, ...(obnovljeni ? [obnovljeni] : [])]);
+      await posluzitelj.zaustavi();
+    }
+  });
+
   it('eliminirani igrač se nakon reconnecta vraća kao promatrač', async () => {
     const { igraci, runda } = await pokreniPartiju();
     const eliminirani = igraci.find((igrac) => igrac.token === runda.naPotezuId)!;
@@ -719,7 +773,12 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(rezultat.stanje.partijaId).toBe(pocetak.partijaId);
     expect(rezultat.stanje.zavrsena).toBe(true);
     expect(rezultat.kraj.plasmani.find((p) => p.igracId === buduciPobjednik.token)?.plasman).toBe(1);
-    odspojiIgrace([...igraci, rezultat.igrac]);
+    expect(Date.parse(rezultat.kraj.prikazRezultataOdIso!) - Date.now()).toBeGreaterThan(6_000);
+    expect(Date.parse(rezultat.kraj.prikazRezultataOdIso!) - Date.now()).toBeLessThanOrEqual(8_000);
+    rezultat.igrac.socket.disconnect();
+    const ponovljeni = await spojiIgracaIPricekajStanjeIKraj(buduciPobjednik.authToken);
+    expect(ponovljeni.kraj.prikazRezultataOdIso).toBe(rezultat.kraj.prikazRezultataOdIso);
+    odspojiIgrace([...igraci, rezultat.igrac, ponovljeni.igrac]);
   });
 
   it('RS-13: kod istodobnih prekida igrač koji je bio na potezu nema prednost', async () => {

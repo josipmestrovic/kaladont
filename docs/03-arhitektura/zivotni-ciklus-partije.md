@@ -26,7 +26,8 @@ stateDiagram-v2
 
 Napomene:
 
-- **SustavBiraRijec:** traje 10 sekundi; nitko ne može igrati. Server prvo nasumično bira iz skupa sigurnih riječi uz aktualne kategorije i potrošene grupe, a zatim po potrebi koristi rezervni odabir riječi sa slobodnim nastavkom. Isti tok vrijedi za 1. rundu partije i nakon svake eliminacije/kaladont-efekta (RS-01). Klijent prikazuje obrazloženje zadnje eliminacije (ako postoji) i brojač. 30-sekundni timer poteza kreće tek kad ovo stanje završi.
+- **SustavBiraRijec:** nakon eliminacije ili Kaladont-efekta traje 8 sekundi; nitko ne može igrati. Server prvo nasumično bira iz skupa sigurnih riječi uz aktualne kategorije i potrošene grupe, a zatim po potrebi koristi rezervni odabir riječi sa slobodnim nastavkom. Prva dodjela ne dodaje ovu pauzu postojećem početnom odbrojavanju. Klijent zadržava avatare i uzročni oblačić te prikazuje kompaktno objašnjenje i „Nova runda za: 8…1”. Dodatna eliminacija tijekom istog prijelaza ne resetira rok. Timer poteza kreće tek po dodjeli riječi; trening ostaje bez timera.
+- **Prikaz rezultata:** `prikazRezultataOdIso` u konačnom rezultatu određuje osamsekundnu pauzu od završetka igre. Spremanje ne čeka taj rok; pri sporoj bazi sučelje zadržava avatare i kratku poruku o spremanju. Ponovno slanje rezultata zadržava izvorni rok.
 - **Mrtva slova** eliminiraju sljedećeg igrača trenutno, bez ulaska u njegovo `CekanjePoteza` (RS-02/RS-03).
 - **CekaPovratak:** mrežni prekid pokreće 10-sekundnu toleranciju samo za prekinutog igrača. Timer poteza ne pauzira se; istek poteza ima prednost ako nastupi prije isteka tolerancije. Dobrovoljni izlazak ne ulazi u ovo stanje.
 - Eliminirani igrač prelazi u ulogu **promatrača** istog stola do `KrajPartije`.
@@ -47,7 +48,7 @@ sequenceDiagram
         Note over S: timer 30 s za sljedećeg igrača
     else nastavka nema
         S->>O: partija:eliminacija (sljedeći igrač, razlog mrtva_slova_*)
-        S->>O: partija:sustav-bira-rijec, zatim (10s) partija:runda-otvorena, ili partija:kraj
+        S->>O: partija:sustav-bira-rijec, zatim (8s) partija:runda-otvorena, ili partija:kraj
     end
 ```
 

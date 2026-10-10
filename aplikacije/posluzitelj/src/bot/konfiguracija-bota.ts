@@ -38,10 +38,13 @@ function postotak(vrijednost: string | undefined, zadano: number): number {
 }
 
 export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): KonfiguracijaBota {
+  const lokalnoTestiranje = env.NODE_ENV === 'development';
   return {
     ...ZADANA_KONFIGURACIJA_BOTA,
+    javnoRazmisljanjeMinMs: lokalnoTestiranje ? 2_000 : ZADANA_KONFIGURACIJA_BOTA.javnoRazmisljanjeMinMs,
+    javnoRazmisljanjeMaksMs: lokalnoTestiranje ? 2_000 : ZADANA_KONFIGURACIJA_BOTA.javnoRazmisljanjeMaksMs,
     vjerojatnostOstavljanjaKa: postotak(env.BOT_VJEROJATNOST_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa),
     vjerojatnostPropusta: postotak(env.BOT_VJEROJATNOST_NE_ZNAM, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropusta),
-    vjerojatnostIsteka: postotak(env.BOT_VJEROJATNOST_ISTEKA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostIsteka),
+    vjerojatnostIsteka: lokalnoTestiranje ? 0 : postotak(env.BOT_VJEROJATNOST_ISTEKA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostIsteka),
   };
 }
