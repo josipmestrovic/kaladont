@@ -185,7 +185,9 @@ export class SimulatorMijesanihBotova {
     const neuspjeli = ishodi.filter((ishod) => ishod.status === 'rejected');
     if (neuspjeli.length > 0) {
       this.brojTehnickihGresaka += neuspjeli.length;
-      throw new Error(`${neuspjeli.length} botova nije se uspjelo spojiti.`);
+      const razlozi = neuspjeli.map((ishod) => ishod.reason instanceof Error ? ishod.reason.message : String(ishod.reason));
+      this.pogreske.push(...razlozi);
+      throw new Error(`${neuspjeli.length} botova nije se uspjelo spojiti: ${razlozi.join('; ')}.`);
     }
 
     if (grupa.vrsta === 'privatni_cetveroboj') {
@@ -200,10 +202,10 @@ export class SimulatorMijesanihBotova {
   uzorak(): UzorakBotova {
     if (!this.planiranoZatvaranje && !this.signalPrekida?.aborted) {
       const sada = performance.now();
-      if ([...this.botovi].some((bot) => bot.stanje === 'red' && sada - bot.cekaOdMs > 60_000) ||
-          [...this.partije.values()].some((partija) => partija.zavrsenoU === null && sada - partija.zadnjiDogadajMs > 60_000)) {
-        this.prekini('Bot ili partija nema napretka dulje od 60 sekundi.');
-      }
+      const cekaURedu = [...this.botovi].find((bot) => bot.stanje === 'red' && sada - bot.cekaOdMs > 60_000);
+      const neaktivnaPartija = [...this.partije.values()].find((partija) => partija.zavrsenoU === null && sada - partija.zadnjiDogadajMs > 60_000);
+      if (cekaURedu) this.prekini(`Virtualni igrač čeka dulje od 60 sekundi: vrsta=${cekaURedu.vrsta}, mod=${cekaURedu.mod}, partija=${cekaURedu.partijaId ?? 'nema'}.`);
+      else if (neaktivnaPartija) this.prekini(`Partija nema napretka dulje od 60 sekundi: id=${neaktivnaPartija.id}, kontekst=${neaktivnaPartija.kontekst}, mod=${neaktivnaPartija.mod}, naPotezu=${neaktivnaPartija.naPotezuId ?? 'nema'}.`);
     }
     const poStanjima: Record<StanjeBota, number> = {
       spajanje: 0,
@@ -288,15 +290,25 @@ export class SimulatorMijesanihBotova {
     bot.socket = socket;
     this.botovi.add(bot);
     this.otvoreniSocketi.add(socket);
+    let transportOtvorenU: number | null = null;
+    const naOtvaranjeTransporta = () => { transportOtvorenU = performance.now(); };
+    socket.io.on('open', naOtvaranjeTransporta);
 
     try {
       await cekajDogadaj(socket, 'connect', this.opcije.timeoutMs, () => true, this.signalPrekida);
     } catch (greska) {
+      const faza = transportOtvorenU === null ? 'Engine.IO handshake' : 'Socket.IO autorizacija';
+      const trajanjeMs = Math.round(performance.now() - pocetak);
+      const otvorenihVeza = [...this.botovi].filter((igrac) => igrac.socket.connected).length;
+      const memorijaMiB = Math.round(process.memoryUsage().rss / 1_048_576);
       socket.disconnect();
       this.otvoreniSocketi.delete(socket);
-      throw greska;
+      throw new Error(`${greska instanceof Error ? greska.message : String(greska)}; faza=${faza}, trajanjeMs=${trajanjeMs}, otvoreneVeze=${otvorenihVeza}, generatorRssMiB=${memorijaMiB}`);
+    } finally {
+      socket.io.off('open', naOtvaranjeTransporta);
     }
     bot.stanje = 'red';
+    bot.cekaOdMs = performance.now();
     this.registrirajDogadajeBota(bot);
     if (performance.now() - pocetak > this.opcije.timeoutMs) throw new Error('Spajanje je premašilo vremensko ograničenje.');
   }
@@ -461,7 +473,7 @@ export class SimulatorMijesanihBotova {
     partija.trazenaSlova = poruka.trazenaSlova;
     partija.turnToken = poruka.turnToken;
     partija.odgovorRacunalaPoceoU = partija.vanjskiIgraci.has(poruka.sljedeciId) ? performance.now() : null;
-    if (!poruka.istekPotezaIso) return;
+    if (poruka.istekPotezaIso === undefined) return;
 
     partija.generacijaRunde += 1;
     partija.pokusaneRijeci.clear();
@@ -711,7 +723,15 @@ async function cekajDogadaj<T>(
       if (valjan(vrijednost)) zavrsi(() => resolve(vrijednost));
     };
     const prekid = () => zavrsi(() => reject(new Error('Test je prekinut.')));
-    const greskaSpajanja = (greska: Error) => zavrsi(() => reject(greska));
+    const greskaSpajanja = (greska: Error & { description?: unknown; data?: { kod?: string } }) => {
+      const transportnaGreska = greska.description !== null && typeof greska.description === 'object'
+        ? greska.description as { error?: unknown; message?: unknown } : undefined;
+      const opis = transportnaGreska?.error instanceof Error ? transportnaGreska.error.message
+        : typeof transportnaGreska?.message === 'string' ? transportnaGreska.message
+        : typeof greska.description === 'string' || typeof greska.description === 'number' ? String(greska.description) : undefined;
+      const detalji = [greska.message, opis, greska.data?.kod].filter(Boolean).join('; ');
+      zavrsi(() => reject(new Error(detalji)));
+    };
     const odspojen = () => zavrsi(() => reject(new Error(`Veza je prekinuta dok se čeka ${dogadaj}.`)));
     const timer = setTimeout(() => zavrsi(() => reject(new Error(`Događaj ${dogadaj} nije stigao na vrijeme.`))), timeoutMs);
     socket.on(dogadaj, slusac);

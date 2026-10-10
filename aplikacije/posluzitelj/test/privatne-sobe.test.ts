@@ -17,7 +17,7 @@ let adresa: string;
 
 beforeAll(async () => {
   // Datoteka otvara desetke gostiju s iste IP adrese; produkcijski limit handshakea nije predmet ovih testova.
-  ({ app } = await izgradiPosluzitelj({ socketOgranicenja: { handshakePoIpMinuti: 1_000 } }));
+  ({ app } = await izgradiPosluzitelj({ socketOgranicenja: { handshakePoIpMinuti: 1_000, dogadajiPoProzoru: 1_000 } }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = app.server.address();
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
@@ -384,13 +384,14 @@ describe('privatne sobe', () => {
       grupeZaRijec: (rijec) => grupePoRijeci.get(rijec) ?? [],
     };
     const prekid = new AbortController();
+    let razlogPrekida = '';
     const simulator = new SimulatorMijesanihBotova({
       adresa,
       timeoutMs: 5_000,
       cekanjePotezaMinMs: 5,
       cekanjePotezaMaksMs: 15,
       maksPotezaPoPartiji: 1,
-    }, rjecnikTesta, () => prekid.abort());
+    }, rjecnikTesta, (razlog) => { razlogPrekida = razlog; prekid.abort(); });
 
     try {
       await Promise.all([
@@ -405,6 +406,7 @@ describe('privatne sobe', () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
+      expect(prekid.signal.aborted, `${razlogPrekida}; ${JSON.stringify(simulator.sazetak().greske)}`).toBe(false);
       await simulator.dovrsiPartije(5_000, prekid.signal);
       expect(simulator.uzorak().aktivnePartije).toBe(0);
       const sazetak = simulator.sazetak();

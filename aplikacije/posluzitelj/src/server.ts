@@ -288,6 +288,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const botKontroler = new BotKontroler({
     rjecnik,
     izvrsiNaredbu: (partijaId, igracId, naredba) => upravitelj.naredbaBota(partijaId, igracId, naredba),
+    oznaciNamjerniIstek: (partijaId, igracId, turnToken) => upravitelj.oznaciNamjerniIstek(partijaId, igracId, turnToken),
     konfiguracija: ucitajKonfiguracijuBota(),
     zapisi: (poruka, podaci) => app.log.warn(podaci, poruka),
   });
@@ -347,6 +348,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       fondSlobodni: fond.slobodni,
       fondIscrpljenja: fond.iscrpljenja,
       botIsteci: upravitelj.brojIstekaBota(),
+      botNamjerniIsteci: upravitelj.brojNamjernihIstekaBota(),
       botTehnickeGreske: botKontroler.brojaci.tehnickeGreske,
       botoviDvoboj: popunaDvobojUkljucena(),
       botoviCetveroboj: popunaCetverobojUkljucena(),
@@ -581,7 +583,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   };
   const uzorkujNadzor = () => {
     const fond = fondBotova.stanje();
-    metrike.uzorkuj({ veze: io.sockets.sockets.size, partije: upravitelj.brojAktivnihPartija(), treninzi: upravitelj.brojAktivnihTreninga(), slobodniBotovi: fond.slobodni, botoviUPartiji: fond.uPartiji, isteciBotova: upravitelj.brojIstekaBota(), greskeBotova: botKontroler.brojaci.tehnickeGreske }, eventLoop.count > 0 ? eventLoop.percentile(95) / 1e6 : 0);
+    metrike.uzorkuj({ veze: io.sockets.sockets.size, partije: upravitelj.brojAktivnihPartija(), treninzi: upravitelj.brojAktivnihTreninga(), slobodniBotovi: fond.slobodni, botoviUPartiji: fond.uPartiji, isteciBotova: upravitelj.brojIstekaBota() - upravitelj.brojNamjernihIstekaBota(), namjerniIsteciBotova: upravitelj.brojNamjernihIstekaBota(), greskeBotova: botKontroler.brojaci.tehnickeGreske }, eventLoop.count > 0 ? eventLoop.percentile(95) / 1e6 : 0);
     eventLoop.reset();
     void alarmi.provjeri(metrike.dohvatiPovijest());
   };

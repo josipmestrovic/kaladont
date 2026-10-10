@@ -17,7 +17,7 @@ test('admin nadzor prikazuje metrike i probnu obavijest na desktopu i mobitelu',
         cpuPostotak: 24, rssBajtovi: 500 * 1_048_576, heapBajtovi: 250 * 1_048_576, vanjskaMemorijaBajtovi: 10 * 1_048_576, eventLoopP95Ms: 21,
         http: { zahtjevi: 100, greske4xx: 2, greske5xx: 0, p95Ms: 80 },
         socket: { pokusaji: 50, odbijeni: 1, autorizirani: 49, greskeAutorizacije: 0, prekidi: 3, p95AutorizacijeMs: 15, odbijeniOrigin: 0, odbijeniIp: 1, odbijeniLimit: 0 },
-        igra: { veze: 49, partije: 10, treninzi: 2, slobodniBotovi: 40, botoviUPartiji: 0, isteciBotova: 0, greskeBotova: 0 },
+        igra: { veze: 49, partije: 10, treninzi: 2, slobodniBotovi: 40, botoviUPartiji: 0, isteciBotova: 0, namjerniIsteciBotova: 0, greskeBotova: 0 },
         baza: { dostupna: true, trajanjeMs: 2, provjerenoU: new Date().toISOString() },
       };
       const pregled: PregledNadzora = {

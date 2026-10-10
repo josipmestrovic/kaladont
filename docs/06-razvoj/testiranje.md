@@ -1,5 +1,7 @@
 # Provjera admin monitoringa
 
+Bot politika v2: jedinični testovi provjeravaju osnovne učestale oblike i omjer 90/10, trening 3 s, javni tempo 5–14 s, fallback propust i namjerni javni istek. Integracijski/E2E testovi isključuju slučajne propuste parametrima `BOT_VJEROJATNOST_ISTEKA=0` i `BOT_VJEROJATNOST_NE_ZNAM=0`; deterministički testovi kontrolera namjerni istek uključuju izričito. Admin alarm računa samo neočekivane isteke. Predtest popune iz ukupnog health broja oduzima `botNamjerniIsteci` i bilježi razliku namjernih isteka zasebno.
+
 `pnpm --filter posluzitelj exec vitest run test/nadzor.test.ts test/admin-statistika.test.ts test/http-rute.test.ts --hookTimeout=180000 --testTimeout=120000` provjerava ograničenu povijest, CPU delte, alarmne pragove i cooldown, admin pristup i kompatibilnost healtha. `e2e/admin-nadzor.spec.ts` provjerava desktop/mobilni prikaz, zastarjele podatke i izričitu probnu obavijest s mock API-jem. Testovi ne šalju stvarne operativne emailove. Prije uključivanja na stagingu/produkciji operater mora postaviti `DEV_MAIL`, uključiti `NADZOR_EMAIL_OMOGUCEN=true` i provjeriti inbox nakon probne obavijesti; CI ne potvrđuje stvarnu dostavu ni vanjsku dostupnost VPS-a.
 # Testiranje
 

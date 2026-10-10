@@ -17,6 +17,7 @@ export interface HealthSnapshot {
   fondSlobodni: number | null;
   fondIscrpljenja: number | null;
   botIsteci: number | null;
+  botNamjerniIsteci?: number;
   botTehnickeGreske: number | null;
   botoviDvoboj: boolean | null;
   botoviCetveroboj: boolean | null;
@@ -64,6 +65,7 @@ export async function dohvatiHealth(adresa: string, prekid?: AbortSignal): Promi
     fondSlobodni: broj('fondSlobodni'),
     fondIscrpljenja: broj('fondIscrpljenja'),
     botIsteci: broj('botIsteci'),
+    botNamjerniIsteci: broj('botNamjerniIsteci') ?? 0,
     botTehnickeGreske: broj('botTehnickeGreske'),
     botoviDvoboj: zastavica('botoviDvoboj'),
     botoviCetveroboj: zastavica('botoviCetveroboj'),

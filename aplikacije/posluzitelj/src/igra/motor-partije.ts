@@ -225,6 +225,15 @@ export function stvoriUpraviteljPartija(
   const partijaPoIgracu = new Map<string, string>(); // igracId -> partijaId
   let zaustavljanje = false;
   let brojIstekaBota = 0;
+  let brojNamjernihIstekaBota = 0;
+  const namjerniIsteciBotova = new Map<string, { igracId: string; turnToken: string }>();
+
+  function oznaciNamjerniIstek(partijaId: string, igracId: string, turnToken: string): boolean {
+    const stanje = partije.get(partijaId);
+    if (!stanje || stanje.zavrsena || stanje.izborUToku || stanje.kontekst !== 'javna' || stanje.turnToken !== turnToken || stanje.naPotezuId !== igracId || !stanje.aktivni.has(igracId) || stanje.sudionici.find((sudionik) => sudionik.igracId === igracId)?.upravljac !== 'bot') return false;
+    namjerniIsteciBotova.set(partijaId, { igracId, turnToken });
+    return true;
+  }
 
   function objaviPromjenuPoteza(stanje: StanjeStola): void {
     if (!postavke.naPromjenuPoteza) return;
@@ -451,6 +460,7 @@ export function stvoriUpraviteljPartija(
   }
 
   function noviTurnToken(stanje: StanjeStola): string {
+    namjerniIsteciBotova.delete(stanje.partijaId);
     stanje.turnToken = randomUUID();
     return stanje.turnToken;
   }
@@ -530,6 +540,7 @@ export function stvoriUpraviteljPartija(
   async function zaustavi(): Promise<void> {
     if (zaustavljanje) return;
     zaustavljanje = true;
+    namjerniIsteciBotova.clear();
     const aktivnePartije = [...partije.values()].filter((stanje) =>
       !stanje.zavrsena || stanje.statusSpremanja === 'spremanje_rezultata');
     const partijaIdovi = aktivnePartije.filter((stanje) => stanje.politika.zapisujePovijest).map((stanje) => stanje.partijaId);
@@ -554,6 +565,7 @@ export function stvoriUpraviteljPartija(
   }
 
   function zakaziBrisanjeNakonSpremanja(stanje: StanjeStola): void {
+    namjerniIsteciBotova.delete(stanje.partijaId);
     setTimeout(() => {
       if (stanje.retrySpremanjaHandle) clearTimeout(stanje.retrySpremanjaHandle);
       for (const s of stanje.sudionici) {
@@ -644,6 +656,7 @@ export function stvoriUpraviteljPartija(
       mod,
       kontekst,
       politika,
+      trajanjePotezaSek: kontekst === 'trening' ? 0 : undefined,
       sudionici,
       aktivni: new Set(sudionici.map((s) => s.igracId)),
       eliminirani: [],
@@ -1118,8 +1131,12 @@ export function stvoriUpraviteljPartija(
 
     ponistiCekanjePovratka(stanje, igracId);
     stanje.zadnjiPotezi.delete(igracId);
-    // Bot koji istekne nije stigao odigrati: signal zagušenja poslužitelja, ne pravilo igre.
-    if (razlog === 'istek' && stanje.sudionici.find((s) => s.igracId === igracId)?.upravljac === 'bot') brojIstekaBota += 1;
+    if (razlog === 'istek' && stanje.sudionici.find((s) => s.igracId === igracId)?.upravljac === 'bot') {
+      brojIstekaBota += 1;
+      const plan = namjerniIsteciBotova.get(stanje.partijaId);
+      if (plan?.igracId === igracId && plan.turnToken === stanje.turnToken) brojNamjernihIstekaBota += 1;
+    }
+    if (namjerniIsteciBotova.get(stanje.partijaId)?.igracId === igracId) namjerniIsteciBotova.delete(stanje.partijaId);
 
     stanje.aktivni.delete(igracId);
     stanje.eliminirani.push(igracId);
@@ -1950,5 +1967,7 @@ export function stvoriUpraviteljPartija(
     brojAktivnihPartija: () => partije.size,
     brojAktivnihTreninga,
     brojIstekaBota: () => brojIstekaBota,
+    brojNamjernihIstekaBota: () => brojNamjernihIstekaBota,
+    oznaciNamjerniIstek,
   };
 }

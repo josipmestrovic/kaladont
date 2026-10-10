@@ -6,6 +6,37 @@ import {
   zatvoriIgrace,
 } from './pomocnici/igraci.js';
 
+for (const mod of ['dva_igraca', 'cetiri_igraca'] as const) {
+  test(`odbrojavanje prikazuje konačna bot sjedala u modu ${mod}`, async ({ page }) => {
+    await page.goto(`/red?mod=${mod}`);
+    await expect(page.locator('.mjesta li.moje-sjedalo')).toHaveCount(1);
+    await page.evaluate(async (nacin) => {
+      const putanjaModula = '/src/lib/socket.ts';
+      const modul = await import(putanjaModula);
+      const socket = modul.dohvatiSocket();
+      const stanje = await new Promise<{ mojIgracId: string }>((resolve) => {
+        socket.once('red:stanje', resolve);
+        socket.emit('red:stanje', { mod: nacin });
+      });
+      const mjesta = nacin === 'dva_igraca' ? 2 : 4;
+      socket.emitEvent(['partija:pocetak', {
+        partijaId: 'test-odbrojavanje', mojIgracId: stanje.mojIgracId, mod: nacin, kontekst: 'javna',
+        pocetakIso: new Date(Date.now() + 60_000).toISOString(),
+        sjedala: Array.from({ length: mjesta }, (_, indeks) => ({
+          igracId: indeks === 0 ? stanje.mojIgracId : `bot-${indeks}`,
+          nadimak: indeks === 0 ? 'Igrac' : `TestniBot${indeks}`,
+          jeGost: indeks === 0, avatarId: 0, avatarConfig: null, avatarRevision: 0,
+          rang: null, razina: 1, trenutniNiz: 0, razinaVatre: 0,
+        })),
+      }]);
+    }, mod);
+    await expect(page.getByRole('heading', { name: /Svi igrači su tu/ })).toBeVisible();
+    await expect(page.locator('.mjesta li.zauzeto')).toHaveCount(mod === 'dva_igraca' ? 2 : 4);
+    await expect(page.getByText('Prazno mjesto', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('TestniBot1', { exact: true })).toBeVisible();
+  });
+}
+
 test('četiri igrača ulaze u javni red i dobivaju isti stol', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 4);
   try {

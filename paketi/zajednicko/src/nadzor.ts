@@ -7,7 +7,7 @@ export interface UzorakNadzora {
   eventLoopP95Ms: number;
   http: { zahtjevi: number; greske4xx: number; greske5xx: number; p95Ms: number | null };
   socket: { pokusaji: number; odbijeni: number; autorizirani: number; greskeAutorizacije: number; prekidi: number; p95AutorizacijeMs: number | null; odbijeniOrigin: number; odbijeniIp: number; odbijeniLimit: number };
-  igra: { veze: number; partije: number; treninzi: number; slobodniBotovi: number; botoviUPartiji: number; isteciBotova: number; greskeBotova: number };
+  igra: { veze: number; partije: number; treninzi: number; slobodniBotovi: number; botoviUPartiji: number; isteciBotova: number; namjerniIsteciBotova: number; greskeBotova: number };
   baza: { dostupna: boolean | null; trajanjeMs: number | null; provjerenoU: string | null };
 }
 

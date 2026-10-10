@@ -20,6 +20,7 @@ export interface OvisnostiBotKontrolera {
   zakazi?: (posao: () => void, ms: number) => NodeJS.Timeout;
   otkazi?: (handle: NodeJS.Timeout) => void;
   zapisi?: (poruka: string, podaci: Record<string, unknown>) => void;
+  oznaciNamjerniIstek?: (partijaId: string, igracId: string, turnToken: string) => boolean;
 }
 
 export interface BrojaciBota {
@@ -29,6 +30,7 @@ export interface BrojaciBota {
   bezRijeci: number;
   zastarjelo: number;
   tehnickeGreske: number;
+  namjernihCekanjaIsteka: number;
 }
 
 interface PlaniranaAkcija {
@@ -40,13 +42,14 @@ interface PlaniranaAkcija {
 export class BotKontroler {
   private readonly stanjaPoPartiji = new Map<string, Map<string, StanjeBotaUPartiji>>();
   private readonly planirano = new Map<string, PlaniranaAkcija>();
+  private readonly namjerniIsteci = new Map<string, string>();
   private readonly rng: Rng;
   private readonly sada: () => number;
   private readonly zakazi: (posao: () => void, ms: number) => NodeJS.Timeout;
   private readonly otkazi: (handle: NodeJS.Timeout) => void;
   private readonly zapisi: (poruka: string, podaci: Record<string, unknown>) => void;
   private zaustavljen = false;
-  readonly brojaci: BrojaciBota = { planirano: 0, odigranihRijeci: 0, namjernihPropusta: 0, bezRijeci: 0, zastarjelo: 0, tehnickeGreske: 0 };
+  readonly brojaci: BrojaciBota = { planirano: 0, odigranihRijeci: 0, namjernihPropusta: 0, bezRijeci: 0, zastarjelo: 0, tehnickeGreske: 0, namjernihCekanjaIsteka: 0 };
 
   constructor(private readonly ovisnosti: OvisnostiBotKontrolera) {
     this.rng = ovisnosti.rng ?? Math.random;
@@ -57,7 +60,10 @@ export class BotKontroler {
   }
 
   naPromjenuPoteza(dogadaj: DogadajPoteza): void {
+    const prethodniPlan = this.planirano.get(dogadaj.partijaId);
+    if (!dogadaj.zavrsena && !dogadaj.izborUToku && (prethodniPlan?.turnToken === dogadaj.turnToken || this.namjerniIsteci.get(dogadaj.partijaId) === dogadaj.turnToken)) return;
     this.otkaziPlan(dogadaj.partijaId);
+    this.namjerniIsteci.delete(dogadaj.partijaId);
     if (this.zaustavljen) return;
     if (dogadaj.zavrsena) {
       this.stanjaPoPartiji.delete(dogadaj.partijaId);
@@ -67,11 +73,16 @@ export class BotKontroler {
     const sudionik = dogadaj.sudionici.find((s) => s.igracId === dogadaj.naPotezuId);
     if (!sudionik || sudionik.upravljac !== 'bot' || !sudionik.aktivan) return;
 
+    if (dogadaj.kontekst === 'javna' && dogadaj.istekPotezaMs !== null && dogadaj.istekPotezaMs > this.sada() && this.rng() < this.ovisnosti.konfiguracija.vjerojatnostIsteka && this.ovisnosti.oznaciNamjerniIstek?.(dogadaj.partijaId, sudionik.igracId, dogadaj.turnToken)) {
+      this.namjerniIsteci.set(dogadaj.partijaId, dogadaj.turnToken);
+      this.brojaci.namjernihCekanjaIsteka += 1;
+      return;
+    }
+
     const stanjeBota = this.stanjeBota(dogadaj.partijaId, sudionik.igracId);
     const odluka = this.odluci(dogadaj, stanjeBota);
-    const ritam = stanjeBota.vrecicaRitma.izvuci();
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
-    const odgoda = trajanjeRazmisljanjaMs(ritam, odluka.vrsta === 'rijec' ? odluka.rijec : null, rok, this.ovisnosti.konfiguracija, this.rng);
+    const odgoda = trajanjeRazmisljanjaMs(rok, this.ovisnosti.konfiguracija, this.rng, dogadaj.kontekst);
     const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const turnToken = dogadaj.turnToken;
     const handle = this.zakazi(() => {
@@ -92,6 +103,7 @@ export class BotKontroler {
     this.zaustavljen = true;
     for (const partijaId of [...this.planirano.keys()]) this.otkaziPlan(partijaId);
     this.stanjaPoPartiji.clear();
+    this.namjerniIsteci.clear();
   }
 
   brojPlaniranih(): number {

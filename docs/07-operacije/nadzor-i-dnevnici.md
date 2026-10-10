@@ -6,6 +6,8 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 
 ## Admin nadzor aplikacije
 
+Bot politika v2 raspodjeljuje javne isteke na namjerne (0,5 % poteza) i neočekivane. Admin ih prikazuje odvojeno, a alarm reagira samo na neočekivani istek. Javni health zadržava kumulativni `botIsteci` za sve isteke i dodaje `botNamjerniIsteci`; razlika daje neočekivane isteke. Trening nema namjerni istek. Raniji rezultati mjerenja ne prepravljaju se zbog promjene politike.
+
 `GET /api/admin/statistike/posluzitelj` zahtijeva admin sesiju i vraća `Cache-Control: no-store`. Pregled se osvježava svakih 5 s dok je kartica vidljiva. Povijest čuva najviše 180 uzoraka (15 minuta) u memoriji; restart briše povijest i brojače. Ne sadrži tokene, IP adrese, sadržaj zahtjeva ni korisničke identitete.
 
 CPU je potrošnja Node procesa izražena u postotku jednog jezgrenog procesora (može prijeći 100 %); RSS, heap i vanjska memorija također pripadaju aplikaciji, ne cijelom VPS-u. HTTP p95 i 5xx odnose se na završene poslovne `/api/` zahtjeve u prozoru; javni health, HTML/statičke datoteke i admin rute ne ulaze u taj prozor. Socket.IO brojači prate prihvat/odbijanje transporta, autorizaciju i prekide, ali ne vide mrežni timeout koji nikad ne stigne do servera. Baza se provjerava periodično, bez upita pri svakom admin osvježavanju. Javna health shema ostaje kompatibilna; event-loop p95 čita dovršeni petosekundni uzorak i poziv ga ne resetira.

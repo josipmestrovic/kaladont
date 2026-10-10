@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MAKS_POVIJESTI, MetrikeNadzora } from '../src/nadzor/metrike.js';
 import { AlarmiNadzora } from '../src/nadzor/alarmi.js';
 
-const igra = { veze: 0, partije: 0, treninzi: 0, slobodniBotovi: 40, botoviUPartiji: 0, isteciBotova: 0, greskeBotova: 0 };
+const igra = { veze: 0, partije: 0, treninzi: 0, slobodniBotovi: 40, botoviUPartiji: 0, isteciBotova: 0, namjerniIsteciBotova: 0, greskeBotova: 0 };
 
 describe('metrike nadzora', () => {
   it('agregira HTTP i Socket.IO te ograničava povijest', () => {
@@ -33,6 +33,18 @@ describe('metrike nadzora', () => {
 
 describe('email alarmi', () => {
   const pragovi = { cpuPostotak: 90, rssMiB: 1024, eventLoopMs: 100, httpMs: 1000 };
+  it('namjerni javni istek nije alarm, a novi neočekivani istek jest', async () => {
+    const alarmi = new AlarmiNadzora(false, pragovi, async () => true, 0);
+    const metrike = new MetrikeNadzora();
+    metrike.uzorkuj(igra, 0, undefined, undefined, undefined, 60_000);
+    await alarmi.provjeri(metrike.dohvatiPovijest(), 60_000);
+    metrike.uzorkuj({ ...igra, namjerniIsteciBotova: 1 }, 0, undefined, undefined, undefined, 65_000);
+    await alarmi.provjeri(metrike.dohvatiPovijest(), 65_000);
+    expect(alarmi.dohvatiStanja().find((stanje) => stanje.kljuc === 'botovi')?.aktivan).toBe(false);
+    metrike.uzorkuj({ ...igra, namjerniIsteciBotova: 1, isteciBotova: 1 }, 0, undefined, undefined, undefined, 70_000);
+    await alarmi.provjeri(metrike.dohvatiPovijest(), 70_000);
+    expect(alarmi.dohvatiStanja().find((stanje) => stanje.kljuc === 'botovi')?.aktivan).toBe(true);
+  });
   it('probno slanje je izričito, ograničeno na minutu i prestaje nakon zatvaranja', async () => {
     let broj = 0;
     const alarmi = new AlarmiNadzora(true, pragovi, async () => { broj += 1; return true; }, 0);

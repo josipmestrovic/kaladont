@@ -23,7 +23,7 @@ function laznaRijec(rijeci: Record<string, { frekvencija: number; grupe: string[
   };
 }
 
-const konfigBezPropusta: KonfiguracijaBota = { ...ZADANA_KONFIGURACIJA_BOTA, udioPartijaSPropustom: 0, vjerojatnostOstavljanjaKa: 0 };
+const konfigBezPropusta: KonfiguracijaBota = { ...ZADANA_KONFIGURACIJA_BOTA, vjerojatnostOstavljanjaKa: 0, vjerojatnostPropusta: 0, vjerojatnostIsteka: 0 };
 
 describe('vrećica', () => {
   it('poštuje udjele kroz jedan ciklus i puni se iznova', () => {
@@ -45,7 +45,7 @@ describe('odabir riječi bota', () => {
     maska: { frekvencija: 400, grupe: ['imenica:maska'] },
   });
 
-  it('bira iz cijelog popisa, uključujući riječ bez frekvencije na kraju', () => {
+  it('ne bira rijetke oblike kada postoje popularne osnovne imenice', () => {
     const r = rng(7);
     const stanje = stvoriStanjeBota(konfigBezPropusta, r);
     const odabrane = new Set<string>();
@@ -53,9 +53,10 @@ describe('odabir riječi bota', () => {
       const odluka = odaberiPotez({ trazenaSlova: 'ma', kandidati: ['maslac', 'masa', 'mast', 'mastilo', 'mastodont'], ...rjecnik }, stanje, konfigBezPropusta, r);
       if (odluka.vrsta === 'rijec') odabrane.add(odluka.rijec);
     }
-    expect(odabrane).toContain('mastodont');
-    expect(odabrane).toContain('mastilo');
-    expect(odabrane.size).toBe(5);
+    expect(odabrane).not.toContain('mastodont');
+    expect(odabrane).not.toContain('mastilo');
+    expect(odabrane).not.toContain('mast');
+    expect(odabrane).toEqual(new Set(['masa', 'maslac']));
   });
 
   it('isti RNG daje isti izbor neovisno o protivnikovim nastavcima (nenapadačka politika)', () => {
@@ -66,16 +67,36 @@ describe('odabir riječi bota', () => {
     expect(drugi).toEqual(prvi);
   });
 
-  it('na lakom prefiksu namjerni propust je nemoguć, na teškom se iskoristi najviše jednom', () => {
-    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, udioPartijaSPropustom: 1, pragTeskogPrefiksa: 3 };
+  it('propust vrijedi po fallback potezu, ali ne kad postoji poželjan čest oblik', () => {
+    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostPropusta: 1 };
     const stanje = stvoriStanjeBota(konfig, rng(5));
-    expect(stanje.propustDostupan).toBe(true);
     const lak = odaberiPotez({ trazenaSlova: 'ma', kandidati: ['maslac', 'masa', 'mast'], ...rjecnik }, stanje, konfig, rng(5));
     expect(lak.vrsta).toBe('rijec');
     const tezak = odaberiPotez({ trazenaSlova: 'ma', kandidati: ['mastodont'], ...rjecnik }, stanje, konfig, rng(5));
     expect(tezak).toEqual({ vrsta: 'odustani', razlog: 'namjerni_propust' });
     const ponovo = odaberiPotez({ trazenaSlova: 'ma', kandidati: ['mastodont'], ...rjecnik }, stanje, konfig, rng(5));
-    expect(ponovo.vrsta).toBe('rijec');
+    expect(ponovo).toEqual({ vrsta: 'odustani', razlog: 'namjerni_propust' });
+  });
+
+  it('među čestim osnovnim oblicima bira 90 imenica i 10 glagola/pridjeva u ciklusu', () => {
+    const rijeci = laznaRijec({
+      masa: { frekvencija: 900, grupe: ['imenica:masa'] },
+      mazati: { frekvencija: 600, grupe: ['glagol:mazati'] },
+      malen: { frekvencija: 500, grupe: ['pridjev:malen'] },
+      masama: { frekvencija: 1000, grupe: ['imenica:masa'] },
+    });
+    const generator = rng(42);
+    const stanje = stvoriStanjeBota(konfigBezPropusta, generator);
+    let imenice = 0;
+    for (let indeks = 0; indeks < 100; indeks += 1) {
+      const odluka = odaberiPotez({ trazenaSlova: 'ma', kandidati: ['masa', 'mazati', 'malen', 'masama'], ...rijeci }, stanje, konfigBezPropusta, generator);
+      expect(odluka.vrsta).toBe('rijec');
+      if (odluka.vrsta === 'rijec') {
+        expect(odluka.rijec).not.toBe('masama');
+        if (odluka.rijec === 'masa') imenice += 1;
+      }
+    }
+    expect(imenice).toBe(90);
   });
 
   it('bez ijednog kandidata odustaje bez propusta', () => {
@@ -111,19 +132,21 @@ describe('odabir riječi bota', () => {
   it('vrijeme razmišljanja nikad ne prelazi rok minus marginu', () => {
     const r = rng(9);
     for (let i = 0; i < 100; i += 1) {
-      const ms = trajanjeRazmisljanjaMs('spor', 'mastodontima', 30_000, ZADANA_KONFIGURACIJA_BOTA, r);
+      const ms = trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, r);
       expect(ms).toBeLessThanOrEqual(28_500);
       expect(ms).toBeGreaterThanOrEqual(800);
     }
-    expect(trajanjeRazmisljanjaMs('brz', 'masa', 2_000, ZADANA_KONFIGURACIJA_BOTA, r)).toBeLessThanOrEqual(500);
-    expect(trajanjeRazmisljanjaMs('brz', 'masa', null, ZADANA_KONFIGURACIJA_BOTA, r)).toBe(300);
+    expect(trajanjeRazmisljanjaMs(2_000, ZADANA_KONFIGURACIJA_BOTA, r)).toBeLessThanOrEqual(500);
+    expect(trajanjeRazmisljanjaMs(null, ZADANA_KONFIGURACIJA_BOTA, () => 0)).toBe(5_000);
+    expect(trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, () => 1)).toBe(14_000);
+    expect(trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, r, 'trening')).toBe(3_000);
   });
 
   it('konfiguracija iz okoline mijenja samo valjane postotke', () => {
-    const konfig = ucitajKonfiguracijuBota({ BOT_UDIO_PARTIJA_S_PROPUSTOM: '0.5', BOT_VJEROJATNOST_KA: 'abc', BOT_PRAG_TESKOG_PREFIKSA: '5' } as NodeJS.ProcessEnv);
-    expect(konfig.udioPartijaSPropustom).toBe(0.5);
+    const konfig = ucitajKonfiguracijuBota({ BOT_VJEROJATNOST_NE_ZNAM: '0.5', BOT_VJEROJATNOST_KA: 'abc', BOT_VJEROJATNOST_ISTEKA: '2' } as NodeJS.ProcessEnv);
+    expect(konfig.vjerojatnostPropusta).toBe(0.5);
     expect(konfig.vjerojatnostOstavljanjaKa).toBe(0.05);
-    expect(konfig.pragTeskogPrefiksa).toBe(5);
+    expect(konfig.vjerojatnostIsteka).toBe(0.005);
   });
 });
 
@@ -145,7 +168,7 @@ describe('bot kontroler', () => {
     };
   }
 
-  function stvori(izvrsi: (p: string, i: string, n: unknown) => RezultatNaredbe, verzija = () => 1) {
+  function stvori(izvrsi: (p: string, i: string, n: unknown) => RezultatNaredbe, verzija = () => 1, konfiguracija = konfigBezPropusta) {
     const timeri: { posao: () => void; ms: number }[] = [];
     const kontroler = new BotKontroler({
       rjecnik: {
@@ -155,7 +178,8 @@ describe('bot kontroler', () => {
         verzijaRjecnika: verzija,
       },
       izvrsiNaredbu: izvrsi as never,
-      konfiguracija: konfigBezPropusta,
+      konfiguracija,
+      oznaciNamjerniIstek: () => true,
       rng: rng(4),
       sada: () => 0,
       zakazi: (posao, ms) => {
@@ -176,6 +200,31 @@ describe('bot kontroler', () => {
     timeri[0]!.posao();
     expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ vrsta: 'rijec', turnToken: 't1' }));
     expect(kontroler.brojaci.odigranihRijeci).toBe(1);
+  });
+
+  it('trening uvijek planira 3 s i ne može namjerno čekati istek', () => {
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, { ...konfigBezPropusta, vjerojatnostIsteka: 1 });
+    kontroler.naPromjenuPoteza(dogadaj({ kontekst: 'trening' }));
+    expect(timeri[0]!.ms).toBe(3_000);
+    expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(0);
+  });
+
+  it('javni namjerni istek ne igra potez i odluka vrijedi samo jednom za token', () => {
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri } = stvori(izvrsi, () => 1, { ...konfigBezPropusta, vjerojatnostIsteka: 1 });
+    kontroler.naPromjenuPoteza(dogadaj());
+    kontroler.naPromjenuPoteza(dogadaj());
+    expect(timeri).toHaveLength(0);
+    expect(izvrsi).not.toHaveBeenCalled();
+    expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(1);
+    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't2' }));
+    expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(2);
+  });
+
+  it('već propušten rok ne označava kao namjerni istek', () => {
+    const { kontroler } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, { ...konfigBezPropusta, vjerojatnostIsteka: 1 });
+    kontroler.naPromjenuPoteza(dogadaj({ istekPotezaMs: -1 }));
+    expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(0);
   });
 
   it('ne planira za čovjeka, tijekom izbora sustava ni nakon kraja', () => {

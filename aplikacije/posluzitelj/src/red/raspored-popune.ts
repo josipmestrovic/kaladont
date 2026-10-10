@@ -89,6 +89,7 @@ export class PopunaReda {
     }
 
     if (this.rezervacije.length > 0 && ljudi.length + this.rezervacije.length >= this.ovisnosti.velicinaStola) {
+      this.ovisnosti.naPromjenu?.();
       this.pokreni(ljudi.slice(0, this.ovisnosti.velicinaStola - this.rezervacije.length));
       return;
     }

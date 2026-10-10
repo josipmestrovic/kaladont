@@ -388,7 +388,7 @@ async function glavno(): Promise<void> {
     const ocjena = ocijeniPopunuReda({
       mjerenja,
       planirano: { dva_igraca: postavke.brojPoModu, cetiri_igraca: postavke.brojPoModu },
-      istekBotovaDelta: zavrsniHealth.botIsteci !== null && baseline.botIsteci !== null ? zavrsniHealth.botIsteci - baseline.botIsteci : null,
+      istekBotovaDelta: zavrsniHealth.botIsteci !== null && baseline.botIsteci !== null ? zavrsniHealth.botIsteci - baseline.botIsteci - ((zavrsniHealth.botNamjerniIsteci ?? 0) - (baseline.botNamjerniIsteci ?? 0)) : null,
       tehnickeGreskeBotovaDelta: zavrsniHealth.botTehnickeGreske !== null && baseline.botTehnickeGreske !== null ? zavrsniHealth.botTehnickeGreske - baseline.botTehnickeGreske : null,
       iscrpljenjaDelta: zavrsniHealth.fondIscrpljenja !== null && baseline.fondIscrpljenja !== null ? zavrsniHealth.fondIscrpljenja - baseline.fondIscrpljenja : null,
       tehnickeGreskeGeneratora: generator.brojTehnickihGresaka + generator.brojNeocekivanihPrekida,
@@ -412,7 +412,8 @@ async function glavno(): Promise<void> {
         fondSlobodniKraj: zavrsniHealth.fondSlobodni,
         botoviUPartijiKraj: zavrsniHealth.botoviUPartiji,
         iscrpljenjaDelta: (zavrsniHealth.fondIscrpljenja ?? 0) - (baseline.fondIscrpljenja ?? 0),
-        istekBotovaDelta: (zavrsniHealth.botIsteci ?? 0) - (baseline.botIsteci ?? 0),
+        istekBotovaDelta: (zavrsniHealth.botIsteci ?? 0) - (baseline.botIsteci ?? 0) - ((zavrsniHealth.botNamjerniIsteci ?? 0) - (baseline.botNamjerniIsteci ?? 0)),
+        namjerniIsteciDelta: (zavrsniHealth.botNamjerniIsteci ?? 0) - (baseline.botNamjerniIsteci ?? 0),
         tehnickeGreskeBotovaDelta: (zavrsniHealth.botTehnickeGreske ?? 0) - (baseline.botTehnickeGreske ?? 0),
         greskeGeneratora: generator.greske.slice(0, 30),
       },

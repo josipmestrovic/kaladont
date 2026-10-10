@@ -10,6 +10,7 @@ test('gost pokreće Zagrijavanje, odustaje i vidi kraj treninga bez napretka', a
   const sjedala = page.locator('.igraci-red > li');
   await expect(sjedala).toHaveCount(2);
   await expect(page.getByText('Računalo')).toBeVisible();
+  await expect(page.locator('.timer-prsten')).toHaveCount(0);
 
   // Čovjek odustaje čim dođe na potez; Računalo igra samo.
   await expect(page.getByRole('button', { name: 'Ne znam' })).toBeEnabled({ timeout: 30_000 });

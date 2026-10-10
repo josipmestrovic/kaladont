@@ -2,9 +2,9 @@
  * Čisti odabir botove riječi (ADR-017). Nenapadačka politika: ni jedan kriterij ne gleda
  * protivnikove nastavke; broj kandidata procjenjuje samo težinu TRENUTNOG prefiksa.
  */
-import { grafemi, kolekcijskiKljucGrupe, zadnjaDva } from 'zajednicko';
+import { grafemi, zadnjaDva } from 'zajednicko';
 import { promijesajNiz } from '../igra/raspored-sjedala.js';
-import type { KategorijaRijeci, KonfiguracijaBota, RitamPoteza } from './konfiguracija-bota.js';
+import type { KategorijaRijeci, KonfiguracijaBota } from './konfiguracija-bota.js';
 
 /** Vraća broj u [0, 1). */
 export type Rng = () => number;
@@ -34,22 +34,12 @@ export class Vrecica<T> {
 }
 
 export interface StanjeBotaUPartiji {
-  vrecicaKategorija: Vrecica<KategorijaRijeci>;
-  vrecicaRitma: Vrecica<RitamPoteza>;
-  propustDostupan: boolean;
+  vrecicaVrsta: Vrecica<'imenica' | 'ostalo'>;
 }
 
-export function stvoriStanjeBota(konfig: KonfiguracijaBota, rng: Rng): StanjeBotaUPartiji {
+export function stvoriStanjeBota(_konfig: KonfiguracijaBota, rng: Rng): StanjeBotaUPartiji {
   return {
-    vrecicaKategorija: new Vrecica(
-      (Object.keys(konfig.udioKategorija) as KategorijaRijeci[]).map((k) => ({ vrijednost: k, udio: konfig.udioKategorija[k] })),
-      rng,
-    ),
-    vrecicaRitma: new Vrecica(
-      (Object.keys(konfig.udioRitma) as RitamPoteza[]).map((r) => ({ vrijednost: r, udio: konfig.udioRitma[r] })),
-      rng,
-    ),
-    propustDostupan: rng() < konfig.udioPartijaSPropustom,
+    vrecicaVrsta: new Vrecica([{ vrijednost: 'imenica', udio: 90 }, { vrijednost: 'ostalo', udio: 10 }], rng),
   };
 }
 
@@ -94,61 +84,54 @@ export function odaberiPotez(
   // Primljeni KA: bot prepoznaje Kaladont kao i čovjek; to nije traženje mrtvog izlaznog nastavka.
   if (ulaz.trazenaSlova === 'ka') return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
 
-  const poKategoriji: Record<KategorijaRijeci, string[]> = { uobicajena: [], srednja: [], rijetka: [] };
+  const kandidati: string[] = [];
   const naKa: string[] = [];
-  const uobicajeneGrupe = new Set<string>();
   for (const rijec of ulaz.kandidati) {
     if (zadnjaDva(rijec) === 'ka') {
       naKa.push(rijec);
       continue;
     }
-    const kategorija = kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig);
-    poKategoriji[kategorija].push(rijec);
-    if (kategorija === 'uobicajena') for (const grupa of ulaz.grupeZa(rijec)) uobicajeneGrupe.add(kolekcijskiKljucGrupe(grupa));
+    kandidati.push(rijec);
   }
 
-  const ukupnoBezKa = poKategoriji.uobicajena.length + poKategoriji.srednja.length + poKategoriji.rijetka.length;
-  if (ukupnoBezKa === 0 && naKa.length === 0) return { vrsta: 'odustani', razlog: 'nema_rijeci' };
+  if (kandidati.length === 0 && naKa.length === 0) return { vrsta: 'odustani', razlog: 'nema_rijeci' };
 
   // Rijetko ostavljanje KA: samo kad kandidat postoji i samo kontroliranim udjelom.
-  if (naKa.length > 0 && (ukupnoBezKa === 0 || rng() < konfig.vjerojatnostOstavljanjaKa)) {
-    for (const rijec of naKa) poKategoriji[kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig)].push(rijec);
+  if (naKa.length > 0 && (kandidati.length === 0 || rng() < konfig.vjerojatnostOstavljanjaKa)) {
+    kandidati.push(...naKa);
   }
 
-  if (stanje.propustDostupan && uobicajeneGrupe.size < konfig.pragTeskogPrefiksa) {
-    stanje.propustDostupan = false;
-    return { vrsta: 'odustani', razlog: 'namjerni_propust' };
+  const osnovnaVrsta = (rijec: string, vrste: string[]) => ulaz.grupeZa(rijec).some((grupa) => {
+    const [vrsta, lema] = grupa.split(':');
+    return vrste.includes(vrsta!) && lema === rijec;
+  });
+  const uobicajene = kandidati.filter((rijec) => kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig) === 'uobicajena');
+  const imenice = uobicajene.filter((rijec) => osnovnaVrsta(rijec, ['imenica']));
+  const ostalo = uobicajene.filter((rijec) => osnovnaVrsta(rijec, ['glagol', 'pridjev']));
+  let izbor: string[];
+  if (imenice.length || ostalo.length) {
+    const vrsta = stanje.vrecicaVrsta.izvuci();
+    izbor = vrsta === 'imenica' && imenice.length ? imenice : ostalo.length ? ostalo : imenice;
+  } else {
+    if (rng() < konfig.vjerojatnostPropusta) return { vrsta: 'odustani', razlog: 'namjerni_propust' };
+    izbor = uobicajene.length ? uobicajene : kandidati;
   }
-
-  let kategorija = stanje.vrecicaKategorija.izvuci();
-  if (poKategoriji[kategorija].length === 0) {
-    const neprazne = (Object.keys(poKategoriji) as KategorijaRijeci[]).filter((k) => poKategoriji[k].length > 0);
-    const zbroj = neprazne.reduce((suma, k) => suma + konfig.udioKategorija[k], 0);
-    let preostalo = rng() * zbroj;
-    kategorija = neprazne[neprazne.length - 1]!;
-    for (const k of neprazne) {
-      preostalo -= konfig.udioKategorija[k];
-      if (preostalo < 0) {
-        kategorija = k;
-        break;
-      }
-    }
-  }
-  return { vrsta: 'rijec', rijec: izaberiPonderirano(poKategoriji[kategorija], rng), kategorija };
+  const najvisaFrekvencija = izbor.reduce((maksimum, rijec) => Math.max(maksimum, ulaz.frekvencijaZa(rijec) ?? 0), 0);
+  const popularne = najvisaFrekvencija > 0 ? izbor.filter((rijec) => (ulaz.frekvencijaZa(rijec) ?? 0) >= najvisaFrekvencija * 0.5) : izbor;
+  const rijec = izaberiPonderirano(popularne, rng);
+  return { vrsta: 'rijec', rijec, kategorija: kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig) };
 }
 
 /** Vrijeme razmišljanja unutar roka; bot nikad ne dobiva više od roka minus margina. */
 export function trajanjeRazmisljanjaMs(
-  ritam: RitamPoteza,
-  rijec: string | null,
   trajanjePotezaMs: number | null,
   konfig: KonfiguracijaBota,
   rng: Rng,
+  kontekst: 'javna' | 'privatna' | 'trening' = 'javna',
 ): number {
-  if (trajanjePotezaMs === null) return konfig.odgodaBezTimeraMs;
-  const [od, do_] = konfig.rasponRitma[ritam];
-  const osnova = trajanjePotezaMs * (od + rng() * (do_ - od));
-  const dodatak = rijec ? Math.min(konfig.maksDodatakMs, grafemi(rijec).length * konfig.dodatakPoGrafemuMs) : 0;
+  const osnova = kontekst === 'trening' ? konfig.treningRazmisljanjeMs
+    : konfig.javnoRazmisljanjeMinMs + rng() * (konfig.javnoRazmisljanjeMaksMs - konfig.javnoRazmisljanjeMinMs);
+  if (trajanjePotezaMs === null) return osnova;
   const gornja = Math.max(0, trajanjePotezaMs - konfig.marginaRokaMs);
-  return Math.min(gornja, Math.max(Math.min(konfig.najmanjeRazmisljanjeMs, gornja), osnova + dodatak));
+  return Math.min(gornja, osnova);
 }

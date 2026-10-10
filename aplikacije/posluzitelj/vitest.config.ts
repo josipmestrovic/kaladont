@@ -12,6 +12,8 @@ export default defineConfig({
       EMAIL_API_KLJUC: '',
       VERZIJA: 'lokalno',
       DIGEST: 'lokalno',
+      BOT_VJEROJATNOST_ISTEKA: '0',
+      BOT_VJEROJATNOST_NE_ZNAM: '0',
       ONEMOGUCI_TIMER_POTEZA: 'true',
       ODGODA_POCETKA_PARTIJE_MS: '0',
       TOLERANCIJA_PREKIDA_MS: '300',

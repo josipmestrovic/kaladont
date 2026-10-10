@@ -10,7 +10,7 @@ let posluzitelj: Posluzitelj;
 let adresa: string;
 
 beforeAll(async () => {
-  posluzitelj = await izgradiPosluzitelj({ socketOgranicenja: { handshakePoIpMinuti: 1_000 } });
+  posluzitelj = await izgradiPosluzitelj({ socketOgranicenja: { handshakePoIpMinuti: 1_000 }, postavkeMotora: { timerOnemogucen: false, trajanjePotezaMs: 50 } });
   await posluzitelj.app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = posluzitelj.app.server.address();
   adresa = `http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`;
@@ -60,6 +60,7 @@ function cekaj<T>(socket: ClientSocket, dogadaj: string, filter: (p: T) => boole
 
 async function odigrajTreningDoKraja(socket: ClientSocket): Promise<{ pocetak: PocetakPartije; kraj: KrajPartije; botIgrao: boolean }> {
   const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
+  const rundaPromise = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena');
   const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
   const brojRijeciPrije = posluzitelj.brojaciBota.odigranihRijeci;
   let mojId: string | null = null;
@@ -68,7 +69,7 @@ async function odigrajTreningDoKraja(socket: ClientSocket): Promise<{ pocetak: P
     if (poruka.naPotezuId === mojId) socket.emit('potez:ne-znam', { turnToken: poruka.turnToken });
   };
   const naPotez = (poruka: PrihvacenPotez) => {
-    if (poruka.sljedeciId === mojId && poruka.istekPotezaIso) socket.emit('potez:ne-znam', { turnToken: poruka.turnToken });
+    if (poruka.sljedeciId === mojId && poruka.istekPotezaIso !== undefined) socket.emit('potez:ne-znam', { turnToken: poruka.turnToken });
   };
   socket.on('partija:pocetak', naPocetak);
   socket.on('partija:runda-otvorena', naRundu);
@@ -77,6 +78,7 @@ async function odigrajTreningDoKraja(socket: ClientSocket): Promise<{ pocetak: P
     const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => socket.emit('trening:zapocni', resolve));
     expect(potvrda.pokrenut).toBe(true);
     const pocetak = await pocetakPromise;
+    expect((await rundaPromise).istekPotezaIso).toBe('');
     const kraj = await krajPromise;
     return { pocetak, kraj, botIgrao: posluzitelj.brojaciBota.odigranihRijeci > brojRijeciPrije };
   } finally {
