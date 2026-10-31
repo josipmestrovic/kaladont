@@ -257,11 +257,17 @@ test('svaki igrač vidi sebe prvog, a sjedala se ne mijenjaju nakon eliminacije'
 
     const stranicaNaPotezu = igraci[indeksNaPotezu]!.stranica;
     await stranicaNaPotezu.locator('.ne-znam-gumb').click();
+    await expect(stranicaNaPotezu.getByRole('dialog')).toBeVisible();
     await stranicaNaPotezu.getByRole('dialog').getByRole('button', { name: 'Da' }).click();
 
     for (const { stranica } of igraci) {
       await expect(stranica.locator('.igraci-red li.eliminiran')).toHaveCount(1);
     }
+    // Eliminirani klijent: dijalog nestaje, turn-forma se skida, vidi se promatranje.
+    await expect(stranicaNaPotezu.getByRole('dialog')).toHaveCount(0);
+    await expect(stranicaNaPotezu.locator('.ne-znam-gumb')).toHaveCount(0);
+    await expect(stranicaNaPotezu.locator('.promatranje-traka')).toBeVisible();
+    await expect(stranicaNaPotezu.locator('.promatranje-traka')).toContainText('Promatraš partiju');
     const redoslijediPoslije = await Promise.all(
       igraci.map(({ stranica }) =>
         stranica

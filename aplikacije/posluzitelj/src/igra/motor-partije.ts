@@ -1533,7 +1533,28 @@ export function stvoriUpraviteljPartija(
       iskustvo: stavkaEliminacije,
     };
     stanje.eliminacije.push(porukaElim);
+    if (stanje.politika.dajeNapredak) {
+      void spremiRaniPorazUBazi({
+        partijaId: stanje.partijaId,
+        igracId: prethodniId,
+        mod: stanje.mod,
+        plasman: plasman as 1 | 2 | 3 | 4,
+        bodovi: izracunajBodove({ plasman: plasman as 1 | 2 | 3 | 4, eliminacije: stanje.eliminacijeBrojac.get(prethodniId) ?? 0 }, stanje.mod),
+        eliminacije: stanje.eliminacijeBrojac.get(prethodniId) ?? 0,
+        nacinIspadanja: 'kaladont',
+      });
+    }
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', porukaElim);
+
+    // Isto kao eliminirajIgraca: eliminirani odmah dobiva privatni obračun XP-a za promatranje.
+    if (stanje.politika.dajeNapredak) {
+      const obracun = izracunajObracunIskustva(
+        stanje.iskustvoPrije.get(prethodniId) ?? 0,
+        stanje.stavkeIskustva.get(prethodniId) ?? [],
+        stanje.statistikeRijeci.get(prethodniId)?.najduziStreak ?? 0,
+      );
+      aktivneVeze.dohvatiSocket(prethodniId)?.emit('iskustvo:obracun', { partijaId: stanje.partijaId, mojeIskustvo: obracun });
+    }
 
     if (stanje.aktivni.size <= 1) {
       zakljuciPartiju(stanje);

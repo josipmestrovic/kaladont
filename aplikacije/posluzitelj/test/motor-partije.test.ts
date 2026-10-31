@@ -831,6 +831,10 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     const eliminacijaPromise = new Promise<Eliminacija>((resolve) => {
       promatrac.socket.on('partija:eliminacija', resolve);
     });
+    const zrtva = igraci.find((ig) => ig.token === igracKojiJeOmoguciKa)!;
+    const obracunZrtvePromise = new Promise<{ partijaId: string; mojeIskustvo: { osvojenoIskustvo: number } }>((resolve) => {
+      zrtva.socket.once('iskustvo:obracun', resolve);
+    });
     const novaRundaPromise = cekajRunduOtvorenu(promatrac.socket);
     const kaladontPrihvacen = new Promise<{ igracId: string; iskustvo?: { vrsta: string; iskustvo: number }[] }>((resolve) => {
       sayer.socket.on('potez:prihvacen', (potez) => {
@@ -846,6 +850,9 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(eliminacija.igracId).toBe(igracKojiJeOmoguciKa); // otvarac je omogucio "ka" - on ispada
     expect(eliminacija.razlog).toBe('kaladont');
     expect(eliminacija.bodZa).toBe(sayer.token); // bod ide onome tko je izgovorio kaladont
+    const obracunZrtve = await obracunZrtvePromise;
+    expect(obracunZrtve.partijaId).toBe(pocetak.partijaId);
+    expect(obracunZrtve.mojeIskustvo.osvojenoIskustvo).toBeGreaterThanOrEqual(0);
 
     const novaRunda = await novaRundaPromise;
     expect(novaRunda.naPotezuId).not.toBe(igracKojiJeOmoguciKa);

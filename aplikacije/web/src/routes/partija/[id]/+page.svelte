@@ -304,12 +304,19 @@
     return `${uzrok}${imeIgraca(eliminacija.igracId)} · ${statusEliminacije(eliminacija)}.${bod}`;
   }
 
-  const jeNaPotezu = $derived(stanje.naPotezuId === stanje.mojIgracId && !stanje.sustavBiraRijec && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena');
   const prikazanaSjedala = $derived(
     izvediLokalniRedSjedala(stanje.sjedala, stanje.mojIgracId),
   );
   const vezaSpremna = $derived(stanjeVeze.stanje === 'spremno' || stanjeVeze.stanje === 'nepoznato');
   const jeEliminiran = $derived(stanje.eliminacije.some((e) => e.igracId === stanje.mojIgracId));
+  // Eliminirani nikad ne smije vidjeti turn-formu: server još neko vrijeme drži naPotezuId na ispalom.
+  const jeNaPotezu = $derived(
+    !jeEliminiran &&
+      stanje.naPotezuId === stanje.mojIgracId &&
+      !stanje.sustavBiraRijec &&
+      !stanje.kraj &&
+      stanje.statusSpremanja === 'nije_zavrsena',
+  );
   const brojPreostalihIgraca = $derived(stanje.sjedala.length - stanje.eliminacije.length);
   const prefiksRijeci = $derived(stanje.trazenaSlova?.normalize('NFC').trim() ?? '');
   const najviseZnakovaNastavka = $derived(Math.max(0, 31 - prefiksRijeci.length));
@@ -337,6 +344,17 @@
 
   let unosInput: HTMLInputElement | null = $state(null);
   let preostaloVrijemePoteza = $state<number | null>(null);
+
+  /** Gasi dijalog „Ne znam”, odblokira unos i skida fokus s turn-UI-ja nakon ispadanja / kraja poteza. */
+  function ocistiTurnUiNakonIspadanja() {
+    neZnamDijalog = false;
+    slanjeUTijeku = false;
+    if (slanjeTimeoutId !== null) {
+      clearTimeout(slanjeTimeoutId);
+      slanjeTimeoutId = null;
+    }
+    unosInput?.blur();
+  }
 
   $effect(() => {
     if (!jeNaPotezu || !stanje.istekPotezaIso) {
@@ -440,16 +458,19 @@
 
   // Globalni game-state listener je izvor istine i nakon reconnecta. Ako aktivni
   // ekran propusti jedan Socket.IO event, promjena reda ipak mora otključati
-  // ili zaključati unos bez čekanja na refresh.
+  // ili zaključati unos bez čekanja na refresh. Posebno: ispadanje mora ugasiti
+  // dijalog „Ne znam” (inače fixed overlay z-index 2000 zamrzne cijeli ekran).
   $effect(() => {
     if (stanje.partijaId !== partijaId) return;
-    const trebaBitiZakljucano = stanje.ponistenaPoruka || stanje.kraj || stanje.statusSpremanja !== 'nije_zavrsena' || stanje.sustavBiraRijec || !jeNaPotezu;
+    const trebaBitiZakljucano =
+      jeEliminiran ||
+      stanje.ponistenaPoruka ||
+      stanje.kraj ||
+      stanje.statusSpremanja !== 'nije_zavrsena' ||
+      stanje.sustavBiraRijec ||
+      !jeNaPotezu;
     if (!trebaBitiZakljucano) return;
-    slanjeUTijeku = false;
-    if (slanjeTimeoutId !== null) {
-      clearTimeout(slanjeTimeoutId);
-      slanjeTimeoutId = null;
-    }
+    ocistiTurnUiNakonIspadanja();
   });
 
   $effect(() => {
@@ -593,7 +614,8 @@
 
     const naEliminaciju = (eliminacija: Eliminacija) => {
       if (!jeAktualnaPartija()) return;
-      slanjeUTijeku = false;
+      if (eliminacija.igracId === stanje.mojIgracId) ocistiTurnUiNakonIspadanja();
+      else slanjeUTijeku = false;
       // Ubojita riječ (mrtva slova/kaladont) nikad ne stiže kroz potez:prihvacen - prikaži je iz eliminacije
       if (eliminacija.rijecUzrok && eliminacija.rijecUzrok !== prikazanaRijec?.rijec) {
         prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
@@ -1172,6 +1194,12 @@
         {/if}
         <p class="sustav-bira-tekst">Nova runda za: <strong>{sustavBrojac}</strong></p>
       </div>
+      {#if jeEliminiran}
+        <aside class="promatranje-traka" aria-live="polite">
+          <span>Promatraš partiju.</span>
+          <button type="button" onclick={napustiPartiju}>Napusti partiju</button>
+        </aside>
+      {/if}
     {:else}
       {#if stanje.zadnjaNagrada}
         {#key `${stanje.zadnjaNagrada.tekst}-${stanje.trenutniStreak}`}
@@ -1209,7 +1237,12 @@
         <p class="priprema-partije">Igra počinje…</p>
       {/if}
 
-    {#if jeNaPotezu}
+    {#if jeEliminiran}
+      <aside class="promatranje-traka" aria-live="polite">
+        <span>Promatraš partiju.</span>
+        <button type="button" onclick={napustiPartiju}>Napusti partiju</button>
+      </aside>
+    {:else if jeNaPotezu}
       <form class="zona-poteza" use:pratiMobilniUnos onsubmit={(e) => { e.preventDefault(); posaljiPotez(); }}>
         <div class="mobilni-kontekst">
           {#if prikazanaRijec?.rijec}
@@ -1247,11 +1280,6 @@
           <p class="poruka-poteza" role="alert">{porukaPoteza}</p>
         {/if}
       </form>
-    {:else if jeEliminiran}
-      <aside class="promatranje-traka" aria-live="polite">
-        <span>Promatraš partiju.</span>
-        <button type="button" onclick={napustiPartiju}>Napusti partiju</button>
-      </aside>
     {/if}
 
     {#if prikazanaRijec?.rijec && prikazanaRijec.vrsta === 'sustav_rijec'}
