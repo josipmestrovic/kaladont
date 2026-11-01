@@ -35,11 +35,11 @@ Audit stvaranja, aktivacije i deaktivacije: bot UUID (postaje `null` pri brisanj
 
 ## trening_rijeci_igraca i pobjede_treninga
 
-`trening_rijeci_igraca` sprema jedinstvene prihvaćene oblike po registriranom čovjeku; upis se potvrđuje prije emitiranja prihvaćenog poteza. `pobjede_treninga` ima jedinstveni ID treninga i stvarnog registriranog pobjednika; nema FK prema `partije`, jer trening ne stvara redak partije. Više trening pobjeda po igraču dopušteno je. Brisanje računa briše obje tablice kaskadno. Pragovi Zagrijanog izvode se iz broja jedinstveno spremljenih pobjeda.
+`trening_rijeci_igraca` je naslijeđena tablica ranijih trening oblika; novi trening više ne upisuje retke ni ne prikazuje ih u kolekciji. `pobjede_treninga` ima jedinstveni ID treninga i stvarnog registriranog pobjednika; nema FK prema `partije`, jer trening ne stvara redak partije. Više trening pobjeda po igraču dopušteno je. Brisanje računa briše obje tablice kaskadno. Pragovi Zagrijanog izvode se iz broja jedinstveno spremljenih pobjeda.
 
 ## otkljucane_grupe_igraca
 
-Stupac `za_dostignuca` razlikuje kolekciju otkrivenu u treningu (false) od javno/privatno potvrđene grupe (true). Stari retci dobivaju true. Javno/privatno otkrivanje treningom poznate grupe je monotona promocija i smije povećati opći brojač samo jednom.
+Stupac `za_dostignuca` razlikuje grupe otkrivene u starom treningu (false) od javno/privatno potvrđenih (true). Stari retci dobivaju true. Javno/privatno otkrivanje grupe koja je ranije došla samo iz treninga je monotona promocija i smije povećati opći brojač samo jednom. Novi trening više ne upisuje grupe.
 
 ## igraci
 

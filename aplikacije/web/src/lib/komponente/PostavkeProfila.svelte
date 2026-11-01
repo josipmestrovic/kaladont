@@ -5,7 +5,6 @@
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import AudioKontrola from './AudioKontrola.svelte';
   import KontrolePristupacnosti from './KontrolePristupacnosti.svelte';
-  import OdabirKursora from './OdabirKursora.svelte';
   import PrekidacTeme from './PrekidacTeme.svelte';
 
   interface Profil {
@@ -67,11 +66,6 @@
   <section class="sekcija">
     <h3>Izgled</h3>
     <PrekidacTeme />
-  </section>
-
-  <section class="sekcija">
-    <h3>Kursor</h3>
-    <OdabirKursora />
   </section>
 
   <section class="sekcija">

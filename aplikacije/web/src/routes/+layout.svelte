@@ -7,7 +7,7 @@
   import PadajuceRijeci from '$lib/komponente/PadajuceRijeci.svelte';
   import { inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { inicijalizirajAudio, inicijalizirajGlobalneUiZvukove } from '$lib/audio-manager.js';
-  import { inicijalizirajKursor } from '$lib/postavke-kursora.js';
+  import { ucitajCoreAsete } from '$lib/asetovi-core.js';
   import { inicijalizirajFontPostavku } from '$lib/postavke-fonta.js';
   import { inicijalizirajTemu } from '$lib/postavke-teme.js';
   import { inicijalizirajGlas } from '$lib/glasovni-manager.js';
@@ -15,9 +15,14 @@
   import VezaObavijest from '$lib/komponente/VezaObavijest.svelte';
   import CitanjeNaglasObavijest from '$lib/komponente/CitanjeNaglasObavijest.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
+  import BootUcitavanje from '$lib/komponente/BootUcitavanje.svelte';
+
+  const PRAG_INSTANT_BOOTA_MS = 250;
 
   let { children } = $props();
-  let identitetSpreman = $state(false);
+  let spreman = $state(false);
+  let napredakBoota = $state(0);
+  let prikaziBootProgress = $state(false);
   let prethodnaPutanja = $state<string | null>(null);
   let mozeNaprijed = $state(false);
   let povijestAplikacije: string[] = [];
@@ -55,21 +60,41 @@
     $page.url.pathname === '/' || $page.url.pathname === '/red' || $page.url.pathname.startsWith('/partija/'),
   );
   const urlCilja = $derived($navigating?.to?.url ?? $page.url);
+  // Kostur samo dok traje navigacija prema /red; boot gate zamjenjuje stari !identitetSpreman slučaj.
   const prikaziKosturCekanja = $derived(
-    urlCilja.pathname === '/red' && ($navigating !== null || ($page.url.pathname === '/red' && !identitetSpreman)),
+    spreman && urlCilja.pathname === '/red' && $navigating !== null,
   );
   const brojMjestaKostura = $derived(urlCilja.searchParams.get('mod') === 'dva_igraca' ? 2 : 4);
 
   onMount(async () => {
     inicijalizirajTemu();
-    inicijalizirajKursor();
     inicijalizirajFontPostavku();
     inicijalizirajGlas();
-    await inicijalizirajGostSesiju();
-    identitetSpreman = true;
     inicijalizirajAudio();
+
+    const pocetak = performance.now();
+    // Prikaži progress tek ako boot traje dovoljno dugo — inače nema flasha na return visit.
+    const timerProgressa = window.setTimeout(() => {
+      if (!spreman) prikaziBootProgress = true;
+    }, PRAG_INSTANT_BOOTA_MS);
+
+    try {
+      await Promise.all([
+        inicijalizirajGostSesiju(),
+        ucitajCoreAsete((p) => {
+          napredakBoota = p;
+        }),
+      ]);
+    } finally {
+      window.clearTimeout(timerProgressa);
+    }
+
     inicijalizirajGlobalneUiZvukove();
     pokreniSlusateljeIgre();
+
+    const trajanje = performance.now() - pocetak;
+    if (trajanje < PRAG_INSTANT_BOOTA_MS) prikaziBootProgress = false;
+    spreman = true;
   });
 </script>
 
@@ -78,14 +103,18 @@
     <VezaObavijest />
     <CitanjeNaglasObavijest />
   </div>
-  {#if $page.url.pathname === '/'}<PadajuceRijeci />{/if}
-  {#if identitetSpreman && !bezHeadera}
+  {#if $page.url.pathname === '/' && spreman}<PadajuceRijeci />{/if}
+  {#if spreman && !bezHeadera}
     <Header {prethodnaPutanja} {mozeNaprijed} />
   {/if}
   <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">
-    {#if prikaziKosturCekanja}
+    {#if !spreman}
+      {#if prikaziBootProgress}
+        <BootUcitavanje napredak={napredakBoota} />
+      {/if}
+    {:else if prikaziKosturCekanja}
       <RedCekanjaKostur ukupnoMjesta={brojMjestaKostura} />
-    {:else if identitetSpreman}
+    {:else}
       {@render children()}
     {/if}
   </div>

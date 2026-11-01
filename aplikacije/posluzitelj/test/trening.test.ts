@@ -120,7 +120,7 @@ async function odigrajTreningDoKraja(socket: ClientSocket, zahtijevajPotezBota =
 }
 
 describe('Zagrijavanje', () => {
-  it('registrirani čovjek sprema prihvaćene oblike prije ack-a bez upisa partije ili XP-a', async () => {
+  it('registrirani čovjek ne sprema kolekciju ni XP, a potez se prihvaća bez upisa partije', async () => {
     const igracId = randomUUID();
     igraciZaBrisanje.push(igracId);
     const email = `trening-${igracId}@example.com`;
@@ -164,14 +164,15 @@ describe('Zagrijavanje', () => {
       odigraoRijec = true;
       expect(prihvacen.rijec).toBe(kandidat.rijec);
       const [oblik] = await baza.execute<{ rijec: string }>(sql`select rijec from trening_rijeci_igraca where igrac_id = ${igracId} and rijec = ${kandidat.rijec}`);
-      expect(oblik?.rijec).toBe(kandidat.rijec);
-      const [grupa] = await baza.select({ zaDostignuca: otkljucaneGrupeIgraca.zaDostignuca }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId)).limit(1);
-      expect(grupa?.zaDostignuca).toBe(false);
-      const kategorija = await fetch(`${adresa}/api/profil/kolekcija/rijeci?kategorija=oblici_treninga`, { headers: { authorization: `Bearer ${sesija.token}` } });
-      expect(kategorija.status).toBe(200);
-      expect((await kategorija.json() as { rijeci: string[] }).rijeci).toContain(kandidat.rijec);
+      expect(oblik).toBeUndefined();
+      const grupe = await baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
+      expect(grupe).toHaveLength(0);
+      const kolekcija = await fetch(`${adresa}/api/profil/kolekcija`, { headers: { authorization: `Bearer ${sesija.token}` } });
+      expect(kolekcija.status).toBe(200);
+      expect((await kolekcija.json() as { kategorije: { vrsta: string }[] }).kategorije.some((stavka) => stavka.vrsta === 'oblici_treninga')).toBe(false);
       const kraj = await krajPromise;
       expect(kraj.kontekst).toBe('trening');
+      expect(kraj.kolekcija).toBeUndefined();
       expect(kraj.mojeIskustvo).toBeNull();
       expect(kraj.mojaForma).toBeUndefined();
       const [partija] = await baza.execute<{ broj: number }>(sql`select count(*)::int as broj from partije where id = ${pocetak.partijaId}`);

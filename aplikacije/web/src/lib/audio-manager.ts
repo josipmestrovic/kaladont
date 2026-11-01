@@ -10,15 +10,13 @@ export type AudioDogadaj =
   | 'potez-odbijen-2'
   | 'potez-odbijen-3'
   | 'tvoj-red'
+  | 'promjena-reda'
   | 'eliminacija'
-  | 'nova-runda'
+  | 'aplauz-kaladont'
   | 'partija-kraj'
   | 'pred-istek-vremena'
   | 'klik-misa'
-  | 'hover-efekt'
-  | 'nagrada-mala'
-  | 'nagrada-srednja'
-  | 'nagrada-velika';
+  | 'hover-efekt';
 
 const KLJUC_POSTAVKI = 'kaladont_audio_postavke_v1';
 const ZVUKOVI: Record<AudioDogadaj, string> = {
@@ -31,15 +29,13 @@ const ZVUKOVI: Record<AudioDogadaj, string> = {
   'potez-odbijen-2': '/zvukovi/potez-odbijen-2.wav',
   'potez-odbijen-3': '/zvukovi/potez-odbijen-3.wav',
   'tvoj-red': '/zvukovi/tvoj-red.mp3',
+  'promjena-reda': '/zvukovi/promjena-reda.wav',
   eliminacija: '/zvukovi/eliminacija.wav',
-  'nova-runda': '/zvukovi/nova-runda.wav',
+  'aplauz-kaladont': '/zvukovi/applause-cheering.mp3',
   'partija-kraj': '/zvukovi/partija-kraj.mp3',
   'pred-istek-vremena': '/zvukovi/pred-istek-vremena.wav',
   'klik-misa': '/zvukovi/klik-misa.wav',
   'hover-efekt': '/zvukovi/hover-efekt.wav',
-  'nagrada-mala': '/zvukovi/nagrada-mala.wav',
-  'nagrada-srednja': '/zvukovi/nagrada-srednja.wav',
-  'nagrada-velika': '/zvukovi/nagrada-velika.wav',
 };
 
 interface AudioPostavke {
@@ -47,7 +43,8 @@ interface AudioPostavke {
   utišano: boolean;
 }
 
-// UI feedback (klik/hover) je najucestaliji i najlakse zamara - stisan na 30% (-70%); ostalo na 60% (-40%).
+// UI feedback (klik/hover) je najucestaliji i najlakse zamara - stisan na 30% (-70%);
+// eliminacija i dugi aplauz su tiši da ne preglase tvoj-red / promjena-reda.
 const POJACANJE_PO_DOGADAJU: Record<AudioDogadaj, number> = {
   'ulazak-u-sobu': 0.6,
   'izlazak-iz-sobe': 0.6,
@@ -57,16 +54,14 @@ const POJACANJE_PO_DOGADAJU: Record<AudioDogadaj, number> = {
   'potez-odbijen-1': 0.6,
   'potez-odbijen-2': 0.6,
   'potez-odbijen-3': 0.6,
-  'tvoj-red': 0.6,
-  eliminacija: 0.6,
-  'nova-runda': 0.6,
+  'tvoj-red': 0.85,
+  'promjena-reda': 0.6,
+  eliminacija: 0.3,
+  'aplauz-kaladont': 0.25,
   'partija-kraj': 0.6,
   'pred-istek-vremena': 0.6,
   'klik-misa': 0.3,
   'hover-efekt': 0.3,
-  'nagrada-mala': 0.6,
-  'nagrada-srednja': 0.7,
-  'nagrada-velika': 0.8,
 };
 
 const zadanePostavke: AudioPostavke = { volumen: 0.65, utišano: false };
@@ -75,6 +70,8 @@ export const audioPostavke = writable<AudioPostavke>(zadanePostavke);
 let aktiviran = false;
 let postavke: AudioPostavke = zadanePostavke;
 const cache = new Map<AudioDogadaj, HTMLAudioElement>();
+/** Klonovi u tijeku reprodukcije — treba ih moći ugasiti pri izlasku iz partije. */
+const aktivniZvukovi = new Set<HTMLAudioElement>();
 
 function ucitajPostavke(): AudioPostavke {
   if (typeof localStorage === 'undefined') return zadanePostavke;
@@ -114,24 +111,94 @@ function ucitajZvuk(dogadaj: AudioDogadaj): HTMLAudioElement {
   return zvuk;
 }
 
-// Klik/hover/ulazak su gotovo sigurno prvi zvukovi koje korisnik čuje - preuzeti ih odmah umjesto
-// da se prvi put dohvaćaju tek pri prvom pustiAudio pozivu; ostalo ostaje lijeno (rjeđi, teži zvukovi).
-const KRITICNI_ZVUKOVI: AudioDogadaj[] = ['klik-misa', 'hover-efekt', 'ulazak-u-sobu'];
+const TIMEOUT_PRELOADA_ZVUKA_MS = 15_000;
 
-function preucitajKriticneZvukove(): void {
+function cekajZvukSpremnost(zvuk: HTMLAudioElement): Promise<void> {
+  if (zvuk.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return Promise.resolve();
+  return new Promise((resolve) => {
+    let rijeseno = false;
+    const zavrsi = () => {
+      if (rijeseno) return;
+      rijeseno = true;
+      window.clearTimeout(timer);
+      zvuk.removeEventListener('canplaythrough', zavrsi);
+      zvuk.removeEventListener('error', zavrsi);
+      resolve();
+    };
+    const timer = window.setTimeout(zavrsi, TIMEOUT_PRELOADA_ZVUKA_MS);
+    zvuk.addEventListener('canplaythrough', zavrsi);
+    zvuk.addEventListener('error', zavrsi);
+    try {
+      zvuk.load();
+    } catch {
+      zavrsi();
+      return;
+    }
+    // load() može sinkrono dovesti do dovoljnog readyStatea.
+    if (zvuk.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) zavrsi();
+  });
+}
+
+/** Broj SFX datoteka koje boot preloadira (za progress bar). */
+export function brojZvukovaZaPreload(): number {
+  return Object.keys(ZVUKOVI).length;
+}
+
+/** Predloži sve mapirane SFX u memory cache; tolerantno na error/timeout. */
+export async function preucitajSveZvukove(onJedanGotov?: () => void): Promise<void> {
   if (typeof window === 'undefined') return;
-  for (const dogadaj of KRITICNI_ZVUKOVI) ucitajZvuk(dogadaj);
+  const dogadaji = Object.keys(ZVUKOVI) as AudioDogadaj[];
+  await Promise.all(
+    dogadaji.map(async (dogadaj) => {
+      try {
+        const zvuk = ucitajZvuk(dogadaj);
+        await cekajZvukSpremnost(zvuk);
+      } catch {
+        // Pojedinačni SFX ne smije blokirati boot.
+      } finally {
+        onJedanGotov?.();
+      }
+    }),
+  );
 }
 
 export function pustiAudio(dogadaj: AudioDogadaj): void {
   if (typeof window === 'undefined' || !aktiviran || postavke.utišano || postavke.volumen <= 0) return;
   try {
-    const zvuk = ucitajZvuk(dogadaj);
+    // Predlozak drži HTTP cache topao; za play koristimo klon da currentTime/seek
+    // na još neučitanom mp3 ne proguta cijeli efekt (tihi catch).
+    const predlozak = ucitajZvuk(dogadaj);
+    const zvuk = predlozak.cloneNode(true) as HTMLAudioElement;
     zvuk.volume = postavke.volumen * POJACANJE_PO_DOGADAJU[dogadaj];
-    zvuk.currentTime = 0;
-    void zvuk.play().catch(() => undefined);
+    const ocisti = () => {
+      aktivniZvukovi.delete(zvuk);
+    };
+    zvuk.addEventListener('ended', ocisti, { once: true });
+    zvuk.addEventListener('error', ocisti, { once: true });
+    aktivniZvukovi.add(zvuk);
+    const pokreni = () => {
+      // zaustaviSveZvukove makne iz seta prije pause — ne pokreći ugašeni klon.
+      if (!aktivniZvukovi.has(zvuk)) return;
+      void zvuk.play().catch(ocisti);
+    };
+    if (zvuk.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) pokreni();
+    else zvuk.addEventListener('canplay', pokreni, { once: true });
   } catch {
     // Audio nikad ne smije prekinuti Socket.IO/state obradu poteza.
+  }
+}
+
+/** Prekida sve trenutno svirajuće SFX klonove (npr. izlazak iz partije). */
+export function zaustaviSveZvukove(): void {
+  const zvukovi = [...aktivniZvukovi];
+  aktivniZvukovi.clear();
+  for (const zvuk of zvukovi) {
+    try {
+      zvuk.pause();
+      zvuk.currentTime = 0;
+    } catch {
+      // Čišćenje audia ne smije ometati navigaciju.
+    }
   }
 }
 
@@ -163,7 +230,7 @@ export function inicijalizirajGlobalneUiZvukove(): void {
   if (typeof document === 'undefined' || globalniUiZvukoviInicijalizirani) return;
   globalniUiZvukoviInicijalizirani = true;
 
-  preucitajKriticneZvukove();
+  // Preload SFX ide iz boot loadera (ucitajCoreAsete); ovdje samo UI listeners.
 
   // Prva prava korisnicka interakcija bilo gdje u appu naoruzava zvuk (aktiviran flag resetira se na svaki refresh).
   document.addEventListener('pointerdown', aktivirajAudio, { capture: true, passive: true });

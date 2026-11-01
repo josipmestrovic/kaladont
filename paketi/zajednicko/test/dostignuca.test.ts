@@ -46,6 +46,15 @@ describe('dostignuca', () => {
     });
   });
 
+  it('ne najavljuje Iskusnjaru ako je ista razina već u trajnom napretku', () => {
+    expect(izracunajNovaDostignuca({ razina: 11 }, {}, 11, false).find((dostignuce) => dostignuce.id === 'iskusnjara')).toBeUndefined();
+    expect(izracunajNovaDostignuca({ razina: 9 }, {}, 11, false).find((dostignuce) => dostignuce.id === 'iskusnjara')).toEqual({
+      id: 'iskusnjara',
+      novaRazina: 1,
+      maksimalnaRazina: 5,
+    });
+  });
+
   it('ne smanjuje trajni niz kada je trenutni niz kraći', () => {
     const nova = izracunajNovaDostignuca(
       { najduziStreak: 10 },

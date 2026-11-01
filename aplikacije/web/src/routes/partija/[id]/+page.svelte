@@ -5,7 +5,7 @@
   import { api } from '$lib/api.js';
   import { dohvatiSocket, dohvatiStanjeVeze } from '$lib/socket.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { dohvatiStanjeIgre } from '$lib/stanje-igre.svelte.js';
+  import { dohvatiStanjeIgre, napustiLokalnuPartiju } from '$lib/stanje-igre.svelte.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import Konfeti from '$lib/komponente/Konfeti.svelte';
@@ -116,7 +116,6 @@
     veznik: 'Veznici',
     cestica: 'Čestice',
     uzvik: 'Usklici',
-    oblici_treninga: 'Oblici odigrani u treningu',
     vlastito_ime: 'Vlastita imena',
   };
 
@@ -241,6 +240,9 @@
 
   function napustiPartiju() {
     zatvoriIzbornikReakcija();
+    // Prvo lokalno: ugasi SFX i ignoriraj kasne evente prije nego server pošalje eliminaciju/poteze.
+    napustiLokalnuPartiju();
+    zaustaviGovor();
     dohvatiSocket().emit('partija:izadji');
     void goto('/');
   }
@@ -577,8 +579,17 @@
     } };
   }
 
+  // Briši unos samo na stvarno novi potez (novi turnToken/prefiks).
+  // Flicker jeNaPotezu (destroy forme + partija:stanje) ne smije obrisati tipkanje.
+  let zadnjiKljucOciscenogUnosa: string | null = null;
   $effect(() => {
     if (!jeNaPotezu || !prefiksRijeci) return;
+    const kljucPoteza = `${stanje.turnToken ?? ''}|${prefiksRijeci}`;
+    if (kljucPoteza === zadnjiKljucOciscenogUnosa) {
+      queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
+      return;
+    }
+    zadnjiKljucOciscenogUnosa = kljucPoteza;
     unosNastavkaRijeci = '';
     queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
   });
@@ -776,6 +787,12 @@
     // (fire-and-forget upis u bazu znači da refetch odmah nakon eventa može vratiti stariju listu).
     const naPrihvacenPotez = (potez: PrihvacenPotez) => {
       if (!jeAktualnaPartija()) return;
+      const tuđiDokSamNaPotezu =
+        stanje.naPotezuId !== null &&
+        stanje.naPotezuId === stanje.mojIgracId &&
+        potez.igracId !== stanje.mojIgracId;
+      // Zastarjeli tuđi potez dok si na redu ne smije dirati UI ni prikazanu riječ.
+      if (tuđiDokSamNaPotezu) return;
       // Potvrda je dovoljna za otključavanje unosa. To vrijedi i kada riječ
       // odmah uzrokuje mrtva slova i ekran nove runde.
       neZnamDijalog = false;
@@ -784,21 +801,7 @@
         clearTimeout(slanjeTimeoutId);
         slanjeTimeoutId = null;
       }
-      // Globalni listener također obrađuje događaj, ali aktivni ekran odmah primjenjuje
-      // prijelaz reda kako render ne bi čekao drugi lifecycle ili ručno osvježavanje.
-      // Prazan istek uz uključen timer = ubojita riječ / prijelaz (ne lažni potez).
-      // U privatnoj sobi bez limitu (trajanje 0) prazan istek je normalan.
-      if (potez.istekPotezaIso || stanje.trajanjePotezaSek === 0) {
-        stanje.naPotezuId = potez.sljedeciId;
-        stanje.istekPotezaIso = potez.istekPotezaIso;
-      } else {
-        stanje.naPotezuId = null;
-        stanje.istekPotezaIso = null;
-      }
-      stanje.trazenaSlova = potez.trazenaSlova;
-      stanje.brojIskoristenih = potez.brojIskoristenih;
-      if (potez.igracId === stanje.mojIgracId) stanje.trenutniStreak = potez.streak;
-      stanje.zadnjaNagrada = potez.igracId === stanje.mojIgracId ? potez.nagrada : null;
+      // Red / prefiks / streak / nagrada: samo globalni listener (stanje-igre).
       prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
       prikazanaRijec = {
         id: -Date.now(),
@@ -1004,7 +1007,7 @@
       Trening se ne bilježi kao partija i ne utječe na bodove, XP, rang, formu ni natjecateljsku statistiku.
     </p>
     {#if jeRegistriranKorisnik()}
-      <p class="privatna-obavijest">Tvoje prihvaćene riječi spremljene su u kolekciju. Pobjeda u treningu može otključati dostignuće Zagrijan.</p>
+      <p class="privatna-obavijest">Pobjeda u treningu može otključati dostignuće Zagrijan.</p>
     {/if}
   {:else if stanje.kraj.jePrivatna || stanje.jePrivatna}
     <p class="privatna-obavijest">
@@ -1351,7 +1354,7 @@
   {/if}
   {#if jeTrening && stanje.treningNeaktivnost?.upozorenje && !stanje.kraj}
     <section class="trening-neaktivnost" role="status" aria-live="polite">
-      <p>Trening će se zatvoriti nakon pet minuta neaktivnosti. Ako si registriran, potvrđene riječi ostaju u tvojoj kolekciji.</p>
+      <p>Trening će se zatvoriti nakon pet minuta neaktivnosti.</p>
       <button type="button" onclick={nastaviTrening}>Nastavi trening</button>
     </section>
   {/if}

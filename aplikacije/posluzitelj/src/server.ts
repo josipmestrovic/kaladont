@@ -238,20 +238,47 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
     const { handler } = await import(pathToFileURL(putanjaWebHandlera).href);
 
-    // Zvukovi nisu sadrzajno hashani kao _app/immutable - adapter-node im ne daje dugotrajni cache,
-    // pa ih serviramo posebno prije SvelteKit catch-alla (samo staging/produkcija, dev koristi Vite).
-    const direktorijZvukova = path.join(path.dirname(putanjaWebHandlera), 'client', 'zvukovi');
-    const MIME_ZVUKOVA: Record<string, string> = { '.wav': 'audio/wav', '.mp3': 'audio/mpeg' };
+    // Statični asseti nisu sadržajno hashani kao _app/immutable - adapter-node im ne daje
+    // dugotrajni cache, pa ih serviramo posebno prije SvelteKit catch-alla (staging/produkcija;
+    // dev koristi Vite).
+    const direktorijKlijenta = path.join(path.dirname(putanjaWebHandlera), 'client');
+    const CACHE_STATICKIH = 'public, max-age=31536000, immutable';
 
-    app.get('/zvukovi/*', { config: { rateLimit: false } }, async (zahtjev, odgovor) => {
-      const trazenaPutanja = (zahtjev.params as { '*': string })['*'];
-      const puniPuta = path.join(direktorijZvukova, trazenaPutanja);
-      if (!puniPuta.startsWith(direktorijZvukova) || !existsSync(puniPuta)) {
-        return odgovor.code(404).send();
-      }
-      const mime = MIME_ZVUKOVA[path.extname(puniPuta)] ?? 'application/octet-stream';
-      odgovor.header('cache-control', 'public, max-age=31536000, immutable').type(mime);
-      return odgovor.send(createReadStream(puniPuta));
+    const servirajStatickiDirektorij = (
+      putanjaUrl: string,
+      poddirektorij: string,
+      mimePoEkstenziji: Record<string, string>,
+    ) => {
+      const korijen = path.join(direktorijKlijenta, poddirektorij);
+      app.get(putanjaUrl, { config: { rateLimit: false } }, async (zahtjev, odgovor) => {
+        const trazenaPutanja = (zahtjev.params as { '*': string })['*'];
+        const puniPuta = path.join(korijen, trazenaPutanja);
+        if (!puniPuta.startsWith(korijen) || !existsSync(puniPuta)) {
+          return odgovor.code(404).send();
+        }
+        const mime = mimePoEkstenziji[path.extname(puniPuta).toLowerCase()] ?? 'application/octet-stream';
+        odgovor.header('cache-control', CACHE_STATICKIH).type(mime);
+        return odgovor.send(createReadStream(puniPuta));
+      });
+    };
+
+    servirajStatickiDirektorij('/zvukovi/*', 'zvukovi', {
+      '.wav': 'audio/wav',
+      '.mp3': 'audio/mpeg',
+    });
+    servirajStatickiDirektorij('/ikone/*', 'ikone', {
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.json': 'application/json',
+    });
+    servirajStatickiDirektorij('/slike/*', 'slike', {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.gif': 'image/gif',
     });
 
     app.route({

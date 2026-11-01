@@ -267,6 +267,7 @@ export async function zakljuciPartijuUBazi(
         odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
         bodovi: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
         eliminacije: mod === 'dva_igraca' ? igraci.eliminacije1v1 : igraci.eliminacijeUkupno,
+        iskustvoUkupno: igraci.iskustvoUkupno,
       }).from(igraci).where(eq(igraci.id, r.igracId));
       const [staraDnkStatistika] = await tx.select().from(dnkStatistikeIgraca)
         .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)))
@@ -530,7 +531,9 @@ export async function zakljuciPartijuUBazi(
         if (napredak) {
           const agregat = agregati.get(r.igracId);
           const razina = stanjeIskustva(agregat?.iskustvoUkupno ?? 0).razina;
-          const nova = izracunajNovaDostignuca({
+          const razinaPrije = stanjeIskustva(stariIgrac?.iskustvoUkupno ?? 0).razina;
+          const trajniPrije = {
+            razina: razinaPrije,
             rijetkeLeksemskeGrupe: napredakPrijeIgre.rijetkeLeksemskeGrupe,
             dugeRijeci: napredakPrijeIgre.dugeRijeci,
             najduziStreak: napredakPrijeIgre.najduziStreak,
@@ -539,7 +542,8 @@ export async function zakljuciPartijuUBazi(
             izazvaneEliminacije: napredakPrijeIgre.izazvaneEliminacije,
             mrtvaSlovaEliminacije: napredakPrijeIgre.mrtvaSlovaEliminacije,
             javnePobjede: napredakPrijeIgre.javnePobjede,
-          }, delta, razina, samoStatistika);
+          };
+          const nova = izracunajNovaDostignuca(trajniPrije, delta, razina, samoStatistika);
           if (nova.length > 0) {
             await tx.insert(dostignucaIgraca).values(nova.map((dostignuce) => ({
               igracId: r.igracId,

@@ -16,7 +16,7 @@ ADR-008 odbio je botove zbog rizika povjerenja male zajednice. Zatvorena alfa po
 
 Trening nema timer poteza: motor postavlja trajanje na 0, ne zakazuje istek i šalje prazan `istekPotezaIso`. Računalo odgovara nakon 1–3 s i bez timera; javne partije zadržavaju redovni rok. Klijenti i simulator ne smiju prazan rok zamijeniti za pauzu igre.
 4. **Trajni identiteti.** Javni botovi imaju trajan profil, nadimak, avatar i stvarnu statistiku odigranih partija. Administrator vidi oznaku bota; običan igrač ne. Botovi se ne prikazuju na javnim ljestvicama. Bot identitet ne može dobiti sesiju, lozinku, reset ni preuzimanje. Početni fond: 40 aktivnih, tvrdi maksimum 100.
-5. **Zagrijavanje.** Novi način „Igraj dvoboj protiv računala” za goste i registrirane (uključujući nepotvrđen e-mail). Protivnik je privremeno „Računalo” s jednim stalnim avatarom, izvan javnog fonda. Trening ne stvara trajni zapis partije/poteza ni natjecateljski XP, rang, formu ili nizove. Registriranom čovjeku trajno zapisuje potvrđene vlastite oblike i kolekcijske grupe, ali ih ne broji za opća dostignuća dok ih igrač ne otkrije u javnoj/privatnoj partiji. Prirodna pobjeda registriranog čovjeka može otključati samo Zagrijan (1/5/20/50/100); poraz, izlazak, neaktivnost i tehnički prekid ne dodjeljuju ga. Gost i privremeno Računalo ne ostavljaju trajne trening zapise.
+5. **Zagrijavanje.** Novi način „Igraj dvoboj protiv računala” za goste i registrirane (uključujući nepotvrđen e-mail). Protivnik je privremeno „Računalo” s jednim stalnim avatarom, izvan javnog fonda. Trening ne stvara trajni zapis partije/poteza ni natjecateljski XP, rang, formu, nizove ni kolekciju riječi. Prirodna pobjeda registriranog čovjeka može otključati samo Zagrijan (1/5/20/50/100); poraz, izlazak, neaktivnost i tehnički prekid ne dodjeljuju ga. Gost i privremeno Računalo ne ostavljaju trajne trening zapise.
 6. **Mjerljivost za podešavanje.** Vrijeme čekanja ljudi i broj botova po partiji bilježe se i prikazuju administratoru.
 7. **Kontrolirano uključivanje.** Tri zasebne zastavice: trening, botovi u Dvoboju, botovi u Četveroboju. Na stagingu se uključuju tim redom. Isključivanje zaustavlja nove rezervacije; započete partije normalno završavaju.
 
@@ -31,7 +31,7 @@ Trening nema timer poteza: motor postavlja trajanje na 0, ne zakazuje istek i š
 ## Posljedice
 
 - Motor dobiva dimenziju `kontekst: javna | privatna | trening` i politiku učinaka partije; sve trajne upise i nagrade kontrolira ta politika.
-- Registrirani trening potez potvrđuje se klijentu tek nakon transakcijskog upisa oblika/kolekcijskih grupa. Pobjede treninga imaju zaseban idempotentni zapis po UUID-u treninga, bez FK-a na `partije`.
+- Trening potez se potvrđuje kao i u drugim kontekstima, bez upisa kolekcije. Pobjede treninga imaju zaseban idempotentni zapis po UUID-u treninga, bez FK-a na `partije`.
 - Shema dobiva `igraci.upravljac` (`covjek` | `bot`), tablicu `botovi` i `partije.broj_botova`; migracije su aditivne.
 - Jedan proces ([ADR-012](012-jedan-proces-same-origin.md)) dopušta koordinaciju rezervacija u memoriji; raspodijeljeni koordinator uvodi se tek ako se arhitektura promijeni.
 - Slabiji botovi mogu se iskorištavati za bodove; mjeri se udio pobjeda ljudi po sastavu stola i parametri se podešavaju kroz verzioniranu konfiguraciju.
