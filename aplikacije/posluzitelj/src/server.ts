@@ -263,8 +263,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     };
 
     servirajStatickiDirektorij('/zvukovi/*', 'zvukovi', {
-      '.wav': 'audio/wav',
       '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
     });
     servirajStatickiDirektorij('/ikone/*', 'ikone', {
       '.png': 'image/png',

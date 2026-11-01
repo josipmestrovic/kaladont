@@ -4,7 +4,7 @@
   import { dohvatiSocket } from '$lib/socket.js';
   import { dohvatiSavjete } from '$lib/savjeti.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
-  import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
+  import { aktivirajAudio, pustiAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import type { PocetakPartije, PotvrdaTreninga, RundaOtvorena, StanjePartije } from 'zajednicko';
 
   const igra = dohvatiStanjeIgre();
@@ -33,7 +33,7 @@
         if (odbrojavanje) clearInterval(odbrojavanje);
         odbrojavanje = null;
         igra.pocetakPartijeIso = null;
-        pustiAudio('pocetak-partije');
+        // pocetak-partije svira stanje-igre na runda-otvorena (runda 1), ne ovdje.
         void goto(`/partija/${partijaId}`);
       }
     };
@@ -66,6 +66,7 @@
   }
 
   onMount(() => {
+    zagrijGameplayZvukove();
     pokreniSlusateljeIgre();
     savjet = savjeti[Math.floor(Math.random() * savjeti.length)] ?? '';
     const socket = dohvatiSocket();
