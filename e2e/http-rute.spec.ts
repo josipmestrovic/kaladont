@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+const STATICKI_ASET =
+  /\.(png|jpe?g|webp|gif|svg|mp3|wav|ogg|woff2?|ttf|otf|ico|pdf)$/i;
+
 async function poslovniZahtjeviImajuApiPrefiks(page: import('@playwright/test').Page): Promise<void> {
   const propusti: string[] = [];
   page.on('request', (zahtjev) => {
@@ -7,6 +10,8 @@ async function poslovniZahtjeviImajuApiPrefiks(page: import('@playwright/test').
     if (url.origin !== new URL(page.url()).origin) return;
     if (url.pathname.startsWith('/socket.io/') || url.pathname === '/zdravlje') return;
     if (zahtjev.resourceType() === 'document' || url.pathname.startsWith('/_app/')) return;
+    // Boot/preload smije fetchati ikone i zvukove — to nisu poslovne rute.
+    if (STATICKI_ASET.test(url.pathname)) return;
     if (['xhr', 'fetch'].includes(zahtjev.resourceType()) && !url.pathname.startsWith('/api/')) {
       propusti.push(`${zahtjev.method()} ${url.pathname}`);
     }
