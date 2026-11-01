@@ -152,9 +152,6 @@ function pustiOdbijanje(): void {
 
 function primijeniStanjePartije(p: StanjePartije): void {
   if (napustioPartiju) return;
-  // #region agent log
-  fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'D',location:'stanje-igre.svelte.ts:primijeniStanjePartije',message:'full state reapply',data:{partijaId:p.partijaId,naPotezuId:p.naPotezuId,mojIgracId:p.mojIgracId,trazenaSlova:p.trazenaSlova,sustavBiraRijec:p.sustavBiraRijec,prevNaPotezuId:stanje.naPotezuId,prevTrazena:stanje.trazenaSlova,prevSustavBira:stanje.sustavBiraRijec},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   oznaciPartijuDostupnom();
   stanje.partijaId = p.partijaId;
   stanje.pocetakPartijeIso = null;
@@ -261,9 +258,6 @@ export function pokreniSlusateljeIgre(): void {
       stanje.naPotezuId !== null &&
       stanje.naPotezuId === stanje.mojIgracId &&
       p.igracId !== stanje.mojIgracId;
-    // #region agent log
-    fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'post-fix',hypothesisId:'F',location:'stanje-igre.svelte.ts:potez:prihvacen',message:tuđiDokSamNaPotezu ? 'ignore foreign potez while on turn' : 'apply potez:prihvacen',data:{tuđiDokSamNaPotezu,igracId:p.igracId,mojId:stanje.mojIgracId,naPotezuId:stanje.naPotezuId,trazena:p.trazenaSlova,prevTrazena:stanje.trazenaSlova,istek:p.istekPotezaIso,sljedeciId:p.sljedeciId,rijec:(p.rijec??'').slice(0,24)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (tuđiDokSamNaPotezu) return;
 
     stanje.oznakaPrihvacenogPoteza += 1;
@@ -416,9 +410,6 @@ export function pokreniSlusateljeIgre(): void {
   });
 
   socket.on('connect', () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'D',location:'stanje-igre.svelte.ts:connect',message:'socket connect → request partija:stanje',data:{partijaId:stanje.partijaId,naPotezuId:stanje.naPotezuId,trazenaSlova:stanje.trazenaSlova},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     socket.emit('partija:stanje');
   });
   if (socket.connected) socket.emit('partija:stanje');

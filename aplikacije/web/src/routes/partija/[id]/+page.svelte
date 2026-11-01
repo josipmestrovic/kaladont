@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
@@ -510,9 +510,6 @@
   }
 
   function pratiMobilniUnos(element: HTMLElement, dijalog = false) {
-    // #region agent log
-    fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'C',location:'+page.svelte:pratiMobilniUnos',message:'action attach',data:{dijalog,imaUnos:Boolean(unosNastavkaRijeci),unosLen:unosNastavkaRijeci.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const vidljiviZaslon = window.visualViewport;
     const mobitel = window.matchMedia('(max-width: 999px)');
     let okvir = 0;
@@ -524,12 +521,8 @@
       otpustanje = requestAnimationFrame(() => { zadrziPolozaj = false; osvjezi(); });
     };
     const ocisti = () => {
-      const imao = element.classList.contains('mobilni-potez');
       element.classList.remove('mobilni-potez');
       for (const svojstvo of ['top', 'left', 'width', 'height', 'max-height']) element.style.removeProperty(svojstvo);
-      // #region agent log
-      if (imao) fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'C',location:'+page.svelte:pratiMobilniUnos.ocisti',message:'mobilni-potez removed',data:{dijalog,unosLen:unosNastavkaRijeci.length,active:document.activeElement===unosInput},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     };
     const osvjezi = () => {
       cancelAnimationFrame(okvir);
@@ -550,11 +543,7 @@
           element.style.height = `${vidljiviZaslon.height}px`;
           return;
         }
-        const vecImao = element.classList.contains('mobilni-potez');
         element.classList.add('mobilni-potez');
-        // #region agent log
-        if (!vecImao) fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'C',location:'+page.svelte:pratiMobilniUnos.add',message:'mobilni-potez added',data:{unosLen:unosNastavkaRijeci.length,vvH:vidljiviZaslon.height,vvTop:vidljiviZaslon.offsetTop},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         element.style.left = `${vidljiviZaslon.offsetLeft + 8}px`;
         element.style.width = `${Math.max(0, vidljiviZaslon.width - 16)}px`;
         element.style.maxHeight = `${Math.max(0, vidljiviZaslon.height - 16)}px`;
@@ -574,9 +563,6 @@
     mobitel.addEventListener('change', osvjezi);
     osvjezi();
     return { destroy() {
-      // #region agent log
-      fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'B',location:'+page.svelte:pratiMobilniUnos.destroy',message:'form action destroyed (zona remount)',data:{dijalog,unosLen:unosNastavkaRijeci.length,jeNaPotezu},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       cancelAnimationFrame(okvir);
       cancelAnimationFrame(otpustanje);
       dimenzije.disconnect();
@@ -593,31 +579,12 @@
     } };
   }
 
-  let prethodniJeNaPotezuDebug: boolean | null = null;
-  let prethodniPrefiksDebug: string | null = null;
-  $effect(() => {
-    const naPotezu = jeNaPotezu;
-    const prefiks = prefiksRijeci;
-    // #region agent log
-    if (prethodniJeNaPotezuDebug !== null && prethodniJeNaPotezuDebug !== naPotezu) {
-      const unosLen = untrack(() => unosNastavkaRijeci.length);
-      fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'B',location:'+page.svelte:jeNaPotezu-track',message:'jeNaPotezu flipped',data:{from:prethodniJeNaPotezuDebug,to:naPotezu,prefiks,unosLen,naPotezuId:stanje.naPotezuId,mojId:stanje.mojIgracId,sustavBira:stanje.sustavBiraRijec,veza:stanjeVeze.stanje},timestamp:Date.now()})}).catch(()=>{});
-    }
-    // #endregion
-    prethodniJeNaPotezuDebug = naPotezu;
-    prethodniPrefiksDebug = prefiks;
-  });
-
   // Briši unos samo na stvarno novi potez (novi turnToken/prefiks).
   // Flicker jeNaPotezu (destroy forme + partija:stanje) ne smije obrisati tipkanje.
   let zadnjiKljucOciscenogUnosa: string | null = null;
   $effect(() => {
     if (!jeNaPotezu || !prefiksRijeci) return;
     const kljucPoteza = `${stanje.turnToken ?? ''}|${prefiksRijeci}`;
-    // #region agent log
-    const prevUnos = untrack(() => unosNastavkaRijeci);
-    fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'post-fix',hypothesisId:'A',location:'+page.svelte:clear-unos-effect',message:kljucPoteza === zadnjiKljucOciscenogUnosa ? 'skip clear same turn' : 'clearing unosNastavkaRijeci',data:{prevUnosLen:prevUnos.length,prevUnos:prevUnos.slice(0,40),prefiks:prefiksRijeci,kljucPoteza,istiKljuc:kljucPoteza === zadnjiKljucOciscenogUnosa,turnToken:stanje.turnToken,naPotezuId:stanje.naPotezuId,veza:stanjeVeze.stanje},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (kljucPoteza === zadnjiKljucOciscenogUnosa) {
       queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
       return;
@@ -626,16 +593,6 @@
     unosNastavkaRijeci = '';
     queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
   });
-
-  // #region agent log
-  $effect(() => {
-    const onPageHide = () => {
-      fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'E',location:'+page.svelte:pagehide',message:'page hiding (possible full refresh)',data:{unosLen:untrack(() => unosNastavkaRijeci.length),persisted:(performance as Performance & {navigation?:{type?:number}}).navigation?.type},timestamp:Date.now()})}).catch(()=>{});
-    };
-    window.addEventListener('pagehide', onPageHide);
-    return () => window.removeEventListener('pagehide', onPageHide);
-  });
-  // #endregion
 
   // Globalni game-state listener je izvor istine i nakon reconnecta. Ako aktivni
   // ekran propusti jedan Socket.IO event, promjena reda ipak mora otključati
@@ -830,13 +787,10 @@
     // (fire-and-forget upis u bazu znači da refetch odmah nakon eventa može vratiti stariju listu).
     const naPrihvacenPotez = (potez: PrihvacenPotez) => {
       if (!jeAktualnaPartija()) return;
-      // #region agent log
       const tuđiDokSamNaPotezu =
         stanje.naPotezuId !== null &&
         stanje.naPotezuId === stanje.mojIgracId &&
         potez.igracId !== stanje.mojIgracId;
-      fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'post-fix',hypothesisId:'F',location:'+page.svelte:naPrihvacenPotez',message:tuđiDokSamNaPotezu ? 'ignore foreign page potez' : 'page UI-only potez handler',data:{tuđiDokSamNaPotezu,igracId:potez.igracId,trazena:potez.trazenaSlova,istek:potez.istekPotezaIso,naPotezuId:stanje.naPotezuId,rijec:(potez.rijec??'').slice(0,24)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       // Zastarjeli tuđi potez dok si na redu ne smije dirati UI ni prikazanu riječ.
       if (tuđiDokSamNaPotezu) return;
       // Potvrda je dovoljna za otključavanje unosa. To vrijedi i kada riječ
