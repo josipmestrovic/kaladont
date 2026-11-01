@@ -12,14 +12,14 @@ export interface PolitikaUcinkaPartije {
   dajeNapredak: boolean;
   /** kolekcije riječi i dostignuća (privatne sobe ih zadržavaju) */
   dajeDostignucaIKolekcije: boolean;
-  /** Samo registrirani ljudski trening-sudionik trajno sprema vlastite riječi. */
+  /** Ako true, registrirani ljudski trening-sudionik trajno sprema vlastite riječi (trenutno isključeno). */
   zapisujeKolekcijuTreninga: boolean;
 }
 
 const POLITIKE: Record<KontekstPartije, PolitikaUcinkaPartije> = {
   javna: { kontekst: 'javna', zapisujePovijest: true, dajeNapredak: true, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
   privatna: { kontekst: 'privatna', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
-  trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: false, zapisujeKolekcijuTreninga: true },
+  trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: false, zapisujeKolekcijuTreninga: false },
 };
 
 export function politikaZaKontekst(kontekst: KontekstPartije): PolitikaUcinkaPartije {

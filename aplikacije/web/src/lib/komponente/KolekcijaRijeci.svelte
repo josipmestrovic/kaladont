@@ -25,7 +25,6 @@
     imenica: 'Imenice', glagol: 'Glagoli', pridjev_prilog: 'Pridjevi i prilozi',
     vlastita_imena: 'Vlastita imena', zamjenica: 'Zamjenice', broj: 'Brojevi',
     prijedlog: 'Prijedlozi', veznik: 'Veznici', cestica: 'Čestice', uzvik: 'Usklici',
-    oblici_treninga: 'Oblici odigrani u treningu',
   };
   const naziviZaNaslov: Record<string, string> = {
     imenica: 'imenica', glagol: 'glagola', pridjev_prilog: 'pridjeva i priloga',

@@ -72,10 +72,10 @@ Postavke se učitavaju jednom pri pokretanju procesa. Ako trajni zapis još ne p
 - Dvoboj protiv jednog računalnog protivnika „Računalo” s jednim stalnim avatarom. Dostupno gostima i registriranima, uključujući nepotvrđen e-mail.
 - Pokreće se odmah, bez javnog reda i bez trošenja javnog fonda botova. Igrač može imati samo jedan aktivni kontekst igranja (red, soba, partija ili trening).
 - Pravila valjanosti poteza i eliminacije identična su javnom Dvoboju, ali trening nema vremensko ograničenje poteza: nema automatskog ispadanja zbog čekanja ni prikaza timera. Računalo odigrava nakon 1–3 s; igrač može razmišljati bez roka.
-- Trening ne bilježi partiju, poteze ni natjecateljski napredak: nema bodova, XP-a, ranga, forme, nizova ni općih dostignuća. Registriranom čovjeku trajno se dodaje svaka vlastita prihvaćena riječ u zajedničku kolekciju tek nakon potvrđenog DB upisa; gostu i privremenom „Računalu” ne sprema se ništa. Kolekcija treninga sama po sebi ne broji opće dostignuće rijetkih grupa; grupa može postati opće dostignuće ako je naknadno otkrije u javnoj ili privatnoj partiji.
-- Registrirani čovjek koji prirodno pobijedi dobiva napredak dostignuća **Zagrijan** na 1, 5, 20, 50 i 100 trening pobjeda. Ne dodjeljuje se pri izlasku, porazu, tehničkom prekidu ili neaktivnosti. Gosti nemaju trajnu kolekciju ni dostignuće.
-- Neaktivni trening upozorava nakon 4 minute i tehnički se zatvara nakon 5 minuta bez ljudskog prihvaćenog poteza ili izričitog nastavka. Otkucaji veze i potezi Računala ne resetiraju neaktivnost. Potvrđene riječi ostaju spremljene; zatvaranje nije pobjeda ni poraz.
-- Završni ekran jasno navodi da se trening ne bilježi kao partija i ne utječe na natjecateljske statistike, XP, rang ili formu; može prikazati zajedničku kolekciju riječi i novu razinu dostignuća Zagrijanog.
+- Trening ne bilježi partiju, poteze ni natjecateljski napredak: nema bodova, XP-a, ranga, forme, nizova, kolekcije riječi ni općih dostignuća. Gostu i privremenom „Računalu” ne sprema se ništa.
+- Registrirani čovjek koji prirodno pobijedi dobiva napredak dostignuća **Zagrijan** na 1, 5, 20, 50 i 100 trening pobjeda. Ne dodjeljuje se pri izlasku, porazu, tehničkom prekidu ili neaktivnosti. Gosti nemaju dostignuće Zagrijan.
+- Neaktivni trening upozorava nakon 4 minute i tehnički se zatvara nakon 5 minuta bez ljudskog prihvaćenog poteza ili izričitog nastavka. Otkucaji veze i potezi Računala ne resetiraju neaktivnost. Zatvaranje nije pobjeda ni poraz.
+- Završni ekran jasno navodi da se trening ne bilježi kao partija i ne utječe na natjecateljske statistike, XP, rang, formu ni kolekciju; može prikazati novu razinu dostignuća Zagrijanog.
 - Poslužitelj ograničava broj aktivnih treninga odvojeno od javnih partija; pri zauzeću prikazuje jasnu poruku.
 
 ## Provjera pod opterećenjem

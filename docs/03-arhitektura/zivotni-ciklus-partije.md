@@ -60,9 +60,9 @@ sequenceDiagram
 
 ## Kontekst partije i politika učinaka (ADR-017)
 
-Stol pri stvaranju dobiva `kontekst: javna | privatna | trening` i iz njega izvedenu `PolitikaUcinkaPartije`. Javna partija piše povijest i natjecateljski napredak; privatna piše povijest i kolekcije/opća dostignuća, ali ne XP/bodove; trening nema zapis partije, XP ni natjecateljske statistike. Ipak, potvrđeni registrirani ljudski trening potez čeka transakcijski upis riječi/kolekcije prije `potez:prihvacen`; pobjeda može idempotentno zabilježiti samo dostignuće Zagrijan. Gosti i privremeno Računalo nemaju DB upise. Tehnički prekid treninga ne daje pobjedu ni poraz.
+Stol pri stvaranju dobiva `kontekst: javna | privatna | trening` i iz njega izvedenu `PolitikaUcinkaPartije`. Javna partija piše povijest i natjecateljski napredak; privatna piše povijest i kolekcije/opća dostignuća, ali ne XP/bodove; trening nema zapis partije, XP, natjecateljske statistike ni kolekcije. Pobjeda može idempotentno zabilježiti samo dostignuće Zagrijan. Gosti i privremeno Računalo nemaju DB upise. Tehnički prekid treninga ne daje pobjedu ni poraz.
 
-Trening emitira upozorenje neaktivnosti nakon 4 minute i poništava sesiju nakon 5 minuta. Resetiraju je samo prihvaćen ljudski potez ili scoped `trening:nastavi`; heartbeat, reconnect i botov potez ne resetiraju sat. Poništenje zadržava potvrđene riječi kolekcije.
+Trening emitira upozorenje neaktivnosti nakon 4 minute i poništava sesiju nakon 5 minuta. Resetiraju je samo prihvaćen ljudski potez ili scoped `trening:nastavi`; heartbeat, reconnect i botov potez ne resetiraju sat.
 
 Potezi ljudi i botova prolaze iste autoritativne naredbe `odigrajRijec` / `odustani` (turnToken, red na potezu, faza izbora sustava, validacija). Socket handleri su tanki omotači koji identitet uzimaju iz sesije; `naredbaBota` prihvaća samo sudionike s `upravljac = bot`. Pokretanje partije vraća eksplicitan rezultat (`pokrenuta`, `limit`, `zaustavljanje`, `greska`), pa servis reda vraća u red samo ljude koji još čekaju, s izvornim `usaoU`.
 

@@ -3,7 +3,7 @@
  * jer partija:pocetak stiže dok je korisnik još na /red, prije nego /partija/[id] postoji.
  */
 import type { Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, ObracunIskustvaTijekomPartije, OtkljucavanjeRijeci, PocetakPartije, StavkaIskustva, StanjePartije, TreningNeaktivnost } from 'zajednicko';
-import { pustiAudio, type AudioDogadaj } from './audio-manager.js';
+import { pustiAudio, zaustaviSveZvukove, type AudioDogadaj } from './audio-manager.js';
 import { dohvatiSocket, oznaciPartijuDostupnom } from './socket.js';
 
 interface StanjeIgre {
@@ -96,6 +96,8 @@ const stanje = $state<StanjeIgre>({
 });
 
 let pokrenuto = false;
+/** True nakon dobrovoljnog izlaska dok ne stigne nova partija:pocetak — blokira SFX i stale socket evente. */
+let napustioPartiju = false;
 let brojOdbijenihNaPotezu = 0;
 let timerStavkiIskustva: ReturnType<typeof setTimeout> | null = null;
 let timerNagradePoteza: ReturnType<typeof setTimeout> | null = null;
@@ -149,6 +151,10 @@ function pustiOdbijanje(): void {
 }
 
 function primijeniStanjePartije(p: StanjePartije): void {
+  if (napustioPartiju) return;
+  // #region agent log
+  fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'D',location:'stanje-igre.svelte.ts:primijeniStanjePartije',message:'full state reapply',data:{partijaId:p.partijaId,naPotezuId:p.naPotezuId,mojIgracId:p.mojIgracId,trazenaSlova:p.trazenaSlova,sustavBiraRijec:p.sustavBiraRijec,prevNaPotezuId:stanje.naPotezuId,prevTrazena:stanje.trazenaSlova,prevSustavBira:stanje.sustavBiraRijec},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   oznaciPartijuDostupnom();
   stanje.partijaId = p.partijaId;
   stanje.pocetakPartijeIso = null;
@@ -184,6 +190,7 @@ export function pokreniSlusateljeIgre(): void {
   const socket = dohvatiSocket();
 
   socket.on('partija:pocetak', (p) => {
+    napustioPartiju = false;
     oznaciPartijuDostupnom();
     brojOdbijenihNaPotezu = 0;
     stanje.partijaId = p.partijaId;
@@ -247,11 +254,25 @@ export function pokreniSlusateljeIgre(): void {
   });
 
   socket.on('potez:prihvacen', (p) => {
+    if (napustioPartiju) return;
+    // Dok si na potezu, tuđi potez:prihvacen je zastario/strani — primjena ruši formu
+    // (naPotezuId=null + krivi prefiks), a partija:stanje odmah vraća isti red.
+    const tuđiDokSamNaPotezu =
+      stanje.naPotezuId !== null &&
+      stanje.naPotezuId === stanje.mojIgracId &&
+      p.igracId !== stanje.mojIgracId;
+    // #region agent log
+    fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'post-fix',hypothesisId:'F',location:'stanje-igre.svelte.ts:potez:prihvacen',message:tuđiDokSamNaPotezu ? 'ignore foreign potez while on turn' : 'apply potez:prihvacen',data:{tuđiDokSamNaPotezu,igracId:p.igracId,mojId:stanje.mojIgracId,naPotezuId:stanje.naPotezuId,trazena:p.trazenaSlova,prevTrazena:stanje.trazenaSlova,istek:p.istekPotezaIso,sljedeciId:p.sljedeciId,rijec:(p.rijec??'').slice(0,24)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    if (tuđiDokSamNaPotezu) return;
+
     stanje.oznakaPrihvacenogPoteza += 1;
     const mojPotez = p.igracId === stanje.mojIgracId;
     // Prazan istek uz timer = ubojita riječ / prijelaz. U privatnoj sobi bez limitu (0) prazan istek je normalan.
     const prijelazBezPoteza = !p.istekPotezaIso && stanje.trajanjePotezaSek !== 0;
-    const mojSljedeciRed = !prijelazBezPoteza && p.sljedeciId === stanje.mojIgracId;
+    // Red na mene = id match; prijelazBezPoteza samo sprečava lažni tvoj-red na ubojitoj riječi.
+    const redDolaziNaMene = p.sljedeciId === stanje.mojIgracId;
+    const mojSljedeciRed = redDolaziNaMene && !prijelazBezPoteza;
     stanje.zadnjaEliminacija = null;
     stanje.turnToken = p.turnToken ?? stanje.turnToken;
     // Prazan istek = ubojita riječ / prijelaz runde: nemoj ostaviti lažni aktivan potez.
@@ -278,22 +299,28 @@ export function pokreniSlusateljeIgre(): void {
 
     // State se mora primijeniti prije zvuka: nepostojeći ili blokirani audio
     // asset ne smije zaustaviti prijelaz reda ili ažuriranje streaka.
+    // Autor: potvrda. Sljedeći: tvoj-red. Ostali (četveroboj / privatna 3+): promjena-reda.
+    // Vrijedi i u 1. rundi — jedini izuzetak je samo otvaranje partije (vidi runda-otvorena).
     if (mojPotez) pustiAudio('potez-prihvacen');
-    if (p.nagrada && mojPotez) pustiAudio(`nagrada-${p.nagrada.intenzitet}` as AudioDogadaj);
-    if (mojSljedeciRed) {
+    else if (mojSljedeciRed) {
       brojOdbijenihNaPotezu = 0;
       pustiAudio('tvoj-red');
+    } else {
+      pustiAudio('promjena-reda');
     }
   });
 
   socket.on('potez:odbijen', (p) => {
+    if (napustioPartiju) return;
     pustiOdbijanje();
     stanje.trenutniStreak = 0;
     stanje.poruka = p.poruka;
   });
 
   socket.on('partija:eliminacija', (p) => {
-    pustiAudio('eliminacija');
+    if (napustioPartiju) return;
+    // Kaladont: samo tiši aplauz (high moment). Ostali razlozi: tiša eliminacija.
+    pustiAudio(p.razlog === 'kaladont' ? 'aplauz-kaladont' : 'eliminacija');
     stanje.eliminacije = [...stanje.eliminacije, p];
     stanje.zadnjaEliminacija = p;
     // Samo XP eliminacije — ne šalji ponovo XP poteza (kaladont/mrtva), inače obavijest
@@ -322,18 +349,24 @@ export function pokreniSlusateljeIgre(): void {
   });
 
   socket.on('partija:sustav-bira-rijec', (p) => {
+    if (napustioPartiju) return;
     stanje.zadnjaNagrada = null;
     stanje.sustavBiraRijec = true;
     stanje.istekIzboraIso = p.istekIzboraIso;
   });
 
   socket.on('partija:runda-otvorena', (p) => {
+    if (napustioPartiju) return;
     stanje.zadnjaNagrada = null;
-    // 1. runda već ima pocetak-partije zvuk - nova-runda samo od 2. runde nadalje da se ne preklapaju.
-    if (p.runda > 1) pustiAudio('nova-runda');
-    if (p.naPotezuId === stanje.mojIgracId) {
+    // Samo PRVO otvaranje (runda 1): ne sviraj tvoj-red/promjena-reda — već svira pocetak-partije.
+    // Nakon toga (potezi u 1. rundi + svako kasnije otvaranje runde) zvukovi rade normalno.
+    if (p.runda === 1) {
+      if (p.naPotezuId === stanje.mojIgracId) brojOdbijenihNaPotezu = 0;
+    } else if (p.naPotezuId === stanje.mojIgracId) {
       brojOdbijenihNaPotezu = 0;
       pustiAudio('tvoj-red');
+    } else if (p.naPotezuId) {
+      pustiAudio('promjena-reda');
     }
     stanje.sustavBiraRijec = false;
     stanje.turnToken = p.turnToken ?? null;
@@ -382,10 +415,68 @@ export function pokreniSlusateljeIgre(): void {
     stanje.poruka = g.poruka;
   });
 
-  socket.on('connect', () => socket.emit('partija:stanje'));
+  socket.on('connect', () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7283/ingest/117221f2-d99f-40c0-9e5c-43456ef950a8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'7324e0'},body:JSON.stringify({sessionId:'7324e0',runId:'pre-fix',hypothesisId:'D',location:'stanje-igre.svelte.ts:connect',message:'socket connect → request partija:stanje',data:{partijaId:stanje.partijaId,naPotezuId:stanje.naPotezuId,trazenaSlova:stanje.trazenaSlova},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    socket.emit('partija:stanje');
+  });
   if (socket.connected) socket.emit('partija:stanje');
 }
 
 export function dohvatiStanjeIgre(): StanjeIgre {
   return stanje;
+}
+
+/**
+ * Lokalno napuštanje partije: gasi SFX i ignorira kasne socket evente stare partije
+ * dok ne stigne nova partija:pocetak. Pozvati prije emit('partija:izadji').
+ */
+export function napustiLokalnuPartiju(): void {
+  napustioPartiju = true;
+  zaustaviSveZvukove();
+  brojOdbijenihNaPotezu = 0;
+  if (timerStavkiIskustva) clearTimeout(timerStavkiIskustva);
+  if (timerNagradePoteza) clearTimeout(timerNagradePoteza);
+  if (timerNovaDostignuca) clearTimeout(timerNovaDostignuca);
+  if (timerKonfetaIskustva) clearTimeout(timerKonfetaIskustva);
+  timerStavkiIskustva = null;
+  timerNagradePoteza = null;
+  timerNovaDostignuca = null;
+  timerKonfetaIskustva = null;
+  stanje.partijaId = null;
+  stanje.mojIgracId = null;
+  stanje.sjedala = [];
+  stanje.turnToken = null;
+  stanje.naPotezuId = null;
+  stanje.trazenaSlova = null;
+  stanje.istekPotezaIso = null;
+  stanje.pocetakPartijeIso = null;
+  stanje.runda = 0;
+  stanje.brojIskoristenih = 0;
+  stanje.eliminacije = [];
+  stanje.zadnjaEliminacija = null;
+  stanje.poruka = null;
+  stanje.kraj = null;
+  stanje.ponistenaPoruka = null;
+  stanje.statusSpremanja = 'nije_zavrsena';
+  stanje.rezultatiPrikazaniPartijaId = null;
+  stanje.obracunIskustva = null;
+  stanje.sustavBiraRijec = false;
+  stanje.istekIzboraIso = null;
+  stanje.zadnjaRijec = null;
+  stanje.zadnjaRijecIgracId = null;
+  stanje.zadnjaRijecVrsta = null;
+  stanje.mod = null;
+  stanje.kontekst = null;
+  stanje.treningNeaktivnost = null;
+  stanje.jePrivatna = false;
+  stanje.kodSobe = null;
+  stanje.trajanjePotezaSek = null;
+  stanje.zadnjaNagrada = null;
+  stanje.trenutniStreak = 0;
+  stanje.stavkeIskustva = [];
+  stanje.novaDostignucaTijekomPartije = [];
+  stanje.otkljucavanjeRijeci = null;
+  stanje.intenzitetKonfetaIskustva = null;
 }

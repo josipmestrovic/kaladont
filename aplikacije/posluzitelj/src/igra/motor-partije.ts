@@ -58,7 +58,7 @@ import type { StavkaReda } from '../red/red-cekanja.js';
 import { ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisStatistikeRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
-import { zapisiPrihvaceneRijeciTreninga, zabiljeziPobjeduTreninga } from '../trening/upis-napretka.js';
+import { zabiljeziPobjeduTreninga } from '../trening/upis-napretka.js';
 import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
 
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50), turnToken: z.string().min(1).max(64).optional() }).strict();
@@ -237,8 +237,6 @@ export function stvoriUpraviteljPartija(
 
   const partije = new Map<string, StanjeStola>();
   const partijaPoIgracu = new Map<string, string>(); // igracId -> partijaId
-  const treningPoteziUTijeku = new Set<string>();
-  const upisiTreningaUTijeku = new Map<string, Promise<void>>();
   let zaustavljanje = false;
   let brojIstekaBota = 0;
   let brojNamjernihIstekaBota = 0;
@@ -352,12 +350,7 @@ export function stvoriUpraviteljPartija(
     stanje.treningUpozorenjeHandle.unref();
     const zatvoriAkoIsteko = () => {
       if (stanje.zavrsena || stanje.treningGeneration !== generacija || stanjeNeaktivnostiTreninga(aktivnostMs, Date.now(), rokovi) !== 'isteklo') return;
-      if ([...upisiTreningaUTijeku.keys()].some((kljuc) => kljuc.startsWith(`${stanje.partijaId}:`))) {
-        stanje.treningZatvaranjeHandle = setTimeout(zatvoriAkoIsteko, 100);
-        stanje.treningZatvaranjeHandle.unref();
-        return;
-      }
-      ponistiStol(stanje, 'Trening je zatvoren nakon pet minuta neaktivnosti. Ako si registriran, potvrđene riječi ostaju u tvojoj kolekciji.');
+      ponistiStol(stanje, 'Trening je zatvoren nakon pet minuta neaktivnosti.');
     };
     stanje.treningZatvaranjeHandle = setTimeout(zatvoriAkoIsteko, Math.max(0, zatvaraMs - Date.now()));
     stanje.treningZatvaranjeHandle.unref();
@@ -654,7 +647,6 @@ export function stvoriUpraviteljPartija(
     if (zaustavljanje) return;
     zaustavljanje = true;
     namjerniIsteciBotova.clear();
-    await Promise.allSettled([...upisiTreningaUTijeku.values()]);
     const aktivnePartije = [...partije.values()].filter((stanje) =>
       !stanje.zavrsena || stanje.statusSpremanja === 'spremanje_rezultata');
     const partijaIdovi = aktivnePartije.filter((stanje) => stanje.politika.zapisujePovijest).map((stanje) => stanje.partijaId);
@@ -808,7 +800,7 @@ export function stvoriUpraviteljPartija(
       iskustvoPrije: new Map(sudionici.map((s) => [s.igracId, 0])),
       stavkeIskustva: new Map(sudionici.map((s) => [s.igracId, []])),
       napredakDostignuca: new Map(sudionici.map((s) => [s.igracId, {}])),
-      napredakDostignucaPrije: new Map(sudionici.map((s) => [s.igracId, {}])),
+      napredakDostignucaPrije: new Map(sudionici.map((s) => [s.igracId, { razina: s.razina }])),
       najavljenaDostignuca: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       statusSpremanja: 'nije_zavrsena',
       brojPokusajaSpremanja: 0,
@@ -884,7 +876,7 @@ export function stvoriUpraviteljPartija(
         }
       }
       stanje.iskustvoPrije = new Map(sudionici.map((s) => [s.igracId, iskustvo.get(s.igracId) ?? 0]));
-      stanje.napredakDostignucaPrije = new Map(sudionici.map((s) => [s.igracId, napredak.get(s.igracId) ?? {}]));
+      stanje.napredakDostignucaPrije = new Map(sudionici.map((s) => [s.igracId, { ...(napredak.get(s.igracId) ?? {}), razina: s.razina }]));
       if (stanje.zavrsena || prekiniPrazanPocetak(stanje)) return 'zaustavljanje' as const;
       if (stanje.izborHandle) return 'pokrenuta' as const;
       const odgodaPocetka = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PARTIJE_MS;
@@ -1000,8 +992,6 @@ export function stvoriUpraviteljPartija(
         }
         stanje.statusSpremanja = 'rezultati_spremljeni';
         for (const p of plasmani) {
-          const sudionik = stanje.sudionici.find((stavka) => stavka.igracId === p.igracId);
-          const jeRegistriraniCovjek = sudionik?.upravljac === 'covjek' && sudionik.vrsta !== 'gost';
           const poruka: KrajPartije = {
             partijaId: stanje.partijaId,
             prikazRezultataOdIso,
@@ -1012,7 +1002,6 @@ export function stvoriUpraviteljPartija(
             mojaOcjenaIgre: null,
             bonusOcjenaIgre: 0,
             novaDostignuca: p.igracId === pobjednikId && nagrada?.novaRazina ? [{ id: 'zagrijan', novaRazina: nagrada.novaRazina, maksimalnaRazina: nagrada.maksimalnaRazina }] : [],
-            ...(jeRegistriraniCovjek ? { kolekcija: kolekcijaZaKraj(stanje, p.igracId) } : {}),
             mod: stanje.mod,
             kontekst: 'trening',
           };
@@ -1772,44 +1761,6 @@ export function stvoriUpraviteljPartija(
     return { ishod: 'prihvacen' };
   }
 
-  async function odigrajRijecTreninga(stanje: StanjeStola, igracId: string, rijec: string, turnToken: string | undefined, socket: KaladontSocket): Promise<RezultatNaredbe> {
-    const kljucPoteza = `${stanje.partijaId}:${turnToken ?? stanje.turnToken}`;
-    if (treningPoteziUTijeku.has(kljucPoteza)) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
-    treningPoteziUTijeku.add(kljucPoteza);
-    const posao = obradiRijecTreninga(stanje, igracId, rijec, turnToken, socket);
-    upisiTreningaUTijeku.set(kljucPoteza, posao.then(() => undefined));
-    try {
-      return await posao;
-    } finally {
-      treningPoteziUTijeku.delete(kljucPoteza);
-      upisiTreningaUTijeku.delete(kljucPoteza);
-    }
-  }
-
-  async function obradiRijecTreninga(stanje: StanjeStola, igracId: string, rijec: string, turnToken: string | undefined, socket: KaladontSocket): Promise<RezultatNaredbe> {
-    try {
-      if (stanje.zavrsena || !stanje.aktivni.has(igracId) || stanje.naPotezuId !== igracId || stanje.izborUToku) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
-      if (turnToken && turnToken !== stanje.turnToken) return { ishod: 'odbijen', kod: 'STARI_TURN_TOKEN', poruka: 'Potez je zastario. Osvježi stanje i pokušaj ponovno.' };
-      const normalizirana = rijec.normalize('NFC').trim().toLowerCase();
-      const rezultat = validirajPotez({ rijec, trazenaSlova: stanje.trazenaSlova!, iskoristeneGrupe: stanje.iskoristeneGrupe, potrosioGrupu: stanje.potrosioGrupu, dopusteneVrste: stanje.dopusteneVrste, rjecnik });
-      if (!rezultat.valjano) {
-        stanje.streakovi.set(igracId, 0);
-        return { ishod: 'odbijen', kod: rezultat.kod!, poruka: rezultat.poruka! };
-      }
-      const frekvencija = rjecnik.frekvencijaZa?.(normalizirana);
-      const brojGrafema = grafemi(normalizirana).length;
-      const tier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
-      await zapisiPrihvaceneRijeciTreninga(igracId, stanje.partijaId, [{ rijec: normalizirana, grupe: rjecnik.grupeZa(normalizirana).map((grupa) => ({ grupa, tier })) }]);
-      const aktualno = partije.get(stanje.partijaId);
-      if (aktualno !== stanje || stanje.zavrsena || stanje.turnToken !== (turnToken ?? stanje.turnToken) || stanje.naPotezuId !== igracId) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
-      return odigrajRijec(stanje, igracId, normalizirana, turnToken, socket);
-    } catch (greska) {
-      console.error('Neuspjelo spremanje riječi treninga:', greska);
-      socket.emit('greska', { kod: 'INTERNA', poruka: 'Riječ nije spremljena u kolekciju. Pokušaj ponovno.' });
-      return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
-    }
-  }
-
   function odustani(stanje: StanjeStola, igracId: string, turnToken: string | undefined): RezultatNaredbe {
     if (stanje.zavrsena) return { ishod: 'ignoriran', razlog: 'zavrsena' };
     if (!stanje.aktivni.has(igracId)) return { ishod: 'ignoriran', razlog: 'nije_sudionik' };
@@ -1818,9 +1769,6 @@ export function stvoriUpraviteljPartija(
     }
     if (stanje.izborUToku) return { ishod: 'ignoriran', razlog: 'sustav_bira' };
     if (stanje.naPotezuId !== igracId) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
-    if (stanje.kontekst === 'trening' && upisiTreningaUTijeku.has(`${stanje.partijaId}:${turnToken ?? stanje.turnToken}`)) {
-      return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
-    }
     eliminirajIgraca(stanje, igracId, 'ne_znam');
     return { ishod: 'prihvacen' };
   }
@@ -1860,12 +1808,15 @@ export function stvoriUpraviteljPartija(
     izvorniSocket?: KaladontSocket,
   ): void {
     // Nakon reconnecta socket može kratko biti izvan rooma; autor ipak mora dobiti potvrdu.
+    // Igrači koji su dobrovoljno izašli (nema ih u partijaPoIgracu) ne primaju više poteze —
+    // inače im klijent i dalje svira promjena-reda / tvoj-red nakon goto('/').
     const poslaniSocketi = new Set<string>();
     if (izvorniSocket) {
       izvorniSocket.emit('potez:prihvacen', poruka);
       poslaniSocketi.add(izvorniSocket.id);
     }
     for (const sudionik of stanje.sudionici) {
+      if (partijaPoIgracu.get(sudionik.igracId) !== stanje.partijaId) continue;
       const socket = aktivneVeze.dohvatiSocket(sudionik.igracId);
       if (socket && !poslaniSocketi.has(socket.id)) {
         socket.emit('potez:prihvacen', poruka);
@@ -1982,7 +1933,7 @@ export function stvoriUpraviteljPartija(
       if (provjeriDogadaj(socket.data.igracId, 'partija:stanje')) posaljiStanje(socket);
     }));
 
-    socket.on('potez:rijec', omotajSocketHandler(socket, 'potez:rijec', zapisSocketHandlerGreske, async (payload: unknown, ...dodatniArgumenti: unknown[]) => {
+    socket.on('potez:rijec', omotajSocketHandler(socket, 'potez:rijec', zapisSocketHandlerGreske, (payload: unknown, ...dodatniArgumenti: unknown[]) => {
       const rezultatSheme = ShemaPotezRijec.safeParse(payload);
       if (!rezultatSheme.success || dodatniArgumenti.length > 0) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
@@ -2003,10 +1954,7 @@ export function stvoriUpraviteljPartija(
         socket.emit('greska', { kod: 'PREBRZO', poruka: PORUKE.prebrzo });
         return;
       }
-      const vlastnik = stanje.sudionici.find((sudionik) => sudionik.igracId === socket.data.igracId);
-      const rezultat = stanje.kontekst === 'trening' && vlastnik?.upravljac === 'covjek' && vlastnik.vrsta === 'registriran'
-        ? await odigrajRijecTreninga(stanje, socket.data.igracId, rijec, turnToken, socket)
-        : odigrajRijec(stanje, socket.data.igracId, rijec, turnToken, socket);
+      const rezultat = odigrajRijec(stanje, socket.data.igracId, rijec, turnToken, socket);
       if (rezultat.ishod === 'odbijen') socket.emit('potez:odbijen', { kod: rezultat.kod, poruka: rezultat.poruka });
     }));
 
@@ -2052,11 +2000,6 @@ export function stvoriUpraviteljPartija(
       const partijaId = partijaPoIgracu.get(socket.data.igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;
       if (!stanje) return;
-
-      if ([...upisiTreningaUTijeku.keys()].some((kljuc) => kljuc.startsWith(`${stanje.partijaId}:`))) {
-        socket.emit('greska', { kod: 'PREBRZO', poruka: 'Potez se još sprema. Pokušaj ponovno izaći za trenutak.' });
-        return;
-      }
 
       if (prekiniPrazanPocetak(stanje, socket.data.igracId)) return;
       if (!stanje.zavrsena && stanje.aktivni.has(socket.data.igracId)) {
@@ -2148,7 +2091,7 @@ export function stvoriUpraviteljPartija(
       iskustvoPrije: new Map(sudionici.map((s) => [s.igracId, 0])),
       stavkeIskustva: new Map(sudionici.map((s) => [s.igracId, []])),
       napredakDostignuca: new Map(sudionici.map((s) => [s.igracId, {}])),
-      napredakDostignucaPrije: new Map(sudionici.map((s) => [s.igracId, {}])),
+      napredakDostignucaPrije: new Map(sudionici.map((s) => [s.igracId, { razina: s.razina }])),
       najavljenaDostignuca: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       statusSpremanja: 'nije_zavrsena',
       brojPokusajaSpremanja: 0,

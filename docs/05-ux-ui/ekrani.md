@@ -158,7 +158,6 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 
 - Zvučne kontrole (`AudioKontrola`) dostupne su svim korisnicima.
 - Zajednička grupa **Pristupačnost** sadrži prekidače **Font za disleksiju** i **Čitanje naglas**. Prvi primjenjuje OpenDyslexic kroz cijelu aplikaciju, drugi govori samo novu riječ na stolu; obje postavke dostupne su gostima i registriranima te se pamte lokalno u pregledniku, ne na računu.
-- Grupa **Kursor** dostupna je gostima i registriranima. Sadrži pet vizualno preglednih setova (Klasik, Vitez, Čudovište, Čarobnjak i Kaladont), zadani set je Kaladont, a izbor se sprema lokalno u pregledniku. Za odabrani set korisnik bira stalnu rukicu ili običnu strelicu; primarni klik prikazuje stanje `klik`, bez automatskog prebacivanja pri hoveru. Kursor se primjenjuje kroz cijelu aplikaciju samo na uređajima s mišem ili drugim pokazivačem. Napomena: „Prilagođeni kursor prikazuje se na računalima i prijenosnicima s mišem ili drugim pokazivačem. Na uređajima koji se koriste dodirom ostaje standardni pokazivač.”
 - Registrirani igrači vide izbor avatara, izmjenu email adrese i lozinke.
 - Gosti vide obavijest da su napredne postavke rezervirane za registrirane korisnike uz gumb za registraciju.
 
