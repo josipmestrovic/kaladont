@@ -6,7 +6,7 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 
 ## Admin nadzor aplikacije
 
-Bot politika v2 raspodjeljuje javne isteke na namjerne (0,5 % poteza) i neočekivane. Admin ih prikazuje odvojeno, a alarm reagira samo na neočekivani istek. Javni health zadržava kumulativni `botIsteci` za sve isteke i dodaje `botNamjerniIsteci`; razlika daje neočekivane isteke. Trening nema namjerni istek. Raniji rezultati mjerenja ne prepravljaju se zbog promjene politike.
+Bot politika v3 raspodjeljuje javne isteke na namjerne (jedna prilika u 2 % sudjelovanja, ne po potezu) i neočekivane. Admin ih prikazuje odvojeno, a alarm reagira samo na neočekivani istek. Javni health zadržava kumulativni `botIsteci` za sve isteke i dodaje `botNamjerniIsteci`; razlika daje neočekivane isteke. Trening nema namjerni istek. Raniji rezultati mjerenja ne prepravljaju se zbog promjene politike.
 
 `GET /api/admin/statistike/posluzitelj` zahtijeva admin sesiju i vraća `Cache-Control: no-store`. Pregled se osvježava svakih 5 s dok je kartica vidljiva. Povijest čuva najviše 180 uzoraka (15 minuta) u memoriji; restart briše povijest i brojače. Ne sadrži tokene, IP adrese, sadržaj zahtjeva ni korisničke identitete.
 

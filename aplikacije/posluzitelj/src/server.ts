@@ -25,6 +25,8 @@ import { registrirajProfilRute } from './profil/rute.js';
 import { registrirajLjestviceRute } from './ljestvice/rute.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
+import { spremiTrajnePostavkeBotova, ucitajTrajnePostavkeBotova } from './bot/trajne-postavke.js';
+import { stvoriNoveBotove } from './bot/servis-identiteta.js';
 import { registrirajRjecnikRute } from './rjecnik/rute.js';
 import { registrirajPovratneInformacijeRute } from './povratne-informacije/rute.js';
 import { konfiguracija } from './konfiguracija.js';
@@ -46,7 +48,7 @@ import { obradiLeaseStaginga, type LeaseStaginga } from './sigurnost/staging-opt
 import type { ZapisSocketHandlerGreske } from './sigurnost/socket-handler.js';
 import { ponistiPartijeUTijekuUBazi } from './igra/upis-partije.js';
 import { ocistiIstekleNepotvrdjeneRacune } from './racuni/ciscenje-nepotvrdjenih.js';
-import { nizoviPobjedaIgraca } from './baza/shema.js';
+import { botovi, izmjeneBotova, nizoviPobjedaIgraca } from './baza/shema.js';
 import { omotajSocketHandler } from './sigurnost/socket-handler.js';
 import { MetrikeNadzora } from './nadzor/metrike.js';
 import { AlarmiNadzora } from './nadzor/alarmi.js';
@@ -160,6 +162,13 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   let dohvatiZivoStanjeBotova: () => import('./admin/rute.js').ZivoStanjeBotova | null = () => null;
   const rjecnik = await ucitajRjecnik();
   app.log.info(`Rječnik učitan: ${rjecnik.brojRijeci()} riječi`);
+  const zadanePostavkeBotova = ucitajKonfiguracijuBota({ ...process.env, NODE_ENV: konfiguracija.NODE_ENV });
+  let zapisPostavkiBotova = await ucitajTrajnePostavkeBotova(zadanePostavkeBotova);
+  const postavkeBotova = structuredClone(zapisPostavkiBotova.konfiguracija);
+  if (konfiguracija.NODE_ENV !== 'development') postavkeBotova.brziRazvoj = false;
+  let naPromjenuPostavkiBotova = () => {};
+  let dohvatiPregledBotova: () => unknown = () => ({ ok: false, greska: 'Pregled se pokreće.' });
+  const botAdminAkcije: { promijeniAktivaciju?: (igracId: string, aktivan: boolean, adminId: string) => Promise<{ aktivan: boolean; dovrsavaIgru: boolean } | null> } = {};
 
   await app.register(
     async (apiApp) => {
@@ -173,6 +182,30 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       await registrirajAdminRute(apiApp, rjecnik, () => dohvatiZivoStanjeBotova(), {
         pregled: () => ({ ok: true, verzija: konfiguracija.VERZIJA, digest: konfiguracija.DIGEST, uptimeSekunde: process.uptime(), trenutno: metrike.dohvatiTrenutno(), povijest: metrike.dohvatiPovijest(), alarmi: alarmi.dohvatiStanja(), emailOmogucen: alarmi.omogucen }),
         probnaObavijest: () => alarmi.posaljiProbnu(),
+      }, {
+        pregled: () => structuredClone(zapisPostavkiBotova),
+        zadano: zadanePostavkeBotova,
+        brziRazvojDopusten: konfiguracija.NODE_ENV === 'development',
+        pregledBotova: () => dohvatiPregledBotova(),
+        promijeniAktivacijuBota: (...argumenti) => botAdminAkcije.promijeniAktivaciju ? botAdminAkcije.promijeniAktivaciju(...argumenti) : Promise.resolve(null),
+        stvoriBotove: async (broj, tip, adminId) => {
+          const rezultat = await stvoriNoveBotove(broj, tip, adminId, postavkeBotova.maksimalnoAktivnihBotova);
+          if (fondBotova) {
+            fondBotova.postaviIdentitete(await ucitajIdentiteteBotova(undefined, true));
+            redServis?.osvjeziPopunu();
+          }
+          return rezultat;
+        },
+        spremi: async (konfiguracijaBota, revizija, adminId) => {
+          if (fondBotova && fondBotova.stanje().ukupno > konfiguracijaBota.maksimalnoAktivnihBotova) throw new Error(`Aktivni fond trenutačno broji ${fondBotova.stanje().ukupno} botova. Prije spremanja deaktiviraj višak.`);
+          const noviZapis = await spremiTrajnePostavkeBotova(konfiguracijaBota, revizija, adminId);
+          if (noviZapis.revizija > zapisPostavkiBotova.revizija) {
+            zapisPostavkiBotova = noviZapis;
+            Object.assign(postavkeBotova, structuredClone(noviZapis.konfiguracija));
+            naPromjenuPostavkiBotova();
+          }
+          return noviZapis;
+        },
       });
       await registrirajRjecnikRute(apiApp, rjecnik);
     },
@@ -280,17 +313,22 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     }
   };
 
-  let naJavnaPartijaZavrsila: () => void = () => undefined;
+  let naJavnaPartijaZavrsila: (partijaId: string) => void = () => undefined;
+  const timeriOsvjezavanjaBotova = new Set<ReturnType<typeof setTimeout>>();
+  let popravakProfilaUTijeku = false;
   const eventLoop = monitorEventLoopDelay({ resolution: 20 });
   eventLoop.enable();
-  const popunaDvobojUkljucena = () => opcije.popunaBotovima?.dvoboj ?? konfiguracija.BOTOVI_DVOBOJ === 'true';
-  const popunaCetverobojUkljucena = () => opcije.popunaBotovima?.cetveroboj ?? konfiguracija.BOTOVI_CETVEROBOJ === 'true';
+  const popunaDvobojUkljucena = () => opcije.popunaBotovima?.dvoboj ?? postavkeBotova.botoviDvoboj;
+  const popunaCetverobojUkljucena = () => opcije.popunaBotovima?.cetveroboj ?? postavkeBotova.botoviCetveroboj;
   // Kontroler i motor referenciraju se međusobno samo kroz zatvaranja, pa redoslijed stvaranja nije bitan.
   const botKontroler = new BotKontroler({
     rjecnik,
     izvrsiNaredbu: (partijaId, igracId, naredba) => upravitelj.naredbaBota(partijaId, igracId, naredba),
     oznaciNamjerniIstek: (partijaId, igracId, turnToken) => upravitelj.oznaciNamjerniIstek(partijaId, igracId, turnToken),
-    konfiguracija: ucitajKonfiguracijuBota({ ...process.env, NODE_ENV: konfiguracija.NODE_ENV }),
+    dohvatiPotez: (partijaId) => upravitelj.dohvatiPotez(partijaId),
+    prekiniZbogGreske: (partijaId, igracId, turnToken) => upravitelj.prekiniZbogGreskeBota(partijaId, igracId, turnToken),
+    naAktivnost: (igracId) => fondBotova?.zabiljeziAktivnost(igracId),
+    konfiguracija: postavkeBotova,
     zapisi: (poruka, podaci) => app.log.warn(podaci, poruka),
   });
   const upravitelj = stvoriUpraviteljPartija(
@@ -307,12 +345,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       ...opcije.postavkeMotora,
       maksimalnoAktivnihPartija: socketOgranicenja.maksimalnoAktivnihPartija,
       maksimalnoAktivnihTreninga: konfiguracija.MAKSIMALNO_AKTIVNIH_TRENINGA,
+      dohvatiRokoveNeaktivnostiTreninga: opcije.postavkeMotora?.dohvatiRokoveNeaktivnostiTreninga
+        ?? (() => ({ upozorenjeMs: postavkeBotova.treningUpozorenjeNeaktivnostiMs, zatvaranjeMs: postavkeBotova.treningZatvaranjeNeaktivnostiMs })),
       provjeriDogadaj,
       zapisSocketHandlerGreske,
       naPromjenuPoteza: (dogadaj) => botKontroler.naPromjenuPoteza(dogadaj),
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
-        naJavnaPartijaZavrsila();
+        naJavnaPartijaZavrsila(partijaId);
       },
       naPrivatnaPartijaZavrsila: (kodSobe, partijaId, pobjednikId, rezultati) => {
         sobaServis?.registrirajRezultatPartije(kodSobe, partijaId, pobjednikId, rezultati);
@@ -491,10 +531,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   });
 
   let igracImaPrivatnuSobu: (igracId: string) => boolean = () => false;
-  const fondBotova = new FondBotova(await ucitajIdentiteteBotova().catch((greska: unknown) => {
+  const fondBotova = new FondBotova(await ucitajIdentiteteBotova(undefined, true).catch((greska: unknown) => {
     app.log.error({ greska }, 'Učitavanje javnih botova nije uspjelo; popuna reda ostaje bez botova');
     return [];
-  }));
+  }), Date.now, undefined, () => postavkeBotova);
   app.log.info({ brojBotova: fondBotova.stanje().ukupno }, 'Fond javnih botova učitan');
   const redServis = registrirajRedCekanja(
     io,
@@ -513,10 +553,93 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       fond: fondBotova,
       omogucena: (mod) => mod === 'dva_igraca' ? popunaDvobojUkljucena() : popunaCetverobojUkljucena(),
       botJeZauzet: upravitelj.imaNezavrsenuObradu,
-      pragoviMs: opcije.popunaBotovima?.pragoviMs ?? pragoviPopuneZaOkruzenje(konfiguracija.NODE_ENV),
+      pragoviMs: opcije.popunaBotovima?.pragoviMs ?? pragoviPopuneZaOkruzenje(konfiguracija.NODE_ENV, postavkeBotova.brziRazvoj),
+      odstupanjaMs: !opcije.popunaBotovima?.pragoviMs && !postavkeBotova.brziRazvoj && konfiguracija.NODE_ENV !== 'test' ? postavkeBotova.odstupanjaPopuneMs : undefined,
+      dohvatiRaspored: (mod) => ({
+        pragoviMs: opcije.popunaBotovima?.pragoviMs?.[mod] ?? (postavkeBotova.brziRazvoj ? pragoviPopuneZaOkruzenje(konfiguracija.NODE_ENV)[mod] : postavkeBotova.pragoviPopuneMs[mod]),
+        odstupanjaMs: !opcije.popunaBotovima?.pragoviMs && !postavkeBotova.brziRazvoj && konfiguracija.NODE_ENV !== 'test' ? postavkeBotova.odstupanjaPopuneMs[mod] : undefined,
+      }),
+      dohvatiOdmaciNeuspjelogPokretanja: () => postavkeBotova.odmaciPonovnogPokretanjaRedaMs,
     },
   );
-  naJavnaPartijaZavrsila = () => redServis.osvjeziPopunu();
+  naPromjenuPostavkiBotova = () => redServis.osvjeziPopunu();
+  botAdminAkcije.promijeniAktivaciju = async (igracId, aktivan, adminId) => {
+    const rezervacijaPrije = fondBotova.rezervacijaZa(igracId);
+    const rezultat = await baza.transaction(async (transakcija) => {
+      const [stari] = await transakcija.select({ igracId: botovi.igracId, kljucSeeda: botovi.kljucSeeda, aktivan: botovi.aktivan })
+        .from(botovi).where(eq(botovi.igracId, igracId)).for('update');
+      if (!stari) return null;
+      if (!stari.aktivan && aktivan) {
+        const [brojAktivnih] = await transakcija.select({ broj: sql<number>`count(*)::int` }).from(botovi).where(eq(botovi.aktivan, true));
+        if (Number(brojAktivnih?.broj ?? 0) >= postavkeBotova.maksimalnoAktivnihBotova) throw new Error(`Fond je dosegnuo limit od ${postavkeBotova.maksimalnoAktivnihBotova} aktivnih botova.`);
+      }
+      if (stari.aktivan !== aktivan) {
+        await transakcija.update(botovi).set({ aktivan }).where(eq(botovi.igracId, igracId));
+        await transakcija.insert(izmjeneBotova).values({ botId: igracId, kljucSeeda: stari.kljucSeeda, akcija: aktivan ? 'aktiviran' : 'deaktiviran', aktivanPrije: stari.aktivan, aktivanPoslije: aktivan, adminId });
+      }
+      return { aktivan };
+    });
+    if (!rezultat) return null;
+    fondBotova.postaviIdentitete(await ucitajIdentiteteBotova(undefined, true));
+    redServis.osvjeziPopunu();
+    return { aktivan: rezultat.aktivan, dovrsavaIgru: !aktivan && Boolean(rezervacijaPrije && rezervacijaPrije.stanje !== 'rezerviran') };
+  };
+  dohvatiPregledBotova = () => {
+    const igre = new Map(upravitelj.pregledBotova().map((igra) => [igra.igracId, igra]));
+    const planovi = new Map(botKontroler.pregledPlanova().map((plan) => [plan.igracId, plan]));
+    const greske = botKontroler.pregledGresaka();
+    return {
+      ok: true,
+      vrijemeIso: new Date().toISOString(),
+      revizijaPostavki: zapisPostavkiBotova.revizija,
+      fond: fondBotova.stanje(),
+      botovi: fondBotova.pregled().map((bot) => {
+        const igra = igre.get(bot.igracId) ?? null;
+        const status = igra?.status ?? bot.rezervacija?.stanje ?? (bot.greskaProfila ? 'tehnicki_kvar' : bot.osvjezavanjeUTijeku ? 'osvjezavanje_profila' : bot.aktivan ? 'slobodan' : 'deaktiviran');
+        return {
+          ...bot,
+          status,
+          stanjeOdMs: igra?.pocetakPartijeMs ?? (status === bot.rezervacija?.stanje ? bot.rezervacija.stanjeOd : !igra && !bot.rezervacija ? bot.zadnjaAktivnostMs : null),
+          dovrsavaPrijeDeaktivacije: !bot.aktivan && (igra !== null || bot.rezervacija !== null),
+          igra,
+          plan: igra?.naPotezu ? planovi.get(bot.igracId) ?? null : null,
+          greska: greske.get(bot.igracId) ?? null,
+        };
+      }),
+    };
+  };
+  naJavnaPartijaZavrsila = (partijaId) => {
+    const botovi = upravitelj.botoviPartije(partijaId).filter((igracId) => fondBotova.jeBot(igracId));
+    if (!botovi.length) { redServis.osvjeziPopunu(); return; }
+    const pokusaj = (broj: number) => {
+      if (zatvoreno) return;
+      void fondBotova.osvjeziProfile(botovi, ucitajIdentiteteBotova).then(() => {
+        if (!zatvoreno) redServis.osvjeziPopunu();
+      }).catch((greska: unknown) => {
+        app.log.error({ greska, partijaId, pokusaj: broj }, 'Osvježavanje profila botova nije uspjelo');
+        if (zatvoreno || broj >= postavkeBotova.pokusajiOsvjezavanjaProfila) return;
+        const timer = setTimeout(() => {
+          timeriOsvjezavanjaBotova.delete(timer);
+          pokusaj(broj + 1);
+        }, postavkeBotova.odmakOsvjezavanjaProfilaMs * broj);
+        timer.unref();
+        timeriOsvjezavanjaBotova.add(timer);
+      });
+    };
+    pokusaj(1);
+    redServis.osvjeziPopunu();
+  };
+  const osvjeziNeaktualneProfileBotova = () => {
+    if (zatvoreno || popravakProfilaUTijeku) return;
+    const igracIdovi = fondBotova.pregled().filter((bot) => bot.aktivan && bot.greskaProfila).map((bot) => bot.igracId);
+    if (!igracIdovi.length) return;
+    popravakProfilaUTijeku = true;
+    void fondBotova.osvjeziProfile(igracIdovi, ucitajIdentiteteBotova).then(() => {
+      if (!zatvoreno) redServis.osvjeziPopunu();
+    }).catch((greska: unknown) => {
+      if (!zatvoreno) app.log.warn({ greska, brojBotova: igracIdovi.length }, 'Periodično osvježavanje profila botova nije uspjelo');
+    }).finally(() => { popravakProfilaUTijeku = false; });
+  };
 
   const sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
     upravitelj.zapocniPrivatnuPartiju(sudionici, postavke, kodSobe),
@@ -535,7 +658,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   igracImaPrivatnuSobu = sobaServis.imaPrivatnuSobu;
 
   const treningServis = registrirajTrening(io, {
-    omogucen: () => konfiguracija.TRENING_OMOGUCEN === 'true' && upravitelj.mozePokrenutiPartiju(),
+    omogucen: () => postavkeBotova.treningOmogucen && upravitelj.mozePokrenutiPartiju(),
     zapocniTrening: (sudionici) => upravitelj.zapocniPartiju(sudionici, 'dva_igraca', { kontekst: 'trening' }),
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
     igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
@@ -551,9 +674,9 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     bot: { ...botKontroler.brojaci },
     trening: { aktivni: upravitelj.brojAktivnihTreninga(), ...treningServis.brojaci },
     zastavice: {
-      trening: konfiguracija.TRENING_OMOGUCEN === 'true',
-      botoviDvoboj: konfiguracija.BOTOVI_DVOBOJ === 'true',
-      botoviCetveroboj: konfiguracija.BOTOVI_CETVEROBOJ === 'true',
+      trening: postavkeBotova.treningOmogucen,
+      botoviDvoboj: popunaDvobojUkljucena(),
+      botoviCetveroboj: popunaCetverobojUkljucena(),
     },
   });
 
@@ -590,13 +713,17 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   };
   const timerNadzora = setInterval(uzorkujNadzor, 5_000);
   const timerBaze = setInterval(provjeriBazu, 10_000);
+  const timerOsvjezavanjaProfila = setInterval(osvjeziNeaktualneProfileBotova, 60_000);
   timerNadzora.unref();
   timerBaze.unref();
   provjeriBazu();
   uzorkujNadzor();
   zatvoriNadzor = () => {
+    for (const timer of timeriOsvjezavanjaBotova) clearTimeout(timer);
+    timeriOsvjezavanjaBotova.clear();
     clearInterval(timerNadzora);
     clearInterval(timerBaze);
+    clearInterval(timerOsvjezavanjaProfila);
     clearTimeout(bazaTimeout);
     alarmi.zaustavi();
     eventLoop.disable();

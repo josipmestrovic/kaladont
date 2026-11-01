@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { dohvatiSocket } from '$lib/socket.js';
-  import { dohvatiSavjete } from '$lib/savjeti.js';
+  import Zanimljivosti from '$lib/komponente/Zanimljivosti.svelte';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
@@ -16,7 +16,6 @@
     $page.url.searchParams.get('mod') === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca'
   );
   const ukupnoMjesta = $derived(trazeneMod === 'dva_igraca' ? 2 : 4);
-  const savjeti = $derived(dohvatiSavjete(trazeneMod));
 
   let stanje = $state<StanjeReda>({
     mojIgracId: '',
@@ -25,7 +24,6 @@
     prosjekCekanjaSek: 0,
   });
   let poruka = $state<string | null>(null);
-  let savjet = $state('');
   let countdown = $state<number | null>(null);
   let stanjeUcitano = $state(false);
   let odbrojavanjePartije: ReturnType<typeof setInterval> | null = null;
@@ -66,7 +64,6 @@
 
   onMount(() => {
     pokreniSlusateljeIgre();
-    savjet = savjeti[Math.floor(Math.random() * savjeti.length)] ?? '';
     const socket = dohvatiSocket();
 
     const naStanjeReda = (novoStanje: StanjeReda) => {
@@ -234,10 +231,7 @@
   <button type="button" class="odustani-gumb" onclick={odustani}>Odustani</button>
 {/if}
 
-<section class="korisne-informacije" aria-label="Korisne informacije">
-  <h2 class="hint-naslov"><span aria-hidden="true">💡</span> Korisne informacije</h2>
-  <p class="hint">{savjet}</p>
-</section>
+<Zanimljivosti />
 </main>
 {/if}
 
@@ -329,35 +323,6 @@
     margin: 0 0 24px;
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mali);
-  }
-
-  .korisne-informacije {
-    margin: 28px 0 0;
-  }
-
-  .hint-naslov {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 6px;
-    margin: 0 0 4px;
-    color: var(--boja-tekst-naslov);
-    font-family: var(--font-tijelo);
-    font-size: var(--tekst-mali);
-    font-weight: 600;
-  }
-
-  .hint {
-    width: 100%;
-    min-height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    margin: 0;
-    padding: 0 12px;
-    color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-mali);
-    text-align: left;
   }
 
   .odustani-gumb {

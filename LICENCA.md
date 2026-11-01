@@ -34,11 +34,8 @@ Personalizirani avatar sustav koristi **Avatar Illustration System** autora Mica
 
 Za Kaladont su SVG dijelovi pripremljeni za lokalno sastavljanje i promjenu podržanih boja. Sustav je proširen paketom od 60 novih modularnih dijelova nacrtanih za Kaladont (prefiks `k2-`, vidi `skripte/avatari/pack-02/`); oni su izvorno djelo i ne potječu iz Figma predloška. Ova licenca odnosi se na navedene third-party avatar assete i ne mijenja licencu izvornog koda projekta Kaladont.
 
-## Ikone igre — CC BY 4.0
+## Vlastite ilustracije i kontrolne ikone
 
-Ikone sučelja igre koriste **The Ultimate Games Icons Library**:
+PNG ikone igre izvorni su crteži pripremljeni za Kaladont i ne koriste dijelove ranije korištenog paketa The Ultimate Games Icons Library. Za vlastite ilustracije vrijedi navod o pridržanim pravima autora projekta.
 
-- [Izvorni Figma Community file](https://www.figma.com/community/file/1266365661823917037/the-ultimate-games-icons-library)
-- [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
-
-Ova licenca odnosi se na navedene third-party ikone i ne mijenja licencu izvornog koda projekta Kaladont.
+Kontrolne ikone biblioteke [Lucide](https://lucide.dev/license) zadržavaju licencu ISC, a dijelovi izvedeni iz Feathera licencu MIT. Licencne obavijesti i atribucije isporučene s paketom dostupne su i u aplikaciji na `/licence/lucide.txt`. Prava na izvorni kod i vlastite ilustracije ne mijenjaju CC BY-SA 4.0 licencu izvedenog rječnika ni CC BY 4.0 licencu tuđih dijelova avatara.

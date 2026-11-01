@@ -1,5 +1,35 @@
 import { expect, test } from '@playwright/test';
 
+for (const sirina of [320, 390, 1440]) {
+  test(`copyright i licence ostaju dostupni ${sirina}px`, async ({ page }, podaciTesta) => {
+    await page.setViewportSize({ width: sirina, height: sirina < 1000 ? 568 : 900 });
+    await page.goto('/');
+    const footer = page.locator('.landing-footer');
+    await expect(footer.locator('.copyright')).toHaveText('© 2026 Kaladont. Sva prava pridržana.');
+    await page.evaluate(() => document.fonts.ready);
+    const nav = await footer.locator('nav').boundingBox();
+    const copyright = await footer.locator('.copyright').boundingBox();
+    if (sirina >= 1000) {
+      expect(copyright!.x).toBeGreaterThan(nav!.x + nav!.width);
+      expect(Math.abs(copyright!.y + copyright!.height / 2 - nav!.y - nav!.height / 2)).toBeLessThanOrEqual(1);
+    } else {
+      expect(copyright!.y).toBeGreaterThanOrEqual(nav!.y + nav!.height);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+    await page.screenshot({ path: podaciTesta.outputPath('footer.png') });
+    await footer.getByRole('button', { name: 'Uvjeti i privatnost' }).click();
+    await page.getByRole('dialog').getByRole('link', { name: 'O igri i licence' }).click();
+    await expect(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toHaveAttribute('href', 'https://creativecommons.org/licenses/by-sa/4.0/deed.hr');
+    await expect(page.getByRole('link', { name: 'CC BY 4.0', exact: true })).toBeVisible();
+    await expect(page.getByText(/Micaha Laniera/)).toBeVisible();
+    await expect(page.getByText(/The Ultimate Games Icons Library/)).toHaveCount(0);
+    const obavijest = await page.request.get('/licence/lucide.txt');
+    expect(obavijest.ok()).toBe(true);
+    expect(await obavijest.text()).toContain('Cole Bemis');
+  });
+}
+
 test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', async ({ page }) => {
   await page.goto('/');
 

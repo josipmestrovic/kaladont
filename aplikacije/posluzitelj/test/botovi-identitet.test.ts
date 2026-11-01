@@ -42,6 +42,25 @@ async function noviCovjek(nadimak: string): Promise<string> {
 }
 
 describe('bot identitet', () => {
+  it('živi pregled čita stvarna stanja i ne dopušta promjenu rezervacije kroz snapshot', async () => {
+    let sada = 1_000;
+    const identitet: IdentitetBota = { igracId: 'nadzor-bot', nadimak: 'Nadzor', avatarId: 0, avatarConfig: null, avatarRevision: 0, odigrane: 0, pobjede: 0, bodoviUkupno: 0, odigrane1v1: 0, pobjede1v1: 0, bodovi1v1: 0, iskustvoUkupno: 0 };
+    const fond = new FondBotova([identitet], () => sada);
+    const rezervacija = fond.rezerviraj('popuna-2')!;
+    expect(fond.pregled()[0]?.rezervacija?.stanje).toBe('rezerviran');
+    sada = 2_000;
+    fond.oznaci(rezervacija, 'pokretanje');
+    const pregled = fond.pregled()[0]!;
+    expect(pregled.rezervacija?.stanjeOd).toBe(2_000);
+    pregled.rezervacija!.stanje = 'u_partiji';
+    expect(fond.rezervacijaZa(identitet.igracId)?.stanje).toBe('pokretanje');
+    fond.oslobodi(rezervacija);
+    await expect(fond.osvjeziProfile([identitet.igracId], async () => { throw new Error('Kvar'); })).rejects.toThrow('Kvar');
+    expect(fond.pregled()[0]).toMatchObject({ profilAktualan: false, greskaProfila: true, osvjezavanjeUTijeku: false, rezervacija: null });
+    await fond.osvjeziProfile([identitet.igracId], async () => [identitet]);
+    expect(fond.pregled()[0]).toMatchObject({ profilAktualan: true, greskaProfila: false });
+  });
+
   it('ne može dobiti sesiju ni razriješiti identitet', async () => {
     const botId = await noviBot();
     await expect(izdajSesiju(botId)).rejects.toThrow('nije moguće izdati sesiju');
@@ -128,7 +147,7 @@ describe('fond botova', () => {
     expect(fond.rezervacijaZa('a')?.stanje).toBe('u_partiji');
   });
 
-  it('bira najdulje neiskorišten identitet i gradi stavku reda kao bota', () => {
+  it('rotira identitete i gradi stavku reda sa stabilnim trenutkom rezervacije', () => {
     let sada = 0;
     const fond = new FondBotova(identiteti, () => sada);
     const prva = fond.rezerviraj('g1')!;
@@ -138,5 +157,77 @@ describe('fond botova', () => {
     expect(druga.igracId).not.toBe(prva.igracId);
     const stavka = fond.stavkaReda(druga.igracId);
     expect(stavka).toMatchObject({ upravljac: 'bot', vrsta: 'registriran', usaoU: 50 });
+    sada = 70;
+    expect(fond.stavkaReda(druga.igracId).usaoU).toBe(50);
+  });
+
+  it('svaki osnovni krug izvlači sve identitete jednom, a različiti RNG daju različit red', () => {
+    const izvuci = (slucajniIndeks: (gornja: number) => number) => {
+      const fond = new FondBotova(['a', 'b', 'c', 'd'].map((igracId) => ({ ...identiteti[0]!, igracId })), () => 0, slucajniIndeks);
+      return Array.from({ length: 8 }, () => {
+        const rezervacija = fond.rezerviraj('g1')!;
+        fond.oslobodi(rezervacija);
+        return rezervacija.igracId;
+      });
+    };
+    const prvi = izvuci(() => 0);
+    const drugi = izvuci((gornja) => gornja - 1);
+    expect(new Set(prvi.slice(0, 4)).size).toBe(4);
+    expect(new Set(prvi.slice(4)).size).toBe(4);
+    expect(prvi[3]).not.toBe(prvi[4]);
+    expect(prvi).not.toEqual(drugi);
+  });
+
+  it('zauzeti ostatak kruga ne blokira slobodnog i zadržava priliku nakon oslobađanja', () => {
+    const fond = new FondBotova(identiteti, () => 0, (gornja) => gornja - 1);
+    const zauzeti = fond.rezerviraj('dvoboj')!;
+    const slobodni = fond.rezerviraj('cetveroboj')!;
+    fond.oslobodi(slobodni);
+    const pomocni = fond.rezerviraj('dvoboj-2')!;
+    expect(pomocni.igracId).toBe(slobodni.igracId);
+    fond.oslobodi(pomocni);
+    fond.oslobodi(zauzeti);
+    expect(fond.rezerviraj('cetveroboj-2')!.igracId).toBe(zauzeti.igracId);
+  });
+
+  it('osvježavanje profila ne ruši rezervaciju ni ne vraća korištenog bota na početak', () => {
+    const fond = new FondBotova(identiteti, () => 0, (gornja) => gornja - 1);
+    const rezervacija = fond.rezerviraj('g1')!;
+    fond.postaviIdentitete(identiteti.map((identitet) => ({ ...identitet, nadimak: 'NovoIme' })));
+    expect(fond.rezervacijaZa(rezervacija.igracId)?.generacija).toBe(rezervacija.generacija);
+    expect(fond.stavkaReda(rezervacija.igracId).nadimak).toBe('NovoIme');
+    fond.oslobodi(rezervacija);
+    expect(fond.rezerviraj('g2')!.igracId).not.toBe(rezervacija.igracId);
+  });
+
+  it('bot koji čeka svježi profil ne ulazi u novi red, a spremljeni nizovi ostaju vidljivi', async () => {
+    const fond = new FondBotova(identiteti, () => 0, (gornja) => gornja - 1);
+    let dovrsi: (profili: IdentitetBota[]) => void = () => undefined;
+    const osvjezeno = fond.osvjeziProfile(['a'], () => new Promise((resolve) => { dovrsi = resolve; }));
+    expect(fond.rezerviraj('g1')!.igracId).toBe('b');
+    expect(fond.rezerviraj('g2')).toBeNull();
+    dovrsi([{ ...identiteti[0]!, iskustvoUkupno: 100, trenutniNiz1v1: 3, trenutniNiz4p: 2 }]);
+    await osvjezeno;
+    expect(fond.rezerviraj('g3')!.igracId).toBe('a');
+    expect(fond.stavkaReda('a')).toMatchObject({ iskustvoUkupno: 100, trenutniNiz1v1: 3, trenutniNiz4p: 2 });
+  });
+
+  it('neuspjeli upis profila zadržava bota nedostupnim do uspješnog oporavka', async () => {
+    const fond = new FondBotova(identiteti.slice(0, 1));
+    await expect(fond.osvjeziProfile(['a'], async () => { throw new Error('Baza nije dostupna'); })).rejects.toThrow();
+    expect(fond.rezerviraj('g1')).toBeNull();
+    await fond.osvjeziProfile(['a'], async () => identiteti.slice(0, 1));
+    expect(fond.rezerviraj('g2')!.igracId).toBe('a');
+  });
+
+  it('među dostupnima daje prednost nepoznatom protivniku, a povijest istječe nakon dana', () => {
+    let sada = 0;
+    const fond = new FondBotova(['a', 'b', 'c'].map((igracId) => ({ ...identiteti[0]!, igracId })), () => sada, (gornja) => gornja - 1);
+    fond.zapamtiProtivnike([{ igracId: 'covjek', upravljac: 'covjek' }, { igracId: 'a', upravljac: 'bot' }, { igracId: 'b', upravljac: 'bot' }]);
+    const novi = fond.rezerviraj('cetveroboj', ['covjek'])!;
+    expect(novi.igracId).toBe('c');
+    fond.oslobodi(novi);
+    sada = 86_400_001;
+    expect(fond.rezerviraj('dvoboj', ['covjek'])!.igracId).toBe('a');
   });
 });

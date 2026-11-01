@@ -17,6 +17,30 @@ erDiagram
     igraci ||--o{ povratne_informacije : pregledava
 ```
 
+## postavke_botova
+
+Jedan zapis s `id = 1`, pozitivnom `revizija`, strogo validiranom JSON konfiguracijom politike v3 te `azurirao_id` i `azurirano`. Nedostatak zapisa koristi env zadane vrijednosti uz reviziju 0. Spremanje koristi usporedbu očekivane revizije; konkurentna izmjena ne može neprimjetno prebrisati drugu.
+
+## izmjene_postavki_botova
+
+Audit promjena: `revizija` kao primarni ključ, potvrđena `konfiguracija`, `admin_id` i `vrijeme`. Upis pripada istoj transakciji kao promjena postavki. Brisanje administratora postavlja oba admin FK-a na `null`, ne briše konfiguraciju ni audit. Aditivna migracija ne preimenuje botove niti mijenja statistiku ili postojeće kolekcije.
+
+## izmjene_botova
+
+Audit stvaranja, aktivacije i deaktivacije: bot UUID (postaje `null` pri brisanju), trajni `kljuc_seeda`, akcija, prethodna/nova aktivnost, administrator i vrijeme. `botovi.tip` je prezentacija i ne mijenja `igraci.vrsta`/`upravljac`; stari botovi migriraju kao `imenovani`.
+
+## izmjene_botova
+
+Audit stvaranja, aktivacije i deaktivacije: bot UUID (postaje `null` pri brisanju), trajni `kljuc_seeda`, akcija, prethodna/nova aktivnost, administrator i vrijeme. `botovi.tip` je prezentacija i ne mijenja `igraci.vrsta`/`upravljac`; stari botovi migriraju kao `imenovani`.
+
+## trening_rijeci_igraca i pobjede_treninga
+
+`trening_rijeci_igraca` sprema jedinstvene prihvaćene oblike po registriranom čovjeku; upis se potvrđuje prije emitiranja prihvaćenog poteza. `pobjede_treninga` ima jedinstveni ID treninga i stvarnog registriranog pobjednika; nema FK prema `partije`, jer trening ne stvara redak partije. Više trening pobjeda po igraču dopušteno je. Brisanje računa briše obje tablice kaskadno. Pragovi Zagrijanog izvode se iz broja jedinstveno spremljenih pobjeda.
+
+## otkljucane_grupe_igraca
+
+Stupac `za_dostignuca` razlikuje kolekciju otkrivenu u treningu (false) od javno/privatno potvrđene grupe (true). Stari retci dobivaju true. Javno/privatno otkrivanje treningom poznate grupe je monotona promocija i smije povećati opći brojač samo jednom.
+
 ## igraci
 
 Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta je `UPDATE` istog retka — statistika ostaje.
@@ -62,6 +86,7 @@ Konfiguracija javnog bota (ADR-017). Identitet, avatar i statistika žive u `igr
 |---|---|---|
 | igrac_id | uuid PK, FK → igraci | |
 | kljuc_seeda | text, unique | Stabilan ključ (`bot-001` …) za idempotentan seed |
+| tip | enum `imenovani` / `gost` | Prezentacija; gost-bot nema javni profil ni ljestvicu |
 | aktivan | boolean | Neaktivan bot ne ulazi u fond popune |
 | verzija_profila | smallint | Verzija ponašanja/konfiguracije radi usporedbe rezultata |
 | stvoren | timestamptz | |

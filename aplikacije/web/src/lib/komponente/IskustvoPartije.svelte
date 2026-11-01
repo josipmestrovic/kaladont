@@ -34,9 +34,9 @@
 <style>
   .iskustvo-partije { margin: 16px 0; padding: 16px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
   header, li { display: flex; justify-content: space-between; gap: 12px; }
-  header { color: var(--boja-mint); font-size: var(--tekst-veliki); }
+  header { color: var(--boja-isticanje-tekst); font-size: var(--tekst-veliki); }
   p { margin: 8px 0; color: var(--boja-tekst-sekundarni); }
-  .max, .razina-povecana { color: var(--boja-mint); font-weight: 700; }
+  .max, .razina-povecana { color: var(--boja-isticanje-tekst); font-weight: 700; }
   .traka { height: 8px; overflow: hidden; border-radius: 4px; background: #e5ddc8; }
   .traka span { display: block; height: 100%; background: var(--boja-mint); }
   ul { display: grid; gap: 6px; margin: 16px 0; padding: 0; list-style: none; }

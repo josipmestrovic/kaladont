@@ -9,6 +9,7 @@ export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
   slijepa_ulica: '/ikone/46-slijepa-ulica.png',
   zavrsna_rijec: '/ikone/47-zavrsna-rijec.png',
   glas_zajednice: '/ikone/48-glas-zajednice.png',
+  zagrijan: '/ikone/06-trofej.png',
 };
 
 export function ikonaDostignuca(id: string): string {

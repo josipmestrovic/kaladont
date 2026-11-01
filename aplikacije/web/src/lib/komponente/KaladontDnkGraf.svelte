@@ -170,14 +170,14 @@
   }
 
   .dnk-podrucje {
-    fill: color-mix(in srgb, var(--boja-akcent) 22%, transparent);
-    stroke: var(--boja-akcent);
+    fill: color-mix(in srgb, var(--boja-akcent-tekst) 22%, transparent);
+    stroke: var(--boja-akcent-tekst);
     stroke-width: 2.5;
     stroke-linejoin: round;
   }
 
   .dnk-tocka {
-    fill: var(--boja-akcent);
+    fill: var(--boja-akcent-tekst);
     stroke: var(--boja-povrsina);
     stroke-width: 2;
   }

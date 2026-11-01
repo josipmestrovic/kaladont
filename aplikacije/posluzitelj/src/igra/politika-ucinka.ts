@@ -12,12 +12,14 @@ export interface PolitikaUcinkaPartije {
   dajeNapredak: boolean;
   /** kolekcije riječi i dostignuća (privatne sobe ih zadržavaju) */
   dajeDostignucaIKolekcije: boolean;
+  /** Samo registrirani ljudski trening-sudionik trajno sprema vlastite riječi. */
+  zapisujeKolekcijuTreninga: boolean;
 }
 
 const POLITIKE: Record<KontekstPartije, PolitikaUcinkaPartije> = {
-  javna: { kontekst: 'javna', zapisujePovijest: true, dajeNapredak: true, dajeDostignucaIKolekcije: true },
-  privatna: { kontekst: 'privatna', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: true },
-  trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: false },
+  javna: { kontekst: 'javna', zapisujePovijest: true, dajeNapredak: true, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
+  privatna: { kontekst: 'privatna', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
+  trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: false, zapisujeKolekcijuTreninga: true },
 };
 
 export function politikaZaKontekst(kontekst: KontekstPartije): PolitikaUcinkaPartije {
@@ -42,6 +44,8 @@ export interface DogadajPoteza {
   trazenaSlova: string | null;
   zadnjaRijec: string | null;
   istekPotezaMs: number | null;
+  pocetakPotezaMs: number;
+  trajanjePotezaMs: number;
   iskoristeneGrupe: ReadonlySet<string>;
   dopusteneVrste?: ReadonlySet<import('zajednicko').VrstaRijeci>;
   sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot'; aktivan: boolean }[];

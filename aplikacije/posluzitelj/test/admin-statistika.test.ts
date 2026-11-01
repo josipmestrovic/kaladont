@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { igraci, partije, sudioniciPartije } from '../src/baza/shema.js';
+import { botovi, igraci, izmjeneBotova, izmjenePostavkiBotova, partije, postavkeBotova, sudioniciPartije } from '../src/baza/shema.js';
+import { ucitajTrajnePostavkeBotova, type ZapisPostavkiBotova } from '../src/bot/trajne-postavke.js';
+import { ZADANA_KONFIGURACIJA_BOTA } from '../src/bot/konfiguracija-bota.js';
 import { izracunajStatistikuCekanja } from '../src/admin/statistika-cekanja.js';
 import type { PregledNadzora } from 'zajednicko';
 
@@ -14,8 +16,12 @@ let adminToken: string;
 let obicanToken: string;
 const stvoreniIgraci: string[] = [];
 const stvorenePartije: string[] = [];
+const stvoreniBotovi: { igracId: string; kljucSeeda: string }[] = [];
+let pocetnePostavke: typeof postavkeBotova.$inferSelect | undefined;
+const stvoreneRevizije: number[] = [];
 
 beforeAll(async () => {
+  [pocetnePostavke] = await baza.select().from(postavkeBotova);
   posluzitelj = await izgradiPosluzitelj();
   await posluzitelj.app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = posluzitelj.app.server.address();
@@ -36,6 +42,21 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (stvoreniBotovi.length) {
+    const kljucevi = stvoreniBotovi.map((bot) => bot.kljucSeeda);
+    await baza.delete(izmjeneBotova).where(inArray(izmjeneBotova.kljucSeeda, kljucevi));
+    await baza.delete(botovi).where(inArray(botovi.igracId, stvoreniBotovi.map((bot) => bot.igracId)));
+    await baza.delete(igraci).where(inArray(igraci.id, stvoreniBotovi.map((bot) => bot.igracId)));
+  }
+  if (stvoreneRevizije.length) {
+    await baza.transaction(async (transakcija) => {
+      const [aktualne] = await transakcija.select().from(postavkeBotova).where(eq(postavkeBotova.id, 1)).for('update');
+      if (!aktualne || !stvoreneRevizije.includes(aktualne.revizija)) throw new Error('Postavke su promijenjene izvan testa; ne vraćam tuđu izmjenu.');
+      await transakcija.delete(izmjenePostavkiBotova).where(inArray(izmjenePostavkiBotova.revizija, stvoreneRevizije));
+      if (pocetnePostavke) await transakcija.update(postavkeBotova).set(pocetnePostavke).where(eq(postavkeBotova.id, 1));
+      else await transakcija.delete(postavkeBotova).where(eq(postavkeBotova.id, 1));
+    });
+  }
   if (stvorenePartije.length) {
     await baza.delete(sudioniciPartije).where(inArray(sudioniciPartije.partijaId, stvorenePartije));
     await baza.delete(partije).where(inArray(partije.id, stvorenePartije));
@@ -45,6 +66,40 @@ afterAll(async () => {
 });
 
 describe('GET /admin/statistike/cekanje', () => {
+  it('bot postavke zahtijevaju admina, validiraju i transakcijski odbijaju neaktualnu reviziju', async () => {
+    const putanja = `${adresa}/api/admin/botovi/postavke`;
+    expect((await fetch(putanja)).status).toBe(401);
+    expect((await fetch(putanja, { headers: { authorization: `Bearer ${obicanToken}` } })).status).toBe(403);
+    const headers = { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' };
+    expect((await fetch(putanja, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(401);
+    expect((await fetch(putanja, { method: 'PUT', headers: { authorization: `Bearer ${obicanToken}`, 'content-type': 'application/json' }, body: '{}' })).status).toBe(403);
+    const odgovor = await fetch(putanja, { headers });
+    expect(odgovor.headers.get('cache-control')).toBe('no-store');
+    const prije = await odgovor.json() as ZapisPostavkiBotova;
+    expect(prije.revizija).toBe(pocetnePostavke?.revizija ?? 0);
+    const spremi = (konfiguracija = prije.konfiguracija, revizija = prije.revizija) => fetch(putanja, { method: 'PUT', headers, body: JSON.stringify({ revizija, konfiguracija }) });
+    expect((await spremi({ ...prije.konfiguracija, udioBrzih: 0.9, udioUobicajenih: 0.9 })).status).toBe(400);
+    expect((await spremi({ ...prije.konfiguracija, brziRazvoj: true })).status).toBe(400);
+    const odgovori = await Promise.all([
+      spremi({ ...prije.konfiguracija, vjerojatnostOstavljanjaKa: 0.22 }),
+      spremi({ ...prije.konfiguracija, vjerojatnostOstavljanjaKa: 0.33 }),
+    ]);
+    expect(odgovori.map((stavka) => stavka.status).sort()).toEqual([200, 409]);
+    const uspjeh = await odgovori.find((stavka) => stavka.status === 200)!.json() as ZapisPostavkiBotova;
+    stvoreneRevizije.push(uspjeh.revizija);
+    expect(uspjeh.revizija).toBe(prije.revizija + 1);
+    expect((await spremi()).status).toBe(409);
+    const trajno = await ucitajTrajnePostavkeBotova(ZADANA_KONFIGURACIJA_BOTA);
+    expect({ ok: true, ...trajno }).toEqual(uspjeh);
+    const [audit] = await baza.select().from(izmjenePostavkiBotova).where(eq(izmjenePostavkiBotova.revizija, uspjeh.revizija));
+    expect(audit?.konfiguracija).toEqual(uspjeh.konfiguracija);
+    expect(audit?.adminId).toBe(stvoreniIgraci[0]);
+    const poslije = await (await fetch(putanja, { headers })).json() as ZapisPostavkiBotova;
+    expect(poslije.revizija).toBe(uspjeh.revizija);
+    expect(poslije.konfiguracija).toEqual(uspjeh.konfiguracija);
+    expect(JSON.stringify(poslije)).not.toContain(adminToken);
+  });
+
   it('privatni nadzor zahtijeva admina, ne izlaže identitete i ne resetira health uzorak', async () => {
     const putanja = `${adresa}/api/admin/statistike/posluzitelj`;
     expect((await fetch(putanja)).status).toBe(401);
@@ -65,6 +120,48 @@ describe('GET /admin/statistike/cekanje', () => {
     expect(drugi.eventLoopP95Ms).toBe(prvi.eventLoopP95Ms);
     expect((await posluzitelj.app.inject({ method: 'POST', url: '/api/admin/nadzor/probna-obavijest', remoteAddress: '203.0.113.20' })).statusCode).toBe(401);
     expect((await fetch(`${adresa}/api/admin/nadzor/probna-obavijest`, { method: 'POST', headers: { authorization: `Bearer ${adminToken}` } })).status).toBe(409);
+  });
+
+  it('živi pregled botova je privatan i čitanje ne mijenja fond', async () => {
+    const putanja = `${adresa}/api/admin/botovi/pregled`;
+    expect((await fetch(putanja)).status).toBe(401);
+    expect((await fetch(putanja, { headers: { authorization: `Bearer ${obicanToken}` } })).status).toBe(403);
+    const headers = { authorization: `Bearer ${adminToken}` };
+    const prvi = await fetch(putanja, { headers });
+    expect(prvi.status).toBe(200);
+    expect(prvi.headers.get('cache-control')).toBe('no-store');
+    const pregled = await prvi.json() as { fond: unknown; botovi: { igracId: string; status: string; plan: unknown; rezervacija: unknown }[] };
+    const drugi = await (await fetch(putanja, { headers })).json() as typeof pregled;
+    expect(drugi.fond).toEqual(pregled.fond);
+    expect(drugi.botovi).toEqual(pregled.botovi);
+    expect(new Set(pregled.botovi.map((bot) => bot.igracId)).size).toBe(pregled.botovi.length);
+    expect(pregled.botovi.every((bot) => bot.status === 'slobodan' && bot.plan === null && bot.rezervacija === null)).toBe(true);
+    expect(JSON.stringify(pregled)).not.toContain(adminToken);
+    expect(JSON.stringify(pregled)).not.toContain('@example.com');
+  });
+
+  it('stvara, deaktivira i aktivira gosta-bota uz privatnost profila, drain i audit', async () => {
+    const putanja = `${adresa}/api/admin/botovi`;
+    const headers = { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' };
+    const prije = posluzitelj.fondBotova.stanje().ukupno;
+    const odgovor = await fetch(putanja, { method: 'POST', headers, body: JSON.stringify({ broj: 1, tip: 'gost' }) });
+    expect(odgovor.status).toBe(200);
+    const stvoren = await odgovor.json() as { stvoreno: { igracId: string; kljucSeeda: string; tip: string }[]; aktivnoPoslije: number };
+    const gostBot = stvoren.stvoreno[0]!;
+    stvoreniBotovi.push(gostBot);
+    expect(gostBot.tip).toBe('gost');
+    expect(stvoren.aktivnoPoslije).toBe(prije + 1);
+    expect((await fetch(`${adresa}/api/profil/javni/${gostBot.igracId}`)).status).toBe(404);
+
+    const aktivacija = `${adresa}/api/admin/botovi/${gostBot.igracId}/aktivacija`;
+    const deaktiviran = await fetch(aktivacija, { method: 'PUT', headers, body: JSON.stringify({ aktivan: false }) });
+    expect(deaktiviran.status).toBe(200);
+    expect(await deaktiviran.json()).toMatchObject({ ok: true, aktivan: false, dovrsavaIgru: false });
+    const pregled = await (await fetch(`${adresa}/api/admin/botovi/pregled`, { headers: { authorization: `Bearer ${adminToken}` } })).json() as { botovi: { igracId: string; status: string; tip: string }[] };
+    expect(pregled.botovi.find((bot) => bot.igracId === gostBot.igracId)).toMatchObject({ status: 'deaktiviran', tip: 'gost' });
+    const aktiviran = await fetch(aktivacija, { method: 'PUT', headers, body: JSON.stringify({ aktivan: true }) });
+    expect(aktiviran.status).toBe(200);
+    expect(await baza.select().from(izmjeneBotova).where(eq(izmjeneBotova.botId, gostBot.igracId))).toHaveLength(3);
   });
 
   it('traži administratora', async () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { dohvatiStanjeVeze, type StanjeVeze } from '$lib/socket.js';
@@ -7,7 +8,24 @@
   const stanjeVeze = dohvatiStanjeVeze();
   const stanjeIgre = dohvatiStanjeIgre();
   const prikazivaStanja: StanjeVeze[] = ['prekid', 'ponovno_spajanje', 'sesija_istekla', 'druga_kartica'];
-  const trebaPrikazati = $derived(stanjeVeze.partijaNedostupna || prikazivaStanja.includes(stanjeVeze.stanje));
+  const obavijestAktivna = $derived(stanjeVeze.partijaNedostupna || prikazivaStanja.includes(stanjeVeze.stanje));
+  let obavijestZatvorena = $state(false);
+  let obavijest: HTMLElement | undefined = $state();
+  const trebaPrikazati = $derived(obavijestAktivna && !obavijestZatvorena);
+
+  $effect(() => {
+    if (!obavijestAktivna) obavijestZatvorena = false;
+  });
+
+  onMount(() => {
+    function zatvoriKlikomIzvan(dogadaj: MouseEvent): void {
+      if (!trebaPrikazati || !obavijest || !(dogadaj.target instanceof Node)) return;
+      if (!obavijest.contains(dogadaj.target)) obavijestZatvorena = true;
+    }
+
+    document.addEventListener('click', zatvoriKlikomIzvan);
+    return () => document.removeEventListener('click', zatvoriKlikomIzvan);
+  });
 
   $effect(() => {
     if (!$page.url.pathname.startsWith('/partija/') || $page.url.pathname.startsWith('/partija/arhiva/')) {
@@ -46,23 +64,23 @@
           : 'Čekamo da se veza s poslužiteljem vrati.',
   );
 
-  function osvjezi(): void {
-    window.location.reload();
+  function prijaviSe(): void {
+    obavijestZatvorena = true;
+    void goto('/prijava');
   }
 </script>
 
 {#if trebaPrikazati}
-  <aside class="veza-obavijest" class:kriticno={stanjeVeze.stanje === 'sesija_istekla' || stanjeVeze.stanje === 'druga_kartica'} role="status" aria-live="polite">
+  <aside bind:this={obavijest} class="veza-obavijest" class:kriticno={stanjeVeze.stanje === 'sesija_istekla' || stanjeVeze.stanje === 'druga_kartica'} role="status" aria-live="polite">
     <div>
       <strong>{naslov}</strong>
       <span>{opis}</span>
     </div>
+    <button type="button" class="zatvori" aria-label="Zatvori obavijest" onclick={() => (obavijestZatvorena = true)}>×</button>
     {#if stanjeVeze.partijaNedostupna}
       <button type="button" onclick={() => void goto('/')}>Na početnu</button>
     {:else if stanjeVeze.stanje === 'sesija_istekla'}
-      <button type="button" onclick={() => void goto('/prijava')}>Prijavi se</button>
-    {:else if stanjeVeze.stanje === 'druga_kartica'}
-      <button type="button" onclick={osvjezi}>Ponovno učitaj</button>
+      <button type="button" onclick={prijaviSe}>Prijavi se</button>
     {/if}
   </aside>
 {/if}
@@ -74,7 +92,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 12px 16px;
+    padding: 12px 44px 12px 16px;
+    position: relative;
     border: 1px solid var(--boja-zlato-obrub);
     border-radius: 8px;
     background: var(--boja-zlato-pozadina);
@@ -105,6 +124,22 @@
     background: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
     cursor: pointer;
+  }
+
+  .veza-obavijest button.zatvori {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 22px;
+    line-height: 1;
   }
 
   @media (max-width: 999px) {

@@ -260,6 +260,34 @@
       "when": 1791532699372,
       "tag": "0036_bot_identiteti",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791628403417,
+      "tag": "0037_postavke_botova_v3",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791630271080,
+      "tag": "0038_napredak_treninga_i_kolekcija",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1791632971045,
+      "tag": "0039_tip_prezentacije_bota",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791633064547,
+      "tag": "0040_izmjene_botova",
+      "breakpoints": true
     }
   ]
 }

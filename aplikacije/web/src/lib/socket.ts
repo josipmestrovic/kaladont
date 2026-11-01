@@ -42,7 +42,10 @@ function postaviSlusatelje(aktivniSocket: KaladontSocket): void {
     postaviStanjeVeze('spremno');
   });
   aktivniSocket.on('veza:zatvorena', (p) => {
-    if (p.kod === 'DRUGA_KARTICA') postaviStanjeVeze('druga_kartica', p.kod, p.poruka);
+    if (p.kod === 'DRUGA_KARTICA') {
+      aktivniSocket.io.reconnection(false);
+      postaviStanjeVeze('druga_kartica', p.kod, p.poruka);
+    }
     if (p.kod === 'SESIJA_ISTEKLA') postaviStanjeVeze('sesija_istekla', p.kod, p.poruka);
   });
   aktivniSocket.on('disconnect', (razlog) => {
@@ -54,8 +57,10 @@ function postaviSlusatelje(aktivniSocket: KaladontSocket): void {
   });
   aktivniSocket.on('connect_error', (greska: Error & { data?: { kod?: string } }) => {
     const kod = kodIzGreske(greska);
-    if (kod === 'DRUGA_KARTICA') postaviStanjeVeze('druga_kartica', kod, greska.message);
-    else if (kod === 'SESIJA_ISTEKLA' || kod === 'NEVALJAN_TOKEN') {
+    if (kod === 'DRUGA_KARTICA') {
+      aktivniSocket.io.reconnection(false);
+      postaviStanjeVeze('druga_kartica', kod, greska.message);
+    } else if (kod === 'SESIJA_ISTEKLA' || kod === 'NEVALJAN_TOKEN') {
       aktivniSocket.io.reconnection(false);
       postaviStanjeVeze('sesija_istekla', kod, greska.message);
     } else postaviStanjeVeze('ponovno_spajanje', kod, greska.message);
@@ -106,4 +111,3 @@ export async function osvjeziSocketIdentitet(): Promise<void> {
 export function oznaciNamjernoIskljucenje(): void {
   postaviStanjeVeze('rucno_iskljuceno');
 }
-

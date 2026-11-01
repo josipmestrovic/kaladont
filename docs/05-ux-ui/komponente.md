@@ -25,11 +25,11 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 
 | Komponenta | Opis |
 |---|---|
-| IzbornikBrzihPoruka | Mali animirani izbornik sidren uz vlastito sjedalo; 4 okomite varijante: 👋 Prijatno, 😅 Nemoj zamjerit, 👏 Bravo!, 😎 Hvala; odabrana reakcija prikazuje se ispod imena |
+| IzbornikBrzihPoruka | Mali animirani izbornik sidren uz vlastito sjedalo; 4 okomite varijante: 👋 Bok!, 😅 Nemoj zamjerit, 👏 Bravo!, 😎 Hvala; odabrana reakcija prikazuje se ispod imena |
 | WordBubble | Jedan bubble za zadnju prihvaćenu igračku riječ, sidren neposredno iznad avatara autora; veći tekst, narančasto istaknuta zadnja dva grafema, stabilan prikaz i manji font za duge riječi |
 | CountdownRing | SVG prsten oko avatara, prazni se 30s, prikazuje preostale sekunde u kontrastnoj sredini, prati zelenu shemu aktivnog sjedala, jače se oglasi pri dolasku reda i pulsira zadnjih 5 s |
 | SjedaloKartica | avatar + rang bedž + ime + status; aktivno sjedalo ima debeli zeleni okvir i label „Na redu!”, reakcija je sidrena neposredno iznad avatara s visokim slojem, vlastito sjedalo jedna je klikabilna cjelina, a primljena reakcija nakratko podigne avatar |
-| GlobalneObavijesti | plutajući stupac s VezaObavijest i CitanjeNaglasObavijest; poruke ostaju zasebne, jedna ispod druge, a govorna obavijest prikazuje procjenu platforme, dostupnost hrvatskog glasa, poveznicu na pomoć i akciju „Razumijem” |
+| GlobalneObavijesti | plutajući stupac s VezaObavijest i CitanjeNaglasObavijest; poruke ostaju zasebne, jedna ispod druge, VezaObavijest se zatvara križićem, klikom izvan nje ili odabirom „Prijavi se”, a govorna obavijest prikazuje procjenu platforme, dostupnost hrvatskog glasa, poveznicu na pomoć i akciju „Razumijem” |
 | Toast/Alert | uspjeh (mint), greška (crvena), info (neutralno) — auto-nestaje 2s ili traje dok se ne zatvori |
 | Modal/Dijalog | naslov + tijelo + 2 akcije (potvrdi/odustani) — koristi se za potvrdu izlaska i prijavu greške |
 | EliminacijaKartica | poruka + tko dobiva bod + gumb Prijavi |

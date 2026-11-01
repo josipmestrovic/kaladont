@@ -10,7 +10,7 @@ Jedina svrha MVP-a: **provjeriti hoće li ljudi igrati**. Sve što tome ne prido
 | Zajednički red čekanja | Ljudi imaju prednost; nakon 30 s (Dvoboj) odnosno 20/30/40 s (Četveroboj) prazna mjesta popunjavaju botovi; real-time popunjavanje s imenima + prosjek čekanja zadnjih 100 partija |
 | Partija 4 igrača       | 30 s po potezu, ispadanje, bodovi (plasman + eliminacije + bonus), emoji reakcije, promatranje nakon ispadanja |
 | Botovi za popunu       | Trajni identiteti, isti obračun za ljude, nenapadačka politika riječi; oznaka vidljiva samo administratoru ([ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md)) |
-| Zagrijavanje           | Dvoboj protiv računala za goste i registrirane; ništa se ne bilježi ([botovi.md](../02-pravila-igre/botovi.md))     |
+| Zagrijavanje           | Dvoboj bez natjecateljske statistike/XP-a; registriranima se spremaju potvrđene riječi i pobjednički napredak Zagrijanog ([botovi.md](../02-pravila-igre/botovi.md)) |
 | Registracija           | Email + lozinka; gost postaje račun bez gubitka statistike                                                     |
 | Rangovi                | Prikazni (Prvopisac → Kaladont), nakon 10 kalibracijskih partija                                               |
 | Javna ljestvica        | Top 100 po prosjeku bodova                                                                                     |
