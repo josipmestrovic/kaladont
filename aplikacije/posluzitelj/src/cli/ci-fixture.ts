@@ -2,15 +2,20 @@ import { sql } from 'drizzle-orm';
 import { baza, zatvoriBazu } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
 
+// Svaki prefiks koji se pojavi kao nastavak mora imati ≥2 ne-ka odgovora,
+// inače trening e2e/unit testovi padaju kad je početna riječ jedini ne-ka kandidat.
 const rijeciZaCi = [
   'baba',
+  'bala',
   'baka',
   'kapa',
   'kara',
   'raka',
+  'rasa',
   'pala',
   'papa',
   'lala',
+  'lama',
   'laka',
   'mama',
   'masa',
