@@ -20,23 +20,54 @@ export type AudioDogadaj =
 
 const KLJUC_POSTAVKI = 'kaladont_audio_postavke_v1';
 const ZVUKOVI: Record<AudioDogadaj, string> = {
-  'ulazak-u-sobu': '/zvukovi/ulazak-u-sobu.wav',
-  'izlazak-iz-sobe': '/zvukovi/izlazak-iz-sobe.wav',
-  'odbrojavanje-single-count-sound': '/zvukovi/odbrojavanje-single-count-sound.wav',
-  'pocetak-partije': '/zvukovi/pocetak-partije.wav',
-  'potez-prihvacen': '/zvukovi/potez-prihvacen.wav',
-  'potez-odbijen-1': '/zvukovi/potez-odbijen-1.wav',
-  'potez-odbijen-2': '/zvukovi/potez-odbijen-2.wav',
-  'potez-odbijen-3': '/zvukovi/potez-odbijen-3.wav',
+  'ulazak-u-sobu': '/zvukovi/ulazak-u-sobu.mp3',
+  'izlazak-iz-sobe': '/zvukovi/izlazak-iz-sobe.mp3',
+  'odbrojavanje-single-count-sound': '/zvukovi/odbrojavanje-single-count-sound.mp3',
+  'pocetak-partije': '/zvukovi/pocetak-partije.mp3',
+  'potez-prihvacen': '/zvukovi/potez-prihvacen.mp3',
+  'potez-odbijen-1': '/zvukovi/potez-odbijen-1.mp3',
+  'potez-odbijen-2': '/zvukovi/potez-odbijen-2.mp3',
+  'potez-odbijen-3': '/zvukovi/potez-odbijen-3.mp3',
   'tvoj-red': '/zvukovi/tvoj-red.mp3',
-  'promjena-reda': '/zvukovi/promjena-reda.wav',
-  eliminacija: '/zvukovi/eliminacija.wav',
+  'promjena-reda': '/zvukovi/promjena-reda.mp3',
+  eliminacija: '/zvukovi/eliminacija.mp3',
   'aplauz-kaladont': '/zvukovi/applause-cheering.mp3',
   'partija-kraj': '/zvukovi/partija-kraj.mp3',
-  'pred-istek-vremena': '/zvukovi/pred-istek-vremena.wav',
-  'klik-misa': '/zvukovi/klik-misa.wav',
-  'hover-efekt': '/zvukovi/hover-efekt.wav',
+  'pred-istek-vremena': '/zvukovi/pred-istek-vremena.mp3',
+  'klik-misa': '/zvukovi/klik-misa.mp3',
+  'hover-efekt': '/zvukovi/hover-efekt.mp3',
 };
+
+const UI_ZVUKOVI: AudioDogadaj[] = ['klik-misa', 'hover-efekt'];
+
+/** Kritični SFX — warm do canplaythrough (odbrojavanje / potez / UI). */
+const KRITICNI_WARM_ZVUKOVI: ReadonlySet<AudioDogadaj> = new Set([
+  'odbrojavanje-single-count-sound',
+  'pocetak-partije',
+  'ulazak-u-sobu',
+  'tvoj-red',
+  'promjena-reda',
+  'potez-prihvacen',
+  'klik-misa',
+  'hover-efekt',
+]);
+
+const GAMEPLAY_ZVUKOVI: AudioDogadaj[] = [
+  'ulazak-u-sobu',
+  'izlazak-iz-sobe',
+  'odbrojavanje-single-count-sound',
+  'pocetak-partije',
+  'potez-prihvacen',
+  'potez-odbijen-1',
+  'potez-odbijen-2',
+  'potez-odbijen-3',
+  'tvoj-red',
+  'promjena-reda',
+  'eliminacija',
+  'aplauz-kaladont',
+  'partija-kraj',
+  'pred-istek-vremena',
+];
 
 interface AudioPostavke {
   volumen: number;
@@ -70,8 +101,11 @@ export const audioPostavke = writable<AudioPostavke>(zadanePostavke);
 let aktiviran = false;
 let postavke: AudioPostavke = zadanePostavke;
 const cache = new Map<AudioDogadaj, HTMLAudioElement>();
-/** Klonovi u tijeku reprodukcije — treba ih moći ugasiti pri izlasku iz partije. */
+/** Trenutno svirajući cached elementi — gasi se pri izlasku iz partije. */
 const aktivniZvukovi = new Set<HTMLAudioElement>();
+let uiZvukoviPokrenuti = false;
+let gameplayZvukoviPokrenuti = false;
+let audioUnlockOdraden = false;
 
 function ucitajPostavke(): AudioPostavke {
   if (typeof localStorage === 'undefined') return zadanePostavke;
@@ -97,8 +131,31 @@ export function inicijalizirajAudio(): void {
   audioPostavke.set({ ...postavke });
 }
 
+function odkljucajAudioPipeline(): void {
+  if (audioUnlockOdraden || typeof window === 'undefined') return;
+  audioUnlockOdraden = true;
+  try {
+    // Odvojeni element — ne diraj cached klik-misa (pointerdown + click bi se preklapali).
+    const unlock = new Audio(ZVUKOVI['klik-misa']);
+    unlock.preload = 'auto';
+    unlock.muted = true;
+    unlock.volume = 0;
+    const ocisti = () => {
+      try {
+        unlock.pause();
+      } catch {
+        // Unlock ne smije bacati.
+      }
+    };
+    void unlock.play().then(ocisti).catch(ocisti);
+  } catch {
+    // Unlock ne smije bacati.
+  }
+}
+
 export function aktivirajAudio(): void {
   aktiviran = true;
+  odkljucajAudioPipeline();
 }
 
 function ucitajZvuk(dogadaj: AudioDogadaj): HTMLAudioElement {
@@ -111,88 +168,168 @@ function ucitajZvuk(dogadaj: AudioDogadaj): HTMLAudioElement {
   return zvuk;
 }
 
-const TIMEOUT_PRELOADA_ZVUKA_MS = 15_000;
-
-function cekajZvukSpremnost(zvuk: HTMLAudioElement): Promise<void> {
-  if (zvuk.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return Promise.resolve();
-  return new Promise((resolve) => {
-    let rijeseno = false;
-    const zavrsi = () => {
-      if (rijeseno) return;
-      rijeseno = true;
-      window.clearTimeout(timer);
-      zvuk.removeEventListener('canplaythrough', zavrsi);
-      zvuk.removeEventListener('error', zavrsi);
-      resolve();
-    };
-    const timer = window.setTimeout(zavrsi, TIMEOUT_PRELOADA_ZVUKA_MS);
-    zvuk.addEventListener('canplaythrough', zavrsi);
-    zvuk.addEventListener('error', zavrsi);
-    try {
-      zvuk.load();
-    } catch {
-      zavrsi();
-      return;
-    }
-    // load() može sinkrono dovesti do dovoljnog readyStatea.
-    if (zvuk.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) zavrsi();
-  });
+function cekajCanPlayThrough(zvuk: HTMLAudioElement): void {
+  if (zvuk.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return;
+  const naGotovo = () => {
+    zvuk.removeEventListener('canplaythrough', naGotovo);
+    zvuk.removeEventListener('error', naGotovo);
+  };
+  zvuk.addEventListener('canplaythrough', naGotovo, { once: true });
+  zvuk.addEventListener('error', naGotovo, { once: true });
+  try {
+    zvuk.load();
+  } catch {
+    naGotovo();
+  }
 }
 
-/** Broj SFX datoteka koje boot preloadira (za progress bar). */
-export function brojZvukovaZaPreload(): number {
-  return Object.keys(ZVUKOVI).length;
-}
-
-/** Predloži sve mapirane SFX u memory cache; tolerantno na error/timeout. */
-export async function preucitajSveZvukove(onJedanGotov?: () => void): Promise<void> {
+/** Zagrije cache; kritični SFX dodatno do canplaythrough (ne blokira UI). */
+function zagrijZvukove(dogadaji: readonly AudioDogadaj[]): void {
   if (typeof window === 'undefined') return;
-  const dogadaji = Object.keys(ZVUKOVI) as AudioDogadaj[];
-  await Promise.all(
-    dogadaji.map(async (dogadaj) => {
-      try {
-        const zvuk = ucitajZvuk(dogadaj);
-        await cekajZvukSpremnost(zvuk);
-      } catch {
-        // Pojedinačni SFX ne smije blokirati boot.
-      } finally {
-        onJedanGotov?.();
-      }
-    }),
-  );
+  for (const dogadaj of dogadaji) {
+    try {
+      const zvuk = ucitajZvuk(dogadaj);
+      if (KRITICNI_WARM_ZVUKOVI.has(dogadaj)) cekajCanPlayThrough(zvuk);
+    } catch {
+      // Warm-up ne smije bacati.
+    }
+  }
 }
+
+function pokreniUPozadini(posao: () => void): void {
+  if (typeof window === 'undefined') return;
+  const ric = window.requestIdleCallback?.bind(window);
+  if (ric) ric(() => posao(), { timeout: 2_000 });
+  else window.setTimeout(posao, 0);
+}
+
+/** Fire-and-forget nakon reveal — klik/hover (idle OK). */
+export function preucitajUiZvukove(): void {
+  if (uiZvukoviPokrenuti) return;
+  uiZvukoviPokrenuti = true;
+  pokreniUPozadini(() => zagrijZvukove(UI_ZVUKOVI));
+}
+
+/**
+ * Zagrij gameplay SFX odmah (bez idle) — zove se iz user gest-a / ulaska u red.
+ * Ne await-a canplaythrough; fetch kreće u istom ticku.
+ */
+export function zagrijGameplayZvukove(): void {
+  if (gameplayZvukoviPokrenuti) return;
+  gameplayZvukoviPokrenuti = true;
+  zagrijZvukove(GAMEPLAY_ZVUKOVI);
+}
+
+const TIMEOUT_PLAY_RETRY_MS = 1_500;
+/** Generacija po elementu — stari play().catch ne smije load()-ati preko novijeg pustiAudio. */
+const playGeneracija = new WeakMap<HTMLAudioElement, number>();
+/** Skini ended/error/canplay + retry timer prije novog playa na istom čvoru. */
+const ocistiPokusajPoZvuku = new WeakMap<HTMLAudioElement, () => void>();
 
 export function pustiAudio(dogadaj: AudioDogadaj): void {
   if (typeof window === 'undefined' || !aktiviran || postavke.utišano || postavke.volumen <= 0) return;
   try {
-    // Predlozak drži HTTP cache topao; za play koristimo klon da currentTime/seek
-    // na još neučitanom mp3 ne proguta cijeli efekt (tihi catch).
-    const predlozak = ucitajZvuk(dogadaj);
-    const zvuk = predlozak.cloneNode(true) as HTMLAudioElement;
+    // Reuse istog elementa — cloneNode na mobitelu gubi buffer i čeka canplay po nekoliko sekundi.
+    const zvuk = ucitajZvuk(dogadaj);
+    ocistiPokusajPoZvuku.get(zvuk)?.();
+    const generacija = (playGeneracija.get(zvuk) ?? 0) + 1;
+    playGeneracija.set(zvuk, generacija);
+
     zvuk.volume = postavke.volumen * POJACANJE_PO_DOGADAJU[dogadaj];
+    try {
+      zvuk.pause();
+    } catch {
+      // pause na neučitanom elementu može baciti u nekim browserima.
+    }
+    try {
+      zvuk.currentTime = 0;
+    } catch {
+      // currentTime prije loada — ignoriši.
+    }
+
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let naCanPlay: (() => void) | null = null;
+    const josAktivan = () => playGeneracija.get(zvuk) === generacija && aktivniZvukovi.has(zvuk);
+    const skiniSlusatelje = () => {
+      if (retryTimer !== null) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      if (naCanPlay) {
+        zvuk.removeEventListener('canplay', naCanPlay);
+        naCanPlay = null;
+      }
+      zvuk.removeEventListener('ended', ocisti);
+      zvuk.removeEventListener('error', naGresku);
+      if (ocistiPokusajPoZvuku.get(zvuk) === skiniSlusatelje) ocistiPokusajPoZvuku.delete(zvuk);
+    };
     const ocisti = () => {
-      aktivniZvukovi.delete(zvuk);
+      skiniSlusatelje();
+      if (playGeneracija.get(zvuk) === generacija) aktivniZvukovi.delete(zvuk);
     };
-    zvuk.addEventListener('ended', ocisti, { once: true });
-    zvuk.addEventListener('error', ocisti, { once: true });
+    const naGresku = () => {
+      if (playGeneracija.get(zvuk) === generacija) cache.delete(dogadaj);
+      ocisti();
+    };
+    zvuk.addEventListener('ended', ocisti);
+    zvuk.addEventListener('error', naGresku);
+    ocistiPokusajPoZvuku.set(zvuk, skiniSlusatelje);
     aktivniZvukovi.add(zvuk);
+
     const pokreni = () => {
-      // zaustaviSveZvukove makne iz seta prije pause — ne pokreći ugašeni klon.
-      if (!aktivniZvukovi.has(zvuk)) return;
-      void zvuk.play().catch(ocisti);
+      if (!josAktivan()) return;
+      void zvuk.play().catch(() => {
+        // pause()/novi pustiAudio odbija stari play — ne load() jer to abortira noviji play.
+        if (!josAktivan()) return;
+        if (zvuk.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          ocisti();
+          return;
+        }
+        // Buffer još nije spreman — jedan load + canplay retry s timeoutom.
+        naCanPlay = () => {
+          if (retryTimer !== null) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+          }
+          naCanPlay = null;
+          if (!josAktivan()) return;
+          void zvuk.play().catch(() => {
+            if (josAktivan()) ocisti();
+          });
+        };
+        zvuk.addEventListener('canplay', naCanPlay, { once: true });
+        try {
+          zvuk.load();
+        } catch {
+          ocisti();
+          return;
+        }
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          if (naCanPlay) {
+            zvuk.removeEventListener('canplay', naCanPlay);
+            naCanPlay = null;
+          }
+          if (josAktivan()) ocisti();
+        }, TIMEOUT_PLAY_RETRY_MS);
+      });
     };
-    if (zvuk.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) pokreni();
-    else zvuk.addEventListener('canplay', pokreni, { once: true });
+
+    // Optimistic play — ne čekaj canplay zauvijek (iOS/Chrome ponekad ga ne emitira nakon seek/load).
+    pokreni();
   } catch {
     // Audio nikad ne smije prekinuti Socket.IO/state obradu poteza.
   }
 }
 
-/** Prekida sve trenutno svirajuće SFX klonove (npr. izlazak iz partije). */
+/** Prekida sve trenutno svirajuće SFX (npr. izlazak iz partije). */
 export function zaustaviSveZvukove(): void {
-  const zvukovi = [...aktivniZvukovi];
+  const izAktivnih = [...aktivniZvukovi];
   aktivniZvukovi.clear();
-  for (const zvuk of zvukovi) {
+  const kandidati = new Set<HTMLAudioElement>([...izAktivnih, ...cache.values()]);
+  for (const zvuk of kandidati) {
+    ocistiPokusajPoZvuku.get(zvuk)?.();
+    playGeneracija.set(zvuk, (playGeneracija.get(zvuk) ?? 0) + 1);
     try {
       zvuk.pause();
       zvuk.currentTime = 0;
@@ -229,8 +366,6 @@ const KLIKABILNI_SELEKTOR = 'button:not(:disabled), a[href]';
 export function inicijalizirajGlobalneUiZvukove(): void {
   if (typeof document === 'undefined' || globalniUiZvukoviInicijalizirani) return;
   globalniUiZvukoviInicijalizirani = true;
-
-  // Preload SFX ide iz boot loadera (ucitajCoreAsete); ovdje samo UI listeners.
 
   // Prva prava korisnicka interakcija bilo gdje u appu naoruzava zvuk (aktiviran flag resetira se na svaki refresh).
   document.addEventListener('pointerdown', aktivirajAudio, { capture: true, passive: true });

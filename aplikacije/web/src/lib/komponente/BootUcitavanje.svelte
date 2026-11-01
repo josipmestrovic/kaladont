@@ -15,7 +15,8 @@
     aria-valuenow={postotak}
     aria-label="Napredak učitavanja"
   >
-    <div class="ispuna" style={`width: ${postotak}%`}></div>
+    <div class="ispuna" style={`width: ${Math.max(postotak, 8)}%`}></div>
+    <div class="shimmer" aria-hidden="true"></div>
   </div>
 </main>
 
@@ -40,6 +41,7 @@
     font-weight: 800;
     letter-spacing: 0.02em;
     line-height: 1.1;
+    animation: brand-pulse 1.4s ease-in-out infinite;
   }
 
   .tekst {
@@ -50,6 +52,7 @@
   }
 
   .traka {
+    position: relative;
     width: min(240px, 70vw);
     height: 8px;
     overflow: hidden;
@@ -63,5 +66,43 @@
     border-radius: inherit;
     background: var(--boja-cta-pozadina, var(--boja-tekst-osnovni));
     transition: width 160ms ease-out;
+  }
+
+  .shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      110deg,
+      transparent 30%,
+      rgb(255 255 255 / 28%) 50%,
+      transparent 70%
+    );
+    transform: translateX(-100%);
+    animation: shimmer 1.2s linear infinite;
+  }
+
+  @keyframes brand-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.82;
+      transform: scale(1.02);
+    }
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand,
+    .shimmer {
+      animation: none;
+    }
   }
 </style>

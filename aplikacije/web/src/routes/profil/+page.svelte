@@ -12,6 +12,7 @@
   import StilIgrePojasnjenje from '$lib/komponente/StilIgrePojasnjenje.svelte';
   import KolekcijaRijeci from '$lib/komponente/KolekcijaRijeci.svelte';
   import Podizbornik from '$lib/komponente/Podizbornik.svelte';
+  import { ucitajAseteProfila } from '$lib/asetovi-core.js';
   import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
 
     interface StatistikaRijeci {
@@ -118,6 +119,7 @@
   }
 
   onMount(() => {
+    ucitajAseteProfila();
     const prilagodiAvatar = () => {
       velicinaAvatara = window.innerWidth < 1000 ? 160 : 248;
     };

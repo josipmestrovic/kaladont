@@ -2,12 +2,22 @@
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik, obrisiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
+  import { ucitajModalIgraAsete, urlAseta } from '$lib/asetovi-core.js';
+  import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import Kaladont2d5d from '$lib/komponente/Kaladont2d5d.svelte';
   import KontrolePristupacnosti from '$lib/komponente/KontrolePristupacnosti.svelte';
   import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
   let otvoreniModal = $state<'igra' | 'pravno' | null>(null);
+
+  function otvoriModal(vrsta: 'igra' | 'pravno') {
+    otvoreniModal = vrsta;
+    if (vrsta === 'igra') {
+      ucitajModalIgraAsete();
+      zagrijGameplayZvukove();
+    }
+  }
 
   function zatvoriNaEscape(dogadaj: KeyboardEvent) {
     if (dogadaj.key === 'Escape') otvoreniModal = null;
@@ -32,7 +42,7 @@
 <main class="landing">
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <header class="landing-tekst">
-      <img class="demo-oznaka" src="/slike/demo-slika.png" alt="Demo verzija igre" />
+      <img class="demo-oznaka" src="/slike/demo-slika.webp" alt="Demo verzija igre" width="120" height="48" />
       <h1 id="naslov-kaladont"><span class="ime-igre">KALADONT</span> <span class="vrsta-igre">online</span></h1>
     </header>
 
@@ -40,38 +50,38 @@
     <div class="desktop-navigacija-red">
       <Kaladont2d5d />
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
-      <button type="button" class="navigacijska-stavka primarna" onclick={() => (otvoreniModal = 'igra')}>
-        <img class="ikona-sucelja" src="/ikone/07-igraj.png" alt="" aria-hidden="true" />
+      <button type="button" class="navigacijska-stavka primarna" onclick={() => otvoriModal('igra')}>
+        <img class="ikona-sucelja" src={urlAseta('/ikone/07-igraj.png')} alt="" aria-hidden="true" width="40" height="40" />
         <span>Igraj</span>
       </button>
       <a href="/profil" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src="/ikone/31-moj-profil.png" alt="" aria-hidden="true" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/31-moj-profil.png')} alt="" aria-hidden="true" width="40" height="40" />
         <span>Moj profil</span>
       </a>
       <a href="/ljestvice" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src="/ikone/09-ljestvice.png" alt="" aria-hidden="true" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/09-ljestvice.png')} alt="" aria-hidden="true" width="40" height="40" />
         <span>Ljestvice</span>
       </a>
       <a href="/pravila" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src="/ikone/08-pravila.png" alt="" aria-hidden="true" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/08-pravila.png')} alt="" aria-hidden="true" width="40" height="40" />
         <span>Pravila</span>
       </a>
       <a href="/postavke" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src="/ikone/11-postavke.png" alt="" aria-hidden="true" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/11-postavke.png')} alt="" aria-hidden="true" width="40" height="40" />
         <span>Postavke</span>
       </a>
       {#if registriran}
         <button type="button" class="navigacijska-stavka odjava-stavka" onclick={odjaviSe}>
-          <img class="ikona-sucelja" src="/ikone/12-odjavi-se.png" alt="" aria-hidden="true" />
+          <img class="ikona-sucelja" src={urlAseta('/ikone/12-odjavi-se.png')} alt="" aria-hidden="true" width="40" height="40" />
           <span>Odjavi se</span>
         </button>
       {:else}
         <a href="/prijava" class="navigacijska-stavka">
-          <img class="ikona-sucelja" src="/ikone/13-prijavi-se.png" alt="" aria-hidden="true" />
+          <img class="ikona-sucelja" src={urlAseta('/ikone/13-prijavi-se.png')} alt="" aria-hidden="true" width="40" height="40" />
           <span>Prijavi se</span>
         </a>
         <a href="/registracija" class="navigacijska-stavka">
-          <img class="ikona-sucelja" src="/ikone/14-registriraj-se.png" alt="" aria-hidden="true" />
+          <img class="ikona-sucelja" src={urlAseta('/ikone/14-registriraj-se.png')} alt="" aria-hidden="true" width="40" height="40" />
           <span>Registriraj se</span>
         </a>
       {/if}
@@ -91,7 +101,7 @@
       <a href="/povratne-informacije">
         <span>Pomozi poboljšati igru</span>
       </a>
-      <button type="button" onclick={() => (otvoreniModal = 'pravno')}>Uvjeti i privatnost</button>
+      <button type="button" onclick={() => otvoriModal('pravno')}>Uvjeti i privatnost</button>
     </nav>
     <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
   </footer>

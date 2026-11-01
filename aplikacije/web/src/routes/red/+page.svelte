@@ -5,7 +5,7 @@
   import { dohvatiSocket } from '$lib/socket.js';
   import Zanimljivosti from '$lib/komponente/Zanimljivosti.svelte';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
-  import { aktivirajAudio, pustiAudio } from '$lib/audio-manager.js';
+  import { aktivirajAudio, pustiAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import type { PayloadGreska, PocetakPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
@@ -54,7 +54,8 @@
         if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
         odbrojavanjePartije = null;
         igra.pocetakPartijeIso = null; // najava je potrošena - točno jedna navigacija po najavi
-        pustiAudio('pocetak-partije');
+        // pocetak-partije svira stanje-igre na runda-otvorena (runda 1), ne ovdje —
+        // early goto na runda-otvorena/stanje inače ugasi countdown prije ovog poziva.
         void goto(`/partija/${partijaId}`);
       }
     };
@@ -63,6 +64,7 @@
   }
 
   onMount(() => {
+    zagrijGameplayZvukove();
     pokreniSlusateljeIgre();
     const socket = dohvatiSocket();
 

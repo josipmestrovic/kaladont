@@ -6,8 +6,12 @@
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import PadajuceRijeci from '$lib/komponente/PadajuceRijeci.svelte';
   import { inicijalizirajGostSesiju } from '$lib/identitet.js';
-  import { inicijalizirajAudio, inicijalizirajGlobalneUiZvukove } from '$lib/audio-manager.js';
-  import { ucitajCoreAsete } from '$lib/asetovi-core.js';
+  import {
+    inicijalizirajAudio,
+    inicijalizirajGlobalneUiZvukove,
+    preucitajUiZvukove,
+  } from '$lib/audio-manager.js';
+  import { ucitajKriticneIkone, ucitajPozadinskeAseteLandinga } from '$lib/asetovi-core.js';
   import { inicijalizirajFontPostavku } from '$lib/postavke-fonta.js';
   import { inicijalizirajTemu } from '$lib/postavke-teme.js';
   import { inicijalizirajGlas } from '$lib/glasovni-manager.js';
@@ -17,12 +21,10 @@
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import BootUcitavanje from '$lib/komponente/BootUcitavanje.svelte';
 
-  const PRAG_INSTANT_BOOTA_MS = 250;
-
   let { children } = $props();
-  let spreman = $state(false);
+  let sesijaSpreman = $state(false);
+  let navIkoneSpremane = $state(false);
   let napredakBoota = $state(0);
-  let prikaziBootProgress = $state(false);
   let prethodnaPutanja = $state<string | null>(null);
   let mozeNaprijed = $state(false);
   let povijestAplikacije: string[] = [];
@@ -60,9 +62,11 @@
     $page.url.pathname === '/' || $page.url.pathname === '/red' || $page.url.pathname.startsWith('/partija/'),
   );
   const urlCilja = $derived($navigating?.to?.url ?? $page.url);
-  // Kostur samo dok traje navigacija prema /red; boot gate zamjenjuje stari !identitetSpreman slučaj.
+  const prikaziBoot = $derived($page.url.pathname === '/' && !navIkoneSpremane);
+  // Kostur na /red: dok sesija nije gotova ili dok traje navigacija prema redu.
   const prikaziKosturCekanja = $derived(
-    spreman && urlCilja.pathname === '/red' && $navigating !== null,
+    urlCilja.pathname === '/red' &&
+      ((!sesijaSpreman && $page.url.pathname === '/red') || (sesijaSpreman && $navigating !== null)),
   );
   const brojMjestaKostura = $derived(urlCilja.searchParams.get('mod') === 'dva_igraca' ? 2 : 4);
 
@@ -72,29 +76,31 @@
     inicijalizirajGlas();
     inicijalizirajAudio();
 
-    const pocetak = performance.now();
-    // Prikaži progress tek ako boot traje dovoljno dugo — inače nema flasha na return visit.
-    const timerProgressa = window.setTimeout(() => {
-      if (!spreman) prikaziBootProgress = true;
-    }, PRAG_INSTANT_BOOTA_MS);
+    const naNaslovnici = $page.url.pathname === '/';
+    const sesija = inicijalizirajGostSesiju();
 
-    try {
+    if (naNaslovnici) {
       await Promise.all([
-        inicijalizirajGostSesiju(),
-        ucitajCoreAsete((p) => {
+        sesija,
+        ucitajKriticneIkone((p) => {
           napredakBoota = p;
         }),
       ]);
-    } finally {
-      window.clearTimeout(timerProgressa);
+      // Oba odjednom — inače jedan frame bez Boota i bez children.
+      sesijaSpreman = true;
+      navIkoneSpremane = true;
+      ucitajPozadinskeAseteLandinga();
+      preucitajUiZvukove();
+    } else {
+      // Deep link /red ili druga ruta: nikad Boot — samo sesija, ikone u pozadini.
+      navIkoneSpremane = true;
+      await sesija;
+      sesijaSpreman = true;
+      void ucitajKriticneIkone();
     }
 
     inicijalizirajGlobalneUiZvukove();
     pokreniSlusateljeIgre();
-
-    const trajanje = performance.now() - pocetak;
-    if (trajanje < PRAG_INSTANT_BOOTA_MS) prikaziBootProgress = false;
-    spreman = true;
   });
 </script>
 
@@ -103,18 +109,16 @@
     <VezaObavijest />
     <CitanjeNaglasObavijest />
   </div>
-  {#if $page.url.pathname === '/' && spreman}<PadajuceRijeci />{/if}
-  {#if spreman && !bezHeadera}
+  {#if $page.url.pathname === '/' && sesijaSpreman && navIkoneSpremane}<PadajuceRijeci />{/if}
+  {#if sesijaSpreman && !bezHeadera}
     <Header {prethodnaPutanja} {mozeNaprijed} />
   {/if}
   <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">
-    {#if !spreman}
-      {#if prikaziBootProgress}
-        <BootUcitavanje napredak={napredakBoota} />
-      {/if}
+    {#if prikaziBoot}
+      <BootUcitavanje napredak={napredakBoota} />
     {:else if prikaziKosturCekanja}
       <RedCekanjaKostur ukupnoMjesta={brojMjestaKostura} />
-    {:else}
+    {:else if sesijaSpreman}
       {@render children()}
     {/if}
   </div>

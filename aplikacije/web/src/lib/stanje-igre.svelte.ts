@@ -98,6 +98,8 @@ const stanje = $state<StanjeIgre>({
 let pokrenuto = false;
 /** True nakon dobrovoljnog izlaska dok ne stigne nova partija:pocetak — blokira SFX i stale socket evente. */
 let napustioPartiju = false;
+/** Dedupe: runda-otvorena (runda 1) može stići više puta; pocetak-partije samo jednom po partiji. */
+let odsviranPocetakZaPartijuId: string | null = null;
 let brojOdbijenihNaPotezu = 0;
 let timerStavkiIskustva: ReturnType<typeof setTimeout> | null = null;
 let timerNagradePoteza: ReturnType<typeof setTimeout> | null = null;
@@ -188,6 +190,7 @@ export function pokreniSlusateljeIgre(): void {
 
   socket.on('partija:pocetak', (p) => {
     napustioPartiju = false;
+    odsviranPocetakZaPartijuId = null;
     oznaciPartijuDostupnom();
     brojOdbijenihNaPotezu = 0;
     stanje.partijaId = p.partijaId;
@@ -262,7 +265,9 @@ export function pokreniSlusateljeIgre(): void {
 
     stanje.oznakaPrihvacenogPoteza += 1;
     const mojPotez = p.igracId === stanje.mojIgracId;
-    // Prazan istek uz timer = ubojita riječ / prijelaz. U privatnoj sobi bez limitu (0) prazan istek je normalan.
+    // Prazan istek = ubojita/prijelaz kad timer nije isključen.
+    // null trajanje = javna partija (default timer) — prazan istek i dalje briše red.
+    // 0 = privatna bez limitu / ONEMOGUCI_TIMER — prazan istek je normalan.
     const prijelazBezPoteza = !p.istekPotezaIso && stanje.trajanjePotezaSek !== 0;
     // Red na mene = id match; prijelazBezPoteza samo sprečava lažni tvoj-red na ubojitoj riječi.
     const redDolaziNaMene = p.sljedeciId === stanje.mojIgracId;
@@ -293,13 +298,14 @@ export function pokreniSlusateljeIgre(): void {
 
     // State se mora primijeniti prije zvuka: nepostojeći ili blokirani audio
     // asset ne smije zaustaviti prijelaz reda ili ažuriranje streaka.
-    // Autor: potvrda. Sljedeći: tvoj-red. Ostali (četveroboj / privatna 3+): promjena-reda.
+    // Autor: potvrda. Sljedeći: tvoj-red. Ostali: promjena-reda.
+    // redDolaziNaMene + prijelazBezPoteza (ubojita) → tišina (slijedi eliminacija).
     // Vrijedi i u 1. rundi — jedini izuzetak je samo otvaranje partije (vidi runda-otvorena).
     if (mojPotez) pustiAudio('potez-prihvacen');
     else if (mojSljedeciRed) {
       brojOdbijenihNaPotezu = 0;
       pustiAudio('tvoj-red');
-    } else {
+    } else if (!redDolaziNaMene) {
       pustiAudio('promjena-reda');
     }
   });
@@ -352,9 +358,14 @@ export function pokreniSlusateljeIgre(): void {
   socket.on('partija:runda-otvorena', (p) => {
     if (napustioPartiju) return;
     stanje.zadnjaNagrada = null;
-    // Samo PRVO otvaranje (runda 1): ne sviraj tvoj-red/promjena-reda — već svira pocetak-partije.
-    // Nakon toga (potezi u 1. rundi + svako kasnije otvaranje runde) zvukovi rade normalno.
+    // Jedini izvor pocetak-partije (red/zagrijavanje/soba) — ne ovisi o countdown goto raceu.
+    // Na rundi 1 ne sviraj tvoj-red/promjena-reda da se ne preklopi s početkom.
     if (p.runda === 1) {
+      const partijaId = stanje.partijaId;
+      if (partijaId && odsviranPocetakZaPartijuId !== partijaId) {
+        odsviranPocetakZaPartijuId = partijaId;
+        pustiAudio('pocetak-partije');
+      }
       if (p.naPotezuId === stanje.mojIgracId) brojOdbijenihNaPotezu = 0;
     } else if (p.naPotezuId === stanje.mojIgracId) {
       brojOdbijenihNaPotezu = 0;
@@ -425,6 +436,7 @@ export function dohvatiStanjeIgre(): StanjeIgre {
  */
 export function napustiLokalnuPartiju(): void {
   napustioPartiju = true;
+  odsviranPocetakZaPartijuId = null;
   zaustaviSveZvukove();
   brojOdbijenihNaPotezu = 0;
   if (timerStavkiIskustva) clearTimeout(timerStavkiIskustva);
