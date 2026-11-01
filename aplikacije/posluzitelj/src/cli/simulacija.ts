@@ -19,7 +19,10 @@ import { rijeci } from '../baza/shema.js';
 import { konfiguracija } from '../konfiguracija.js';
 
 const ADRESA = konfiguracija.SIMULACIJA_ADRESA;
-const VREMENSKO_OGRANICENJE_MS = 60_000;
+/** Dva×8s prijelaza + duži fixture lanac; 60s je tijesno kad padne PREBRZO. */
+const VREMENSKO_OGRANICENJE_MS = 120_000;
+/** Ispod RS-23 (max 3 pokušaja/s) da botovi ne gube potez zbog rate limita. */
+const ODGODA_POTEZA_MS = 400;
 
 async function pronadjiRijec(
   prefiks: string | null,
@@ -62,6 +65,7 @@ async function glavno(): Promise<void> {
   const iskoristene = new Set<string>();
   // rijeci vec odbijene u trenutnoj rundi za trenutnog igraca - iskljucuju se iz sljedeceg pokusaja
   let pokusaneOvajPotez = new Set<string>();
+  let zadnjaPokusana: string | null = null;
   let trazenaSlova: string | null = null;
   let naPotezuId: string | null = null;
 
@@ -69,11 +73,15 @@ async function glavno(): Promise<void> {
     if (igracId !== naPotezuId) return;
     const bot = botovi.find((b) => b.igracId === igracId);
     if (!bot) return;
+    await odgodi(ODGODA_POTEZA_MS);
+    if (igracId !== naPotezuId) return;
     const rijec = await pronadjiRijec(trazenaSlova, iskoristene, pokusaneOvajPotez);
     if (rijec) {
       pokusaneOvajPotez.add(rijec);
+      zadnjaPokusana = rijec;
       bot.socket.emit('potez:rijec', { rijec });
     } else {
+      zadnjaPokusana = null;
       bot.socket.emit('potez:ne-znam');
     }
   }
@@ -98,6 +106,7 @@ async function glavno(): Promise<void> {
     trazenaSlova = poruka.trazenaSlova;
     naPotezuId = poruka.sljedeciId;
     pokusaneOvajPotez = new Set();
+    zadnjaPokusana = null;
     console.log(`${poruka.igracId.slice(0, 8)} -> "${poruka.rijec}" (traži se: ${poruka.trazenaSlova})`);
     void odigrajAkoJeNaRedu(naPotezuId);
   });
@@ -115,6 +124,7 @@ async function glavno(): Promise<void> {
     naPotezuId = poruka.naPotezuId;
     trazenaSlova = poruka.trazenaSlova;
     pokusaneOvajPotez = new Set();
+    zadnjaPokusana = null;
     void odigrajAkoJeNaRedu(naPotezuId);
   });
 
@@ -136,6 +146,11 @@ async function glavno(): Promise<void> {
     bot.socket.on('greska', async (poruka: { kod: string; poruka: string }) => {
       console.log(`${bot.igracId?.slice(0, 8) ?? 'nepoznat'} greška (${poruka.kod}: ${poruka.poruka}) - pokušavam kasnije`);
       if (poruka.kod === 'PREBRZO') {
+        // Rate limit nije odbijanje riječi — vrati je u bazen za retry.
+        if (zadnjaPokusana) {
+          pokusaneOvajPotez.delete(zadnjaPokusana);
+          zadnjaPokusana = null;
+        }
         await odgodi(1100);
         if (bot.igracId) await odigrajAkoJeNaRedu(bot.igracId);
       }

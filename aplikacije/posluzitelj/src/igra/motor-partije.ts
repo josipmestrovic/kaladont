@@ -1229,7 +1229,27 @@ export function stvoriUpraviteljPartija(
     stanje.izborHandle = null;
     const autoRijec = rjecnik.nasumicnaPocetnaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
     if (!autoRijec) {
-      // ekstremni rubni slucaj (rjecnik iscrpljen) - sigurnosno zavrsi partiju
+      // Rječnik iscrpljen: zakljuciPartiju očekuje ≤1 aktivnog. Ostale rangiraj kao
+      // mrtva_slova (bez nove runde), inače CI/simulacija ostane bez partija:kraj.
+      const preostali = [...stanje.aktivni];
+      for (let i = 1; i < preostali.length; i += 1) {
+        const igracId = preostali[i]!;
+        stanje.aktivni.delete(igracId);
+        stanje.eliminirani.push(igracId);
+        stanje.razloziEliminacije.set(igracId, 'mrtva_slova');
+        const plasman = stanje.aktivni.size + 1;
+        const porukaElim: Eliminacija = {
+          igracId,
+          plasman,
+          razlog: 'mrtva_slova',
+          bodZa: null,
+          slova: null,
+          rijecUzrok: null,
+          iskustvo: null,
+        };
+        stanje.eliminacije.push(porukaElim);
+        io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', porukaElim);
+      }
       zakljuciPartiju(stanje);
       return;
     }
