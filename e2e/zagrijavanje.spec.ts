@@ -21,7 +21,7 @@ test('gost pokreće Zagrijavanje, odustaje i vidi kraj treninga bez napretka', a
 
   await expect(page.getByRole('heading', { name: 'Kraj treninga' })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('trening-obavijest')).toContainText('Trening se ne bilježi');
-  await expect(page.getByText(/XP/)).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Osvojeno iskustvo' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Forma' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Kolekcija riječi' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Registriraj se' })).toHaveCount(0);
