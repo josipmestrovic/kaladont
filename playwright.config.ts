@@ -51,8 +51,8 @@ export default defineConfig({
         SESIJA_TAJNA: 'e2e-test-secret',
         VERZIJA: 'e2e',
         DIGEST: 'e2e',
-        BOT_VJEROJATNOST_ISTEKA: '0',
-        BOT_VJEROJATNOST_NE_ZNAM: '0',
+        BOT_IZOSTANAK_PO_SUDJELOVANJU: '0',
+        BOT_NEZNANJE_PO_SUDJELOVANJU: '0',
       },
     },
     {

@@ -24,12 +24,14 @@ import {
 import { baza } from '../baza/klijent.js';
 import {
   dostignucaIgraca,
+  botovi,
   dnkStatistikeIgraca,
   igraci,
   napredakDostignucaIgraca,
   obracuniPartija,
   otkljucaneGrupeIgraca,
   otkljucaneRijeciIgraca,
+  treningRijeciIgraca,
   partije,
   potezi,
   nizoviPobjedaIgraca,
@@ -40,6 +42,7 @@ import {
 import { BROJ_AVATARA } from '../identitet/identitet.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { porukaPotvrdeEmaila, pokusajPoslatiEmail } from '../email.js';
+import { dohvatiRijeciTreninga } from '../trening/upis-napretka.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { izdajTokenPotvrdeEmaila } from '../racuni/tokeni.js';
 import { izracunajDnk } from '../igra/izracun-dnk.js';
@@ -102,7 +105,7 @@ type CursorPovijestiPartija = { kraj: string; partijaId: string };
 type CursorRijeci = { rijec: string };
 const KATEGORIJE_RIJECI = ['duge', 'srednjeDuge', 'jakoDuge', 'rijetke', 'srednjeRijetke', 'jakoRijetke'] as const;
 type KategorijaRijeci = (typeof KATEGORIJE_RIJECI)[number];
-const KATEGORIJE_KOLEKCIJE = ['osnovne', 'vlastita_imena', 'duge', 'srednjeDuge', 'jakoDuge', 'rijetke', 'srednjeRijetke', 'jakoRijetke', ...['imenica', 'glagol', 'pridjev_prilog', 'zamjenica', 'broj', 'prijedlog', 'veznik', 'cestica', 'uzvik']] as const;
+const KATEGORIJE_KOLEKCIJE = ['osnovne', 'vlastita_imena', 'duge', 'srednjeDuge', 'jakoDuge', 'rijetke', 'srednjeRijetke', 'jakoRijetke', 'oblici_treninga', ...['imenica', 'glagol', 'pridjev_prilog', 'zamjenica', 'broj', 'prijedlog', 'veznik', 'cestica', 'uzvik']] as const;
 type KategorijaKolekcije = (typeof KATEGORIJE_KOLEKCIJE)[number];
 
 function kodirajCursor<T>(vrijednost: T): string {
@@ -262,6 +265,10 @@ async function dohvatiStranicuRijeci(igracId: string, kategorija: KategorijaRije
 }
 
 async function dohvatiStranicuKolekcije(igracId: string, kategorija: KategorijaKolekcije, limit: number, cursor: CursorRijeci | null) {
+  if (kategorija === 'oblici_treninga') {
+    const stranica = await dohvatiRijeciTreninga(igracId, limit, cursor?.rijec);
+    return { ...stranica, sljedeciCursor: stranica.imaJos ? kodirajCursor({ rijec: stranica.rijeci.at(-1)! }) : null };
+  }
   if (KATEGORIJE_RIJECI.includes(kategorija as KategorijaRijeci)) {
     return dohvatiStranicuRijeci(igracId, kategorija as KategorijaRijeci, limit, cursor);
   }
@@ -318,9 +325,10 @@ function kolekcionarskaRazina(otkljucano: number, ukupno: number) {
 }
 
 async function dohvatiKolekciju(igracId: string, rjecnik: RjecnikUMemoriji) {
-  const [grupe, oblici] = await Promise.all([
+  const [grupe, oblici, treningOblici] = await Promise.all([
     baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId)),
     baza.select({ rijec: otkljucaneRijeciIgraca.rijec, dugaTier: otkljucaneRijeciIgraca.dugaTier, rijetkaTier: otkljucaneRijeciIgraca.rijetkaTier }).from(otkljucaneRijeciIgraca).where(eq(otkljucaneRijeciIgraca.igracId, igracId)),
+    baza.select({ broj: sql<number>`count(*)::int` }).from(treningRijeciIgraca).where(eq(treningRijeciIgraca.igracId, igracId)),
   ]);
   const kolekcijske = new Map<string, { osnovnaRijec: string; vrste: Set<string> }>();
   for (const redak of grupe) {
@@ -362,8 +370,22 @@ async function dohvatiKolekciju(igracId: string, rjecnik: RjecnikUMemoriji) {
         vrsta: 'vlastita_imena',
         otkljucano: poVrsti.get('vlastito_ime') ?? 0,
         ukupno: rjecnik.brojKolekcijskihGrupaPoVrsti().get('vlastito_ime') ?? 0,
+      }, {
+        vrsta: 'oblici_treninga',
+        otkljucano: treningOblici[0]?.broj ?? 0,
+        ukupno: rjecnik.brojRijeci(),
       }]).sort((prva, druga) => druga.ukupno - prva.ukupno),
   };
+}
+
+async function dohvatiJavniProfil(igracId: string) {
+  const [igrac] = await baza.select({ id: igraci.id }).from(igraci).where(and(
+    eq(igraci.id, igracId),
+    sql`${igraci.vrsta} in ('registriran', 'admin')`,
+    isNull(igraci.obrisanAt),
+    notExists(baza.select({ id: botovi.igracId }).from(botovi).where(and(eq(botovi.igracId, igraci.id), eq(botovi.tip, 'gost')))),
+  )).limit(1);
+  return igrac ?? null;
 }
 
 function izracunajDnkProfil(
@@ -492,11 +514,7 @@ export async function registrirajProfilRute(
     async (zahtjev, odgovor) => {
       const kategorija = dohvatiKategoriju(zahtjev.query.kategorija);
       if (!kategorija) return odgovor.code(400).send({ ok: false, greska: 'Neispravna kategorija riječi.' });
-      const [igrac] = await baza.select({ id: igraci.id }).from(igraci).where(and(
-        eq(igraci.id, zahtjev.params.igracId),
-        sql`${igraci.vrsta} in ('registriran', 'admin')`,
-        isNull(igraci.obrisanAt),
-      )).limit(1);
+      const igrac = await dohvatiJavniProfil(zahtjev.params.igracId);
       if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
       const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '50', 10) || 50, 1), MAKSIMALNO_RIJECI_PO_STRANICI);
       const cursor = dekodirajCursor<CursorRijeci>(zahtjev.query.cursor);
@@ -516,11 +534,7 @@ export async function registrirajProfilRute(
   });
 
   app.get<{ Params: { igracId: string } }>('/profil/javni/:igracId/kolekcija', async (zahtjev, odgovor) => {
-    const [igrac] = await baza.select({ id: igraci.id }).from(igraci).where(and(
-      eq(igraci.id, zahtjev.params.igracId),
-      sql`${igraci.vrsta} in ('registriran', 'admin')`,
-      isNull(igraci.obrisanAt),
-    )).limit(1);
+    const igrac = await dohvatiJavniProfil(zahtjev.params.igracId);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
     return { ok: true, ...(await dohvatiKolekciju(igrac.id, rjecnik)) };
   });
@@ -530,6 +544,7 @@ export async function registrirajProfilRute(
       const igracId = zahtjev.params.igracId ?? (zahtjev as ZahtjevSIgracem).igrac?.id;
       const kategorija = KATEGORIJE_KOLEKCIJE.includes(zahtjev.query.kategorija as KategorijaKolekcije) ? zahtjev.query.kategorija as KategorijaKolekcije : null;
       if (!igracId || !kategorija) return odgovor.code(400).send({ ok: false, greska: 'Neispravna kategorija kolekcije.' });
+      if (zahtjev.params.igracId && !await dohvatiJavniProfil(igracId)) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
       const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '20', 10) || 20, 1), 50);
       const cursor = dekodirajCursor<CursorRijeci>(zahtjev.query.cursor);
       if (zahtjev.query.cursor && !cursor?.rijec) return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor kolekcije.' });
@@ -602,9 +617,12 @@ export async function registrirajProfilRute(
     const [igrac] = await baza
       .select()
       .from(igraci)
-      .where(
-        sql`${igraci.id} = ${zahtjev.params.igracId} and ${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null`,
-      )
+      .where(and(
+        eq(igraci.id, zahtjev.params.igracId),
+        sql`${igraci.vrsta} in ('registriran', 'admin')`,
+        isNull(igraci.obrisanAt),
+        notExists(baza.select({ id: botovi.igracId }).from(botovi).where(and(eq(botovi.igracId, igraci.id), eq(botovi.tip, 'gost')))),
+      ))
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
 

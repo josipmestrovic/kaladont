@@ -19,10 +19,12 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import type { KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
 
 export const vrstaIgraca = pgEnum('vrsta_igraca', ['gost', 'registriran', 'admin']);
 /** Tko upravlja identitetom (ADR-017); odvojeno od prava prijave i uloge. */
 export const upravljacIgraca = pgEnum('upravljac_igraca', ['covjek', 'bot']);
+export const tipPrezentacijeBota = pgEnum('tip_prezentacije_bota', ['imenovani', 'gost']);
 export const statusPartije = pgEnum('status_partije', ['u_tijeku', 'zavrsena', 'ponistena']);
 export const modPartije = pgEnum('mod_partije', ['cetiri_igraca', 'dva_igraca']);
 export const nacinIspadanja = pgEnum('nacin_ispadanja', [
@@ -180,6 +182,7 @@ export const otkljucaneGrupeIgraca = pgTable(
     igracId: uuid('igrac_id').notNull().references(() => igraci.id),
     grupa: text('grupa').notNull(),
     tier: smallint('tier'),
+    zaDostignuca: boolean('za_dostignuca').notNull().default(true),
     otkljucano: timestamp('otkljucano', { withTimezone: true }).notNull().defaultNow(),
   },
   (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.grupa] })],
@@ -216,6 +219,7 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   mrtvaSlovaEliminacije: integer('mrtva_slova_eliminacije').notNull().default(0),
   javnePobjede: integer('javne_pobjede').notNull().default(0),
   povratneInformacije: integer('povratne_informacije').notNull().default(0),
+  treningPobjede: integer('trening_pobjede').notNull().default(0),
   anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
@@ -248,9 +252,57 @@ export const dostignucaIgraca = pgTable('dostignuca_igraca', {
 }, (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.dostignuceId] })]);
 
 /** Konfiguracija javnog bota (ADR-017); identitet i statistika žive u `igraci`. */
+export const postavkeBotova = pgTable('postavke_botova', {
+  id: smallint('id').primaryKey().default(1),
+  revizija: integer('revizija').notNull(),
+  konfiguracija: jsonb('konfiguracija').$type<KonfiguracijaBota>().notNull(),
+  azuriraoId: uuid('azurirao_id').references(() => igraci.id, { onDelete: 'set null' }),
+  azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  check('postavke_botova_jedan_zapis', sql`${tablica.id} = 1`),
+  check('postavke_botova_pozitivna_revizija', sql`${tablica.revizija} > 0`),
+]);
+
+export const izmjenePostavkiBotova = pgTable('izmjene_postavki_botova', {
+  revizija: integer('revizija').primaryKey(),
+  konfiguracija: jsonb('konfiguracija').$type<KonfiguracijaBota>().notNull(),
+  adminId: uuid('admin_id').references(() => igraci.id, { onDelete: 'set null' }),
+  vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const izmjeneBotova = pgTable('izmjene_botova', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  botId: uuid('bot_id').references(() => igraci.id, { onDelete: 'set null' }),
+  kljucSeeda: text('kljuc_seeda').notNull(),
+  akcija: text('akcija').notNull(),
+  aktivanPrije: boolean('aktivan_prije'),
+  aktivanPoslije: boolean('aktivan_poslije'),
+  adminId: uuid('admin_id').references(() => igraci.id, { onDelete: 'set null' }),
+  vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  check('izmjene_botova_akcija_dopustena', sql`${tablica.akcija} in ('stvoren', 'aktiviran', 'deaktiviran')`),
+]);
+
+export const treningRijeciIgraca = pgTable('trening_rijeci_igraca', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  rijec: text('rijec').notNull(),
+  prvoTreningId: uuid('prvo_trening_id').notNull(),
+  otkljucano: timestamp('otkljucano', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.rijec] }),
+  index('idx_trening_rijeci_igraca_rijec').on(tablica.igracId, tablica.rijec),
+]);
+
+export const pobjedeTreninga = pgTable('pobjede_treninga', {
+  treningId: uuid('trening_id').primaryKey(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  zavrseno: timestamp('zavrseno', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [index('idx_pobjede_treninga_igrac_id').on(tablica.igracId, tablica.zavrseno)]);
+
 export const botovi = pgTable('botovi', {
   igracId: uuid('igrac_id').primaryKey().references(() => igraci.id),
   kljucSeeda: text('kljuc_seeda').notNull(),
+  tip: tipPrezentacijeBota('tip').notNull().default('imenovani'),
   aktivan: boolean('aktivan').notNull().default(true),
   verzijaProfila: smallint('verzija_profila').notNull().default(1),
   stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),

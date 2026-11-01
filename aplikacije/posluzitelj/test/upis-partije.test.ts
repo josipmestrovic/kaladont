@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { izracunajRazinuDostignuca, dohvatiDefinicijuDostignuca } from 'zajednicko';
 import { baza } from '../src/baza/klijent.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { ponistiPartijeUTijekuUBazi, zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 
 describe('upis partije i javne pobjede', () => {
@@ -15,6 +15,7 @@ describe('upis partije i javne pobjede', () => {
       await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
     }
     await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igracId));
+    await baza.delete(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
     await baza.delete(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igracId));
     await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.igracId, igracId));
     await baza.delete(partije).where(eq(partije.pobjednikId, igracId));
@@ -182,6 +183,47 @@ describe('upis partije i javne pobjede', () => {
     const obracuni = await baza.select().from(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
     expect(stanje?.kaladontIzvedbe).toBe(1);
     expect(obracuni).toHaveLength(1);
+  });
+
+  it('promovira trening-grupu za dostignuća jednom, uključujući istodobni obračun', async () => {
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Promocija Treninga' });
+    const grupa = `imenica:promocija-${randomUUID()}`;
+    await baza.insert(otkljucaneGrupeIgraca).values({ igracId, grupa, tier: 1, zaDostignuca: false });
+    const statistika = {
+      igracId,
+      grupe: [{ grupa, tier: 1 }],
+      otkljucaneRijeci: [],
+      prihvaceniPotezi: 1,
+      ukupnoTrajanjePrihvaceniPoteziMs: 1_000,
+      najduziStreak: 1,
+      otkriveneJakoRijetkeGrupe: 0,
+      otkriveneSrednjeRijetkeGrupe: 0,
+      otkriveneRijetkeGrupe: 0,
+      upisaneDugeRijeci: 0,
+      upisaneSrednjeDugeRijeci: 0,
+      upisaneJakoDugeRijeci: 0,
+      najduzaRijec: null,
+      najduzaRijecGrafemi: 0,
+      najrjedaRijec: null,
+      najrjedaRijecFrekvencija: null,
+      najrjedaTier: null,
+    };
+    const rezultati = [{ igracId, plasman: 1 as const, bodovi: 0, eliminacije: 0, iskustvo: 0, nacinIspadanja: 'pobjednik' as const }];
+    const napredak = new Map([[igracId, { delta: { rijetkeLeksemskeGrupe: 0 } }]]);
+    const obracun = (partijaId: string) => zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'dva_igraca', new Map([[igracId, statistika]]), true, napredak);
+    const prviId = randomUUID();
+    obracuniZaBrisanje.push(prviId);
+    await Promise.all([obracun(prviId), obracun(prviId)]);
+    const drugiId = randomUUID();
+    obracuniZaBrisanje.push(drugiId);
+    await obracun(drugiId);
+
+    const [otkljucana] = await baza.select({ zaDostignuca: otkljucaneGrupeIgraca.zaDostignuca }).from(otkljucaneGrupeIgraca).where(and(eq(otkljucaneGrupeIgraca.igracId, igracId), eq(otkljucaneGrupeIgraca.grupa, grupa)));
+    const [napredakDB] = await baza.select({ rijetke: napredakDostignucaIgraca.rijetkeLeksemskeGrupe }).from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracId));
+    const [dostignuce] = await baza.select({ razina: dostignucaIgraca.razina }).from(dostignucaIgraca).where(and(eq(dostignucaIgraca.igracId, igracId), eq(dostignucaIgraca.dostignuceId, 'rijetkolovac')));
+    expect(otkljucana?.zaDostignuca).toBe(true);
+    expect(napredakDB?.rijetke).toBe(1);
+    expect(dostignuce?.razina).toBe(1);
   });
 
   it('pri oporavku označava nezavršenu partiju kao poništenu', async () => {

@@ -21,6 +21,7 @@ Poslužitelj razrješava identitet (ili stvara novog gosta) i veže socket uz `i
 |---|---|---|
 | `red:udji` | `{}` | Ulazak u red čekanja |
 | `trening:zapocni` | bez payloada, opcionalni ack | Pokreće Zagrijavanje (dvoboj protiv „Računala”); napušta javni red, odbija se uz aktivnu partiju ili sobu |
+| `trening:nastavi` | `{}` | Izričito nastavlja aktivni vlastiti trening i resetira ljudsku neaktivnost; ne utječe na redni timer poteza |
 | `red:izadji` | `{}` | Dobrovoljni izlazak iz reda |
 | `partija:stanje` | `{}` | Zahtjev za trenutačnim stanjem partije nakon ponovnog spajanja |
 | `potez:rijec` | `{ rijec: string, turnToken?: string }` | Pokušaj poteza vezan uz trenutačni potez |
@@ -47,6 +48,7 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 | `partija:spremanje-rezultata` | `SpremanjeRezultataPartije` | Igra je završila, ali se konačni rezultat još pokušava spremiti; šalje se pri svakom ponovnom pokušaju/reconnectu |
 | `partija:ponistena` | `PonistenaPartija` | Partija je prekinuta restartom ili kontroliranim gašenjem; rezultat nije dodijeljen |
 | `partija:kraj` | `KrajPartije` | Konačni plasmani, bodovi i privatni XP obračun primatelja; opcionalni `prikazRezultataOdIso` je zajednički rok prikaza detalja, 8 s od završetka igre, ne mijenja se pri reconnectu |
+| `trening:neaktivnost` | `{ upozorenje: boolean, upozorenjeIso: string, zatvaraIso: string }` | Samo aktivnom ljudskom sudioniku treninga; apsolutni rok upozorenja i tehničkog zatvaranja, obnovljiv je kroz `StanjePartije` |
 | `iskustvo:obracun` | `ObracunIskustvaTijekomPartije` | Privatni XP obračun eliminiranog igrača |
 | `reakcija:nova` | `{ igracId: string, poruka: BrzaPoruka }` | |
 | `greska` | `{ kod: KodGreske, poruka: string }` | Općenite greške (npr. `PREBRZO`) |
@@ -59,7 +61,9 @@ Ack za `red:udji` je opcionalan: poziv bez callbacka podržan je za fire-and-for
 
 Iznimka je `trening:zapocni`: šalje se bez payloada, a opcionalni ack prima `{ pokrenut: true }` ili `{ pokrenut: false, kod, poruka }` (kodovi `VEC_U_PARTIJI`, `VEC_U_SOBI`, `PREVISE_PARTIJA`, `TRENING_NEDOSTUPAN`, `INTERNA`). Sama partija kreće redovnim `partija:pocetak`.
 
-`PocetakPartije`, `StanjePartije` i `KrajPartije` nose `kontekst: 'javna' | 'privatna' | 'trening'`; klijent ga ne može promijeniti. U treningu `partija:kraj` nema XP, formu, niz, DNK ni kolekciju, a `rijec:otkljucana`, `iskustvo:obracun` i `dostignuce:otkljucano` se ne šalju. Rezervirani botovi u čekaonici pojavljuju se u `red:stanje` kao sudionici koji čekaju; rokove popune određuje isključivo poslužitelj.
+`PocetakPartije`, `StanjePartije` i `KrajPartije` nose `kontekst: 'javna' | 'privatna' | 'trening'`; klijent ga ne može promijeniti. U treningu nema XP-a, forme, niza ni DNK. Registrirani čovjek dobiva potvrdu poteza tek nakon spremanja vlastite riječi; rezultat može nositi njegovu kolekciju i dostignuće Zagrijan, ali nikad bodove ni opće napredovanje riječi. Gosti i privremeno Računalo ne zapisivat će riječi. `rijec:otkljucana` i `iskustvo:obracun` se ne šalju. Rezervirani botovi u čekaonici pojavljuju se u `red:stanje` kao sudionici koji čekaju; rokove popune određuje isključivo poslužitelj.
+
+Neaktivnost treninga: `trening:neaktivnost` šalje rokove upozorenja (4 min) i tehničkog zatvaranja (5 min). `StanjePartije.treningNeaktivnost` sadrži iste apsolutne rokove za reconnect. Samo prihvaćen ljudski potez ili valjan `trening:nastavi` resetira ih; heartbeat i potez botova ne resetiraju. Zatvaranje šalje `partija:ponistena`, ne bilježi pobjedu/poraz, a već potvrđene riječi ostaju spremljene.
 
 Socket.IO ograničava pojedinačnu ulaznu poruku na najviše **16 KiB**. Valjane sheme i najveći dopušteni avatar/room payload moraju ostati ispod te granice; povećanje limita zahtijeva mjerenje i odgovarajuću promjenu dokumentacije.
 

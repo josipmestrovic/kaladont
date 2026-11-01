@@ -13,6 +13,7 @@
     "ci-fixture": "tsx src/cli/ci-fixture.ts",
     "testni-podaci-ljestvice": "tsx src/cli/testni-podaci-ljestvice.ts",
     "seed-botova": "tsx src/cli/seed-botova.ts",
+    "zamijeni-fond-botova": "tsx src/cli/zamijeni-fond-botova.ts",
     "opterecenje:izvezi-rjecnik": "tsx src/cli/izvezi-opterecenje-rjecnika.ts",
     "opterecenje:status": "tsx src/cli/opterecenje-status.ts",
     "provjera-indeksa": "tsx src/cli/provjera-indeksa.ts",

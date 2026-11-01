@@ -158,7 +158,7 @@
   .dnk-prsten { fill: none; stroke: var(--boja-graf-mreza); stroke-width: 1; }
   .dnk-os { stroke: var(--boja-graf-os); stroke-width: 1; }
   .dnk-oznaka { fill: var(--boja-tekst-sekundarni); font-size: 8px; font-weight: 700; }
-  .dnk-podrucje { fill: color-mix(in srgb, var(--boja-akcent) 22%, transparent); stroke: var(--boja-akcent); stroke-width: 2.5; stroke-linejoin: round; }
+  .dnk-podrucje { fill: color-mix(in srgb, var(--boja-akcent-tekst) 22%, transparent); stroke: var(--boja-akcent-tekst); stroke-width: 2.5; stroke-linejoin: round; }
 
   .dnk-promjene-lista {
     display: grid;
@@ -173,11 +173,11 @@
   }
 
   .dnk-promjena-redak > strong { color: var(--boja-tekst-osnovni); }
-  .dnk-promjena-redak > span { display: inline-flex; align-items: center; gap: 7px; color: var(--boja-akcent); }
+  .dnk-promjena-redak > span { display: inline-flex; align-items: center; gap: 7px; color: var(--boja-tekst-osnovni); }
   .dnk-promjena-redak s { color: var(--boja-tekst-sekundarni); text-decoration-thickness: 2px; }
   .dnk-promjena-redak b { min-width: 22px; text-align: right; }
   .strelica { color: var(--boja-akcent); font-size: 1.15rem; font-weight: 800; line-height: 1; }
-  .strelica.pad { color: var(--boja-mint-tamni); }
+  .strelica.pad { color: var(--boja-tekst-sekundarni); }
 
   @media (max-width: 999px) {
     .dnk-promjena { padding: 14px; }

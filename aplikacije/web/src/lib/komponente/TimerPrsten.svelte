@@ -88,6 +88,9 @@
     top: 0;
     left: 0;
     pointer-events: none;
+    contain: layout paint;
+    isolation: isolate;
+    will-change: transform, opacity;
   }
 
   .timer-prsten circle:last-child {

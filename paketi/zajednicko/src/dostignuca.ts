@@ -11,6 +11,7 @@ export type BrojacDostignuca =
   | 'izazvaneEliminacije'
   | 'mrtvaSlovaEliminacije'
   | 'javnePobjede'
+  | 'treningPobjede'
   | 'povratneInformacije';
 
 export interface DefinicijaDostignuca {
@@ -47,6 +48,7 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
   { id: 'slijepa_ulica', naziv: 'Slijepa ulica', opis: 'Izazovi eliminacije mrtvim slovima.', kategorija: 'igra', pragovi: [1, 5, 15, 40, 100], vrijediUPrivatnoj: false, brojac: 'mrtvaSlovaEliminacije' },
   { id: 'zavrsna_rijec', naziv: 'Završna riječ', opis: 'Pobijedi u javnoj partiji.', kategorija: 'igra', pragovi: [1, 5, 20, 50, 100], vrijediUPrivatnoj: false, brojac: 'javnePobjede' },
   { id: 'glas_zajednice', naziv: 'Glas zajednice', opis: 'Pošalji povratnu informaciju o igri.', kategorija: 'igra', pragovi: [1, 2, 3, 4, 5], vrijediUPrivatnoj: false, brojac: 'povratneInformacije' },
+  { id: 'zagrijan', naziv: 'Zagrijan', opis: 'Pobijedi u treningu protiv Računala.', kategorija: 'igra', pragovi: [1, 5, 20, 50, 100], vrijediUPrivatnoj: false, brojac: 'treningPobjede' },
 ] as const;
 
 export const UKUPNO_ZVJEZDICA_DOSTIGNUCA = DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0);
@@ -58,6 +60,7 @@ export function izracunajRazinuDostignuca(definicija: DefinicijaDostignuca, vrij
 const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   'iskusnjara',
   'glas_zajednice',
+  'zagrijan',
   'kaladont',
   'rijetkolovac',
   'dugometras',

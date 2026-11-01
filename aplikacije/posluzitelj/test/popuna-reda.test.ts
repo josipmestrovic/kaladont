@@ -55,6 +55,45 @@ function cekaj<T>(socket: ClientSocket, dogadaj: string, filter: (p: T) => boole
 }
 
 describe('popuna javnog reda botovima', () => {
+  it('izlazak posljednjeg čovjeka prije prve riječi poništava početak bez rezultata', async () => {
+    const lokalni = await izgradiPosluzitelj({
+      socketOgranicenja: { handshakePoIpMinuti: 1_000 },
+      postavkeMotora: { odgodaPocetkaPartijeMs: 5_000 },
+      popunaBotovima: { dvoboj: true, pragoviMs: { dva_igraca: [10] } },
+    });
+    lokalni.fondBotova.postaviIdentitete((await ucitajIdentiteteBotova()).filter((bot) => testniBotovi.includes(bot.igracId)));
+    let socket: ClientSocket | null = null;
+    try {
+      await lokalni.app.listen({ port: 0, host: '127.0.0.1' });
+      const podaci = lokalni.app.server.address();
+      socket = ioClient(`http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`, { auth: { token: `gost.${randomUUID().replaceAll('-', '')}` }, forceNew: true });
+      await new Promise<void>((resolve, reject) => { socket!.once('connect', resolve); socket!.once('connect_error', reject); });
+      let rezultati = 0;
+      let eliminacije = 0;
+      let otvoreneRunde = 0;
+      socket.on('partija:kraj', () => { rezultati += 1; });
+      socket.on('partija:eliminacija', () => { eliminacije += 1; });
+      socket.on('partija:runda-otvorena', () => { otvoreneRunde += 1; });
+      const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
+      socket.emit('red:udji', { mod: 'dva_igraca' });
+      const pocetak = await pocetakPromise;
+      const ponistena = cekaj<{ partijaId: string }>(socket, 'partija:ponistena');
+      socket.emit('partija:izadji');
+      expect((await ponistena).partijaId).toBe(pocetak.partijaId);
+      await expect.poll(async () => {
+        const [redak] = await baza.select({ status: partije.status }).from(partije).where(eq(partije.id, pocetak.partijaId));
+        return redak?.status;
+      }).toBe('ponistena');
+      await expect.poll(() => lokalni.fondBotova.stanje().slobodni).toBe(3);
+      expect(rezultati).toBe(0);
+      expect(eliminacije).toBe(0);
+      expect(otvoreneRunde).toBe(0);
+    } finally {
+      socket?.disconnect();
+      await lokalni.zaustavi();
+    }
+  });
+
   it('dvoboj: sam čovjek dobiva bota nakon praga, partija se upisuje s brojem botova i bot se oslobađa', async () => {
     expect(posluzitelj.fondBotova.stanje().ukupno).toBeGreaterThan(0);
     const socket = await spoji();

@@ -93,6 +93,7 @@
       </a>
       <button type="button" onclick={() => (otvoreniModal = 'pravno')}>Uvjeti i privatnost</button>
     </nav>
+    <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
   </footer>
 </main>
 
@@ -137,6 +138,9 @@
           </a>
           <a href="/privatnost" class="modal-opcija pravna-opcija">
             <span><strong>Pravila privatnosti</strong><small>Koje podatke koristimo, zašto i koliko dugo.</small></span>
+          </a>
+          <a href="/o-igri" class="modal-opcija pravna-opcija">
+            <span><strong>O igri i licence</strong><small>Izvori rječnika, avatara i licence korištenih materijala.</small></span>
           </a>
         </div>
       {/if}
@@ -332,13 +336,20 @@
   .landing-footer {
     position: relative;
     z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    width: min(1100px, calc(100% - 32px));
   }
+
+  .copyright { flex: none; font-size: 12px; line-height: 16px; color: var(--boja-tekst-sekundarni); white-space: nowrap; }
 
   .landing-footer nav {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 8px 18px;
   }
 
@@ -386,9 +397,15 @@
     h1 { line-height: 0.95; }
     :global(html[data-font-disleksiju]) h1 { font-size: calc(var(--velicina-naslova) * 0.7); }
     :global(html[data-font-disleksiju]) .vrsta-igre { margin-top: clamp(4px, 1dvh, 8px); }
-    .landing-footer nav { gap: 0 8px; }
+    .landing-footer { flex-direction: column; gap: 2px; }
+    .landing-footer nav { justify-content: center; gap: 0 8px; }
+    .copyright { font-size: 11px; line-height: 14px; }
     .landing-footer a,
     .landing-footer button { padding: clamp(2px, 0.6dvh, 8px) 6px; font-size: clamp(12px, 2dvh, var(--tekst-sitni)); line-height: 1.2; }
+  }
+
+  @media (max-width: 999px) and (max-height: 700px) {
+    .landing { --landing-razmak: 8px; --razmak-stavki: 4px; }
   }
 
   .modal-podloga {

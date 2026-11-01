@@ -208,6 +208,7 @@ export async function zakljuciPartijuUBazi(
   const modStatistike = mod;
 
   await baza.transaction(async (tx) => {
+    const brojNovihRijetkihGrupa = new Map<string, number>();
     const claim = samoStatistika
       ? await tx.insert(obracuniPartija)
         .values({ partijaId, vrsta: 'privatna_gamifikacija' })
@@ -391,9 +392,20 @@ export async function zakljuciPartijuUBazi(
       const statistika = statistike.get(r.igracId);
       if (statistika) {
         if (statistika.grupe.length > 0) {
-          await tx.insert(otkljucaneGrupeIgraca)
-            .values(statistika.grupe.map(({ grupa, tier }) => ({ igracId: r.igracId, grupa, tier })))
-            .onConflictDoNothing();
+          const grupeNovootkljucane = await tx.insert(otkljucaneGrupeIgraca)
+            .values(statistika.grupe.map(({ grupa, tier }) => ({ igracId: r.igracId, grupa, tier, zaDostignuca: true })))
+            .onConflictDoNothing()
+            .returning({ grupa: otkljucaneGrupeIgraca.grupa });
+          const grupePromovirane = await tx.update(otkljucaneGrupeIgraca)
+            .set({ zaDostignuca: true })
+            .where(and(
+              eq(otkljucaneGrupeIgraca.igracId, r.igracId),
+              eq(otkljucaneGrupeIgraca.zaDostignuca, false),
+              inArray(otkljucaneGrupeIgraca.grupa, statistika.grupe.map(({ grupa }) => grupa)),
+            ))
+            .returning({ grupa: otkljucaneGrupeIgraca.grupa });
+          const promijenjene = new Set([...grupeNovootkljucane, ...grupePromovirane].map(({ grupa }) => grupa));
+          brojNovihRijetkihGrupa.set(r.igracId, statistika.grupe.filter(({ grupa, tier }) => promijenjene.has(grupa) && tier !== null).length);
         }
         if (statistika.otkljucaneRijeci.length > 0) {
           await tx.insert(otkljucaneRijeciIgraca)
@@ -473,6 +485,7 @@ export async function zakljuciPartijuUBazi(
       const zapisNapretka = napredakDostignuca.get(r.igracId);
       if (zapisNapretka && stariIgrac?.vrsta !== 'gost') {
         const delta: DeltaNapretkaDostignuca = { ...zapisNapretka.delta };
+        delta.rijetkeLeksemskeGrupe = brojNovihRijetkihGrupa.get(r.igracId) ?? 0;
         if (!samoStatistika && r.plasman === 1) delta.javnePobjede = (delta.javnePobjede ?? 0) + 1;
 
         const [stariNapredak] = await tx.select().from(napredakDostignucaIgraca)

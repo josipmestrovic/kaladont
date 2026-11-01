@@ -2,12 +2,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { KrajPartije, PocetakPartije, PrihvacenPotez, RundaOtvorena } from 'zajednicko';
 import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
+import { dostignucaIgraca, igraci, otkljucaneGrupeIgraca, pobjedeTreninga } from '../src/baza/shema.js';
+import { izdajSesiju } from '../src/racuni/sesije.js';
+import { zabiljeziPobjeduTreninga } from '../src/trening/upis-napretka.js';
 
 let posluzitelj: Posluzitelj;
 let adresa: string;
+const igraciZaBrisanje: string[] = [];
 
 beforeAll(async () => {
   posluzitelj = await izgradiPosluzitelj({ socketOgranicenja: { handshakePoIpMinuti: 1_000 }, postavkeMotora: { timerOnemogucen: false, trajanjePotezaMs: 50 } });
@@ -18,11 +23,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await posluzitelj.zaustavi();
+  for (const igracId of igraciZaBrisanje) {
+    await baza.delete(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
+    await baza.delete(igraci).where(eq(igraci.id, igracId));
+  }
 });
 
 const TABLICE_NAPRETKA = [
   'partije', 'sudionici_partije', 'potezi', 'obracuni_partija', 'rezultati_forme_igraca', 'nizovi_pobjeda_igraca',
   'otkljucane_grupe_igraca', 'otkljucane_rijeci_igraca', 'napredak_dostignuca_igraca', 'dostignuca_igraca',
+  'trening_rijeci_igraca', 'pobjede_treninga',
   'dnk_statistike_igraca', 'statistike_rijeci_igraca',
 ] as const;
 
@@ -110,6 +120,91 @@ async function odigrajTreningDoKraja(socket: ClientSocket, zahtijevajPotezBota =
 }
 
 describe('Zagrijavanje', () => {
+  it('registrirani čovjek sprema prihvaćene oblike prije ack-a bez upisa partije ili XP-a', async () => {
+    const igracId = randomUUID();
+    igraciZaBrisanje.push(igracId);
+    const email = `trening-${igracId}@example.com`;
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: `Tr${igracId.slice(0, 6)}`, email, emailPotvrdjen: true });
+    const sesija = await izdajSesiju(igracId);
+    const socket = await spoji(sesija.token);
+    let odigraoRijec = false;
+    let mojId = '';
+    const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
+    const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
+    const prvaRundaPromise = Promise.race([
+      cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena', (runda) => runda.naPotezuId === igracId).then((runda) => ({ rijec: runda.rijec, trazenaSlova: runda.trazenaSlova, turnToken: runda.turnToken })),
+      cekaj<PrihvacenPotez>(socket, 'potez:prihvacen', (potez) => potez.sljedeciId === igracId).then((potez) => ({ rijec: potez.rijec, trazenaSlova: potez.trazenaSlova, turnToken: potez.turnToken })),
+    ]);
+    const naPocetak = (pocetak: PocetakPartije) => { mojId = pocetak.mojIgracId; };
+    const naRunda = (runda: RundaOtvorena) => {
+      if (runda.naPotezuId === igracId && odigraoRijec) socket.emit('potez:ne-znam', { turnToken: runda.turnToken });
+    };
+    const naPrihvacen = (potez: PrihvacenPotez) => {
+      if (potez.sljedeciId === igracId && odigraoRijec) socket.emit('potez:ne-znam', { turnToken: potez.turnToken });
+    };
+    socket.on('partija:pocetak', naPocetak);
+    socket.on('partija:runda-otvorena', naRunda);
+    socket.on('potez:prihvacen', naPrihvacen);
+    try {
+      expect((await new Promise<{ pokrenut: boolean }>((resolve) => socket.emit('trening:zapocni', resolve))).pokrenut).toBe(true);
+      const pocetak = await pocetakPromise;
+      const runda = await prvaRundaPromise;
+      expect(mojId).toBe(igracId);
+      const [kandidat] = await baza.execute<{ rijec: string }>(sql`
+        select kandidat.rijec from rijeci kandidat
+        join rijeci pocetna on pocetna.rijec = ${runda.rijec}
+        where kandidat.aktivna and kandidat.prva_dva = ${runda.trazenaSlova}
+          and kandidat.zadnja_dva <> 'ka' and not (kandidat.grupe && pocetna.grupe)
+        order by kandidat.rijec limit 1
+      `);
+      if (!kandidat) throw new Error(`Nema valjanog trening poteza na ${runda.trazenaSlova}`);
+      const prihvacenPromise = cekaj<PrihvacenPotez>(socket, 'potez:prihvacen', (potez) => potez.igracId === igracId);
+      socket.emit('potez:rijec', { rijec: kandidat.rijec, turnToken: runda.turnToken });
+      const prihvacen = await prihvacenPromise;
+      odigraoRijec = true;
+      expect(prihvacen.rijec).toBe(kandidat.rijec);
+      const [oblik] = await baza.execute<{ rijec: string }>(sql`select rijec from trening_rijeci_igraca where igrac_id = ${igracId} and rijec = ${kandidat.rijec}`);
+      expect(oblik?.rijec).toBe(kandidat.rijec);
+      const [grupa] = await baza.select({ zaDostignuca: otkljucaneGrupeIgraca.zaDostignuca }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId)).limit(1);
+      expect(grupa?.zaDostignuca).toBe(false);
+      const kategorija = await fetch(`${adresa}/api/profil/kolekcija/rijeci?kategorija=oblici_treninga`, { headers: { authorization: `Bearer ${sesija.token}` } });
+      expect(kategorija.status).toBe(200);
+      expect((await kategorija.json() as { rijeci: string[] }).rijeci).toContain(kandidat.rijec);
+      const kraj = await krajPromise;
+      expect(kraj.kontekst).toBe('trening');
+      expect(kraj.mojeIskustvo).toBeNull();
+      expect(kraj.mojaForma).toBeUndefined();
+      const [partija] = await baza.execute<{ broj: number }>(sql`select count(*)::int as broj from partije where id = ${pocetak.partijaId}`);
+      expect(partija?.broj).toBe(0);
+      const [igrac] = await baza.select({ iskustvo: igraci.iskustvoUkupno, odigrane: igraci.odigrane }).from(igraci).where(eq(igraci.id, igracId));
+      expect(igrac).toMatchObject({ iskustvo: 0, odigrane: 0 });
+    } finally {
+      socket.off('partija:pocetak', naPocetak);
+      socket.off('partija:runda-otvorena', naRunda);
+      socket.off('potez:prihvacen', naPrihvacen);
+      socket.disconnect();
+    }
+  });
+
+  it('Zagrijan se otključava na 1/5/20/50/100 pobjeda i ponovljeni trening ne broji dvaput', async () => {
+    const igracId = randomUUID();
+    igraciZaBrisanje.push(igracId);
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: `Pob${igracId.slice(0, 6)}`, email: `pobjede-${igracId}@example.com`, emailPotvrdjen: true });
+    const ids: string[] = [];
+    for (let broj = 1; broj <= 100; broj += 1) {
+      const treningId = randomUUID();
+      ids.push(treningId);
+      const pobjeda = await zabiljeziPobjeduTreninga(treningId, igracId);
+      expect(pobjeda?.pobjede).toBe(broj);
+      if ([1, 5, 20, 50, 100].includes(broj)) expect(pobjeda?.novaRazina).toBe([1, 5, 20, 50, 100].indexOf(broj) + 1);
+      else expect(pobjeda?.novaRazina).toBe(0);
+    }
+    expect(await zabiljeziPobjeduTreninga(ids[0]!, igracId)).toBeNull();
+    const [dostignuce] = await baza.select().from(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igracId));
+    expect(dostignuce).toMatchObject({ dostignuceId: 'zagrijan', razina: 5 });
+    expect(await baza.select().from(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igracId))).toHaveLength(100);
+  });
+
   it('gost igra protiv Računala, dobiva kraj bez napretka i baza ostaje netaknuta', async () => {
     const prije = await snimkaNapretka();
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
@@ -151,9 +246,10 @@ describe('Zagrijavanje', () => {
   it('ne pokreće drugi trening dok je prvi aktivan', async () => {
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
+      const prvaRunda = cekaj(socket, 'partija:runda-otvorena');
       const prvi = await new Promise<{ pokrenut: boolean }>((resolve) => socket.emit('trening:zapocni', resolve));
       expect(prvi.pokrenut).toBe(true);
-      await cekaj(socket, 'partija:runda-otvorena');
+      await prvaRunda;
       const drugi = await new Promise<{ pokrenut: boolean; kod?: string }>((resolve) => socket.emit('trening:zapocni', resolve));
       expect(drugi).toMatchObject({ pokrenut: false, kod: 'VEC_U_PARTIJI' });
       socket.emit('partija:izadji');

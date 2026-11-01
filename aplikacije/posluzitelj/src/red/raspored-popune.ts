@@ -12,8 +12,8 @@ export const PRAGOVI_POPUNE_MS: Record<'dva_igraca' | 'cetiri_igraca', readonly 
   cetiri_igraca: [20_000, 30_000, 40_000],
 };
 
-export function pragoviPopuneZaOkruzenje(okruzenje: string): typeof PRAGOVI_POPUNE_MS {
-  return okruzenje === 'development'
+export function pragoviPopuneZaOkruzenje(okruzenje: string, brziRazvoj = true): typeof PRAGOVI_POPUNE_MS {
+  return okruzenje === 'development' && brziRazvoj
     ? { dva_igraca: [1_000], cetiri_igraca: [1_000, 1_000, 1_000] }
     : PRAGOVI_POPUNE_MS;
 }
@@ -34,6 +34,9 @@ export interface OvisnostiPopune {
   fond: FondBotova;
   velicinaStola: number;
   pragoviMs: readonly number[];
+  odstupanjaMs?: readonly number[];
+  dohvatiRaspored?: () => { pragoviMs: readonly number[]; odstupanjaMs?: readonly number[] };
+  rng?: () => number;
   omogucena: () => boolean;
   /** Pokreće stol ljudi + botova; vraća rezultat motora. */
   pokreniStol: (stol: StavkaReda[]) => Promise<RezultatPokretanja>;
@@ -54,6 +57,7 @@ export class PopunaReda {
   private readonly zakazi: (posao: () => void, ms: number) => NodeJS.Timeout;
   private readonly otkazi: (handle: NodeJS.Timeout) => void;
   private brojacGrupa = 0;
+  private pragoviEpizode: number[] | null = null;
 
   constructor(private readonly ovisnosti: OvisnostiPopune) {
     this.grupaId = `popuna-${ovisnosti.velicinaStola}`;
@@ -74,22 +78,36 @@ export class PopunaReda {
     if (this.pokretanjeUTijeku) return;
     const ljudi = this.ovisnosti.red.stanje().filter((stavka) => stavka.upravljac !== 'bot');
     if (ljudi.length === 0 || !this.ovisnosti.omogucena()) {
+      if (ljudi.length === 0) this.pragoviEpizode = null;
       this.oslobodiSve();
       this.ovisnosti.naPromjenu?.();
       return;
     }
 
     const sada = this.sada();
+    for (let indeks = this.rezervacije.length - 1; indeks >= 0; indeks -= 1) {
+      const rezervacija = this.rezervacije[indeks]!;
+      if (this.ovisnosti.fond.jeAktivan(rezervacija.igracId)) continue;
+      this.rezervacije.splice(indeks, 1);
+      this.ovisnosti.fond.oslobodi(rezervacija);
+    }
+    if (this.pragoviEpizode === null) {
+      const raspored = this.ovisnosti.dohvatiRaspored?.() ?? this.ovisnosti;
+      this.pragoviEpizode = raspored.pragoviMs.map((prag, indeks) => {
+        const odstupanje = raspored.odstupanjaMs?.[indeks] ?? 0;
+        return Math.max(0, prag + ((this.ovisnosti.rng ?? Math.random)() * 2 - 1) * odstupanje);
+      }).sort((prvi, drugi) => prvi - drugi);
+    }
     const najstariji = Math.min(...ljudi.map((stavka) => stavka.usaoU));
     const nedostaje = Math.max(0, this.ovisnosti.velicinaStola - ljudi.length);
-    const dopusteno = Math.min(nedostaje, dopustenoBotova(najstariji, sada, this.ovisnosti.pragoviMs));
+    const dopusteno = Math.min(nedostaje, dopustenoBotova(najstariji, sada, this.pragoviEpizode));
 
     while (this.rezervacije.length > dopusteno) {
       const visak = this.rezervacije.pop()!;
       this.ovisnosti.fond.oslobodi(visak);
     }
     while (this.rezervacije.length < dopusteno) {
-      const rezervacija = this.ovisnosti.fond.rezerviraj(this.grupaId);
+      const rezervacija = this.ovisnosti.fond.rezerviraj(this.grupaId, ljudi.map((covjek) => covjek.igracId));
       if (!rezervacija) break; // fond iscrpljen: čeka se čovjek ili oslobađanje bota
       this.rezervacije.push(rezervacija);
     }
@@ -100,7 +118,7 @@ export class PopunaReda {
       return;
     }
 
-    const zaKoliko = sljedeciPragMs(najstariji, sada, this.ovisnosti.pragoviMs);
+    const zaKoliko = sljedeciPragMs(najstariji, sada, this.pragoviEpizode);
     if (zaKoliko !== null && dopusteno < nedostaje) {
       this.timer = this.zakazi(() => {
         this.timer = null;
@@ -116,6 +134,7 @@ export class PopunaReda {
   }
 
   private pokreni(ljudi: StavkaReda[]): void {
+    this.pragoviEpizode = null;
     const rezervacije = this.rezervacije;
     this.rezervacije = [];
     this.brojacGrupa += 1;

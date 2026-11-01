@@ -145,6 +145,14 @@ export interface StanjePartije {
   kodSobe?: string;
   trajanjePotezaSek?: number;
   dopusteneVrste?: VrstaRijeci[];
+  treningNeaktivnost?: { upozorenjeIso: string; zatvaraIso: string; upozorenje: boolean };
+}
+
+export interface TreningNeaktivnost {
+  partijaId: string;
+  upozorenjeIso: string;
+  zatvaraIso: string;
+  upozorenje: boolean;
 }
 
 export interface PrihvacenPotez {
@@ -353,6 +361,7 @@ export type PotvrdaTreninga = (ishod: { pokrenut: true } | { pokrenut: false; ko
 export interface DogadajiKlijentPoslužitelj {
   'red:udji': (payload: PayloadUdjiURed | undefined, potvrda?: PotvrdaUlaskaURed) => void;
   'trening:zapocni': (potvrda?: PotvrdaTreninga) => void;
+  'trening:nastavi': (payload: Record<string, never>) => void;
   'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;
@@ -381,6 +390,7 @@ export interface DogadajiPosluziteljKlijent {
   'partija:runda-otvorena': (payload: RundaOtvorena) => void;
   'partija:spremanje-rezultata': (payload: SpremanjeRezultataPartije) => void;
   'partija:ponistena': (payload: PonistenaPartija) => void;
+  'trening:neaktivnost': (payload: TreningNeaktivnost) => void;
   'partija:kraj': (payload: KrajPartije) => void;
   'dostignuce:otkljucano': (payload: NovoDostignuceTijekomPartije) => void;
   'iskustvo:obracun': (payload: ObracunIskustvaTijekomPartije) => void;

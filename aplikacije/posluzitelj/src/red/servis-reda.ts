@@ -27,6 +27,9 @@ export interface OpcijePopuneReda {
   sada?: () => number;
   /** Samo za testove: kraći pragovi od produkcijskih 30 / 20-30-40 s. */
   pragoviMs?: Partial<Record<'cetiri_igraca' | 'dva_igraca', readonly number[]>>;
+  odstupanjaMs?: Partial<Record<'cetiri_igraca' | 'dva_igraca', readonly number[]>>;
+  dohvatiRaspored?: (mod: 'cetiri_igraca' | 'dva_igraca') => { pragoviMs: readonly number[]; odstupanjaMs?: readonly number[] };
+  dohvatiOdmaciNeuspjelogPokretanja?: () => readonly number[];
 }
 
 export function registrirajRedCekanja(
@@ -42,6 +45,11 @@ export function registrirajRedCekanja(
 ): { ukloniIzReda: (igracId: string) => void; osvjeziPopunu: () => void; zaustaviPopunu: () => void } {
   const red4p = new RedCekanja(prvaCetvorica);
   const red1v1 = new RedCekanja(prviPar);
+  const namjere = new Map<string, { mod: 'cetiri_igraca' | 'dva_igraca'; generacija: number }>();
+  let generacijaUlaska = 0;
+  let zaustavljen = false;
+  const ponavljanja = new Map<'cetiri_igraca' | 'dva_igraca', NodeJS.Timeout>();
+  const greskePokretanja = new Map<'cetiri_igraca' | 'dva_igraca', number>();
 
   function stvoriPopunu(mod: 'cetiri_igraca' | 'dva_igraca'): PopunaReda | null {
     if (!popunaOpcije) return null;
@@ -50,7 +58,9 @@ export function registrirajRedCekanja(
       fond: popunaOpcije.fond,
       velicinaStola: mod === 'dva_igraca' ? 2 : 4,
       pragoviMs: popunaOpcije.pragoviMs?.[mod] ?? PRAGOVI_POPUNE_MS[mod],
-      omogucena: () => popunaOpcije.omogucena(mod) && mozeStvoritiPartiju(),
+      odstupanjaMs: popunaOpcije.odstupanjaMs?.[mod],
+      dohvatiRaspored: popunaOpcije.dohvatiRaspored ? () => popunaOpcije.dohvatiRaspored!(mod) : undefined,
+      omogucena: () => !zaustavljen && !ponavljanja.has(mod) && popunaOpcije.omogucena(mod) && mozeStvoritiPartiju(),
       pokreniStol: (stol) => pokreniStolSRezultatom(stol, mod),
       botJeZauzet: popunaOpcije.botJeZauzet,
       naPromjenu: () => posaljiStanje(mod),
@@ -106,32 +116,62 @@ export function registrirajRedCekanja(
   }
 
   function ukloniIzSvihRedova(igracId: string) {
+    namjere.delete(igracId);
     red4p.izadji(igracId);
     red1v1.izadji(igracId);
   }
 
   /** Nakon neuspjelog starta vraća samo ljude koji još čekaju isti način; zadržava izvorni usaoU. */
-  function vratiURed(stol: readonly StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca'): void {
+  function vratiURed(stol: readonly StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca', generacije: ReadonlyMap<string, number>): void {
     const red = mod === 'dva_igraca' ? red1v1 : red4p;
     const soba = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
-    const uSobi = io.sockets.adapter.rooms.get(soba);
     for (const stavka of stol) {
       if (stavka.upravljac === 'bot') continue;
-      const prisutan = [...(uSobi ?? [])].some((socketId) => io.sockets.sockets.get(socketId)?.data.igracId === stavka.igracId);
-      if (prisutan && !igracImaAktivnuPartiju(stavka.igracId)) red.udji(stavka);
+      const namjera = namjere.get(stavka.igracId);
+      const socket = [...io.sockets.sockets.values()].find((veza) => veza.connected && veza.data.igracId === stavka.igracId);
+      if (!zaustavljen && socket && namjera?.mod === mod && namjera.generacija === generacije.get(stavka.igracId) && !igracImaAktivnuPartiju(stavka.igracId) && !igracImaPrivatnuSobu(stavka.igracId)) {
+        socket.join(soba);
+        red.udji(stavka);
+      }
     }
   }
 
   function pokreniStolSRezultatom(stol: StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca'): Promise<RezultatPokretanja> {
+    const generacije = new Map(stol.filter((stavka) => stavka.upravljac !== 'bot').map((stavka) => [stavka.igracId, namjere.get(stavka.igracId)?.generacija ?? -1]));
+    const obradiNeuspjeh = () => {
+      vratiURed(stol, mod, generacije);
+      if (zaustavljen || ponavljanja.has(mod)) return;
+      const broj = (greskePokretanja.get(mod) ?? 0) + 1;
+      greskePokretanja.set(mod, broj);
+      const odmaci = popunaOpcije?.dohvatiOdmaciNeuspjelogPokretanja?.() ?? [1_000, 2_000, 4_000, 5_000];
+      const odmak = odmaci[Math.min(broj - 1, odmaci.length - 1)] ?? 5_000;
+      const timer = setTimeout(() => {
+        ponavljanja.delete(mod);
+        if (zaustavljen) return;
+        const red = mod === 'dva_igraca' ? red1v1 : red4p;
+        const noviStol = red.pokusajSastaviStol();
+        if (noviStol) pokreniStol(noviStol, mod);
+        else popunaZa(mod)?.osvjezi();
+      }, odmak);
+      timer.unref();
+      ponavljanja.set(mod, timer);
+    };
     return Promise.resolve()
       .then(() => naStolSastavljen(stol, mod))
       .then((rezultat) => {
         const konacni: RezultatPokretanja = rezultat ?? 'pokrenuta';
-        if (konacni !== 'pokrenuta') vratiURed(stol, mod);
+        if (konacni !== 'pokrenuta') obradiNeuspjeh();
+        else {
+          popunaOpcije?.fond.zapamtiProtivnike(stol);
+          greskePokretanja.delete(mod);
+          for (const [igracId, generacija] of generacije) {
+            if (namjere.get(igracId)?.generacija === generacija) namjere.delete(igracId);
+          }
+        }
         return konacni;
       }, (greska: unknown) => {
         console.error('Neuspjelo pokretanje partije:', greska);
-        vratiURed(stol, mod);
+        obradiNeuspjeh();
         return 'greska' as const;
       })
       .finally(() => posaljiStanje(mod));
@@ -201,6 +241,7 @@ export function registrirajRedCekanja(
       }
 
       ukloniIzSvihRedova(socket.data.igracId);
+      namjere.set(socket.data.igracId, { mod, generacija: ++generacijaUlaska });
 
       red.udji({
         igracId: socket.data.igracId,
@@ -223,7 +264,7 @@ export function registrirajRedCekanja(
       potvrda?.(izracunajStanje(socket.data.igracId, mod));
       posaljiStanje(mod);
 
-      const stol = red.pokusajSastaviStol();
+      const stol = ponavljanja.has(mod) ? null : red.pokusajSastaviStol();
       if (stol) pokreniStol(stol, mod);
       else popunaZa(mod)?.osvjezi();
     }));
@@ -271,6 +312,11 @@ export function registrirajRedCekanja(
       popuna1v1?.osvjezi();
     },
     zaustaviPopunu: () => {
+      zaustavljen = true;
+      for (const timer of ponavljanja.values()) clearTimeout(timer);
+      ponavljanja.clear();
+      namjere.clear();
+      greskePokretanja.clear();
       popuna4p?.zaustavi();
       popuna1v1?.zaustavi();
     },

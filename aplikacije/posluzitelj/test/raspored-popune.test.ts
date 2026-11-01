@@ -3,6 +3,74 @@ import type { RezultatPokretanja } from '../src/igra/politika-ucinka.js';
 import { FondBotova, type IdentitetBota } from '../src/bot/fond.js';
 import { RedCekanja, prvaCetvorica, prviPar, type StavkaReda } from '../src/red/red-cekanja.js';
 import { PRAGOVI_POPUNE_MS, PopunaReda, dopustenoBotova, sljedeciPragMs } from '../src/red/raspored-popune.js';
+import { createServer } from 'node:http';
+import { Server } from 'socket.io';
+import { io as spojiSocket, type Socket } from 'socket.io-client';
+import { registrirajRedCekanja } from '../src/red/servis-reda.js';
+import type { KaladontIo } from '../src/server.js';
+import type { StanjeReda } from 'zajednicko';
+
+describe('povrat namjere reda nakon neuspjelog početka', () => {
+  it.each([false, true])('povrat nakon izlaska iz socket sobe, dobrovoljni izlazak=%s', async (izlazi) => {
+    const http = createServer();
+    const io = new Server(http);
+    const klijenti: Socket[] = [];
+    let dovrsiPokusaj: (rezultat: RezultatPokretanja) => void = () => undefined;
+    const pocetci: StavkaReda[][] = [];
+    let oznaciPocetak: () => void = () => undefined;
+    const zapoceo = new Promise<void>((resolve) => { oznaciPocetak = resolve; });
+    io.on('connection', (socket) => {
+      socket.data = { igracId: socket.id, vrsta: 'gost', nadimak: 'Gost', avatarId: 0, avatarConfig: null, avatarRevision: 0 };
+    });
+    const servis = registrirajRedCekanja(io as unknown as KaladontIo, (stol) => {
+      pocetci.push(stol);
+      for (const socket of io.sockets.sockets.values()) socket.leave('red-cekanja-1v1');
+      oznaciPocetak();
+      return new Promise<RezultatPokretanja>((resolve) => { dovrsiPokusaj = resolve; });
+    }, () => false, () => false, () => true, () => true, () => true, () => undefined);
+    try {
+      await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+      const podaci = http.address();
+      const adresa = `http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`;
+      for (let indeks = 0; indeks < 2; indeks += 1) {
+        const socket = spojiSocket(adresa, { forceNew: true });
+        await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); });
+        klijenti.push(socket);
+        await new Promise<StanjeReda>((resolve) => socket.emit('red:udji', { mod: 'dva_igraca' }, resolve));
+      }
+      await zapoceo;
+      const prvi = klijenti[0]!;
+      const stanjeNakon = new Promise<StanjeReda>((resolve) => prvi.once('red:stanje', resolve));
+      if (izlazi) {
+        const potvrdaIzlaska = new Promise<void>((resolve) => io.sockets.sockets.get(prvi.id!)!.once('red:izadji', resolve));
+        prvi.emit('red:izadji');
+        await potvrdaIzlaska;
+      }
+      const drugiStanje = new Promise<StanjeReda>((resolve) => {
+        const slusaj = (stanje: StanjeReda) => {
+          if (stanje.mjesta.filter(Boolean).length !== (izlazi ? 1 : 2)) return;
+          klijenti[1]!.off('red:stanje', slusaj);
+          resolve(stanje);
+        };
+        klijenti[1]!.on('red:stanje', slusaj);
+      });
+      dovrsiPokusaj('greska');
+      const stanje = await (izlazi ? drugiStanje : stanjeNakon);
+      expect(stanje.mjesta.filter(Boolean)).toHaveLength(izlazi ? 1 : 2);
+      expect(io.sockets.sockets.get(prvi.id!)?.rooms.has('red-cekanja-1v1')).toBe(!izlazi);
+      if (!izlazi) {
+        const ponovniPocetak = new Promise<void>((resolve) => { oznaciPocetak = resolve; });
+        await ponovniPocetak;
+        expect(pocetci).toHaveLength(2);
+        expect(pocetci[1]!.map((stavka) => stavka.usaoU)).toEqual(pocetci[0]!.map((stavka) => stavka.usaoU));
+      }
+    } finally {
+      servis.zaustaviPopunu();
+      for (const socket of klijenti) socket.disconnect();
+      await new Promise<void>((resolve) => io.close(() => resolve()));
+    }
+  });
+});
 
 function identiteti(broj: number): IdentitetBota[] {
   return Array.from({ length: broj }, (_, i) => ({
@@ -86,6 +154,44 @@ function okolina(mod: 'dva_igraca' | 'cetiri_igraca', brojBotova = 5): Okolina {
 }
 
 describe('pragovi popune', () => {
+  it('odstupanje se izvlači samo jednom po epizodi čekanja', () => {
+    const red = new RedCekanja(prvaCetvorica);
+    const fond = new FondBotova(identiteti(5));
+    let sada = 0;
+    const generator = vi.fn(() => 1);
+    let pragovi = [20_000, 30_000, 40_000];
+    const popuna = new PopunaReda({
+      red, fond, velicinaStola: 4, pragoviMs: [20_000, 30_000, 40_000], odstupanjaMs: [3_000, 3_000, 3_000],
+      rng: generator, sada: () => sada, omogucena: () => true,
+      dohvatiRaspored: () => ({ pragoviMs: pragovi, odstupanjaMs: [3_000, 3_000, 3_000] }),
+      pokreniStol: async () => 'pokrenuta', botJeZauzet: () => false,
+      zakazi: () => 1 as unknown as NodeJS.Timeout, otkazi: () => undefined,
+    });
+    red.udji(covjek('h1', 0));
+    popuna.osvjezi();
+    pragovi = [5_000, 10_000, 15_000];
+    sada = 22_999;
+    popuna.osvjezi();
+    expect(popuna.rezerviraniBotovi()).toHaveLength(0);
+    sada = 23_000;
+    popuna.osvjezi();
+    expect(popuna.rezerviraniBotovi()).toHaveLength(1);
+    red.udji(covjek('h2', 10_000));
+    red.izadji('h1');
+    popuna.osvjezi();
+    expect(generator).toHaveBeenCalledTimes(3);
+    expect(popuna.rezerviraniBotovi()).toHaveLength(0);
+    red.izadji('h2');
+    popuna.osvjezi();
+    red.udji(covjek('h3', sada));
+    popuna.osvjezi();
+    expect(generator).toHaveBeenCalledTimes(6);
+    sada += 8_000;
+    popuna.osvjezi();
+    expect(popuna.rezerviraniBotovi()).toHaveLength(1);
+    popuna.zaustavi();
+  });
+
   it('dopušta 0/1/2/3 bota točno na granicama', () => {
     const pragovi = PRAGOVI_POPUNE_MS.cetiri_igraca;
     expect(dopustenoBotova(0, 19_999, pragovi)).toBe(0);

@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost/socket-handler.js';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { konfiguracija } from '../konfiguracija.js';
 import { promijesajNiz } from './raspored-sjedala.js';
 import {
@@ -58,9 +58,12 @@ import type { StavkaReda } from '../red/red-cekanja.js';
 import { ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisStatistikeRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
+import { zapisiPrihvaceneRijeciTreninga, zabiljeziPobjeduTreninga } from '../trening/upis-napretka.js';
+import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
 
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50), turnToken: z.string().min(1).max(64).optional() }).strict();
 const ShemaNeznam = z.object({ turnToken: z.string().min(1).max(64).optional() }).strict().optional();
+const ShemaTreningNastavi = z.object({}).strict();
 const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) }).strict();
 
 const TRAJANJE_POTEZA_MS = konfiguracija.TRAJANJE_POTEZA_MS;
@@ -111,6 +114,7 @@ export interface PostavkeMotoraPartije {
   timerOnemogucen?: boolean;
   trajanjePotezaMs?: number;
   trajanjeIzboraSustavaMs?: number;
+  odgodaPocetkaPartijeMs?: number;
   tolerancijaPrekidaMs?: number;
   odgodaObradePrekidaMs?: number;
   zadrzavanjeSobeNakonKrajaMs?: number;
@@ -122,6 +126,7 @@ export interface PostavkeMotoraPartije {
   /** Poziva se pri svakoj promjeni poteza, otvaranju runde i kraju; koristi ga bot kontroler. */
   naPromjenuPoteza?: (dogadaj: DogadajPoteza) => void;
   maksimalnoAktivnihTreninga?: number;
+  dohvatiRokoveNeaktivnostiTreninga?: () => { upozorenjeMs: number; zatvaranjeMs: number };
 }
 
 interface PrekidUTijeku {
@@ -151,6 +156,7 @@ interface StatistikaRijeciPartije {
 
 interface StanjeStola {
   partijaId: string;
+  pocetakPartijeMs: number;
   mod: 'cetiri_igraca' | 'dva_igraca';
   kontekst: KontekstPartije;
   politika: PolitikaUcinkaPartije;
@@ -189,8 +195,10 @@ interface StanjeStola {
   dopusteneVrste?: ReadonlySet<VrstaRijeci>;
   postavkePrivatneSobe?: PostavkePrivatneSobe;
   grupeSNagradom: Map<string, Map<string, number | null>>;
+  grupeZaDostignuca: Map<string, Set<string>>;
   pocetneKolekcijskeGrupe: Map<string, Set<string>>;
   noveGrupeSNagradom: Map<string, Map<string, number | null>>;
+  noveGrupeKolekcije: Map<string, Map<string, number | null>>;
   streakovi: Map<string, number>;
   statistikeRijeci: Map<string, StatistikaRijeciPartije>;
   iskustvoPrije: Map<string, number>;
@@ -203,6 +211,11 @@ interface StanjeStola {
   retrySpremanjaHandle: NodeJS.Timeout | null;
   zavrsnoSpremanje: (() => Promise<void>) | null;
   upisiPotezaUTijeku: Promise<void>[];
+  treningNeaktivnost: { upozorenjeIso: string; zatvaraIso: string; upozorenje: boolean } | null;
+  treningRokovi: { upozorenjeMs: number; zatvaranjeMs: number } | null;
+  treningGeneration: number;
+  treningUpozorenjeHandle: NodeJS.Timeout | null;
+  treningZatvaranjeHandle: NodeJS.Timeout | null;
 }
 
 export function stvoriUpraviteljPartija(
@@ -224,6 +237,8 @@ export function stvoriUpraviteljPartija(
 
   const partije = new Map<string, StanjeStola>();
   const partijaPoIgracu = new Map<string, string>(); // igracId -> partijaId
+  const treningPoteziUTijeku = new Set<string>();
+  const upisiTreningaUTijeku = new Map<string, Promise<void>>();
   let zaustavljanje = false;
   let brojIstekaBota = 0;
   let brojNamjernihIstekaBota = 0;
@@ -236,12 +251,10 @@ export function stvoriUpraviteljPartija(
     return true;
   }
 
-  function objaviPromjenuPoteza(stanje: StanjeStola): void {
-    if (!postavke.naPromjenuPoteza) return;
+  function snimkaPoteza(stanje: StanjeStola): import('./politika-ucinka.js').DogadajPoteza {
     const trajanjeMs = stanje.trajanjePotezaSek !== undefined ? stanje.trajanjePotezaSek * 1000 : trajanjePotezaMs;
     const imaTimer = !timerOnemogucen && trajanjeMs > 0 && !stanje.izborUToku && !stanje.zavrsena;
-    try {
-      postavke.naPromjenuPoteza({
+    return {
         partijaId: stanje.partijaId,
         kontekst: stanje.kontekst,
         zavrsena: stanje.zavrsena,
@@ -251,10 +264,18 @@ export function stvoriUpraviteljPartija(
         trazenaSlova: stanje.trazenaSlova,
         zadnjaRijec: stanje.zadnjaRijec,
         istekPotezaMs: imaTimer ? stanje.vrijemePocetkaPotezaMs + trajanjeMs : null,
+        pocetakPotezaMs: stanje.vrijemePocetkaPotezaMs,
+        trajanjePotezaMs: trajanjeMs,
         iskoristeneGrupe: stanje.iskoristeneGrupe,
         dopusteneVrste: stanje.dopusteneVrste,
         sudionici: stanje.sudionici.map((s) => ({ igracId: s.igracId, upravljac: s.upravljac, aktivan: stanje.aktivni.has(s.igracId) })),
-      });
+      };
+  }
+
+  function objaviPromjenuPoteza(stanje: StanjeStola): void {
+    if (!postavke.naPromjenuPoteza) return;
+    try {
+      postavke.naPromjenuPoteza(snimkaPoteza(stanje));
     } catch (greska) {
       console.error('Promatrač poteza bacio je pogrešku:', greska);
     }
@@ -266,6 +287,83 @@ export function stvoriUpraviteljPartija(
     return broj;
   }
 
+  function prekiniZbogGreskeBota(partijaId: string, igracId: string, turnToken: string): void {
+    const stanje = partije.get(partijaId);
+    if (!stanje || stanje.zavrsena || stanje.izborUToku || stanje.turnToken !== turnToken || stanje.naPotezuId !== igracId || !stanje.aktivni.has(igracId) || stanje.sudionici.find((sudionik) => sudionik.igracId === igracId)?.upravljac !== 'bot') return;
+    ponistiStol(stanje, 'Igra je prekinuta zbog tehničke pogreške. Pobjeda i rezultat nisu dodijeljeni.');
+  }
+
+  function prekiniPrazanPocetak(stanje: StanjeStola, odlaziIgracId?: string): boolean {
+    if (stanje.zavrsena || stanje.runda !== 0 || stanje.kontekst !== 'javna' || !stanje.sudionici.some((sudionik) => sudionik.upravljac === 'bot')) return false;
+    const imaCovjeka = stanje.sudionici.some((sudionik) => sudionik.upravljac === 'covjek' && sudionik.igracId !== odlaziIgracId && stanje.aktivni.has(sudionik.igracId) && aktivneVeze.dohvatiSocket(sudionik.igracId)?.connected);
+    if (imaCovjeka) return false;
+    ponistiStol(stanje, 'Igra nije započela jer su svi igrači izašli. Rezultat nije dodijeljen.');
+    return true;
+  }
+
+  function ponistiStol(stanje: StanjeStola, poruka: string): void {
+    if (stanje.zavrsena) return;
+    const partijaId = stanje.partijaId;
+    stanje.zavrsena = true;
+    namjerniIsteciBotova.delete(partijaId);
+    if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
+    if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
+    if (stanje.treningUpozorenjeHandle) clearTimeout(stanje.treningUpozorenjeHandle);
+    if (stanje.treningZatvaranjeHandle) clearTimeout(stanje.treningZatvaranjeHandle);
+    for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
+    stanje.prekidiUTijeku.clear();
+    objaviPromjenuPoteza(stanje);
+    const dovrsi = () => {
+      for (const sudionik of stanje.sudionici) {
+        if (partijaPoIgracu.get(sudionik.igracId) === partijaId) partijaPoIgracu.delete(sudionik.igracId);
+      }
+      partije.delete(partijaId);
+      postavke.naPartijaZavrsila?.(partijaId);
+    };
+    if (stanje.politika.zapisujePovijest) {
+      pokreniSpremanjeRezultata(stanje, async () => { await ponistiPartijeUTijekuUBazi([partijaId]); }, dovrsi);
+    } else {
+      stanje.statusSpremanja = 'rezultati_spremljeni';
+      dovrsi();
+    }
+    for (const sudionik of stanje.sudionici) {
+      const socket = aktivneVeze.dohvatiSocket(sudionik.igracId);
+      socket?.emit('partija:ponistena', { partijaId, poruka });
+      socket?.leave(SOBA_PARTIJE(partijaId));
+    }
+  }
+
+  function zakaziNeaktivnostTreninga(stanje: StanjeStola, aktivnostMs = Date.now()): void {
+    if (stanje.treningUpozorenjeHandle) clearTimeout(stanje.treningUpozorenjeHandle);
+    if (stanje.treningZatvaranjeHandle) clearTimeout(stanje.treningZatvaranjeHandle);
+    if (stanje.kontekst !== 'trening' || stanje.zavrsena) return;
+    const rokovi = stanje.treningRokovi ??= structuredClone(postavke.dohvatiRokoveNeaktivnostiTreninga?.() ?? ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA);
+    const generacija = ++stanje.treningGeneration;
+    const rok = izracunajRokoveNeaktivnostiTreninga(aktivnostMs, rokovi);
+    const upozorenjeMs = rok.upozorenjeMs;
+    const zatvaraMs = rok.zatvaranjeMs;
+    stanje.treningNeaktivnost = { upozorenjeIso: new Date(upozorenjeMs).toISOString(), zatvaraIso: new Date(zatvaraMs).toISOString(), upozorenje: false };
+    const igrac = stanje.sudionici.find((sudionik) => sudionik.upravljac === 'covjek');
+    stanje.treningUpozorenjeHandle = setTimeout(() => {
+      if (stanje.zavrsena || stanje.treningGeneration !== generacija || !stanje.treningNeaktivnost || stanjeNeaktivnostiTreninga(aktivnostMs, Date.now(), rokovi) !== 'upozorenje') return;
+      stanje.treningNeaktivnost.upozorenje = true;
+      if (igrac) aktivneVeze.dohvatiSocket(igrac.igracId)?.emit('trening:neaktivnost', { partijaId: stanje.partijaId, ...stanje.treningNeaktivnost });
+    }, Math.max(0, upozorenjeMs - Date.now()));
+    stanje.treningUpozorenjeHandle.unref();
+    const zatvoriAkoIsteko = () => {
+      if (stanje.zavrsena || stanje.treningGeneration !== generacija || stanjeNeaktivnostiTreninga(aktivnostMs, Date.now(), rokovi) !== 'isteklo') return;
+      if ([...upisiTreningaUTijeku.keys()].some((kljuc) => kljuc.startsWith(`${stanje.partijaId}:`))) {
+        stanje.treningZatvaranjeHandle = setTimeout(zatvoriAkoIsteko, 100);
+        stanje.treningZatvaranjeHandle.unref();
+        return;
+      }
+      ponistiStol(stanje, 'Trening je zatvoren nakon pet minuta neaktivnosti. Ako si registriran, potvrđene riječi ostaju u tvojoj kolekciji.');
+    };
+    stanje.treningZatvaranjeHandle = setTimeout(zatvoriAkoIsteko, Math.max(0, zatvaraMs - Date.now()));
+    stanje.treningZatvaranjeHandle.unref();
+    if (igrac) aktivneVeze.dohvatiSocket(igrac.igracId)?.emit('trening:neaktivnost', { partijaId: stanje.partijaId, ...stanje.treningNeaktivnost });
+  }
+
   async function ucitajOtkljucaneGrupe(igraci: readonly SudionikPartije[]): Promise<Map<string, Map<string, number | null>>> {
     const igracIds = igraci.map((igrac) => igrac.igracId);
     const retci = igracIds.length === 0
@@ -275,6 +373,16 @@ export function stvoriUpraviteljPartija(
         .where(inArray(otkljucaneGrupeIgraca.igracId, igracIds));
     const rezultat = new Map(igracIds.map((igracId) => [igracId, new Map<string, number | null>()]));
     for (const redak of retci) rezultat.get(redak.igracId)?.set(redak.grupa, redak.tier);
+    return rezultat;
+  }
+
+  async function ucitajGrupeZaDostignuca(igraciPartije: readonly SudionikPartije[]): Promise<Map<string, Set<string>>> {
+    const igracIds = igraciPartije.filter((igrac) => igrac.vrsta !== 'gost').map((igrac) => igrac.igracId);
+    const retci = igracIds.length ? await baza.select({ igracId: otkljucaneGrupeIgraca.igracId, grupa: otkljucaneGrupeIgraca.grupa })
+      .from(otkljucaneGrupeIgraca)
+      .where(and(inArray(otkljucaneGrupeIgraca.igracId, igracIds), eq(otkljucaneGrupeIgraca.zaDostignuca, true))) : [];
+    const rezultat = new Map(igraciPartije.map((igrac) => [igrac.igracId, new Set<string>()]));
+    for (const redak of retci) rezultat.get(redak.igracId)?.add(redak.grupa);
     return rezultat;
   }
 
@@ -320,6 +428,7 @@ export function stvoriUpraviteljPartija(
         izazvaneEliminacije: redak.izazvaneEliminacije,
         mrtvaSlovaEliminacije: redak.mrtvaSlovaEliminacije,
         javnePobjede: redak.javnePobjede,
+        treningPobjede: redak.treningPobjede,
         povratneInformacije: redak.povratneInformacije,
       });
     }
@@ -386,7 +495,7 @@ export function stvoriUpraviteljPartija(
   function kolekcijaZaKraj(stanje: StanjeStola, igracId: string): NonNullable<KrajPartije['kolekcija']> {
     const pocetniKljuc = stanje.pocetneKolekcijskeGrupe.get(igracId) ?? new Set<string>();
     const trenutneGrupe = stanje.grupeSNagradom.get(igracId) ?? new Map<string, number | null>();
-    const noveGrupe = stanje.noveGrupeSNagradom.get(igracId) ?? new Map<string, number | null>();
+    const noveGrupe = stanje.noveGrupeKolekcije.get(igracId) ?? new Map<string, number | null>();
     const trenutniKljuc = new Set([...trenutneGrupe.keys()].map(kolekcijskiKljucGrupe));
     const novePoVrsti = new Map<string, Set<string>>();
     const noveRijeciPoVrsti = new Map<string, Set<string>>();
@@ -480,7 +589,7 @@ export function stvoriUpraviteljPartija(
     }
     const token = stanje.turnToken;
     stanje.timerHandle = setTimeout(() => {
-      if (stanje.zavrsena || stanje.turnToken !== token) return;
+      if (stanje.zavrsena || stanje.izborUToku || stanje.turnToken !== token) return;
       eliminirajIgraca(stanje, stanje.naPotezuId, 'istek');
     }, trajanjeMs);
   }
@@ -490,7 +599,9 @@ export function stvoriUpraviteljPartija(
       stanje.trajanjePotezaSek !== undefined
         ? stanje.trajanjePotezaSek * 1000
         : trajanjePotezaMs;
-    if (trajanjeMs <= 0) return '';
+    // Tijekom izbora riječi / isključenog timera nema "živog" poteza — prazan istek
+    // sprječava klijente da mountaju formu između eliminacije i nove runde.
+    if (timerOnemogucen || stanje.izborUToku || stanje.zavrsena || trajanjeMs <= 0) return '';
     return new Date(stanje.vrijemePocetkaPotezaMs + trajanjeMs).toISOString();
   }
 
@@ -524,6 +635,7 @@ export function stvoriUpraviteljPartija(
       trajanjePotezaSek: stanje.trajanjePotezaSek,
       dopusteneVrste: stanje.dopusteneVrste ? [...stanje.dopusteneVrste] : undefined,
       statusSpremanja: stanje.statusSpremanja,
+      ...(stanje.treningNeaktivnost && stanje.kontekst === 'trening' ? { treningNeaktivnost: { ...stanje.treningNeaktivnost } } : {}),
     };
     socket.emit('partija:stanje', poruka);
   }
@@ -542,6 +654,7 @@ export function stvoriUpraviteljPartija(
     if (zaustavljanje) return;
     zaustavljanje = true;
     namjerniIsteciBotova.clear();
+    await Promise.allSettled([...upisiTreningaUTijeku.values()]);
     const aktivnePartije = [...partije.values()].filter((stanje) =>
       !stanje.zavrsena || stanje.statusSpremanja === 'spremanje_rezultata');
     const partijaIdovi = aktivnePartije.filter((stanje) => stanje.politika.zapisujePovijest).map((stanje) => stanje.partijaId);
@@ -549,6 +662,8 @@ export function stvoriUpraviteljPartija(
       stanje.zavrsena = true;
       if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
       if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
+      if (stanje.treningUpozorenjeHandle) clearTimeout(stanje.treningUpozorenjeHandle);
+      if (stanje.treningZatvaranjeHandle) clearTimeout(stanje.treningZatvaranjeHandle);
       if (stanje.retrySpremanjaHandle) clearTimeout(stanje.retrySpremanjaHandle);
       for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
       objaviPromjenuPoteza(stanje);
@@ -654,6 +769,7 @@ export function stvoriUpraviteljPartija(
 
     const stanje: StanjeStola = {
       partijaId,
+      pocetakPartijeMs: Date.now(),
       mod,
       kontekst,
       politika,
@@ -683,8 +799,10 @@ export function stvoriUpraviteljPartija(
       zadnjiPotezi: new Map(),
       zadnjeReakcije: new Map(),
       grupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      grupeZaDostignuca: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       pocetneKolekcijskeGrupe: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       noveGrupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      noveGrupeKolekcije: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
       streakovi: new Map(sudionici.map((s) => [s.igracId, 0])),
       statistikeRijeci: new Map(sudionici.map((s) => [s.igracId, novaStatistikaRijeci()])),
       iskustvoPrije: new Map(sudionici.map((s) => [s.igracId, 0])),
@@ -697,6 +815,11 @@ export function stvoriUpraviteljPartija(
       retrySpremanjaHandle: null,
       zavrsnoSpremanje: null,
       upisiPotezaUTijeku: [],
+      treningNeaktivnost: null,
+      treningRokovi: null,
+      treningGeneration: 0,
+      treningUpozorenjeHandle: null,
+      treningZatvaranjeHandle: null,
       razloziEliminacije: new Map(),
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
@@ -705,6 +828,7 @@ export function stvoriUpraviteljPartija(
     };
 
     partije.set(partijaId, stanje);
+    if (kontekst === 'trening') zakaziNeaktivnostTreninga(stanje);
     for (const s of sudionici) partijaPoIgracu.set(s.igracId, partijaId);
 
     for (const s of sudionici) {
@@ -723,24 +847,37 @@ export function stvoriUpraviteljPartija(
     const upisPocetkaPromise = politika.zapisujePovijest
       ? zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod, sudionici.length - ljudi.length)
       : Promise.resolve();
-    const ucitajIliPrazno = <T,>(ucitaj: () => Promise<Map<string, T>>, prazno: () => T, opis: string) =>
-      politika.dajeDostignucaIKolekcije || politika.dajeNapredak
+    stanje.upisiPotezaUTijeku.push(upisPocetkaPromise.catch(() => undefined));
+    const sudioniciZaKolekciju = politika.zapisujeKolekcijuTreninga
+      ? sudionici.filter((sudionik) => sudionik.upravljac === 'covjek' && sudionik.vrsta === 'registriran')
+      : sudioniciUBazi;
+    const ucitajIliPrazno = <T,>(ucitaj: () => Promise<Map<string, T>>, prazno: () => T, opis: string, dopusteno = politika.dajeDostignucaIKolekcije || politika.dajeNapredak) =>
+      dopusteno
         ? ucitaj().catch((greska) => {
           console.error(`Neuspjelo učitavanje ${opis}:`, greska);
           return praznaMapa(prazno);
         })
         : Promise.resolve(praznaMapa(prazno));
     // Igrači dobivaju countdown tek kad je poslužitelj spreman objaviti prvu rundu.
+    const grupeDostignucaPromise = politika.dajeDostignucaIKolekcije
+      ? ucitajGrupeZaDostignuca(sudioniciUBazi).catch((greska) => {
+        console.error('Neuspjelo učitavanje grupa za dostignuća:', greska);
+        return new Map(sudionici.map((igrac) => [igrac.igracId, new Set<string>()]));
+      })
+      : Promise.resolve(new Map(sudionici.map((igrac) => [igrac.igracId, new Set<string>()])));
     return Promise.all([
       upisPocetkaPromise,
-      ucitajIliPrazno(() => ucitajOtkljucaneGrupe(sudioniciUBazi), () => new Map<string, number | null>(), 'otključanih grupa'),
+      ucitajIliPrazno(() => ucitajOtkljucaneGrupe(sudioniciZaKolekciju), () => new Map<string, number | null>(), 'otključanih grupa', politika.zapisujeKolekcijuTreninga || politika.dajeDostignucaIKolekcije),
       ucitajIliPrazno(() => ucitajOtkljucaneOblike(sudioniciUBazi), () => [] as { rijec: string; jakoDuga: boolean; jakoRijetka: boolean; dugaTier: number | null; rijetkaTier: number | null }[], 'otključanih oblika'),
       ucitajIliPrazno(() => ucitajIskustvo(sudioniciUBazi), () => 0, 'iskustva'),
       ucitajIliPrazno(() => ucitajNapredakDostignuca(sudioniciUBazi), () => ({}) as Record<string, number>, 'napretka dostignuća'),
-    ]).then(([, grupe, oblici, iskustvo, napredak]) => {
+      grupeDostignucaPromise,
+    ]).then(([, grupe, oblici, iskustvo, napredak, grupeDostignuca]) => {
       stanje.grupeSNagradom = new Map(sudionici.map((s) => [s.igracId, grupe.get(s.igracId) ?? new Map<string, number | null>()]));
+      stanje.grupeZaDostignuca = grupeDostignuca;
       stanje.pocetneKolekcijskeGrupe = new Map([...stanje.grupeSNagradom].map(([igracId, mape]) => [igracId, new Set([...mape.keys()].map(kolekcijskiKljucGrupe))]));
       stanje.noveGrupeSNagradom = praznaMapa(() => new Map<string, number | null>());
+      stanje.noveGrupeKolekcije = praznaMapa(() => new Map<string, number | null>());
       for (const sudionik of sudionici) {
         for (const oblik of oblici.get(sudionik.igracId) ?? []) {
           stanje.statistikeRijeci.get(sudionik.igracId)?.otkljucaneRijeci.set(oblik.rijec, oblik);
@@ -748,8 +885,10 @@ export function stvoriUpraviteljPartija(
       }
       stanje.iskustvoPrije = new Map(sudionici.map((s) => [s.igracId, iskustvo.get(s.igracId) ?? 0]));
       stanje.napredakDostignucaPrije = new Map(sudionici.map((s) => [s.igracId, napredak.get(s.igracId) ?? {}]));
-      if (stanje.zavrsena || stanje.izborHandle) return 'pokrenuta' as const;
-      pocetakIso = new Date(Date.now() + ODGODA_POCETKA_PARTIJE_MS).toISOString();
+      if (stanje.zavrsena || prekiniPrazanPocetak(stanje)) return 'zaustavljanje' as const;
+      if (stanje.izborHandle) return 'pokrenuta' as const;
+      const odgodaPocetka = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PARTIJE_MS;
+      pocetakIso = new Date(Date.now() + odgodaPocetka).toISOString();
       stanje.istekIzboraIso = pocetakIso;
       const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
         partijaId,
@@ -761,7 +900,7 @@ export function stvoriUpraviteljPartija(
       for (const s of sudionici) {
         aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
       }
-      stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), ODGODA_POCETKA_PARTIJE_MS);
+      stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), odgodaPocetka);
       return 'pokrenuta' as const;
     }).catch((greska) => {
       console.error(`Neuspjelo pokretanje partije ${partijaId}:`, greska);
@@ -803,6 +942,8 @@ export function stvoriUpraviteljPartija(
 
   function zakljuciPartiju(stanje: StanjeStola): void {
     stanje.zavrsena = true;
+    if (stanje.treningUpozorenjeHandle) clearTimeout(stanje.treningUpozorenjeHandle);
+    if (stanje.treningZatvaranjeHandle) clearTimeout(stanje.treningZatvaranjeHandle);
     // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.
     const zavrsenoU = new Date();
     const prikazRezultataOdIso = new Date(zavrsenoU.getTime() + 8_000).toISOString();
@@ -845,29 +986,42 @@ export function stvoriUpraviteljPartija(
     stanje.zadnjeReakcije.clear();
 
     if (stanje.kontekst === 'trening') {
-      // Trening ne dira bazu: rezultat je odmah „spremljen” i prikazuje se bez napretka.
-      stanje.statusSpremanja = 'rezultati_spremljeni';
-      for (const p of plasmani) {
-        const poruka: KrajPartije = {
-          partijaId: stanje.partijaId,
-          prikazRezultataOdIso,
-          plasmani,
-          mojNoviProsjek: 0,
-          mojRang: null,
-          mojeIskustvo: null,
-          mojaOcjenaIgre: null,
-          bonusOcjenaIgre: 0,
-          novaDostignuca: [],
-          mod: stanje.mod,
-          kontekst: 'trening',
-        };
-        stanje.rezultatiKraja.set(p.igracId, poruka);
-        if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) {
-          aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
+      stanje.statusSpremanja = 'spremanje_rezultata';
+      void (async () => {
+        let nagrada: { pobjede: number; novaRazina: number; maksimalnaRazina: number } | null = null;
+        const pobjednik = stanje.sudionici.find((sudionik) => sudionik.igracId === pobjednikId);
+        if (pobjednik?.upravljac === 'covjek' && pobjednik.vrsta !== 'gost') {
+          try {
+            nagrada = await zabiljeziPobjeduTreninga(stanje.partijaId, pobjednikId);
+          } catch (greska) {
+            console.error('Neuspjelo spremanje pobjede treninga:', greska);
+            aktivneVeze.dohvatiSocket(pobjednikId)?.emit('greska', { kod: 'INTERNA', poruka: 'Pobjeda je završena, ali napredak dostignuća nije spremljen.' });
+          }
         }
-      }
-      postavke.naPartijaZavrsila?.(stanje.partijaId);
-      zakaziBrisanjeNakonSpremanja(stanje);
+        stanje.statusSpremanja = 'rezultati_spremljeni';
+        for (const p of plasmani) {
+          const sudionik = stanje.sudionici.find((stavka) => stavka.igracId === p.igracId);
+          const jeRegistriraniCovjek = sudionik?.upravljac === 'covjek' && sudionik.vrsta !== 'gost';
+          const poruka: KrajPartije = {
+            partijaId: stanje.partijaId,
+            prikazRezultataOdIso,
+            plasmani,
+            mojNoviProsjek: 0,
+            mojRang: null,
+            mojeIskustvo: null,
+            mojaOcjenaIgre: null,
+            bonusOcjenaIgre: 0,
+            novaDostignuca: p.igracId === pobjednikId && nagrada?.novaRazina ? [{ id: 'zagrijan', novaRazina: nagrada.novaRazina, maksimalnaRazina: nagrada.maksimalnaRazina }] : [],
+            ...(jeRegistriraniCovjek ? { kolekcija: kolekcijaZaKraj(stanje, p.igracId) } : {}),
+            mod: stanje.mod,
+            kontekst: 'trening',
+          };
+          stanje.rezultatiKraja.set(p.igracId, poruka);
+          if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
+        }
+        postavke.naPartijaZavrsila?.(stanje.partijaId);
+        zakaziBrisanjeNakonSpremanja(stanje);
+      })();
       return;
     }
 
@@ -1040,7 +1194,7 @@ export function stvoriUpraviteljPartija(
           };
           stanje.rezultatiKraja.set(p.igracId, poruka);
           if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) {
-            aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
+            socket?.emit('partija:kraj', poruka);
           }
         }
       }),
@@ -1069,6 +1223,8 @@ export function stvoriUpraviteljPartija(
   function zapocniIzborRijeciSustava(stanje: StanjeStola, napadac: string | null): void {
     const izvorniRok = stanje.izborUToku ? stanje.istekIzboraIso : null;
     const trajanje = postavke.trajanjeIzboraSustavaMs ?? (konfiguracija.NODE_ENV === 'test' ? 0 : TRAJANJE_IZBORA_SUSTAVA_MS);
+    if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
+    stanje.timerHandle = null;
     if (stanje.izborHandle) clearTimeout(stanje.izborHandle); // moze se dogoditi ako netko napusti partiju dok sustav vec bira
     stanje.izborUToku = true;
     stanje.napadacId = null;
@@ -1080,6 +1236,7 @@ export function stvoriUpraviteljPartija(
   }
 
   function objaviRijecSustava(stanje: StanjeStola, napadac: string | null): void {
+    if (stanje.zavrsena || prekiniPrazanPocetak(stanje)) return;
     stanje.izborHandle = null;
     const autoRijec = rjecnik.nasumicnaPocetnaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
     if (!autoRijec) {
@@ -1249,6 +1406,12 @@ export function stvoriUpraviteljPartija(
     const noviOtvarac = razlog.startsWith('mrtva_slova') && napadac
       ? (sljedeciAktivni(stanje, napadac) ?? napadac)
       : (napadac ?? [...stanje.aktivni][0]!);
+    // Ne dodjeljuj novi aktivni potez prije izbora riječi — inače sljedeći (često
+    // napadač) dobije formu na ~trenutak, pa se UI čini zamrznutim / neupotrebljivim.
+    if (stanje.timerHandle) {
+      clearTimeout(stanje.timerHandle);
+      stanje.timerHandle = null;
+    }
     zapocniIzborRijeciSustava(stanje, noviOtvarac);
   }
 
@@ -1261,8 +1424,11 @@ export function stvoriUpraviteljPartija(
     const trazenaSlovaZaOvajPotez = stanje.trazenaSlova!;
     const trajanjeMs = Date.now() - stanje.vrijemePocetkaPotezaMs;
     const prethodniNapadacId = stanje.napadacId;
+    const sudionik = stanje.sudionici.find((stavka) => stavka.igracId === igracId);
     const gamifikacijaAktivna = stanje.politika.dajeDostignucaIKolekcije;
+    const kolekcijaAktivna = gamifikacijaAktivna || (stanje.politika.zapisujeKolekcijuTreninga && sudionik?.upravljac === 'covjek' && sudionik.vrsta !== 'gost');
     const trenutniStreak = gamifikacijaAktivna ? (stanje.streakovi.get(igracId) ?? 0) + 1 : 0;
+    if (stanje.kontekst === 'trening' && sudionik?.upravljac === 'covjek') zakaziNeaktivnostTreninga(stanje);
     if (gamifikacijaAktivna) stanje.streakovi.set(igracId, trenutniStreak);
     const statistikaPoteza = stanje.statistikeRijeci.get(igracId)!;
     statistikaPoteza.prihvaceniPotezi += 1;
@@ -1272,7 +1438,15 @@ export function stvoriUpraviteljPartija(
     const grupeIgraca = stanje.grupeSNagradom.get(igracId) ?? new Map<string, number | null>();
     stanje.grupeSNagradom.set(igracId, grupeIgraca);
     const kolekcijskeGrupePrije = new Set([...grupeIgraca.keys()].map(kolekcijskiKljucGrupe));
-    const noveGrupe = grupe.filter((grupa) => !grupeIgraca.has(grupa));
+    const noveGrupe = kolekcijaAktivna ? grupe.filter((grupa) => !grupeIgraca.has(grupa)) : [];
+    const grupeZaDostignucaIgraca = stanje.grupeZaDostignuca.get(igracId) ?? new Set<string>();
+    const noveGrupeZaDostignuca = gamifikacijaAktivna ? grupe.filter((grupa) => !grupeZaDostignucaIgraca.has(grupa)) : [];
+    const brojGrafema = grafemi(rijecNormalizirana).length;
+    const rijetkaTier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
+    for (const grupa of noveGrupe) grupeIgraca.set(grupa, rijetkaTier);
+    const noveGrupeKolekcije = stanje.noveGrupeKolekcije.get(igracId) ?? new Map<string, number | null>();
+    for (const grupa of noveGrupe) noveGrupeKolekcije.set(grupa, rijetkaTier);
+    if (kolekcijaAktivna) stanje.noveGrupeKolekcije.set(igracId, noveGrupeKolekcije);
     const noveOsnovneRijeci = [...new Set(noveGrupe
       .filter((grupa) => !kolekcijskeGrupePrije.has(kolekcijskiKljucGrupe(grupa)))
       .map(osnovnaRijecIzGrupe))];
@@ -1282,7 +1456,6 @@ export function stvoriUpraviteljPartija(
     let nagrada: PrihvacenPotez['nagrada'] = null;
     if (gamifikacijaAktivna) {
       const statistika = stanje.statistikeRijeci.get(igracId)!;
-      const brojGrafema = grafemi(rijecNormalizirana).length;
       statistika.najduziStreak = Math.max(statistika.najduziStreak, trenutniStreak);
       if (brojGrafema >= PRAGOVI_DULJINE.jakoDuga) statistika.upisaneJakoDugeRijeci += 1;
       else if (brojGrafema >= PRAGOVI_DULJINE.srednjeDuga) statistika.upisaneSrednjeDugeRijeci += 1;
@@ -1295,7 +1468,7 @@ export function stvoriUpraviteljPartija(
         const tier = frekvencija === 0 && brojGrafema >= 4 ? 0 : frekvencija <= 9 ? 1 : frekvencija <= 99 ? 2 : null;
         const grupeZaStatistiku = tier === 0 ? statistika.otkriveneJakoRijetkeGrupe : tier === 1 ? statistika.otkriveneSrednjeRijetkeGrupe : tier === 2 ? statistika.otkriveneRijetkeGrupe : null;
         if (tier !== null && grupeZaStatistiku) {
-          for (const grupa of noveGrupe) grupeZaStatistiku.add(grupa);
+          for (const grupa of noveGrupeZaDostignuca) grupeZaStatistiku.add(grupa);
           if (statistika.najrjedaTier === null || tier <= statistika.najrjedaTier) {
             statistika.najrjedaTier = Math.min(statistika.najrjedaTier ?? tier, tier);
             statistika.najrjedaRijec = rijecNormalizirana;
@@ -1304,16 +1477,14 @@ export function stvoriUpraviteljPartija(
         }
       }
       const rijecJeDuga = brojGrafema >= PRAGOVI_DULJINE.duga;
-      const rijetkaTier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
-      for (const grupa of noveGrupe) {
-        grupeIgraca.set(grupa, rijetkaTier);
-      }
-      const noveGrupeSNagradom = stanje.noveGrupeSNagradom.get(igracId) ?? new Map<string, number | null>();
-      for (const grupa of noveGrupe) noveGrupeSNagradom.set(grupa, rijetkaTier);
-      stanje.noveGrupeSNagradom.set(igracId, noveGrupeSNagradom);
+      for (const grupa of noveGrupeZaDostignuca) grupeZaDostignucaIgraca.add(grupa);
+      stanje.grupeZaDostignuca.set(igracId, grupeZaDostignucaIgraca);
+      const grupeZaZapis = stanje.noveGrupeSNagradom.get(igracId) ?? new Map<string, number | null>();
+      for (const grupa of noveGrupeZaDostignuca) grupeZaZapis.set(grupa, rijetkaTier);
+      stanje.noveGrupeSNagradom.set(igracId, grupeZaZapis);
       dodajNapredakDostignuca(stanje, igracId, {
         dugeRijeci: rijecJeDuga ? 1 : 0,
-        rijetkeLeksemskeGrupe: rijetkaTier === null ? 0 : noveGrupe.length,
+        rijetkeLeksemskeGrupe: rijetkaTier === null ? 0 : noveGrupeZaDostignuca.length,
         najduziStreak: trenutniStreak,
       });
       if (rijecJeDuga || rijetkaTier !== null) {
@@ -1327,12 +1498,12 @@ export function stvoriUpraviteljPartija(
           rijetkaTier: rijetkaTier ?? postojeca?.rijetkaTier ?? null,
         });
       }
-      nagrada = frekvencija === undefined || frekvencija === null
-        ? null
-        : izracunajNagraduZaRijec(rijecNormalizirana, frekvencija, grupe, new Set(grupeIgraca.keys()));
+    }
+
+    if (kolekcijaAktivna && typeof frekvencija === 'number') {
+      nagrada = izracunajNagraduZaRijec(rijecNormalizirana, frekvencija, grupe, new Set(grupeIgraca.keys()));
       if (nagrada) {
-        const brojOtkljucanih = [...grupeIgraca.values()].filter((vrijednost) => vrijednost !== null).length;
-        nagrada.otkljucano = brojOtkljucanih;
+        nagrada.otkljucano = [...grupeIgraca.values()].filter((vrijednost) => vrijednost !== null).length;
         nagrada.ukupno = nagrada.kategorija === 'rijetke'
           ? rjecnik.ciljeviRijeci?.().rijetke.ukupno ?? null
           : rjecnik.ciljeviRijeci?.().duge.ukupno ?? null;
@@ -1440,15 +1611,16 @@ export function stvoriUpraviteljPartija(
     );
 
     if (razlogMrtvihSlova) {
-      const sljedeci = sljedeciAktivni(stanje, igracId);
+      const zrtva = sljedeciAktivni(stanje, igracId);
       stanje.trazenaSlova = novaTrazenaSlova;
-      if (sljedeci) {
-        stanje.naPotezuId = sljedeci;
+      // Ne stavljaj žrtvu na potez i ne šalji stanje s aktivnim redom — odmah slijedi
+      // eliminacija i 8 s izbora riječi; inače se eliminatoru/sljedećem otvori forma.
+      if (zrtva) {
         emitirajPrihvacenPotezSvima(stanje, {
           igracId,
           rijec: rijecNormalizirana,
           trazenaSlova: novaTrazenaSlova,
-          sljedeciId: sljedeci,
+          sljedeciId: zrtva,
           turnToken: stanje.turnToken,
           istekPotezaIso: '',
           serverVrijemeIso: new Date().toISOString(),
@@ -1457,9 +1629,8 @@ export function stvoriUpraviteljPartija(
           nagrada,
           iskustvo: stavkePotezaIskustva,
         }, izvorniSocket);
-        posaljiStanjeSvima(stanje);
+        eliminirajIgraca(stanje, zrtva, razlogMrtvihSlova);
       }
-      if (sljedeci) eliminirajIgraca(stanje, sljedeci, razlogMrtvihSlova);
       return;
     }
 
@@ -1535,11 +1706,24 @@ export function stvoriUpraviteljPartija(
     stanje.eliminacije.push(porukaElim);
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', porukaElim);
 
+    if (stanje.politika.dajeNapredak) {
+      const obracun = izracunajObracunIskustva(
+        stanje.iskustvoPrije.get(prethodniId) ?? 0,
+        stanje.stavkeIskustva.get(prethodniId) ?? [],
+        stanje.statistikeRijeci.get(prethodniId)?.najduziStreak ?? 0,
+      );
+      aktivneVeze.dohvatiSocket(prethodniId)?.emit('iskustvo:obracun', { partijaId: stanje.partijaId, mojeIskustvo: obracun });
+    }
+
     if (stanje.aktivni.size <= 1) {
       zakljuciPartiju(stanje);
       return;
     }
 
+    if (stanje.timerHandle) {
+      clearTimeout(stanje.timerHandle);
+      stanje.timerHandle = null;
+    }
     zapocniIzborRijeciSustava(stanje, sayerId);
   }
 
@@ -1588,6 +1772,44 @@ export function stvoriUpraviteljPartija(
     return { ishod: 'prihvacen' };
   }
 
+  async function odigrajRijecTreninga(stanje: StanjeStola, igracId: string, rijec: string, turnToken: string | undefined, socket: KaladontSocket): Promise<RezultatNaredbe> {
+    const kljucPoteza = `${stanje.partijaId}:${turnToken ?? stanje.turnToken}`;
+    if (treningPoteziUTijeku.has(kljucPoteza)) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
+    treningPoteziUTijeku.add(kljucPoteza);
+    const posao = obradiRijecTreninga(stanje, igracId, rijec, turnToken, socket);
+    upisiTreningaUTijeku.set(kljucPoteza, posao.then(() => undefined));
+    try {
+      return await posao;
+    } finally {
+      treningPoteziUTijeku.delete(kljucPoteza);
+      upisiTreningaUTijeku.delete(kljucPoteza);
+    }
+  }
+
+  async function obradiRijecTreninga(stanje: StanjeStola, igracId: string, rijec: string, turnToken: string | undefined, socket: KaladontSocket): Promise<RezultatNaredbe> {
+    try {
+      if (stanje.zavrsena || !stanje.aktivni.has(igracId) || stanje.naPotezuId !== igracId || stanje.izborUToku) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
+      if (turnToken && turnToken !== stanje.turnToken) return { ishod: 'odbijen', kod: 'STARI_TURN_TOKEN', poruka: 'Potez je zastario. Osvježi stanje i pokušaj ponovno.' };
+      const normalizirana = rijec.normalize('NFC').trim().toLowerCase();
+      const rezultat = validirajPotez({ rijec, trazenaSlova: stanje.trazenaSlova!, iskoristeneGrupe: stanje.iskoristeneGrupe, potrosioGrupu: stanje.potrosioGrupu, dopusteneVrste: stanje.dopusteneVrste, rjecnik });
+      if (!rezultat.valjano) {
+        stanje.streakovi.set(igracId, 0);
+        return { ishod: 'odbijen', kod: rezultat.kod!, poruka: rezultat.poruka! };
+      }
+      const frekvencija = rjecnik.frekvencijaZa?.(normalizirana);
+      const brojGrafema = grafemi(normalizirana).length;
+      const tier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
+      await zapisiPrihvaceneRijeciTreninga(igracId, stanje.partijaId, [{ rijec: normalizirana, grupe: rjecnik.grupeZa(normalizirana).map((grupa) => ({ grupa, tier })) }]);
+      const aktualno = partije.get(stanje.partijaId);
+      if (aktualno !== stanje || stanje.zavrsena || stanje.turnToken !== (turnToken ?? stanje.turnToken) || stanje.naPotezuId !== igracId) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
+      return odigrajRijec(stanje, igracId, normalizirana, turnToken, socket);
+    } catch (greska) {
+      console.error('Neuspjelo spremanje riječi treninga:', greska);
+      socket.emit('greska', { kod: 'INTERNA', poruka: 'Riječ nije spremljena u kolekciju. Pokušaj ponovno.' });
+      return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
+    }
+  }
+
   function odustani(stanje: StanjeStola, igracId: string, turnToken: string | undefined): RezultatNaredbe {
     if (stanje.zavrsena) return { ishod: 'ignoriran', razlog: 'zavrsena' };
     if (!stanje.aktivni.has(igracId)) return { ishod: 'ignoriran', razlog: 'nije_sudionik' };
@@ -1596,6 +1818,9 @@ export function stvoriUpraviteljPartija(
     }
     if (stanje.izborUToku) return { ishod: 'ignoriran', razlog: 'sustav_bira' };
     if (stanje.naPotezuId !== igracId) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
+    if (stanje.kontekst === 'trening' && upisiTreningaUTijeku.has(`${stanje.partijaId}:${turnToken ?? stanje.turnToken}`)) {
+      return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
+    }
     eliminirajIgraca(stanje, igracId, 'ne_znam');
     return { ishod: 'prihvacen' };
   }
@@ -1736,6 +1961,19 @@ export function stvoriUpraviteljPartija(
   }
 
   function registrirajHandlere(socket: KaladontSocket): void {
+    socket.on('trening:nastavi', omotajSocketHandler(socket, 'trening:nastavi', zapisSocketHandlerGreske, (payload: unknown, ...dodatniArgumenti: unknown[]) => {
+      if (!ShemaTreningNastavi.safeParse(payload).success || dodatniArgumenti.length > 0) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        return;
+      }
+      if (!provjeriDogadaj(socket.data.igracId, 'trening:nastavi')) return;
+      const partijaId = partijaPoIgracu.get(socket.data.igracId);
+      const stanje = partijaId ? partije.get(partijaId) : undefined;
+      const sudionik = stanje?.sudionici.find((stavka) => stavka.igracId === socket.data.igracId);
+      if (!stanje || stanje.kontekst !== 'trening' || stanje.zavrsena || !sudionik || sudionik.upravljac !== 'covjek' || !stanje.aktivni.has(socket.data.igracId)) return;
+      zakaziNeaktivnostTreninga(stanje);
+    }));
+
     socket.on('partija:stanje', omotajSocketHandler(socket, 'partija:stanje', zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
       if (argumenti.length > 0) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
@@ -1744,7 +1982,7 @@ export function stvoriUpraviteljPartija(
       if (provjeriDogadaj(socket.data.igracId, 'partija:stanje')) posaljiStanje(socket);
     }));
 
-    socket.on('potez:rijec', omotajSocketHandler(socket, 'potez:rijec', zapisSocketHandlerGreske, (payload: unknown, ...dodatniArgumenti: unknown[]) => {
+    socket.on('potez:rijec', omotajSocketHandler(socket, 'potez:rijec', zapisSocketHandlerGreske, async (payload: unknown, ...dodatniArgumenti: unknown[]) => {
       const rezultatSheme = ShemaPotezRijec.safeParse(payload);
       if (!rezultatSheme.success || dodatniArgumenti.length > 0) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
@@ -1765,7 +2003,10 @@ export function stvoriUpraviteljPartija(
         socket.emit('greska', { kod: 'PREBRZO', poruka: PORUKE.prebrzo });
         return;
       }
-      const rezultat = odigrajRijec(stanje, socket.data.igracId, rijec, turnToken, socket);
+      const vlastnik = stanje.sudionici.find((sudionik) => sudionik.igracId === socket.data.igracId);
+      const rezultat = stanje.kontekst === 'trening' && vlastnik?.upravljac === 'covjek' && vlastnik.vrsta === 'registriran'
+        ? await odigrajRijecTreninga(stanje, socket.data.igracId, rijec, turnToken, socket)
+        : odigrajRijec(stanje, socket.data.igracId, rijec, turnToken, socket);
       if (rezultat.ishod === 'odbijen') socket.emit('potez:odbijen', { kod: rezultat.kod, poruka: rezultat.poruka });
     }));
 
@@ -1812,6 +2053,12 @@ export function stvoriUpraviteljPartija(
       const stanje = partijaId ? partije.get(partijaId) : undefined;
       if (!stanje) return;
 
+      if ([...upisiTreningaUTijeku.keys()].some((kljuc) => kljuc.startsWith(`${stanje.partijaId}:`))) {
+        socket.emit('greska', { kod: 'PREBRZO', poruka: 'Potez se još sprema. Pokušaj ponovno izaći za trenutak.' });
+        return;
+      }
+
+      if (prekiniPrazanPocetak(stanje, socket.data.igracId)) return;
       if (!stanje.zavrsena && stanje.aktivni.has(socket.data.igracId)) {
         eliminirajIgraca(stanje, socket.data.igracId, 'prekid');
       }
@@ -1823,6 +2070,8 @@ export function stvoriUpraviteljPartija(
     }));
 
     socket.on('disconnect', omotajSocketHandler(socket, 'disconnect', zapisSocketHandlerGreske, () => {
+      const stav = dohvatiPartijuZaSocket(socket);
+      if (stav && prekiniPrazanPocetak(stav, socket.data.igracId)) return;
       pokreniCekanjePovratka(socket);
     }));
 
@@ -1861,6 +2110,7 @@ export function stvoriUpraviteljPartija(
 
     const stanje: StanjeStola = {
       partijaId,
+      pocetakPartijeMs: Date.now(),
       mod: 'cetiri_igraca',
       kontekst: 'privatna',
       politika: politikaZaKontekst('privatna'),
@@ -1889,8 +2139,10 @@ export function stvoriUpraviteljPartija(
       zadnjiPotezi: new Map(),
       zadnjeReakcije: new Map(),
       grupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      grupeZaDostignuca: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       pocetneKolekcijskeGrupe: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       noveGrupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      noveGrupeKolekcije: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
       streakovi: new Map(sudionici.map((s) => [s.igracId, 0])),
       statistikeRijeci: new Map(sudionici.map((s) => [s.igracId, novaStatistikaRijeci()])),
       iskustvoPrije: new Map(sudionici.map((s) => [s.igracId, 0])),
@@ -1903,6 +2155,11 @@ export function stvoriUpraviteljPartija(
       retrySpremanjaHandle: null,
       zavrsnoSpremanje: null,
       upisiPotezaUTijeku: [],
+      treningNeaktivnost: null,
+      treningRokovi: null,
+      treningGeneration: 0,
+      treningUpozorenjeHandle: null,
+      treningZatvaranjeHandle: null,
       razloziEliminacije: new Map(),
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
@@ -1941,8 +2198,9 @@ export function stvoriUpraviteljPartija(
       aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
     }
 
-    void Promise.all([upisPocetkaPrivatnePartije, ucitajOtkljucaneGrupe(sudionici)]).then(([, grupe]) => {
+    void Promise.all([upisPocetkaPrivatnePartije, ucitajOtkljucaneGrupe(sudionici), ucitajGrupeZaDostignuca(sudionici)]).then(([, grupe, grupeDostignuca]) => {
       stanje.grupeSNagradom = grupe;
+      stanje.grupeZaDostignuca = grupeDostignuca;
       stanje.pocetneKolekcijskeGrupe = new Map([...grupe].map(([igracId, mape]) => [igracId, new Set([...mape.keys()].map(kolekcijskiKljucGrupe))]));
       const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - Date.now());
       stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), preostaloMs);
@@ -1974,6 +2232,22 @@ export function stvoriUpraviteljPartija(
     brojAktivnihTreninga,
     brojIstekaBota: () => brojIstekaBota,
     brojNamjernihIstekaBota: () => brojNamjernihIstekaBota,
+    botoviPartije: (partijaId: string) => partije.get(partijaId)?.sudionici.filter((sudionik) => sudionik.upravljac === 'bot').map((sudionik) => sudionik.igracId) ?? [],
+    pregledBotova: () => [...partije.values()].filter((stanje) => !stanje.zavrsena || stanje.statusSpremanja !== 'rezultati_spremljeni').flatMap((stanje) => stanje.sudionici.filter((sudionik) => sudionik.upravljac === 'bot').map((sudionik) => ({
+      igracId: sudionik.igracId,
+      partijaId: stanje.partijaId,
+      mod: stanje.mod,
+      kontekst: stanje.kontekst,
+      pocetakPartijeMs: stanje.pocetakPartijeMs,
+      aktivan: stanje.aktivni.has(sudionik.igracId),
+      naPotezu: !stanje.zavrsena && !stanje.izborUToku && stanje.naPotezuId === sudionik.igracId,
+      status: stanje.zavrsena ? stanje.statusSpremanja : stanje.runda === 0 ? 'pokretanje' : stanje.izborUToku ? 'izbor_rijeci' : 'u_partiji',
+    }))),
     oznaciNamjerniIstek,
+    dohvatiPotez: (partijaId: string) => {
+      const stanje = partije.get(partijaId);
+      return stanje ? snimkaPoteza(stanje) : null;
+    },
+    prekiniZbogGreskeBota,
   };
 }

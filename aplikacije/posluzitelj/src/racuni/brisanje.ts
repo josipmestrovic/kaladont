@@ -9,6 +9,8 @@ import {
   otkljucaneRijeciIgraca,
   sesije,
   statistikeRijeciIgraca,
+  treningRijeciIgraca,
+  pobjedeTreninga,
 } from '../baza/shema.js';
 
 export type IshodBrisanja = 'obrisan' | 'nije-pronaden' | 'vec-obrisan';
@@ -35,6 +37,8 @@ export async function obrisiRacun(email: string, potvrdi: boolean): Promise<Isho
     await transakcija.delete(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igrac.id));
     await transakcija.delete(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igrac.id));
     await transakcija.delete(otkljucaneRijeciIgraca).where(eq(otkljucaneRijeciIgraca.igracId, igrac.id));
+    await transakcija.delete(treningRijeciIgraca).where(eq(treningRijeciIgraca.igracId, igrac.id));
+    await transakcija.delete(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igrac.id));
     await transakcija
       .update(igraci)
       .set({
