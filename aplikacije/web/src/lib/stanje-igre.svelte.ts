@@ -265,12 +265,10 @@ export function pokreniSlusateljeIgre(): void {
 
     stanje.oznakaPrihvacenogPoteza += 1;
     const mojPotez = p.igracId === stanje.mojIgracId;
-    // Prazan istek = ubojita/prijelaz samo kad znamo da je timer uključen (>0).
-    // null trajanje (javna partija) ili 0 (bez limitu / ONEMOGUCI_TIMER) — nije prijelaz.
-    const prijelazBezPoteza =
-      !p.istekPotezaIso &&
-      stanje.trajanjePotezaSek !== null &&
-      stanje.trajanjePotezaSek > 0;
+    // Prazan istek = ubojita/prijelaz kad timer nije isključen.
+    // null trajanje = javna partija (default timer) — prazan istek i dalje briše red.
+    // 0 = privatna bez limitu / ONEMOGUCI_TIMER — prazan istek je normalan.
+    const prijelazBezPoteza = !p.istekPotezaIso && stanje.trajanjePotezaSek !== 0;
     // Red na mene = id match; prijelazBezPoteza samo sprečava lažni tvoj-red na ubojitoj riječi.
     const redDolaziNaMene = p.sljedeciId === stanje.mojIgracId;
     const mojSljedeciRed = redDolaziNaMene && !prijelazBezPoteza;

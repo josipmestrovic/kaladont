@@ -221,12 +221,20 @@ export function zagrijGameplayZvukove(): void {
 }
 
 const TIMEOUT_PLAY_RETRY_MS = 1_500;
+/** Generacija po elementu — stari play().catch ne smije load()-ati preko novijeg pustiAudio. */
+const playGeneracija = new WeakMap<HTMLAudioElement, number>();
+/** Skini ended/error/canplay + retry timer prije novog playa na istom čvoru. */
+const ocistiPokusajPoZvuku = new WeakMap<HTMLAudioElement, () => void>();
 
 export function pustiAudio(dogadaj: AudioDogadaj): void {
   if (typeof window === 'undefined' || !aktiviran || postavke.utišano || postavke.volumen <= 0) return;
   try {
     // Reuse istog elementa — cloneNode na mobitelu gubi buffer i čeka canplay po nekoliko sekundi.
     const zvuk = ucitajZvuk(dogadaj);
+    ocistiPokusajPoZvuku.get(zvuk)?.();
+    const generacija = (playGeneracija.get(zvuk) ?? 0) + 1;
+    playGeneracija.set(zvuk, generacija);
+
     zvuk.volume = postavke.volumen * POJACANJE_PO_DOGADAJU[dogadaj];
     try {
       zvuk.pause();
@@ -240,33 +248,54 @@ export function pustiAudio(dogadaj: AudioDogadaj): void {
     }
 
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    const ocisti = () => {
+    let naCanPlay: (() => void) | null = null;
+    const josAktivan = () => playGeneracija.get(zvuk) === generacija && aktivniZvukovi.has(zvuk);
+    const skiniSlusatelje = () => {
       if (retryTimer !== null) {
         clearTimeout(retryTimer);
         retryTimer = null;
       }
-      aktivniZvukovi.delete(zvuk);
+      if (naCanPlay) {
+        zvuk.removeEventListener('canplay', naCanPlay);
+        naCanPlay = null;
+      }
+      zvuk.removeEventListener('ended', ocisti);
+      zvuk.removeEventListener('error', naGresku);
+      if (ocistiPokusajPoZvuku.get(zvuk) === skiniSlusatelje) ocistiPokusajPoZvuku.delete(zvuk);
+    };
+    const ocisti = () => {
+      skiniSlusatelje();
+      if (playGeneracija.get(zvuk) === generacija) aktivniZvukovi.delete(zvuk);
     };
     const naGresku = () => {
-      cache.delete(dogadaj);
+      if (playGeneracija.get(zvuk) === generacija) cache.delete(dogadaj);
       ocisti();
     };
-    zvuk.addEventListener('ended', ocisti, { once: true });
-    zvuk.addEventListener('error', naGresku, { once: true });
+    zvuk.addEventListener('ended', ocisti);
+    zvuk.addEventListener('error', naGresku);
+    ocistiPokusajPoZvuku.set(zvuk, skiniSlusatelje);
     aktivniZvukovi.add(zvuk);
 
     const pokreni = () => {
-      if (!aktivniZvukovi.has(zvuk)) return;
+      if (!josAktivan()) return;
       void zvuk.play().catch(() => {
-        if (!aktivniZvukovi.has(zvuk)) return;
-        // play() odbijen jer buffer još nije spreman — jedan load + canplay retry s timeoutom.
-        const naCanPlay = () => {
+        // pause()/novi pustiAudio odbija stari play — ne load() jer to abortira noviji play.
+        if (!josAktivan()) return;
+        if (zvuk.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          ocisti();
+          return;
+        }
+        // Buffer još nije spreman — jedan load + canplay retry s timeoutom.
+        naCanPlay = () => {
           if (retryTimer !== null) {
             clearTimeout(retryTimer);
             retryTimer = null;
           }
-          if (!aktivniZvukovi.has(zvuk)) return;
-          void zvuk.play().catch(ocisti);
+          naCanPlay = null;
+          if (!josAktivan()) return;
+          void zvuk.play().catch(() => {
+            if (josAktivan()) ocisti();
+          });
         };
         zvuk.addEventListener('canplay', naCanPlay, { once: true });
         try {
@@ -277,8 +306,11 @@ export function pustiAudio(dogadaj: AudioDogadaj): void {
         }
         retryTimer = setTimeout(() => {
           retryTimer = null;
-          zvuk.removeEventListener('canplay', naCanPlay);
-          ocisti();
+          if (naCanPlay) {
+            zvuk.removeEventListener('canplay', naCanPlay);
+            naCanPlay = null;
+          }
+          if (josAktivan()) ocisti();
         }, TIMEOUT_PLAY_RETRY_MS);
       });
     };
@@ -296,6 +328,8 @@ export function zaustaviSveZvukove(): void {
   aktivniZvukovi.clear();
   const kandidati = new Set<HTMLAudioElement>([...izAktivnih, ...cache.values()]);
   for (const zvuk of kandidati) {
+    ocistiPokusajPoZvuku.get(zvuk)?.();
+    playGeneracija.set(zvuk, (playGeneracija.get(zvuk) ?? 0) + 1);
     try {
       zvuk.pause();
       zvuk.currentTime = 0;
