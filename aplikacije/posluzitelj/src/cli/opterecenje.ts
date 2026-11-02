@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { io, type Socket } from 'socket.io-client';
 import { and, eq } from 'drizzle-orm';
 import type { Eliminacija, KrajPartije, PrihvacenPotez, PocetakPartije, RundaOtvorena, SpremanjeRezultataPartije } from 'zajednicko';
+import { zadnjaDva } from 'zajednicko';
 import { baza, zatvoriBazu } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
 import {
@@ -483,6 +484,16 @@ interface MjerenaPartija {
   timerTestirano: boolean;
 }
 
+async function imaNastavakUBazi(prefiks: string, iskoristene: ReadonlySet<string>, iskljuci: string): Promise<boolean> {
+  const nastavci = await baza
+    .select({ rijec: rijeci.rijec })
+    .from(rijeci)
+    .where(and(eq(rijeci.aktivna, true), eq(rijeci.prvaDva, prefiks)))
+    .limit(50);
+  return nastavci.some((kandidat) => kandidat.rijec !== iskljuci && !iskoristene.has(kandidat.rijec));
+}
+
+/** Preferira riječi sa živim nastavkom da CI fixture mrtvi mostovi ne skrate partiju bez mjerenih poteza. */
 async function pronadjiRijec(prefiks: string, iskoristene: Set<string>, pokusane: Set<string>): Promise<string | null> {
   const kandidati = await baza
     .select({ rijec: rijeci.rijec })
@@ -492,7 +503,13 @@ async function pronadjiRijec(prefiks: string, iskoristene: Set<string>, pokusane
   const slobodne = kandidati
     .map((kandidat) => kandidat.rijec)
     .filter((rijec) => !iskoristene.has(rijec) && !pokusane.has(rijec));
-  return slobodne[Math.floor(Math.random() * slobodne.length)] ?? null;
+  if (slobodne.length === 0) return null;
+  const zive: string[] = [];
+  for (const rijec of slobodne) {
+    if (await imaNastavakUBazi(zadnjaDva(rijec), iskoristene, rijec)) zive.push(rijec);
+  }
+  const bazen = zive.length > 0 ? zive : slobodne;
+  return bazen[Math.floor(Math.random() * bazen.length)] ?? null;
 }
 
 async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
@@ -522,18 +539,24 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
         if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
         if (partija.odigraniPotezi >= MAKS_POTEZA_KONTROLIRANE_PARTIJE) {
           bot.socket.emit('potez:ne-znam');
+          partija.potezUObradi = false;
           return;
         }
         const rijec = await pronadjiRijec(partija.trazenaSlova!, partija.iskoristene, partija.pokusane);
         if (!rijec) {
           bot.socket.emit('potez:ne-znam');
+          partija.potezUObradi = false;
           return;
         }
-        if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
+        if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) {
+          partija.potezUObradi = false;
+          return;
+        }
         partija.pokusane.add(rijec);
         partija.poslanPotezMs.set(igracIdNaPotezu, performance.now());
         bot.socket.emit('potez:rijec', { rijec });
       })().catch((greska: unknown) => {
+        partija.potezUObradi = false;
         const poruka = greska instanceof Error ? greska.message : String(greska);
         partija.greske.push(poruka);
         greske.push(poruka);
@@ -582,6 +605,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
       partija.potezUObradi = false;
       partija.naPotezuId = poruka.naPotezuId;
       partija.trazenaSlova = poruka.trazenaSlova;
+      partija.iskoristene.add(poruka.rijec);
       partija.pokusane.clear();
       if (
         postavke.timerTest &&

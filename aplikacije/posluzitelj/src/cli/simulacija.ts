@@ -14,6 +14,7 @@ import type {
   PrihvacenPotez,
   RundaOtvorena,
 } from 'zajednicko';
+import { zadnjaDva } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
 import { konfiguracija } from '../konfiguracija.js';
@@ -24,6 +25,15 @@ const VREMENSKO_OGRANICENJE_MS = 120_000;
 /** Ispod RS-23 (max 3 pokušaja/s) da botovi ne gube potez zbog rate limita. */
 const ODGODA_POTEZA_MS = 400;
 
+async function imaNastavakUBazi(prefiks: string, iskoristene: ReadonlySet<string>, iskljuci: string): Promise<boolean> {
+  const nastavci = await baza
+    .select({ rijec: rijeci.rijec })
+    .from(rijeci)
+    .where(and(eq(rijeci.aktivna, true), eq(rijeci.prvaDva, prefiks)))
+    .limit(50);
+  return nastavci.some((kandidat) => kandidat.rijec !== iskljuci && !iskoristene.has(kandidat.rijec));
+}
+
 async function pronadjiRijec(
   prefiks: string | null,
   iskoristene: Set<string>,
@@ -31,9 +41,14 @@ async function pronadjiRijec(
 ): Promise<string | null> {
   const uvjet = prefiks ? and(eq(rijeci.aktivna, true), eq(rijeci.prvaDva, prefiks)) : eq(rijeci.aktivna, true);
   const kandidati = await baza.select({ rijec: rijeci.rijec }).from(rijeci).where(uvjet).limit(500);
-  const slobodni = kandidati.filter((k) => !iskoristene.has(k.rijec) && !pokusane.has(k.rijec));
+  const slobodni = kandidati.filter((k) => !iskoristene.has(k.rijec) && !pokusane.has(k.rijec)).map((k) => k.rijec);
   if (slobodni.length === 0) return null;
-  return slobodni[Math.floor(Math.random() * slobodni.length)]!.rijec;
+  const zive: string[] = [];
+  for (const rijec of slobodni) {
+    if (await imaNastavakUBazi(zadnjaDva(rijec), iskoristene, rijec)) zive.push(rijec);
+  }
+  const bazen = zive.length > 0 ? zive : slobodni;
+  return bazen[Math.floor(Math.random() * bazen.length)] ?? null;
 }
 
 function odgodi(ms: number): Promise<void> {

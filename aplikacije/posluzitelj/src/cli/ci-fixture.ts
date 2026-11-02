@@ -4,33 +4,36 @@ import { rijeci } from '../baza/shema.js';
 
 // Svaki prefiks koji se pojavi kao nastavak mora imati ≥2 ne-ka odgovora,
 // inače trening e2e/unit testovi padaju kad je početna riječ jedini ne-ka kandidat.
-// Riječi na „ax” (bax, kax, …) su namjerni mrtvi nastavci: ništa ne počinje s ax,
-// pa motor-partije test mrtvih slova uvijek ima kandidata (inače flaky u gustoj mreži).
+//
+// Mrtvi nastavci: most *qa (živi, vodi na qax) + qax (mrtav, ništa ne počinje s xx).
+// Ne stavljati mrtve riječi izravno na ba/la/ka/... — load smoke nasumice ih bira i
+// partije završe bez mjerenih poteza / s kratkim mrtva-slova lancom.
 const rijeciZaCi = [
   'baba',
   'bala',
   'baka',
-  'bax',
+  'baqa',
   'kapa',
   'kara',
-  'kax',
+  'kaqa',
   'raka',
   'rasa',
-  'rax',
+  'raqa',
   'pala',
   'papa',
-  'pax',
+  'paqa',
   'lala',
   'lama',
   'laka',
-  'lax',
+  'laqa',
   'mama',
   'masa',
-  'max',
+  'maqa',
   'sala',
   'sapa',
-  'sax',
+  'saqa',
   'apa',
+  'qax',
 ];
 
 function grafemiRijeci(rijec: string): { prvaDva: string; zadnjaDva: string } {
