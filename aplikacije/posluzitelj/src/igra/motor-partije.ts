@@ -1412,9 +1412,9 @@ export function stvoriUpraviteljPartija(
       return;
     }
 
-    const noviOtvarac = razlog.startsWith('mrtva_slova') && napadac
-      ? (sljedeciAktivni(stanje, napadac) ?? napadac)
-      : (napadac ?? [...stanje.aktivni][0]!);
+    // Anchor za objaviRijecSustava: autor riječi ili eliminirani (bez napadača).
+    // Ne pre-advancati za mrtva_slova — objaviRijecSustava već radi jedan sljedeciAktivni.
+    const noviOtvarac = napadac ?? igracId;
     // Ne dodjeljuj novi aktivni potez prije izbora riječi — inače sljedeći (često
     // napadač) dobije formu na ~trenutak, pa se UI čini zamrznutim / neupotrebljivim.
     if (stanje.timerHandle) {

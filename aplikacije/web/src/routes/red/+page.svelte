@@ -112,15 +112,7 @@
     const naPocetakPartije = (pocetak: PocetakPartije) => {
       const mod = pocetak.mod ?? trazeneMod;
       if (mod !== trazeneMod || Date.parse(pocetak.pocetakIso) < Date.now() - 3000) return;
-      naStanjeReda({
-        mojIgracId: pocetak.mojIgracId,
-        mod,
-        prosjekCekanjaSek: stanje.prosjekCekanjaSek,
-        mjesta: pocetak.sjedala.map((sjedalo) => {
-          const prethodno = stanje.mjesta.find((mjesto) => mjesto?.igracId === sjedalo.igracId);
-          return { ...sjedalo, odigrane: prethodno?.odigrane ?? 0, prosjekBodova: prethodno?.prosjekBodova ?? 0, postotakPobjeda: prethodno?.postotakPobjeda ?? 0 };
-        }),
-      });
+      // Lobby zadržava red ulaska iz red:stanje; shuffled sjedala vidi se tek na /partija.
       pokreniOdbrojavanje(pocetak.pocetakIso, pocetak.partijaId);
     };
     socket.on('red:stanje', naStanjeReda);
