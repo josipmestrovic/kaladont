@@ -169,7 +169,8 @@ test('tablice ostaju čitljive u obje teme i s disleksijskim fontom', async ({ p
   await page.setViewportSize({ width: 320, height: 760 });
   for (const svijetla of [false, true]) {
     for (const disleksijskiFont of [false, true]) {
-      await page.goto('/pravila-kaladonta?tema=napredak');
+      // WebKit na CI povremeno padne na page.reload ("internal error"); goto + domcontentloaded je stabilniji.
+      await page.goto('/pravila-kaladonta?tema=napredak', { waitUntil: 'domcontentloaded' });
       await page.evaluate(
         ({ svijetlaTema, font }) => {
           localStorage.setItem('kaladont_tema_v1', svijetlaTema ? 'svijetla' : 'tamna');
@@ -177,7 +178,7 @@ test('tablice ostaju čitljive u obje teme i s disleksijskim fontom', async ({ p
         },
         { svijetlaTema: svijetla, font: disleksijskiFont },
       );
-      await page.reload();
+      await page.goto('/pravila-kaladonta?tema=napredak', { waitUntil: 'domcontentloaded' });
       await page.evaluate(() => document.fonts.ready);
       const prelijevanje = await page.locator('table').evaluateAll((elementi) =>
         elementi.some((tablica) => {
