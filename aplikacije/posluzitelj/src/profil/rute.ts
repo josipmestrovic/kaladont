@@ -93,8 +93,7 @@ const PRAGOVI_KOLEKCIONARSKE_RAZINE = [
 
 type TopRijeciCache = {
   stvoreno: number;
-  ukupnoPartija: number;
-  retci: { rijec: string | null; brojUpotreba: number; brojPartija: number }[];
+  retci: { rijec: string | null; brojUpotreba: number }[];
 };
 
 let topRijeciCache: TopRijeciCache | null = null;
@@ -123,32 +122,44 @@ function normalizirajEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/** Samo za testove: prazni privremenu memoriju top riječi. */
+export function ocistiMemorijuTopRijeci(): void {
+  topRijeciCache = null;
+}
+
 async function dohvatiTopRijeci(): Promise<TopRijeciCache> {
   const sada = Date.now();
   if (topRijeciCache && sada - topRijeciCache.stvoreno < ZIVOTNI_VIJEK_TOP_RIJECI_MS) {
     return topRijeciCache;
   }
 
-  const [[redakUkupno], retci] = await Promise.all([
-    baza.select({ ukupnoPartija: sql<number>`count(*)::int` }).from(partije),
+  const nijePrivatna = notExists(
     baza
-      .select({
-        rijec: potezi.rijec,
-        brojUpotreba: sql<number>`count(*)::int`,
-        brojPartija: sql<number>`count(distinct ${potezi.partijaId})::int`,
-      })
-      .from(potezi)
-      .where(sql`${potezi.vrsta} = 'rijec' and ${potezi.rijec} is not null`)
-      .groupBy(potezi.rijec)
-      .orderBy(desc(sql`count(*)`), asc(potezi.rijec))
-      .limit(100),
-  ]);
+      .select({ partijaId: obracuniPartija.partijaId })
+      .from(obracuniPartija)
+      .where(and(eq(obracuniPartija.partijaId, partije.id), eq(obracuniPartija.vrsta, 'privatna_gamifikacija'))),
+  );
 
-  topRijeciCache = {
-    stvoreno: sada,
-    ukupnoPartija: redakUkupno?.ukupnoPartija ?? 0,
-    retci,
-  };
+  const retci = await baza
+    .select({
+      rijec: potezi.rijec,
+      brojUpotreba: sql<number>`count(*)::int`,
+    })
+    .from(potezi)
+    .innerJoin(partije, eq(potezi.partijaId, partije.id))
+    .innerJoin(igraci, eq(potezi.igracId, igraci.id))
+    .where(and(
+      sql`${potezi.vrsta} = 'rijec'`,
+      sql`${potezi.rijec} is not null`,
+      eq(partije.status, 'zavrsena'),
+      eq(igraci.upravljac, 'covjek'),
+      nijePrivatna,
+    ))
+    .groupBy(potezi.rijec)
+    .orderBy(desc(sql`count(*)`), asc(potezi.rijec))
+    .limit(100);
+
+  topRijeciCache = { stvoreno: sada, retci };
   return topRijeciCache;
 }
 
@@ -831,7 +842,7 @@ export async function registrirajProfilRute(
   app.get<{ Querystring: { limit?: string } }>('/rijeci/top', async (zahtjev) => {
     const rezultatLimita = ShemaLimit.safeParse(zahtjev.query);
     const limit = rezultatLimita.success ? (rezultatLimita.data.limit ?? 10) : 10;
-    const { retci, ukupnoPartija } = await dohvatiTopRijeci();
+    const { retci } = await dohvatiTopRijeci();
 
     return {
       ok: true,
@@ -839,7 +850,6 @@ export async function registrirajProfilRute(
         mjesto: indeks + 1,
         rijec: redak.rijec,
         brojUpotreba: redak.brojUpotreba,
-        postotakPartija: ukupnoPartija > 0 ? (redak.brojPartija / ukupnoPartija) * 100 : 0,
       })),
     };
   });

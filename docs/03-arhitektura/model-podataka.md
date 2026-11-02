@@ -183,11 +183,11 @@ Sažetak se upisuje samo za javne igre, u istoj transakciji kao konačni rezulta
 
 ## obracuni_partija
 
-Trajni idempotency zapis završnih obračuna. Jedinstveni ključ `(partija_id, vrsta)` sprečava da retry ili konkurentni poziv ponovno primijeni isti obračun. Privatne partije nemaju red u `partije`, zato `partija_id` ovdje nije strani ključ.
+Trajni idempotency zapis završnih obračuna. Jedinstveni ključ `(partija_id, vrsta)` sprečava da retry ili konkurentni poziv ponovno primijeni isti obračun. Javni završetak upisuje `javna_partija`; privatna soba upisuje `privatna_gamifikacija` uz red u `partije` (bez javnog `plasman`/`bodovi`). Vremenske ljestvice i top riječi isključuju partije s `privatna_gamifikacija`.
 
 | Stupac | Tip | Opis |
 |---|---|---|
-| partija_id | uuid | Identitet partije iz memorije; za privatne partije nije FK |
+| partija_id | uuid | Identitet partije (javne i privatne imaju red u `partije`; stupac nije FK radi fleksibilnosti claima) |
 | vrsta | enum: `javna_partija`, `privatna_gamifikacija` | Deduplikacijski namespace obračuna |
 | stvoren | timestamptz | Vrijeme prvog uspješnog claima |
 
@@ -264,7 +264,7 @@ Revizijski trag **ručnih** promjena rječnika. Masovni uvoz se ne bilježi ovdj
 - **Prosjek čekanja zadnjih 100 partija:** upit nad `sudionici_partije.cekanje_ms` za zadnjih 100 završenih partija; keširano u memoriji poslužitelja, osvježava se pri svakom početku partije.
 - **Rang:** računa se pri prikazu iz agregata (`bodovi_ukupno / odigrane`), nikad se ne pohranjuje — promjena pragova ne traži migraciju.
 - **Border:** izveden 1:1 iz trenutnog ranga (vidi [vizualni-identitet.md](../05-ux-ui/vizualni-identitet.md#avatari-i-borderi)); nema vlastiti stupac, korisnik ga ne bira.
-- **Top riječi:** `GET /rijeci/top` koristi lokalni TTL cache od 30 sekundi za top 100 rezultata i broj partija. Podaci su stvarna učestalost igranja iz `potezi.rijec`, različita od statičke `rijeci.frekvencija` iz korpusnog uvoza. Cache je procesni i ponovno se puni nakon isteka.
+- **Top riječi:** `GET /rijeci/top` koristi lokalni TTL cache od 30 sekundi za top 100 rezultata. Broje se samo potezi `vrsta = rijec` koje je odigrao čovjek (`igraci.upravljac = covjek`) u završenoj partiji bez `privatna_gamifikacija`. Odgovor vraća riječ i broj upotreba (UI: broj ponavljanja); mjesto je samo redoslijed u listi. Cache je procesni i ponovno se puni nakon isteka.
 - **Nagrade za riječi:** server nakon prihvaćene riječi računa frekvencijski tier (`0`, `1–9`, `10–99`) i tier duljine (`10–11`, `12–14`, `15+` grafema). Jedan potez može imati oba svojstva, ali emitira samo jedan efekt; tekst navodi oba razloga. Ista leksemska grupa nagrađuje se najviše jednom u životu igrača, uključujući privatne sobe.
 - **Otključane grupe:** `otkljucane_grupe_igraca` je trajni jedinstveni skup `(igrac_id, grupa)` s tierom. Učitava se na početku svake partije i sprečava ponovno dobivanje iste nagrade u kasnijim partijama.
 - **Javni profil:** samo registrirani igrači imaju javni read-only profil. Ljestvica i završni sažetak smiju voditi na profil; lobby i aktivni stol ne prikazuju linkove na profile. Javni odgovor ne sadrži email ni podatke za autentikaciju.

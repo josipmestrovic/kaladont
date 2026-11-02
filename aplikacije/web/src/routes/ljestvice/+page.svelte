@@ -23,8 +23,13 @@
     mjesto: number;
     rijec: string;
     brojUpotreba: number;
-    postotakPartija: number;
   }
+
+  const PRAVILA_BODOVANJA: Record<Mod, string> = {
+    cetiri_igraca:
+      'Plasman: 1. mjesto 3 boda, 2. mjesto 2, 3. mjesto 1, 4. mjesto 0. Uz to +1 za pobjedu i +1 po eliminaciji (najviše 3). Maksimum je 7 bodova po igri.',
+    dva_igraca: 'Pobjednik dobiva 1 bod, poraženi 0. Eliminacije ne dodaju bodove.',
+  };
 
   const NAZIVI_RAZDOBLJA: Record<RazdobljeLjestvice, string> = {
     dnevno: 'Dnevna',
@@ -40,9 +45,12 @@
     godisnje: 'ove godine',
     svih_vremena: 'dosad',
   };
-  const NAZIVI_METRIKA: Record<MetrikaLjestvice, string> = {
-    prosjek_bodova: 'Prosjek bodova',
-    niz_pobjeda: 'Niz pobjeda',
+  const RESET_RAZDOBLJA: Record<RazdobljeLjestvice, string> = {
+    dnevno: 'Reset u ponoć u 00:00.',
+    tjedno: 'Reset u ponedjeljak u 00:00.',
+    mjesecno: 'Reset prvog dana u mjesecu u 00:00.',
+    godisnje: 'Novi poredak 1. siječnja.',
+    svih_vremena: '',
   };
 
   const url = $derived($page.url);
@@ -56,9 +64,9 @@
   const razdoblje = $derived<RazdobljeLjestvice>(
     (RAZDOBLJA_LJESTVICA as readonly string[]).includes(url.searchParams.get('razdoblje') ?? '')
       ? (url.searchParams.get('razdoblje') as RazdobljeLjestvice)
-      : 'dnevno',
+      : 'tjedno',
   );
-  const prikaz = $derived<PrikazLjestvice>(url.searchParams.get('prikaz') === 'oko_mene' ? 'oko_mene' : 'top');
+  const prikazUrl = $derived<PrikazLjestvice>(url.searchParams.get('prikaz') === 'oko_mene' ? 'oko_mene' : 'top');
 
   let podaci = $state<OdgovorLjestvice | null>(null);
   let ucitava = $state(false);
@@ -72,6 +80,30 @@
   let zadnjiZahtjev = 0;
   let osvjezenoNaKraju = '';
   let rijeciZatrazene = false;
+  let prikaziBodovanje = $state(false);
+  let prikaziIzjednacenje = $state(false);
+  // Ne-reaktivni ključ posljednjeg zahtjeva — sprečava dupli fetch kad effect
+  // ponovno prođe zbog ažuriranja `podaci` bez promjene filtra/prikaza.
+  let zadnjiPoslaniKljuc = '';
+
+  const mojaPozicija = $derived(podaci?.mojaPozicija ?? null);
+  // Oko mene samo uz rang izvan Top 10 za trenutni filter (stari odgovor ne broji).
+  const mozeOkoMene = $derived(
+    !!podaci
+      && podaci.mod === mod
+      && podaci.metrika === metrika
+      && podaci.razdoblje.vrsta === razdoblje
+      && mojaPozicija?.status === 'rangiran'
+      && mojaPozicija.mjesto !== null
+      && mojaPozicija.mjesto > 10,
+  );
+  // Stari ?prikaz=oko_mene bez potrebe prikazuje Top 10; normalizirani prikaz ide u API.
+  const prikaz = $derived<PrikazLjestvice>(prikazUrl === 'oko_mene' && mozeOkoMene ? 'oko_mene' : 'top');
+
+  function nazivMetrike(me: MetrikaLjestvice, m: Mod = mod): string {
+    if (me === 'niz_pobjeda') return 'Niz pobjeda';
+    return m === 'dva_igraca' ? 'Udio pobjeda' : 'Prosjek bodova';
+  }
 
   function promijeni(izmjene: Record<string, string>) {
     const novi = new URL(url);
@@ -83,6 +115,10 @@
     const idZahtjeva = ++zadnjiZahtjev;
     ucitava = true;
     greska = null;
+    // Ne briši podaci pri grešci/učitavanju — inače mozeOkoMene padne i effect
+    // uđe u petlju top↔oko_mene pa greska nikad ne ostane na ekranu.
+    prikaziBodovanje = false;
+    prikaziIzjednacenje = false;
     try {
       const odgovor = await fetch(apiUrl(`/ljestvice?mod=${m}&metrika=${me}&razdoblje=${r}&prikaz=${p}`), {
         headers: { authorization: `Bearer ${dohvatiAuthToken()}` },
@@ -116,8 +152,13 @@
   }
 
   $effect(() => {
-    if (kategorija === 'igraci') void ucitajLjestvicu(mod, metrika, razdoblje, prikaz);
-    else if (!rijeciZatrazene) {
+    if (kategorija === 'igraci') {
+      // Normalizirani prikaz: prvo top dok ne znamo rang; drugi zahtjev samo ako je oko mene dopušteno.
+      const kljuc = `${mod}|${metrika}|${razdoblje}|${prikaz}`;
+      if (kljuc === zadnjiPoslaniKljuc) return;
+      zadnjiPoslaniKljuc = kljuc;
+      void ucitajLjestvicu(mod, metrika, razdoblje, prikaz);
+    } else if (!rijeciZatrazene) {
       rijeciZatrazene = true;
       void ucitajRijeci(10);
     }
@@ -150,45 +191,41 @@
     return 'igara';
   }
 
-  function datum(iso: string): string {
-    const dijelovi = Object.fromEntries(
-      new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zagreb', day: 'numeric', month: 'numeric', year: 'numeric' })
-        .formatToParts(new Date(iso))
-        .map((d) => [d.type, d.value]),
-    );
-    return `${Number(dijelovi.day)}. ${Number(dijelovi.month)}. ${dijelovi.year}.`;
+  function godinaIzIso(iso: string): string {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zagreb', year: 'numeric' }).format(new Date(iso));
   }
 
-  function kratkiStatus(pozicija: PozicijaNaLjestvici, r: RazdobljeLjestvice): string {
+  function osobniNapredak(pozicija: PozicijaNaLjestvici, me: MetrikaLjestvice): string | null {
     switch (pozicija.status) {
-      case 'rangiran': return `Tvoja pozicija: ${pozicija.mjesto}`;
-      case 'nije_igrano': return `Nije odigrano ${OBUHVAT_RAZDOBLJA[r]}`;
-      case 'nedovoljan_broj_igara': return `Još ${pozicija.nedostajeIgara} ${oblikIgre(pozicija.nedostajeIgara ?? 0)} do poretka`;
-      case 'nema_rezultata': return metrika === 'niz_pobjeda' ? `Još nema pobjede ${OBUHVAT_RAZDOBLJA[r]}` : 'Još nema rezultata';
-      case 'podaci_nepotpuni': return 'Rezultat još nije dostupan';
-      case 'zakljucano': return podaci ? `Dostupno od ${datum(podaci.svihVremenaOtkljucavaSe)}` : 'Zaključano';
-      case 'prijava_potrebna': return 'Prijavi se za svoju poziciju';
+      case 'nedovoljan_broj_igara':
+        return `Još ${pozicija.nedostajeIgara} ${oblikIgre(pozicija.nedostajeIgara ?? 0)} do poretka.`;
+      case 'nema_rezultata':
+        return me === 'niz_pobjeda' ? 'Za prvi niz treba ti jedna pobjeda.' : 'Još nema rezultata.';
+      case 'podaci_nepotpuni':
+        return 'Rezultat još nije dostupan.';
+      case 'nije_igrano':
+        return null;
+      case 'prijava_potrebna':
+        return 'Prijavi se za svoju poziciju.';
+      default:
+        return null;
     }
   }
 
-  function opisKriterija(me: MetrikaLjestvice, minimum: number, r: RazdobljeLjestvice): string {
-    const uvjet = `Za ulazak treba ${minimum} ${oblikIgre(minimum)} ${OBUHVAT_RAZDOBLJA[r] === 'dosad' ? 'ukupno' : OBUHVAT_RAZDOBLJA[r]}.`;
-    return me === 'prosjek_bodova'
-      ? `Poredak prema prosjeku bodova po završenoj javnoj igri. ${uvjet} Veći prosjek je bolji.`
-      : `Najduži niz uzastopnih pobjeda unutar razdoblja; pobjede izvan razdoblja se ne pribrajaju, a igre se slažu redom kojim si u njih ulazio. ${uvjet} Dulji niz je bolji.`;
+  function vrijednostRetka(redak: RedakLjestvice, m: Mod, me: MetrikaLjestvice): string {
+    if (redak.vrijednost.vrsta === 'niz_pobjeda') return String(redak.vrijednost.broj);
+    if (m === 'dva_igraca' && me === 'prosjek_bodova') {
+      return `${new Intl.NumberFormat('hr-HR', { maximumFractionDigits: 0 }).format(redak.vrijednost.prosjek * 100)} %`;
+    }
+    return new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(redak.vrijednost.prosjek);
   }
 
-  function vrijednostRetka(redak: RedakLjestvice): string {
-    return redak.vrijednost.vrsta === 'prosjek_bodova'
-      ? new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(redak.vrijednost.prosjek)
-      : String(redak.vrijednost.broj);
-  }
-
-  const mojaPozicija = $derived(podaci?.mojaPozicija ?? null);
-  const okoMeneNedostupno = $derived(prikaz === 'oko_mene' && mojaPozicija !== null && mojaPozicija.status !== 'rangiran');
-  const pocetakNakonKalendara = $derived(
-    podaci && podaci.razdoblje.od === podaci.razdoblje.podaciOd && podaci.razdoblje.vrsta !== 'svih_vremena',
+  const redakUlaska = $derived(
+    podaci && podaci.razdoblje.stanje !== 'zakljucano'
+      ? `Za ulazak treba ${podaci.minimumIgara} javnih ${oblikIgre(podaci.minimumIgara)}. ${RESET_RAZDOBLJA[razdoblje]}`.trim()
+      : null,
   );
+  const osobniRedak = $derived(mojaPozicija ? osobniNapredak(mojaPozicija, metrika) : null);
 </script>
 
 <svelte:head>
@@ -202,76 +239,72 @@
     Igrači
   </button>
   <button type="button" role="tab" aria-selected={kategorija === 'rijeci'} class:aktivan={kategorija === 'rijeci'} onclick={() => promijeni({ kategorija: 'rijeci' })}>
-    Riječi
+    Najčešće riječi
   </button>
 </div>
 
 {#if kategorija === 'igraci'}
-  <div class="pod-tabovi" role="group" aria-label="Način igre">
-    <button type="button" class="pod-tab-gumb" aria-pressed={mod === 'cetiri_igraca'} class:aktivan={mod === 'cetiri_igraca'} onclick={() => promijeni({ mod: 'cetiri_igraca' })}>Četveroboj</button>
-    <button type="button" class="pod-tab-gumb" aria-pressed={mod === 'dva_igraca'} class:aktivan={mod === 'dva_igraca'} onclick={() => promijeni({ mod: 'dva_igraca' })}>Dvoboj</button>
+  <div class="modovi" role="group" aria-label="Način igre">
+    <button type="button" class="mod-gumb" aria-pressed={mod === 'cetiri_igraca'} class:aktivan={mod === 'cetiri_igraca'} onclick={() => promijeni({ mod: 'cetiri_igraca' })}>Četveroboj</button>
+    <button type="button" class="mod-gumb" aria-pressed={mod === 'dva_igraca'} class:aktivan={mod === 'dva_igraca'} onclick={() => promijeni({ mod: 'dva_igraca' })}>Dvoboj</button>
   </div>
 
-  <div class="pod-tabovi" role="group" aria-label="Ljestvica">
+  <div class="metrike" role="group" aria-label="Ljestvica">
     {#each METRIKE_LJESTVICA as m (m)}
-      <button type="button" class="pod-tab-gumb" aria-pressed={metrika === m} class:aktivan={metrika === m} onclick={() => promijeni({ metrika: m })}>{NAZIVI_METRIKA[m]}</button>
+      <button type="button" class="metrika-gumb" aria-pressed={metrika === m} class:aktivan={metrika === m} onclick={() => promijeni({ metrika: m })}>{nazivMetrike(m)}</button>
     {/each}
   </div>
 
   <div class="razdoblja" role="tablist" aria-label="Razdoblje">
     {#each RAZDOBLJA_LJESTVICA as r (r)}
-      {@const pozicija = podaci?.pozicijePoRazdobljima[r]}
       <button type="button" role="tab" class="razdoblje" aria-selected={razdoblje === r} class:aktivan={razdoblje === r} onclick={() => promijeni({ razdoblje: r })}>
-        <span class="naziv-razdoblja">{NAZIVI_RAZDOBLJA[r]}</span>
-        <span class="status-razdoblja">{pozicija ? kratkiStatus(pozicija, r) : '…'}</span>
+        {NAZIVI_RAZDOBLJA[r]}
       </button>
     {/each}
   </div>
 
-  {#if podaci}
-    <section class="pravila" aria-label="Pravila ljestvice">
-      {#if podaci.razdoblje.stanje === 'zakljucano'}
-        <p><strong>Ljestvicu svih vremena otključavamo nakon prve godine javnog igranja.</strong> Dostupna od {podaci.razdoblje.otkljucavaSe ? datum(podaci.razdoblje.otkljucavaSe) : '—'}</p>
-      {:else}
-        <p>{opisKriterija(metrika, podaci.minimumIgara, razdoblje)}</p>
-        <p>Kod jednakog rezultata prednost ima igrač s više odigranih igara u ovom razdoblju. Ako je i broj igara isti, prednost ima ranije ostvaren rezultat.</p>
-        <p class="sitno">Svi rezultati odnose se na završene javne igre. Dan završava u ponoć po hrvatskom vremenu, a igra pripada danu u kojem je završila.{#if pocetakNakonKalendara} Rezultati od {datum(podaci.razdoblje.podaciOd)}{/if}</p>
-        {#if preostaloMs !== null}
-          <p class="odbrojavanje" aria-live="off">
-            {razdoblje === 'godisnje' ? 'Zaključava se za' : 'Resetira se za'} <strong>{formatirajOdbrojavanje(preostaloMs)}</strong>
-          </p>
-        {/if}
+  {#if greska}
+    <div class="obavijest greska" role="alert">
+      <p>{greska}</p>
+      <button type="button" class="ucitaj-vise-gumb" onclick={() => ucitajLjestvicu(mod, metrika, razdoblje, prikaz)}>Pokušaj ponovno</button>
+    </div>
+  {:else if ucitava || !podaci}
+    <p class="ucitavanje">Učitavanje…</p>
+  {:else if podaci.razdoblje.stanje === 'zakljucano'}
+    <p class="zakljucano">
+      Ljestvica svih vremena stiže {podaci.razdoblje.otkljucavaSe ? godinaIzIso(podaci.razdoblje.otkljucavaSe) : godinaIzIso(podaci.svihVremenaOtkljucavaSe)}.
+    </p>
+  {:else}
+    <div class="status-redak">
+      {#if osobniRedak}
+        <p class="osobni-napredak">{osobniRedak}</p>
       {/if}
-    </section>
-  {/if}
-
-  {#if podaci?.razdoblje.stanje !== 'zakljucano'}
-    <div class="pod-tabovi" role="group" aria-label="Prikaz">
-      <button type="button" class="pod-tab-gumb" aria-pressed={prikaz === 'top'} class:aktivan={prikaz === 'top'} onclick={() => promijeni({ prikaz: 'top' })}>Top 10</button>
-      <button type="button" class="pod-tab-gumb" aria-pressed={prikaz === 'oko_mene'} class:aktivan={prikaz === 'oko_mene'} onclick={() => promijeni({ prikaz: 'oko_mene' })}>Oko mene</button>
+      {#if razdoblje !== 'godisnje' && preostaloMs !== null}
+        <p class="odbrojavanje" aria-live="off">
+          Resetira se za <strong>{formatirajOdbrojavanje(preostaloMs)}</strong>
+        </p>
+      {/if}
     </div>
 
-    {#if okoMeneNedostupno && mojaPozicija && podaci}
-      <p class="obavijest">Prikaz „Oko mene" dostupan je kad uđeš na ovu ljestvicu ({kratkiStatus(mojaPozicija, razdoblje).toLowerCase()}). Prikazujemo Top 10.</p>
+    {#if mozeOkoMene}
+      <div class="prikazi" role="group" aria-label="Prikaz">
+        <button type="button" class="prikaz-gumb" aria-pressed={prikaz === 'top'} class:aktivan={prikaz === 'top'} onclick={() => promijeni({ prikaz: 'top' })}>Top 10</button>
+        <button type="button" class="prikaz-gumb" aria-pressed={prikaz === 'oko_mene'} class:aktivan={prikaz === 'oko_mene'} onclick={() => promijeni({ prikaz: 'oko_mene' })}>Oko mene</button>
+      </div>
+    {:else}
+      <h2 class="naslov-tablice">Top 10</h2>
     {/if}
 
-    {#if greska}
-      <div class="obavijest greska" role="alert">
-        <p>{greska}</p>
-        <button type="button" class="ucitaj-vise-gumb" onclick={() => ucitajLjestvicu(mod, metrika, razdoblje, prikaz)}>Pokušaj ponovno</button>
-      </div>
-    {:else if !podaci && ucitava}
-      <p>Učitavanje…</p>
-    {:else if podaci && podaci.redci.length === 0}
+    {#if podaci.redci.length === 0}
       <p>Još nitko nije ušao na ovu ljestvicu. Odigraj {podaci.minimumIgara} {oblikIgre(podaci.minimumIgara)} {OBUHVAT_RAZDOBLJA[razdoblje]} i budi prvi.</p>
-    {:else if podaci}
-      <table class="tablica-mobilni-retci tablica-ljestvice" aria-busy={ucitava}>
+    {:else}
+      <table class="tablica-mobilni-retci tablica-ljestvice">
         <thead>
           <tr>
             <th scope="col">Mjesto</th>
             <th scope="col">Igrač</th>
-            <th scope="col">{NAZIVI_METRIKA[podaci.metrika]}</th>
-            <th scope="col">Odigrane igre</th>
+            <th scope="col">{nazivMetrike(podaci.metrika, podaci.mod)}</th>
+            <th scope="col">Igre</th>
           </tr>
         </thead>
         <tbody>
@@ -286,36 +319,52 @@
                 {/if}
                 {#if redak.jeJa}<span class="oznaka-ti">Ovo si ti</span>{/if}
               </th>
-              <td data-label={NAZIVI_METRIKA[podaci.metrika]}>{vrijednostRetka(redak)}</td>
-              <td data-label="Odigrane igre">{redak.odigraneIgre}</td>
+              <td data-label={nazivMetrike(podaci.metrika, podaci.mod)}>{vrijednostRetka(redak, podaci.mod, podaci.metrika)}</td>
+              <td data-label="Igre">{redak.odigraneIgre}</td>
             </tr>
           {/each}
         </tbody>
       </table>
     {/if}
+
+    <div class="ispod-tablice">
+      <button type="button" class="veza-pravila" aria-expanded={prikaziBodovanje} onclick={() => { prikaziBodovanje = !prikaziBodovanje; }}>
+        {prikaziBodovanje ? 'Sakrij pravila bodovanja' : 'Pravila bodovanja'}
+      </button>
+      {#if prikaziBodovanje}
+        <p class="sitno">{PRAVILA_BODOVANJA[mod]}</p>
+      {/if}
+      <button type="button" class="veza-pravila" aria-expanded={prikaziIzjednacenje} onclick={() => { prikaziIzjednacenje = !prikaziIzjednacenje; }}>
+        {prikaziIzjednacenje ? 'Sakrij pravila izjednačenja' : 'Pravila izjednačenja'}
+      </button>
+      {#if prikaziIzjednacenje}
+        <p class="sitno">Kod jednakog rezultata prednost ima igrač s više odigranih igara u ovom razdoblju. Ako je i broj igara isti, prednost ima ranije ostvaren rezultat.</p>
+      {/if}
+      {#if redakUlaska}
+        <p class="ulazak">{redakUlaska}</p>
+      {/if}
+    </div>
   {/if}
 {:else}
-  <p>Najčešće riječi: Top {prosirenoRijeci ? '100' : '10'} najčešće odigranih riječi u svim igrama.</p>
-
   {#if greskaRijeci}
     <div class="obavijest greska" role="alert">
       <p>Riječi trenutno nije moguće učitati.</p>
       <button type="button" class="ucitaj-vise-gumb" onclick={() => ucitajRijeci(10)}>Pokušaj ponovno</button>
     </div>
-  {:else if topRijeci.length === 0 && !ucitavaRijeci}
+  {:else if ucitavaRijeci && topRijeci.length === 0}
+    <p class="ucitavanje">Učitavanje…</p>
+  {:else if topRijeci.length === 0}
     <p>Još nema dovoljno odigranih igara.</p>
   {:else}
-    <table class="tablica-mobilni-retci tablica-rijeci">
+    <table class="tablica-mobilni-retci tablica-rijeci" aria-busy={ucitavaRijeci}>
       <thead>
-        <tr><th scope="col">Mjesto</th><th scope="col">Riječ</th><th scope="col">Broj upotreba</th><th scope="col">% igara</th></tr>
+        <tr><th scope="col">Riječ</th><th scope="col">Broj ponavljanja</th></tr>
       </thead>
       <tbody>
         {#each topRijeci as stavka (stavka.mjesto)}
           <tr>
-            <td data-label="Mjesto">{stavka.mjesto}.</td>
             <th scope="row">{stavka.rijec}</th>
-            <td data-label="Broj upotreba">{stavka.brojUpotreba}</td>
-            <td data-label="% igara">{stavka.postotakPartija.toFixed(0)}%</td>
+            <td data-label="Broj ponavljanja">{stavka.brojUpotreba}</td>
           </tr>
         {/each}
       </tbody>
@@ -331,35 +380,162 @@
 <style>
   .tabovi {
     display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 12px;
+    margin-bottom: 20px;
     border-bottom: 1px solid var(--boja-obrub);
   }
 
   .tabovi button {
     background: none;
     border: none;
-    padding: 8px 16px;
+    padding: 10px 4px 12px;
     cursor: pointer;
-    font-size: var(--tekst-baza);
+    font-size: 1.15rem;
     color: var(--boja-tekst-sekundarni);
-    border-bottom: 2px solid transparent;
+    border-bottom: 3px solid transparent;
   }
 
   .tabovi button.aktivan {
     color: var(--boja-isticanje-tekst);
-    font-weight: bold;
+    font-weight: 700;
     border-bottom-color: var(--boja-isticanje-slova);
   }
 
-  .pod-tabovi {
+  .modovi {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 8px 0 16px;
+  }
+
+  .mod-gumb {
+    background: transparent;
+    border: 2px solid var(--boja-tekst-osnovni);
+    color: var(--boja-tekst-osnovni);
+    padding: 10px 20px;
+    border-radius: var(--radijus-pill);
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .mod-gumb.aktivan {
+    background: var(--boja-tekst-osnovni);
+    color: var(--boja-pozadina, #0f2a1f);
+  }
+
+  .metrike {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin: 12px 0;
+    margin: 0 0 14px;
   }
 
-  .pod-tab-gumb {
+  .metrika-gumb {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--boja-tekst-sekundarni);
+    padding: 6px 12px;
+    border-radius: var(--radijus-pill);
+    font-size: var(--tekst-sitni);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .metrika-gumb.aktivan {
+    background: color-mix(in srgb, var(--boja-povrsina-2) 80%, white 20%);
+    border-color: var(--boja-obrub);
+    color: var(--boja-tekst-osnovni);
+  }
+
+  .razdoblja {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0 0 16px;
+    border-bottom: 1px solid var(--boja-obrub);
+  }
+
+  .razdoblje {
+    background: none;
+    border: none;
+    color: var(--boja-tekst-sekundarni);
+    padding: 8px 2px 10px;
+    cursor: pointer;
+    font-size: var(--tekst-mali);
+    border-bottom: 2px solid transparent;
+  }
+
+  .razdoblje.aktivan {
+    color: var(--boja-tekst-osnovni);
+    font-weight: 600;
+    border-bottom-color: var(--boja-tekst-osnovni);
+  }
+
+  .status-redak {
+    margin: 0 0 16px;
+    font-size: var(--tekst-mali);
+  }
+
+  .status-redak p { margin: 0 0 6px; }
+
+  .osobni-napredak {
+    color: var(--boja-isticanje-tekst);
+    font-weight: 600;
+  }
+
+  .ispod-tablice {
+    margin-top: 16px;
+    padding-bottom: 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: var(--tekst-mali);
+  }
+
+  .veza-pravila {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .sitno { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-sitni); margin: 0; }
+
+  .ulazak {
+    margin: 8px 0 0;
+    color: var(--boja-tekst-sekundarni);
+  }
+
+  .odbrojavanje strong {
+    font-variant-numeric: tabular-nums;
+    color: var(--boja-isticanje-tekst);
+  }
+
+  .zakljucano {
+    margin: 24px 0;
+    font-size: 1.05rem;
+  }
+
+  .ucitavanje { margin: 24px 0; color: var(--boja-tekst-sekundarni); }
+
+  .naslov-tablice {
+    margin: 0 0 12px;
+    font-size: 1.1rem;
+  }
+
+  .prikazi {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 12px;
+  }
+
+  .prikaz-gumb {
     background: var(--boja-povrsina-2);
     border: 1px solid var(--boja-obrub);
     color: var(--boja-tekst-osnovni);
@@ -370,57 +546,11 @@
     cursor: pointer;
   }
 
-  .pod-tab-gumb.aktivan {
+  .prikaz-gumb.aktivan {
     background: var(--boja-cta-pozadina);
     border-color: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
     font-weight: 700;
-  }
-
-  .razdoblja {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 8px;
-    margin: 12px 0;
-  }
-
-  .razdoblje {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    background: var(--boja-povrsina-2);
-    border: 1px solid var(--boja-obrub);
-    color: var(--boja-tekst-osnovni);
-    padding: 8px 12px;
-    border-radius: var(--radijus-kartica);
-    cursor: pointer;
-    text-align: left;
-  }
-
-  .razdoblje.aktivan {
-    border-color: var(--boja-isticanje-slova);
-    box-shadow: inset 0 0 0 1px var(--boja-isticanje-slova);
-  }
-
-  .naziv-razdoblja { font-weight: 700; font-size: var(--tekst-baza); }
-  .status-razdoblja { font-size: var(--tekst-sitni); color: var(--boja-tekst-sekundarni); }
-
-  .pravila {
-    background: var(--boja-povrsina);
-    border-radius: var(--radijus-kartica);
-    padding: 8px 14px;
-    margin: 12px 0;
-    font-size: var(--tekst-mali);
-  }
-
-  .pravila p { margin: 6px 0; }
-  .sitno { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-sitni); }
-
-  .odbrojavanje strong {
-    font-variant-numeric: tabular-nums;
-    color: var(--boja-isticanje-tekst);
   }
 
   .obavijest {
@@ -478,10 +608,28 @@
   }
 
   @media (max-width: 999px) {
-    .tablica-ljestvice tr, .tablica-rijeci tr { display: grid; grid-template-columns: auto minmax(0, 1fr); }
-    .tablica-ljestvice tbody th, .tablica-rijeci tbody th { align-self: center; }
-    .tablica-ljestvice td:not(:first-child), .tablica-rijeci td:not(:first-child) { grid-column: 1 / -1; }
-    .tablica-ljestvice td:first-child, .tablica-rijeci td:first-child { align-self: center; padding-right: 12px; font-weight: 700; }
+    .tablica-ljestvice tr { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+    .tablica-ljestvice tbody th { align-self: center; }
+    .tablica-ljestvice td:not(:first-child) { grid-column: 1 / -1; }
+    .tablica-ljestvice td:first-child { align-self: center; padding-right: 12px; font-weight: 700; }
+    .tablica-rijeci tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+    .tablica-rijeci tbody th, .tablica-rijeci td { align-self: center; }
+
+    .razdoblja {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0;
+    }
+
+    .razdoblje {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--boja-obrub);
+    }
+
+    .razdoblje.aktivan {
+      border-bottom-color: var(--boja-tekst-osnovni);
+    }
   }
 
   .ucitaj-vise-gumb {

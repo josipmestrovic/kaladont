@@ -4,7 +4,7 @@ import Fastify from 'fastify';
 import { inArray } from 'drizzle-orm';
 import type { OdgovorLjestvice } from 'zajednicko';
 import { baza } from '../src/baza/klijent.js';
-import { igraci, partije, sudioniciPartije } from '../src/baza/shema.js';
+import { igraci, obracuniPartija, partije, sudioniciPartije } from '../src/baza/shema.js';
 import { registrirajLjestviceRute } from '../src/ljestvice/rute.js';
 import { izracunajPoredak, pozicijaIgraca } from '../src/ljestvice/servis.js';
 
@@ -52,6 +52,7 @@ async function niz(igracId: string, plasmani: number[], mod: 'cetiri_igraca' | '
 
 afterAll(async () => {
   if (stvorenePartije.length) {
+    await baza.delete(obracuniPartija).where(inArray(obracuniPartija.partijaId, stvorenePartije));
     await baza.delete(sudioniciPartije).where(inArray(sudioniciPartije.partijaId, stvorenePartije));
     await baza.delete(partije).where(inArray(partije.id, stvorenePartije));
   }
@@ -128,6 +129,49 @@ describe('poredak vremenskih ljestvica (stvarni Postgres)', () => {
 
     const dvoboj = await izracunajPoredak('dva_igraca', 'niz_pobjeda', 'tjedno', OD, DO);
     expect(pozicijaIgraca(dvoboj, izolacija)).toMatchObject({ status: 'rangiran', mjesto: 1, odigraneIgre: 20 });
+  });
+
+  it('privatna igra ne mijenja broj javnih igara, prosjek, niz ni mjesto', async () => {
+    const igracId = await noviIgrac(`Priv${randomUUID().slice(0, 6)}`);
+    await niz(igracId, Array(20).fill(1));
+
+    const prije = await izracunajPoredak('cetiri_igraca', 'prosjek_bodova', 'tjedno', OD, DO);
+    const nizPrije = await izracunajPoredak('cetiri_igraca', 'niz_pobjeda', 'tjedno', OD, DO);
+    const stavkaPrije = prije.poIgracu.get(igracId)!;
+    const pozicijaPrije = pozicijaIgraca(prije, igracId);
+    expect(pozicijaPrije.status).toBe('rangiran');
+    expect(stavkaPrije.odigraneIgre).toBe(20);
+
+    // Privatna soba: završena Četveroboj partija bez javnog plasmana + obračun privatna_gamifikacija.
+    brojac += 1;
+    const privatnaId = randomUUID();
+    stvorenePartije.push(privatnaId);
+    const pocetak = new Date(OD.getTime() + brojac * 60_000);
+    await baza.insert(partije).values({
+      id: privatnaId,
+      mod: 'cetiri_igraca',
+      status: 'zavrsena',
+      pocetak,
+      kraj: new Date(pocetak.getTime() + 30_000),
+    });
+    await baza.insert(sudioniciPartije).values({
+      partijaId: privatnaId,
+      igracId,
+      sjedalo: 0,
+      plasman: null,
+      bodovi: 0,
+    });
+    await baza.insert(obracuniPartija).values({ partijaId: privatnaId, vrsta: 'privatna_gamifikacija' });
+
+    const poslije = await izracunajPoredak('cetiri_igraca', 'prosjek_bodova', 'tjedno', OD, DO);
+    const nizPoslije = await izracunajPoredak('cetiri_igraca', 'niz_pobjeda', 'tjedno', OD, DO);
+    const stavkaPoslije = poslije.poIgracu.get(igracId)!;
+    expect(pozicijaIgraca(poslije, igracId)).toEqual(pozicijaPrije);
+    expect(stavkaPoslije.odigraneIgre).toBe(stavkaPrije.odigraneIgre);
+    expect(stavkaPoslije.vrijednost).toEqual(stavkaPrije.vrijednost);
+    expect(stavkaPoslije.mjesto).toBe(stavkaPrije.mjesto);
+    expect(nizPoslije.poIgracu.get(igracId)?.vrijednost).toEqual(nizPrije.poIgracu.get(igracId)?.vrijednost);
+    expect(pozicijaIgraca(poslije, igracId).status).not.toBe('podaci_nepotpuni');
   });
 });
 
