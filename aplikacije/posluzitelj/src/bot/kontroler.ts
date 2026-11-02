@@ -118,7 +118,7 @@ export class BotKontroler {
 
     const odluka = this.odluci(dogadaj, stanjeBota);
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
-    const odgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rng, dogadaj.kontekst, {
+    const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rng, dogadaj.kontekst, {
       punoTrajanjeMs: dogadaj.trajanjePotezaMs,
       protekloMs: Math.max(0, this.sada() - dogadaj.pocetakPotezaMs),
       koeficijentTempa: stanjeBota.koeficijentTempa,
@@ -126,6 +126,10 @@ export class BotKontroler {
       primljeniKa: dogadaj.trazenaSlova === 'ka',
       ...(odluka.vrsta === 'rijec' ? { brojGrafema: grafemi(odluka.rijec).length, frekvencija: this.ovisnosti.rjecnik.frekvencijaZa(odluka.rijec) } : {}),
     });
+    // Bez roka (testni ONEMOGUCI_TIMER / privatno bez tajmera) ne čekaj udio od 30 s — inače CI testovi isteku.
+    const odgoda = rok === null && dogadaj.kontekst !== 'trening'
+      ? Math.min(izracunataOdgoda, 200)
+      : izracunataOdgoda;
     const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const turnToken = dogadaj.turnToken;
     const handle = this.zakazi(() => {

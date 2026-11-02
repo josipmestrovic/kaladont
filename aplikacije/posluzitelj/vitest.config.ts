@@ -1,5 +1,12 @@
 import { defineConfig } from 'vitest/config';
 
+// Forsiraj ispod CI job enva (npr. ONEMOGUCI_TIMER_POTEZA=false za e2e) prije loada worker procesa.
+process.env.ONEMOGUCI_TIMER_POTEZA = 'true';
+process.env.ODGODA_POCETKA_PARTIJE_MS = '0';
+process.env.TOLERANCIJA_PREKIDA_MS = '300';
+process.env.BOT_IZOSTANAK_PO_SUDJELOVANJU = '0';
+process.env.BOT_NEZNANJE_PO_SUDJELOVANJU = '0';
+
 export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
@@ -7,7 +14,7 @@ export default defineConfig({
     hookTimeout: 20000,
     // integracijski testovi dijele lokalnu Postgres bazu - sekvencijalno je pouzdanije od paralelnog
     fileParallelism: false,
-    // isklju\u010di 30s timer poteza i 5s odabir rije\u010di sustava - testovi ne trebaju \u010dekati stvarno vrijeme
+    // isključi 30s timer poteza i 5s odabir riječi sustava - testovi ne trebaju čekati stvarno vrijeme
     env: {
       EMAIL_API_KLJUC: '',
       VERZIJA: 'lokalno',

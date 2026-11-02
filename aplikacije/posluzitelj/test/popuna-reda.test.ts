@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
@@ -11,6 +11,14 @@ import { ucitajIdentiteteBotova } from '../src/bot/fond.js';
 let posluzitelj: Posluzitelj;
 let adresa: string;
 const testniBotovi = Array.from({ length: 3 }, () => randomUUID());
+/** Brzi motor za CI: isključen timer, kratki potez i brzo otpuštanje veze da fond ne ostane zaključan. */
+const postavkeTestMotora = {
+  timerOnemogucen: true,
+  trajanjePotezaMs: 2_000,
+  odgodaPocetkaPartijeMs: 0,
+  tolerancijaPrekidaMs: 200,
+  odgodaObradePrekidaMs: 0,
+} as const;
 
 beforeAll(async () => {
   await baza.insert(igraci).values(testniBotovi.map((id) => ({
@@ -20,12 +28,24 @@ beforeAll(async () => {
   await baza.insert(botovi).values(testniBotovi.map((igracId) => ({ igracId, kljucSeeda: `test-${igracId}` })));
   posluzitelj = await izgradiPosluzitelj({
     socketOgranicenja: { handshakePoIpMinuti: 1_000 },
+    postavkeMotora: postavkeTestMotora,
     popunaBotovima: { dvoboj: true, cetveroboj: true, pragoviMs: { dva_igraca: [1_000], cetiri_igraca: [1_000, 1_500, 2_000] } },
   });
   posluzitelj.fondBotova.postaviIdentitete((await ucitajIdentiteteBotova()).filter((bot) => testniBotovi.includes(bot.igracId)));
   await posluzitelj.app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = posluzitelj.app.server.address();
   adresa = `http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`;
+});
+
+async function cekajOslobodjenFond(timeoutMs = 20_000): Promise<void> {
+  if (!posluzitelj) return;
+  await expect.poll(() => posluzitelj.fondBotova.stanje().uPartiji, { timeout: timeoutMs }).toBe(0);
+  await expect.poll(() => posluzitelj.fondBotova.stanje().slobodni, { timeout: timeoutMs })
+    .toBe(posluzitelj.fondBotova.stanje().ukupno);
+}
+
+afterEach(async () => {
+  await cekajOslobodjenFond();
 });
 
 afterAll(async () => {
@@ -58,7 +78,7 @@ describe('popuna javnog reda botovima', () => {
   it('izlazak posljednjeg čovjeka prije prve riječi poništava početak bez rezultata', async () => {
     const lokalni = await izgradiPosluzitelj({
       socketOgranicenja: { handshakePoIpMinuti: 1_000 },
-      postavkeMotora: { odgodaPocetkaPartijeMs: 5_000 },
+      postavkeMotora: { ...postavkeTestMotora, odgodaPocetkaPartijeMs: 5_000 },
       popunaBotovima: { dvoboj: true, pragoviMs: { dva_igraca: [10] } },
     });
     lokalni.fondBotova.postaviIdentitete((await ucitajIdentiteteBotova()).filter((bot) => testniBotovi.includes(bot.igracId)));
@@ -92,7 +112,7 @@ describe('popuna javnog reda botovima', () => {
       socket?.disconnect();
       await lokalni.zaustavi();
     }
-  });
+  }, 30_000);
 
   it('dvoboj: sam čovjek dobiva bota nakon praga, partija se upisuje s brojem botova i bot se oslobađa', async () => {
     expect(posluzitelj.fondBotova.stanje().ukupno).toBeGreaterThan(0);
@@ -149,11 +169,22 @@ describe('popuna javnog reda botovima', () => {
     } finally {
       socket.disconnect();
     }
-  });
+  }, 30_000);
 
   it('četveroboj: rezervirani bot se prikazuje u čekaonici prije pokretanja, a partija kreće s tri bota', async () => {
-    const socket = await spoji();
+    // Zaseban server s odgodom prve riječi: izlazak prije runde poništava stol i odmah vraća botove u fond.
+    const lokalni = await izgradiPosluzitelj({
+      socketOgranicenja: { handshakePoIpMinuti: 1_000 },
+      postavkeMotora: { ...postavkeTestMotora, odgodaPocetkaPartijeMs: 5_000 },
+      popunaBotovima: { cetveroboj: true, pragoviMs: { cetiri_igraca: [50, 100, 150] } },
+    });
+    lokalni.fondBotova.postaviIdentitete((await ucitajIdentiteteBotova()).filter((bot) => testniBotovi.includes(bot.igracId)));
+    let socket: ClientSocket | null = null;
     try {
+      await lokalni.app.listen({ port: 0, host: '127.0.0.1' });
+      const podaci = lokalni.app.server.address();
+      socket = ioClient(`http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`, { auth: { token: `gost.${randomUUID().replaceAll('-', '')}` }, forceNew: true });
+      await new Promise<void>((resolve, reject) => { socket!.once('connect', resolve); socket!.once('connect_error', reject); });
       const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak', () => true, 15_000);
       socket.emit('red:udji', { mod: 'cetiri_igraca' });
       const stanjeReda = await cekaj<StanjeReda>(socket, 'red:stanje', (s) => s.mod === 'cetiri_igraca' && s.mjesta.filter(Boolean).length === 2, 5_000);
@@ -161,11 +192,15 @@ describe('popuna javnog reda botovima', () => {
       const pocetak = await pocetakPromise;
       expect(pocetak.sjedala).toHaveLength(4);
       expect(pocetak.sjedala.filter((s) => s.igracId !== pocetak.mojIgracId)).toHaveLength(3);
+      const ponistena = cekaj<{ partijaId: string }>(socket, 'partija:ponistena');
       socket.emit('partija:izadji');
+      expect((await ponistena).partijaId).toBe(pocetak.partijaId);
+      await expect.poll(() => lokalni.fondBotova.stanje().slobodni).toBe(3);
     } finally {
-      socket.disconnect();
+      socket?.disconnect();
+      await lokalni.zaustavi();
     }
-  });
+  }, 30_000);
 
   it('drugi čovjek prije praga igra protiv čovjeka, bez bota', async () => {
     const prvi = await spoji();
