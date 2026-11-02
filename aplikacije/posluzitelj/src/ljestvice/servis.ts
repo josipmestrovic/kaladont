@@ -73,6 +73,10 @@ function upitPoretka(mod: ModPartije, metrika: MetrikaLjestvice, od: Date, doTre
         and p.kraj >= ${od.toISOString()}::timestamptz and p.kraj < ${doTrenutka.toISOString()}::timestamptz
         and i.obrisan_at is null
         and i.upravljac = 'covjek'
+        and not exists (
+          select 1 from obracuni_partija o
+          where o.partija_id = p.id and o.vrsta = 'privatna_gamifikacija'
+        )
     ),
     agregati as (
       select igrac_id, count(*)::int as igre, coalesce(sum(bodovi), 0)::int as zbroj_bodova,

@@ -1,12 +1,13 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { validirajAvatarConfig, ZADANI_AVATAR_CONFIG } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { dnkStatistikeIgraca, igraci, obracuniPartija, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { botovi, dnkStatistikeIgraca, igraci, obracuniPartija, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
+import { ocistiMemorijuTopRijeci } from '../src/profil/rute.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -405,5 +406,106 @@ describe('PUT /profil/nadimak', () => {
     } finally {
       await baza.delete(igraci).where(eq(igraci.id, gost.id));
     }
+  });
+});
+
+describe('GET /rijeci/top', () => {
+  const partijaIds: string[] = [];
+  const igracIds: string[] = [];
+
+  afterEach(async () => {
+    if (partijaIds.length) {
+      await baza.delete(potezi).where(inArray(potezi.partijaId, partijaIds));
+      await baza.delete(obracuniPartija).where(inArray(obracuniPartija.partijaId, partijaIds));
+      await baza.delete(sudioniciPartije).where(inArray(sudioniciPartije.partijaId, partijaIds));
+      await baza.delete(partije).where(inArray(partije.id, partijaIds));
+      partijaIds.length = 0;
+    }
+    if (igracIds.length) {
+      await baza.delete(botovi).where(inArray(botovi.igracId, igracIds));
+      await baza.delete(igraci).where(inArray(igraci.id, igracIds));
+      igracIds.length = 0;
+    }
+    ocistiMemorijuTopRijeci();
+  });
+
+  async function noviIgrac(upravljac: 'covjek' | 'bot' = 'covjek'): Promise<string> {
+    const id = randomUUID();
+    igracIds.push(id);
+    await baza.insert(igraci).values({
+      id,
+      vrsta: 'registriran',
+      upravljac,
+      nadimak: `Top${id.slice(0, 8)}`,
+      emailPotvrdjen: true,
+    });
+    if (upravljac === 'bot') {
+      await baza.insert(botovi).values({ igracId: id, kljucSeeda: `test-top-${id}` });
+    }
+    return id;
+  }
+
+  async function partijaSPotezima(opcije: {
+    igracId: string;
+    rijec: string;
+    brojPoteza?: number;
+    status?: 'zavrsena' | 'u_tijeku' | 'ponistena';
+    privatna?: boolean;
+  }): Promise<void> {
+    const id = randomUUID();
+    partijaIds.push(id);
+    await baza.insert(partije).values({
+      id,
+      mod: 'cetiri_igraca',
+      status: opcije.status ?? 'zavrsena',
+      kraj: opcije.status === 'u_tijeku' ? null : new Date(),
+    });
+    await baza.insert(sudioniciPartije).values({ partijaId: id, igracId: opcije.igracId, sjedalo: 0 });
+    const broj = opcije.brojPoteza ?? 1;
+    await baza.insert(potezi).values(
+      Array.from({ length: broj }, (_, indeks) => ({
+        partijaId: id,
+        runda: 1,
+        redniBroj: indeks + 1,
+        igracId: opcije.igracId,
+        vrsta: 'rijec' as const,
+        rijec: opcije.rijec,
+        trazenaSlova: opcije.rijec.slice(0, 2),
+        trajanjeMs: 100,
+      })),
+    );
+    if (opcije.privatna) {
+      await baza.insert(obracuniPartija).values({ partijaId: id, vrsta: 'privatna_gamifikacija' });
+    }
+  }
+
+  it('broji samo ljudske riječi iz završenih javnih igara', async () => {
+    const sufiks = randomUUID().slice(0, 8);
+    const javna = `javna${sufiks}`;
+    const privatna = `priv${sufiks}`;
+    const botova = `bot${sufiks}`;
+    const ponistena = `pon${sufiks}`;
+
+    const covjek = await noviIgrac('covjek');
+    const bot = await noviIgrac('bot');
+    // Dovoljno upotreba da jedinstvena riječ uđe u top 100 čak i uz postojeće podatke.
+    await partijaSPotezima({ igracId: covjek, rijec: javna, brojPoteza: 500 });
+    await partijaSPotezima({ igracId: covjek, rijec: privatna, brojPoteza: 500, privatna: true });
+    await partijaSPotezima({ igracId: bot, rijec: botova, brojPoteza: 500 });
+    await partijaSPotezima({ igracId: covjek, rijec: ponistena, brojPoteza: 500, status: 'ponistena' });
+
+    ocistiMemorijuTopRijeci();
+    const odgovor = await fetch(`${adresa}/api/rijeci/top?limit=100`);
+    expect(odgovor.status).toBe(200);
+    const tijelo = (await odgovor.json()) as {
+      ok: boolean;
+      rijeci: { rijec: string; brojUpotreba: number }[];
+    };
+    expect(tijelo.ok).toBe(true);
+    const poRijeci = new Map(tijelo.rijeci.map((redak) => [redak.rijec, redak]));
+    expect(poRijeci.get(javna)?.brojUpotreba).toBe(500);
+    expect(poRijeci.has(privatna)).toBe(false);
+    expect(poRijeci.has(botova)).toBe(false);
+    expect(poRijeci.has(ponistena)).toBe(false);
   });
 });

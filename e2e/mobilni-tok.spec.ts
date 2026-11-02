@@ -260,7 +260,7 @@ test('mobilne ljestvice prikazuju oznake i dugačke nazive bez pomicanja', async
     ruta.fulfill({
       json: {
         rijeci: [
-          { mjesto: 1, rijec: 'najduzarijecbezrazmaka', brojUpotreba: 12, postotakPartija: 15 },
+          { mjesto: 1, rijec: 'najduzarijecbezrazmaka', brojUpotreba: 12 },
         ],
       },
     }),
@@ -270,7 +270,7 @@ test('mobilne ljestvice prikazuju oznake i dugačke nazive bez pomicanja', async
     await page.setViewportSize({ width: sirina, height: 760 });
     await page.goto('/ljestvice');
     await expect(page.getByText('Ovo si ti')).toBeVisible();
-    for (const tab of ['Igrači', 'Riječi']) {
+    for (const tab of ['Igrači', 'Najčešće riječi']) {
       await page.getByRole('tab', { name: tab }).click();
       const tablica = page.locator('table.tablica-mobilni-retci');
       await expect(tablica.locator('tbody tr')).toHaveCount(1);

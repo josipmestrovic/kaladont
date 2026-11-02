@@ -43,7 +43,7 @@ Stari ukupni poredak (`GET /api/ljestvica`, najmanje **10 završenih javnih part
 Stranica `/ljestvice` ima zasebne poretke za Četveroboj i Dvoboj, po metrici i razdoblju. Prva faza: **Prosjek bodova** i **Niz pobjeda**; Niz riječi, Najduža riječ i Najbrži igrači dolaze u sljedećoj fazi.
 
 - **Razdoblja:** Dnevna, Tjedna (ponedjeljak–ponedjeljak), Mjesečna, Godišnja (kalendarska) i Svih vremena. Granice su ponoći po zoni `Europe/Zagreb`, interval `[početak, kraj)`.
-- **Pripadnost:** cijela igra pripada razdoblju u kojem je **završila** (`partije.kraj`). Ulaze samo završene javne igre; privatne, aktivne i poništene ne.
+- **Pripadnost:** cijela igra pripada razdoblju u kojem je **završila** (`partije.kraj`). Ulaze samo završene javne igre; privatne (`obracuni_partija.vrsta = privatna_gamifikacija`), aktivne i poništene ne. Privatna igra ne smije promijeniti broj javnih igara, prosjek, niz ni mjesto.
 - **Minimum:** 10 igara u danu; 20 igara unutar svakog duljeg razdoblja posebno. Današnje igre pridonose svim duljim razdobljima, ali rang se dobiva tek kad je minimum tog razdoblja ispunjen.
 - **Prosjek bodova:** zbroj bodova / broj igara, veći je bolji; prosjek 0 je valjan rezultat.
 - **Niz pobjeda:** najduži niz uzastopnih pobjeda (plasman 1) unutar razdoblja; svaki drugi plasman ga prekida. Igre se slažu redom **ulaska** (`partije.pocetak`, zatim ID), a ne redom završetka stolova. Pobjede izvan razdoblja se ne pribrajaju. Igrač bez pobjede nema rezultat.
