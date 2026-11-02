@@ -7,7 +7,7 @@ import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA } from '../bot/konfig
 
 async function glavno(): Promise<void> {
   const primijeni = process.argv.includes('--primijeni=DA');
-  const odravanjeProdukcije = process.argv.includes('--odrzavanje-produkcije=DA');
+  const odrzavanjeProdukcije = process.argv.includes('--odrzavanje-produkcije=DA');
   if (konfiguracija.NODE_ENV === 'production' && !odrzavanjeProdukcije) {
     throw new Error('Zamjena botova u produkciji traži --odrzavanje-produkcije=DA (samo tijekom održavanja).');
   }
