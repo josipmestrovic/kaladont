@@ -1230,18 +1230,18 @@ export function stvoriUpraviteljPartija(
     const autoRijec = rjecnik.nasumicnaPocetnaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
     if (!autoRijec) {
       // Rječnik iscrpljen: zakljuciPartiju očekuje ≤1 aktivnog. Ostale rangiraj kao
-      // mrtva_slova (bez nove runde), inače CI/simulacija ostane bez partija:kraj.
+      // mrtva_slova_iskoristeno (bez nove runde), inače CI/simulacija ostane bez partija:kraj.
       const preostali = [...stanje.aktivni];
       for (let i = 1; i < preostali.length; i += 1) {
         const igracId = preostali[i]!;
         stanje.aktivni.delete(igracId);
         stanje.eliminirani.push(igracId);
-        stanje.razloziEliminacije.set(igracId, 'mrtva_slova');
+        stanje.razloziEliminacije.set(igracId, 'mrtva_slova_iskoristeno');
         const plasman = stanje.aktivni.size + 1;
         const porukaElim: Eliminacija = {
           igracId,
           plasman,
-          razlog: 'mrtva_slova',
+          razlog: 'mrtva_slova_iskoristeno',
           bodZa: null,
           slova: null,
           rijecUzrok: null,
