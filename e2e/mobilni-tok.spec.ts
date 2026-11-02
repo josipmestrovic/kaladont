@@ -165,19 +165,20 @@ test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomican
   await expect(page.locator('.tablica-rangova')).toHaveCSS('display', 'table');
 });
 
-test('tablice ostaju čitljive u obje teme i s disleksijskim fontom', async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 760 });
-  for (const svijetla of [false, true]) {
-    for (const disleksijskiFont of [false, true]) {
-      // WebKit na CI povremeno padne na page.reload ("internal error"); goto + domcontentloaded je stabilniji.
-      await page.goto('/pravila-kaladonta?tema=napredak', { waitUntil: 'domcontentloaded' });
-      await page.evaluate(
+// Jedan goto po kombinaciji (svježi page) — WebKit na CI pada na reload/dvostruki goto ("internal error").
+for (const svijetla of [false, true]) {
+  for (const disleksijskiFont of [false, true]) {
+    const oznakaTeme = svijetla ? 'svijetla' : 'tamna';
+    const oznakaFonta = disleksijskiFont ? ' + disleksija' : '';
+    test(`tablice ostaju čitljive (${oznakaTeme}${oznakaFonta})`, async ({ page }) => {
+      await page.addInitScript(
         ({ svijetlaTema, font }) => {
           localStorage.setItem('kaladont_tema_v1', svijetlaTema ? 'svijetla' : 'tamna');
           localStorage.setItem('kaladont_font_postavke_v1', String(font));
         },
         { svijetlaTema: svijetla, font: disleksijskiFont },
       );
+      await page.setViewportSize({ width: 320, height: 760 });
       await page.goto('/pravila-kaladonta?tema=napredak', { waitUntil: 'domcontentloaded' });
       await page.evaluate(() => document.fonts.ready);
       const prelijevanje = await page.locator('table').evaluateAll((elementi) =>
@@ -189,9 +190,9 @@ test('tablice ostaju čitljive u obje teme i s disleksijskim fontom', async ({ p
         }),
       );
       expect(prelijevanje).toBe(false);
-    }
+    });
   }
-});
+}
 
 test('dvostupčana statistika rječnika stane na uski mobitel', async ({ page }) => {
   await page.route(/\/rjecnik\/statistika$/, (ruta) =>
