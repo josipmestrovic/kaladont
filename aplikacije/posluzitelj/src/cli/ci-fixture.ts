@@ -1,39 +1,38 @@
-import { sql } from 'drizzle-orm';
+import { and, eq, notInArray, sql } from 'drizzle-orm';
 import { baza, zatvoriBazu } from '../baza/klijent.js';
 import { rijeci } from '../baza/shema.js';
 
 // Svaki prefiks koji se pojavi kao nastavak mora imati ≥2 ne-ka odgovora,
 // inače trening e2e/unit testovi padaju kad je početna riječ jedini ne-ka kandidat.
 //
-// Mrtvi nastavci: most *qa (živi, vodi na qax) + qax (mrtav, ništa ne počinje s xx).
-// Ne stavljati mrtve riječi izravno na ba/la/ka/... — load smoke nasumice ih bira i
-// partije završe bez mjerenih poteza / s kratkim mrtva-slova lancom.
+// Mrtvi nastavci na „ax” (bax, kax, …): ništa ne počinje s ax, pa motor-partije
+// test mrtvih slova uvijek ima kandidata. Ne mogu biti početna riječ (nema odgovora).
+// Load smoke / simulacija preferiraju žive nastavke pa ih nasumice ne biraju.
 const rijeciZaCi = [
   'baba',
   'bala',
   'baka',
-  'baqa',
+  'bax',
   'kapa',
   'kara',
-  'kaqa',
+  'kax',
   'raka',
   'rasa',
-  'raqa',
+  'rax',
   'pala',
   'papa',
-  'paqa',
+  'pax',
   'lala',
   'lama',
   'laka',
-  'laqa',
+  'lax',
   'mama',
   'masa',
-  'maqa',
+  'max',
   'sala',
   'sapa',
-  'saqa',
+  'sax',
   'apa',
-  'qax',
 ];
 
 function grafemiRijeci(rijec: string): { prvaDva: string; zadnjaDva: string } {
@@ -72,6 +71,20 @@ async function ucitajFixture(): Promise<void> {
         aktivna: true,
       },
     });
+
+  // Deaktiviraj starije CI mostove (*qa / qax) ako su ostali u bazi iz prethodnog loada.
+  await baza
+    .update(rijeci)
+    .set({ aktivna: false })
+    .where(
+      and(
+        eq(rijeci.napomena, 'Sintetički CI fixture; nije stvarni rječnik.'),
+        notInArray(
+          rijeci.rijec,
+          redci.map((redak) => redak.rijec),
+        ),
+      ),
+    );
 
   await zatvoriBazu();
   console.log(`CI fixture učitan: ${redci.length} riječi.`);
