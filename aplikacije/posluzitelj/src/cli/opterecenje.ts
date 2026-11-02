@@ -469,6 +469,7 @@ interface MjerenaPartija {
   pokusane: Set<string>;
   naPotezuId: string | null;
   trazenaSlova: string | null;
+  turnToken: string | null;
   pocetakMs: number;
   poslanPotezMs: Map<string, number>;
   poteziMs: number[];
@@ -479,6 +480,7 @@ interface MjerenaPartija {
   zakazanPotez: boolean;
   potezUObradi: boolean;
   generacijaRunde: number;
+  obradeniPotezi: Set<string>;
   timerCekaMs: number | null;
   timerDriftMs: number[];
   timerTestirano: boolean;
@@ -532,19 +534,25 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
     const igracIdNaPotezu = partija.naPotezuId;
     partija.zakazanPotez = true;
     setTimeout(() => {
-      if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
+      if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) {
+        if (partija.generacijaRunde === generacijaRunde) partija.zakazanPotez = false;
+        return;
+      }
       partija.zakazanPotez = false;
       partija.potezUObradi = true;
       void (async () => {
-        if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) return;
+        if (partija.generacijaRunde !== generacijaRunde || partija.naPotezuId !== igracIdNaPotezu) {
+          partija.potezUObradi = false;
+          return;
+        }
         if (partija.odigraniPotezi >= MAKS_POTEZA_KONTROLIRANE_PARTIJE) {
-          bot.socket.emit('potez:ne-znam');
+          bot.socket.emit('potez:ne-znam', partija.turnToken ? { turnToken: partija.turnToken } : undefined);
           partija.potezUObradi = false;
           return;
         }
         const rijec = await pronadjiRijec(partija.trazenaSlova!, partija.iskoristene, partija.pokusane);
         if (!rijec) {
-          bot.socket.emit('potez:ne-znam');
+          bot.socket.emit('potez:ne-znam', partija.turnToken ? { turnToken: partija.turnToken } : undefined);
           partija.potezUObradi = false;
           return;
         }
@@ -554,7 +562,10 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
         }
         partija.pokusane.add(rijec);
         partija.poslanPotezMs.set(igracIdNaPotezu, performance.now());
-        bot.socket.emit('potez:rijec', { rijec });
+        bot.socket.emit('potez:rijec', {
+          rijec,
+          ...(partija.turnToken ? { turnToken: partija.turnToken } : {}),
+        });
       })().catch((greska: unknown) => {
         partija.potezUObradi = false;
         const poruka = greska instanceof Error ? greska.message : String(greska);
@@ -577,6 +588,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
           pokusane: new Set(),
           naPotezuId: null,
           trazenaSlova: null,
+          turnToken: null,
           pocetakMs: performance.now(),
           poslanPotezMs: new Map(),
           poteziMs: [],
@@ -587,6 +599,7 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
           zakazanPotez: false,
           potezUObradi: false,
           generacijaRunde: 0,
+          obradeniPotezi: new Set(),
           timerCekaMs: null,
           timerDriftMs: [],
           timerTestirano: false,
@@ -600,23 +613,27 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
       const igracId = igracPoSocketu.get(bot.socket.id ?? bot.token);
       const partija = igracId ? partijaPoIgracu.get(igracId) : undefined;
       if (!partija) return;
-      partija.generacijaRunde += 1;
-      partija.zakazanPotez = false;
-      partija.potezUObradi = false;
-      partija.naPotezuId = poruka.naPotezuId;
-      partija.trazenaSlova = poruka.trazenaSlova;
-      partija.iskoristene.add(poruka.rijec);
-      partija.pokusane.clear();
+      // Isti događaj stiže na sva 4 sjedala — dijeljeno stanje ažurirati samo jednom po turnTokenu.
+      if (partija.turnToken !== poruka.turnToken) {
+        partija.generacijaRunde += 1;
+        partija.zakazanPotez = false;
+        partija.potezUObradi = false;
+        partija.naPotezuId = poruka.naPotezuId;
+        partija.trazenaSlova = poruka.trazenaSlova;
+        partija.turnToken = poruka.turnToken;
+        partija.iskoristene.add(poruka.rijec);
+        partija.pokusane.clear();
+      }
       if (
         postavke.timerTest &&
         !partija.timerTestirano &&
-        partija.naPotezuId === igracId
+        poruka.naPotezuId === igracId
       ) {
         partija.timerTestirano = true;
         partija.timerCekaMs = performance.now() + Math.max(0, Date.parse(poruka.istekPotezaIso) - Date.now());
         return;
       }
-      if (partija.naPotezuId === igracId) zakaziPotez(partija);
+      if (poruka.naPotezuId === igracId) zakaziPotez(partija);
     });
 
     bot.socket.on('partija:eliminacija', (poruka: Eliminacija) => {
@@ -631,7 +648,11 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
     bot.socket.on('potez:prihvacen', (poruka: PrihvacenPotez) => {
       const partija = [...partije.values()].find((kandidat) => kandidat.igraci.has(poruka.igracId));
       if (!partija) return;
+      const kljucPoteza = `${poruka.turnToken}:${poruka.igracId}:${poruka.rijec}`;
+      if (partija.obradeniPotezi.has(kljucPoteza)) return;
+      partija.obradeniPotezi.add(kljucPoteza);
       partija.potezUObradi = false;
+      partija.zakazanPotez = false;
       const poslano = partija.poslanPotezMs.get(poruka.igracId);
       if (poslano !== undefined) {
         partija.poteziMs.push(performance.now() - poslano);
@@ -641,6 +662,8 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
       partija.odigraniPotezi += 1;
       partija.naPotezuId = poruka.sljedeciId;
       partija.trazenaSlova = poruka.trazenaSlova;
+      partija.turnToken = poruka.turnToken;
+      partija.generacijaRunde += 1;
       partija.pokusane.clear();
       zakaziPotez(partija);
     });
