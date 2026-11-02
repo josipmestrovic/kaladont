@@ -5,35 +5,30 @@ import { rijeci } from '../baza/shema.js';
 // Svaki prefiks koji se pojavi kao nastavak mora imati ≥2 ne-ka odgovora,
 // inače trening e2e/unit testovi padaju kad je početna riječ jedini ne-ka kandidat.
 //
-// Mrtvi nastavci na „ax” (bax, kax, …): ništa ne počinje s ax, pa motor-partije
-// test mrtvih slova uvijek ima kandidata. Ne mogu biti početna riječ (nema odgovora).
-// Load smoke / simulacija preferiraju žive nastavke pa ih nasumice ne biraju.
-const rijeciZaCi = [
+// Mrtvi nastavci (*aax): ništa ne počinje s ax, pa motor-partije test mrtvih slova
+// uvijek ima kandidata. Duljina ≥4 i frekvencija 0 → bot ih „ne zna” (ne igra ih
+// dok ima živih alternativa). Ne mogu biti početna riječ (nema odgovora).
+const ziveRijeci = [
   'baba',
   'bala',
   'baka',
-  'bax',
   'kapa',
   'kara',
-  'kax',
   'raka',
   'rasa',
-  'rax',
   'pala',
   'papa',
-  'pax',
   'lala',
   'lama',
   'laka',
-  'lax',
   'mama',
   'masa',
-  'max',
   'sala',
   'sapa',
-  'sax',
   'apa',
-];
+] as const;
+
+const mrtveRijeci = ['baax', 'kaax', 'raax', 'paax', 'laax', 'maax', 'saax'] as const;
 
 function grafemiRijeci(rijec: string): { prvaDva: string; zadnjaDva: string } {
   return {
@@ -43,20 +38,35 @@ function grafemiRijeci(rijec: string): { prvaDva: string; zadnjaDva: string } {
 }
 
 async function ucitajFixture(): Promise<void> {
-  const redci = rijeciZaCi.map((rijec) => {
-    const { prvaDva, zadnjaDva } = grafemiRijeci(rijec);
-    return {
-      rijec,
-      prvaDva,
-      zadnjaDva,
-      vrste: ['imenica'],
-      grupe: [`imenica:${rijec}`],
-      // ≥ prag uobičajene (100) da botovi u CI biraju ove riječi kao poznate/poželjne.
-      frekvencija: 100,
-      aktivna: true,
-      napomena: 'Sintetički CI fixture; nije stvarni rječnik.',
-    };
-  });
+  const redci = [
+    ...ziveRijeci.map((rijec) => {
+      const { prvaDva, zadnjaDva } = grafemiRijeci(rijec);
+      return {
+        rijec,
+        prvaDva,
+        zadnjaDva,
+        vrste: ['imenica'],
+        grupe: [`imenica:${rijec}`],
+        // ≥ prag uobičajene (100) da botovi u CI biraju ove riječi kao poznate/poželjne.
+        frekvencija: 100,
+        aktivna: true,
+        napomena: 'Sintetički CI fixture; nije stvarni rječnik.',
+      };
+    }),
+    ...mrtveRijeci.map((rijec) => {
+      const { prvaDva, zadnjaDva } = grafemiRijeci(rijec);
+      return {
+        rijec,
+        prvaDva,
+        zadnjaDva,
+        vrste: ['imenica'],
+        grupe: [`imenica:${rijec}`],
+        frekvencija: 0,
+        aktivna: true,
+        napomena: 'Sintetički CI fixture; nije stvarni rječnik.',
+      };
+    }),
+  ];
 
   await baza
     .insert(rijeci)
@@ -73,7 +83,7 @@ async function ucitajFixture(): Promise<void> {
       },
     });
 
-  // Deaktiviraj starije CI mostove (*qa / qax) ako su ostali u bazi iz prethodnog loada.
+  // Deaktiviraj starije CI mostove (bax/qax/…) ako su ostali u bazi iz prethodnog loada.
   await baza
     .update(rijeci)
     .set({ aktivna: false })

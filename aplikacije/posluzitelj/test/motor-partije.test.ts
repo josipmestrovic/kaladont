@@ -238,7 +238,7 @@ async function imaZivNastavak(kandidat: KandidatRijec, potrosene: ReadonlySet<st
 /** Igriva rijec koja pocinje na zadane grafeme i sama ima daljnji nastavak (server bi je inace odmah eliminirao). */
 async function pronadjiRijecNaPrefiks(prefiks: string, potrosene: ReadonlySet<string>): Promise<string> {
   const rezultati = await kandidatiNaPrefiks(prefiks, 100);
-  // Preskoči CI mrtve nastavke (*ax): imaju odgovor 0, pa bi sljedeći potez bio mrtva_slova.
+  // Preskoči CI mrtve nastavke (*aax): imaju odgovor 0, pa bi sljedeći potez bio mrtva_slova.
   for (const kandidat of rezultati) {
     if (jeIgriva(kandidat, potrosene) && (await imaZivNastavak(kandidat, potrosene))) return kandidat.rijec;
   }
@@ -1170,7 +1170,7 @@ describe('motor partije - otvarač runde nakon eliminacije', () => {
         }
       }
 
-      expect(mrtvaRijec, 'nije pronađena riječ bez nastavka u 10 pokušaja (CI fixture: mrtvi *ax)').not.toBeNull();
+      expect(mrtvaRijec, 'nije pronađena riječ bez nastavka u 10 pokušaja (CI fixture: mrtvi *aax)').not.toBeNull();
     } finally {
       odspojiIgrace(igraci);
     }

@@ -131,24 +131,6 @@ describe('Zagrijavanje', () => {
     let mojId = '';
     const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
     const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
-    // Računalo na „ka” igra kaladont i emitira prihvaćen prije nove runde sustava —
-    // to nije stvarni potez čovjeka (kaladont nije u tablici rijeci → JOIN pada).
-    const prvaRundaPromise = Promise.race([
-      cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena', (runda) => runda.naPotezuId === igracId).then((runda) => ({
-        rijec: runda.rijec,
-        trazenaSlova: runda.trazenaSlova,
-        turnToken: runda.turnToken,
-      })),
-      cekaj<PrihvacenPotez>(
-        socket,
-        'potez:prihvacen',
-        (potez) => potez.sljedeciId === igracId && !RIJECI_KALADONT.has(potez.rijec),
-      ).then((potez) => ({
-        rijec: potez.rijec,
-        trazenaSlova: potez.trazenaSlova,
-        turnToken: potez.turnToken,
-      })),
-    ]);
     const naPocetak = (pocetak: PocetakPartije) => { mojId = pocetak.mojIgracId; };
     const naRunda = (runda: RundaOtvorena) => {
       if (runda.naPotezuId === igracId && odigraoRijec) socket.emit('potez:ne-znam', { turnToken: runda.turnToken });
@@ -159,25 +141,56 @@ describe('Zagrijavanje', () => {
     socket.on('partija:pocetak', naPocetak);
     socket.on('partija:runda-otvorena', naRunda);
     socket.on('potez:prihvacen', naPrihvacen);
+
+    async function pronadjiValjanPotez(prefiks: string, zadnjaRijec: string): Promise<string | null> {
+      const [kandidat] = await baza.execute<{ rijec: string }>(sql`
+        select kandidat.rijec from rijeci kandidat
+        left join rijeci pocetna on pocetna.rijec = ${zadnjaRijec}
+        where kandidat.aktivna and kandidat.prva_dva = ${prefiks}
+          and kandidat.zadnja_dva <> 'ka'
+          and kandidat.rijec <> ${zadnjaRijec}
+          and (pocetna.rijec is null or not (kandidat.grupe && pocetna.grupe))
+        order by kandidat.rijec limit 1
+      `);
+      return kandidat?.rijec ?? null;
+    }
+
+    // Preskoči kaladont / mrtva-slova prijelaze (prihvaćen stiže prije eliminacije/nove runde).
+    function cekajIgrivPotez(): Promise<{ rijec: string; trazenaSlova: string; turnToken: string; kandidat: string }> {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Nema igrivog trening poteza unutar 15000 ms')), 15_000);
+        const pokusaj = (rijec: string, trazenaSlova: string, turnToken: string) => {
+          if (RIJECI_KALADONT.has(rijec)) return;
+          void pronadjiValjanPotez(trazenaSlova, rijec).then((kandidat) => {
+            if (!kandidat) return;
+            clearTimeout(timer);
+            socket.off('partija:runda-otvorena', naOtvorenu);
+            socket.off('potez:prihvacen', naPotez);
+            resolve({ rijec, trazenaSlova, turnToken, kandidat });
+          }).catch(reject);
+        };
+        const naOtvorenu = (runda: RundaOtvorena) => {
+          if (runda.naPotezuId === igracId) pokusaj(runda.rijec, runda.trazenaSlova, runda.turnToken);
+        };
+        const naPotez = (potez: PrihvacenPotez) => {
+          if (potez.sljedeciId === igracId) pokusaj(potez.rijec, potez.trazenaSlova, potez.turnToken);
+        };
+        socket.on('partija:runda-otvorena', naOtvorenu);
+        socket.on('potez:prihvacen', naPotez);
+      });
+    }
+
     try {
       expect((await new Promise<{ pokrenut: boolean }>((resolve) => socket.emit('trening:zapocni', resolve))).pokrenut).toBe(true);
       const pocetak = await pocetakPromise;
-      const runda = await prvaRundaPromise;
+      const runda = await cekajIgrivPotez();
       expect(mojId).toBe(igracId);
-      const [kandidat] = await baza.execute<{ rijec: string }>(sql`
-        select kandidat.rijec from rijeci kandidat
-        join rijeci pocetna on pocetna.rijec = ${runda.rijec}
-        where kandidat.aktivna and kandidat.prva_dva = ${runda.trazenaSlova}
-          and kandidat.zadnja_dva <> 'ka' and not (kandidat.grupe && pocetna.grupe)
-        order by kandidat.rijec limit 1
-      `);
-      if (!kandidat) throw new Error(`Nema valjanog trening poteza na ${runda.trazenaSlova}`);
       const prihvacenPromise = cekaj<PrihvacenPotez>(socket, 'potez:prihvacen', (potez) => potez.igracId === igracId);
-      socket.emit('potez:rijec', { rijec: kandidat.rijec, turnToken: runda.turnToken });
+      socket.emit('potez:rijec', { rijec: runda.kandidat, turnToken: runda.turnToken });
       const prihvacen = await prihvacenPromise;
       odigraoRijec = true;
-      expect(prihvacen.rijec).toBe(kandidat.rijec);
-      const [oblik] = await baza.execute<{ rijec: string }>(sql`select rijec from trening_rijeci_igraca where igrac_id = ${igracId} and rijec = ${kandidat.rijec}`);
+      expect(prihvacen.rijec).toBe(runda.kandidat);
+      const [oblik] = await baza.execute<{ rijec: string }>(sql`select rijec from trening_rijeci_igraca where igrac_id = ${igracId} and rijec = ${runda.kandidat}`);
       expect(oblik).toBeUndefined();
       const grupe = await baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
       expect(grupe).toHaveLength(0);
