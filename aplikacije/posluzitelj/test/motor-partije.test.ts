@@ -1169,7 +1169,7 @@ describe('motor partije - otvarač runde nakon eliminacije', () => {
         }
       }
 
-      expect(mrtvaRijec, 'nije pronađena riječ bez nastavka u 10 pokušaja').not.toBeNull();
+      expect(mrtvaRijec, 'nije pronađena riječ bez nastavka u 10 pokušaja (CI fixture treba imati *ax mrtve nastavke)').not.toBeNull();
     } finally {
       odspojiIgrace(igraci);
     }

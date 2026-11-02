@@ -47,6 +47,8 @@
   --boja-crvena: #e4572e;
   --boja-tekst: #ffffff;
   --boja-tekst-sekundarni: rgb(255 255 255 / 82%);
+  /* Tamnije od tipkanog teksta, ali dovoljno svijetlo na tamnim inputima */
+  --boja-tekst-placeholder: rgb(255 255 255 / 62%);
   --boja-zuta-krema: #f4c95d;
 
   /* Boje - semanticki slojevi */
@@ -143,6 +145,7 @@ html[data-tema='svijetla'] {
 
   --boja-tekst: #1a1815;
   --boja-tekst-sekundarni: #5c554a;
+  --boja-tekst-placeholder: #8f8778;
 
   --boja-pozadina-podloga: var(--boja-krem);
   --boja-pozadina-primarna: var(--boja-mint);
@@ -245,6 +248,12 @@ h3 {
 a {
   color: var(--boja-tekst-naslov);
   font-weight: 700;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--boja-tekst-placeholder);
+  opacity: 1;
 }
 
 button {
