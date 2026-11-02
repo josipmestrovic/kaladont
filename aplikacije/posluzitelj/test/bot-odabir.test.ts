@@ -152,6 +152,20 @@ describe('odabir riječi bota', () => {
     expect(bez).toEqual({ vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' });
   });
 
+  it('propust KA bez poželjnih poznatih riječi ne troši namjerni propust — igra kaladont', () => {
+    const rijeci = laznaRijec({ kamenčić: { frekvencija: 20, grupe: ['imenica:kamenčić'] } });
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostPropustaKa: 1,
+      vjerojatnostNeznanjaPoSudjelovanju: 1,
+      rasponTeskogPotezaNeznanja: [1, 1],
+    };
+    const stanje = stvoriStanjeBota(konfig, rng(1));
+    const odluka = odaberiPotez({ trazenaSlova: 'ka', kandidati: ['kamenčić'], ...rijeci }, stanje, konfig, () => 0);
+    expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' });
+    expect(stanje.neznanjePotroseno).toBe(false);
+  });
+
   it('među magla/mačka/makroekonomist preferira maglu i ne bira jako rijetko', () => {
     const rijeci = laznaRijec({
       magla: { frekvencija: 900, grupe: ['imenica:magla'] },

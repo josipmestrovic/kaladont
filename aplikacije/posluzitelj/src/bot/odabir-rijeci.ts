@@ -165,6 +165,11 @@ export function odaberiPotez(
 
   const pozeljni = poznati.filter((rijec) => kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig) === 'uobicajena' && osnovnaVrsta(rijec, ['imenica', 'glagol', 'pridjev']));
   if (!pozeljni.length) {
+    // Propust bez poželjne riječi na „ka” → ipak kaladont (kao empty-poznati).
+    if (propustKa) {
+      stanje.brojKandidata = 1;
+      return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
+    }
     const propust = pokusajNamjerniPropust(stanje, ulaz.turnToken, ulaz.oporavak);
     if (propust) return propust;
   }
