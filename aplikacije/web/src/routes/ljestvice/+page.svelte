@@ -82,6 +82,17 @@
   let rijeciZatrazene = false;
   let prikaziBodovanje = $state(false);
   let prikaziIzjednacenje = $state(false);
+  // Filtriraj ključ da pri promjeni moda/metrike/razdoblja prvo učitamo Top 10
+  // (dok još ne znamo smije li „Oko mene”), pa tek onda eventualno oko mene.
+  let filterKljuc = $state('');
+
+  const mojaPozicija = $derived(podaci?.mojaPozicija ?? null);
+  // Oko mene samo kad si rangiran izvan Top 10; u Top 10 si već vidiš svoj redak.
+  const mozeOkoMene = $derived(
+    mojaPozicija?.status === 'rangiran' && mojaPozicija.mjesto !== null && mojaPozicija.mjesto > 10,
+  );
+  // Stari ?prikaz=oko_mene bez potrebe prikazuje Top 10; normalizirani prikaz ide u API.
+  const prikaz = $derived<PrikazLjestvice>(prikazUrl === 'oko_mene' && mozeOkoMene ? 'oko_mene' : 'top');
 
   function nazivMetrike(me: MetrikaLjestvice, m: Mod = mod): string {
     if (me === 'niz_pobjeda') return 'Niz pobjeda';
@@ -98,7 +109,7 @@
     const idZahtjeva = ++zadnjiZahtjev;
     ucitava = true;
     greska = null;
-    podaci = null;
+    // Ne briši podaci tijekom učitavanja — inače mozeOkoMene padne na false i effect uđe u petlju top↔oko_mene.
     prikaziBodovanje = false;
     prikaziIzjednacenje = false;
     try {
@@ -112,7 +123,10 @@
       pomakSataMs = new Date(tijelo.izracunatoU).getTime() - Date.now();
       podaci = tijelo;
     } catch {
-      if (idZahtjeva === zadnjiZahtjev) greska = 'Ljestvicu trenutno nije moguće učitati.';
+      if (idZahtjeva === zadnjiZahtjev) {
+        greska = 'Ljestvicu trenutno nije moguće učitati.';
+        podaci = null;
+      }
     } finally {
       if (idZahtjeva === zadnjiZahtjev) ucitava = false;
     }
@@ -134,8 +148,15 @@
   }
 
   $effect(() => {
-    if (kategorija === 'igraci') void ucitajLjestvicu(mod, metrika, razdoblje, prikazUrl);
-    else if (!rijeciZatrazene) {
+    if (kategorija === 'igraci') {
+      const noviKljuc = `${mod}|${metrika}|${razdoblje}`;
+      if (noviKljuc !== filterKljuc) {
+        filterKljuc = noviKljuc;
+        podaci = null;
+      }
+      // Normalizirani prikaz: prvo top dok ne znamo rang; drugi zahtjev samo ako je oko mene dopušteno.
+      void ucitajLjestvicu(mod, metrika, razdoblje, prikaz);
+    } else if (!rijeciZatrazene) {
       rijeciZatrazene = true;
       void ucitajRijeci(10);
     }
@@ -156,7 +177,7 @@
     const kraj = podaci?.razdoblje.do;
     if (kraj && preostaloMs !== null && preostaloMs <= 0 && osvjezenoNaKraju !== kraj && kategorija === 'igraci') {
       osvjezenoNaKraju = kraj;
-      void ucitajLjestvicu(mod, metrika, razdoblje, prikazUrl);
+      void ucitajLjestvicu(mod, metrika, razdoblje, prikaz);
     }
   });
 
@@ -197,13 +218,6 @@
     return new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(redak.vrijednost.prosjek);
   }
 
-  const mojaPozicija = $derived(podaci?.mojaPozicija ?? null);
-  // Oko mene samo kad si rangiran izvan Top 10; u Top 10 si već vidiš svoj redak.
-  const mozeOkoMene = $derived(
-    mojaPozicija?.status === 'rangiran' && mojaPozicija.mjesto !== null && mojaPozicija.mjesto > 10,
-  );
-  // Stari ?prikaz=oko_mene bez potrebe prikazuje Top 10; server već vraća top slice.
-  const prikaz = $derived<PrikazLjestvice>(prikazUrl === 'oko_mene' && mozeOkoMene ? 'oko_mene' : 'top');
   const redakUlaska = $derived(
     podaci && podaci.razdoblje.stanje !== 'zakljucano'
       ? `Za ulazak treba ${podaci.minimumIgara} javnih ${oblikIgre(podaci.minimumIgara)}. ${RESET_RAZDOBLJA[razdoblje]}`.trim()
