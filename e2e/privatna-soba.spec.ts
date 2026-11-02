@@ -53,13 +53,13 @@ test('dva igrača stvaraju privatnu sobu i pokreću partiju', async ({ browser }
 
 test('pojašnjenje mrtvih slova radi na mobilnom prikazu', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/pravila');
+  await page.goto('/pravila-kaladonta?tema=pitanja');
 
   await page.getByRole('button', { name: 'mrtva slova' }).click();
   const pojasnjenje = page.getByRole('tooltip');
   await expect(pojasnjenje).toBeVisible();
   await expect(pojasnjenje).toContainText(
-    'Riječi koje nemaju nastavka. Sustav automatski izbacuje sljedećeg igrača u slučaju takvih riječi.',
+    'Zadnja dva slova nemaju nijednu slobodnu riječ: ili je nema u rječniku, ili su svi oblici već odigrani u ovoj igri.',
   );
 
   await page.keyboard.press('Escape');
