@@ -14,8 +14,10 @@ export interface KonfiguracijaBota {
   /** Korpusna frekvencija: >= uobicajena je uobičajena, >= srednja je srednja, ostalo (uključujući 0) rijetko. */
   pragFrekvencije: { uobicajena: number; srednja: number };
   marginaRokaMs: number;
-  /** Vjerojatnost da bot ostavi riječ na „ka” kad takva postoji među kandidatima. */
+  /** Vjerojatnost da bot ostavi riječ na „ka” kad takva postoji među poznatim kandidatima. */
   vjerojatnostOstavljanjaKa: number;
+  /** Vjerojatnost da bot propusti tuđi „ka” i igra običnu riječ umjesto kaladonta. */
+  vjerojatnostPropustaKa: number;
   vjerojatnostNeznanjaPoSudjelovanju: number;
   vjerojatnostIzostankaPoSudjelovanju: number;
   treningRazmisljanjeMinMs: number;
@@ -61,7 +63,8 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   verzija: VERZIJA_BOT_POLITIKE,
   pragFrekvencije: { uobicajena: 100, srednja: 10 },
   marginaRokaMs: 1_500,
-  vjerojatnostOstavljanjaKa: 0.05,
+  vjerojatnostOstavljanjaKa: 0.015,
+  vjerojatnostPropustaKa: 0.08,
   vjerojatnostNeznanjaPoSudjelovanju: 0.2,
   vjerojatnostIzostankaPoSudjelovanju: 0.02,
   treningRazmisljanjeMinMs: 1_000,
@@ -116,6 +119,7 @@ export const ShemaKonfiguracijeBota = z.object({
   pragFrekvencije: z.object({ uobicajena: z.number().int().min(0).max(2_000_000_000), srednja: z.number().int().min(0).max(2_000_000_000) }).strict(),
   marginaRokaMs: z.number().int().min(150).max(1_500),
   vjerojatnostOstavljanjaKa: Vjerojatnost,
+  vjerojatnostPropustaKa: Vjerojatnost.default(0.08),
   vjerojatnostNeznanjaPoSudjelovanju: Vjerojatnost,
   vjerojatnostIzostankaPoSudjelovanju: Vjerojatnost,
   treningRazmisljanjeMinMs: z.number().int().min(100).max(30_000),
@@ -185,6 +189,7 @@ export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): K
     botoviCetveroboj: env.BOTOVI_CETVEROBOJ === 'true',
     brziRazvoj: lokalnoTestiranje,
     vjerojatnostOstavljanjaKa: postotak(env.BOT_VJEROJATNOST_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa),
+    vjerojatnostPropustaKa: postotak(env.BOT_VJEROJATNOST_PROPUSTA_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropustaKa),
     vjerojatnostNeznanjaPoSudjelovanju: postotak(env.BOT_NEZNANJE_PO_SUDJELOVANJU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostNeznanjaPoSudjelovanju),
     vjerojatnostIzostankaPoSudjelovanju: lokalnoTestiranje ? 0 : postotak(env.BOT_IZOSTANAK_PO_SUDJELOVANJU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostIzostankaPoSudjelovanju),
   };

@@ -2,7 +2,7 @@
  * Čisti odabir botove riječi (ADR-017). Nenapadačka politika: ni jedan kriterij ne gleda
  * protivnikove nastavke; broj kandidata procjenjuje samo težinu TRENUTNOG prefiksa.
  */
-import { grafemi, zadnjaDva } from 'zajednicko';
+import { grafemi, PRAGOVI_DULJINE, zadnjaDva } from 'zajednicko';
 import { promijesajNiz } from '../igra/raspored-sjedala.js';
 import { ZADANA_KONFIGURACIJA_BOTA, type KategorijaRijeci, type KonfiguracijaBota } from './konfiguracija-bota.js';
 import { createHash } from 'node:crypto';
@@ -76,7 +76,7 @@ export interface UlazOdabira {
 }
 
 export type OdlukaBota =
-  | { vrsta: 'rijec'; rijec: string; kategorija: KategorijaRijeci | 'kaladont'; izborKa?: 'dobrovoljni' | 'prisilni' }
+  | { vrsta: 'rijec'; rijec: string; kategorija: KategorijaRijeci | 'kaladont'; izborKa?: 'dobrovoljni' | 'prisilni'; propustKa?: boolean }
   | { vrsta: 'odustani'; razlog: 'nema_rijeci' | 'namjerni_propust' };
 
 export function kategorijaRijeci(frekvencija: number | null, konfig: KonfiguracijaBota): KategorijaRijeci {
@@ -86,8 +86,20 @@ export function kategorijaRijeci(frekvencija: number | null, konfig: Konfiguraci
   return 'rijetka';
 }
 
+/** Jako rijetka (freq 0) ili ≥15 grafema — bot se toga „ne sjeća”. */
+export function jeNepoznataBotu(rijec: string, frekvencija: number | null): boolean {
+  const brojGrafema = grafemi(rijec).length;
+  if (brojGrafema >= PRAGOVI_DULJINE.jakoDuga) return true;
+  if (frekvencija === null || frekvencija === 0) return brojGrafema >= 4 || frekvencija === null;
+  return false;
+}
+
 function ponderDuljine(rijec: string, konfig: KonfiguracijaBota): number {
-  return 1 / (1 + konfig.ponderDuljinePoGrafemu * Math.max(0, grafemi(rijec).length - 8));
+  const broj = grafemi(rijec).length;
+  // Soft: blago od 8, jače od 10 do 14 (hard cut je ≥15 u filteru).
+  const odOsnovnog = Math.max(0, broj - 8) * konfig.ponderDuljinePoGrafemu;
+  const odDuge = Math.max(0, broj - (PRAGOVI_DULJINE.duga - 1)) * konfig.ponderDuljinePoGrafemu;
+  return 1 / (1 + odOsnovnog + odDuge);
 }
 
 function izaberiPonderirano(rijeci: readonly string[], frekvencijaZa: UlazOdabira['frekvencijaZa'], rng: Rng, konfig: KonfiguracijaBota): string {
@@ -100,46 +112,73 @@ function izaberiPonderirano(rijeci: readonly string[], frekvencijaZa: UlazOdabir
   return rijeci[rijeci.length - 1]!;
 }
 
+function pokusajNamjerniPropust(stanje: StanjeBotaUPartiji, turnToken: string | undefined, oporavak: boolean | undefined): OdlukaBota | null {
+  if (oporavak) return null;
+  if (!turnToken || turnToken !== stanje.zadnjiTezakToken) {
+    stanje.brojTeskihPoteza += 1;
+    stanje.zadnjiTezakToken = turnToken ?? null;
+  }
+  if (!stanje.neznanjePotroseno && stanje.ciljNeznanja === stanje.brojTeskihPoteza) {
+    stanje.neznanjePotroseno = true;
+    return { vrsta: 'odustani', razlog: 'namjerni_propust' };
+  }
+  return null;
+}
+
 export function odaberiPotez(
   ulaz: UlazOdabira,
   stanje: StanjeBotaUPartiji,
   konfig: KonfiguracijaBota,
   rng: Rng,
 ): OdlukaBota {
-  // Primljeni KA: bot prepoznaje Kaladont kao i čovjek; to nije traženje mrtvog izlaznog nastavka.
-  if (ulaz.trazenaSlova === 'ka') { stanje.brojKandidata = 1; return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' }; }
+  const sviKandidati = [...ulaz.kandidati];
+  let propustKa = false;
 
-  const kandidati: string[] = [];
-  const naKa: string[] = [];
-  for (const rijec of ulaz.kandidati) {
-    if (zadnjaDva(rijec) === 'ka') {
-      naKa.push(rijec);
-      continue;
+  // Primljeni KA: većinom kaladont; ponekad propusti i igra običnu riječ na „ka”.
+  if (ulaz.trazenaSlova === 'ka') {
+    if (rng() >= konfig.vjerojatnostPropustaKa) {
+      stanje.brojKandidata = 1;
+      return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
     }
-    kandidati.push(rijec);
+    propustKa = true;
   }
 
-  stanje.brojKandidata = kandidati.length + naKa.length;
-  if (stanje.brojKandidata === 0) return { vrsta: 'odustani', razlog: 'nema_rijeci' };
+  const poznati = sviKandidati.filter((rijec) => !jeNepoznataBotu(rijec, ulaz.frekvencijaZa(rijec)));
+  stanje.brojKandidata = poznati.length;
+
+  if (poznati.length === 0) {
+    // Propust bez poznate riječi na „ka” → ipak kaladont (kao čovjek koji se sjetio pravila).
+    if (propustKa) {
+      stanje.brojKandidata = 1;
+      return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
+    }
+    if (sviKandidati.length === 0) return { vrsta: 'odustani', razlog: 'nema_rijeci' };
+    const propust = pokusajNamjerniPropust(stanje, ulaz.turnToken, ulaz.oporavak);
+    if (propust) return propust;
+    return { vrsta: 'odustani', razlog: 'nema_rijeci' };
+  }
 
   const osnovnaVrsta = (rijec: string, vrste: string[]) => ulaz.grupeZa(rijec).some((grupa) => {
     const [vrsta, lema] = grupa.split(':');
     return vrste.includes(vrsta!) && lema === rijec;
   });
-  const svi = [...kandidati, ...naKa];
-  const imaPozeljnih = svi.some((rijec) => kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig) === 'uobicajena' && osnovnaVrsta(rijec, ['imenica', 'glagol', 'pridjev']));
-  if (!imaPozeljnih && !ulaz.oporavak) {
-    if (!ulaz.turnToken || ulaz.turnToken !== stanje.zadnjiTezakToken) {
-      stanje.brojTeskihPoteza += 1;
-      stanje.zadnjiTezakToken = ulaz.turnToken ?? null;
-    }
-    if (!stanje.neznanjePotroseno && stanje.ciljNeznanja === stanje.brojTeskihPoteza) {
-      stanje.neznanjePotroseno = true;
-      return { vrsta: 'odustani', razlog: 'namjerni_propust' };
-    }
+
+  const pozeljni = poznati.filter((rijec) => kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig) === 'uobicajena' && osnovnaVrsta(rijec, ['imenica', 'glagol', 'pridjev']));
+  if (!pozeljni.length) {
+    const propust = pokusajNamjerniPropust(stanje, ulaz.turnToken, ulaz.oporavak);
+    if (propust) return propust;
   }
+
+  const radni = pozeljni.length ? pozeljni : poznati;
+  const kandidati: string[] = [];
+  const naKa: string[] = [];
+  for (const rijec of radni) {
+    if (zadnjaDva(rijec) === 'ka') naKa.push(rijec);
+    else kandidati.push(rijec);
+  }
+
   const prisilniKa = naKa.length > 0 && kandidati.length === 0;
-  const odabranaSkupina = naKa.length && (prisilniKa || rng() < konfig.vjerojatnostOstavljanjaKa) ? naKa : kandidati;
+  const odabranaSkupina = naKa.length && (prisilniKa || rng() < konfig.vjerojatnostOstavljanjaKa) ? naKa : (kandidati.length ? kandidati : naKa);
   const uobicajene = odabranaSkupina.filter((rijec) => kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig) === 'uobicajena');
   const imenice = uobicajene.filter((rijec) => osnovnaVrsta(rijec, ['imenica']));
   const ostalo = uobicajene.filter((rijec) => osnovnaVrsta(rijec, ['glagol', 'pridjev']));
@@ -151,7 +190,13 @@ export function odaberiPotez(
     izbor = uobicajene.length ? uobicajene : odabranaSkupina;
   }
   const rijec = izaberiPonderirano(izbor, ulaz.frekvencijaZa, rng, konfig);
-  return { vrsta: 'rijec', rijec, kategorija: kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig), ...(zadnjaDva(rijec) === 'ka' ? { izborKa: prisilniKa ? 'prisilni' as const : 'dobrovoljni' as const } : {}) };
+  return {
+    vrsta: 'rijec',
+    rijec,
+    kategorija: kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig),
+    ...(zadnjaDva(rijec) === 'ka' ? { izborKa: prisilniKa ? 'prisilni' as const : 'dobrovoljni' as const } : {}),
+    ...(propustKa ? { propustKa: true } : {}),
+  };
 }
 
 /** Vrijeme razmišljanja unutar roka; bot nikad ne dobiva više od roka minus margina. */

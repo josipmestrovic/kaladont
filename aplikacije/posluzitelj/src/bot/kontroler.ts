@@ -37,6 +37,7 @@ export interface BrojaciBota {
   namjernihCekanjaIsteka: number;
   dobrovoljniKa: number;
   prisilniKa: number;
+  propustPrimljenogKa: number;
 }
 
 interface PlaniranaAkcija {
@@ -62,7 +63,7 @@ export class BotKontroler {
   private readonly otkazi: (handle: NodeJS.Timeout) => void;
   private readonly zapisi: (poruka: string, podaci: Record<string, unknown>) => void;
   private zaustavljen = false;
-  readonly brojaci: BrojaciBota = { planirano: 0, odigranihRijeci: 0, namjernihPropusta: 0, bezRijeci: 0, zastarjelo: 0, tehnickeGreske: 0, namjernihCekanjaIsteka: 0, dobrovoljniKa: 0, prisilniKa: 0 };
+  readonly brojaci: BrojaciBota = { planirano: 0, odigranihRijeci: 0, namjernihPropusta: 0, bezRijeci: 0, zastarjelo: 0, tehnickeGreske: 0, namjernihCekanjaIsteka: 0, dobrovoljniKa: 0, prisilniKa: 0, propustPrimljenogKa: 0 };
 
   constructor(private readonly ovisnosti: OvisnostiBotKontrolera) {
     this.rng = ovisnosti.rng ?? Math.random;
@@ -123,7 +124,8 @@ export class BotKontroler {
       protekloMs: Math.max(0, this.sada() - dogadaj.pocetakPotezaMs),
       koeficijentTempa: stanjeBota.koeficijentTempa,
       brojKandidata: stanjeBota.brojKandidata,
-      primljeniKa: dogadaj.trazenaSlova === 'ka',
+      // Brzi tempo samo kad stvarno igra kaladont na primljeni ka (ne pri propustu).
+      primljeniKa: odluka.vrsta === 'rijec' && odluka.rijec === 'kaladont' && dogadaj.trazenaSlova === 'ka',
       ...(odluka.vrsta === 'rijec' ? { brojGrafema: grafemi(odluka.rijec).length, frekvencija: this.ovisnosti.rjecnik.frekvencijaZa(odluka.rijec) } : {}),
     });
     // Bez roka (testni ONEMOGUCI_TIMER / privatno bez tajmera) ne čekaj udio od 30 s — inače CI testovi isteku.
@@ -206,6 +208,7 @@ export class BotKontroler {
       turnToken: dogadaj.turnToken,
       oporavak: oporavak || ista !== undefined,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng);
+    if (odluka.vrsta === 'rijec' && odluka.propustKa) this.brojaci.propustPrimljenogKa += 1;
     if (odluka.vrsta === 'rijec' && odluka.izborKa && stanjeBota.zadnjiTokenKa !== dogadaj.turnToken) {
       stanjeBota.zadnjiTokenKa = dogadaj.turnToken;
       if (odluka.izborKa === 'dobrovoljni') this.brojaci.dobrovoljniKa += 1;

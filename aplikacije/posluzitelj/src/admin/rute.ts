@@ -18,7 +18,7 @@ import { SukobRevizijeBotova, type ZapisPostavkiBotova } from '../bot/trajne-pos
 /** Živi brojači iz memorije procesa; nisu trajni i vrijede od zadnjeg pokretanja. */
 export interface ZivoStanjeBotova {
   fond: { ukupno: number; slobodni: number; rezervirani: number; uPartiji: number; iscrpljenja: number };
-  bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number; dobrovoljniKa: number; prisilniKa: number };
+  bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number; dobrovoljniKa: number; prisilniKa: number; propustPrimljenogKa: number };
   trening: { aktivni: number; zapoceti: number; odbijeni: number; neuspjeli: number };
   zastavice: { trening: boolean; botoviDvoboj: boolean; botoviCetveroboj: boolean };
 }

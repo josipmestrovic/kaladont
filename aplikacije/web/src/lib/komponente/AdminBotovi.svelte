@@ -9,6 +9,7 @@
     pragFrekvencije: { uobicajena: number; srednja: number };
     marginaRokaMs: number;
     vjerojatnostOstavljanjaKa: number;
+    vjerojatnostPropustaKa: number;
     vjerojatnostNeznanjaPoSudjelovanju: number;
     vjerojatnostIzostankaPoSudjelovanju: number;
     treningRazmisljanjeMinMs: number;
@@ -243,6 +244,7 @@
             <label>Korekcija rijetke riječi<input type="number" min="0" max="0.15" step="0.01" bind:value={nacrt.korekcijaRijetkosti} /></label>
             <label>Korekcija teškog prefiksa<input type="number" min="0" max="0.15" step="0.005" bind:value={nacrt.korekcijaTeskogPrefiksa} /></label>
             <label>Dobrovoljni KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostOstavljanjaKa} /><span>{postotak(nacrt.vjerojatnostOstavljanjaKa)}</span></label>
+            <label>Propust tuđeg KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostPropustaKa} /><span>{postotak(nacrt.vjerojatnostPropustaKa)}</span></label>
             <label>Prilika „Ne znam” po sudjelovanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostNeznanjaPoSudjelovanju} /><span>{postotak(nacrt.vjerojatnostNeznanjaPoSudjelovanju)}</span></label>
             <label>Prilika izostanka po sudjelovanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostIzostankaPoSudjelovanju} /><span>{postotak(nacrt.vjerojatnostIzostankaPoSudjelovanju)}</span></label>
             <label>Teški potez za „Ne znam” od<input type="number" min="1" max="100" bind:value={nacrt.rasponTeskogPotezaNeznanja[0]} /><input aria-label="Teški potez za ne znam do" type="number" min="1" max="100" bind:value={nacrt.rasponTeskogPotezaNeznanja[1]} /></label>

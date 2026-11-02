@@ -68,7 +68,7 @@ stagingu i produkciji.
 | `TRENING_OMOGUCEN`          | Zagrijavanje protiv „Računala” (ADR-017). Zadano `true`; `false` isključuje pokretanje novih treninga.                                                                                              |
 | `BOTOVI_DVOBOJ`, `BOTOVI_CETVEROBOJ` | Popuna javnog reda botovima po modu (30 s odnosno 20/30/40 s). Zadano `false`; uključiti tek nakon seeda identiteta i staging provjere. Isključivanje zaustavlja nove rezervacije. |
 | `MAKSIMALNO_AKTIVNIH_TRENINGA` | Gornja granica istodobnih treninga, odvojena od javnog limita partija. Zadano 100.                                                                                                             |
-| `BOT_NEZNANJE_PO_SUDJELOVANJU`, `BOT_IZOSTANAK_PO_SUDJELOVANJU`, `BOT_VJEROJATNOST_KA` | Politika v3: jedna prilika po sudjelovanju za neznanje (0.2) i javni izostanak (0.02), dobrovoljni KA 0.05. Stari ključevi po potezu više se ne čitaju. Vidi [botovi.md](../02-pravila-igre/botovi.md). |
+| `BOT_NEZNANJE_PO_SUDJELOVANJU`, `BOT_IZOSTANAK_PO_SUDJELOVANJU`, `BOT_VJEROJATNOST_KA`, `BOT_VJEROJATNOST_PROPUSTA_KA` | Politika v3: neznanje (0.2) i javni izostanak (0.02) po sudjelovanju; dobrovoljni KA 0.015; propust tuđeg KA 0.08. Stari ključevi po potezu više se ne čitaju. Vidi [botovi.md](../02-pravila-igre/botovi.md). |
 | `BOTOVI_BRZI_RAZVOJ` | Samo `development`: zadano ubrzava javnu popunu na 1 s i odgovor na 2 s. `false` vraća realni tempo i odstupanja pragova popune; ne ubrzava staging, produkciju ni `test`. |
 
 Javne bot identitete stvara `pnpm --filter posluzitelj seed-botova -- --broj=40` (idempotentno, najviše 100). Ponovno pokretanje ne mijenja postojeće botove ni ljudske račune. Bez seeda popuna reda ostaje bez botova iako je zastavica uključena.

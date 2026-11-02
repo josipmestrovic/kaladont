@@ -1,7 +1,11 @@
 import { and, eq } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { izmjenePostavkiBotova, postavkeBotova } from '../baza/shema.js';
-import { ShemaKonfiguracijeBota, type KonfiguracijaBota } from './konfiguracija-bota.js';
+import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from './konfiguracija-bota.js';
+
+function parsajSpremljenuKonfiguraciju(sirovo: unknown): KonfiguracijaBota {
+  return ShemaKonfiguracijeBota.parse({ ...ZADANA_KONFIGURACIJA_BOTA, ...(sirovo && typeof sirovo === 'object' ? sirovo : {}) });
+}
 
 export interface ZapisPostavkiBotova {
   revizija: number;
@@ -16,7 +20,7 @@ export async function ucitajTrajnePostavkeBotova(zadano: KonfiguracijaBota): Pro
   const [zapis] = await baza.select().from(postavkeBotova).where(eq(postavkeBotova.id, 1));
   return zapis ? {
     revizija: zapis.revizija,
-    konfiguracija: ShemaKonfiguracijeBota.parse(zapis.konfiguracija),
+    konfiguracija: parsajSpremljenuKonfiguraciju(zapis.konfiguracija),
     azurirano: zapis.azurirano.toISOString(),
     azuriraoId: zapis.azuriraoId,
   } : { revizija: 0, konfiguracija: ShemaKonfiguracijeBota.parse(zadano), azurirano: null, azuriraoId: null };

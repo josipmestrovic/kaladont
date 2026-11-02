@@ -25,7 +25,7 @@ Centralni frontend helper `apiUrl()` dodaje `/api` samo poslovnim pozivima. Sock
 
 Sve rute zahtijevaju admin sesiju (401 bez nje, 403 za običnog igrača) i koriste `Cache-Control: no-store`. Pregled čita memoriju procesa; ponovno pokretanje briše runtime podatke, ne trajnu konfiguraciju. Završena igra zadržana za prikaz spremljenih rezultata nije aktivno zauzeće bota.
 
-Jednokratna zamjena fonda ima CLI samo za održavanje: `pnpm --filter posluzitelj zamijeni-fond-botova` ispisuje read-only preview s postojećim i ciljnim ključevima; `-- --primijeni=DA` primjenjuje transakciju. Apply odbija produkciju, uključene javne popune i spremljene aktivne partije. Operater mora dodatno zaustaviti poslužitelj i provjeriti da nema memorijskih rezervacija prije applya; ne pokreće se automatski.
+Jednokratna zamjena fonda ima CLI samo za održavanje: `pnpm --filter posluzitelj zamijeni-fond-botova` ispisuje read-only preview s postojećim i ciljnim ključevima; `-- --primijeni=DA --posluzitelj-zaustavljen=DA` primjenjuje transakciju. U produkciji treba i `--odrzavanje-produkcije=DA`. Apply odbija uključene javne popune, uključen trening i spremljene aktivne partije. Operater mora zaustaviti poslužitelj prije applya; ne pokreće se automatski.
 
 ## Vremenske ljestvice
 
