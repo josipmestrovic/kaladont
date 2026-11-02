@@ -1132,7 +1132,7 @@ describe('motor partije - otvarač runde nakon eliminacije', () => {
       let potrosene = new Set(await grupeRijeci(runda.rijec));
       let mrtvaRijec: string | null = null;
       let autorId: string | null = null;
-      let trenutnaRunda = runda.runda;
+      const trenutnaRunda = runda.runda;
 
       for (let pokusaj = 0; pokusaj < 10 && !mrtvaRijec; pokusaj += 1) {
         const naPotezu = igraci.find((igrac) => igrac.token === naPotezuId)!;
