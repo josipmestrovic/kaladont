@@ -200,7 +200,8 @@ export class SimulatorMijesanihBotova {
   }
 
   uzorak(): UzorakBotova {
-    if (!this.planiranoZatvaranje && !this.signalPrekida?.aborted) {
+    // Za vrijeme dovrsiPartije/zatvaranja botovi smiju stajati u redu; 60 s detekcija vrijedi samo tijekom aktivnog pokusa.
+    if (!this.planiranoZatvaranje && !this.zavrsavanjePokusa && !this.signalPrekida?.aborted) {
       const sada = performance.now();
       const cekaURedu = [...this.botovi].find((bot) => bot.stanje === 'red' && sada - bot.cekaOdMs > 60_000);
       const neaktivnaPartija = [...this.partije.values()].find((partija) => partija.zavrsenoU === null && sada - partija.zadnjiDogadajMs > 60_000);

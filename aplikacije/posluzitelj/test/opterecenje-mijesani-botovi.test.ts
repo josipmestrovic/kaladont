@@ -131,6 +131,28 @@ describe('potvrda ulaska virtualnog igrača u javni red', () => {
     }
   });
 
+  it('za vrijeme dovrsiPartije ne lažno prekida botove koji čekaju u redu', async () => {
+    const sat = vi.spyOn(performance, 'now').mockReturnValue(1_000);
+    odgovor = 'potvrda';
+    const prekid = new AbortController();
+    const prekini = vi.fn(() => prekid.abort());
+    const simulator = new SimulatorMijesanihBotova({
+      adresa: 'http://localhost:3000', timeoutMs: 50,
+      cekanjePotezaMinMs: 1, cekanjePotezaMaksMs: 1, maksPotezaPoPartiji: 1,
+    }, rjecnik, prekini);
+    try {
+      await simulator.pokreniGrupu(izradiGrupuBotova('dvoboj'), prekid.signal);
+      await expect(simulator.dovrsiPartije(50, prekid.signal)).resolves.toBeUndefined();
+      sat.mockReturnValue(62_001);
+      expect(simulator.uzorak().aktivnePartije).toBe(0);
+      expect(prekini).not.toHaveBeenCalled();
+      expect(prekid.signal.aborted).toBe(false);
+    } finally {
+      sat.mockRestore();
+      await simulator.zatvori();
+    }
+  });
+
   it.each([
     new Error('Unexpected server response: 403'),
     { error: new Error('Unexpected server response: 403') },
