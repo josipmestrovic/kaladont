@@ -156,8 +156,8 @@ test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomican
   await page.goto('/pravila-kaladonta?tema=bodovi');
   const rangovi = page.locator('.tablica-rangova tbody tr');
   await expect(rangovi).toHaveCount(10);
-  await expect(rangovi.first().locator('td').last()).toContainText('manje od 30 %');
-  await expect(rangovi.last().locator('td').last()).toContainText('89 % ili više');
+  await expect(rangovi.first().locator('td').last()).toContainText('< 0,30');
+  await expect(rangovi.last().locator('td').last()).toContainText('> 0,89');
   await expect(rangovi.first().locator('.rang-uzorak')).toHaveCSS('border-top-width', '4px');
 
   await page.setViewportSize({ width: 1000, height: 760 });
@@ -204,7 +204,7 @@ test('dvostupčana statistika rječnika stane na uski mobitel', async ({ page })
     }),
   );
   await page.setViewportSize({ width: 320, height: 760 });
-  await page.goto('/pravila-kaladonta?tema=kako-igrati');
+  await page.goto('/o-igri');
   const tablica = page.getByRole('region', { name: 'Broj riječi po vrsti' }).getByRole('table');
   await expect(
     tablica.getByRole('rowheader', { name: 'Ukupno jedinstvenih oblika' }),

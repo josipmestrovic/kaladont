@@ -113,7 +113,7 @@
     </div>
   {:else}
     <h1 aria-live="polite">Pripremamo dvoboj protiv računala…</h1>
-    <p class="napomena">Ovo je trening. Rezultat se ne bilježi i ne utječe na tvoju statistiku, dostignuća ni formu.</p>
+    <p class="napomena">Ovo je trening. Ne bilježi se i ne mijenja statistiku, rang, XP ni formu. Registriranim igračima pobjeda broji dostignuće Zagrijan.</p>
     <a href="/" class="sporedni-gumb">Odustani</a>
   {/if}
 

@@ -36,7 +36,7 @@ if (brojVus > (lokalniSmoke ? 3 : 3_000) ||
 const stranice = [
   { putanja: '/', udio: 60 },
   { putanja: '/ljestvice', udio: 20 },
-  { putanja: '/novosti', udio: 10 },
+  { putanja: '/o-igri', udio: 10 },
   { putanja: '/pravila-kaladonta?tema=pravila', udio: 10 },
 ];
 

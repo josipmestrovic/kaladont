@@ -95,8 +95,8 @@
 
   <footer class="landing-footer">
     <nav aria-label="Dodatne poveznice">
-      <a href="/novosti">
-        <span>Što je novo?</span>
+      <a href="/o-igri">
+        <span>O igri</span>
       </a>
       <a href="/povratne-informacije">
         <span>Pomozi poboljšati igru</span>
@@ -150,7 +150,7 @@
             <span><strong>Pravila privatnosti</strong><small>Koje podatke koristimo, zašto i koliko dugo.</small></span>
           </a>
           <a href="/o-igri" class="modal-opcija pravna-opcija">
-            <span><strong>O igri i licence</strong><small>Izvori rječnika, avatara i licence korištenih materijala.</small></span>
+            <span><strong>O igri i licence</strong><small>Pregled igre, izvori rječnika, avatara i licence korištenih materijala.</small></span>
           </a>
         </div>
       {/if}

@@ -26,7 +26,7 @@
         <a class="sporedna-akcija" href="/profil">Vidjeti svoj profil</a>
         <a class="sporedna-akcija" href="/postavke">Otvoriti postavke</a>
         <a class="sporedna-akcija" href="/ljestvice">Pogledati ljestvice</a>
-        <a class="sporedna-akcija" href="/novosti">Vidjeti što je novo u igri</a>
+        <a class="sporedna-akcija" href="/o-igri">Saznaj više o igri</a>
       </div>
     </section>
   </main>

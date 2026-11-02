@@ -24,7 +24,7 @@
   <ul>
     {#each obracun.stavke as stavka (`${stavka.vrsta}-${stavka.naziv}`)}
       <li>
-        <span>{stavka.naziv.startsWith('Streak ') ? `Prihvaćene riječi za redom: ${stavka.kolicina}` : stavka.naziv}{stavka.naziv.startsWith('Streak ') === false && stavka.poStavci !== null ? ` ${stavka.kolicina} × ${stavka.poStavci}` : ''}</span>
+        <span>{stavka.naziv}{stavka.poStavci !== null ? ` ${stavka.kolicina} × ${stavka.poStavci}` : ''}</span>
         <strong>+{stavka.iskustvo}</strong>
       </li>
     {/each}

@@ -15,8 +15,8 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 
 - Traka je potpuno transparentna, bez donjeg obruba i bez sjene, tako da se vizualno stapa s pozadinom stranice.
 - Naslovnica nema zajednički header ni avatar, neovisno o širini zaslona ili vrsti korisnika.
-- **Lijevo na svim drugim stranicama s headerom:** klikabilna narančasta povratna strelica s tekstom „Nazad”, koja koristi povijest preglednika. Ako prethodna ruta nije root `/` ili nije poznata, uz nju se prikazuje `GiFastBackwardButton` s tekstom „Početna” i poveznicom na `/`. Obje akcije preslikavaju uzorak „Što je novo?”: ikona 59 × 59 px, ukupna visina 80 px te ista veličina i težina fonta na desktopu i mobitelu.
-- **Desno:** avatar korisnika ili gosta i njegov nadimak u horizontalnom rasporedu na desktopu i mobitelu; klik vodi na `/profil`. Avatar je povećan tako da njegova visina odgovara ukupnoj visini notebook ikone i teksta „Što je novo?”. Dugi nadimak skraćuje se elipsom umjesto širenja headera.
+- **Lijevo na svim drugim stranicama s headerom:** klikabilna narančasta povratna strelica s tekstom „Nazad”, koja koristi povijest preglednika. Ako prethodna ruta nije root `/` ili nije poznata, uz nju se prikazuje `GiFastBackwardButton` s tekstom „Početna” i poveznicom na `/`. Obje akcije preslikavaju uzorak „O igri”: ikona 59 × 59 px, ukupna visina 80 px te ista veličina i težina fonta na desktopu i mobitelu.
+- **Desno:** avatar korisnika ili gosta i njegov nadimak u horizontalnom rasporedu na desktopu i mobitelu; klik vodi na `/profil`. Avatar je povećan tako da njegova visina odgovara ukupnoj visini notebook ikone i teksta „O igri”. Dugi nadimak skraćuje se elipsom umjesto širenja headera.
 - **Admin:** ispod glavnog headera vidi dodatnu navigaciju sa svim admin površinama: **Rječnik**, **Prijave** i **Mišljenja korisnika**. Ta navigacija je samo pogodnost; server zasebno štiti svaku admin rutu.
 
 ## Globalne obavijesti
@@ -36,7 +36,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Svi korisnici vide **Postavke** (`/postavke`, uz preusmjeravanje na `/profil?tab=postavke#postavke`); promjena teme dostupna je isključivo ondje. Registrirani korisnik dodatno vidi blago narančastu akciju **Odjavi se**. Gost vidi **Prijavi se** i **Registriraj se**. Editor avatara (`/profil/avatar`) dostupan je i gostima.
 - **Igraj** otvara modal sa slijedom: **Dvoboj** (`/red?mod=dva_igraca`, opis „2 igrača”), **Četveroboj** (`/red?mod=cetiri_igraca`, opis „4 igrača”), **Zagrijavanje** (`/zagrijavanje`, podnaslov „Igraj dvoboj protiv računala.”, ikona `19-vatra.png`) i **Privatna soba** (`/soba/kreiraj`). Modal zamućuje pozadinu.
 - **Pravila** vode na `/pravila`, a **Ljestvice** na `/ljestvice`.
-- Footer na dnu naslovnice sadrži poveznice **Što je novo?** (`/novosti`) i **Pomozi poboljšati igru** (`/povratne-informacije`) te gumb **Uvjeti i privatnost** koji otvara modal bez ikona i nadnaslova, s naslovom „Što te zanima?” i opcijama **Uvjeti korištenja** (`/uvjeti`), **Pravila privatnosti** (`/privatnost`) i **O igri i licence** (`/o-igri`). Poveznice su vidljive gostima i prijavljenim korisnicima. Desktop ima navigaciju lijevo i „© 2026 Kaladont. Sva prava pridržana.” desno u istom retku; mobitel ima copyright odmah ispod navigacije. Postojeći razmaci na niskim mobilnim zaslonima sažimaju se tako da naslovnica ne dobije dodatno skrolanje.
+- Footer na dnu naslovnice sadrži poveznice **O igri** (`/o-igri`) i **Pomozi poboljšati igru** (`/povratne-informacije`) te gumb **Uvjeti i privatnost** koji otvara modal bez ikona i nadnaslova, s naslovom „Što te zanima?” i opcijama **Uvjeti korištenja** (`/uvjeti`), **Pravila privatnosti** (`/privatnost`) i **O igri i licence** (`/o-igri`). Poveznice su vidljive gostima i prijavljenim korisnicima. Desktop ima navigaciju lijevo i „© 2026 Kaladont. Sva prava pridržana.” desno u istom retku; mobitel ima copyright odmah ispod navigacije. Postojeći razmaci na niskim mobilnim zaslonima sažimaju se tako da naslovnica ne dobije dodatno skrolanje.
 - Font za disleksiju i čitanje naglas nalaze se u **Postavkama** za goste i registrirane korisnike. Font mijenja tipografiju cijelog sučelja; čitanje naglas izgovara novu riječ na stolu Web Speech API-jem uz `hr-HR`. Postavke se spremaju lokalno u pregledniku. Uključeno čitanje naglas prikazuje globalnu obavijest koju korisnik može potvrditi.
 - Pomoć (`/pomoc?tema=pristupacnost`) objašnjava govornu mogućnost i vodi na upute za Android, iPhone/iPad, Windows, Mac i Linux. Ista tema opisuje disleksiju i moguću vrijednost jezične igre bez terapijskih tvrdnji.
 - Zaseban red poveznica Prijavi se / Registriraj se ispod navigacije ne prikazuje se; te su akcije dio jedinstvene navigacije gosta.
@@ -120,7 +120,7 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 - Desetsekundni sažetak prije završnog poretka prikazuje se samo prvi put. Ako igrač nakon prikazanih rezultata ode na drugu stranicu i vrati se browser poviješću, ista partija odmah prikazuje završni poredak bez ponovnog odbrojavanja i zvuka završetka.
 - Prijava riječi je zatvoreni accordion; nakon otvaranja prikazuju se odigrane riječi i gumb „Prijavi riječ”.
 - Tipke: **Igraj opet** (u red), **Povratak**, a gostu i registracija za trajno čuvanje statistike.
-- **Kraj treninga** (kontekst `trening`): naslov „Kraj treninga”, obavijest „Ovo je trening. Rezultat se ne bilježi i ne utječe na tvoju statistiku, dostignuća ni formu.”, poredak s oznakom Pobjeda/Poraz bez bodova; nema ocjene igre, XP-a, forme, DNK-a, kolekcije, dostignuća ni poruke za goste. Tipke: **Igraj novi trening** (`/zagrijavanje`) i **Povratak na odabir igre**.
+- **Kraj treninga** (kontekst `trening`): naslov „Kraj treninga”, obavijest da se trening ne bilježi kao partija i ne utječe na bodove, XP, rang, formu ni natjecateljsku statistiku. Registriranom pobjedniku može se prikazati novo dostignuće Zagrijan. Poredak ima oznaku Pobjeda/Poraz bez bodova; nema ocjene igre, XP-a, forme, DNK-a ni kolekcije. Tipke: **Igraj novi trening** (`/zagrijavanje`) i **Povratak na odabir igre**.
 
 ## 5. Prijava riječi (`/partija/:id/povijest`)
 
@@ -132,7 +132,7 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 
 - Registracija: višekoračni tijek (1. Korak: nadimak; 2. Korak: email, lozinka, odabir avatara). Kod email polja diskretna napomena: „Na tvoju email adresu nećemo slati nikakve obavijesti, isključivo je koristimo kako bi ti omogućili pristup računu ako zaboraviš lozinku."
 - Prijava: jednostavna prijava u dva odvojena retka (Email i Lozinka) s velikim zelenim gumbom.
-- Nakon uspješne registracije korisnik dolazi na javnu stranicu `/zahvala` s čestitkom, nenametljivim konfetima i izborom sljedeće akcije: Dvoboj, Četveroboj, privatna soba, pravila, profil, postavke, ljestvice ili zasebna stranica novosti `/novosti`.
+- Nakon uspješne registracije korisnik dolazi na javnu stranicu `/zahvala` s čestitkom, nenametljivim konfetima i izborom sljedeće akcije: Dvoboj, Četveroboj, privatna soba, pravila, profil, postavke, ljestvice ili stranica **O igri** (`/o-igri`).
 
 ## 7. Profil (`/profil`) — vlastiti i javni
 
@@ -180,11 +180,11 @@ Jedna stranica s odabirima u URL-u (Natrag/Naprijed vraća odabir). Pravila pore
 
 ## 10. Statične stranice
 
-- `/pomoc?tema=kako-igrati|pravila|nacini|bodovi|napredak|dnk|pristupacnost|pitanja` — pomoć kroz teme od prvog poteza do pravila, brojnosti rječnika, napretka, zasebnog vodiča za DNK i pristupačnost te praktičnog FAQ-a. Broj oblika po vrsti i jedinstveni ukupni broj dolaze iz `/api/rjecnik/statistika`; zbroj kategorija može biti veći od ukupnog broja jer jedan oblik može pripadati više vrsta. DNK vodič objašnjava što mjeri svaka os i što utječe na njezin rast. `/pravila` i `/o-igri` ostaju kompatibilni redirecti na odgovarajući sadržaj.
-- Stranica „O igri i licence” (`/o-igri`) prikazuje **atribuciju hrLexa** prema [izvor-i-licenca.md](../04-rjecnik/izvor-i-licenca.md#tekst-atribucije-za-stranicu-o-igri), CC BY-SA 4.0 za izvedeni rječnik, atribuciju Micaha Laniera i CC BY 4.0 za tuđe dijelove avatara, statistiku rječnika i kontakt. Vlastite PNG ikone ne nose zastarjelu atribuciju zamijenjenog paketa. Lucide/Feather licencne obavijesti dostupne su na `/licence/lucide.txt`. Navod o pridržanim pravima izvornog koda i vlastitih ilustracija ne mijenja te licence. Ruta ne preusmjerava na Help hub.
+- `/pomoc?tema=kako-igrati|pravila|nacini|bodovi|napredak|dnk|pristupacnost|pitanja` — pomoć kroz teme od prvog poteza do pravila, brojnosti rječnika, napretka, zasebnog vodiča za DNK i pristupačnost te praktičnog FAQ-a. Broj oblika po vrsti i jedinstveni ukupni broj dolaze iz `/api/rjecnik/statistika`; zbroj kategorija može biti veći od ukupnog broja jer jedan oblik može pripadati više vrsta. DNK vodič objašnjava što mjeri svaka os i što utječe na njezin rast. `/pravila` ostaje kompatibilni redirect na pravila.
+- Stranica **O igri** (`/o-igri`) prikazuje prijateljski overview igre (načini, pametan rječnik, bodovi, rangovi, ispadanje, napredak) te ispod toga **atribuciju hrLexa** prema [izvor-i-licenca.md](../04-rjecnik/izvor-i-licenca.md#tekst-atribucije-za-stranicu-o-igri), CC BY-SA 4.0 za izvedeni rječnik, atribuciju Micaha Laniera i CC BY 4.0 za tuđe dijelove avatara, statistiku rječnika i kontakt. Vlastite PNG ikone ne nose zastarjelu atribuciju zamijenjenog paketa. Lucide/Feather licencne obavijesti dostupne su na `/licence/lucide.txt`. Navod o pridržanim pravima izvornog koda i vlastitih ilustracija ne mijenja te licence. Ruta ne preusmjerava na Help hub. Stara adresa `/novosti` preusmjerava ovamo.
 - `/privatnost`, `/uvjeti` — pravni minimum (vidi [sigurnost-i-privatnost.md](../07-operacije/sigurnost-i-privatnost.md)).
-- `/zahvala` — javna zahvalna stranica nakon registracije s navigacijom prema glavnim akcijama i stranici `/novosti`.
-- `/novosti` — javna stranica s izdanjima, novim značajkama, prijedlozima za testiranje i poznatim ograničenjima.
+- `/zahvala` — javna zahvalna stranica nakon registracije s navigacijom prema glavnim akcijama i stranici `/o-igri`.
+- `/novosti` — preusmjerava na `/o-igri`.
 
 ## Responzivnost
 

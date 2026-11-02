@@ -29,7 +29,7 @@ export async function dodajRijec(
 
   const svi = grafemi(rijec);
   if (svi.length < 2) {
-    throw new NevaljanaRijecError(`Riječ mora imati barem 2 grafema: "${rijecUlaz}"`);
+    throw new NevaljanaRijecError(`Riječ mora imati barem 2 slova: "${rijecUlaz}"`);
   }
   const prvaDva = svi.slice(0, 2).join('');
   const zadnjaDva = svi.slice(-2).join('');

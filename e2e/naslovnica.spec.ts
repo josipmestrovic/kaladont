@@ -41,8 +41,8 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   await expect(page.locator('.ilustracija')).toHaveCount(0);
 
   const footer = page.locator('.landing-footer');
-  const novosti = footer.getByRole('link', { name: 'Što je novo?' });
-  await expect(novosti).toHaveAttribute('href', '/novosti');
+  const oIgri = footer.getByRole('link', { name: 'O igri' });
+  await expect(oIgri).toHaveAttribute('href', '/o-igri');
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toHaveAttribute('href', '/povratne-informacije');
   await expect(footer.getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
 
@@ -68,9 +68,9 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   await page.keyboard.press('Escape');
   await expect(dijalog).toBeHidden();
 
-  await novosti.click();
-  await expect(page).toHaveURL('/novosti');
-  await expect(page.getByRole('heading', { name: 'Što je novo' })).toBeVisible();
+  await oIgri.click();
+  await expect(page).toHaveURL('/o-igri');
+  await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
 });
 
 test('mobilna naslovnica skriva header i prikazuje poveznice u footeru', async ({ page }) => {
@@ -81,7 +81,7 @@ test('mobilna naslovnica skriva header i prikazuje poveznice u footeru', async (
   await expect(page.locator('.header')).toHaveCount(0);
   await expect(page.locator('.avatar')).toHaveCount(0);
   const footer = page.locator('.landing-footer');
-  await expect(footer.getByRole('link', { name: 'Što je novo?' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'O igri' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toBeVisible();
   await expect(footer.getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
 
@@ -139,7 +139,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await expect(povratak).toBeVisible();
   await expect(povratak).toHaveCSS('height', '80px');
   await expect(page.getByRole('link', { name: 'Početna' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Što je novo?' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'O igri' })).toHaveCount(0);
   await expect(povratak.locator('img')).toHaveAttribute('src', '/ikone/03-nazad.png');
 
   await povratak.click();

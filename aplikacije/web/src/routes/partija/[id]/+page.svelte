@@ -1090,7 +1090,7 @@
       {#if stanje.kraj.mojNiz}
         <p>Niz pobjeda: <strong>{stanje.kraj.mojNiz.poslije}</strong> · Najbolji niz: <strong>{stanje.kraj.mojNiz.najbolji}</strong></p>
         {#if stanje.kraj.mojNiz.poslije > 1}
-          <p>Sljedeća pobjeda donosi <strong>+{bonusPobjednickogNiza(stanje.kraj.mojNiz.poslije + 1, modNiza)}% XP</strong>.</p>
+          <p>Sljedeća pobjeda donosi <strong>+{bonusPobjednickogNiza(stanje.kraj.mojNiz.poslije + 1, modNiza)} % XP</strong>.</p>
         {/if}
       {/if}
       {#if stanje.kraj.mojaForma && stanje.kraj.mojaForma.rezultati.length > 0}

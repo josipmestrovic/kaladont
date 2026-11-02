@@ -51,7 +51,9 @@ describe('iskustvo', () => {
     expect(mnoziteljZaStreak(6)).toBe(1.6);
     expect(obracun.brutoIskustvo).toBe(256);
     expect(obracun.osvojenoIskustvo).toBe(256);
-    expect(obracun.stavke.at(-1)?.iskustvo).toBe(96);
+    expect(obracun.stavke.at(-1)).toEqual(
+      expect.objectContaining({ naziv: 'Prihvaćene riječi za redom +60 %', iskustvo: 96 }),
+    );
     expect(ISKUSTVO_KALADONT).toBe(100);
 
     const naMaksimumu = izracunajObracunIskustva(MAKSIMALNO_ISKUSTVO - 10, [{ vrsta: 'kaladont', naziv: 'Kaladont', kolicina: 1, poStavci: 100, iskustvo: 100 }], 1);

@@ -238,8 +238,8 @@
             <label>Srednja frekvencija<input type="number" min="0" max="2000000000" bind:value={nacrt.pragFrekvencije.srednja} /></label>
             <label>Udio imenica<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.udioImenica} /><span>{postotak(nacrt.udioImenica)}</span></label>
             <label>Skala log frekvencije<input type="number" min="0" max="10" step="0.1" bind:value={nacrt.skalaLogFrekvencije} /></label>
-            <label>Ponder duljine po grafemu<input type="number" min="0" max="2" step="0.01" bind:value={nacrt.ponderDuljinePoGrafemu} /></label>
-            <label>Korekcija duljine po grafemu<input type="number" min="0" max="0.02" step="0.001" bind:value={nacrt.korekcijaDuljinePoGrafemu} /></label>
+            <label>Ponder duljine po slovu<input type="number" min="0" max="2" step="0.01" bind:value={nacrt.ponderDuljinePoGrafemu} /></label>
+            <label>Korekcija duljine po slovu<input type="number" min="0" max="0.02" step="0.001" bind:value={nacrt.korekcijaDuljinePoGrafemu} /></label>
             <label>Najveća korekcija duljine<input type="number" min="0" max="0.15" step="0.01" bind:value={nacrt.maksimalnaKorekcijaDuljine} /></label>
             <label>Korekcija rijetke riječi<input type="number" min="0" max="0.15" step="0.01" bind:value={nacrt.korekcijaRijetkosti} /></label>
             <label>Korekcija teškog prefiksa<input type="number" min="0" max="0.15" step="0.005" bind:value={nacrt.korekcijaTeskogPrefiksa} /></label>

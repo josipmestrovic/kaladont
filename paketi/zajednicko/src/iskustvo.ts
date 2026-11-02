@@ -123,10 +123,11 @@ export function izracunajObracunIskustva(
   const bonusIskustva = Math.round(brutoBezOcjene * bonusOcjenaIgre / 100);
   const brutoIskustvo = brutoBezOcjene + bonusIskustva;
   const osvojenoIskustvo = Math.max(0, Math.min(brutoIskustvo, MAKSIMALNO_ISKUSTVO - prije.ukupno));
-  const bonusStreaka = brutoIskustvo - subtotal;
+  const bonusStreaka = brutoBezOcjene - subtotal;
+  const postotakStreaka = Math.round((mnoziteljStreaka - 1) * 100);
   const stavke: StavkaIskustva[] = bonusStreaka > 0
-    ? [...stavkeBezStreaka, { vrsta: 'streak', naziv: `Streak ${najboljiStreak} x${mnoziteljStreaka.toFixed(2)}`, kolicina: najboljiStreak, poStavci: null, iskustvo: bonusStreaka }]
+    ? [...stavkeBezStreaka, { vrsta: 'streak', naziv: `Prihvaćene riječi za redom +${postotakStreaka} %`, kolicina: najboljiStreak, poStavci: null, iskustvo: bonusStreaka }]
     : [...stavkeBezStreaka];
-  if (bonusIskustva > 0) stavke.push({ vrsta: 'streak', naziv: `Ocjena igre +${bonusOcjenaIgre}%`, kolicina: 1, poStavci: null, iskustvo: bonusIskustva });
+  if (bonusIskustva > 0) stavke.push({ vrsta: 'streak', naziv: `Ocjena igre +${bonusOcjenaIgre} %`, kolicina: 1, poStavci: null, iskustvo: bonusIskustva });
   return { prije, poslije: stanjeIskustva(prije.ukupno + osvojenoIskustvo), stavke, najboljiStreak, mnoziteljStreaka, brutoIskustvo, osvojenoIskustvo, bonusOcjenaIgre };
 }

@@ -62,9 +62,9 @@
   <div class="header-sadrzaj">
     {#if jeNaslovna}
       <div class="naslovne-akcije">
-        <a href="/novosti" class="novosti-link" aria-label="Što je novo?">
+        <a href="/o-igri" class="novosti-link" aria-label="O igri">
           <img class="header-ikona" src="/ikone/01-sto-je-novo.png" alt="" aria-hidden="true" />
-          <span>Što je novo?</span>
+          <span>O igri</span>
         </a>
         {#if profil && !jeGost}
           <a href="/povratne-informacije" class="novosti-link" aria-label="Pomozi poboljšati igru">

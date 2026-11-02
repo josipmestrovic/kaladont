@@ -1150,14 +1150,14 @@ export function stvoriUpraviteljPartija(
               if (!obracun) return null;
               const bonusNiza = agregat?.bonusPobjednickogNizaXp ?? 0;
               if (bonusNiza > 0) {
-                obracun.stavke.push({ vrsta: 'pobjednicki_niz', naziv: `Pobjednički niz +${agregat?.bonusPobjednickogNizaPostotak ?? 0}%`, kolicina: 1, poStavci: null, iskustvo: bonusNiza });
+                obracun.stavke.push({ vrsta: 'pobjednicki_niz', naziv: `Pobjednički niz +${agregat?.bonusPobjednickogNizaPostotak ?? 0} %`, kolicina: 1, poStavci: null, iskustvo: bonusNiza });
                 obracun.brutoIskustvo += bonusNiza;
                 obracun.osvojenoIskustvo = Math.min(obracun.osvojenoIskustvo + bonusNiza, MAKSIMALNO_ISKUSTVO - obracun.prije.ukupno);
               }
               const bonusPostotak = agregat?.bonusOcjenaIgre ?? 0;
               if (bonusPostotak > 0) {
                 const bonus = Math.round(obracun.osvojenoIskustvo * bonusPostotak / 100);
-                obracun.stavke.push({ vrsta: 'streak', naziv: `Ocjena igre +${bonusPostotak}%`, kolicina: 1, poStavci: null, iskustvo: bonus });
+                obracun.stavke.push({ vrsta: 'streak', naziv: `Ocjena igre +${bonusPostotak} %`, kolicina: 1, poStavci: null, iskustvo: bonus });
                 obracun.brutoIskustvo += bonus;
                 obracun.osvojenoIskustvo = Math.min(obracun.osvojenoIskustvo + bonus, MAKSIMALNO_ISKUSTVO - obracun.prije.ukupno);
               }

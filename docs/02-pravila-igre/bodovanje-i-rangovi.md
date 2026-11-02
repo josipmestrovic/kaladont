@@ -101,36 +101,36 @@ XP je trajni napredak, ali nije rezultat partije i ne mijenja izravno rang. Dodj
 | Događaj | XP |
 |---|---:|
 | Prihvaćena riječ | +5 |
-| Duga riječ, 10–11 grafema | dodatnih +10 |
-| Srednje duga riječ, 12–14 grafema | dodatnih +20 |
-| Jako duga riječ, najmanje 15 grafema | dodatnih +35 |
+| Duga riječ, 10–11 slova | dodatnih +10 |
+| Srednje duga riječ, 12–14 slova | dodatnih +20 |
+| Jako duga riječ, najmanje 15 slova | dodatnih +35 |
 | Rijetka riječ, frekvencija 10–99 | dodatnih +15 |
 | Srednje rijetka riječ, frekvencija 1–9 | dodatnih +30 |
-| Jako rijetka riječ, frekvencija 0 i najmanje 4 grafema | dodatnih +50 |
+| Jako rijetka riječ, frekvencija 0 i najmanje 4 slova | dodatnih +50 |
 | Izazvana eliminacija | +25 |
 | Pobjeda u javnoj partiji | +50 |
 | Kaladont / kalodont | zasebnih +100 |
 
-Povećanja za duljinu i rijetkost mogu se dobiti za istu riječ uz osnovni XP za prihvaćenu riječ. Duljina se računa grafemima: `nj`, `lj` i `dž` svaki su jedan grafem. Rijetkost ovisi o frekvenciji u rječniku. Kaladont donosi fiksnih +100 XP umjesto redovnih +5 XP i dodataka za duljinu ili rijetkost.
+Povećanja za duljinu i rijetkost mogu se dobiti za istu riječ uz osnovni XP za prihvaćenu riječ. Duljina se računa slovima: `nj`, `lj` i `dž` svaki su jedno slovo. Rijetkost ovisi o frekvenciji u rječniku. Kaladont donosi fiksnih +100 XP umjesto redovnih +5 XP i dodataka za duljinu ili rijetkost.
 
 XP za dugu ili rijetku riječ dobiva se pri njezinu prihvaćanju, neovisno o tome je li igrač ranije otključao leksemsku grupu. Trajna kolekcija riječi i dostignuća su zaseban napredak.
 
 ### Niz prihvaćenih riječi tijekom partije
 
-Ovaj se niz broji **tijekom jedne partije**. Svaka uzastopna prihvaćena riječ povećava niz, a odbijena riječ vraća ga na nulu. Najdulji niz u partiji određuje XP-množitelj:
+Ovaj se niz broji **tijekom jedne partije**. Svaka uzastopna prihvaćena riječ povećava niz, a odbijena riječ vraća ga na nulu. Najdulji niz u partiji određuje bonus iskustva:
 
-| Najdulji niz prihvaćenih riječi u partiji | XP-množitelj |
+| Najdulji niz prihvaćenih riječi u partiji | Bonus iskustva |
 |---:|---:|
-| 0–2 | ×1,00 |
-| 3 | ×1,10 |
-| 4 | ×1,25 |
-| 5 | ×1,40 |
-| 6 | ×1,60 |
-| 7 | ×1,75 |
-| 8 | ×1,90 |
-| 9 ili više | ×2,00 |
+| 0–2 | +0 % |
+| 3 | +10 % |
+| 4 | +25 % |
+| 5 | +40 % |
+| 6 | +60 % |
+| 7 | +75 % |
+| 8 | +90 % |
+| 9 ili više | +100 % |
 
-Množitelj se primjenjuje na zbroj osnovnih XP stavki u toj partiji. To nije isto što i niz pobjeda kroz više partija.
+Bonus se računa na zbroj osnovnih XP stavki u toj partiji. To nije isto što i niz pobjeda kroz više partija.
 
 ### Niz pobjeda kroz partije
 
@@ -185,12 +185,12 @@ Postojeće spremljene ocjene ne preračunavaju se. Prosjek igrača zato može sa
 ### Redoslijed obračuna XP-a i primjer
 
 1. Zbrajaju se XP stavke za prihvaćene riječi, njihovu duljinu i rijetkost, eliminacije, pobjedu i Kaladont.
-2. Zbroj osnovnih XP stavki množi se faktorom niza prihvaćenih riječi u toj partiji.
+2. Na zbroj osnovnih XP stavki dodaje se bonus niza prihvaćenih riječi u toj partiji.
 3. Ako je igrač osvojio javnu partiju, dodaje se bonus njegova niza pobjeda.
 4. Ako je igrač dobio ocjenu partije, dodaje se ocjeni pripadajući XP-bonus.
 5. Na kraju se primjenjuje ograničenje razine 100. Zato stvarno dodijeljeni XP može biti manji od obračunate sume.
 
-Primjer: osnovne XP stavke iznose 200 XP, faktor niza prihvaćenih riječi je ×1,00, riječ je o trećoj uzastopnoj pobjedi u Četveroboju (+20 %), a ocjena partije je pet zvjezdica (+20 %). Niz pobjeda dodaje 40 XP. Bonus ocjene zatim se računa na 240 XP i dodaje 48 XP. Prije ograničenja razine, igra ukupno donosi 288 XP.
+Primjer: osnovne XP stavke iznose 200 XP, bonus niza prihvaćenih riječi je +0 %, riječ je o trećoj uzastopnoj pobjedi u Četveroboju (+20 %), a ocjena partije je pet zvjezdica (+20 %). Niz pobjeda dodaje 40 XP. Bonus ocjene zatim se računa na 240 XP i dodaje 48 XP. Prije ograničenja razine, igra ukupno donosi 288 XP.
 
 Odbijena riječ prekida niz prihvaćenih riječi unutar partije; poraz prekida javni niz pobjeda u tom modu. To su različiti nizovi, a oba su odvojena od ocjene partije. Igrač koji dobrovoljno napusti partiju ili se ne vrati nakon prekida veze ne dobiva XP za tu partiju.
 
@@ -220,7 +220,7 @@ Vatra ovisi o trenutačnom javnom nizu pobjeda, a ne o formi. U Četveroboju raz
 
 ## Dostignuća
 
-Registrirani igrač ima 10 dostignuća s po pet razina: ukupno **50 razina, odnosno zvjezdica, za otključavanje**. Razina raste kada napredak dosegne sljedeći prag; u jednoj partiji može se prijeći više pragova.
+Registrirani igrač ima 11 dostignuća s po pet razina: ukupno **55 razina, odnosno zvjezdica, za otključavanje**. Razina raste kada napredak dosegne sljedeći prag; u jednoj partiji može se prijeći više pragova.
 
 | Dostignuće | Što se broji | Pragovi za razine 1–5 |
 |---|---|---|
@@ -234,11 +234,12 @@ Registrirani igrač ima 10 dostignuća s po pet razina: ukupno **50 razina, odno
 | Slijepa ulica | Eliminacije izazvane mrtvim slovima | 1, 5, 15, 40, 100 |
 | Završna riječ | Pobjede u javnim partijama | 1, 5, 20, 50, 100 |
 | Glas zajednice | Poslane povratne informacije | 1, 2, 3, 4, 5 |
+| Zagrijan | Pobjede u Zagrijavanju protiv Računala, samo za registriranog igrača | 1, 5, 20, 50, 100 |
 
-Privatnim partijama mogu napredovati i otključati se samo **Rijetkolovac**, **Dugometraš** i **Jezik u plamenu**. Ostala dostignuća zahtijevaju javnu partiju ili javno stečenu razinu XP-a. Dostignuća ne mijenjaju bodove ni rang.
+Privatnim partijama mogu napredovati i otključati se samo **Rijetkolovac**, **Dugometraš** i **Jezik u plamenu**. **Zagrijan** napreduje samo pobjedom u Zagrijavanju. Ostala dostignuća zahtijevaju javnu partiju ili javno stečenu razinu XP-a. Dostignuća ne mijenjaju bodove ni rang.
 
 ## Gosti i prijenos napretka na račun
 
 Gosti igraju po istim pravilima riječi i bodovanja, ali nemaju javni rang ni javni profil. Njihova statistika povezana je s gostujućim identitetom na tom uređaju; registracijom se taj identitet i napredak pretvaraju u račun. Registrirani igrač može otvoriti profil i statistiku na drugim uređajima.
 
-Detalji pravila riječi i tijeka partije nalaze se u [Pravila igre](pravila-igre.md). Jezični primjeri i iznimke grafema nalaze se u [Digrafi i grafemi](digrafi-i-grafemi.md).
+Detalji pravila riječi i tijeka partije nalaze se u [Pravila igre](pravila-igre.md). Jezični primjeri i iznimke slova nalaze se u [Digrafi i slova](digrafi-i-grafemi.md).
