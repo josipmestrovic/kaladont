@@ -7,11 +7,14 @@ import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA } from '../bot/konfig
 
 async function glavno(): Promise<void> {
   const primijeni = process.argv.includes('--primijeni=DA');
-  if (konfiguracija.NODE_ENV === 'production') throw new Error('Zamjena botova nije dopuštena u produkciji.');
+  const odravanjeProdukcije = process.argv.includes('--odrzavanje-produkcije=DA');
+  if (konfiguracija.NODE_ENV === 'production' && !odrzavanjeProdukcije) {
+    throw new Error('Zamjena botova u produkciji traži --odrzavanje-produkcije=DA (samo tijekom održavanja).');
+  }
   const pregled = await pregledZamjeneFondaBotova();
   console.log(`Pregled fonda: ${JSON.stringify(pregled)}`);
   if (!primijeni) {
-    console.log('Samo pregled. Za primjenu pokreni ponovno s --primijeni=DA tijekom održavanja, uz zaustavljen poslužitelj.');
+    console.log('Samo pregled. Za primjenu: --primijeni=DA --posluzitelj-zaustavljen=DA (u produkciji i --odrzavanje-produkcije=DA).');
     return;
   }
   if (konfiguracija.BOTOVI_DVOBOJ === 'true' || konfiguracija.BOTOVI_CETVEROBOJ === 'true') {
@@ -26,7 +29,9 @@ async function glavno(): Promise<void> {
     .where(eq(partije.status, 'u_tijeku'));
   if (Number(aktivnePartije?.broj ?? 0) > 0) throw new Error('Postoje spremljene aktivne partije. Pričekaj završetak i ponovi pregled.');
   const [trajni] = await baza.select({ konfiguracija: postavkeBotova.konfiguracija }).from(postavkeBotova).where(eq(postavkeBotova.id, 1));
-  const aktivniLimit = trajni ? ShemaKonfiguracijeBota.parse(trajni.konfiguracija).maksimalnoAktivnihBotova : ZADANA_KONFIGURACIJA_BOTA.maksimalnoAktivnihBotova;
+  const aktivniLimit = trajni
+    ? ShemaKonfiguracijeBota.parse({ ...ZADANA_KONFIGURACIJA_BOTA, ...(trajni.konfiguracija as object) }).maksimalnoAktivnihBotova
+    : ZADANA_KONFIGURACIJA_BOTA.maksimalnoAktivnihBotova;
   const rezultat = await zamijeniFondBotova(null, aktivniLimit);
   console.log(`Zamjena završena: ${JSON.stringify(rezultat)}`);
 }

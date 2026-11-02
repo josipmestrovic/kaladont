@@ -70,7 +70,7 @@
     eliminacijeBotova: { nacinIspadanja: string; broj: number }[];
     zivo: {
       fond: { ukupno: number; slobodni: number; rezervirani: number; uPartiji: number; iscrpljenja: number };
-      bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number; dobrovoljniKa: number; prisilniKa: number };
+      bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number; dobrovoljniKa: number; prisilniKa: number; propustPrimljenogKa: number };
       trening: { aktivni: number; zapoceti: number; odbijeni: number; neuspjeli: number };
       zastavice: { trening: boolean; botoviDvoboj: boolean; botoviCetveroboj: boolean };
     } | null;
@@ -194,7 +194,7 @@
         <dt>Fond botova</dt>
         <dd>{statistika.zivo.fond.slobodni} slobodnih / {statistika.zivo.fond.rezervirani} rezerviranih / {statistika.zivo.fond.uPartiji} u partiji od {statistika.zivo.fond.ukupno}; iscrpljenja od pokretanja: {statistika.zivo.fond.iscrpljenja}</dd>
         <dt>Botovi od pokretanja</dt>
-        <dd>{statistika.zivo.bot.odigranihRijeci} riječi · {statistika.zivo.bot.dobrovoljniKa} dobrovoljnih KA · {statistika.zivo.bot.prisilniKa} prisilnih KA · {statistika.zivo.bot.namjernihPropusta} namjernih propusta · {statistika.zivo.bot.bezRijeci} bez riječi · {statistika.zivo.bot.zastarjelo} zastarjelih · {statistika.zivo.bot.tehnickeGreske} tehničkih grešaka</dd>
+        <dd>{statistika.zivo.bot.odigranihRijeci} riječi · {statistika.zivo.bot.dobrovoljniKa} dobrovoljnih KA · {statistika.zivo.bot.prisilniKa} prisilnih KA · {statistika.zivo.bot.propustPrimljenogKa} propusta tuđeg KA · {statistika.zivo.bot.namjernihPropusta} namjernih propusta · {statistika.zivo.bot.bezRijeci} bez riječi · {statistika.zivo.bot.zastarjelo} zastarjelih · {statistika.zivo.bot.tehnickeGreske} tehničkih grešaka</dd>
         <dt>Zagrijavanje</dt>
         <dd>{statistika.zivo.trening.aktivni} aktivnih · {statistika.zivo.trening.zapoceti} započetih · {statistika.zivo.trening.odbijeni} odbijenih · {statistika.zivo.trening.neuspjeli} neuspjelih</dd>
       </dl>

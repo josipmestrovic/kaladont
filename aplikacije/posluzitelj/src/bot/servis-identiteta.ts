@@ -3,15 +3,23 @@ import { and, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { nasumicnaKonfiguracijaAvatara, UZORAK_NADIMKA, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { botovi, izmjeneBotova, igraci, postavkeBotova } from '../baza/shema.js';
-import { KANDIDATI_NADIMAKA_BOTOVA, NADIMCI_POCETNOG_FONDA_V3 } from './nadimci.js';
+import {
+  BROJ_GOSTIJU_FONDA_V4,
+  CILJ_AKTIVNIH_FONDA_V4,
+  KANDIDATI_NADIMAKA_BOTOVA,
+  NADIMCI_POCETNOG_FONDA_V4,
+} from './nadimci.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA } from './konfiguracija-bota.js';
 
 export const MAKSIMALNO_AKTIVNIH_BOTOVA = 100;
 const ZAKLJUCAVANJE_FONDA_BOTOVA = 1_784_120_339;
+const PREFIKS_FONDA_V4 = 'bot-v4-';
 
 export async function dohvatiLimitAktivnihBotova(): Promise<number> {
   const [zapis] = await baza.select({ konfiguracija: postavkeBotova.konfiguracija }).from(postavkeBotova).where(eq(postavkeBotova.id, 1));
-  return zapis ? ShemaKonfiguracijeBota.parse(zapis.konfiguracija).maksimalnoAktivnihBotova : ZADANA_KONFIGURACIJA_BOTA.maksimalnoAktivnihBotova;
+  return zapis
+    ? ShemaKonfiguracijeBota.parse({ ...ZADANA_KONFIGURACIJA_BOTA, ...(zapis.konfiguracija as object) }).maksimalnoAktivnihBotova
+    : ZADANA_KONFIGURACIJA_BOTA.maksimalnoAktivnihBotova;
 }
 
 export interface UlazNovogBota {
@@ -67,13 +75,16 @@ export async function stvoriNoveBotove(broj: number, tip: 'imenovani' | 'gost', 
 
 export function stavkeZamjeneFondaBotova(): UlazNovogBota[] {
   return [
-    ...NADIMCI_POCETNOG_FONDA_V3.map((stavka, indeks) => ({
-      kljucSeeda: `bot-v3-imenovani-${String(indeks + 1).padStart(3, '0')}`,
+    ...NADIMCI_POCETNOG_FONDA_V4.map((stavka, indeks) => ({
+      kljucSeeda: `${PREFIKS_FONDA_V4}imenovani-${String(indeks + 1).padStart(3, '0')}`,
       tip: 'imenovani' as const,
       nadimak: stavka.nadimak,
       pocetnoSlovo: stavka.pocetnoSlovo,
     })),
-    ...Array.from({ length: 30 }, (_, indeks) => ({ kljucSeeda: `bot-v3-gost-${String(indeks + 1).padStart(3, '0')}`, tip: 'gost' as const })),
+    ...Array.from({ length: BROJ_GOSTIJU_FONDA_V4 }, (_, indeks) => ({
+      kljucSeeda: `${PREFIKS_FONDA_V4}gost-${String(indeks + 1).padStart(3, '0')}`,
+      tip: 'gost' as const,
+    })),
   ];
 }
 
@@ -81,35 +92,41 @@ export async function pregledZamjeneFondaBotova() {
   const [aktivni] = await baza.select({ broj: count() }).from(botovi).where(eq(botovi.aktivan, true));
   const ciljevi = stavkeZamjeneFondaBotova();
   const ciljniKljuci = new Set(ciljevi.map((bot) => bot.kljucSeeda));
-  const postojeV3 = await baza.select({ kljucSeeda: botovi.kljucSeeda, tip: botovi.tip, aktivan: botovi.aktivan }).from(botovi).where(sql`${botovi.kljucSeeda} like 'bot-v3-%'`);
-  const kljucevi = new Map(postojeV3.map((bot) => [bot.kljucSeeda, bot]));
+  const postojeV4 = await baza.select({ kljucSeeda: botovi.kljucSeeda, tip: botovi.tip, aktivan: botovi.aktivan }).from(botovi).where(sql`${botovi.kljucSeeda} like ${`${PREFIKS_FONDA_V4}%`}`);
+  const kljucevi = new Map(postojeV4.map((bot) => [bot.kljucSeeda, bot]));
   const stariAktivni = await baza.select({ kljucSeeda: botovi.kljucSeeda, nadimak: igraci.nadimak })
     .from(botovi).innerJoin(igraci, eq(igraci.id, botovi.igracId))
     .where(and(eq(botovi.aktivan, true), notInArray(botovi.kljucSeeda, [...ciljniKljuci])))
     .orderBy(botovi.kljucSeeda);
   const nedostajuciCiljevi = ciljevi.filter((bot) => !kljucevi.has(bot.kljucSeeda));
+  const zeljeniNadimci = ciljevi.filter((bot) => bot.tip === 'imenovani' && bot.nadimak).map((bot) => bot.nadimak!);
+  const zauzetiZeljeni = zeljeniNadimci.length
+    ? await baza.select({ nadimak: igraci.nadimak }).from(igraci).where(sql`lower(${igraci.nadimak}) in (${sql.join(zeljeniNadimci.map((nadimak) => sql`${nadimak.toLocaleLowerCase('hr-HR')}`), sql`, `)})`)
+    : [];
+  const zauzetaZeljenaImena = zauzetiZeljeni.map((redak) => redak.nadimak);
   return {
     nacin: 'preview',
     aktivnoPrije: Number(aktivni?.broj ?? 0),
-    deaktiviratCeAktivnihStarih: Math.max(0, Number(aktivni?.broj ?? 0) - postojeV3.filter((bot) => bot.aktivan).length),
-    postojeV3: postojeV3.length,
+    deaktiviratCeAktivnihStarih: Math.max(0, Number(aktivni?.broj ?? 0) - postojeV4.filter((bot) => bot.aktivan).length),
+    postojeV4: postojeV4.length,
     nedostajeImenovanih: ciljevi.filter((bot) => bot.tip === 'imenovani' && !kljucevi.has(bot.kljucSeeda)).length,
     nedostajeGostiju: ciljevi.filter((bot) => bot.tip === 'gost' && !kljucevi.has(bot.kljucSeeda)).length,
+    zauzetaZeljenaImena,
     mapaZamjene: stariAktivni.map((stari, indeks) => ({ stari, novi: nedostajuciCiljevi[indeks] ?? null })),
-    ciljniKljuci: ciljevi.map(({ kljucSeeda, tip }) => ({ kljucSeeda, tip })),
-    ciljAktivnih: 70,
+    ciljniKljuci: ciljevi.map(({ kljucSeeda, tip, nadimak }) => ({ kljucSeeda, tip, nadimak: nadimak ?? null })),
+    ciljAktivnih: CILJ_AKTIVNIH_FONDA_V4,
     mijenjaStatistiku: false,
   };
 }
 
 export async function zamijeniFondBotova(adminId: string | null = null, aktivniLimit = MAKSIMALNO_AKTIVNIH_BOTOVA) {
-  if (aktivniLimit < 70) throw new Error('Aktivni limit mora biti barem 70 za zamjenski fond v3.');
+  if (aktivniLimit < CILJ_AKTIVNIH_FONDA_V4) throw new Error(`Aktivni limit mora biti barem ${CILJ_AKTIVNIH_FONDA_V4} za zamjenski fond v4.`);
   const ciljevi = stavkeZamjeneFondaBotova();
   return baza.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${ZAKLJUCAVANJE_FONDA_BOTOVA})`);
-    const postojeV3 = await tx.select({ igracId: botovi.igracId, kljucSeeda: botovi.kljucSeeda, tip: botovi.tip, aktivan: botovi.aktivan, nadimak: igraci.nadimak })
-      .from(botovi).innerJoin(igraci, eq(igraci.id, botovi.igracId)).where(sql`${botovi.kljucSeeda} like 'bot-v3-%'`).for('update');
-    const poKljucu = new Map(postojeV3.map((bot) => [bot.kljucSeeda, bot]));
+    const postojeV4 = await tx.select({ igracId: botovi.igracId, kljucSeeda: botovi.kljucSeeda, tip: botovi.tip, aktivan: botovi.aktivan, nadimak: igraci.nadimak })
+      .from(botovi).innerJoin(igraci, eq(igraci.id, botovi.igracId)).where(sql`${botovi.kljucSeeda} like ${`${PREFIKS_FONDA_V4}%`}`).for('update');
+    const poKljucu = new Map(postojeV4.map((bot) => [bot.kljucSeeda, bot]));
     const ciljniKljuci = new Set(ciljevi.map((bot) => bot.kljucSeeda));
     for (const cilj of ciljevi) {
       const postoje = poKljucu.get(cilj.kljucSeeda);
@@ -117,7 +134,7 @@ export async function zamijeniFondBotova(adminId: string | null = null, aktivniL
     }
     const sviAktivni = await tx.select({ igracId: botovi.igracId, kljucSeeda: botovi.kljucSeeda })
       .from(botovi).where(eq(botovi.aktivan, true)).for('update');
-    const zauzetiNadimci = new Set(postojeV3.filter((bot) => bot.tip === 'imenovani').map((bot) => bot.nadimak.toLocaleLowerCase('hr-HR')));
+    const zauzetiNadimci = new Set(postojeV4.filter((bot) => bot.tip === 'imenovani').map((bot) => bot.nadimak.toLocaleLowerCase('hr-HR')));
     let deaktivirano = 0;
     for (const bot of sviAktivni) {
       if (ciljniKljuci.has(bot.kljucSeeda)) continue;
@@ -139,8 +156,10 @@ export async function zamijeniFondBotova(adminId: string | null = null, aktivniL
       }
     }
     const [ukupno] = await tx.select({ broj: count() }).from(botovi).where(eq(botovi.aktivan, true));
-    if (Number(ukupno?.broj ?? 0) !== 70 || Number(ukupno?.broj ?? 0) > aktivniLimit) throw new Error('Zamjena fonda mora završiti s točno 70 aktivnih botova unutar postavljenog limita.');
-    return { ciljAktivnih: 70, stvoreno, aktivirano, deaktivirano, aktivnoPoslije: 70 };
+    if (Number(ukupno?.broj ?? 0) !== CILJ_AKTIVNIH_FONDA_V4 || Number(ukupno?.broj ?? 0) > aktivniLimit) {
+      throw new Error(`Zamjena fonda mora završiti s točno ${CILJ_AKTIVNIH_FONDA_V4} aktivnih botova unutar postavljenog limita.`);
+    }
+    return { ciljAktivnih: CILJ_AKTIVNIH_FONDA_V4, stvoreno, aktivirano, deaktivirano, aktivnoPoslije: CILJ_AKTIVNIH_FONDA_V4 };
   }, { isolationLevel: 'serializable' });
 }
 
@@ -176,7 +195,7 @@ async function stvoriBotaUTransakciji(tx: BotTransaction, ulaz: UlazNovogBota, a
     email: null, lozinkaHash: null, emailPotvrdjen: true, registriranAt: sql`now()`,
   }).returning({ id: igraci.id });
   if (!igrac) throw new Error('Umetanje bot računa nije uspjelo.');
-  await tx.insert(botovi).values({ igracId: igrac.id, kljucSeeda: ulaz.kljucSeeda, tip: ulaz.tip, aktivan: true, verzijaProfila: 3 });
+  await tx.insert(botovi).values({ igracId: igrac.id, kljucSeeda: ulaz.kljucSeeda, tip: ulaz.tip, aktivan: true, verzijaProfila: 4 });
   await tx.insert(izmjeneBotova).values({ botId: igrac.id, kljucSeeda: ulaz.kljucSeeda, akcija: 'stvoren', aktivanPrije: false, aktivanPoslije: true, adminId });
   return { igracId: igrac.id, kljucSeeda: ulaz.kljucSeeda, tip: ulaz.tip, nadimak };
 }

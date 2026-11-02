@@ -1,4 +1,4 @@
-import { MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, UZORAK_NADIMKA } from 'zajednicko';
+import { jeValjanNadimak, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, UZORAK_NADIMKA } from 'zajednicko';
 
 /**
  * Fond nadimaka za javne botove (ADR-017): usklađen s UZORAK_NADIMKA (3–12 znakova),
@@ -28,8 +28,6 @@ const KORIJENI_NADIMAKA = [
 ];
 
 const NASTAVCI_NADIMAKA = ['ko', 'ka', 'ac', 'ica'] as const;
-function velikaPocetna(tekst: string): string { return tekst[0]!.toLocaleUpperCase('hr-HR') + tekst.slice(1); }
-function malaPocetna(tekst: string): string { return tekst[0]!.toLocaleLowerCase('hr-HR') + tekst.slice(1); }
 
 const JEZGRI = new Set<string>();
 for (const nadimak of NADIMCI_BOTOVA) JEZGRI.add(nadimak.toLocaleLowerCase('hr-HR'));
@@ -42,10 +40,33 @@ export const KANDIDATI_NADIMAKA_BOTOVA: readonly string[] = [...JEZGRI].filter((
   nadimak.length >= MINIMALNA_DULJINA_NADIMKA && nadimak.length <= MAKSIMALNA_DULJINA_NADIMKA && UZORAK_NADIMKA.test(nadimak),
 );
 
-export const NADIMCI_POCETNOG_FONDA_V3: readonly { nadimak: string; pocetnoSlovo: 'malo' | 'veliko' }[] = [
-  ...KORIJENI_NADIMAKA.slice(0, 20).map((korijen) => ({ nadimak: malaPocetna(`${korijen}ko`), pocetnoSlovo: 'malo' as const })),
-  ...KORIJENI_NADIMAKA.slice(20, 40).map((korijen) => ({ nadimak: velikaPocetna(`${korijen}ka`), pocetnoSlovo: 'veliko' as const })),
-];
+/** Curirani zamjenski fond v4: 80 imenovanih (+ 20 gost u servisu). */
+export const NADIMCI_POCETNOG_FONDA_V4: readonly { nadimak: string; pocetnoSlovo: 'malo' | 'veliko' }[] = [
+  'kaladontaš', 'Lik33', 'Mare', 'burek', 'Nika_7', 'jos5min', 'Fićo', 'iva_k', 'Gogo82', 'šogi',
+  'TinaM', 'samo_gledam', 'Žućo', 'kokica', 'Bero', 'katastrofica', 'TetaVesna', 'nabrzinu', 'Maya', 'silver',
+  'ginosaji', 'armanoGoku', 'fl0ky', 'lucijas', 'brunchy1', 'woole', 'Hrvoje', 'Kile', 'Ivan_emil', 'Agramer',
+  'Diavolo_CRO', 'Majstor', 'Mladomud', 'hanhinaamat', 'ćelavimajmun', 'IceAge', 'richmondAFC', 'sstefan', '-aldo-', 'Lemez',
+  'kautokeino', 'MihaelH2005', 'melo18', 'Peluketa', 'panter4o', 'Yamal', 'Vicinho', 'andrej', 'mymoon', 'aaaaaaaaa',
+  '1235346', 'zoki', 'Miki87', 'periš', 'Lara', 'brusli', 'Dado', 'Roki', 'tea_m', 'pajo',
+  'Cuki', 'markec', 'šuki', 'dzej', 'Vjeko', 'keks', 'AnaB', 'tošo', 'Luka_9', 'nene',
+  'Boki', 'crni', 'Iva2', 'dule', 'Pegla', 'maki', 'Tonči', 'riba', 'Jura', 'sova',
+].map((nadimak) => ({
+  nadimak,
+  pocetnoSlovo: nadimak[0] === nadimak[0]!.toLocaleLowerCase('hr-HR') ? 'malo' as const : 'veliko' as const,
+}));
+
+/** @deprecated Koristi NADIMCI_POCETNOG_FONDA_V4. */
+export const NADIMCI_POCETNOG_FONDA_V3 = NADIMCI_POCETNOG_FONDA_V4;
+
+export const BROJ_IMENOVANIH_FONDA_V4 = 80;
+export const BROJ_GOSTIJU_FONDA_V4 = 20;
+export const CILJ_AKTIVNIH_FONDA_V4 = BROJ_IMENOVANIH_FONDA_V4 + BROJ_GOSTIJU_FONDA_V4;
 
 if (KANDIDATI_NADIMAKA_BOTOVA.length < 200) throw new Error('Fond nadimaka botova mora imati najmanje 200 različitih kandidata.');
-if (new Set(NADIMCI_POCETNOG_FONDA_V3.map(({ nadimak }) => nadimak.toLocaleLowerCase('hr-HR'))).size !== 40) throw new Error('Početni fond v3 mora imati 40 različitih nadimaka.');
+if (NADIMCI_POCETNOG_FONDA_V4.length !== BROJ_IMENOVANIH_FONDA_V4) throw new Error(`Početni fond v4 mora imati ${BROJ_IMENOVANIH_FONDA_V4} nadimaka.`);
+if (new Set(NADIMCI_POCETNOG_FONDA_V4.map(({ nadimak }) => nadimak.toLocaleLowerCase('hr-HR'))).size !== BROJ_IMENOVANIH_FONDA_V4) {
+  throw new Error(`Početni fond v4 mora imati ${BROJ_IMENOVANIH_FONDA_V4} različitih nadimaka.`);
+}
+for (const { nadimak } of NADIMCI_POCETNOG_FONDA_V4) {
+  if (!jeValjanNadimak(nadimak)) throw new Error(`Nadimak fonda v4 nije valjan: ${nadimak}`);
+}
