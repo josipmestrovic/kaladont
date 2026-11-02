@@ -3,7 +3,7 @@ import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
-import type { KrajPartije, PocetakPartije, PrihvacenPotez, RundaOtvorena } from 'zajednicko';
+import { RIJECI_KALADONT, type KrajPartije, type PocetakPartije, type PrihvacenPotez, type RundaOtvorena } from 'zajednicko';
 import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { dostignucaIgraca, igraci, otkljucaneGrupeIgraca, pobjedeTreninga } from '../src/baza/shema.js';
@@ -131,9 +131,23 @@ describe('Zagrijavanje', () => {
     let mojId = '';
     const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
     const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
+    // Računalo na „ka” igra kaladont i emitira prihvaćen prije nove runde sustava —
+    // to nije stvarni potez čovjeka (kaladont nije u tablici rijeci → JOIN pada).
     const prvaRundaPromise = Promise.race([
-      cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena', (runda) => runda.naPotezuId === igracId).then((runda) => ({ rijec: runda.rijec, trazenaSlova: runda.trazenaSlova, turnToken: runda.turnToken })),
-      cekaj<PrihvacenPotez>(socket, 'potez:prihvacen', (potez) => potez.sljedeciId === igracId).then((potez) => ({ rijec: potez.rijec, trazenaSlova: potez.trazenaSlova, turnToken: potez.turnToken })),
+      cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena', (runda) => runda.naPotezuId === igracId).then((runda) => ({
+        rijec: runda.rijec,
+        trazenaSlova: runda.trazenaSlova,
+        turnToken: runda.turnToken,
+      })),
+      cekaj<PrihvacenPotez>(
+        socket,
+        'potez:prihvacen',
+        (potez) => potez.sljedeciId === igracId && !RIJECI_KALADONT.has(potez.rijec),
+      ).then((potez) => ({
+        rijec: potez.rijec,
+        trazenaSlova: potez.trazenaSlova,
+        turnToken: potez.turnToken,
+      })),
     ]);
     const naPocetak = (pocetak: PocetakPartije) => { mojId = pocetak.mojIgracId; };
     const naRunda = (runda: RundaOtvorena) => {

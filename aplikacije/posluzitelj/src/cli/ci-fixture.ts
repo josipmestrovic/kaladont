@@ -51,7 +51,8 @@ async function ucitajFixture(): Promise<void> {
       zadnjaDva,
       vrste: ['imenica'],
       grupe: [`imenica:${rijec}`],
-      frekvencija: 1,
+      // ≥ prag uobičajene (100) da botovi u CI biraju ove riječi kao poznate/poželjne.
+      frekvencija: 100,
       aktivna: true,
       napomena: 'Sintetički CI fixture; nije stvarni rječnik.',
     };
