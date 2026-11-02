@@ -82,14 +82,20 @@
   let rijeciZatrazene = false;
   let prikaziBodovanje = $state(false);
   let prikaziIzjednacenje = $state(false);
-  // Filtriraj ključ da pri promjeni moda/metrike/razdoblja prvo učitamo Top 10
-  // (dok još ne znamo smije li „Oko mene”), pa tek onda eventualno oko mene.
-  let filterKljuc = $state('');
+  // Ne-reaktivni ključ posljednjeg zahtjeva — sprečava dupli fetch kad effect
+  // ponovno prođe zbog ažuriranja `podaci` bez promjene filtra/prikaza.
+  let zadnjiPoslaniKljuc = '';
 
   const mojaPozicija = $derived(podaci?.mojaPozicija ?? null);
-  // Oko mene samo kad si rangiran izvan Top 10; u Top 10 si već vidiš svoj redak.
+  // Oko mene samo uz rang izvan Top 10 za trenutni filter (stari odgovor ne broji).
   const mozeOkoMene = $derived(
-    mojaPozicija?.status === 'rangiran' && mojaPozicija.mjesto !== null && mojaPozicija.mjesto > 10,
+    !!podaci
+      && podaci.mod === mod
+      && podaci.metrika === metrika
+      && podaci.razdoblje.vrsta === razdoblje
+      && mojaPozicija?.status === 'rangiran'
+      && mojaPozicija.mjesto !== null
+      && mojaPozicija.mjesto > 10,
   );
   // Stari ?prikaz=oko_mene bez potrebe prikazuje Top 10; normalizirani prikaz ide u API.
   const prikaz = $derived<PrikazLjestvice>(prikazUrl === 'oko_mene' && mozeOkoMene ? 'oko_mene' : 'top');
@@ -109,7 +115,8 @@
     const idZahtjeva = ++zadnjiZahtjev;
     ucitava = true;
     greska = null;
-    // Ne briši podaci tijekom učitavanja — inače mozeOkoMene padne na false i effect uđe u petlju top↔oko_mene.
+    // Ne briši podaci pri grešci/učitavanju — inače mozeOkoMene padne i effect
+    // uđe u petlju top↔oko_mene pa greska nikad ne ostane na ekranu.
     prikaziBodovanje = false;
     prikaziIzjednacenje = false;
     try {
@@ -123,10 +130,7 @@
       pomakSataMs = new Date(tijelo.izracunatoU).getTime() - Date.now();
       podaci = tijelo;
     } catch {
-      if (idZahtjeva === zadnjiZahtjev) {
-        greska = 'Ljestvicu trenutno nije moguće učitati.';
-        podaci = null;
-      }
+      if (idZahtjeva === zadnjiZahtjev) greska = 'Ljestvicu trenutno nije moguće učitati.';
     } finally {
       if (idZahtjeva === zadnjiZahtjev) ucitava = false;
     }
@@ -149,12 +153,10 @@
 
   $effect(() => {
     if (kategorija === 'igraci') {
-      const noviKljuc = `${mod}|${metrika}|${razdoblje}`;
-      if (noviKljuc !== filterKljuc) {
-        filterKljuc = noviKljuc;
-        podaci = null;
-      }
       // Normalizirani prikaz: prvo top dok ne znamo rang; drugi zahtjev samo ako je oko mene dopušteno.
+      const kljuc = `${mod}|${metrika}|${razdoblje}|${prikaz}`;
+      if (kljuc === zadnjiPoslaniKljuc) return;
+      zadnjiPoslaniKljuc = kljuc;
       void ucitajLjestvicu(mod, metrika, razdoblje, prikaz);
     } else if (!rijeciZatrazene) {
       rijeciZatrazene = true;
