@@ -260,8 +260,9 @@
   }
 
   function imeIgraca(igracId: string): string {
-    if (igracId === stanje.mojIgracId) return 'Ti';
-    return stanje.sjedala.find((s) => s.igracId === igracId)?.nadimak ?? igracId;
+    return stanje.sjedala.find((s) => s.igracId === igracId)?.nadimak
+      ?? stanje.kraj?.plasmani.find((p) => p.igracId === igracId)?.nadimak
+      ?? igracId;
   }
 
   function praznaSadrzajObavijesti(): SadrzajObavijestiNapretka {
@@ -950,13 +951,6 @@
 {/snippet}
 
 {#snippet obavijestiNapretka()}
-{#if !stanje.jePrivatna && !jeTrening}
-  {#if stanje.intenzitetKonfetaIskustva}
-    {#key stanje.oznakaKonfetaIskustva}
-      <Konfeti intenzitet={stanje.intenzitetKonfetaIskustva} />
-    {/key}
-  {/if}
-{/if}
 {#if povijestObavijestiNapretka.length > 0 && odabranaObavijestNapretka >= 0}
   <section class="preglednik-obavijesti" class:sakrij-desktop={jeNaPotezu} aria-label="Obavijesti tijekom partije">
     <div
@@ -1027,6 +1021,11 @@
   </section>
 {/if}
 {/snippet}
+{#if stanje.intenzitetKonfetaIskustva}
+  {#key stanje.oznakaKonfetaIskustva}
+    <Konfeti intenzitet={stanje.intenzitetKonfetaIskustva} />
+  {/key}
+{/if}
 {#if stanje.kraj && prikaziRezultate}
   <div class="zavrsni-header"><Header /></div>
   {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
@@ -1052,7 +1051,12 @@
       <li class:pobjednik={igrac.plasman === 1}>
         <span class="plasman-broj">{igrac.plasman}.</span>
         <span class="plasman-ime">
-          {imeIgraca(igrac.igracId)}
+          <span class="plasman-ime-redak">
+            <span class="nadimak">{igrac.nadimak}</span>
+            {#if igrac.igracId === stanje.mojIgracId}
+              <span class="oznaka-ti" aria-label="To si ti">TI</span>
+            {/if}
+          </span>
           {#if ocjenaIgraca !== null && ocjenaIgraca !== undefined}
             <span class="plasman-ocjena" aria-label={`Ocjena: ${ocjenaIgraca} od 5 zvjezdica`}>
               {#each Array.from({ length: 5 }, (_, indeks) => indeks < ocjenaIgraca) as ispunjena}
@@ -1090,7 +1094,7 @@
     {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
       <span>Ocjena igre se ne računa u privatnoj sobi.</span>
     {:else if stanje.kraj.mojaOcjenaIgre === null || stanje.kraj.mojaOcjenaIgre === undefined}
-      <span>Za ocjenu igre potrebna su najmanje 3 prihvaćena poteza.</span>
+      <span>Ocjena igre nije dostupna za ovu partiju.</span>
     {:else}
       <strong>Tvoja ocjena</strong>
       <span class="ocjena-zvjezdice" aria-label={`Moja ocjena: ${stanje.kraj.mojaOcjenaIgre} od 5 zvjezdica`}>
@@ -1099,7 +1103,7 @@
         {/each}
       </span>
       <PojamPomoc
-        opis="Ocjena partije temelji se na promjeni tvojih Kaladont DNK vrijednosti i pobjedi. Ne mijenja bodove ni rang, nego utječe na dodatni XP."
+        opis="Ocjena partije gleda tvoj učinak u ovoj igri (riječi, bodovi, eliminacije). Ne mijenja bodove ni rang, nego utječe na dodatni XP. Pobjeda daje 5 zvjezdica."
         id="ocjena-partije-pomoc"
       />
     {/if}
@@ -1405,113 +1409,115 @@
           Rezultati za: <strong>{sekundeDoRezultata}</strong>
         </p>
       </div>
-    {:else if stanje.statusSpremanja === 'spremanje_rezultata'}
-      <div class="zavrsni-sazetak" aria-live="polite">
-        {#if stanje.eliminacije.at(-1)}<p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>{/if}
-        <p class="odbrojavanje-najava">Spremanje rezultata…</p>
-      </div>
-      {@render obavijestiNapretka()}
-    {:else if stanje.sustavBiraRijec}
-      <div class="sustav-bira-inline" aria-live="polite">
-        {#if stanje.zadnjaEliminacija}
-          <p class="sustav-bira-obrazlozenje">
-            {sazetakEliminacije(stanje.zadnjaEliminacija)}
-          </p>
-        {/if}
-        <p class="sustav-bira-tekst">Nova runda za: <strong>{sustavBrojac}</strong></p>
-      </div>
-      {@render obavijestiNapretka()}
     {:else}
-      {#if stanje.trazenaSlova}
-        <div class="rijec-kartica">
-          {#key prikazanaRijec?.rijec ?? stanje.trazenaSlova}
-            <div class="rijec-sadrzaj">
-              <p class="trazena-slova">Traži se riječ na: <strong>{stanje.trazenaSlova.toUpperCase()}</strong></p>
-            </div>
-          {/key}
+      {#if stanje.statusSpremanja === 'spremanje_rezultata'}
+        <div class="zavrsni-sazetak" aria-live="polite">
+          {#if stanje.eliminacije.at(-1)}<p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>{/if}
+          <p class="odbrojavanje-najava">Spremanje rezultata…</p>
+        </div>
+      {:else if stanje.sustavBiraRijec}
+        <div class="sustav-bira-inline" aria-live="polite">
+          {#if stanje.zadnjaEliminacija}
+            <p class="sustav-bira-obrazlozenje">
+              {sazetakEliminacije(stanje.zadnjaEliminacija)}
+            </p>
+          {/if}
+          <p class="sustav-bira-tekst">Nova runda za: <strong>{sustavBrojac}</strong></p>
         </div>
       {:else}
-        <p class="priprema-partije">Igra počinje…</p>
-      {/if}
+        {#if stanje.trazenaSlova}
+          <div class="rijec-kartica">
+            {#key prikazanaRijec?.rijec ?? stanje.trazenaSlova}
+              <div class="rijec-sadrzaj">
+                <p class="trazena-slova">Traži se riječ na: <strong>{stanje.trazenaSlova.toUpperCase()}</strong></p>
+              </div>
+            {/key}
+          </div>
+        {:else}
+          <p class="priprema-partije">Igra počinje…</p>
+        {/if}
 
-      <p class="trenutni-streak" class:ugasen={stanje.trenutniStreak === 0} role="status" aria-live="polite" aria-label={`Niz bez greške: ${stanje.trenutniStreak}`}>
-        {#key streakAnimKljuc}
-          <span class="streak-vatre" class:animiraj={streakAnimKljuc > 0} aria-hidden="true">
-            {#each Array(brojVatri) as _}
-              <img src="/ikone/19-vatra.png" alt="" />
-            {/each}
-          </span>
-        {/key}
-        <span class="streak-broj-okvir">
+        <p class="trenutni-streak" class:ugasen={stanje.trenutniStreak === 0} role="status" aria-live="polite" aria-label={`Niz bez greške: ${stanje.trenutniStreak}`}>
           {#key streakAnimKljuc}
-            <strong class:streak-broj-slide={streakAnimKljuc > 0}>{stanje.trenutniStreak}</strong>
-          {/key}
-        </span>
-      </p>
-
-      {@render obavijestiNapretka()}
-
-    {#if jeNaPotezu}
-      <form class="zona-poteza" use:pratiMobilniUnos onsubmit={(e) => { e.preventDefault(); posaljiPotez(); }}>
-        <div class="mobilni-kontekst">
-          {#if prikazanaRijec?.rijec}
-            <span class="mobilna-trenutna-rijec">{@render trenutnaRijec(prikazanaRijec.rijec)}</span>
-          {/if}
-          <span class="mobilni-niz" class:ugasen={stanje.trenutniStreak === 0} aria-label={`Niz bez greške: ${stanje.trenutniStreak}`}>
-            <span class="streak-vatre" aria-hidden="true">
+            <span class="streak-vatre" class:animiraj={streakAnimKljuc > 0} aria-hidden="true">
               {#each Array(brojVatri) as _}
                 <img src="/ikone/19-vatra.png" alt="" />
               {/each}
             </span>
-            <strong>{stanje.trenutniStreak}</strong>
+          {/key}
+          <span class="streak-broj-okvir">
+            {#key streakAnimKljuc}
+              <strong class:streak-broj-slide={streakAnimKljuc > 0}>{stanje.trenutniStreak}</strong>
+            {/key}
           </span>
-        </div>
-          <div class="unos-rijeci" class:unos-ima-gresku={brojGreskeUnosa > 0 && porukaPoteza !== null}>
-            <span class="prefiks-unosa" aria-hidden="true">{prefiksRijeci}</span>
-            <input
-              bind:this={unosInput}
-              type="text"
-              bind:value={unosNastavkaRijeci}
-              oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
-              oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
-              autocomplete="off"
-              autocapitalize="none"
-              autocorrect="off"
-              spellcheck={false}
-              inputmode="text"
-              enterkeyhint="send"
-              maxlength={najviseZnakovaNastavka}
-              aria-label={`Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
-              aria-invalid={brojGreskeUnosa > 0 && porukaPoteza !== null}
-              disabled={slanjeUTijeku || !vezaSpremna}
-            />
-          </div>
-        <div class="potez-gumbi">
-          <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
-          {#if !stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === ''}
-            <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku || !vezaSpremna} onclick={posaljiNeZnam}>Ne znam</button>
-          {/if}
-        </div>
-        {#if porukaPoteza}
+        </p>
+      {/if}
+
+      {@render obavijestiNapretka()}
+
+      {#if stanje.statusSpremanja !== 'spremanje_rezultata' && !stanje.sustavBiraRijec}
+        {#if jeNaPotezu}
+          <form class="zona-poteza" use:pratiMobilniUnos onsubmit={(e) => { e.preventDefault(); posaljiPotez(); }}>
+            <div class="mobilni-kontekst">
+              {#if prikazanaRijec?.rijec}
+                <span class="mobilna-trenutna-rijec">{@render trenutnaRijec(prikazanaRijec.rijec)}</span>
+              {/if}
+              <span class="mobilni-niz" class:ugasen={stanje.trenutniStreak === 0} aria-label={`Niz bez greške: ${stanje.trenutniStreak}`}>
+                <span class="streak-vatre" aria-hidden="true">
+                  {#each Array(brojVatri) as _}
+                    <img src="/ikone/19-vatra.png" alt="" />
+                  {/each}
+                </span>
+                <strong>{stanje.trenutniStreak}</strong>
+              </span>
+            </div>
+              <div class="unos-rijeci" class:unos-ima-gresku={brojGreskeUnosa > 0 && porukaPoteza !== null}>
+                <span class="prefiks-unosa" aria-hidden="true">{prefiksRijeci}</span>
+                <input
+                  bind:this={unosInput}
+                  type="text"
+                  bind:value={unosNastavkaRijeci}
+                  oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
+                  oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
+                  autocomplete="off"
+                  autocapitalize="none"
+                  autocorrect="off"
+                  spellcheck={false}
+                  inputmode="text"
+                  enterkeyhint="send"
+                  maxlength={najviseZnakovaNastavka}
+                  aria-label={`Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
+                  aria-invalid={brojGreskeUnosa > 0 && porukaPoteza !== null}
+                  disabled={slanjeUTijeku || !vezaSpremna}
+                />
+              </div>
+            <div class="potez-gumbi">
+              <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
+              {#if !stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === ''}
+                <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku || !vezaSpremna} onclick={posaljiNeZnam}>Ne znam</button>
+              {/if}
+            </div>
+            {#if porukaPoteza}
+              {@render porukaOdbijenogPoteza()}
+            {/if}
+          </form>
+        {/if}
+
+        {#if prikazanaRijec?.rijec && prikazanaRijec.vrsta === 'sustav_rijec'}
+          <p class="kontekst-rijeci obavijest-igre" aria-live="polite">
+            {#if stanje.runda === 1}
+              Igra počinje, sustav je dodijelio:
+            {:else}
+              Ostaje {brojPreostalihIgraca} igrača, započinje nova runda. Sustav je dodijelio riječ:
+            {/if}
+            {@render trenutnaRijec(prikazanaRijec.rijec)}
+          </p>
+        {/if}
+
+        {#if porukaPoteza && !jeNaPotezu}
           {@render porukaOdbijenogPoteza()}
         {/if}
-      </form>
-    {/if}
-
-    {#if prikazanaRijec?.rijec && prikazanaRijec.vrsta === 'sustav_rijec'}
-      <p class="kontekst-rijeci obavijest-igre" aria-live="polite">
-        {#if stanje.runda === 1}
-          Igra počinje, sustav je dodijelio:
-        {:else}
-          Ostaje {brojPreostalihIgraca} igrača, započinje nova runda. Sustav je dodijelio riječ:
-        {/if}
-        {@render trenutnaRijec(prikazanaRijec.rijec)}
-      </p>
-    {/if}
-
-    {#if porukaPoteza && !jeNaPotezu}
-      {@render porukaOdbijenogPoteza()}
-    {/if}
+      {/if}
     {/if}
     {#if jeEliminiran && !stanje.ponistenaPoruka}
       <aside class="promatranje-traka" aria-live="polite">
@@ -1571,10 +1577,10 @@
 
   .preglednik-obavijesti { display: grid; width: min(680px, 100%); gap: 6px; margin: 8px auto 12px; }
   .preglednik-obavijesti.sakrij-desktop { display: none; }
-  .klizac-obavijesti { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; cursor: grab; touch-action: pan-x; }
+  .klizac-obavijesti { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; cursor: grab; touch-action: pan-x; border-radius: 8px; }
   .klizac-obavijesti:global(.povlace) { scroll-snap-type: none; cursor: grabbing; user-select: none; }
   .klizac-obavijesti::-webkit-scrollbar { display: none; }
-  .obavijest-napretka { display: flex; min-height: 42px; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px 16px; padding: 8px 12px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina); box-shadow: var(--sjena-suptilna); font-size: var(--tekst-sitni); scroll-snap-align: start; animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
+  .obavijest-napretka { display: flex; min-height: 42px; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px 16px; padding: 8px 12px; border-radius: 8px; background: var(--boja-povrsina); box-shadow: var(--sjena-suptilna); font-size: var(--tekst-sitni); scroll-snap-align: start; animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
   .obavijest-grupa { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px 16px; }
   .obavijest-napretka strong { color: var(--boja-isticanje-tekst); font-size: var(--tekst-baza); }
   .dobitak-iskustva-tekst { color: var(--boja-tekst-sekundarni); }
@@ -2704,14 +2710,36 @@
     color: #1a1815;
     font-weight: bold;
   }
+  .plasmani-lista li.pobjednik .oznaka-ti {
+    background: #1a1815;
+    border-color: #1a1815;
+    color: var(--boja-isticanje-slova);
+  }
+  .plasmani-lista li.pobjednik .plasman-ocjena img {
+    filter: drop-shadow(0 0 0.5px #1a1815) brightness(0.55) contrast(1.2);
+  }
   .plasman-broj {
     font-family: var(--font-naslov);
     font-size: 18px;
     width: 24px;
   }
   .plasman-ime {
+    display: inline-flex;
     flex: 1;
+    align-items: center;
+    gap: 8px;
     min-width: 0;
+  }
+  .plasman-ime-redak {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .plasman-ime-redak .nadimak {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .plasman-ocjena {
     display: inline-flex;

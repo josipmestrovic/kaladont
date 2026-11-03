@@ -13,20 +13,20 @@ for (const sirina of [320, 390, 1440]) {
     await page.goto('/red?mod=dva_igraca');
     const zanimljivosti = page.getByRole('region', { name: 'Zanimljivosti o hrvatskom jeziku' });
     await expect(zanimljivosti.getByRole('heading', { name: 'Zanimljivosti', exact: true })).toBeVisible();
-    await expect(zanimljivosti.locator('article')).toHaveCount(23);
+    await expect(zanimljivosti.locator('article')).toHaveCount(5);
     await page.evaluate(() => document.fonts.ready);
     const visina = (await zanimljivosti.boundingBox())!.height;
     const prviNaslov = await zanimljivosti.locator('article[aria-hidden="false"] h3').textContent();
     await zanimljivosti.getByRole('button', { name: 'Sljedeća zanimljivost' }).click();
-    await expect(zanimljivosti.locator('.brojac')).toHaveText('2 / 23');
+    await expect(zanimljivosti.locator('.brojac')).toHaveText('2 / 5');
     await expect(zanimljivosti.locator('article[aria-hidden="false"] h3')).not.toHaveText(prviNaslov!);
     await zanimljivosti.getByRole('button', { name: 'Prethodna zanimljivost' }).click();
-    await expect(zanimljivosti.locator('.brojac')).toHaveText('1 / 23');
+    await expect(zanimljivosti.locator('.brojac')).toHaveText('1 / 5');
     await zanimljivosti.getByRole('button', { name: 'Sljedeća zanimljivost' }).focus();
     await page.keyboard.press('ArrowRight');
-    await expect(zanimljivosti.locator('.brojac')).toHaveText('2 / 23');
-    await zanimljivosti.locator('.klizac').evaluate((element) => element.scrollTo({ left: element.clientWidth * 22, behavior: 'instant' }));
-    await expect(zanimljivosti.locator('.brojac')).toHaveText('23 / 23');
+    await expect(zanimljivosti.locator('.brojac')).toHaveText('2 / 5');
+    await zanimljivosti.locator('.klizac').evaluate((element) => element.scrollTo({ left: element.clientWidth * 4, behavior: 'instant' }));
+    await expect(zanimljivosti.locator('.brojac')).toHaveText('5 / 5');
     expect((await zanimljivosti.boundingBox())!.height).toBe(visina);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     for (const clanak of await zanimljivosti.locator('article').all()) {

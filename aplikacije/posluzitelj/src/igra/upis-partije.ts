@@ -5,7 +5,7 @@
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { izracunajNovaDostignuca, izracunajOcjenuIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce } from 'zajednicko';
-import { bonusPobjednickogNiza, izracunajFormu, jeOcjenaIgreDostupna } from 'zajednicko';
+import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import type { SudionikPartije } from './motor-partije.js';
@@ -589,10 +589,14 @@ export async function zakljuciPartijuUBazi(
           jakoRijetkeRijeci: povijesniDnk.jakoRijetkeRijeci + (statistika?.otkriveneJakoRijetkeGrupe ?? 0),
         };
         agregatZaDnk.dnkPoslije = izracunajDnk(ukupniDnk, mod);
-        agregatZaDnk.ocjenaIgre = jeOcjenaIgreDostupna(r.iskustvo)
-          ? izracunajOcjenuIgre(agregatZaDnk.dnkPrije, agregatZaDnk.dnkPoslije, r.plasman === 1, r.iskustvo)
-          : null;
-        agregatZaDnk.bonusOcjenaIgre = agregatZaDnk.ocjenaIgre === null ? 0 : postotakXpZaOcjenu(agregatZaDnk.ocjenaIgre);
+        agregatZaDnk.ocjenaIgre = izracunajOcjenuIgre({
+          pobjeda: r.plasman === 1,
+          prihvaceniPotezi: statistika?.prihvaceniPotezi ?? 0,
+          bodovi: r.bodovi,
+          eliminacije: r.eliminacije,
+          iskustvo: r.iskustvo,
+        });
+        agregatZaDnk.bonusOcjenaIgre = postotakXpZaOcjenu(agregatZaDnk.ocjenaIgre);
         const bonusIskustva = Math.round(r.iskustvo * agregatZaDnk.bonusOcjenaIgre / 100);
         if (bonusIskustva > 0 && !samoStatistika) {
           const [azuriranoIskustvo] = await tx.update(igraci)

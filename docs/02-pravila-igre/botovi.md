@@ -42,6 +42,7 @@ Samo u lokalnom razvojnom okruženju (`NODE_ENV=development`), radi bržeg testi
 - **Namjerni istek:** javno sudjelovanje bota ima 2 % šanse za jednu priliku da pričeka redovni istek timera, na unaprijed izvučenom vlastitom 2.–12. potezu, uključujući potez na „ka”. Ako partija ne dosegne taj potez, prilika ostaje neiskorištena. Trening nema namjerni istek. Namjerno čekanje posebno se bilježi i razlikuje od neočekivanog isteka/tehničkog zastoja u admin nadzoru i testovima.
 - **KA:** bot prepoznaje KA i odigrava `kaladont` kad to pravila dopuštaju; u zadano 8 % slučajeva propusti tuđi „ka” i pokuša običnu riječ. Pri vlastitom izboru, tek među poznatim, u zadano 1,5 % slučajeva ostavlja riječ na „ka” ako postoji obična alternativa; ako su poznate samo na „ka”, odigra takvu riječ.
 - Bot nikada ne dogovara igru s drugim botom niti namješta ishod čovjeku.
+- **Brze poruke (javne partije):** botovi šalju iste brze reakcije kao ljudi, s globalnim frekvencijama u admin postavkama (ne po botu). Zadano: 20 % pozdrav (Bok!) na početku po botu; 30 % „Nemoj zamjerit” kad bot eliminira nekoga; pri ispadanju bota 10 % „Bravo!” ili 5 % „Hvala” (međusobno isključivo). Svaka zakazana reakcija čeka najmanje 2 s plus nasumično 0–3 s. Trening i privatne partije bez ovih reakcija. Vrijedi postojeći cooldown 2 s po igraču (RS-22).
 - Nakon eliminacije čovjeka preostali botovi normalno dovršavaju javnu partiju; eliminirani čovjek može gledati.
 
 Postoci su početne vrijednosti verzionirane konfiguracije i mijenjaju se nakon mjerenja, ne skrivenim promjenama u kodu.
@@ -62,7 +63,7 @@ Postavke se učitavaju jednom pri pokretanju procesa. Ako trajni zapis još ne p
 - Među dostupnim kandidatima istog prioriteta izbjegavaju se posljednja dva različita bot-protivnika čovjeka, zajednički za oba moda, bez dodatnog čekanja. Povijest nastaje samo nakon uspješnog početka, istječe nakon 24 h, ograničena je na 50.000 zapisa i ne preživljava restart.
 - Trajan profil, nadimak i avatar; statistika nastaje stvarnim odigranim javnim partijama.
 - Prije sljedeće rezervacije nakon spremljene igre osvježavaju se agregati i stvarni nizovi za oba javna moda. Bot sa zastarjelim profilom ostaje nedostupan dok osvježavanje ne uspije; neuspjeh ne zaustavlja druge slobodne botove.
-- Administrator vidi oznaku bota; običan igrač ne. Botovi se ne prikazuju na javnim ljestvicama, ali imaju javni profil kao i registrirani igrači.
+- Administrator vidi oznaku bota; običan igrač ne. Imenovani botovi ulaze na javne ljestvice jednako kao ljudi (isti minimum igara, metrike i razdoblja); gost-botovi ne. Imenovani botovi imaju javni profil kao registrirani igrači.
 - Jedan identitet igra najviše jednu partiju istodobno. Zamjenski fond v4 ima 80 imenovanih i 20 botova prikazanih kao „Gost”; tvrdi maksimum aktivnog fonda je 100. Stari identiteti se deaktiviraju, ne preimenuju niti brišu. Gost-bot je trajan račun kojim upravlja bot, nema javni profil ni ljestvicu, a nije običan privremeni gost.
 - Administrator može stvarati imenovane ili gost-botove, aktivirati/deaktivirati ih te mijenjati validirane postavke. Deaktivacija odmah sprječava nove rezervacije i oslobađa čekajuće rezervacije; već započete partije se dovršavaju. Sve promjene identiteta bilježe se s administratorom i vremenom.
 - Bot identitet ne može se prijaviti, resetirati lozinku ni biti preuzet.

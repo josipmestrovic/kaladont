@@ -50,6 +50,7 @@ import {
   type VrstaRijeci,
   type DeltaNapretkaDostignuca,
   type KontekstPartije,
+  type BrzaPoruka,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
@@ -125,6 +126,16 @@ export interface PostavkeMotoraPartije {
   naPrivatnaPartijaZavrsila?: (kodSobe: string, partijaId: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => void;
   /** Poziva se pri svakoj promjeni poteza, otvaranju runde i kraju; koristi ga bot kontroler. */
   naPromjenuPoteza?: (dogadaj: DogadajPoteza) => void;
+  /** Javni početak partije: bot kontroler može zakazati pozdrave. */
+  naPocetakPartijeZaBotove?: (partijaId: string, kontekst: KontekstPartije, botIds: readonly string[]) => void;
+  /** Nakon eliminacije: bot kontroler može zakazati sorry / bravo / hvala. */
+  naEliminacijuZaBotove?: (
+    partijaId: string,
+    kontekst: KontekstPartije,
+    zrtvaId: string,
+    bodZaId: string | null,
+    sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot' }[],
+  ) => void;
   maksimalnoAktivnihTreninga?: number;
   dohvatiRokoveNeaktivnostiTreninga?: () => { upozorenjeMs: number; zatvaranjeMs: number };
 }
@@ -892,6 +903,11 @@ export function stvoriUpraviteljPartija(
       for (const s of sudionici) {
         aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
       }
+      postavke.naPocetakPartijeZaBotove?.(
+        partijaId,
+        kontekst,
+        sudionici.filter((s) => s.upravljac === 'bot').map((s) => s.igracId),
+      );
       stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), odgodaPocetka);
       return 'pokrenuta' as const;
     }).catch((greska) => {
@@ -1373,6 +1389,13 @@ export function stvoriUpraviteljPartija(
       });
     }
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', poruka);
+    postavke.naEliminacijuZaBotove?.(
+      stanje.partijaId,
+      stanje.kontekst,
+      igracId,
+      napadac,
+      stanje.sudionici.map((s) => ({ igracId: s.igracId, upravljac: s.upravljac })),
+    );
 
     if (stanje.politika.dajeNapredak && razlog !== 'prekid') {
       const obracun = izracunajObracunIskustva(
@@ -2216,5 +2239,16 @@ export function stvoriUpraviteljPartija(
       return stanje ? snimkaPoteza(stanje) : null;
     },
     prekiniZbogGreskeBota,
+    /** Interni ulaz za bot kontroler; poštuje RS-22 cooldown, dopušta i kratko nakon kraja dok soba živi. */
+    posaljiReakcijuSudionika(partijaId: string, igracId: string, poruka: BrzaPoruka): boolean {
+      const stanje = partije.get(partijaId);
+      if (!stanje || !stanje.sudionici.some((s) => s.igracId === igracId)) return false;
+      const sada = Date.now();
+      const zadnja = stanje.zadnjeReakcije.get(igracId) ?? 0;
+      if (sada - zadnja < 2000) return false;
+      stanje.zadnjeReakcije.set(igracId, sada);
+      io.to(SOBA_PARTIJE(stanje.partijaId)).emit('reakcija:nova', { igracId, poruka });
+      return true;
+    },
   };
 }

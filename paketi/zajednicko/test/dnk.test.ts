@@ -16,23 +16,20 @@ describe('DNK zajednicko', () => {
     expect(jeDnkOtkljucan(11)).toBe(true);
   });
 
-  it('ocjena igre dostupna je samo kad je dodijeljen XP', () => {
-    expect(jeOcjenaIgreDostupna(0)).toBe(false);
-    expect(jeOcjenaIgreDostupna(-1)).toBe(false);
+  it('ocjena igre dostupna je u javnoj partiji bez obzira na XP', () => {
+    expect(jeOcjenaIgreDostupna(0)).toBe(true);
+    expect(jeOcjenaIgreDostupna(-1)).toBe(true);
     expect(jeOcjenaIgreDostupna(1)).toBe(true);
   });
 
-  it('ocjena igre daje najmanje dvije zvjezdice za pozitivan XP i dvije za pobjedu', () => {
-    const bezOsa = [];
-    expect(izracunajOcjenuIgre(bezOsa, bezOsa, false, 1)).toBe(2);
-    expect(izracunajOcjenuIgre(bezOsa, bezOsa, true, 1)).toBe(4);
-    expect(izracunajOcjenuIgre(bezOsa, bezOsa, true, 0)).toBe(0);
-  });
-
-  it('ograničava ocjenu pobjede na pet zvjezdica', () => {
-    const prije = [{ kljuc: 'vjestina' as const, naziv: '', vrijednost: 0, tier: 0, oznaka: '', detalj: '' }];
-    const poslije = [{ ...prije[0]!, vrijednost: 100 }];
-    expect(izracunajOcjenuIgre(prije, poslije, true, 1)).toBe(5);
+  it('ocjena igre prati učinak partije i pobjedu', () => {
+    expect(izracunajOcjenuIgre({ pobjeda: false, prihvaceniPotezi: 0, bodovi: 0, eliminacije: 0, iskustvo: 0 })).toBe(1);
+    expect(izracunajOcjenuIgre({ pobjeda: false, prihvaceniPotezi: 1, bodovi: 0, eliminacije: 0, iskustvo: 5 })).toBe(2);
+    expect(izracunajOcjenuIgre({ pobjeda: false, prihvaceniPotezi: 2, bodovi: 0, eliminacije: 0, iskustvo: 10 })).toBe(3);
+    expect(izracunajOcjenuIgre({ pobjeda: false, prihvaceniPotezi: 5, bodovi: 0, eliminacije: 0, iskustvo: 25 })).toBe(4);
+    expect(izracunajOcjenuIgre({ pobjeda: false, prihvaceniPotezi: 12, bodovi: 0, eliminacije: 0, iskustvo: 60 })).toBe(5);
+    expect(izracunajOcjenuIgre({ pobjeda: false, prihvaceniPotezi: 1, bodovi: 3, eliminacije: 1, iskustvo: 5 })).toBe(4);
+    expect(izracunajOcjenuIgre({ pobjeda: true, prihvaceniPotezi: 0, bodovi: 0, eliminacije: 0, iskustvo: 0 })).toBe(5);
   });
 
   it('računa profil za 4 igrača i 1v1 odvojeno', () => {

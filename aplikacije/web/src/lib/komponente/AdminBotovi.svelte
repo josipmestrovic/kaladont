@@ -12,6 +12,10 @@
     vjerojatnostPropustaKa: number;
     vjerojatnostNeznanjaPoSudjelovanju: number;
     vjerojatnostIzostankaPoSudjelovanju: number;
+    vjerojatnostReakcijePozdravNaPocetku: number;
+    vjerojatnostReakcijeSorryPriEliminaciji: number;
+    vjerojatnostReakcijeBravoPriIspadanju: number;
+    vjerojatnostReakcijeHvalaPriIspadanju: number;
     treningRazmisljanjeMinMs: number;
     treningRazmisljanjeMaksMs: number;
     brziRazvoj: boolean;
@@ -230,6 +234,14 @@
             <label>Osobni tempo do<input type="number" min="0.5" max="1.5" step="0.01" bind:value={nacrt.koeficijentTempaMaks} /></label>
             <label>Najmanji udio poteza<input type="number" min="0.01" max="0.99" step="0.01" bind:value={nacrt.minimalniUdioPoteza} /></label>
             <label>Najveći udio poteza<input type="number" min="0.01" max="0.99" step="0.01" bind:value={nacrt.maksimalniUdioPoteza} /></label>
+          </div>
+        </fieldset>
+        <fieldset><legend>Brze poruke</legend>
+          <div class="polja">
+            <label>Pozdrav na početku<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostReakcijePozdravNaPocetku} /><span>{postotak(nacrt.vjerojatnostReakcijePozdravNaPocetku)}</span></label>
+            <label>„Nemoj zamjerit” pri eliminaciji<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostReakcijeSorryPriEliminaciji} /><span>{postotak(nacrt.vjerojatnostReakcijeSorryPriEliminaciji)}</span></label>
+            <label>„Bravo” pri ispadanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostReakcijeBravoPriIspadanju} /><span>{postotak(nacrt.vjerojatnostReakcijeBravoPriIspadanju)}</span></label>
+            <label>„Hvala” pri ispadanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostReakcijeHvalaPriIspadanju} /><span>{postotak(nacrt.vjerojatnostReakcijeHvalaPriIspadanju)}</span></label>
           </div>
         </fieldset>
         <fieldset><legend>Izbor riječi i prilike</legend>

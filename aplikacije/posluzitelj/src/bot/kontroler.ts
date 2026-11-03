@@ -2,10 +2,17 @@
  * Bot kontroler (ADR-017): sluša promjene poteza iz motora i za bota na potezu planira
  * točno jednu akciju po (partijaId, igracId, turnToken). Pri buđenju sve ponovno provjerava.
  */
+import type { BrzaPoruka } from 'zajednicko';
 import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import type { KonfiguracijaBota } from './konfiguracija-bota.js';
 import { koeficijentTempaBota, odaberiPotez, stvoriStanjeBota, trajanjeRazmisljanjaMs, type OdlukaBota, type Rng, type StanjeBotaUPartiji } from './odabir-rijeci.js';
+import {
+  odaberiReakcijuNaPocetku,
+  odaberiReakcijuPriEliminacijiProtivnika,
+  odaberiReakcijuPriIspadanju,
+  odgodaReakcijeMs,
+} from './reakcije.js';
 import { grafemi } from 'zajednicko';
 
 export type NaredbaBota =
@@ -15,6 +22,7 @@ export type NaredbaBota =
 export interface OvisnostiBotKontrolera {
   rjecnik: Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika'> & { frekvencijaZa(rijec: string): number | null };
   izvrsiNaredbu: (partijaId: string, igracId: string, naredba: NaredbaBota) => RezultatNaredbe;
+  posaljiReakciju?: (partijaId: string, igracId: string, poruka: BrzaPoruka) => boolean;
   konfiguracija: KonfiguracijaBota;
   rng?: Rng;
   sada?: () => number;
@@ -57,6 +65,7 @@ export class BotKontroler {
   private readonly greskePoBotu = new Map<string, { broj: number; posljednja: string; vrijemeMs: number }>();
   private readonly konfiguracijePartija = new Map<string, KonfiguracijaBota>();
   private readonly odluke = new Map<string, { turnToken: string; odluka: OdlukaBota; verzijaRjecnika: number }>();
+  private readonly zakazaneReakcije = new Map<string, NodeJS.Timeout[]>();
   private readonly rng: Rng;
   private readonly sada: () => number;
   private readonly zakazi: (posao: () => void, ms: number) => NodeJS.Timeout;
@@ -86,6 +95,43 @@ export class BotKontroler {
     }
   }
 
+  /** Javna partija: svaki bot neovisno može pozdraviti nakon 2–5 s. */
+  naPocetakPartije(partijaId: string, kontekst: DogadajPoteza['kontekst'], botIds: readonly string[]): void {
+    if (this.zaustavljen || kontekst !== 'javna' || !this.ovisnosti.posaljiReakciju || botIds.length === 0) return;
+    if (!this.konfiguracijePartija.has(partijaId)) {
+      this.konfiguracijePartija.set(partijaId, structuredClone(this.ovisnosti.konfiguracija));
+    }
+    const konfiguracija = this.konfiguracijePartija.get(partijaId)!;
+    for (const igracId of botIds) {
+      const poruka = odaberiReakcijuNaPocetku(konfiguracija, this.rng);
+      if (poruka) this.zakaziReakciju(partijaId, igracId, poruka);
+    }
+  }
+
+  /** Javna partija: eliminator (sorry) i žrtva-bot (bravo/hvala, međusobno isključivo). */
+  naEliminaciju(
+    partijaId: string,
+    kontekst: DogadajPoteza['kontekst'],
+    zrtvaId: string,
+    bodZaId: string | null,
+    sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot' }[],
+  ): void {
+    if (this.zaustavljen || kontekst !== 'javna' || !this.ovisnosti.posaljiReakciju) return;
+    if (!this.konfiguracijePartija.has(partijaId)) {
+      this.konfiguracijePartija.set(partijaId, structuredClone(this.ovisnosti.konfiguracija));
+    }
+    const konfiguracija = this.konfiguracijePartija.get(partijaId)!;
+    const jeBot = (igracId: string | null) => Boolean(igracId && sudionici.some((s) => s.igracId === igracId && s.upravljac === 'bot'));
+    if (jeBot(bodZaId) && bodZaId) {
+      const poruka = odaberiReakcijuPriEliminacijiProtivnika(konfiguracija, this.rng);
+      if (poruka) this.zakaziReakciju(partijaId, bodZaId, poruka);
+    }
+    if (jeBot(zrtvaId)) {
+      const poruka = odaberiReakcijuPriIspadanju(konfiguracija, this.rng);
+      if (poruka) this.zakaziReakciju(partijaId, zrtvaId, poruka);
+    }
+  }
+
   private planiraj(dogadaj: DogadajPoteza): void {
     const prethodniPlan = this.planirano.get(dogadaj.partijaId);
     if (!dogadaj.zavrsena && !dogadaj.izborUToku && (prethodniPlan?.turnToken === dogadaj.turnToken || this.namjerniIsteci.get(dogadaj.partijaId) === dogadaj.turnToken || this.dovrseniTokeni.get(dogadaj.partijaId) === dogadaj.turnToken)) return;
@@ -98,6 +144,7 @@ export class BotKontroler {
       this.dovrseniTokeni.delete(dogadaj.partijaId);
       this.konfiguracijePartija.delete(dogadaj.partijaId);
       this.odluke.delete(dogadaj.partijaId);
+      // Zakazane reakcije (2–5 s) smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
       return;
     }
     if (dogadaj.izborUToku || !dogadaj.naPotezuId || !dogadaj.trazenaSlova) return;
@@ -158,6 +205,7 @@ export class BotKontroler {
   zaustavi(): void {
     this.zaustavljen = true;
     for (const partijaId of [...this.planirano.keys()]) this.otkaziPlan(partijaId);
+    for (const partijaId of [...this.zakazaneReakcije.keys()]) this.otkaziReakcije(partijaId);
     this.stanjaPoPartiji.clear();
     this.namjerniIsteci.clear();
     this.aktualniPotezi.clear();
@@ -338,5 +386,30 @@ export class BotKontroler {
     if (!plan) return;
     this.otkazi(plan.handle);
     this.planirano.delete(partijaId);
+  }
+
+  private zakaziReakciju(partijaId: string, igracId: string, poruka: BrzaPoruka): void {
+    if (!this.ovisnosti.posaljiReakciju) return;
+    const odgoda = odgodaReakcijeMs(this.rng);
+    const handle = this.zakazi(() => {
+      const red = this.zakazaneReakcije.get(partijaId);
+      if (red) {
+        const indeks = red.indexOf(handle);
+        if (indeks >= 0) red.splice(indeks, 1);
+        if (red.length === 0) this.zakazaneReakcije.delete(partijaId);
+      }
+      if (this.zaustavljen) return;
+      this.ovisnosti.posaljiReakciju?.(partijaId, igracId, poruka);
+    }, odgoda);
+    const red = this.zakazaneReakcije.get(partijaId) ?? [];
+    red.push(handle);
+    this.zakazaneReakcije.set(partijaId, red);
+  }
+
+  private otkaziReakcije(partijaId: string): void {
+    const red = this.zakazaneReakcije.get(partijaId);
+    if (!red) return;
+    for (const handle of red) this.otkazi(handle);
+    this.zakazaneReakcije.delete(partijaId);
   }
 }

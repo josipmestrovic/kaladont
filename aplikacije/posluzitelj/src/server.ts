@@ -351,6 +351,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const botKontroler = new BotKontroler({
     rjecnik,
     izvrsiNaredbu: (partijaId, igracId, naredba) => upravitelj.naredbaBota(partijaId, igracId, naredba),
+    posaljiReakciju: (partijaId, igracId, poruka) => upravitelj.posaljiReakcijuSudionika(partijaId, igracId, poruka),
     oznaciNamjerniIstek: (partijaId, igracId, turnToken) => upravitelj.oznaciNamjerniIstek(partijaId, igracId, turnToken),
     dohvatiPotez: (partijaId) => upravitelj.dohvatiPotez(partijaId),
     prekiniZbogGreske: (partijaId, igracId, turnToken) => upravitelj.prekiniZbogGreskeBota(partijaId, igracId, turnToken),
@@ -377,6 +378,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       provjeriDogadaj,
       zapisSocketHandlerGreske,
       naPromjenuPoteza: (dogadaj) => botKontroler.naPromjenuPoteza(dogadaj),
+      naPocetakPartijeZaBotove: (partijaId, kontekst, botIds) => botKontroler.naPocetakPartije(partijaId, kontekst, botIds),
+      naEliminacijuZaBotove: (partijaId, kontekst, zrtvaId, bodZaId, sudionici) => botKontroler.naEliminaciju(partijaId, kontekst, zrtvaId, bodZaId, sudionici),
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
         naJavnaPartijaZavrsila(partijaId);

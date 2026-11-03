@@ -20,6 +20,14 @@ export interface KonfiguracijaBota {
   vjerojatnostPropustaKa: number;
   vjerojatnostNeznanjaPoSudjelovanju: number;
   vjerojatnostIzostankaPoSudjelovanju: number;
+  /** Po botu na početku javne partije: brza poruka `pozdrav` (Bok!). */
+  vjerojatnostReakcijePozdravNaPocetku: number;
+  /** Kad bot eliminira nekoga: brza poruka `sorry` (Nemoj zamjerit). */
+  vjerojatnostReakcijeSorryPriEliminaciji: number;
+  /** Kad bota eliminiraju: brza poruka `dobro-odigrano` (Bravo!); međusobno isključivo s hvala. */
+  vjerojatnostReakcijeBravoPriIspadanju: number;
+  /** Kad bota eliminiraju: brza poruka `najjaci` (Hvala); međusobno isključivo s bravo. */
+  vjerojatnostReakcijeHvalaPriIspadanju: number;
   treningRazmisljanjeMinMs: number;
   treningRazmisljanjeMaksMs: number;
   brziRazvoj: boolean;
@@ -67,6 +75,10 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   vjerojatnostPropustaKa: 0.08,
   vjerojatnostNeznanjaPoSudjelovanju: 0.2,
   vjerojatnostIzostankaPoSudjelovanju: 0.02,
+  vjerojatnostReakcijePozdravNaPocetku: 0.2,
+  vjerojatnostReakcijeSorryPriEliminaciji: 0.3,
+  vjerojatnostReakcijeBravoPriIspadanju: 0.1,
+  vjerojatnostReakcijeHvalaPriIspadanju: 0.05,
   treningRazmisljanjeMinMs: 1_000,
   treningRazmisljanjeMaksMs: 3_000,
   brziRazvoj: false,
@@ -122,6 +134,10 @@ export const ShemaKonfiguracijeBota = z.object({
   vjerojatnostPropustaKa: Vjerojatnost.default(0.08),
   vjerojatnostNeznanjaPoSudjelovanju: Vjerojatnost,
   vjerojatnostIzostankaPoSudjelovanju: Vjerojatnost,
+  vjerojatnostReakcijePozdravNaPocetku: Vjerojatnost,
+  vjerojatnostReakcijeSorryPriEliminaciji: Vjerojatnost,
+  vjerojatnostReakcijeBravoPriIspadanju: Vjerojatnost,
+  vjerojatnostReakcijeHvalaPriIspadanju: Vjerojatnost,
   treningRazmisljanjeMinMs: z.number().int().min(100).max(30_000),
   treningRazmisljanjeMaksMs: z.number().int().min(100).max(30_000),
   brziRazvoj: z.boolean(),
@@ -168,6 +184,9 @@ export const ShemaKonfiguracijeBota = z.object({
   if (postavke.treningRazmisljanjeMinMs > postavke.treningRazmisljanjeMaksMs) pogreska('treningRazmisljanjeMaksMs', 'Najveće vrijeme ne smije biti manje od najmanjeg.');
   if (postavke.treningUpozorenjeNeaktivnostiMs >= postavke.treningZatvaranjeNeaktivnostiMs) pogreska('treningZatvaranjeNeaktivnostiMs', 'Zatvaranje mora biti nakon upozorenja.');
   if (postavke.pragFrekvencije.srednja > postavke.pragFrekvencije.uobicajena) pogreska('pragFrekvencije', 'Srednji prag ne smije prelaziti uobičajeni.');
+  if (postavke.vjerojatnostReakcijeBravoPriIspadanju + postavke.vjerojatnostReakcijeHvalaPriIspadanju > 1) {
+    pogreska('vjerojatnostReakcijeHvalaPriIspadanju', 'Ukupna vjerojatnost reakcija pri ispadanju ne smije prelaziti 100 %.');
+  }
   if (postavke.rasponBrzih[1] > postavke.rasponUobicajenih[0] || postavke.rasponUobicajenih[1] > postavke.rasponSporih[0]) pogreska('rasponUobicajenih', 'Rasponi kategorija moraju biti poredani.');
   for (const mod of ['dva_igraca', 'cetiri_igraca'] as const) {
     const pragovi = postavke.pragoviPopuneMs[mod];
