@@ -339,7 +339,7 @@
         <p>Nizovi Četveroboja i Dvoboja odvojeni su. Poraz prekida niz tog načina. Privatne igre ga ne diraju.</p>
 
         <h4 id="ocjena-partije">Ocjena igre</h4>
-        <p>Javna igra dobiva zvjezdice čim imaš barem 1 iskustvo. Bez iskustva ocjena je 0, i uz pobjedu. Osnovica je 2–4 zvjezdice iz DNK-a; pobjeda dodaje +2, najviše 5.</p>
+        <p>Javna igra uvijek dobiva 1–5 zvjezdica prema učinku u toj partiji (prihvaćene riječi, bodovi, eliminacije, XP). Bez doprinosa je 1, bilo kakav potez barem 2, duže partije lakše daju 3–4, a pobjeda ili vrlo jak učinak daje 5. Ne ovisi o Kaladont DNK-u.</p>
         <div class="tablica-omotac">
           <table class="tablica-mobilni-retci">
             <thead><tr><th scope="col">Zvjezdice</th><th scope="col">Bonus iskustva</th></tr></thead>

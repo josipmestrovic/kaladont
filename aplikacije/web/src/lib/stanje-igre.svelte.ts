@@ -106,16 +106,25 @@ let timerNagradePoteza: ReturnType<typeof setTimeout> | null = null;
 let timerNovaDostignuca: ReturnType<typeof setTimeout> | null = null;
 let timerKonfetaIskustva: ReturnType<typeof setTimeout> | null = null;
 
-function prikaziKonfeteIskustva(stavke: readonly StavkaIskustva[]): void {
-  const najjaca = Math.max(...stavke.filter((stavka) => stavka.vrsta === 'duge_rijeci' || stavka.vrsta === 'rijetke_rijeci').map((stavka) => stavka.iskustvo), 0);
-  if (najjaca === 0) return;
-  stanje.intenzitetKonfetaIskustva = najjaca >= 35 ? 'veliki' : najjaca >= 20 ? 'srednji' : 'mali';
+function pokreniKonfete(intenzitet: 'mali' | 'srednji' | 'veliki', trajanjeMs = 3_200): void {
+  stanje.intenzitetKonfetaIskustva = intenzitet;
   stanje.oznakaKonfetaIskustva += 1;
   if (timerKonfetaIskustva) clearTimeout(timerKonfetaIskustva);
   timerKonfetaIskustva = setTimeout(() => {
     stanje.intenzitetKonfetaIskustva = null;
     timerKonfetaIskustva = null;
-  }, 3_200);
+  }, trajanjeMs);
+}
+
+function prikaziKonfeteIskustva(stavke: readonly StavkaIskustva[]): void {
+  if (stanje.jePrivatna || stanje.kontekst === 'trening') return;
+  const najjaca = Math.max(...stavke.filter((stavka) => stavka.vrsta === 'duge_rijeci' || stavka.vrsta === 'rijetke_rijeci').map((stavka) => stavka.iskustvo), 0);
+  if (najjaca === 0) return;
+  pokreniKonfete(najjaca >= 35 ? 'veliki' : najjaca >= 20 ? 'srednji' : 'mali');
+}
+
+function prikaziKonfeteKaladont(): void {
+  pokreniKonfete('veliki', 4_000);
 }
 
 function prikaziStavkeIskustva(stavke: readonly StavkaIskustva[]): void {
@@ -321,6 +330,7 @@ export function pokreniSlusateljeIgre(): void {
     if (napustioPartiju) return;
     // Kaladont: samo tiši aplauz (high moment). Ostali razlozi: tiša eliminacija.
     pustiAudio(p.razlog === 'kaladont' ? 'aplauz-kaladont' : 'eliminacija');
+    if (p.razlog === 'kaladont') prikaziKonfeteKaladont();
     stanje.eliminacije = [...stanje.eliminacije, p];
     stanje.zadnjaEliminacija = p;
     // Samo XP eliminacije — ne šalji ponovo XP poteza (kaladont/mrtva), inače obavijest

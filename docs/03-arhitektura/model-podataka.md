@@ -80,7 +80,7 @@ Indeksi: parcijalni unique funkcionalni indeks na `lower(email)` uz `email IS NO
 
 ## botovi
 
-Konfiguracija javnog bota (ADR-017). Identitet, avatar i statistika žive u `igraci` (`vrsta = registriran`, `upravljac = bot`, bez e-maila i lozinke). Stvara ih idempotentan seed po stabilnom ključu; ponovni seed ne mijenja postojeće. Javni botovi imaju javni profil, ali se isključuju iz ljestvica (`upravljac = 'covjek'` u upitu). Privremeno „Računalo” u Zagrijavanju nema redak ni ovdje ni u `igraci`.
+Konfiguracija javnog bota (ADR-017). Identitet, avatar i statistika žive u `igraci` (`vrsta = registriran`, `upravljac = bot`, bez e-maila i lozinke). Stvara ih idempotentan seed po stabilnom ključu; ponovni seed ne mijenja postojeće. Imenovani botovi imaju javni profil i ulaze u ljestvice kao ljudi; gost-botovi (`tip = gost`) nemaju ni profil ni ljestvicu. Privremeno „Računalo” u Zagrijavanju nema redak ni ovdje ni u `igraci`.
 
 | Stupac | Tip | Opis |
 |---|---|---|

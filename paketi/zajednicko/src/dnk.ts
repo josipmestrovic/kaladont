@@ -154,22 +154,33 @@ export function izracunajOcjenuDnk(osi: readonly DnkOs[]): number {
   return Math.max(0, Math.min(5, Math.round(prosjek / 20)));
 }
 
-export function jeOcjenaIgreDostupna(iskustvo: number): boolean {
-  return Number.isFinite(iskustvo) && iskustvo > 0;
+/** Javna partija uvijek ima ocjenu 1–5; XP više nije uvjet. */
+export function jeOcjenaIgreDostupna(_iskustvo?: number): boolean {
+  return true;
 }
 
-export function izracunajOcjenuIgre(
-  prije: readonly DnkOs[],
-  poslije: readonly DnkOs[],
-  pobjeda: boolean,
-  iskustvo: number,
-): number {
-  if (!jeOcjenaIgreDostupna(iskustvo)) return 0;
-  const deltaProsjek = poslije.length === 0
-    ? 0
-    : poslije.reduce((zbroj, os) => zbroj + (os.vrijednost - (prije.find((staro) => staro.kljuc === os.kljuc)?.vrijednost ?? os.vrijednost)), 0) / poslije.length;
-  const osnovneZvjezdice = Math.max(0, Math.min(4, Math.round((deltaProsjek + 20) / 10)));
-  return Math.min(5, Math.max(2, osnovneZvjezdice) + (pobjeda ? 2 : 0));
+export interface UlazOcjeneIgre {
+  pobjeda: boolean;
+  prihvaceniPotezi: number;
+  bodovi: number;
+  eliminacije: number;
+  /** XP partije prije bonusa ocjene. */
+  iskustvo: number;
+}
+
+/** Ocjena 1–5 iz učinka te partije (ne iz DNK delte). Pobjeda ili jak učinak → 5. */
+export function izracunajOcjenuIgre(ulaz: UlazOcjeneIgre): number {
+  if (ulaz.pobjeda) return 5;
+  const prihvaceniPotezi = Math.max(0, ulaz.prihvaceniPotezi);
+  const bodovi = Math.max(0, ulaz.bodovi);
+  const eliminacije = Math.max(0, ulaz.eliminacije);
+  const iskustvo = Math.max(0, Number.isFinite(ulaz.iskustvo) ? ulaz.iskustvo : 0);
+  const ucinak = iskustvo + bodovi * 8 + eliminacije * 12;
+  if (ucinak >= 60) return 5;
+  if (ucinak >= 25) return 4;
+  if (ucinak >= 10) return 3;
+  if (prihvaceniPotezi > 0 || bodovi > 0 || eliminacije > 0 || iskustvo > 0) return 2;
+  return 1;
 }
 
 export function postotakXpZaOcjenu(ocjena: number): number {

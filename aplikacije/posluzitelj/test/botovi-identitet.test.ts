@@ -72,25 +72,31 @@ describe('bot identitet', () => {
     await expect(razrijesiIdentitet(sesija.token)).rejects.toThrow();
   });
 
-  it('ne pojavljuje se na ljestvici iako ima završene partije', async () => {
+  it('imenovani bot ulazi na ljestvicu jednako kao čovjek; gost-bot ne', async () => {
     const OD = new Date('2002-03-05T23:00:00Z');
     const DO = new Date('2002-03-12T23:00:00Z');
-    const botId = await noviBot();
+    const imenovaniId = await noviBot(`Im${randomUUID().slice(0, 6)}`);
+    const gostId = await noviBot(`Gs${randomUUID().slice(0, 6)}`);
+    await baza.update(botovi).set({ tip: 'gost' }).where(eq(botovi.igracId, gostId));
     const covjekId = await noviCovjek(`Lj${randomUUID().slice(0, 6)}`);
     for (let i = 0; i < 6; i += 1) {
       const id = randomUUID();
       stvorenePartije.push(id);
       const pocetak = new Date(OD.getTime() + (i + 1) * 60_000);
-      await baza.insert(partije).values({ id, mod: 'dva_igraca', status: 'zavrsena', pocetak, kraj: new Date(pocetak.getTime() + 30_000), brojBotova: 1 });
+      await baza.insert(partije).values({ id, mod: 'dva_igraca', status: 'zavrsena', pocetak, kraj: new Date(pocetak.getTime() + 30_000), brojBotova: 2 });
       await baza.insert(sudioniciPartije).values([
-        { partijaId: id, igracId: botId, sjedalo: 0, plasman: 1, bodovi: 4 },
-        { partijaId: id, igracId: covjekId, sjedalo: 1, plasman: 2, bodovi: 1 },
+        { partijaId: id, igracId: imenovaniId, sjedalo: 0, plasman: 1, bodovi: 4 },
+        { partijaId: id, igracId: gostId, sjedalo: 1, plasman: 2, bodovi: 3 },
+        { partijaId: id, igracId: covjekId, sjedalo: 2, plasman: 3, bodovi: 1 },
       ]);
     }
     const poredak = await izracunajPoredak('dva_igraca', 'prosjek_bodova', 'tjedno', OD, DO);
     const idovi = [...poredak.poIgracu.keys()];
     expect(idovi).toContain(covjekId);
-    expect(idovi).not.toContain(botId);
+    expect(idovi).toContain(imenovaniId);
+    expect(idovi).not.toContain(gostId);
+    expect(poredak.poIgracu.get(imenovaniId)?.odigraneIgre).toBe(6);
+    expect(poredak.poIgracu.get(covjekId)?.odigraneIgre).toBe(6);
   });
 });
 
