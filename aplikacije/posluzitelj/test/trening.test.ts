@@ -181,9 +181,11 @@ describe('Zagrijavanje', () => {
     }
 
     try {
+      // Slušaj igrivi potez prije započinjanja — inače se propusti prva runda kad čovjek ide prvi.
+      const igrivPotezPromise = cekajIgrivPotez();
       expect((await new Promise<{ pokrenut: boolean }>((resolve) => socket.emit('trening:zapocni', resolve))).pokrenut).toBe(true);
       const pocetak = await pocetakPromise;
-      const runda = await cekajIgrivPotez();
+      const runda = await igrivPotezPromise;
       expect(mojId).toBe(igracId);
       const prihvacenPromise = cekaj<PrihvacenPotez>(socket, 'potez:prihvacen', (potez) => potez.igracId === igracId);
       socket.emit('potez:rijec', { rijec: runda.kandidat, turnToken: runda.turnToken });
