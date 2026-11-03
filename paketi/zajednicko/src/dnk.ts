@@ -156,6 +156,7 @@ export function izracunajOcjenuDnk(osi: readonly DnkOs[]): number {
 
 /** Javna partija uvijek ima ocjenu 1–5; XP više nije uvjet. */
 export function jeOcjenaIgreDostupna(_iskustvo?: number): boolean {
+  void _iskustvo;
   return true;
 }
 
