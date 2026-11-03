@@ -1122,7 +1122,11 @@ export function stvoriUpraviteljPartija(
       () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod, statistike, false, new Map(
         [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
       ), zavrsenoU).then((agregati) => {
-        for (const p of plasmani) {
+        const plasmaniSOcjenama = plasmani.map((p) => ({
+          ...p,
+          ocjenaIgre: agregati.get(p.igracId)?.ocjenaIgre ?? null,
+        }));
+        for (const p of plasmaniSOcjenama) {
           const agregat = agregati.get(p.igracId);
           const prosjek = agregat && agregat.odigrane > 0 ? agregat.bodoviUkupno / agregat.odigrane : 0;
           const socket = aktivneVeze.dohvatiSocket(p.igracId);
@@ -1142,7 +1146,7 @@ export function stvoriUpraviteljPartija(
           const poruka: KrajPartije = {
             partijaId: stanje.partijaId,
             prikazRezultataOdIso,
-            plasmani,
+            plasmani: plasmaniSOcjenama,
             mojNoviProsjek: prosjek,
             mojRang: null,
             mojeIskustvo: (() => {

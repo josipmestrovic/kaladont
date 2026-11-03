@@ -1,9 +1,10 @@
 <script lang="ts">
   import { CircleHelp } from 'lucide-svelte';
 
-  let { tekst, opis, id } = $props<{ tekst: string; opis: string; id: string }>();
+  let { tekst, opis, id } = $props<{ tekst?: string; opis: string; id: string }>();
   let otvoreno = $state(false);
   let omotac: HTMLSpanElement;
+  const samoIkona = $derived(!tekst);
 
   function preklopi(dogadaj: MouseEvent) {
     dogadaj.stopPropagation();
@@ -24,11 +25,13 @@
   <button
     type="button"
     class="pojam-gumb"
+    class:samo-ikona={samoIkona}
+    aria-label={samoIkona ? 'Pojasni' : undefined}
     aria-expanded={otvoreno}
     aria-controls={id}
     onclick={preklopi}
   >
-    <span>{tekst}</span>
+    {#if tekst}<span>{tekst}</span>{/if}
     <CircleHelp size={14} strokeWidth={2.25} aria-hidden="true" />
   </button>
   {#if otvoreno}
@@ -55,6 +58,10 @@
     font-weight: inherit;
     line-height: inherit;
     cursor: help;
+  }
+
+  .pojam-gumb.samo-ikona {
+    border-bottom: 0;
   }
 
   .pojasnjenje {

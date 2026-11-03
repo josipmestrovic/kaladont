@@ -16,6 +16,7 @@
   import { pustiAudio } from '$lib/audio-manager.js';
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
+  import { povuciScroll } from '$lib/povuci-klizac.js';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, PORUKE, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
@@ -58,6 +59,7 @@
   type ObavijestNapretka = SadrzajObavijestiNapretka & { id: number };
   let povijestObavijestiNapretka = $state<ObavijestNapretka[]>([]);
   let odabranaObavijestNapretka = $state(-1);
+  let klizacObavijesti: HTMLDivElement | undefined = $state();
   let sljedeciIdObavijestiNapretka = 0;
   let aktivnaGrupaObavijestiId: number | null = null;
   let obavijestiNapretkaNaCekanju = praznaSadrzajObavijesti();
@@ -300,7 +302,7 @@
       };
       spojiSadrzajObavijesti(obavijest, sadrzaj);
       povijestObavijestiNapretka = [...povijestObavijestiNapretka, obavijest];
-      odabranaObavijestNapretka = povijestObavijestiNapretka.length - 1;
+      idiNaObavijest(povijestObavijestiNapretka.length - 1);
       return;
     }
 
@@ -309,7 +311,7 @@
     spojiSadrzajObavijesti(obavijest, sadrzaj);
     povijest[indeks] = obavijest;
     povijestObavijestiNapretka = povijest;
-    odabranaObavijestNapretka = indeks;
+    idiNaObavijest(indeks);
   }
 
   function zapocniGrupuObavijestiPoteza(): void {
@@ -323,7 +325,7 @@
     if (!imaSadrzajObavijesti(obavijest)) return;
 
     povijestObavijestiNapretka = [...povijestObavijestiNapretka, obavijest];
-    odabranaObavijestNapretka = povijestObavijestiNapretka.length - 1;
+    idiNaObavijest(povijestObavijestiNapretka.length - 1);
   }
 
   $effect(() => {
@@ -379,12 +381,26 @@
     dodajSadrzajGrupiNapretka(noviSadrzaj);
   });
 
+  function idiNaObavijest(indeks: number, behavior: ScrollBehavior = 'smooth'): void {
+    const cilj = Math.max(0, Math.min(povijestObavijestiNapretka.length - 1, indeks));
+    odabranaObavijestNapretka = cilj;
+    void tick().then(() => {
+      if (!klizacObavijesti?.clientWidth || odabranaObavijestNapretka !== cilj) return;
+      const pomak = cilj * klizacObavijesti.clientWidth;
+      if (Math.abs(klizacObavijesti.scrollLeft - pomak) < 1) return;
+      klizacObavijesti.scrollTo({
+        left: pomak,
+        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : behavior,
+      });
+    });
+  }
+
   function odaberiPrethodnuObavijest(): void {
-    odabranaObavijestNapretka = Math.max(0, odabranaObavijestNapretka - 1);
+    idiNaObavijest(odabranaObavijestNapretka - 1);
   }
 
   function odaberiSljedecuObavijest(): void {
-    odabranaObavijestNapretka = Math.min(povijestObavijestiNapretka.length - 1, odabranaObavijestNapretka + 1);
+    idiNaObavijest(odabranaObavijestNapretka + 1);
   }
 
   function jeAktualnaPartija(): boolean {
@@ -941,50 +957,65 @@
     {/key}
   {/if}
 {/if}
-{#if povijestObavijestiNapretka.length > 0 && odabranaObavijestNapretka >= 0 && odabranaObavijestNapretka < povijestObavijestiNapretka.length}
-  {@const obavijest = povijestObavijestiNapretka[odabranaObavijestNapretka]!}
+{#if povijestObavijestiNapretka.length > 0 && odabranaObavijestNapretka >= 0}
   <section class="preglednik-obavijesti" class:sakrij-desktop={jeNaPotezu} aria-label="Obavijesti tijekom partije">
     <div
-      class="obavijest-napretka"
-      class:nagrada-za-rijec={obavijest.nagrada !== null}
-      class:nagrada-srednji={obavijest.nagrada?.intenzitet === 'srednji'}
-      class:nagrada-veliki={obavijest.nagrada?.intenzitet === 'veliki'}
-      role="status"
-      aria-live="polite"
+      class="klizac-obavijesti"
+      bind:this={klizacObavijesti}
+      use:povuciScroll
+      role="group"
+      aria-label="Povijest obavijesti tijekom partije"
+      onscroll={() => {
+        if (klizacObavijesti?.clientWidth) {
+          odabranaObavijestNapretka = Math.round(klizacObavijesti.scrollLeft / klizacObavijesti.clientWidth);
+        }
+      }}
     >
-      {#if obavijest.nagrada}
-        <div class="obavijest-grupa">
-          <strong>{obavijest.nagrada.tekst}</strong>
-          {#if obavijest.nagrada.otkljucano !== null}
-            <span class="nagrada-napredak">{obavijest.nagrada.kategorija === 'rijetke' ? 'Rijetke riječi' : 'Duge riječi'}: {obavijest.nagrada.otkljucano} / {obavijest.nagrada.ukupno ?? '—'} otključano</span>
+      {#each povijestObavijestiNapretka as obavijest, redniBroj (obavijest.id)}
+        <div
+          class="obavijest-napretka"
+          class:nagrada-za-rijec={obavijest.nagrada !== null}
+          class:nagrada-srednji={obavijest.nagrada?.intenzitet === 'srednji'}
+          class:nagrada-veliki={obavijest.nagrada?.intenzitet === 'veliki'}
+          role="status"
+          aria-live={redniBroj === odabranaObavijestNapretka ? 'polite' : 'off'}
+          aria-hidden={redniBroj !== odabranaObavijestNapretka}
+        >
+          {#if obavijest.nagrada}
+            <div class="obavijest-grupa">
+              <strong>{obavijest.nagrada.tekst}</strong>
+              {#if obavijest.nagrada.otkljucano !== null}
+                <span class="nagrada-napredak">{obavijest.nagrada.kategorija === 'rijetke' ? 'Rijetke riječi' : 'Duge riječi'}: {obavijest.nagrada.otkljucano} / {obavijest.nagrada.ukupno ?? '—'} otključano</span>
+              {/if}
+            </div>
           {/if}
-        </div>
-      {/if}
-      {#if obavijest.otkljucavanje}
-        <div class="obavijest-grupa">
-          {#if obavijest.otkljucavanje.novaOsnovnaRijec}
-            <strong>Dodano u kolekciju: {obavijest.otkljucavanje.osnovneRijeci.join(', ')}</strong>
-          {:else}
-            <strong>{obavijest.otkljucavanje.oblik}</strong>
+          {#if obavijest.otkljucavanje}
+            <div class="obavijest-grupa">
+              {#if obavijest.otkljucavanje.novaOsnovnaRijec}
+                <strong>Dodano u kolekciju: {obavijest.otkljucavanje.osnovneRijeci.join(', ')}</strong>
+              {:else}
+                <strong>{obavijest.otkljucavanje.oblik}</strong>
+              {/if}
+              {#if obavijest.otkljucavanje.dugaKategorija || obavijest.otkljucavanje.rijetkaKategorija}
+                <span class="dobitak-iskustva-tekst">
+                  {obavijest.otkljucavanje.dugaKategorija ? 'Duga riječ' : ''}{obavijest.otkljucavanje.dugaKategorija && obavijest.otkljucavanje.rijetkaKategorija ? ' i ' : ''}{obavijest.otkljucavanje.rijetkaKategorija ? 'rijetka riječ' : ''}
+                </span>
+              {/if}
+            </div>
           {/if}
-          {#if obavijest.otkljucavanje.dugaKategorija || obavijest.otkljucavanje.rijetkaKategorija}
-            <span class="dobitak-iskustva-tekst">
-              {obavijest.otkljucavanje.dugaKategorija ? 'Duga riječ' : ''}{obavijest.otkljucavanje.dugaKategorija && obavijest.otkljucavanje.rijetkaKategorija ? ' i ' : ''}{obavijest.otkljucavanje.rijetkaKategorija ? 'rijetka riječ' : ''}
-            </span>
-          {/if}
-        </div>
-      {/if}
-      {#each obavijest.stavke as stavka, indeksStavke (`${obavijest.id}-${indeksStavke}-${stavka.vrsta}-${stavka.naziv}`)}
-        <span class="dobitak-iskustva-tekst">{stavka.naziv} <strong>+{stavka.iskustvo} XP</strong></span>
-      {/each}
-      {#if obavijest.dostignuca.length > 0}
-        <div class="obavijest-grupa dobitak-dostignuca">
-          <strong>Dostignuće otključano</strong>
-          {#each obavijest.dostignuca as dostignuce (`${obavijest.id}-${dostignuce.id}`)}
-            <span>{dostignuce.naziv} — razina {dostignuce.novaRazina}</span>
+          {#each obavijest.stavke as stavka, indeksStavke (`${obavijest.id}-${indeksStavke}-${stavka.vrsta}-${stavka.naziv}`)}
+            <span class="dobitak-iskustva-tekst">{stavka.naziv} <strong>+{stavka.iskustvo} XP</strong></span>
           {/each}
+          {#if obavijest.dostignuca.length > 0}
+            <div class="obavijest-grupa dobitak-dostignuca">
+              <strong>Dostignuće otključano</strong>
+              {#each obavijest.dostignuca as dostignuce (`${obavijest.id}-${dostignuce.id}`)}
+                <span>{dostignuce.naziv} — razina {dostignuce.novaRazina}</span>
+              {/each}
+            </div>
+          {/if}
         </div>
-      {/if}
+      {/each}
     </div>
     {#if povijestObavijestiNapretka.length > 1}
       <nav class="navigacija-obavijesti" aria-label="Povijest obavijesti">
@@ -1017,20 +1048,21 @@
   {@const modZavrsnePartije = stanje.kraj.mod ?? stanje.mod ?? 'cetiri_igraca'}
   <ol class="plasmani-lista">
     {#each [...stanje.kraj.plasmani].sort((a, b) => a.plasman - b.plasman) as igrac (igrac.igracId)}
+      {@const ocjenaIgraca = igrac.ocjenaIgre ?? (igrac.igracId === stanje.mojIgracId ? stanje.kraj.mojaOcjenaIgre : null)}
       <li class:pobjednik={igrac.plasman === 1}>
         <span class="plasman-broj">{igrac.plasman}.</span>
         <span class="plasman-ime">
           {imeIgraca(igrac.igracId)}
-          {#if igrac.igracId === stanje.mojIgracId && stanje.kraj.mojaOcjenaIgre !== null && stanje.kraj.mojaOcjenaIgre !== undefined}
-            <span class="plasman-ocjena" aria-label={`Moja ocjena: ${stanje.kraj.mojaOcjenaIgre} od 5 zvjezdica`}>
-              {#each Array.from({ length: 5 }, (_, indeks) => indeks < (stanje.kraj?.mojaOcjenaIgre ?? 0)) as ispunjena}
+          {#if ocjenaIgraca !== null && ocjenaIgraca !== undefined}
+            <span class="plasman-ocjena" aria-label={`Ocjena: ${ocjenaIgraca} od 5 zvjezdica`}>
+              {#each Array.from({ length: 5 }, (_, indeks) => indeks < ocjenaIgraca) as ispunjena}
                 <img src={ispunjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />
               {/each}
             </span>
           {/if}
         </span>
         <span class="plasman-bodovi">
-          {#if jeTrening}{igrac.plasman === 1 ? 'Pobjeda' : 'Poraz'}{:else}{igrac.bodovi} bodova{#if modZavrsnePartije === 'cetiri_igraca'} ({igrac.eliminacije} elim.){/if}{/if}
+          {#if jeTrening}{igrac.plasman === 1 ? 'Pobjeda' : 'Poraz'}{:else}{igrac.bodovi} bodova{#if modZavrsnePartije === 'cetiri_igraca'}{' '}({igrac.eliminacije} elim.){/if}{/if}
         </span>
       </li>
     {/each}
@@ -1067,11 +1099,9 @@
         {/each}
       </span>
       <PojamPomoc
-        tekst="?"
         opis="Ocjena partije temelji se na promjeni tvojih Kaladont DNK vrijednosti i pobjedi. Ne mijenja bodove ni rang, nego utječe na dodatni XP."
         id="ocjena-partije-pomoc"
       />
-      <a href="/pravila-kaladonta?tema=napredak#ocjena-partije">Kako se računa?</a>
     {/if}
   </section>
   {/if}
@@ -1541,7 +1571,10 @@
 
   .preglednik-obavijesti { display: grid; width: min(680px, 100%); gap: 6px; margin: 8px auto 12px; }
   .preglednik-obavijesti.sakrij-desktop { display: none; }
-  .obavijest-napretka { display: flex; min-height: 42px; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px 16px; padding: 8px 12px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina); box-shadow: var(--sjena-suptilna); font-size: var(--tekst-sitni); animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
+  .klizac-obavijesti { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; cursor: grab; touch-action: pan-x; }
+  .klizac-obavijesti:global(.povlace) { scroll-snap-type: none; cursor: grabbing; user-select: none; }
+  .klizac-obavijesti::-webkit-scrollbar { display: none; }
+  .obavijest-napretka { display: flex; min-height: 42px; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px 16px; padding: 8px 12px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina); box-shadow: var(--sjena-suptilna); font-size: var(--tekst-sitni); scroll-snap-align: start; animation: ulaz-dobitka 380ms cubic-bezier(.2, .8, .2, 1); }
   .obavijest-grupa { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px 16px; }
   .obavijest-napretka strong { color: var(--boja-isticanje-tekst); font-size: var(--tekst-baza); }
   .dobitak-iskustva-tekst { color: var(--boja-tekst-sekundarni); }

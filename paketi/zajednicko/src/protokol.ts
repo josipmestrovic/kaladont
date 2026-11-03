@@ -224,6 +224,8 @@ export interface PlasmanPartije {
   bodovi: number;
   eliminacije: number;
   nacinIspadanja: NacinIspadanja | null;
+  /** Ocjena igre (1–5); null ako nije dostupna (npr. premalo poteza / privatna / trening). */
+  ocjenaIgre?: number | null;
 }
 
 export interface ArhivaPartije {

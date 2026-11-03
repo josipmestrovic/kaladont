@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { ChevronLeft, ChevronRight } from 'lucide-svelte';
+  import { povuciScroll } from '$lib/povuci-klizac.js';
 
   const zanimljivosti = [
     { naslov: 'Mjesec hrvatskoga jezika', tekst: 'Od 21. veljače do 17. ožujka slavimo hrvatski jezik. To je odlična prilika za nove riječi i dobre priče!' },
@@ -59,7 +60,7 @@
       <button type="button" aria-label="Sljedeća zanimljivost" title="Sljedeća zanimljivost" disabled={indeks === poredak.length - 1} onclick={() => pomakni(1)} onkeydown={listajTipkom}><ChevronRight size={20} aria-hidden="true" /></button>
     </div>
   </div>
-  <div class="klizac" bind:this={klizac} role="group" aria-label="Zanimljivosti o hrvatskom jeziku"
+  <div class="klizac" bind:this={klizac} use:povuciScroll role="group" aria-label="Zanimljivosti o hrvatskom jeziku"
     onscroll={() => { if (klizac?.clientWidth) indeks = Math.round(klizac.scrollLeft / klizac.clientWidth); }}
   >
     {#each poredak as zanimljivost, redniBroj (zanimljivost.naslov)}
@@ -79,7 +80,8 @@
   button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--boja-obrub-jaci); border-radius: 6px; background: var(--boja-povrsina); color: var(--boja-tekst-osnovni); cursor: pointer; }
   button:disabled { opacity: 0.45; cursor: default; }
   .brojac { min-width: 54px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--boja-tekst-sekundarni); }
-  .klizac { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; overscroll-behavior-x: contain; }
+  .klizac { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; overscroll-behavior-x: contain; cursor: grab; touch-action: pan-x; }
+  .klizac:global(.povlace) { scroll-snap-type: none; cursor: grabbing; user-select: none; }
   article { min-width: 0; padding: 12px 4px; scroll-snap-align: start; overflow-wrap: anywhere; }
   h3 { margin: 0 0 8px; font-size: 16px; color: var(--boja-tekst-naslov); }
   p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--boja-tekst-sekundarni); }

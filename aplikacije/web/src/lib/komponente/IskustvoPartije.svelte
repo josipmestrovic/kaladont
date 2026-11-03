@@ -37,7 +37,7 @@
   header { color: var(--boja-isticanje-tekst); font-size: var(--tekst-veliki); }
   p { margin: 8px 0; color: var(--boja-tekst-sekundarni); }
   .max, .razina-povecana { color: var(--boja-isticanje-tekst); font-weight: 700; }
-  .traka { height: 8px; overflow: hidden; border-radius: 4px; background: #e5ddc8; }
-  .traka span { display: block; height: 100%; background: var(--boja-mint); }
+  .traka { height: 8px; overflow: hidden; border-radius: 4px; background: var(--boja-krem); }
+  .traka span { display: block; height: 100%; background: var(--boja-isticanje-tekst); }
   ul { display: grid; gap: 6px; margin: 16px 0; padding: 0; list-style: none; }
 </style>
