@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
   import Header from '$lib/komponente/Header.svelte';
+  import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
 
   interface Plasman {
     igracId: string;
@@ -24,8 +25,6 @@
   let arhiva = $state<Arhiva | null>(null);
   let greska = $state<string | null>(null);
   let prijavljeniIgrac = $state<Plasman | null>(null);
-  let razlog = $state<'pogrdan_nadimak' | 'neprimjereno_ponasanje' | 'drugo'>('pogrdan_nadimak');
-  let poruka = $state('');
   let porukaPrijave = $state<string | null>(null);
   let slanje = $state(false);
 
@@ -38,18 +37,16 @@
     slanje = true;
     porukaPrijave = null;
     try {
-      const odgovor = await api<{ poruka: string }>('/prijave-igraca', {
+      await api<{ poruka: string }>('/prijave-igraca', {
         method: 'POST',
         body: JSON.stringify({
           partijaId: arhiva.partijaId,
           prijavljeniIgracId: prijavljeniIgrac.igracId,
-          razlog,
-          poruka,
+          razlog: 'pogrdan_nadimak',
         }),
       });
-      porukaPrijave = odgovor.poruka;
       prijavljeniIgrac = null;
-      poruka = '';
+      pokaziUspjeh('Igrač je prijavljen.');
     } catch (e) {
       porukaPrijave = e instanceof Error ? e.message : 'Prijava nije uspjela.';
     } finally {
@@ -111,20 +108,10 @@
   <div class="modal-pozadina" role="presentation" onclick={() => (prijavljeniIgrac = null)}>
     <dialog open class="modal" aria-labelledby="prijava-naslov" onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.key === 'Escape' && (prijavljeniIgrac = null)}>
       <h2 id="prijava-naslov">Prijavi igrača</h2>
-      <p>Prijavljuješ: <strong>{prijavljeniIgrac.nadimak}</strong></p>
-      <label>Razlog
-        <select bind:value={razlog}>
-          <option value="pogrdan_nadimak">Pogrdan ili neprimjeren nadimak</option>
-          <option value="neprimjereno_ponasanje">Neprimjereno ponašanje</option>
-          <option value="drugo">Drugo</option>
-        </select>
-      </label>
-      <label>Poruka (opcionalno)
-        <textarea bind:value={poruka} maxlength="1000" rows="4"></textarea>
-      </label>
+      <p>Prijavljuješ: <strong>{prijavljeniIgrac.nadimak}</strong> zbog pogrdnog nadimka.</p>
       <div class="modal-akcije">
         <button type="button" onclick={() => (prijavljeniIgrac = null)}>Odustani</button>
-        <button type="button" onclick={() => void posaljiPrijavu()} disabled={slanje}>{slanje ? 'Šaljem...' : 'Pošalji prijavu'}</button>
+        <button type="button" onclick={() => void posaljiPrijavu()} disabled={slanje}>{slanje ? 'Šaljem...' : 'Prijavi'}</button>
       </div>
     </dialog>
   </div>

@@ -13,7 +13,49 @@ import {
   pobjedeTreninga,
 } from '../baza/shema.js';
 
-export type IshodBrisanja = 'obrisan' | 'nije-pronaden' | 'vec-obrisan';
+export type IshodBrisanja = 'obrisan' | 'nije-pronaden' | 'vec-obrisan' | 'zasticen';
+
+async function obrisiRacunUTransakciji(
+  transakcija: Parameters<Parameters<typeof baza.transaction>[0]>[0],
+  igrac: { id: string; obrisanAt: Date | null; vrsta: 'gost' | 'registriran' | 'admin'; upravljac: 'covjek' | 'bot' },
+): Promise<IshodBrisanja> {
+  if (igrac.obrisanAt) return 'vec-obrisan';
+  // Botovi i admini ne smiju se soft-brisati ovim putem (živ fond / admin pristup).
+  if (igrac.upravljac === 'bot' || igrac.vrsta === 'admin') return 'zasticen';
+
+  await transakcija.delete(sesije).where(eq(sesije.igracId, igrac.id));
+  await transakcija.delete(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igrac.id));
+  await transakcija.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igrac.id));
+  await transakcija.delete(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igrac.id));
+  await transakcija.delete(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igrac.id));
+  await transakcija.delete(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igrac.id));
+  await transakcija.delete(otkljucaneRijeciIgraca).where(eq(otkljucaneRijeciIgraca.igracId, igrac.id));
+  await transakcija.delete(treningRijeciIgraca).where(eq(treningRijeciIgraca.igracId, igrac.id));
+  await transakcija.delete(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igrac.id));
+  await transakcija
+    .update(igraci)
+    .set({
+      vrsta: 'registriran',
+      nadimak: 'Obrisani igrač',
+      avatarId: 0,
+      email: null,
+      lozinkaHash: null,
+      emailPotvrdjen: false,
+      obrisanAt: new Date(),
+      odigrane: 0,
+      pobjede: 0,
+      eliminacijeUkupno: 0,
+      bodoviUkupno: 0,
+      odigrane1v1: 0,
+      pobjede1v1: 0,
+      eliminacije1v1: 0,
+      bodovi1v1: 0,
+      iskustvoUkupno: 0,
+    })
+    .where(and(eq(igraci.id, igrac.id), isNull(igraci.obrisanAt)));
+
+  return 'obrisan';
+}
 
 export async function obrisiRacun(email: string, potvrdi: boolean): Promise<IshodBrisanja> {
   const normaliziraniEmail = email.trim().toLowerCase();
@@ -22,45 +64,36 @@ export async function obrisiRacun(email: string, potvrdi: boolean): Promise<Isho
 
   return baza.transaction(async (transakcija) => {
     const [igrac] = await transakcija
-      .select({ id: igraci.id, email: igraci.email, obrisanAt: igraci.obrisanAt })
+      .select({
+        id: igraci.id,
+        email: igraci.email,
+        obrisanAt: igraci.obrisanAt,
+        vrsta: igraci.vrsta,
+        upravljac: igraci.upravljac,
+      })
       .from(igraci)
       .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
       .limit(1);
 
     if (!igrac) return 'nije-pronaden';
-    if (igrac.obrisanAt) return 'vec-obrisan';
+    return obrisiRacunUTransakciji(transakcija, igrac);
+  });
+}
 
-    await transakcija.delete(sesije).where(eq(sesije.igracId, igrac.id));
-    await transakcija.delete(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igrac.id));
-    await transakcija.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igrac.id));
-    await transakcija.delete(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igrac.id));
-    await transakcija.delete(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igrac.id));
-    await transakcija.delete(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igrac.id));
-    await transakcija.delete(otkljucaneRijeciIgraca).where(eq(otkljucaneRijeciIgraca.igracId, igrac.id));
-    await transakcija.delete(treningRijeciIgraca).where(eq(treningRijeciIgraca.igracId, igrac.id));
-    await transakcija.delete(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igrac.id));
-    await transakcija
-      .update(igraci)
-      .set({
-        vrsta: 'registriran',
-        nadimak: 'Obrisani igrač',
-        avatarId: 0,
-        email: null,
-        lozinkaHash: null,
-        emailPotvrdjen: false,
-        obrisanAt: new Date(),
-        odigrane: 0,
-        pobjede: 0,
-        eliminacijeUkupno: 0,
-        bodoviUkupno: 0,
-        odigrane1v1: 0,
-        pobjede1v1: 0,
-        eliminacije1v1: 0,
-        bodovi1v1: 0,
-        iskustvoUkupno: 0,
+export async function obrisiRacunPoId(igracId: string): Promise<IshodBrisanja> {
+  return baza.transaction(async (transakcija) => {
+    const [igrac] = await transakcija
+      .select({
+        id: igraci.id,
+        obrisanAt: igraci.obrisanAt,
+        vrsta: igraci.vrsta,
+        upravljac: igraci.upravljac,
       })
-      .where(and(eq(igraci.id, igrac.id), isNull(igraci.obrisanAt)));
+      .from(igraci)
+      .where(eq(igraci.id, igracId))
+      .limit(1);
 
-    return 'obrisan';
+    if (!igrac) return 'nije-pronaden';
+    return obrisiRacunUTransakciji(transakcija, igrac);
   });
 }

@@ -24,7 +24,8 @@
     "test:opterecenje:mijesano": "tsx src/cli/opterecenje-mijesano.ts",
     "test:opterecenje:lokalno": "tsx src/cli/opterecenje-mijesano.ts --lokalno=DA",
     "test:opterecenje:popuna": "tsx src/cli/opterecenje-popuna.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:prijave-produkcija": "vitest run --config vitest.manual.config.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

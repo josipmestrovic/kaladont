@@ -45,6 +45,7 @@ export const vrstaPoteza = pgEnum('vrsta_poteza', [
   'sustav_rijec',
 ]);
 export const statusPrijave = pgEnum('status_prijave', ['nova', 'pregledana', 'rijesena']);
+export const tipPrijaveRijeci = pgEnum('tip_prijave_rijeci', ['za_brisanje', 'za_dodavanje']);
 export const statusPovratneInformacije = pgEnum('status_povratne_informacije', ['nova', 'pregledana', 'arhivirana']);
 export const akcijaIzmjeneRjecnika = pgEnum('akcija_izmjene_rjecnika', [
   'dodana',
@@ -430,6 +431,8 @@ export const prijave = pgTable('prijave', {
   igracId: uuid('igrac_id')
     .notNull()
     .references(() => igraci.id),
+  tip: tipPrijaveRijeci('tip').notNull().default('za_brisanje'),
+  rijec: text('rijec').notNull().default(''),
   poruka: text('poruka').notNull(),
   status: statusPrijave('status').notNull().default('nova'),
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
@@ -437,7 +440,12 @@ export const prijave = pgTable('prijave', {
   napomenaAdmina: text('napomena_admina'),
 }, (tablica) => [
   index('idx_prijave_igrac_id_partija_id_vrijeme').on(tablica.igracId, tablica.partijaId, tablica.vrijeme),
-  uniqueIndex('uq_prijave_igrac_partija_potez').on(tablica.igracId, tablica.partijaId, tablica.potezId),
+  uniqueIndex('uq_prijave_brisanje_igrac_partija_potez')
+    .on(tablica.igracId, tablica.partijaId, tablica.potezId)
+    .where(sql`${tablica.tip} = 'za_brisanje'`),
+  uniqueIndex('uq_prijave_dodavanje_igrac_partija_rijec')
+    .on(tablica.igracId, tablica.partijaId, tablica.rijec)
+    .where(sql`${tablica.tip} = 'za_dodavanje'`),
 ]);
 
 export const prijaveIgraca = pgTable('prijave_igraca', {

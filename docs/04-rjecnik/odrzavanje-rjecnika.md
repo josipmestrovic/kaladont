@@ -6,44 +6,46 @@ Rječnik na startu **nije savršen** i to je svjesna odluka: umjesto nemoguće s
 
 ```mermaid
 flowchart TD
-    A[Igrač uoči grešku] --> B[Prijava iz povijesti partije]
-    B --> C[Zapis u tablicu prijave + poziv email adaptera]
+    A[Igrac uoci gresku] --> B[Prijava tijekom ili nakon partije]
+    B --> C[Zapis u tablicu prijave]
     C --> D[Admin pregledava na admin stranici]
     D --> E{Odluka}
-    E -- riječ nedostaje --> F[Dodaj riječ]
-    E -- riječ ne pripada --> G[Deaktiviraj riječ]
-    E -- nije greška --> H[Odbij uz napomenu]
+    E -- rijec nedostaje --> F[Dodaj rijec]
+    E -- rijec ne pripada --> G[Deaktiviraj rijec]
+    E -- nije greska --> H[Dismiss]
     F --> I[Zapis u izmjene_rjecnika]
     G --> I
-    I --> J[Signal ponovnog učitavanja rječnika]
+    I --> J[ponovoUcitaj u RAM-u]
 ```
 
 ## Prijava riječi (perspektiva igrača)
 
-1. Igrač otvori **povijest partije** (dostupna tijekom i nakon igre).
-2. Označi konkretan potez i napiše kratku poruku (npr. „riječ 'aljkavost' postoji, a nije prihvaćena").
-3. Prijava se sprema sa statusom `nova` i vezom na završenu partiju i potez; igrač može prijaviti najviše tri različite riječi po partiji. Email adapter se poziva best-effort nakon spremanja.
-4. Nakon klika gumb prelazi u stanje „Riječ je prijavljena"; ponovni klik na istu riječ nije dopušten.
+1. Igrač otvori panel **Prijavi riječ** (dostupan tijekom i nakon partije, ispod zone igre).
+2. Mini toggle: **Odigrane** (prihvaćene riječi → admin može obrisati) ili **Moje odbijene** (vlastite `RIJEC_NE_POSTOJI` → admin može dodati).
+3. Limit **3 + 3** po partiji (odvojeno po tipu). Nema poruke ni emaila; lokalna zelena potvrda.
+4. Nakon klika gumb prelazi u „Prijavljeno”; ponovni klik nije dopušten.
 
 Tipični povodi prijave:
 
-| Situacija                                          | Vjerojatan uzrok                                 |
-| -------------------------------------------------- | ------------------------------------------------ |
-| „U bazi nemamo riječ na 'XY'", a igrač zna riječ   | Riječ nedostaje (filtar uvoza ili nije u hrLexu) |
-| Prihvaćena riječ koja ne postoji                   | Šum web-korpusa (tipfeler u hrWaC-u)             |
-| Riječ odbijena kao kriva slova, a igrač je siguran | Kandidat za iznimku digrafa                      |
+| Situacija                                          | Tip prijave     | Admin akcija |
+| -------------------------------------------------- | --------------- | ------------ |
+| Prihvaćena riječ koja ne postoji                   | `za_brisanje`   | Obriši       |
+| Odbijena riječ koja bi trebala proći               | `za_dodavanje`  | Dodaj        |
 
 ## Admin stranica (perspektiva admina)
 
-- Popis prijava s filtrima po statusu (`nova` / `pregledana` / `rijesena`), uz svaku prikaz povijesti partije s **označenim spornim potezom**.
-- Akcije: dodaj riječ (uz automatski izračun grafema i **obaveznu vrstu riječi**; leksemska grupa se izvodi iz vrste i leme), deaktiviraj riječ, dodaj iznimku digrafa, odbij prijavu — sve uz obaveznu napomenu.
-- Svaka akcija zapisuje se u `izmjene_rjecnika` (tko, kada, zašto, iz koje prijave).
+- Tri reda: riječi za brisanje, riječi za dodavanje, računi s pogrdnim nadimkom.
+- Jedan klik: **Obriši** / **Dodaj** / **Dismiss** (riječi); **Obriši račun** / **Pusti** (igrači).
+- Jedan-klik **Dodaj** koristi default vrstu `imenica`; ručni obrazac i dalje bira vrstu.
+- Ručni rječnik: pretraga, deaktivacija/vraćanje, dodavanje s obaveznom vrstom.
+- Nakon izmjene `ponovoUcitaj()` osvježava RAM — aktivne partije odmah vide novu validaciju za buduće poteze. Restart nije potreban.
+- Bez email obavijesti; admin se ulogira i pregleda.
 
 ### Trenutačni administrativni put
 
-Admin stranica i rute koriste stvarnu sesiju registriranog računa s `vrsta = 'admin'`; privremeni `X-Admin-Kljuc` više nije aktivni model autentikacije. Ruta za izmjenu odmah osvježava rječnik u memoriji (`ponovoUcitaj()`), pa nije potreban restart poslužitelja.
+Admin stranica i rute koriste stvarnu sesiju registriranog računa s `vrsta = 'admin'`.
 
-Prije produkcije još treba implementirati jednokratni CLI koji već registriranom i potvrđenom računu sigurno dodjeljuje prvu admin ulogu. Dok taj CLI ne postoji, ručni SQL ostaje poznato lokalno ograničenje i **nije odobren produkcijski postupak**. Dodavanje iznimke digrafa također još nije potpuna live admin akcija: iznimke su dio verzioniranog koda i zahtijevaju PR, test i redeploy.
+Prije produkcije još treba implementirati jednokratni CLI koji već registriranom i potvrđenom računu sigurno dodjeljuje prvu admin ulogu. Dodavanje iznimke digrafa i dalje zahtijeva PR i redeploy.
 
 ## Pravila izmjena
 

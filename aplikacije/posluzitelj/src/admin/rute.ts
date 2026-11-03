@@ -4,13 +4,15 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { desc, eq, and, isNotNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { SVE_VRSTE_RIJECI, type PregledNadzora } from 'zajednicko';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { dodajRijec, deaktivirajRijec, vratiRijec, NevaljanaRijecError } from '../rjecnik/administracija.js';
-import { prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza/shema.js';
+import { igraci, prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza/shema.js';
 import { baza } from '../baza/klijent.js';
 import { zahtijevajAdmina, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
+import { obrisiRacunPoId } from '../racuni/brisanje.js';
 import { izracunajStatistikuCekanja } from './statistika-cekanja.js';
 import { ShemaKonfiguracijeBota, type KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
 import { SukobRevizijeBotova, type ZapisPostavkiBotova } from '../bot/trajne-postavke.js';
@@ -21,6 +23,33 @@ export interface ZivoStanjeBotova {
   bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number; dobrovoljniKa: number; prisilniKa: number; propustPrimljenogKa: number };
   trening: { aktivni: number; zapoceti: number; odbijeni: number; neuspjeli: number };
   zastavice: { trening: boolean; botoviDvoboj: boolean; botoviCetveroboj: boolean };
+}
+
+async function uskladiRjecnikNakonUbaci(rjecnik: RjecnikUMemoriji, rijecUlaz: string): Promise<void> {
+  const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
+  const [redak] = await baza
+    .select({
+      rijec: rijeci.rijec,
+      prvaDva: rijeci.prvaDva,
+      vrste: rijeci.vrste,
+      grupe: rijeci.grupe,
+      frekvencija: rijeci.frekvencija,
+      aktivna: rijeci.aktivna,
+    })
+    .from(rijeci)
+    .where(eq(rijeci.rijec, rijec))
+    .limit(1);
+  if (!redak || !redak.aktivna) {
+    rjecnik.primijeniUklanjanje(rijec);
+    return;
+  }
+  rjecnik.primijeniUbaci({
+    rijec: redak.rijec,
+    prvaDva: redak.prvaDva,
+    vrste: redak.vrste as typeof SVE_VRSTE_RIJECI[number][],
+    grupe: redak.grupe,
+    frekvencija: redak.frekvencija,
+  });
 }
 
 const ShemaRijec = z.object({ rijec: z.string().min(2), razlog: z.string().min(1) });
@@ -122,17 +151,25 @@ export async function registrirajAdminRute(
     },
   );
 
-  app.get<{ Querystring: { status?: string } }>(
+  app.get<{ Querystring: { status?: string; tip?: string } }>(
     '/admin/prijave',
     { preHandler: zahtijevajAdmina },
     async (zahtjev) => {
-      const uvjet = zahtjev.query.status
-        ? eq(prijave.status, zahtjev.query.status as 'nova' | 'pregledana' | 'rijesena')
-        : undefined;
+      const status = (zahtjev.query.status as 'nova' | 'pregledana' | 'rijesena' | undefined) ?? 'nova';
+      const tip = zahtjev.query.tip as 'za_brisanje' | 'za_dodavanje' | undefined;
+      const uvjeti = [eq(prijave.status, status)];
+      if (tip === 'za_brisanje' || tip === 'za_dodavanje') uvjeti.push(eq(prijave.tip, tip));
       const retci = await baza
-        .select()
+        .select({
+          id: prijave.id,
+          tip: prijave.tip,
+          rijec: prijave.rijec,
+          status: prijave.status,
+          vrijeme: prijave.vrijeme,
+          partijaId: prijave.partijaId,
+        })
         .from(prijave)
-        .where(uvjet)
+        .where(and(...uvjeti))
         .orderBy(desc(prijave.vrijeme))
         .limit(200);
       return { ok: true, prijave: retci };
@@ -160,10 +197,84 @@ export async function registrirajAdminRute(
     },
   );
 
-  app.get('/admin/prijave-igraca', { preHandler: zahtijevajAdmina }, async () => {
+  app.post<{ Params: { id: string } }>(
+    '/admin/prijave/:id/dismiss',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev) => {
+      const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+      await baza
+        .update(prijave)
+        .set({ status: 'rijesena', napomenaAdmina: 'dismiss', rijesioId: admin.id })
+        .where(eq(prijave.id, Number(zahtjev.params.id)));
+      return { ok: true };
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/admin/prijave/:id/obrisi-rijec',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev, odgovor) => {
+      const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+      const prijavaId = Number(zahtjev.params.id);
+      const [prijava] = await baza.select().from(prijave).where(eq(prijave.id, prijavaId)).limit(1);
+      if (!prijava) return odgovor.code(404).send({ ok: false, greska: 'Prijava nije pronađena.' });
+      if (prijava.tip !== 'za_brisanje') {
+        return odgovor.code(400).send({ ok: false, greska: 'Ova prijava nije za brisanje riječi.' });
+      }
+      await deaktivirajRijec(prijava.rijec, 'Prijava igrača — riječ uklonjena', admin.id, prijavaId);
+      await baza
+        .update(prijave)
+        .set({ status: 'rijesena', napomenaAdmina: 'obrisana', rijesioId: admin.id })
+        .where(eq(prijave.id, prijavaId));
+      rjecnik.primijeniUklanjanje(prijava.rijec);
+      return { ok: true, brojRijeci: rjecnik.brojRijeci() };
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/admin/prijave/:id/dodaj-rijec',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev, odgovor) => {
+      const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+      const prijavaId = Number(zahtjev.params.id);
+      const [prijava] = await baza.select().from(prijave).where(eq(prijave.id, prijavaId)).limit(1);
+      if (!prijava) return odgovor.code(404).send({ ok: false, greska: 'Prijava nije pronađena.' });
+      if (prijava.tip !== 'za_dodavanje') {
+        return odgovor.code(400).send({ ok: false, greska: 'Ova prijava nije za dodavanje riječi.' });
+      }
+      try {
+        await dodajRijec(prijava.rijec, 'Prijava igrača — riječ dodana', admin.id, 'imenica', undefined, prijavaId);
+      } catch (greska) {
+        if (greska instanceof NevaljanaRijecError) {
+          return odgovor.code(400).send({ ok: false, greska: greska.message });
+        }
+        throw greska;
+      }
+      await baza
+        .update(prijave)
+        .set({ status: 'rijesena', napomenaAdmina: 'dodana', rijesioId: admin.id })
+        .where(eq(prijave.id, prijavaId));
+      await uskladiRjecnikNakonUbaci(rjecnik, prijava.rijec);
+      return { ok: true, brojRijeci: rjecnik.brojRijeci() };
+    },
+  );
+
+  app.get<{ Querystring: { status?: string } }>('/admin/prijave-igraca', { preHandler: zahtijevajAdmina }, async (zahtjev) => {
+    const status = (zahtjev.query.status as 'nova' | 'pregledana' | 'rijesena' | undefined) ?? 'nova';
+    const prijavljeni = alias(igraci, 'prijavljeni_igrac');
     const retci = await baza
-      .select()
+      .select({
+        id: prijaveIgraca.id,
+        partijaId: prijaveIgraca.partijaId,
+        prijavljeniIgracId: prijaveIgraca.prijavljeniIgracId,
+        nadimak: prijavljeni.nadimak,
+        razlog: prijaveIgraca.razlog,
+        status: prijaveIgraca.status,
+        vrijeme: prijaveIgraca.vrijeme,
+      })
       .from(prijaveIgraca)
+      .innerJoin(prijavljeni, eq(prijaveIgraca.prijavljeniIgracId, prijavljeni.id))
+      .where(eq(prijaveIgraca.status, status))
       .orderBy(desc(prijaveIgraca.vrijeme))
       .limit(200);
     return { ok: true, prijave: retci };
@@ -185,6 +296,44 @@ export async function registrirajAdminRute(
     },
   );
 
+  app.post<{ Params: { id: string } }>(
+    '/admin/prijave-igraca/:id/dismiss',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev) => {
+      const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+      await baza.update(prijaveIgraca).set({
+        status: 'rijesena',
+        napomenaAdmina: 'dismiss',
+        rijesioId: admin.id,
+      }).where(eq(prijaveIgraca.id, Number(zahtjev.params.id)));
+      return { ok: true };
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/admin/prijave-igraca/:id/obrisi-racun',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev, odgovor) => {
+      const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+      const prijavaId = Number(zahtjev.params.id);
+      const [prijava] = await baza.select().from(prijaveIgraca).where(eq(prijaveIgraca.id, prijavaId)).limit(1);
+      if (!prijava) return odgovor.code(404).send({ ok: false, greska: 'Prijava nije pronađena.' });
+      const ishod = await obrisiRacunPoId(prijava.prijavljeniIgracId);
+      if (ishod === 'nije-pronaden') return odgovor.code(404).send({ ok: false, greska: 'Račun nije pronađen.' });
+      if (ishod === 'zasticen') {
+        return odgovor
+          .code(400)
+          .send({ ok: false, greska: 'Botove i admin račune nije moguće obrisati ovim putem.' });
+      }
+      await baza.update(prijaveIgraca).set({
+        status: 'rijesena',
+        napomenaAdmina: ishod === 'vec-obrisan' ? 'racun_vec_obrisan' : 'racun_obrisan',
+        rijesioId: admin.id,
+      }).where(eq(prijaveIgraca.id, prijavaId));
+      return { ok: true, ishod };
+    },
+  );
+
   app.post('/admin/rjecnik/dodaj', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
     const rezultat = ShemaDodajRijec.safeParse(zahtjev.body);
     if (!rezultat.success) {
@@ -201,7 +350,7 @@ export async function registrirajAdminRute(
         rezultat.data.vrsta as (typeof SVE_VRSTE_RIJECI)[number],
         rezultat.data.lema,
       );
-      await rjecnik.ponovoUcitaj();
+      await uskladiRjecnikNakonUbaci(rjecnik, rezultat.data.rijec);
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
     } catch (greska) {
       if (greska instanceof NevaljanaRijecError) {
@@ -218,7 +367,7 @@ export async function registrirajAdminRute(
     }
     const admin = (zahtjev as ZahtjevSIgracem).igrac!;
     await deaktivirajRijec(rezultat.data.rijec, rezultat.data.razlog, admin.id);
-    await rjecnik.ponovoUcitaj();
+    rjecnik.primijeniUklanjanje(rezultat.data.rijec);
     return { ok: true, brojRijeci: rjecnik.brojRijeci() };
   });
 
@@ -229,7 +378,7 @@ export async function registrirajAdminRute(
     }
     const admin = (zahtjev as ZahtjevSIgracem).igrac!;
     await vratiRijec(rezultat.data.rijec, rezultat.data.razlog, admin.id);
-    await rjecnik.ponovoUcitaj();
+    await uskladiRjecnikNakonUbaci(rjecnik, rezultat.data.rijec);
     return { ok: true, brojRijeci: rjecnik.brojRijeci() };
   });
 

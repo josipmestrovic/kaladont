@@ -10,6 +10,7 @@ process.env.BOT_NEZNANJE_PO_SUDJELOVANJU = '0';
 export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**', 'test/**/*.manual.test.ts'],
     testTimeout: 15000,
     hookTimeout: 20000,
     // integracijski testovi dijele lokalnu Postgres bazu - sekvencijalno je pouzdanije od paralelnog

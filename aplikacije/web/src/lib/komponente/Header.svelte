@@ -114,8 +114,9 @@
 
 {#if profil?.vrsta === 'admin'}
   <nav class="admin-navigacija" aria-label="Administracija">
-    <a href="/admin#rjecnik">Rječnik</a>
-    <a href="/admin#prijave">Prijave</a>
+    <a href="/admin">Nadzor</a>
+    <a href="/admin/prijave">Prijave</a>
+    <a href="/admin/rjecnik">Rječnik</a>
     <a href="/misljenja-korisnika">Mišljenja korisnika</a>
   </nav>
 {/if}

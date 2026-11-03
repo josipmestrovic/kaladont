@@ -288,6 +288,13 @@
       "when": 1791633064547,
       "tag": "0040_izmjene_botova",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793695030049,
+      "tag": "0041_bizarre_blur",
+      "breakpoints": true
     }
   ]
 }
