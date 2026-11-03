@@ -52,10 +52,21 @@ test('stranice s queryjem, hashom, ljestvicom i javnim profilom rade nakon refre
   expect(registracija.ok()).toBe(true);
   const podaci = (await registracija.json()) as { igracId: string };
 
-  await page.goto(`/profil/javni/${podaci.igracId}`);
+  const javniProfil = `/profil/javni/${podaci.igracId}`;
+  const prviOdgovor = await request.get(javniProfil);
+  expect(prviOdgovor.status()).toBe(200);
+  expect(prviOdgovor.headers()['content-type']).toContain('text/html');
+
+  await page.goto(javniProfil);
   await expect(page).toHaveURL(new RegExp(`/profil/javni/${podaci.igracId}$`));
+  await expect(page.getByText('HttpE2E')).toBeVisible();
   await page.reload();
   await expect(page).toHaveURL(new RegExp(`/profil/javni/${podaci.igracId}$`));
+  await expect(page.getByText('HttpE2E')).toBeVisible();
+
+  const drugiOdgovor = await request.get(javniProfil);
+  expect(drugiOdgovor.status()).toBe(200);
+  expect(drugiOdgovor.headers()['content-type']).toContain('text/html');
 });
 
 test('nepoznata API ruta vraća JSON 404, a reset stranica ostaje HTML', async ({ page }) => {

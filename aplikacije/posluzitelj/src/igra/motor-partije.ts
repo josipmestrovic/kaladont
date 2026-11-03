@@ -61,6 +61,7 @@ import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenj
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { zabiljeziPobjeduTreninga } from '../trening/upis-napretka.js';
 import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
+import { stvoriStvarniSat, type Sat, type SatHandle } from './sat.js';
 
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50), turnToken: z.string().min(1).max(64).optional() }).strict();
 const ShemaNeznam = z.object({ turnToken: z.string().min(1).max(64).optional() }).strict().optional();
@@ -112,6 +113,7 @@ export interface AktivneVezeIgraca {
 }
 
 export interface PostavkeMotoraPartije {
+  sat?: Sat;
   timerOnemogucen?: boolean;
   trajanjePotezaMs?: number;
   trajanjeIzboraSustavaMs?: number;
@@ -141,7 +143,7 @@ export interface PostavkeMotoraPartije {
 }
 
 interface PrekidUTijeku {
-  timerHandle: NodeJS.Timeout;
+  timerHandle: SatHandle;
   istekMs: number;
   bioNaPotezu: boolean;
   napadacId: string | null;
@@ -187,9 +189,9 @@ interface StanjeStola {
   runda: number;
   redniBroj: number;
   vrijemePocetkaPotezaMs: number;
-  timerHandle: NodeJS.Timeout | null;
+  timerHandle: SatHandle | null;
   izborUToku: boolean; // true dok sustav bira rijec za otvaranje runde (RS: nitko ne moze igrati)
-  izborHandle: NodeJS.Timeout | null;
+  izborHandle: SatHandle | null;
   istekIzboraIso: string | null;
   eliminacije: Eliminacija[];
   eliminacijeBrojac: Map<string, number>;
@@ -219,14 +221,14 @@ interface StanjeStola {
   najavljenaDostignuca: Map<string, Set<string>>;
   statusSpremanja: 'nije_zavrsena' | 'spremanje_rezultata' | 'rezultati_spremljeni';
   brojPokusajaSpremanja: number;
-  retrySpremanjaHandle: NodeJS.Timeout | null;
+  retrySpremanjaHandle: SatHandle | null;
   zavrsnoSpremanje: (() => Promise<void>) | null;
   upisiPotezaUTijeku: Promise<void>[];
   treningNeaktivnost: { upozorenjeIso: string; zatvaraIso: string; upozorenje: boolean } | null;
   treningRokovi: { upozorenjeMs: number; zatvaranjeMs: number } | null;
   treningGeneration: number;
-  treningUpozorenjeHandle: NodeJS.Timeout | null;
-  treningZatvaranjeHandle: NodeJS.Timeout | null;
+  treningUpozorenjeHandle: SatHandle | null;
+  treningZatvaranjeHandle: SatHandle | null;
 }
 
 export function stvoriUpraviteljPartija(
@@ -235,6 +237,7 @@ export function stvoriUpraviteljPartija(
   aktivneVeze: AktivneVezeIgraca,
   postavke: PostavkeMotoraPartije = {},
 ) {
+  const sat = postavke.sat ?? stvoriStvarniSat();
   // SAMO za lokalno testiranje (docs/06-razvoj/postavljanje-okoline.md) - u produkciji mora biti iskljuceno/nepostavljeno
   const timerOnemogucen = postavke.timerOnemogucen ?? konfiguracija.ONEMOGUCI_TIMER_POTEZA === 'true';
   const trajanjePotezaMs = postavke.trajanjePotezaMs ?? TRAJANJE_POTEZA_MS;
@@ -315,11 +318,11 @@ export function stvoriUpraviteljPartija(
     const partijaId = stanje.partijaId;
     stanje.zavrsena = true;
     namjerniIsteciBotova.delete(partijaId);
-    if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
-    if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
-    if (stanje.treningUpozorenjeHandle) clearTimeout(stanje.treningUpozorenjeHandle);
-    if (stanje.treningZatvaranjeHandle) clearTimeout(stanje.treningZatvaranjeHandle);
-    for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
+    if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
+    if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
+    if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
+    if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
+    for (const prekid of stanje.prekidiUTijeku.values()) sat.otkazi(prekid.timerHandle);
     stanje.prekidiUTijeku.clear();
     objaviPromjenuPoteza(stanje);
     const dovrsi = () => {
@@ -342,9 +345,9 @@ export function stvoriUpraviteljPartija(
     }
   }
 
-  function zakaziNeaktivnostTreninga(stanje: StanjeStola, aktivnostMs = Date.now()): void {
-    if (stanje.treningUpozorenjeHandle) clearTimeout(stanje.treningUpozorenjeHandle);
-    if (stanje.treningZatvaranjeHandle) clearTimeout(stanje.treningZatvaranjeHandle);
+  function zakaziNeaktivnostTreninga(stanje: StanjeStola, aktivnostMs = sat.sada()): void {
+    if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
+    if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
     if (stanje.kontekst !== 'trening' || stanje.zavrsena) return;
     const rokovi = stanje.treningRokovi ??= structuredClone(postavke.dohvatiRokoveNeaktivnostiTreninga?.() ?? ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA);
     const generacija = ++stanje.treningGeneration;
@@ -353,17 +356,17 @@ export function stvoriUpraviteljPartija(
     const zatvaraMs = rok.zatvaranjeMs;
     stanje.treningNeaktivnost = { upozorenjeIso: new Date(upozorenjeMs).toISOString(), zatvaraIso: new Date(zatvaraMs).toISOString(), upozorenje: false };
     const igrac = stanje.sudionici.find((sudionik) => sudionik.upravljac === 'covjek');
-    stanje.treningUpozorenjeHandle = setTimeout(() => {
-      if (stanje.zavrsena || stanje.treningGeneration !== generacija || !stanje.treningNeaktivnost || stanjeNeaktivnostiTreninga(aktivnostMs, Date.now(), rokovi) !== 'upozorenje') return;
+    stanje.treningUpozorenjeHandle = sat.zakazi(() => {
+      if (stanje.zavrsena || stanje.treningGeneration !== generacija || !stanje.treningNeaktivnost || stanjeNeaktivnostiTreninga(aktivnostMs, sat.sada(), rokovi) !== 'upozorenje') return;
       stanje.treningNeaktivnost.upozorenje = true;
       if (igrac) aktivneVeze.dohvatiSocket(igrac.igracId)?.emit('trening:neaktivnost', { partijaId: stanje.partijaId, ...stanje.treningNeaktivnost });
-    }, Math.max(0, upozorenjeMs - Date.now()));
+    }, Math.max(0, upozorenjeMs - sat.sada()));
     stanje.treningUpozorenjeHandle.unref();
     const zatvoriAkoIsteko = () => {
-      if (stanje.zavrsena || stanje.treningGeneration !== generacija || stanjeNeaktivnostiTreninga(aktivnostMs, Date.now(), rokovi) !== 'isteklo') return;
+      if (stanje.zavrsena || stanje.treningGeneration !== generacija || stanjeNeaktivnostiTreninga(aktivnostMs, sat.sada(), rokovi) !== 'isteklo') return;
       ponistiStol(stanje, 'Trening je zatvoren nakon pet minuta neaktivnosti.');
     };
-    stanje.treningZatvaranjeHandle = setTimeout(zatvoriAkoIsteko, Math.max(0, zatvaraMs - Date.now()));
+    stanje.treningZatvaranjeHandle = sat.zakazi(zatvoriAkoIsteko, Math.max(0, zatvaraMs - sat.sada()));
     stanje.treningZatvaranjeHandle.unref();
     if (igrac) aktivneVeze.dohvatiSocket(igrac.igracId)?.emit('trening:neaktivnost', { partijaId: stanje.partijaId, ...stanje.treningNeaktivnost });
   }
@@ -580,8 +583,8 @@ export function stvoriUpraviteljPartija(
   }
 
   function postaviTimer(stanje: StanjeStola): void {
-    if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
-    stanje.vrijemePocetkaPotezaMs = Date.now();
+    if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
+    stanje.vrijemePocetkaPotezaMs = sat.sada();
     const trajanjeMs =
       stanje.trajanjePotezaSek !== undefined
         ? stanje.trajanjePotezaSek * 1000
@@ -592,7 +595,7 @@ export function stvoriUpraviteljPartija(
       return;
     }
     const token = stanje.turnToken;
-    stanje.timerHandle = setTimeout(() => {
+    stanje.timerHandle = sat.zakazi(() => {
       if (stanje.zavrsena || stanje.izborUToku || stanje.turnToken !== token) return;
       eliminirajIgraca(stanje, stanje.naPotezuId, 'istek');
     }, trajanjeMs);
@@ -622,7 +625,7 @@ export function stvoriUpraviteljPartija(
       naPotezuId: stanje.naPotezuId,
       trazenaSlova: stanje.trazenaSlova,
       istekPotezaIso: istekPotezaIso(stanje),
-      serverVrijemeIso: new Date().toISOString(),
+      serverVrijemeIso: new Date(sat.sada()).toISOString(),
       runda: stanje.runda,
       brojIskoristenih: stanje.brojOdigranih,
       eliminacije: stanje.eliminacije,
@@ -663,12 +666,12 @@ export function stvoriUpraviteljPartija(
     const partijaIdovi = aktivnePartije.filter((stanje) => stanje.politika.zapisujePovijest).map((stanje) => stanje.partijaId);
     for (const stanje of aktivnePartije) {
       stanje.zavrsena = true;
-      if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
-      if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
-      if (stanje.treningUpozorenjeHandle) clearTimeout(stanje.treningUpozorenjeHandle);
-      if (stanje.treningZatvaranjeHandle) clearTimeout(stanje.treningZatvaranjeHandle);
-      if (stanje.retrySpremanjaHandle) clearTimeout(stanje.retrySpremanjaHandle);
-      for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
+      if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
+      if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
+      if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
+      if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
+      if (stanje.retrySpremanjaHandle) sat.otkazi(stanje.retrySpremanjaHandle);
+      for (const prekid of stanje.prekidiUTijeku.values()) sat.otkazi(prekid.timerHandle);
       objaviPromjenuPoteza(stanje);
       for (const sudionik of stanje.sudionici) {
         aktivneVeze.dohvatiSocket(sudionik.igracId)?.emit('partija:ponistena', {
@@ -685,8 +688,8 @@ export function stvoriUpraviteljPartija(
 
   function zakaziBrisanjeNakonSpremanja(stanje: StanjeStola): void {
     namjerniIsteciBotova.delete(stanje.partijaId);
-    setTimeout(() => {
-      if (stanje.retrySpremanjaHandle) clearTimeout(stanje.retrySpremanjaHandle);
+    sat.zakazi(() => {
+      if (stanje.retrySpremanjaHandle) sat.otkazi(stanje.retrySpremanjaHandle);
       for (const s of stanje.sudionici) {
         aktivneVeze.dohvatiSocket(s.igracId)?.leave(SOBA_PARTIJE(stanje.partijaId));
         if (partijaPoIgracu.get(s.igracId) === stanje.partijaId) partijaPoIgracu.delete(s.igracId);
@@ -727,7 +730,7 @@ export function stvoriUpraviteljPartija(
           POCETNI_ODMAK_RETRYJA_REZULTATA_MS * 2 ** (stanje.brojPokusajaSpremanja - 1),
           MAKSIMALNI_ODMAK_RETRYJA_REZULTATA_MS,
         );
-        stanje.retrySpremanjaHandle = setTimeout(pokusaj, odmak);
+        stanje.retrySpremanjaHandle = sat.zakazi(pokusaj, odmak);
         stanje.retrySpremanjaHandle.unref();
       });
     };
@@ -772,7 +775,7 @@ export function stvoriUpraviteljPartija(
 
     const stanje: StanjeStola = {
       partijaId,
-      pocetakPartijeMs: Date.now(),
+      pocetakPartijeMs: sat.sada(),
       mod,
       kontekst,
       politika,
@@ -792,7 +795,7 @@ export function stvoriUpraviteljPartija(
       brojOdigranih: 0,
       runda: 0,
       redniBroj: 0,
-      vrijemePocetkaPotezaMs: Date.now(),
+      vrijemePocetkaPotezaMs: sat.sada(),
       timerHandle: null,
       izborUToku: true, // do prve riječi sustava potezi nisu mogući
       izborHandle: null,
@@ -841,7 +844,7 @@ export function stvoriUpraviteljPartija(
       socket?.join(SOBA_PARTIJE(partijaId));
     }
     // Čekanje se mjeri samo ljudima; botov ulazak u stol nije čekanje.
-    const cekanjeMsPoIgracu = new Map(izmjesano.map((s) => [s.igracId, s.upravljac === 'bot' ? 0 : Date.now() - s.usaoU]));
+    const cekanjeMsPoIgracu = new Map(izmjesano.map((s) => [s.igracId, s.upravljac === 'bot' ? 0 : sat.sada() - s.usaoU]));
     const ljudi = sudionici.filter((s) => s.upravljac === 'covjek');
     // Javni botovi imaju redak u bazi; privremeno Računalo u treningu nema ništa.
     const sudioniciUBazi = politika.zapisujePovijest ? sudionici : [];
@@ -891,7 +894,7 @@ export function stvoriUpraviteljPartija(
       if (stanje.zavrsena || prekiniPrazanPocetak(stanje)) return 'zaustavljanje' as const;
       if (stanje.izborHandle) return 'pokrenuta' as const;
       const odgodaPocetka = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PARTIJE_MS;
-      pocetakIso = new Date(Date.now() + odgodaPocetka).toISOString();
+      pocetakIso = new Date(sat.sada() + odgodaPocetka).toISOString();
       stanje.istekIzboraIso = pocetakIso;
       const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
         partijaId,
@@ -908,12 +911,12 @@ export function stvoriUpraviteljPartija(
         kontekst,
         sudionici.filter((s) => s.upravljac === 'bot').map((s) => s.igracId),
       );
-      stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), odgodaPocetka);
+      stanje.izborHandle = sat.zakazi(() => objaviRijecSustava(stanje, null), odgodaPocetka);
       return 'pokrenuta' as const;
     }).catch((greska) => {
       console.error(`Neuspjelo pokretanje partije ${partijaId}:`, greska);
-      if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
-      if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
+      if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
+      if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
       partije.delete(partijaId);
       for (const sudionik of sudionici) {
         if (partijaPoIgracu.get(sudionik.igracId) === partijaId) partijaPoIgracu.delete(sudionik.igracId);
@@ -950,14 +953,14 @@ export function stvoriUpraviteljPartija(
 
   function zakljuciPartiju(stanje: StanjeStola): void {
     stanje.zavrsena = true;
-    if (stanje.treningUpozorenjeHandle) clearTimeout(stanje.treningUpozorenjeHandle);
-    if (stanje.treningZatvaranjeHandle) clearTimeout(stanje.treningZatvaranjeHandle);
+    if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
+    if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
     // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.
-    const zavrsenoU = new Date();
+    const zavrsenoU = new Date(sat.sada());
     const prikazRezultataOdIso = new Date(zavrsenoU.getTime() + 8_000).toISOString();
-    if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
-    if (stanje.izborHandle) clearTimeout(stanje.izborHandle);
-    for (const prekid of stanje.prekidiUTijeku.values()) clearTimeout(prekid.timerHandle);
+    if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
+    if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
+    for (const prekid of stanje.prekidiUTijeku.values()) sat.otkazi(prekid.timerHandle);
     stanje.prekidiUTijeku.clear();
     objaviPromjenuPoteza(stanje);
 
@@ -1232,15 +1235,15 @@ export function stvoriUpraviteljPartija(
   function zapocniIzborRijeciSustava(stanje: StanjeStola, napadac: string | null): void {
     const izvorniRok = stanje.izborUToku ? stanje.istekIzboraIso : null;
     const trajanje = postavke.trajanjeIzboraSustavaMs ?? (konfiguracija.NODE_ENV === 'test' ? 0 : TRAJANJE_IZBORA_SUSTAVA_MS);
-    if (stanje.timerHandle) clearTimeout(stanje.timerHandle);
+    if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
     stanje.timerHandle = null;
-    if (stanje.izborHandle) clearTimeout(stanje.izborHandle); // moze se dogoditi ako netko napusti partiju dok sustav vec bira
+    if (stanje.izborHandle) sat.otkazi(stanje.izborHandle); // moze se dogoditi ako netko napusti partiju dok sustav vec bira
     stanje.izborUToku = true;
     stanje.napadacId = null;
-    stanje.istekIzboraIso = izvorniRok || new Date(Date.now() + trajanje).toISOString();
+    stanje.istekIzboraIso = izvorniRok || new Date(sat.sada() + trajanje).toISOString();
     const poruka: SustavBiraRijec = { istekIzboraIso: stanje.istekIzboraIso };
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:sustav-bira-rijec', poruka);
-    stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, napadac), Math.max(0, Date.parse(stanje.istekIzboraIso) - Date.now()));
+    stanje.izborHandle = sat.zakazi(() => objaviRijecSustava(stanje, napadac), Math.max(0, Date.parse(stanje.istekIzboraIso) - sat.sada()));
     objaviPromjenuPoteza(stanje);
   }
 
@@ -1306,7 +1309,7 @@ export function stvoriUpraviteljPartija(
       naPotezuId: naPotezu,
       turnToken: stanje.turnToken,
       istekPotezaIso: istekPotezaIso(stanje),
-      serverVrijemeIso: new Date().toISOString(),
+      serverVrijemeIso: new Date(sat.sada()).toISOString(),
       runda: stanje.runda,
     };
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:runda-otvorena', poruka);
@@ -1342,7 +1345,7 @@ export function stvoriUpraviteljPartija(
       vrsta: razlog.startsWith('mrtva_slova') ? 'auto_kraj' : (razlog as 'ne_znam' | 'istek' | 'prekid'),
       rijec: null,
       trazenaSlova: stanje.trazenaSlova,
-      trajanjeMs: razlog.startsWith('mrtva_slova') ? 0 : Date.now() - stanje.vrijemePocetkaPotezaMs,
+      trajanjeMs: razlog.startsWith('mrtva_slova') ? 0 : sat.sada() - stanje.vrijemePocetkaPotezaMs,
     });
 
     // napadac nikad nije sam eliminirani igrac (npr. otvarač runde koji istekne prije ijedne riječi)
@@ -1445,7 +1448,7 @@ export function stvoriUpraviteljPartija(
     // Ne dodjeljuj novi aktivni potez prije izbora riječi — inače sljedeći (često
     // napadač) dobije formu na ~trenutak, pa se UI čini zamrznutim / neupotrebljivim.
     if (stanje.timerHandle) {
-      clearTimeout(stanje.timerHandle);
+      sat.otkazi(stanje.timerHandle);
       stanje.timerHandle = null;
     }
     zapocniIzborRijeciSustava(stanje, noviOtvarac);
@@ -1458,7 +1461,7 @@ export function stvoriUpraviteljPartija(
     izvorniSocket?: KaladontSocket,
   ): void {
     const trazenaSlovaZaOvajPotez = stanje.trazenaSlova!;
-    const trajanjeMs = Date.now() - stanje.vrijemePocetkaPotezaMs;
+    const trajanjeMs = sat.sada() - stanje.vrijemePocetkaPotezaMs;
     const prethodniNapadacId = stanje.napadacId;
     const sudionik = stanje.sudionici.find((stavka) => stavka.igracId === igracId);
     const gamifikacijaAktivna = stanje.politika.dajeDostignucaIKolekcije;
@@ -1628,7 +1631,7 @@ export function stvoriUpraviteljPartija(
         sljedeciId: sljedeci,
         turnToken: stanje.turnToken,
         istekPotezaIso: '',
-        serverVrijemeIso: new Date().toISOString(),
+        serverVrijemeIso: new Date(sat.sada()).toISOString(),
         brojIskoristenih: stanje.brojOdigranih,
         streak: trenutniStreak,
         nagrada,
@@ -1659,7 +1662,7 @@ export function stvoriUpraviteljPartija(
           sljedeciId: zrtva,
           turnToken: stanje.turnToken,
           istekPotezaIso: '',
-          serverVrijemeIso: new Date().toISOString(),
+          serverVrijemeIso: new Date(sat.sada()).toISOString(),
           brojIskoristenih: stanje.brojOdigranih,
           streak: trenutniStreak,
           nagrada,
@@ -1684,7 +1687,7 @@ export function stvoriUpraviteljPartija(
       sljedeciId: sljedeci,
       turnToken: stanje.turnToken,
       istekPotezaIso: istekPotezaIso(stanje),
-      serverVrijemeIso: new Date().toISOString(),
+      serverVrijemeIso: new Date(sat.sada()).toISOString(),
       brojIskoristenih: stanje.brojOdigranih,
       streak: trenutniStreak,
       nagrada,
@@ -1757,14 +1760,14 @@ export function stvoriUpraviteljPartija(
     }
 
     if (stanje.timerHandle) {
-      clearTimeout(stanje.timerHandle);
+      sat.otkazi(stanje.timerHandle);
       stanje.timerHandle = null;
     }
     zapocniIzborRijeciSustava(stanje, sayerId);
   }
 
   function jePrebrzo(stanje: StanjeStola, igracId: string): boolean {
-    const sada = Date.now();
+    const sada = sat.sada();
     const povijest = (stanje.zadnjiPotezi.get(igracId) ?? []).filter((t) => sada - t < 1000);
     if (povijest.length >= 3) {
       stanje.zadnjiPotezi.set(igracId, povijest);
@@ -1838,7 +1841,7 @@ export function stvoriUpraviteljPartija(
   function ponistiCekanjePovratka(stanje: StanjeStola, igracId: string): void {
     const prekid = stanje.prekidiUTijeku.get(igracId);
     if (!prekid) return;
-    clearTimeout(prekid.timerHandle);
+    sat.otkazi(prekid.timerHandle);
     stanje.prekidiUTijeku.delete(igracId);
   }
 
@@ -1876,7 +1879,7 @@ export function stvoriUpraviteljPartija(
     stanje.obradaPrekidaZakazana = false;
     if (stanje.zavrsena) return;
 
-    const sada = Date.now();
+    const sada = sat.sada();
     const istekliPoRoku = [...stanje.prekidiUTijeku.entries()]
       .filter(([, prekid]) => prekid.istekMs <= sada)
       .sort(([, prvi], [, drugi]) => prvi.istekMs - drugi.istekMs);
@@ -1904,7 +1907,7 @@ export function stvoriUpraviteljPartija(
     for (const [igracId, prekid] of istekli) {
       if (stanje.prekidiUTijeku.get(igracId) !== prekid) continue;
       stanje.prekidiUTijeku.delete(igracId);
-      clearTimeout(prekid.timerHandle);
+      sat.otkazi(prekid.timerHandle);
       eliminirajIgraca(stanje, igracId, 'prekid', prekid);
     }
   }
@@ -1913,7 +1916,7 @@ export function stvoriUpraviteljPartija(
     if (stanje.obradaPrekidaZakazana || stanje.zavrsena) return;
     stanje.obradaPrekidaZakazana = true;
     const handle = odgodaObradePrekidaMs > 0
-      ? setTimeout(() => obradiIsteklePrekide(stanje), odgodaObradePrekidaMs)
+      ? sat.zakazi(() => obradiIsteklePrekide(stanje), odgodaObradePrekidaMs)
       : setImmediate(() => obradiIsteklePrekide(stanje));
     handle.unref();
   }
@@ -1927,8 +1930,8 @@ export function stvoriUpraviteljPartija(
     if (!stanje || stanje.zavrsena || !stanje.aktivni.has(igracId)) return;
 
     ponistiCekanjePovratka(stanje, igracId);
-    const istekMs = Date.now() + tolerancijaPrekidaMs;
-    const timerHandle = setTimeout(() => zakaziObraduIsteklihPrekida(stanje), tolerancijaPrekidaMs);
+    const istekMs = sat.sada() + tolerancijaPrekidaMs;
+    const timerHandle = sat.zakazi(() => zakaziObraduIsteklihPrekida(stanje), tolerancijaPrekidaMs);
     timerHandle.unref();
     stanje.prekidiUTijeku.set(igracId, {
       timerHandle,
@@ -2031,7 +2034,7 @@ export function stvoriUpraviteljPartija(
 
       const stanje = dohvatiPartijuZaSocket(socket);
       if (!stanje || stanje.zavrsena) return;
-      const sada = Date.now();
+      const sada = sat.sada();
       const zadnja = stanje.zadnjeReakcije.get(socket.data.igracId) ?? 0;
       if (sada - zadnja < 2000) return; // RS-22: tiho ignoriraj
       stanje.zadnjeReakcije.set(socket.data.igracId, sada);
@@ -2096,11 +2099,11 @@ export function stvoriUpraviteljPartija(
     const partijaId = randomUUID();
     const prviIgracId = sudionici[0]!.igracId;
       const odgodaMs = ODGODA_POCETKA_PRIVATNE_PARTIJE_MS;
-    const pocetakIso = new Date(Date.now() + odgodaMs).toISOString();
+    const pocetakIso = new Date(sat.sada() + odgodaMs).toISOString();
 
     const stanje: StanjeStola = {
       partijaId,
-      pocetakPartijeMs: Date.now(),
+      pocetakPartijeMs: sat.sada(),
       mod: 'cetiri_igraca',
       kontekst: 'privatna',
       politika: politikaZaKontekst('privatna'),
@@ -2119,7 +2122,7 @@ export function stvoriUpraviteljPartija(
       brojOdigranih: 0,
       runda: 0,
       redniBroj: 0,
-      vrijemePocetkaPotezaMs: Date.now(),
+      vrijemePocetkaPotezaMs: sat.sada(),
       timerHandle: null,
       izborUToku: true,
       izborHandle: null,
@@ -2192,8 +2195,8 @@ export function stvoriUpraviteljPartija(
       stanje.grupeSNagradom = grupe;
       stanje.grupeZaDostignuca = grupeDostignuca;
       stanje.pocetneKolekcijskeGrupe = new Map([...grupe].map(([igracId, mape]) => [igracId, new Set([...mape.keys()].map(kolekcijskiKljucGrupe))]));
-      const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - Date.now());
-      stanje.izborHandle = setTimeout(() => objaviRijecSustava(stanje, null), preostaloMs);
+      const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - sat.sada());
+      stanje.izborHandle = sat.zakazi(() => objaviRijecSustava(stanje, null), preostaloMs);
     }).catch((greska) => console.error('Neuspio pripremiti privatnu partiju:', greska));
 
     return partijaId;
@@ -2243,7 +2246,7 @@ export function stvoriUpraviteljPartija(
     posaljiReakcijuSudionika(partijaId: string, igracId: string, poruka: BrzaPoruka): boolean {
       const stanje = partije.get(partijaId);
       if (!stanje || !stanje.sudionici.some((s) => s.igracId === igracId)) return false;
-      const sada = Date.now();
+      const sada = sat.sada();
       const zadnja = stanje.zadnjeReakcije.get(igracId) ?? 0;
       if (sada - zadnja < 2000) return false;
       stanje.zadnjeReakcije.set(igracId, sada);

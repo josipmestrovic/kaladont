@@ -45,11 +45,15 @@ testove, pa dodavanje browsera ne usporava svakodnevni testni ciklus.
 CI dodatno pokreće `pnpm test:e2e:http` protiv izgrađenog imagea na portu 3000 s
 `POSLUZUJ_WEB=true`. Taj test provjerava direktan ulazak i refresh stranica na istom Fastify
 procesu koji poslužuje API i SvelteKit, uključujući razdvajanje `/api/...` ruta od URL-ova stranica.
+Javni profil nakon refresha mora vratiti HTTP 200, `text/html` i vidljiv nadimak igrača.
+Izvještaj ide u `playwright-report-http/` (odvojeno od image-smokea).
 
 CI nakon toga pokreće `pnpm test:e2e:image-smoke` protiv istog buildanog imagea. To je kratki
 real-user smoke: browser otvara privatnu sobu, pokreće partiju, završava je kroz „Ne znam”, provjerava
-završni poredak i povratak kroz „Igraj ponovno”. Cilj nije zamijeniti sve E2E testove, nego dokazati
-da stvarni produkcijski server, cookie/token stanje, SvelteKit stranice i Socket.IO rade zajedno.
+završni poredak i povratak kroz „Igraj ponovno”. Datoteka `image-smoke.spec.ts` **nije** dio desktop
+E2E na Viteu (`testIgnore` u `playwright.config.ts`); izvještaj je u `playwright-report-image/`.
+Cilj nije zamijeniti sve E2E testove, nego dokazati da stvarni produkcijski server, cookie/token
+stanje, SvelteKit stranice i Socket.IO rade zajedno.
 
 Početni kritični paket ima šest testova: registracija/prijava i sesija, javni red za četiri igrača,
 javni red za dva igrača, privatna soba s dva igrača i reconnect aktivne partije. Pravila grafema,
@@ -66,7 +70,9 @@ Mobilni unos pokriva `mobilni-tok.spec.ts` s kontroliranom geometrijom `visualVi
 
 `red.spec.ts` provjerava ručno listanje 23 zanimljivosti, brojač i nepromijenjenu visinu slidera na 320/390/1440 px. Završni rezultati imaju browser provjeru stvarnog kontrasta teksta prema složenoj pozadini u obje teme (XP, nova i maksimalna razina, bodovi pobjednika, DNK vrijednosti i akcije) te boje DNK grafa. `naslovnica.spec.ts` pokriva desktop/mobilni copyright bez dodatnog skrolanja, font za disleksiju i stvarni pristup CC licencama i licencnim obavijestima iz footera.
 
-Stabilnost avatara pokriva `red.spec.ts` za Dvoboj i Četveroboj na zaslonima 1440×900, 390×844, 320×568 i 844×390. Testovi uspoređuju stvarne koordinate svih avatara kroz šest razloga eliminacije, obnovu stanja, novu rundu, XP obavijesti i spremanje/čekanje rezultata; provjeravaju vidljivost oblačića, jednoredne statuse i odsutnost prekrivanja. Kontrolirani sat provjerava završno odbrojavanje 8→5→rezultati. `motor-partije.test.ts` dodatno provjerava stvarni rok od 8 s, da riječ ne stiže prerano te da dodatna eliminacija i reconnect ne resetiraju rok. Browser emulacija ne potvrđuje ponašanje fizičke mobilne tipkovnice.
+Stabilnost avatara pokriva `red.spec.ts` za Dvoboj i Četveroboj na zaslonima 1440×900, 390×844, 320×568 i 844×390. Testovi uspoređuju stvarne koordinate svih avatara kroz šest razloga eliminacije, obnovu stanja, novu rundu, XP obavijesti i spremanje/čekanje rezultata; provjeravaju vidljivost oblačića, jednoredne statuse i odsutnost prekrivanja. Kontrolirani sat u browseru provjerava završno odbrojavanje 8→5→rezultati. U `motor-partije.test.ts` rok izbora sustava (8 s) i istek poteza koriste injektirani `Sat` (`aplikacije/posluzitelj/src/igra/sat.ts`) umjesto wall-clock prozora na runneru; ostali integracijski testovi i dalje koriste stvarni sat. Browser emulacija ne potvrđuje ponašanje fizičke mobilne tipkovnice.
+
+CI load smoke (`opterecenje --scenarij=igra`) na PR/mainu zahtijeva prihvaćene poteze i završetak partija; p95 pragovi u CI-ju su labavi (5000 ms). Strože mjerenje kapaciteta ostaje ručno / na stagingu.
 
 Puni E2E paket izvršava se jednom na `desktop-chrome`. Datoteka `mobilni-tok.spec.ts` izvršava se
 samo na `android-chrome` (Pixel 7, Chromium) i `iphone-webkit` (iPhone 13, WebKit), kako se cijeli

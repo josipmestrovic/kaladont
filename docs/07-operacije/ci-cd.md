@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-> **Status 2026-11-03: djelomično implementirano.** `.github/workflows/ci.yml`, `.github/workflows/objavi-ghcr.yml`, `.github/workflows/objavi-staging.yml`, `.github/workflows/promoviraj-produkciju.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički CI fixture postoje. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda, staging automatski objavljuje digest, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Prava backup automatika (systemd/`age`/Storage Box) još nije u repou — dok je nema, `skripte/zahtijevaj-svjez-offserver-backup.sh` namjerno pada prije migracija. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
+> **Status 2026-11-03: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Prava backup automatika (systemd/`age`/Storage Box) još nije u repou — dok je nema, `skripte/zahtijevaj-svjez-offserver-backup.sh` namjerno pada prije migracija. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
 
 Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
 
@@ -15,18 +15,40 @@ flowchart LR
     G --> H[Isti digest u produkciju]
 ```
 
-Razvojno računalo nema virtualizaciju pa se Docker slika ne može testirati lokalno — **CI je jedino mjesto koje dokazuje da slika radi** prije staginga. Zato smoke test nije opcionalan korak nego bloker objave.
+Razvojno računalo nema virtualizaciju pa se Docker slika ne može testirati lokalno — **CI je jedino mjesto koje dokazuje da slika radi** prije staginga. Zato smoke test nije opcionalan korak nego bloker objave (osim docs-only pusha).
 
 ## Pravila koja vrijede za sve workflowe
 
 - Sve third-party GitHub Actions reference pinaju se na puni commit SHA; komentar uz SHA navodi čitljivu verziju. Dependabot ih ažurira kroz Pull Request (PR).
-- Svaki job dobiva samo nužne `GITHUB_TOKEN` ovlasti. Zadano je `contents: read`; samo job koji objavljuje sliku dobiva `packages: write`.
+- Workflow zadano ima `contents: read`. Job `slika` dodatno ima `packages: write` (main candidate) i `security-events: write` (Trivy SARIF). Job `kod` i agregator ostaju na `contents: read`.
 - Aplikacijska slika gradi se samo za `linux/amd64`. ARM/multi-arch nije dio početne postave.
 - Staging i produkcija imaju zasebne GitHub Environmente i SSH ključeve. Produkcijski Environment nema required reviewer jer postoji jedan operater; ručni `workflow_dispatch` jest kontrolna točka.
 - `concurrency` dopušta najviše jedan aktivni deploy po okruženju. Novi staging deploy ne smije se utrkivati sa starim, a produkcijski deploy nikad ne prekida drugi produkcijski deploy.
 - SSH veza provjerava unaprijed spremljen host fingerprint. `StrictHostKeyChecking=no` je zabranjen.
 - Nema `git pull` ni builda na VPS-u. VPS prima verzionirane konfiguracije i povlači gotovu sliku po digestu.
-- Docs-only promjene (`docs/**` i Markdown datoteke koje ne utječu na build) prolaze provjeru dokumentacije, ali preskaču build slike i deploy.
+
+## Docs-only i chore
+
+Detekcija je **isključivo po putanjama** u difu (base SHA → head SHA). Poruka commita (`docs:`, `chore:`, `[skip ci]`) **ne** utječe na CI.
+
+**Docs-only** vrijedi samo ako je **svaka** izmijenjena datoteka u jednoj od ovih skupina:
+
+| Dopušteno | Primjeri |
+| --- | --- |
+| `docs/**` | `docs/07-operacije/ci-cd.md` |
+| root `*.md` | `README.md` |
+| `.cursor/**` | rules, skills |
+| `LICENSE` | licenca |
+
+Čim se pojavi bilo što drugo (`.github/**`, `Dockerfile*`, `docker-compose*`, `aplikacije/**`, `paketi/**`, `e2e/**`, `skripte/**`, `package.json`, `pnpm-lock.yaml`, `playwright*`, `Caddyfile*`…), CI je **puni**.
+
+Na docs-only:
+
+1. Jobovi `kod` i `slika` se **preskaču**.
+2. Agregator **Lint, test, check i build** ostaje zelen (required check za ruleset).
+3. Nema Docker candidatea → `objavi-ghcr` i staging **preskaču promociju/deploy** bez crvenog pada samo kad registry vrati eksplicitni „not found” / `NAME_UNKNOWN`. Mreža, auth, 5xx ili neparsiran Digest **ruše** job (fail-closed), da uspješan main CI ne ostane tiho bez `main` taga / staginga.
+
+**Chore ≠ skip.** `chore:` koji dira kod, workflow ili lockfile pokreće puni CI. Samo sadržaj diffa odlučuje.
 
 ## Preduvjeti implementacije
 
@@ -41,19 +63,30 @@ Prije uključivanja workflowa moraju postojati i biti međusobno usklađeni:
 7. stvarno slanje emaila preko Resenda i E2E provjeru buildanog same-origin web/API servera;
 8. verzionirane backup/restore skripte i pripadajuće systemd jedinice.
 
-## `main` provjere — ciljani `ci.yml`
+## CI jobovi — `ci.yml`
 
-Projekt zasad vodi jedan operater i promjene se objavljuju direktnim pushom na `main`. Zbog toga `main` CI nije samo potvrda nakon spajanja nego glavni sigurnosni gate prije GHCR promocije i staging deploya. Ako bilo koji obvezni korak padne, slika se ne promovira i staging se ne dira.
+Projekt zasad vodi jedan operater. `main` CI je glavni sigurnosni gate prije GHCR promocije i staging deploya. Ako agregator padne, slika se ne promovira.
 
-Workflow se okida na svaki push na `main`:
+```mermaid
+flowchart TD
+  trigger[push_or_PR] --> putanje[putanje]
+  putanje -->|docs_only| agregator[Lint_test_check_i_build]
+  putanje -->|inače| kod[kod_lint_test_e2e]
+  putanje -->|inače| slika[slika_docker_smoke]
+  kod --> agregator
+  slika --> agregator
+```
 
-1. Checkout + pnpm cache → `pnpm install --frozen-lockfile`.
-2. Kritični security minimum: `pnpm audit --audit-level critical`, sken tajni i sken Docker imagea. Kritični nalazi ruše CI.
-3. Migracijski upgrade test nad zasebnom sintetičkom bazom: baseline migracije + postojeći podaci + zadnje migracije + provjera očuvanja.
-4. ESLint, Vitest, `svelte-check` i TypeScript build svih workspace paketa.
-5. Playwright kritični E2E paket na dev serverima.
-6. Build i smoke stvarne Docker slike.
-7. Artefakti i dijagnostika spremaju se u GitHub Actions kada test ili deploy korak padne.
+| Job | Što radi | Ovlasti |
+| --- | --- | --- |
+| `putanje` | Izračun `docs_only` iz difa | `contents: read` |
+| `kod` | install, audit, Trivy secret, migracije, lint, Vitest, web check, build, Playwright cache + E2E (Chromium+WebKit) | `contents: read` |
+| `slika` | prod Compose config + sintetički validator konfiguracije, Docker build/candidate, Trivy image+SARIF, Caddy, compose smoke, HTTP E2E, image-smoke, load, simulacija | `contents: read` + `packages: write` + `security-events: write` |
+| agregator (**Lint, test, check i build**) | Zelen ako docs-only **ili** (`kod` i `slika` uspješni) | `contents: read` |
+
+`kod` i `slika` idu **paralelno** da lint/Vitest padne ranije, ne tek nakon Docker koraka. Playwright preglednici se predmemoriraju (`~/.cache/ms-playwright`, ključ na `pnpm-lock.yaml`).
+
+Ruleset i dalje traži check **Lint, test, check i build** — to je ime agregatora; ne treba mijenjati branch protection pri splitanju jobova.
 
 ## Build i smoke test stvarne slike
 
@@ -66,17 +99,18 @@ Na `main` se slika gradi jednom. Taj lokalni image ili registry digest koristi s
 5. Uvoz **malog sintetičkog testnog rječnika** iz repozitorija; pravi hrLex ne ulazi u git ni CI fixture.
 6. Pokretanje aplikacije kao ne-root korisnika u kontejneru.
 7. `GET /zdravlje` mora vratiti 200, dostupnu bazu, `brojRijeci > 0` i isti digest koji je candidate build proizveo.
-8. `pnpm test:e2e:http` provjerava same-origin HTTP rute i Socket.IO handshake protiv buildanog servera.
-9. `pnpm test:e2e:image-smoke` u browseru odigra kratku stvarnu partiju protiv buildanog servera i provjeri ponovnu igru.
-10. Kratki `opterecenje --scenarij=igra` smoke provjerava da nekoliko partija završava, da p95 i RSS ostaju unutar pragova i da se stanje očisti.
-11. Skripta `simulacija` spaja četiri Socket.IO klijenta i odigra **cijelu partiju** protiv kontejnera.
-12. Gašenje stacka i volumena čak i kada prethodni korak padne.
+8. Prije builda: `docker compose -f docker-compose.prod.yml config` (sintetički env) i `provjera-produkcijske-konfiguracije.ts` (sintetički `NODE_ENV=production`).
+9. `pnpm test:e2e:http` provjerava same-origin HTTP rute i Socket.IO handshake protiv buildanog servera (izvještaj u `playwright-report-http/`).
+10. `pnpm test:e2e:image-smoke` u browseru odigra kratku stvarnu partiju protiv buildanog servera (izvještaj u `playwright-report-image/`); **ne** ulazi u desktop E2E na Viteu.
+11. Kratki `opterecenje --scenarij=igra` smoke zahtijeva prihvaćene poteze i završene partije; CI p95 pragovi su labavi (`5000` ms) da ne miješaju kapacitet s funkcionalnim padom. Stroži p95 ostaje za ručni/staging kapacitet.
+12. Skripta `simulacija` spaja četiri Socket.IO klijenta i odigra **cijelu partiju** protiv kontejnera.
+13. Gašenje stacka i volumena čak i kada prethodni korak padne.
 
-Padne li bilo koji korak, slika se ne objavljuje i staging se ne dira. Browser izvještaji, trace/screenshot/video artefakti, Docker Compose stanje, aplikacijski logovi i logovi baze spremaju se kao Actions artefakti kada postoje.
+Padne li `kod` ili `slika`, agregator je crven i staging se ne dira. Dev E2E, HTTP i image-smoke artefakti imaju odvojene putanje da se ne pregaze.
 
 ## GHCR i nepromjenjivi digest
 
-CI se prije smoke testa prijavljuje u `ghcr.io` ugrađenim `GITHUB_TOKEN`-om i ovlašću `packages: write`, jednom izgradi candidate i pushne ga pod `ci-<commit-sha>-<run-id>` tagom. Smoke test koristi puni digest tog kandidata. Nakon uspješnog CI-ja `objavi-ghcr.yml` ne gradi novu sliku: registry-level promotion samo dodjeljuje isti manifest punom commit SHA tagu i `main` tagu te provjerava da sva tri tag-a pokazuju isti `sha256:...` digest. Trenutni paket je javno dostupan; ako se promijeni u privatan, VPS će trebati zaseban `read:packages` pristup.
+Na `main` (ne docs-only) job `slika` prijavljuje se u `ghcr.io` s `packages: write`, izgradi candidate i pushne ga pod `ci-<commit-sha>-<run-id>`. Smoke koristi puni digest. Nakon uspješnog CI-ja `objavi-ghcr.yml` ne gradi novu sliku: ako candidate postoji, registry-level promotion dodjeljuje isti manifest commit SHA i `main` tagu; ako inspect vrati eksplicitni „not found” (docs-only), promocija se **preskače** bez greške. Ostali inspect padovi (mreža/auth/5xx/prazan Digest) ostaju crveni. Trenutni paket je javno dostupan; ako se promijeni u privatan, VPS će trebati zaseban `read:packages` pristup.
 
 Candidate tagovi su privremeni release artefakti. Treba ih zadržati dovoljno dugo za dijagnostiku i ručnu promociju, a zatim čistiti GHCR retention politikom ili zasebnim cleanupom; cleanup ne smije obrisati commit SHA tagove ili digest-e koji se koriste na stagingu/produkciji.
 
@@ -88,7 +122,7 @@ VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kra
 
 ## Staging — automatski workflow
 
-`objavi-staging.yml` pokreće se nakon uspješnog GHCR promotion workflowa za `main`. Workflow iz commit SHA taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije i `skripte/objava-staging.sh`. Skripta iz postojećeg VPS `.env` priprema privremeni kandidat zapis s novim `KALADONT_IMAGE`, `DIGEST` i `VERZIJA`, preko njega validira Compose, povlači točan image i izvršava migracije. Stvarni `.env` mijenja tek nakon uspješnih migracija, zatim rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. Ostale aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
+`objavi-staging.yml` pokreće se nakon uspješnog GHCR workflowa za `main`. Prvo inspecta commit SHA tag: eksplicitni „not found” (docs-only) → deploy se **preskače**; mreža/auth/5xx → crveni job. Inače iz taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije i `skripte/objava-staging.sh`. Skripta iz postojećeg VPS `.env` priprema privremeni kandidat zapis s novim `KALADONT_IMAGE`, `DIGEST` i `VERZIJA`, preko njega validira Compose, povlači točan image i izvršava migracije. Stvarni `.env` mijenja tek nakon uspješnih migracija, zatim rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. Ostale aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
 
 1. Workflow koristi GitHub Environment `staging` i tajne `STAGING_HOST`, `STAGING_SSH_KLJUC` i `STAGING_SSH_KNOWN_HOSTS`.
 2. Fiksni SSH korisnik je `deploy`, a host fingerprint se provjerava s `StrictHostKeyChecking=yes`.

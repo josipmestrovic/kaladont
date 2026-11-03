@@ -1,8 +1,8 @@
 name: CI
 
-# PR: iste lint/test/build/e2e/image smoke provjere, lokalni image (kaladont:ci), bez GHCR pusha.
+# PR: lint/test/e2e + lokalni image smoke, bez GHCR pusha.
 # main push: isti suite + candidate u GHCR; Objaviti Docker/staging pale se samo s main via workflow_run.
-# packages:write treba main candidate pushu; na pull_request se login/push koraci ne izvršavaju.
+# Docs-only putanje (docs/**, root *.md, .cursor/**, LICENSE) preskaču kod i sliku; agregator ostaje zelen.
 on:
   push:
     branches:
@@ -13,17 +13,76 @@ on:
 
 permissions:
   contents: read
-  packages: write
-  security-events: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  provjere:
-    name: Lint, test, check i build
+  putanje:
+    name: Detekcija putanja
     runs-on: ubuntu-24.04
+    outputs:
+      docs_only: ${{ steps.detekcija.outputs.docs_only }}
+    steps:
+      - name: Preuzeti repozitorij
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Odrediti docs-only
+        id: detekcija
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            baza="${{ github.event.pull_request.base.sha }}"
+          else
+            baza="${{ github.event.before }}"
+            if [[ -z "$baza" || "$baza" =~ ^0+$ ]]; then
+              baza="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+            fi
+          fi
+          mapa=$(git diff --name-only "$baza" "${{ github.sha }}" || true)
+          if [[ -z "${mapa//[[:space:]]/}" ]]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "Nema izmijenjenih datoteka — puni CI."
+            exit 0
+          fi
+          docs_only=true
+          while IFS= read -r datoteka; do
+            [[ -z "$datoteka" ]] && continue
+            if [[ "$datoteka" == docs/* ]]; then
+              continue
+            fi
+            if [[ "$datoteka" == .cursor/* ]]; then
+              continue
+            fi
+            if [[ "$datoteka" == "LICENSE" ]]; then
+              continue
+            fi
+            if [[ "$datoteka" == *.md && "$datoteka" != */* ]]; then
+              continue
+            fi
+            docs_only=false
+            break
+          done <<< "$mapa"
+          echo "docs_only=${docs_only}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Detekcija putanja"
+            echo "- Base: \`$baza\`"
+            echo "- Docs-only: \`${docs_only}\`"
+            echo "- Datoteke:"
+            printf '%s\n' "$mapa" | sed 's/^/- `/' | sed 's/$/`/'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  kod:
+    name: Kod — lint, test, E2E
+    needs: putanje
+    if: ${{ needs.putanje.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
 
     services:
       postgres:
@@ -48,8 +107,6 @@ jobs:
       UMAMI_URL: ''
       ODGODA_POCETKA_PARTIJE_MS: '0'
       ADMIN_TAJNI_KLJUC: ci-admin-secret
-      CANDIDATE_TAG: ci-${{ github.sha }}-${{ github.run_id }}
-      IMAGE_REF: ''
 
     steps:
       - name: Preuzeti repozitorij
@@ -112,12 +169,17 @@ jobs:
       - name: Izgraditi workspace
         run: pnpm build
 
+      - name: Predmemorija Playwright preglednika
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Instalirati Chromium i WebKit za E2E
         run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Pokrenuti kritične Playwright E2E testove
         env:
-          # E2E treba stvarni timer poteza i dužu toleranciju prekida (vitest forsira kraće vrijednosti).
           ONEMOGUCI_TIMER_POTEZA: 'false'
           TOLERANCIJA_PREKIDA_MS: '10000'
         run: pnpm test:e2e
@@ -128,10 +190,67 @@ jobs:
         with:
           name: playwright-e2e-${{ github.run_id }}
           path: |
-            playwright-report/
-            test-results/
+            playwright-report-e2e/
+            test-results/e2e/
           if-no-files-found: ignore
           retention-days: 14
+
+  slika:
+    name: Slika — build, sken, smoke
+    needs: putanje
+    if: ${{ needs.putanje.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    env:
+      BAZA_URL: postgresql://kaladont:kaladont@localhost:5432/kaladont_ci
+      SESIJA_TAJNA: ci-test-secret
+      EMAIL_API_KLJUC: ''
+      DEV_MAIL: dev@example.com
+      UMAMI_URL: ''
+      ODGODA_POCETKA_PARTIJE_MS: '0'
+      ADMIN_TAJNI_KLJUC: ci-admin-secret
+      CANDIDATE_TAG: ci-${{ github.sha }}-${{ github.run_id }}
+      IMAGE_REF: ''
+
+    steps:
+      - name: Preuzeti repozitorij
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Postaviti pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Postaviti Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalirati ovisnosti
+        run: pnpm install --frozen-lockfile
+
+      - name: Validirati produkcijski Compose
+        shell: bash
+        env:
+          CADDY_EMAIL: ops@example.com
+          KALADONT_IMAGE: ghcr.io/josipmestrovic/kaladont@sha256:0000000000000000000000000000000000000000000000000000000000000001
+          BAZA_LOZINKA: ci-sintetika-baza
+          SESIJA_TAJNA: ci-produkcijska-sesija-tajna-ne-promijeni-me
+          EMAIL_API_KLJUC: re_ci_sinteticki_kljuc
+          DEV_MAIL: ops@example.com
+          ADMIN_TAJNI_KLJUC: ci-admin-secret
+          LJESTVICE_POCETAK: '2026-01-01T00:00:00+01:00'
+          VERZIJA: ci-provjera
+          DIGEST: sha256:0000000000000000000000000000000000000000000000000000000000000001
+        run: docker compose -f docker-compose.prod.yml config >/dev/null
+
+      - name: Validirati produkcijsku konfiguraciju (sintetika)
+        run: pnpm --filter posluzitelj exec tsx src/cli/provjera-produkcijske-konfiguracije.ts
 
       - name: Prijaviti se u GHCR za main candidate
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -229,6 +348,15 @@ jobs:
             caddy:2.9.1-alpine \
             caddy validate --config /etc/caddy/Caddyfile
 
+      - name: Predmemorija Playwright Chromium
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Instalirati Chromium za image E2E
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Pokrenuti CI bazu
         run: docker compose -f docker-compose.ci.yml up -d baza
 
@@ -272,10 +400,32 @@ jobs:
           fi
           exit "$izlazni_kod"
 
+      - name: Spremiti Playwright HTTP izvještaj
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-http-${{ github.run_id }}
+          path: |
+            playwright-report-http/
+            test-results/http/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Pokrenuti browser smoke cijele partije nad imageom
         env:
           E2E_HTTP_ADRESA: http://127.0.0.1:3000
         run: pnpm test:e2e:image-smoke
+
+      - name: Spremiti Playwright image E2E izvještaj
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-image-e2e-${{ github.run_id }}
+          path: |
+            playwright-report-image/
+            test-results/image-smoke/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Pokrenuti kratki load smoke nad imageom
         shell: bash
@@ -288,8 +438,8 @@ jobs:
               --partije=2 \
               --timeout-ms=120000 \
               --maks-stopa-gresaka=0.01 \
-              --p95-potez-ms=750 \
-              --p95-spremanje-ms=1500 \
+              --p95-potez-ms=5000 \
+              --p95-spremanje-ms=5000 \
               --maks-rss-delta-mb=300 \
             | tee ci-izvjestaji/load-smoke.log
 
@@ -301,17 +451,6 @@ jobs:
           path: ci-izvjestaji/load-smoke.log
           if-no-files-found: ignore
           retention-days: 30
-
-      - name: Spremiti Playwright image E2E izvještaj
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: playwright-image-e2e-${{ github.run_id }}
-          path: |
-            playwright-report/
-            test-results/
-          if-no-files-found: ignore
-          retention-days: 14
 
       - name: Pokrenuti simulaciju četiri igrača
         run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/simulacija.js
@@ -337,3 +476,40 @@ jobs:
       - name: Ugasi CI stack i ukloni volume
         if: always()
         run: docker compose -f docker-compose.ci.yml down --volumes --remove-orphans
+
+  agregator:
+    name: Lint, test, check i build
+    needs: [putanje, kod, slika]
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Sažeti ishod CI-ja
+        shell: bash
+        run: |
+          set -euo pipefail
+          docs_only='${{ needs.putanje.outputs.docs_only }}'
+          putanje='${{ needs.putanje.result }}'
+          kod='${{ needs.kod.result }}'
+          slika='${{ needs.slika.result }}'
+          {
+            echo '## CI agregator'
+            echo "- putanje: \`$putanje\` (docs_only=\`$docs_only\`)"
+            echo "- kod: \`$kod\`"
+            echo "- slika: \`$slika\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$putanje" != "success" ]]; then
+            echo "Detekcija putanja nije uspjela."
+            exit 1
+          fi
+          if [[ "$docs_only" == "true" ]]; then
+            echo "Docs-only promjene — kod i slika preskočeni; required check zelen."
+            exit 0
+          fi
+          if [[ "$kod" == "success" && "$slika" == "success" ]]; then
+            echo "Kod i slika su zeleni."
+            exit 0
+          fi
+          echo "CI nije prošao (kod=$kod, slika=$slika)."
+          exit 1

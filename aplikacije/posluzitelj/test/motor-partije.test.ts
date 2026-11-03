@@ -15,6 +15,7 @@ import {
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { partije, rijeci, sesije, sudioniciPartije } from '../src/baza/shema.js';
+import { stvoriKontroliraniSat } from '../src/igra/sat.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -727,8 +728,10 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
   });
 
   it('prijelaz traje 8 sekundi, dodatna eliminacija i reconnect ne resetiraju rok', async () => {
+    // Početak blizu stvarnog Date.now(): usaoU u redu i dalje dolazi iz wall clocka.
+    const sat = stvoriKontroliraniSat(Date.now());
     const posluzitelj = await izgradiPosluzitelj({
-      postavkeMotora: { trajanjeIzboraSustavaMs: 8_000, tolerancijaPrekidaMs: 1_000 },
+      postavkeMotora: { sat, trajanjeIzboraSustavaMs: 8_000, tolerancijaPrekidaMs: 1_000 },
       socketOgranicenja: { handshakePoIpMinuti: 1_000 },
     });
     let igraci: Igrac[] = [];
@@ -750,18 +753,16 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
         const slusajRundu = (poruka: RundaOtvorena) => {
           if (poruka.runda <= partija.runda.runda) return;
           promatrac.socket.off('partija:runda-otvorena', slusajRundu);
-          otvorenaU = Date.now();
+          otvorenaU = sat.sada();
           resolve(poruka);
         };
         promatrac.socket.on('partija:runda-otvorena', slusajRundu);
       });
-      const pocetakPrijelaza = Date.now();
+      const pocetakPrijelaza = sat.sada();
       naPotezu.socket.emit('potez:ne-znam', { turnToken: partija.runda.turnToken });
       const izbor = await izborPromise;
       const rok = Date.parse(izbor.istekIzboraIso);
-      expect(rok - pocetakPrijelaza).toBeGreaterThanOrEqual(8_000);
-      expect(rok - pocetakPrijelaza).toBeLessThan(8_500);
-      await odgodi(200);
+      expect(rok - pocetakPrijelaza).toBe(8_000);
       expect(otvorenaU).toBe(0);
       ostali[1]!.socket.emit('partija:izadji');
       naPotezu.socket.disconnect();
@@ -770,9 +771,9 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       expect(povratak.stanje.sustavBiraRijec).toBe(true);
       expect(povratak.stanje.istekIzboraIso).toBe(izbor.istekIzboraIso);
       expect(povratak.stanje.eliminacije.some((eliminacija) => eliminacija.igracId === naPotezu.igracId)).toBe(true);
+      sat.unaprijedi(8_000);
       await novaRunda;
-      expect(otvorenaU).toBeGreaterThanOrEqual(rok - 10);
-      expect(otvorenaU).toBeLessThan(rok + 1_000);
+      expect(otvorenaU).toBe(rok);
       expect(rokovi.every((vrijednost) => vrijednost === izbor.istekIzboraIso)).toBe(true);
     } finally {
       odspojiIgrace([...igraci, ...(obnovljeni ? [obnovljeni] : [])]);
@@ -1053,8 +1054,10 @@ describe('motor partije - utrka timera i tolerancije prekida', () => {
   });
 
   it('istek poteza prije tolerancije proizvodi samo jednu eliminaciju s razlogom istek', async () => {
+    const sat = stvoriKontroliraniSat(Date.now());
     const posebniPosluzitelj = await izgradiPosluzitelj({
       postavkeMotora: {
+        sat,
         timerOnemogucen: false,
         trajanjePotezaMs: 1_000,
         tolerancijaPrekidaMs: 2_000,
@@ -1078,11 +1081,13 @@ describe('motor partije - utrka timera i tolerancije prekida', () => {
         });
       });
 
-      expect(new Date(runda.istekPotezaIso).getTime() - Date.now()).toBeGreaterThan(500);
+      expect(new Date(runda.istekPotezaIso).getTime() - sat.sada()).toBe(1_000);
       odspojeni.socket.disconnect();
+      sat.unaprijedi(1_000);
       const eliminacija = await eliminacijaPromise;
       expect(eliminacija.razlog).toBe('istek');
-      await odgodi(2_050);
+      sat.unaprijedi(2_050);
+      await odgodi(0);
       expect(eliminacije.filter((dogadaj) => dogadaj.igracId === odspojeni.token)).toHaveLength(1);
     } finally {
       odspojiIgrace(igraciZaCiscenje);

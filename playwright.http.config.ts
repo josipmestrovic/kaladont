@@ -9,7 +9,10 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['dot'], ['html', { open: 'never' }]] : 'list',
+  reporter: process.env.CI
+    ? [['dot'], ['html', { open: 'never', outputFolder: 'playwright-report-http' }]]
+    : 'list',
+  outputDir: 'test-results/http',
   use: {
     baseURL: process.env.E2E_HTTP_ADRESA ?? 'http://127.0.0.1:3000',
     trace: 'retain-on-failure',
