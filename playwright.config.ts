@@ -2,14 +2,17 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: 'http-rute.spec.ts',
+  testIgnore: ['http-rute.spec.ts', 'image-smoke.spec.ts'],
   fullyParallel: false,
   workers: 1,
   timeout: 30_000,
   expect: { timeout: 5_000 },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['dot'], ['html', { open: 'never' }]] : 'list',
+  reporter: process.env.CI
+    ? [['dot'], ['html', { open: 'never', outputFolder: 'playwright-report-e2e' }]]
+    : 'list',
+  outputDir: 'test-results/e2e',
   use: {
     baseURL: 'http://127.0.0.1:5174',
     trace: 'retain-on-failure',
@@ -19,7 +22,7 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chrome',
-      testIgnore: ['mobilni-tok.spec.ts', 'http-rute.spec.ts'],
+      testIgnore: ['mobilni-tok.spec.ts', 'http-rute.spec.ts', 'image-smoke.spec.ts'],
       use: { ...devices['Desktop Chrome'] },
     },
     {

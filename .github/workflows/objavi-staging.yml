@@ -18,18 +18,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  objava:
-    name: Objaviti isti digest na staging
+  odredi:
+    name: Odredi promovirani digest
     runs-on: ubuntu-24.04
-    environment: staging
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
+    outputs:
+      postoji: ${{ steps.release.outputs.postoji }}
+      digest: ${{ steps.release.outputs.digest }}
+      image: ${{ steps.release.outputs.image }}
     steps:
-      - name: Preuzeti repozitorij
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
       - name: Prijaviti se u GHCR
         uses: docker/login-action@v3
         with:
@@ -47,8 +44,16 @@ jobs:
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           image="ghcr.io/josipmestrovic/kaladont:${COMMIT_SHA}"
-          digest=$(docker buildx imagetools inspect "$image" | awk '/^Digest:/ { print $2 }')
-          test -n "$digest"
+          if ! digest=$(docker buildx imagetools inspect "$image" 2>/dev/null | awk '/^Digest:/ { print $2 }') || [[ -z "$digest" ]]; then
+            echo "postoji=false" >> "$GITHUB_OUTPUT"
+            {
+              echo '## Staging release'
+              echo "- Commit \`$COMMIT_SHA\` nema promovirani GHCR tag (docs-only ili CI bez slike)."
+              echo '- Staging deploy se preskače.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "postoji=true" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/josipmestrovic/kaladont@${digest}" >> "$GITHUB_OUTPUT"
           {
@@ -57,6 +62,19 @@ jobs:
             echo "- Digest: \`$digest\`"
             echo '- Deploy skripta na VPS-u ispisuje snapshot i fazu pada ako objava ne uspije.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  objava:
+    name: Objaviti isti digest na staging
+    runs-on: ubuntu-24.04
+    needs: odredi
+    environment: staging
+    if: ${{ needs.odredi.outputs.postoji == 'true' }}
+
+    steps:
+      - name: Preuzeti repozitorij
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Pripremiti SSH vjerodajnice
         shell: bash
@@ -87,8 +105,8 @@ jobs:
         shell: bash
         env:
           STAGING_HOST: ${{ secrets.STAGING_HOST }}
-          IMAGE_REF: ${{ steps.release.outputs.image }}
-          IMAGE_DIGEST: ${{ steps.release.outputs.digest }}
+          IMAGE_REF: ${{ needs.odredi.outputs.image }}
+          IMAGE_DIGEST: ${{ needs.odredi.outputs.digest }}
           RELEASE_VERSION: ${{ github.event.workflow_run.head_sha }}
         run: |
           ssh -i "$RUNNER_TEMP/ssh/id_ed25519" \
@@ -100,7 +118,7 @@ jobs:
       - name: Provjeriti staging health i digest
         shell: bash
         env:
-          EXPECTED_DIGEST: ${{ steps.release.outputs.digest }}
+          EXPECTED_DIGEST: ${{ needs.odredi.outputs.digest }}
           EXPECTED_VERSION: ${{ github.event.workflow_run.head_sha }}
         run: |
           for pokusaj in {1..30}; do
