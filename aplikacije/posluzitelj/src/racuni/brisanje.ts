@@ -13,13 +13,15 @@ import {
   pobjedeTreninga,
 } from '../baza/shema.js';
 
-export type IshodBrisanja = 'obrisan' | 'nije-pronaden' | 'vec-obrisan';
+export type IshodBrisanja = 'obrisan' | 'nije-pronaden' | 'vec-obrisan' | 'zasticen';
 
 async function obrisiRacunUTransakciji(
   transakcija: Parameters<Parameters<typeof baza.transaction>[0]>[0],
-  igrac: { id: string; obrisanAt: Date | null },
+  igrac: { id: string; obrisanAt: Date | null; vrsta: 'gost' | 'registriran' | 'admin'; upravljac: 'covjek' | 'bot' },
 ): Promise<IshodBrisanja> {
   if (igrac.obrisanAt) return 'vec-obrisan';
+  // Botovi i admini ne smiju se soft-brisati ovim putem (živ fond / admin pristup).
+  if (igrac.upravljac === 'bot' || igrac.vrsta === 'admin') return 'zasticen';
 
   await transakcija.delete(sesije).where(eq(sesije.igracId, igrac.id));
   await transakcija.delete(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igrac.id));
@@ -62,7 +64,13 @@ export async function obrisiRacun(email: string, potvrdi: boolean): Promise<Isho
 
   return baza.transaction(async (transakcija) => {
     const [igrac] = await transakcija
-      .select({ id: igraci.id, email: igraci.email, obrisanAt: igraci.obrisanAt })
+      .select({
+        id: igraci.id,
+        email: igraci.email,
+        obrisanAt: igraci.obrisanAt,
+        vrsta: igraci.vrsta,
+        upravljac: igraci.upravljac,
+      })
       .from(igraci)
       .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
       .limit(1);
@@ -75,7 +83,12 @@ export async function obrisiRacun(email: string, potvrdi: boolean): Promise<Isho
 export async function obrisiRacunPoId(igracId: string): Promise<IshodBrisanja> {
   return baza.transaction(async (transakcija) => {
     const [igrac] = await transakcija
-      .select({ id: igraci.id, obrisanAt: igraci.obrisanAt })
+      .select({
+        id: igraci.id,
+        obrisanAt: igraci.obrisanAt,
+        vrsta: igraci.vrsta,
+        upravljac: igraci.upravljac,
+      })
       .from(igraci)
       .where(eq(igraci.id, igracId))
       .limit(1);

@@ -320,6 +320,11 @@ export async function registrirajAdminRute(
       if (!prijava) return odgovor.code(404).send({ ok: false, greska: 'Prijava nije pronađena.' });
       const ishod = await obrisiRacunPoId(prijava.prijavljeniIgracId);
       if (ishod === 'nije-pronaden') return odgovor.code(404).send({ ok: false, greska: 'Račun nije pronađen.' });
+      if (ishod === 'zasticen') {
+        return odgovor
+          .code(400)
+          .send({ ok: false, greska: 'Botove i admin račune nije moguće obrisati ovim putem.' });
+      }
       await baza.update(prijaveIgraca).set({
         status: 'rijesena',
         napomenaAdmina: ishod === 'vec-obrisan' ? 'racun_vec_obrisan' : 'racun_obrisan',

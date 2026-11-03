@@ -212,4 +212,53 @@ describe('POST /prijave-igraca', () => {
     expect(rijesena?.status).toBe('rijesena');
     expect(rijesena?.napomenaAdmina).toBe('racun_obrisan');
   });
+
+  it('admin obrisi-racun odbija botove i admine', async () => {
+    await baza.update(partije).set({ status: 'zavrsena', pobjednikId: igracId }).where(eq(partije.id, partijaId));
+    await baza.update(igraci).set({ upravljac: 'bot' }).where(eq(igraci.id, drugiIgracId));
+
+    const prijavaOdgovor = await app.inject({
+      url: '/api/prijave-igraca',
+      method: 'POST',
+      headers: { authorization: `Bearer ${sesijskiToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ partijaId, prijavljeniIgracId: drugiIgracId, razlog: 'pogrdan_nadimak' }),
+    });
+    expect(prijavaOdgovor.statusCode).toBe(200);
+
+    const registracija = await app.inject({
+      url: '/api/racuni/registracija',
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: `admin-zasticen-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+    });
+    const admin = registracija.json() as { igracId: string; sesijskiToken: string };
+    igracIds.push(admin.igracId);
+    await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, admin.igracId));
+
+    const [prijava] = await baza.select().from(prijaveIgraca).where(eq(prijaveIgraca.partijaId, partijaId)).limit(1);
+    const brisanjeBota = await app.inject({
+      url: `/api/admin/prijave-igraca/${prijava!.id}/obrisi-racun`,
+      method: 'POST',
+      headers: { authorization: `Bearer ${admin.sesijskiToken}`, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(brisanjeBota.statusCode).toBe(400);
+    expect(brisanjeBota.json()).toMatchObject({ ok: false });
+
+    const [bot] = await baza.select().from(igraci).where(eq(igraci.id, drugiIgracId)).limit(1);
+    expect(bot?.obrisanAt).toBeNull();
+    expect(bot?.upravljac).toBe('bot');
+
+    await baza.update(igraci).set({ upravljac: 'covjek', vrsta: 'admin' }).where(eq(igraci.id, drugiIgracId));
+    const brisanjeAdmina = await app.inject({
+      url: `/api/admin/prijave-igraca/${prijava!.id}/obrisi-racun`,
+      method: 'POST',
+      headers: { authorization: `Bearer ${admin.sesijskiToken}`, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(brisanjeAdmina.statusCode).toBe(400);
+    const [zasticen] = await baza.select().from(igraci).where(eq(igraci.id, drugiIgracId)).limit(1);
+    expect(zasticen?.obrisanAt).toBeNull();
+    expect(zasticen?.vrsta).toBe('admin');
+  });
 });

@@ -72,12 +72,128 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
   let brojKolekcijskih = 0;
   let kolekcijskihPoVrsti = new Map<VrstaRijeci, number>();
   let kolekcijskihKljuceviPoVrsti = new Map<VrstaRijeci, Set<string>>();
+  /** Broj oblika koji drže kolekcijski ključ (globalno / po vrsti) — za inkrementalni add/remove. */
+  let kolekcijskiBrojac = new Map<string, number>();
+  let kolekcijskiBrojacPoVrsti = new Map<VrstaRijeci, Map<string, number>>();
+  let rijetkiOblici: [Set<string>, Set<string>, Set<string>] = [new Set(), new Set(), new Set()];
+  let rijetkeGrupe: [Set<string>, Set<string>, Set<string>] = [new Set(), new Set(), new Set()];
+  let rijetkeGrupeBrojac: [Map<string, number>, Map<string, number>, Map<string, number>] = [
+    new Map(),
+    new Map(),
+    new Map(),
+  ];
+  let dugeRijeci: [Set<string>, Set<string>, Set<string>] = [new Set(), new Set(), new Set()];
   let brojDugih = 0;
   let brojRijetkih = 0;
   let brojDugihPoTieru: readonly number[] = [0, 0, 0];
   let brojRijetkihPoTieru: readonly number[] = [0, 0, 0];
   let ciljevi: CiljeviRijeci = { rijetke: { ukupno: 0, niska: 0, srednja: 0, jaka: 0 }, duge: { ukupno: 0, duga: 0, srednja: 0, jaka: 0 } };
   let verzija = 0;
+
+  function kljucKolekcije(grupa: string): string {
+    return grupa.split(':').slice(0, 2).join(':');
+  }
+
+  function rarityTierZa(rijec: string, frekvencija: number): number {
+    const brojGrafema = grafemi(rijec).length;
+    return frekvencija === 0 && brojGrafema >= 4 ? 2 : frekvencija <= 9 ? 1 : frekvencija <= 99 ? 0 : -1;
+  }
+
+  function duljinaTierZa(rijec: string): number {
+    const brojGrafema = grafemi(rijec).length;
+    return brojGrafema >= 15 ? 2 : brojGrafema >= 12 ? 1 : brojGrafema >= 10 ? 0 : -1;
+  }
+
+  function osvjeziIzvedeneBrojace(): void {
+    brojKolekcijskih = kolekcijskiBrojac.size;
+    kolekcijskihPoVrsti = new Map(
+      [...kolekcijskiBrojacPoVrsti.entries()].map(([vrsta, mapa]) => [vrsta, mapa.size]),
+    );
+    kolekcijskihKljuceviPoVrsti = new Map(
+      [...kolekcijskiBrojacPoVrsti.entries()].map(([vrsta, mapa]) => [vrsta, new Set(mapa.keys())]),
+    );
+    brojDugih = dugeRijeci.reduce((zbroj, skup) => zbroj + skup.size, 0);
+    brojRijetkih = rijetkiOblici.reduce((zbroj, skup) => zbroj + skup.size, 0);
+    brojDugihPoTieru = dugeRijeci.map((skup) => skup.size);
+    brojRijetkihPoTieru = rijetkiOblici.map((skup) => skup.size);
+    ciljevi = {
+      rijetke: {
+        niska: rijetkeGrupe[0].size,
+        srednja: rijetkeGrupe[1].size,
+        jaka: rijetkeGrupe[2].size,
+        ukupno: ciljevi.rijetke.ukupno || 81037,
+      },
+      duge: {
+        duga: dugeRijeci[0].size,
+        srednja: dugeRijeci[1].size,
+        jaka: dugeRijeci[2].size,
+        ukupno: ciljevi.duge.ukupno || 379193,
+      },
+    };
+  }
+
+  function dodajKolekcijskeKljuceve(grupe: readonly string[], vrste: readonly VrstaRijeci[]): void {
+    const kljucevi = [...new Set(grupe.map(kljucKolekcije))];
+    for (const kljuc of kljucevi) {
+      kolekcijskiBrojac.set(kljuc, (kolekcijskiBrojac.get(kljuc) ?? 0) + 1);
+      for (const vrsta of vrste) {
+        const mapa = kolekcijskiBrojacPoVrsti.get(vrsta) ?? new Map<string, number>();
+        mapa.set(kljuc, (mapa.get(kljuc) ?? 0) + 1);
+        kolekcijskiBrojacPoVrsti.set(vrsta, mapa);
+      }
+    }
+  }
+
+  function ukloniKolekcijskeKljuceve(grupe: readonly string[], vrste: readonly VrstaRijeci[]): void {
+    const kljucevi = [...new Set(grupe.map(kljucKolekcije))];
+    for (const kljuc of kljucevi) {
+      const globalno = (kolekcijskiBrojac.get(kljuc) ?? 0) - 1;
+      if (globalno <= 0) kolekcijskiBrojac.delete(kljuc);
+      else kolekcijskiBrojac.set(kljuc, globalno);
+      for (const vrsta of vrste) {
+        const mapa = kolekcijskiBrojacPoVrsti.get(vrsta);
+        if (!mapa) continue;
+        const trenutno = (mapa.get(kljuc) ?? 0) - 1;
+        if (trenutno <= 0) mapa.delete(kljuc);
+        else mapa.set(kljuc, trenutno);
+        if (mapa.size === 0) kolekcijskiBrojacPoVrsti.delete(vrsta);
+      }
+    }
+  }
+
+  function dodajRijetkostIDuljinu(rijec: string, grupe: readonly string[], frekvencija: number): void {
+    const rarityTier = rarityTierZa(rijec, frekvencija);
+    if (rarityTier >= 0) {
+      rijetkiOblici[rarityTier]!.add(rijec);
+      const brojac = rijetkeGrupeBrojac[rarityTier]!;
+      for (const grupa of grupe) {
+        brojac.set(grupa, (brojac.get(grupa) ?? 0) + 1);
+        rijetkeGrupe[rarityTier]!.add(grupa);
+      }
+    }
+    const duljinaTier = duljinaTierZa(rijec);
+    if (duljinaTier >= 0) dugeRijeci[duljinaTier]!.add(rijec);
+  }
+
+  function ukloniRijetkostIDuljinu(rijec: string, grupe: readonly string[], frekvencija: number): void {
+    const rarityTier = rarityTierZa(rijec, frekvencija);
+    if (rarityTier >= 0) {
+      rijetkiOblici[rarityTier]!.delete(rijec);
+      const brojac = rijetkeGrupeBrojac[rarityTier]!;
+      const skup = rijetkeGrupe[rarityTier]!;
+      for (const grupa of grupe) {
+        const trenutno = (brojac.get(grupa) ?? 0) - 1;
+        if (trenutno <= 0) {
+          brojac.delete(grupa);
+          skup.delete(grupa);
+        } else {
+          brojac.set(grupa, trenutno);
+        }
+      }
+    }
+    const duljinaTier = duljinaTierZa(rijec);
+    if (duljinaTier >= 0) dugeRijeci[duljinaTier]!.delete(rijec);
+  }
 
   async function ucitaj(): Promise<void> {
     const novoRijecGrupe = new Map<string, string | readonly string[]>();
@@ -89,9 +205,9 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     const noviBrojPoVrsti = new Map<VrstaRijeci, number>();
     const noveKolekcijske = new Set<string>();
     const noveKolekcijskePoVrsti = new Map<VrstaRijeci, Set<string>>();
-    const rijetkeGrupe = [new Set<string>(), new Set<string>(), new Set<string>()];
-    const rijetkiOblici = [new Set<string>(), new Set<string>(), new Set<string>()];
-    const dugeRijeci = [new Set<string>(), new Set<string>(), new Set<string>()];
+    const loadRijetkeGrupe = [new Set<string>(), new Set<string>(), new Set<string>()];
+    const loadRijetkiOblici = [new Set<string>(), new Set<string>(), new Set<string>()];
+    const loadDugeRijeci = [new Set<string>(), new Set<string>(), new Set<string>()];
     const kanon = new Map<string, string>();
     const kanoniziraj = (vrijednost: string): string => {
       const postojeci = kanon.get(vrijednost);
@@ -149,11 +265,11 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
         const brojGrafema = grafemi(redak.rijec).length;
         const rarityTier = redak.frekvencija === 0 && brojGrafema >= 4 ? 2 : redak.frekvencija <= 9 ? 1 : redak.frekvencija <= 99 ? 0 : -1;
         if (rarityTier >= 0) {
-          rijetkiOblici[rarityTier]!.add(redak.rijec);
-          for (const grupa of grupe) rijetkeGrupe[rarityTier]!.add(grupa);
+          loadRijetkiOblici[rarityTier]!.add(redak.rijec);
+          for (const grupa of grupe) loadRijetkeGrupe[rarityTier]!.add(grupa);
         }
         const duljinaTier = brojGrafema >= 15 ? 2 : brojGrafema >= 12 ? 1 : brojGrafema >= 10 ? 0 : -1;
-        if (duljinaTier >= 0) dugeRijeci[duljinaTier]!.add(redak.rijec);
+        if (duljinaTier >= 0) loadDugeRijeci[duljinaTier]!.add(redak.rijec);
         const vrste = (redak.vrste as VrstaRijeci[]).map(kanoniziraj) as VrstaRijeci[];
         novoRijecGrupe.set(redak.rijec, grupe.length === 1 ? grupe[0]! : grupe);
         novoRijecFrekvencija.set(redak.rijec, redak.frekvencija);
@@ -181,17 +297,54 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     kategorije = [...noviBrojPoVrsti.entries()]
       .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
       .sort((a, b) => b.brojOblika - a.brojOblika);
-    brojKolekcijskih = noveKolekcijske.size;
-    kolekcijskihPoVrsti = new Map([...noveKolekcijskePoVrsti.entries()].map(([vrsta, skup]) => [vrsta, skup.size]));
-    kolekcijskihKljuceviPoVrsti = noveKolekcijskePoVrsti;
-    brojDugih = dugeRijeci.reduce((zbroj, skup) => zbroj + skup.size, 0);
-    brojRijetkih = rijetkiOblici.reduce((zbroj, skup) => zbroj + skup.size, 0);
-    brojDugihPoTieru = dugeRijeci.map((skup) => skup.size);
-    brojRijetkihPoTieru = rijetkiOblici.map((skup) => skup.size);
+
+    // Refcount kolekcija + live setovi rijetkih/dugih — potrebno za inkrementalne admin izmjene.
+    const noviKolekcijskiBrojac = new Map<string, number>();
+    const noviKolekcijskiBrojacPoVrsti = new Map<VrstaRijeci, Map<string, number>>();
+    for (const [rijec, grupeRaw] of novoRijecGrupe) {
+      const grupe = typeof grupeRaw === 'string' ? [grupeRaw] : [...grupeRaw];
+      const vrsteRaw = novoRijecVrste.get(rijec);
+      const vrste = vrsteRaw === undefined ? [] : typeof vrsteRaw === 'string' ? [vrsteRaw] : [...vrsteRaw];
+      for (const kljuc of new Set(grupe.map(kljucKolekcije))) {
+        noviKolekcijskiBrojac.set(kljuc, (noviKolekcijskiBrojac.get(kljuc) ?? 0) + 1);
+        for (const vrsta of vrste) {
+          const mapa = noviKolekcijskiBrojacPoVrsti.get(vrsta) ?? new Map<string, number>();
+          mapa.set(kljuc, (mapa.get(kljuc) ?? 0) + 1);
+          noviKolekcijskiBrojacPoVrsti.set(vrsta, mapa);
+        }
+      }
+    }
+    kolekcijskiBrojac = noviKolekcijskiBrojac;
+    kolekcijskiBrojacPoVrsti = noviKolekcijskiBrojacPoVrsti;
+
+    rijetkiOblici = [
+      new Set(loadRijetkiOblici[0]),
+      new Set(loadRijetkiOblici[1]),
+      new Set(loadRijetkiOblici[2]),
+    ];
+    rijetkeGrupe = [
+      new Set(loadRijetkeGrupe[0]),
+      new Set(loadRijetkeGrupe[1]),
+      new Set(loadRijetkeGrupe[2]),
+    ];
+    rijetkeGrupeBrojac = [new Map(), new Map(), new Map()];
+    for (let tier = 0; tier < 3; tier += 1) {
+      for (const rijec of rijetkiOblici[tier]!) {
+        const grupeRaw = novoRijecGrupe.get(rijec);
+        if (grupeRaw === undefined) continue;
+        const grupe = typeof grupeRaw === 'string' ? [grupeRaw] : grupeRaw;
+        for (const grupa of grupe) {
+          rijetkeGrupeBrojac[tier]!.set(grupa, (rijetkeGrupeBrojac[tier]!.get(grupa) ?? 0) + 1);
+        }
+      }
+    }
+    dugeRijeci = [new Set(loadDugeRijeci[0]), new Set(loadDugeRijeci[1]), new Set(loadDugeRijeci[2])];
+
     ciljevi = {
-      rijetke: { niska: rijetkeGrupe[0]!.size, srednja: rijetkeGrupe[1]!.size, jaka: rijetkeGrupe[2]!.size, ukupno: 81037 },
-      duge: { duga: dugeRijeci[0]!.size, srednja: dugeRijeci[1]!.size, jaka: dugeRijeci[2]!.size, ukupno: 379193 },
+      rijetke: { niska: 0, srednja: 0, jaka: 0, ukupno: 81037 },
+      duge: { duga: 0, srednja: 0, jaka: 0, ukupno: 379193 },
     };
+    osvjeziIzvedeneBrojace();
     verzija += 1;
   }
 
@@ -287,13 +440,15 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     }
   }
 
-  function primijeniUklanjanje(rijecUlaz: string): void {
-    const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
-    if (!rijecGrupe.has(rijec)) {
-      verzija += 1;
-      return;
-    }
+  function ukloniOblikIzMemorije(rijec: string): void {
+    const grupe = grupeZa(rijec);
     const vrste = vrsteZa(rijec);
+    const frekvencija = rijecFrekvencija.get(rijec) ?? 0;
+    if (!rijecGrupe.has(rijec)) return;
+
+    ukloniKolekcijskeKljuceve(grupe, vrste);
+    ukloniRijetkostIDuljinu(rijec, grupe, frekvencija);
+
     rijecGrupe.delete(rijec);
     rijecFrekvencija.delete(rijec);
     rijecVrste.delete(rijec);
@@ -316,6 +471,12 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
         .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
         .sort((a, b) => b.brojOblika - a.brojOblika);
     }
+  }
+
+  function primijeniUklanjanje(rijecUlaz: string): void {
+    const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
+    ukloniOblikIzMemorije(rijec);
+    osvjeziIzvedeneBrojace();
     verzija += 1;
   }
 
@@ -327,13 +488,13 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     frekvencija?: number;
   }): void {
     const rijec = zapis.rijec.normalize('NFC').trim().toLowerCase();
-    const vecPostojala = rijecGrupe.has(rijec);
-    if (vecPostojala) primijeniUklanjanje(rijec);
+    if (rijecGrupe.has(rijec)) ukloniOblikIzMemorije(rijec);
 
     const grupe = [...zapis.grupe];
     const vrste = [...zapis.vrste];
+    const frekvencija = zapis.frekvencija ?? 0;
     rijecGrupe.set(rijec, grupe.length === 1 ? grupe[0]! : grupe);
-    rijecFrekvencija.set(rijec, zapis.frekvencija ?? 0);
+    rijecFrekvencija.set(rijec, frekvencija);
     rijecVrste.set(rijec, vrste.length === 1 ? vrste[0]! : vrste);
 
     const prefiks = zapis.prvaDva.normalize('NFC').toLowerCase();
@@ -348,6 +509,9 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
       pocetneImenickeRijeci.push(rijec);
     }
 
+    dodajKolekcijskeKljuceve(grupe, vrste);
+    dodajRijetkostIDuljinu(rijec, grupe, frekvencija);
+
     const mapa = new Map(kategorije.map((k) => [k.vrsta, k.brojOblika]));
     for (const vrsta of vrste) {
       mapa.set(vrsta, (mapa.get(vrsta) ?? 0) + 1);
@@ -355,6 +519,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     kategorije = [...mapa.entries()]
       .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
       .sort((a, b) => b.brojOblika - a.brojOblika);
+    osvjeziIzvedeneBrojace();
     verzija += 1;
   }
 
