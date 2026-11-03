@@ -24,11 +24,6 @@ jobs:
     environment: produkcija
 
     steps:
-      - name: Preuzeti repozitorij
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: main
-
       - name: Prijaviti se u GHCR
         uses: docker/login-action@v3
         with:
@@ -73,7 +68,7 @@ jobs:
             echo "- Commit (OCI revision): \`$verzija\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Staging gate — uspješan staging deploy za isti commit
+      - name: Staging gate — uspješan staging deploy ovog digesta
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -81,30 +76,46 @@ jobs:
           DIGEST: ${{ steps.release.outputs.digest }}
         run: |
           test -n "$VERZIJA"
-          # Dokaz: uspješan run workflowa „Objaviti staging” s head_sha = commit iz OCI labele.
-          run_id=$(gh api \
+          test -n "$DIGEST"
+          # GHCR commit tag može se pomaknuti novim CI runom; gate mora dokazati da je
+          # uspješan „Objaviti staging” stvarno deployao BAŠ ovaj digest, ne samo isti SHA.
+          image_ref="ghcr.io/josipmestrovic/kaladont@${DIGEST}"
+          run_id=""
+
+          mapfile -t kandidati < <(gh api \
             -H "Accept: application/vnd.github+json" \
-            "/repos/${GITHUB_REPOSITORY}/actions/workflows/objavi-staging.yml/runs?status=completed&per_page=50" \
-            --jq ".workflow_runs[] | select(.conclusion == \"success\" and .head_sha == \"$VERZIJA\") | .id" \
-            | head -n 1)
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/objavi-staging.yml/runs?status=completed&per_page=100" \
+            --jq ".workflow_runs[] | select(.conclusion == \"success\" and .head_sha == \"$VERZIJA\") | .id")
+
+          if [ "${#kandidati[@]}" -eq 0 ]; then
+            echo "Nema uspješnog „Objaviti staging” runa za commit $VERZIJA."
+            exit 1
+          fi
+
+          for candidate in "${kandidati[@]}"; do
+            echo "Provjeravam staging run ${candidate} za digest ${DIGEST}…"
+            # Log sadrži expandirani IMAGE_REF u naredbi objava-staging.sh.
+            if gh run view "$candidate" --log 2>/dev/null | grep -F -q -- "$image_ref"; then
+              run_id=$candidate
+              break
+            fi
+          done
 
           if test -z "$run_id"; then
-            echo "Nema uspješnog „Objaviti staging” runa za commit $VERZIJA. Produkcija prima samo digeste koji su prošli staging."
+            echo "Nema uspješnog staging deploya koji je objavio digest $DIGEST za commit $VERZIJA."
+            echo "Trenutni GHCR tag commit SHA nije dokaz: nakon CI re-runa tag pokazuje na novi digest dok stari zeleni staging ostaje za isti SHA."
             exit 1
           fi
 
-          # Dodatna usklađenost: GHCR tag commit SHA mora pokazivati na isti digest.
-          tagged_digest=$(docker buildx imagetools inspect "ghcr.io/josipmestrovic/kaladont:${VERZIJA}" | awk '/^Digest:/ { print $2 }')
-          if test "$tagged_digest" != "$DIGEST"; then
-            echo "Digest ulaza ($DIGEST) ne odgovara GHCR tagu ${VERZIJA} ($tagged_digest)."
-            exit 1
-          fi
-
-          echo "Staging gate OK: workflow run $run_id za $VERZIJA; digest usklađen s GHCR tagom."
+          echo "Staging gate OK: workflow run $run_id deployao je $image_ref."
           {
-            echo "- Staging gate: uspješan run \`$run_id\` za commit \`$VERZIJA\`"
-            echo "- GHCR tag commit SHA pokazuje na isti digest"
+            echo "- Staging gate: uspješan run \`$run_id\` deployao je digest \`$DIGEST\` (commit \`$VERZIJA\`)"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preuzeti repozitorij na commit slike
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.release.outputs.verzija }}
 
       - name: Pripremiti SSH vjerodajnice
         shell: bash
