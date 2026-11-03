@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-> **Status 2026-09-16: djelomično implementirano.** `.github/workflows/ci.yml`, `.github/workflows/objavi-ghcr.yml`, `.github/workflows/objavi-staging.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički CI fixture postoje i provjereni su. Main CI sada pushne candidate, smoke-testira njegov digest, GHCR workflow promovira isti manifest bez rebuilda, a staging workflow automatski objavljuje promovirani digest i provjerava javni health. Produkcijski promotion workflow, backup automatika i deploy ključevi još ne postoje. Ovaj dokument razlikuje stvarni tok od ciljanog budućeg toka.
+> **Status 2026-11-03: djelomično implementirano.** `.github/workflows/ci.yml`, `.github/workflows/objavi-ghcr.yml`, `.github/workflows/objavi-staging.yml`, `.github/workflows/promoviraj-produkciju.yml`, Dockerfile, Compose/Caddy konfiguracije i sintetički CI fixture postoje. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda, staging automatski objavljuje digest, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Prava backup automatika (systemd/`age`/Storage Box) još nije u repou — dok je nema, `skripte/zahtijevaj-svjez-offserver-backup.sh` namjerno pada prije migracija. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
 
 Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
 
@@ -101,23 +101,23 @@ Ako staging deploy padne prije završetka migracija, stvarni `.env` ostaje na pr
 
 Staging tijekom privremenog multiplayer testiranja nema Basic Auth kako browser ne bi izazivao ponovne promptove na Socket.IO zahtjevima. `X-Robots-Tag: noindex, nofollow` nije kontrola pristupa; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway.
 
-## Ručna produkcija — ciljani `promoviraj-produkciju.yml`
+## Ručna produkcija — `promoviraj-produkciju.yml` (isporučeno)
 
-Workflow se pokreće isključivo ručno (`workflow_dispatch`). Ulaz je puni digest koji već ima uspješan staging Deployment zapis. Workflow odbija tag, skraćeni digest, nepoznat digest i digest koji nije prošao staging.
+Actions ime: **Promoviraj produkciju**. Pokreće se isključivo ručno (`workflow_dispatch`). Ulaz `digest` je puni `sha256:` + 64 hex; workflow odbija tag, `latest`, skraćeni digest, nepoznat digest i digest bez uspješnog staging deploya **tog istog digesta** (ne dovolji zeleni staging za isti commit ako je GHCR tag poslije pomaknut CI re-runom).
 
-1. Koristi Environment `produkcija`; nema required reviewer ni dodatnog approval koraka.
-2. Provjerava i zapisuje trenutno aktivni digest kao kandidat za rollback.
-3. Pokreće produkcijski backup i nastavlja tek kada su `pg_dump`, `age` enkripcija, prijenos na Storage Box i verifikacija uspješni.
-4. Sigurno prenosi i validira verzionirane konfiguracije.
-5. Kratkotrajno se prijavljuje u GHCR i povlači **identičan staging digest**.
-6. Jednokratnim alatom iz novog digesta izvršava samo unatrag kompatibilne migracije.
-7. Pokreće `docker compose up -d` s novim digestom, zatim uklanja GHCR vjerodajnice.
-8. Ponavlja `https://kaladont.hr/zdravlje`; odgovor mora sadržavati očekivani digest.
-9. Zapisuje GitHub Deployment, prethodni i novi digest, rezultat backupa i health checka.
+1. Koristi Environment `produkcija`; nema required reviewer ni dodatnog approval koraka. (`PROD_HOST`, `PROD_SSH_KLJUC`, `PROD_SSH_KNOWN_HOSTS` — nakon VPS-a.)
+2. Iz OCI labele `org.opencontainers.image.revision` čita commit SHA; checkout i SCP koriste taj SHA (ne `main`), da rollback starog digesta vrati i tadašnje compose/Caddy. Zapisuje trenutni `DIGEST`/`VERZIJA` s VPS-a kao kandidat za rollback.
+3. **Backup gate:** na VPS-u pokreće `skripte/zahtijevaj-svjez-offserver-backup.sh`. Exit ≠ 0 = crveni job **prije** migracija. Trenutačno je skripta fail-closed stub (backup tooling još nije u repou); kad stigne backup PR, zamjenjuje se tijelo bez mijenjanja ugovora workflowa.
+4. SCP: `docker-compose.prod.yml`, `Caddyfile`, `objava-produkcija.sh`, backup helper s commita slike.
+5. Kratkotrajni GHCR login na VPS-u (`GITHUB_TOKEN` + privremeni `DOCKER_CONFIG` + logout), zatim `objava-produkcija.sh` s istom faza-mašinom kao staging (kandidat `.env` → pull → migracije → stvarni `.env` → recreate → Caddy).
+6. Poll `https://kaladont.hr/zdravlje` (~30×): `ok`, `baza=dostupna`, očekivani `digest` i `verzija`.
+7. Step summary: prethodni i novi digest, commit, ishod. Na failure: artifact `.deploy-snapshot-*` bez tajni.
+
+`concurrency.group: produkcija-deploy`, `cancel-in-progress: false`. Nema automatskog rollbacka slike nakon migracija.
 
 Workflow ne provjerava postoje li aktivne partije i može ih prekinuti. Operater ga zato pokreće u doba slabog prometa. Ako se očekuje prekid dulji od 5 minuta, održavanje se najavljuje najmanje 24 sata unaprijed.
 
-Automatskog rollbacka nema. Ako migracija, startup ili health check padnu, workflow završava crveno i u sažetku prikazuje prethodni digest te poveznicu na [ručni rollback](runbook-objava-i-rollback.md#rollback-vraćanje-prethodne-verzije). Operater prvo sprema dokaze, zatim ručno promovira prethodni digest; cilj povrata je 15 minuta.
+Ako migracija, startup ili health check padnu, workflow završava crveno i u sažetku prikazuje prethodni digest te poveznicu na [ručni rollback](runbook-objava-i-rollback.md#rollback-vraćanje-prethodne-verzije). Operater prvo sprema dokaze, zatim ručno promovira prethodni digest istim workflowom; cilj povrata je 15 minuta.
 
 ## Ručna provjera nakon workflowa
 
