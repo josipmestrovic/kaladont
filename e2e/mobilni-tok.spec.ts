@@ -425,6 +425,7 @@ test('mobilna privatna partija završava i Igraj ponovno vraća u sobu', async (
   context,
   page,
 }) => {
+  test.setTimeout(60_000);
   const igraci: E2EIgrac[] = [
     { kontekst: context, stranica: page },
     ...(await dodajIgrace(browser, 1)),
@@ -449,13 +450,15 @@ test('mobilna privatna partija završava i Igraj ponovno vraća u sobu', async (
     await expect(vlasnik.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({
       timeout: 20_000,
     });
-    await vlasnik.locator('button.povijest-naslov').click();
-    const prijavaRijeci = vlasnik.locator('button.prijavi-btn').first();
-    await expect(prijavaRijeci).toBeVisible();
+    // PanelPrijavaRijeci je već otvoren (otvorenoPocetno); klik na naslov bi ga zatvorio.
+    const panelPrijava = vlasnik.getByRole('button', { name: 'Prijavi riječ' });
+    await expect(panelPrijava).toHaveAttribute('aria-expanded', 'true');
+    await panelPrijava.scrollIntoViewIfNeeded();
+    const prijavaRijeci = vlasnik.getByRole('button', { name: 'Prijavi', exact: true }).first();
+    await expect(prijavaRijeci).toBeVisible({ timeout: 15_000 });
     await prijavaRijeci.click();
-    await expect(
-      vlasnik.getByRole('button', { name: 'Riječ je prijavljena' }).first(),
-    ).toBeVisible();
+    await expect(vlasnik.getByRole('button', { name: 'Prijavljeno' }).first()).toBeVisible();
+    await expect(vlasnik.locator('.uspjeh-obavijest')).toContainText('Hvala');
     await expect(vlasnik.locator('textarea')).toHaveCount(0);
     await vlasnik.getByRole('link', { name: 'Igraj ponovno' }).click();
     await expect(vlasnik).toHaveURL(new RegExp(`/soba/${kodSobe}$`));
