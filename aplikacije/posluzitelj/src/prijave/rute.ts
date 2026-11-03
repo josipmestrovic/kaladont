@@ -5,17 +5,27 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { baza } from '../baza/klijent.js';
-import { igraci, obracuniPartija, partije, potezi, prijave, prijaveIgraca, sudioniciPartije } from '../baza/shema.js';
-import { pokusajPoslatiEmail } from '../email.js';
-import { konfiguracija } from '../konfiguracija.js';
+import { partije, potezi, prijave, prijaveIgraca, sudioniciPartije } from '../baza/shema.js';
 import { zahtijevajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
-import { and, count, eq, inArray, isNotNull, notExists } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
 
-const ShemaPrijave = z.object({
-  partijaId: z.string().uuid(),
-  potezId: z.number().int().positive(),
-  poruka: z.string().trim().max(1000).optional(),
-});
+const ShemaPrijave = z
+  .object({
+    partijaId: z.string().uuid(),
+    tip: z.enum(['za_brisanje', 'za_dodavanje']),
+    potezId: z.number().int().positive().optional(),
+    rijec: z.string().trim().min(2).max(100).optional(),
+    poruka: z.string().trim().max(1000).optional(),
+  })
+  .superRefine((podaci, ctx) => {
+    if (podaci.tip === 'za_brisanje' && podaci.potezId == null && !podaci.rijec) {
+      ctx.addIssue({ code: 'custom', path: ['potezId'], message: 'potezId ili rijec su obavezni za prijavu odigrane riječi.' });
+    }
+    if (podaci.tip === 'za_dodavanje' && !podaci.rijec) {
+      ctx.addIssue({ code: 'custom', path: ['rijec'], message: 'rijec je obavezna za prijavu odbijene riječi.' });
+    }
+  });
+
 const ShemaPrijavaIgraca = z.object({
   partijaId: z.string().uuid(),
   prijavljeniIgracId: z.string().uuid(),
@@ -29,6 +39,10 @@ class GreskaPrijave extends Error {
   }
 }
 
+function normalizirajRijec(ulaz: string): string {
+  return ulaz.normalize('NFC').trim().toLowerCase();
+}
+
 export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void> {
   app.post('/prijave', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
     const rezultat = ShemaPrijave.safeParse(zahtjev.body);
@@ -36,30 +50,16 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
     }
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+    const tip = rezultat.data.tip;
 
-    let nova: typeof prijave.$inferSelect;
     try {
-      const umetnute = await baza.transaction(async (tx) => {
+      await baza.transaction(async (tx) => {
         const [partija] = await tx
           .select({ id: partije.id })
           .from(partije)
-          .where(and(eq(partije.id, rezultat.data.partijaId), eq(partije.status, 'zavrsena')))
+          .where(and(eq(partije.id, rezultat.data.partijaId), inArray(partije.status, ['u_tijeku', 'zavrsena'])))
           .limit(1);
-        if (!partija) throw new GreskaPrijave(404, 'Partija ne postoji ili još nije završena.');
-
-        const [potez] = await tx
-          .select({ id: potezi.id })
-          .from(potezi)
-          .where(
-            and(
-              eq(potezi.id, rezultat.data.potezId),
-              eq(potezi.partijaId, rezultat.data.partijaId),
-              inArray(potezi.vrsta, ['rijec', 'sustav_rijec']),
-              isNotNull(potezi.rijec),
-            ),
-          )
-          .limit(1);
-        if (!potez) throw new GreskaPrijave(404, 'Riječ ne pripada navedenoj partiji.');
+        if (!partija) throw new GreskaPrijave(404, 'Partija ne postoji ili nije dostupna za prijavu.');
 
         const [sudionik] = await tx
           .select({ igracId: sudioniciPartije.igracId })
@@ -69,46 +69,95 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
           .limit(1);
         if (!sudionik) throw new GreskaPrijave(403, 'Samo sudionici partije mogu prijaviti riječ.');
 
-        const [duplikat] = await tx
-          .select({ id: prijave.id })
-          .from(prijave)
-          .where(and(eq(prijave.partijaId, rezultat.data.partijaId), eq(prijave.potezId, rezultat.data.potezId), eq(prijave.igracId, igrac.id)))
-          .limit(1);
-        if (duplikat) throw new GreskaPrijave(409, 'Ovu si riječ već prijavio/la.');
-
         const [redakBrojaca] = await tx
           .select({ ukupno: count() })
           .from(prijave)
-          .where(and(eq(prijave.partijaId, rezultat.data.partijaId), eq(prijave.igracId, igrac.id)));
-        if (Number(redakBrojaca?.ukupno ?? 0) >= 3) throw new GreskaPrijave(429, 'Dosegnut je limit od 3 prijave po partiji.');
+          .where(and(eq(prijave.partijaId, rezultat.data.partijaId), eq(prijave.igracId, igrac.id), eq(prijave.tip, tip)));
+        if (Number(redakBrojaca?.ukupno ?? 0) >= 3) {
+          throw new GreskaPrijave(429, tip === 'za_brisanje'
+            ? 'Dosegnut je limit od 3 prijave odigranih riječi po partiji.'
+            : 'Dosegnut je limit od 3 prijave odbijenih riječi po partiji.');
+        }
 
-        return tx
-          .insert(prijave)
-          .values({
+        if (tip === 'za_brisanje') {
+          const uvjetPoteza = rezultat.data.potezId != null
+            ? and(
+                eq(potezi.id, rezultat.data.potezId),
+                eq(potezi.partijaId, rezultat.data.partijaId),
+                inArray(potezi.vrsta, ['rijec', 'sustav_rijec']),
+                isNotNull(potezi.rijec),
+              )
+            : and(
+                eq(potezi.partijaId, rezultat.data.partijaId),
+                eq(potezi.rijec, normalizirajRijec(rezultat.data.rijec!)),
+                inArray(potezi.vrsta, ['rijec', 'sustav_rijec']),
+                isNotNull(potezi.rijec),
+              );
+          const [potez] = await tx
+            .select({ id: potezi.id, rijec: potezi.rijec })
+            .from(potezi)
+            .where(uvjetPoteza)
+            .limit(1);
+          if (!potez?.rijec) throw new GreskaPrijave(404, 'Riječ ne pripada navedenoj partiji.');
+
+          const [duplikat] = await tx
+            .select({ id: prijave.id })
+            .from(prijave)
+            .where(and(
+              eq(prijave.partijaId, rezultat.data.partijaId),
+              eq(prijave.potezId, potez.id),
+              eq(prijave.igracId, igrac.id),
+              eq(prijave.tip, 'za_brisanje'),
+            ))
+            .limit(1);
+          if (duplikat) throw new GreskaPrijave(409, 'Ovu si riječ već prijavio/la.');
+
+          await tx.insert(prijave).values({
             partijaId: rezultat.data.partijaId,
-            potezId: rezultat.data.potezId,
+            potezId: potez.id,
             igracId: igrac.id,
+            tip: 'za_brisanje',
+            rijec: potez.rijec,
             poruka: rezultat.data.poruka || 'Riječ prijavljena na provjeru.',
-          })
-          .returning();
+          });
+          return;
+        }
+
+        const rijec = normalizirajRijec(rezultat.data.rijec!);
+        const [duplikat] = await tx
+          .select({ id: prijave.id })
+          .from(prijave)
+          .where(and(
+            eq(prijave.partijaId, rezultat.data.partijaId),
+            eq(prijave.rijec, rijec),
+            eq(prijave.igracId, igrac.id),
+            eq(prijave.tip, 'za_dodavanje'),
+          ))
+          .limit(1);
+        if (duplikat) throw new GreskaPrijave(409, 'Ovu si riječ već prijavio/la.');
+
+        await tx.insert(prijave).values({
+          partijaId: rezultat.data.partijaId,
+          potezId: null,
+          igracId: igrac.id,
+          tip: 'za_dodavanje',
+          rijec,
+          poruka: rezultat.data.poruka || 'Odbijena riječ prijavljena na provjeru.',
+        });
       });
-          const spremljena = umetnute[0];
-          if (!spremljena) throw new Error('Prijava nije spremljena.');
-          nova = spremljena;
     } catch (greska) {
       if (greska instanceof GreskaPrijave) {
         return odgovor.code(greska.status).send({ ok: false, greska: greska.message });
       }
+      if (jeJedinstvenostPrekrsena(greska)) {
+        return odgovor.code(409).send({ ok: false, greska: 'Ovu si riječ već prijavio/la.' });
+      }
       throw greska;
     }
 
-    const [prviAdmin] = await baza.select().from(igraci).where(eq(igraci.vrsta, 'admin')).limit(1);
-    const primatelj = konfiguracija.DEV_MAIL || prviAdmin?.email || 'dev@example.com';
-    void pokusajPoslatiEmail(app.log, primatelj, `Nova prijava #${nova.id} od ${igrac.nadimak}: ${nova.poruka}`, `prijava:${nova.id}`);
-
     return {
       ok: true,
-      poruka: 'Hvala! Pregledat ćemo prijavu — ovako nam pomažeš da igra bude bolja.',
+      poruka: tip === 'za_brisanje' ? 'Riječ je prijavljena.' : 'Riječ je prijavljena.',
     };
   });
 
@@ -122,15 +171,12 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
 
     try {
       await baza.transaction(async (tx) => {
-        const [partija] = await tx.select({ id: partije.id }).from(partije).where(and(
-          eq(partije.id, rezultat.data.partijaId),
-          eq(partije.status, 'zavrsena'),
-          notExists(tx.select({ partijaId: obracuniPartija.partijaId }).from(obracuniPartija).where(and(
-            eq(obracuniPartija.partijaId, partije.id),
-            eq(obracuniPartija.vrsta, 'privatna_gamifikacija'),
-          ))),
-        )).limit(1);
-        if (!partija) throw new GreskaPrijave(404, 'Javna završena partija nije pronađena.');
+        const [partija] = await tx
+          .select({ id: partije.id })
+          .from(partije)
+          .where(and(eq(partije.id, rezultat.data.partijaId), inArray(partije.status, ['u_tijeku', 'zavrsena'])))
+          .limit(1);
+        if (!partija) throw new GreskaPrijave(404, 'Partija nije pronađena.');
 
         const [sudionik] = await tx.select({ igracId: sudioniciPartije.igracId }).from(sudioniciPartije).where(and(
           eq(sudioniciPartije.partijaId, rezultat.data.partijaId),
@@ -159,6 +205,6 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
       }
       throw greska;
     }
-    return { ok: true, poruka: 'Hvala! Prijava je spremljena za pregled.' };
+    return { ok: true, poruka: 'Igrač je prijavljen.' };
   });
 }

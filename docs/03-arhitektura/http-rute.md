@@ -33,6 +33,10 @@ Jednokratna zamjena fonda ima CLI samo za održavanje: `pnpm --filter posluzitel
 
 Stari `GET /api/ljestvica` ostaje privremeno radi kompatibilnosti.
 
-## Prijava riječi
+## Prijava riječi i igrača
 
-`POST /api/prijave` zahtijeva identificiranog sudionika završene partije i tijelo `{ partijaId, potezId }`. Server provjerava da potez pripada partiji i da je riječ o odigranoj riječi. Jedan igrač može prijaviti najviše tri različita poteza u istoj partiji, a ponovljena prijava istog poteza vraća `409`. Dosegnut limit vraća `429`. Email obavijest administratoru šalje se best-effort nakon spremanja i ne blokira HTTP odgovor. Gosti imaju ista prava kao registrirani korisnici.
+`POST /api/prijave` zahtijeva identificiranog sudionika partije (`u_tijeku` ili `zavrsena`) i tijelo `{ partijaId, tip: 'za_brisanje'|'za_dodavanje', potezId?, rijec? }`. Za `za_brisanje` treba `potezId` ili `rijec` (lookup u potezima partije); za `za_dodavanje` obavezna je `rijec`. Limit je **3 + 3** po tipu i partiji. Duplikat vraća `409`, limit `429`. Bez email obavijesti.
+
+`POST /api/prijave-igraca` — tijelo `{ partijaId, prijavljeniIgracId, razlog }` (UI šalje `pogrdan_nadimak`). Partija `u_tijeku` ili `zavrsena`; admin lista ne vraća `prijaviteljId`.
+
+Admin (sesija `vrsta=admin`): `GET /api/admin/prijave?status=nova&tip=…`, `POST …/obrisi-rijec|dodaj-rijec|dismiss`; `GET /api/admin/prijave-igraca`, `POST …/obrisi-racun|dismiss`. Izmjene rječnika zovu `ponovoUcitaj()`.

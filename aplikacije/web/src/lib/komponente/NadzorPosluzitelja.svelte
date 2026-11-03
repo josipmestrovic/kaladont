@@ -9,10 +9,9 @@
   let ucitavanje = $state(false);
   let slanje = $state(false);
   let poruka = $state<string | null>(null);
-  let sada = $state(Date.now());
   let aktivan = true;
   const uzorak = $derived(pregled?.trenutno);
-  const zastarjelo = $derived(uzorak ? sada - Date.parse(uzorak.vrijeme) > 15_000 : true);
+  const zastarjelo = $derived(uzorak ? Date.now() - Date.parse(uzorak.vrijeme) > 15_000 : true);
   const broj = (vrijednost: number | null | undefined, jedinica = '') => vrijednost == null ? 'Nije dostupno' : `${vrijednost.toLocaleString('hr-HR', { maximumFractionDigits: 1 })}${jedinica}`;
   const memorija = (bajtovi: number | undefined) => broj(bajtovi == null ? null : bajtovi / 1_048_576, ' MiB');
   const vrijeme = (datum: string | null | undefined) => datum ? new Date(datum).toLocaleTimeString('hr-HR') : 'Nije dostupno';
@@ -43,13 +42,7 @@
   onMount(() => {
     aktivan = true;
     void osvjezi();
-    const priVidljivosti = () => { if (!document.hidden) void osvjezi(); };
-    document.addEventListener('visibilitychange', priVidljivosti);
-    const timer = setInterval(() => {
-      sada = Date.now();
-      if (!document.hidden) void osvjezi();
-    }, 5_000);
-    return () => { aktivan = false; clearInterval(timer); document.removeEventListener('visibilitychange', priVidljivosti); };
+    return () => { aktivan = false; };
   });
 </script>
 

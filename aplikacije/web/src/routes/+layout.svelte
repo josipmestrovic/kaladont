@@ -17,6 +17,7 @@
   import { inicijalizirajGlas } from '$lib/glasovni-manager.js';
   import Header from '$lib/komponente/Header.svelte';
   import VezaObavijest from '$lib/komponente/VezaObavijest.svelte';
+  import UspjehObavijest from '$lib/komponente/UspjehObavijest.svelte';
   import CitanjeNaglasObavijest from '$lib/komponente/CitanjeNaglasObavijest.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import BootUcitavanje from '$lib/komponente/BootUcitavanje.svelte';
@@ -107,6 +108,7 @@
 <div class:landing-shell={$page.url.pathname === '/'} class="aplikacija">
   <div class="status-obavijesti">
     <VezaObavijest />
+    <UspjehObavijest />
     <CitanjeNaglasObavijest />
   </div>
   {#if $page.url.pathname === '/' && sesijaSpreman && navIkoneSpremane}<PadajuceRijeci />{/if}

@@ -47,6 +47,16 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   verzijaRjecnika(): number;
   /** Ponovno učita rječnik iz baze i zamijeni zajedničke podatke in-place. */
   ponovoUcitaj(): Promise<void>;
+  /** Brza inkrementalna izmjena nakon admin UPSERT-a — bez punog učitavanja. */
+  primijeniUbaci(zapis: {
+    rijec: string;
+    prvaDva: string;
+    vrste: readonly VrstaRijeci[];
+    grupe: readonly string[];
+    frekvencija?: number;
+  }): void;
+  /** Brzo uklanjanje iz memorije nakon soft-deletea — bez punog učitavanja. */
+  primijeniUklanjanje(rijec: string): void;
 }
 
 export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
@@ -277,6 +287,77 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     }
   }
 
+  function primijeniUklanjanje(rijecUlaz: string): void {
+    const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
+    if (!rijecGrupe.has(rijec)) {
+      verzija += 1;
+      return;
+    }
+    const vrste = vrsteZa(rijec);
+    rijecGrupe.delete(rijec);
+    rijecFrekvencija.delete(rijec);
+    rijecVrste.delete(rijec);
+    const prefiks = prvaDva(rijec);
+    const lista = poPrefiksu.get(prefiks);
+    if (lista) {
+      const nova = lista.filter((r) => r !== rijec);
+      if (nova.length === 0) poPrefiksu.delete(prefiks);
+      else poPrefiksu.set(prefiks, nova);
+    }
+    pocetneImenickeRijeci = pocetneImenickeRijeci.filter((r) => r !== rijec);
+    if (vrste.length > 0) {
+      const mapa = new Map(kategorije.map((k) => [k.vrsta, k.brojOblika]));
+      for (const vrsta of vrste) {
+        const trenutno = mapa.get(vrsta) ?? 0;
+        if (trenutno <= 1) mapa.delete(vrsta);
+        else mapa.set(vrsta, trenutno - 1);
+      }
+      kategorije = [...mapa.entries()]
+        .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
+        .sort((a, b) => b.brojOblika - a.brojOblika);
+    }
+    verzija += 1;
+  }
+
+  function primijeniUbaci(zapis: {
+    rijec: string;
+    prvaDva: string;
+    vrste: readonly VrstaRijeci[];
+    grupe: readonly string[];
+    frekvencija?: number;
+  }): void {
+    const rijec = zapis.rijec.normalize('NFC').trim().toLowerCase();
+    const vecPostojala = rijecGrupe.has(rijec);
+    if (vecPostojala) primijeniUklanjanje(rijec);
+
+    const grupe = [...zapis.grupe];
+    const vrste = [...zapis.vrste];
+    rijecGrupe.set(rijec, grupe.length === 1 ? grupe[0]! : grupe);
+    rijecFrekvencija.set(rijec, zapis.frekvencija ?? 0);
+    rijecVrste.set(rijec, vrste.length === 1 ? vrste[0]! : vrste);
+
+    const prefiks = zapis.prvaDva.normalize('NFC').toLowerCase();
+    const lista = poPrefiksu.get(prefiks);
+    if (lista) {
+      if (!lista.includes(rijec)) lista.push(rijec);
+    } else {
+      poPrefiksu.set(prefiks, [rijec]);
+    }
+
+    if (rijec.length < 6 && grupe.includes(`imenica:${rijec}`) && !pocetneImenickeRijeci.includes(rijec)) {
+      pocetneImenickeRijeci.push(rijec);
+    }
+
+    const mapa = new Map(kategorije.map((k) => [k.vrsta, k.brojOblika]));
+    for (const vrsta of vrste) {
+      mapa.set(vrsta, (mapa.get(vrsta) ?? 0) + 1);
+    }
+    kategorije = [...mapa.entries()]
+      .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
+      .sort((a, b) => b.brojOblika - a.brojOblika);
+    verzija += 1;
+  }
+
   await ucitaj();
 
   return {
@@ -337,5 +418,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
       return null;
     },
     ponovoUcitaj: ucitaj,
+    primijeniUbaci,
+    primijeniUklanjanje,
   };
 }

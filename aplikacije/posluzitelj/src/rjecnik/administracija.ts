@@ -12,13 +12,15 @@ const DOPUSTENA_SLOVA = /^[a-zšđčćž]+$/;
 export class NevaljanaRijecError extends Error {}
 
 /** Dodaje riječ u rječnik (UPSERT) i bilježi izmjenu u izmjene_rjecnika. Vrsta je obavezna (ADR-013);
- * leksemska grupa se izvodi iz vrste i leme (default: sama riječ). Ne osvježava memoriju - pozovi rjecnik.ponovoUcitaj(). */
+ * leksemska grupa se izvodi iz vrste i leme (default: sama riječ). Ne osvježava memoriju — pozovi
+ * `rjecnik.primijeniUbaci` / `uskladiRjecnikNakonUbaci` (ne puni `ponovoUcitaj`). */
 export async function dodajRijec(
   rijecUlaz: string,
   razlog: string,
   adminId: string | null,
   vrsta: VrstaRijeci,
   lemaUlaz?: string,
+  prijavaId?: number | null,
 ): Promise<void> {
   const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
   const lema = (lemaUlaz ?? rijec).normalize('NFC').trim().toLowerCase();
@@ -40,14 +42,31 @@ export async function dodajRijec(
     .values({ rijec, prvaDva, zadnjaDva, vrste: [vrsta], grupe: [grupa], aktivna: true, napomena: 'ručno dodano' })
     .onConflictDoUpdate({ target: rijeci.rijec, set: { aktivna: true } });
 
-  await baza.insert(izmjeneRjecnika).values({ rijec, akcija: 'dodana', razlog, adminId });
+  await baza.insert(izmjeneRjecnika).values({
+    rijec,
+    akcija: 'dodana',
+    razlog,
+    adminId,
+    prijavaId: prijavaId ?? null,
+  });
 }
 
 /** Soft-delete (aktivna=false) - povijest odigranih partija ostaje razumljiva (odrzavanje-rjecnika.md). */
-export async function deaktivirajRijec(rijecUlaz: string, razlog: string, adminId: string | null = null): Promise<void> {
+export async function deaktivirajRijec(
+  rijecUlaz: string,
+  razlog: string,
+  adminId: string | null = null,
+  prijavaId?: number | null,
+): Promise<void> {
   const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
   await baza.update(rijeci).set({ aktivna: false }).where(eq(rijeci.rijec, rijec));
-  await baza.insert(izmjeneRjecnika).values({ rijec, akcija: 'uklonjena', razlog, adminId });
+  await baza.insert(izmjeneRjecnika).values({
+    rijec,
+    akcija: 'uklonjena',
+    razlog,
+    adminId,
+    prijavaId: prijavaId ?? null,
+  });
 }
 
 /** Vraća prethodno deaktiviranu riječ. */

@@ -5,6 +5,11 @@ Bot politika v3: jedinični testovi provjeravaju osnovne učestale oblike i omje
 Zagrijavanje: `test/trening.test.ts` pokriva gosta bez ikakvog novog zapisa, registriranog čovjeka bez upisa kolekcije/partije/XP-a te odsutnost kategorije `oblici_treninga`. Trening pobjede testiraju jedinstvenost UUID-a te pragove Zagrijanog 1/5/20/50/100. `test/upis-partije.test.ts` provjerava da se stara trening-grupa (`za_dostignuca: false`) u javnom/privatnom gamificiranom upisu promovira jednom i da istodobni obračuni ne udvostruče rijetko dostignuće. Tehnički prekid/izlazak ne smije dodijeliti pobjedu.
 
 `pnpm --filter posluzitelj exec vitest run test/nadzor.test.ts test/admin-statistika.test.ts test/http-rute.test.ts --hookTimeout=180000 --testTimeout=120000` provjerava ograničenu povijest, CPU delte, alarmne pragove i cooldown, admin pristup i kompatibilnost healtha. `e2e/admin-nadzor.spec.ts` provjerava desktop/mobilni prikaz, zastarjele podatke i izričitu probnu obavijest s mock API-jem. Testovi ne šalju stvarne operativne emailove. Prije uključivanja na stagingu/produkciji operater mora postaviti `DEV_MAIL`, uključiti `NADZOR_EMAIL_OMOGUCEN=true` i provjeriti inbox nakon probne obavijesti; CI ne potvrđuje stvarnu dostavu ni vanjsku dostupnost VPS-a.
+
+### Ručni suite prijava (produkcija)
+
+`pnpm --filter posluzitelj test:prijave-produkcija` nije dio `pnpm test` ni CI-ja. Pokriva: admin dodaj/deaktiviraj riječ, admin brisanje računa preko prijave igrača, prijave riječi tijekom i nakon partije, admin listu bez curenja prijavitelja. Datoteka: `aplikacije/posluzitelj/test/prijave-produkcija.manual.test.ts` (isključena iz zadanog Vitesta). Nadzor na `/admin` nema auto-poll — osvježavanje je ručno.
+
 # Testiranje
 
 Pravila igre su srce proizvoda — greška u validaciji ili bodovanju izravno krade partije igračima. Zato je pokrivenost pravila **obavezna**, a UI testovi pragmatični.
