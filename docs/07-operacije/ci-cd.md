@@ -103,12 +103,12 @@ Staging tijekom privremenog multiplayer testiranja nema Basic Auth kako browser 
 
 ## Ručna produkcija — `promoviraj-produkciju.yml` (isporučeno)
 
-Actions ime: **Promoviraj produkciju**. Pokreće se isključivo ručno (`workflow_dispatch`). Ulaz `digest` je puni `sha256:` + 64 hex; workflow odbija tag, `latest`, skraćeni digest, nepoznat digest i digest bez uspješnog staging deploya za isti commit (`Objaviti staging` + GHCR tag commit SHA).
+Actions ime: **Promoviraj produkciju**. Pokreće se isključivo ručno (`workflow_dispatch`). Ulaz `digest` je puni `sha256:` + 64 hex; workflow odbija tag, `latest`, skraćeni digest, nepoznat digest i digest bez uspješnog staging deploya **tog istog digesta** (ne dovolji zeleni staging za isti commit ako je GHCR tag poslije pomaknut CI re-runom).
 
 1. Koristi Environment `produkcija`; nema required reviewer ni dodatnog approval koraka. (`PROD_HOST`, `PROD_SSH_KLJUC`, `PROD_SSH_KNOWN_HOSTS` — nakon VPS-a.)
-2. Iz OCI labele `org.opencontainers.image.revision` čita commit SHA; zapisuje trenutni `DIGEST`/`VERZIJA` s VPS-a kao kandidat za rollback.
+2. Iz OCI labele `org.opencontainers.image.revision` čita commit SHA; checkout i SCP koriste taj SHA (ne `main`), da rollback starog digesta vrati i tadašnje compose/Caddy. Zapisuje trenutni `DIGEST`/`VERZIJA` s VPS-a kao kandidat za rollback.
 3. **Backup gate:** na VPS-u pokreće `skripte/zahtijevaj-svjez-offserver-backup.sh`. Exit ≠ 0 = crveni job **prije** migracija. Trenutačno je skripta fail-closed stub (backup tooling još nije u repou); kad stigne backup PR, zamjenjuje se tijelo bez mijenjanja ugovora workflowa.
-4. SCP: `docker-compose.prod.yml`, `Caddyfile`, `objava-produkcija.sh`, backup helper.
+4. SCP: `docker-compose.prod.yml`, `Caddyfile`, `objava-produkcija.sh`, backup helper s commita slike.
 5. Kratkotrajni GHCR login na VPS-u (`GITHUB_TOKEN` + privremeni `DOCKER_CONFIG` + logout), zatim `objava-produkcija.sh` s istom faza-mašinom kao staging (kandidat `.env` → pull → migracije → stvarni `.env` → recreate → Caddy).
 6. Poll `https://kaladont.hr/zdravlje` (~30×): `ok`, `baza=dostupna`, očekivani `digest` i `verzija`.
 7. Step summary: prethodni i novi digest, commit, ishod. Na failure: artifact `.deploy-snapshot-*` bez tajni.
