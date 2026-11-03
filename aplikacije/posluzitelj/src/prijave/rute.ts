@@ -3,6 +3,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, obracuniPartija, partije, potezi, prijave, prijaveIgraca, sudioniciPartije } from '../baza/shema.js';
 import { pokusajPoslatiEmail } from '../email.js';
@@ -153,7 +154,7 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
       });
     } catch (greska) {
       if (greska instanceof GreskaPrijave) return odgovor.code(greska.status).send({ ok: false, greska: greska.message });
-      if (typeof greska === 'object' && greska !== null && 'code' in greska && greska.code === '23505') {
+      if (jeJedinstvenostPrekrsena(greska)) {
         return odgovor.code(409).send({ ok: false, greska: 'Ovog si igrača već prijavio/la za tu partiju.' });
       }
       throw greska;
