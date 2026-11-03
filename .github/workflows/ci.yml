@@ -1,7 +1,13 @@
 name: CI
 
+# PR: iste lint/test/build/e2e/image smoke provjere, lokalni image (kaladont:ci), bez GHCR pusha.
+# main push: isti suite + candidate u GHCR; Objaviti Docker/staging pale se samo s main via workflow_run.
+# packages:write treba main candidate pushu; na pull_request se login/push koraci ne izvršavaju.
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
 
