@@ -1,0 +1,270 @@
+name: Promoviraj produkciju
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: Puni image digest (sha256: + 64 hex) koji je prošao staging
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+  actions: read
+
+concurrency:
+  group: produkcija-deploy
+  cancel-in-progress: false
+
+jobs:
+  promocija:
+    name: Promovirati isti digest u produkciju
+    runs-on: ubuntu-24.04
+    environment: produkcija
+
+    steps:
+      - name: Preuzeti repozitorij
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      - name: Prijaviti se u GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Postaviti Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validirati digest i izvući commit SHA
+        id: release
+        shell: bash
+        env:
+          DIGEST_ULAZ: ${{ inputs.digest }}
+        run: |
+          digest="$DIGEST_ULAZ"
+          if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "Očekivan je puni digest oblika sha256: + 64 heksadecimalna znaka. Tag, latest i skraćeni digest nisu dopušteni."
+            exit 1
+          fi
+
+          image="ghcr.io/josipmestrovic/kaladont@${digest}"
+          docker buildx imagetools inspect "$image" >/dev/null
+
+          curl -fsSL "https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" crane
+          chmod 755 "$RUNNER_TEMP/crane"
+
+          verzija=$("$RUNNER_TEMP/crane" config "$image" | jq -r '.config.Labels["org.opencontainers.image.revision"] // empty')
+          if [[ ! "$verzija" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Slika nema valjani OCI label org.opencontainers.image.revision (puni commit SHA)."
+            exit 1
+          fi
+
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "verzija=$verzija" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Produkcijska promocija'
+            echo "- Ulazni digest: \`$digest\`"
+            echo "- Commit (OCI revision): \`$verzija\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Staging gate — uspješan staging deploy za isti commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERZIJA: ${{ steps.release.outputs.verzija }}
+          DIGEST: ${{ steps.release.outputs.digest }}
+        run: |
+          test -n "$VERZIJA"
+          # Dokaz: uspješan run workflowa „Objaviti staging” s head_sha = commit iz OCI labele.
+          run_id=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/objavi-staging.yml/runs?status=completed&per_page=50" \
+            --jq ".workflow_runs[] | select(.conclusion == \"success\" and .head_sha == \"$VERZIJA\") | .id" \
+            | head -n 1)
+
+          if test -z "$run_id"; then
+            echo "Nema uspješnog „Objaviti staging” runa za commit $VERZIJA. Produkcija prima samo digeste koji su prošli staging."
+            exit 1
+          fi
+
+          # Dodatna usklađenost: GHCR tag commit SHA mora pokazivati na isti digest.
+          tagged_digest=$(docker buildx imagetools inspect "ghcr.io/josipmestrovic/kaladont:${VERZIJA}" | awk '/^Digest:/ { print $2 }')
+          if test "$tagged_digest" != "$DIGEST"; then
+            echo "Digest ulaza ($DIGEST) ne odgovara GHCR tagu ${VERZIJA} ($tagged_digest)."
+            exit 1
+          fi
+
+          echo "Staging gate OK: workflow run $run_id za $VERZIJA; digest usklađen s GHCR tagom."
+          {
+            echo "- Staging gate: uspješan run \`$run_id\` za commit \`$VERZIJA\`"
+            echo "- GHCR tag commit SHA pokazuje na isti digest"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pripremiti SSH vjerodajnice
+        shell: bash
+        env:
+          SSH_KLJUC: ${{ secrets.PROD_SSH_KLJUC }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_KLJUC"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d "$RUNNER_TEMP/ssh"
+          printf '%s\n' "$SSH_KLJUC" > "$RUNNER_TEMP/ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/ssh/id_ed25519" "$RUNNER_TEMP/ssh/known_hosts"
+
+      - name: Pročitati prethodni produkcijski digest
+        id: prethodni
+        shell: bash
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          test -n "$PROD_HOST"
+          prethodni=$(ssh -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            "deploy@${PROD_HOST}" \
+            "grep -E '^(DIGEST|VERZIJA)=' /opt/kaladont/.env || true")
+
+          prethodni_digest=$(printf '%s\n' "$prethodni" | awk -F= '/^DIGEST=/ { print $2; exit }')
+          prethodna_verzija=$(printf '%s\n' "$prethodni" | awk -F= '/^VERZIJA=/ { print $2; exit }')
+          echo "digest=${prethodni_digest}" >> "$GITHUB_OUTPUT"
+          echo "verzija=${prethodna_verzija}" >> "$GITHUB_OUTPUT"
+          {
+            echo "- Prethodni digest: \`${prethodni_digest:-nije-pronaden}\`"
+            echo "- Prethodni commit: \`${prethodna_verzija:-nije-pronaden}\`"
+            echo '- Ručni rollback: ponovno pokreni ovaj workflow s prethodnim digestom (shema mora biti kompatibilna).'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail-closed svježi off-server backup
+        shell: bash
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          scp -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            skripte/zahtijevaj-svjez-offserver-backup.sh \
+            "deploy@${PROD_HOST}:/opt/kaladont/"
+
+          ssh -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            "deploy@${PROD_HOST}" \
+            "chmod 700 /opt/kaladont/zahtijevaj-svjez-offserver-backup.sh && /opt/kaladont/zahtijevaj-svjez-offserver-backup.sh"
+
+          echo '- Backup gate: potvrđen' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prenijeti produkcijske konfiguracije
+        shell: bash
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          scp -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            docker-compose.prod.yml Caddyfile \
+            skripte/objava-produkcija.sh \
+            skripte/zahtijevaj-svjez-offserver-backup.sh \
+            "deploy@${PROD_HOST}:/opt/kaladont/"
+
+      - name: Objaviti produkciju uz kratkotrajni GHCR login
+        shell: bash
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          IMAGE_REF: ${{ steps.release.outputs.image }}
+          IMAGE_DIGEST: ${{ steps.release.outputs.digest }}
+          RELEASE_VERSION: ${{ steps.release.outputs.verzija }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Token samo preko stdin u docker login; privremeni DOCKER_CONFIG + logout na kraju.
+          printf '%s\n' "$GHCR_TOKEN" | ssh -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            "deploy@${PROD_HOST}" \
+            "export DOCKER_CONFIG=\$(mktemp -d) && \
+             trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf \"\$DOCKER_CONFIG\"' EXIT && \
+             docker login ghcr.io -u $(printf '%q' "$GHCR_USER") --password-stdin && \
+             chmod 700 /opt/kaladont/objava-produkcija.sh && \
+             /opt/kaladont/objava-produkcija.sh $(printf '%q' "$IMAGE_REF") $(printf '%q' "$IMAGE_DIGEST") $(printf '%q' "$RELEASE_VERSION")"
+
+      - name: Provjeriti produkcijski health i digest
+        shell: bash
+        env:
+          EXPECTED_DIGEST: ${{ steps.release.outputs.digest }}
+          EXPECTED_VERSION: ${{ steps.release.outputs.verzija }}
+        run: |
+          for pokusaj in {1..30}; do
+            status=$(curl --silent --show-error --output odgovor.json --write-out '%{http_code}' https://kaladont.hr/zdravlje || true)
+            odgovor=$(cat odgovor.json 2>/dev/null || true)
+            echo "Pokušaj ${pokusaj}: HTTP ${status:-mrežna-greška}; ${odgovor:-bez tijela}"
+            if test "$status" = '200' && echo "$odgovor" | jq -e --arg digest "$EXPECTED_DIGEST" --arg verzija "$EXPECTED_VERSION" '.ok == true and .baza == "dostupna" and .digest == $digest and .verzija == $verzija' >/dev/null; then
+              {
+                echo "- Novi digest: \`$EXPECTED_DIGEST\`"
+                echo "- Novi commit: \`$EXPECTED_VERSION\`"
+                echo '- Health: https://kaladont.hr/zdravlje OK'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Produkcija nije postala zdrava s očekivanim digestom.'
+          exit 1
+
+      - name: Preuzeti deploy snapshot na neuspjeh
+        if: failure()
+        shell: bash
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/deploy-snapshot"
+          if ! test -f "$RUNNER_TEMP/ssh/id_ed25519"; then
+            echo 'SSH ključ nije dostupan; preskačem dohvat deploy snapshota.'
+            exit 0
+          fi
+          if test -z "${PROD_HOST:-}"; then
+            echo 'PROD_HOST nije dostupan; preskačem dohvat deploy snapshota.'
+            exit 0
+          fi
+
+          snapshot=$(ssh -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            "deploy@${PROD_HOST}" \
+            "cd /opt/kaladont && ls -1t .deploy-snapshot-* 2>/dev/null | head -n 1" || true)
+
+          if test -z "$snapshot"; then
+            echo 'Deploy snapshot nije pronađen na produkcijskom VPS-u.'
+            exit 0
+          fi
+
+          if scp -i "$RUNNER_TEMP/ssh/id_ed25519" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            "deploy@${PROD_HOST}:/opt/kaladont/${snapshot}" \
+            "$RUNNER_TEMP/deploy-snapshot/${snapshot}"; then
+            echo "Preuzet deploy snapshot: ${snapshot}"
+            echo "- Snapshot: \`${snapshot}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Snapshot postoji, ali dohvat nije uspio: ${snapshot}"
+          fi
+
+      - name: Spremiti deploy snapshot artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: produkcija-deploy-snapshot
+          path: ${{ runner.temp }}/deploy-snapshot/.deploy-snapshot-*
+          if-no-files-found: ignore
+
+      - name: Očistiti SSH vjerodajnice
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/ssh"

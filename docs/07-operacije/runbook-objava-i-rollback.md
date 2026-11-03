@@ -2,7 +2,7 @@
 
 Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani su u [release shemi](release-shema.md), automatika u [ci-cd.md](ci-cd.md), a ovdje je ono što radi čovjek. Pravilo: **promocija u produkciju uvijek nosi digest koji je već prošao staging** — nikad svježi build, nikad ručni SSH deploy.
 
-> **Status: djelomično izvedivo.** CI, Docker smoke test, GHCR promotion i automatski staging deploy postoje. Produkcijska promocija workflowom još ne postoji; koraci koji je pretpostavljaju ostaju ciljani budući postupak.
+> **Status: djelomično izvedivo.** CI, Docker smoke test, GHCR promotion, automatski staging i ručni workflow **Promoviraj produkciju** postoje. Produkcijski run zahtijeva Environment `produkcija`, `PROD_*` tajne, VPS `.env` i (nakon backup PR-a) instaliran off-server backup; do tada backup gate namjerno blokira deploy prije migracija.
 
 ## Prije svakog release kandidata
 
@@ -27,8 +27,8 @@ Postupci za svakodnevne objave. Release identitet, statusi i checkliste opisani 
    - za baznu promjenu pregledaj migracijski korak i potvrdi da stara aplikacija može raditi nad novom shemom barem jedan ciklus.
 5. **Zabilježi staging rezultat** kao `staging-provjereno` ili `odbačeno`. Ne promoviraj i ne dijeli closed testerima poznatu grešku uz obećanje da će se popraviti poslije.
 6. **Za closed test release** pošalji testerima samo staging link, kratku napomenu što se testira i način prijave greške. Popis testera i privatni kontakt podaci ne ulaze u git.
-7. **Za buduću produkciju odaberi vrijeme slabog prometa.** Workflow ne blokira aktivne partije; zamjena procesa može ih prekinuti.
-8. **Pokreni `promoviraj-produkciju`** preko Actions → Run workflow i unesi puni staging digest. Nema dodatnog Environment odobrenja jer postoji jedan operater. Ovaj korak je ciljano stanje dok produkcijski workflow ne postoji.
+7. **Odaberi vrijeme slabog prometa.** Workflow ne blokira aktivne partije; zamjena procesa može ih prekinuti.
+8. **Pokreni Actions → Promoviraj produkciju → Run workflow** i unesi puni staging digest (`sha256:` + 64 hex). Nema dodatnog Environment odobrenja jer postoji jedan operater. Workflow odbija digest bez uspješnog staginga; backup gate mora proći prije migracija.
 9. **Prati svaki korak:** prethodni digest, svježi šifrirani off-server backup, migracije, pull istog digesta, zamjena i health check. Crveni korak nije poziv na naslijepo ponovno pokretanje.
 10. **Provjeri produkciju:** `/zdravlje` vraća 200 i očekivani digest; landing, Pravila, O igri, Privatnost i Uvjeti rade; zatim odigraj cijelu partiju u četiri odvojene sesije. Ta partija ostaje u običnoj statistici.
 11. **Pregledaj logove** bez ispisivanja tajni:
