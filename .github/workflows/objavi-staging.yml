@@ -43,8 +43,35 @@ jobs:
         env:
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
+          set -euo pipefail
           image="ghcr.io/josipmestrovic/kaladont:${COMMIT_SHA}"
-          if ! digest=$(docker buildx imagetools inspect "$image" 2>/dev/null | awk '/^Digest:/ { print $2 }') || [[ -z "$digest" ]]; then
+          inspect_log=$(mktemp)
+          set +e
+          docker buildx imagetools inspect "$image" >"$inspect_log" 2>&1
+          kod=$?
+          set -e
+
+          if [[ "$kod" -eq 0 ]]; then
+            digest=$(awk '/^Digest:/ { print $2; exit }' "$inspect_log")
+            if [[ -z "$digest" ]]; then
+              echo "Inspect je uspio, ali Digest nije parsiran iz izlaza:"
+              cat "$inspect_log"
+              exit 1
+            fi
+            echo "postoji=true" >> "$GITHUB_OUTPUT"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+            echo "image=ghcr.io/josipmestrovic/kaladont@${digest}" >> "$GITHUB_OUTPUT"
+            {
+              echo '## Staging release'
+              echo "- Commit: \`$COMMIT_SHA\`"
+              echo "- Digest: \`$digest\`"
+              echo '- Deploy skripta na VPS-u ispisuje snapshot i fazu pada ako objava ne uspije.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Samo eksplicitni „nema taga” smije biti docs-only skip.
+          if grep -qiE 'not found|NAME_UNKNOWN|manifest unknown|no such (manifest|tag)|404' "$inspect_log"; then
             echo "postoji=false" >> "$GITHUB_OUTPUT"
             {
               echo '## Staging release'
@@ -53,15 +80,10 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          echo "postoji=true" >> "$GITHUB_OUTPUT"
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "image=ghcr.io/josipmestrovic/kaladont@${digest}" >> "$GITHUB_OUTPUT"
-          {
-            echo '## Staging release'
-            echo "- Commit: \`$COMMIT_SHA\`"
-            echo "- Digest: \`$digest\`"
-            echo '- Deploy skripta na VPS-u ispisuje snapshot i fazu pada ako objava ne uspije.'
-          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Dohvat commit taga nije uspio (nije docs-only skip):"
+          cat "$inspect_log"
+          exit 1
 
   objava:
     name: Objaviti isti digest na staging

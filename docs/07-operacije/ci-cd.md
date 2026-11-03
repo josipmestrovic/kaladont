@@ -46,7 +46,7 @@ Na docs-only:
 
 1. Jobovi `kod` i `slika` se **preskaču**.
 2. Agregator **Lint, test, check i build** ostaje zelen (required check za ruleset).
-3. Nema Docker candidatea → `objavi-ghcr` i staging **preskaču promociju/deploy** bez crvenog pada (nema commit SHA taga).
+3. Nema Docker candidatea → `objavi-ghcr` i staging **preskaču promociju/deploy** bez crvenog pada samo kad registry vrati eksplicitni „not found” / `NAME_UNKNOWN`. Mreža, auth, 5xx ili neparsiran Digest **ruše** job (fail-closed), da uspješan main CI ne ostane tiho bez `main` taga / staginga.
 
 **Chore ≠ skip.** `chore:` koji dira kod, workflow ili lockfile pokreće puni CI. Samo sadržaj diffa odlučuje.
 
@@ -110,7 +110,7 @@ Padne li `kod` ili `slika`, agregator je crven i staging se ne dira. Dev E2E, HT
 
 ## GHCR i nepromjenjivi digest
 
-Na `main` (ne docs-only) job `slika` prijavljuje se u `ghcr.io` s `packages: write`, izgradi candidate i pushne ga pod `ci-<commit-sha>-<run-id>`. Smoke koristi puni digest. Nakon uspješnog CI-ja `objavi-ghcr.yml` ne gradi novu sliku: ako candidate postoji, registry-level promotion dodjeljuje isti manifest commit SHA i `main` tagu; ako candidate **ne postoji** (docs-only), promocija se **preskače** bez greške. Trenutni paket je javno dostupan; ako se promijeni u privatan, VPS će trebati zaseban `read:packages` pristup.
+Na `main` (ne docs-only) job `slika` prijavljuje se u `ghcr.io` s `packages: write`, izgradi candidate i pushne ga pod `ci-<commit-sha>-<run-id>`. Smoke koristi puni digest. Nakon uspješnog CI-ja `objavi-ghcr.yml` ne gradi novu sliku: ako candidate postoji, registry-level promotion dodjeljuje isti manifest commit SHA i `main` tagu; ako inspect vrati eksplicitni „not found” (docs-only), promocija se **preskače** bez greške. Ostali inspect padovi (mreža/auth/5xx/prazan Digest) ostaju crveni. Trenutni paket je javno dostupan; ako se promijeni u privatan, VPS će trebati zaseban `read:packages` pristup.
 
 Candidate tagovi su privremeni release artefakti. Treba ih zadržati dovoljno dugo za dijagnostiku i ručnu promociju, a zatim čistiti GHCR retention politikom ili zasebnim cleanupom; cleanup ne smije obrisati commit SHA tagove ili digest-e koji se koriste na stagingu/produkciji.
 
@@ -122,7 +122,7 @@ VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kra
 
 ## Staging — automatski workflow
 
-`objavi-staging.yml` pokreće se nakon uspješnog GHCR workflowa za `main`. Prvo provjerava postoji li commit SHA tag; ako ne (docs-only / bez kandidata), deploy se **preskače**. Inače iz taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije i `skripte/objava-staging.sh`. Skripta iz postojećeg VPS `.env` priprema privremeni kandidat zapis s novim `KALADONT_IMAGE`, `DIGEST` i `VERZIJA`, preko njega validira Compose, povlači točan image i izvršava migracije. Stvarni `.env` mijenja tek nakon uspješnih migracija, zatim rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. Ostale aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
+`objavi-staging.yml` pokreće se nakon uspješnog GHCR workflowa za `main`. Prvo inspecta commit SHA tag: eksplicitni „not found” (docs-only) → deploy se **preskače**; mreža/auth/5xx → crveni job. Inače iz taga dohvaća puni digest, preko GitHub Environmenta `staging` šalje verzionirane Compose/Caddy konfiguracije i `skripte/objava-staging.sh`. Skripta iz postojećeg VPS `.env` priprema privremeni kandidat zapis s novim `KALADONT_IMAGE`, `DIGEST` i `VERZIJA`, preko njega validira Compose, povlači točan image i izvršava migracije. Stvarni `.env` mijenja tek nakon uspješnih migracija, zatim rekreira samo aplikaciju i provjerava `https://staging.kaladont.hr/zdravlje`. Ostale aplikacijske tajne ostaju na VPS-u; workflow ih ne šalje niti ispisuje.
 
 1. Workflow koristi GitHub Environment `staging` i tajne `STAGING_HOST`, `STAGING_SSH_KLJUC` i `STAGING_SSH_KNOWN_HOSTS`.
 2. Fiksni SSH korisnik je `deploy`, a host fingerprint se provjerava s `StrictHostKeyChecking=yes`.
