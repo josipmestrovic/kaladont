@@ -746,10 +746,20 @@ export function stvoriUpraviteljPartija(
     stanje.brojPokusajaSpremanja = 0;
     emitirajSpremanjeRezultata(stanje);
 
+    // Handle označava samo čekanje backoffa. Dok traje upis mora biti null, inače
+    // reconnect otkaže "timer" i pokrene drugi pokusaj preko većeg upisa u tijeku.
+    let upisUTijeku = false;
+
     const pokusaj = () => {
-      if (stanje.statusSpremanja === 'rezultati_spremljeni') return;
+      if (stanje.statusSpremanja === 'rezultati_spremljeni' || upisUTijeku) return;
+      if (stanje.retrySpremanjaHandle) {
+        sat.otkazi(stanje.retrySpremanjaHandle);
+        stanje.retrySpremanjaHandle = null;
+      }
+      upisUTijeku = true;
       stanje.brojPokusajaSpremanja += 1;
       void upisSaCekanjemPoteza().then(() => {
+        upisUTijeku = false;
         if (stanje.statusSpremanja === 'rezultati_spremljeni') return;
         stanje.statusSpremanja = 'rezultati_spremljeni';
         stanje.zavrsnoSpremanje = null;
@@ -757,7 +767,9 @@ export function stvoriUpraviteljPartija(
         stanje.retrySpremanjaHandle = null;
         nakonUspjeha();
       }).catch((greska) => {
+        upisUTijeku = false;
         console.error(`Neuspio završni upis partije ${stanje.partijaId} (pokušaj ${stanje.brojPokusajaSpremanja}):`, greska);
+        if (stanje.statusSpremanja === 'rezultati_spremljeni') return;
         emitirajSpremanjeRezultata(stanje);
         const odmak = Math.min(
           POCETNI_ODMAK_RETRYJA_REZULTATA_MS * 2 ** (stanje.brojPokusajaSpremanja - 1),
@@ -2054,7 +2066,7 @@ export function stvoriUpraviteljPartija(
         partijaId: stanje.partijaId,
         poruka: 'Partija je završila. Konačni rezultat se još sprema, pokušavamo ponovno.',
       });
-      // Reconnect: ako čekamo backoff, odmah ponovi isti pokusaj (nakonUspjeha ostaje u njemu).
+      // Reconnect: retrySpremanjaHandle postoji samo dok čekamo backoff (ne dok traje upis).
       if (stanje.ponoviZavrsnoSpremanje && stanje.retrySpremanjaHandle) {
         sat.otkazi(stanje.retrySpremanjaHandle);
         stanje.retrySpremanjaHandle = null;
