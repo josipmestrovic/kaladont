@@ -39,22 +39,25 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 
   await page.goto('/');
-  // Novi račun može dobiti popup novih misija iznad menija (daily pa weekly).
-  for (let i = 0; i < 2; i += 1) {
-    const popupMisija = page.getByRole('dialog', { name: /Nove (dnevne|tjedne) misije/ });
+  // Pričekaj odluku o popup-u novih misija (async GET), zatim zatvori daily→weekly.
+  await page.waitForResponse(
+    (odgovor) => odgovor.url().includes('/api/misije') && odgovor.request().method() === 'GET',
+    { timeout: 10_000 },
+  ).catch(() => {});
+  const popupMisija = page.getByRole('dialog', { name: /Nove (dnevne|tjedne) misije/ });
+  for (let i = 0; i < 3; i += 1) {
     if (await popupMisija.count() === 0) break;
     await popupMisija.getByRole('button', { name: 'Zatvori' }).click();
-    await expect(popupMisija).toHaveCount(0);
+    await popupMisija.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
   }
-  const odjava = page.getByRole('navigation', { name: 'Glavna navigacija' }).getByRole('button', { name: 'Odjavi se' });
-  await expect(odjava).toBeVisible();
-  await Promise.all([
-    page.waitForEvent('load'),
-    odjava.click(),
-  ]);
-  await expect(page).toHaveURL('/');
-  await page.reload();
+  await expect(popupMisija).toHaveCount(0);
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
+  const odjava = navigacija.getByRole('button', { name: 'Odjavi se' });
+  await expect(odjava).toBeVisible();
+  await odjava.click();
+  await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toBeVisible({ timeout: 15_000 });
+  await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
+  await page.reload();
   await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toBeVisible();
   await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
 });
