@@ -38,17 +38,24 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await page.getByRole('button', { name: 'Završi registraciju' }).click();
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 
-  await page.goto('/');
-  // Pričekaj odluku o popup-u novih misija (async GET), zatim zatvori daily→weekly.
-  await page.waitForResponse(
+  // waitForResponse mora biti registriran prije navigacije, inače GET /api/misije može proći neuhvaćen.
+  const misijeOdgovor = page.waitForResponse(
     (odgovor) => odgovor.url().includes('/api/misije') && odgovor.request().method() === 'GET',
     { timeout: 10_000 },
-  ).catch(() => {});
+  );
+  await page.goto('/');
+  await misijeOdgovor.catch(() => {});
   const popupMisija = page.getByRole('dialog', { name: /Nove (dnevne|tjedne) misije/ });
+  await popupMisija.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
   for (let i = 0; i < 3; i += 1) {
     if (await popupMisija.count() === 0) break;
+    const naslovPrije = await popupMisija.locator('h2').textContent();
     await popupMisija.getByRole('button', { name: 'Zatvori' }).click();
-    await popupMisija.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+    // Daily→weekly zamjenjuje dijalog in place; čekaj nestanak ili promjenu naslova.
+    await expect.poll(async () => {
+      if (await popupMisija.count() === 0) return 'gone';
+      return (await popupMisija.locator('h2').textContent()) ?? '';
+    }, { timeout: 10_000 }).not.toBe(naslovPrije);
   }
   await expect(popupMisija).toHaveCount(0);
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });

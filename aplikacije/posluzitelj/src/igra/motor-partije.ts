@@ -239,6 +239,7 @@ interface StanjeStola {
   brojPokusajaSpremanja: number;
   retrySpremanjaHandle: SatHandle | null;
   zavrsnoSpremanje: (() => Promise<void>) | null;
+  ponoviZavrsnoSpremanje: (() => void) | null;
   upisiPotezaUTijeku: Promise<void>[];
   treningNeaktivnost: { upozorenjeIso: string; zatvaraIso: string; upozorenje: boolean } | null;
   treningRokovi: { upozorenjeMs: number; zatvaranjeMs: number } | null;
@@ -752,6 +753,7 @@ export function stvoriUpraviteljPartija(
         if (stanje.statusSpremanja === 'rezultati_spremljeni') return;
         stanje.statusSpremanja = 'rezultati_spremljeni';
         stanje.zavrsnoSpremanje = null;
+        stanje.ponoviZavrsnoSpremanje = null;
         stanje.retrySpremanjaHandle = null;
         nakonUspjeha();
       }).catch((greska) => {
@@ -766,6 +768,7 @@ export function stvoriUpraviteljPartija(
       });
     };
 
+    stanje.ponoviZavrsnoSpremanje = pokusaj;
     pokusaj();
   }
 
@@ -851,6 +854,7 @@ export function stvoriUpraviteljPartija(
       brojPokusajaSpremanja: 0,
       retrySpremanjaHandle: null,
       zavrsnoSpremanje: null,
+      ponoviZavrsnoSpremanje: null,
       upisiPotezaUTijeku: [],
       treningNeaktivnost: null,
       treningRokovi: null,
@@ -1028,65 +1032,67 @@ export function stvoriUpraviteljPartija(
     stanje.zadnjeReakcije.clear();
 
     if (stanje.kontekst === 'trening') {
-      stanje.statusSpremanja = 'spremanje_rezultata';
-      void (async () => {
-        type NagradaTreninga = Awaited<ReturnType<typeof zabiljeziPobjeduTreninga>>;
-        let nagrada: NagradaTreninga = null;
-        const pobjednik = stanje.sudionici.find((sudionik) => sudionik.igracId === pobjednikId);
-        const zavrsenoU = new Date(prikazRezultataOdIso);
-        if (pobjednik?.upravljac === 'covjek' && pobjednik.vrsta !== 'gost') {
-          try {
-            const statistika = stanje.statistikeRijeci.get(pobjednikId);
-            nagrada = await zabiljeziPobjeduTreninga(stanje.partijaId, pobjednikId, zavrsenoU, {
-              mod: stanje.mod,
-              plasman: 1,
-              nacinIspadanja: 'pobjednik',
-              prihvaceneRijeci: statistika?.prihvaceniPotezi ?? 0,
-              najduziNiz: statistika?.najduziStreak ?? 0,
-            });
-          } catch (greska) {
-            console.error('Neuspjelo spremanje pobjede treninga:', greska);
-            stanje.statusSpremanja = 'spremanje_rezultata';
-            aktivneVeze.dohvatiSocket(pobjednikId)?.emit('greska', {
-              kod: 'INTERNA',
-              poruka: 'Pobjeda je završena, ali napredak nije spremljen. Pokušaj ponovno.',
-            });
-            // Ne potvrđuj rezultate_spremljeni — dopusti retry reconnectom.
-            return;
+      const pobjednik = stanje.sudionici.find((sudionik) => sudionik.igracId === pobjednikId);
+      const zavrsenoU = new Date(prikazRezultataOdIso);
+      pokreniSpremanjeRezultata(
+        stanje,
+        async () => {
+          type NagradaTreninga = Awaited<ReturnType<typeof zabiljeziPobjeduTreninga>>;
+          let nagrada: NagradaTreninga = null;
+          if (pobjednik?.upravljac === 'covjek' && pobjednik.vrsta !== 'gost') {
+            try {
+              const statistika = stanje.statistikeRijeci.get(pobjednikId);
+              nagrada = await zabiljeziPobjeduTreninga(stanje.partijaId, pobjednikId, zavrsenoU, {
+                mod: stanje.mod,
+                plasman: 1,
+                nacinIspadanja: 'pobjednik',
+                prihvaceneRijeci: statistika?.prihvaceniPotezi ?? 0,
+                najduziNiz: statistika?.najduziStreak ?? 0,
+              });
+            } catch (greska) {
+              aktivneVeze.dohvatiSocket(pobjednikId)?.emit('greska', {
+                kod: 'INTERNA',
+                poruka: 'Pobjeda je završena, ali napredak nije spremljen. Pokušaj ponovno.',
+              });
+              throw greska;
+            }
           }
-        }
-        stanje.statusSpremanja = 'rezultati_spremljeni';
-        for (const p of plasmani) {
-          const ishod = p.igracId === pobjednikId ? nagrada?.ishodMisija : null;
-          const novaDostignuca = [
-            ...(p.igracId === pobjednikId && nagrada?.novaRazina
-              ? [{ id: 'zagrijan', novaRazina: nagrada.novaRazina, maksimalnaRazina: nagrada.maksimalnaRazina }]
-              : []),
-            ...(ishod?.novaDostignuca ?? []),
-          ];
-          const poId = new Map(novaDostignuca.map((d) => [d.id, d]));
-          const poruka: KrajPartije = {
-            partijaId: stanje.partijaId,
-            prikazRezultataOdIso,
-            plasmani,
-            mojNoviProsjek: 0,
-            mojRang: null,
-            mojeIskustvo: null,
-            mojaOcjenaIgre: null,
-            bonusOcjenaIgre: 0,
-            novaDostignuca: [...poId.values()],
-            promjeneMisija: ishod?.promjeneMisija,
-            ukupnoIskustvo: ishod?.ukupnoIskustvo,
-            misijeStanjeVerzija: ishod?.misijeStanjeVerzija,
-            mod: stanje.mod,
-            kontekst: 'trening',
-          };
-          stanje.rezultatiKraja.set(p.igracId, poruka);
-          if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
-        }
-        postavke.naPartijaZavrsila?.(stanje.partijaId);
-        zakaziBrisanjeNakonSpremanja(stanje);
-      })();
+          for (const p of plasmani) {
+            const ishod = p.igracId === pobjednikId ? nagrada?.ishodMisija : null;
+            const novaDostignuca = [
+              ...(p.igracId === pobjednikId && nagrada?.novaRazina
+                ? [{ id: 'zagrijan', novaRazina: nagrada.novaRazina, maksimalnaRazina: nagrada.maksimalnaRazina }]
+                : []),
+              ...(ishod?.novaDostignuca ?? []),
+            ];
+            const poId = new Map(novaDostignuca.map((d) => [d.id, d]));
+            const poruka: KrajPartije = {
+              partijaId: stanje.partijaId,
+              prikazRezultataOdIso,
+              plasmani,
+              mojNoviProsjek: 0,
+              mojRang: null,
+              mojeIskustvo: null,
+              mojaOcjenaIgre: null,
+              bonusOcjenaIgre: 0,
+              novaDostignuca: [...poId.values()],
+              promjeneMisija: ishod?.promjeneMisija,
+              ukupnoIskustvo: ishod?.ukupnoIskustvo,
+              misijeStanjeVerzija: ishod?.misijeStanjeVerzija,
+              mod: stanje.mod,
+              kontekst: 'trening',
+            };
+            stanje.rezultatiKraja.set(p.igracId, poruka);
+            if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) {
+              aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
+            }
+          }
+        },
+        () => {
+          postavke.naPartijaZavrsila?.(stanje.partijaId);
+          zakaziBrisanjeNakonSpremanja(stanje);
+        },
+      );
       return;
     }
 
@@ -2045,6 +2051,12 @@ export function stvoriUpraviteljPartija(
         partijaId: stanje.partijaId,
         poruka: 'Partija je završila. Konačni rezultat se još sprema, pokušavamo ponovno.',
       });
+      // Reconnect: ako čekamo backoff, odmah ponovi isti pokusaj (nakonUspjeha ostaje u njemu).
+      if (stanje.ponoviZavrsnoSpremanje && stanje.retrySpremanjaHandle) {
+        sat.otkazi(stanje.retrySpremanjaHandle);
+        stanje.retrySpremanjaHandle = null;
+        stanje.ponoviZavrsnoSpremanje();
+      }
     }
     const rezultatKraja = stanje.rezultatiKraja.get(igracId);
     if (rezultatKraja) socket.emit('partija:kraj', rezultatKraja);
@@ -2236,6 +2248,7 @@ export function stvoriUpraviteljPartija(
       brojPokusajaSpremanja: 0,
       retrySpremanjaHandle: null,
       zavrsnoSpremanje: null,
+      ponoviZavrsnoSpremanje: null,
       upisiPotezaUTijeku: [],
       treningNeaktivnost: null,
       treningRokovi: null,

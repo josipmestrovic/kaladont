@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   DEFINICIJE_DOSTIGNUCA,
   MAKSIMALNO_ISKUSTVO,
@@ -100,14 +100,26 @@ export async function obracunajMisijeZaIgraca(
     return (await ucitajIliNullIshod(tx, metrike.igracId, metrike.kontekst, metrike.izvorId)) ?? payload;
   }
 
-  const aktivne = await tx.select().from(dodjeleMisija).where(and(
+  // Dnevne: samo aktivne. Tjedne: aktivna ili istekla ako je rok još bio otvoren u trenutku igre
+  // (GET/osiguranje u novom tjednu može već označiti prošlotjedne kao istekla prije late settlementa).
+  const kandidati = await tx.select().from(dodjeleMisija).where(and(
     eq(dodjeleMisija.igracId, metrike.igracId),
-    eq(dodjeleMisija.status, 'aktivna'),
+    or(
+      and(eq(dodjeleMisija.vrsta, 'dnevna'), eq(dodjeleMisija.status, 'aktivna')),
+      and(
+        eq(dodjeleMisija.vrsta, 'tjedna'),
+        inArray(dodjeleMisija.status, ['aktivna', 'istekla']),
+        or(
+          isNull(dodjeleMisija.istjeceU),
+          gt(dodjeleMisija.istjeceU, metrike.zavrsenoU),
+        ),
+      ),
+    ),
   )).orderBy(asc(dodjeleMisija.vrsta), asc(dodjeleMisija.dostupnaOd), asc(dodjeleMisija.id));
 
-  const dovrseneZaIsplatu: typeof aktivne = [];
+  const dovrseneZaIsplatu: typeof kandidati = [];
 
-  for (const dodjela of aktivne) {
+  for (const dodjela of kandidati) {
     if (dodjela.dostupnaOd.getTime() > metrike.zavrsenoU.getTime()) continue;
 
     const [doprinos] = await tx.insert(doprinosiMisijama).values({
@@ -140,7 +152,8 @@ export async function obracunajMisijeZaIgraca(
     await tx.update(dodjeleMisija).set({
       napredak: rezultat.noviNapredak,
       podstanje: rezultat.novoPodstanje,
-      status: dovrsena ? 'dovrsena' : 'aktivna',
+      // Ne vraćaj istekla → aktivna: late settlement samo dovršava ili ažurira napredak.
+      status: dovrsena ? 'dovrsena' : dodjela.status,
       zavrsenaU: dovrsena ? metrike.zavrsenoU : null,
     }).where(eq(dodjeleMisija.id, dodjela.id));
 

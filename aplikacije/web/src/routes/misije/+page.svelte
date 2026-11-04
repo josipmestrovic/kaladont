@@ -199,6 +199,7 @@
     const poSlotu = new Map(stanje.dnevne.aktivne.map((m) => [m.slot, m]));
     return [1, 2, 3].map((slot) => poSlotu.get(slot as 1 | 2 | 3) ?? null);
   });
+  const prviPrazniDnevni = $derived(dnevneMjesta.findIndex((m) => m === null));
 
   const tjedneKartice = $derived(
     stanje ? [...stanje.tjedne.misije].sort((a, b) => a.slot - b.slot) : [],
@@ -258,7 +259,7 @@
             />
           {:else}
             <div class="prazno-mjesto" aria-label={`Prazno dnevno mjesto ${i + 1}`}>
-              {#if i === stanje.dnevne.aktivne.length}
+              {#if stanje.dnevne.aktivne.length < 3 && i === prviPrazniDnevni}
                 <p>Nova misija u ponoć</p>
                 <small>{formatirajVrijeme(stanje.dnevne.sljedeciDotokU)}</small>
               {:else}

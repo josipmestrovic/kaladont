@@ -210,18 +210,28 @@ export async function osigurajStanjeMisija(
     stanje = await zakljucajStanje(tx, igracId);
     if (!stanje) throw new Error('Nije moguće inicijalizirati stanje misija.');
 
-    // Prva dnevna + tjedni paket.
-    const prva = await dodijeliJednuDnevnu(tx, igracId, sada, sada, satRng.rng);
-    await tx.insert(dotokDnevnihMisija).values({
-      igracId,
-      lokalniDatum: danasIso,
-      status: prva ? 'dodijeljeno' : 'preskoceno',
-    }).onConflictDoNothing();
+    // Concurrent first-init: druga TX može već seedati dnevnu/dotok nakon insert+re-lock.
+    const [dotokDanas] = await tx.select().from(dotokDnevnihMisija).where(and(
+      eq(dotokDnevnihMisija.igracId, igracId),
+      eq(dotokDnevnihMisija.lokalniDatum, danasIso),
+    ));
+    const vecAktivneDnevne = await aktivneDnevne(tx, igracId);
+    if (dotokDanas || vecAktivneDnevne.length > 0) {
+      // Već seedano — nastavi normalnim pathom (rollover + catch-up).
+    } else {
+      // Prva dnevna + tjedni paket.
+      const prva = await dodijeliJednuDnevnu(tx, igracId, sada, sada, satRng.rng);
+      await tx.insert(dotokDnevnihMisija).values({
+        igracId,
+        lokalniDatum: danasIso,
+        status: prva ? 'dodijeljeno' : 'preskoceno',
+      }).onConflictDoNothing();
 
-    const granice = tjedneGranice(sada);
-    await isteciStariTjedni(tx, igracId, granice.od);
-    await kreirajTjedniPaket(tx, igracId, sada, satRng.rng);
-    return stanje;
+      const granice = tjedneGranice(sada);
+      await isteciStariTjedni(tx, igracId, granice.od);
+      await kreirajTjedniPaket(tx, igracId, sada, satRng.rng);
+      return stanje;
+    }
   }
 
   // Tjedni rollover prije dnevnog catch-upa.

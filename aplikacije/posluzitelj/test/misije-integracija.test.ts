@@ -400,6 +400,97 @@ describe('misije API i stanje', () => {
     expect(t1.promjeneMisija.some((p) => p.predlozakId === 'D10' && p.upravoDovrsena)).toBe(true);
   });
 
+  it('paralelni first-init daje točno 1 aktivnu dnevnu', async () => {
+    const { igracId } = await registriraj();
+    const sada = new Date('2026-11-04T12:00:00+01:00');
+    await Promise.all([
+      baza.transaction((tx) => osigurajStanjeMisija(tx, igracId, { sada: () => sada, rng: fiksniRng() })),
+      baza.transaction((tx) => osigurajStanjeMisija(tx, igracId, { sada: () => sada, rng: fiksniRng(0.3) })),
+    ]);
+    const aktivne = await baza.select().from(dodjeleMisija).where(and(
+      eq(dodjeleMisija.igracId, igracId),
+      eq(dodjeleMisija.vrsta, 'dnevna'),
+      eq(dodjeleMisija.status, 'aktivna'),
+    ));
+    expect(aktivne).toHaveLength(1);
+  });
+
+  it('obračun napreduje istekla tjednu ako je igra završila prije isteka', async () => {
+    const { igracId } = await registriraj();
+    const utorak = new Date('2026-11-03T12:00:00+01:00');
+    const nedjelja = new Date('2026-11-08T18:00:00+01:00');
+    const iduciUtorak = new Date('2026-11-10T12:00:00+01:00');
+
+    let tjednaId = '';
+    await baza.transaction(async (tx) => {
+      await osigurajStanjeMisija(tx, igracId, { sada: () => utorak, rng: fiksniRng() });
+      const [tjedna] = await tx.select().from(dodjeleMisija).where(and(
+        eq(dodjeleMisija.igracId, igracId),
+        eq(dodjeleMisija.vrsta, 'tjedna'),
+        eq(dodjeleMisija.status, 'aktivna'),
+      ));
+      expect(tjedna).toBeTruthy();
+      tjednaId = tjedna!.id;
+      const w01 = DEFINICIJE_MISIJA.find((d) => d.predlozakId === 'W01')!;
+      await tx.update(dodjeleMisija).set({
+        predlozakId: w01.predlozakId,
+        cilj: w01.cilj,
+        napredak: 0,
+        snapshot: {
+          predlozakId: w01.predlozakId,
+          verzijaDefinicije: 1,
+          naziv: w01.naziv,
+          opis: w01.opis,
+          metrika: w01.metrika,
+          cilj: w01.cilj,
+          pragMetrike: null,
+          podciljevi: null,
+          xp: w01.xp,
+          obitelj: w01.obitelj,
+          zahtjevnija: false,
+          kontekst: 'javna',
+          mod: 'oba',
+        },
+      }).where(eq(dodjeleMisija.id, tjednaId));
+    });
+
+    // Ponavljanje u novom tjednu označava staru tjednu kao istekla (kao GET u ponedjeljak).
+    await baza.transaction(async (tx) => {
+      await osigurajStanjeMisija(tx, igracId, { sada: () => iduciUtorak, rng: fiksniRng(0.55) });
+    });
+    const [istekla] = await baza.select().from(dodjeleMisija).where(eq(dodjeleMisija.id, tjednaId));
+    expect(istekla?.status).toBe('istekla');
+
+    const metrike = {
+      izvorId: randomUUID(),
+      kontekst: 'javna' as const,
+      mod: 'dva_igraca' as const,
+      igracId,
+      zavrsenoU: nedjelja,
+      plasman: 2,
+      nacinIspadanja: 'poraz',
+      prihvaceneRijeci: 4,
+      najduziNiz: 2,
+      dugeRijeci: 0,
+      jakoDugeRijeci: 0,
+      rijetkeRijeci: 0,
+      jakoRijetkeRijeci: 0,
+      dugeIRijetkeRijeci: 0,
+      eliminacije: 0,
+      kaladontIzvedbe: 0,
+      razlicitiPoceci: ['ba', 'ka'],
+    };
+
+    const ishod = await baza.transaction((tx) =>
+      obracunajMisijeZaIgraca(tx, metrike, 100, 50, { sada: () => nedjelja, rng: fiksniRng() }),
+    );
+    expect(ishod.promjeneMisija.some((p) => p.dodjelaId === tjednaId && p.poslije > 0)).toBe(true);
+
+    const [nakon] = await baza.select().from(dodjeleMisija).where(eq(dodjeleMisija.id, tjednaId));
+    expect(nakon!.napredak).toBeGreaterThan(0);
+    expect(['istekla', 'dovrsena']).toContain(nakon!.status);
+  });
+
   it('soft-delete: neaktivna definicija se ne bira za nove dodjele', async () => {
     const { odaberiZamjenu } = await import('../src/misije/generator.js');
     const iskljucena: DefinicijaMisije = {
