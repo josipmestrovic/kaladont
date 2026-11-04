@@ -1083,7 +1083,10 @@ export function stvoriUpraviteljPartija(
               kontekst: 'trening',
             };
             stanje.rezultatiKraja.set(p.igracId, poruka);
-            if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) {
+            // izadji može obrisati mapiranje prije ovog async upisa; i dalje pošalji kraj
+            // dok igrač nije u drugoj partiji.
+            const trenutnaPartija = partijaPoIgracu.get(p.igracId);
+            if (trenutnaPartija === stanje.partijaId || trenutnaPartija === undefined) {
               aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
             }
           }
