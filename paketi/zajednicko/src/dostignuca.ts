@@ -12,7 +12,9 @@ export type BrojacDostignuca =
   | 'mrtvaSlovaEliminacije'
   | 'javnePobjede'
   | 'treningPobjede'
-  | 'povratneInformacije';
+  | 'povratneInformacije'
+  | 'pohvaleNizUkupno'
+  | 'pohvaleXpUkupno';
 
 export interface DefinicijaDostignuca {
   id: string;
@@ -42,6 +44,8 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
   { id: 'rijetkolovac', naziv: 'Rijetkolovac', opis: 'Otkrij rijetke riječi.', kategorija: 'rijeci', pragovi: [1, 5, 15, 40, 100], vrijediUPrivatnoj: true, brojac: 'rijetkeLeksemskeGrupe' },
   { id: 'dugometras', naziv: 'Dugometraš', opis: 'Odigraj duge riječi.', kategorija: 'rijeci', pragovi: [1, 10, 30, 75, 150], vrijediUPrivatnoj: true, brojac: 'dugeRijeci' },
   { id: 'jezik_u_plamenu', naziv: 'Jezik u plamenu', opis: 'Izgradi dugi niz prihvaćenih riječi.', kategorija: 'vjestina', pragovi: [3, 5, 7, 10, 15], vrijediUPrivatnoj: true, brojac: 'najduziStreak' },
+  { id: 'vladar_niza', naziv: 'Vladar niza', opis: 'Osvoji pohvalu za najdulji niz u javnoj igri.', kategorija: 'vjestina', pragovi: [1, 15, 30, 60, 100], vrijediUPrivatnoj: false, brojac: 'pohvaleNizUkupno' },
+  { id: 'xp_prvak', naziv: 'XP prvak', opis: 'Osvoji pohvalu za najviše XP-a u javnoj igri.', kategorija: 'napredak', pragovi: [1, 15, 30, 60, 100], vrijediUPrivatnoj: false, brojac: 'pohvaleXpUkupno' },
   { id: 'kaladont', naziv: 'Kaladont!', opis: 'Izvedi Kaladont.', kategorija: 'kaladont', pragovi: [1, 3, 10, 25, 50], vrijediUPrivatnoj: false, brojac: 'kaladontIzvedbe' },
   { id: 'ka_zna', naziv: 'KA-zna', opis: 'Budi izbačen Kaladontom.', kategorija: 'kaladont', pragovi: [1, 5, 15, 25, 50], vrijediUPrivatnoj: false, brojac: 'kaladontZrtve' },
   { id: 'lovac_na_glave', naziv: 'Lovac na glave', opis: 'Izazovi eliminacije.', kategorija: 'igra', pragovi: [1, 10, 30, 75, 150], vrijediUPrivatnoj: false, brojac: 'izazvaneEliminacije' },
@@ -69,6 +73,8 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   'zavrsna_rijec',
   'ka_zna',
   'jezik_u_plamenu',
+  'vladar_niza',
+  'xp_prvak',
 ] as const;
 
 export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(

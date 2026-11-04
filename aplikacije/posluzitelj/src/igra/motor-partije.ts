@@ -437,6 +437,8 @@ export function stvoriUpraviteljPartija(
         javnePobjede: redak.javnePobjede,
         treningPobjede: redak.treningPobjede,
         povratneInformacije: redak.povratneInformacije,
+        pohvaleNizUkupno: redak.pohvaleNizUkupno,
+        pohvaleXpUkupno: redak.pohvaleXpUkupno,
       });
     }
     return rezultat;
@@ -1136,11 +1138,15 @@ export function stvoriUpraviteljPartija(
       }]),
     );
 
+    const osnovniBrutoPoIgracu = new Map(
+      [...obracuniIskustva].map(([igracId, obracun]) => [igracId, obracun.brutoIskustvo]),
+    );
+
     pokreniSpremanjeRezultata(
       stanje,
       () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod, statistike, false, new Map(
         [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
-      ), zavrsenoU).then((agregati) => {
+      ), zavrsenoU, osnovniBrutoPoIgracu).then((agregati) => {
         const plasmaniSOcjenama = plasmani.map((p) => ({
           ...p,
           ocjenaIgre: agregati.get(p.igracId)?.ocjenaIgre ?? null,
@@ -1190,6 +1196,7 @@ export function stvoriUpraviteljPartija(
             mojaOcjenaIgre: agregat?.ocjenaIgre ?? null,
             bonusOcjenaIgre: agregat?.bonusOcjenaIgre ?? 0,
             novaDostignuca: agregat?.novaDostignuca ?? [],
+            pohvale: agregat?.pohvale?.length ? agregat.pohvale : undefined,
             mojaForma: agregat?.forma ?? undefined,
             mojNiz: agregat ? { prije: agregat.nizPrije, poslije: agregat.nizPoslije, najbolji: agregat.najboljiNiz } : undefined,
             kolekcija: kolekcijaZaKraj(stanje, p.igracId),

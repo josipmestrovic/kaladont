@@ -7,6 +7,7 @@ import type { ObracunIskustva, StavkaIskustva } from './iskustvo.js';
 import type { DnkOs } from './dnk.js';
 import type { AvatarConfigV1 } from './avatar.js';
 import type { FormaIgraca } from './forma.js';
+import type { PohvalaIgre } from './pohvale-igre.js';
 
 export interface PodaciVeze {
   /** Opaque guest token ILI sesijski token registriranog igrača. */
@@ -257,6 +258,8 @@ export interface KrajPartije {
   mojaOcjenaIgre?: number | null;
   bonusOcjenaIgre?: number;
   novaDostignuca: { id: string; novaRazina: number; maksimalnaRazina: number }[];
+  /** Usporedne pohvale ove javne igre za primatelja; prazno ako nema. */
+  pohvale?: PohvalaIgre[];
   mojNiz?: { prije: number; poslije: number; najbolji: number };
   mojaForma?: FormaIgraca;
   mojDnk?: {
