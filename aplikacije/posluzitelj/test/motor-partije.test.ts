@@ -1207,3 +1207,57 @@ describe('motor partije - otvarač runde nakon eliminacije', () => {
   });
 });
 
+describe('motor partije - PR02 kolekcija oznake na kraju', () => {
+  it('PR02-08/09: završni snapshot nosi oznake uz novootključane riječi i reconnect ih ne mijenja', async () => {
+    const igraci = await Promise.all([spojiIgraca(), spojiIgraca()]);
+    const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
+      igraci[0]!.socket.on('partija:pocetak', resolve);
+    });
+    const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
+    for (const igrac of igraci) igrac.socket.emit('red:udji', { mod: 'dva_igraca' });
+    const pocetak = await pocetakPromise;
+    const runda = await rundaPromise;
+
+    const otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;
+    const protivnik = igraci.find((ig) => ig !== otvarac)!;
+    const potrosene = new Set(await grupeRijeci(runda.rijec));
+    const rijecZaIgru = await pronadjiRijecNaPrefiks(runda.trazenaSlova, potrosene);
+
+    const prihvacenoPromise = new Promise<{ sljedeciId: string }>((resolve) => {
+      otvarac.socket.on('potez:prihvacen', (poruka: { igracId: string; sljedeciId: string }) => {
+        if (poruka.igracId === otvarac.token) resolve(poruka);
+      });
+    });
+    otvarac.socket.emit('potez:rijec', { rijec: rijecZaIgru, turnToken: runda.turnToken });
+    const prihvaceno = await prihvacenoPromise;
+    expect(prihvaceno.sljedeciId).toBe(protivnik.token);
+
+    const krajPromise = new Promise<KrajPartije>((resolve) => {
+      otvarac.socket.once('partija:kraj', resolve);
+    });
+    protivnik.socket.emit('potez:ne-znam');
+    const kraj = await krajPromise;
+
+    expect(kraj.kolekcija).toBeDefined();
+    expect(kraj.kolekcija!.dodaneKategorije.length).toBeGreaterThan(0);
+    const leme = new Set(kraj.kolekcija!.dodaneKategorije.flatMap((k) => k.rijeci));
+    expect(kraj.kolekcija!.oznakeNovihRijeci).toBeDefined();
+    expect(kraj.kolekcija!.oznakeNovihRijeci!.length).toBeGreaterThan(0);
+    for (const oznaka of kraj.kolekcija!.oznakeNovihRijeci!) {
+      expect(leme.has(oznaka.osnovnaRijec)).toBe(true);
+      if (oznaka.odigraniOblik !== null) {
+        expect(oznaka.odigraniOblik).not.toBe(oznaka.osnovnaRijec);
+      }
+    }
+
+    const tokenOtvaraca = otvarac.authToken;
+    for (const igrac of igraci) igrac.socket.disconnect();
+    const reconnect = await spojiIgracaIPricekajStanjeIKraj(tokenOtvaraca);
+    expect(reconnect.kraj.partijaId).toBe(pocetak.partijaId);
+    expect(reconnect.kraj.kolekcija).toEqual(kraj.kolekcija);
+    reconnect.igrac.socket.disconnect();
+  });
+});
+
+
+

@@ -6,6 +6,7 @@ export * from './poruke.js';
 export * from './rangovi.js';
 export * from './nagrada-za-rijec.js';
 export * from './iskustvo.js';
+export * from './oznake-novih-rijeci.js';
 export * from './dostignuca.js';
 export * from './pohvale-igre.js';
 export * from './dnk.js';

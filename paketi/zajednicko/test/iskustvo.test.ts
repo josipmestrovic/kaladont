@@ -28,6 +28,32 @@ describe('iskustvo', () => {
     expect(tierRijetkostiIskustva(99, 2)).toBe('rijetka');
   });
 
+  it('PR02-01: duljinski pragovi po grafemima uključuju nj/lj/dž', () => {
+    expect(tierDuljineIskustva('abcdefghi')).toBeNull(); // 9
+    expect(tierDuljineIskustva('abcdefghij')).toBe('duga'); // 10
+    expect(tierDuljineIskustva('abcdefghijk')).toBe('duga'); // 11
+    expect(tierDuljineIskustva('abcdefghijkl')).toBe('srednje_duga'); // 12
+    expect(tierDuljineIskustva('abcdefghijklmn')).toBe('srednje_duga'); // 14
+    expect(tierDuljineIskustva('abcdefghijklmno')).toBe('jako_duga'); // 15
+    // digrafi broje kao jedan grafem: 9×nj → null, 10×nj → duga
+    expect(tierDuljineIskustva('njnjnjnjnjnjnjnjnj')).toBeNull();
+    expect(tierDuljineIskustva('njnjnjnjnjnjnjnjnjnj')).toBe('duga');
+    expect(tierDuljineIskustva('ljljljljljljljljljlj')).toBe('duga');
+    expect(tierDuljineIskustva('dždždždždždždždždždž')).toBe('duga');
+  });
+
+  it('PR02-02: rijetkost ne laže za freq 0 uz <4 grafema', () => {
+    expect(tierRijetkostiIskustva(null, 5)).toBeNull();
+    expect(tierRijetkostiIskustva(undefined, 5)).toBeNull();
+    expect(tierRijetkostiIskustva(0, 3)).toBeNull();
+    expect(tierRijetkostiIskustva(0, 4)).toBe('jako_rijetka');
+    expect(tierRijetkostiIskustva(1, 2)).toBe('srednje_rijetka');
+    expect(tierRijetkostiIskustva(9, 2)).toBe('srednje_rijetka');
+    expect(tierRijetkostiIskustva(10, 2)).toBe('rijetka');
+    expect(tierRijetkostiIskustva(99, 2)).toBe('rijetka');
+    expect(tierRijetkostiIskustva(100, 2)).toBeNull();
+  });
+
   it('razdvaja osnovni XP poteza od bonusa rijetke riječi', () => {
     const obracun = izracunajObracunIskustva(0, [
       { vrsta: 'potezi', naziv: 'Pogođena riječ', kolicina: 1, poStavci: 5, iskustvo: 5 },

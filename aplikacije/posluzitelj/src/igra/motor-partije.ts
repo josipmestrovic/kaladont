@@ -25,6 +25,9 @@ import {
   iskustvoZaRijetkost,
   tierDuljineIskustva,
   tierRijetkostiIskustva,
+  projektirajOznakeNovihRijeci,
+  type TierDuljineIskustva,
+  type TierRijetkostiIskustva,
   ISKUSTVO_PRIHVACENA_RIJEC,
   ISKUSTVO_KALADONT,
   ISKUSTVO_ELIMINACIJA,
@@ -167,6 +170,12 @@ interface StatistikaRijeciPartije {
   najrjedaTier: number | null;
 }
 
+interface MetapodatakOtkljucanjaKolekcije {
+  odigraniOblik: string;
+  duljina: TierDuljineIskustva | null;
+  rijetkost: TierRijetkostiIskustva | null;
+}
+
 interface StanjeStola {
   partijaId: string;
   pocetakPartijeMs: number;
@@ -211,7 +220,8 @@ interface StanjeStola {
   grupeZaDostignuca: Map<string, Set<string>>;
   pocetneKolekcijskeGrupe: Map<string, Set<string>>;
   noveGrupeSNagradom: Map<string, Map<string, number | null>>;
-  noveGrupeKolekcije: Map<string, Map<string, number | null>>;
+  /** Nova kolekcijska grupa → metapodatak odigranog oblika koji ju je otključao (first-wins). */
+  noveGrupeKolekcije: Map<string, Map<string, MetapodatakOtkljucanjaKolekcije>>;
   streakovi: Map<string, number>;
   statistikeRijeci: Map<string, StatistikaRijeciPartije>;
   iskustvoPrije: Map<string, number>;
@@ -504,11 +514,12 @@ export function stvoriUpraviteljPartija(
   function kolekcijaZaKraj(stanje: StanjeStola, igracId: string): NonNullable<KrajPartije['kolekcija']> {
     const pocetniKljuc = stanje.pocetneKolekcijskeGrupe.get(igracId) ?? new Set<string>();
     const trenutneGrupe = stanje.grupeSNagradom.get(igracId) ?? new Map<string, number | null>();
-    const noveGrupe = stanje.noveGrupeKolekcije.get(igracId) ?? new Map<string, number | null>();
+    const noveGrupe = stanje.noveGrupeKolekcije.get(igracId) ?? new Map<string, MetapodatakOtkljucanjaKolekcije>();
     const trenutniKljuc = new Set([...trenutneGrupe.keys()].map(kolekcijskiKljucGrupe));
     const novePoVrsti = new Map<string, Set<string>>();
     const noveRijeciPoVrsti = new Map<string, Set<string>>();
-    for (const grupa of noveGrupe.keys()) {
+    const ulaziOznaka: { grupa: string; odigraniOblik: string; duljina: TierDuljineIskustva | null; rijetkost: TierRijetkostiIskustva | null }[] = [];
+    for (const [grupa, meta] of noveGrupe) {
       const kljuc = kolekcijskiKljucGrupe(grupa);
       if (pocetniKljuc.has(kljuc)) continue;
       const vrsta = kljuc.split(':')[0] ?? 'ostalo';
@@ -518,6 +529,12 @@ export function stvoriUpraviteljPartija(
       const rijeci = noveRijeciPoVrsti.get(vrsta) ?? new Set<string>();
       rijeci.add(osnovnaRijecIzGrupe(grupa));
       noveRijeciPoVrsti.set(vrsta, rijeci);
+      ulaziOznaka.push({
+        grupa,
+        odigraniOblik: meta.odigraniOblik,
+        duljina: meta.duljina,
+        rijetkost: meta.rijetkost,
+      });
     }
     const ukupnoOtkljucano = trenutniKljuc.size;
     let trenutna: (typeof PRAGOVI_KOLEKCIONARSKE_RAZINE)[number] = PRAGOVI_KOLEKCIONARSKE_RAZINE[0]!;
@@ -528,8 +545,10 @@ export function stvoriUpraviteljPartija(
       .map(([vrsta, kljucevi]) => ({ vrsta, broj: kljucevi.size, rijeci: [...(noveRijeciPoVrsti.get(vrsta) ?? [])].sort((a, b) => a.localeCompare(b, 'hr')) }))
       .concat([{ vrsta: 'pridjev_prilog', broj: (novePoVrsti.get('pridjev')?.size ?? 0) + (novePoVrsti.get('prilog')?.size ?? 0), rijeci: [...new Set([...(noveRijeciPoVrsti.get('pridjev') ?? []), ...(noveRijeciPoVrsti.get('prilog') ?? [])])].sort((a, b) => a.localeCompare(b, 'hr')) }])
       .filter((stavka) => stavka.broj > 0) as NonNullable<KrajPartije['kolekcija']>['dodaneKategorije'];
+    const oznakeNovihRijeci = projektirajOznakeNovihRijeci(ulaziOznaka);
     return {
       dodaneKategorije,
+      oznakeNovihRijeci: oznakeNovihRijeci.length > 0 ? oznakeNovihRijeci : undefined,
       ukupnoOtkljucano,
       ukupnoDostupno: rjecnik.brojKolekcijskihGrupa?.() ?? ukupnoOtkljucano,
       trenutnaRazina: trenutna.naziv,
@@ -810,7 +829,7 @@ export function stvoriUpraviteljPartija(
       grupeZaDostignuca: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       pocetneKolekcijskeGrupe: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       noveGrupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
-      noveGrupeKolekcije: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      noveGrupeKolekcije: new Map(sudionici.map((s) => [s.igracId, new Map<string, MetapodatakOtkljucanjaKolekcije>()])),
       streakovi: new Map(sudionici.map((s) => [s.igracId, 0])),
       statistikeRijeci: new Map(sudionici.map((s) => [s.igracId, novaStatistikaRijeci()])),
       iskustvoPrije: new Map(sudionici.map((s) => [s.igracId, 0])),
@@ -885,7 +904,7 @@ export function stvoriUpraviteljPartija(
       stanje.grupeZaDostignuca = grupeDostignuca;
       stanje.pocetneKolekcijskeGrupe = new Map([...stanje.grupeSNagradom].map(([igracId, mape]) => [igracId, new Set([...mape.keys()].map(kolekcijskiKljucGrupe))]));
       stanje.noveGrupeSNagradom = praznaMapa(() => new Map<string, number | null>());
-      stanje.noveGrupeKolekcije = praznaMapa(() => new Map<string, number | null>());
+      stanje.noveGrupeKolekcije = praznaMapa(() => new Map<string, MetapodatakOtkljucanjaKolekcije>());
       for (const sudionik of sudionici) {
         for (const oblik of oblici.get(sudionik.igracId) ?? []) {
           stanje.statistikeRijeci.get(sudionik.igracId)?.otkljucaneRijeci.set(oblik.rijec, oblik);
@@ -1490,8 +1509,17 @@ export function stvoriUpraviteljPartija(
     const brojGrafema = grafemi(rijecNormalizirana).length;
     const rijetkaTier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
     for (const grupa of noveGrupe) grupeIgraca.set(grupa, rijetkaTier);
-    const noveGrupeKolekcije = stanje.noveGrupeKolekcije.get(igracId) ?? new Map<string, number | null>();
-    for (const grupa of noveGrupe) noveGrupeKolekcije.set(grupa, rijetkaTier);
+    const duljinaZaOznaku = tierDuljineIskustva(rijecNormalizirana);
+    const rijetkostZaOznaku = tierRijetkostiIskustva(frekvencija, brojGrafema);
+    const noveGrupeKolekcije = stanje.noveGrupeKolekcije.get(igracId) ?? new Map<string, MetapodatakOtkljucanjaKolekcije>();
+    for (const grupa of noveGrupe) {
+      if (noveGrupeKolekcije.has(grupa)) continue;
+      noveGrupeKolekcije.set(grupa, {
+        odigraniOblik: rijecNormalizirana,
+        duljina: duljinaZaOznaku,
+        rijetkost: rijetkostZaOznaku,
+      });
+    }
     if (kolekcijaAktivna) stanje.noveGrupeKolekcije.set(igracId, noveGrupeKolekcije);
     const noveOsnovneRijeci = [...new Set(noveGrupe
       .filter((grupa) => !kolekcijskeGrupePrije.has(kolekcijskiKljucGrupe(grupa)))
@@ -2142,7 +2170,7 @@ export function stvoriUpraviteljPartija(
       grupeZaDostignuca: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       pocetneKolekcijskeGrupe: new Map(sudionici.map((s) => [s.igracId, new Set<string>()])),
       noveGrupeSNagradom: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
-      noveGrupeKolekcije: new Map(sudionici.map((s) => [s.igracId, new Map<string, number | null>()])),
+      noveGrupeKolekcije: new Map(sudionici.map((s) => [s.igracId, new Map<string, MetapodatakOtkljucanjaKolekcije>()])),
       streakovi: new Map(sudionici.map((s) => [s.igracId, 0])),
       statistikeRijeci: new Map(sudionici.map((s) => [s.igracId, novaStatistikaRijeci()])),
       iskustvoPrije: new Map(sudionici.map((s) => [s.igracId, 0])),
