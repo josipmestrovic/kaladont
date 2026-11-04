@@ -295,6 +295,13 @@
       "when": 1793695030049,
       "tag": "0041_bizarre_blur",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793795886661,
+      "tag": "0042_little_inhumans",
+      "breakpoints": true
     }
   ]
 }

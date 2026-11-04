@@ -8,10 +8,10 @@ import {
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
-  it('ima jedanaest dostignuća i 55 zvjezdica', () => {
-    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(11);
+  it('ima trinaest dostignuća i 65 zvjezdica', () => {
+    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(13);
     expect(DEFINICIJE_DOSTIGNUCA.every((definicija) => definicija.pragovi.length === 5)).toBe(true);
-    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(55);
+    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(65);
   });
 
   it('preskače više razina i vraća najvišu novu razinu', () => {

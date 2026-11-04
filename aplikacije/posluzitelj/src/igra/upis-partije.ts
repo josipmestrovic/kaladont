@@ -4,10 +4,10 @@
  * koji je transakcijski jer mijenja više tablica odjednom.
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajNovaDostignuca, izracunajOcjenuIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajOcjenuIgre, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce, type PohvalaIgre } from 'zajednicko';
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
 
@@ -162,6 +162,9 @@ interface AgregatZakljucka {
   bonusPobjednickogNizaPostotak: number;
   bonusPobjednickogNizaXp: number;
   forma: ReturnType<typeof izracunajFormu> | null;
+  pohvale: PohvalaIgre[];
+  upravljac: 'covjek' | 'bot';
+  vrstaIgraca: 'gost' | 'registriran' | 'admin';
 }
 
 function dnkPodaciIzRedaka(
@@ -203,6 +206,8 @@ export async function zakljuciPartijuUBazi(
   samoStatistika = false,
   napredakDostignuca: Map<string, ZapisNapretkaDostignuca> = new Map(),
   zavrsenoU: Date = new Date(),
+  /** Osnovni bruto XP prije bonusa niza/ocjene (iz motora); za rangiranje pohvale. */
+  osnovniBrutoPoIgracu: Map<string, number> = new Map(),
 ): Promise<Map<string, AgregatZakljucka>> {
   const agregati = new Map<string, AgregatZakljucka>();
   const modStatistike = mod;
@@ -220,6 +225,19 @@ export async function zakljuciPartijuUBazi(
         .returning({ partijaId: partije.id });
 
     if (claim.length === 0) {
+      const spremljenePohvale = !samoStatistika
+        ? await tx.select().from(pohvaleIgre).where(eq(pohvaleIgre.igraId, partijaId))
+        : [];
+      const pohvalePoIgracu = new Map<string, PohvalaIgre[]>();
+      for (const red of spremljenePohvale) {
+        const lista = pohvalePoIgracu.get(red.igracId) ?? [];
+        lista.push({
+          vrsta: red.vrsta,
+          vrijednost: red.vrijednost,
+          dijeljenoPrvoMjesto: spremljenePohvale.filter((p) => p.vrsta === red.vrsta).length > 1,
+        });
+        pohvalePoIgracu.set(red.igracId, lista);
+      }
       for (const r of rezultati) {
         const [stanjeIgraca] = await tx
           .select({
@@ -227,12 +245,17 @@ export async function zakljuciPartijuUBazi(
             odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
             pobjede: mod === 'dva_igraca' ? igraci.pobjede1v1 : igraci.pobjede,
             iskustvoUkupno: igraci.iskustvoUkupno,
+            upravljac: igraci.upravljac,
+            vrstaIgraca: igraci.vrsta,
           })
           .from(igraci)
           .where(eq(igraci.id, r.igracId));
         if (stanjeIgraca) {
           agregati.set(r.igracId, {
-            ...stanjeIgraca,
+            bodoviUkupno: stanjeIgraca.bodoviUkupno,
+            odigrane: stanjeIgraca.odigrane,
+            pobjede: stanjeIgraca.pobjede,
+            iskustvoUkupno: stanjeIgraca.iskustvoUkupno,
             novaDostignuca: [],
             dnkPrije: [],
             dnkPoslije: [],
@@ -245,6 +268,9 @@ export async function zakljuciPartijuUBazi(
             bonusPobjednickogNizaPostotak: 0,
             bonusPobjednickogNizaXp: 0,
             forma: null,
+            pohvale: pohvalePoIgracu.get(r.igracId) ?? [],
+            upravljac: stanjeIgraca.upravljac,
+            vrstaIgraca: stanjeIgraca.vrstaIgraca,
           });
         }
       }
@@ -264,11 +290,14 @@ export async function zakljuciPartijuUBazi(
     for (const r of rezultati) {
       const [stariIgrac] = await tx.select({
         vrsta: igraci.vrsta,
+        upravljac: igraci.upravljac,
         odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
         bodovi: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
         eliminacije: mod === 'dva_igraca' ? igraci.eliminacije1v1 : igraci.eliminacijeUkupno,
         iskustvoUkupno: igraci.iskustvoUkupno,
       }).from(igraci).where(eq(igraci.id, r.igracId));
+      const upravljac = stariIgrac?.upravljac ?? 'covjek';
+      const vrstaIgraca = stariIgrac?.vrsta ?? 'gost';
       const [staraDnkStatistika] = await tx.select().from(dnkStatistikeIgraca)
         .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)))
         .limit(1);
@@ -370,7 +399,24 @@ export async function zakljuciPartijuUBazi(
           .returning({ bodoviUkupno: igraci.bodovi1v1, odigrane: igraci.odigrane1v1, pobjede: igraci.pobjede1v1, iskustvoUkupno: igraci.iskustvoUkupno });
 
         if (azurirani) {
-          agregati.set(r.igracId, { ...azurirani, novaDostignuca: [], dnkPrije: prije, dnkPoslije: [], ocjenaIgre: 0, bonusOcjenaIgre: 0, nizPrije, nizPoslije, najboljiNiz, osnovniXp, bonusPobjednickogNizaPostotak, bonusPobjednickogNizaXp, forma });
+          agregati.set(r.igracId, {
+            ...azurirani,
+            novaDostignuca: [],
+            dnkPrije: prije,
+            dnkPoslije: [],
+            ocjenaIgre: 0,
+            bonusOcjenaIgre: 0,
+            nizPrije,
+            nizPoslije,
+            najboljiNiz,
+            osnovniXp,
+            bonusPobjednickogNizaPostotak,
+            bonusPobjednickogNizaXp,
+            forma,
+            pohvale: [],
+            upravljac,
+            vrstaIgraca,
+          });
         }
       } else if (!samoStatistika) {
         const [azurirani] = await tx
@@ -386,7 +432,24 @@ export async function zakljuciPartijuUBazi(
           .returning({ bodoviUkupno: igraci.bodoviUkupno, odigrane: igraci.odigrane, pobjede: igraci.pobjede, iskustvoUkupno: igraci.iskustvoUkupno });
 
         if (azurirani) {
-          agregati.set(r.igracId, { ...azurirani, novaDostignuca: [], dnkPrije: prije, dnkPoslije: [], ocjenaIgre: 0, bonusOcjenaIgre: 0, nizPrije, nizPoslije, najboljiNiz, osnovniXp, bonusPobjednickogNizaPostotak, bonusPobjednickogNizaXp, forma });
+          agregati.set(r.igracId, {
+            ...azurirani,
+            novaDostignuca: [],
+            dnkPrije: prije,
+            dnkPoslije: [],
+            ocjenaIgre: 0,
+            bonusOcjenaIgre: 0,
+            nizPrije,
+            nizPoslije,
+            najboljiNiz,
+            osnovniXp,
+            bonusPobjednickogNizaPostotak,
+            bonusPobjednickogNizaXp,
+            forma,
+            pohvale: [],
+            upravljac,
+            vrstaIgraca,
+          });
         }
       }
 
@@ -612,6 +675,88 @@ export async function zakljuciPartijuUBazi(
               brojOcjenaIgre: sql`${dnkStatistikeIgraca.brojOcjenaIgre} + 1`,
             })
             .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)));
+        }
+      }
+    }
+
+    if (!samoStatistika) {
+      const sudioniciZaPohvalu = rezultati.map((r) => {
+        const agregat = agregati.get(r.igracId);
+        const osnovniBruto = osnovniBrutoPoIgracu.get(r.igracId) ?? agregat?.osnovniXp ?? 0;
+        const bonusNiza = agregat?.bonusPobjednickogNizaXp ?? 0;
+        const bonusOcjenaPostotak = agregat?.bonusOcjenaIgre ?? 0;
+        const xpZaOcjenu = (agregat?.osnovniXp ?? 0) + bonusNiza;
+        const bonusOcjenaXp = Math.round(xpZaOcjenu * bonusOcjenaPostotak / 100);
+        return {
+          igracId: r.igracId,
+          upravljac: agregat?.upravljac ?? 'covjek',
+          najduziStreak: statistike.get(r.igracId)?.najduziStreak ?? 0,
+          finalniBrutoXp: osnovniBruto + bonusNiza + bonusOcjenaXp,
+        };
+      });
+      const pohvalePoIgracu = odrediPohvaleIgre(sudioniciZaPohvalu);
+
+      for (const [igracId, pohvale] of pohvalePoIgracu) {
+        const agregat = agregati.get(igracId);
+        if (!agregat) continue;
+        agregat.pohvale = pohvale;
+
+        for (const pohvala of pohvale) {
+          const umetnuto = await tx.insert(pohvaleIgre).values({
+            igraId: partijaId,
+            igracId,
+            vrsta: pohvala.vrsta,
+            vrijednost: pohvala.vrijednost,
+          }).onConflictDoNothing().returning({
+            igracId: pohvaleIgre.igracId,
+            vrsta: pohvaleIgre.vrsta,
+          });
+          if (umetnuto.length === 0) continue;
+          if (agregat.vrstaIgraca === 'gost' || agregat.upravljac !== 'covjek') continue;
+
+          const deltaPohvale: DeltaNapretkaDostignuca = pohvala.vrsta === 'najduzi_niz'
+            ? { pohvaleNizUkupno: 1 }
+            : { pohvaleXpUkupno: 1 };
+          const [stariNapredakPohvale] = await tx.select().from(napredakDostignucaIgraca)
+            .where(eq(napredakDostignucaIgraca.igracId, igracId));
+          await tx.insert(napredakDostignucaIgraca).values({
+            igracId,
+            pohvaleNizUkupno: deltaPohvale.pohvaleNizUkupno ?? 0,
+            pohvaleXpUkupno: deltaPohvale.pohvaleXpUkupno ?? 0,
+          }).onConflictDoUpdate({
+            target: napredakDostignucaIgraca.igracId,
+            set: {
+              pohvaleNizUkupno: sql`${napredakDostignucaIgraca.pohvaleNizUkupno} + ${deltaPohvale.pohvaleNizUkupno ?? 0}`,
+              pohvaleXpUkupno: sql`${napredakDostignucaIgraca.pohvaleXpUkupno} + ${deltaPohvale.pohvaleXpUkupno ?? 0}`,
+              azurirano: new Date(),
+            },
+          });
+          // Bez razine iskusnjara vidi 0 i lažno otključava za LVL ≥ 10.
+          const razinaNakonIgre = stanjeIskustva(agregat.iskustvoUkupno).razina;
+          const trajniPrijePohvale = {
+            razina: razinaNakonIgre,
+            pohvaleNizUkupno: stariNapredakPohvale?.pohvaleNizUkupno ?? 0,
+            pohvaleXpUkupno: stariNapredakPohvale?.pohvaleXpUkupno ?? 0,
+          };
+          const novaPohvala = izracunajNovaDostignuca(
+            trajniPrijePohvale,
+            deltaPohvale,
+            razinaNakonIgre,
+            false,
+          );
+          if (novaPohvala.length > 0) {
+            await tx.insert(dostignucaIgraca).values(novaPohvala.map((dostignuce) => ({
+              igracId,
+              dostignuceId: dostignuce.id,
+              razina: dostignuce.novaRazina,
+              prvoOtkljucano: new Date(),
+              zadnjeOtkljucavanje: new Date(),
+            }))).onConflictDoUpdate({
+              target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
+              set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
+            });
+            agregat.novaDostignuca = [...agregat.novaDostignuca, ...novaPohvala];
+          }
         }
       }
     }

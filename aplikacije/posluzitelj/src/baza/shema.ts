@@ -56,6 +56,7 @@ export const vrstaObracunaPartije = pgEnum('vrsta_obracuna_partije', [
   'javna_partija',
   'privatna_gamifikacija',
 ]);
+export const vrstaPohvaleIgre = pgEnum('vrsta_pohvale_igre', ['najduzi_niz', 'najvise_xp']);
 
 export const igraci = pgTable('igraci', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -221,6 +222,8 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   javnePobjede: integer('javne_pobjede').notNull().default(0),
   povratneInformacije: integer('povratne_informacije').notNull().default(0),
   treningPobjede: integer('trening_pobjede').notNull().default(0),
+  pohvaleNizUkupno: integer('pohvale_niz_ukupno').notNull().default(0),
+  pohvaleXpUkupno: integer('pohvale_xp_ukupno').notNull().default(0),
   anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
@@ -330,6 +333,26 @@ export const obracuniPartija = pgTable('obracuni_partija', {
   vrsta: vrstaObracunaPartije('vrsta').notNull(),
   stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.partijaId, tablica.vrsta] })]);
+
+/** Audit usporednih pohvala javne igre; UNIQUE sprječava dvostruko uvećanje brojača. */
+export const pohvaleIgre = pgTable(
+  'pohvale_igre',
+  {
+    igraId: uuid('igra_id')
+      .notNull()
+      .references(() => partije.id, { onDelete: 'cascade' }),
+    igracId: uuid('igrac_id')
+      .notNull()
+      .references(() => igraci.id, { onDelete: 'cascade' }),
+    vrsta: vrstaPohvaleIgre('vrsta').notNull(),
+    vrijednost: integer('vrijednost').notNull(),
+    stvoreno: timestamp('stvoreno', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (tablica) => [
+    primaryKey({ columns: [tablica.igraId, tablica.igracId, tablica.vrsta] }),
+    index('idx_pohvale_igre_igrac').on(tablica.igracId, tablica.stvoreno),
+  ],
+);
 
 export const sudioniciPartije = pgTable(
   'sudionici_partije',

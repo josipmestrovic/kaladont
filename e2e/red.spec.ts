@@ -36,6 +36,126 @@ for (const sirina of [320, 390, 1440]) {
   });
 }
 
+test('P01-15/16: pohvale igre vidljive na završnom ekranu; prijave ostaju na dnu', async ({ browser }) => {
+  const igraci = await stvoriIgrace(browser, 2);
+  try {
+    await udjiUJavniRed(igraci, 'dva_igraca');
+    const partijaId = await cekajIstuPartiju(igraci);
+    const stranica = igraci[0]!.stranica;
+    await stranica.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(() => stranica.evaluate(async () => {
+      const { dohvatiStanjeIgre } = await import('/src/lib/stanje-igre.svelte.ts');
+      return dohvatiStanjeIgre().runda;
+    })).toBeGreaterThanOrEqual(1);
+    await stranica.evaluate(async (id) => {
+      const { dohvatiStanjeIgre } = await import('/src/lib/stanje-igre.svelte.ts');
+      const stanje = dohvatiStanjeIgre();
+      stanje.kraj = {
+        partijaId: id,
+        prikazRezultataOdIso: new Date(Date.now() - 1_000).toISOString(),
+        plasmani: stanje.sjedala.map((sjedalo: { igracId: string; nadimak: string }, indeks: number) => ({
+          igracId: sjedalo.igracId,
+          nadimak: sjedalo.nadimak,
+          plasman: indeks + 1,
+          bodovi: indeks === 0 ? 1 : 0,
+          eliminacije: 0,
+        })),
+        mojNoviProsjek: 1,
+        mojRang: null,
+        mojaOcjenaIgre: 4,
+        bonusOcjenaIgre: 0,
+        novaDostignuca: [],
+        pohvale: [
+          { vrsta: 'najduzi_niz', vrijednost: 7, dijeljenoPrvoMjesto: false },
+          { vrsta: 'najvise_xp', vrijednost: 190, dijeljenoPrvoMjesto: true },
+        ],
+        mod: 'dva_igraca',
+        kontekst: 'javna',
+        mojeIskustvo: null,
+      };
+    }, partijaId);
+    await expect(stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({ timeout: 5_000 });
+    const pohvale = stranica.getByRole('region', { name: 'Pohvale ove igre' });
+    await expect(pohvale).toBeVisible();
+    await expect(pohvale.getByText(/Najdulji niz bez greške/)).toBeVisible();
+    await expect(pohvale.getByText(/Najviše ostvarenog XP-a/)).toBeVisible();
+    await expect(pohvale.getByText('Dijeljeno prvo mjesto')).toBeVisible();
+    await expect(stranica.getByText('Prijavi riječ').first()).toBeVisible();
+    await expect(stranica.getByText('Prijavi igrača').first()).toBeVisible();
+    const yPohvala = await pohvale.boundingBox();
+    const yPrijava = await stranica.getByText('Prijavi riječ').first().boundingBox();
+    expect(yPohvala && yPrijava && yPohvala.y < yPrijava.y).toBe(true);
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
+test('P01-regresija: kasni kraj s obje pohvale otvara Završni poredak', async ({ browser }) => {
+  const igraci = await stvoriIgrace(browser, 2);
+  try {
+    await udjiUJavniRed(igraci, 'dva_igraca');
+    const partijaId = await cekajIstuPartiju(igraci);
+    const stranica = igraci[0]!.stranica;
+    await expect.poll(() => stranica.evaluate(async () => {
+      const { dohvatiStanjeIgre } = await import('/src/lib/stanje-igre.svelte.ts');
+      return dohvatiStanjeIgre().runda;
+    })).toBeGreaterThanOrEqual(1);
+
+    // Kasni partija:kraj: rok je već istekao (kao nakon sporog upisa s pohvalama).
+    await stranica.evaluate(async (id) => {
+      const { dohvatiStanjeIgre } = await import('/src/lib/stanje-igre.svelte.ts');
+      const stanje = dohvatiStanjeIgre();
+      const mojId = stanje.mojIgracId ?? stanje.sjedala[0]?.igracId;
+      stanje.kraj = {
+        partijaId: id,
+        prikazRezultataOdIso: new Date(Date.now() - 2_000).toISOString(),
+        plasmani: stanje.sjedala.map((sjedalo: { igracId: string; nadimak: string }) => ({
+          igracId: sjedalo.igracId,
+          nadimak: sjedalo.nadimak,
+          plasman: sjedalo.igracId === mojId ? 1 : 2,
+          bodovi: sjedalo.igracId === mojId ? 3 : 0,
+          eliminacije: sjedalo.igracId === mojId ? 1 : 0,
+        })),
+        mojNoviProsjek: 1,
+        mojRang: null,
+        mojaOcjenaIgre: 5,
+        bonusOcjenaIgre: 20,
+        novaDostignuca: [
+          { id: 'vladar_niza', novaRazina: 1, maksimalnaRazina: 5 },
+          { id: 'xp_prvak', novaRazina: 1, maksimalnaRazina: 5 },
+        ],
+        pohvale: [
+          { vrsta: 'najduzi_niz', vrijednost: 7, dijeljenoPrvoMjesto: false },
+          { vrsta: 'najvise_xp', vrijednost: 190, dijeljenoPrvoMjesto: false },
+        ],
+        mod: 'dva_igraca',
+        kontekst: 'javna',
+        mojeIskustvo: {
+          prije: { razina: 2, ukupno: 150, uRazini: 50, doIduce: 150 },
+          poslije: { razina: 3, ukupno: 340, uRazini: 40, doIduce: 200 },
+          stavke: [{ vrsta: 'potezi', naziv: 'Prihvaćene riječi', kolicina: 7, poStavci: 5, iskustvo: 35 }],
+          osvojenoIskustvo: 190,
+          brutoIskustvo: 190,
+          najboljiStreak: 7,
+          mnoziteljStreaka: 1,
+          bonusOcjenaIgre: 20,
+        },
+      };
+    }, partijaId);
+
+    await expect(stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({ timeout: 5_000 });
+    await expect(stranica.getByText(/Rezultati za:/)).toHaveCount(0);
+    const pohvale = stranica.getByRole('region', { name: 'Pohvale ove igre' });
+    await expect(pohvale).toBeVisible();
+    await expect(pohvale.getByText(/Najdulji niz bez greške/)).toContainText('7');
+    await expect(pohvale.getByText(/Najviše ostvarenog XP-a/)).toContainText('190');
+    await expect(stranica.getByText('Vladar niza')).toBeVisible();
+    await expect(stranica.getByText('XP prvak')).toBeVisible();
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
 for (const svijetla of [false, true]) {
   test(`završni rezultati imaju čitljiv kontrast ${svijetla ? 'svijetla' : 'tamna'}`, async ({ browser }, podaciTesta) => {
     const igraci = await stvoriIgrace(browser, 2);

@@ -1,10 +1,34 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import { izracunajRazinuDostignuca, dohvatiDefinicijuDostignuca } from 'zajednicko';
+import { izracunajRazinuDostignuca, dohvatiDefinicijuDostignuca, ukupnoIskustvoZaRazinu } from 'zajednicko';
 import { baza } from '../src/baza/klijent.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, pohvaleIgre, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { ponistiPartijeUTijekuUBazi, zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
+import type { ZapisStatistikeRijeci } from '../src/igra/upis-partije.js';
+
+function praznaStatistika(igracId: string, najduziStreak = 0): ZapisStatistikeRijeci {
+  const imaNiza = najduziStreak > 0;
+  return {
+    igracId,
+    grupe: [],
+    otkljucaneRijeci: [],
+    prihvaceniPotezi: najduziStreak,
+    ukupnoTrajanjePrihvaceniPoteziMs: 0,
+    najduziStreak,
+    otkriveneJakoRijetkeGrupe: 0,
+    otkriveneSrednjeRijetkeGrupe: 0,
+    otkriveneRijetkeGrupe: 0,
+    upisaneDugeRijeci: 0,
+    upisaneSrednjeDugeRijeci: 0,
+    upisaneJakoDugeRijeci: 0,
+    najduzaRijec: imaNiza ? 'test' : null,
+    najduzaRijecGrafemi: imaNiza ? 4 : 0,
+    najrjedaRijec: null,
+    najrjedaRijecFrekvencija: null,
+    najrjedaTier: null,
+  };
+}
 
 describe('upis partije i javne pobjede', () => {
   const igracId = randomUUID();
@@ -362,5 +386,213 @@ describe('upis partije i javne pobjede', () => {
       { metrikeVerzija: 1, prihvaceneRijeci: 0, najduzaRijec: null },
       { metrikeVerzija: null, prihvaceneRijeci: null, najduzaRijec: null },
     ]);
+  });
+});
+
+describe('P01 pohvale igre', () => {
+  const igracA = randomUUID();
+  const igracB = randomUUID();
+  const botId = randomUUID();
+  const gostId = randomUUID();
+  const obracuniZaBrisanje: string[] = [];
+  const igraciZaBrisanje = [igracA, igracB, botId, gostId];
+
+  afterEach(async () => {
+    for (const partijaId of obracuniZaBrisanje.splice(0)) {
+      await baza.delete(pohvaleIgre).where(eq(pohvaleIgre.igraId, partijaId));
+      await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+      await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+      await baza.delete(partije).where(eq(partije.id, partijaId));
+    }
+    for (const id of igraciZaBrisanje) {
+      await baza.delete(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, id));
+      await baza.delete(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, id));
+      await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, id));
+      await baza.delete(igraci).where(eq(igraci.id, id));
+    }
+  });
+
+  it('P01-09: ista igra dvaput — jedan audit red i jedan pomak brojača', async () => {
+    await baza.insert(igraci).values([
+      { id: igracA, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'A' },
+      { id: igracB, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'B' },
+    ]);
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'dva_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values([
+      { partijaId, igracId: igracA, sjedalo: 0 },
+      { partijaId, igracId: igracB, sjedalo: 1 },
+    ]);
+    const rezultati = [
+      { igracId: igracA, plasman: 1 as const, bodovi: 2, eliminacije: 0, iskustvo: 50, nacinIspadanja: 'pobjednik' as const },
+      { igracId: igracB, plasman: 2 as const, bodovi: 1, eliminacije: 0, iskustvo: 30, nacinIspadanja: 'ne_znam' as const },
+    ];
+    const statistike = new Map([
+      [igracA, praznaStatistika(igracA, 6)],
+      [igracB, praznaStatistika(igracB, 3)],
+    ]);
+    const bruto = new Map([[igracA, 50], [igracB, 30]]);
+    await Promise.all([
+      zakljuciPartijuUBazi(partijaId, igracA, rezultati, 'dva_igraca', statistike, false, new Map(), new Date(), bruto),
+      zakljuciPartijuUBazi(partijaId, igracA, rezultati, 'dva_igraca', statistike, false, new Map(), new Date(), bruto),
+    ]);
+    const audit = await baza.select().from(pohvaleIgre).where(eq(pohvaleIgre.igraId, partijaId));
+    const [napredak] = await baza.select().from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracA));
+    expect(audit.filter((r) => r.igracId === igracA)).toHaveLength(2);
+    expect(napredak?.pohvaleNizUkupno).toBe(1);
+    expect(napredak?.pohvaleXpUkupno).toBe(1);
+  });
+
+  it('P01-10: prag 0→1 otključava Vladar niza', async () => {
+    await baza.insert(igraci).values([
+      { id: igracA, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'A' },
+      { id: igracB, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'B' },
+    ]);
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'dva_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values([
+      { partijaId, igracId: igracA, sjedalo: 0 },
+      { partijaId, igracId: igracB, sjedalo: 1 },
+    ]);
+    const agregati = await zakljuciPartijuUBazi(
+      partijaId,
+      igracA,
+      [
+        { igracId: igracA, plasman: 1, bodovi: 1, eliminacije: 0, iskustvo: 10, nacinIspadanja: 'pobjednik' },
+        { igracId: igracB, plasman: 2, bodovi: 0, eliminacije: 0, iskustvo: 5, nacinIspadanja: 'ne_znam' },
+      ],
+      'dva_igraca',
+      new Map([[igracA, praznaStatistika(igracA, 4)], [igracB, praznaStatistika(igracB, 1)]]),
+      false,
+      new Map(),
+      new Date(),
+      new Map([[igracA, 10], [igracB, 5]]),
+    );
+    expect(agregati.get(igracA)?.pohvale.some((p) => p.vrsta === 'najduzi_niz')).toBe(true);
+    expect(agregati.get(igracA)?.novaDostignuca.some((d) => d.id === 'vladar_niza' && d.novaRazina === 1)).toBe(true);
+    const [dostignuce] = await baza.select().from(dostignucaIgraca)
+      .where(and(eq(dostignucaIgraca.igracId, igracA), eq(dostignucaIgraca.dostignuceId, 'vladar_niza')));
+    expect(dostignuce?.razina).toBe(1);
+  });
+
+  it('P01: LVL ≥ 10 + obje pohvale ne laže iskusnjaru (ni dvaput)', async () => {
+    const iskustvoPrije = ukupnoIskustvoZaRazinu(12);
+    await baza.insert(igraci).values([
+      { id: igracA, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'A', iskustvoUkupno: iskustvoPrije },
+      { id: igracB, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'B' },
+    ]);
+    await baza.insert(dostignucaIgraca).values({
+      igracId: igracA,
+      dostignuceId: 'iskusnjara',
+      razina: 1,
+      prvoOtkljucano: new Date('2020-01-01T00:00:00Z'),
+      zadnjeOtkljucavanje: new Date('2020-01-01T00:00:00Z'),
+    });
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'dva_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values([
+      { partijaId, igracId: igracA, sjedalo: 0 },
+      { partijaId, igracId: igracB, sjedalo: 1 },
+    ]);
+    const agregati = await zakljuciPartijuUBazi(
+      partijaId,
+      igracA,
+      [
+        { igracId: igracA, plasman: 1, bodovi: 2, eliminacije: 0, iskustvo: 40, nacinIspadanja: 'pobjednik' },
+        { igracId: igracB, plasman: 2, bodovi: 1, eliminacije: 0, iskustvo: 10, nacinIspadanja: 'ne_znam' },
+      ],
+      'dva_igraca',
+      new Map([[igracA, praznaStatistika(igracA, 6)], [igracB, praznaStatistika(igracB, 2)]]),
+      false,
+      new Map(),
+      new Date(),
+      new Map([[igracA, 40], [igracB, 10]]),
+    );
+    const pohvale = agregati.get(igracA)?.pohvale ?? [];
+    expect(pohvale.some((p) => p.vrsta === 'najduzi_niz')).toBe(true);
+    expect(pohvale.some((p) => p.vrsta === 'najvise_xp')).toBe(true);
+    const lazneIskusnjare = (agregati.get(igracA)?.novaDostignuca ?? []).filter((d) => d.id === 'iskusnjara');
+    expect(lazneIskusnjare).toEqual([]);
+    const [iskusnjara] = await baza.select().from(dostignucaIgraca)
+      .where(and(eq(dostignucaIgraca.igracId, igracA), eq(dostignucaIgraca.dostignuceId, 'iskusnjara')));
+    expect(iskusnjara?.razina).toBe(1);
+    expect(iskusnjara?.zadnjeOtkljucavanje?.toISOString()).toBe('2020-01-01T00:00:00.000Z');
+  });
+
+  it('P01-11: privatna soba ne stvara pohvale', async () => {
+    await baza.insert(igraci).values([
+      { id: igracA, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'A' },
+      { id: igracB, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'B' },
+    ]);
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'dva_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values([
+      { partijaId, igracId: igracA, sjedalo: 0 },
+      { partijaId, igracId: igracB, sjedalo: 1 },
+    ]);
+    const agregati = await zakljuciPartijuUBazi(
+      partijaId,
+      igracA,
+      [
+        { igracId: igracA, plasman: 1, bodovi: 1, eliminacije: 0, iskustvo: 40, nacinIspadanja: 'pobjednik' },
+        { igracId: igracB, plasman: 2, bodovi: 0, eliminacije: 0, iskustvo: 10, nacinIspadanja: 'ne_znam' },
+      ],
+      'dva_igraca',
+      new Map([[igracA, praznaStatistika(igracA, 5)], [igracB, praznaStatistika(igracB, 1)]]),
+      true,
+      new Map(),
+      new Date(),
+      new Map([[igracA, 40], [igracB, 10]]),
+    );
+    expect(agregati.get(igracA)?.pohvale ?? []).toEqual([]);
+    const audit = await baza.select().from(pohvaleIgre).where(eq(pohvaleIgre.igraId, partijaId));
+    expect(audit).toHaveLength(0);
+  });
+
+  it('P01-12/13: gost dobiva DTO pohvalu bez brojača; bot ne dobiva zapis', async () => {
+    await baza.insert(igraci).values([
+      { id: gostId, vrsta: 'gost', upravljac: 'covjek', nadimak: 'Gost' },
+      { id: botId, vrsta: 'registriran', upravljac: 'bot', nadimak: 'Bot' },
+      { id: igracA, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'A' },
+    ]);
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'cetiri_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values([
+      { partijaId, igracId: gostId, sjedalo: 0 },
+      { partijaId, igracId: botId, sjedalo: 1 },
+      { partijaId, igracId: igracA, sjedalo: 2 },
+    ]);
+    const agregati = await zakljuciPartijuUBazi(
+      partijaId,
+      gostId,
+      [
+        { igracId: gostId, plasman: 1, bodovi: 3, eliminacije: 0, iskustvo: 80, nacinIspadanja: 'pobjednik' },
+        { igracId: botId, plasman: 2, bodovi: 2, eliminacije: 0, iskustvo: 200, nacinIspadanja: 'ne_znam' },
+        { igracId: igracA, plasman: 3, bodovi: 1, eliminacije: 0, iskustvo: 20, nacinIspadanja: 'ne_znam' },
+      ],
+      'cetiri_igraca',
+      new Map([
+        [gostId, praznaStatistika(gostId, 8)],
+        [botId, praznaStatistika(botId, 2)],
+        [igracA, praznaStatistika(igracA, 1)],
+      ]),
+      false,
+      new Map(),
+      new Date(),
+      new Map([[gostId, 80], [botId, 200], [igracA, 20]]),
+    );
+    expect(agregati.get(gostId)?.pohvale.some((p) => p.vrsta === 'najduzi_niz')).toBe(true);
+    expect(agregati.get(gostId)?.pohvale.some((p) => p.vrsta === 'najvise_xp')).toBeFalsy();
+    expect(agregati.get(botId)?.pohvale ?? []).toEqual([]);
+    const [napredakGost] = await baza.select().from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, gostId));
+    expect(napredakGost?.pohvaleNizUkupno ?? 0).toBe(0);
+    const auditBot = await baza.select().from(pohvaleIgre)
+      .where(and(eq(pohvaleIgre.igraId, partijaId), eq(pohvaleIgre.igracId, botId)));
+    expect(auditBot).toHaveLength(0);
   });
 });

@@ -3,6 +3,8 @@ export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
   rijetkolovac: '/ikone/40-rijetkolovac.png',
   dugometras: '/ikone/41-dugometras.png',
   jezik_u_plamenu: '/ikone/42-jezik-u-plamenu.png',
+  vladar_niza: '/ikone/06-trofej.png',
+  xp_prvak: '/ikone/06-trofej.png',
   kaladont: '/ikone/43-kaladont.png',
   ka_zna: '/ikone/44-ka-zna.png',
   lovac_na_glave: '/ikone/45-lovac-na-glave.png',

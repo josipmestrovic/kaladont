@@ -74,7 +74,6 @@
   let prethodnaPartijaObavijesti: string | null | undefined;
   const jeTrening = $derived(stanje.kontekst === 'trening' || stanje.kraj?.kontekst === 'trening');
   let sekundeDoRezultata = $state(8);
-  let odbrojavanjeIntervalId: ReturnType<typeof setInterval> | null = null;
   let rezervniRokRezultataMs: number | null = null;
   type VrstaReakcije = BrzaPoruka | 'tuzan';
   let reakcije = $state<{ id: number; igracId: string; poruka: VrstaReakcije }[]>([]);
@@ -746,30 +745,39 @@
   });
 
   $effect(() => {
-    if (!stanje.kraj) return;
-    if (stanje.rezultatiPrikazaniPartijaId === stanje.kraj.partijaId) {
+    const kraj = stanje.kraj;
+    if (!kraj) return;
+
+    if (stanje.rezultatiPrikazaniPartijaId === kraj.partijaId) {
       prikaziRezultate = true;
       sekundeDoRezultata = 0;
-      if (odbrojavanjeIntervalId !== null) clearInterval(odbrojavanjeIntervalId);
-      odbrojavanjeIntervalId = null;
       return;
     }
-    if (odbrojavanjeIntervalId !== null) return;
+
     prikaziRezultate = false;
     rezervniRokRezultataMs ??= Date.now() + 8_000;
-    const rok = stanje.kraj.prikazRezultataOdIso ? Date.parse(stanje.kraj.prikazRezultataOdIso) : rezervniRokRezultataMs;
-    const azuriraj = () => {
-      sekundeDoRezultata = Math.max(0, Math.ceil((rok - Date.now()) / 1_000));
-      if (sekundeDoRezultata <= 0) {
-        if (odbrojavanjeIntervalId !== null) clearInterval(odbrojavanjeIntervalId);
-        odbrojavanjeIntervalId = null;
-        prikaziRezultate = true;
-        stanje.rezultatiPrikazaniPartijaId = stanje.kraj?.partijaId ?? null;
-        pustiAudio('partija-kraj');
-      }
+    const rok = kraj.prikazRezultataOdIso ? Date.parse(kraj.prikazRezultataOdIso) : rezervniRokRezultataMs;
+
+    const otkrijRezultate = () => {
+      stanje.rezultatiPrikazaniPartijaId = kraj.partijaId;
+      prikaziRezultate = true;
+      sekundeDoRezultata = 0;
+      pustiAudio('partija-kraj');
     };
-    odbrojavanjeIntervalId = setInterval(azuriraj, 250);
+
+    if (rok - Date.now() <= 0) {
+      otkrijRezultate();
+      return;
+    }
+
+    const azuriraj = () => {
+      const preostaloMs = rok - Date.now();
+      sekundeDoRezultata = Math.max(0, Math.ceil(preostaloMs / 1_000));
+      if (preostaloMs <= 0) otkrijRezultate();
+    };
     azuriraj();
+    const intervalId = setInterval(azuriraj, 250);
+    return () => clearInterval(intervalId);
   });
 
   async function ucitajPoteze(prikaziZadnjuRijec = true, ucitajJos = false) {
@@ -1296,6 +1304,25 @@
     </p>
     <a href="/registracija">Registriraj se</a>
   {/if}
+  {#if stanje.kraj.pohvale && stanje.kraj.pohvale.length > 0}
+    <section class="pohvale-igre" aria-labelledby="pohvale-igre-naslov">
+      <h3 id="pohvale-igre-naslov">Pohvale ove igre</h3>
+      <ul class="pohvale-igre-lista">
+        {#each stanje.kraj.pohvale as pohvala (pohvala.vrsta)}
+          <li>
+            {#if pohvala.vrsta === 'najduzi_niz'}
+              Najdulji niz bez greške u ovoj igri: <strong>{pohvala.vrijednost} {pohvala.vrijednost === 1 ? 'riječ' : 'riječi'}</strong>
+            {:else}
+              Najviše ostvarenog XP-a u ovoj igri: <strong>{pohvala.vrijednost}</strong>
+            {/if}
+            {#if pohvala.dijeljenoPrvoMjesto}
+              <span class="pohvale-igre-dijeljeno">Dijeljeno prvo mjesto</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
   <PanelPrijavaRijeci
     partijaId={partijaId!}
     potezi={lokalniPoteziZaPrijavu.length > 0 ? lokalniPoteziZaPrijavu : potezi}
@@ -1700,7 +1727,8 @@
     color: var(--boja-akcent-tekst);
   }
   .zavrsni-dnk,
-  .zavrsna-dostignuca {
+  .zavrsna-dostignuca,
+  .pohvale-igre {
     max-width: none;
     margin: 24px auto 0;
     padding: 18px;
@@ -1708,6 +1736,24 @@
     border-radius: 8px;
     background: var(--boja-povrsina);
     text-align: left;
+  }
+  .pohvale-igre h3 {
+    margin: 0 0 12px;
+  }
+  .pohvale-igre-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+  }
+  .pohvale-igre-lista li {
+    display: grid;
+    gap: 4px;
+  }
+  .pohvale-igre-dijeljeno {
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni, 0.9rem);
   }
   .ocjena-igre-zavrsna {
     display: flex;
@@ -1981,6 +2027,7 @@
   @media (max-width: 999px) {
     .zavrsni-dnk,
     .zavrsna-dostignuca,
+    .pohvale-igre,
     .zavrsna-kolekcija { padding: 14px; }
     .zavrsni-dnk-zaglavlje { align-items: flex-start; flex-direction: column; }
     .zavrsna-kolekcija-napredak { grid-template-columns: 1fr; gap: 10px; }
