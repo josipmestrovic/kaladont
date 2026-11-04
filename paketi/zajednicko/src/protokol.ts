@@ -4,6 +4,7 @@
  */
 import type { VrstaRijeci } from './pravila.js';
 import type { ObracunIskustva, StavkaIskustva } from './iskustvo.js';
+import type { OznakeNoveRijeci } from './oznake-novih-rijeci.js';
 import type { DnkOs } from './dnk.js';
 import type { AvatarConfigV1 } from './avatar.js';
 import type { FormaIgraca } from './forma.js';
@@ -272,6 +273,8 @@ export interface KrajPartije {
   };
   kolekcija?: {
     dodaneKategorije: { vrsta: VrstaRijeci | 'pridjev_prilog'; broj: number; rijeci: string[] }[];
+    /** Oznake duljine/rijetkosti uz novootključane osnovne riječi; opcionalno radi kompatibilnosti. */
+    oznakeNovihRijeci?: OznakeNoveRijeci[];
     ukupnoOtkljucano: number;
     ukupnoDostupno: number;
     trenutnaRazina: string;

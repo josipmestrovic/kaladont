@@ -20,8 +20,8 @@
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
-  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, PORUKE, zadnjaDva } from 'zajednicko';
-  import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
+  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, zadnjaDva } from 'zajednicko';
+  import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
   const stanjeVeze = dohvatiStanjeVeze();
@@ -412,6 +412,10 @@
 
   function jeAktualnaPartija(): boolean {
     return stanje.partijaId === partijaId;
+  }
+
+  function oznakeZaRijecKolekcije(osnovnaRijec: string, oznake: OznakeNoveRijeci[] | undefined): OznakeNoveRijeci | null {
+    return oznake?.find((stavka) => stavka.osnovnaRijec === osnovnaRijec) ?? null;
   }
 
   function opisDostignuca(id: string): { naziv: string; opis: string } {
@@ -1143,24 +1147,6 @@
       </li>
     {/each}
   </ol>
-  {#if jeTrening}
-    <div class="kraj-akcije">
-      <a href="/zagrijavanje" class="igraj-opet-gumb">Igraj novi trening</a>
-      <a href="/" class="sporedni-gumb">Povratak na odabir igre</a>
-    </div>
-  {:else if stanje.kraj.jePrivatna || stanje.jePrivatna}
-    {@const kodSobe = stanje.kraj.kodSobe ?? stanje.kodSobe}
-    <div class="kraj-akcije">
-      <a href={kodSobe ? `/soba/${kodSobe}` : '/soba/kreiraj'} class="igraj-opet-gumb">Igraj ponovno</a>
-      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
-    </div>
-  {:else}
-    {@const modPartije = stanje.kraj.mod ?? stanje.mod}
-    <div class="kraj-akcije">
-      <a href={modPartije === 'dva_igraca' ? '/red?mod=dva_igraca' : '/red?mod=cetiri_igraca'} class="igraj-opet-gumb">Igraj opet</a>
-      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
-    </div>
-  {/if}
   {#if !jeTrening}
   <section class="ocjena-igre-zavrsna" aria-label="Ocjena igre">
     {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
@@ -1183,6 +1169,46 @@
   {/if}
   {#if stanje.kraj.mojeIskustvo}
     <IskustvoPartije obracun={stanje.kraj.mojeIskustvo} />
+  {/if}
+  {#if stanje.kraj.pohvale && stanje.kraj.pohvale.length > 0}
+    <section class="pohvale-igre" aria-labelledby="pohvale-igre-naslov">
+      <h3 id="pohvale-igre-naslov">Pohvale ove igre</h3>
+      <ul class="pohvale-igre-lista">
+        {#each stanje.kraj.pohvale as pohvala (pohvala.vrsta)}
+          <li>
+            {#if pohvala.vrsta === 'najduzi_niz'}
+              Najdulji niz bez greške u ovoj igri: <strong>{pohvala.vrijednost} {pohvala.vrijednost === 1 ? 'riječ' : 'riječi'}</strong>
+            {:else}
+              Najviše ostvarenog XP-a u ovoj igri: <strong>{pohvala.vrijednost}</strong>
+            {/if}
+            {#if pohvala.dijeljenoPrvoMjesto}
+              <span class="pohvale-igre-dijeljeno">Dijeljeno prvo mjesto</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+  {#if stanje.kraj.novaDostignuca.length > 0}
+    <section class="zavrsna-dostignuca" aria-labelledby="zavrsna-dostignuca-naslov">
+      <h3 id="zavrsna-dostignuca-naslov">{jeTrening ? 'Dostignuće treninga' : 'Dostignuća otključana u ovoj partiji'}</h3>
+      <div class="zavrsna-dostignuca-mrezica">
+        {#each stanje.kraj.novaDostignuca as dostignuce (dostignuce.id)}
+          {@const detalji = opisDostignuca(dostignuce.id)}
+          <article class="zavrsno-dostignuce" aria-label={`${detalji.naziv}: novo otključano dostignuće`}>
+            <span class="zavrsno-dostignuce-ikona" aria-hidden="true"><img src="/ikone/27-zvjezdica-puna.png" alt="" /></span>
+            <div class="zavrsno-dostignuce-sadrzaj">
+              <div class="zavrsno-dostignuce-zaglavlje">
+                <strong>{detalji.naziv}</strong>
+                <span class="zavrsno-dostignuce-status">Otključano</span>
+              </div>
+              <p>{detalji.opis}</p>
+              <small>Razina {dostignuce.novaRazina} / {dostignuce.maksimalnaRazina}</small>
+            </div>
+          </article>
+        {/each}
+      </div>
+    </section>
   {/if}
   {#if stanje.kraj.mojNiz || stanje.kraj.mojaForma}
     {@const modNiza = stanje.kraj.mod ?? stanje.mod ?? 'cetiri_igraca'}
@@ -1269,7 +1295,21 @@
             <p>Riječi dodane u kolekciju u ovoj partiji:</p>
             <ul class="kolekcija-modal-rijeci">
               {#each stavka.rijeci as rijec}
-                <li>{rijec}</li>
+                {@const oznake = oznakeZaRijecKolekcije(rijec, kolekcija.oznakeNovihRijeci)}
+                {@const labelDuljine = nazivOznakeDuljine(oznake?.duljina)}
+                {@const labelRijetkosti = nazivOznakeRijetkosti(oznake?.rijetkost)}
+                <li>
+                  <span class="kolekcija-modal-lema">{rijec}</span>
+                  {#if oznake?.odigraniOblik}
+                    <span class="kolekcija-modal-oblik">Odigrani oblik: {oznake.odigraniOblik}</span>
+                  {/if}
+                  {#if labelDuljine || labelRijetkosti}
+                    <span class="kolekcija-modal-oznake">
+                      {#if labelDuljine}<span class="kolekcija-oznaka">{labelDuljine}</span>{/if}
+                      {#if labelRijetkosti}<span class="kolekcija-oznaka">{labelRijetkosti}</span>{/if}
+                    </span>
+                  {/if}
+                </li>
               {/each}
             </ul>
           </dialog>
@@ -1277,51 +1317,29 @@
       {/if}
     {/if}
   {/if}
-  {#if stanje.kraj.novaDostignuca.length > 0}
-    <section class="zavrsna-dostignuca" aria-labelledby="zavrsna-dostignuca-naslov">
-      <h3 id="zavrsna-dostignuca-naslov">{jeTrening ? 'Dostignuće treninga' : 'Dostignuća otključana u ovoj partiji'}</h3>
-      <div class="zavrsna-dostignuca-mrezica">
-        {#each stanje.kraj.novaDostignuca as dostignuce (dostignuce.id)}
-          {@const detalji = opisDostignuca(dostignuce.id)}
-          <article class="zavrsno-dostignuce" aria-label={`${detalji.naziv}: novo otključano dostignuće`}>
-            <span class="zavrsno-dostignuce-ikona" aria-hidden="true"><img src="/ikone/27-zvjezdica-puna.png" alt="" /></span>
-            <div class="zavrsno-dostignuce-sadrzaj">
-              <div class="zavrsno-dostignuce-zaglavlje">
-                <strong>{detalji.naziv}</strong>
-                <span class="zavrsno-dostignuce-status">Otključano</span>
-              </div>
-              <p>{detalji.opis}</p>
-              <small>Razina {dostignuce.novaRazina} / {dostignuce.maksimalnaRazina}</small>
-            </div>
-          </article>
-        {/each}
-      </div>
-    </section>
+  {#if jeTrening}
+    <div class="kraj-akcije">
+      <a href="/zagrijavanje" class="igraj-opet-gumb">Igraj novi trening</a>
+      <a href="/" class="sporedni-gumb">Povratak na odabir igre</a>
+    </div>
+  {:else if stanje.kraj.jePrivatna || stanje.jePrivatna}
+    {@const kodSobe = stanje.kraj.kodSobe ?? stanje.kodSobe}
+    <div class="kraj-akcije">
+      <a href={kodSobe ? `/soba/${kodSobe}` : '/soba/kreiraj'} class="igraj-opet-gumb">Igraj ponovno</a>
+      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
+    </div>
+  {:else}
+    {@const modPartije = stanje.kraj.mod ?? stanje.mod}
+    <div class="kraj-akcije">
+      <a href={modPartije === 'dva_igraca' ? '/red?mod=dva_igraca' : '/red?mod=cetiri_igraca'} class="igraj-opet-gumb">Igraj opet</a>
+      <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
+    </div>
   {/if}
   {#if !jeRegistriranKorisnik() && !stanje.kraj.jePrivatna && !stanje.jePrivatna && !jeTrening}
     <p class="gost-poruka">
       Ova statistika je spremljena lokalno u ovom pregledniku. Registriraj se da je zadržiš zauvijek!
     </p>
     <a href="/registracija">Registriraj se</a>
-  {/if}
-  {#if stanje.kraj.pohvale && stanje.kraj.pohvale.length > 0}
-    <section class="pohvale-igre" aria-labelledby="pohvale-igre-naslov">
-      <h3 id="pohvale-igre-naslov">Pohvale ove igre</h3>
-      <ul class="pohvale-igre-lista">
-        {#each stanje.kraj.pohvale as pohvala (pohvala.vrsta)}
-          <li>
-            {#if pohvala.vrsta === 'najduzi_niz'}
-              Najdulji niz bez greške u ovoj igri: <strong>{pohvala.vrijednost} {pohvala.vrijednost === 1 ? 'riječ' : 'riječi'}</strong>
-            {:else}
-              Najviše ostvarenog XP-a u ovoj igri: <strong>{pohvala.vrijednost}</strong>
-            {/if}
-            {#if pohvala.dijeljenoPrvoMjesto}
-              <span class="pohvale-igre-dijeljeno">Dijeljeno prvo mjesto</span>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    </section>
   {/if}
   <PanelPrijavaRijeci
     partijaId={partijaId!}
@@ -1943,16 +1961,38 @@
   }
   .kolekcija-modal-rijeci {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 8px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
   .kolekcija-modal-rijeci li {
-    padding: 5px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
     border-radius: 5px;
     background: var(--boja-povrsina-3);
+  }
+  .kolekcija-modal-lema {
+    font-weight: 600;
+  }
+  .kolekcija-modal-oblik {
+    font-size: 0.9rem;
+    color: var(--boja-tekst-sekundarni);
+  }
+  .kolekcija-modal-oznake {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .kolekcija-oznaka {
+    font-size: 0.85rem;
+    line-height: 1.3;
+    padding: 2px 6px;
+    border: 1px solid var(--boja-obrub, currentColor);
+    border-radius: 4px;
   }
   .zavrsna-dostignuca h3 {
     margin-bottom: 12px;

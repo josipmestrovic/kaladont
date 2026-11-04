@@ -36,6 +36,171 @@ for (const sirina of [320, 390, 1440]) {
   });
 }
 
+test('PR02-12/19: puni završni DTO u ciljanom DOM redoslijedu; pohvale nepromijenjene', async ({ browser }) => {
+  const igraci = await stvoriIgrace(browser, 2);
+  try {
+    await udjiUJavniRed(igraci, 'dva_igraca');
+    const partijaId = await cekajIstuPartiju(igraci);
+    const stranica = igraci[0]!.stranica;
+    await stranica.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(() => stranica.evaluate(async () => {
+      const { dohvatiStanjeIgre } = await import('/src/lib/stanje-igre.svelte.ts');
+      return dohvatiStanjeIgre().runda;
+    })).toBeGreaterThanOrEqual(1);
+    await stranica.evaluate(async (id) => {
+      const { dohvatiStanjeIgre } = await import('/src/lib/stanje-igre.svelte.ts');
+      const stanje = dohvatiStanjeIgre();
+      stanje.kraj = {
+        partijaId: id,
+        prikazRezultataOdIso: new Date(Date.now() - 1_000).toISOString(),
+        plasmani: stanje.sjedala.map((sjedalo: { igracId: string; nadimak: string }, indeks: number) => ({
+          igracId: sjedalo.igracId,
+          nadimak: sjedalo.nadimak,
+          plasman: indeks + 1,
+          bodovi: indeks === 0 ? 1 : 0,
+          eliminacije: 0,
+        })),
+        mojNoviProsjek: 1,
+        mojRang: null,
+        mojaOcjenaIgre: 4,
+        bonusOcjenaIgre: 0,
+        novaDostignuca: [{ id: 'vladar_niza', novaRazina: 1, maksimalnaRazina: 5 }],
+        pohvale: [
+          { vrsta: 'najduzi_niz', vrijednost: 7, dijeljenoPrvoMjesto: false },
+          { vrsta: 'najvise_xp', vrijednost: 190, dijeljenoPrvoMjesto: true },
+        ],
+        mojNiz: { prije: 0, poslije: 2, najbolji: 2 },
+        mojaForma: {
+          status: 'prikupljanje',
+          naziv: null,
+          razina: null,
+          vrijednost: null,
+          brojPobjeda: 0,
+          brojPartija: 0,
+          trend: null,
+          rezultati: [],
+        },
+        mojDnk: {
+          odigrano: 5,
+          preostaloDoOtkljucavanja: 0,
+          otkljucan: true,
+          upravoOtkljucan: false,
+          prije: [],
+          poslije: [],
+        },
+        kolekcija: {
+          dodaneKategorije: [{ vrsta: 'imenica', broj: 1, rijeci: ['kuća'] }],
+          oznakeNovihRijeci: [{
+            osnovnaRijec: 'kuća',
+            odigraniOblik: 'kućamaaaaaaaaa',
+            duljina: 'jako_duga',
+            rijetkost: 'jako_rijetka',
+          }],
+          ukupnoOtkljucano: 10,
+          ukupnoDostupno: 100,
+          trenutnaRazina: 'Početnik',
+          sljedecaRazina: 'Istraživač',
+          doSljedece: 5,
+        },
+        mod: 'dva_igraca',
+        kontekst: 'javna',
+        mojeIskustvo: {
+          prije: { razina: 2, ukupno: 150, uRazini: 50, doIduce: 150 },
+          poslije: { razina: 3, ukupno: 340, uRazini: 40, doIduce: 200 },
+          stavke: [{ vrsta: 'potezi', naziv: 'Prihvaćene riječi', kolicina: 7, poStavci: 5, iskustvo: 35 }],
+          osvojenoIskustvo: 190,
+          brutoIskustvo: 190,
+          najboljiStreak: 7,
+          mnoziteljStreaka: 1,
+          bonusOcjenaIgre: 0,
+        },
+      };
+    }, partijaId);
+
+    await expect(stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({ timeout: 5_000 });
+    const y = async (locator: ReturnType<Page['getByRole']> | ReturnType<Page['getByText']> | ReturnType<Page['locator']>) =>
+      (await locator.boundingBox())?.y ?? Number.POSITIVE_INFINITY;
+
+    const yPoredak = await y(stranica.getByRole('heading', { name: 'Završni poredak' }));
+    const yOcjena = await y(stranica.getByRole('region', { name: 'Ocjena igre' }));
+    const yXp = await y(stranica.getByRole('region', { name: 'Osvojeno iskustvo' }));
+    const yPohvala = await y(stranica.getByRole('region', { name: 'Pohvale ove igre' }));
+    const yDostignuca = await y(stranica.getByRole('heading', { name: 'Dostignuća otključana u ovoj partiji' }));
+    const yForma = await y(stranica.getByRole('heading', { name: 'Forma' }));
+    const yKolekcija = await y(stranica.getByRole('heading', { name: 'Kolekcija riječi' }));
+    const yAkcije = await y(stranica.locator('.kraj-akcije').first());
+    const yPrijavaRijeci = await y(stranica.getByText('Prijavi riječ').first());
+    const yPrijavaIgraca = await y(stranica.getByText('Prijavi igrača').first());
+
+    expect(yPoredak).toBeLessThan(yOcjena);
+    expect(yOcjena).toBeLessThan(yXp);
+    expect(yXp).toBeLessThan(yPohvala);
+    expect(yPohvala).toBeLessThan(yDostignuca);
+    expect(yDostignuca).toBeLessThan(yForma);
+    expect(yForma).toBeLessThan(yKolekcija);
+    expect(yKolekcija).toBeLessThan(yAkcije);
+    expect(yAkcije).toBeLessThan(yPrijavaRijeci);
+    expect(yPrijavaRijeci).toBeLessThan(yPrijavaIgraca);
+
+    const pohvale = stranica.getByRole('region', { name: 'Pohvale ove igre' });
+    await expect(pohvale.getByText(/Najdulji niz bez greške/)).toContainText('7');
+    await expect(pohvale.getByText(/Najviše ostvarenog XP-a/)).toContainText('190');
+
+    await stranica.locator('.zavrsna-kolekcija-kategorije button').first().click();
+    await expect(stranica.getByText(/Odigrani oblik:/)).toBeVisible();
+    await expect(stranica.getByText('Jako duga riječ')).toBeVisible();
+    await expect(stranica.getByText('Jako rijetka riječ')).toBeVisible();
+    await expect(stranica.getByRole('link', { name: 'Igraj opet' })).toHaveAttribute('href', '/red?mod=dva_igraca');
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
+test('PR02-13: minimalni završni DTO skriva opcionalne blokove; akcije i prijave ostaju', async ({ browser }) => {
+  const igraci = await stvoriIgrace(browser, 2);
+  try {
+    await udjiUJavniRed(igraci, 'dva_igraca');
+    const partijaId = await cekajIstuPartiju(igraci);
+    const stranica = igraci[0]!.stranica;
+    await expect.poll(() => stranica.evaluate(async () => {
+      const { dohvatiStanjeIgre } = await import('/src/lib/stanje-igre.svelte.ts');
+      return dohvatiStanjeIgre().runda;
+    })).toBeGreaterThanOrEqual(1);
+    await stranica.evaluate(async (id) => {
+      const { dohvatiStanjeIgre } = await import('/src/lib/stanje-igre.svelte.ts');
+      const stanje = dohvatiStanjeIgre();
+      stanje.kraj = {
+        partijaId: id,
+        prikazRezultataOdIso: new Date(Date.now() - 1_000).toISOString(),
+        plasmani: stanje.sjedala.map((sjedalo: { igracId: string; nadimak: string }, indeks: number) => ({
+          igracId: sjedalo.igracId,
+          nadimak: sjedalo.nadimak,
+          plasman: indeks + 1,
+          bodovi: 0,
+          eliminacije: 0,
+        })),
+        mojNoviProsjek: 0,
+        mojRang: null,
+        mojaOcjenaIgre: null,
+        novaDostignuca: [],
+        mod: 'dva_igraca',
+        kontekst: 'javna',
+        mojeIskustvo: null,
+      };
+    }, partijaId);
+
+    await expect(stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({ timeout: 5_000 });
+    await expect(stranica.getByRole('region', { name: 'Pohvale ove igre' })).toHaveCount(0);
+    await expect(stranica.getByRole('heading', { name: 'Kolekcija riječi' })).toHaveCount(0);
+    await expect(stranica.getByRole('heading', { name: 'Dostignuća otključana u ovoj partiji' })).toHaveCount(0);
+    await expect(stranica.locator('.kraj-akcije')).toBeVisible();
+    await expect(stranica.getByText('Prijavi riječ').first()).toBeVisible();
+    await expect(stranica.getByText('Prijavi igrača').first()).toBeVisible();
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
 test('P01-15/16: pohvale igre vidljive na završnom ekranu; prijave ostaju na dnu', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 2);
   try {
