@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import { izracunajRazinuDostignuca, dohvatiDefinicijuDostignuca } from 'zajednicko';
+import { izracunajRazinuDostignuca, dohvatiDefinicijuDostignuca, ukupnoIskustvoZaRazinu } from 'zajednicko';
 import { baza } from '../src/baza/klijent.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, pohvaleIgre, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { ponistiPartijeUTijekuUBazi, zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
@@ -475,6 +475,51 @@ describe('P01 pohvale igre', () => {
     const [dostignuce] = await baza.select().from(dostignucaIgraca)
       .where(and(eq(dostignucaIgraca.igracId, igracA), eq(dostignucaIgraca.dostignuceId, 'vladar_niza')));
     expect(dostignuce?.razina).toBe(1);
+  });
+
+  it('P01: LVL ≥ 10 + obje pohvale ne laže iskusnjaru (ni dvaput)', async () => {
+    const iskustvoPrije = ukupnoIskustvoZaRazinu(12);
+    await baza.insert(igraci).values([
+      { id: igracA, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'A', iskustvoUkupno: iskustvoPrije },
+      { id: igracB, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'B' },
+    ]);
+    await baza.insert(dostignucaIgraca).values({
+      igracId: igracA,
+      dostignuceId: 'iskusnjara',
+      razina: 1,
+      prvoOtkljucano: new Date('2020-01-01T00:00:00Z'),
+      zadnjeOtkljucavanje: new Date('2020-01-01T00:00:00Z'),
+    });
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'dva_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values([
+      { partijaId, igracId: igracA, sjedalo: 0 },
+      { partijaId, igracId: igracB, sjedalo: 1 },
+    ]);
+    const agregati = await zakljuciPartijuUBazi(
+      partijaId,
+      igracA,
+      [
+        { igracId: igracA, plasman: 1, bodovi: 2, eliminacije: 0, iskustvo: 40, nacinIspadanja: 'pobjednik' },
+        { igracId: igracB, plasman: 2, bodovi: 1, eliminacije: 0, iskustvo: 10, nacinIspadanja: 'ne_znam' },
+      ],
+      'dva_igraca',
+      new Map([[igracA, praznaStatistika(igracA, 6)], [igracB, praznaStatistika(igracB, 2)]]),
+      false,
+      new Map(),
+      new Date(),
+      new Map([[igracA, 40], [igracB, 10]]),
+    );
+    const pohvale = agregati.get(igracA)?.pohvale ?? [];
+    expect(pohvale.some((p) => p.vrsta === 'najduzi_niz')).toBe(true);
+    expect(pohvale.some((p) => p.vrsta === 'najvise_xp')).toBe(true);
+    const lazneIskusnjare = (agregati.get(igracA)?.novaDostignuca ?? []).filter((d) => d.id === 'iskusnjara');
+    expect(lazneIskusnjare).toEqual([]);
+    const [iskusnjara] = await baza.select().from(dostignucaIgraca)
+      .where(and(eq(dostignucaIgraca.igracId, igracA), eq(dostignucaIgraca.dostignuceId, 'iskusnjara')));
+    expect(iskusnjara?.razina).toBe(1);
+    expect(iskusnjara?.zadnjeOtkljucavanje?.toISOString()).toBe('2020-01-01T00:00:00.000Z');
   });
 
   it('P01-11: privatna soba ne stvara pohvale', async () => {

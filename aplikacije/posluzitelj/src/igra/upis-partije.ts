@@ -731,14 +731,17 @@ export async function zakljuciPartijuUBazi(
               azurirano: new Date(),
             },
           });
+          // Bez razine iskusnjara vidi 0 i lažno otključava za LVL ≥ 10.
+          const razinaNakonIgre = stanjeIskustva(agregat.iskustvoUkupno).razina;
           const trajniPrijePohvale = {
+            razina: razinaNakonIgre,
             pohvaleNizUkupno: stariNapredakPohvale?.pohvaleNizUkupno ?? 0,
             pohvaleXpUkupno: stariNapredakPohvale?.pohvaleXpUkupno ?? 0,
           };
           const novaPohvala = izracunajNovaDostignuca(
             trajniPrijePohvale,
             deltaPohvale,
-            stanjeIskustva(agregat.iskustvoUkupno).razina,
+            razinaNakonIgre,
             false,
           );
           if (novaPohvala.length > 0) {
