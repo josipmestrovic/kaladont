@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik, obrisiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
@@ -6,6 +8,7 @@
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import Kaladont2d5d from '$lib/komponente/Kaladont2d5d.svelte';
   import KontrolePristupacnosti from '$lib/komponente/KontrolePristupacnosti.svelte';
+  import PopupNovihMisija from '$lib/komponente/PopupNovihMisija.svelte';
   import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
@@ -30,6 +33,10 @@
     window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
     window.location.assign('/');
   }
+
+  onMount(() => {
+    if ($page.url.searchParams.get('igraj') === '1') otvoriModal('igra');
+  });
 </script>
 
 <svelte:window onkeydown={zatvoriNaEscape} />
@@ -57,6 +64,10 @@
       <a href="/profil" class="navigacijska-stavka">
         <img class="ikona-sucelja" src={urlAseta('/ikone/31-moj-profil.png')} alt="" aria-hidden="true" width="40" height="40" />
         <span>Moj profil</span>
+      </a>
+      <a href="/misije" class="navigacijska-stavka">
+        <img class="ikona-sucelja" src={urlAseta('/ikone/06-trofej.png')} alt="" aria-hidden="true" width="40" height="40" />
+        <span>Misije</span>
       </a>
       <a href="/ljestvice" class="navigacijska-stavka">
         <img class="ikona-sucelja" src={urlAseta('/ikone/09-ljestvice.png')} alt="" aria-hidden="true" width="40" height="40" />
@@ -107,7 +118,11 @@
   </footer>
 </main>
 
-{#if otvoreniModal}
+{#if registriran}
+  <PopupNovihMisija />
+{/if}
+
+  {#if otvoreniModal}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal-podloga" role="presentation" onclick={() => (otvoreniModal = null)}>
     <div

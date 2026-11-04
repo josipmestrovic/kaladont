@@ -6,6 +6,7 @@ const TIMEOUT_ASETA_MS = 8_000;
 export const KRITICNE_IKONE: readonly string[] = [
   '/ikone/07-igraj.png',
   '/ikone/31-moj-profil.png',
+  '/ikone/06-trofej.png',
   '/ikone/09-ljestvice.png',
   '/ikone/08-pravila.png',
   '/ikone/11-postavke.png',

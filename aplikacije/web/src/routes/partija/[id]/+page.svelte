@@ -10,6 +10,7 @@
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import Konfeti from '$lib/komponente/Konfeti.svelte';
   import IskustvoPartije from '$lib/komponente/IskustvoPartije.svelte';
+  import NapredakMisijaPartije from '$lib/komponente/NapredakMisijaPartije.svelte';
   import KaladontDnkPromjena from '$lib/komponente/KaladontDnkPromjena.svelte';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
   import Header from '$lib/komponente/Header.svelte';
@@ -1168,7 +1169,12 @@
   </section>
   {/if}
   {#if stanje.kraj.mojeIskustvo}
-    <IskustvoPartije obracun={stanje.kraj.mojeIskustvo} />
+    <IskustvoPartije obracun={stanje.kraj.mojeIskustvo} ukupnoIskustvo={stanje.kraj.ukupnoIskustvo ?? null} />
+  {:else if stanje.kraj.ukupnoIskustvo}
+    <IskustvoPartije ukupnoIskustvo={stanje.kraj.ukupnoIskustvo} />
+  {/if}
+  {#if stanje.kraj.promjeneMisija && stanje.kraj.promjeneMisija.length > 0}
+    <NapredakMisijaPartije promjene={stanje.kraj.promjeneMisija} />
   {/if}
   {#if stanje.kraj.pohvale && stanje.kraj.pohvale.length > 0}
     <section class="pohvale-igre" aria-labelledby="pohvale-igre-naslov">

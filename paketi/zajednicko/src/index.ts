@@ -8,6 +8,7 @@ export * from './nagrada-za-rijec.js';
 export * from './iskustvo.js';
 export * from './oznake-novih-rijeci.js';
 export * from './dostignuca.js';
+export * from './misije.js';
 export * from './pohvale-igre.js';
 export * from './dnk.js';
 export * from './avatar.js';

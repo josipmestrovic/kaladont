@@ -15,6 +15,7 @@ import {
   izracunajRang,
   stanjeIskustva,
   grafemi,
+  prvaDva,
   PRAGOVI_DULJINE,
   zadnjaDva,
   PORUKE,
@@ -163,6 +164,11 @@ interface StatistikaRijeciPartije {
   upisaneDugeRijeci: number;
   upisaneSrednjeDugeRijeci: number;
   upisaneJakoDugeRijeci: number;
+  /** Prihvaćeni oblici bilo kojeg tiera rijetkosti (za misije, ne grupe). */
+  prihvaceneRijetkeRijeci: number;
+  prihvaceneJakoRijetkeRijeci: number;
+  dugeIRijetkeRijeci: number;
+  razlicitiPoceci: Set<string>;
   najduzaRijec: string | null;
   najduzaRijecGrafemi: number;
   najrjedaRijec: string | null;
@@ -569,6 +575,10 @@ export function stvoriUpraviteljPartija(
       upisaneDugeRijeci: 0,
       upisaneSrednjeDugeRijeci: 0,
       upisaneJakoDugeRijeci: 0,
+      prihvaceneRijetkeRijeci: 0,
+      prihvaceneJakoRijetkeRijeci: 0,
+      dugeIRijetkeRijeci: 0,
+      razlicitiPoceci: new Set(),
       najduzaRijec: null,
       najduzaRijecGrafemi: 0,
       najrjedaRijec: null,
@@ -1020,18 +1030,41 @@ export function stvoriUpraviteljPartija(
     if (stanje.kontekst === 'trening') {
       stanje.statusSpremanja = 'spremanje_rezultata';
       void (async () => {
-        let nagrada: { pobjede: number; novaRazina: number; maksimalnaRazina: number } | null = null;
+        type NagradaTreninga = Awaited<ReturnType<typeof zabiljeziPobjeduTreninga>>;
+        let nagrada: NagradaTreninga = null;
         const pobjednik = stanje.sudionici.find((sudionik) => sudionik.igracId === pobjednikId);
+        const zavrsenoU = new Date(prikazRezultataOdIso);
         if (pobjednik?.upravljac === 'covjek' && pobjednik.vrsta !== 'gost') {
           try {
-            nagrada = await zabiljeziPobjeduTreninga(stanje.partijaId, pobjednikId);
+            const statistika = stanje.statistikeRijeci.get(pobjednikId);
+            nagrada = await zabiljeziPobjeduTreninga(stanje.partijaId, pobjednikId, zavrsenoU, {
+              mod: stanje.mod,
+              plasman: 1,
+              nacinIspadanja: 'pobjednik',
+              prihvaceneRijeci: statistika?.prihvaceniPotezi ?? 0,
+              najduziNiz: statistika?.najduziStreak ?? 0,
+            });
           } catch (greska) {
             console.error('Neuspjelo spremanje pobjede treninga:', greska);
-            aktivneVeze.dohvatiSocket(pobjednikId)?.emit('greska', { kod: 'INTERNA', poruka: 'Pobjeda je završena, ali napredak dostignuća nije spremljen.' });
+            stanje.statusSpremanja = 'spremanje_rezultata';
+            aktivneVeze.dohvatiSocket(pobjednikId)?.emit('greska', {
+              kod: 'INTERNA',
+              poruka: 'Pobjeda je završena, ali napredak nije spremljen. Pokušaj ponovno.',
+            });
+            // Ne potvrđuj rezultate_spremljeni — dopusti retry reconnectom.
+            return;
           }
         }
         stanje.statusSpremanja = 'rezultati_spremljeni';
         for (const p of plasmani) {
+          const ishod = p.igracId === pobjednikId ? nagrada?.ishodMisija : null;
+          const novaDostignuca = [
+            ...(p.igracId === pobjednikId && nagrada?.novaRazina
+              ? [{ id: 'zagrijan', novaRazina: nagrada.novaRazina, maksimalnaRazina: nagrada.maksimalnaRazina }]
+              : []),
+            ...(ishod?.novaDostignuca ?? []),
+          ];
+          const poId = new Map(novaDostignuca.map((d) => [d.id, d]));
           const poruka: KrajPartije = {
             partijaId: stanje.partijaId,
             prikazRezultataOdIso,
@@ -1041,7 +1074,10 @@ export function stvoriUpraviteljPartija(
             mojeIskustvo: null,
             mojaOcjenaIgre: null,
             bonusOcjenaIgre: 0,
-            novaDostignuca: p.igracId === pobjednikId && nagrada?.novaRazina ? [{ id: 'zagrijan', novaRazina: nagrada.novaRazina, maksimalnaRazina: nagrada.maksimalnaRazina }] : [],
+            novaDostignuca: [...poId.values()],
+            promjeneMisija: ishod?.promjeneMisija,
+            ukupnoIskustvo: ishod?.ukupnoIskustvo,
+            misijeStanjeVerzija: ishod?.misijeStanjeVerzija,
             mod: stanje.mod,
             kontekst: 'trening',
           };
@@ -1069,6 +1105,10 @@ export function stvoriUpraviteljPartija(
           upisaneDugeRijeci: statistika.upisaneDugeRijeci,
           upisaneSrednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
           upisaneJakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
+          prihvaceneRijetkeRijeci: statistika.prihvaceneRijetkeRijeci,
+          prihvaceneJakoRijetkeRijeci: statistika.prihvaceneJakoRijetkeRijeci,
+          dugeIRijetkeRijeci: statistika.dugeIRijetkeRijeci,
+          razlicitiPoceci: [...statistika.razlicitiPoceci],
           najduzaRijec: statistika.najduzaRijec,
           najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
           najrjedaRijec: statistika.najrjedaRijec,
@@ -1149,6 +1189,10 @@ export function stvoriUpraviteljPartija(
         upisaneDugeRijeci: statistika.upisaneDugeRijeci,
         upisaneSrednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
         upisaneJakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
+        prihvaceneRijetkeRijeci: statistika.prihvaceneRijetkeRijeci,
+        prihvaceneJakoRijetkeRijeci: statistika.prihvaceneJakoRijetkeRijeci,
+        dugeIRijetkeRijeci: statistika.dugeIRijetkeRijeci,
+        razlicitiPoceci: [...statistika.razlicitiPoceci],
         najduzaRijec: statistika.najduzaRijec,
         najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
         najrjedaRijec: statistika.najrjedaRijec,
@@ -1227,6 +1271,9 @@ export function stvoriUpraviteljPartija(
               prije: agregat.dnkPrije,
               poslije: agregat.dnkPoslije,
             } : undefined,
+            promjeneMisija: agregat?.promjeneMisija,
+            ukupnoIskustvo: agregat?.ukupnoIskustvo,
+            misijeStanjeVerzija: agregat?.misijeStanjeVerzija,
             mod: stanje.mod,
             kontekst: 'javna',
           };
@@ -1538,8 +1585,15 @@ export function stvoriUpraviteljPartija(
         statistika.najduzaRijec = rijecNormalizirana;
         statistika.najduzaRijecGrafemi = brojGrafema;
       }
+      const pocetak = prvaDva(rijecNormalizirana);
+      if (pocetak.length > 0) statistika.razlicitiPoceci.add(pocetak);
       if (frekvencija !== undefined && frekvencija !== null) {
         const tier = frekvencija === 0 && brojGrafema >= 4 ? 0 : frekvencija <= 9 ? 1 : frekvencija <= 99 ? 2 : null;
+        if (tier !== null) {
+          statistika.prihvaceneRijetkeRijeci += 1;
+          if (tier === 0) statistika.prihvaceneJakoRijetkeRijeci += 1;
+          if (brojGrafema >= PRAGOVI_DULJINE.duga) statistika.dugeIRijetkeRijeci += 1;
+        }
         const grupeZaStatistiku = tier === 0 ? statistika.otkriveneJakoRijetkeGrupe : tier === 1 ? statistika.otkriveneSrednjeRijetkeGrupe : tier === 2 ? statistika.otkriveneRijetkeGrupe : null;
         if (tier !== null && grupeZaStatistiku) {
           for (const grupa of noveGrupeZaDostignuca) grupeZaStatistiku.add(grupa);

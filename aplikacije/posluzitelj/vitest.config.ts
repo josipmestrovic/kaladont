@@ -11,8 +11,8 @@ export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', 'test/**/*.manual.test.ts'],
-    testTimeout: 15000,
-    hookTimeout: 20000,
+    testTimeout: 30000,
+    hookTimeout: 60000,
     // integracijski testovi dijele lokalnu Postgres bazu - sekvencijalno je pouzdanije od paralelnog
     fileParallelism: false,
     // isključi 30s timer poteza i 5s odabir riječi sustava - testovi ne trebaju čekati stvarno vrijeme

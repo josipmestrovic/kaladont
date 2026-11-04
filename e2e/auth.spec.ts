@@ -39,6 +39,13 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 
   await page.goto('/');
+  // Novi račun može dobiti popup novih misija iznad menija (daily pa weekly).
+  for (let i = 0; i < 2; i += 1) {
+    const popupMisija = page.getByRole('dialog', { name: /Nove (dnevne|tjedne) misije/ });
+    if (await popupMisija.count() === 0) break;
+    await popupMisija.getByRole('button', { name: 'Zatvori' }).click();
+    await expect(popupMisija).toHaveCount(0);
+  }
   const odjava = page.getByRole('navigation', { name: 'Glavna navigacija' }).getByRole('button', { name: 'Odjavi se' });
   await expect(odjava).toBeVisible();
   await Promise.all([

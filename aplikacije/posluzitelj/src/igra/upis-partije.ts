@@ -4,10 +4,11 @@
  * koji je transakcijski jer mijenja više tablica odjednom.
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajNovaDostignuca, izracunajOcjenuIgre, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type NovoDostignuce, type PohvalaIgre } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajOcjenuIgre, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type NovoDostignuce, type PohvalaIgre, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { dohvatiIshodMisija, obracunajMisijeZaIgraca } from '../misije/obracun.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
 
@@ -134,6 +135,10 @@ export interface ZapisStatistikeRijeci {
   upisaneDugeRijeci: number;
   upisaneSrednjeDugeRijeci: number;
   upisaneJakoDugeRijeci: number;
+  prihvaceneRijetkeRijeci?: number;
+  prihvaceneJakoRijetkeRijeci?: number;
+  dugeIRijetkeRijeci?: number;
+  razlicitiPoceci?: string[];
   najduzaRijec: string | null;
   najduzaRijecGrafemi: number;
   najrjedaRijec: string | null;
@@ -165,6 +170,10 @@ interface AgregatZakljucka {
   pohvale: PohvalaIgre[];
   upravljac: 'covjek' | 'bot';
   vrstaIgraca: 'gost' | 'registriran' | 'admin';
+  iskustvoPrijePartije: number;
+  promjeneMisija?: PromjenaMisije[];
+  ukupnoIskustvo?: UkupnoIskustvoIshoda;
+  misijeStanjeVerzija?: number;
 }
 
 function dnkPodaciIzRedaka(
@@ -271,7 +280,17 @@ export async function zakljuciPartijuUBazi(
             pohvale: pohvalePoIgracu.get(r.igracId) ?? [],
             upravljac: stanjeIgraca.upravljac,
             vrstaIgraca: stanjeIgraca.vrstaIgraca,
+            iskustvoPrijePartije: stanjeIgraca.iskustvoUkupno,
           });
+          if (!samoStatistika && (stanjeIgraca.vrstaIgraca === 'registriran' || stanjeIgraca.vrstaIgraca === 'admin') && stanjeIgraca.upravljac === 'covjek') {
+            const ishod = await dohvatiIshodMisija(tx, r.igracId, 'javna', partijaId);
+            const agregat = agregati.get(r.igracId);
+            if (ishod && agregat) {
+              agregat.promjeneMisija = ishod.promjeneMisija;
+              agregat.ukupnoIskustvo = ishod.ukupnoIskustvo;
+              agregat.misijeStanjeVerzija = ishod.misijeStanjeVerzija;
+            }
+          }
         }
       }
       return;
@@ -416,6 +435,7 @@ export async function zakljuciPartijuUBazi(
             pohvale: [],
             upravljac,
             vrstaIgraca,
+            iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
           });
         }
       } else if (!samoStatistika) {
@@ -449,6 +469,7 @@ export async function zakljuciPartijuUBazi(
             pohvale: [],
             upravljac,
             vrstaIgraca,
+            iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
           });
         }
       }
@@ -757,6 +778,61 @@ export async function zakljuciPartijuUBazi(
             });
             agregat.novaDostignuca = [...agregat.novaDostignuca, ...novaPohvala];
           }
+        }
+      }
+
+      // Misije: nakon partijskog XP-a i pohvala, prije commita.
+      const igraciZaMisije = [...agregati.entries()]
+        .filter(([, a]) => a.upravljac === 'covjek' && (a.vrstaIgraca === 'registriran' || a.vrstaIgraca === 'admin'))
+        .sort(([a], [b]) => a.localeCompare(b));
+
+      for (const [igracId, agregat] of igraciZaMisije) {
+        const rezultat = rezultati.find((r) => r.igracId === igracId);
+        const statistika = statistike.get(igracId);
+        if (!rezultat) continue;
+        const duge = (statistika?.upisaneDugeRijeci ?? 0)
+          + (statistika?.upisaneSrednjeDugeRijeci ?? 0)
+          + (statistika?.upisaneJakoDugeRijeci ?? 0);
+        const delta = napredakDostignuca.get(igracId)?.delta;
+        const metrike: MetrikeMisijaIgre = {
+          izvorId: partijaId,
+          kontekst: 'javna',
+          mod,
+          igracId,
+          zavrsenoU,
+          plasman: rezultat.plasman,
+          nacinIspadanja: rezultat.nacinIspadanja,
+          prihvaceneRijeci: statistika?.prihvaceniPotezi ?? 0,
+          najduziNiz: statistika?.najduziStreak ?? 0,
+          dugeRijeci: duge,
+          jakoDugeRijeci: statistika?.upisaneJakoDugeRijeci ?? 0,
+          rijetkeRijeci: statistika?.prihvaceneRijetkeRijeci ?? 0,
+          jakoRijetkeRijeci: statistika?.prihvaceneJakoRijetkeRijeci ?? 0,
+          dugeIRijetkeRijeci: statistika?.dugeIRijetkeRijeci ?? 0,
+          eliminacije: delta?.izazvaneEliminacije ?? 0,
+          kaladontIzvedbe: delta?.kaladontIzvedbe ?? 0,
+          razlicitiPoceci: statistika?.razlicitiPoceci ?? [],
+        };
+        const [xpRed] = await tx.select({ iskustvoUkupno: igraci.iskustvoUkupno })
+          .from(igraci).where(eq(igraci.id, igracId)).for('update');
+        const nakonPartijeXp = xpRed?.iskustvoUkupno ?? agregat.iskustvoUkupno;
+        const ishod = await obracunajMisijeZaIgraca(
+          tx,
+          metrike,
+          nakonPartijeXp,
+          agregat.iskustvoPrijePartije,
+        );
+        agregat.promjeneMisija = ishod.promjeneMisija;
+        agregat.ukupnoIskustvo = ishod.ukupnoIskustvo;
+        agregat.misijeStanjeVerzija = ishod.misijeStanjeVerzija;
+        agregat.iskustvoUkupno = ishod.ukupnoIskustvo.poslije.ukupno;
+        if (ishod.novaDostignuca.length > 0) {
+          const poId = new Map(agregat.novaDostignuca.map((d) => [d.id, d]));
+          for (const d of ishod.novaDostignuca) {
+            const staro = poId.get(d.id);
+            if (!staro || d.novaRazina > staro.novaRazina) poId.set(d.id, d);
+          }
+          agregat.novaDostignuca = [...poId.values()];
         }
       }
     }

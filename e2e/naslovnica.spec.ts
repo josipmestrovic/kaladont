@@ -49,6 +49,7 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByRole('button', { name: 'Igraj' })).toBeVisible();
   await expect(navigacija.getByRole('link', { name: 'Pravila' })).toHaveAttribute('href', '/pravila');
+  await expect(navigacija.getByRole('link', { name: 'Misije' })).toHaveAttribute('href', '/misije');
   await expect(navigacija.getByRole('link', { name: 'Ljestvice' })).toHaveAttribute('href', '/ljestvice');
   await expect(navigacija.getByRole('link', { name: 'Moj profil' })).toHaveAttribute('href', '/profil');
   await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toHaveAttribute('href', '/prijava');

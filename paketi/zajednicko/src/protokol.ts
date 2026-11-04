@@ -9,6 +9,7 @@ import type { DnkOs } from './dnk.js';
 import type { AvatarConfigV1 } from './avatar.js';
 import type { FormaIgraca } from './forma.js';
 import type { PohvalaIgre } from './pohvale-igre.js';
+import type { PromjenaMisije, UkupnoIskustvoIshoda } from './misije.js';
 
 export interface PodaciVeze {
   /** Opaque guest token ILI sesijski token registriranog igrača. */
@@ -281,6 +282,11 @@ export interface KrajPartije {
     sljedecaRazina: string | null;
     doSljedece: number | null;
   };
+  /** Osobne promjene misija ovog završetka; nema tuđih misija. */
+  promjeneMisija?: PromjenaMisije[];
+  /** Konačno iskustvo nakon partijskog + misijskog XP-a. */
+  ukupnoIskustvo?: UkupnoIskustvoIshoda;
+  misijeStanjeVerzija?: number;
   mod?: 'cetiri_igraca' | 'dva_igraca';
   kontekst?: KontekstPartije;
   jePrivatna?: boolean;
