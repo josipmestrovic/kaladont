@@ -175,16 +175,17 @@
 
 <style>
   /* Sve vertikalne mjere skaliraju se s visinom ekrana kako bi naslovnica stala bez scrolla (do ~560px). */
+  /* Visine računaju na do 8 navigacijskih stavki (gost + Misije). */
   .landing {
-    --landing-padding: clamp(8px, 3dvh, 40px);
-    --landing-razmak: clamp(8px, 2.5dvh, 32px);
-    --visina-stavke: clamp(44px, 7dvh, 72px);
-    --razmak-stavki: clamp(6px, 1.2dvh, 12px);
-    --velicina-ikone: calc(var(--visina-stavke) * 0.6);
-    --font-stavke: clamp(18px, 3dvh, 25px);
-    --velicina-naslova: clamp(52px, 10dvh, 92px);
-    --visina-kontrole: clamp(40px, 6dvh, 56px);
-    --visina-ilustracije: min(470px, calc(7 * var(--visina-stavke) + 6 * var(--razmak-stavki)));
+    --landing-padding: clamp(6px, 2.2dvh, 32px);
+    --landing-razmak: clamp(6px, 2dvh, 28px);
+    --visina-stavke: clamp(40px, 6.2dvh, 66px);
+    --razmak-stavki: clamp(4px, 1dvh, 10px);
+    --velicina-ikone: calc(var(--visina-stavke) * 0.58);
+    --font-stavke: clamp(16px, 2.7dvh, 23px);
+    --velicina-naslova: clamp(48px, 9dvh, 86px);
+    --visina-kontrole: clamp(36px, 5.5dvh, 52px);
+    --visina-ilustracije: min(470px, calc(8 * var(--visina-stavke) + 7 * var(--razmak-stavki)));
 
     position: relative;
     isolation: isolate;
@@ -214,7 +215,7 @@
 
   .landing-tekst {
     display: block;
-    padding-top: clamp(16px, 3dvh, 36px);
+    padding-top: clamp(10px, 2dvh, 28px);
     text-align: left;
   }
 
@@ -247,7 +248,7 @@
   .vrsta-igre { font-size: 0.72em; }
 
   @media (min-width: 1000px) {
-    .landing { gap: 0; --landing-padding: clamp(8px, 2dvh, 24px); }
+    .landing { gap: 0; --landing-padding: clamp(6px, 1.6dvh, 20px); }
 
     .izbornik {
       justify-content: flex-start;
@@ -264,6 +265,16 @@
 
     .ime-igre,
     .vrsta-igre { display: inline; }
+  }
+
+  @media (min-width: 1000px) and (max-height: 720px) {
+    .landing {
+      --visina-stavke: clamp(36px, 5.5dvh, 52px);
+      --razmak-stavki: clamp(3px, 0.7dvh, 6px);
+      --landing-razmak: clamp(4px, 1.2dvh, 12px);
+      --velicina-naslova: clamp(40px, 7dvh, 64px);
+      --visina-kontrole: clamp(32px, 5dvh, 44px);
+    }
   }
 
   .glavna-navigacija {
@@ -400,7 +411,7 @@
   @media (max-width: 999px) {
     .izbornik {
       justify-content: flex-start;
-      gap: clamp(8px, 1.5dvh, 14px);
+      gap: clamp(4px, 1dvh, 10px);
     }
 
     .kontrole-pristupacnosti-naslovnica {
@@ -408,12 +419,13 @@
     }
 
     .landing {
-      --landing-padding: clamp(6px, 1dvh, 10px);
-      --landing-razmak: clamp(8px, 2.5dvh, 28px);
-      --visina-stavke: clamp(40px, 7dvh, 68px);
-      --razmak-stavki: clamp(5px, 1.2dvh, 12px);
-      --font-stavke: clamp(17px, 2.8dvh, 22px);
-      --velicina-naslova: clamp(34px, 6.5dvh, 58px);
+      --landing-padding: clamp(4px, 0.8dvh, 8px);
+      --landing-razmak: clamp(4px, 1.6dvh, 18px);
+      --visina-stavke: clamp(34px, 5.4dvh, 56px);
+      --razmak-stavki: clamp(3px, 0.8dvh, 8px);
+      --font-stavke: clamp(15px, 2.4dvh, 20px);
+      --velicina-naslova: clamp(30px, 5.5dvh, 52px);
+      --visina-kontrole: clamp(32px, 5dvh, 48px);
     }
 
     .izbornik { width: min(100%, 440px); margin: 0 auto; }
@@ -430,7 +442,21 @@
   }
 
   @media (max-width: 999px) and (max-height: 700px) {
-    .landing { --landing-razmak: 8px; --razmak-stavki: 4px; }
+    .landing {
+      --landing-razmak: 4px;
+      --razmak-stavki: 2px;
+      --visina-stavke: clamp(32px, 5dvh, 48px);
+      --velicina-naslova: clamp(28px, 5dvh, 44px);
+    }
+  }
+
+  @media (max-width: 999px) {
+    :global(html[data-font-disleksiju]) .landing {
+      --visina-stavke: clamp(32px, 5dvh, 50px);
+      --font-stavke: clamp(14px, 2.2dvh, 18px);
+      --razmak-stavki: clamp(2px, 0.6dvh, 6px);
+      --landing-razmak: clamp(3px, 1.2dvh, 12px);
+    }
   }
 
   .modal-podloga {
