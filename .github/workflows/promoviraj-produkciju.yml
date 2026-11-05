@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       digest:
-        description: Puni image digest (sha256: + 64 hex) koji je prošao staging
+        description: 'Puni image digest (sha256: + 64 hex) koji je prošao staging'
         required: true
         type: string
 

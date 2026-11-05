@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-> **Status 2026-11-03: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Prava backup automatika (systemd/`age`/Storage Box) još nije u repou — dok je nema, `skripte/zahtijevaj-svjez-offserver-backup.sh` namjerno pada prije migracija. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
+> **Status 2026-11-03: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Job `kod` na početku pokreće pinani **actionlint** nad `.github/workflows/` (YAML sintaksa i Actions pravila). Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Prava backup automatika (systemd/`age`/Storage Box) još nije u repou — dok je nema, `skripte/zahtijevaj-svjez-offserver-backup.sh` namjerno pada prije migracija. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
 
 Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
 
@@ -80,7 +80,7 @@ flowchart TD
 | Job | Što radi | Ovlasti |
 | --- | --- | --- |
 | `putanje` | Izračun `docs_only` iz difa | `contents: read` |
-| `kod` | install, audit, Trivy secret, migracije, lint, Vitest, web check, build, Playwright cache + E2E (Chromium+WebKit) | `contents: read` |
+| `kod` | actionlint (workflow YAML), install, audit, Trivy secret, migracije, lint, Vitest, web check, build, Playwright cache + E2E (Chromium+WebKit) | `contents: read` |
 | `slika` | prod Compose config + sintetički validator konfiguracije, Docker build/candidate, Trivy image+SARIF, Caddy, compose smoke, HTTP E2E, image-smoke, load, simulacija | `contents: read` + `packages: write` + `security-events: write` |
 | agregator (**Lint, test, check i build**) | Zelen ako docs-only **ili** (`kod` i `slika` uspješni) | `contents: read` |
 
