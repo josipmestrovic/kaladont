@@ -71,7 +71,7 @@ Pitanja o kronologiji ranog ispadanja, datumu početka, zatvaranju arhive i star
 | Forma | `rezultatiFormeIgraca`, profil čita zadnjih 20 | To nije tablica za sve nove ljestvice. Samo čitanje zadnjih 20 nije cijeli tjedan/godina. |
 | Rani poraz | `spremiRaniPorazUBazi` upisuje rezultat i prije završetka cijele igre | Ne uzeti taj zapis kao da je igra već konačno završena. Postoji mogućnost drukčijeg redoslijeda korisnikovih igara i završetaka stolova. |
 | Riječni niz | Motor resetira `streakovi` na odbijenu riječ | Odbijeni pokušaji ne spremaju se u `potezi`; iz prihvaćenih redaka nije moguće točno obnoviti stari najduži niz. |
-| Trajnost loga poteza | `zapisiPotez` hvata grešku i ne propagira je | Iako završni tok čeka promiseove, to nije dokaz da je svaki stari potez stvarno spremljen. Ne obećavati potpuni povijesni backfill. |
+| Trajnost loga poteza | ~~`zapisiPotez` hvata grešku i ne propagira je~~ **Zatvoreno:** greška se propagira; završni tok idempotentno osigurava sve poteze prije XP-a | Ne obećavati potpuni povijesni backfill starih partija. |
 | Završno vrijeme | `partije.kraj` postavlja `new Date()` u završnom DB pokušaju | Retry preko ponoći može promijeniti razdoblje ako se ne sačuva stvarni trenutak kraja. |
 | Profil | Oba profila već imaju CV, formu i podizbornike | Ugraditi mali blok poretka; ne zamijeniti te featuree ili ponovo graditi profil. |
 | Brisanje računa | `racuni/brisanje.ts` anonimizira redak | Novi živi i arhivski prikazi trebaju uvažavati obrisanog igrača, bez vraćanja starih osobnih oznaka. |

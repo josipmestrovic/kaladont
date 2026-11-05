@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { izracunajRazinuDostignuca, dohvatiDefinicijuDostignuca, ukupnoIskustvoZaRazinu } from 'zajednicko';
 import { baza } from '../src/baza/klijent.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, pohvaleIgre, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
-import { ponistiPartijeUTijekuUBazi, zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
-import type { ZapisStatistikeRijeci } from '../src/igra/upis-partije.js';
+import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, pohvaleIgre, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { osigurajUpisePoteza, ponistiPartijeUTijekuUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
+import type { ZapisPoteza, ZapisStatistikeRijeci } from '../src/igra/upis-partije.js';
 
 function praznaStatistika(igracId: string, najduziStreak = 0): ZapisStatistikeRijeci {
   const imaNiza = najduziStreak > 0;
@@ -594,5 +594,122 @@ describe('P01 pohvale igre', () => {
     const auditBot = await baza.select().from(pohvaleIgre)
       .where(and(eq(pohvaleIgre.igraId, partijaId), eq(pohvaleIgre.igracId, botId)));
     expect(auditBot).toHaveLength(0);
+  });
+});
+
+describe('pouzdan upis poteza', () => {
+  const igracId = randomUUID();
+  const partijeZaBrisanje: string[] = [];
+
+  afterEach(async () => {
+    for (const partijaId of partijeZaBrisanje.splice(0)) {
+      await baza.delete(potezi).where(eq(potezi.partijaId, partijaId));
+      await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+      await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+      await baza.delete(partije).where(eq(partije.id, partijaId));
+    }
+    await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igracId));
+    await baza.delete(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igracId));
+    await baza.delete(igraci).where(eq(igraci.id, igracId));
+  });
+
+  function zapisPoteza(partijaId: string, redniBroj: number, rijec: string): ZapisPoteza {
+    return {
+      partijaId,
+      runda: 1,
+      redniBroj,
+      igracId,
+      vrsta: 'rijec',
+      rijec,
+      trazenaSlova: rijec.slice(0, 2),
+      trajanjeMs: 1_000,
+    };
+  }
+
+  it('propagira DB grešku umjesto da je proguta kao uspjeh', async () => {
+    const nepostojecaPartija = randomUUID();
+    await expect(zapisiPotez(zapisPoteza(nepostojecaPartija, 1, 'mama'))).rejects.toBeTruthy();
+  });
+
+  it('idempotentno upisuje isti redni broj samo jednom', async () => {
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Upis Idem' });
+    const partijaId = randomUUID();
+    partijeZaBrisanje.push(partijaId);
+    await zapisiPocetakPartije(partijaId, [{
+      igracId,
+      nadimak: 'Upis Idem',
+      sjedalo: 0,
+      avatarId: 1,
+      avatarConfig: null,
+      avatarRevision: 0,
+      rang: null,
+      razina: 1,
+      trenutniNiz: 0,
+      razinaVatre: 0,
+      upravljac: 'covjek',
+      vrsta: 'registriran',
+    }], new Map([[igracId, 0]]));
+
+    const zapis = zapisPoteza(partijaId, 1, 'mama');
+    await zapisiPotez(zapis);
+    await zapisiPotez(zapis);
+    await osigurajUpisePoteza([zapis, zapis]);
+
+    const redovi = await baza.select().from(potezi).where(eq(potezi.partijaId, partijaId));
+    expect(redovi).toHaveLength(1);
+    expect(redovi[0]?.rijec).toBe('mama');
+  });
+
+  it('nakon privremenog kvara osigurava potpunu povijest i jedan XP', async () => {
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Upis Retry', iskustvoUkupno: 100 });
+    const partijaId = randomUUID();
+    partijeZaBrisanje.push(partijaId);
+
+    const prvi = zapisPoteza(partijaId, 1, 'mama');
+    const drugi = zapisPoteza(partijaId, 2, 'mata');
+
+    // Prekid: FK još ne postoji — greška se mora vidjeti, ne gutati.
+    await expect(zapisiPotez(prvi)).rejects.toBeTruthy();
+
+    await zapisiPocetakPartije(partijaId, [{
+      igracId,
+      nadimak: 'Upis Retry',
+      sjedalo: 0,
+      avatarId: 1,
+      avatarConfig: null,
+      avatarRevision: 0,
+      rang: null,
+      razina: 1,
+      trenutniNiz: 0,
+      razinaVatre: 0,
+      upravljac: 'covjek',
+      vrsta: 'registriran',
+    }], new Map([[igracId, 0]]));
+
+    // Ponovni pokušaj (kao završni osigurajUpisePoteza) — potpuna povijest.
+    await osigurajUpisePoteza([prvi, drugi]);
+    // Ponovna provjera nije novi write.
+    await osigurajUpisePoteza([prvi, drugi]);
+
+    const redovi = await baza.select({ redniBroj: potezi.redniBroj, rijec: potezi.rijec })
+      .from(potezi)
+      .where(eq(potezi.partijaId, partijaId));
+    expect(redovi).toHaveLength(2);
+    expect(redovi.map((r) => r.rijec).sort()).toEqual(['mama', 'mata']);
+
+    const rezultati = [{ igracId, plasman: 1 as const, bodovi: 3, eliminacije: 0, iskustvo: 50, nacinIspadanja: 'pobjednik' as const }];
+    const statistike = new Map([[igracId, praznaStatistika(igracId, 2)]]);
+    const osnovni = new Map([[igracId, 50]]);
+    await Promise.all([
+      zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', statistike, false, new Map(), new Date(), osnovni),
+      zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', statistike, false, new Map(), new Date(), osnovni),
+    ]);
+    const [nakonPrvih] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
+    await zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', statistike, false, new Map(), new Date(), osnovni);
+    const [nakonPonovnog] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
+    const obracuni = await baza.select().from(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+    expect(obracuni).toHaveLength(1);
+    expect(nakonPrvih?.iskustvoUkupno).toBeGreaterThan(100);
+    expect(nakonPonovnog?.iskustvoUkupno).toBe(nakonPrvih?.iskustvoUkupno);
   });
 });

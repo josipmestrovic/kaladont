@@ -422,7 +422,7 @@ export const potezi = pgTable('potezi', {
   trajanjeMs: integer('trajanje_ms').notNull().default(0),
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [
-  index('idx_potezi_partija_id_redni_broj').on(tablica.partijaId, tablica.redniBroj),
+  uniqueIndex('uq_potezi_partija_id_redni_broj').on(tablica.partijaId, tablica.redniBroj),
 ]);
 
 export const rijeci = pgTable(

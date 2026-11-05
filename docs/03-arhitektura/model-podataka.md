@@ -211,7 +211,7 @@ Potpuna povijest — pogoni prikaz povijesti, prijave grešaka i buduće analize
 
 Neuspjeli pokušaji (odbijene riječi) se **ne** zapisuju u `potezi` — samo prolaze kroz validaciju; brojač odbijenih po potezu može se dodati kasnije bude li potreban.
 
-Indeks: `(partija_id, redni_broj)` za dohvat i redoslijed kompletne povijesti poteza jedne partije.
+Jedinstveni indeks: `(partija_id, redni_broj)` za dohvat, redoslijed i idempotentan ponovni upis iste povijesti poteza.
 
 ## rijeci
 

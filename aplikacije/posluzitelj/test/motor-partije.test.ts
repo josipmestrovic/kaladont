@@ -563,11 +563,12 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       expect(eliminacija.bodZa).toBe(otvarac.token); // napadac = autor zadnje prihvacene rijeci
 
       const preostali = igraci.filter((igrac) => igrac !== sljedeci);
+      // Kraj čeka i završni DB upis (osiguravanje poteza + XP); CI treba više od 8s.
       const krajPromise = cekajEventNaBiloKojem<KrajPartije>(
         preostali.map((ig) => ig.socket),
         'partija:kraj',
         () => true,
-        8_000,
+        15_000,
         `partija=${pocetak.partijaId}`,
       );
       preostali[0]!.socket.disconnect();
