@@ -374,7 +374,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Pokrenuti CI bazu
-        run: docker compose -f docker-compose.ci.yml up -d baza
+        run: docker compose -f docker-compose.ci.yml up -d --wait --wait-timeout 60 baza
 
       - name: Osigurati DB uloge u CI imageu
         run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/osiguraj-db-uloge.js
