@@ -147,9 +147,14 @@ docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-d
 faza='migracije_zavrsene'
 docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/osiguraj-db-uloge.js
 faza='uloge_nakon_migracija'
-if ! docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/provjeri-rjecnik.js; then
+rjecnik_kod=0
+docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/provjeri-rjecnik.js || rjecnik_kod=$?
+if [ "$rjecnik_kod" -eq 2 ]; then
   faza='rjecnik_uvoz'
   docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/uvezi-rjecnik.js
+elif [ "$rjecnik_kod" -ne 0 ]; then
+  echo "Provjera rječnika pala s kodom $rjecnik_kod (nije djelomičan rječnik)." >&2
+  exit "$rjecnik_kod"
 fi
 faza='rjecnik_spreman'
 zapisi_env "$novi_release_zapis"

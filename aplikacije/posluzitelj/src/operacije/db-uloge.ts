@@ -1,4 +1,9 @@
+import path from 'node:path';
+import { config as ucitajDotenv } from 'dotenv';
 import postgres from 'postgres';
+
+// Isto kao konfiguracija.ts — lokalni CLI (migracije / osiguraj-db-uloge) čita root .env.
+ucitajDotenv({ path: path.resolve(process.cwd(), '../../.env') });
 
 export const APP_ULOGA = 'kaladont_app';
 
