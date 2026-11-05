@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
-import type { KrajPartije, PocetakPartije, PrihvacenPotez, RundaOtvorena, StanjeReda } from 'zajednicko';
+import type { Eliminacija, KrajPartije, PocetakPartije, PrihvacenPotez, RundaOtvorena, StanjeReda } from 'zajednicko';
 import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { botovi, igraci, partije, sudioniciPartije } from '../src/baza/shema.js';
@@ -74,6 +74,50 @@ function cekaj<T>(socket: ClientSocket, dogadaj: string, filter: (p: T) => boole
   });
 }
 
+/** Red događaja koji hvata emit i prije nego test stigne na await (bot ≤200 ms). */
+function napraviRedDogadaja<T>() {
+  const spremni: T[] = [];
+  const cekanja: Array<{ predikat: (p: T) => boolean; resolve: (p: T) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }> = [];
+
+  return {
+    push(payload: T) {
+      const indeks = cekanja.findIndex((c) => c.predikat(payload));
+      if (indeks >= 0) {
+        const [cekanje] = cekanja.splice(indeks, 1);
+        clearTimeout(cekanje!.timer);
+        cekanje!.resolve(payload);
+        return;
+      }
+      spremni.push(payload);
+    },
+    next(predikat: (p: T) => boolean = () => true, timeoutMs = 15_000, opis = 'događaj'): Promise<T> {
+      const indeks = spremni.findIndex(predikat);
+      if (indeks >= 0) {
+        const [payload] = spremni.splice(indeks, 1);
+        return Promise.resolve(payload!);
+      }
+      return new Promise((resolve, reject) => {
+        const unos = {
+          predikat,
+          resolve,
+          reject,
+          timer: setTimeout(() => {
+            const i = cekanja.indexOf(unos);
+            if (i >= 0) cekanja.splice(i, 1);
+            reject(new Error(`Nema ${opis} unutar ${timeoutMs} ms`));
+          }, timeoutMs),
+        };
+        cekanja.push(unos);
+      });
+    },
+    ocisti() {
+      for (const c of cekanja) clearTimeout(c.timer);
+      cekanja.length = 0;
+      spremni.length = 0;
+    },
+  };
+}
+
 describe('popuna javnog reda botovima', () => {
   it('izlazak posljednjeg čovjeka prije prve riječi poništava početak bez rezultata', async () => {
     const lokalni = await izgradiPosluzitelj({
@@ -125,13 +169,29 @@ describe('popuna javnog reda botovima', () => {
     lokalni.fondBotova.postaviIdentitete((await ucitajIdentiteteBotova()).filter((bot) => testniBotovi.includes(bot.igracId)));
     expect(lokalni.fondBotova.stanje().ukupno).toBeGreaterThan(0);
     let socket: ClientSocket | null = null;
+    const runde = napraviRedDogadaja<RundaOtvorena>();
+    const potezi = napraviRedDogadaja<PrihvacenPotez>();
+    const eliminacije = napraviRedDogadaja<Eliminacija>();
+    const krajevi = napraviRedDogadaja<KrajPartije>();
+    const handleri = {
+      runda: (p: RundaOtvorena) => runde.push(p),
+      potez: (p: PrihvacenPotez) => potezi.push(p),
+      eliminacija: (p: Eliminacija) => eliminacije.push(p),
+      kraj: (p: KrajPartije) => krajevi.push(p),
+    };
     try {
       await lokalni.app.listen({ port: 0, host: '127.0.0.1' });
       const podaci = lokalni.app.server.address();
       socket = ioClient(`http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`, { auth: { token: `gost.${randomUUID().replaceAll('-', '')}` }, forceNew: true });
       await new Promise<void>((resolve, reject) => { socket!.once('connect', resolve); socket!.once('connect_error', reject); });
+
+      // Buffer prije red:udji — bot može odigrati ≤200 ms prije nego petlja stigne na await.
+      socket.on('partija:runda-otvorena', handleri.runda);
+      socket.on('potez:prihvacen', handleri.potez);
+      socket.on('partija:eliminacija', handleri.eliminacija);
+      socket.on('partija:kraj', handleri.kraj);
+
       const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak', () => true, 10_000);
-      const rundaPromise = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena', () => true, 10_000);
       socket.emit('red:udji', { mod: 'dva_igraca' });
       // U Dvoboju rezervacija i pokretanje padaju u isti trenutak praga; nema zasebne faze prikaza bota.
       const pocetak = await pocetakPromise;
@@ -141,32 +201,40 @@ describe('popuna javnog reda botovima', () => {
       const botSjedalo = pocetak.sjedala.find((s) => s.igracId !== mojId)!;
       expect(botSjedalo.jeGost).toBe(false);
 
-      // Kraj timer tek nakon početka — inače CI utroši budget na učitavanje/prag.
-      const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 30_000);
-      const runda = await rundaPromise;
+      const krajPromise = krajevi.next(() => true, 30_000, 'partija:kraj');
+      const runda = await runde.next(() => true, 10_000, 'partija:runda-otvorena');
       let naPotezu = runda.naPotezuId;
       let turnToken = runda.turnToken;
-      let botIgrao = false;
+      let odustao = false;
       for (let korak = 0; korak < 6; korak += 1) {
         if (naPotezu === mojId) {
           socket.emit('potez:ne-znam', { turnToken });
+          const ishod = await Promise.race([
+            eliminacije.next((e) => e.igracId === mojId, 10_000, 'partija:eliminacija').then(() => 'eliminacija' as const),
+            krajPromise.then(() => 'kraj' as const),
+          ]);
+          odustao = ishod === 'eliminacija' || ishod === 'kraj';
           break;
         }
         const ishod = await Promise.race([
-          cekaj<PrihvacenPotez>(socket, 'potez:prihvacen', (p) => p.igracId === naPotezu, 5_000).then((p) => ({ vrsta: 'potez' as const, p })),
+          potezi.next((p) => p.igracId === naPotezu, 5_000, `potez:prihvacen od ${naPotezu}`).then((p) => ({ vrsta: 'potez' as const, p })),
           krajPromise.then(() => ({ vrsta: 'kraj' as const })),
         ]);
-        if (ishod.vrsta === 'kraj') break;
-        botIgrao = true;
+        if (ishod.vrsta === 'kraj') {
+          odustao = true;
+          break;
+        }
         naPotezu = ishod.p.sljedeciId;
         turnToken = ishod.p.turnToken;
+      }
+      if (!odustao) {
+        throw new Error('Dvoboj petlja nije eliminirala čovjeka ni primila partija:kraj.');
       }
       const kraj = await krajPromise;
       expect(kraj.kontekst).toBe('javna');
       // Isti javni obračun kao bez bota: čovjek ima XP obračun i plasman.
       expect(kraj.mojeIskustvo).not.toBeNull();
       expect(kraj.plasmani).toHaveLength(2);
-      void botIgrao;
 
       const [partija] = await baza.select().from(partije).where(eq(partije.id, kraj.partijaId));
       expect(partija?.brojBotova).toBe(1);
@@ -181,7 +249,17 @@ describe('popuna javnog reda botovima', () => {
         return stanje.uPartiji === 0 && stanje.slobodni === stanje.ukupno;
       }, { timeout: 10_000 }).toBe(true);
     } finally {
-      socket?.disconnect();
+      if (socket) {
+        socket.off('partija:runda-otvorena', handleri.runda);
+        socket.off('potez:prihvacen', handleri.potez);
+        socket.off('partija:eliminacija', handleri.eliminacija);
+        socket.off('partija:kraj', handleri.kraj);
+        socket.disconnect();
+      }
+      runde.ocisti();
+      potezi.ocisti();
+      eliminacije.ocisti();
+      krajevi.ocisti();
       await lokalni.zaustavi();
     }
   }, 45_000);
