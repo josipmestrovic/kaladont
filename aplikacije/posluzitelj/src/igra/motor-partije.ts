@@ -913,7 +913,9 @@ export function stvoriUpraviteljPartija(
         return osiguraj();
       })()
       : Promise.resolve();
-    stanje.upisiPotezaUTijeku.push(upisPocetkaPromise);
+    // Čekanje in-flight ne smije progutati grešku starta za Promise.all ispod;
+    // završni tok ponovno zove osigurajPocetakPartije.
+    stanje.upisiPotezaUTijeku.push(upisPocetkaPromise.catch(() => undefined));
     const sudioniciZaKolekciju = politika.zapisujeKolekcijuTreninga
       ? sudionici.filter((sudionik) => sudionik.upravljac === 'covjek' && sudionik.vrsta === 'registriran')
       : sudioniciUBazi;
@@ -1010,7 +1012,8 @@ export function stvoriUpraviteljPartija(
     if (!stanje.politika.zapisujePovijest) return;
     const potpuni: ZapisPoteza = { partijaId: stanje.partijaId, ...zapis };
     stanje.zapisiPotezaZaOsigurati.push(potpuni);
-    stanje.upisiPotezaUTijeku.push(zapisiPotez(potpuni));
+    // Fire-and-forget: grešku bilježi zapisiPotez, a završni osigurajUpisePoteza je ponavlja.
+    stanje.upisiPotezaUTijeku.push(zapisiPotez(potpuni).catch(() => undefined));
   }
 
   function zakljuciPartiju(stanje: StanjeStola): void {
@@ -2309,7 +2312,7 @@ export function stvoriUpraviteljPartija(
     );
     stanje.osigurajPocetakPartije = osigurajPocetakPrivatne;
     const upisPocetkaPrivatnePartije = osigurajPocetakPrivatne();
-    stanje.upisiPotezaUTijeku.push(upisPocetkaPrivatnePartije);
+    stanje.upisiPotezaUTijeku.push(upisPocetkaPrivatnePartije.catch(() => undefined));
 
     const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
       partijaId,

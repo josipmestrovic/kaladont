@@ -78,7 +78,10 @@ export interface ZapisPoteza {
   trajanjeMs: number;
 }
 
-/** Idempotentan upis: postojeći (partija_id, redni_broj) je uspjeh, ne novi write. */
+/**
+ * Idempotentan upis: postojeći (partija_id, redni_broj) je uspjeh (ponovna provjera),
+ * ne novi write. UNIQUE indeks štiti utrku; ostale DB greške se propagiraju.
+ */
 export async function zapisiPotez(zapis: ZapisPoteza): Promise<void> {
   const [postojeci] = await baza
     .select({ id: potezi.id })
@@ -98,9 +101,7 @@ export async function zapisiPotez(zapis: ZapisPoteza): Promise<void> {
 
 /** Ponovno osigurava sve payloade (npr. nakon privremenog kvara baze prije završnog XP-a). */
 export async function osigurajUpisePoteza(zapisi: readonly ZapisPoteza[]): Promise<void> {
-  for (const zapis of zapisi) {
-    await zapisiPotez(zapis);
-  }
+  await Promise.all(zapisi.map((zapis) => zapisiPotez(zapis)));
 }
 
 export function spremiRaniPorazUBazi(zapis: {
