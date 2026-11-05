@@ -207,7 +207,13 @@ describe('Zagrijavanje', () => {
       const [partija] = await baza.execute<{ broj: number }>(sql`select count(*)::int as broj from partije where id = ${pocetak.partijaId}`);
       expect(partija?.broj).toBe(0);
       const [igrac] = await baza.select({ iskustvo: igraci.iskustvoUkupno, odigrane: igraci.odigrane }).from(igraci).where(eq(igraci.id, igracId));
-      expect(igrac).toMatchObject({ iskustvo: 0, odigrane: 0 });
+      // Trening ne piše partijski XP/odigrane; dnevna/tjedna misija smije dodati XP u istom završetku.
+      expect(igrac?.odigrane).toBe(0);
+      if (kraj.ukupnoIskustvo) {
+        expect(igrac?.iskustvo).toBe(kraj.ukupnoIskustvo.poslije.ukupno);
+      } else {
+        expect(igrac?.iskustvo).toBe(0);
+      }
     } finally {
       socket.off('partija:pocetak', naPocetak);
       socket.off('partija:runda-otvorena', naRunda);
