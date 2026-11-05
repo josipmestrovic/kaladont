@@ -130,17 +130,8 @@ udaljeni_age="${STORAGEBOX_DIR%/}/${bazno_ime}.age"
 udaljeni_sha="${STORAGEBOX_DIR%/}/${bazno_ime}.age.sha256"
 udaljeni_part="${udaljeni_age}.part"
 
-batch_upload="$(mktemp "${RADNI_DIR}/sftp-upload.XXXXXX")"
-cat >"$batch_upload" <<EOF
-mkdir ${STORAGEBOX_DIR}
-put ${LOKALNA_AGE} ${udaljeni_part}
-rename ${udaljeni_part} ${udaljeni_age}
-put ${LOKALNI_SHA} ${udaljeni_sha}
-bye
-EOF
-
-# mkdir smije pasti ako direktorij već postoji — zato ne -b strogo na cijeli batch
-# u jednom pokušaju; prvo osiguraj dir, zatim upload.
+# mkdir u zasebnom batchu: sftp -b prekida cijeli batch na grešci, a postojeći
+# direktorij bi inače spriječio put/rename. Upload batch zato NE smije sadržavati mkdir.
 batch_mkdir="$(mktemp "${RADNI_DIR}/sftp-mkdir.XXXXXX")"
 cat >"$batch_mkdir" <<EOF
 mkdir ${STORAGEBOX_DIR}
@@ -148,6 +139,13 @@ bye
 EOF
 kaladont_sftp_batch "$batch_mkdir" >/dev/null 2>&1 || true
 
+batch_upload="$(mktemp "${RADNI_DIR}/sftp-upload.XXXXXX")"
+cat >"$batch_upload" <<EOF
+put ${LOKALNA_AGE} ${udaljeni_part}
+rename ${udaljeni_part} ${udaljeni_age}
+put ${LOKALNI_SHA} ${udaljeni_sha}
+bye
+EOF
 kaladont_sftp_batch "$batch_upload" >/dev/null
 
 # Udaljena veličina: preuzmi u privremeni dir i usporedi.
