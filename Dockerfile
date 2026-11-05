@@ -16,13 +16,16 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm build
+RUN pnpm --filter uvoz-rjecnika build
 RUN pnpm deploy --filter posluzitelj --prod /runtime
+RUN pnpm deploy --filter uvoz-rjecnika --prod /uvoz-runtime
 
 FROM node:22-alpine AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV HRLEX_PODACI_DIR=/tmp/kaladont-hrlex
 
 RUN addgroup -S kaladont \
   && adduser -S --ingroup kaladont kaladont
@@ -32,6 +35,8 @@ COPY --from=builder --chown=kaladont:kaladont /app/aplikacije/posluzitelj/dist .
 COPY --from=builder --chown=kaladont:kaladont /app/aplikacije/posluzitelj/src/baza/migracije ./src/baza/migracije
 COPY --from=builder --chown=kaladont:kaladont /app/aplikacije/posluzitelj/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder --chown=kaladont:kaladont /app/aplikacije/web/build /app/web/build
+COPY --from=builder --chown=kaladont:kaladont /uvoz-runtime /app/alati/uvoz-rjecnika
+COPY --from=builder --chown=kaladont:kaladont /app/skripte/uvoz-rjecnika/dist /app/alati/uvoz-rjecnika/dist
 
 LABEL org.opencontainers.image.title="Kaladont"
 LABEL org.opencontainers.image.description="Hrvatska višeigračka igra riječi"

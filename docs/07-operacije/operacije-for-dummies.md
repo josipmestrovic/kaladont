@@ -854,15 +854,14 @@ Ako išta ne radi, staging kandidat nije spreman za produkciju čak i ako je CI 
 
 Staging Resend konfiguracija namjerno šalje na bilo koju testnu adresu. Registraciju i promjenu emaila provjeri s više uređaja, uključujući potvrdu i reset lozinke.
 
-Prvi admin nastaje budućim jednokratnim CLI alatom iz istog digesta. Ciljani Compose servis `alati` nije drugi stalni proces: koristi **isti aplikacijski image/digest**, pokreće zadanu administrativnu naredbu i briše se nakon završetka (`run --rm`). Njegov stvarni naziv i argumenti moraju biti implementirani i testirani prije uporabe:
+Prvi admin nastaje jednokratnim CLI alatom iz **istog** aplikacijskog digesta (`run --rm`, bez zasebnog servisa). Najprije registriraj i potvrdi email računa, zatim:
 
 ```bash
-# CILJANO STANJE - NE IZVODITI DOK ADMIN CLI NE POSTOJI
-docker compose -f docker-compose.staging.yml run --rm alati \
-  dodijeli-admina --email <STAGING_ADMIN_EMAIL>
+docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija \
+  node dist/cli/dodijeli-admina.js --email=<STAGING_ADMIN_EMAIL> --potvrdi
 ```
 
-Alat mora tražiti eksplicitno okruženje/ potvrdu, pronaći već registriran i potvrđen račun te evidentirati promjenu. Ručni SQL nije dopušten postupak.
+Alat traži `--potvrdi`, pronalazi već registriran i potvrđen ljudski račun, odbija dodjelu ako već postoji drugi admin, te je idempotentan ako je taj račun već admin. Ručni SQL nije dopušten postupak.
 
 ## 19. Dokaži staging backup i restore
 

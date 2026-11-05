@@ -166,7 +166,7 @@ Rezultat mora sadržavati točno sačuvanu staging Primary IPv4. Caddy ne može 
 3. Puni hrLex uvoz izveden je jednokratno na stagingu; kasniji deployi ga ne ponavljaju.
 4. Staging mora imati javni `/zdravlje` 200 s dostupnom bazom, `brojRijeci > 0` i očekivanim digestom.
 5. Staging je privremeno bez Basic Autha zbog Socket.IO prometa; prije šireg dijeljenja treba uvesti gateway zaštitu.
-6. Ručno odigraj cijelu partiju u četiri odvojene sesije, testiraj Resend na više testnih adresa i jednokratnim CLI alatom dodijeli prvi admin račun.
+6. Ručno odigraj cijelu partiju u četiri odvojene sesije, testiraj Resend na više testnih adresa i dodijeli prvi admin: `docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija node dist/cli/dodijeli-admina.js --email=… --potvrdi`. U `.env` moraju postojati i `BAZA_LOZINKA` (vlasnik) i `BAZA_APP_LOZINKA` (runtime uloga `kaladont_app`).
 7. Napravi šifrirani staging dump na privremeni Storage Box podračun i vrati ga u praznu izoliranu bazu.
 8. Tek nakon svih zelenih koraka ponovi provisioning za produkciju i ručno promoviraj staging digest.
 

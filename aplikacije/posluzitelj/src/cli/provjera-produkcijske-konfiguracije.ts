@@ -4,7 +4,9 @@
  */
 const sintetika: Record<string, string> = {
   NODE_ENV: 'production',
-  BAZA_URL: 'postgresql://kaladont:ci-sintetika@127.0.0.1:5432/kaladont_prod',
+  BAZA_URL: 'postgresql://kaladont_app:ci-sintetika-app@127.0.0.1:5432/kaladont_prod',
+  BAZA_URL_MIGRACIJE: 'postgresql://kaladont:ci-sintetika@127.0.0.1:5432/kaladont_prod',
+  BAZA_APP_LOZINKA: 'ci-sintetika-app',
   SESIJA_TAJNA: 'ci-produkcijska-sesija-tajna-ne-promijeni-me',
   EMAIL_API_KLJUC: 're_ci_sinteticki_kljuc',
   EMAIL_POSILJATELJ: 'noreply@kaladont.hr',
@@ -13,7 +15,6 @@ const sintetika: Record<string, string> = {
   ONEMOGUCI_TIMER_POTEZA: 'false',
   TOLERANCIJA_PREKIDA_MS: '10000',
   ODGODA_POCETKA_PARTIJE_MS: '10000',
-  ADMIN_TAJNI_KLJUC: 'ci-admin-secret',
   LJESTVICE_POCETAK: '2026-01-01T00:00:00+01:00',
   VERZIJA: 'ci-provjera',
   DIGEST: 'ci-provjera',

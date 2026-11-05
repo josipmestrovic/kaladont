@@ -11,7 +11,9 @@ import { finished } from 'node:stream/promises';
 import path from 'node:path';
 import { grafemi, kljucGrupe, type StupanjRijeci, type VrstaRijeci } from 'zajednicko';
 
-export const PODACI_DIR = path.resolve(import.meta.dirname, '../podaci');
+export const PODACI_DIR = process.env.HRLEX_PODACI_DIR?.trim()
+  ? path.resolve(process.env.HRLEX_PODACI_DIR.trim())
+  : path.resolve(import.meta.dirname, '../podaci');
 export const PUTANJA_GZ = path.join(PODACI_DIR, 'hrLex_v1.3.gz');
 
 const URL_HRLEX =

@@ -256,10 +256,10 @@ jobs:
           CADDY_EMAIL: ops@example.com
           KALADONT_IMAGE: ghcr.io/josipmestrovic/kaladont@sha256:0000000000000000000000000000000000000000000000000000000000000001
           BAZA_LOZINKA: ci-sintetika-baza
+          BAZA_APP_LOZINKA: ci-sintetika-app
           SESIJA_TAJNA: ci-produkcijska-sesija-tajna-ne-promijeni-me
           EMAIL_API_KLJUC: re_ci_sinteticki_kljuc
           DEV_MAIL: ops@example.com
-          ADMIN_TAJNI_KLJUC: ci-admin-secret
           LJESTVICE_POCETAK: '2026-01-01T00:00:00+01:00'
           VERZIJA: ci-provjera
           DIGEST: sha256:0000000000000000000000000000000000000000000000000000000000000001
@@ -374,10 +374,16 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Pokrenuti CI bazu
-        run: docker compose -f docker-compose.ci.yml up -d baza
+        run: docker compose -f docker-compose.ci.yml up -d --wait --wait-timeout 60 baza
+
+      - name: Osigurati DB uloge u CI imageu
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/osiguraj-db-uloge.js
 
       - name: Primijeniti migracije u CI imageu
-        run: docker compose -f docker-compose.ci.yml run --rm aplikacija node dist/cli/migracije.js
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/migracije.js
+
+      - name: Osvježiti DML prava nakon migracija
+        run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/osiguraj-db-uloge.js
 
       - name: Učitati sintetički fixture u CI imageu
         run: docker compose -f docker-compose.ci.yml run --rm --no-deps aplikacija node dist/cli/ci-fixture.js
