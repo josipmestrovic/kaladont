@@ -1,0 +1,11 @@
+[Unit]
+Description=Kaladont disk usage check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/kaladont/kaladont-disk-provjera.sh
+
+[Install]
+WantedBy=multi-user.target

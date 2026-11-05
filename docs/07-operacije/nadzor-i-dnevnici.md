@@ -155,7 +155,7 @@ Zaseban check prati svaki periodični posao: produkcijski backup, forumski off-s
 
 Ping URL je tajna jer ga netko drugi može lažno označiti uspješnim. Čuva se u Bitwardenu i konfiguraciji odgovarajućeg VPS-a, ne u gitu. Šalje se samo stanje i vrijeme izvršenja; stdout, stderr, putanja backupa, IP, dump i podaci igrača ne šalju se Healthchecks.io.
 
-Backup se očekuje jednom dnevno nakon 04:00 UTC. Provjera zauzeća diska izvodi se periodično i pada kada bilo koji relevantni filesystem prijeđe 80 %. Točan OnCalendar izraz i grace period definiraju se u verzioniranim systemd jedinicama.
+Backup se očekuje jednom dnevno nakon 04:00 UTC (`kaladont-backup.timer` → `kaladont-backup.service`). Provjera zauzeća diska ide preko `kaladont-disk-provjera.timer` (svakih 6 h) i pada iznad 80 % (`DISK_PRAG_POSTOTAK` u `/etc/kaladont/backup.env`). Healthchecks checkovi tipično nose imena `kaladont-produkcija-backup` i `kaladont-produkcija-disk`; ping URL-ovi su tajne u `backup.env`.
 
 Politika i postupak backupa nalaze se u [runbooku backupa i vraćanja](runbook-backup-i-vracanje.md).
 

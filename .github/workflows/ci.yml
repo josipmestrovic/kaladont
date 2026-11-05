@@ -173,6 +173,10 @@ jobs:
       - name: Učitati sintetički CI rječnik
         run: pnpm --filter posluzitelj ci-fixture
 
+      - name: Provjeriti backup skripte
+        shell: bash
+        run: bash skripte/testovi/backup/pokreni.sh
+
       - name: Pokrenuti lint
         run: pnpm lint
 

@@ -865,23 +865,28 @@ Alat traži `--potvrdi`, pronalazi već registriran i potvrđen ljudski račun, 
 
 ## 19. Dokaži staging backup i restore
 
-Stvori privremeni Storage Box podračun `kaladont-staging-dokaz` sa zasebnim ključem. Budući backup service mora:
-
-- napraviti `pg_dump -Fc` sintetičke staging baze;
-- šifrirati javnim `age` recipientom;
-- prenijeti i provjeriti SHA-256;
-- poslati Healthchecks success.
-
-Ciljani poziv:
+Stvori privremeni Storage Box podračun `kaladont-staging-dokaz` sa zasebnim ključem. Instaliraj verzionirane alate iz `skripte/backup/` i popuni `/etc/kaladont/backup.env` za staging (`BAZA_IME=kaladont_staging`, staging compose, staging Box i HC URL-ove).
 
 ```bash
-# CILJANO STANJE - SERVICE JOŠ NE POSTOJI
+sudo bash skripte/backup/instaliraj-backup-jedinice.sh
+# Uredi /etc/kaladont/backup.env (staging vrijednosti).
 sudo systemctl start kaladont-backup.service
-sudo systemctl status kaladont-backup.service --no-pager
+sudo systemctl show kaladont-backup.service -p Result -p ExecMainStatus
 sudo journalctl -u kaladont-backup.service --since "15 minutes ago" --no-pager
+sudo /usr/local/lib/kaladont/kaladont-backup-status.sh
 ```
 
-Zatim vrati kopiju u očito imenovanu praznu izoliranu bazu. Restore alat mora odbiti produkcijski/staging glavni DB URL i zahtijevati eksplicitni privremeni cilj.
+Zatim vrati kopiju u izoliranu bazu:
+
+```bash
+sudo /usr/local/lib/kaladont/kaladont-restore-drill.sh \
+  --age=/putanja/kopija.dump.age \
+  --sha256=<64hex> \
+  --identity=/dev/shm/.../identity \
+  --cilj-ime=kaladont_drill_staging
+```
+
+Restore alat odbija `kaladont_prod` / žive nazive i zahtijeva `kaladont_drill_…`.
 
 Checkpoint je zelen samo kada:
 
@@ -972,27 +977,26 @@ Prije javnog lansiranja pošalji stvarnu potvrdu registracije i reset lozinke na
 
 ## 22. Produkcijski backup i monitoring prije aplikacije
 
-Stvori trajni Storage Box podračun `kaladont-produkcija`, zaseban SSH ključ i pinani host fingerprint. Postavi verzionirane backup/restore skripte i systemd jedinice.
+Stvori trajni Storage Box podračun `kaladont-produkcija`, zaseban SSH ključ i pinani host fingerprint. Instaliraj alate:
+
+```bash
+sudo bash skripte/backup/instaliraj-backup-jedinice.sh
+sudo nano /etc/kaladont/backup.env   # produkcijske vrijednosti; mode 600
+# Ključ Boxa → /etc/kaladont/storagebox_id_ed25519 + known_hosts
+```
+
+Detalji: [runbook backupa](runbook-backup-i-vracanje.md).
 
 ### Healthchecks.io
 
 Stvori zasebne checkove:
 
 - `kaladont-produkcija-backup`, očekivan dnevno nakon 04:00 UTC;
-- `kaladont-produkcija-disk`, prema implementiranom rasporedu;
+- `kaladont-produkcija-disk`, timer svakih 6 h (`kaladont-disk-provjera.timer`);
 
-Ping URL svakog checka je tajna. Spremi ga u Bitwarden i root-only konfiguraciju odgovarajućeg servera. Ne šalji stdout/stderr Healthchecksu.
+Ping URL svakog checka je tajna (`HEALTHCHECK_BACKUP_URL` / `HEALTHCHECK_DISK_URL` u `/etc/kaladont/backup.env`). Spremi ga u Bitwarden. Ne šalji stdout/stderr Healthchecksu.
 
-Healthchecks ne dolazi po status na VPS. Buduća systemd skripta sama šalje tri vrste kratkog HTTP signala:
-
-```bash
-# CILJANI OBLIK UNUTAR BUDUĆE SKRIPTE; URL JE TAJNA IZ KONFIGURACIJE
-curl -fsS -m 10 --retry 5 -o /dev/null "${HEALTHCHECK_URL}/start"
-curl -fsS -m 10 --retry 5 -o /dev/null "${HEALTHCHECK_URL}"
-curl -fsS -m 10 --retry 5 -o /dev/null "${HEALTHCHECK_URL}/fail"
-```
-
-`/start` znači da je posao počeo, osnovni URL da je uspješno završio, a `/fail` da je skripta uhvatila neuspjeh. Success se šalje samo nakon udaljene SHA-256 provjere. Skripta mora poslati fail kroz kontrolirani error handler; ne izvršavaju se sva tri retka jedan za drugim.
+`kaladont-backup.sh` i `kaladont-disk-provjera.sh` šalju `/start`, zatim success (gol URL) ili `/fail`. Success backupa ide tek nakon udaljene SHA-256 provjere.
 
 ### UptimeRobot
 
@@ -1000,16 +1004,14 @@ Stvori HTTPS monitor za `https://kaladont.hr/zdravlje`, interval 5 minuta, alert
 
 ### Systemd provjera
 
-Kada jedinice postoje:
-
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now kaladont-backup.timer
-sudo systemctl enable --now kaladont-disk-provjera.timer
-sudo systemctl list-timers --all | grep kaladont
+sudo systemctl list-timers --all 'kaladont-*'
+sudo systemctl start kaladont-backup.service
+sudo systemctl show kaladont-backup.service -p Result -p ExecMainStatus
+sudo /usr/local/lib/kaladont/kaladont-backup-status.sh
 ```
 
-Očekuješ oba timera i sljedeće UTC vrijeme izvršavanja. Ručno pokreni backup i dokaži udaljeni hash prije prve migracije.
+Očekuješ oba timera i `Result=success`. Ručno pokreni backup i dokaži udaljeni hash prije prve migracije.
 
 ## 23. Prva produkcijska promocija
 

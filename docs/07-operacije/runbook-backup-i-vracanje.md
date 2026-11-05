@@ -2,7 +2,7 @@
 
 Ovo je autoritativni postupak za backup i oporavak baze igre. Vrijedi pravilo: **kopija koja nije testirana vraćanjem ne postoji.** Nadzor poslova opisan je u [nadzoru i dnevnicima](nadzor-i-dnevnici.md), a potpuna početnička izvedba u [Operacije for dummies](operacije-for-dummies.md).
 
-> **Status: ciljano stanje, još nije implementirano.** Verzionirane backup/restore skripte, systemd service/timer jedinice, `age` ključevi, Storage Box i Healthchecks provjere još ne postoje. Naredbe u ovom dokumentu predstavljaju ugovor budućih artefakata, ne današnju funkcionalnost.
+> **Status: implementirano u repou.** Verzionirane skripte su u `skripte/backup/`, gate u `skripte/zahtijevaj-svjez-offserver-backup.sh`. Na VPS-u ih instaliraš s `sudo bash skripte/backup/instaliraj-backup-jedinice.sh`, popuniš `/etc/kaladont/backup.env` iz primjera, postaviš Storage Box ključ i Healthchecks URL-ove. Privatni `age` ključ i stvarni Box pristup ostaju operaterski; CI ne spaja se na pravi Storage Box.
 
 ## Ciljevi i izvori oporavka
 
@@ -22,26 +22,39 @@ Na produkcijskom VPS-u systemd timer oko 04:00 UTC pokreće verzionirani backup 
 
 1. šalje `/start` signal zasebnom Healthchecks.io checku;
 2. provjerava dostupnost baze, slobodan lokalni prostor i sve obvezne varijable;
-3. radi `pg_dump` u PostgreSQL custom formatu (`-Fc`) u lokalni privremeni direktorij;
-4. šifrira dump javnim `age` recipientom **prije** napuštanja VPS-a;
-5. računa SHA-256 šifrirane datoteke;
-6. prenosi samo `.age` datoteku na produkcijski Storage Box podračun preko SSH ključa/SFTP-a;
-7. na udaljenoj strani provjerava postojanje, očekivanu veličinu i SHA-256;
-8. provodi retenciju 7 dnevnih + 4 tjedne kopije;
-9. briše lokalni plaintext dump i stare lokalne šifrirane kopije;
+3. radi `pg_dump -Fc` u cjevovodu izravno u `age` (nema plaintext dump datoteke na disku);
+4. šifrira javnim `age` recipientom **prije** napuštanja VPS-a;
+5. računa SHA-256 šifrirane datoteke i `.sha256` sidecar;
+6. prenosi `.age` + sidecar na Storage Box podračun preko SFTP-a (port 23);
+7. ponovno preuzima artefakte i provjerava veličinu te SHA-256 (Box bez shell naredbi);
+8. provodi retenciju 7 dnevnih + 4 tjedne (nedjeljni sidri) kopije; `pre-migracija` oznake drži ≥7 dana;
+9. briše lokalne privremene šifrirane kopije;
 10. šalje success ping tek kada su svi koraci uspjeli, odnosno `/fail` pri bilo kojem neuspjehu.
 
 Privatni `age` ključ **nije na VPS-u**. Nalazi se u Bitwardenu i šifriranom offline izvozu. Dnevna automatika zato može stvarati šifrirane kopije, ali ih ne može sama dešifrirati; mjesečni ljudski restore drill dokazuje uporabljivost.
 
 Jedan Storage Box ima zasebne podračune za produkciju igre i forum. Svaki VPS dobiva samo ključ vlastitog podračuna i ne može čitati direktorij drugog sustava. Glavni Storage Box pristup ostaje u Bitwardenu. Automatski dnevni Storage Box snapshotovi daju dodatnu točku oporavka ako kompromitirani VPS izbriše datoteke iz svojeg podračuna.
 
-Systemd timer i service koriste UTC, `Persistent=true` i nasumičnu malu odgodu kako bi se propušteni posao izvršio nakon ponovnog paljenja bez istodobnog udara svih poslova. Točan naziv jedinice i naredba moraju odgovarati budućim verzioniranim skriptama.
+Systemd jedinice: `kaladont-backup.timer` (04:00 UTC, `Persistent=true`, `RandomizedDelaySec=15m`) → `kaladont-backup.service`; `kaladont-disk-provjera.timer` (svakih 6 h) → `kaladont-disk-provjera.service`. Status bez tajni: `/usr/local/lib/kaladont/kaladont-backup-status.sh`.
+
+### Instalacija na VPS-u
+
+```bash
+# Iz checkouta ili kopije repoa (kao root):
+sudo bash skripte/backup/instaliraj-backup-jedinice.sh
+sudo nano /etc/kaladont/backup.env   # popuni iz predloška; mode 600
+# Postavi STORAGEBOX_SSH_KEY + known_hosts, AGE_RECIPIENT, Healthchecks URL-ove.
+sudo systemctl start kaladont-backup.service
+sudo /usr/local/lib/kaladont/kaladont-backup-status.sh
+```
+
+Installer postavlja sudoers fragment tako da `deploy` može `sudo -n /usr/local/lib/kaladont/kaladont-backup.sh` (gate iz Actionsa).
 
 ## Backup prije produkcijske migracije
 
-Produkcijski workflow prije **svake** migracije poziva isti backup mehanizam i čeka potvrdu svih koraka, uključujući udaljenu SHA-256 provjeru. Ako backup ne uspije, migracija i deploy ne počinju. U GitHub Deployment zapis sprema se samo vrijeme/identifikator kopije i rezultat, nikad tajna ili sadržaj dumpa.
+Produkcijski workflow prije **svake** migracije pokreće `skripte/zahtijevaj-svjez-offserver-backup.sh`, koja preko `sudo -n` pokreće **novi** dump s `--razlog=pre-migracija` (sinoćnji dnevni nije dovoljan) i čeka udaljenu SHA-256 potvrdu. Ako backup ne uspije, migracija i deploy ne počinju. U GitHub Deployment zapis sprema se samo vrijeme/identifikator kopije i rezultat, nikad tajna ili sadržaj dumpa.
 
-Ovaj backup ne mijenja dnevnu retenciju: migracijska kopija dobiva prepoznatljivu oznaku i čuva se najmanje dok nova verzija ne prođe produkcijsku provjeru i sljedeći redovni dnevni backup.
+Migracijska kopija ima sufiks `_pre-migracija` i ne briše se dnevnom retencijom; čuva se najmanje 7 dana.
 
 ## Forum i početni staging dokaz
 
@@ -77,12 +90,21 @@ Vraća se **u izoliranu, praznu PostgreSQL instancu na produkcijskom VPS-u**, ni
 2. Preuzmi šifriranu kopiju sa Storage Boxa i ponovno provjeri SHA-256.
 3. Privatni `age` ključ prenesi iz Bitwardena u root-only datoteku na memorijskom filesystemu (`/dev/shm`), bez lijepljenja u naredbu ili shell history; ukloni je čim dešifriranje završi.
 4. Podigni zaseban privremeni PostgreSQL kontejner/volume na internoj mreži bez javnog porta, s očitim nazivom koji nije `baza`.
-5. Dešifriraj u privremenu datoteku, provjeri `pg_restore --list`, zatim vrati u praznu bazu.
-6. Provjeri broj redaka ključnih tablica (`igraci`, `partije`, `rijeci`), strane ključeve i uzorak zadnje završene partije sa sudionicima/potezima; `rijeci` mora biti > 0.
-7. Zapiši početak, kraj, trajanje, digest aplikacije, naziv kopije i rezultat u [evidenciju održavanja](odrzavanje.md).
-8. Sruši **isključivo očito imenovan privremeni** kontejner i volume, ukloni dešifrirani dump i privatni ključ iz `/dev/shm`, pa potvrdi da živa baza i aplikacija i dalje rade.
+5. Pokreni verzionirani drill (odbija žive nazive; cilj mora biti `kaladont_drill_…`):
 
-Destruktivni dio buduće restore skripte mora zahtijevati eksplicitno ime cilja i odbiti produkcijski naziv/URL. Nikad ne koristi zadanu `BAZA_URL` za drill.
+```bash
+sudo /usr/local/lib/kaladont/kaladont-restore-drill.sh \
+  --age=/putanja/kopija.dump.age \
+  --sha256=<64hex> \
+  --identity=/dev/shm/kaladont-restore.XXX/identity \
+  --cilj-ime=kaladont_drill_$(date -u +%Y%m%d)
+```
+
+6. Provjeri broj redaka ključnih tablica (`igraci`, `partije`, `rijeci`, `potezi`); `rijeci` mora biti > 0. Po potrebi uđi u `psql` u probnom kontejneru prije nego skripta završi (za ručni produbljeni drill koristi postupak iz vodiča).
+7. Zapiši početak, kraj, trajanje, digest aplikacije, naziv kopije i rezultat u [evidenciju održavanja](odrzavanje.md).
+8. Skripta ruši privremeni kontejner; ukloni privatni ključ iz `/dev/shm` i lokalnu `.age` kopiju kad više nisu potrebni, pa potvrdi da živa baza i aplikacija i dalje rade.
+
+`kaladont-restore-drill.sh` zahtijeva eksplicitno `--cilj-ime=kaladont_drill_…` i odbija `kaladont_prod` / slične žive nazive. Nikad ne koristi zadanu `BAZA_URL` za drill.
 
 Forumski restore dokaz izvodi se prije nego se njegov off-server backup proglasi gotovim, a zatim prema rasporedu održavanja. Ne koristi bazu ni Compose mrežu igre.
 

@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-> **Status 2026-11-05: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Job `kod` na početku pokreće pinani **actionlint** nad `.github/workflows/` (YAML sintaksa i Actions pravila). Ista aplikacijska slika nosi CLI za DB uloge, migracije, provjeru/uvoz hrLexa i first-admin. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Prava backup automatika (systemd/`age`/Storage Box) još nije u repou — dok je nema, `skripte/zahtijevaj-svjez-offserver-backup.sh` namjerno pada prije migracija. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
+> **Status 2026-11-05: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Job `kod` na početku pokreće pinani **actionlint** nad `.github/workflows/` te `bash skripte/testovi/backup/pokreni.sh` (sintaksa + mock gate/restore/pg_dump). Ista aplikacijska slika nosi CLI za DB uloge, migracije, provjeru/uvoz hrLexa i first-admin. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Backup automatika je u `skripte/backup/` (systemd/`age`/Storage Box); gate `skripte/zahtijevaj-svjez-offserver-backup.sh` na VPS-u pokreće **novi** `--razlog=pre-migracija` dump i pada ako tooling nije instaliran ili dump nije potvrđen. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
 
 Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
 
@@ -61,7 +61,7 @@ Prije uključivanja workflowa moraju postojati i biti međusobno usklađeni:
 5. mali licencno čist sintetički fixture rječnika za CI;
 6. prošireni `/zdravlje` koji provjerava bazu i rječnik te vraća 503 kad servis nije spreman;
 7. stvarno slanje emaila preko Resenda i E2E provjeru buildanog same-origin web/API servera;
-8. verzionirane backup/restore skripte i pripadajuće systemd jedinice.
+8. ~~verzionirane backup/restore skripte i pripadajuće systemd jedinice~~ — isporučeno u `skripte/backup/` + gate.
 
 ## CI jobovi — `ci.yml`
 
@@ -141,7 +141,7 @@ Actions ime: **Promoviraj produkciju**. Pokreće se isključivo ručno (`workflo
 
 1. Koristi Environment `produkcija`; nema required reviewer ni dodatnog approval koraka. (`PROD_HOST`, `PROD_SSH_KLJUC`, `PROD_SSH_KNOWN_HOSTS` — nakon VPS-a.)
 2. Iz OCI labele `org.opencontainers.image.revision` čita commit SHA; checkout i SCP koriste taj SHA (ne `main`), da rollback starog digesta vrati i tadašnje compose/Caddy. Zapisuje trenutni `DIGEST`/`VERZIJA` s VPS-a kao kandidat za rollback.
-3. **Backup gate:** na VPS-u pokreće `skripte/zahtijevaj-svjez-offserver-backup.sh`. Exit ≠ 0 = crveni job **prije** migracija. Trenutačno je skripta fail-closed stub (backup tooling još nije u repou); kad stigne backup PR, zamjenjuje se tijelo bez mijenjanja ugovora workflowa.
+3. **Backup gate:** na VPS-u pokreće `skripte/zahtijevaj-svjez-offserver-backup.sh`. Exit ≠ 0 = crveni job **prije** migracija. Skripta traži instalirani `/usr/local/lib/kaladont/kaladont-backup.sh` i `kaladont-backup.service`, zatim preko `sudo -n` pokreće **novi** dump s `--razlog=pre-migracija` (sinoćnji dnevni nije dovoljan) i čeka udaljenu SHA-256 potvrdu. Installer postavlja sudoers fragment za korisnika `deploy`.
 4. SCP: `docker-compose.prod.yml`, `Caddyfile`, `objava-produkcija.sh`, backup helper s commita slike.
 5. Kratkotrajni GHCR login na VPS-u (`GITHUB_TOKEN` + privremeni `DOCKER_CONFIG` + logout), zatim `objava-produkcija.sh` s istom faza-mašinom kao staging (kandidat `.env` → pull → migracije → stvarni `.env` → recreate → Caddy).
 6. Poll `https://kaladont.hr/zdravlje` (~30×): `ok`, `baza=dostupna`, očekivani `digest` i `verzija`.

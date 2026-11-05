@@ -1,0 +1,11 @@
+[Unit]
+Description=Kaladont daily backup timer (04:00 UTC)
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=kaladont-backup.service
+
+[Install]
+WantedBy=timers.target
