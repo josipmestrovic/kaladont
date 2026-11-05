@@ -1,39 +1,57 @@
 /**
  * Upis partije u bazu (model-podataka.md): partije, sudionici_partije, potezi, agregati u igraci.
- * DB pozivi iz motora partije su "fire and forget" (ne blokiraju tijek igre) osim zaključka partije,
- * koji je transakcijski jer mijenja više tablica odjednom.
+ * Upisi tijekom igre su fire-and-forget zbog latencije, ali završni tok mora osigurati
+ * uspješan upis početka i svih poteza prije isplate XP-a (idempotentni retry).
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { izracunajNovaDostignuca, izracunajOcjenuIgre, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type NovoDostignuce, type PohvalaIgre, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
+import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca } from '../misije/obracun.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
 
-export function zapisiPocetakPartije(
+export async function zapisiPocetakPartije(
   partijaId: string,
   sudionici: SudionikPartije[],
   cekanjeMsPoIgracu: Map<string, number>,
   mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
   brojBotova = 0,
 ): Promise<void> {
-  return baza.transaction(async (tx) => {
-    await tx.insert(partije).values({ id: partijaId, mod, status: 'u_tijeku', brojBotova });
-    await tx.insert(sudioniciPartije).values(
-      sudionici.map((s) => ({
-        partijaId,
-        igracId: s.igracId,
-        nadimak: s.nadimak,
-        sjedalo: s.sjedalo,
-        cekanjeMs: cekanjeMsPoIgracu.get(s.igracId) ?? 0,
-      })),
-    );
-  }).catch((greska) => {
+  const [postojeca] = await baza
+    .select({ id: partije.id })
+    .from(partije)
+    .where(eq(partije.id, partijaId))
+    .limit(1);
+  if (postojeca) return;
+
+  try {
+    await baza.transaction(async (tx) => {
+      await tx.insert(partije).values({ id: partijaId, mod, status: 'u_tijeku', brojBotova });
+      await tx.insert(sudioniciPartije).values(
+        sudionici.map((s) => ({
+          partijaId,
+          igracId: s.igracId,
+          nadimak: s.nadimak,
+          sjedalo: s.sjedalo,
+          cekanjeMs: cekanjeMsPoIgracu.get(s.igracId) ?? 0,
+        })),
+      );
+    });
+  } catch (greska) {
+    if (jeJedinstvenostPrekrsena(greska)) {
+      const [vecPostoji] = await baza
+        .select({ id: partije.id })
+        .from(partije)
+        .where(eq(partije.id, partijaId))
+        .limit(1);
+      if (vecPostoji) return;
+    }
     console.error('Neuspio transakcijski upis početka partije:', greska);
     throw new Error('Početak partije nije moguće spremiti.', { cause: greska });
-  });
+  }
 }
 
 /** Restart ili kontrolirano gašenje prekida samo partije koje nisu završile. */
@@ -60,10 +78,29 @@ export interface ZapisPoteza {
   trajanjeMs: number;
 }
 
-export function zapisiPotez(zapis: ZapisPoteza): Promise<void> {
-  return baza.insert(potezi).values(zapis).then(() => {}).catch((greska) => {
+/** Idempotentan upis: postojeći (partija_id, redni_broj) je uspjeh, ne novi write. */
+export async function zapisiPotez(zapis: ZapisPoteza): Promise<void> {
+  const [postojeci] = await baza
+    .select({ id: potezi.id })
+    .from(potezi)
+    .where(and(eq(potezi.partijaId, zapis.partijaId), eq(potezi.redniBroj, zapis.redniBroj)))
+    .limit(1);
+  if (postojeci) return;
+
+  try {
+    await baza.insert(potezi).values(zapis);
+  } catch (greska) {
+    if (jeJedinstvenostPrekrsena(greska)) return;
     console.error('Neuspio upis poteza:', greska);
-  });
+    throw greska;
+  }
+}
+
+/** Ponovno osigurava sve payloade (npr. nakon privremenog kvara baze prije završnog XP-a). */
+export async function osigurajUpisePoteza(zapisi: readonly ZapisPoteza[]): Promise<void> {
+  for (const zapis of zapisi) {
+    await zapisiPotez(zapis);
+  }
 }
 
 export function spremiRaniPorazUBazi(zapis: {
