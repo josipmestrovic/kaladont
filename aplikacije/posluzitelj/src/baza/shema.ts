@@ -74,6 +74,8 @@ export const igraci = pgTable('igraci', {
   email: text('email'),
   emailNaCekanju: text('email_na_cekanju'),
   lozinkaHash: text('lozinka_hash'),
+  /** Brojač jednokratnih reset tokena; uspješan reset atomski povećava vrijednost. */
+  resetLozinkeVerzija: integer('reset_lozinke_verzija').notNull().default(0),
   emailPotvrdjen: boolean('email_potvrdjen').notNull().default(false),
   emailPotvrdaZatrazenAt: timestamp('email_potvrda_zatrazen_at', { withTimezone: true }),
   emailPotvrdaPoslanaAt: timestamp('email_potvrda_poslana_at', { withTimezone: true }),

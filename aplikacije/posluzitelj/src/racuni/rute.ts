@@ -7,7 +7,7 @@ import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { baza } from '../baza/klijent.js';
-import { igraci } from '../baza/shema.js';
+import { igraci, sesije } from '../baza/shema.js';
 import { porukaPotvrdeEmaila, porukaResetaLozinke, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
@@ -31,6 +31,8 @@ export interface OpcijeAuthRateLimita {
 
 export interface OpcijeRacuna {
   naSesijaOpozvana?: (sesijaId: string) => void | Promise<void>;
+  /** Nakon brisanja svih sesija igrača (npr. uspješan reset lozinke). */
+  naSesijeIgracaOpozvane?: (igracId: string) => void | Promise<void>;
 }
 
 export function registrirajStariLinkPotvrdeEmaila(app: FastifyInstance): void {
@@ -303,12 +305,12 @@ export async function registrirajRacuneRute(
 
       const normaliziraniEmail = normalizirajEmail(rezultat.data.email);
       const [korisnik] = await baza
-        .select()
+        .select({ id: igraci.id, resetLozinkeVerzija: igraci.resetLozinkeVerzija })
         .from(igraci)
         .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
         .limit(1);
       if (korisnik) {
-        const token = izdajTokenResetaLozinke(korisnik.id);
+        const token = izdajTokenResetaLozinke(korisnik.id, korisnik.resetLozinkeVerzija);
         await pokusajPoslatiEmail(
           app.log,
           normaliziraniEmail,
@@ -326,14 +328,34 @@ export async function registrirajRacuneRute(
     if (!rezultat.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni podaci.' });
     }
-    const igracId = provjeriTokenResetaLozinke(rezultat.data.token);
-    if (!igracId) {
+    const potvrda = provjeriTokenResetaLozinke(rezultat.data.token);
+    if (!potvrda) {
       return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
     }
 
     const lozinkaHash = await argonHash(rezultat.data.novaLozinka);
-    await baza.update(igraci).set({ lozinkaHash }).where(eq(igraci.id, igracId));
+    const uspjeh = await baza.transaction(async (tx) => {
+      const [azuriran] = await tx
+        .update(igraci)
+        .set({
+          lozinkaHash,
+          resetLozinkeVerzija: potvrda.verzija + 1,
+        })
+        .where(and(
+          eq(igraci.id, potvrda.igracId),
+          eq(igraci.resetLozinkeVerzija, potvrda.verzija),
+        ))
+        .returning({ id: igraci.id });
+      if (!azuriran) return false;
+      await tx.delete(sesije).where(eq(sesije.igracId, potvrda.igracId));
+      return true;
+    });
 
+    if (!uspjeh) {
+      return odgovor.code(400).send({ ok: false, greska: 'Nevaljan ili istekao link.' });
+    }
+
+    await opcijeRacuna.naSesijeIgracaOpozvane?.(potvrda.igracId);
     return { ok: true };
   });
 
