@@ -154,7 +154,7 @@ if [ "$rjecnik_kod" -eq 2 ]; then
   docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/uvezi-rjecnik.js
 elif [ "$rjecnik_kod" -ne 0 ]; then
   echo "Provjera rječnika pala s kodom $rjecnik_kod (nije djelomičan rječnik)." >&2
-  exit "$rjecnik_kod"
+  na_gresku "$rjecnik_kod"
 fi
 faza='rjecnik_spreman'
 zapisi_env "$novi_release_zapis"
