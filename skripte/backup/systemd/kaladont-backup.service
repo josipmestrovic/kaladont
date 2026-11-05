@@ -1,0 +1,15 @@
+[Unit]
+Description=Kaladont encrypted PostgreSQL backup to Storage Box
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/kaladont/kaladont-backup.sh --razlog=dnevni
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target

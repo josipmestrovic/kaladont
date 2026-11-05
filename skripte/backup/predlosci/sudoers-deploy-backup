@@ -1,0 +1,5 @@
+# Omogućuje deploy korisniku pokretanje pre-migracijskog backupa bez lozinke.
+# Instalira se kao /etc/sudoers.d/kaladont-backup (mode 440).
+# Provjeri s: visudo -cf /etc/sudoers.d/kaladont-backup
+
+deploy ALL=(root) NOPASSWD: /usr/local/lib/kaladont/kaladont-backup.sh
