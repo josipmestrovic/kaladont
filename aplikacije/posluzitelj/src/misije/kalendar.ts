@@ -1,21 +1,11 @@
-import { ZONA_LJESTVICA, kalendarskeGranice } from 'zajednicko';
+import { ZONA_LJESTVICA, kalendarskeGranice, lokalniDatumIso } from 'zajednicko';
 
-const formatDatum = new Intl.DateTimeFormat('en-CA', {
-  timeZone: ZONA_LJESTVICA,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
+export { lokalniDatumIso };
 
 const formatDanTjedna = new Intl.DateTimeFormat('en-US', {
   timeZone: ZONA_LJESTVICA,
   weekday: 'short',
 });
-
-/** Zagrebački kalendarski datum kao `YYYY-MM-DD` (za `date` stupce). */
-export function zagrebackiDatumIso(trenutak: Date): string {
-  return formatDatum.format(trenutak);
-}
 
 export function dnevneGranice(trenutak: Date): { od: Date; do: Date } {
   return kalendarskeGranice('dnevno', trenutak);
@@ -43,13 +33,13 @@ export function daniIzmedu(odIso: string, doIso: string): string[] {
   return dani;
 }
 
-/** Ponoć Zagreba za YYYY-MM-DD (putem kalendarskih granica). */
+/** Ponoć za YYYY-MM-DD (putem kalendarskih granica). */
 export function ponocZaDatumIso(datumIso: string): Date {
   const dijelovi = datumIso.split('-').map(Number);
   const y = dijelovi[0] ?? 0;
   const m = dijelovi[1] ?? 1;
   const d = dijelovi[2] ?? 1;
-  // Podne UTC tog kalendarskog dana sigurno pada u taj zagrebački dan.
+  // Podne UTC tog kalendarskog dana sigurno pada u taj lokalni dan.
   const sidro = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   return dnevneGranice(sidro).od;
 }

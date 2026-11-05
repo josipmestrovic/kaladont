@@ -276,7 +276,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   tjedna('W03', 'Tri dobra niza', 'U 3 različite partije ostvari niz od barem 5 prihvaćenih riječi bez pogreške.', 'partije_s_nizom', 3, 'niz', { pragMetrike: 5 }),
   tjedna('W04', 'Čuvar dugih riječi', 'Odigraj 15 riječi s najmanje 10 grafema.', 'duge', 15, 'duljina'),
   tjedna('W05', 'Lovac na rijetke', 'Odigraj 10 rijetkih riječi, bilo kojeg postojećeg tiera.', 'rijetke', 10, 'rijetkost'),
-  tjedna('W06', 'Tri dana igre', 'Završi barem 1 javnu partiju u 3 različita zagrebačka dana ovog tjedna.', 'dani', 3, 'razliciti_dani'),
+  tjedna('W06', 'Tri dana igre', 'Završi barem 1 javnu partiju u 3 različita dana ovog tjedna.', 'dani', 3, 'razliciti_dani'),
   tjedna('W07', 'Osam dobrih partija', 'U 8 različitih partija odigraj barem 5 prihvaćenih riječi po partiji.', 'partije_s_rijecima', 8, 'ucinak_partije', { pragMetrike: 5 }),
   tjedna('W08', 'Pet četverobojnih pobjeda', 'Pobijedi u 5 Četveroboja.', 'pobjede', 5, 'plasman', { zahtjevnija: true, mod: 'cetiri_igraca' }),
   tjedna('W09', 'Dvobojski pobjednik', 'Pobijedi u 20 javnih Dvoboja.', 'pobjede', 20, 'plasman', { zahtjevnija: true, mod: 'dva_igraca' }),

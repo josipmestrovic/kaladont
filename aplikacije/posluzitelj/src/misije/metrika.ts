@@ -1,6 +1,6 @@
 import type { MetrikeMisijaIgre } from 'zajednicko';
 import { jeTopDvaCetverobojMisija } from 'zajednicko';
-import { zagrebackiDatumIso } from './kalendar.js';
+import { lokalniDatumIso } from './kalendar.js';
 import type { PodstanjeMisije, SnapshotMisije } from './tipovi.js';
 
 export function smijePrimitiMisijskiNapredak(metrike: MetrikeMisijaIgre): boolean {
@@ -131,7 +131,7 @@ export function primijeniMetrikuNaDodjelu(ulaz: {
       break;
     }
     case 'dani': {
-      const dan = zagrebackiDatumIso(metrike.zavrsenoU);
+      const dan = lokalniDatumIso(metrike.zavrsenoU);
       if (!podstanje.dani!.includes(dan)) podstanje.dani!.push(dan);
       napredak = Math.min(cilj, podstanje.dani!.length);
       delta.dani = podstanje.dani;

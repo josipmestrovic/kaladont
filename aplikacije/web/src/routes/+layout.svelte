@@ -6,6 +6,7 @@
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import PadajuceRijeci from '$lib/komponente/PadajuceRijeci.svelte';
   import { inicijalizirajGostSesiju } from '$lib/identitet.js';
+  import { pokreniEvidencijuAktivnogDana } from '$lib/aktivnost-dana.js';
   import {
     inicijalizirajAudio,
     inicijalizirajGlobalneUiZvukove,
@@ -71,37 +72,43 @@
   );
   const brojMjestaKostura = $derived(urlCilja.searchParams.get('mod') === 'dva_igraca' ? 2 : 4);
 
-  onMount(async () => {
+  onMount(() => {
     inicijalizirajTemu();
     inicijalizirajFontPostavku();
     inicijalizirajGlas();
     inicijalizirajAudio();
 
+    let zaustaviEvidenciju = () => {};
     const naNaslovnici = $page.url.pathname === '/';
     const sesija = inicijalizirajGostSesiju();
 
-    if (naNaslovnici) {
-      await Promise.all([
-        sesija,
-        ucitajKriticneIkone((p) => {
-          napredakBoota = p;
-        }),
-      ]);
-      // Oba odjednom — inače jedan frame bez Boota i bez children.
-      sesijaSpreman = true;
-      navIkoneSpremane = true;
-      ucitajPozadinskeAseteLandinga();
-      preucitajUiZvukove();
-    } else {
-      // Deep link /red ili druga ruta: nikad Boot — samo sesija, ikone u pozadini.
-      navIkoneSpremane = true;
-      await sesija;
-      sesijaSpreman = true;
-      void ucitajKriticneIkone();
-    }
+    void (async () => {
+      if (naNaslovnici) {
+        await Promise.all([
+          sesija,
+          ucitajKriticneIkone((p) => {
+            napredakBoota = p;
+          }),
+        ]);
+        // Oba odjednom — inače jedan frame bez Boota i bez children.
+        sesijaSpreman = true;
+        navIkoneSpremane = true;
+        ucitajPozadinskeAseteLandinga();
+        preucitajUiZvukove();
+      } else {
+        // Deep link /red ili druga ruta: nikad Boot — samo sesija, ikone u pozadini.
+        navIkoneSpremane = true;
+        await sesija;
+        sesijaSpreman = true;
+        void ucitajKriticneIkone();
+      }
 
-    inicijalizirajGlobalneUiZvukove();
-    pokreniSlusateljeIgre();
+      inicijalizirajGlobalneUiZvukove();
+      pokreniSlusateljeIgre();
+      zaustaviEvidenciju = pokreniEvidencijuAktivnogDana();
+    })();
+
+    return () => zaustaviEvidenciju();
   });
 </script>
 

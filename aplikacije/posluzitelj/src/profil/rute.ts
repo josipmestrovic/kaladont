@@ -43,6 +43,7 @@ import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { porukaPotvrdeEmaila, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { izdajTokenPotvrdeEmaila } from '../racuni/tokeni.js';
+import { dohvatiNajboljiNizAktivnosti, dohvatiSažetakAktivnostiDana } from '../racuni/aktivnost-dana.js';
 import { izracunajDnk } from '../igra/izracun-dnk.js';
 import {
   pokusajIdentifikaciju,
@@ -452,20 +453,25 @@ function izracunajDnkProfil(
 }
 
 async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number) {
-  const [napredak, otkljucana] = await Promise.all([
+  const [napredak, otkljucana, najboljiNizAktivnosti] = await Promise.all([
     baza
       .select()
       .from(napredakDostignucaIgraca)
       .where(eq(napredakDostignucaIgraca.igracId, igracId))
       .limit(1),
     baza.select().from(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igracId)),
+    dohvatiNajboljiNizAktivnosti(igracId),
   ]);
   const brojac = napredak[0];
   const razinaIskustva = stanjeIskustva(iskustvoUkupno).razina;
   const razine = new Map(otkljucana.map((redak) => [redak.dostignuceId, redak.razina]));
   const dostignuca = DEFINICIJE_DOSTIGNUCA.map((definicija) => {
     const vrijednost =
-      definicija.brojac === 'razina' ? razinaIskustva : Number(brojac?.[definicija.brojac] ?? 0);
+      definicija.brojac === 'razina'
+        ? razinaIskustva
+        : definicija.brojac === 'najboljiNizAktivnosti'
+          ? najboljiNizAktivnosti
+          : Number(brojac?.[definicija.brojac as keyof typeof brojac] ?? 0);
     const izracunataRazina = izracunajRazinuDostignuca(definicija, vrijednost);
     const razina = Math.max(razine.get(definicija.id) ?? 0, izracunataRazina);
     const zapis = otkljucana.find((redak) => redak.dostignuceId === definicija.id);
@@ -554,7 +560,8 @@ export async function registrirajProfilRute(
   registrirajKolekcijaRijeciRutu('/profil/kolekcija/rijeci');
   registrirajKolekcijaRijeciRutu('/profil/javni/:igracId/kolekcija/rijeci');
 
-  app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev) => {
+  app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'private, no-store');
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
     const statistikaCetiri = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
     const [dnkCetiri, dnkDva] = await Promise.all([
@@ -571,7 +578,12 @@ export async function registrirajProfilRute(
       igrac.odigrane + igrac.odigrane1v1,
       igrac.eliminacijeUkupno + igrac.eliminacije1v1,
     );
-    const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
+    const [dostignuca, aktivnostDana] = await Promise.all([
+      dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
+      igrac.vrsta === 'gost' || igrac.upravljac !== 'covjek'
+        ? Promise.resolve(null)
+        : dohvatiSažetakAktivnostiDana(igrac.id),
+    ]);
     const profilDnkCetiri = izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca');
     const profilDnkDva = izracunajDnkProfil(igrac, dnkDva, 'dva_igraca');
     return {
@@ -608,6 +620,7 @@ export async function registrirajProfilRute(
       statistikaRijeci: javnaStatistika(statistikaCetiri),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
       dostignuca,
+      ...(aktivnostDana ? { aktivnostDana } : {}),
     };
   });
 

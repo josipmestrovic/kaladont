@@ -8,7 +8,7 @@ import {
   stanjeMisijaIgraca,
   zamjeneMisija,
 } from '../baza/shema.js';
-import { dnevneGranice, sljedecaPonocNakon, tjedneGranice, zagrebackiDatumIso } from './kalendar.js';
+import { dnevneGranice, sljedecaPonocNakon, tjedneGranice, lokalniDatumIso } from './kalendar.js';
 import { izracunajNovosti, osigurajStanjeMisija } from './stanje.js';
 import type { MisijeSatRng, MisijeTx, PodstanjeMisije, SnapshotMisije } from './tipovi.js';
 import { zadaniSatRng } from './tipovi.js';
@@ -57,7 +57,7 @@ function mapirajMisiju(
 }
 
 async function kvotaZamjene(tx: MisijeTx, igracId: string, vrsta: VrstaMisije, sada: Date) {
-  const dan = zagrebackiDatumIso(sada);
+  const dan = lokalniDatumIso(sada);
   const [red] = await tx.select({ id: zamjeneMisija.id }).from(zamjeneMisija).where(and(
     eq(zamjeneMisija.igracId, igracId),
     eq(zamjeneMisija.vrsta, vrsta),

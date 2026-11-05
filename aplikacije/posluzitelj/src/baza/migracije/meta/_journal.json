@@ -309,6 +309,13 @@
       "when": 1793810000000,
       "tag": "0043_misije",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1793900000000,
+      "tag": "0044_aktivni_dani",
+      "breakpoints": true
     }
   ]
 }

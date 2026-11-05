@@ -11,7 +11,8 @@ import { igraci } from '../baza/shema.js';
 import { porukaPotvrdeEmaila, porukaResetaLozinke, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
-import { dohvatiSesijuZahtjeva, zahtijevajPrijavu } from './autentikacija.js';
+import { dohvatiSesijuZahtjeva, zahtijevajPrijavu, type ZahtjevSIgracem } from './autentikacija.js';
+import { zabiljeziAktivniDan } from './aktivnost-dana.js';
 import { izdajSesiju, opozoviSesiju, stvoriGostSesiju } from './sesije.js';
 import { MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA, validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
 import {
@@ -334,5 +335,17 @@ export async function registrirajRacuneRute(
     await baza.update(igraci).set({ lozinkaHash }).where(eq(igraci.id, igracId));
 
     return { ok: true };
+  });
+
+  app.post('/racuni/aktivnost-dana', { preHandler: zahtijevajPrijavu }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'private, no-store');
+    const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+    if (igrac.upravljac !== 'covjek') {
+      return odgovor.code(403).send({ ok: false, greska: 'Aktivni dan nije dostupan za ovaj račun.' });
+    }
+    if (igrac.obrisanAt) {
+      return odgovor.code(403).send({ ok: false, greska: 'Račun nije dostupan.' });
+    }
+    return zabiljeziAktivniDan(igrac.id);
   });
 }

@@ -11,7 +11,7 @@ import {
   ponocZaDatumIso,
   sljedecaPonocNakon,
   tjedneGranice,
-  zagrebackiDatumIso,
+  lokalniDatumIso,
 } from './kalendar.js';
 
 function pomakniDatumIso(iso: string, deltaDana: number): string {
@@ -197,7 +197,7 @@ export async function osigurajStanjeMisija(
   satRng: MisijeSatRng = zadaniSatRng,
 ) {
   const sada = satRng.sada();
-  const danasIso = zagrebackiDatumIso(sada);
+  const danasIso = lokalniDatumIso(sada);
   let stanje = await zakljucajStanje(tx, igracId);
 
   if (!stanje) {

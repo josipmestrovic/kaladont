@@ -8,7 +8,7 @@ import {
 import { izgradiStanjeMisijaDto } from './dto.js';
 import { odaberiZamjenu, snapshotIzDefinicije } from './generator.js';
 import { osigurajStanjeMisija } from './stanje.js';
-import { zagrebackiDatumIso } from './kalendar.js';
+import { lokalniDatumIso } from './kalendar.js';
 import type { MisijeSatRng, MisijeTx, SnapshotMisije } from './tipovi.js';
 import { zadaniSatRng } from './tipovi.js';
 
@@ -59,7 +59,7 @@ export async function zamijeniMisiju(
   if (dodjela.status === 'dovrsena') return { ok: false, greska: { kod: 'MISIJA_DOVRSENA' } };
   if (dodjela.status !== 'aktivna') return { ok: false, greska: { kod: 'MISIJA_NIJE_AKTIVNA' } };
 
-  const dan = zagrebackiDatumIso(sada);
+  const dan = lokalniDatumIso(sada);
   const [kvota] = await tx.select().from(zamjeneMisija).where(and(
     eq(zamjeneMisija.igracId, igracId),
     eq(zamjeneMisija.vrsta, dodjela.vrsta),
