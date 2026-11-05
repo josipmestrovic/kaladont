@@ -229,7 +229,9 @@ describe('Zagrijavanje', () => {
       if ([1, 5, 20, 50, 100].includes(broj)) expect(pobjeda?.novaRazina).toBe([1, 5, 20, 50, 100].indexOf(broj) + 1);
       else expect(pobjeda?.novaRazina).toBe(0);
     }
-    expect(await zabiljeziPobjeduTreninga(ids[0]!, igracId)).toBeNull();
+    const ponovljeno = await zabiljeziPobjeduTreninga(ids[0]!, igracId);
+    expect(ponovljeno).toMatchObject({ pobjede: 100, novaRazina: 0, maksimalnaRazina: 5 });
+    expect(ponovljeno?.ishodMisija).toBeTruthy();
     const [dostignuce] = await baza.select().from(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igracId));
     expect(dostignuce).toMatchObject({ dostignuceId: 'zagrijan', razina: 5 });
     expect(await baza.select().from(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igracId))).toHaveLength(100);

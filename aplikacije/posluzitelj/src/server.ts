@@ -23,6 +23,7 @@ import {
 } from './racuni/rute.js';
 import { registrirajProfilRute } from './profil/rute.js';
 import { registrirajLjestviceRute } from './ljestvice/rute.js';
+import { registrirajMisijeRute } from './misije/rute.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
 import { spremiTrajnePostavkeBotova, ucitajTrajnePostavkeBotova } from './bot/trajne-postavke.js';
@@ -177,6 +178,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       });
       await registrirajProfilRute(apiApp, rjecnik);
       await registrirajLjestviceRute(apiApp);
+      await registrirajMisijeRute(apiApp);
       await registrirajPrijaveRute(apiApp);
       await registrirajPovratneInformacijeRute(apiApp);
       await registrirajAdminRute(apiApp, rjecnik, () => dohvatiZivoStanjeBotova(), {

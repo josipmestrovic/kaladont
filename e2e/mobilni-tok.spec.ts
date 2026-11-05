@@ -300,6 +300,17 @@ test('mobilna ljestvica privatne sobe prikazuje označene rezultate', async ({ p
   ).toBe(true);
 });
 
+test('mobilna naslovnica prikazuje poveznicu Misije', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const misije = page.getByRole('navigation', { name: 'Glavna navigacija' }).getByRole('link', { name: 'Misije' });
+  await expect(misije).toBeVisible();
+  await expect(misije).toHaveAttribute('href', '/misije');
+  await misije.click();
+  await expect(page).toHaveURL('/misije');
+  await expect(page.getByRole('heading', { name: 'Misije', exact: true })).toBeVisible();
+});
+
 test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', async ({ page }) => {
   const odgovor = await page.request.post('http://127.0.0.1:3001/api/racuni/registracija', {
     data: {

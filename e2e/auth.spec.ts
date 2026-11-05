@@ -38,16 +38,33 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await page.getByRole('button', { name: 'Završi registraciju' }).click();
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 
+  // waitForResponse mora biti registriran prije navigacije, inače GET /api/misije može proći neuhvaćen.
+  const misijeOdgovor = page.waitForResponse(
+    (odgovor) => odgovor.url().includes('/api/misije') && odgovor.request().method() === 'GET',
+    { timeout: 10_000 },
+  );
   await page.goto('/');
-  const odjava = page.getByRole('navigation', { name: 'Glavna navigacija' }).getByRole('button', { name: 'Odjavi se' });
-  await expect(odjava).toBeVisible();
-  await Promise.all([
-    page.waitForEvent('load'),
-    odjava.click(),
-  ]);
-  await expect(page).toHaveURL('/');
-  await page.reload();
+  await misijeOdgovor.catch(() => {});
+  const popupMisija = page.getByRole('dialog', { name: /Nove (dnevne|tjedne) misije/ });
+  await popupMisija.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+  for (let i = 0; i < 3; i += 1) {
+    if (await popupMisija.count() === 0) break;
+    const naslovPrije = await popupMisija.locator('h2').textContent();
+    await popupMisija.getByRole('button', { name: 'Zatvori' }).click();
+    // Daily→weekly zamjenjuje dijalog in place; čekaj nestanak ili promjenu naslova.
+    await expect.poll(async () => {
+      if (await popupMisija.count() === 0) return 'gone';
+      return (await popupMisija.locator('h2').textContent()) ?? '';
+    }, { timeout: 10_000 }).not.toBe(naslovPrije);
+  }
+  await expect(popupMisija).toHaveCount(0);
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
+  const odjava = navigacija.getByRole('button', { name: 'Odjavi se' });
+  await expect(odjava).toBeVisible();
+  await odjava.click();
+  await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toBeVisible({ timeout: 15_000 });
+  await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
+  await page.reload();
   await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toBeVisible();
   await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
 });

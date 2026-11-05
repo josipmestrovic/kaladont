@@ -6,6 +6,7 @@ import {
   bigint,
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -57,6 +58,10 @@ export const vrstaObracunaPartije = pgEnum('vrsta_obracuna_partije', [
   'privatna_gamifikacija',
 ]);
 export const vrstaPohvaleIgre = pgEnum('vrsta_pohvale_igre', ['najduzi_niz', 'najvise_xp']);
+export const vrstaMisije = pgEnum('vrsta_misije', ['dnevna', 'tjedna']);
+export const statusDodjeleMisije = pgEnum('status_dodjele_misije', ['aktivna', 'dovrsena', 'zamijenjena', 'istekla']);
+export const statusDotokaDnevneMisije = pgEnum('status_dotoka_dnevne_misije', ['dodijeljeno', 'preskoceno']);
+export const kontekstIzvoraMisije = pgEnum('kontekst_izvora_misije', ['javna', 'trening']);
 
 export const igraci = pgTable('igraci', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -496,3 +501,124 @@ export const izmjeneRjecnika = pgTable('izmjene_rjecnika', {
   adminId: uuid('admin_id').references(() => igraci.id),
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Osobno stanje sustava misija; zaključava se pri dotoku/zamjeni/obračunu. */
+export const stanjeMisijaIgraca = pgTable('stanje_misija_igraca', {
+  igracId: uuid('igrac_id').primaryKey().references(() => igraci.id, { onDelete: 'cascade' }),
+  inicijaliziranoU: timestamp('inicijalizirano_u', { withTimezone: true }).notNull(),
+  zadnjiObradjeniDnevniDatum: date('zadnji_obradeni_dnevni_datum').notNull(),
+  verzijaStanja: integer('verzija_stanja').notNull().default(1),
+  zadnjiPregledDnevnihU: timestamp('zadnji_pregled_dnevnih_u', { withTimezone: true }),
+  zadnjiPregledTjednihU: timestamp('zadnji_pregled_tjednih_u', { withTimezone: true }),
+});
+
+export const dotokDnevnihMisija = pgTable('dotok_dnevnih_misija', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  lokalniDatum: date('lokalni_datum').notNull(),
+  status: statusDotokaDnevneMisije('status').notNull(),
+  stvorenoU: timestamp('stvoreno_u', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  uniqueIndex('uq_dotok_dnevnih_misija_igrac_datum').on(tablica.igracId, tablica.lokalniDatum),
+]);
+
+export const ciklusiTjednihMisija = pgTable('ciklusi_tjednih_misija', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  periodOd: timestamp('period_od', { withTimezone: true }).notNull(),
+  periodDo: timestamp('period_do', { withTimezone: true }).notNull(),
+  stvorenoU: timestamp('stvoreno_u', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  uniqueIndex('uq_ciklusi_tjednih_misija_igrac_period').on(tablica.igracId, tablica.periodOd),
+  check('chk_ciklusi_tjednih_period', sql`${tablica.periodOd} < ${tablica.periodDo}`),
+]);
+
+export const dodjeleMisija = pgTable('dodjele_misija', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  vrsta: vrstaMisije('vrsta').notNull(),
+  slot: smallint('slot').notNull(),
+  ciklusId: uuid('ciklus_id').references(() => ciklusiTjednihMisija.id, { onDelete: 'cascade' }),
+  predlozakId: text('predlozak_id').notNull(),
+  verzijaDefinicije: integer('verzija_definicije').notNull(),
+  snapshot: jsonb('snapshot').notNull(),
+  napredak: integer('napredak').notNull().default(0),
+  cilj: integer('cilj').notNull(),
+  podstanje: jsonb('podstanje').notNull().default({}),
+  status: statusDodjeleMisije('status').notNull().default('aktivna'),
+  dostupnaOd: timestamp('dostupna_od', { withTimezone: true }).notNull(),
+  zavrsenaU: timestamp('zavrsena_u', { withTimezone: true }),
+  istjeceU: timestamp('istjece_u', { withTimezone: true }),
+  stvorenoU: timestamp('stvoreno_u', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  check('chk_dodjele_misija_slot', sql`${tablica.slot} between 1 and 3`),
+  check('chk_dodjele_misija_napredak', sql`${tablica.napredak} >= 0 and ${tablica.napredak} <= ${tablica.cilj}`),
+  check('chk_dodjele_misija_cilj', sql`${tablica.cilj} > 0`),
+  check('chk_dodjele_misija_dnevni_istek', sql`(${tablica.vrsta} = 'dnevna' and ${tablica.istjeceU} is null) or ${tablica.vrsta} = 'tjedna'`),
+  check('chk_dodjele_misija_tjedni_ciklus', sql`(${tablica.vrsta} = 'tjedna' and ${tablica.ciklusId} is not null) or (${tablica.vrsta} = 'dnevna' and ${tablica.ciklusId} is null)`),
+  uniqueIndex('uq_dodjele_dnevna_aktivna_slot')
+    .on(tablica.igracId, tablica.slot)
+    .where(sql`${tablica.vrsta} = 'dnevna' and ${tablica.status} = 'aktivna'`),
+  uniqueIndex('uq_dodjele_tjedna_trenutna_slot')
+    .on(tablica.ciklusId, tablica.slot)
+    .where(sql`${tablica.vrsta} = 'tjedna' and ${tablica.status} in ('aktivna', 'dovrsena')`),
+  uniqueIndex('uq_dodjele_dnevna_aktivna_predlozak')
+    .on(tablica.igracId, tablica.predlozakId)
+    .where(sql`${tablica.vrsta} = 'dnevna' and ${tablica.status} = 'aktivna'`),
+  uniqueIndex('uq_dodjele_tjedna_ciklus_predlozak')
+    .on(tablica.ciklusId, tablica.predlozakId)
+    .where(sql`${tablica.vrsta} = 'tjedna' and ${tablica.status} in ('aktivna', 'dovrsena', 'zamijenjena')`),
+  index('idx_dodjele_misija_igrac_vrsta_status').on(tablica.igracId, tablica.vrsta, tablica.status),
+]);
+
+export const zamjeneMisija = pgTable('zamjene_misija', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  vrsta: vrstaMisije('vrsta').notNull(),
+  zagrebackiDatum: date('zagrebacki_datum').notNull(),
+  staraDodjelaId: uuid('stara_dodjela_id').notNull().references(() => dodjeleMisija.id, { onDelete: 'cascade' }),
+  novaDodjelaId: uuid('nova_dodjela_id').notNull().references(() => dodjeleMisija.id, { onDelete: 'cascade' }),
+  idempotencyKey: text('idempotency_key').notNull(),
+  stvorenoU: timestamp('stvoreno_u', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  uniqueIndex('uq_zamjene_misija_kvota').on(tablica.igracId, tablica.vrsta, tablica.zagrebackiDatum),
+  uniqueIndex('uq_zamjene_misija_idempotency').on(tablica.igracId, tablica.idempotencyKey),
+]);
+
+export const doprinosiMisijama = pgTable('doprinosi_misijama', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  dodjelaId: uuid('dodjela_id').notNull().references(() => dodjeleMisija.id, { onDelete: 'cascade' }),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  kontekstIzvora: kontekstIzvoraMisije('kontekst_izvora').notNull(),
+  izvorId: uuid('izvor_id').notNull(),
+  delta: jsonb('delta').notNull(),
+  stvorenoU: timestamp('stvoreno_u', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  uniqueIndex('uq_doprinosi_misijama_dodjela_izvor').on(tablica.dodjelaId, tablica.kontekstIzvora, tablica.izvorId),
+  index('idx_doprinosi_misijama_izvor').on(tablica.igracId, tablica.kontekstIzvora, tablica.izvorId),
+]);
+
+export const nagradeMisija = pgTable('nagrade_misija', {
+  dodjelaId: uuid('dodjela_id').primaryKey().references(() => dodjeleMisija.id, { onDelete: 'cascade' }),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  xpNominalno: integer('xp_nominalno').notNull(),
+  xpStvarno: integer('xp_stvarno').notNull(),
+  kontekstIzvora: kontekstIzvoraMisije('kontekst_izvora').notNull(),
+  izvorId: uuid('izvor_id').notNull(),
+  dodijeljenaU: timestamp('dodijeljena_u', { withTimezone: true }).notNull(),
+}, (tablica) => [
+  check('chk_nagrade_misija_xp', sql`${tablica.xpNominalno} >= 0 and ${tablica.xpStvarno} >= 0 and ${tablica.xpStvarno} <= ${tablica.xpNominalno}`),
+  index('idx_nagrade_misija_igrac').on(tablica.igracId, tablica.dodijeljenaU),
+]);
+
+export const ishodiMisijaIgara = pgTable('ishodi_misija_igara', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  kontekstIzvora: kontekstIzvoraMisije('kontekst_izvora').notNull(),
+  izvorId: uuid('izvor_id').notNull(),
+  zavrsenoU: timestamp('zavrseno_u', { withTimezone: true }).notNull(),
+  payload: jsonb('payload').notNull(),
+  stvorenoU: timestamp('stvoreno_u', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  uniqueIndex('uq_ishodi_misija_igara_izvor').on(tablica.igracId, tablica.kontekstIzvora, tablica.izvorId),
+]);

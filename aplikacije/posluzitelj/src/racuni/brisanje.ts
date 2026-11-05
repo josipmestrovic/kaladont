@@ -1,16 +1,24 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import {
+  ciklusiTjednihMisija,
   dnkStatistikeIgraca,
+  dodjeleMisija,
+  doprinosiMisijama,
   dostignucaIgraca,
+  dotokDnevnihMisija,
   igraci,
+  ishodiMisijaIgara,
   napredakDostignucaIgraca,
+  nagradeMisija,
   otkljucaneGrupeIgraca,
   otkljucaneRijeciIgraca,
   sesije,
+  stanjeMisijaIgraca,
   statistikeRijeciIgraca,
   treningRijeciIgraca,
   pobjedeTreninga,
+  zamjeneMisija,
 } from '../baza/shema.js';
 
 export type IshodBrisanja = 'obrisan' | 'nije-pronaden' | 'vec-obrisan' | 'zasticen';
@@ -32,6 +40,14 @@ async function obrisiRacunUTransakciji(
   await transakcija.delete(otkljucaneRijeciIgraca).where(eq(otkljucaneRijeciIgraca.igracId, igrac.id));
   await transakcija.delete(treningRijeciIgraca).where(eq(treningRijeciIgraca.igracId, igrac.id));
   await transakcija.delete(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igrac.id));
+  await transakcija.delete(doprinosiMisijama).where(eq(doprinosiMisijama.igracId, igrac.id));
+  await transakcija.delete(nagradeMisija).where(eq(nagradeMisija.igracId, igrac.id));
+  await transakcija.delete(ishodiMisijaIgara).where(eq(ishodiMisijaIgara.igracId, igrac.id));
+  await transakcija.delete(zamjeneMisija).where(eq(zamjeneMisija.igracId, igrac.id));
+  await transakcija.delete(dodjeleMisija).where(eq(dodjeleMisija.igracId, igrac.id));
+  await transakcija.delete(dotokDnevnihMisija).where(eq(dotokDnevnihMisija.igracId, igrac.id));
+  await transakcija.delete(ciklusiTjednihMisija).where(eq(ciklusiTjednihMisija.igracId, igrac.id));
+  await transakcija.delete(stanjeMisijaIgraca).where(eq(stanjeMisijaIgraca.igracId, igrac.id));
   await transakcija
     .update(igraci)
     .set({
