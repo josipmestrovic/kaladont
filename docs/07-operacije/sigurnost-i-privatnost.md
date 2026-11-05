@@ -27,9 +27,9 @@ Voditelj obrade je **piši farmaceut, obrt za računalno programiranje, vl. Josi
 
 - Lozinke: **argon2id** (memorijski tvrd), nikad u logovima; minimalna duljina 8 znakova bez glupih pravila kompleksnosti.
 - Sesije: httpOnly + Secure + SameSite=Lax kolačić s nasumičnim tokenom čiji se hash provjerava u tablici `sesije`; Socket.IO handshake provjerava istu sesiju. Token se zbog postojeće kompatibilnosti šalje i kroz Bearer zaglavlje/Socket.IO handshake.
-- Logout briše samo trenutačnu sesiju. Reset lozinke te promjena lozinke ili emaila ne opozivaju postojeće sesije. Ne pohranjujemo IP, user-agent ni druge podatke o uređaju.
+- Logout briše samo trenutačnu sesiju. Uspješan reset lozinke potroši jednokratni link (uključujući race), briše sve sesije računa i prekida aktivne Socket.IO veze. Promjena lozinke ili emaila zasad ne opoziva postojeće sesije. Ne pohranjujemo IP, user-agent ni druge podatke o uređaju.
 - Gost identitet: opaque nasumični token u localStorageu, čiji se hash provjerava u tablici `sesije`; javni `igrac_id` nije pristupni token.
-- Potvrda emaila poveznicom s istekom (24 h); reset lozinke istim mehanizmom, bez otkrivanja postoji li račun. Email poveznice koriste javnu adresu aktivnog okruženja, a staging šalje samo na izričito dopuštene testne adrese.
+- Potvrda emaila poveznicom s istekom (24 h). Reset lozinke koristi HMAC token s verzijom iz `igraci.reset_lozinke_verzija` i istekom 24 h, bez otkrivanja postoji li račun. Email poveznice koriste javnu adresu aktivnog okruženja, a staging šalje samo na izričito dopuštene testne adrese.
 
 ## Validacija ulaza — server ne vjeruje nikome
 

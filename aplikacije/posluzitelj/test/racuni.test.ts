@@ -323,7 +323,7 @@ describe('potvrda emaila i reset lozinke', () => {
     expect(retci).toHaveLength(1);
   });
 
-  it('resetira lozinku valjanim tokenom pa dopušta novu prijavu', async () => {
+  it('resetira lozinku valjanim tokenom, opoziva stare sesije i dopušta novu prijavu', async () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -333,7 +333,17 @@ describe('potvrda emaila i reset lozinke', () => {
       igracId: string;
       sesijskiToken: string;
     };
-    const token = izdajTokenResetaLozinke(igracId);
+    const drugaPrijava = await fetch(`${adresa}/api/racuni/prijava`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { sesijskiToken: drugiToken } = (await drugaPrijava.json()) as { sesijskiToken: string };
+    const [redak] = await baza
+      .select({ resetLozinkeVerzija: igraci.resetLozinkeVerzija })
+      .from(igraci)
+      .where(eq(igraci.id, igracId));
+    const token = izdajTokenResetaLozinke(igracId, redak!.resetLozinkeVerzija);
 
     const reset = await fetch(`${adresa}/api/racuni/resetiraj-lozinku`, {
       method: 'POST',
@@ -342,13 +352,117 @@ describe('potvrda emaila i reset lozinke', () => {
     });
     expect(reset.status).toBe(200);
 
+    expect(await baza.select().from(sesije).where(eq(sesije.igracId, igracId))).toHaveLength(0);
+    expect((await fetch(`${adresa}/api/profil`, { headers: { authorization: `Bearer ${sesijskiToken}` } })).status).toBe(401);
+    expect((await fetch(`${adresa}/api/profil`, { headers: { authorization: `Bearer ${drugiToken}` } })).status).toBe(401);
+
+    const ponovniReset = await fetch(`${adresa}/api/racuni/resetiraj-lozinku`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, novaLozinka: 'jos-jedna-lozinka' }),
+    });
+    expect(ponovniReset.status).toBe(400);
+
     const prijava = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka123' }),
     });
     expect(prijava.status).toBe(200);
-    expect((await fetch(`${adresa}/api/profil`, { headers: { authorization: `Bearer ${sesijskiToken}` } })).status).toBe(200);
+  });
+
+  it('isti reset token uspije samo jednom i kod istodobnih zahtjeva', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId } = (await registracija.json()) as { igracId: string };
+    const [redak] = await baza
+      .select({ resetLozinkeVerzija: igraci.resetLozinkeVerzija })
+      .from(igraci)
+      .where(eq(igraci.id, igracId));
+    const token = izdajTokenResetaLozinke(igracId, redak!.resetLozinkeVerzija);
+
+    const [prvi, drugi] = await Promise.all([
+      fetch(`${adresa}/api/racuni/resetiraj-lozinku`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token, novaLozinka: 'nova-lozinka-a' }),
+      }),
+      fetch(`${adresa}/api/racuni/resetiraj-lozinku`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token, novaLozinka: 'nova-lozinka-b' }),
+      }),
+    ]);
+    const statusi = [prvi.status, drugi.status].sort();
+    expect(statusi).toEqual([200, 400]);
+
+    const [nakon] = await baza
+      .select({ resetLozinkeVerzija: igraci.resetLozinkeVerzija })
+      .from(igraci)
+      .where(eq(igraci.id, igracId));
+    expect(nakon?.resetLozinkeVerzija).toBe(redak!.resetLozinkeVerzija + 1);
+
+    const prijavaA = await fetch(`${adresa}/api/racuni/prijava`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka-a' }),
+    });
+    const prijavaB = await fetch(`${adresa}/api/racuni/prijava`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka-b' }),
+    });
+    const uspjesnePrijave = [prijavaA.status, prijavaB.status].filter((s) => s === 200);
+    expect(uspjesnePrijave).toHaveLength(1);
+  });
+
+  it('reset lozinke prekida aktivni Socket.IO i zabranjuje reconnect starim tokenom', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { igracId, sesijskiToken } = (await registracija.json()) as {
+      igracId: string;
+      sesijskiToken: string;
+    };
+    const socket = await new Promise<ReturnType<typeof ioClient>>((resolve, reject) => {
+      const s = ioClient(adresa, { auth: { token: sesijskiToken }, forceNew: true, reconnection: false });
+      s.on('connect', () => resolve(s));
+      s.on('connect_error', reject);
+    });
+    const odspojen = new Promise<void>((resolve) => socket.once('disconnect', () => resolve()));
+    const [redak] = await baza
+      .select({ resetLozinkeVerzija: igraci.resetLozinkeVerzija })
+      .from(igraci)
+      .where(eq(igraci.id, igracId));
+    const token = izdajTokenResetaLozinke(igracId, redak!.resetLozinkeVerzija);
+
+    const reset = await fetch(`${adresa}/api/racuni/resetiraj-lozinku`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, novaLozinka: 'nova-lozinka123' }),
+    });
+    expect(reset.status).toBe(200);
+    await odspojen;
+
+    await expect(
+      new Promise((resolve, reject) => {
+        const ponovnaVeza = ioClient(adresa, {
+          auth: { token: sesijskiToken },
+          forceNew: true,
+          reconnection: false,
+        });
+        ponovnaVeza.on('connect', () => reject(new Error('stara sesija se ne smije spojiti nakon reseta')));
+        ponovnaVeza.on('connect_error', (greska) => {
+          ponovnaVeza.disconnect();
+          resolve(greska);
+        });
+      }),
+    ).resolves.toBeDefined();
   });
 });
 

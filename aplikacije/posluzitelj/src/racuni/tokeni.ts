@@ -12,28 +12,6 @@ function potpisi(sadrzaj: string): string {
   return createHmac('sha256', tajna()).update(sadrzaj).digest('base64url');
 }
 
-function izdaj(svrha: string, igracId: string, trajanjeMs: number): string {
-  const istekMs = Date.now() + trajanjeMs;
-  const sadrzaj = `${svrha}.${igracId}.${istekMs}`;
-  return `${sadrzaj}.${potpisi(sadrzaj)}`;
-}
-
-/** Vraća igracId ako je token valjan (potpis + svrha + neistekao), inače null. */
-function provjeri(ocekivanaSvrha: string, token: string): string | null {
-  const dijelovi = token.split('.');
-  if (dijelovi.length !== 4) return null;
-  const [svrha, igracId, istekStr, potpis] = dijelovi;
-  if (svrha !== ocekivanaSvrha || !igracId || !istekStr || !potpis) return null;
-
-  const ocekivaniPotpis = potpisi(`${svrha}.${igracId}.${istekStr}`);
-  const a = Buffer.from(potpis);
-  const b = Buffer.from(ocekivaniPotpis);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  if (Date.now() > Number(istekStr)) return null;
-
-  return igracId;
-}
-
 function hashEmaila(email: string): string {
   return createHash('sha256').update(email.trim().toLowerCase()).digest('base64url');
 }
@@ -59,6 +37,35 @@ export function provjeriTokenPotvrdeEmaila(token: string): { igracId: string; em
 
 export const emailHashPotvrde = hashEmaila;
 
-export const izdajTokenResetaLozinke = (igracId: string): string =>
-  izdaj('reset-lozinke', igracId, TRAJANJE_POTVRDE_MS);
-export const provjeriTokenResetaLozinke = (token: string): string | null => provjeri('reset-lozinke', token);
+/**
+ * Jednokratni reset token. `verzija` mora odgovarati `igraci.reset_lozinke_verzija`
+ * u trenutku izdavanja; uspješan reset atomski povećava verziju pa stari linkovi padaju.
+ */
+export function izdajTokenResetaLozinke(igracId: string, verzija: number): string {
+  if (!Number.isInteger(verzija) || verzija < 0) {
+    throw new Error('Verzija reset tokena mora biti cijeli broj ≥ 0.');
+  }
+  const istekMs = Date.now() + TRAJANJE_POTVRDE_MS;
+  const sadrzaj = `reset-lozinke.${igracId}.${istekMs}.${verzija}`;
+  return `${sadrzaj}.${potpisi(sadrzaj)}`;
+}
+
+export function provjeriTokenResetaLozinke(
+  token: string,
+): { igracId: string; verzija: number } | null {
+  const dijelovi = token.split('.');
+  if (dijelovi.length !== 5) return null;
+  const [svrha, igracId, istekStr, verzijaStr, potpis] = dijelovi;
+  if (svrha !== 'reset-lozinke' || !igracId || !istekStr || !verzijaStr || !potpis) return null;
+  if (!/^\d+$/.test(verzijaStr)) return null;
+  const verzija = Number(verzijaStr);
+  if (!Number.isSafeInteger(verzija)) return null;
+
+  const ocekivaniPotpis = potpisi(`${svrha}.${igracId}.${istekStr}.${verzija}`);
+  const a = Buffer.from(potpis);
+  const b = Buffer.from(ocekivaniPotpis);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  if (Date.now() > Number(istekStr)) return null;
+
+  return { igracId, verzija };
+}

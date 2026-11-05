@@ -55,6 +55,7 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | email | text, null | Samo registrirani; jedinstven |
 | email_na_cekanju | text, null | Nova adresa registriranog računa dok ne bude potvrđena; stari potvrđeni email ostaje aktivan |
 | lozinka_hash | text, null | argon2id |
+| reset_lozinke_verzija | integer, default 0 | Brojač jednokratnih reset tokena; uspješan reset atomski povećava vrijednost |
 | email_potvrdjen | boolean | |
 | email_potvrda_zatrazen_at, email_potvrda_poslana_at | timestamptz, null | Rok čišćenja nepotvrđenog računa i server-side cooldown ručnog ponovnog slanja |
 | obrisan_at | timestamptz, null | Vrijeme ručne anonimizacije računa; obrisani račun više se ne može autentificirati |
@@ -119,7 +120,7 @@ Serverska sesija registriranog igrača. Sirovi token se ne sprema u bazu; `token
 | stvorena | timestamptz | Vrijeme izdavanja |
 | istek | timestamptz | Fiksni istek 30 dana nakon izdavanja |
 
-Logout briše samo odgovarajući red. Reset lozinke i promjene vjerodajnica ne brišu postojeće sesije. Pri brisanju računa sesije se brišu, privatni podaci se uklanjaju, a red igrača ostaje anonimiziran radi zajedničke povijesti.
+Logout briše samo odgovarajući red. Uspješan reset lozinke briše sve sesije tog igrača. Promjene lozinke ili emaila (kad postoje kao zasebne rute) zasad ne brišu sesije. Pri brisanju računa sesije se brišu, privatni podaci se uklanjaju, a red igrača ostaje anonimiziran radi zajedničke povijesti.
 
 ### Gamifikacijski agregati igrača
 

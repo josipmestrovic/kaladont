@@ -160,6 +160,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   await app.register(cookie);
   await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
   let opozoviSocketSesije: (sesijaId: string) => void = () => {};
+  let opozoviSocketSesijeIgraca: (igracId: string) => void = () => {};
   let dohvatiZivoStanjeBotova: () => import('./admin/rute.js').ZivoStanjeBotova | null = () => null;
   const rjecnik = await ucitajRjecnik();
   app.log.info(`Rječnik učitan: ${rjecnik.brojRijeci()} riječi`);
@@ -175,6 +176,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     async (apiApp) => {
       await registrirajRacuneRute(apiApp, authRateLimit, {
         naSesijaOpozvana: (sesijaId) => opozoviSocketSesije(sesijaId),
+        naSesijeIgracaOpozvane: (igracId) => opozoviSocketSesijeIgraca(igracId),
       });
       await registrirajProfilRute(apiApp, rjecnik);
       await registrirajLjestviceRute(apiApp);
@@ -333,12 +335,20 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const igracMozeIgrati = (socket: KaladontSocket): boolean =>
     socket.data.vrsta === 'gost' || socket.data.emailPotvrdjen;
 
+  const zatvoriSocketSesiju = (socket: KaladontSocket) => {
+    socket.emit('veza:zatvorena', { kod: 'SESIJA_ISTEKLA', poruka: 'Sesija je istekla ili je opozvana.' });
+    socket.disconnect(true);
+  };
+
   opozoviSocketSesije = (sesijaId) => {
     for (const socket of io.sockets.sockets.values()) {
-      if (socket.data.sesijaId === sesijaId) {
-        socket.emit('veza:zatvorena', { kod: 'SESIJA_ISTEKLA', poruka: 'Sesija je istekla ili je opozvana.' });
-        socket.disconnect(true);
-      }
+      if (socket.data.sesijaId === sesijaId) zatvoriSocketSesiju(socket);
+    }
+  };
+
+  opozoviSocketSesijeIgraca = (igracId) => {
+    for (const socket of io.sockets.sockets.values()) {
+      if (socket.data.igracId === igracId) zatvoriSocketSesiju(socket);
     }
   };
 
