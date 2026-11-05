@@ -242,8 +242,8 @@ interface StanjeStola {
   ponoviZavrsnoSpremanje: (() => void) | null;
   /** In-flight fire-and-forget upisi tijekom igre (čekaju se na kraju). */
   upisiPotezaUTijeku: Promise<void>[];
-  /** Payloadi poteza za idempotentno osiguravanje prije završnog XP-a. */
-  zapisiPotezaZaOsigurati: ZapisPoteza[];
+  /** Payloadi poteza; `uspio` omogućuje da završni tok retrya samo neuspjelo. */
+  zapisiPotezaZaOsigurati: { zapis: ZapisPoteza; uspio: boolean }[];
   /** Retryable upis početka partije; null ako politika ne zapisuje povijest. */
   osigurajPocetakPartije: (() => Promise<void>) | null;
   treningNeaktivnost: { upozorenjeIso: string; zatvaraIso: string; upozorenje: boolean } | null;
@@ -746,7 +746,11 @@ export function stvoriUpraviteljPartija(
     const upisSaCekanjemPoteza = async () => {
       await Promise.allSettled(stanje.upisiPotezaUTijeku);
       if (stanje.osigurajPocetakPartije) await stanje.osigurajPocetakPartije();
-      await osigurajUpisePoteza(stanje.zapisiPotezaZaOsigurati);
+      const nedostaju = stanje.zapisiPotezaZaOsigurati.filter((stavka) => !stavka.uspio);
+      if (nedostaju.length > 0) {
+        await osigurajUpisePoteza(nedostaju.map((stavka) => stavka.zapis));
+        for (const stavka of nedostaju) stavka.uspio = true;
+      }
       await upis();
     };
     stanje.zavrsnoSpremanje = upisSaCekanjemPoteza;
@@ -908,13 +912,18 @@ export function stvoriUpraviteljPartija(
     // Trening ništa ne čita ni ne piše; računalni protivnik nema redak u bazi.
     const upisPocetkaPromise = politika.zapisujePovijest
       ? (() => {
-        const osiguraj = () => zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod, sudionici.length - ljudi.length);
+        let pocetakUspio = false;
+        const osiguraj = async () => {
+          if (pocetakUspio) return;
+          await zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod, sudionici.length - ljudi.length);
+          pocetakUspio = true;
+        };
         stanje.osigurajPocetakPartije = osiguraj;
         return osiguraj();
       })()
       : Promise.resolve();
     // Čekanje in-flight ne smije progutati grešku starta za Promise.all ispod;
-    // završni tok ponovno zove osigurajPocetakPartije.
+    // završni tok ponovno zove osigurajPocetakPartije samo ako prvi pokušaj nije uspio.
     stanje.upisiPotezaUTijeku.push(upisPocetkaPromise.catch(() => undefined));
     const sudioniciZaKolekciju = politika.zapisujeKolekcijuTreninga
       ? sudionici.filter((sudionik) => sudionik.upravljac === 'covjek' && sudionik.vrsta === 'registriran')
@@ -1011,9 +1020,12 @@ export function stvoriUpraviteljPartija(
   function spremiPotezAkoTreba(stanje: StanjeStola, zapis: Omit<ZapisPoteza, 'partijaId'>) {
     if (!stanje.politika.zapisujePovijest) return;
     const potpuni: ZapisPoteza = { partijaId: stanje.partijaId, ...zapis };
-    stanje.zapisiPotezaZaOsigurati.push(potpuni);
-    // Fire-and-forget: grešku bilježi zapisiPotez, a završni osigurajUpisePoteza je ponavlja.
-    stanje.upisiPotezaUTijeku.push(zapisiPotez(potpuni).catch(() => undefined));
+    const stavka = { zapis: potpuni, uspio: false };
+    stanje.zapisiPotezaZaOsigurati.push(stavka);
+    // Fire-and-forget: grešku bilježi zapisiPotez; završni tok retrya samo !uspio.
+    stanje.upisiPotezaUTijeku.push(
+      zapisiPotez(potpuni).then(() => { stavka.uspio = true; }).catch(() => undefined),
+    );
   }
 
   function zakljuciPartiju(stanje: StanjeStola): void {
@@ -2304,12 +2316,17 @@ export function stvoriUpraviteljPartija(
 
     partije.set(partijaId, stanje);
     for (const s of sudionici) partijaPoIgracu.set(s.igracId, partijaId);
-    const osigurajPocetakPrivatne = () => zapisiPocetakPartije(
-      partijaId,
-      sudionici,
-      new Map(sudionici.map((s) => [s.igracId, 0])),
-      'cetiri_igraca',
-    );
+    let pocetakPrivatneUspio = false;
+    const osigurajPocetakPrivatne = async () => {
+      if (pocetakPrivatneUspio) return;
+      await zapisiPocetakPartije(
+        partijaId,
+        sudionici,
+        new Map(sudionici.map((s) => [s.igracId, 0])),
+        'cetiri_igraca',
+      );
+      pocetakPrivatneUspio = true;
+    };
     stanje.osigurajPocetakPartije = osigurajPocetakPrivatne;
     const upisPocetkaPrivatnePartije = osigurajPocetakPrivatne();
     stanje.upisiPotezaUTijeku.push(upisPocetkaPrivatnePartije.catch(() => undefined));

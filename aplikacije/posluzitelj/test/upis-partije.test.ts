@@ -698,17 +698,18 @@ describe('pouzdan upis poteza', () => {
     expect(redovi.map((r) => r.rijec).sort()).toEqual(['mama', 'mata']);
 
     const rezultati = [{ igracId, plasman: 1 as const, bodovi: 3, eliminacije: 0, iskustvo: 50, nacinIspadanja: 'pobjednik' as const }];
+    const statistike = new Map([[igracId, praznaStatistika(igracId, 2)]]);
+    const osnovni = new Map([[igracId, 50]]);
     await Promise.all([
-      zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', new Map([[igracId, praznaStatistika(igracId, 2)]]), false, new Map(), new Date(), new Map([[igracId, 50]])),
-      zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', new Map([[igracId, praznaStatistika(igracId, 2)]]), false, new Map(), new Date(), new Map([[igracId, 50]])),
+      zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', statistike, false, new Map(), new Date(), osnovni),
+      zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', statistike, false, new Map(), new Date(), osnovni),
     ]);
-    await zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', new Map([[igracId, praznaStatistika(igracId, 2)]]), false, new Map(), new Date(), new Map([[igracId, 50]]));
-
-    const [igrac] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
+    const [nakonPrvih] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
+    await zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'cetiri_igraca', statistike, false, new Map(), new Date(), osnovni);
+    const [nakonPonovnog] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
     const obracuni = await baza.select().from(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
     expect(obracuni).toHaveLength(1);
-    // 100 + 50 osnovnog + eventualni bonus ocjene; bitno je da nije udvostručeno (~200+).
-    expect(igrac?.iskustvoUkupno).toBeGreaterThanOrEqual(150);
-    expect(igrac?.iskustvoUkupno).toBeLessThan(250);
+    expect(nakonPrvih?.iskustvoUkupno).toBeGreaterThan(100);
+    expect(nakonPonovnog?.iskustvoUkupno).toBe(nakonPrvih?.iskustvoUkupno);
   });
 });

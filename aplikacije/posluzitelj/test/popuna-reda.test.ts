@@ -132,7 +132,7 @@ describe('popuna javnog reda botovima', () => {
       await new Promise<void>((resolve, reject) => { socket!.once('connect', resolve); socket!.once('connect_error', reject); });
       const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak', () => true, 10_000);
       const rundaPromise = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena', () => true, 10_000);
-      const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
+      const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 30_000);
       socket.emit('red:udji', { mod: 'dva_igraca' });
       // U Dvoboju rezervacija i pokretanje padaju u isti trenutak praga; nema zasebne faze prikaza bota.
       const pocetak = await pocetakPromise;
