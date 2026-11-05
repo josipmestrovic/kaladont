@@ -9,7 +9,14 @@
     novo?: boolean;
   }
 
-  let { dostignuce }: { dostignuce: Dostignuce } = $props();
+  let {
+    dostignuce,
+    trenutniNiz = null,
+  }: {
+    dostignuce: Dostignuce;
+    trenutniNiz?: number | null;
+  } = $props();
+  const jeStalnoSiTu = $derived(dostignuce.id === 'stalno_si_tu');
   const postotak = $derived(
     dostignuce.sljedeciPrag === null
       ? 100
@@ -41,8 +48,14 @@
       {/each}
     </div>
     <p class="opis">{dostignuce.opis}</p>
+    {#if jeStalnoSiTu && trenutniNiz !== null}
+      <p class="cilj">Trenutni niz: {trenutniNiz} {trenutniNiz === 1 ? 'dan' : 'dana'}</p>
+    {/if}
     {#if dostignuce.sljedeciPrag === null}
-      <p class="cilj">Maksimum dosegnut · {dostignuce.vrijednost}</p>
+      <p class="cilj">{jeStalnoSiTu ? `Najbolji niz: ${dostignuce.vrijednost} dana · maksimum dosegnut` : `Maksimum dosegnut · ${dostignuce.vrijednost}`}</p>
+    {:else if jeStalnoSiTu}
+      <p class="cilj">Najbolji niz: {dostignuce.vrijednost} {dostignuce.vrijednost === 1 ? 'dan' : 'dana'} · sljedeća zvjezdica nakon {dostignuce.sljedeciPrag} dana zaredom</p>
+      <div class="traka" aria-hidden="true"><span style={`width: ${postotak}%`}></span></div>
     {:else}
       <p class="cilj">Sljedeći cilj: {dostignuce.id === 'iskusnjara' ? `LVL ${dostignuce.sljedeciPrag}` : dostignuce.sljedeciPrag} <span>({dostignuce.id === 'iskusnjara' ? `LVL ${dostignuce.vrijednost} / LVL ${dostignuce.sljedeciPrag}` : `${dostignuce.vrijednost} / ${dostignuce.sljedeciPrag}`})</span></p>
       <div class="traka" aria-hidden="true"><span style={`width: ${postotak}%`}></span></div>

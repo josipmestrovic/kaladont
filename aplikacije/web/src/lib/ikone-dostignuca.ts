@@ -12,6 +12,7 @@ export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
   zavrsna_rijec: '/ikone/47-zavrsna-rijec.png',
   glas_zajednice: '/ikone/48-glas-zajednice.png',
   zagrijan: '/ikone/06-trofej.png',
+  stalno_si_tu: '/ikone/38-pobjednicki-niz.png',
 };
 
 export function ikonaDostignuca(id: string): string {

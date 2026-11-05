@@ -622,3 +622,24 @@ export const ishodiMisijaIgara = pgTable('ishodi_misija_igara', {
 }, (tablica) => [
   uniqueIndex('uq_ishodi_misija_igara_izvor').on(tablica.igracId, tablica.kontekstIzvora, tablica.izvorId),
 ]);
+
+/** Jedan valjani aktivni dan po registriranom igraču (audit / idempotentnost). */
+export const aktivnostIgracaDani = pgTable('aktivnost_igraca_dani', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  lokalniDatum: date('lokalni_datum').notNull(),
+  zabiljezenAt: timestamp('zabiljezen_at', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.lokalniDatum] }),
+]);
+
+/** Agregat trenutačnog i najboljeg niza aktivnih dana. */
+export const nizAktivnostiIgraca = pgTable('niz_aktivnosti_igraca', {
+  igracId: uuid('igrac_id').primaryKey().references(() => igraci.id, { onDelete: 'cascade' }),
+  zadnjiAktivniDatum: date('zadnji_aktivni_datum').notNull(),
+  trenutniNiz: integer('trenutni_niz').notNull(),
+  najboljiNiz: integer('najbolji_niz').notNull(),
+  azuriranoAt: timestamp('azurirano_at', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  check('chk_niz_aktivnosti_trenutni', sql`${tablica.trenutniNiz} >= 1`),
+  check('chk_niz_aktivnosti_najbolji', sql`${tablica.najboljiNiz} >= ${tablica.trenutniNiz}`),
+]);

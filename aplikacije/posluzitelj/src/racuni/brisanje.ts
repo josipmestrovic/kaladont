@@ -1,6 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import {
+  aktivnostIgracaDani,
   ciklusiTjednihMisija,
   dnkStatistikeIgraca,
   dodjeleMisija,
@@ -11,6 +12,7 @@ import {
   ishodiMisijaIgara,
   napredakDostignucaIgraca,
   nagradeMisija,
+  nizAktivnostiIgraca,
   otkljucaneGrupeIgraca,
   otkljucaneRijeciIgraca,
   sesije,
@@ -48,6 +50,8 @@ async function obrisiRacunUTransakciji(
   await transakcija.delete(dotokDnevnihMisija).where(eq(dotokDnevnihMisija.igracId, igrac.id));
   await transakcija.delete(ciklusiTjednihMisija).where(eq(ciklusiTjednihMisija.igracId, igrac.id));
   await transakcija.delete(stanjeMisijaIgraca).where(eq(stanjeMisijaIgraca.igracId, igrac.id));
+  await transakcija.delete(aktivnostIgracaDani).where(eq(aktivnostIgracaDani.igracId, igrac.id));
+  await transakcija.delete(nizAktivnostiIgraca).where(eq(nizAktivnostiIgraca.igracId, igrac.id));
   await transakcija
     .update(igraci)
     .set({

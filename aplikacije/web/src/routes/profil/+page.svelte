@@ -60,6 +60,7 @@
     statistikaRijeci: StatistikaRijeci | null;
     ciljeviRijeci: { rijetke: { ukupno: number }; duge: { ukupno: number } };
     dostignuca: { ukupnoZvjezdica: number; maksimalnoZvjezdica: number; ukupnoOtkljucanih: number; dostignuca: Dostignuce[] };
+    aktivnostDana?: { trenutniNiz: number; najboljiNiz: number; zadnjiAktivniDatum: string | null };
   }
 
   interface DnkMetrike {
@@ -318,7 +319,10 @@
         <div class="dostignuca-sažetak"><strong>{profil.dostignuca.ukupnoZvjezdica} / {profil.dostignuca.maksimalnoZvjezdica} zvjezdica</strong><span>{profil.dostignuca.ukupnoOtkljucanih} otključanih dostignuća</span></div>
         <div class="dostignuca-mrezica">
           {#each profil.dostignuca.dostignuca as dostignuce (dostignuce.id)}
-            <DostignuceKartica {dostignuce} />
+            <DostignuceKartica
+              {dostignuce}
+              trenutniNiz={dostignuce.id === 'stalno_si_tu' ? (profil.aktivnostDana?.trenutniNiz ?? null) : null}
+            />
           {/each}
         </div>
       </section>

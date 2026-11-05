@@ -14,7 +14,11 @@ export type BrojacDostignuca =
   | 'treningPobjede'
   | 'povratneInformacije'
   | 'pohvaleNizUkupno'
-  | 'pohvaleXpUkupno';
+  | 'pohvaleXpUkupno'
+  /** Najbolji niz aktivnih dana; otključava se samo iz servisa aktivnog dana, ne iz party delte. */
+  | 'najboljiNizAktivnosti';
+
+export const ID_DOSTIGNUCA_STALNO_SI_TU = 'stalno_si_tu';
 
 export interface DefinicijaDostignuca {
   id: string;
@@ -53,6 +57,15 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
   { id: 'zavrsna_rijec', naziv: 'Završna riječ', opis: 'Pobijedi u javnoj partiji.', kategorija: 'igra', pragovi: [1, 5, 20, 50, 100], vrijediUPrivatnoj: false, brojac: 'javnePobjede' },
   { id: 'glas_zajednice', naziv: 'Glas zajednice', opis: 'Pošalji povratnu informaciju o igri.', kategorija: 'igra', pragovi: [1, 2, 3, 4, 5], vrijediUPrivatnoj: false, brojac: 'povratneInformacije' },
   { id: 'zagrijan', naziv: 'Zagrijan', opis: 'Pobijedi u treningu protiv Računala.', kategorija: 'igra', pragovi: [1, 5, 20, 50, 100], vrijediUPrivatnoj: false, brojac: 'treningPobjede' },
+  {
+    id: ID_DOSTIGNUCA_STALNO_SI_TU,
+    naziv: 'Stalno si tu',
+    opis: 'Vraćaj se uzastopnih dana — dovoljno je otvoriti igru.',
+    kategorija: 'napredak',
+    pragovi: [2, 5, 10, 20, 30],
+    vrijediUPrivatnoj: false,
+    brojac: 'najboljiNizAktivnosti',
+  },
 ] as const;
 
 export const UKUPNO_ZVJEZDICA_DOSTIGNUCA = DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0);
@@ -75,6 +88,7 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   'jezik_u_plamenu',
   'vladar_niza',
   'xp_prvak',
+  ID_DOSTIGNUCA_STALNO_SI_TU,
 ] as const;
 
 export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(
@@ -108,6 +122,8 @@ export function izracunajNovaDostignuca(
   jePrivatna: boolean,
 ): NovoDostignuce[] {
   return DEFINICIJE_DOSTIGNUCA.flatMap((definicija) => {
+    // Aktivni dani se otključavaju isključivo u servisu aktivnog dana.
+    if (definicija.id === ID_DOSTIGNUCA_STALNO_SI_TU || definicija.brojac === 'najboljiNizAktivnosti') return [];
     if (jePrivatna && !definicija.vrijediUPrivatnoj) return [];
     const staraVrijednost = definicija.brojac === 'razina'
       ? (trajniNapredak[definicija.brojac] ?? 0)
