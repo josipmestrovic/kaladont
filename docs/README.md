@@ -84,6 +84,7 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | [vodic-postava-vps.md](07-operacije/vodic-postava-vps.md)                       | Početnički vodič: od praznog VPS-a do žive igre                                        |
 | [vodic-postava-discourse.md](07-operacije/vodic-postava-discourse.md)           | Postava foruma na zasebnom VPS-u                                                       |
 | [runbook-objava-i-rollback.md](07-operacije/runbook-objava-i-rollback.md)       | Postupak objave, promocije i vraćanja unatrag                                          |
+| [runbook-ssh-produkcija.md](07-operacije/runbook-ssh-produkcija.md)             | Svakodnevni SSH ulaz na produkcijski VPS (ključ, known_hosts, korisnik kaladont)      |
 | [runbook-backup-i-vracanje.md](07-operacije/runbook-backup-i-vracanje.md)       | Backup postupci i drill vraćanja                                                       |
 | [incidentni-postupak.md](07-operacije/incidentni-postupak.md)                   | Što raditi kad nešto padne                                                             |
 | [odrzavanje.md](07-operacije/odrzavanje.md)                                     | Dnevne/tjedne/mjesečne rutine održavanja                                               |
