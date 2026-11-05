@@ -196,29 +196,6 @@ function cekajPrihvacenOdIgraca(
   });
 }
 
-/** Jednokratni socket event s fail-fast timeoutom (izbjegava tihi Vitest 30s hang). */
-function cekajEvent<T>(
-  socket: ClientSocket,
-  ime: string,
-  predikat: (payload: T) => boolean = () => true,
-  timeoutMs = 8_000,
-  kontekst = '',
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      socket.off(ime, handler);
-      reject(new Error(`Timeout ${timeoutMs}ms čekajući ${ime}${kontekst ? ` (${kontekst})` : ''}`));
-    }, timeoutMs);
-    function handler(payload: T) {
-      if (!predikat(payload)) return;
-      clearTimeout(timer);
-      socket.off(ime, handler);
-      resolve(payload);
-    }
-    socket.on(ime, handler);
-  });
-}
-
 /** Prvi matching event s bilo kojeg socketa; skida listenere čim stigne. */
 function cekajEventNaBiloKojem<T>(
   socketi: readonly ClientSocket[],
