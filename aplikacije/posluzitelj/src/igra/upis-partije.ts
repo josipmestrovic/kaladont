@@ -79,17 +79,10 @@ export interface ZapisPoteza {
 }
 
 /**
- * Idempotentan upis: postojeći (partija_id, redni_broj) je uspjeh (ponovna provjera),
- * ne novi write. UNIQUE indeks štiti utrku; ostale DB greške se propagiraju.
+ * Idempotentan upis: UNIQUE (partija_id, redni_broj) sukob je uspjeh (ponovna provjera),
+ * ne novi write. Ostale DB greške se propagiraju.
  */
 export async function zapisiPotez(zapis: ZapisPoteza): Promise<void> {
-  const [postojeci] = await baza
-    .select({ id: potezi.id })
-    .from(potezi)
-    .where(and(eq(potezi.partijaId, zapis.partijaId), eq(potezi.redniBroj, zapis.redniBroj)))
-    .limit(1);
-  if (postojeci) return;
-
   try {
     await baza.insert(potezi).values(zapis);
   } catch (greska) {

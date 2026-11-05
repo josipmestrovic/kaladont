@@ -744,7 +744,15 @@ export function stvoriUpraviteljPartija(
 
     stanje.statusSpremanja = 'spremanje_rezultata';
     const upisSaCekanjemPoteza = async () => {
-      await Promise.allSettled(stanje.upisiPotezaUTijeku);
+      // Kratko pričekaj in-flight (ne blokiraj zauvijek ako neki upis visi),
+      // zatim idempotentno upiši samo one koji još nisu uspjeli.
+      await Promise.race([
+        Promise.allSettled(stanje.upisiPotezaUTijeku),
+        new Promise<void>((resolve) => {
+          const h = sat.zakazi(resolve, 2_000);
+          h.unref();
+        }),
+      ]);
       if (stanje.osigurajPocetakPartije) await stanje.osigurajPocetakPartije();
       const nedostaju = stanje.zapisiPotezaZaOsigurati.filter((stavka) => !stavka.uspio);
       if (nedostaju.length > 0) {
