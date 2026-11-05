@@ -137,10 +137,21 @@ faza='kandidat_env_spreman'
 docker compose --env-file "$kandidat_env" -f "$compose_datoteka" config >/dev/null
 docker compose --env-file "$kandidat_env" -f "$compose_datoteka" pull aplikacija
 faza='slika_povucena'
+docker compose --env-file "$kandidat_env" -f "$compose_datoteka" up -d --wait --wait-timeout 120 baza
+faza='baza_sprema'
+docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/osiguraj-db-uloge.js
+faza='uloge_osigurane'
 migracije_pokrenute='da'
 faza='migracije_pokrenute'
 docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/migracije.js
 faza='migracije_zavrsene'
+docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/osiguraj-db-uloge.js
+faza='uloge_nakon_migracija'
+if ! docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/provjeri-rjecnik.js; then
+  faza='rjecnik_uvoz'
+  docker compose --env-file "$kandidat_env" -f "$compose_datoteka" run --rm --no-deps aplikacija node dist/cli/uvezi-rjecnik.js
+fi
+faza='rjecnik_spreman'
 zapisi_env "$novi_release_zapis"
 env_stvarni_promijenjen='da'
 faza='env_azuriran'

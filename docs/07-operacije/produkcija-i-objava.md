@@ -88,7 +88,7 @@ Detaljni koraci za početnika nalaze se u [Operacije for dummies](operacije-for-
 2. Postaviti Storage Box i dokazati off-server backup/restore postojećeg Discoursea.
 3. Stvoriti samo staging Primary IPv4 i VPS; očvrsnuti SSH, firewall i Docker.
 4. Zatražiti staging A zapis od XHostinga i postaviti Caddy HTTPS; staging je privremeno bez Basic Autha zbog Socket.IO promptova.
-5. Prvi workflow izvršava migracije, uvozi hrLex samo ako je rječnik prazan, pokreće aplikaciju i provjerava `/zdravlje`.
+5. Prvi workflow osigurava app DB ulogu (`kaladont_app`), izvršava migracije vlasničkim URL-om, uvozi hrLex samo ako je rječnik ispod praga, pokreće aplikaciju i provjerava `/zdravlje`. Prvi admin se dodjeljuje ručno: `node dist/cli/dodijeli-admina.js --email=… --potvrdi`.
 6. Ručno odigrati staging partiju i dokazati šifrirani backup/restore staging baze.
 7. Tek tada stvoriti i postaviti produkcijski Primary IPv4/VPS, Resend DNS, backup i monitoring.
 8. Ručno promovirati isti digest koji je prošao staging.

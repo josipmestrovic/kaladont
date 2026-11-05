@@ -2,8 +2,9 @@
   "name": "uvoz-rjecnika",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "scripts": {
+    "build": "tsc -p .",
     "start": "tsx src/index.ts",
     "analiza": "node --expose-gc --import tsx src/analiza.ts"
   },

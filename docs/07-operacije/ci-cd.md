@@ -1,6 +1,6 @@
 # CI/CD (GitHub Actions)
 
-> **Status 2026-11-03: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Job `kod` na početku pokreće pinani **actionlint** nad `.github/workflows/` (YAML sintaksa i Actions pravila). Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Prava backup automatika (systemd/`age`/Storage Box) još nije u repou — dok je nema, `skripte/zahtijevaj-svjez-offserver-backup.sh` namjerno pada prije migracija. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
+> **Status 2026-11-05: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Job `kod` na početku pokreće pinani **actionlint** nad `.github/workflows/` (YAML sintaksa i Actions pravila). Ista aplikacijska slika nosi CLI za DB uloge, migracije, provjeru/uvoz hrLexa i first-admin. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Prava backup automatika (systemd/`age`/Storage Box) još nije u repou — dok je nema, `skripte/zahtijevaj-svjez-offserver-backup.sh` namjerno pada prije migracija. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
 
 Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
 
@@ -57,7 +57,7 @@ Prije uključivanja workflowa moraju postojati i biti međusobno usklađeni:
 1. produkcijski Dockerfile s jednim Node procesom i OCI oznakom izvornog repozitorija;
 2. `docker-compose.staging.yml` i `docker-compose.prod.yml` bez javnog aplikacijskog ili DB porta;
 3. staging i produkcijski Caddyfile;
-4. jednokratne naredbe u istoj aplikacijskoj slici za migracije, provjeru/uvoz rječnika i dodjelu prvog admina;
+4. jednokratne naredbe u istoj aplikacijskoj slici za DB uloge (`osiguraj-db-uloge`), migracije, provjeru/uvoz rječnika (`provjeri-rjecnik` / `uvezi-rjecnik`) i dodjelu prvog admina (`dodijeli-admina`);
 5. mali licencno čist sintetički fixture rječnika za CI;
 6. prošireni `/zdravlje` koji provjerava bazu i rječnik te vraća 503 kad servis nije spreman;
 7. stvarno slanje emaila preko Resenda i E2E provjeru buildanog same-origin web/API servera;

@@ -340,9 +340,9 @@ Očekuješ da `KALADONT_IMAGE` i `DIGEST` sadrže isti puni image digest, a `VER
 Ne mijenjaj:
 
 - `BAZA_LOZINKA`;
+- `BAZA_APP_LOZINKA`;
 - `SESIJA_TAJNA`;
 - `EMAIL_API_KLJUC`;
-- `ADMIN_TAJNI_KLJUC`;
 - `STAGING_EMAIL_ALLOWLIST`;
 - domenu;
 - Docker volumee;

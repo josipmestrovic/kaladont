@@ -2,6 +2,8 @@
 
 Skripta `skripte/uvoz-rjecnika` pretvara hrLex u tablicu `rijeci`. Uvoz je **idempotentan** (ponovno pokretanje ne duplicira) i ispisuje statistiku za ljudsku provjeru.
 
+**Operaterski put iz Docker slike** (staging/produkcija): deploy skripte nakon migracija pokreću `node dist/cli/provjeri-rjecnik.js` (prag ≥ 1 000 000 redaka). Ako padne, pokreću `node dist/cli/uvezi-rjecnik.js`, koji poziva spakirani uvoznik u `/app/alati/uvoz-rjecnika` i kešira gz u `HRLEX_PODACI_DIR` (zadano `/tmp/kaladont-hrlex`). Lokalno i dalje: `pnpm --filter uvoz-rjecnika start`.
+
 ## Cjevovod
 
 ```mermaid

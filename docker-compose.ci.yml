@@ -19,7 +19,10 @@ services:
       NODE_ENV: test
       POSLUZUJ_WEB: 'true'
       PORT: 3000
-      BAZA_URL: postgresql://kaladont:kaladont@baza:5432/kaladont_ci
+      BAZA_URL: postgresql://kaladont_app:kaladont_app@baza:5432/kaladont_ci
+      BAZA_URL_MIGRACIJE: postgresql://kaladont:kaladont@baza:5432/kaladont_ci
+      BAZA_APP_LOZINKA: kaladont_app
+      HRLEX_PODACI_DIR: /tmp/kaladont-hrlex
       SESIJA_TAJNA: ci-test-secret
       EMAIL_API_KLJUC: ''
       EMAIL_POSILJATELJ: noreply@kaladont.hr
@@ -28,7 +31,7 @@ services:
       ONEMOGUCI_TIMER_POTEZA: 'false'
       ODGODA_POCETKA_PARTIJE_MS: '0'
       TOLERANCIJA_PREKIDA_MS: '10000'
-      ADMIN_TAJNI_KLJUC: ci-admin-secret
+      ADMIN_TAJNI_KLJUC: ''
       VERZIJA: ci
       DIGEST: ${IMAGE_DIGEST:-ci}
       SIMULACIJA_ADRESA: http://aplikacija:3000
