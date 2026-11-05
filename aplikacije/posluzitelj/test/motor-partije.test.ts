@@ -196,6 +196,35 @@ function cekajPrihvacenOdIgraca(
   });
 }
 
+/** Prvi matching event s bilo kojeg socketa; skida listenere čim stigne. */
+function cekajEventNaBiloKojem<T>(
+  socketi: readonly ClientSocket[],
+  ime: string,
+  predikat: (payload: T) => boolean = () => true,
+  timeoutMs = 8_000,
+  kontekst = '',
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ocisti();
+      reject(new Error(`Timeout ${timeoutMs}ms čekajući ${ime} na ${socketi.length} socketa${kontekst ? ` (${kontekst})` : ''}`));
+    }, timeoutMs);
+    const parovi: Array<readonly [ClientSocket, (payload: T) => void]> = socketi.map((socket) => {
+      const handler = (payload: T) => {
+        if (!predikat(payload)) return;
+        clearTimeout(timer);
+        ocisti();
+        resolve(payload);
+      };
+      socket.on(ime, handler);
+      return [socket, handler] as const;
+    });
+    function ocisti() {
+      for (const [socket, handler] of parovi) socket.off(ime, handler);
+    }
+  });
+}
+
 /** Kandidat s grupama - potrebno jer potez troši SVE grupe oblika (RS-28/RS-29, ADR-013). */
 interface KandidatRijec {
   rijec: string;
@@ -485,66 +514,75 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
 
   it('RS-09: prekid na potezu eliminira igrača i daje bod napadaču', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
+    try {
+      const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
+        igraci[0]!.socket.once('partija:pocetak', resolve);
+      });
+      const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
+      for (const igrac of igraci) igrac.socket.emit('red:udji');
+      const pocetak = await pocetakPromise;
+      const runda = await rundaPromise;
 
-    const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
-      igraci[0]!.socket.on('partija:pocetak', resolve);
-    });
-    const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
-    for (const igrac of igraci) igrac.socket.emit('red:udji');
-    const pocetak = await pocetakPromise;
-    const runda = await rundaPromise;
+      const otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;
+      const rijecZaIgru = await pronadjiRijecNaPrefiks(
+        runda.trazenaSlova,
+        new Set(await grupeRijeci(runda.rijec)),
+      );
 
-    const otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;
-    const rijecZaIgru = await pronadjiRijecNaPrefiks(
-      runda.trazenaSlova,
-      new Set(await grupeRijeci(runda.rijec)),
-    );
+      const kontekstPoteza = `otvarac=${otvarac.token} partija=${pocetak.partijaId}`;
+      const ishodPoteza = cekajJedanOd(otvarac.socket, ['potez:prihvacen', 'potez:odbijen']);
+      otvarac.socket.emit('potez:rijec', { rijec: rijecZaIgru, turnToken: runda.turnToken });
+      const ishod = await Promise.race([
+        ishodPoteza,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(`Timeout 8000ms čekajući potez (${kontekstPoteza})`)), 8_000);
+        }),
+      ]);
+      if (ishod.event === 'potez:odbijen') {
+        throw new Error(`Potez odbijen umjesto prihvaćen: ${(ishod.payload as { kod?: string }).kod ?? '?'}`);
+      }
+      const prihvaceno = ishod.payload as { igracId: string; sljedeciId: string };
+      if (prihvaceno.igracId !== otvarac.token) {
+        throw new Error(`Očekivan potez od ${otvarac.token}, stigao od ${prihvaceno.igracId}`);
+      }
 
-    const prihvacenoPromise = new Promise<{ sljedeciId: string }>((resolve) => {
-      otvarac.socket.on('potez:prihvacen', resolve);
-    });
-    otvarac.socket.emit('potez:rijec', { rijec: rijecZaIgru });
-    const prihvaceno = await prihvacenoPromise;
+      const sljedeci = igraci.find((ig) => ig.token === prihvaceno.sljedeciId)!;
+      const eliminacijaPromise = cekajEventNaBiloKojem<{ igracId: string; razlog: string; bodZa: string | null }>(
+        igraci.map((ig) => ig.socket),
+        'partija:eliminacija',
+        (e) => e.igracId === sljedeci.token,
+        8_000,
+        `sljedeci=${sljedeci.token} partija=${pocetak.partijaId}`,
+      );
 
-    const sljedeci = igraci.find((ig) => ig.token === prihvaceno.sljedeciId)!;
-    const promatraci = igraci.filter((ig) => ig !== sljedeci);
-    const eliminacijaPromise = new Promise<{ igracId: string; razlog: string; bodZa: string | null }>(
-      (resolve) => {
-        const slusatelji = promatraci.map((promatrac) => {
-          const slusatelj = (eliminacija: { igracId: string; razlog: string; bodZa: string | null }) => {
-            if (eliminacija.igracId !== sljedeci.token) return;
-            for (const [socket, aktivniSlusatelj] of slusatelji) socket.off('partija:eliminacija', aktivniSlusatelj);
-            resolve(eliminacija);
-          };
-          promatrac.socket.on('partija:eliminacija', slusatelj);
-          return [promatrac.socket, slusatelj] as const;
-        });
-      },
-    );
+      sljedeci.socket.emit('partija:izadji'); // prekid partije dok je na potezu (RS-09)
 
-    sljedeci.socket.emit('partija:izadji'); // prekid partije dok je na potezu (RS-09)
+      const eliminacija = await eliminacijaPromise;
+      expect(eliminacija.igracId).toBe(sljedeci.token);
+      expect(eliminacija.razlog).toBe('prekid');
+      expect(eliminacija.bodZa).toBe(otvarac.token); // napadac = autor zadnje prihvacene rijeci
 
-    const eliminacija = await eliminacijaPromise;
-    expect(eliminacija.igracId).toBe(sljedeci.token);
-    expect(eliminacija.razlog).toBe('prekid');
-    expect(eliminacija.bodZa).toBe(otvarac.token); // napadac = autor zadnje prihvacene rijeci
+      const preostali = igraci.filter((igrac) => igrac !== sljedeci);
+      const krajPromise = cekajEventNaBiloKojem<KrajPartije>(
+        preostali.map((ig) => ig.socket),
+        'partija:kraj',
+        () => true,
+        8_000,
+        `partija=${pocetak.partijaId}`,
+      );
+      preostali[0]!.socket.disconnect();
+      preostali[1]!.socket.disconnect();
+      await krajPromise;
 
-    const preostali = igraci.filter((igrac) => igrac !== sljedeci);
-    const krajPromise = new Promise<KrajPartije>((resolve) => {
-      for (const igrac of preostali) igrac.socket.once('partija:kraj', resolve);
-    });
-    preostali[0]!.socket.disconnect();
-    preostali[1]!.socket.disconnect();
-    await krajPromise;
-
-    const [spremljeniPrekid] = await baza
-      .select({ nacinIspadanja: sudioniciPartije.nacinIspadanja, iskustvo: sudioniciPartije.iskustvo })
-      .from(sudioniciPartije)
-      .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, sljedeci.igracId)));
-    expect(spremljeniPrekid?.nacinIspadanja).toBe('prekid');
-    expect(spremljeniPrekid?.iskustvo).toBe(0);
-
-    preostali[2]!.socket.disconnect();
+      const [spremljeniPrekid] = await baza
+        .select({ nacinIspadanja: sudioniciPartije.nacinIspadanja, iskustvo: sudioniciPartije.iskustvo })
+        .from(sudioniciPartije)
+        .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, sljedeci.igracId)));
+      expect(spremljeniPrekid?.nacinIspadanja).toBe('prekid');
+      expect(spremljeniPrekid?.iskustvo).toBe(0);
+    } finally {
+      odspojiIgrace(igraci);
+    }
   }, 30_000);
 
   it('RS-10: istek tolerancije izvan poteza je samoeliminacija bez boda, igra se nastavlja', async () => {

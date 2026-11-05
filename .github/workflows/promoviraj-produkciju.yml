@@ -20,6 +20,7 @@ concurrency:
 jobs:
   promocija:
     name: Promovirati isti digest u produkciju
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     environment: produkcija
 
@@ -38,7 +39,7 @@ jobs:
         id: release
         shell: bash
         env:
-          DIGEST_ULAZ: ${{ inputs.digest }}
+          DIGEST_ULAZ: ${{ github.event.inputs.digest }}
         run: |
           digest="$DIGEST_ULAZ"
           if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
