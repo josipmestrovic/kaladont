@@ -36,7 +36,7 @@ U Hetzner konzoli prvo stvori zasebnu **Primary IPv4** adresu u istoj lokaciji u
 
 Zapiši naziv, lokaciju, Primary IPv4 i očekivani SSH host fingerprint u Bitwarden. Stvarna vrijednost ne ulazi u git.
 
-Prva prijava s Windowsa (PowerShell):
+Prva prijava s Windowsa (PowerShell) tijekom početne postave može ići kao `root` dok hardening nije gotov. **Nakon očvršćivanja** (produkcija 2026-11-05) root SSH je isključen — za svakodnevni ulaz vidi [runbook-ssh-produkcija.md](runbook-ssh-produkcija.md).
 
 ```powershell
 ssh root@IP_ADRESA
