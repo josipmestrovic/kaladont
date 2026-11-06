@@ -17,7 +17,16 @@ describe('dostignuca', () => {
   it('ne otključava servisna dostignuća kroz izracunajNovaDostignuca', () => {
     const nova = izracunajNovaDostignuca(
       {},
-      { dovrseneMisije: 250, privatneIgre: 100, tjedniPaketi: 50, najboljiNizAktivnosti: 30 },
+      {
+        dovrseneMisije: 250,
+        privatneIgre: 100,
+        tjedniPaketi: 50,
+        najboljiNizAktivnosti: 30,
+        dvostrukeKrune: 50,
+        cistePetice: 100,
+        svePohvale: 50,
+        rijetkeGrdosije: 100,
+      },
       1,
       true,
     );
@@ -26,6 +35,10 @@ describe('dostignuca', () => {
     expect(idovi).not.toContain('privatnik');
     expect(idovi).not.toContain('tjedan_pod_kontrolom');
     expect(idovi).not.toContain('stalno_si_tu');
+    expect(idovi).not.toContain('dvostruka_kruna');
+    expect(idovi).not.toContain('cista_petica');
+    expect(idovi).not.toContain('sve_pohvale');
+    expect(idovi).not.toContain('rijetka_grdosija');
   });
 
   it('preskače više razina i vraća najvišu novu razinu', () => {
