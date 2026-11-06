@@ -3,11 +3,13 @@ import {
   DEFINICIJE_DOSTIGNUCA,
   MAKSIMALNO_ISKUSTVO,
   type MetrikeMisijaIgre,
+  type ObavijestOtkljucanogDostignuca,
   type PromjenaMisije,
   type UkupnoIskustvoIshoda,
   izracunajRazinuDostignuca,
   stanjeIskustva,
 } from 'zajednicko';
+import { priznajDovrsenuMisiju, priznajTjedniPaketAkoKompletan } from '../dostignuca/dodjela.js';
 import {
   dodjeleMisija,
   doprinosiMisijama,
@@ -27,6 +29,8 @@ export interface IshodMisijaPayload {
   ukupnoIskustvo: UkupnoIskustvoIshoda;
   misijeStanjeVerzija: number;
   novaDostignuca: { id: string; novaRazina: number; maksimalnaRazina: number }[];
+  /** Samo svježi obračun; ne sprema se u ishod pa se ne emitira ponovo. */
+  noveObavijesti?: ObavijestOtkljucanogDostignuca[];
 }
 
 function opisNapretka(naziv: string, prije: number, poslije: number, cilj: number): string {
@@ -59,7 +63,8 @@ export async function obracunajMisijeZaIgraca(
   satRng: MisijeSatRng = zadaniSatRng,
 ): Promise<IshodMisijaPayload> {
   const postojeći = await ucitajIliNullIshod(tx, metrike.igracId, metrike.kontekst, metrike.izvorId);
-  if (postojeći) return postojeći;
+  // Retry ne emitira ponovno — obavijesti su već obrađene u prvom prolazu.
+  if (postojeći) return { ...postojeći, noveObavijesti: [] };
 
   await osigurajStanjeMisija(tx, metrike.igracId, {
     sada: () => metrike.zavrsenoU,
@@ -195,6 +200,7 @@ export async function obracunajMisijeZaIgraca(
 
   let misijskiXpNominalno = 0;
   let misijskiXpStvarno = 0;
+  const noveObavijesti: ObavijestOtkljucanogDostignuca[] = [];
 
   for (const dodjela of dovrseneZaIsplatu) {
     const snapshot = dodjela.snapshot as SnapshotMisije;
@@ -218,6 +224,23 @@ export async function obracunajMisijeZaIgraca(
     if (promjena) {
       promjena.xpNominalno = nominalno;
       promjena.xpStvarnoDodijeljeno = stvarno;
+    }
+
+    const priznataMisija = await priznajDovrsenuMisiju(tx, {
+      igracId: metrike.igracId,
+      dodjelaId: dodjela.id,
+      zavrsenoU: metrike.zavrsenoU,
+    });
+    novaDostignuca.push(...priznataMisija.novaDostignuca);
+    noveObavijesti.push(...priznataMisija.noveObavijesti);
+    if (dodjela.vrsta === 'tjedna' && dodjela.ciklusId) {
+      const priznatiPaket = await priznajTjedniPaketAkoKompletan(tx, {
+        igracId: metrike.igracId,
+        ciklusId: dodjela.ciklusId,
+        zavrsenoU: metrike.zavrsenoU,
+      });
+      novaDostignuca.push(...priznatiPaket.novaDostignuca);
+      noveObavijesti.push(...priznatiPaket.noveObavijesti);
     }
   }
 
@@ -281,7 +304,8 @@ export async function obracunajMisijeZaIgraca(
     payload,
   }).onConflictDoNothing();
 
-  return (await ucitajIliNullIshod(tx, metrike.igracId, metrike.kontekst, metrike.izvorId)) ?? payload;
+  const spremljen = (await ucitajIliNullIshod(tx, metrike.igracId, metrike.kontekst, metrike.izvorId)) ?? payload;
+  return { ...spremljen, noveObavijesti };
 }
 
 export async function dohvatiIshodMisija(

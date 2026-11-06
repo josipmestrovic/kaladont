@@ -298,6 +298,20 @@ export interface NovoDostignuceTijekomPartije {
   dostignuca: { id: string; naziv: string; novaRazina: number; maksimalnaRazina: number }[];
 }
 
+/** Trajna osobna obavijest o novoj razini dostignuća (D01 i kasniji sandučić). */
+export interface ObavijestOtkljucanogDostignuca {
+  id: string;
+  dostignuceId: string;
+  naziv: string;
+  novaRazina: number;
+  maksimalnaRazina: number;
+  izvor: string | null;
+}
+
+export interface NovostiDostignuca {
+  obavijesti: ObavijestOtkljucanogDostignuca[];
+}
+
 /** Privatni obračun eliminiranog igrača; trajni upis slijedi pri završetku partije. */
 export interface ObracunIskustvaTijekomPartije {
   partijaId: string;
@@ -407,6 +421,7 @@ export interface DogadajiPosluziteljKlijent {
   'trening:neaktivnost': (payload: TreningNeaktivnost) => void;
   'partija:kraj': (payload: KrajPartije) => void;
   'dostignuce:otkljucano': (payload: NovoDostignuceTijekomPartije) => void;
+  'dostignuca:novosti': (payload: NovostiDostignuca) => void;
   'iskustvo:obracun': (payload: ObracunIskustvaTijekomPartije) => void;
   'reakcija:nova': (payload: { igracId: string; poruka: BrzaPoruka }) => void;
   'soba:stvorena': (payload: { kod: string }) => void;

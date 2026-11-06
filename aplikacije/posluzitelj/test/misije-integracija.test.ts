@@ -349,7 +349,18 @@ describe('misije API i stanje', () => {
     const drugi = await baza.transaction((tx) =>
       obracunajMisijeZaIgraca(tx, metrike, 100, 50, { sada: () => sada, rng: fiksniRng() }),
     );
-    expect(drugi).toEqual(prvi);
+    expect({
+      promjeneMisija: drugi.promjeneMisija,
+      ukupnoIskustvo: drugi.ukupnoIskustvo,
+      misijeStanjeVerzija: drugi.misijeStanjeVerzija,
+      novaDostignuca: drugi.novaDostignuca,
+    }).toEqual({
+      promjeneMisija: prvi.promjeneMisija,
+      ukupnoIskustvo: prvi.ukupnoIskustvo,
+      misijeStanjeVerzija: prvi.misijeStanjeVerzija,
+      novaDostignuca: prvi.novaDostignuca,
+    });
+    expect(drugi.noveObavijesti ?? []).toEqual([]);
     expect(prvi.promjeneMisija.some((p) => p.predlozakId === 'D01' && p.poslije >= 1)).toBe(true);
 
     const treningId = randomUUID();
@@ -396,7 +407,18 @@ describe('misije API i stanje', () => {
     const t2 = await baza.transaction((tx) =>
       obracunajMisijeZaIgraca(tx, treningMetrike, 120, 100, { sada: () => sada, rng: fiksniRng() }),
     );
-    expect(t2).toEqual(t1);
+    expect({
+      promjeneMisija: t2.promjeneMisija,
+      ukupnoIskustvo: t2.ukupnoIskustvo,
+      misijeStanjeVerzija: t2.misijeStanjeVerzija,
+      novaDostignuca: t2.novaDostignuca,
+    }).toEqual({
+      promjeneMisija: t1.promjeneMisija,
+      ukupnoIskustvo: t1.ukupnoIskustvo,
+      misijeStanjeVerzija: t1.misijeStanjeVerzija,
+      novaDostignuca: t1.novaDostignuca,
+    });
+    expect(t2.noveObavijesti ?? []).toEqual([]);
     expect(t1.promjeneMisija.some((p) => p.predlozakId === 'D10' && p.upravoDovrsena)).toBe(true);
   });
 

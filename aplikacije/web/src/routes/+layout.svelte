@@ -7,6 +7,7 @@
   import PadajuceRijeci from '$lib/komponente/PadajuceRijeci.svelte';
   import { inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { pokreniEvidencijuAktivnogDana } from '$lib/aktivnost-dana.js';
+  import { pokreniObavijestiDostignuca } from '$lib/obavijesti-dostignuca.svelte.js';
   import {
     inicijalizirajAudio,
     inicijalizirajGlobalneUiZvukove,
@@ -19,6 +20,7 @@
   import Header from '$lib/komponente/Header.svelte';
   import VezaObavijest from '$lib/komponente/VezaObavijest.svelte';
   import UspjehObavijest from '$lib/komponente/UspjehObavijest.svelte';
+  import DostignuceObavijest from '$lib/komponente/DostignuceObavijest.svelte';
   import CitanjeNaglasObavijest from '$lib/komponente/CitanjeNaglasObavijest.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import BootUcitavanje from '$lib/komponente/BootUcitavanje.svelte';
@@ -79,6 +81,7 @@
     inicijalizirajAudio();
 
     let zaustaviEvidenciju = () => {};
+    let zaustaviObavijesti = () => {};
     const naNaslovnici = $page.url.pathname === '/';
     const sesija = inicijalizirajGostSesiju();
 
@@ -106,9 +109,13 @@
       inicijalizirajGlobalneUiZvukove();
       pokreniSlusateljeIgre();
       zaustaviEvidenciju = pokreniEvidencijuAktivnogDana();
+      zaustaviObavijesti = pokreniObavijestiDostignuca();
     })();
 
-    return () => zaustaviEvidenciju();
+    return () => {
+      zaustaviEvidenciju();
+      zaustaviObavijesti();
+    };
   });
 </script>
 
@@ -116,6 +123,7 @@
   <div class="status-obavijesti">
     <VezaObavijest />
     <UspjehObavijest />
+    <DostignuceObavijest />
     <CitanjeNaglasObavijest />
   </div>
   {#if $page.url.pathname === '/' && sesijaSpreman && navIkoneSpremane}<PadajuceRijeci />{/if}
@@ -165,7 +173,8 @@
   }
 
   .status-obavijesti :global(.veza-obavijest),
-  .status-obavijesti :global(.obavijest-citanja-naglas) {
+  .status-obavijesti :global(.obavijest-citanja-naglas),
+  .status-obavijesti :global(.red-dostignuca) {
     position: relative;
     inset: auto;
     width: 100%;

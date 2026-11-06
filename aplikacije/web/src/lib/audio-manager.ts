@@ -6,6 +6,7 @@ export type AudioDogadaj =
   | 'odbrojavanje-single-count-sound'
   | 'pocetak-partije'
   | 'potez-prihvacen'
+  | 'dostignuce-otkljucano'
   | 'potez-odbijen-1'
   | 'potez-odbijen-2'
   | 'potez-odbijen-3'
@@ -25,6 +26,7 @@ const ZVUKOVI: Record<AudioDogadaj, string> = {
   'odbrojavanje-single-count-sound': '/zvukovi/odbrojavanje-single-count-sound.mp3',
   'pocetak-partije': '/zvukovi/pocetak-partije.mp3',
   'potez-prihvacen': '/zvukovi/potez-prihvacen.mp3',
+  'dostignuce-otkljucano': '/zvukovi/potez-prihvacen.mp3',
   'potez-odbijen-1': '/zvukovi/potez-odbijen-1.mp3',
   'potez-odbijen-2': '/zvukovi/potez-odbijen-2.mp3',
   'potez-odbijen-3': '/zvukovi/potez-odbijen-3.mp3',
@@ -82,6 +84,7 @@ const POJACANJE_PO_DOGADAJU: Record<AudioDogadaj, number> = {
   'odbrojavanje-single-count-sound': 0.6,
   'pocetak-partije': 0.6,
   'potez-prihvacen': 0.6,
+  'dostignuce-otkljucano': 0.6,
   'potez-odbijen-1': 0.6,
   'potez-odbijen-2': 0.6,
   'potez-odbijen-3': 0.6,

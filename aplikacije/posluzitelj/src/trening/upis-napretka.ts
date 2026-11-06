@@ -1,7 +1,8 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajRazinuDostignuca, DEFINICIJE_DOSTIGNUCA, type MetrikeMisijaIgre } from 'zajednicko';
+import { izracunajRazinuDostignuca, DEFINICIJE_DOSTIGNUCA, type MetrikeMisijaIgre, type ObavijestOtkljucanogDostignuca } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, pobjedeTreninga } from '../baza/shema.js';
+import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca, type IshodMisijaPayload } from '../misije/obracun.js';
 
 const PRAGOVI_ZAGRIJANOG = [1, 5, 20, 50, 100] as const;
@@ -25,7 +26,7 @@ export async function zabiljeziPobjeduTreninga(
     najduziNiz: number;
   },
 ): Promise<RezultatTreningPobjede | null> {
-  return baza.transaction(async (tx) => {
+  const rezultat = await baza.transaction(async (tx) => {
     const [igrac] = await tx.select({
       vrsta: igraci.vrsta,
       upravljac: igraci.upravljac,
@@ -52,6 +53,7 @@ export async function zabiljeziPobjeduTreninga(
         novaRazina: 0,
         maksimalnaRazina: PRAGOVI_ZAGRIJANOG.length,
         ishodMisija,
+        obavijesti: [] as ObavijestOtkljucanogDostignuca[],
       };
     }
 
@@ -112,8 +114,18 @@ export async function zabiljeziPobjeduTreninga(
       novaRazina,
       maksimalnaRazina: PRAGOVI_ZAGRIJANOG.length,
       ishodMisija,
+      obavijesti: ishodMisija.noveObavijesti ?? [],
     };
   });
+
+  if (rezultat?.obavijesti.length) emitirajNovostiDostignuca(igracId, rezultat.obavijesti);
+  if (!rezultat) return null;
+  return {
+    pobjede: rezultat.pobjede,
+    novaRazina: rezultat.novaRazina,
+    maksimalnaRazina: rezultat.maksimalnaRazina,
+    ishodMisija: rezultat.ishodMisija,
+  };
 }
 
 export async function promovirajTreningGrupe(igracId: string, grupe: readonly string[]) {

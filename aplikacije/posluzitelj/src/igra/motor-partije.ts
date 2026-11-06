@@ -1247,7 +1247,7 @@ export function stvoriUpraviteljPartija(
         bodovi: 0,
         eliminacije: 0,
         iskustvo: 0,
-        nacinIspadanja: 'pobjednik' as const,
+        nacinIspadanja: p.plasman === 1 ? ('pobjednik' as const) : nacinIspadanjaZaIgraca(stanje, p.igracId),
       }));
       pokreniSpremanjeRezultata(
         stanje,
