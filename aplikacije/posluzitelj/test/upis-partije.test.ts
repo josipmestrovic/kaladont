@@ -180,8 +180,11 @@ describe('upis partije i javne pobjede', () => {
   it('privatna partija ne zapisuje statistiku javnog moda', async () => {
     await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Privatni Test' });
 
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'cetiri_igraca', status: 'u_tijeku' });
     await zakljuciPartijuUBazi(
-      randomUUID(),
+      partijaId,
       igracId,
       [{ igracId, plasman: 1, bodovi: 2, eliminacije: 0, iskustvo: 0, nacinIspadanja: 'pobjednik' }],
       'cetiri_igraca',
@@ -261,9 +264,11 @@ describe('upis partije i javne pobjede', () => {
     const obracun = (partijaId: string) => zakljuciPartijuUBazi(partijaId, igracId, rezultati, 'dva_igraca', new Map([[igracId, statistika]]), true, napredak);
     const prviId = randomUUID();
     obracuniZaBrisanje.push(prviId);
+    await baza.insert(partije).values({ id: prviId, mod: 'dva_igraca', status: 'u_tijeku' });
     await Promise.all([obracun(prviId), obracun(prviId)]);
     const drugiId = randomUUID();
     obracuniZaBrisanje.push(drugiId);
+    await baza.insert(partije).values({ id: drugiId, mod: 'dva_igraca', status: 'u_tijeku' });
     await obracun(drugiId);
 
     const [otkljucana] = await baza.select({ zaDostignuca: otkljucaneGrupeIgraca.zaDostignuca }).from(otkljucaneGrupeIgraca).where(and(eq(otkljucaneGrupeIgraca.igracId, igracId), eq(otkljucaneGrupeIgraca.grupa, grupa)));

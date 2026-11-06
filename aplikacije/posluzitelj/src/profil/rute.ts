@@ -466,12 +466,17 @@ async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number
   const razinaIskustva = stanjeIskustva(iskustvoUkupno).razina;
   const razine = new Map(otkljucana.map((redak) => [redak.dostignuceId, redak.razina]));
   const dostignuca = DEFINICIJE_DOSTIGNUCA.map((definicija) => {
-    const vrijednost =
-      definicija.brojac === 'razina'
-        ? razinaIskustva
-        : definicija.brojac === 'najboljiNizAktivnosti'
-          ? najboljiNizAktivnosti
-          : Number(brojac?.[definicija.brojac as keyof typeof brojac] ?? 0);
+    const vrijednost = definicija.brojac === 'razina'
+      ? razinaIskustva
+      : definicija.brojac === 'najboljiNizAktivnosti'
+        ? najboljiNizAktivnosti
+        : definicija.brojac === 'dovrseneMisije'
+          ? (brojac?.dovrseneMisije ?? 0)
+          : definicija.brojac === 'privatneIgre'
+            ? (brojac?.privatneIgre ?? 0)
+            : definicija.brojac === 'tjedniPaketi'
+              ? (brojac?.tjedniPaketi ?? 0)
+              : Number(brojac?.[definicija.brojac as keyof typeof brojac] ?? 0);
     const izracunataRazina = izracunajRazinuDostignuca(definicija, vrijednost);
     const razina = Math.max(razine.get(definicija.id) ?? 0, izracunataRazina);
     const zapis = otkljucana.find((redak) => redak.dostignuceId === definicija.id);

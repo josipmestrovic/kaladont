@@ -4,11 +4,13 @@
  * uspješan upis početka i svih poteza prije isplate XP-a (idempotentni retry).
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajNovaDostignuca, izracunajOcjenuIgre, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type NovoDostignuce, type PohvalaIgre, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajOcjenuIgre, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
+import { priznajPrivatnika } from '../dostignuca/dodjela.js';
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca } from '../misije/obracun.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
@@ -236,6 +238,14 @@ export function sazetakMetrika(statistika: ZapisStatistikeRijeci | undefined) {
   };
 }
 
+function jeNamjerniIzlazak(nacin: string): boolean {
+  return nacin === 'prekid' || nacin === 'odspajanje' || nacin === 'napustanje';
+}
+
+function jeLjudskiRacun(vrsta: string, upravljac: string): boolean {
+  return upravljac === 'covjek' && (vrsta === 'registriran' || vrsta === 'admin');
+}
+
 /** Zaključuje partiju transakcijski i vraća ažurirane agregate (bodovi_ukupno, odigrane) po igraču. */
 export async function zakljuciPartijuUBazi(
   partijaId: string,
@@ -250,7 +260,57 @@ export async function zakljuciPartijuUBazi(
   osnovniBrutoPoIgracu: Map<string, number> = new Map(),
 ): Promise<Map<string, AgregatZakljucka>> {
   const agregati = new Map<string, AgregatZakljucka>();
+  const obavijestiPoIgracu = new Map<string, ObavijestOtkljucanogDostignuca[]>();
   const modStatistike = mod;
+
+  const zapamtiObavijesti = (igracId: string, obavijesti: readonly ObavijestOtkljucanogDostignuca[]) => {
+    if (obavijesti.length === 0) return;
+    const lista = obavijestiPoIgracu.get(igracId) ?? [];
+    lista.push(...obavijesti);
+    obavijestiPoIgracu.set(igracId, lista);
+  };
+
+  const pridruziDostignuca = (
+    igracId: string,
+    nova: readonly NovoDostignuce[],
+    upravljac: 'covjek' | 'bot',
+    vrstaIgraca: 'gost' | 'registriran' | 'admin',
+    iskustvoPrijePartije: number,
+  ) => {
+    if (nova.length === 0) return;
+    const postojeci = agregati.get(igracId);
+    if (!postojeci) {
+      agregati.set(igracId, {
+        bodoviUkupno: 0,
+        odigrane: 0,
+        pobjede: 0,
+        iskustvoUkupno: 0,
+        novaDostignuca: [...nova],
+        dnkPrije: [],
+        dnkPoslije: [],
+        ocjenaIgre: null,
+        bonusOcjenaIgre: 0,
+        nizPrije: 0,
+        nizPoslije: 0,
+        najboljiNiz: 0,
+        osnovniXp: 0,
+        bonusPobjednickogNizaPostotak: 0,
+        bonusPobjednickogNizaXp: 0,
+        forma: null,
+        pohvale: [],
+        upravljac,
+        vrstaIgraca,
+        iskustvoPrijePartije,
+      });
+      return;
+    }
+    const poId = new Map(postojeci.novaDostignuca.map((dostignuce) => [dostignuce.id, dostignuce]));
+    for (const dostignuce of nova) {
+      const staro = poId.get(dostignuce.id);
+      if (!staro || dostignuce.novaRazina > staro.novaRazina) poId.set(dostignuce.id, dostignuce);
+    }
+    postojeci.novaDostignuca = [...poId.values()];
+  };
 
   await baza.transaction(async (tx) => {
     const brojNovihRijetkihGrupa = new Map<string, number>();
@@ -729,6 +789,17 @@ export async function zakljuciPartijuUBazi(
             .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)));
         }
       }
+
+      if (
+        samoStatistika
+        && jeLjudskiRacun(vrstaIgraca, upravljac)
+        && (statistike.get(r.igracId)?.prihvaceniPotezi ?? 0) >= 1
+        && !jeNamjerniIzlazak(r.nacinIspadanja)
+      ) {
+        const privatnik = await priznajPrivatnika(tx, { igracId: r.igracId, partijaId, zavrsenoU });
+        zapamtiObavijesti(r.igracId, privatnik.noveObavijesti);
+        pridruziDostignuca(r.igracId, privatnik.novaDostignuca, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+      }
     }
 
     if (!samoStatistika) {
@@ -865,9 +936,14 @@ export async function zakljuciPartijuUBazi(
           }
           agregat.novaDostignuca = [...poId.values()];
         }
+        zapamtiObavijesti(igracId, ishod.noveObavijesti ?? []);
       }
     }
   });
+
+  for (const [igracId, obavijesti] of obavijestiPoIgracu) {
+    emitirajNovostiDostignuca(igracId, obavijesti);
+  }
 
   return agregati;
 }
