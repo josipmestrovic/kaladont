@@ -239,6 +239,10 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   cistePetice: integer('ciste_petice').notNull().default(0),
   svePohvale: integer('sve_pohvale').notNull().default(0),
   rijetkeGrdosije: integer('rijetke_grdosije').notNull().default(0),
+  dnevneDesetke: integer('dnevne_desetke').notNull().default(0),
+  tjedneElite: integer('tjedne_elite').notNull().default(0),
+  mjesecneElite: integer('mjesecne_elite').notNull().default(0),
+  naDvijeFronte: integer('na_dvije_fronte').notNull().default(0),
   anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
@@ -687,6 +691,51 @@ export const dokaziDostignucaRijetkaGrdosija = pgTable('dokazi_dostignuca_rijetk
   normaliziraniOblik: text('normalizirani_oblik').notNull(),
 }, (tablica) => [
   primaryKey({ columns: [tablica.igracId, tablica.normaliziraniOblik] }),
+]);
+
+/**
+ * Prvi ulazak u Top 10 jednog moda i kalendarskog razdoblja.
+ * `obradjeno_u` je trajni red: null znači da nagrada još nije provedena.
+ */
+export const dokaziTop10Ulazaka = pgTable('dokazi_top10_ulazaka', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  vrstaRazdoblja: text('vrsta_razdoblja').notNull(),
+  kalendarskiPocetak: timestamp('kalendarski_pocetak', { withTimezone: true }).notNull(),
+  mod: modPartije('mod').notNull(),
+  metrika: text('metrika').notNull(),
+  mjesto: smallint('mjesto').notNull(),
+  opazenoU: timestamp('opazeno_u', { withTimezone: true }).notNull(),
+  izvor: text('izvor').notNull(),
+  izvorPartijaId: uuid('izvor_partija_id').references(() => partije.id, { onDelete: 'set null' }),
+  obradjenoU: timestamp('obradjeno_u', { withTimezone: true }),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_top10_ulazaka_pk', columns: [tablica.igracId, tablica.vrstaRazdoblja, tablica.kalendarskiPocetak, tablica.mod] }),
+  check('chk_dokazi_top10_ulazaka_vrsta', sql`${tablica.vrstaRazdoblja} in ('dnevno', 'tjedno', 'mjesecno')`),
+  check('chk_dokazi_top10_ulazaka_metrika', sql`${tablica.metrika} in ('prosjek_bodova', 'niz_pobjeda')`),
+  check('chk_dokazi_top10_ulazaka_mjesto', sql`${tablica.mjesto} between 1 and 10`),
+  check('chk_dokazi_top10_ulazaka_izvor', sql`${tablica.izvor} in ('partija', 'brisanje')`),
+  index('idx_dokazi_top10_ulazaka_neobradeni').on(tablica.igracId).where(sql`${tablica.obradjenoU} is null`),
+  index('idx_dokazi_top10_ulazaka_partija').on(tablica.izvorPartijaId).where(sql`${tablica.obradjenoU} is null and ${tablica.izvorPartijaId} is not null`),
+]);
+
+/** Jedan doprinos Dnevnoj desetki, Tjednoj eliti ili Mjesečnoj eliti po kalendarskom početku. */
+export const dokaziDostignucaTop10 = pgTable('dokazi_dostignuca_top10', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  dostignuceId: text('dostignuce_id').notNull(),
+  kalendarskiPocetak: timestamp('kalendarski_pocetak', { withTimezone: true }).notNull(),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_dostignuca_top10_pk', columns: [tablica.igracId, tablica.dostignuceId, tablica.kalendarskiPocetak] }),
+  check('chk_dokazi_dostignuca_top10_id', sql`${tablica.dostignuceId} in ('dnevna_desetka', 'tjedna_elita', 'mjesecna_elita')`),
+]);
+
+/** Par Top 10 u oba moda za istu vrstu i kalendarski početak razdoblja. */
+export const dokaziDostignucaNaDvijeFronte = pgTable('dokazi_dostignuca_na_dvije_fronte', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  vrstaRazdoblja: text('vrsta_razdoblja').notNull(),
+  kalendarskiPocetak: timestamp('kalendarski_pocetak', { withTimezone: true }).notNull(),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_dostignuca_na_dvije_fronte_pk', columns: [tablica.igracId, tablica.vrstaRazdoblja, tablica.kalendarskiPocetak] }),
+  check('chk_dokazi_na_dvije_fronte_vrsta', sql`${tablica.vrstaRazdoblja} in ('dnevno', 'tjedno', 'mjesecno')`),
 ]);
 
 /** Trajne osobne obavijesti (seed za kasniji sandučić). Neprikazane čeka klijent. */
