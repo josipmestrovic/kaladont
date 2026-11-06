@@ -73,6 +73,7 @@ import {
   type StatusOtvaranjaAnalitike,
   type UpravljacOtvaranjaAnalitike,
 } from '../analitika/otvaranja.js';
+import { mapirajVrstuRacuna, zabiljeziKrajIgre, zabiljeziPocetakIgre } from '../analitika/igre.js';
 
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50), turnToken: z.string().min(1).max(64).optional() }).strict();
 const ShemaNeznam = z.object({ turnToken: z.string().min(1).max(64).optional() }).strict().optional();
@@ -357,10 +358,26 @@ export function stvoriUpraviteljPartija(
     return true;
   }
 
+  function zabiljeziAnalitikuPocetka(stanje: StanjeStola): void {
+    zabiljeziPocetakIgre({
+      igraId: stanje.partijaId,
+      kontekst: stanje.kontekst,
+      mod: stanje.mod,
+      pocetakU: new Date(stanje.pocetakPartijeMs),
+      sudionici: stanje.sudionici
+        .filter((s) => s.upravljac === 'covjek')
+        .map((s) => ({
+          igracId: s.igracId,
+          vrstaRacunaNaPocetku: mapirajVrstuRacuna(s.vrsta),
+        })),
+    });
+  }
+
   function ponistiStol(stanje: StanjeStola, poruka: string): void {
     if (stanje.zavrsena) return;
     const partijaId = stanje.partijaId;
     stanje.zavrsena = true;
+    zabiljeziKrajIgre(partijaId, new Date(sat.sada()), 'prekinuta');
     namjerniIsteciBotova.delete(partijaId);
     if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
     if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
@@ -1015,6 +1032,7 @@ export function stvoriUpraviteljPartija(
         kontekst,
         sudionici.filter((s) => s.upravljac === 'bot').map((s) => s.igracId),
       );
+      zabiljeziAnalitikuPocetka(stanje);
       stanje.izborHandle = sat.zakazi(() => objaviRijecSustava(stanje, null), odgodaPocetka);
       return 'pokrenuta' as const;
     }).catch((greska) => {
@@ -1063,6 +1081,7 @@ export function stvoriUpraviteljPartija(
 
   function zakljuciPartiju(stanje: StanjeStola): void {
     stanje.zavrsena = true;
+    zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'zavrsena');
     if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
     if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
     // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.
@@ -2513,6 +2532,7 @@ export function stvoriUpraviteljPartija(
     for (const s of sudionici) {
       aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
     }
+    zabiljeziAnalitikuPocetka(stanje);
 
     void Promise.all([upisPocetkaPrivatnePartije, ucitajOtkljucaneGrupe(sudionici), ucitajGrupeZaDostignuca(sudionici)]).then(([, grupe, grupeDostignuca]) => {
       stanje.grupeSNagradom = grupe;

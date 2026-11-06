@@ -693,3 +693,27 @@ export const analitikaOtvaranja = pgTable('analitika_otvaranja', {
     sql`${tablica.incidentPozicija} is null or ${tablica.incidentPozicija} in (1, 2)`,
   ),
 ]);
+
+export const ishodAnalitikeIgre = pgEnum('ishod_analitike_igre', ['zavrsena', 'prekinuta', 'nepotpuno']);
+export const vrstaRacunaAnalitike = pgEnum('vrsta_racuna_analitike', ['gost', 'registriran']);
+
+export const analitikaIgre = pgTable('analitika_igre', {
+  igraId: uuid('igra_id').primaryKey(),
+  kontekst: kontekstAnalitike('kontekst').notNull(),
+  mod: modPartije('mod').notNull(),
+  pocetakU: timestamp('pocetak_u', { withTimezone: true }).notNull(),
+  krajU: timestamp('kraj_u', { withTimezone: true }),
+  ishod: ishodAnalitikeIgre('ishod'),
+}, (tablica) => [
+  index('idx_analitika_igre_pocetak').on(tablica.pocetakU, tablica.kontekst),
+  index('idx_analitika_igre_kraj').on(tablica.krajU, tablica.ishod, tablica.kontekst),
+]);
+
+export const analitikaSudjelovanja = pgTable('analitika_sudjelovanja', {
+  igraId: uuid('igra_id').notNull().references(() => analitikaIgre.igraId, { onDelete: 'cascade' }),
+  igracId: uuid('igrac_id').notNull(),
+  vrstaRacunaNaPocetku: vrstaRacunaAnalitike('vrsta_racuna_na_pocetku').notNull(),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igraId, tablica.igracId] }),
+  index('idx_analitika_sudjelovanja_igrac').on(tablica.igracId),
+]);

@@ -37,10 +37,24 @@
     dodijeljenoU: string;
   }
 
+  interface Dnevno {
+    dani: { dan: string; zapocete: number; zavrsene: number }[];
+    ljudi: {
+      igraci: number;
+      igraciS2Plus: number;
+      postotakS2Plus: number | null;
+      postotakGost: number | null;
+      postotakRegistriran: number | null;
+      sudjelovanjaGost: number;
+      sudjelovanjaRegistriran: number;
+    };
+  }
+
   let od = $state('');
   let doDana = $state('');
   let kontekst = $state<'' | 'javna' | 'privatna' | 'trening'>('');
   let agregat = $state<AgregatPocetnih | null>(null);
+  let dnevno = $state<Dnevno | null>(null);
   let incidenti = $state<IncidentRedak[]>([]);
   let ukupnoIncidenata = $state(0);
   let stranica = $state(1);
@@ -66,11 +80,13 @@
     greska = null;
     try {
       const q = query();
-      const [a, i] = await Promise.all([
+      const [a, i, d] = await Promise.all([
         api<AgregatPocetnih & { ok: boolean }>(`/admin/analitika/pocetne-rijeci?${q}`),
         api<{ ok: boolean; ukupno: number; incidenti: IncidentRedak[] }>(`/admin/analitika/incidenti?${q}`),
+        api<Dnevno & { ok: boolean; od: string; do: string }>(`/admin/analitika/dnevno?${q}`),
       ]);
       agregat = a;
+      dnevno = d;
       if (!od) od = a.od;
       if (!doDana) doDana = a.do;
       incidenti = i.incidenti;
@@ -120,6 +136,31 @@
   </label>
   <button type="submit">Osvježi</button>
 </form>
+
+{#if dnevno}
+  <section aria-labelledby="dnevno-naslov">
+    <h2 id="dnevno-naslov">Dnevno igranje</h2>
+    <dl class="kartice">
+      <div><dt>Gost sudjelovanja</dt><dd>{postotak(dnevno.ljudi.postotakGost)}</dd></div>
+      <div><dt>Registrirani sudjelovanja</dt><dd>{postotak(dnevno.ljudi.postotakRegistriran)}</dd></div>
+      <div><dt>Igrači s 2+ igrama</dt><dd>{dnevno.ljudi.igraciS2Plus} / {dnevno.ljudi.igraci} ({postotak(dnevno.ljudi.postotakS2Plus)})</dd></div>
+    </dl>
+    <table>
+      <thead>
+        <tr><th>Dan</th><th>Započete</th><th>Završene</th></tr>
+      </thead>
+      <tbody>
+        {#each dnevno.dani as red (red.dan)}
+          <tr>
+            <td>{red.dan}</td>
+            <td>{red.zapocete}</td>
+            <td>{red.zavrsene}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </section>
+{/if}
 
 {#if agregat}
   <section aria-labelledby="pocetne-naslov">

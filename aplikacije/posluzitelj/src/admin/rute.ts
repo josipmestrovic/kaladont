@@ -25,6 +25,7 @@ import {
   ANALITIKA_VREMENSKA_ZONA,
   type KontekstOtvaranjaAnalitike,
 } from '../analitika/otvaranja.js';
+import { agregirajDnevneIgre } from '../analitika/igre.js';
 
 /** Živi brojači iz memorije procesa; nisu trajni i vrijede od zadnjeg pokretanja. */
 export interface ZivoStanjeBotova {
@@ -508,5 +509,23 @@ export async function registrirajAdminRute(
     const incident = await dohvatiIncidentPoId(id.data);
     if (!incident) return odgovor.code(404).send({ ok: false, greska: 'Incident nije pronađen.' });
     return { ok: true, incident };
+  });
+
+  app.get('/admin/analitika/dnevno', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const filter = parsirajFilterAnalitike(zahtjev.query);
+    if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
+    const dnevno = await agregirajDnevneIgre({
+      odDan: filter.od,
+      doDan: filter.do,
+      kontekst: filter.kontekst,
+    });
+    return {
+      ok: true,
+      od: filter.od,
+      do: filter.do,
+      kontekst: filter.kontekst ?? null,
+      ...dnevno,
+    };
   });
 }
