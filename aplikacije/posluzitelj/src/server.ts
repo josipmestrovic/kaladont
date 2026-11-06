@@ -25,7 +25,8 @@ import { registrirajProfilRute } from './profil/rute.js';
 import { registrirajLjestviceRute } from './ljestvice/rute.js';
 import { registrirajMisijeRute } from './misije/rute.js';
 import { registrirajDostignucaRute } from './dostignuca/rute.js';
-import { postaviVezeZaObavijestiDostignuca } from './dostignuca/obavijesti.js';
+import { postaviVezeZaObavijestiDostignuca, emitirajNovostiDostignuca } from './dostignuca/obavijesti.js';
+import { obradiNeobradeneTop10Dokaze } from './dostignuca/top10.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
 import { spremiTrajnePostavkeBotova, ucitajTrajnePostavkeBotova } from './bot/trajne-postavke.js';
@@ -786,6 +787,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     await new Promise<void>((resolve) => io.close(() => resolve()));
     await app.close();
   };
+
+  void obradiNeobradeneTop10Dokaze().then((poIgracu) => {
+    for (const [igracId, obavijesti] of poIgracu) emitirajNovostiDostignuca(igracId, obavijesti);
+  }).catch((greska: unknown) => {
+    app.log.error({ greska }, 'Oporavak neobrađenih Top 10 dokaza nije uspio');
+  });
 
   return { app, io, zaustavi, brojaciTreninga: treningServis.brojaci, brojaciBota: botKontroler.brojaci, fondBotova };
 }

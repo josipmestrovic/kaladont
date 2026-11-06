@@ -142,15 +142,22 @@ function uStavku(metrika: MetrikaLjestvice, redak: RedakUpita): StavkaPoretka {
   };
 }
 
+/** Isti SQL kao javni prikaz. `izvrsitelj` je transakcija kad snimka mora vidjeti još necommitani rezultat. */
+export interface IzvrsiteljPoretka {
+  execute(upit: SQL): Promise<Iterable<RedakUpita>>;
+}
+
 export async function izracunajPoredak(
   mod: ModPartije,
   metrika: MetrikaLjestvice,
   razdoblje: RazdobljeLjestvice,
   od: Date,
   doTrenutka: Date,
+  izvrsitelj?: IzvrsiteljPoretka,
 ): Promise<Poredak> {
   const minimumIgara = minimumIgaraZaRazdoblje(razdoblje);
-  const redci = await baza.execute<RedakUpita>(upitPoretka(mod, metrika, od, doTrenutka, minimumIgara));
+  const izvor = izvrsitelj ?? (baza as unknown as IzvrsiteljPoretka);
+  const redci = await izvor.execute(upitPoretka(mod, metrika, od, doTrenutka, minimumIgara));
   const poIgracu = new Map<string, StavkaPoretka>();
   const rangirani: StavkaPoretka[] = [];
   for (const redak of redci) {

@@ -20,6 +20,10 @@ export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
   cista_petica: '/ikone/42-jezik-u-plamenu.png',
   sve_pohvale: '/ikone/65-vladar-niza.webp',
   rijetka_grdosija: '/ikone/40-rijetkolovac.png',
+  dnevna_desetka: '/ikone/09-ljestvice.png',
+  tjedna_elita: '/ikone/09-ljestvice.png',
+  mjesecna_elita: '/ikone/09-ljestvice.png',
+  na_dvije_fronte: '/ikone/06-trofej.png',
 };
 
 export function ikonaDostignuca(id: string): string {

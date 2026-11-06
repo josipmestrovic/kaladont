@@ -15,9 +15,11 @@ import {
   dokaziDostignucaDvostrukaKruna,
   dokaziDostignucaMisija,
   dokaziDostignucaPrivatnik,
+  dokaziDostignucaNaDvijeFronte,
   dokaziDostignucaRijetkaGrdosija,
   dokaziDostignucaSvePohvale,
   dokaziDostignucaTjedniPaket,
+  dokaziDostignucaTop10,
   napredakDostignucaIgraca,
   obavijestiIgraca,
 } from '../baza/shema.js';
@@ -40,7 +42,9 @@ type DokazDodjele =
   | { vrsta: 'dnevna_pobjeda'; lokalniDatum: string }
   | { vrsta: 'cista_petica'; partijaId: string }
   | { vrsta: 'sve_pohvale'; partijaId: string }
-  | { vrsta: 'rijetka_grdosija'; normaliziraniOblik: string };
+  | { vrsta: 'rijetka_grdosija'; normaliziraniOblik: string }
+  | { vrsta: 'top10_razdoblje'; kalendarskiPocetak: Date }
+  | { vrsta: 'na_dvije_fronte'; vrstaRazdoblja: 'dnevno' | 'tjedno' | 'mjesecno'; kalendarskiPocetak: Date };
 
 const STUPCI_SERVISNIH_BROJACA = {
   dovrseneMisije: napredakDostignucaIgraca.dovrseneMisije,
@@ -50,6 +54,10 @@ const STUPCI_SERVISNIH_BROJACA = {
   cistePetice: napredakDostignucaIgraca.cistePetice,
   svePohvale: napredakDostignucaIgraca.svePohvale,
   rijetkeGrdosije: napredakDostignucaIgraca.rijetkeGrdosije,
+  dnevneDesetke: napredakDostignucaIgraca.dnevneDesetke,
+  tjedneElite: napredakDostignucaIgraca.tjedneElite,
+  mjesecneElite: napredakDostignucaIgraca.mjesecneElite,
+  naDvijeFronte: napredakDostignucaIgraca.naDvijeFronte,
 } as const;
 
 type ServisniBrojac = keyof typeof STUPCI_SERVISNIH_BROJACA;
@@ -65,6 +73,8 @@ export interface ParametriDodjele {
   zavrsenoU: Date;
   izvor: string;
   kontekst?: Record<string, unknown> | null;
+  /** Više doprinosa istog dostignuća u jednoj obradi dijeli jednu obavijest najviše razine. */
+  preskociObavijest?: boolean;
 }
 
 async function umetniDokaz(tx: MisijeTx, parametri: ParametriDodjele) {
@@ -99,9 +109,65 @@ async function umetniDokaz(tx: MisijeTx, parametri: ParametriDodjele) {
       .onConflictDoNothing()
       .returning({ igracId: dokaziDostignucaSvePohvale.igracId });
   }
-  return tx.insert(dokaziDostignucaRijetkaGrdosija).values({ igracId, normaliziraniOblik: dokaz.normaliziraniOblik })
-    .onConflictDoNothing()
-    .returning({ igracId: dokaziDostignucaRijetkaGrdosija.igracId });
+  if (dokaz.vrsta === 'rijetka_grdosija') {
+    return tx.insert(dokaziDostignucaRijetkaGrdosija).values({ igracId, normaliziraniOblik: dokaz.normaliziraniOblik })
+      .onConflictDoNothing()
+      .returning({ igracId: dokaziDostignucaRijetkaGrdosija.igracId });
+  }
+  if (dokaz.vrsta === 'top10_razdoblje') {
+    return tx.insert(dokaziDostignucaTop10).values({
+      igracId,
+      dostignuceId: parametri.dostignuceId,
+      kalendarskiPocetak: dokaz.kalendarskiPocetak,
+    }).onConflictDoNothing().returning({ igracId: dokaziDostignucaTop10.igracId });
+  }
+  return tx.insert(dokaziDostignucaNaDvijeFronte).values({
+    igracId,
+    vrstaRazdoblja: dokaz.vrstaRazdoblja,
+    kalendarskiPocetak: dokaz.kalendarskiPocetak,
+  }).onConflictDoNothing().returning({ igracId: dokaziDostignucaNaDvijeFronte.igracId });
+}
+
+export async function upisiObavijestDostignuca(
+  tx: MisijeTx,
+  ulaz: {
+    igracId: string;
+    dostignuceId: string;
+    novaRazina: number;
+    zavrsenoU: Date;
+    izvor: string;
+    kontekst?: Record<string, unknown> | null;
+  },
+): Promise<ObavijestOtkljucanogDostignuca | null> {
+  const definicija = dohvatiDefinicijuDostignuca(ulaz.dostignuceId);
+  if (!definicija) return null;
+  const [obavijest] = await tx.insert(obavijestiIgraca).values({
+    igracId: ulaz.igracId,
+    vrsta: 'dostignuce_otkljucano',
+    dostignuceId: ulaz.dostignuceId,
+    novaRazina: ulaz.novaRazina,
+    maksimalnaRazina: definicija.pragovi.length,
+    izvor: ulaz.izvor,
+    kontekst: ulaz.kontekst ?? null,
+    stvorenoU: ulaz.zavrsenoU,
+  }).onConflictDoNothing({
+    target: [obavijestiIgraca.igracId, obavijestiIgraca.dostignuceId, obavijestiIgraca.novaRazina],
+  }).returning({
+    id: obavijestiIgraca.id,
+    dostignuceId: obavijestiIgraca.dostignuceId,
+    novaRazina: obavijestiIgraca.novaRazina,
+    maksimalnaRazina: obavijestiIgraca.maksimalnaRazina,
+    izvor: obavijestiIgraca.izvor,
+  });
+  if (!obavijest?.id || !obavijest.dostignuceId || obavijest.novaRazina == null || obavijest.maksimalnaRazina == null) return null;
+  return {
+    id: obavijest.id,
+    dostignuceId: obavijest.dostignuceId,
+    naziv: definicija.naziv,
+    novaRazina: obavijest.novaRazina,
+    maksimalnaRazina: obavijest.maksimalnaRazina,
+    izvor: obavijest.izvor,
+  };
 }
 
 async function uvecajBrojac(tx: MisijeTx, igracId: string, brojac: ServisniBrojac, zavrsenoU: Date): Promise<number> {
@@ -154,38 +220,21 @@ export async function dodijeliDoprinos(tx: MisijeTx, parametri: ParametriDodjele
   const novaDostignuca: NovoDostignuce[] = [];
   const noveObavijesti: ObavijestOtkljucanogDostignuca[] = [];
   if (novaRazina > staraRazina) {
-    const [obavijest] = await tx.insert(obavijestiIgraca).values({
-      igracId: parametri.igracId,
-      vrsta: 'dostignuce_otkljucano',
-      dostignuceId: parametri.dostignuceId,
-      novaRazina,
-      maksimalnaRazina: definicija.pragovi.length,
-      izvor: parametri.izvor,
-      kontekst: parametri.kontekst ?? null,
-      stvorenoU: parametri.zavrsenoU,
-    }).onConflictDoNothing({
-      target: [obavijestiIgraca.igracId, obavijestiIgraca.dostignuceId, obavijestiIgraca.novaRazina],
-    }).returning({
-      id: obavijestiIgraca.id,
-      dostignuceId: obavijestiIgraca.dostignuceId,
-      novaRazina: obavijestiIgraca.novaRazina,
-      maksimalnaRazina: obavijestiIgraca.maksimalnaRazina,
-      izvor: obavijestiIgraca.izvor,
-    });
     novaDostignuca.push({
       id: parametri.dostignuceId,
       novaRazina,
       maksimalnaRazina: definicija.pragovi.length,
     });
-    if (obavijest?.id && obavijest.dostignuceId && obavijest.novaRazina != null && obavijest.maksimalnaRazina != null) {
-      noveObavijesti.push({
-        id: obavijest.id,
-        dostignuceId: obavijest.dostignuceId,
-        naziv: definicija.naziv,
-        novaRazina: obavijest.novaRazina,
-        maksimalnaRazina: obavijest.maksimalnaRazina,
-        izvor: obavijest.izvor,
+    if (!parametri.preskociObavijest) {
+      const obavijest = await upisiObavijestDostignuca(tx, {
+        igracId: parametri.igracId,
+        dostignuceId: parametri.dostignuceId,
+        novaRazina,
+        zavrsenoU: parametri.zavrsenoU,
+        izvor: parametri.izvor,
+        kontekst: parametri.kontekst,
       });
+      if (obavijest) noveObavijesti.push(obavijest);
     }
   }
 

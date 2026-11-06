@@ -548,6 +548,10 @@
         <p>Dnevno treba 10 javnih igara tog dana, a tjedno, mjesečno, godišnje i ukupno 20 u tom razdoblju. Igra pripada danu završetka, po hrvatskom vremenu.</p>
       </details>
       <details>
+        <summary>Kada dobivam zvjezdicu za Top 10?</summary>
+        <p>Čim dosegneš mjesto od 1 do 10 na dnevnoj, tjednoj ili mjesečnoj ljestvici. Ne treba ostati do kraja razdoblja niti otvoriti ljestvice. Ako ispadneš, zvjezdica ostaje. Ponovni ulazak u istom danu, tjednu ili mjesecu ne donosi još jedan napredak. Top 10 u oba moda istog razdoblja broji se i za Na dvije fronte.</p>
+      </details>
+      <details>
         <summary>Zašto privatna soba ne daje XP?</summary>
         <p>Ima svoju ljestvicu. XP, rang i DNK ostaju za javne igre. U sobi napreduju Rijetkolovac, Dugometraš i Jezik u plamenu.</p>
       </details>

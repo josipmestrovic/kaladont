@@ -1,5 +1,8 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
+import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
+import { imaJavnuIgruUOtvorenomMjesecu, obradiNeobradeneTop10Dokaze, zabiljeziTop10NakonPromjene } from '../dostignuca/top10.js';
+import { ocistiMemorijuLjestvica } from '../ljestvice/servis.js';
 import {
   aktivnostIgracaDani,
   ciklusiTjednihMisija,
@@ -11,9 +14,12 @@ import {
   dokaziDostignucaDvostrukaKruna,
   dokaziDostignucaMisija,
   dokaziDostignucaPrivatnik,
+  dokaziDostignucaNaDvijeFronte,
   dokaziDostignucaRijetkaGrdosija,
   dokaziDostignucaSvePohvale,
   dokaziDostignucaTjedniPaket,
+  dokaziDostignucaTop10,
+  dokaziTop10Ulazaka,
   dotokDnevnihMisija,
   evidencijaDnevnihPobjedaModova,
   igraci,
@@ -52,6 +58,9 @@ async function obrisiRacunUTransakciji(
   await transakcija.delete(dokaziDostignucaCistaPetica).where(eq(dokaziDostignucaCistaPetica.igracId, igrac.id));
   await transakcija.delete(dokaziDostignucaSvePohvale).where(eq(dokaziDostignucaSvePohvale.igracId, igrac.id));
   await transakcija.delete(dokaziDostignucaRijetkaGrdosija).where(eq(dokaziDostignucaRijetkaGrdosija.igracId, igrac.id));
+  await transakcija.delete(dokaziTop10Ulazaka).where(eq(dokaziTop10Ulazaka.igracId, igrac.id));
+  await transakcija.delete(dokaziDostignucaTop10).where(eq(dokaziDostignucaTop10.igracId, igrac.id));
+  await transakcija.delete(dokaziDostignucaNaDvijeFronte).where(eq(dokaziDostignucaNaDvijeFronte.igracId, igrac.id));
   await transakcija.delete(evidencijaDnevnihPobjedaModova).where(eq(evidencijaDnevnihPobjedaModova.igracId, igrac.id));
   await transakcija.delete(obavijestiIgraca).where(eq(obavijestiIgraca.igracId, igrac.id));
   await transakcija.delete(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igrac.id));
@@ -95,12 +104,37 @@ async function obrisiRacunUTransakciji(
   return 'obrisan';
 }
 
+type TransakcijaBrisanja = Parameters<Parameters<typeof baza.transaction>[0]>[0];
+
+async function osvjeziLjestvicuAkoTreba(tx: TransakcijaBrisanja, igracId: string): Promise<boolean> {
+  const opazenoU = new Date();
+  if (!(await imaJavnuIgruUOtvorenomMjesecu(tx, igracId, opazenoU))) return false;
+  await zabiljeziTop10NakonPromjene(tx, {
+    modovi: ['cetiri_igraca', 'dva_igraca'],
+    opazenoU,
+    izvor: 'brisanje',
+    partijaId: null,
+  });
+  return true;
+}
+
+async function dovrsiTop10NakonBrisanja(): Promise<void> {
+  try {
+    const poIgracu = await obradiNeobradeneTop10Dokaze();
+    for (const [igracId, obavijesti] of poIgracu) emitirajNovostiDostignuca(igracId, obavijesti);
+    ocistiMemorijuLjestvica();
+  } catch (greska) {
+    console.error('Top 10 nakon brisanja računa nije obrađen:', greska);
+  }
+}
+
 export async function obrisiRacun(email: string, potvrdi: boolean): Promise<IshodBrisanja> {
   const normaliziraniEmail = email.trim().toLowerCase();
   if (!normaliziraniEmail) throw new Error('Obavezan je --email=<adresa>.');
   if (!potvrdi) throw new Error('Brisanje nije potvrđeno. Dodaj --potvrdi.');
 
-  return baza.transaction(async (transakcija) => {
+  let osvjezi = false;
+  const ishod = await baza.transaction(async (transakcija) => {
     const [igrac] = await transakcija
       .select({
         id: igraci.id,
@@ -114,12 +148,17 @@ export async function obrisiRacun(email: string, potvrdi: boolean): Promise<Isho
       .limit(1);
 
     if (!igrac) return 'nije-pronaden';
-    return obrisiRacunUTransakciji(transakcija, igrac);
+    const rezultat = await obrisiRacunUTransakciji(transakcija, igrac);
+    if (rezultat === 'obrisan') osvjezi = await osvjeziLjestvicuAkoTreba(transakcija, igrac.id);
+    return rezultat;
   });
+  if (osvjezi) await dovrsiTop10NakonBrisanja();
+  return ishod;
 }
 
 export async function obrisiRacunPoId(igracId: string): Promise<IshodBrisanja> {
-  return baza.transaction(async (transakcija) => {
+  let osvjezi = false;
+  const ishod = await baza.transaction(async (transakcija) => {
     const [igrac] = await transakcija
       .select({
         id: igraci.id,
@@ -132,6 +171,10 @@ export async function obrisiRacunPoId(igracId: string): Promise<IshodBrisanja> {
       .limit(1);
 
     if (!igrac) return 'nije-pronaden';
-    return obrisiRacunUTransakciji(transakcija, igrac);
+    const rezultat = await obrisiRacunUTransakciji(transakcija, igrac);
+    if (rezultat === 'obrisan') osvjezi = await osvjeziLjestvicuAkoTreba(transakcija, igrac.id);
+    return rezultat;
   });
+  if (osvjezi) await dovrsiTop10NakonBrisanja();
+  return ishod;
 }

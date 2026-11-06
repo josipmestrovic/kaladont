@@ -30,7 +30,15 @@ export type BrojacDostignuca =
   /** Javne igre u kojima su osvojene obje pohvale; samo servis dodjele. */
   | 'svePohvale'
   /** Različiti oblici koji su istodobno dugi i rijetki; samo servis dodjele. */
-  | 'rijetkeGrdosije';
+  | 'rijetkeGrdosije'
+  /** Dani u kojima je dosegnut dnevni Top 10; samo servis dodjele. */
+  | 'dnevneDesetke'
+  /** Tjedni u kojima je dosegnut tjedni Top 10; samo servis dodjele. */
+  | 'tjedneElite'
+  /** Mjeseci u kojima je dosegnut mjesečni Top 10; samo servis dodjele. */
+  | 'mjesecneElite'
+  /** Razdoblja s Top 10 u oba moda; samo servis dodjele. */
+  | 'naDvijeFronte';
 
 export const ID_DOSTIGNUCA_STALNO_SI_TU = 'stalno_si_tu';
 export const ID_DOSTIGNUCA_COVJEK_NA_MISIJI = 'covjek_na_misiji';
@@ -40,6 +48,10 @@ export const ID_DOSTIGNUCA_DVOSTRUKA_KRUNA = 'dvostruka_kruna';
 export const ID_DOSTIGNUCA_CISTA_PETICA = 'cista_petica';
 export const ID_DOSTIGNUCA_SVE_POHVALE = 'sve_pohvale';
 export const ID_DOSTIGNUCA_RIJETKA_GRDOSIJA = 'rijetka_grdosija';
+export const ID_DOSTIGNUCA_DNEVNA_DESETKA = 'dnevna_desetka';
+export const ID_DOSTIGNUCA_TJEDNA_ELITA = 'tjedna_elita';
+export const ID_DOSTIGNUCA_MJESECNA_ELITA = 'mjesecna_elita';
+export const ID_DOSTIGNUCA_NA_DVIJE_FRONTE = 'na_dvije_fronte';
 
 /** Brojači koji se ne smiju otključati kroz partijsku deltu. */
 export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Set([
@@ -51,6 +63,10 @@ export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Se
   'cistePetice',
   'svePohvale',
   'rijetkeGrdosije',
+  'dnevneDesetke',
+  'tjedneElite',
+  'mjesecneElite',
+  'naDvijeFronte',
 ]);
 
 export interface DefinicijaDostignuca {
@@ -162,6 +178,42 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
     vrijediUPrivatnoj: true,
     brojac: 'rijetkeGrdosije',
   },
+  {
+    id: ID_DOSTIGNUCA_DNEVNA_DESETKA,
+    naziv: 'Dnevna desetka',
+    opis: 'Dosegni Top 10 na dnevnoj ljestvici u različitim danima.',
+    kategorija: 'igra',
+    pragovi: [1, 2, 3, 4, 5],
+    vrijediUPrivatnoj: false,
+    brojac: 'dnevneDesetke',
+  },
+  {
+    id: ID_DOSTIGNUCA_TJEDNA_ELITA,
+    naziv: 'Tjedna elita',
+    opis: 'Dosegni Top 10 na tjednoj ljestvici u različitim tjednima.',
+    kategorija: 'igra',
+    pragovi: [1, 2, 3, 4, 5],
+    vrijediUPrivatnoj: false,
+    brojac: 'tjedneElite',
+  },
+  {
+    id: ID_DOSTIGNUCA_MJESECNA_ELITA,
+    naziv: 'Mjesečna elita',
+    opis: 'Dosegni Top 10 na mjesečnoj ljestvici u različitim mjesecima.',
+    kategorija: 'igra',
+    pragovi: [1, 2, 3, 4, 5],
+    vrijediUPrivatnoj: false,
+    brojac: 'mjesecneElite',
+  },
+  {
+    id: ID_DOSTIGNUCA_NA_DVIJE_FRONTE,
+    naziv: 'Na dvije fronte',
+    opis: 'U istom danu, tjednu ili mjesecu dosegni Top 10 u oba moda.',
+    kategorija: 'igra',
+    pragovi: [1, 2, 3, 4, 5],
+    vrijediUPrivatnoj: false,
+    brojac: 'naDvijeFronte',
+  },
 ] as const;
 
 export const UKUPNO_ZVJEZDICA_DOSTIGNUCA = DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0);
@@ -192,6 +244,10 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   ID_DOSTIGNUCA_CISTA_PETICA,
   ID_DOSTIGNUCA_SVE_POHVALE,
   ID_DOSTIGNUCA_RIJETKA_GRDOSIJA,
+  ID_DOSTIGNUCA_DNEVNA_DESETKA,
+  ID_DOSTIGNUCA_TJEDNA_ELITA,
+  ID_DOSTIGNUCA_MJESECNA_ELITA,
+  ID_DOSTIGNUCA_NA_DVIJE_FRONTE,
 ] as const;
 
 export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(
@@ -225,7 +281,7 @@ export function izracunajNovaDostignuca(
   jePrivatna: boolean,
 ): NovoDostignuce[] {
   return DEFINICIJE_DOSTIGNUCA.flatMap((definicija) => {
-    // Servisna dostignuća (aktivni dani, misije, privatnik, D02 kombinacije) ne idu kroz party deltu.
+    // Servisna dostignuća (aktivni dani, misije, privatnik, D02 kombinacije, Top 10) ne idu kroz party deltu.
     if (definicija.id === ID_DOSTIGNUCA_STALNO_SI_TU || BROJACI_VAN_PARTIJSKE_DELTA.has(definicija.brojac)) return [];
     if (jePrivatna && !definicija.vrijediUPrivatnoj) return [];
     const staraVrijednost = definicija.brojac === 'razina'

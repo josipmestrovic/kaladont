@@ -8,10 +8,10 @@ import {
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
-  it('ima dvadeset i jedno dostignuće i 105 zvjezdica', () => {
-    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(21);
+  it('ima dvadeset i pet dostignuća i 125 zvjezdica', () => {
+    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(25);
     expect(DEFINICIJE_DOSTIGNUCA.every((definicija) => definicija.pragovi.length === 5)).toBe(true);
-    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(105);
+    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(125);
   });
 
   it('ne otključava servisna dostignuća kroz izracunajNovaDostignuca', () => {
@@ -26,6 +26,10 @@ describe('dostignuca', () => {
         cistePetice: 100,
         svePohvale: 50,
         rijetkeGrdosije: 100,
+        dnevneDesetke: 5,
+        tjedneElite: 5,
+        mjesecneElite: 5,
+        naDvijeFronte: 5,
       },
       1,
       true,
@@ -39,6 +43,10 @@ describe('dostignuca', () => {
     expect(idovi).not.toContain('cista_petica');
     expect(idovi).not.toContain('sve_pohvale');
     expect(idovi).not.toContain('rijetka_grdosija');
+    expect(idovi).not.toContain('dnevna_desetka');
+    expect(idovi).not.toContain('tjedna_elita');
+    expect(idovi).not.toContain('mjesecna_elita');
+    expect(idovi).not.toContain('na_dvije_fronte');
   });
 
   it('preskače više razina i vraća najvišu novu razinu', () => {
