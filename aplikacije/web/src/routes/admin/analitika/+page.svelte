@@ -88,24 +88,33 @@
 
   async function ucitaj() {
     greska = null;
-    try {
-      const q = query();
-      const [a, i, d, s] = await Promise.all([
-        api<AgregatPocetnih & { ok: boolean }>(`/admin/analitika/pocetne-rijeci?${q}`),
-        api<{ ok: boolean; ukupno: number; incidenti: IncidentRedak[] }>(`/admin/analitika/incidenti?${q}`),
-        api<Dnevno & { ok: boolean; od: string; do: string }>(`/admin/analitika/dnevno?${q}`),
-        api<StatusAnalitike & { ok: boolean }>('/admin/analitika/status'),
-      ]);
-      agregat = a;
-      dnevno = d;
-      status = s;
-      if (!od) od = a.od;
-      if (!doDana) doDana = a.do;
-      incidenti = i.incidenti;
-      ukupnoIncidenata = i.ukupno;
-    } catch (e) {
-      greska = e instanceof Error ? e.message : 'Analitika nije dostupna.';
+    const q = query();
+    const rezultati = await Promise.allSettled([
+      api<AgregatPocetnih & { ok: boolean }>(`/admin/analitika/pocetne-rijeci?${q}`),
+      api<{ ok: boolean; ukupno: number; incidenti: IncidentRedak[] }>(`/admin/analitika/incidenti?${q}`),
+      api<Dnevno & { ok: boolean; od: string; do: string }>(`/admin/analitika/dnevno?${q}`),
+      api<StatusAnalitike & { ok: boolean }>('/admin/analitika/status'),
+    ]);
+    const greske: string[] = [];
+    const [a, i, d, s] = rezultati;
+    if (a.status === 'fulfilled') {
+      agregat = a.value;
+      if (!od) od = a.value.od;
+      if (!doDana) doDana = a.value.do;
+    } else {
+      greske.push(a.reason instanceof Error ? a.reason.message : 'Početne riječi nisu dostupne.');
     }
+    if (i.status === 'fulfilled') {
+      incidenti = i.value.incidenti;
+      ukupnoIncidenata = i.value.ukupno;
+    } else {
+      greske.push(i.reason instanceof Error ? i.reason.message : 'Incidenti nisu dostupni.');
+    }
+    if (d.status === 'fulfilled') dnevno = d.value;
+    else greske.push(d.reason instanceof Error ? d.reason.message : 'Dnevno igranje nije dostupno.');
+    if (s.status === 'fulfilled') status = s.value;
+    else greske.push(s.reason instanceof Error ? s.reason.message : 'Status nije dostupan.');
+    greska = greske.length > 0 ? greske.join(' ') : null;
   }
 
   async function otvoriDetalj(id: string) {

@@ -26,10 +26,23 @@ export async function dohvatiStatusAnalitike() {
     })
     .from(analitikaIgre);
 
-  const kandidati = [otvaranja?.najstarije, igre?.najstarije].filter((d): d is Date => Boolean(d));
-  const najnoviji = [otvaranja?.najnovije, igre?.najnovije].filter((d): d is Date => Boolean(d));
-  const mjerenjeOd = kandidati.length === 0 ? null : new Date(Math.min(...kandidati.map((d) => d.getTime())));
-  const zadnjiZapisU = najnoviji.length === 0 ? null : new Date(Math.max(...najnoviji.map((d) => d.getTime())));
+  function uMs(vrijednost: unknown): number | null {
+    if (vrijednost == null) return null;
+    if (vrijednost instanceof Date) {
+      const ms = vrijednost.getTime();
+      return Number.isFinite(ms) ? ms : null;
+    }
+    if (typeof vrijednost === 'string' || typeof vrijednost === 'number') {
+      const ms = new Date(vrijednost).getTime();
+      return Number.isFinite(ms) ? ms : null;
+    }
+    return null;
+  }
+
+  const kandidati = [uMs(otvaranja?.najstarije), uMs(igre?.najstarije)].filter((ms): ms is number => ms !== null);
+  const najnoviji = [uMs(otvaranja?.najnovije), uMs(igre?.najnovije)].filter((ms): ms is number => ms !== null);
+  const mjerenjeOd = kandidati.length === 0 ? null : new Date(Math.min(...kandidati));
+  const zadnjiZapisU = najnoviji.length === 0 ? null : new Date(Math.max(...najnoviji));
 
   return {
     vremenskaZona: ANALITIKA_VREMENSKA_ZONA,
