@@ -344,6 +344,13 @@
       "when": 1794300000000,
       "tag": "0048_analitika_igre",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794400000000,
+      "tag": "0049_dostignuca_d01",
+      "breakpoints": true
     }
   ]
 }

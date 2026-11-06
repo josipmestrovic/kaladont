@@ -8,10 +8,24 @@ import {
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
-  it('ima četrnaest dostignuća i 70 zvjezdica', () => {
-    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(14);
+  it('ima sedamnaest dostignuća i 85 zvjezdica', () => {
+    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(17);
     expect(DEFINICIJE_DOSTIGNUCA.every((definicija) => definicija.pragovi.length === 5)).toBe(true);
-    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(70);
+    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(85);
+  });
+
+  it('ne otključava servisna dostignuća kroz izracunajNovaDostignuca', () => {
+    const nova = izracunajNovaDostignuca(
+      {},
+      { dovrseneMisije: 250, privatneIgre: 100, tjedniPaketi: 50, najboljiNizAktivnosti: 30 },
+      1,
+      true,
+    );
+    const idovi = nova.map((dostignuce) => dostignuce.id);
+    expect(idovi).not.toContain('covjek_na_misiji');
+    expect(idovi).not.toContain('privatnik');
+    expect(idovi).not.toContain('tjedan_pod_kontrolom');
+    expect(idovi).not.toContain('stalno_si_tu');
   });
 
   it('preskače više razina i vraća najvišu novu razinu', () => {

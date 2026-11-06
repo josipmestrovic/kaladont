@@ -17,6 +17,7 @@ import {
   text,
   timestamp,
   uuid,
+  unique,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -231,6 +232,9 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   treningPobjede: integer('trening_pobjede').notNull().default(0),
   pohvaleNizUkupno: integer('pohvale_niz_ukupno').notNull().default(0),
   pohvaleXpUkupno: integer('pohvale_xp_ukupno').notNull().default(0),
+  dovrseneMisije: integer('dovrsene_misije').notNull().default(0),
+  privatneIgre: integer('privatne_igre').notNull().default(0),
+  tjedniPaketi: integer('tjedni_paketi').notNull().default(0),
   anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
@@ -611,6 +615,47 @@ export const nagradeMisija = pgTable('nagrade_misija', {
 }, (tablica) => [
   check('chk_nagrade_misija_xp', sql`${tablica.xpNominalno} >= 0 and ${tablica.xpStvarno} >= 0 and ${tablica.xpStvarno} <= ${tablica.xpNominalno}`),
   index('idx_nagrade_misija_igrac').on(tablica.igracId, tablica.dodijeljenaU),
+]);
+
+/** Idempotentni dokaz dovršene misije za „Čovjek na misiji”. */
+export const dokaziDostignucaMisija = pgTable('dokazi_dostignuca_misija', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  dodjelaId: uuid('dodjela_id').notNull().references(() => dodjeleMisija.id, { onDelete: 'cascade' }),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.dodjelaId] }),
+]);
+
+/** Idempotentni dokaz završene privatne igre za „Privatnik”. */
+export const dokaziDostignucaPrivatnik = pgTable('dokazi_dostignuca_privatnik', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  partijaId: uuid('partija_id').notNull().references(() => partije.id, { onDelete: 'cascade' }),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.partijaId] }),
+]);
+
+/** Idempotentni dokaz potpunog tjednog paketa za „Tjedan pod kontrolom”. */
+export const dokaziDostignucaTjedniPaket = pgTable('dokazi_dostignuca_tjedni_paket', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  ciklusId: uuid('ciklus_id').notNull().references(() => ciklusiTjednihMisija.id, { onDelete: 'cascade' }),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.ciklusId] }),
+]);
+
+/** Trajne osobne obavijesti (seed za kasniji sandučić). Neprikazane čeka klijent. */
+export const obavijestiIgraca = pgTable('obavijesti_igraca', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  vrsta: text('vrsta').notNull(),
+  dostignuceId: text('dostignuce_id'),
+  novaRazina: smallint('nova_razina'),
+  maksimalnaRazina: smallint('maksimalna_razina'),
+  izvor: text('izvor'),
+  kontekst: jsonb('kontekst').$type<Record<string, unknown> | null>(),
+  stvorenoU: timestamp('stvoreno_u', { withTimezone: true }).notNull().defaultNow(),
+  prikazanoU: timestamp('prikazano_u', { withTimezone: true }),
+}, (tablica) => [
+  unique('uq_obavijesti_igraca_dostignuce_razina').on(tablica.igracId, tablica.dostignuceId, tablica.novaRazina),
+  index('idx_obavijesti_igraca_neprikazane').on(tablica.igracId).where(sql`${tablica.prikazanoU} is null`),
 ]);
 
 export const ishodiMisijaIgara = pgTable('ishodi_misija_igara', {

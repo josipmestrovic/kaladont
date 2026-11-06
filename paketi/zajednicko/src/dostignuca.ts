@@ -16,9 +16,26 @@ export type BrojacDostignuca =
   | 'pohvaleNizUkupno'
   | 'pohvaleXpUkupno'
   /** Najbolji niz aktivnih dana; otključava se samo iz servisa aktivnog dana, ne iz party delte. */
-  | 'najboljiNizAktivnosti';
+  | 'najboljiNizAktivnosti'
+  /** Dovršene dnevne i tjedne misije; samo servis dodjele. */
+  | 'dovrseneMisije'
+  /** Završene privatne igre s barem jednom prihvaćenom riječi; samo servis dodjele. */
+  | 'privatneIgre'
+  /** Potpuno dovršeni tjedni paketi; samo servis dodjele. */
+  | 'tjedniPaketi';
 
 export const ID_DOSTIGNUCA_STALNO_SI_TU = 'stalno_si_tu';
+export const ID_DOSTIGNUCA_COVJEK_NA_MISIJI = 'covjek_na_misiji';
+export const ID_DOSTIGNUCA_PRIVATNIK = 'privatnik';
+export const ID_DOSTIGNUCA_TJEDAN_POD_KONTROLOM = 'tjedan_pod_kontrolom';
+
+/** Brojači koji se ne smiju otključati kroz partijsku deltu. */
+export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Set([
+  'najboljiNizAktivnosti',
+  'dovrseneMisije',
+  'privatneIgre',
+  'tjedniPaketi',
+]);
 
 export interface DefinicijaDostignuca {
   id: string;
@@ -66,6 +83,33 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
     vrijediUPrivatnoj: false,
     brojac: 'najboljiNizAktivnosti',
   },
+  {
+    id: ID_DOSTIGNUCA_COVJEK_NA_MISIJI,
+    naziv: 'Čovjek na misiji',
+    opis: 'Dovršavaj dnevne i tjedne misije.',
+    kategorija: 'napredak',
+    pragovi: [1, 10, 50, 100, 250],
+    vrijediUPrivatnoj: false,
+    brojac: 'dovrseneMisije',
+  },
+  {
+    id: ID_DOSTIGNUCA_PRIVATNIK,
+    naziv: 'Privatnik',
+    opis: 'Završi privatne igre i odigraj barem jednu prihvaćenu riječ u svakoj.',
+    kategorija: 'igra',
+    pragovi: [1, 5, 20, 50, 100],
+    vrijediUPrivatnoj: true,
+    brojac: 'privatneIgre',
+  },
+  {
+    id: ID_DOSTIGNUCA_TJEDAN_POD_KONTROLOM,
+    naziv: 'Tjedan pod kontrolom',
+    opis: 'Dovrši sve tri tjedne misije iz istog paketa.',
+    kategorija: 'napredak',
+    pragovi: [1, 3, 10, 25, 50],
+    vrijediUPrivatnoj: false,
+    brojac: 'tjedniPaketi',
+  },
 ] as const;
 
 export const UKUPNO_ZVJEZDICA_DOSTIGNUCA = DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0);
@@ -89,6 +133,9 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   'vladar_niza',
   'xp_prvak',
   ID_DOSTIGNUCA_STALNO_SI_TU,
+  ID_DOSTIGNUCA_COVJEK_NA_MISIJI,
+  ID_DOSTIGNUCA_PRIVATNIK,
+  ID_DOSTIGNUCA_TJEDAN_POD_KONTROLOM,
 ] as const;
 
 export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(
@@ -122,8 +169,8 @@ export function izracunajNovaDostignuca(
   jePrivatna: boolean,
 ): NovoDostignuce[] {
   return DEFINICIJE_DOSTIGNUCA.flatMap((definicija) => {
-    // Aktivni dani se otključavaju isključivo u servisu aktivnog dana.
-    if (definicija.id === ID_DOSTIGNUCA_STALNO_SI_TU || definicija.brojac === 'najboljiNizAktivnosti') return [];
+    // Servisna dostignuća (aktivni dani, misije, privatnik) ne idu kroz party deltu.
+    if (definicija.id === ID_DOSTIGNUCA_STALNO_SI_TU || BROJACI_VAN_PARTIJSKE_DELTA.has(definicija.brojac)) return [];
     if (jePrivatna && !definicija.vrijediUPrivatnoj) return [];
     const staraVrijednost = definicija.brojac === 'razina'
       ? (trajniNapredak[definicija.brojac] ?? 0)
