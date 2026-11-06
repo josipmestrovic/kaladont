@@ -63,7 +63,8 @@ export async function obracunajMisijeZaIgraca(
   satRng: MisijeSatRng = zadaniSatRng,
 ): Promise<IshodMisijaPayload> {
   const postojeći = await ucitajIliNullIshod(tx, metrike.igracId, metrike.kontekst, metrike.izvorId);
-  if (postojeći) return postojeći;
+  // Retry ne emitira ponovno — obavijesti su već obrađene u prvom prolazu.
+  if (postojeći) return { ...postojeći, noveObavijesti: [] };
 
   await osigurajStanjeMisija(tx, metrike.igracId, {
     sada: () => metrike.zavrsenoU,
