@@ -11,8 +11,10 @@ import {
 import {
   dostignucaIgraca,
   dodjeleMisija,
+  dokaziDostignucaCinkaros,
   dokaziDostignucaCistaPetica,
   dokaziDostignucaDvostrukaKruna,
+  dokaziDostignucaJezicniDetektiv,
   dokaziDostignucaMisija,
   dokaziDostignucaPrivatnik,
   dokaziDostignucaNaDvijeFronte,
@@ -44,7 +46,9 @@ type DokazDodjele =
   | { vrsta: 'sve_pohvale'; partijaId: string }
   | { vrsta: 'rijetka_grdosija'; normaliziraniOblik: string }
   | { vrsta: 'top10_razdoblje'; kalendarskiPocetak: Date }
-  | { vrsta: 'na_dvije_fronte'; vrstaRazdoblja: 'dnevno' | 'tjedno' | 'mjesecno'; kalendarskiPocetak: Date };
+  | { vrsta: 'na_dvije_fronte'; vrstaRazdoblja: 'dnevno' | 'tjedno' | 'mjesecno'; kalendarskiPocetak: Date }
+  | { vrsta: 'jezicni_detektiv'; normaliziranaRijec: string }
+  | { vrsta: 'cinkaros'; prijavljeniIgracId: string };
 
 const STUPCI_SERVISNIH_BROJACA = {
   dovrseneMisije: napredakDostignucaIgraca.dovrseneMisije,
@@ -58,6 +62,8 @@ const STUPCI_SERVISNIH_BROJACA = {
   tjedneElite: napredakDostignucaIgraca.tjedneElite,
   mjesecneElite: napredakDostignucaIgraca.mjesecneElite,
   naDvijeFronte: napredakDostignucaIgraca.naDvijeFronte,
+  jezicniDetektivi: napredakDostignucaIgraca.jezicniDetektivi,
+  cinkarosi: napredakDostignucaIgraca.cinkarosi,
 } as const;
 
 type ServisniBrojac = keyof typeof STUPCI_SERVISNIH_BROJACA;
@@ -120,6 +126,18 @@ async function umetniDokaz(tx: MisijeTx, parametri: ParametriDodjele) {
       dostignuceId: parametri.dostignuceId,
       kalendarskiPocetak: dokaz.kalendarskiPocetak,
     }).onConflictDoNothing().returning({ igracId: dokaziDostignucaTop10.igracId });
+  }
+  if (dokaz.vrsta === 'jezicni_detektiv') {
+    return tx.insert(dokaziDostignucaJezicniDetektiv).values({
+      igracId,
+      normaliziranaRijec: dokaz.normaliziranaRijec,
+    }).onConflictDoNothing().returning({ igracId: dokaziDostignucaJezicniDetektiv.igracId });
+  }
+  if (dokaz.vrsta === 'cinkaros') {
+    return tx.insert(dokaziDostignucaCinkaros).values({
+      igracId,
+      prijavljeniIgracId: dokaz.prijavljeniIgracId,
+    }).onConflictDoNothing().returning({ igracId: dokaziDostignucaCinkaros.igracId });
   }
   return tx.insert(dokaziDostignucaNaDvijeFronte).values({
     igracId,
