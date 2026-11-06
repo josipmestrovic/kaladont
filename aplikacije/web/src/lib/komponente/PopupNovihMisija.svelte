@@ -14,6 +14,8 @@
   let aktivnaSkupina = $state<Skupina | null>(null);
   let kartice = $state<MisijaDto[]>([]);
   let zatvaranje = $state(false);
+  /** Podloga ostaje montirana kroz daily→weekly da ekran ne bljesne. */
+  let podlogaVidljiva = $state(false);
 
   async function pokreniRedoslijed() {
     if (!jeRegistriranKorisnik()) return;
@@ -25,11 +27,13 @@
       return;
     }
     if (stanje.novosti.dnevne) {
+      podlogaVidljiva = true;
       aktivnaSkupina = 'dnevna';
       kartice = [...stanje.dnevne.aktivne].sort((a, b) => a.slot - b.slot);
       return;
     }
     if (stanje.novosti.tjedne) {
+      podlogaVidljiva = true;
       aktivnaSkupina = 'tjedna';
       kartice = [...stanje.tjedne.misije].filter((m) => m.status === 'aktivna').sort((a, b) => a.slot - b.slot);
     }
@@ -47,10 +51,12 @@
       } else {
         aktivnaSkupina = null;
         kartice = [];
+        podlogaVidljiva = false;
       }
     } catch {
       aktivnaSkupina = null;
       kartice = [];
+      podlogaVidljiva = false;
     } finally {
       zatvaranje = false;
     }
@@ -61,6 +67,7 @@
     const naIdentitet = () => {
       aktivnaSkupina = null;
       kartice = [];
+      podlogaVidljiva = false;
       void pokreniRedoslijed();
     };
     const naEscape = (e: KeyboardEvent) => {
@@ -77,34 +84,39 @@
   const naslov = $derived(aktivnaSkupina === 'dnevna' ? 'Nove dnevne misije' : 'Nove tjedne misije');
 </script>
 
-{#if aktivnaSkupina}
+{#if podlogaVidljiva}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="popup-podloga" role="presentation" onclick={zatvori}>
-    <div
-      class="popup-sadrzaj"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="popup-misija-naslov"
-      tabindex="-1"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.key === 'Escape' && zatvori()}
-    >
-      <button type="button" class="zatvori" aria-label="Zatvori" onclick={zatvori} disabled={zatvaranje}>
-        <X size={22} aria-hidden="true" />
-      </button>
-      <h2 id="popup-misija-naslov">{naslov}</h2>
-      <p class="opis">Pogledaj nove izazove. Detalje i zamjenu pronađi na stranici Misije.</p>
-      <ul class="kartice">
-        {#each kartice as misija (misija.dodjelaId)}
-          <li>
-            <strong>{misija.naziv}</strong>
-            <span>{misija.opis}</span>
-            <em>{misija.xpNagrada.toLocaleString('hr-HR')} XP</em>
-          </li>
-        {/each}
-      </ul>
-      <a href="/misije" class="link-sve" onclick={zatvori}>Sve misije</a>
-    </div>
+  <div class="popup-podloga" role="presentation" onclick={() => void zatvori()}>
+    {#if aktivnaSkupina}
+      {#key aktivnaSkupina}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="popup-sadrzaj"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="popup-misija-naslov"
+          tabindex="-1"
+          onclick={() => void zatvori()}
+          onkeydown={(e) => e.key === 'Escape' && zatvori()}
+        >
+          <button type="button" class="zatvori" aria-label="Zatvori" onclick={() => void zatvori()} disabled={zatvaranje}>
+            <X size={22} aria-hidden="true" />
+          </button>
+          <h2 id="popup-misija-naslov">{naslov}</h2>
+          <p class="opis">Pogledaj nove izazove. Detalje i zamjenu pronađi na stranici Misije.</p>
+          <ul class="kartice">
+            {#each kartice as misija (misija.dodjelaId)}
+              <li>
+                <strong>{misija.naziv}</strong>
+                <span>{misija.opis}</span>
+                <em>{misija.xpNagrada.toLocaleString('hr-HR')} XP</em>
+              </li>
+            {/each}
+          </ul>
+          <a href="/misije" class="link-sve" onclick={() => void zatvori()}>Sve misije</a>
+        </div>
+      {/key}
+    {/if}
   </div>
 {/if}
 
@@ -113,10 +125,11 @@
     position: fixed;
     inset: 0;
     z-index: 70;
-    background: rgb(0 0 0 / 0.45);
+    background: rgb(0 0 0 / 0);
     display: grid;
     place-items: center;
     padding: 16px;
+    animation: popup-podloga-ulaz 1s ease forwards;
   }
   .popup-sadrzaj {
     position: relative;
@@ -130,6 +143,10 @@
     display: grid;
     gap: 14px;
     box-shadow: 0 16px 40px rgb(0 0 0 / 0.35);
+    cursor: pointer;
+    transform: scale(0.86);
+    opacity: 0;
+    animation: popup-sadrzaj-ulaz 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   }
   .zatvori {
     position: absolute;
@@ -184,6 +201,27 @@
     justify-self: start;
     color: var(--boja-isticanje-tekst);
     font-weight: 700;
+  }
+  @keyframes popup-podloga-ulaz {
+    from { background: rgb(0 0 0 / 0); }
+    to { background: rgb(0 0 0 / 0.55); }
+  }
+  @keyframes popup-sadrzaj-ulaz {
+    from { opacity: 0; transform: scale(0.86); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .popup-podloga,
+    .popup-sadrzaj {
+      animation: none;
+    }
+    .popup-podloga {
+      background: rgb(0 0 0 / 0.55);
+    }
+    .popup-sadrzaj {
+      opacity: 1;
+      transform: none;
+    }
   }
   @media (min-width: 800px) {
     .kartice {

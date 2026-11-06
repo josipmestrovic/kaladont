@@ -640,7 +640,7 @@
     width: 36px;
     height: 36px;
   }
-  .rang-uzorak { display: inline-block; width: 16px; height: 16px; margin-right: 12px; border: 4px solid var(--boja-ranga); border-radius: 50%; vertical-align: middle; }
+  .rang-uzorak { display: inline-block; width: 16px; height: 16px; margin-right: 12px; border: 5px solid var(--boja-ranga); border-radius: 50%; vertical-align: middle; box-sizing: border-box; }
   .tablica-rangova tbody th { color: var(--boja-tekst-osnovni); }
   .red-maksimum th,
   .red-maksimum td {

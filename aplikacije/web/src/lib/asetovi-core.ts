@@ -5,8 +5,8 @@ const TIMEOUT_ASETA_MS = 8_000;
 /** Blocking gate — samo glavna navigacija na landingu. */
 export const KRITICNE_IKONE: readonly string[] = [
   '/ikone/07-igraj.png',
-  '/ikone/31-moj-profil.png',
-  '/ikone/06-trofej.png',
+  '/ikone/61-korisnicki-profil.webp',
+  '/ikone/62-misije.webp',
   '/ikone/09-ljestvice.png',
   '/ikone/08-pravila.png',
   '/ikone/11-postavke.png',
@@ -20,7 +20,7 @@ export const MODAL_IGRA_IKONE: readonly string[] = [
   '/ikone/16-soba-4-igraca.png',
   '/ikone/17-soba-2-igraca.png',
   '/ikone/18-privatna-soba.png',
-  '/ikone/19-vatra.png',
+  '/ikone/67-zagrijavanje-bot.webp',
 ];
 
 /** Idle nakon reveal na landingu — ne blokira children(). */
@@ -40,7 +40,6 @@ export const POZADINSKE_SLIKE_LANDINGA: readonly string[] = [
 
 /** Profil / dostignuća — tek kad se ode na profil. */
 export const SLIKE_PROFILA: readonly string[] = [
-  '/ikone/06-trofej.png',
   '/ikone/15-kaladont-dnk.png',
   '/ikone/23-uredi-avatar.png',
   '/ikone/26-zvjezdica-prazna.png',

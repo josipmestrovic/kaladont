@@ -94,7 +94,7 @@
   .dnk-promjena {
     width: 100%;
     max-width: none;
-    margin: 32px auto 0;
+    margin: 24px auto 0;
     padding: 18px;
     border: 1px solid var(--boja-obrub);
     border-radius: 8px;

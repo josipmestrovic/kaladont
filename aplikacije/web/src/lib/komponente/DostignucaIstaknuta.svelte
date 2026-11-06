@@ -120,4 +120,8 @@
     .zvjezdice { gap: 0.8px; }
     .zvjezdice img { width: 9.6px; height: 9.6px; }
   }
+
+  @media (max-width: 420px) {
+    .popis { gap: 12px; }
+  }
 </style>

@@ -27,6 +27,7 @@
   }
 
   async function odjaviSe() {
+    if (!confirm('Jeste li sigurni da se želite odjaviti?')) return;
     await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
     obrisiSesijskiToken();
     await osvjeziSocketIdentitet().catch(() => {});
@@ -58,41 +59,41 @@
       <Kaladont2d5d />
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
       <button type="button" class="navigacijska-stavka primarna" onclick={() => otvoriModal('igra')}>
-        <img class="ikona-sucelja" src={urlAseta('/ikone/07-igraj.png')} alt="" aria-hidden="true" width="40" height="40" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/07-igraj.png')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Igraj</span>
       </button>
       <a href="/profil" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src={urlAseta('/ikone/31-moj-profil.png')} alt="" aria-hidden="true" width="40" height="40" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/61-korisnicki-profil.webp')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Moj profil</span>
       </a>
       <a href="/misije" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src={urlAseta('/ikone/06-trofej.png')} alt="" aria-hidden="true" width="40" height="40" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/62-misije.webp')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Misije</span>
       </a>
       <a href="/ljestvice" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src={urlAseta('/ikone/09-ljestvice.png')} alt="" aria-hidden="true" width="40" height="40" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/09-ljestvice.png')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Ljestvice</span>
       </a>
       <a href="/pravila" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src={urlAseta('/ikone/08-pravila.png')} alt="" aria-hidden="true" width="40" height="40" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/08-pravila.png')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Pravila</span>
       </a>
       <a href="/postavke" class="navigacijska-stavka">
-        <img class="ikona-sucelja" src={urlAseta('/ikone/11-postavke.png')} alt="" aria-hidden="true" width="40" height="40" />
+        <img class="ikona-sucelja" src={urlAseta('/ikone/11-postavke.png')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Postavke</span>
       </a>
       {#if registriran}
         <button type="button" class="navigacijska-stavka odjava-stavka" onclick={odjaviSe}>
-          <img class="ikona-sucelja" src={urlAseta('/ikone/12-odjavi-se.png')} alt="" aria-hidden="true" width="40" height="40" />
+          <img class="ikona-sucelja" src={urlAseta('/ikone/12-odjavi-se.png')} alt="" aria-hidden="true" width="58" height="58" />
           <span>Odjavi se</span>
         </button>
       {:else}
         <a href="/prijava" class="navigacijska-stavka">
-          <img class="ikona-sucelja" src={urlAseta('/ikone/13-prijavi-se.png')} alt="" aria-hidden="true" width="40" height="40" />
+          <img class="ikona-sucelja" src={urlAseta('/ikone/13-prijavi-se.png')} alt="" aria-hidden="true" width="58" height="58" />
           <span>Prijavi se</span>
         </a>
         <a href="/registracija" class="navigacijska-stavka">
-          <img class="ikona-sucelja" src={urlAseta('/ikone/14-registriraj-se.png')} alt="" aria-hidden="true" width="40" height="40" />
+          <img class="ikona-sucelja" src={urlAseta('/ikone/14-registriraj-se.png')} alt="" aria-hidden="true" width="58" height="58" />
           <span>Registriraj se</span>
         </a>
       {/if}
@@ -149,7 +150,7 @@
             <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" /><span><strong>Četveroboj</strong><small>4 igrača</small></span>
           </a>
           <a href="/zagrijavanje" class="modal-opcija">
-            <img src="/ikone/19-vatra.png" alt="" aria-hidden="true" /><span><strong>Zagrijavanje</strong><small>Igraj dvoboj protiv računala.</small></span>
+            <img src="/ikone/67-zagrijavanje-bot.webp" alt="" aria-hidden="true" /><span><strong>Zagrijavanje</strong><small>Igraj dvoboj protiv računala.</small></span>
           </a>
           <a href="/soba/kreiraj" class="modal-opcija">
             <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" /><span><strong>Privatna soba</strong><small>Prilagodi pravila i pozovi svoju ekipu.</small></span>
@@ -181,7 +182,7 @@
     --landing-razmak: clamp(6px, 2dvh, 28px);
     --visina-stavke: clamp(40px, 6.2dvh, 66px);
     --razmak-stavki: clamp(4px, 1dvh, 10px);
-    --velicina-ikone: calc(var(--visina-stavke) * 0.58);
+    --velicina-ikone: calc(var(--visina-stavke) * 0.84);
     --font-stavke: clamp(16px, 2.7dvh, 23px);
     --velicina-naslova: clamp(48px, 9dvh, 86px);
     --visina-kontrole: clamp(36px, 5.5dvh, 52px);

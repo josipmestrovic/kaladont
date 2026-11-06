@@ -77,18 +77,15 @@
       <div class="lijeve-akcije">
         <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
           <img class="header-ikona" src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
-          <span>Nazad</span>
         </button>
         {#if prikaziPovratakNaPocetnu}
           <a href="/" class="header-akcija" aria-label="Početna">
             <img class="header-ikona" src="/ikone/04-naslovna.png" alt="" aria-hidden="true" />
-            <span>Početna</span>
           </a>
         {/if}
         {#if mozeNaprijed}
           <button type="button" class="header-akcija" aria-label="Naprijed" onclick={idiNaprijed}>
             <img class="header-ikona" src="/ikone/05-naprijed.png" alt="" aria-hidden="true" />
-            <span>Naprijed</span>
           </button>
         {/if}
       </div>
@@ -98,12 +95,12 @@
       {#if profil}
           {#if jeGost}
             <a href="/profil" class="profil-link" aria-label="Moj profil">
-              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost velicina={80} prikaziRangBorder={false} /></span>
+              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost velicina={44} /></span>
               <span class="profil-ime">{profil.nadimak}</span>
             </a>
           {:else}
             <a href="/profil" class="profil-link registrirani-profil" aria-label="Moj profil">
-              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={80} prikaziRangBorder={false} /></span>
+              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={44} /></span>
               <span class="profil-ime">{profil.nadimak}</span>
             </a>
           {/if}
@@ -187,26 +184,19 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    min-height: 44px;
   }
 
   .header-akcija {
-    width: auto;
-    min-width: 80px;
-    height: 80px;
-    display: flex;
-    flex-direction: column;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 3px;
+    justify-content: center;
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--boja-tekst-osnovni);
-    font: inherit;
-    font-size: 25px;
-    font-weight: 700;
-    line-height: 1.2;
-    text-align: center;
     text-decoration: none;
     cursor: pointer;
   }
@@ -241,8 +231,13 @@
     text-decoration: none;
   }
 
-  @media (min-width: 1000px) {
-    .header-avatar { display: inline-flex; }
+  .header-avatar {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    /* Prostor za border ranga da ga roditelj ne odreže. */
+    padding: 4px;
+    margin: -4px;
   }
 
   .profil-link {
@@ -277,13 +272,12 @@
 
   @media (max-width: 999px) {
     .header-sadrzaj { padding-inline: 16px; }
-    .novosti-link, .header-akcija { font-size: 22px; }
+    .novosti-link { font-size: 22px; }
     .naslovne-akcije .header-ikona {
       width: 33px;
       height: 33px;
     }
     .lijeve-akcije { gap: 4px; }
-    .header-akcija { min-width: 68px; }
     .naslovne-akcije {
       height: 80px;
       flex-direction: column;
