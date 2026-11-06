@@ -26,6 +26,7 @@ import {
   type KontekstOtvaranjaAnalitike,
 } from '../analitika/otvaranja.js';
 import { agregirajDnevneIgre } from '../analitika/igre.js';
+import { dohvatiStatusAnalitike } from '../analitika/status.js';
 
 /** Živi brojači iz memorije procesa; nisu trajni i vrijede od zadnjeg pokretanja. */
 export interface ZivoStanjeBotova {
@@ -527,5 +528,11 @@ export async function registrirajAdminRute(
       kontekst: filter.kontekst ?? null,
       ...dnevno,
     };
+  });
+
+  app.get('/admin/analitika/status', { preHandler: zahtijevajAdmina }, async (_zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const status = await dohvatiStatusAnalitike();
+    return { ok: true, ...status };
   });
 }

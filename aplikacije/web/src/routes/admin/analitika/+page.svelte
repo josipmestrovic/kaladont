@@ -50,9 +50,19 @@
     };
   }
 
+  interface StatusAnalitike {
+    imaMjerenja: boolean;
+    mjerenjeOd: string | null;
+    zadnjiZapisU: string | null;
+    otvaranja: { ukupno: number; otvoreni: number; nepotpuni: number };
+    igre: { ukupno: number; bezIshoda: number };
+    napomena: string;
+  }
+
   let od = $state('');
   let doDana = $state('');
   let kontekst = $state<'' | 'javna' | 'privatna' | 'trening'>('');
+  let status = $state<StatusAnalitike | null>(null);
   let agregat = $state<AgregatPocetnih | null>(null);
   let dnevno = $state<Dnevno | null>(null);
   let incidenti = $state<IncidentRedak[]>([]);
@@ -80,13 +90,15 @@
     greska = null;
     try {
       const q = query();
-      const [a, i, d] = await Promise.all([
+      const [a, i, d, s] = await Promise.all([
         api<AgregatPocetnih & { ok: boolean }>(`/admin/analitika/pocetne-rijeci?${q}`),
         api<{ ok: boolean; ukupno: number; incidenti: IncidentRedak[] }>(`/admin/analitika/incidenti?${q}`),
         api<Dnevno & { ok: boolean; od: string; do: string }>(`/admin/analitika/dnevno?${q}`),
+        api<StatusAnalitike & { ok: boolean }>('/admin/analitika/status'),
       ]);
       agregat = a;
       dnevno = d;
+      status = s;
       if (!od) od = a.od;
       if (!doDana) doDana = a.do;
       incidenti = i.incidenti;
@@ -117,7 +129,21 @@
 </svelte:head>
 
 <h1>Analitika</h1>
-<p class="opis">Minimalni pregled početnih riječi i ranih mrtvih slova. Posjećenost još nije uključena.</p>
+<p class="opis">Minimalni pregled početnih riječi, dnevnog igranja i ponavljanja. Posjećenost još nije uključena.</p>
+
+{#if status}
+  <p class="status" role="status">
+    {#if status.imaMjerenja}
+      Mjerenje od {new Date(status.mjerenjeOd!).toLocaleString('hr-HR')};
+      zadnji zapis {status.zadnjiZapisU ? new Date(status.zadnjiZapisU).toLocaleString('hr-HR') : '—'};
+      otvorenih prozora {status.otvaranja.otvoreni}, nepotpunih {status.otvaranja.nepotpuni};
+      igara bez ishoda {status.igre.bezIshoda}.
+    {:else}
+      Nema mjerenja — još nema zabilježenih događaja analitike.
+    {/if}
+  </p>
+  <p class="meta">{status.napomena}</p>
+{/if}
 
 {#if greska}
   <p role="alert">{greska}</p>
@@ -229,6 +255,7 @@
 
 <style>
   .opis, .meta { color: #444; margin-bottom: 12px; }
+  .status { border: 1px solid #ccc; padding: 10px 12px; margin-bottom: 12px; background: #fafafa; }
   .filteri { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 24px; }
   .filteri label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
   .kartice { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }

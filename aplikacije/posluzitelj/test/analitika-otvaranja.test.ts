@@ -42,7 +42,7 @@ describe('analitika otvaranja upis i admin', () => {
 
   afterAll(async () => {
     await zaustavi();
-  });
+  }, 120_000);
 
   it('idempotentno bilježi rani incident i agregira metrike', async () => {
     const igraId = randomUUID();

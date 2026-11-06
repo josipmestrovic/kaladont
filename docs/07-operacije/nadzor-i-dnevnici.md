@@ -4,6 +4,12 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 
 > **Status:** Pino logovi i prošireni `/zdravlje` postoje. Docker rotacija, UptimeRobot, Healthchecks.io te systemd poslovi još su ciljano stanje Faze 8. Pokuse opterećenja nadzirati postojećim alatima; ne uvoditi novu monitoring infrastrukturu radi njih.
 
+## Admin analitika (minimalni slice)
+
+`/admin/analitika` i `GET /api/admin/analitika/*` zahtijevaju admin sesiju (`Cache-Control: no-store`). Slice pokriva: sustavska otvaranja i rane incidente mrtvih slova, dnevne započete/završene igre, omjer gost/registriran među ljudskim sudjelovanjima te postotak igrača (isti ID) s 2+ igrama. Dan je Europe/Zagreb. Nema zasebnog workera: motor piše izravno u `analitika_otvaranja` / `analitika_igre` / `analitika_sudjelovanja`.
+
+Namjerno izvan slicea: Umami/posjećenost, konverzija gost→račun u 7 dana, misije, event-red, retencija 90/13, P90 trajanja. Status ruta razlikuje „nema mjerenja” od „0 događaja u filteru”.
+
 ## Admin nadzor aplikacije
 
 Bot politika v3 raspodjeljuje javne isteke na namjerne (jedna prilika u 2 % sudjelovanja, ne po potezu) i neočekivane. Admin ih prikazuje odvojeno, a alarm reagira samo na neočekivani istek. Javni health zadržava kumulativni `botIsteci` za sve isteke i dodaje `botNamjerniIsteci`; razlika daje neočekivane isteke. Trening nema namjerni istek. Raniji rezultati mjerenja ne prepravljaju se zbog promjene politike.
