@@ -243,6 +243,8 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   tjedneElite: integer('tjedne_elite').notNull().default(0),
   mjesecneElite: integer('mjesecne_elite').notNull().default(0),
   naDvijeFronte: integer('na_dvije_fronte').notNull().default(0),
+  jezicniDetektivi: integer('jezicni_detektivi').notNull().default(0),
+  cinkarosi: integer('cinkarosi').notNull().default(0),
   anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
@@ -483,8 +485,13 @@ export const prijave = pgTable('prijave', {
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
   rijesioId: uuid('rijesio_id').references(() => igraci.id),
   napomenaAdmina: text('napomena_admina'),
+  /** Prihvaćena izmjena rječnika. Null dok je status samo pregledana/riješena bez stvarne promjene. */
+  potvrdenaAkcija: text('potvrdena_akcija'),
+  izmjenaRjecnikaId: integer('izmjena_rjecnika_id'),
 }, (tablica) => [
   index('idx_prijave_igrac_id_partija_id_vrijeme').on(tablica.igracId, tablica.partijaId, tablica.vrijeme),
+  index('idx_prijave_otvorene_rijec').on(tablica.tip, tablica.rijec).where(sql`${tablica.potvrdenaAkcija} is null and ${tablica.status} in ('nova', 'pregledana')`),
+  check('chk_prijave_potvrdena_akcija', sql`${tablica.potvrdenaAkcija} is null or ${tablica.potvrdenaAkcija} in ('dodana', 'reaktivirana', 'deaktivirana')`),
   uniqueIndex('uq_prijave_brisanje_igrac_partija_potez')
     .on(tablica.igracId, tablica.partijaId, tablica.potezId)
     .where(sql`${tablica.tip} = 'za_brisanje'`),
@@ -504,9 +511,17 @@ export const prijaveIgraca = pgTable('prijave_igraca', {
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
   rijesioId: uuid('rijesio_id').references(() => igraci.id),
   napomenaAdmina: text('napomena_admina'),
+  /** Prihvaćena posljedica prijave. Null ostaje i kad je status riješena bez brisanja. */
+  potvrdenaAkcija: text('potvrdena_akcija'),
+  /** Razlog koji je administrator potvrdio, odvojen od statusa riješena. */
+  potvrdeniRazlog: text('potvrdeni_razlog'),
 }, (tablica) => [
   index('idx_prijave_igraca_vrijeme').on(tablica.vrijeme),
+  index('idx_prijave_igraca_otvorene_pogrdne').on(tablica.prijavljeniIgracId).where(sql`${tablica.potvrdenaAkcija} is null and ${tablica.razlog} = 'pogrdan_nadimak'`),
   uniqueIndex('uq_prijave_igraca_partija_prijavitelj_igrac').on(tablica.partijaId, tablica.prijaviteljId, tablica.prijavljeniIgracId),
+  check('chk_prijave_igraca_potvrdena_akcija', sql`${tablica.potvrdenaAkcija} is null or ${tablica.potvrdenaAkcija} = 'soft_brisanje'`),
+  check('chk_prijave_igraca_potvrdeni_razlog', sql`${tablica.potvrdeniRazlog} is null or ${tablica.potvrdeniRazlog} in ('pogrdan_nadimak', 'neprimjereno_ponasanje', 'drugo')`),
+  check('chk_prijave_igraca_potvrda_par', sql`(${tablica.potvrdenaAkcija} is null and ${tablica.potvrdeniRazlog} is null) or (${tablica.potvrdenaAkcija} is not null and ${tablica.potvrdeniRazlog} is not null)`),
 ]);
 
 export const izmjeneRjecnika = pgTable('izmjene_rjecnika', {
@@ -736,6 +751,27 @@ export const dokaziDostignucaNaDvijeFronte = pgTable('dokazi_dostignuca_na_dvije
 }, (tablica) => [
   primaryKey({ name: 'dokazi_dostignuca_na_dvije_fronte_pk', columns: [tablica.igracId, tablica.vrstaRazdoblja, tablica.kalendarskiPocetak] }),
   check('chk_dokazi_na_dvije_fronte_vrsta', sql`${tablica.vrstaRazdoblja} in ('dnevno', 'tjedno', 'mjesecno')`),
+]);
+
+/** Jedan životni doprinos Jezičnom detektivu po prijavitelju i normaliziranoj riječi. */
+export const dokaziDostignucaJezicniDetektiv = pgTable('dokazi_dostignuca_jezicni_detektiv', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  normaliziranaRijec: text('normalizirana_rijec').notNull(),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_dostignuca_jezicni_detektiv_pk', columns: [tablica.igracId, tablica.normaliziranaRijec] }),
+  check('chk_dokazi_jezicni_detektiv_rijec', sql`char_length(${tablica.normaliziranaRijec}) >= 2`),
+]);
+
+/**
+ * Jedan životni doprinos Cinkarošu po prijavitelju i prijavljenom računu.
+ * Brisanje prijavljenog računa ne smije obrisati tuđi dokaz (nema cascade na prijavljenog).
+ */
+export const dokaziDostignucaCinkaros = pgTable('dokazi_dostignuca_cinkaros', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  prijavljeniIgracId: uuid('prijavljeni_igrac_id').notNull().references(() => igraci.id),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_dostignuca_cinkaros_pk', columns: [tablica.igracId, tablica.prijavljeniIgracId] }),
+  check('chk_dokazi_cinkaros_nije_samoprijava', sql`${tablica.igracId} <> ${tablica.prijavljeniIgracId}`),
 ]);
 
 /** Trajne osobne obavijesti (seed za kasniji sandučić). Neprikazane čeka klijent. */
