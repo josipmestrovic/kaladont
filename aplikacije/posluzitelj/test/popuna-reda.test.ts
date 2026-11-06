@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
-import type { Eliminacija, KrajPartije, PocetakPartije, PrihvacenPotez, RundaOtvorena, StanjeReda } from 'zajednicko';
+import type { Eliminacija, KrajPartije, PocetakPartije, PrihvacenPotez, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
 import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { botovi, igraci, partije, sudioniciPartije } from '../src/baza/shema.js';
@@ -71,6 +71,28 @@ function cekaj<T>(socket: ClientSocket, dogadaj: string, filter: (p: T) => boole
       resolve(payload);
     };
     socket.on(dogadaj, slusac);
+  });
+}
+
+/** Svježe stanje prije ne-znam — inače CI može pogoditi sustav_bira / zastarjeli turnToken (tihi ignore). */
+function dohvatiStanjePartije(socket: ClientSocket, timeoutMs = 5_000): Promise<StanjePartije> {
+  const odgovor = cekaj<StanjePartije>(socket, 'partija:stanje', () => true, timeoutMs);
+  socket.emit('partija:stanje');
+  return odgovor;
+}
+
+/** Prvi uspjeh; timeout jednog kandidata ne ruši race dok drugi još čeka. */
+function prviUspjeh<T>(kandidati: Array<Promise<T>>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let preostalo = kandidati.length;
+    let zadnjaGreska: unknown;
+    for (const kandidat of kandidati) {
+      kandidat.then(resolve, (greska) => {
+        zadnjaGreska = greska;
+        preostalo -= 1;
+        if (preostalo === 0) reject(zadnjaGreska);
+      });
+    }
   });
 }
 
@@ -202,22 +224,38 @@ describe('popuna javnog reda botovima', () => {
       expect(botSjedalo.jeGost).toBe(false);
 
       const krajPromise = krajevi.next(() => true, 30_000, 'partija:kraj');
-      const runda = await runde.next(() => true, 10_000, 'partija:runda-otvorena');
+      let runda = await runde.next(() => true, 10_000, 'partija:runda-otvorena');
       let naPotezu = runda.naPotezuId;
       let turnToken = runda.turnToken;
       let odustao = false;
-      for (let korak = 0; korak < 6; korak += 1) {
+      for (let korak = 0; korak < 8; korak += 1) {
+        const stanje = await dohvatiStanjePartije(socket);
+        if (stanje.zavrsena || stanje.statusSpremanja !== 'nije_zavrsena') {
+          odustao = true;
+          break;
+        }
+        if (stanje.sustavBiraRijec) {
+          runda = await runde.next((p) => p.turnToken !== turnToken, 10_000, 'partija:runda-otvorena nakon izbora');
+          naPotezu = runda.naPotezuId;
+          turnToken = runda.turnToken;
+          continue;
+        }
+        naPotezu = stanje.naPotezuId;
+        turnToken = stanje.turnToken;
+
         if (naPotezu === mojId) {
+          const odbijen = cekaj<{ kod: string }>(socket, 'potez:odbijen', () => true, 30_000);
           socket.emit('potez:ne-znam', { turnToken });
-          const ishod = await Promise.race([
-            eliminacije.next((e) => e.igracId === mojId, 10_000, 'partija:eliminacija').then(() => 'eliminacija' as const),
+          const ishod = await prviUspjeh([
+            eliminacije.next((e) => e.igracId === mojId, 30_000, 'partija:eliminacija').then(() => 'eliminacija' as const),
             krajPromise.then(() => 'kraj' as const),
+            odbijen.then((p) => Promise.reject(new Error(`ne-znam odbijen: ${p.kod}`)) as Promise<never>),
           ]);
           odustao = ishod === 'eliminacija' || ishod === 'kraj';
           break;
         }
-        const ishod = await Promise.race([
-          potezi.next((p) => p.igracId === naPotezu, 5_000, `potez:prihvacen od ${naPotezu}`).then((p) => ({ vrsta: 'potez' as const, p })),
+        const ishod = await prviUspjeh([
+          potezi.next((p) => p.igracId === naPotezu, 15_000, `potez:prihvacen od ${naPotezu}`).then((p) => ({ vrsta: 'potez' as const, p })),
           krajPromise.then(() => ({ vrsta: 'kraj' as const })),
         ]);
         if (ishod.vrsta === 'kraj') {
