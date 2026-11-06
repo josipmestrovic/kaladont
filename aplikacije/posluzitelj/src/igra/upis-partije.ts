@@ -11,7 +11,7 @@ import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { priznajPrivatnika } from '../dostignuca/dodjela.js';
-import { priznajDnevnuPobjeduModa, priznajSvePohvale } from '../dostignuca/dodjela-d02.js';
+import { priznajCistuPetica, priznajDnevnuPobjeduModa, priznajRijetkuGrdosiju, priznajSvePohvale } from '../dostignuca/dodjela-d02.js';
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca } from '../misije/obracun.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
@@ -178,6 +178,10 @@ export interface ZapisStatistikeRijeci {
   najrjedaRijec: string | null;
   najrjedaRijecFrekvencija: number | null;
   najrjedaTier: number | null;
+  /** Poznata nula ili broj pravih pogrešnih unosa. Izostanak = nepoznato, nikad 0. */
+  pogresniUnosi?: number;
+  /** Oblici kvalificirani tijekom igre (dugi i bilo kojeg tiera rijetkosti), već normalizirani. */
+  dugeRijetkeRijeci?: readonly string[];
 }
 
 export interface ZapisNapretkaDostignuca {
@@ -236,6 +240,8 @@ export function sazetakMetrika(statistika: ZapisStatistikeRijeci | undefined) {
     najduziNizRijeci: imaRijeci ? Math.min(Math.max(1, statistika.najduziStreak), statistika.prihvaceniPotezi) : 0,
     najduzaRijec: imaRijeci ? statistika.najduzaRijec : null,
     najduzaRijecGrafemi: imaRijeci ? statistika.najduzaRijecGrafemi : null,
+    // NULL ostaje nepoznato. Eksplicitna 0 jest stvarna nula i jedina vrijednost koja može otključati Čistu peticu.
+    ...(typeof statistika.pogresniUnosi === 'number' ? { pogresniUnosi: statistika.pogresniUnosi } : {}),
   };
 }
 
@@ -816,6 +822,28 @@ export async function zakljuciPartijuUBazi(
       if (!samoStatistika && r.plasman === 1 && jeLjudskiRacun(vrstaIgraca, upravljac)) {
         const kruna = await priznajDnevnuPobjeduModa(tx, { igracId: r.igracId, mod, zavrsenoU });
         primijeniDodjelu(r.igracId, kruna, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+        const statistikaPobjede = statistike.get(r.igracId);
+        // Čista petica: pobjeda, ≥5 prihvaćenih riječi i točno 0 pravih pogrešnih unosa.
+        // pogresniUnosi broji samo odbijene riječi koje lome niz (nevažeća riječ, krivi nastavak,
+        // već iskorištena, vlastito ime, nedopuštena vrsta, nije osnovni oblik, prekratka).
+        // Ne broje se zastarjeli token, tuđi red, mrežni retry, limit ni tehničke greške.
+        // Izostanak polja je nepoznato i ne smije se tretirati kao 0.
+        if (statistikaPobjede && statistikaPobjede.prihvaceniPotezi >= 5 && statistikaPobjede.pogresniUnosi === 0) {
+          const petica = await priznajCistuPetica(tx, { igracId: r.igracId, partijaId, zavrsenoU });
+          primijeniDodjelu(r.igracId, petica, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+        }
+      }
+
+      if (jeLjudskiRacun(vrstaIgraca, upravljac)) {
+        const oblici = statistike.get(r.igracId)?.dugeRijetkeRijeci ?? [];
+        for (const oblik of oblici) {
+          const grdosija = await priznajRijetkuGrdosiju(tx, {
+            igracId: r.igracId,
+            normaliziraniOblik: oblik,
+            zavrsenoU,
+          });
+          primijeniDodjelu(r.igracId, grdosija, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+        }
       }
     }
 

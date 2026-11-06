@@ -176,6 +176,10 @@ interface StatistikaRijeciPartije {
   prihvaceneRijetkeRijeci: number;
   prihvaceneJakoRijetkeRijeci: number;
   dugeIRijetkeRijeci: number;
+  /** Pravi pogrešni unosi koji lome niz. 0 je poznata nula, ne nepoznato. */
+  pogresniUnosi: number;
+  /** Jedinstveni normalizirani oblici koji su u ovom potezu bili i dugi i rijetki. */
+  kvalificiraneDugeRijetkeRijeci: Set<string>;
   razlicitiPoceci: Set<string>;
   najduzaRijec: string | null;
   najduzaRijecGrafemi: number;
@@ -639,6 +643,8 @@ export function stvoriUpraviteljPartija(
       prihvaceneRijetkeRijeci: 0,
       prihvaceneJakoRijetkeRijeci: 0,
       dugeIRijetkeRijeci: 0,
+      pogresniUnosi: 0,
+      kvalificiraneDugeRijetkeRijeci: new Set(),
       razlicitiPoceci: new Set(),
       najduzaRijec: null,
       najduzaRijecGrafemi: 0,
@@ -1233,6 +1239,8 @@ export function stvoriUpraviteljPartija(
           prihvaceneRijetkeRijeci: statistika.prihvaceneRijetkeRijeci,
           prihvaceneJakoRijetkeRijeci: statistika.prihvaceneJakoRijetkeRijeci,
           dugeIRijetkeRijeci: statistika.dugeIRijetkeRijeci,
+          pogresniUnosi: statistika.pogresniUnosi,
+          dugeRijetkeRijeci: [...statistika.kvalificiraneDugeRijetkeRijeci],
           razlicitiPoceci: [...statistika.razlicitiPoceci],
           najduzaRijec: statistika.najduzaRijec,
           najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
@@ -1317,6 +1325,8 @@ export function stvoriUpraviteljPartija(
         prihvaceneRijetkeRijeci: statistika.prihvaceneRijetkeRijeci,
         prihvaceneJakoRijetkeRijeci: statistika.prihvaceneJakoRijetkeRijeci,
         dugeIRijetkeRijeci: statistika.dugeIRijetkeRijeci,
+        pogresniUnosi: statistika.pogresniUnosi,
+        dugeRijetkeRijeci: [...statistika.kvalificiraneDugeRijetkeRijeci],
         razlicitiPoceci: [...statistika.razlicitiPoceci],
         najduzaRijec: statistika.najduzaRijec,
         najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
@@ -1840,6 +1850,18 @@ export function stvoriUpraviteljPartija(
           if (tier === 0) statistika.prihvaceneJakoRijetkeRijeci += 1;
           if (brojGrafema >= PRAGOVI_DULJINE.duga) statistika.dugeIRijetkeRijeci += 1;
         }
+        // Rijetka grdosija: isti prihvaćeni potez je dugačak i bilo kojeg tiera rijetkosti, uključujući 0.
+        // Provjera je !== null (tier 0 nije truthy). Skup oblika ide u završni obračun, ne u brojač usred igre.
+        // Isti normalizirani oblik ne ulazi dvaput. Ne uključuje bota, gosta, trening ni sustavsku početnu riječ.
+        if (
+          sudionik?.upravljac === 'covjek'
+          && (sudionik.vrsta === 'registriran' || sudionik.vrsta === 'admin')
+          && stanje.kontekst !== 'trening'
+          && brojGrafema >= PRAGOVI_DULJINE.duga
+          && tier !== null
+        ) {
+          statistika.kvalificiraneDugeRijetkeRijeci.add(rijecNormalizirana);
+        }
         const grupeZaStatistiku = tier === 0 ? statistika.otkriveneJakoRijetkeGrupe : tier === 1 ? statistika.otkriveneSrednjeRijetkeGrupe : tier === 2 ? statistika.otkriveneRijetkeGrupe : null;
         if (tier !== null && grupeZaStatistiku) {
           for (const grupa of noveGrupeZaDostignuca) grupeZaStatistiku.add(grupa);
@@ -2149,6 +2171,13 @@ export function stvoriUpraviteljPartija(
     });
     if (!rezultat.valjano) {
       stanje.streakovi.set(igracId, 0);
+      // Čista petica: pravi pogrešan unos koji lomi niz.
+      // Broje se: RIJEC_NE_POSTOJI, VLASTITO_IME, KRIVA_SLOVA, RIJEC_ISKORISTENA,
+      // NEDOPUSTENA_VRSTA, NIJE_OSNOVNI_OBLIK, PREKRATKA_RIJEC.
+      // Ne broje se (vraćaju se prije ove provjere): STARI_TURN_TOKEN, NIJE_TVOJ_POTEZ,
+      // SUSTAV_BIRA_RIJEC, PREBRZO, NEVALJAN_PAYLOAD i tehničke greške.
+      const statistika = stanje.statistikeRijeci.get(igracId);
+      if (statistika) statistika.pogresniUnosi += 1;
       return { ishod: 'odbijen', kod: rezultat.kod!, poruka: rezultat.poruka! };
     }
     obradiPrihvacenPotez(stanje, igracId, rijecNormalizirana, izvorniSocket);
