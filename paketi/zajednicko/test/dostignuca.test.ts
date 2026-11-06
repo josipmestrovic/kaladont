@@ -8,10 +8,10 @@ import {
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
-  it('ima dvadeset i pet dostignuća i 125 zvjezdica', () => {
-    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(25);
+  it('ima dvadeset i sedam dostignuća i 135 zvjezdica', () => {
+    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(27);
     expect(DEFINICIJE_DOSTIGNUCA.every((definicija) => definicija.pragovi.length === 5)).toBe(true);
-    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(125);
+    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(135);
   });
 
   it('ne otključava servisna dostignuća kroz izracunajNovaDostignuca', () => {
@@ -30,6 +30,8 @@ describe('dostignuca', () => {
         tjedneElite: 5,
         mjesecneElite: 5,
         naDvijeFronte: 5,
+        jezicniDetektivi: 50,
+        cinkarosi: 5,
       },
       1,
       true,
@@ -47,6 +49,8 @@ describe('dostignuca', () => {
     expect(idovi).not.toContain('tjedna_elita');
     expect(idovi).not.toContain('mjesecna_elita');
     expect(idovi).not.toContain('na_dvije_fronte');
+    expect(idovi).not.toContain('jezicni_detektiv');
+    expect(idovi).not.toContain('cinkaros');
   });
 
   it('preskače više razina i vraća najvišu novu razinu', () => {
