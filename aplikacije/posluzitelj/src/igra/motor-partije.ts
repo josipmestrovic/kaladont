@@ -55,6 +55,7 @@ import {
   type DeltaNapretkaDostignuca,
   type KontekstPartije,
   type BrzaPoruka,
+  type IzvorPocetneRijeci,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
@@ -198,6 +199,8 @@ interface StanjeStola {
   zadnjaRijec: string | null; // zadnja izgovorena/dodijeljena riječ - za obrazloženje eliminacije mrtvim slovima
   zadnjaRijecIgracId: string | null;
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
+  /** Izvor zadnje sustavske početne riječi; `nema_kandidata` kad odabir nije uspio. */
+  zadnjiIzvorPocetne: IzvorPocetneRijeci | 'nema_kandidata' | null;
   iskoristeneGrupe: Set<string>; // potrošene leksemske grupe (RS-28/RS-29)
   potrosioGrupu: Map<string, string>; // grupa -> oblik koji ju je potrošio (za poruku odbijanja)
   brojOdigranih: number; // broj prihvaćenih riječi (uključivo sustavske) - za brojIskoristenih u payloadu
@@ -855,6 +858,7 @@ export function stvoriUpraviteljPartija(
       zadnjaRijec: null,
       zadnjaRijecIgracId: null,
       zadnjaRijecVrsta: null,
+      zadnjiIzvorPocetne: null,
       iskoristeneGrupe: new Set(),
       potrosioGrupu: new Map(),
       brojOdigranih: 0,
@@ -1382,8 +1386,9 @@ export function stvoriUpraviteljPartija(
   function objaviRijecSustava(stanje: StanjeStola, napadac: string | null): void {
     if (stanje.zavrsena || prekiniPrazanPocetak(stanje)) return;
     stanje.izborHandle = null;
-    const autoRijec = rjecnik.nasumicnaPocetnaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
-    if (!autoRijec) {
+    const odabir = rjecnik.nasumicnaPocetnaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
+    if (!odabir) {
+      stanje.zadnjiIzvorPocetne = 'nema_kandidata';
       // Rječnik iscrpljen: zakljuciPartiju očekuje ≤1 aktivnog. Ostale rangiraj kao
       // mrtva_slova_iskoristeno (bez nove runde), inače CI/simulacija ostane bez partija:kraj.
       const preostali = [...stanje.aktivni];
@@ -1409,6 +1414,8 @@ export function stvoriUpraviteljPartija(
       return;
     }
 
+    const autoRijec = odabir.rijec;
+    stanje.zadnjiIzvorPocetne = odabir.izvor;
     stanje.runda += 1;
     potrosiGrupe(stanje, autoRijec);
     const trazenaSlova = zadnjaDva(autoRijec);
@@ -2271,6 +2278,7 @@ export function stvoriUpraviteljPartija(
       zadnjaRijec: null,
       zadnjaRijecIgracId: null,
       zadnjaRijecVrsta: null,
+      zadnjiIzvorPocetne: null,
       iskoristeneGrupe: new Set(),
       potrosioGrupu: new Map(),
       brojOdigranih: 0,

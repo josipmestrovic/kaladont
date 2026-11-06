@@ -78,7 +78,9 @@ export function stvoriTestniRjecnik(): RjecnikSucelje {
     postojeRijeciNa: (dvaGrafema) => [...GRUPE_TEST.keys()].some((rijec) => prvaDva(rijec) === dvaGrafema),
     imaSlobodnuRijecNa: (dvaGrafema, iskoristene) =>
       [...GRUPE_TEST.keys()].some((rijec) => prvaDva(rijec) === dvaGrafema && jeIgriva(rijec, iskoristene)),
-    nasumicnaPocetnaRijec: (iskoristene) =>
-      [...GRUPE_TEST.keys()].find((rijec) => jeIgriva(rijec, iskoristene)) ?? null,
+    nasumicnaPocetnaRijec: (iskoristene) => {
+      const rijec = [...GRUPE_TEST.keys()].find((kandidat) => jeIgriva(kandidat, iskoristene));
+      return rijec ? { rijec, izvor: 'sigurni_skup' } : null;
+    },
   };
 }

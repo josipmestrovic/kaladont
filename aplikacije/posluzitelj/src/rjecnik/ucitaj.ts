@@ -556,7 +556,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
         jeIgriva: (rijec, potroseneGrupe, vrste) =>
           jeIgriva(rijec, potroseneGrupe, vrste, samoOsnovniOblici, minDuljinaRijeci),
       });
-      if (sigurnaRijec) return sigurnaRijec;
+      if (sigurnaRijec) return { rijec: sigurnaRijec, izvor: 'sigurni_skup' };
 
       if (!dopusteneVrste || dopusteneVrste.has('imenica')) {
         const ukupno = pocetneImenickeRijeci.length;
@@ -567,7 +567,9 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
             if (!jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) continue;
             const nakonOdabira = new Set(iskoristeneGrupe);
             for (const grupa of grupeZa(rijec)) nakonOdabira.add(grupa);
-            if (imaSlobodnuRijecNa(zadnjaDva(rijec), nakonOdabira, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) return rijec;
+            if (imaSlobodnuRijecNa(zadnjaDva(rijec), nakonOdabira, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
+              return { rijec, izvor: 'rezervni_odabir' };
+            }
           }
         }
       }
@@ -578,7 +580,9 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
         if (!jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) continue;
         const nakonOdabira = new Set(iskoristeneGrupe);
         for (const grupa of grupeZa(rijec)) nakonOdabira.add(grupa);
-        if (imaSlobodnuRijecNa(zadnjaDva(rijec), nakonOdabira, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) return rijec;
+        if (imaSlobodnuRijecNa(zadnjaDva(rijec), nakonOdabira, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
+          return { rijec, izvor: 'rezervni_odabir' };
+        }
       }
       return null;
     },
