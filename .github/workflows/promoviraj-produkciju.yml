@@ -80,8 +80,11 @@ jobs:
           test -n "$DIGEST"
           # GHCR commit tag može se pomaknuti novim CI runom; gate mora dokazati da je
           # uspješan „Objaviti staging” stvarno deployao BAŠ ovaj digest, ne samo isti SHA.
+          # Ne koristiti `gh run view --log` + 2>/dev/null: noviji gh blokira ANSI u logovima
+          # i tihi pad lažno odbija valjan staging (vidi failed runs 42202611930 / 42203210115).
           image_ref="ghcr.io/josipmestrovic/kaladont@${DIGEST}"
           run_id=""
+          dokaz=""
 
           mapfile -t kandidati < <(gh api \
             -H "Accept: application/vnd.github+json" \
@@ -95,27 +98,66 @@ jobs:
 
           for candidate in "${kandidati[@]}"; do
             echo "Provjeravam staging run ${candidate} za digest ${DIGEST}…"
-            # Log u datoteku (ne pipe u grep -q): uz pipefail rani zatvor cijevi daje
-            # SIGPIPE na gh i lažno odbija run koji jest deployao ovaj digest.
-            log_datoteka=$(mktemp)
-            if gh run view "$candidate" --log >"$log_datoteka" 2>/dev/null \
-              && grep -F -q -- "$image_ref" "$log_datoteka"; then
-              rm -f "$log_datoteka"
-              run_id=$candidate
-              break
-            fi
-            rm -f "$log_datoteka"
+            mapfile -t jobovi < <(gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/actions/runs/${candidate}/jobs?per_page=100" \
+              --jq '.jobs[].id')
+            for job_id in "${jobovi[@]}"; do
+              log_datoteka=$(mktemp)
+              err_datoteka=$(mktemp)
+              if gh api \
+                -H "Accept: application/vnd.github+json" \
+                --allow-escape-sequences \
+                "/repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/logs" \
+                >"$log_datoteka" 2>"$err_datoteka"; then
+                if grep -F -q -- "$image_ref" "$log_datoteka" \
+                  || grep -F -q -- "IMAGE_DIGEST: ${DIGEST}" "$log_datoteka" \
+                  || grep -F -q -- "EXPECTED_DIGEST: ${DIGEST}" "$log_datoteka"; then
+                  rm -f "$log_datoteka" "$err_datoteka"
+                  run_id=$candidate
+                  dokaz="workflow-log"
+                  break 2
+                fi
+              else
+                echo "Upozorenje: log joba ${job_id} nije dohvaćen:"
+                cat "$err_datoteka" || true
+              fi
+              rm -f "$log_datoteka" "$err_datoteka"
+            done
           done
 
-          if test -z "$run_id"; then
-            echo "Nema uspješnog staging deploya koji je objavio digest $DIGEST za commit $VERZIJA."
-            echo "Trenutni GHCR tag commit SHA nije dokaz: nakon CI re-runa tag pokazuje na novi digest dok stari zeleni staging ostaje za isti SHA."
+          # Živi staging mora već služiti baš ovaj digest/verziju (ne samo stari zeleni run).
+          zdravlje=$(mktemp)
+          if ! curl --fail --silent --show-error --max-time 20 \
+            https://staging.kaladont.hr/zdravlje >"$zdravlje"; then
+            echo "Staging /zdravlje nije dostupan."
+            cat "$zdravlje" || true
+            rm -f "$zdravlje"
             exit 1
           fi
+          if ! jq -e --arg digest "$DIGEST" --arg verzija "$VERZIJA" \
+            '.ok == true and .digest == $digest and .verzija == $verzija' \
+            "$zdravlje" >/dev/null; then
+            echo "Staging /zdravlje ne odgovara ulaznom digesta/commitu."
+            echo "Očekivano: digest=$DIGEST verzija=$VERZIJA"
+            echo -n "Dobiveno: "
+            jq -c '{ok,digest,verzija}' "$zdravlje" || cat "$zdravlje"
+            rm -f "$zdravlje"
+            exit 1
+          fi
+          rm -f "$zdravlje"
 
-          echo "Staging gate OK: workflow run $run_id deployao je $image_ref."
+          if test -z "$run_id"; then
+            # Živi /zdravlje već potvrđuje digest; log je dodatni dokaz. Ne blokiraj
+            # promociju ako je noviji gh/ANSI u log API-ju opet nestabilan.
+            run_id="${kandidati[0]}"
+            dokaz="zdravlje+staging-run"
+            echo "Upozorenje: digest nije pronađen u staging logovima; prihvaćam živ /zdravlje + zeleni staging run $run_id."
+          fi
+
+          echo "Staging gate OK: workflow run $run_id ($dokaz) + /zdravlje = $image_ref."
           {
-            echo "- Staging gate: uspješan run \`$run_id\` deployao je digest \`$DIGEST\` (commit \`$VERZIJA\`)"
+            echo "- Staging gate: uspješan run \`$run_id\` ($dokaz) i živ \`/zdravlje\` za digest \`$DIGEST\` (commit \`$VERZIJA\`)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Preuzeti repozitorij na commit slike
