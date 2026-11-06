@@ -94,9 +94,10 @@ export async function upsertKrajIgre(
       target: analitikaIgre.igraId,
       set: {
         krajU,
-        // Ne degradiraj završenu igru u prekinutu / nepotpuno.
-        ishod: sql`case when ${analitikaIgre.ishod} = 'zavrsena' then ${analitikaIgre.ishod} else ${ishod} end`,
+        ishod,
       },
+      // Ne degradiraj završenu igru u prekinutu / nepotpuno; krajU se i dalje osvježava samo kad smijemo dirati ishod.
+      setWhere: sql`${analitikaIgre.ishod} is distinct from 'zavrsena'`,
     });
 }
 
