@@ -13,4 +13,3 @@ export {
   postaviVezeZaObavijestiDostignuca,
   type VezeZaObavijestiDostignuca,
 } from './obavijesti.js';
-export { backfillDostignucaD01, type IshodBackfillaD01 } from './backfill-d01.js';

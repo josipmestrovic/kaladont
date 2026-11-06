@@ -120,8 +120,12 @@ export async function zabiljeziPobjeduTreninga(
 
   if (rezultat?.obavijesti.length) emitirajNovostiDostignuca(igracId, rezultat.obavijesti);
   if (!rezultat) return null;
-  const { obavijesti: _obavijesti, ...javno } = rezultat;
-  return javno;
+  return {
+    pobjede: rezultat.pobjede,
+    novaRazina: rezultat.novaRazina,
+    maksimalnaRazina: rezultat.maksimalnaRazina,
+    ishodMisija: rezultat.ishodMisija,
+  };
 }
 
 export async function promovirajTreningGrupe(igracId: string, grupe: readonly string[]) {
