@@ -10,8 +10,10 @@ import {
   dodjeleMisija,
   doprinosiMisijama,
   dostignucaIgraca,
+  dokaziDostignucaCinkaros,
   dokaziDostignucaCistaPetica,
   dokaziDostignucaDvostrukaKruna,
+  dokaziDostignucaJezicniDetektiv,
   dokaziDostignucaMisija,
   dokaziDostignucaPrivatnik,
   dokaziDostignucaNaDvijeFronte,
@@ -61,6 +63,8 @@ async function obrisiRacunUTransakciji(
   await transakcija.delete(dokaziTop10Ulazaka).where(eq(dokaziTop10Ulazaka.igracId, igrac.id));
   await transakcija.delete(dokaziDostignucaTop10).where(eq(dokaziDostignucaTop10.igracId, igrac.id));
   await transakcija.delete(dokaziDostignucaNaDvijeFronte).where(eq(dokaziDostignucaNaDvijeFronte.igracId, igrac.id));
+  await transakcija.delete(dokaziDostignucaJezicniDetektiv).where(eq(dokaziDostignucaJezicniDetektiv.igracId, igrac.id));
+  await transakcija.delete(dokaziDostignucaCinkaros).where(eq(dokaziDostignucaCinkaros.igracId, igrac.id));
   await transakcija.delete(evidencijaDnevnihPobjedaModova).where(eq(evidencijaDnevnihPobjedaModova.igracId, igrac.id));
   await transakcija.delete(obavijestiIgraca).where(eq(obavijestiIgraca.igracId, igrac.id));
   await transakcija.delete(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igrac.id));
@@ -106,6 +110,12 @@ async function obrisiRacunUTransakciji(
 
 type TransakcijaBrisanja = Parameters<Parameters<typeof baza.transaction>[0]>[0];
 
+export interface RezultatBrisanjaRacuna {
+  ishod: IshodBrisanja;
+  /** Istina samo kad je ovo brisanje upisalo Top 10 dokaze koje treba obraditi nakon commita. */
+  osvjeziLjestvicu: boolean;
+}
+
 async function osvjeziLjestvicuAkoTreba(tx: TransakcijaBrisanja, igracId: string): Promise<boolean> {
   const opazenoU = new Date();
   if (!(await imaJavnuIgruUOtvorenomMjesecu(tx, igracId, opazenoU))) return false;
@@ -118,7 +128,7 @@ async function osvjeziLjestvicuAkoTreba(tx: TransakcijaBrisanja, igracId: string
   return true;
 }
 
-async function dovrsiTop10NakonBrisanja(): Promise<void> {
+export async function dovrsiTop10NakonBrisanja(): Promise<void> {
   try {
     const poIgracu = await obradiNeobradeneTop10Dokaze();
     for (const [igracId, obavijesti] of poIgracu) emitirajNovostiDostignuca(igracId, obavijesti);
@@ -126,6 +136,31 @@ async function dovrsiTop10NakonBrisanja(): Promise<void> {
   } catch (greska) {
     console.error('Top 10 nakon brisanja računa nije obrađen:', greska);
   }
+}
+
+async function obrisiZakljucanogIgraca(
+  transakcija: TransakcijaBrisanja,
+  igrac: { id: string; obrisanAt: Date | null; vrsta: 'gost' | 'registriran' | 'admin'; upravljac: 'covjek' | 'bot' },
+): Promise<RezultatBrisanjaRacuna> {
+  const ishod = await obrisiRacunUTransakciji(transakcija, igrac);
+  if (ishod !== 'obrisan') return { ishod, osvjeziLjestvicu: false };
+  return { ishod, osvjeziLjestvicu: await osvjeziLjestvicuAkoTreba(transakcija, igrac.id) };
+}
+
+async function obrisiPoIdUnutar(transakcija: TransakcijaBrisanja, igracId: string): Promise<RezultatBrisanjaRacuna> {
+  const [igrac] = await transakcija
+    .select({
+      id: igraci.id,
+      obrisanAt: igraci.obrisanAt,
+      vrsta: igraci.vrsta,
+      upravljac: igraci.upravljac,
+    })
+    .from(igraci)
+    .where(eq(igraci.id, igracId))
+    .limit(1)
+    .for('update');
+  if (!igrac) return { ishod: 'nije-pronaden', osvjeziLjestvicu: false };
+  return obrisiZakljucanogIgraca(transakcija, igrac);
 }
 
 export async function obrisiRacun(email: string, potvrdi: boolean): Promise<IshodBrisanja> {
@@ -145,35 +180,30 @@ export async function obrisiRacun(email: string, potvrdi: boolean): Promise<Isho
       })
       .from(igraci)
       .where(sql`lower(${igraci.email}) = ${normaliziraniEmail}`)
-      .limit(1);
+      .limit(1)
+      .for('update');
 
     if (!igrac) return 'nije-pronaden';
-    const rezultat = await obrisiRacunUTransakciji(transakcija, igrac);
-    if (rezultat === 'obrisan') osvjezi = await osvjeziLjestvicuAkoTreba(transakcija, igrac.id);
-    return rezultat;
+    const rezultat = await obrisiZakljucanogIgraca(transakcija, igrac);
+    osvjezi = rezultat.osvjeziLjestvicu;
+    return rezultat.ishod;
   });
   if (osvjezi) await dovrsiTop10NakonBrisanja();
   return ishod;
 }
 
-export async function obrisiRacunPoId(igracId: string): Promise<IshodBrisanja> {
+export function obrisiRacunPoId(igracId: string): Promise<IshodBrisanja>;
+export function obrisiRacunPoId(igracId: string, transakcija: TransakcijaBrisanja): Promise<RezultatBrisanjaRacuna>;
+export async function obrisiRacunPoId(
+  igracId: string,
+  transakcija?: TransakcijaBrisanja,
+): Promise<IshodBrisanja | RezultatBrisanjaRacuna> {
+  if (transakcija) return obrisiPoIdUnutar(transakcija, igracId);
   let osvjezi = false;
-  const ishod = await baza.transaction(async (transakcija) => {
-    const [igrac] = await transakcija
-      .select({
-        id: igraci.id,
-        obrisanAt: igraci.obrisanAt,
-        vrsta: igraci.vrsta,
-        upravljac: igraci.upravljac,
-      })
-      .from(igraci)
-      .where(eq(igraci.id, igracId))
-      .limit(1);
-
-    if (!igrac) return 'nije-pronaden';
-    const rezultat = await obrisiRacunUTransakciji(transakcija, igrac);
-    if (rezultat === 'obrisan') osvjezi = await osvjeziLjestvicuAkoTreba(transakcija, igrac.id);
-    return rezultat;
+  const ishod = await baza.transaction(async (unutarnja) => {
+    const rezultat = await obrisiPoIdUnutar(unutarnja, igracId);
+    osvjezi = rezultat.osvjeziLjestvicu;
+    return rezultat.ishod;
   });
   if (osvjezi) await dovrsiTop10NakonBrisanja();
   return ishod;

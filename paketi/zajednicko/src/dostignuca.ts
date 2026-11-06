@@ -38,7 +38,11 @@ export type BrojacDostignuca =
   /** Mjeseci u kojima je dosegnut mjesečni Top 10; samo servis dodjele. */
   | 'mjesecneElite'
   /** Razdoblja s Top 10 u oba moda; samo servis dodjele. */
-  | 'naDvijeFronte';
+  | 'naDvijeFronte'
+  /** Potvrđeni ispravci rječnika po prijavi; samo servis dodjele. */
+  | 'jezicniDetektivi'
+  /** Potvrđena uklanjanja računa zbog pogrdnog nadimka; samo servis dodjele. */
+  | 'cinkarosi';
 
 export const ID_DOSTIGNUCA_STALNO_SI_TU = 'stalno_si_tu';
 export const ID_DOSTIGNUCA_COVJEK_NA_MISIJI = 'covjek_na_misiji';
@@ -52,6 +56,8 @@ export const ID_DOSTIGNUCA_DNEVNA_DESETKA = 'dnevna_desetka';
 export const ID_DOSTIGNUCA_TJEDNA_ELITA = 'tjedna_elita';
 export const ID_DOSTIGNUCA_MJESECNA_ELITA = 'mjesecna_elita';
 export const ID_DOSTIGNUCA_NA_DVIJE_FRONTE = 'na_dvije_fronte';
+export const ID_DOSTIGNUCA_JEZICNI_DETEKTIV = 'jezicni_detektiv';
+export const ID_DOSTIGNUCA_CINKAROS = 'cinkaros';
 
 /** Brojači koji se ne smiju otključati kroz partijsku deltu. */
 export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Set([
@@ -67,6 +73,8 @@ export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Se
   'tjedneElite',
   'mjesecneElite',
   'naDvijeFronte',
+  'jezicniDetektivi',
+  'cinkarosi',
 ]);
 
 export interface DefinicijaDostignuca {
@@ -214,6 +222,24 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
     vrijediUPrivatnoj: false,
     brojac: 'naDvijeFronte',
   },
+  {
+    id: ID_DOSTIGNUCA_JEZICNI_DETEKTIV,
+    naziv: 'Jezični detektiv',
+    opis: 'Prijavi riječi i pomozi potvrđenim ispravcima rječnika.',
+    kategorija: 'igra',
+    pragovi: [1, 3, 10, 25, 50],
+    vrijediUPrivatnoj: false,
+    brojac: 'jezicniDetektivi',
+  },
+  {
+    id: ID_DOSTIGNUCA_CINKAROS,
+    naziv: 'Cinkaroš',
+    opis: 'Prijavi pogrdne nadimke zbog kojih administrator ukloni račun.',
+    kategorija: 'igra',
+    pragovi: [1, 2, 3, 4, 5],
+    vrijediUPrivatnoj: false,
+    brojac: 'cinkarosi',
+  },
 ] as const;
 
 export const UKUPNO_ZVJEZDICA_DOSTIGNUCA = DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0);
@@ -248,6 +274,8 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   ID_DOSTIGNUCA_TJEDNA_ELITA,
   ID_DOSTIGNUCA_MJESECNA_ELITA,
   ID_DOSTIGNUCA_NA_DVIJE_FRONTE,
+  ID_DOSTIGNUCA_JEZICNI_DETEKTIV,
+  ID_DOSTIGNUCA_CINKAROS,
 ] as const;
 
 export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(
@@ -281,7 +309,7 @@ export function izracunajNovaDostignuca(
   jePrivatna: boolean,
 ): NovoDostignuce[] {
   return DEFINICIJE_DOSTIGNUCA.flatMap((definicija) => {
-    // Servisna dostignuća (aktivni dani, misije, privatnik, D02 kombinacije, Top 10) ne idu kroz party deltu.
+    // Servisna dostignuća (aktivni dani, misije, privatnik, D02 kombinacije, Top 10, potvrđene prijave) ne idu kroz party deltu.
     if (definicija.id === ID_DOSTIGNUCA_STALNO_SI_TU || BROJACI_VAN_PARTIJSKE_DELTA.has(definicija.brojac)) return [];
     if (jePrivatna && !definicija.vrijediUPrivatnoj) return [];
     const staraVrijednost = definicija.brojac === 'razina'

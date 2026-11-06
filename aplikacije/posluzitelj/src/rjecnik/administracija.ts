@@ -5,15 +5,59 @@
 import { eq } from 'drizzle-orm';
 import { grafemi, kljucGrupe, type VrstaRijeci } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
+import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { izmjeneRjecnika, rijeci } from '../baza/shema.js';
+import type { MisijeTx } from '../misije/tipovi.js';
 
 const DOPUSTENA_SLOVA = /^[a-zšđčćž]+$/;
 
+type Izvrsitelj = MisijeTx | typeof baza;
+
 export class NevaljanaRijecError extends Error {}
 
-/** Dodaje riječ u rječnik (UPSERT) i bilježi izmjenu u izmjene_rjecnika. Vrsta je obavezna (ADR-013);
- * leksemska grupa se izvodi iz vrste i leme (default: sama riječ). Ne osvježava memoriju — pozovi
- * `rjecnik.primijeniUbaci` / `uskladiRjecnikNakonUbaci` (ne puni `ponovoUcitaj`). */
+export type PromjenaRjecnika =
+  | { promjena: 'nema'; rijec: string }
+  | { promjena: 'dodana' | 'reaktivirana' | 'deaktivirana' | 'vracena'; rijec: string; izmjenaId: number };
+
+export function normalizirajRijecRjecnika(ulaz: string): string {
+  return ulaz.normalize('NFC').trim().toLowerCase();
+}
+
+async function zabiljeziIzmjenu(
+  db: Izvrsitelj,
+  vrijednosti: {
+    rijec: string;
+    akcija: 'dodana' | 'uklonjena' | 'vracena';
+    razlog: string;
+    adminId: string | null;
+    prijavaId?: number | null;
+  },
+): Promise<number> {
+  const [red] = await db.insert(izmjeneRjecnika).values({
+    rijec: vrijednosti.rijec,
+    akcija: vrijednosti.akcija,
+    razlog: vrijednosti.razlog,
+    adminId: vrijednosti.adminId,
+    prijavaId: vrijednosti.prijavaId ?? null,
+  }).returning({ id: izmjeneRjecnika.id });
+  if (!red) throw new Error('Izmjena rječnika nije zapisana.');
+  return red.id;
+}
+
+function provjeriOblik(rijecUlaz: string): { rijec: string; prvaDva: string; zadnjaDva: string } {
+  const rijec = normalizirajRijecRjecnika(rijecUlaz);
+  if (rijec.length < 2 || !DOPUSTENA_SLOVA.test(rijec)) {
+    throw new NevaljanaRijecError(`Neispravan oblik riječi: "${rijecUlaz}"`);
+  }
+  const svi = grafemi(rijec);
+  if (svi.length < 2) {
+    throw new NevaljanaRijecError(`Riječ mora imati barem 2 slova: "${rijecUlaz}"`);
+  }
+  return { rijec, prvaDva: svi.slice(0, 2).join(''), zadnjaDva: svi.slice(-2).join('') };
+}
+
+/** Dodaje riječ u rječnik i bilježi izmjenu. Već aktivna riječ je no-op bez zapisa izmjene.
+ * Ne osvježava memoriju — pozovi `rjecnik.primijeniUbaci` / `uskladiRjecnikNakonUbaci`. */
 export async function dodajRijec(
   rijecUlaz: string,
   razlog: string,
@@ -21,58 +65,70 @@ export async function dodajRijec(
   vrsta: VrstaRijeci,
   lemaUlaz?: string,
   prijavaId?: number | null,
-): Promise<void> {
-  const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
-  const lema = (lemaUlaz ?? rijec).normalize('NFC').trim().toLowerCase();
-
-  if (rijec.length < 2 || !DOPUSTENA_SLOVA.test(rijec)) {
-    throw new NevaljanaRijecError(`Neispravan oblik riječi: "${rijecUlaz}"`);
-  }
-
-  const svi = grafemi(rijec);
-  if (svi.length < 2) {
-    throw new NevaljanaRijecError(`Riječ mora imati barem 2 slova: "${rijecUlaz}"`);
-  }
-  const prvaDva = svi.slice(0, 2).join('');
-  const zadnjaDva = svi.slice(-2).join('');
+  db: Izvrsitelj = baza,
+): Promise<PromjenaRjecnika> {
+  const { rijec, prvaDva, zadnjaDva } = provjeriOblik(rijecUlaz);
+  const lema = normalizirajRijecRjecnika(lemaUlaz ?? rijec);
   const grupa = kljucGrupe(vrsta, lema);
 
-  await baza
-    .insert(rijeci)
-    .values({ rijec, prvaDva, zadnjaDva, vrste: [vrsta], grupe: [grupa], aktivna: true, napomena: 'ručno dodano' })
-    .onConflictDoUpdate({ target: rijeci.rijec, set: { aktivna: true } });
+  const [postojeca] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
+  if (postojeca?.aktivna) return { promjena: 'nema', rijec };
 
-  await baza.insert(izmjeneRjecnika).values({
-    rijec,
-    akcija: 'dodana',
-    razlog,
-    adminId,
-    prijavaId: prijavaId ?? null,
-  });
+  if (!postojeca) {
+    try {
+      await db.insert(rijeci).values({
+        rijec,
+        prvaDva,
+        zadnjaDva,
+        vrste: [vrsta],
+        grupe: [grupa],
+        aktivna: true,
+        napomena: 'ručno dodano',
+      });
+    } catch (greska) {
+      if (!jeJedinstvenostPrekrsena(greska)) throw greska;
+      const [ponovo] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
+      if (!ponovo || ponovo.aktivna) return { promjena: 'nema', rijec };
+      await db.update(rijeci).set({ aktivna: true }).where(eq(rijeci.rijec, rijec));
+      const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId, prijavaId });
+      return { promjena: 'reaktivirana', rijec, izmjenaId };
+    }
+    const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'dodana', razlog, adminId, prijavaId });
+    return { promjena: 'dodana', rijec, izmjenaId };
+  }
+
+  await db.update(rijeci).set({ aktivna: true }).where(eq(rijeci.rijec, rijec));
+  const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId, prijavaId });
+  return { promjena: 'reaktivirana', rijec, izmjenaId };
 }
 
-/** Soft-delete (aktivna=false) - povijest odigranih partija ostaje razumljiva (odrzavanje-rjecnika.md). */
+/** Soft-delete (aktivna=false). Već neaktivna ili nepostojeća riječ je no-op. */
 export async function deaktivirajRijec(
   rijecUlaz: string,
   razlog: string,
   adminId: string | null = null,
   prijavaId?: number | null,
-): Promise<void> {
-  const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
-  await baza.update(rijeci).set({ aktivna: false }).where(eq(rijeci.rijec, rijec));
-  await baza.insert(izmjeneRjecnika).values({
-    rijec,
-    akcija: 'uklonjena',
-    razlog,
-    adminId,
-    prijavaId: prijavaId ?? null,
-  });
+  db: Izvrsitelj = baza,
+): Promise<PromjenaRjecnika> {
+  const rijec = normalizirajRijecRjecnika(rijecUlaz);
+  const [postojeca] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
+  if (!postojeca?.aktivna) return { promjena: 'nema', rijec };
+  await db.update(rijeci).set({ aktivna: false }).where(eq(rijeci.rijec, rijec));
+  const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'uklonjena', razlog, adminId, prijavaId });
+  return { promjena: 'deaktivirana', rijec, izmjenaId };
 }
 
-/** Vraća prethodno deaktiviranu riječ. */
-export async function vratiRijec(rijecUlaz: string, razlog: string, adminId: string | null = null): Promise<void> {
-  const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
-  await baza.update(rijeci).set({ aktivna: true }).where(eq(rijeci.rijec, rijec));
-  await baza.insert(izmjeneRjecnika).values({ rijec, akcija: 'vracena', razlog, adminId });
+/** Vraća prethodno deaktiviranu riječ. Već aktivna ili nepostojeća riječ je no-op. */
+export async function vratiRijec(
+  rijecUlaz: string,
+  razlog: string,
+  adminId: string | null = null,
+  db: Izvrsitelj = baza,
+): Promise<PromjenaRjecnika> {
+  const rijec = normalizirajRijecRjecnika(rijecUlaz);
+  const [postojeca] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
+  if (!postojeca || postojeca.aktivna) return { promjena: 'nema', rijec };
+  await db.update(rijeci).set({ aktivna: true }).where(eq(rijeci.rijec, rijec));
+  const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId });
+  return { promjena: 'vracena', rijec, izmjenaId };
 }
-

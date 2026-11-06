@@ -24,6 +24,8 @@ export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
   tjedna_elita: '/ikone/09-ljestvice.png',
   mjesecna_elita: '/ikone/09-ljestvice.png',
   na_dvije_fronte: '/ikone/06-trofej.png',
+  jezicni_detektiv: '/ikone/48-glas-zajednice.png',
+  cinkaros: '/ikone/45-lovac-na-glave.png',
 };
 
 export function ikonaDostignuca(id: string): string {
