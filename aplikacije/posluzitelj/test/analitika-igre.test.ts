@@ -4,6 +4,14 @@ import { agregirajDnevneIgre, mapirajVrstuRacuna, upsertKrajIgre, upsertPocetakI
 import { danasZagrebIso } from '../src/analitika/otvaranja.js';
 
 describe('analitika igre', () => {
+  const prethodniFlag = process.env.ANALITIKA_U_TESTU;
+  process.env.ANALITIKA_U_TESTU = '1';
+
+  afterAll(() => {
+    if (prethodniFlag === undefined) delete process.env.ANALITIKA_U_TESTU;
+    else process.env.ANALITIKA_U_TESTU = prethodniFlag;
+  });
+
   it('mapira admina kao registriranog', () => {
     expect(mapirajVrstuRacuna('admin')).toBe('registriran');
     expect(mapirajVrstuRacuna('gost')).toBe('gost');

@@ -31,8 +31,10 @@ describe('granice dana Europe/Zagreb', () => {
 describe('analitika otvaranja upis i admin', () => {
   let app: FastifyInstance;
   let zaustavi: () => Promise<void>;
+  const prethodniFlag = process.env.ANALITIKA_U_TESTU;
 
   beforeAll(async () => {
+    process.env.ANALITIKA_U_TESTU = '1';
     ({ app, zaustavi } = await izgradiPosluzitelj({
       postavkeMotora: { tolerancijaPrekidaMs: 50 },
       socketOgranicenja: { handshakePoIpMinuti: 1_000 },
@@ -41,6 +43,8 @@ describe('analitika otvaranja upis i admin', () => {
   });
 
   afterAll(async () => {
+    if (prethodniFlag === undefined) delete process.env.ANALITIKA_U_TESTU;
+    else process.env.ANALITIKA_U_TESTU = prethodniFlag;
     await zaustavi();
   }, 120_000);
 
