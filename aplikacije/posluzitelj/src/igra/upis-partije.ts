@@ -10,6 +10,8 @@ import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
+import { obradiNeobradeneTop10Dokaze, zabiljeziTop10NakonPromjene } from '../dostignuca/top10.js';
+import { ocistiMemorijuLjestvica } from '../ljestvice/servis.js';
 import { priznajPrivatnika } from '../dostignuca/dodjela.js';
 import { priznajCistuPetica, priznajDnevnuPobjeduModa, priznajRijetkuGrdosiju, priznajSvePohvale } from '../dostignuca/dodjela-d02.js';
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca } from '../misije/obracun.js';
@@ -269,6 +271,7 @@ export async function zakljuciPartijuUBazi(
   const agregati = new Map<string, AgregatZakljucka>();
   const obavijestiPoIgracu = new Map<string, ObavijestOtkljucanogDostignuca[]>();
   const modStatistike = mod;
+  let javniZavrsetak = false;
 
   const zapamtiObavijesti = (igracId: string, obavijesti: readonly ObavijestOtkljucanogDostignuca[]) => {
     if (obavijesti.length === 0) return;
@@ -994,7 +997,42 @@ export async function zakljuciPartijuUBazi(
         zapamtiObavijesti(igracId, ishod.noveObavijesti ?? []);
       }
     }
+
+    if (!samoStatistika) {
+      javniZavrsetak = true;
+      await zabiljeziTop10NakonPromjene(tx, {
+        modovi: [mod],
+        opazenoU: zavrsenoU,
+        izvor: 'partija',
+        partijaId,
+      });
+    }
   });
+
+  if (!samoStatistika) {
+    try {
+      const top10 = await obradiNeobradeneTop10Dokaze({ partijaId });
+      for (const [igracId, obavijesti] of top10) {
+        zapamtiObavijesti(igracId, obavijesti);
+        const agregat = agregati.get(igracId);
+        if (!agregat) continue;
+        pridruziDostignuca(
+          igracId,
+          obavijesti.map((obavijest) => ({
+            id: obavijest.dostignuceId,
+            novaRazina: obavijest.novaRazina,
+            maksimalnaRazina: obavijest.maksimalnaRazina,
+          })),
+          agregat.upravljac,
+          agregat.vrstaIgraca,
+          agregat.iskustvoPrijePartije,
+        );
+      }
+      if (javniZavrsetak) ocistiMemorijuLjestvica();
+    } catch (greska) {
+      console.error('Obrada Top 10 nakon partije nije uspjela:', partijaId, greska);
+    }
+  }
 
   for (const [igracId, obavijesti] of obavijestiPoIgracu) {
     emitirajNovostiDostignuca(igracId, obavijesti);

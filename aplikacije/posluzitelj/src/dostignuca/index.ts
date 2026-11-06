@@ -19,3 +19,8 @@ export {
   priznajRijetkuGrdosiju,
   priznajSvePohvale,
 } from './dodjela-d02.js';
+export {
+  imaJavnuIgruUOtvorenomMjesecu,
+  obradiNeobradeneTop10Dokaze,
+  zabiljeziTop10NakonPromjene,
+} from './top10.js';
