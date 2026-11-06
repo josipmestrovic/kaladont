@@ -67,6 +67,12 @@ import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, typ
 import { zabiljeziPobjeduTreninga } from '../trening/upis-napretka.js';
 import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
 import { stvoriStvarniSat, type Sat, type SatHandle } from './sat.js';
+import {
+  zabiljeziOtvaranjeAnalitike,
+  type IzvorOtvaranjaAnalitike,
+  type StatusOtvaranjaAnalitike,
+  type UpravljacOtvaranjaAnalitike,
+} from '../analitika/otvaranja.js';
 
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50), turnToken: z.string().min(1).max(64).optional() }).strict();
 const ShemaNeznam = z.object({ turnToken: z.string().min(1).max(64).optional() }).strict().optional();
@@ -201,6 +207,19 @@ interface StanjeStola {
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
   /** Izvor zadnje sustavske početne riječi; `nema_kandidata` kad odabir nije uspio. */
   zadnjiIzvorPocetne: IzvorPocetneRijeci | 'nema_kandidata' | null;
+  /** Brojač sustavskih otvaranja u ovoj igri (za analitiku). */
+  analitikaOtvaranjaRedni: number;
+  /** Otvoreni prozor prva dva odgovora; null kad nema aktivnog mjerenja. */
+  analitikaProzor: {
+    redniBroj: number;
+    brojOdgovora: number;
+    odgovor1: string | null;
+    odgovor2: string | null;
+    sustavskaRijec: string | null;
+    izvor: IzvorOtvaranjaAnalitike;
+    status: StatusOtvaranjaAnalitike;
+    dodijeljenoU: Date;
+  } | null;
   iskoristeneGrupe: Set<string>; // potrošene leksemske grupe (RS-28/RS-29)
   potrosioGrupu: Map<string, string>; // grupa -> oblik koji ju je potrošio (za poruku odbijanja)
   brojOdigranih: number; // broj prihvaćenih riječi (uključivo sustavske) - za brojIskoristenih u payloadu
@@ -859,6 +878,8 @@ export function stvoriUpraviteljPartija(
       zadnjaRijecIgracId: null,
       zadnjaRijecVrsta: null,
       zadnjiIzvorPocetne: null,
+      analitikaOtvaranjaRedni: 0,
+      analitikaProzor: null,
       iskoristeneGrupe: new Set(),
       potrosioGrupu: new Map(),
       brojOdigranih: 0,
@@ -1362,6 +1383,119 @@ export function stvoriUpraviteljPartija(
     return 'mrtva_slova';
   }
 
+  function upravljacZaAnalitiku(stanje: StanjeStola, igracId: string | null | undefined): UpravljacOtvaranjaAnalitike | null {
+    if (!igracId) return null;
+    return stanje.sudionici.find((s) => s.igracId === igracId)?.upravljac ?? null;
+  }
+
+  function syncAnalitikaProzor(
+    stanje: StanjeStola,
+    dodatak: {
+      status?: StatusOtvaranjaAnalitike;
+      zatvorenoU?: Date | null;
+      incidentPozicija?: 1 | 2 | null;
+      incidentRijecUzrok?: string | null;
+      incidentRazlog?: string | null;
+      incidentAutorUpravljac?: UpravljacOtvaranjaAnalitike | null;
+      incidentZrtvaUpravljac?: UpravljacOtvaranjaAnalitike | null;
+    } = {},
+  ): void {
+    const prozor = stanje.analitikaProzor;
+    if (!prozor) return;
+    if (dodatak.status) prozor.status = dodatak.status;
+    zabiljeziOtvaranjeAnalitike({
+      igraId: stanje.partijaId,
+      redniBrojOtvaranja: prozor.redniBroj,
+      kontekst: stanje.kontekst,
+      mod: stanje.mod,
+      brojSudionika: stanje.sudionici.length,
+      sustavskaRijec: prozor.sustavskaRijec,
+      izvor: prozor.izvor,
+      brojOdgovora: prozor.brojOdgovora,
+      odgovor1: prozor.odgovor1,
+      odgovor2: prozor.odgovor2,
+      status: prozor.status,
+      incidentPozicija: dodatak.incidentPozicija ?? null,
+      incidentRijecUzrok: dodatak.incidentRijecUzrok ?? null,
+      incidentRazlog: dodatak.incidentRazlog ?? null,
+      incidentAutorUpravljac: dodatak.incidentAutorUpravljac ?? null,
+      incidentZrtvaUpravljac: dodatak.incidentZrtvaUpravljac ?? null,
+      dodijeljenoU: prozor.dodijeljenoU,
+      zatvorenoU: dodatak.zatvorenoU ?? null,
+    });
+  }
+
+  function otvoriAnalitikaProzor(
+    stanje: StanjeStola,
+    izvor: IzvorOtvaranjaAnalitike,
+    sustavskaRijec: string | null,
+    status: StatusOtvaranjaAnalitike = 'otvoren',
+  ): void {
+    if (stanje.analitikaProzor?.status === 'otvoren') {
+      syncAnalitikaProzor(stanje, { status: 'nepotpuno', zatvorenoU: new Date(sat.sada()) });
+    }
+    stanje.analitikaOtvaranjaRedni += 1;
+    stanje.analitikaProzor = {
+      redniBroj: stanje.analitikaOtvaranjaRedni,
+      brojOdgovora: 0,
+      odgovor1: null,
+      odgovor2: null,
+      sustavskaRijec,
+      izvor,
+      status,
+      dodijeljenoU: new Date(sat.sada()),
+    };
+    syncAnalitikaProzor(stanje, {
+      status,
+      zatvorenoU: status === 'otvoren' ? null : new Date(sat.sada()),
+    });
+    if (status !== 'otvoren') stanje.analitikaProzor = null;
+  }
+
+  function zabiljeziAnalitikaOdgovor(stanje: StanjeStola, rijec: string): void {
+    const prozor = stanje.analitikaProzor;
+    if (!prozor || prozor.status !== 'otvoren' || prozor.brojOdgovora >= 2) return;
+    prozor.brojOdgovora += 1;
+    if (prozor.brojOdgovora === 1) prozor.odgovor1 = rijec;
+    else prozor.odgovor2 = rijec;
+  }
+
+  function zatvoriAnalitikaProzorDrugim(stanje: StanjeStola): void {
+    const prozor = stanje.analitikaProzor;
+    if (!prozor || prozor.status !== 'otvoren') return;
+    syncAnalitikaProzor(stanje, { status: 'zatvoren_drugim', zatvorenoU: new Date(sat.sada()) });
+    stanje.analitikaProzor = null;
+  }
+
+  function zatvoriAnalitikaProzorRanimIncidentom(
+    stanje: StanjeStola,
+    razlog: string,
+    autorId: string | null,
+    zrtvaId: string,
+  ): void {
+    const prozor = stanje.analitikaProzor;
+    if (!prozor || prozor.status !== 'otvoren') return;
+    if (prozor.brojOdgovora !== 1 && prozor.brojOdgovora !== 2) return;
+    const pozicija = prozor.brojOdgovora as 1 | 2;
+    syncAnalitikaProzor(stanje, {
+      status: 'rani_incident',
+      zatvorenoU: new Date(sat.sada()),
+      incidentPozicija: pozicija,
+      incidentRijecUzrok: pozicija === 1 ? prozor.odgovor1 : prozor.odgovor2,
+      incidentRazlog: razlog,
+      incidentAutorUpravljac: upravljacZaAnalitiku(stanje, autorId),
+      incidentZrtvaUpravljac: upravljacZaAnalitiku(stanje, zrtvaId),
+    });
+    stanje.analitikaProzor = null;
+  }
+
+  function mozdaZatvoriAnalitikaProzorDvaOdgovora(stanje: StanjeStola): void {
+    const prozor = stanje.analitikaProzor;
+    if (!prozor || prozor.status !== 'otvoren' || prozor.brojOdgovora !== 2) return;
+    syncAnalitikaProzor(stanje, { status: 'dva_odgovora_ok', zatvorenoU: new Date(sat.sada()) });
+    stanje.analitikaProzor = null;
+  }
+
   /**
    * Otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta): sustav - ne igrac - bira
    * rijec, sprjecavajuci namjestanje ishoda odabirom "zamke" za konkretnog protivnika.
@@ -1389,6 +1523,7 @@ export function stvoriUpraviteljPartija(
     const odabir = rjecnik.nasumicnaPocetnaRijec(stanje.iskoristeneGrupe, stanje.dopusteneVrste);
     if (!odabir) {
       stanje.zadnjiIzvorPocetne = 'nema_kandidata';
+      otvoriAnalitikaProzor(stanje, 'nema_kandidata', null, 'zatvoren_drugim');
       // Rječnik iscrpljen: zakljuciPartiju očekuje ≤1 aktivnog. Ostale rangiraj kao
       // mrtva_slova_iskoristeno (bez nove runde), inače CI/simulacija ostane bez partija:kraj.
       const preostali = [...stanje.aktivni];
@@ -1416,6 +1551,7 @@ export function stvoriUpraviteljPartija(
 
     const autoRijec = odabir.rijec;
     stanje.zadnjiIzvorPocetne = odabir.izvor;
+    otvoriAnalitikaProzor(stanje, odabir.izvor, autoRijec, 'otvoren');
     stanje.runda += 1;
     potrosiGrupe(stanje, autoRijec);
     const trazenaSlova = zadnjaDva(autoRijec);
@@ -1462,6 +1598,9 @@ export function stvoriUpraviteljPartija(
     kontekstPrekida?: Pick<PrekidUTijeku, 'bioNaPotezu' | 'napadacId'>,
   ): void {
     if (stanje.zavrsena || !stanje.aktivni.has(igracId)) return;
+
+    // Rani incident mrtvih slova zatvara se u obradi poteza prije ovog poziva.
+    if (!razlog.startsWith('mrtva_slova')) zatvoriAnalitikaProzorDrugim(stanje);
 
     ponistiCekanjePovratka(stanje, igracId);
     stanje.zadnjiPotezi.delete(igracId);
@@ -1764,6 +1903,7 @@ export function stvoriUpraviteljPartija(
     stanje.zadnjaRijec = rijecNormalizirana;
     stanje.zadnjaRijecIgracId = igracId;
     stanje.zadnjaRijecVrsta = 'rijec';
+    zabiljeziAnalitikaOdgovor(stanje, rijecNormalizirana);
 
     spremiPotezAkoTreba(stanje, {
       runda: stanje.runda,
@@ -1777,6 +1917,7 @@ export function stvoriUpraviteljPartija(
 
     // Kaladont/kalodont: eliminira se onaj tko je omogucio "ka" otvaranje, ne sljedeci igrac (pravila-igre.md)
     if (RIJECI_KALADONT.has(rijecNormalizirana)) {
+      zatvoriAnalitikaProzorDrugim(stanje);
       dodajNapredakDostignuca(stanje, igracId, { kaladontIzvedbe: 1 });
       const sljedeci = sljedeciAktivni(stanje, igracId) ?? igracId;
       emitirajPrihvacenPotezSvima(stanje, {
@@ -1810,6 +1951,11 @@ export function stvoriUpraviteljPartija(
       // Ne stavljaj žrtvu na potez i ne šalji stanje s aktivnim redom — odmah slijedi
       // eliminacija i 8 s izbora riječi; inače se eliminatoru/sljedećem otvori forma.
       if (zrtva) {
+        if (stanje.analitikaProzor && (stanje.analitikaProzor.brojOdgovora === 1 || stanje.analitikaProzor.brojOdgovora === 2)) {
+          zatvoriAnalitikaProzorRanimIncidentom(stanje, razlogMrtvihSlova, igracId, zrtva);
+        } else {
+          zatvoriAnalitikaProzorDrugim(stanje);
+        }
         emitirajPrihvacenPotezSvima(stanje, {
           igracId,
           rijec: rijecNormalizirana,
@@ -1827,6 +1973,8 @@ export function stvoriUpraviteljPartija(
       }
       return;
     }
+
+    mozdaZatvoriAnalitikaProzorDvaOdgovora(stanje);
 
     const sljedeci = sljedeciAktivni(stanje, igracId);
     if (!sljedeci) return; // ne bi se smjelo dogoditi dok je aktivnih > 1
@@ -2279,6 +2427,8 @@ export function stvoriUpraviteljPartija(
       zadnjaRijecIgracId: null,
       zadnjaRijecVrsta: null,
       zadnjiIzvorPocetne: null,
+      analitikaOtvaranjaRedni: 0,
+      analitikaProzor: null,
       iskoristeneGrupe: new Set(),
       potrosioGrupu: new Map(),
       brojOdigranih: 0,

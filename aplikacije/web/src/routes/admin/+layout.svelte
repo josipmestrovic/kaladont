@@ -15,6 +15,7 @@
 
 <nav class="admin-podnavigacija" aria-label="Admin odjeljci">
   <a href="/admin">Nadzor</a>
+  <a href="/admin/analitika">Analitika</a>
   <a href="/admin/prijave">Prijave</a>
   <a href="/admin/rjecnik">Rječnik</a>
 </nav>

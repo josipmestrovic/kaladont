@@ -645,3 +645,51 @@ export const nizAktivnostiIgraca = pgTable('niz_aktivnosti_igraca', {
   check('chk_niz_aktivnosti_trenutni', sql`${tablica.trenutniNiz} >= 1`),
   check('chk_niz_aktivnosti_najbolji', sql`${tablica.najboljiNiz} >= ${tablica.trenutniNiz}`),
 ]);
+
+export const kontekstAnalitike = pgEnum('kontekst_analitike', ['javna', 'privatna', 'trening']);
+export const izvorPocetneAnalitike = pgEnum('izvor_pocetne_analitike', [
+  'sigurni_skup',
+  'rezervni_odabir',
+  'nema_kandidata',
+]);
+export const statusOtvaranjaAnalitike = pgEnum('status_otvaranja_analitike', [
+  'otvoren',
+  'dva_odgovora_ok',
+  'rani_incident',
+  'zatvoren_drugim',
+  'nepotpuno',
+]);
+export const upravljacAnalitike = pgEnum('upravljac_analitike', ['covjek', 'bot']);
+
+/** Prozor prva dva odgovora nakon sustavske početne riječi (minimalna analitika). */
+export const analitikaOtvaranja = pgTable('analitika_otvaranja', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igraId: uuid('igra_id').notNull(),
+  redniBrojOtvaranja: integer('redni_broj_otvaranja').notNull(),
+  kontekst: kontekstAnalitike('kontekst').notNull(),
+  mod: modPartije('mod').notNull(),
+  brojSudionika: smallint('broj_sudionika').notNull(),
+  sustavskaRijec: text('sustavska_rijec'),
+  izvor: izvorPocetneAnalitike('izvor').notNull(),
+  brojOdgovora: smallint('broj_odgovora').notNull().default(0),
+  odgovor1: text('odgovor_1'),
+  odgovor2: text('odgovor_2'),
+  status: statusOtvaranjaAnalitike('status').notNull().default('otvoren'),
+  incidentPozicija: smallint('incident_pozicija'),
+  incidentRijecUzrok: text('incident_rijec_uzrok'),
+  incidentRazlog: text('incident_razlog'),
+  incidentAutorUpravljac: upravljacAnalitike('incident_autor_upravljac'),
+  incidentZrtvaUpravljac: upravljacAnalitike('incident_zrtva_upravljac'),
+  dodijeljenoU: timestamp('dodijeljeno_u', { withTimezone: true }).notNull(),
+  zatvorenoU: timestamp('zatvoreno_u', { withTimezone: true }),
+  verzijaAplikacije: text('verzija_aplikacije'),
+}, (tablica) => [
+  uniqueIndex('uq_analitika_otvaranja_igra_redni').on(tablica.igraId, tablica.redniBrojOtvaranja),
+  index('idx_analitika_otvaranja_dodijeljeno').on(tablica.dodijeljenoU, tablica.kontekst),
+  index('idx_analitika_otvaranja_status').on(tablica.status, tablica.dodijeljenoU),
+  check('chk_analitika_otvaranja_broj_odgovora', sql`${tablica.brojOdgovora} >= 0 and ${tablica.brojOdgovora} <= 2`),
+  check(
+    'chk_analitika_otvaranja_incident_pozicija',
+    sql`${tablica.incidentPozicija} is null or ${tablica.incidentPozicija} in (1, 2)`,
+  ),
+]);
