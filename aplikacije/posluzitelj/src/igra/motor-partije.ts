@@ -373,11 +373,27 @@ export function stvoriUpraviteljPartija(
     });
   }
 
+  function metaKrajaAnalitike(stanje: StanjeStola) {
+    return {
+      kontekst: stanje.kontekst,
+      mod: stanje.mod,
+      pocetakU: new Date(stanje.pocetakPartijeMs),
+    };
+  }
+
+  function zatvoriAnalitikaProzorNepotpuno(stanje: StanjeStola): void {
+    const prozor = stanje.analitikaProzor;
+    if (!prozor || prozor.status !== 'otvoren') return;
+    syncAnalitikaProzor(stanje, { status: 'nepotpuno', zatvorenoU: new Date(sat.sada()) });
+    stanje.analitikaProzor = null;
+  }
+
   function ponistiStol(stanje: StanjeStola, poruka: string): void {
     if (stanje.zavrsena) return;
     const partijaId = stanje.partijaId;
     stanje.zavrsena = true;
-    zabiljeziKrajIgre(partijaId, new Date(sat.sada()), 'prekinuta');
+    zatvoriAnalitikaProzorNepotpuno(stanje);
+    zabiljeziKrajIgre(partijaId, new Date(sat.sada()), 'prekinuta', metaKrajaAnalitike(stanje));
     namjerniIsteciBotova.delete(partijaId);
     if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
     if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
@@ -741,7 +757,12 @@ export function stvoriUpraviteljPartija(
       !stanje.zavrsena || stanje.statusSpremanja === 'spremanje_rezultata');
     const partijaIdovi = aktivnePartije.filter((stanje) => stanje.politika.zapisujePovijest).map((stanje) => stanje.partijaId);
     for (const stanje of aktivnePartije) {
+      const vecZavrsena = stanje.zavrsena;
       stanje.zavrsena = true;
+      if (!vecZavrsena) {
+        zatvoriAnalitikaProzorNepotpuno(stanje);
+        zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'prekinuta', metaKrajaAnalitike(stanje));
+      }
       if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
       if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
       if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
@@ -1081,7 +1102,8 @@ export function stvoriUpraviteljPartija(
 
   function zakljuciPartiju(stanje: StanjeStola): void {
     stanje.zavrsena = true;
-    zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'zavrsena');
+    zatvoriAnalitikaProzorNepotpuno(stanje);
+    zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'zavrsena', metaKrajaAnalitike(stanje));
     if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
     if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
     // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.

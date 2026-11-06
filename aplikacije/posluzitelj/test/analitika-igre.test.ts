@@ -1,7 +1,10 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { agregirajDnevneIgre, mapirajVrstuRacuna, upsertKrajIgre, upsertPocetakIgre } from '../src/analitika/igre.js';
 import { danasZagrebIso } from '../src/analitika/otvaranja.js';
+import { baza } from '../src/baza/klijent.js';
+import { analitikaIgre } from '../src/baza/shema.js';
 
 describe('analitika igre', () => {
   const prethodniFlag = process.env.ANALITIKA_U_TESTU;
@@ -40,7 +43,7 @@ describe('analitika igre', () => {
         { igracId: igracD, vrstaRacunaNaPocetku: 'registriran' },
       ],
     });
-    await upsertKrajIgre(igra1, sada, 'zavrsena');
+    await upsertKrajIgre(igra1, sada, 'zavrsena', { kontekst: 'javna', mod: 'cetiri_igraca', pocetakU: sada });
 
     await upsertPocetakIgre({
       igraId: igra2,
@@ -49,7 +52,7 @@ describe('analitika igre', () => {
       pocetakU: sada,
       sudionici: [{ igracId: igracA, vrstaRacunaNaPocetku: 'gost' }],
     });
-    await upsertKrajIgre(igra2, sada, 'zavrsena');
+    await upsertKrajIgre(igra2, sada, 'zavrsena', { kontekst: 'javna', mod: 'dva_igraca', pocetakU: sada });
 
     await upsertPocetakIgre({
       igraId: igra3,
@@ -58,7 +61,25 @@ describe('analitika igre', () => {
       pocetakU: sada,
       sudionici: [{ igracId: igracB, vrstaRacunaNaPocetku: 'gost' }],
     });
-    await upsertKrajIgre(igra3, sada, 'zavrsena');
+    await upsertKrajIgre(igra3, sada, 'zavrsena', { kontekst: 'trening', mod: 'dva_igraca', pocetakU: sada });
+
+    // Kraj prije start commit-a: atomarni upsert čuva točan kontekst/mod (ne hardkodira 1v1).
+    const igra4 = randomUUID();
+    await upsertKrajIgre(igra4, sada, 'prekinuta', {
+      kontekst: 'javna',
+      mod: 'cetiri_igraca',
+      pocetakU: sada,
+    });
+    await upsertPocetakIgre({
+      igraId: igra4,
+      kontekst: 'javna',
+      mod: 'cetiri_igraca',
+      pocetakU: sada,
+      sudionici: [{ igracId: igracC, vrstaRacunaNaPocetku: 'registriran' }],
+    });
+    const [red4] = await baza.select().from(analitikaIgre).where(eq(analitikaIgre.igraId, igra4)).limit(1);
+    expect(red4?.mod).toBe('cetiri_igraca');
+    expect(red4?.ishod).toBe('prekinuta');
 
     const sve = await agregirajDnevneIgre({ odDan: dan, doDan: dan });
     const danRed = sve.dani.find((d) => d.dan === dan);

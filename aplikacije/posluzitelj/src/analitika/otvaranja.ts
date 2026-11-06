@@ -69,6 +69,7 @@ export async function upsertOtvaranjaAnalitike(zapis: ZapisOtvaranjaAnalitike): 
     verzijaAplikacije: verzijaAplikacije(),
   };
 
+  // Kasniji fire-and-forget upis (npr. rani_incident) ne smije biti pregazen sporijim/starijim stanjem.
   await baza
     .insert(analitikaOtvaranja)
     .values(vrijednosti)
@@ -92,6 +93,10 @@ export async function upsertOtvaranjaAnalitike(zapis: ZapisOtvaranjaAnalitike): 
         zatvorenoU: vrijednosti.zatvorenoU,
         verzijaAplikacije: vrijednosti.verzijaAplikacije,
       },
+      setWhere: sql`(
+        ${analitikaOtvaranja.status} = 'otvoren'
+        or ${vrijednosti.status} <> 'otvoren'
+      ) and ${analitikaOtvaranja.brojOdgovora} <= ${vrijednosti.brojOdgovora}`,
     });
 }
 

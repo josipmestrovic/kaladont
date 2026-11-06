@@ -75,10 +75,25 @@ describe('analitika otvaranja upis i admin', () => {
     await upsertOtvaranjaAnalitike(zapis);
     await upsertOtvaranjaAnalitike(zapis);
 
+    // Sporiji „otvoren” upis ne smije pregaziti rani incident.
+    await upsertOtvaranjaAnalitike({
+      ...zapis,
+      brojOdgovora: 0,
+      odgovor1: null,
+      status: 'otvoren',
+      incidentPozicija: null,
+      incidentRijecUzrok: null,
+      incidentRazlog: null,
+      incidentAutorUpravljac: null,
+      incidentZrtvaUpravljac: null,
+      zatvorenoU: null,
+    });
+
     const retci = await baza.select().from(analitikaOtvaranja).where(eq(analitikaOtvaranja.igraId, igraId));
     expect(retci).toHaveLength(1);
     expect(retci[0]?.status).toBe('rani_incident');
     expect(retci[0]?.incidentPozicija).toBe(1);
+    expect(retci[0]?.odgovor1).toBe('erupcija');
 
     const dan = danasZagrebIso(dodijeljenoU);
     const { od, do: kraj } = graniceDanaZagreb(dan);
