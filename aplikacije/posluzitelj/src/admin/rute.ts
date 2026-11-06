@@ -12,7 +12,9 @@ import { dodajRijec, deaktivirajRijec, vratiRijec, NevaljanaRijecError } from '.
 import { igraci, prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza/shema.js';
 import { baza } from '../baza/klijent.js';
 import { zahtijevajAdmina, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
-import { obrisiRacunPoId } from '../racuni/brisanje.js';
+import { dovrsiTop10NakonBrisanja } from '../racuni/brisanje.js';
+import { potvrdiIspravakRjecnika, potvrdiUklanjanjeRacuna } from '../dostignuca/potvrde-prijava.js';
+import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { izracunajStatistikuCekanja } from './statistika-cekanja.js';
 import { ShemaKonfiguracijeBota, type KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
 import { SukobRevizijeBotova, type ZapisPostavkiBotova } from '../bot/trajne-postavke.js';
@@ -225,18 +227,14 @@ export async function registrirajAdminRute(
     { preHandler: zahtijevajAdmina },
     async (zahtjev, odgovor) => {
       const admin = (zahtjev as ZahtjevSIgracem).igrac!;
-      const prijavaId = Number(zahtjev.params.id);
-      const [prijava] = await baza.select().from(prijave).where(eq(prijave.id, prijavaId)).limit(1);
-      if (!prijava) return odgovor.code(404).send({ ok: false, greska: 'Prijava nije pronađena.' });
-      if (prijava.tip !== 'za_brisanje') {
-        return odgovor.code(400).send({ ok: false, greska: 'Ova prijava nije za brisanje riječi.' });
-      }
-      await deaktivirajRijec(prijava.rijec, 'Prijava igrača — riječ uklonjena', admin.id, prijavaId);
-      await baza
-        .update(prijave)
-        .set({ status: 'rijesena', napomenaAdmina: 'obrisana', rijesioId: admin.id })
-        .where(eq(prijave.id, prijavaId));
-      rjecnik.primijeniUklanjanje(prijava.rijec);
+      const rezultat = await potvrdiIspravakRjecnika({
+        prijavaId: Number(zahtjev.params.id),
+        adminId: admin.id,
+        smjer: 'deaktiviraj',
+      });
+      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
+      rjecnik.primijeniUklanjanje(rezultat.rijec);
+      for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
     },
   );
@@ -246,25 +244,14 @@ export async function registrirajAdminRute(
     { preHandler: zahtijevajAdmina },
     async (zahtjev, odgovor) => {
       const admin = (zahtjev as ZahtjevSIgracem).igrac!;
-      const prijavaId = Number(zahtjev.params.id);
-      const [prijava] = await baza.select().from(prijave).where(eq(prijave.id, prijavaId)).limit(1);
-      if (!prijava) return odgovor.code(404).send({ ok: false, greska: 'Prijava nije pronađena.' });
-      if (prijava.tip !== 'za_dodavanje') {
-        return odgovor.code(400).send({ ok: false, greska: 'Ova prijava nije za dodavanje riječi.' });
-      }
-      try {
-        await dodajRijec(prijava.rijec, 'Prijava igrača — riječ dodana', admin.id, 'imenica', undefined, prijavaId);
-      } catch (greska) {
-        if (greska instanceof NevaljanaRijecError) {
-          return odgovor.code(400).send({ ok: false, greska: greska.message });
-        }
-        throw greska;
-      }
-      await baza
-        .update(prijave)
-        .set({ status: 'rijesena', napomenaAdmina: 'dodana', rijesioId: admin.id })
-        .where(eq(prijave.id, prijavaId));
-      await uskladiRjecnikNakonUbaci(rjecnik, prijava.rijec);
+      const rezultat = await potvrdiIspravakRjecnika({
+        prijavaId: Number(zahtjev.params.id),
+        adminId: admin.id,
+        smjer: 'dodaj',
+      });
+      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
+      await uskladiRjecnikNakonUbaci(rjecnik, rezultat.rijec);
+      for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
     },
   );
@@ -325,22 +312,14 @@ export async function registrirajAdminRute(
     { preHandler: zahtijevajAdmina },
     async (zahtjev, odgovor) => {
       const admin = (zahtjev as ZahtjevSIgracem).igrac!;
-      const prijavaId = Number(zahtjev.params.id);
-      const [prijava] = await baza.select().from(prijaveIgraca).where(eq(prijaveIgraca.id, prijavaId)).limit(1);
-      if (!prijava) return odgovor.code(404).send({ ok: false, greska: 'Prijava nije pronađena.' });
-      const ishod = await obrisiRacunPoId(prijava.prijavljeniIgracId);
-      if (ishod === 'nije-pronaden') return odgovor.code(404).send({ ok: false, greska: 'Račun nije pronađen.' });
-      if (ishod === 'zasticen') {
-        return odgovor
-          .code(400)
-          .send({ ok: false, greska: 'Botove i admin račune nije moguće obrisati ovim putem.' });
-      }
-      await baza.update(prijaveIgraca).set({
-        status: 'rijesena',
-        napomenaAdmina: ishod === 'vec-obrisan' ? 'racun_vec_obrisan' : 'racun_obrisan',
-        rijesioId: admin.id,
-      }).where(eq(prijaveIgraca.id, prijavaId));
-      return { ok: true, ishod };
+      const rezultat = await potvrdiUklanjanjeRacuna({
+        prijavaId: Number(zahtjev.params.id),
+        adminId: admin.id,
+      });
+      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
+      if (rezultat.osvjeziLjestvicu) await dovrsiTop10NakonBrisanja();
+      for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
+      return { ok: true, ishod: rezultat.ishod };
     },
   );
 
