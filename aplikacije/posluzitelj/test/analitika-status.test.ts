@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { dohvatiStatusAnalitike } from '../src/analitika/status.js';
 
 describe('status analitike', () => {

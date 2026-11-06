@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { agregirajDnevneIgre, mapirajVrstuRacuna, upsertKrajIgre, upsertPocetakIgre } from '../src/analitika/igre.js';
 import { danasZagrebIso } from '../src/analitika/otvaranja.js';
