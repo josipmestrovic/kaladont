@@ -49,6 +49,10 @@
   let potezi = $state<{ id: number; rijec: string | null; igracId: string | null; vrsta: string; redniBroj: number; trazenaSlova: string | null; vrijeme: string }[]>([]);
   let imaJosPoteza = $state(false);
   let cursorPoteza = $state<string | null>(null);
+  let cursorPotezaPrijava = $state<string | null>(null);
+  let imaJosPotezaPrijava = $state(false);
+  let ucitavanjePotezaPrijava = $state(false);
+  let greskaPotezaPrijava = $state<string | null>(null);
   let ucitavanjePovijesti = $state(false);
   let greskaPovijesti = $state<string | null>(null);
   let prikazanaRijec = $state<{ id: number; rijec: string | null; igracId: string | null; vrsta: string; redniBroj: number; trazenaSlova: string | null; vrijeme: string } | null>(null);
@@ -467,15 +471,22 @@
     spremiOdbijene(partijaId, odbijeneRijeci);
   }
 
-  function spojiPotezeZaPrijavu(serverPotezi: Potez[]) {
+  function spojiPotezeZaPrijavuNajnovijePrvo(serverPotezi: Potez[], ucitajJos: boolean) {
     const sRijeci = serverPotezi.filter((potez) => potez.rijec);
-    if (sRijeci.length === 0 && lokalniPoteziZaPrijavu.length === 0) return;
-    const postojece = new Map(lokalniPoteziZaPrijavu.map((potez) => [potez.rijec ?? '', potez]));
-    for (const potez of sRijeci) {
-      if (!potez.rijec) continue;
-      postojece.set(potez.rijec, potez);
+    if (!ucitajJos) {
+      const serverRijeci = new Set(sRijeci.map((potez) => potez.rijec));
+      const lokalniNoviji = lokalniPoteziZaPrijavu.filter(
+        (potez) => potez.id < 0 && potez.rijec && !serverRijeci.has(potez.rijec),
+      );
+      lokalniPoteziZaPrijavu = [...lokalniNoviji, ...sRijeci];
+      return;
     }
-    lokalniPoteziZaPrijavu = [...postojece.values()];
+    if (sRijeci.length === 0) return;
+    const postojece = new Set(lokalniPoteziZaPrijavu.map((potez) => potez.rijec).filter(Boolean));
+    lokalniPoteziZaPrijavu = [
+      ...lokalniPoteziZaPrijavu,
+      ...sRijeci.filter((potez) => potez.rijec && !postojece.has(potez.rijec)),
+    ];
   }
 
   async function prijaviIgraca(igracId: string) {
@@ -803,7 +814,6 @@
       potezi = ucitajJos ? [...potezi, ...odgovor.potezi] : odgovor.potezi;
       imaJosPoteza = odgovor.imaJos;
       cursorPoteza = odgovor.sljedeciCursor;
-      spojiPotezeZaPrijavu(potezi);
       if (prikaziZadnjuRijec) {
         if (stanje.partijaId === partijaId && stanje.zadnjaRijec && stanje.zadnjaRijecVrsta) return;
         const sRijeci = odgovor.potezi.filter((potez) => potez.rijec);
@@ -815,6 +825,28 @@
       greskaPovijesti = 'Riječi se trenutno ne mogu učitati.';
     } finally {
       ucitavanjePovijesti = false;
+    }
+  }
+
+  async function ucitajPotezeZaPrijavu(ucitajJos = false) {
+    if (ucitavanjePotezaPrijava || !partijaId) return;
+    if (ucitajJos && !cursorPotezaPrijava) return;
+    ucitavanjePotezaPrijava = true;
+    greskaPotezaPrijava = null;
+    try {
+      const parametarCursora = ucitajJos && cursorPotezaPrijava
+        ? `&cursor=${encodeURIComponent(cursorPotezaPrijava)}`
+        : '';
+      const odgovor = await api<{ potezi: Potez[]; imaJos: boolean; sljedeciCursor: string | null }>(
+        `/partije/${partijaId}/potezi?limit=100&smjer=desc${parametarCursora}`,
+      );
+      spojiPotezeZaPrijavuNajnovijePrvo(odgovor.potezi, ucitajJos);
+      imaJosPotezaPrijava = odgovor.imaJos;
+      cursorPotezaPrijava = odgovor.sljedeciCursor;
+    } catch {
+      greskaPotezaPrijava = 'Riječi se trenutno ne mogu učitati.';
+    } finally {
+      ucitavanjePotezaPrijava = false;
     }
   }
 
@@ -909,7 +941,7 @@
       };
       prikazanaRijec = lokalni;
       if (potez.rijec && !lokalniPoteziZaPrijavu.some((p) => p.rijec === potez.rijec)) {
-        lokalniPoteziZaPrijavu = [...lokalniPoteziZaPrijavu, lokalni];
+        lokalniPoteziZaPrijavu = [lokalni, ...lokalniPoteziZaPrijavu];
       }
     };
 
@@ -1360,13 +1392,13 @@
   {/if}
   <PanelPrijavaRijeci
     partijaId={partijaId!}
-    potezi={lokalniPoteziZaPrijavu.length > 0 ? lokalniPoteziZaPrijavu : potezi}
+    potezi={lokalniPoteziZaPrijavu}
     {odbijeneRijeci}
-    ucitavanje={ucitavanjePovijesti}
-    greska={greskaPovijesti}
-    imaJos={imaJosPoteza}
-    naUcitajJos={() => void ucitajPoteze(false, true)}
-    naOtvori={() => void ucitajPoteze(false)}
+    ucitavanje={ucitavanjePotezaPrijava}
+    greska={greskaPotezaPrijava}
+    imaJos={imaJosPotezaPrijava}
+    naUcitajJos={() => void ucitajPotezeZaPrijavu(true)}
+    naOtvori={() => void ucitajPotezeZaPrijavu(false)}
     otvorenoPocetno={true}
   />
   {#if !jeTrening && igraciZaPrijavu.length > 0}
@@ -1710,13 +1742,13 @@
   {#if !jeTrening && partijaId}
     <PanelPrijavaRijeci
       partijaId={partijaId}
-      potezi={lokalniPoteziZaPrijavu.length > 0 ? lokalniPoteziZaPrijavu : potezi}
+      potezi={lokalniPoteziZaPrijavu}
       {odbijeneRijeci}
-      ucitavanje={ucitavanjePovijesti}
-      greska={greskaPovijesti}
-      imaJos={imaJosPoteza}
-      naUcitajJos={() => void ucitajPoteze(false, true)}
-      naOtvori={() => void ucitajPoteze(false)}
+      ucitavanje={ucitavanjePotezaPrijava}
+      greska={greskaPotezaPrijava}
+      imaJos={imaJosPotezaPrijava}
+      naUcitajJos={() => void ucitajPotezeZaPrijavu(true)}
+      naOtvori={() => void ucitajPotezeZaPrijavu(false)}
     />
   {/if}
   </div>

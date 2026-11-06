@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
   import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
 
@@ -38,6 +39,10 @@
 
   let otvoreno = $state(otvorenoPocetno);
 
+  onMount(() => {
+    if (otvoreno) naOtvori?.();
+  });
+
   function prebaciOtvoreno() {
     otvoreno = !otvoreno;
     if (otvoreno) naOtvori?.();
@@ -59,9 +64,9 @@
   let vidljivoOdbijenih = $state(VELICINA_STRANICE);
 
   const odigrane = $derived(potezi.filter((potez) => potez.rijec));
-  const odigraneNajnovijePrvo = $derived([...odigrane].toReversed());
+  // Odigrane dolaze već najnovije-prve (živ zapis + API smjer=desc). Odbijene se i dalje grade kronološki.
   const odbijeneNajnovijePrvo = $derived([...odbijeneRijeci].toReversed());
-  const prikazaneOdigrane = $derived(odigraneNajnovijePrvo.slice(0, vidljivoPrihvacenih));
+  const prikazaneOdigrane = $derived(odigrane.slice(0, vidljivoPrihvacenih));
   const prikazaneOdbijene = $derived(odbijeneNajnovijePrvo.slice(0, vidljivoOdbijenih));
   const imaJosPrihvacenih = $derived(odigrane.length > vidljivoPrihvacenih || imaJos);
   const imaJosOdbijenihListe = $derived(odbijeneRijeci.length > vidljivoOdbijenih);
