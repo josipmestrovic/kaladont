@@ -974,24 +974,30 @@ export async function registrirajProfilRute(
     };
   });
 
-  app.get<{ Params: { partijaId: string }; Querystring: { limit?: string; cursor?: string } }>(
+  app.get<{ Params: { partijaId: string }; Querystring: { limit?: string; cursor?: string; smjer?: string } }>(
     '/partije/:partijaId/potezi',
     async (zahtjev, odgovor) => {
       const limit = Math.min(Math.max(parseInt(zahtjev.query.limit ?? '100', 10) || 100, 1), MAKSIMALNO_POTEZA_PO_STRANICI);
+      const smjer = zahtjev.query.smjer === 'desc' ? 'desc' : 'asc';
       const cursor = dekodirajCursor<{ redniBroj: number; id: number }>(zahtjev.query.cursor);
       if (zahtjev.query.cursor && (!cursor || !Number.isInteger(cursor.redniBroj) || !Number.isSafeInteger(cursor.id))) {
         return odgovor.code(400).send({ ok: false, greska: 'Neispravan cursor poteza.' });
       }
       const osnovniUvjet = eq(potezi.partijaId, zahtjev.params.partijaId);
       const uvjetCursora = cursor
-        ? sql`(${potezi.redniBroj} > ${cursor.redniBroj} OR (${potezi.redniBroj} = ${cursor.redniBroj} AND ${potezi.id} > ${cursor.id}))`
+        ? smjer === 'desc'
+          ? sql`(${potezi.redniBroj} < ${cursor.redniBroj} OR (${potezi.redniBroj} = ${cursor.redniBroj} AND ${potezi.id} < ${cursor.id}))`
+          : sql`(${potezi.redniBroj} > ${cursor.redniBroj} OR (${potezi.redniBroj} = ${cursor.redniBroj} AND ${potezi.id} > ${cursor.id}))`
         : undefined;
 
       const retci = await baza
         .select()
         .from(potezi)
         .where(uvjetCursora ? and(osnovniUvjet, uvjetCursora) : osnovniUvjet)
-        .orderBy(asc(potezi.redniBroj), asc(potezi.id))
+        .orderBy(
+          smjer === 'desc' ? desc(potezi.redniBroj) : asc(potezi.redniBroj),
+          smjer === 'desc' ? desc(potezi.id) : asc(potezi.id),
+        )
         .limit(limit + 1);
       const imaJos = retci.length > limit;
       const poteziZaOdgovor = imaJos ? retci.slice(0, limit) : retci;

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { ID_DOSTIGNUCA_STALNO_SI_TU } from 'zajednicko';
+import { ID_DOSTIGNUCA_STALNO_SI_TU, lokalniDatumIso, pomakniKalendarskiDan } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import {
@@ -156,8 +156,10 @@ describe('POST /racuni/aktivnost-dana', () => {
 
   it('vlastiti profil uključuje aktivnostDana', async () => {
     const { token, igracId } = await registriraj('Profil');
-    await zabiljeziAktivniDan(igracId, { sada: () => new Date('2026-11-03T12:00:00.000Z') });
-    await zabiljeziAktivniDan(igracId, { sada: () => new Date('2026-11-04T12:00:00.000Z') });
+    const danas = lokalniDatumIso(new Date());
+    const jucer = pomakniKalendarskiDan(danas, -1);
+    await zabiljeziAktivniDan(igracId, { sada: () => new Date(`${jucer}T12:00:00.000Z`) });
+    await zabiljeziAktivniDan(igracId, { sada: () => new Date(`${danas}T12:00:00.000Z`) });
 
     const odgovor = await fetch(`${adresa}/api/profil`, {
       headers: { authorization: `Bearer ${token}` },

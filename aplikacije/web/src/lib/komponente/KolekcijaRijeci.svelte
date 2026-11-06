@@ -165,7 +165,7 @@
 {/if}
 
 <style>
-  .razina { display: grid; gap: 12px; margin: 18px 0; padding: 18px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
+  .razina { display: grid; gap: 12px; margin: 0 0 18px; padding: 18px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
   .kolekcija-kostur { display: grid; gap: 12px; }
   .kolekcija-kostur-sažetak { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; min-height: 112px; margin: 18px 0; padding: 18px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
   .kolekcija-kostur-kategorije { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }

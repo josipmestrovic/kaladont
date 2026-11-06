@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { bojaBordera, nazivAvatara, putanjaAvatara } from '$lib/avatari.js';
+  import { bojaBordera, debljinaBorderaRanga, nazivAvatara, putanjaAvatara } from '$lib/avatari.js';
   import type { AvatarConfigV1, RazinaVatre } from 'zajednicko';
   import AvatarKonfiguracijaPreview from './AvatarKonfiguracijaPreview.svelte';
   import AvatarVatra from './AvatarVatra.svelte';
@@ -13,32 +13,42 @@
     avatarConfig?: AvatarConfigV1 | null;
     razinaVatre?: RazinaVatre;
     nizPobjeda?: number;
+    /** Fiksna ilustracija (npr. bot za Zagrijavanje) umjesto konfiguracije / kataloga. */
+    vanjskaSlika?: string | null;
   }
 
-  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null, razinaVatre = 0, nizPobjeda = 0 }: Props = $props();
+  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null, razinaVatre = 0, nizPobjeda = 0, vanjskaSlika = null }: Props = $props();
 
-  const border = $derived(gost || !prikaziRangBorder ? null : bojaBordera(rang));
+  const border = $derived(!prikaziRangBorder || vanjskaSlika ? null : bojaBordera(rang));
+  const debljina = $derived(border ? debljinaBorderaRanga(velicina) : 0);
   const gostFontSize = $derived(Math.max(8, Math.round(velicina * 0.21)));
   const oznakaFontSize = $derived(Math.max(7, Math.round(velicina * 0.15)));
 </script>
 
 <div
   class="avatar"
+  class:ima-rang-border={border !== null}
+  class:vanjska={Boolean(vanjskaSlika)}
   style:width="{velicina}px"
   style:height="{velicina}px"
   style:--boja-rang={border ?? 'transparent'}
+  style:--debljina-rang="{debljina}px"
 >
-    <AvatarVatra razina={razinaVatre} niz={nizPobjeda} />
+    {#if !vanjskaSlika}
+      <AvatarVatra razina={razinaVatre} niz={nizPobjeda} />
+    {/if}
     <div class="avatar-sadrzaj">
-      {#if avatarConfig}
-        <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} rang={prikaziRangBorder && !gost ? rang : null} />
+      {#if vanjskaSlika}
+        <img class="vanjska-slika" src={vanjskaSlika} alt={nazivAvatara(avatarId)} />
+      {:else if avatarConfig}
+        <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} />
       {:else if gost}
         <div class="gost-avatar" style:font-size="{gostFontSize}px">Gost</div>
       {:else}
         <img src={putanjaAvatara(avatarId)} alt={nazivAvatara(avatarId)} />
       {/if}
     </div>
-    {#if gost && avatarConfig}
+    {#if gost && avatarConfig && !vanjskaSlika}
       <span class="gost-oznaka" style:font-size="{oznakaFontSize}px">Gost</span>
     {/if}
 </div>
@@ -52,18 +62,22 @@
     position: relative;
     box-sizing: border-box;
     flex-shrink: 0;
-    overflow: hidden;
-    box-shadow: 0 0 0 3px var(--boja-rang, transparent);
+    overflow: visible;
   }
-    .avatar-sadrzaj {
-      position: relative;
-      z-index: 1;
-      display: inline-flex;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      border-radius: inherit;
-    }
+
+  .avatar.ima-rang-border {
+    box-shadow: 0 0 0 var(--debljina-rang, 3px) var(--boja-rang, transparent);
+  }
+
+  .avatar-sadrzaj {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: inherit;
+  }
 
   .avatar img {
     width: 100%;
@@ -71,6 +85,16 @@
     border-radius: 50%;
     object-fit: cover;
     display: block;
+  }
+
+  .avatar.vanjska .avatar-sadrzaj {
+    background: var(--boja-povrsina-2);
+  }
+
+  .avatar .vanjska-slika {
+    object-fit: contain;
+    padding: 6%;
+    box-sizing: border-box;
   }
 
   .gost-avatar {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
-  import { bojaBordera } from '$lib/avatari.js';
+  import { bojaBordera, debljinaBorderaRanga } from '$lib/avatari.js';
   import { bojiStroke, dohvatiObojeniSvg, okvirDijela, putanjaDijela } from '$lib/avatar-render.js';
 
   interface Props {
@@ -11,6 +11,7 @@
 
   let { konfiguracija = ZADANI_AVATAR_CONFIG, rang = null, velicina = 280 }: Props = $props();
   const border = $derived(bojaBordera(rang));
+  const debljina = $derived(border ? debljinaBorderaRanga(velicina) : 0);
   let obojanePutanje = $state<Record<string, string>>({});
   let generacijaBojanja = 0;
 
@@ -62,7 +63,14 @@
     });
   });</script>
 
-<div class="avatar-konfiguracija" style:width={`${velicina}px`} style:height={`${velicina}px`}>
+<div
+  class="avatar-konfiguracija"
+  class:ima-rang-border={border !== null}
+  style:width={`${velicina}px`}
+  style:height={`${velicina}px`}
+  style:--boja-rang={border ?? 'transparent'}
+  style:--debljina-rang="{debljina}px"
+>
   <svg viewBox="0 0 380 380" role="img" aria-label="Sastavljeni Kaladont avatar">
     <circle cx="190" cy="190" r="190" fill="#FFEDEF" />
     {#each slojevi as sloj (sloj.kategorija)}
@@ -75,7 +83,16 @@
 </div>
 
 <style>
-  .avatar-konfiguracija { display: inline-flex; overflow: hidden; flex-shrink: 0; border-radius: 50%; box-sizing: border-box; }
+  .avatar-konfiguracija {
+    display: inline-flex;
+    overflow: hidden;
+    flex-shrink: 0;
+    border-radius: 50%;
+    box-sizing: border-box;
+  }
+  .avatar-konfiguracija.ima-rang-border {
+    box-shadow: 0 0 0 var(--debljina-rang, 3px) var(--boja-rang, transparent);
+  }
   svg { display: block; width: 100%; height: 100%; }
   image { overflow: visible; }
 </style>

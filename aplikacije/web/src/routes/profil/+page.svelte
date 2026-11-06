@@ -110,7 +110,7 @@
   let ucitavanjeRijeci = $state(false);
   let aktivniPogled = $state<PogledProfila>('statistika');
   let ucitaniPogledi = $state<Set<PogledProfila>>(new Set(['statistika']));
-  let velicinaAvatara = $state(216);
+  let velicinaAvatara = $state(198);
   const prikazujePostavke = $derived($page.url.searchParams.get('tab') === 'postavke');
 
   function promijeniPogled(pogled: PogledProfila) {
@@ -122,7 +122,10 @@
   onMount(() => {
     ucitajAseteProfila();
     const prilagodiAvatar = () => {
-      velicinaAvatara = window.innerWidth < 1000 ? 160 : 248;
+      const sirina = window.innerWidth;
+      if (sirina >= 1000) velicinaAvatara = 198; // desktop: 248 − 20%
+      else if (sirina < 380) velicinaAvatara = 136; // uski mobitel: 160 − 15%
+      else velicinaAvatara = 160;
     };
     prilagodiAvatar();
     window.addEventListener('resize', prilagodiAvatar);
@@ -398,10 +401,10 @@
   }
 
   .profil-ucitavanje { display: grid; gap: 24px; min-height: 620px; }
-  .profil-ucitavanje-zaglavlje { display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 16px; min-height: 248px; }
+  .profil-ucitavanje-zaglavlje { display: grid; grid-template-columns: 198px minmax(0, 1fr); gap: 16px; min-height: 198px; }
   .profil-ucitavanje-identitet { display: grid; align-content: start; justify-items: start; gap: 12px; padding-top: 8px; }
   .profil-kostur { border-radius: 8px; background: var(--boja-povrsina-2); }
-  .profil-kostur-avatar { width: 248px; height: 248px; border-radius: 50%; }
+  .profil-kostur-avatar { width: 198px; height: 198px; border-radius: 50%; }
   .profil-kostur-ime { width: min(340px, 75%); height: 54px; }
   .profil-kostur-rang { width: 145px; height: 30px; }
   .profil-kostur-xp { width: min(240px, 65%); height: 22px; }
@@ -474,12 +477,24 @@
     padding-right: 0;
   }
 
+  @media (min-width: 1000px) {
+    .zaglavlje-profila { gap: 52px; }
+  }
+
   .info-profila { flex: 1 1 auto; min-width: 0; }
   .profil-gornji-red { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 0.9fr); align-items: start; gap: 16px; min-width: 0; }
   .profil-identitet { min-width: 0; }
   .profil-sazetak { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 0; padding-top: 2px; }
 
-  .avatar-uredivanje { position: relative; display: block; flex: 0 0 auto; color: inherit; text-decoration: none; }
+  .avatar-uredivanje {
+    position: relative;
+    display: block;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    color: inherit;
+    text-decoration: none;
+  }
   .ikona-uredi { position: absolute; z-index: 555; right: 14px; bottom: 13px; width: 51px; height: 51px; object-fit: contain; }
   .profil-akcije { position: absolute; top: 0; right: 0; display: flex; min-width: 112px; flex-direction: column; align-items: flex-start; gap: 8px; }
   .profil-akcija { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: var(--boja-pozadina-primarna); font: inherit; font-size: var(--tekst-sitni); font-weight: 800; text-decoration: none; cursor: pointer; }
@@ -488,8 +503,8 @@
 
   @media (max-width: 999px) {
     .profil-ucitavanje { min-height: 500px; }
-    .profil-ucitavanje-zaglavlje { grid-template-columns: 128px minmax(0, 1fr); grid-template-rows: 128px auto auto; gap: 10px 12px; min-height: 0; }
-    .profil-kostur-avatar { grid-column: 1; grid-row: 1; width: 128px; height: 128px; }
+    .profil-ucitavanje-zaglavlje { grid-template-columns: 160px minmax(0, 1fr); grid-template-rows: 160px auto auto; gap: 10px 12px; min-height: 0; }
+    .profil-kostur-avatar { grid-column: 1; grid-row: 1; width: 160px; height: 160px; }
     .profil-ucitavanje-identitet { grid-column: 1 / -1; grid-row: 2; }
     .profil-kostur-cv { grid-column: 1 / -1; grid-row: 3; }
     .profil-kostur-ime { height: 34px; }
@@ -497,23 +512,42 @@
     .profil-ucitavanje-statistike .profil-kostur { min-height: 72px; }
     .zaglavlje-profila {
       display: grid;
-      grid-template-columns: minmax(120px, 136px) minmax(0, 1fr);
+      grid-template-columns: auto minmax(0, 1fr);
       grid-template-rows: auto auto auto;
       align-items: start;
+      justify-items: start;
       column-gap: 12px;
       row-gap: 10px;
       padding-right: 0;
     }
-    .avatar-uredivanje { grid-column: 1; grid-row: 1; }
+    .avatar-uredivanje { grid-column: 1; grid-row: 1; justify-self: start; }
+    .ikona-uredi { right: -8px; bottom: 7px; }
     .info-profila, .profil-gornji-red { display: contents; }
     .profil-identitet { grid-column: 1 / -1; grid-row: 2; }
-    .profil-sazetak { grid-column: 2; grid-row: 1; align-items: flex-end; }
+    .profil-sazetak { grid-column: 2; grid-row: 1; align-items: flex-end; gap: 6px; }
     .profil-akcije { position: absolute; top: 0; right: 0; transform: none; }
   }
 
-  @media (max-width: 999px) {
-    .zaglavlje-profila { grid-template-columns: minmax(112px, 128px) minmax(0, 1fr); }
-    .profil-sazetak { gap: 6px; }
+  @media (max-width: 500px) {
+    .zaglavlje-profila {
+      grid-template-columns: auto auto;
+      justify-content: space-between;
+      column-gap: 12px;
+    }
+    .profil-sazetak {
+      justify-self: end;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      align-items: flex-end;
+    }
+    .ikona-uredi { width: 44px; height: 44px; }
+  }
+
+  @media (max-width: 379px) {
+    .profil-ucitavanje-zaglavlje { grid-template-columns: 136px minmax(0, 1fr); grid-template-rows: 136px auto auto; }
+    .profil-kostur-avatar { width: 136px; height: 136px; }
+    .ikona-uredi { right: -17px; }
   }
 
   .info-profila h1 {

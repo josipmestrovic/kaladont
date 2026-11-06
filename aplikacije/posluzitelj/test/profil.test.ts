@@ -295,6 +295,54 @@ describe('GET /partije/:partijaId/potezi', () => {
     expect(tijelo.limit).toBe(500);
     expect(tijelo.imaJos).toBe(false);
   });
+
+  it('smjer=desc vraća najnovije prvo i cursor za starije stranice', async () => {
+    const gost = await stvoriGosta();
+    const partijaId = randomUUID();
+    try {
+      await baza.insert(partije).values({ id: partijaId, mod: 'dva_igraca', status: 'u_tijeku' });
+      await baza.insert(sudioniciPartije).values({ partijaId, igracId: gost.id, sjedalo: 0 });
+      await baza.insert(potezi).values(
+        Array.from({ length: 5 }, (_, indeks) => ({
+          partijaId,
+          runda: 1,
+          redniBroj: indeks + 1,
+          igracId: gost.id,
+          vrsta: 'rijec' as const,
+          rijec: `desc${indeks + 1}`,
+          trazenaSlova: 'de',
+          trajanjeMs: 100,
+        })),
+      );
+
+      const prva = await fetch(`${adresa}/api/partije/${partijaId}/potezi?limit=2&smjer=desc`);
+      expect(prva.status).toBe(200);
+      const tijelo1 = (await prva.json()) as {
+        potezi: { redniBroj: number; rijec: string | null }[];
+        imaJos: boolean;
+        sljedeciCursor: string | null;
+      };
+      expect(tijelo1.potezi.map((potez) => potez.rijec)).toEqual(['desc5', 'desc4']);
+      expect(tijelo1.imaJos).toBe(true);
+      expect(tijelo1.sljedeciCursor).toBeTruthy();
+
+      const druga = await fetch(
+        `${adresa}/api/partije/${partijaId}/potezi?limit=2&smjer=desc&cursor=${encodeURIComponent(tijelo1.sljedeciCursor!)}`,
+      );
+      expect(druga.status).toBe(200);
+      const tijelo2 = (await druga.json()) as {
+        potezi: { rijec: string | null }[];
+        imaJos: boolean;
+      };
+      expect(tijelo2.potezi.map((potez) => potez.rijec)).toEqual(['desc3', 'desc2']);
+      expect(tijelo2.imaJos).toBe(true);
+    } finally {
+      await baza.delete(potezi).where(eq(potezi.partijaId, partijaId));
+      await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+      await baza.delete(partije).where(eq(partije.id, partijaId));
+      await baza.delete(igraci).where(eq(igraci.id, gost.id));
+    }
+  });
 });
 
 describe('PUT /profil/avatar', () => {

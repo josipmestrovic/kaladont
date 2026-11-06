@@ -5,6 +5,7 @@
     ApiGreska,
     dohvatiStanjeMisija,
     noviIdempotencyKey,
+    oznaciPregledMisija,
     porukaZaKodMisije,
     zamijeniMisiju,
   } from '$lib/misije-klijent.js';
@@ -132,7 +133,12 @@
     pendingIdempotency = { dodjelaId: misija.dodjelaId, key };
     const ova = generacija;
     try {
-      const novo = await zamijeniMisiju(misija.dodjelaId, key);
+      let novo = await zamijeniMisiju(misija.dodjelaId, key);
+      try {
+        novo = await oznaciPregledMisija(misija.vrsta);
+      } catch {
+        // Zamjena je uspjela; pregled je best-effort da home popup ne bljesne.
+      }
       if (ova === generacija) {
         primijeniStanje(novo, ova);
         statusPoruka = 'Misija zamijenjena.';
@@ -443,17 +449,17 @@
     min-height: 44px;
     padding: 0 16px;
     border-radius: 8px;
-    border: 1px solid var(--boja-isticanje-tekst);
-    background: var(--boja-isticanje-tekst);
-    color: var(--boja-pozadina);
+    border: 1px solid var(--boja-cta-pozadina);
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
     text-decoration: none;
     font-weight: 700;
     cursor: pointer;
   }
   .gumb.sekundarni {
     background: transparent;
-    color: var(--boja-tekst);
-    border-color: var(--boja-obrub);
+    color: var(--boja-tekst-osnovni);
+    border-color: var(--boja-obrub-jaci);
   }
   .greska {
     color: var(--boja-crvena);

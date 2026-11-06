@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
   import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
 
@@ -38,9 +39,17 @@
 
   let otvoreno = $state(otvorenoPocetno);
 
+  onMount(() => {
+    if (otvoreno) naOtvori?.();
+  });
+
   function prebaciOtvoreno() {
     otvoreno = !otvoreno;
     if (otvoreno) naOtvori?.();
+  }
+
+  function zatvoriPanel() {
+    otvoreno = false;
   }
   let prikaz: 'odigrane' | 'odbijene' = $state('odigrane');
   let prijavljeniPotezi = $state<Set<number>>(new Set());
@@ -55,8 +64,10 @@
   let vidljivoOdbijenih = $state(VELICINA_STRANICE);
 
   const odigrane = $derived(potezi.filter((potez) => potez.rijec));
+  // Odigrane dolaze već najnovije-prve (živ zapis + API smjer=desc). Odbijene se i dalje grade kronološki.
+  const odbijeneNajnovijePrvo = $derived([...odbijeneRijeci].toReversed());
   const prikazaneOdigrane = $derived(odigrane.slice(0, vidljivoPrihvacenih));
-  const prikazaneOdbijene = $derived(odbijeneRijeci.slice(0, vidljivoOdbijenih));
+  const prikazaneOdbijene = $derived(odbijeneNajnovijePrvo.slice(0, vidljivoOdbijenih));
   const imaJosPrihvacenih = $derived(odigrane.length > vidljivoPrihvacenih || imaJos);
   const imaJosOdbijenihListe = $derived(odbijeneRijeci.length > vidljivoOdbijenih);
 
@@ -182,10 +193,19 @@
     {#if prikaz === 'odigrane'}
       {#if ucitavanje && odigrane.length === 0}
         <p aria-live="polite">Učitavanje riječi...</p>
+        <div class="panel-podnozje">
+          <button type="button" class="zatvori-panel" onclick={zatvoriPanel}>Zatvori</button>
+        </div>
       {:else if greska}
         <p class="greska" role="alert">{greska}</p>
+        <div class="panel-podnozje">
+          <button type="button" class="zatvori-panel" onclick={zatvoriPanel}>Zatvori</button>
+        </div>
       {:else if odigrane.length === 0}
         <p class="prazno">Još nema prihvaćenih riječi.</p>
+        <div class="panel-podnozje">
+          <button type="button" class="zatvori-panel" onclick={zatvoriPanel}>Zatvori</button>
+        </div>
       {:else}
         <ul>
           {#each prikazaneOdigrane as potez (potez.id)}
@@ -210,14 +230,20 @@
             </li>
           {/each}
         </ul>
-        {#if imaJosPrihvacenih}
-          <button type="button" class="vidi-jos" onclick={ucitajJosPrihvacenih} disabled={ucitavanje}>
-            {ucitavanje ? 'Učitavanje...' : 'Vidi još'}
-          </button>
-        {/if}
+        <div class="panel-podnozje">
+          {#if imaJosPrihvacenih}
+            <button type="button" class="vidi-jos" onclick={ucitajJosPrihvacenih} disabled={ucitavanje}>
+              {ucitavanje ? 'Učitavanje...' : 'Vidi još'}
+            </button>
+          {/if}
+          <button type="button" class="zatvori-panel" onclick={zatvoriPanel}>Zatvori</button>
+        </div>
       {/if}
     {:else if odbijeneRijeci.length === 0}
       <p class="prazno">Nemaš odbijenih riječi u ovoj partiji.</p>
+      <div class="panel-podnozje">
+        <button type="button" class="zatvori-panel" onclick={zatvoriPanel}>Zatvori</button>
+      </div>
     {:else}
       <ul>
         {#each prikazaneOdbijene as rijec (rijec)}
@@ -242,11 +268,14 @@
           </li>
         {/each}
       </ul>
-      {#if imaJosOdbijenihListe}
-        <button type="button" class="vidi-jos" onclick={ucitajJosOdbijenih}>
-          Vidi još
-        </button>
-      {/if}
+      <div class="panel-podnozje">
+        {#if imaJosOdbijenihListe}
+          <button type="button" class="vidi-jos" onclick={ucitajJosOdbijenih}>
+            Vidi još
+          </button>
+        {/if}
+        <button type="button" class="zatvori-panel" onclick={zatvoriPanel}>Zatvori</button>
+      </div>
     {/if}
   {/if}
 </section>
@@ -319,7 +348,8 @@
   }
 
   .prijavi,
-  .vidi-jos {
+  .vidi-jos,
+  .zatvori-panel {
     flex: 0 0 auto;
     padding: 6px 10px;
     border: 1px solid var(--boja-obrub-jaci);
@@ -336,8 +366,17 @@
     cursor: default;
   }
 
-  .vidi-jos {
+  .panel-podnozje {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     margin-top: 10px;
+  }
+
+  .vidi-jos:disabled {
+    opacity: 0.7;
+    cursor: default;
   }
 
   .greska {

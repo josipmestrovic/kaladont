@@ -158,7 +158,7 @@ test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomican
   await expect(rangovi).toHaveCount(10);
   await expect(rangovi.first().locator('td').last()).toContainText('< 0,30');
   await expect(rangovi.last().locator('td').last()).toContainText('> 0,89');
-  await expect(rangovi.first().locator('.rang-uzorak')).toHaveCSS('border-top-width', '4px');
+  await expect(rangovi.first().locator('.rang-uzorak')).toHaveCSS('border-top-width', '5px');
 
   await page.setViewportSize({ width: 1000, height: 760 });
   await expect(page.locator('.tablica-rangova thead')).toBeVisible();

@@ -52,7 +52,7 @@
 
 <style>
   .napredak-misija {
-    margin: 16px 0;
+    margin: 24px 0 0;
     padding: 16px;
     border: 1px solid var(--boja-obrub);
     border-radius: 8px;

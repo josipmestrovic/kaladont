@@ -39,3 +39,8 @@ export function bojaBordera(rang: string | null): string | null {
   return BOJE_BORDERA[rang] ?? null;
 }
 
+/** Debljina bordera ranga: manji avatari tanji, veći jače izraženi. */
+export function debljinaBorderaRanga(velicina: number): number {
+  return Math.min(16, Math.max(3, Math.round(velicina * 0.065)));
+}
+
