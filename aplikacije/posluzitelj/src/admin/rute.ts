@@ -16,6 +16,16 @@ import { obrisiRacunPoId } from '../racuni/brisanje.js';
 import { izracunajStatistikuCekanja } from './statistika-cekanja.js';
 import { ShemaKonfiguracijeBota, type KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
 import { SukobRevizijeBotova, type ZapisPostavkiBotova } from '../bot/trajne-postavke.js';
+import {
+  agregirajPocetneRijeci,
+  danasZagrebIso,
+  dohvatiIncidentPoId,
+  listajRaneIncidente,
+  rasponOdDoZagreb,
+  type KontekstOtvaranjaAnalitike,
+} from '../analitika/otvaranja.js';
+import { agregirajDnevneIgre } from '../analitika/igre.js';
+import { dohvatiStatusAnalitike } from '../analitika/status.js';
 
 /** Živi brojači iz memorije procesa; nisu trajni i vrijede od zadnjeg pokretanja. */
 export interface ZivoStanjeBotova {
@@ -424,4 +434,103 @@ export async function registrirajAdminRute(
       return { ok: true, rijec: word, nastavci, prethodnici, izmjene };
     },
   );
+
+  const ShemaFilteraAnalitike = z.object({
+    od: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    do: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    kontekst: z.enum(['javna', 'privatna', 'trening']).optional(),
+    stranica: z.coerce.number().int().min(1).max(1000).optional(),
+  });
+
+  function parsirajFilterAnalitike(query: unknown):
+    | { ok: true; od: string; do: string; kontekst?: KontekstOtvaranjaAnalitike; stranica: number; raspon: { od: Date; do: Date } }
+    | { ok: false; greska: string } {
+    const parsed = ShemaFilteraAnalitike.safeParse(query);
+    if (!parsed.success) return { ok: false, greska: 'Neispravni filteri analitike.' };
+    const danas = danasZagrebIso();
+    const doDan = parsed.data.do ?? danas;
+    const odDan = parsed.data.od ?? (() => {
+      const bazaDatuma = new Date(`${doDan}T12:00:00.000Z`);
+      bazaDatuma.setUTCDate(bazaDatuma.getUTCDate() - 6);
+      return bazaDatuma.toISOString().slice(0, 10);
+    })();
+    if (odDan > doDan) return { ok: false, greska: 'Datum od ne smije biti nakon datuma do.' };
+    const raspon = rasponOdDoZagreb(odDan, doDan);
+    const rasponDana = Math.round((raspon.do.getTime() - raspon.od.getTime()) / 86_400_000);
+    if (rasponDana > 90) return { ok: false, greska: 'Raspon smije biti najviše 90 dana.' };
+    return {
+      ok: true,
+      od: odDan,
+      do: doDan,
+      kontekst: parsed.data.kontekst,
+      stranica: parsed.data.stranica ?? 1,
+      raspon,
+    };
+  }
+
+  app.get('/admin/analitika/pocetne-rijeci', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const filter = parsirajFilterAnalitike(zahtjev.query);
+    if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
+    const agregat = await agregirajPocetneRijeci({
+      od: filter.raspon.od,
+      do: filter.raspon.do,
+      kontekst: filter.kontekst,
+    });
+    return {
+      ok: true,
+      od: filter.od,
+      do: filter.do,
+      kontekst: filter.kontekst ?? null,
+      posjecenost: 'Posjećenost još nije uključena',
+      ...agregat,
+    };
+  });
+
+  app.get('/admin/analitika/incidenti', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const filter = parsirajFilterAnalitike(zahtjev.query);
+    if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
+    const lista = await listajRaneIncidente({
+      od: filter.raspon.od,
+      do: filter.raspon.do,
+      kontekst: filter.kontekst,
+      stranica: filter.stranica,
+      poStranici: 50,
+    });
+    return { ok: true, od: filter.od, do: filter.do, kontekst: filter.kontekst ?? null, ...lista };
+  });
+
+  app.get<{ Params: { id: string } }>('/admin/analitika/incidenti/:id', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const id = z.string().uuid().safeParse(zahtjev.params.id);
+    if (!id.success) return odgovor.code(400).send({ ok: false, greska: 'Neispravan ID incidenta.' });
+    const incident = await dohvatiIncidentPoId(id.data);
+    if (!incident) return odgovor.code(404).send({ ok: false, greska: 'Incident nije pronađen.' });
+    return { ok: true, incident };
+  });
+
+  app.get('/admin/analitika/dnevno', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const filter = parsirajFilterAnalitike(zahtjev.query);
+    if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
+    const dnevno = await agregirajDnevneIgre({
+      odDan: filter.od,
+      doDan: filter.do,
+      kontekst: filter.kontekst,
+    });
+    return {
+      ok: true,
+      od: filter.od,
+      do: filter.do,
+      kontekst: filter.kontekst ?? null,
+      ...dnevno,
+    };
+  });
+
+  app.get('/admin/analitika/status', { preHandler: zahtijevajAdmina }, async (_zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const status = await dohvatiStatusAnalitike();
+    return { ok: true, ...status };
+  });
 }

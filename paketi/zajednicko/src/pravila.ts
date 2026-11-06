@@ -53,6 +53,14 @@ export function osnovnaRijecIzGrupe(grupa: string): string {
   return grupa.split(':')[1] ?? grupa;
 }
 
+/** Grana odabira sustavske početne riječi; `nema_kandidata` bilježi motor kad je rezultat null. */
+export type IzvorPocetneRijeci = 'sigurni_skup' | 'rezervni_odabir';
+
+export interface OdabirPocetneRijeci {
+  rijec: string;
+  izvor: IzvorPocetneRijeci;
+}
+
 /** Sučelje prema rječniku - implementira ga poslužitelj (strukture u memoriji, ADR-007 + ADR-013). */
 export interface RjecnikSucelje {
   /** Postoji li riječ u bazi (aktivna, neovisno o potrošenosti u partiji). */
@@ -86,7 +94,7 @@ export interface RjecnikSucelje {
     dopusteneVrste?: ReadonlySet<VrstaRijeci>,
     samoOsnovniOblici?: boolean,
     minDuljinaRijeci?: number,
-  ): string | null;
+  ): OdabirPocetneRijeci | null;
 }
 
 export type KodOdbijenogPoteza =
