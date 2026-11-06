@@ -351,6 +351,13 @@
       "when": 1794400000000,
       "tag": "0049_dostignuca_d01",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1794500000000,
+      "tag": "0050_dostignuca_d02",
+      "breakpoints": true
     }
   ]
 }

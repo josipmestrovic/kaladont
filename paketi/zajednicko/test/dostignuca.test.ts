@@ -8,10 +8,10 @@ import {
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
-  it('ima sedamnaest dostignuća i 85 zvjezdica', () => {
-    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(17);
+  it('ima dvadeset i jedno dostignuće i 105 zvjezdica', () => {
+    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(21);
     expect(DEFINICIJE_DOSTIGNUCA.every((definicija) => definicija.pragovi.length === 5)).toBe(true);
-    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(85);
+    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(105);
   });
 
   it('ne otključava servisna dostignuća kroz izracunajNovaDostignuca', () => {
