@@ -474,16 +474,16 @@
   function spojiPotezeZaPrijavuNajnovijePrvo(serverPotezi: Potez[], ucitajJos: boolean) {
     const sRijeci = serverPotezi.filter((potez) => potez.rijec);
     if (!ucitajJos) {
-      // Samo optimistic potezi noviji od najnovijeg server retka (utrka upisa).
-      // Stariji lokalni izvan prvih limit redaka nisu „najnoviji” — ne prependaj ih.
+      // Ne uspoređuj client/DB vrijeme. Zadrži samo leading optimistic prefiks
+      // (još neupisani najnoviji) dok ne naiđeš na riječ koja je već na server stranici.
       const serverRijeci = new Set(sRijeci.map((potez) => potez.rijec));
-      const granicaMs = sRijeci[0]?.vrijeme ? Date.parse(sRijeci[0].vrijeme) : Number.NEGATIVE_INFINITY;
-      const lokalniNoviji = lokalniPoteziZaPrijavu.filter((potez) => {
-        if (!(potez.id < 0 && potez.rijec && !serverRijeci.has(potez.rijec))) return false;
-        if (!Number.isFinite(granicaMs)) return true;
-        const lokalnoMs = Date.parse(potez.vrijeme);
-        return Number.isFinite(lokalnoMs) && lokalnoMs >= granicaMs;
-      });
+      const lokalniNoviji: Potez[] = [];
+      for (const potez of lokalniPoteziZaPrijavu) {
+        if (!potez.rijec) continue;
+        if (serverRijeci.has(potez.rijec)) break;
+        if (potez.id >= 0) break;
+        lokalniNoviji.push(potez);
+      }
       lokalniPoteziZaPrijavu = [...lokalniNoviji, ...sRijeci];
       return;
     }
