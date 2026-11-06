@@ -16,6 +16,10 @@ export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
   covjek_na_misiji: '/ikone/62-misije.webp',
   tjedan_pod_kontrolom: '/ikone/62-misije.webp',
   privatnik: '/ikone/06-trofej.png',
+  dvostruka_kruna: '/ikone/47-zavrsna-rijec.png',
+  cista_petica: '/ikone/42-jezik-u-plamenu.png',
+  sve_pohvale: '/ikone/65-vladar-niza.webp',
+  rijetka_grdosija: '/ikone/40-rijetkolovac.png',
 };
 
 export function ikonaDostignuca(id: string): string {

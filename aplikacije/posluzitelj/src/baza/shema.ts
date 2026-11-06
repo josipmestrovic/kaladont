@@ -235,6 +235,10 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   dovrseneMisije: integer('dovrsene_misije').notNull().default(0),
   privatneIgre: integer('privatne_igre').notNull().default(0),
   tjedniPaketi: integer('tjedni_paketi').notNull().default(0),
+  dvostrukeKrune: integer('dvostruke_krune').notNull().default(0),
+  cistePetice: integer('ciste_petice').notNull().default(0),
+  svePohvale: integer('sve_pohvale').notNull().default(0),
+  rijetkeGrdosije: integer('rijetke_grdosije').notNull().default(0),
   anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
@@ -389,10 +393,13 @@ export const sudioniciPartije = pgTable(
     najduziNizRijeci: integer('najduzi_niz_rijeci'),
     najduzaRijec: text('najduza_rijec'),
     najduzaRijecGrafemi: integer('najduza_rijec_grafemi'),
+    // NULL = nepoznato (igre prije D02); 0 = igrač nije imao pravi pogrešan unos.
+    pogresniUnosi: integer('pogresni_unosi'),
   },
   (tablica) => [
     primaryKey({ columns: [tablica.partijaId, tablica.igracId] }),
     index('idx_sudionici_partije_igrac_id_partija_id').on(tablica.igracId, tablica.partijaId),
+    check('chk_sudionici_pogresni_unosi', sql`${tablica.pogresniUnosi} is null or ${tablica.pogresniUnosi} >= 0`),
     check('chk_sudionici_metrike_v1', sql`${tablica.metrikeVerzija} is null or (
       ${tablica.metrikeVerzija} = 1
       and ${tablica.prihvaceneRijeci} is not null
@@ -639,6 +646,47 @@ export const dokaziDostignucaTjedniPaket = pgTable('dokazi_dostignuca_tjedni_pak
   ciklusId: uuid('ciklus_id').notNull().references(() => ciklusiTjednihMisija.id, { onDelete: 'cascade' }),
 }, (tablica) => [
   primaryKey({ columns: [tablica.igracId, tablica.ciklusId] }),
+]);
+
+/** Javna pobjeda jednog moda na lokalni dan (Europe/Zagreb). Jedinstveno po igraču, datumu i modu. */
+export const evidencijaDnevnihPobjedaModova = pgTable('evidencija_dnevnih_pobjeda_modova', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  lokalniDatum: date('lokalni_datum').notNull(),
+  mod: modPartije('mod').notNull(),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.lokalniDatum, tablica.mod] }),
+]);
+
+/** Dan u kojem su prisutne pobjede oba moda — jedan doprinos „Dvostrukoj kruni”. */
+export const dokaziDostignucaDvostrukaKruna = pgTable('dokazi_dostignuca_dvostruka_kruna', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  lokalniDatum: date('lokalni_datum').notNull(),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.lokalniDatum] }),
+]);
+
+/** Javna pobjeda bez pravog pogrešnog unosa i s barem pet riječi. */
+export const dokaziDostignucaCistaPetica = pgTable('dokazi_dostignuca_cista_petica', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  partijaId: uuid('partija_id').notNull().references(() => partije.id, { onDelete: 'cascade' }),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.partijaId] }),
+]);
+
+/** Ista javna igra donijela je i najdulji niz i najviše XP-a. */
+export const dokaziDostignucaSvePohvale = pgTable('dokazi_dostignuca_sve_pohvale', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  partijaId: uuid('partija_id').notNull().references(() => partije.id, { onDelete: 'cascade' }),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.partijaId] }),
+]);
+
+/** Jedinstveni normalizirani oblik (NFC, trim, mala slova) koji je bio i dug i rijedak. */
+export const dokaziDostignucaRijetkaGrdosija = pgTable('dokazi_dostignuca_rijetka_grdosija', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  normaliziraniOblik: text('normalizirani_oblik').notNull(),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.normaliziraniOblik] }),
 ]);
 
 /** Trajne osobne obavijesti (seed za kasniji sandučić). Neprikazane čeka klijent. */

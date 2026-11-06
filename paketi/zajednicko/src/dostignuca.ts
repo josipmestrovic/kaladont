@@ -22,12 +22,24 @@ export type BrojacDostignuca =
   /** Završene privatne igre s barem jednom prihvaćenom riječi; samo servis dodjele. */
   | 'privatneIgre'
   /** Potpuno dovršeni tjedni paketi; samo servis dodjele. */
-  | 'tjedniPaketi';
+  | 'tjedniPaketi'
+  /** Dani s javnom pobjedom i u Dvoboju i u Četveroboju; samo servis dodjele. */
+  | 'dvostrukeKrune'
+  /** Javne pobjede bez pravog pogrešnog unosa i s barem pet riječi; samo servis dodjele. */
+  | 'cistePetice'
+  /** Javne igre u kojima su osvojene obje pohvale; samo servis dodjele. */
+  | 'svePohvale'
+  /** Različiti oblici koji su istodobno dugi i rijetki; samo servis dodjele. */
+  | 'rijetkeGrdosije';
 
 export const ID_DOSTIGNUCA_STALNO_SI_TU = 'stalno_si_tu';
 export const ID_DOSTIGNUCA_COVJEK_NA_MISIJI = 'covjek_na_misiji';
 export const ID_DOSTIGNUCA_PRIVATNIK = 'privatnik';
 export const ID_DOSTIGNUCA_TJEDAN_POD_KONTROLOM = 'tjedan_pod_kontrolom';
+export const ID_DOSTIGNUCA_DVOSTRUKA_KRUNA = 'dvostruka_kruna';
+export const ID_DOSTIGNUCA_CISTA_PETICA = 'cista_petica';
+export const ID_DOSTIGNUCA_SVE_POHVALE = 'sve_pohvale';
+export const ID_DOSTIGNUCA_RIJETKA_GRDOSIJA = 'rijetka_grdosija';
 
 /** Brojači koji se ne smiju otključati kroz partijsku deltu. */
 export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Set([
@@ -35,6 +47,10 @@ export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Se
   'dovrseneMisije',
   'privatneIgre',
   'tjedniPaketi',
+  'dvostrukeKrune',
+  'cistePetice',
+  'svePohvale',
+  'rijetkeGrdosije',
 ]);
 
 export interface DefinicijaDostignuca {
@@ -110,6 +126,42 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
     vrijediUPrivatnoj: false,
     brojac: 'tjedniPaketi',
   },
+  {
+    id: ID_DOSTIGNUCA_DVOSTRUKA_KRUNA,
+    naziv: 'Dvostruka kruna',
+    opis: 'Istoga dana pobijedi u javnom Dvoboju i Četveroboju.',
+    kategorija: 'igra',
+    pragovi: [1, 3, 10, 25, 50],
+    vrijediUPrivatnoj: false,
+    brojac: 'dvostrukeKrune',
+  },
+  {
+    id: ID_DOSTIGNUCA_CISTA_PETICA,
+    naziv: 'Čista petica',
+    opis: 'Pobijedi u javnoj igri bez pogrešnog unosa, uz barem pet prihvaćenih riječi.',
+    kategorija: 'vjestina',
+    pragovi: [1, 5, 20, 50, 100],
+    vrijediUPrivatnoj: false,
+    brojac: 'cistePetice',
+  },
+  {
+    id: ID_DOSTIGNUCA_SVE_POHVALE,
+    naziv: 'Sve pohvale',
+    opis: 'U istoj javnoj igri osvoji pohvalu za najdulji niz i najviše XP-a.',
+    kategorija: 'vjestina',
+    pragovi: [1, 5, 15, 30, 50],
+    vrijediUPrivatnoj: false,
+    brojac: 'svePohvale',
+  },
+  {
+    id: ID_DOSTIGNUCA_RIJETKA_GRDOSIJA,
+    naziv: 'Rijetka grdosija',
+    opis: 'Odigraj različite riječi koje su istodobno duge i rijetke.',
+    kategorija: 'rijeci',
+    pragovi: [1, 5, 15, 40, 100],
+    vrijediUPrivatnoj: true,
+    brojac: 'rijetkeGrdosije',
+  },
 ] as const;
 
 export const UKUPNO_ZVJEZDICA_DOSTIGNUCA = DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0);
@@ -136,6 +188,10 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   ID_DOSTIGNUCA_COVJEK_NA_MISIJI,
   ID_DOSTIGNUCA_PRIVATNIK,
   ID_DOSTIGNUCA_TJEDAN_POD_KONTROLOM,
+  ID_DOSTIGNUCA_DVOSTRUKA_KRUNA,
+  ID_DOSTIGNUCA_CISTA_PETICA,
+  ID_DOSTIGNUCA_SVE_POHVALE,
+  ID_DOSTIGNUCA_RIJETKA_GRDOSIJA,
 ] as const;
 
 export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(
@@ -169,7 +225,7 @@ export function izracunajNovaDostignuca(
   jePrivatna: boolean,
 ): NovoDostignuce[] {
   return DEFINICIJE_DOSTIGNUCA.flatMap((definicija) => {
-    // Servisna dostignuća (aktivni dani, misije, privatnik) ne idu kroz party deltu.
+    // Servisna dostignuća (aktivni dani, misije, privatnik, D02 kombinacije) ne idu kroz party deltu.
     if (definicija.id === ID_DOSTIGNUCA_STALNO_SI_TU || BROJACI_VAN_PARTIJSKE_DELTA.has(definicija.brojac)) return [];
     if (jePrivatna && !definicija.vrijediUPrivatnoj) return [];
     const staraVrijednost = definicija.brojac === 'razina'

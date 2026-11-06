@@ -7,10 +7,15 @@ import {
   dodjeleMisija,
   doprinosiMisijama,
   dostignucaIgraca,
+  dokaziDostignucaCistaPetica,
+  dokaziDostignucaDvostrukaKruna,
   dokaziDostignucaMisija,
   dokaziDostignucaPrivatnik,
+  dokaziDostignucaRijetkaGrdosija,
+  dokaziDostignucaSvePohvale,
   dokaziDostignucaTjedniPaket,
   dotokDnevnihMisija,
+  evidencijaDnevnihPobjedaModova,
   igraci,
   ishodiMisijaIgara,
   napredakDostignucaIgraca,
@@ -43,6 +48,11 @@ async function obrisiRacunUTransakciji(
   await transakcija.delete(dokaziDostignucaMisija).where(eq(dokaziDostignucaMisija.igracId, igrac.id));
   await transakcija.delete(dokaziDostignucaPrivatnik).where(eq(dokaziDostignucaPrivatnik.igracId, igrac.id));
   await transakcija.delete(dokaziDostignucaTjedniPaket).where(eq(dokaziDostignucaTjedniPaket.igracId, igrac.id));
+  await transakcija.delete(dokaziDostignucaDvostrukaKruna).where(eq(dokaziDostignucaDvostrukaKruna.igracId, igrac.id));
+  await transakcija.delete(dokaziDostignucaCistaPetica).where(eq(dokaziDostignucaCistaPetica.igracId, igrac.id));
+  await transakcija.delete(dokaziDostignucaSvePohvale).where(eq(dokaziDostignucaSvePohvale.igracId, igrac.id));
+  await transakcija.delete(dokaziDostignucaRijetkaGrdosija).where(eq(dokaziDostignucaRijetkaGrdosija.igracId, igrac.id));
+  await transakcija.delete(evidencijaDnevnihPobjedaModova).where(eq(evidencijaDnevnihPobjedaModova.igracId, igrac.id));
   await transakcija.delete(obavijestiIgraca).where(eq(obavijestiIgraca.igracId, igrac.id));
   await transakcija.delete(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igrac.id));
   await transakcija.delete(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igrac.id));
