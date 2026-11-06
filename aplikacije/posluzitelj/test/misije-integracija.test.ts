@@ -349,7 +349,10 @@ describe('misije API i stanje', () => {
     const drugi = await baza.transaction((tx) =>
       obracunajMisijeZaIgraca(tx, metrike, 100, 50, { sada: () => sada, rng: fiksniRng() }),
     );
-    expect(drugi).toEqual(prvi);
+    const { noveObavijesti: _prviObavijesti, ...prviTrajno } = prvi;
+    const { noveObavijesti: drugiObavijesti, ...drugiTrajno } = drugi;
+    expect(drugiTrajno).toEqual(prviTrajno);
+    expect(drugiObavijesti).toEqual([]);
     expect(prvi.promjeneMisija.some((p) => p.predlozakId === 'D01' && p.poslije >= 1)).toBe(true);
 
     const treningId = randomUUID();
@@ -396,7 +399,10 @@ describe('misije API i stanje', () => {
     const t2 = await baza.transaction((tx) =>
       obracunajMisijeZaIgraca(tx, treningMetrike, 120, 100, { sada: () => sada, rng: fiksniRng() }),
     );
-    expect(t2).toEqual(t1);
+    const { noveObavijesti: _t1Obavijesti, ...t1Trajno } = t1;
+    const { noveObavijesti: t2Obavijesti, ...t2Trajno } = t2;
+    expect(t2Trajno).toEqual(t1Trajno);
+    expect(t2Obavijesti).toEqual([]);
     expect(t1.promjeneMisija.some((p) => p.predlozakId === 'D10' && p.upravoDovrsena)).toBe(true);
   });
 
