@@ -126,38 +126,38 @@ jobs:
             done
           done
 
-          # Živi staging mora već služiti baš ovaj digest/verziju (ne samo stari zeleni run).
-          zdravlje=$(mktemp)
-          if ! curl --fail --silent --show-error --max-time 20 \
-            https://staging.kaladont.hr/zdravlje >"$zdravlje"; then
-            echo "Staging /zdravlje nije dostupan."
-            cat "$zdravlje" || true
-            rm -f "$zdravlje"
-            exit 1
-          fi
-          if ! jq -e --arg digest "$DIGEST" --arg verzija "$VERZIJA" \
-            '.ok == true and .digest == $digest and .verzija == $verzija' \
-            "$zdravlje" >/dev/null; then
-            echo "Staging /zdravlje ne odgovara ulaznom digesta/commitu."
-            echo "Očekivano: digest=$DIGEST verzija=$VERZIJA"
-            echo -n "Dobiveno: "
-            jq -c '{ok,digest,verzija}' "$zdravlje" || cat "$zdravlje"
-            rm -f "$zdravlje"
-            exit 1
-          fi
-          rm -f "$zdravlje"
-
+          # Dovoljan je JEDAN dokaz da je ovaj digest prošao staging:
+          # 1) workflow-log (podržava produkcijski rollback dok staging već služi noviji image), ili
+          # 2) živ /zdravlje koji već služi baš ovaj digest (fallback kad log API padne).
           if test -z "$run_id"; then
-            # Živi /zdravlje već potvrđuje digest; log je dodatni dokaz. Ne blokiraj
-            # promociju ako je noviji gh/ANSI u log API-ju opet nestabilan.
+            zdravlje=$(mktemp)
+            if ! curl --fail --silent --show-error --max-time 20 \
+              https://staging.kaladont.hr/zdravlje >"$zdravlje"; then
+              echo "Nema digesta u staging logovima, a /zdravlje nije dostupan."
+              cat "$zdravlje" || true
+              rm -f "$zdravlje"
+              exit 1
+            fi
+            if ! jq -e --arg digest "$DIGEST" --arg verzija "$VERZIJA" \
+              '.ok == true and .digest == $digest and .verzija == $verzija' \
+              "$zdravlje" >/dev/null; then
+              echo "Nema uspješnog staging deploya koji je objavio digest $DIGEST za commit $VERZIJA."
+              echo "Logovi nemaju digest, a živ /zdravlje ne odgovara (rollback starog digesta i dalje prolazi preko workflow-log dokaza)."
+              echo "Očekivano: digest=$DIGEST verzija=$VERZIJA"
+              echo -n "Dobiveno: "
+              jq -c '{ok,digest,verzija}' "$zdravlje" || cat "$zdravlje"
+              rm -f "$zdravlje"
+              exit 1
+            fi
+            rm -f "$zdravlje"
             run_id="${kandidati[0]}"
             dokaz="zdravlje+staging-run"
             echo "Upozorenje: digest nije pronađen u staging logovima; prihvaćam živ /zdravlje + zeleni staging run $run_id."
           fi
 
-          echo "Staging gate OK: workflow run $run_id ($dokaz) + /zdravlje = $image_ref."
+          echo "Staging gate OK: workflow run $run_id ($dokaz) za $image_ref."
           {
-            echo "- Staging gate: uspješan run \`$run_id\` ($dokaz) i živ \`/zdravlje\` za digest \`$DIGEST\` (commit \`$VERZIJA\`)"
+            echo "- Staging gate: uspješan run \`$run_id\` ($dokaz) za digest \`$DIGEST\` (commit \`$VERZIJA\`)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Preuzeti repozitorij na commit slike
