@@ -24,6 +24,8 @@ import {
 import { registrirajProfilRute } from './profil/rute.js';
 import { registrirajLjestviceRute } from './ljestvice/rute.js';
 import { registrirajMisijeRute } from './misije/rute.js';
+import { registrirajDostignucaRute } from './dostignuca/rute.js';
+import { postaviVezeZaObavijestiDostignuca } from './dostignuca/obavijesti.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
 import { spremiTrajnePostavkeBotova, ucitajTrajnePostavkeBotova } from './bot/trajne-postavke.js';
@@ -181,6 +183,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       await registrirajProfilRute(apiApp, rjecnik);
       await registrirajLjestviceRute(apiApp);
       await registrirajMisijeRute(apiApp);
+      await registrirajDostignucaRute(apiApp);
       await registrirajPrijaveRute(apiApp);
       await registrirajPovratneInformacijeRute(apiApp);
       await registrirajAdminRute(apiApp, rjecnik, () => dohvatiZivoStanjeBotova(), {
@@ -371,16 +374,18 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     konfiguracija: postavkeBotova,
     zapisi: (poruka, podaci) => app.log.warn(podaci, poruka),
   });
+  const aktivneVeze = {
+    dohvatiSocket: (igracId: string) => {
+      const socketId = registarVeza.dohvatiSocketId(igracId);
+      return socketId ? io.sockets.sockets.get(socketId) : undefined;
+    },
+    jeAktivnaVeza: (igracId: string, socketId: string) => registarVeza.dohvatiSocketId(igracId) === socketId,
+  };
+  postaviVezeZaObavijestiDostignuca(aktivneVeze);
   const upravitelj = stvoriUpraviteljPartija(
     io,
     rjecnik,
-    {
-      dohvatiSocket: (igracId) => {
-        const socketId = registarVeza.dohvatiSocketId(igracId);
-        return socketId ? io.sockets.sockets.get(socketId) : undefined;
-      },
-      jeAktivnaVeza: (igracId, socketId) => registarVeza.dohvatiSocketId(igracId) === socketId,
-    },
+    aktivneVeze,
     {
       ...opcije.postavkeMotora,
       maksimalnoAktivnihPartija: socketOgranicenja.maksimalnoAktivnihPartija,
