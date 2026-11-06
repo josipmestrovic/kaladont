@@ -138,7 +138,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
 
   const povratak = page.getByRole('button', { name: 'Nazad' });
   await expect(povratak).toBeVisible();
-  await expect(povratak).toHaveCSS('height', '80px');
+  await expect(povratak).toHaveCSS('height', '44px');
   const header = page.getByRole('banner');
   await expect(header.getByRole('link', { name: 'Početna' })).toHaveCount(0);
   // „O igri” je tema u navigaciji pomoći; u headeru ostaje samo na naslovnici.
@@ -153,7 +153,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await expect(page).toHaveURL('/profil');
   const pocetna = page.getByRole('link', { name: 'Početna' });
   await expect(pocetna).toBeVisible();
-  await expect(pocetna).toHaveCSS('height', '80px');
+  await expect(pocetna).toHaveCSS('height', '44px');
   await expect(pocetna.locator('img')).toHaveAttribute('src', '/ikone/04-naslovna.png');
   await pocetna.click();
   await expect(page).toHaveURL('/');

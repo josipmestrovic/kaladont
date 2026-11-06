@@ -61,6 +61,7 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   const odjava = navigacija.getByRole('button', { name: 'Odjavi se' });
   await expect(odjava).toBeVisible();
+  page.once('dialog', (dijalog) => dijalog.accept());
   await odjava.click();
   await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toBeVisible({ timeout: 15_000 });
   await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
