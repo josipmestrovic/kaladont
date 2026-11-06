@@ -11,8 +11,12 @@ import {
 import {
   dostignucaIgraca,
   dodjeleMisija,
+  dokaziDostignucaCistaPetica,
+  dokaziDostignucaDvostrukaKruna,
   dokaziDostignucaMisija,
   dokaziDostignucaPrivatnik,
+  dokaziDostignucaRijetkaGrdosija,
+  dokaziDostignucaSvePohvale,
   dokaziDostignucaTjedniPaket,
   napredakDostignucaIgraca,
   obavijestiIgraca,
@@ -32,7 +36,27 @@ function prazanIshod(): IshodDodjele {
 type DokazDodjele =
   | { vrsta: 'misija'; dodjelaId: string }
   | { vrsta: 'privatnik'; partijaId: string }
-  | { vrsta: 'tjedni_paket'; ciklusId: string };
+  | { vrsta: 'tjedni_paket'; ciklusId: string }
+  | { vrsta: 'dnevna_pobjeda'; lokalniDatum: string }
+  | { vrsta: 'cista_petica'; partijaId: string }
+  | { vrsta: 'sve_pohvale'; partijaId: string }
+  | { vrsta: 'rijetka_grdosija'; normaliziraniOblik: string };
+
+const STUPCI_SERVISNIH_BROJACA = {
+  dovrseneMisije: napredakDostignucaIgraca.dovrseneMisije,
+  privatneIgre: napredakDostignucaIgraca.privatneIgre,
+  tjedniPaketi: napredakDostignucaIgraca.tjedniPaketi,
+  dvostrukeKrune: napredakDostignucaIgraca.dvostrukeKrune,
+  cistePetice: napredakDostignucaIgraca.cistePetice,
+  svePohvale: napredakDostignucaIgraca.svePohvale,
+  rijetkeGrdosije: napredakDostignucaIgraca.rijetkeGrdosije,
+} as const;
+
+type ServisniBrojac = keyof typeof STUPCI_SERVISNIH_BROJACA;
+
+function jeServisniBrojac(brojac: string): brojac is ServisniBrojac {
+  return Object.hasOwn(STUPCI_SERVISNIH_BROJACA, brojac);
+}
 
 export interface ParametriDodjele {
   igracId: string;
@@ -55,30 +79,37 @@ async function umetniDokaz(tx: MisijeTx, parametri: ParametriDodjele) {
       .onConflictDoNothing()
       .returning({ igracId: dokaziDostignucaPrivatnik.igracId });
   }
-  return tx.insert(dokaziDostignucaTjedniPaket).values({ igracId, ciklusId: dokaz.ciklusId })
+  if (dokaz.vrsta === 'tjedni_paket') {
+    return tx.insert(dokaziDostignucaTjedniPaket).values({ igracId, ciklusId: dokaz.ciklusId })
+      .onConflictDoNothing()
+      .returning({ igracId: dokaziDostignucaTjedniPaket.igracId });
+  }
+  if (dokaz.vrsta === 'dnevna_pobjeda') {
+    return tx.insert(dokaziDostignucaDvostrukaKruna).values({ igracId, lokalniDatum: dokaz.lokalniDatum })
+      .onConflictDoNothing()
+      .returning({ igracId: dokaziDostignucaDvostrukaKruna.igracId });
+  }
+  if (dokaz.vrsta === 'cista_petica') {
+    return tx.insert(dokaziDostignucaCistaPetica).values({ igracId, partijaId: dokaz.partijaId })
+      .onConflictDoNothing()
+      .returning({ igracId: dokaziDostignucaCistaPetica.igracId });
+  }
+  if (dokaz.vrsta === 'sve_pohvale') {
+    return tx.insert(dokaziDostignucaSvePohvale).values({ igracId, partijaId: dokaz.partijaId })
+      .onConflictDoNothing()
+      .returning({ igracId: dokaziDostignucaSvePohvale.igracId });
+  }
+  return tx.insert(dokaziDostignucaRijetkaGrdosija).values({ igracId, normaliziraniOblik: dokaz.normaliziraniOblik })
     .onConflictDoNothing()
-    .returning({ igracId: dokaziDostignucaTjedniPaket.igracId });
+    .returning({ igracId: dokaziDostignucaRijetkaGrdosija.igracId });
 }
 
-async function uvecajBrojac(tx: MisijeTx, igracId: string, brojac: 'dovrseneMisije' | 'privatneIgre' | 'tjedniPaketi', zavrsenoU: Date): Promise<number> {
-  if (brojac === 'dovrseneMisije') {
-    const [red] = await tx.insert(napredakDostignucaIgraca).values({ igracId, dovrseneMisije: 1 }).onConflictDoUpdate({
-      target: napredakDostignucaIgraca.igracId,
-      set: { dovrseneMisije: sql`${napredakDostignucaIgraca.dovrseneMisije} + 1`, azurirano: zavrsenoU },
-    }).returning({ vrijednost: napredakDostignucaIgraca.dovrseneMisije });
-    return red?.vrijednost ?? 0;
-  }
-  if (brojac === 'privatneIgre') {
-    const [red] = await tx.insert(napredakDostignucaIgraca).values({ igracId, privatneIgre: 1 }).onConflictDoUpdate({
-      target: napredakDostignucaIgraca.igracId,
-      set: { privatneIgre: sql`${napredakDostignucaIgraca.privatneIgre} + 1`, azurirano: zavrsenoU },
-    }).returning({ vrijednost: napredakDostignucaIgraca.privatneIgre });
-    return red?.vrijednost ?? 0;
-  }
-  const [red] = await tx.insert(napredakDostignucaIgraca).values({ igracId, tjedniPaketi: 1 }).onConflictDoUpdate({
+async function uvecajBrojac(tx: MisijeTx, igracId: string, brojac: ServisniBrojac, zavrsenoU: Date): Promise<number> {
+  const stupac = STUPCI_SERVISNIH_BROJACA[brojac];
+  const [red] = await tx.insert(napredakDostignucaIgraca).values({ igracId, [brojac]: 1 }).onConflictDoUpdate({
     target: napredakDostignucaIgraca.igracId,
-    set: { tjedniPaketi: sql`${napredakDostignucaIgraca.tjedniPaketi} + 1`, azurirano: zavrsenoU },
-  }).returning({ vrijednost: napredakDostignucaIgraca.tjedniPaketi });
+    set: { [brojac]: sql`${stupac} + 1`, azurirano: zavrsenoU },
+  }).returning({ vrijednost: stupac });
   return red?.vrijednost ?? 0;
 }
 
@@ -91,8 +122,8 @@ export async function dodijeliDoprinos(tx: MisijeTx, parametri: ParametriDodjele
   if (umetnuto.length === 0) return prazanIshod();
 
   const definicija = dohvatiDefinicijuDostignuca(parametri.dostignuceId);
-  if (!definicija || (definicija.brojac !== 'dovrseneMisije' && definicija.brojac !== 'privatneIgre' && definicija.brojac !== 'tjedniPaketi')) {
-    throw new Error(`Dostignuće ${parametri.dostignuceId} nije servisni brojač D01.`);
+  if (!definicija || !jeServisniBrojac(definicija.brojac)) {
+    throw new Error(`Dostignuće ${parametri.dostignuceId} nije servisni brojač.`);
   }
 
   const vrijednost = await uvecajBrojac(tx, parametri.igracId, definicija.brojac, parametri.zavrsenoU);

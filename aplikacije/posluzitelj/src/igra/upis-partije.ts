@@ -11,6 +11,7 @@ import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { priznajPrivatnika } from '../dostignuca/dodjela.js';
+import { priznajDnevnuPobjeduModa, priznajSvePohvale } from '../dostignuca/dodjela-d02.js';
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca } from '../misije/obracun.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
@@ -310,6 +311,17 @@ export async function zakljuciPartijuUBazi(
       if (!staro || dostignuce.novaRazina > staro.novaRazina) poId.set(dostignuce.id, dostignuce);
     }
     postojeci.novaDostignuca = [...poId.values()];
+  };
+
+  const primijeniDodjelu = (
+    igracId: string,
+    ishod: { noveObavijesti: readonly ObavijestOtkljucanogDostignuca[]; novaDostignuca: readonly NovoDostignuce[] },
+    upravljac: 'covjek' | 'bot',
+    vrstaIgraca: 'gost' | 'registriran' | 'admin',
+    iskustvoPrijePartije: number,
+  ) => {
+    zapamtiObavijesti(igracId, ishod.noveObavijesti);
+    pridruziDostignuca(igracId, ishod.novaDostignuca, upravljac, vrstaIgraca, iskustvoPrijePartije);
   };
 
   await baza.transaction(async (tx) => {
@@ -800,6 +812,11 @@ export async function zakljuciPartijuUBazi(
         zapamtiObavijesti(r.igracId, privatnik.noveObavijesti);
         pridruziDostignuca(r.igracId, privatnik.novaDostignuca, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
       }
+
+      if (!samoStatistika && r.plasman === 1 && jeLjudskiRacun(vrstaIgraca, upravljac)) {
+        const kruna = await priznajDnevnuPobjeduModa(tx, { igracId: r.igracId, mod, zavrsenoU });
+        primijeniDodjelu(r.igracId, kruna, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+      }
     }
 
     if (!samoStatistika) {
@@ -881,6 +898,16 @@ export async function zakljuciPartijuUBazi(
             agregat.novaDostignuca = [...agregat.novaDostignuca, ...novaPohvala];
           }
         }
+      }
+
+      for (const [igracId, pohvale] of pohvalePoIgracu) {
+        const imaObje = pohvale.some((pohvala) => pohvala.vrsta === 'najduzi_niz')
+          && pohvale.some((pohvala) => pohvala.vrsta === 'najvise_xp');
+        if (!imaObje) continue;
+        const agregat = agregati.get(igracId);
+        if (!agregat || agregat.vrstaIgraca === 'gost' || agregat.upravljac !== 'covjek') continue;
+        const sve = await priznajSvePohvale(tx, { igracId, partijaId, zavrsenoU });
+        primijeniDodjelu(igracId, sve, agregat.upravljac, agregat.vrstaIgraca, agregat.iskustvoPrijePartije);
       }
 
       // Misije: nakon partijskog XP-a i pohvala, prije commita.

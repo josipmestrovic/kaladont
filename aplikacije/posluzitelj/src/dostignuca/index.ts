@@ -13,3 +13,4 @@ export {
   postaviVezeZaObavijestiDostignuca,
   type VezeZaObavijestiDostignuca,
 } from './obavijesti.js';
+export { priznajDnevnuPobjeduModa, priznajSvePohvale } from './dodjela-d02.js';
