@@ -28,11 +28,6 @@ export interface ZapisPocetkaIgre {
   sudionici: readonly SudionikAnalitike[];
 }
 
-function logGreska(kontekst: string, greska: unknown): void {
-  const poruka = greska instanceof Error ? greska.message : String(greska);
-  console.error(`[analitika.igre] ${kontekst}: ${poruka}`);
-}
-
 export function mapirajVrstuRacuna(vrsta: 'gost' | 'registriran' | 'admin'): VrstaRacunaAnalitike {
   return vrsta === 'gost' ? 'gost' : 'registriran';
 }

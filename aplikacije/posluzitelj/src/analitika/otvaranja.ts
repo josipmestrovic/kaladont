@@ -45,11 +45,6 @@ function verzijaAplikacije(): string | null {
   return konfiguracija.VERZIJA || null;
 }
 
-function logGreska(kontekst: string, greska: unknown): void {
-  const poruka = greska instanceof Error ? greska.message : String(greska);
-  console.error(`[analitika.otvaranja] ${kontekst}: ${poruka}`);
-}
-
 /** Idempotentni upsert po (igra_id, redni_broj_otvaranja). */
 export async function upsertOtvaranjaAnalitike(zapis: ZapisOtvaranjaAnalitike): Promise<void> {
   const vrijednosti = {
