@@ -6,6 +6,7 @@ import { and, desc, eq, gte, lt, sql, type SQL } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { analitikaOtvaranja } from '../baza/shema.js';
 import { konfiguracija } from '../konfiguracija.js';
+import { uRedAnalitike } from './red-upisa.js';
 
 export const ANALITIKA_VREMENSKA_ZONA = 'Europe/Zagreb';
 
@@ -100,7 +101,7 @@ export async function upsertOtvaranjaAnalitike(zapis: ZapisOtvaranjaAnalitike): 
 }
 
 export function zabiljeziOtvaranjeAnalitike(zapis: ZapisOtvaranjaAnalitike): void {
-  void upsertOtvaranjaAnalitike(zapis).catch((greska) => logGreska('upsert', greska));
+  uRedAnalitike(() => upsertOtvaranjaAnalitike(zapis), 'otvaranje');
 }
 
 export interface FilterRazdobljaAnalitike {

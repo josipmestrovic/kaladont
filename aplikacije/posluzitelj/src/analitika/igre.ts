@@ -10,6 +10,7 @@ import {
   pocetakDanaZagrebUtc,
   type KontekstOtvaranjaAnalitike,
 } from './otvaranja.js';
+import { uRedAnalitike } from './red-upisa.js';
 
 export type IshodAnalitikeIgre = 'zavrsena' | 'prekinuta' | 'nepotpuno';
 export type VrstaRacunaAnalitike = 'gost' | 'registriran';
@@ -72,31 +73,35 @@ export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> 
 }
 
 export async function upsertKrajIgre(igraId: string, krajU: Date, ishod: IshodAnalitikeIgre): Promise<void> {
-  const azurirano = await baza
-    .update(analitikaIgre)
-    .set({
-      krajU,
-      ishod: sql`case when ${analitikaIgre.ishod} = 'zavrsena' then ${analitikaIgre.ishod} else ${ishod} end`,
-    })
+  const [postojece] = await baza
+    .select({ ishod: analitikaIgre.ishod })
+    .from(analitikaIgre)
     .where(eq(analitikaIgre.igraId, igraId))
-    .returning({ igraId: analitikaIgre.igraId });
-  if (azurirano.length > 0) return;
-  await baza.insert(analitikaIgre).values({
-    igraId,
-    kontekst: 'javna',
-    mod: 'dva_igraca',
-    pocetakU: krajU,
-    krajU,
-    ishod,
-  }).onConflictDoNothing();
+    .limit(1);
+  if (!postojece) {
+    await baza.insert(analitikaIgre).values({
+      igraId,
+      kontekst: 'javna',
+      mod: 'dva_igraca',
+      pocetakU: krajU,
+      krajU,
+      ishod,
+    }).onConflictDoNothing();
+    return;
+  }
+  if (postojece.ishod === 'zavrsena') {
+    await baza.update(analitikaIgre).set({ krajU }).where(eq(analitikaIgre.igraId, igraId));
+    return;
+  }
+  await baza.update(analitikaIgre).set({ krajU, ishod }).where(eq(analitikaIgre.igraId, igraId));
 }
 
 export function zabiljeziPocetakIgre(zapis: ZapisPocetkaIgre): void {
-  void upsertPocetakIgre(zapis).catch((greska) => logGreska('pocetak', greska));
+  uRedAnalitike(() => upsertPocetakIgre(zapis), 'pocetak');
 }
 
 export function zabiljeziKrajIgre(igraId: string, krajU: Date, ishod: IshodAnalitikeIgre): void {
-  void upsertKrajIgre(igraId, krajU, ishod).catch((greska) => logGreska('kraj', greska));
+  uRedAnalitike(() => upsertKrajIgre(igraId, krajU, ishod), 'kraj');
 }
 
 function uvjetiKonteksta(kontekst?: KontekstOtvaranjaAnalitike): SQL | undefined {

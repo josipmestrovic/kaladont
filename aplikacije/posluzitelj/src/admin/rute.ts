@@ -22,7 +22,6 @@ import {
   dohvatiIncidentPoId,
   listajRaneIncidente,
   rasponOdDoZagreb,
-  ANALITIKA_VREMENSKA_ZONA,
   type KontekstOtvaranjaAnalitike,
 } from '../analitika/otvaranja.js';
 import { agregirajDnevneIgre } from '../analitika/igre.js';
@@ -483,7 +482,6 @@ export async function registrirajAdminRute(
       od: filter.od,
       do: filter.do,
       kontekst: filter.kontekst ?? null,
-      vremenskaZona: ANALITIKA_VREMENSKA_ZONA,
       posjecenost: 'Posjećenost još nije uključena',
       ...agregat,
     };
