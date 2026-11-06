@@ -810,6 +810,8 @@ export function stvoriUpraviteljPartija(
 
     stanje.statusSpremanja = 'spremanje_rezultata';
     const upisSaCekanjemPoteza = async () => {
+      // Najprije osiguraj redak partije — inače in-flight / retry upisi poteza padaju na FK.
+      if (stanje.osigurajPocetakPartije) await stanje.osigurajPocetakPartije();
       // Kratko pričekaj in-flight (ne blokiraj zauvijek ako neki upis visi),
       // zatim idempotentno upiši samo one koji još nisu uspjeli.
       await Promise.race([
@@ -819,7 +821,6 @@ export function stvoriUpraviteljPartija(
           h.unref();
         }),
       ]);
-      if (stanje.osigurajPocetakPartije) await stanje.osigurajPocetakPartije();
       const nedostaju = stanje.zapisiPotezaZaOsigurati.filter((stavka) => !stavka.uspio);
       if (nedostaju.length > 0) {
         await osigurajUpisePoteza(nedostaju.map((stavka) => stavka.zapis));
@@ -1283,15 +1284,18 @@ export function stvoriUpraviteljPartija(
               kodSobe: stanje.kodSobe,
             };
             stanje.rezultatiKraja.set(p.igracId, poruka);
-            if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) {
+            // izadji može obrisati mapiranje prije ovog async upisa; i dalje pošalji kraj
+            // dok igrač nije u drugoj partiji.
+            const trenutnaPartija = partijaPoIgracu.get(p.igracId);
+            if (trenutnaPartija === stanje.partijaId || trenutnaPartija === undefined) {
               aktivneVeze.dohvatiSocket(p.igracId)?.emit('partija:kraj', poruka);
             }
           }
         }),
-        () => {
-          postavke.naPartijaZavrsila?.(stanje.partijaId);
-          zakaziBrisanjeNakonSpremanja(stanje);
-        },
+      () => {
+        postavke.naPartijaZavrsila?.(stanje.partijaId);
+        zakaziBrisanjeNakonSpremanja(stanje);
+      },
       );
       return;
     }
@@ -1413,7 +1417,10 @@ export function stvoriUpraviteljPartija(
             kontekst: 'javna',
           };
           stanje.rezultatiKraja.set(p.igracId, poruka);
-          if (partijaPoIgracu.get(p.igracId) === stanje.partijaId) {
+          // izadji može obrisati mapiranje prije ovog async upisa; i dalje pošalji kraj
+          // dok igrač nije u drugoj partiji.
+          const trenutnaPartija = partijaPoIgracu.get(p.igracId);
+          if (trenutnaPartija === stanje.partijaId || trenutnaPartija === undefined) {
             socket?.emit('partija:kraj', poruka);
           }
         }

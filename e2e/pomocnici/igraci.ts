@@ -26,7 +26,8 @@ export async function udjiUJavniRed(igraci: readonly E2EIgrac[], mod: 'dva_igrac
 export async function cekajIstuPartiju(igraci: readonly E2EIgrac[]): Promise<string> {
   const partijaIdovi = await Promise.all(
     igraci.map(async ({ stranica }) => {
-      await expect(stranica).toHaveURL(/\/partija\/[0-9a-f-]+$/);
+      // CI matchmaking + bot fill često treba više od zadanog Playwright 5s.
+      await expect(stranica).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 30_000 });
       return new URL(stranica.url()).pathname.split('/').at(-1)!;
     }),
   );

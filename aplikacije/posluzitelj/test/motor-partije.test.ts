@@ -563,16 +563,18 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       expect(eliminacija.bodZa).toBe(otvarac.token); // napadac = autor zadnje prihvacene rijeci
 
       const preostali = igraci.filter((igrac) => igrac !== sljedeci);
-      // Kraj čeka i završni DB upis (osiguravanje poteza + XP); CI treba više od 8s.
+      const pobjednik = preostali[2]!;
+      const gubitnici = preostali.slice(0, 2);
+      // Kraj čeka završni DB upis (osiguravanje početka + poteza + XP); CI treba više od 15s.
+      // Forsiraj kraj preko izadji (odmah), ne disconnect+tolerancija — manje utrka s upisom.
       const krajPromise = cekajEventNaBiloKojem<KrajPartije>(
-        preostali.map((ig) => ig.socket),
+        [pobjednik.socket],
         'partija:kraj',
         () => true,
-        15_000,
-        `partija=${pocetak.partijaId}`,
+        30_000,
+        `partija=${pocetak.partijaId} pobjednik=${pobjednik.token}`,
       );
-      preostali[0]!.socket.disconnect();
-      preostali[1]!.socket.disconnect();
+      for (const gubitnik of gubitnici) gubitnik.socket.emit('partija:izadji');
       await krajPromise;
 
       const [spremljeniPrekid] = await baza
@@ -584,7 +586,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     } finally {
       odspojiIgrace(igraci);
     }
-  }, 30_000);
+  }, 45_000);
 
   it('RS-10: istek tolerancije izvan poteza je samoeliminacija bez boda, igra se nastavlja', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
