@@ -281,6 +281,12 @@ describe('sandučic', () => {
       tip: TIP_SANDUCIC_TEST,
       deduplikacijskiKljuc: 'test:prije-rega',
     });
+    await stvoriPoruku({
+      igracId: gost.id,
+      tip: TIP_SANDUCIC_PRVA_IGRA,
+      deduplikacijskiKljuc: 'prva_igra',
+      podaci: { gost: true },
+    });
     const email = `reg-${gost.id}@example.com`;
     await baza.update(igraci).set({
       vrsta: 'registriran',
@@ -291,7 +297,8 @@ describe('sandučic', () => {
     await stvoriDobrodoslicu(gost.id, email);
 
     const redovi = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, gost.id));
-    expect(redovi.map((r) => r.deduplikacijskiKljuc).sort()).toEqual(['dobrodoslica', 'test:prije-rega']);
+    expect(redovi.map((r) => r.deduplikacijskiKljuc).sort()).toEqual(['dobrodoslica', 'prva_igra', 'test:prije-rega']);
+    expect(redovi.find((r) => r.tip === TIP_SANDUCIC_PRVA_IGRA)?.podaci?.gost).toBe(false);
   });
 
   it('HTTP feedback stvara zahvalu u sandučicu', async () => {

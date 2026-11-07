@@ -24,6 +24,8 @@ export async function stvoriDobrodoslicu(igracId: string, email: string): Promis
     izvorTip: 'registracija',
     izvorId: igracId,
   });
+  // Gost→reg: stara „prva igra” više ne smije voditi na /registracija.
+  await azurirajPodatkePorukePoTipu(igracId, TIP_SANDUCIC_PRVA_IGRA, { gost: false });
 }
 
 export async function stvoriPorukuPotvrdeEmaila(igracId: string): Promise<void> {

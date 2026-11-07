@@ -1440,14 +1440,23 @@ export function stvoriUpraviteljPartija(
     stanje: StanjeStola,
     kontekst: 'javna' | 'privatna' | 'trening',
   ): Promise<void> {
-    await Promise.all(stanje.sudionici.map((sudionik) => mozdaObavijestiPrvuIgru({
-      igracId: sudionik.igracId,
-      jeGost: sudionik.vrsta === 'gost',
-      jeBot: sudionik.upravljac === 'bot',
-      izvorId: stanje.partijaId,
-      kontekst,
-      mod: stanje.mod,
-    })));
+    try {
+      await Promise.all(stanje.sudionici.map((sudionik) => mozdaObavijestiPrvuIgru({
+        igracId: sudionik.igracId,
+        jeGost: sudionik.vrsta === 'gost',
+        jeBot: sudionik.upravljac === 'bot',
+        izvorId: stanje.partijaId,
+        kontekst,
+        mod: stanje.mod,
+      })));
+    } catch (greska) {
+      // Sandučic ne smije blokirati partija:kraj ni retry spremanja rezultata.
+      console.error('sanducic:prva_igra nije uspjela', {
+        partijaId: stanje.partijaId,
+        kontekst,
+        greska,
+      });
+    }
   }
 
   function nacinIspadanjaZaIgraca(
