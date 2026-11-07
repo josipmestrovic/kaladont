@@ -130,7 +130,12 @@ export async function zabiljeziPobjeduTreninga(
   });
 
   if (rezultat?.obavijesti.length) emitirajNovostiDostignuca(igracId, rezultat.obavijesti);
-  if (rezultat && rezultat.sanducicZvjezdica > 0) emitirajPromjeneSanducica([igracId]);
+  if (rezultat && (
+    rezultat.sanducicZvjezdica > 0
+    || (rezultat.ishodMisija?.novaDostignuca.length ?? 0) > 0
+  )) {
+    emitirajPromjeneSanducica([igracId]);
+  }
   if (!rezultat) return null;
   return {
     pobjede: rezultat.pobjede,
