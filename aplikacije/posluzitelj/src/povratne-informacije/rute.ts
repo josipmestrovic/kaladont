@@ -5,7 +5,7 @@ import { dohvatiDefinicijuDostignuca, izracunajNovaDostignuca } from 'zajednicko
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, igraci, napredakDostignucaIgraca, povratneInformacije } from '../baza/shema.js';
 import { zahtijevajAdmina, zahtijevajPrijavu, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
-import { emitirajPromjeneSanducica, stvoriZahvaluZaFeedback } from '../sanducic/okidaci.js';
+import { emitirajPromjeneSanducica, stvoriPorukeZvjezdica, stvoriZahvaluZaFeedback } from '../sanducic/okidaci.js';
 
 const ShemaOcjena = z.object({
   pravila: z.number().int().min(1).max(5),
@@ -89,6 +89,11 @@ export async function registrirajPovratneInformacijeRute(app: FastifyInstance): 
         false,
       );
       if (novaDostignuca.length > 0) {
+        const stareRazina = await tx.select({
+          dostignuceId: dostignucaIgraca.dostignuceId,
+          razina: dostignucaIgraca.razina,
+        }).from(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igrac.id));
+        const staraPoId = new Map(stareRazina.map((red) => [red.dostignuceId, red.razina]));
         await tx.insert(dostignucaIgraca).values(novaDostignuca.map((dostignuce) => ({
           igracId: igrac.id,
           dostignuceId: dostignuce.id,
@@ -99,6 +104,17 @@ export async function registrirajPovratneInformacijeRute(app: FastifyInstance): 
           target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
           set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
         });
+        for (const dostignuce of novaDostignuca) {
+          await stvoriPorukeZvjezdica({
+            igracId: igrac.id,
+            dostignuceId: dostignuce.id,
+            staraRazina: staraPoId.get(dostignuce.id) ?? 0,
+            novaRazina: dostignuce.novaRazina,
+            tx,
+            izvorTip: 'feedback',
+            izvorId: String(povratnaInformacija!.id),
+          });
+        }
       }
       const sanducic = await stvoriZahvaluZaFeedback(igrac.id, povratnaInformacija!.id, tx);
       return {

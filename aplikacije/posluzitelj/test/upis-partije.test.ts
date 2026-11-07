@@ -558,7 +558,7 @@ describe('P01 pohvale igre', () => {
     expect(audit).toHaveLength(0);
   });
 
-  it('P01-12/13: gost dobiva DTO pohvalu bez brojača; bot ne dobiva zapis', async () => {
+  it('P01-12/13: gost dobiva DTO pohvalu i brojač (O4); bot ne dobiva zapis', async () => {
     await baza.insert(igraci).values([
       { id: gostId, vrsta: 'gost', upravljac: 'covjek', nadimak: 'Gost' },
       { id: botId, vrsta: 'registriran', upravljac: 'bot', nadimak: 'Bot' },
@@ -595,7 +595,7 @@ describe('P01 pohvale igre', () => {
     expect(agregati.get(gostId)?.pohvale.some((p) => p.vrsta === 'najvise_xp')).toBeFalsy();
     expect(agregati.get(botId)?.pohvale ?? []).toEqual([]);
     const [napredakGost] = await baza.select().from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, gostId));
-    expect(napredakGost?.pohvaleNizUkupno ?? 0).toBe(0);
+    expect(napredakGost?.pohvaleNizUkupno ?? 0).toBe(1);
     const auditBot = await baza.select().from(pohvaleIgre)
       .where(and(eq(pohvaleIgre.igraId, partijaId), eq(pohvaleIgre.igracId, botId)));
     expect(auditBot).toHaveLength(0);

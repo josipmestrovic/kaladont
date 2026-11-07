@@ -8,6 +8,10 @@ export const TIP_SANDUCIC_FEEDBACK = 'feedback' as const;
 export const TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA = 'prijava_rijec_dodana' as const;
 export const TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA = 'prijava_rijec_uklonjena' as const;
 export const TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA = 'prijava_igraca_uvazena' as const;
+export const TIP_SANDUCIC_NOVA_XP_RAZINA = 'nova_xp_razina' as const;
+export const TIP_SANDUCIC_NOVA_ZVJEZDICA = 'nova_zvjezdica' as const;
+export const TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA = 'nova_kolekcionarska_razina' as const;
+export const TIP_SANDUCIC_PROMJENA_RANGA = 'promjena_ranga' as const;
 
 export const KLJUC_PREKRETNICE_PRVA_IGRA = 'prva_igra' as const;
 
@@ -20,6 +24,10 @@ export type TipSanducicPoruke =
   | typeof TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA
   | typeof TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA
   | typeof TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA
+  | typeof TIP_SANDUCIC_NOVA_XP_RAZINA
+  | typeof TIP_SANDUCIC_NOVA_ZVJEZDICA
+  | typeof TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA
+  | typeof TIP_SANDUCIC_PROMJENA_RANGA
   | (string & {});
 
 export interface SanducicPorukaSazetak {
@@ -67,7 +75,7 @@ function tekstPolje(podaci: Record<string, unknown>, kljuc: string): string {
 }
 
 type Predlozak = {
-  naslov: string;
+  naslov: string | ((podaci: Record<string, unknown>) => string);
   tekst: (podaci: Record<string, unknown>) => string;
   poveznica: (podaci: Record<string, unknown>) => string | null;
 };
@@ -129,7 +137,55 @@ const PREDLOSCI: Record<string, Predlozak> = {
       : 'Tvoja prijava igrača je uvažena. Hvala ti što pomažeš poboljšati Kaladont! :)'),
     poveznica: () => null,
   },
+  [TIP_SANDUCIC_NOVA_XP_RAZINA]: {
+    naslov: 'Novi level!',
+    tekst: (podaci) => {
+      const razina = typeof podaci.razina === 'number' ? podaci.razina : Number(podaci.razina);
+      return `Bravo! Dosegnuo/la si LVL ${Number.isFinite(razina) ? razina : '?'}!`;
+    },
+    poveznica: () => '/profil',
+  },
+  [TIP_SANDUCIC_NOVA_ZVJEZDICA]: {
+    naslov: (podaci) => {
+      const zvjezdice = typeof podaci.zvjezdice === 'number' ? podaci.zvjezdice : Number(podaci.zvjezdice);
+      return Number.isFinite(zvjezdice) && zvjezdice > 1 ? 'Nova zvjezdica!' : 'Novo dostignuće!';
+    },
+    tekst: (podaci) => {
+      const naziv = tekstPolje(podaci, 'naziv') || 'dostignuće';
+      const zvjezdice = typeof podaci.zvjezdice === 'number' ? podaci.zvjezdice : Number(podaci.zvjezdice);
+      const broj = Number.isFinite(zvjezdice) ? zvjezdice : 1;
+      if (broj <= 1) return `Bravo! Otključano dostignuće ${naziv}: ${broj}.`;
+      return `Bravo! Dostignuće ${naziv} sada ima ${broj} ${oblikZvjezdice(broj)}!`;
+    },
+    poveznica: () => '/profil',
+  },
+  [TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA]: {
+    naslov: 'Nova kolekcionarska razina!',
+    tekst: (podaci) => {
+      const naziv = tekstPolje(podaci, 'naziv') || 'nova razina';
+      return `Bravo! Otključana kolekcionarska razina ${naziv}!`;
+    },
+    poveznica: () => '/profil',
+  },
+  [TIP_SANDUCIC_PROMJENA_RANGA]: {
+    naslov: (podaci) => (podaci.napredak === true ? 'Novi rang!' : 'Promjena ranga'),
+    tekst: (podaci) => {
+      const mod = tekstPolje(podaci, 'mod') || 'Igra';
+      const rang = tekstPolje(podaci, 'rang') || 'novi rang';
+      if (podaci.napredak === true) {
+        return `${mod}: tvoj novi rang je ${rang}. Bravo!`;
+      }
+      return `${mod}: tvoj rang sada je ${rang}. Sretno u sljedećoj igri!`;
+    },
+    poveznica: () => '/profil',
+  },
 };
+
+function oblikZvjezdice(broj: number): string {
+  if (broj === 1) return 'zvjezdicu';
+  if (broj >= 2 && broj <= 4) return 'zvjezdice';
+  return 'zvjezdica';
+}
 
 export function renderirajSanducicPoruku(
   tip: string,
@@ -141,7 +197,7 @@ export function renderirajSanducicPoruku(
     poveznica: () => null,
   };
   return {
-    naslov: predlozak.naslov,
+    naslov: typeof predlozak.naslov === 'function' ? predlozak.naslov(podaci) : predlozak.naslov,
     tekst: predlozak.tekst(podaci),
     poveznica: predlozak.poveznica(podaci),
   };

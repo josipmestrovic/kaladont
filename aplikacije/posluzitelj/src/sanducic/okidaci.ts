@@ -1,10 +1,16 @@
 import {
+  dohvatiDefinicijuDostignuca,
+  noviKolekcionarskiPragovi,
   TIP_SANDUCIC_DOBRODOSLICA,
   TIP_SANDUCIC_EMAIL_POTVRDEN,
   TIP_SANDUCIC_FEEDBACK,
+  TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
+  TIP_SANDUCIC_NOVA_XP_RAZINA,
+  TIP_SANDUCIC_NOVA_ZVJEZDICA,
   TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA,
   TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA,
   TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA,
+  TIP_SANDUCIC_PROMJENA_RANGA,
   TIP_SANDUCIC_PRVA_IGRA,
 } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
@@ -13,7 +19,7 @@ import {
   emitirajPromjenuSanducica,
   stvoriPoruku,
 } from './servis.js';
-import { pokusajOstvaritiPrvuIgru, type TxSanducic } from './prekretnice.js';
+import { pokusajOstvaritiPrekretnicu, pokusajOstvaritiPrvuIgru, type TxSanducic } from './prekretnice.js';
 
 export async function stvoriDobrodoslicu(igracId: string, email: string): Promise<void> {
   await stvoriPoruku({
@@ -138,4 +144,128 @@ export function emitirajPromjeneSanducica(igracIds: readonly string[]): void {
   for (const igracId of new Set(igracIds)) {
     emitirajPromjenuSanducica(igracId, 'nova');
   }
+}
+
+/** Lazy baseline: potroši postojeće razine bez pošte, pa pošalji samo nove. */
+export async function stvoriPorukeXpRazina(ulaz: {
+  igracId: string;
+  razinaPrije: number;
+  razinaPoslije: number;
+  tx: TxSanducic;
+  izvorTip?: string;
+  izvorId?: string;
+}): Promise<number> {
+  if (ulaz.razinaPoslije <= ulaz.razinaPrije) return 0;
+  for (let razina = 1; razina <= ulaz.razinaPrije; razina += 1) {
+    await pokusajOstvaritiPrekretnicu(ulaz.igracId, `xp_razina:${razina}`, ulaz.tx);
+  }
+  let broj = 0;
+  for (let razina = ulaz.razinaPrije + 1; razina <= ulaz.razinaPoslije; razina += 1) {
+    if (razina < 2) continue;
+    const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, `xp_razina:${razina}`, ulaz.tx);
+    if (!nova) continue;
+    const red = await stvoriPoruku({
+      igracId: ulaz.igracId,
+      tip: TIP_SANDUCIC_NOVA_XP_RAZINA,
+      deduplikacijskiKljuc: `xp_razina:${razina}`,
+      podaci: { razina },
+      izvorTip: ulaz.izvorTip ?? 'xp',
+      izvorId: ulaz.izvorId ?? null,
+    }, { tx: ulaz.tx, emitiraj: false });
+    if (red) broj += 1;
+  }
+  return broj;
+}
+
+export async function stvoriPorukeZvjezdica(ulaz: {
+  igracId: string;
+  dostignuceId: string;
+  staraRazina: number;
+  novaRazina: number;
+  tx: TxSanducic;
+  izvorTip?: string;
+  izvorId?: string;
+}): Promise<number> {
+  if (ulaz.novaRazina <= ulaz.staraRazina) return 0;
+  const definicija = dohvatiDefinicijuDostignuca(ulaz.dostignuceId);
+  const naziv = definicija?.naziv ?? ulaz.dostignuceId;
+  for (let razina = 1; razina <= ulaz.staraRazina; razina += 1) {
+    await pokusajOstvaritiPrekretnicu(ulaz.igracId, `zvjezdica:${ulaz.dostignuceId}:${razina}`, ulaz.tx);
+  }
+  let broj = 0;
+  for (let razina = ulaz.staraRazina + 1; razina <= ulaz.novaRazina; razina += 1) {
+    const kljuc = `zvjezdica:${ulaz.dostignuceId}:${razina}`;
+    const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, ulaz.tx);
+    if (!nova) continue;
+    const red = await stvoriPoruku({
+      igracId: ulaz.igracId,
+      tip: TIP_SANDUCIC_NOVA_ZVJEZDICA,
+      deduplikacijskiKljuc: kljuc,
+      podaci: { naziv, zvjezdice: razina, dostignuceId: ulaz.dostignuceId },
+      izvorTip: ulaz.izvorTip ?? 'dostignuce',
+      izvorId: ulaz.izvorId ?? ulaz.dostignuceId,
+    }, { tx: ulaz.tx, emitiraj: false });
+    if (red) broj += 1;
+  }
+  return broj;
+}
+
+export async function stvoriPorukeKolekcije(ulaz: {
+  igracId: string;
+  brojPrije: number;
+  brojPoslije: number;
+  tx: TxSanducic;
+  izvorTip?: string;
+  izvorId?: string;
+}): Promise<number> {
+  const novi = noviKolekcionarskiPragovi(ulaz.brojPrije, ulaz.brojPoslije);
+  if (novi.length === 0) return 0;
+  // Lazy baseline: svi pragovi već dosegnuti prije ove igre
+  for (const prag of noviKolekcionarskiPragovi(0, ulaz.brojPrije)) {
+    await pokusajOstvaritiPrekretnicu(ulaz.igracId, `kolekcija:${prag.prag}`, ulaz.tx);
+  }
+  let broj = 0;
+  for (const prag of novi) {
+    const kljuc = `kolekcija:${prag.prag}`;
+    const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, ulaz.tx);
+    if (!nova) continue;
+    const red = await stvoriPoruku({
+      igracId: ulaz.igracId,
+      tip: TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
+      deduplikacijskiKljuc: kljuc,
+      podaci: { naziv: prag.naziv, prag: prag.prag },
+      izvorTip: ulaz.izvorTip ?? 'kolekcija',
+      izvorId: ulaz.izvorId ?? null,
+    }, { tx: ulaz.tx, emitiraj: false });
+    if (red) broj += 1;
+  }
+  return broj;
+}
+
+export async function stvoriPorukuPromjeneRanga(ulaz: {
+  igracId: string;
+  mod: 'dva_igraca' | 'cetiri_igraca';
+  rangPrije: string;
+  rangPoslije: string;
+  napredak: boolean;
+  tx: TxSanducic;
+  izvorId: string;
+}): Promise<boolean> {
+  if (ulaz.rangPrije === ulaz.rangPoslije) return false;
+  const nazivModa = ulaz.mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj';
+  const red = await stvoriPoruku({
+    igracId: ulaz.igracId,
+    tip: TIP_SANDUCIC_PROMJENA_RANGA,
+    deduplikacijskiKljuc: `rang:${ulaz.mod}:${ulaz.izvorId}`,
+    podaci: {
+      mod: nazivModa,
+      rang: ulaz.rangPoslije,
+      rangPrije: ulaz.rangPrije,
+      napredak: ulaz.napredak,
+    },
+    izvorTip: 'partija',
+    izvorId: ulaz.izvorId,
+    mod: ulaz.mod,
+  }, { tx: ulaz.tx, emitiraj: false });
+  return red != null;
 }

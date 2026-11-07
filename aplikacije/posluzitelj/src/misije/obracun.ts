@@ -19,6 +19,7 @@ import {
   nagradeMisija,
   stanjeMisijaIgraca,
 } from '../baza/shema.js';
+import { stvoriPorukeZvjezdica } from '../sanducic/okidaci.js';
 import { osigurajStanjeMisija } from './stanje.js';
 import { primijeniMetrikuNaDodjelu, smijePrimitiMisijskiNapredak } from './metrika.js';
 import type { MisijeSatRng, MisijeTx, PodstanjeMisije, SnapshotMisije } from './tipovi.js';
@@ -265,6 +266,15 @@ export async function obracunajMisijeZaIgraca(
       }).onConflictDoUpdate({
         target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
         set: { razina: poslijeZv, zadnjeOtkljucavanje: metrike.zavrsenoU },
+      });
+      await stvoriPorukeZvjezdica({
+        igracId: metrike.igracId,
+        dostignuceId: 'iskusnjara',
+        staraRazina: prijeZv,
+        novaRazina: poslijeZv,
+        tx,
+        izvorTip: metrike.kontekst === 'trening' ? 'trening' : 'partija',
+        izvorId: metrike.izvorId,
       });
       novaDostignuca.push({
         id: 'iskusnjara',

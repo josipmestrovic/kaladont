@@ -26,6 +26,7 @@ import {
   obavijestiIgraca,
 } from '../baza/shema.js';
 import type { MisijeTx } from '../misije/tipovi.js';
+import { stvoriPorukeZvjezdica } from '../sanducic/okidaci.js';
 
 export interface IshodDodjele {
   doprinosUmetnut: boolean;
@@ -242,6 +243,15 @@ export async function dodijeliDoprinos(tx: MisijeTx, parametri: ParametriDodjele
       id: parametri.dostignuceId,
       novaRazina,
       maksimalnaRazina: definicija.pragovi.length,
+    });
+    await stvoriPorukeZvjezdica({
+      igracId: parametri.igracId,
+      dostignuceId: parametri.dostignuceId,
+      staraRazina,
+      novaRazina,
+      tx,
+      izvorTip: parametri.izvor,
+      izvorId: parametri.dostignuceId,
     });
     if (!parametri.preskociObavijest) {
       const obavijest = await upisiObavijestDostignuca(tx, {

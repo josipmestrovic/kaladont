@@ -4,6 +4,7 @@ import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, pobjedeTreninga } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca, type IshodMisijaPayload } from '../misije/obracun.js';
+import { emitirajPromjeneSanducica, stvoriPorukeZvjezdica } from '../sanducic/okidaci.js';
 
 const PRAGOVI_ZAGRIJANOG = [1, 5, 20, 50, 100] as const;
 
@@ -34,9 +35,10 @@ export async function zabiljeziPobjeduTreninga(
       iskustvoUkupno: igraci.iskustvoUkupno,
     })
       .from(igraci).where(eq(igraci.id, igracId)).for('update');
-    if ((igrac?.vrsta !== 'registriran' && igrac?.vrsta !== 'admin') || igrac.upravljac !== 'covjek' || igrac.obrisanAt !== null) {
+    if (!igrac || igrac.upravljac !== 'covjek' || igrac.obrisanAt !== null) {
       return null;
     }
+    const jeRegistriran = igrac.vrsta === 'registriran' || igrac.vrsta === 'admin';
 
     const [pobjeda] = await tx.insert(pobjedeTreninga).values({
       treningId,
@@ -45,7 +47,7 @@ export async function zabiljeziPobjeduTreninga(
     }).onConflictDoNothing().returning({ treningId: pobjedeTreninga.treningId });
 
     if (!pobjeda) {
-      const ishodMisija = await dohvatiIshodMisija(tx, igracId, 'trening', treningId);
+      const ishodMisija = jeRegistriran ? await dohvatiIshodMisija(tx, igracId, 'trening', treningId) : null;
       const [napredak] = await tx.select({ treningPobjede: napredakDostignucaIgraca.treningPobjede })
         .from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracId));
       return {
@@ -54,6 +56,7 @@ export async function zabiljeziPobjeduTreninga(
         maksimalnaRazina: PRAGOVI_ZAGRIJANOG.length,
         ishodMisija,
         obavijesti: [] as ObavijestOtkljucanogDostignuca[],
+        sanducicZvjezdica: 0,
       };
     }
 
@@ -68,6 +71,7 @@ export async function zabiljeziPobjeduTreninga(
     const prije = izracunajRazinuDostignuca(definicija, napredak.treningPobjede - 1);
     const poslije = izracunajRazinuDostignuca(definicija, napredak.treningPobjede);
     let novaRazina = 0;
+    let sanducicZvjezdica = 0;
     if (poslije > prije) {
       novaRazina = poslije;
       await tx.insert(dostignucaIgraca).values({
@@ -79,6 +83,15 @@ export async function zabiljeziPobjeduTreninga(
       }).onConflictDoUpdate({
         target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
         set: { razina: poslije, zadnjeOtkljucavanje: zavrsenoU },
+      });
+      sanducicZvjezdica = await stvoriPorukeZvjezdica({
+        igracId,
+        dostignuceId: 'zagrijan',
+        staraRazina: prije,
+        novaRazina: poslije,
+        tx,
+        izvorTip: 'trening',
+        izvorId: treningId,
       });
     }
 
@@ -102,23 +115,27 @@ export async function zabiljeziPobjeduTreninga(
       razlicitiPoceci: [],
     };
 
-    const ishodMisija = await obracunajMisijeZaIgraca(
-      tx,
-      potpuneMetrike,
-      igrac.iskustvoUkupno,
-      igrac.iskustvoUkupno,
-    );
+    const ishodMisija = jeRegistriran
+      ? await obracunajMisijeZaIgraca(tx, potpuneMetrike, igrac.iskustvoUkupno, igrac.iskustvoUkupno)
+      : null;
 
     return {
       pobjede: napredak.treningPobjede,
       novaRazina,
       maksimalnaRazina: PRAGOVI_ZAGRIJANOG.length,
       ishodMisija,
-      obavijesti: ishodMisija.noveObavijesti ?? [],
+      obavijesti: ishodMisija?.noveObavijesti ?? [],
+      sanducicZvjezdica,
     };
   });
 
   if (rezultat?.obavijesti.length) emitirajNovostiDostignuca(igracId, rezultat.obavijesti);
+  if (rezultat && (
+    rezultat.sanducicZvjezdica > 0
+    || (rezultat.ishodMisija?.novaDostignuca.length ?? 0) > 0
+  )) {
+    emitirajPromjeneSanducica([igracId]);
+  }
   if (!rezultat) return null;
   return {
     pobjede: rezultat.pobjede,
