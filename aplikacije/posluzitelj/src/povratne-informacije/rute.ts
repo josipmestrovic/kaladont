@@ -112,8 +112,13 @@ export async function registrirajPovratneInformacijeRute(app: FastifyInstance): 
 
     if ('greska' in ishod) return odgovor.code(409).send({ ok: false, greska: ishod.greska });
     if (ishod.sanducic) emitirajPromjeneSanducica([igrac.id]);
-    const { sanducic: _sanducic, ...odgovorIshoda } = ishod;
-    return { ok: true, ...odgovorIshoda };
+    return {
+      ok: true,
+      id: ishod.id,
+      anketaIspunjena: ishod.anketaIspunjena,
+      brojPoslanih: ishod.brojPoslanih,
+      novaDostignuca: ishod.novaDostignuca,
+    };
   });
 
   app.get<{ Querystring: { status?: string } }>('/admin/povratne-informacije', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
