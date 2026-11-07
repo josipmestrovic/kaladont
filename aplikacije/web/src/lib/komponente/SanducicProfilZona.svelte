@@ -18,27 +18,43 @@
   let profil = $state<Profil | null>(null);
   let jeGost = $state(true);
   let ucitavanjeProfila = false;
+  let zakazanoUcitavanje = false;
 
   async function ucitajProfil(pokusaji = 3) {
-    if (ucitavanjeProfila) return;
+    // osvjeziGostSesijuNakon401 emitira identitet-promijenjen usred loada — ne dropaj taj reload.
+    if (ucitavanjeProfila) {
+      zakazanoUcitavanje = true;
+      return;
+    }
     ucitavanjeProfila = true;
     try {
-      for (let i = 0; i < pokusaji; i += 1) {
-        try {
-          const odgovor = await api<Profil>('/profil');
-          profil = odgovor;
-          jeGost = !odgovor.email;
-          return;
-        } catch {
-          // Zamjena gost tokena + socket reconnect + identitet event (sandučic/badge).
-          await osvjeziGostSesijuNakon401().catch(() => {});
-          if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+      do {
+        zakazanoUcitavanje = false;
+        let uspjeh = false;
+        for (let i = 0; i < pokusaji; i += 1) {
+          try {
+            const odgovor = await api<Profil>('/profil');
+            profil = odgovor;
+            jeGost = !odgovor.email;
+            uspjeh = true;
+            break;
+          } catch {
+            // Zamjena gost tokena + socket reconnect + identitet event (sandučic/badge).
+            await osvjeziGostSesijuNakon401().catch(() => {});
+            if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+          }
         }
-      }
-      profil = null;
-      jeGost = true;
+        if (uspjeh) {
+          // Ovaj load već koristi novi token — ne treba još jedan krug zbog eventa.
+          zakazanoUcitavanje = false;
+          break;
+        }
+        profil = null;
+        jeGost = true;
+      } while (zakazanoUcitavanje);
     } finally {
       ucitavanjeProfila = false;
+      if (zakazanoUcitavanje) void ucitajProfil();
     }
   }
 
@@ -47,7 +63,6 @@
       const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1 }>).detail;
       profil = profil ? { ...profil, avatarConfig: detalji.avatarConfig } : profil;
     };
-    // Guard u ucitajProfil — osvjeziGostSesijuNakon401 emitira isti event.
     const azurirajIdentitet = () => void ucitajProfil();
     window.addEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
     window.addEventListener('kaladont:identitet-promijenjen', azurirajIdentitet);
