@@ -4,7 +4,7 @@
  */
 import { tekstSanducicToasta, type SanducicPorukaSazetak } from 'zajednicko';
 import { api } from './api.js';
-import { dohvatiAuthToken } from './identitet.js';
+import { osigurajAuthToken } from './identitet.js';
 import { dohvatiSocket } from './socket.js';
 
 const TRAJANJE_TOASTA_MS = 6000;
@@ -150,7 +150,8 @@ export async function potvrdiZavrsniSazetak(): Promise<void> {
 }
 
 export async function osvjeziSazetakSanducica(): Promise<void> {
-  if (!dohvatiAuthToken()) {
+  const token = await osigurajAuthToken();
+  if (!token) {
     ocistiLokalno();
     return;
   }

@@ -11,8 +11,16 @@ export function dohvatiGostToken(): string {
     // SSR/build faza - privremeni; klijent koristi samo token iz gost-sesije.
     return `gost.${crypto.randomUUID().replaceAll('-', '')}`;
   }
-  // Ne mintaj lokalni token — neregistrirani gost.* daje 401 i može u utrci obrisati valjanu sesiju.
+  // Sync read — može biti prazan prije gost-sesije. Za HTTP/socket koristi osigurajAuthToken().
   return localStorage.getItem(KLJUC_GOST_TOKEN) ?? '';
+}
+
+/** Vraća bearer token; ako nema sesije, prvo registrira gosta na poslužitelju. */
+export async function osigurajAuthToken(): Promise<string> {
+  const postojeci = dohvatiAuthToken();
+  if (postojeci) return postojeci;
+  await inicijalizirajGostSesiju();
+  return dohvatiAuthToken();
 }
 
 /** Jedan in-flight init — paralelni pozivi ne smiju oboje obrisati tuđi valjani token. */
@@ -74,9 +82,9 @@ export function spremiSesijskiToken(token: string): void {
   localStorage.removeItem(KLJUC_GOST_TOKEN);
 }
 
+/** Samo sesijski token. Za odjavu + novi gost koristi `prijediNaGostujucuSesiju`. */
 export function obrisiSesijskiToken(): void {
   localStorage.removeItem(KLJUC_SESIJSKI_TOKEN);
-  localStorage.removeItem(KLJUC_GOST_TOKEN);
 }
 
 /** Odjavljuje račun i stvara potpuno novi gostujući identitet za samostalnu igru. */

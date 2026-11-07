@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
-  import { dohvatiAuthToken, inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
@@ -21,14 +20,12 @@
   async function ucitajProfil(pokusaji = 3) {
     for (let i = 0; i < pokusaji; i += 1) {
       try {
-        if (!dohvatiAuthToken()) await inicijalizirajGostSesiju();
+        // api() zove osigurajAuthToken — nema praznog Bearera nakon odjave.
         const odgovor = await api<Profil>('/profil');
         profil = odgovor;
         jeGost = !odgovor.email;
         return;
       } catch {
-        // Single-flight init — nakon odjave/praznog storagea treba registrirani gost token.
-        await inicijalizirajGostSesiju().catch(() => {});
         if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
       }
     }
