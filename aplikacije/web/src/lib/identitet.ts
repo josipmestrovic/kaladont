@@ -32,10 +32,20 @@ export async function osigurajAuthToken(): Promise<string> {
   return dohvatiAuthToken();
 }
 
-/** Nakon 401/neuspjelog /profil — zaboravi cache da idući osigurajAuthToken ponovo validira. */
+/**
+ * Nakon 401/neuspjelog /profil — zamijeni nevaljani gost token i uskladi socket/sandučic.
+ * Bez ovoga avatar može oživjeti, a socket ostaje na NEVALJAN_TOKEN bez reconnecta.
+ */
 export async function osvjeziGostSesijuNakon401(): Promise<void> {
+  const prije = dohvatiAuthToken();
   zadnjiValjaniGostToken = null;
   await inicijalizirajGostSesiju();
+  const poslije = dohvatiAuthToken();
+  if (typeof window === 'undefined' || !poslije || poslije === prije) return;
+  // Dinamički import — socket.ts već uvozi identitet (nema kružni graph na loadu).
+  const { osvjeziSocketIdentitet } = await import('./socket.js');
+  await osvjeziSocketIdentitet().catch(() => {});
+  window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
 }
 
 /** Jedan in-flight init — paralelni pozivi ne smiju oboje obrisati tuđi valjani token. */

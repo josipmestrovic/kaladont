@@ -17,22 +17,29 @@
 
   let profil = $state<Profil | null>(null);
   let jeGost = $state(true);
+  let ucitavanjeProfila = false;
 
   async function ucitajProfil(pokusaji = 3) {
-    for (let i = 0; i < pokusaji; i += 1) {
-      try {
-        const odgovor = await api<Profil>('/profil');
-        profil = odgovor;
-        jeGost = !odgovor.email;
-        return;
-      } catch {
-        // Nevaljani leftover gost.* inače ostaje u osigurajAuthToken cacheu.
-        await osvjeziGostSesijuNakon401().catch(() => {});
-        if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+    if (ucitavanjeProfila) return;
+    ucitavanjeProfila = true;
+    try {
+      for (let i = 0; i < pokusaji; i += 1) {
+        try {
+          const odgovor = await api<Profil>('/profil');
+          profil = odgovor;
+          jeGost = !odgovor.email;
+          return;
+        } catch {
+          // Zamjena gost tokena + socket reconnect + identitet event (sandučic/badge).
+          await osvjeziGostSesijuNakon401().catch(() => {});
+          if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+        }
       }
+      profil = null;
+      jeGost = true;
+    } finally {
+      ucitavanjeProfila = false;
     }
-    profil = null;
-    jeGost = true;
   }
 
   onMount(() => {
@@ -40,6 +47,7 @@
       const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1 }>).detail;
       profil = profil ? { ...profil, avatarConfig: detalji.avatarConfig } : profil;
     };
+    // Guard u ucitajProfil — osvjeziGostSesijuNakon401 emitira isti event.
     const azurirajIdentitet = () => void ucitajProfil();
     window.addEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
     window.addEventListener('kaladont:identitet-promijenjen', azurirajIdentitet);
