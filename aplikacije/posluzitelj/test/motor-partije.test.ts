@@ -617,9 +617,16 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(eliminacija.bodZa).toBeNull(); // samoeliminacija - nitko ne dobiva bod
 
     const preostali = igraci.filter((igrac) => igrac !== izvanPoteza);
-    const krajPromise = new Promise<KrajPartije>((resolve) => preostali[0]!.socket.once('partija:kraj', resolve));
-    preostali[1]!.socket.disconnect();
-    preostali[2]!.socket.disconnect();
+    const pobjednik = preostali[2]!;
+    const gubitnici = preostali.slice(0, 2);
+    const krajPromise = cekajEventNaBiloKojem<KrajPartije>(
+      [pobjednik.socket],
+      'partija:kraj',
+      () => true,
+      30_000,
+      `RS-10 partija=${pocetak.partijaId}`,
+    );
+    for (const gubitnik of gubitnici) gubitnik.socket.emit('partija:izadji');
     await krajPromise;
 
     const [spremljeniPrekid] = await baza
@@ -628,8 +635,8 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, izvanPoteza.igracId)));
     expect(spremljeniPrekid).toEqual({ nacinIspadanja: 'prekid', iskustvo: 0 });
 
-    for (const igrac of igraci) igrac.socket.disconnect();
-  });
+    odspojiIgrace(igraci);
+  }, 45_000);
 
   it('RS-10 koristi stanje u trenutku prekida ako red tijekom tolerancije dođe do igrača', async () => {
     const { igraci, pocetak, runda } = await pokreniPartiju();
@@ -882,103 +889,126 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
 
   it('kaladont: eliminira igraca koji je omogucio "ka", bod ide igracu koji ga izgovori', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
-
-    const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
-      igraci[0]!.socket.on('partija:pocetak', resolve);
-    });
-    const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
-    for (const igrac of igraci) igrac.socket.emit('red:udji');
-    const pocetak = await pocetakPromise;
-    const runda = await rundaPromise;
-
-    // odigraj stvaran lanac rijeci dok netko ne odigra rijec koja zavrsava na "ka"
-    const lanac = await pronadjiLanacDoKa(runda.trazenaSlova, new Set(await grupeRijeci(runda.rijec)));
-    expect(lanac).not.toBeNull();
-
-    let otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;
-    let igracKojiJeOmoguciKa = otvarac.token;
-    for (const rijec of lanac!) {
-      const prihvacenoPromise = cekajPrihvacenOdIgraca(otvarac.socket, otvarac.token);
-      otvarac.socket.emit('potez:rijec', { rijec });
-      const prihvaceno = await prihvacenoPromise;
-      igracKojiJeOmoguciKa = otvarac.token; // zadnji koji je odigrao rijec je taj koji "omogucuje ka"
-      otvarac = igraci.find((ig) => ig.token === prihvaceno.sljedeciId)!;
-    }
-    // otvarac je sada sljedeci na potezu nakon rijeci koja zavrsava na "ka" - on postaje sayer
-    const sayer = otvarac;
-    const promatrac = igraci.find((ig) => ig.token !== igracKojiJeOmoguciKa && ig !== sayer)!;
-
-    const zrtva = igraci.find((ig) => ig.token === igracKojiJeOmoguciKa)!;
-    const eliminacijaPromise = new Promise<Eliminacija>((resolve) => {
-      promatrac.socket.on('partija:eliminacija', resolve);
-    });
-    const obracunZrtvePromise = new Promise<{ partijaId: string; mojeIskustvo: { osvojenoIskustvo: number } }>((resolve) => {
-      zrtva.socket.once('iskustvo:obracun', resolve);
-    });
-    const stanjaPrijeRunde: StanjePartije[] = [];
-    const slusateljStanja = (stanje: StanjePartije) => {
-      stanjaPrijeRunde.push(stanje);
-    };
-    sayer.socket.on('partija:stanje', slusateljStanja);
-    const novaRundaPromise = cekajRunduOtvorenu(promatrac.socket);
-    const kaladontPrihvacen = new Promise<{ igracId: string; iskustvo?: { vrsta: string; iskustvo: number }[]; istekPotezaIso: string }>((resolve) => {
-      sayer.socket.on('potez:prihvacen', (potez) => {
-        if (potez.igracId === sayer.token && potez.rijec === 'kaladont') resolve(potez);
+    try {
+      const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
+        igraci[0]!.socket.once('partija:pocetak', resolve);
       });
-    });
+      const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
+      for (const igrac of igraci) igrac.socket.emit('red:udji');
+      const pocetak = await pocetakPromise;
+      const runda = await rundaPromise;
 
-    sayer.socket.emit('potez:rijec', { rijec: 'kaladont' });
+      // odigraj stvaran lanac rijeci dok netko ne odigra rijec koja zavrsava na "ka"
+      const lanac = await pronadjiLanacDoKa(runda.trazenaSlova, new Set(await grupeRijeci(runda.rijec)));
+      expect(lanac).not.toBeNull();
 
-    const prihvacen = await kaladontPrihvacen;
-    expect(prihvacen.iskustvo).toContainEqual(expect.objectContaining({ vrsta: 'kaladont', iskustvo: 100 }));
-    expect(prihvacen.istekPotezaIso).toBe('');
-    const eliminacija = await eliminacijaPromise;
-    expect(eliminacija.igracId).toBe(igracKojiJeOmoguciKa); // otvarac je omogucio "ka" - on ispada
-    expect(eliminacija.razlog).toBe('kaladont');
-    expect(eliminacija.bodZa).toBe(sayer.token); // bod ide onome tko je izgovorio kaladont
-    const obracunZrtve = await obracunZrtvePromise;
-    expect(obracunZrtve.partijaId).toBe(pocetak.partijaId);
-    expect(obracunZrtve.mojeIskustvo).toEqual(expect.objectContaining({ osvojenoIskustvo: expect.any(Number) }));
+      let otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;
+      let igracKojiJeOmoguciKa = otvarac.token;
+      for (const rijec of lanac!) {
+        const prihvacenoPromise = cekajPrihvacenOdIgraca(otvarac.socket, otvarac.token);
+        otvarac.socket.emit('potez:rijec', { rijec });
+        const prihvaceno = await Promise.race([
+          prihvacenoPromise,
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error(`Timeout 8000ms čekajući potez:prihvacen (${rijec})`)), 8_000);
+          }),
+        ]);
+        igracKojiJeOmoguciKa = otvarac.token; // zadnji koji je odigrao rijec je taj koji "omogucuje ka"
+        otvarac = igraci.find((ig) => ig.token === prihvaceno.sljedeciId)!;
+      }
+      // otvarac je sada sljedeci na potezu nakon rijeci koja zavrsava na "ka" - on postaje sayer
+      const sayer = otvarac;
+      const promatrac = igraci.find((ig) => ig.token !== igracKojiJeOmoguciKa && ig !== sayer)!;
 
-    const novaRunda = await novaRundaPromise;
-    sayer.socket.off('partija:stanje', slusateljStanja);
-    // Nakon eliminacije, a prije nove runde, stanje ne smije izgledati kao aktivan potez.
-    for (const snimka of stanjaPrijeRunde) {
-      const zrtvaEliminirana = snimka.eliminacije.some((e) => e.igracId === igracKojiJeOmoguciKa);
-      if (!zrtvaEliminirana || snimka.runda > runda.runda) continue;
-      expect(
-        snimka.sustavBiraRijec || !snimka.istekPotezaIso || snimka.zavrsena,
-        'partija:stanje ne smije aktivirati potez prije runde nakon kaladonta',
-      ).toBe(true);
+      const zrtva = igraci.find((ig) => ig.token === igracKojiJeOmoguciKa)!;
+      const eliminacijaPromise = cekajEventNaBiloKojem<Eliminacija>(
+        igraci.map((ig) => ig.socket),
+        'partija:eliminacija',
+        (e) => e.igracId === igracKojiJeOmoguciKa,
+        10_000,
+        `kaladont zrtva=${igracKojiJeOmoguciKa}`,
+      );
+      const obracunZrtvePromise = new Promise<{ partijaId: string; mojeIskustvo: { osvojenoIskustvo: number } }>((resolve) => {
+        zrtva.socket.once('iskustvo:obracun', resolve);
+      });
+      const stanjaPrijeRunde: StanjePartije[] = [];
+      const slusateljStanja = (stanje: StanjePartije) => {
+        stanjaPrijeRunde.push(stanje);
+      };
+      sayer.socket.on('partija:stanje', slusateljStanja);
+      const novaRundaPromise = cekajRunduOtvorenu(promatrac.socket);
+      const kaladontPrihvacen = new Promise<{ igracId: string; iskustvo?: { vrsta: string; iskustvo: number }[]; istekPotezaIso: string }>((resolve) => {
+        sayer.socket.on('potez:prihvacen', (potez) => {
+          if (potez.igracId === sayer.token && potez.rijec === 'kaladont') resolve(potez);
+        });
+      });
+
+      sayer.socket.emit('potez:rijec', { rijec: 'kaladont' });
+
+      const prihvacen = await Promise.race([
+        kaladontPrihvacen,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout 8000ms čekajući kaladont potez:prihvacen')), 8_000);
+        }),
+      ]);
+      expect(prihvacen.iskustvo).toContainEqual(expect.objectContaining({ vrsta: 'kaladont', iskustvo: 100 }));
+      expect(prihvacen.istekPotezaIso).toBe('');
+      const eliminacija = await eliminacijaPromise;
+      expect(eliminacija.igracId).toBe(igracKojiJeOmoguciKa); // otvarac je omogucio "ka" - on ispada
+      expect(eliminacija.razlog).toBe('kaladont');
+      expect(eliminacija.bodZa).toBe(sayer.token); // bod ide onome tko je izgovorio kaladont
+      const obracunZrtve = await obracunZrtvePromise;
+      expect(obracunZrtve.partijaId).toBe(pocetak.partijaId);
+      expect(obracunZrtve.mojeIskustvo).toEqual(expect.objectContaining({ osvojenoIskustvo: expect.any(Number) }));
+
+      const novaRunda = await novaRundaPromise;
+      sayer.socket.off('partija:stanje', slusateljStanja);
+      // Nakon eliminacije, a prije nove runde, stanje ne smije izgledati kao aktivan potez.
+      for (const snimka of stanjaPrijeRunde) {
+        const zrtvaEliminirana = snimka.eliminacije.some((e) => e.igracId === igracKojiJeOmoguciKa);
+        if (!zrtvaEliminirana || snimka.runda > runda.runda) continue;
+        expect(
+          snimka.sustavBiraRijec || !snimka.istekPotezaIso || snimka.zavrsena,
+          'partija:stanje ne smije aktivirati potez prije runde nakon kaladonta',
+        ).toBe(true);
+      }
+      expect(novaRunda.naPotezuId).not.toBe(igracKojiJeOmoguciKa);
+      expect(novaRunda.naPotezuId).not.toBe(sayer.token);
+      const aktivniNakonKaladonta = new Set(
+        pocetak.sjedala.map((sjedalo) => sjedalo.igracId).filter((id) => id !== igracKojiJeOmoguciKa),
+      );
+      expect(novaRunda.naPotezuId).toBe(sljedeciUKrugu(pocetak.sjedala, sayer.token, aktivniNakonKaladonta));
+
+      const stanjePromise = new Promise<StanjePartije>((resolve) => {
+        promatrac.socket.once('partija:stanje', resolve);
+      });
+      promatrac.socket.emit('partija:stanje');
+      const stanje = await stanjePromise;
+      expect(stanje.eliminacije).toContainEqual(eliminacija);
+
+      const preostali = igraci.filter((igrac) => igrac.token !== igracKojiJeOmoguciKa);
+      const pobjednik = preostali[2]!;
+      const gubitnici = preostali.slice(0, 2);
+      // Lanac do "ka" + završni DB upis lako potroše Vitest 30s; forsiraj kraj preko izadji.
+      const krajPromise = cekajEventNaBiloKojem<KrajPartije>(
+        [pobjednik.socket],
+        'partija:kraj',
+        () => true,
+        30_000,
+        `kaladont partija=${pocetak.partijaId}`,
+      );
+      for (const gubitnik of gubitnici) gubitnik.socket.emit('partija:izadji');
+      await krajPromise;
+
+      const [spremljeniKaladont] = await baza
+        .select({ nacinIspadanja: sudioniciPartije.nacinIspadanja })
+        .from(sudioniciPartije)
+        .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, igracKojiJeOmoguciKa)));
+      expect(spremljeniKaladont?.nacinIspadanja).toBe('kaladont');
+    } finally {
+      odspojiIgrace(igraci);
     }
-    expect(novaRunda.naPotezuId).not.toBe(igracKojiJeOmoguciKa);
-    expect(novaRunda.naPotezuId).not.toBe(sayer.token);
-    const aktivniNakonKaladonta = new Set(
-      pocetak.sjedala.map((sjedalo) => sjedalo.igracId).filter((id) => id !== igracKojiJeOmoguciKa),
-    );
-    expect(novaRunda.naPotezuId).toBe(sljedeciUKrugu(pocetak.sjedala, sayer.token, aktivniNakonKaladonta));
-
-    const stanjePromise = new Promise<StanjePartije>((resolve) => {
-      promatrac.socket.once('partija:stanje', resolve);
-    });
-    promatrac.socket.emit('partija:stanje');
-    const stanje = await stanjePromise;
-    expect(stanje.eliminacije).toContainEqual(eliminacija);
-
-    const preostali = igraci.filter((igrac) => igrac.token !== igracKojiJeOmoguciKa);
-    const krajPromise = new Promise<KrajPartije>((resolve) => preostali[0]!.socket.once('partija:kraj', resolve));
-    preostali[1]!.socket.disconnect();
-    preostali[2]!.socket.disconnect();
-    await krajPromise;
-
-    const [spremljeniKaladont] = await baza
-      .select({ nacinIspadanja: sudioniciPartije.nacinIspadanja })
-      .from(sudioniciPartije)
-      .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, igracKojiJeOmoguciKa)));
-    expect(spremljeniKaladont?.nacinIspadanja).toBe('kaladont');
-
-    for (const igrac of igraci) igrac.socket.disconnect();
-  });
+  }, 60_000);
 
   it('RS-22: emitira reakciju cijeloj sobi, a drugu unutar dvije sekunde tiho ignorira', async () => {
     const igraci = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca(), spojiIgraca()]);
