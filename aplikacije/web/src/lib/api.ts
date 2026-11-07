@@ -1,9 +1,9 @@
 /** Mali helper za pozive prema poslužiteljevom HTTP API-ju (Authorization: Bearer <token>). */
 import { apiUrl } from './api-url.js';
-import { dohvatiAuthToken } from './identitet.js';
+import { osigurajAuthToken } from './identitet.js';
 
 export async function api<T>(putanja: string, opcije: RequestInit = {}): Promise<T> {
-  const token = dohvatiAuthToken();
+  const token = await osigurajAuthToken();
   const odgovor = await fetch(apiUrl(putanja), {
     ...opcije,
     headers: {

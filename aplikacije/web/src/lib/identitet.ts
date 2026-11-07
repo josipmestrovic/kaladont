@@ -8,35 +8,108 @@ const KLJUC_ONBORDING_ZAVRSEN = 'kaladont_onboarding_zavrsen';
 
 export function dohvatiGostToken(): string {
   if (typeof localStorage === 'undefined') {
-    // SSR/build faza - vrati privremeni token, klijent ce ga zamijeniti u browseru
+    // SSR/build faza - privremeni; klijent koristi samo token iz gost-sesije.
     return `gost.${crypto.randomUUID().replaceAll('-', '')}`;
   }
-  const postojeci = localStorage.getItem(KLJUC_GOST_TOKEN);
-  if (postojeci) return postojeci;
-
-  const novi = `gost.${crypto.randomUUID().replaceAll('-', '')}`;
-  localStorage.setItem(KLJUC_GOST_TOKEN, novi);
-  return novi;
+  // Sync read — može biti prazan prije gost-sesije. Za HTTP/socket koristi osigurajAuthToken().
+  return localStorage.getItem(KLJUC_GOST_TOKEN) ?? '';
 }
+
+/** Gost token koji je u ovoj kartici prošao /profil (ili tek stigao iz gost-sesije). */
+let zadnjiValjaniGostToken: string | null = null;
+
+/** Vraća bearer token; nevaljani leftover gost.* se zamijeni prije HTTP/socket poziva. */
+export async function osigurajAuthToken(): Promise<string> {
+  if (typeof localStorage === 'undefined') return dohvatiAuthToken();
+  const sesijski = localStorage.getItem(KLJUC_SESIJSKI_TOKEN);
+  if (sesijski) return sesijski;
+
+  const gost = localStorage.getItem(KLJUC_GOST_TOKEN) ?? '';
+  if (gost && gost === zadnjiValjaniGostToken) return gost;
+
+  // Cache puni samo init (uspješan /profil ili novi token) — 5xx ne smije cacheirati slijepo.
+  await inicijalizirajGostSesiju();
+  return dohvatiAuthToken();
+}
+
+/**
+ * Nakon 401/neuspjelog /profil — zamijeni nevaljani gost token i uskladi socket/sandučic.
+ * `emitirajIdentitet` default true; profil loader ga gasi da ne uđe u event petlju.
+ * @returns true ako je token stvarno zamijenjen
+ */
+export async function osvjeziGostSesijuNakon401(
+  opcije: { emitirajIdentitet?: boolean } = {},
+): Promise<boolean> {
+  const emitirajIdentitet = opcije.emitirajIdentitet !== false;
+  const prije = dohvatiAuthToken();
+  zadnjiValjaniGostToken = null;
+  await inicijalizirajGostSesiju();
+  const poslije = dohvatiAuthToken();
+  if (!poslije || poslije === prije) return false;
+  if (typeof window === 'undefined') return true;
+  // Dinamički import — socket.ts već uvozi identitet (nema kružni graph na loadu).
+  const { osvjeziSocketIdentitet } = await import('./socket.js');
+  await osvjeziSocketIdentitet().catch(() => {});
+  if (emitirajIdentitet) window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
+  return true;
+}
+
+/** Jedan in-flight init — paralelni pozivi ne smiju oboje obrisati tuđi valjani token. */
+let gostSesijaUTijeku: Promise<void> | null = null;
 
 export async function inicijalizirajGostSesiju(): Promise<void> {
   if (typeof localStorage === 'undefined' || localStorage.getItem(KLJUC_SESIJSKI_TOKEN)) return;
+  if (gostSesijaUTijeku) return gostSesijaUTijeku;
 
-  const postojeci = localStorage.getItem(KLJUC_GOST_TOKEN);
-  if (postojeci?.startsWith('gost.')) {
-    const provjera = await fetch(apiUrl('/profil'), {
-      headers: { authorization: `Bearer ${postojeci}` },
-    });
-    if (provjera.ok) return;
-    if (provjera.status !== 401) throw new Error('Provjera gostujuće sesije nije uspjela.');
-    localStorage.removeItem(KLJUC_GOST_TOKEN);
-    localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
-  }
+  gostSesijaUTijeku = (async () => {
+    const postojeci = localStorage.getItem(KLJUC_GOST_TOKEN);
+    if (postojeci?.startsWith('gost.')) {
+      try {
+        const provjera = await fetch(apiUrl('/profil'), {
+          headers: { authorization: `Bearer ${postojeci}` },
+        });
+        if (provjera.ok) {
+          zadnjiValjaniGostToken = postojeci;
+          return;
+        }
+        // 401 → lokalni/nevaljani token; ostale greške — ostavi token i kasnije retryaj profil.
+        if (provjera.status !== 401) return;
+      } catch {
+        // Mreža pala — ne briši token, boot ide dalje.
+        return;
+      }
+      // Briši samo ako je još isti token — inače bi obrisali valjanu sesiju koju je drugi poziv upravo spremio.
+      if (localStorage.getItem(KLJUC_GOST_TOKEN) === postojeci) {
+        localStorage.removeItem(KLJUC_GOST_TOKEN);
+        localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
+        zadnjiValjaniGostToken = null;
+      } else {
+        return;
+      }
+    }
 
-  const odgovor = await fetch(apiUrl('/racuni/gost-sesija'), { method: 'POST' });
-  if (!odgovor.ok) throw new Error('Gostujuća sesija nije uspjela.');
-  const tijelo = (await odgovor.json()) as { token: string };
-  localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);
+    for (let pokusaj = 0; pokusaj < 3; pokusaj += 1) {
+      try {
+        const odgovor = await fetch(apiUrl('/racuni/gost-sesija'), { method: 'POST' });
+        if (!odgovor.ok) {
+          if (pokusaj < 2) await new Promise((r) => setTimeout(r, 200 * (pokusaj + 1)));
+          continue;
+        }
+        const tijelo = (await odgovor.json()) as { token?: string };
+        if (tijelo.token) {
+          localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);
+          zadnjiValjaniGostToken = tijelo.token;
+          return;
+        }
+      } catch {
+        if (pokusaj < 2) await new Promise((r) => setTimeout(r, 200 * (pokusaj + 1)));
+      }
+    }
+  })().finally(() => {
+    gostSesijaUTijeku = null;
+  });
+
+  return gostSesijaUTijeku;
 }
 
 /** Sprema nečitljivi sesijski token nakon prijave/registracije (racuni/sesije.ts na serveru). */
@@ -45,9 +118,9 @@ export function spremiSesijskiToken(token: string): void {
   localStorage.removeItem(KLJUC_GOST_TOKEN);
 }
 
+/** Samo sesijski token. Za odjavu + novi gost koristi `prijediNaGostujucuSesiju`. */
 export function obrisiSesijskiToken(): void {
   localStorage.removeItem(KLJUC_SESIJSKI_TOKEN);
-  localStorage.removeItem(KLJUC_GOST_TOKEN);
 }
 
 /** Odjavljuje račun i stvara potpuno novi gostujući identitet za samostalnu igru. */
@@ -55,6 +128,7 @@ export async function prijediNaGostujucuSesiju(): Promise<void> {
   localStorage.removeItem(KLJUC_SESIJSKI_TOKEN);
   localStorage.removeItem(KLJUC_GOST_TOKEN);
   localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
+  zadnjiValjaniGostToken = null;
   await inicijalizirajGostSesiju();
 }
 

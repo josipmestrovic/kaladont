@@ -2,13 +2,14 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
-  import { jeRegistriranKorisnik, obrisiSesijskiToken } from '$lib/identitet.js';
+  import { jeRegistriranKorisnik, prijediNaGostujucuSesiju } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import { ucitajModalIgraAsete, urlAseta } from '$lib/asetovi-core.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import Kaladont2d5d from '$lib/komponente/Kaladont2d5d.svelte';
   import KontrolePristupacnosti from '$lib/komponente/KontrolePristupacnosti.svelte';
   import PopupNovihMisija from '$lib/komponente/PopupNovihMisija.svelte';
+  import SanducicProfilZona from '$lib/komponente/SanducicProfilZona.svelte';
   import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
@@ -29,7 +30,8 @@
   async function odjaviSe() {
     if (!confirm('Jeste li sigurni da se želite odjaviti?')) return;
     await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
-    obrisiSesijskiToken();
+    // Novi gost token prije socketa/profila — prazan Bearer ostavlja avatar/sandučic mrtvim.
+    await prijediNaGostujucuSesiju();
     await osvjeziSocketIdentitet().catch(() => {});
     window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
     window.location.assign('/');
@@ -48,6 +50,7 @@
 </svelte:head>
 
 <main class="landing">
+  <SanducicProfilZona />
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <header class="landing-tekst">
       <img class="demo-oznaka" src="/slike/demo-slika.webp" alt="Demo verzija igre" width="120" height="48" />

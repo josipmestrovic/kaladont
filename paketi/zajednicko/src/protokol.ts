@@ -422,6 +422,7 @@ export interface DogadajiPosluziteljKlijent {
   'partija:kraj': (payload: KrajPartije) => void;
   'dostignuce:otkljucano': (payload: NovoDostignuceTijekomPartije) => void;
   'dostignuca:novosti': (payload: NovostiDostignuca) => void;
+  'sanducic:promjena': (payload: import('./sanducic.js').SanducicPromjena) => void;
   'iskustvo:obracun': (payload: ObracunIskustvaTijekomPartije) => void;
   'reakcija:nova': (payload: { igracId: string; poruka: BrzaPoruka }) => void;
   'soba:stvorena': (payload: { kod: string }) => void;

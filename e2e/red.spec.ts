@@ -606,16 +606,20 @@ for (const zaslon of [
         await provjeri();
         const vrijemeRezultata = Date.now();
         for (const { stranica } of igraci) {
+          // install sam ne pauzira sat. pauseAt(isti timestamp) baca „Cannot fast-forward to the past”
+          // čim sat odmakne između awaitova — pauziraj 1s unaprijed, rok rezultata = pauza + 8s.
+          const pauzaMs = vrijemeRezultata + 1_000;
           await stranica.clock.install({ time: new Date(vrijemeRezultata) });
-          await stranica.evaluate(async ({ id, vrijeme }) => {
+          await stranica.clock.pauseAt(new Date(pauzaMs));
+          await stranica.evaluate(async ({ id, rok }) => {
             const putanja = '/src/lib/socket.ts';
             const { dohvatiSocket } = await import(putanja);
             dohvatiSocket().emitEvent(['partija:kraj', {
-              partijaId: id, prikazRezultataOdIso: new Date(vrijeme + 8_000).toISOString(),
+              partijaId: id, prikazRezultataOdIso: new Date(rok).toISOString(),
               plasmani: [], mojNoviProsjek: 0, mojRang: null, mojeIskustvo: null,
               mojaOcjenaIgre: null, bonusOcjenaIgre: 0, novaDostignuca: [],
             }]);
-          }, { id: partijaId, vrijeme: vrijemeRezultata });
+          }, { id: partijaId, rok: pauzaMs + 8_000 });
           await expect(stranica.getByText(/Rezultati za:/)).toBeVisible();
         }
         await provjeri();
