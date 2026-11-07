@@ -28,13 +28,14 @@ export async function inicijalizirajGostSesiju(): Promise<void> {
       headers: { authorization: `Bearer ${postojeci}` },
     });
     if (provjera.ok) return;
-    if (provjera.status !== 401) throw new Error('Provjera gostujuće sesije nije uspjela.');
+    // 401 → novi gost; ostale greške (5xx/mreža) ne blokiraju boot — token ostaje za retry.
+    if (provjera.status !== 401) return;
     localStorage.removeItem(KLJUC_GOST_TOKEN);
     localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
   }
 
   const odgovor = await fetch(apiUrl('/racuni/gost-sesija'), { method: 'POST' });
-  if (!odgovor.ok) throw new Error('Gostujuća sesija nije uspjela.');
+  if (!odgovor.ok) return;
   const tijelo = (await odgovor.json()) as { token: string };
   localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);
 }

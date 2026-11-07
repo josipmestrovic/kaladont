@@ -91,24 +91,31 @@
     postaviPutanjuSanducica($page.url.pathname);
 
     void (async () => {
-      if (naNaslovnici) {
-        await Promise.all([
-          sesija,
-          ucitajKriticneIkone((p) => {
-            napredakBoota = p;
-          }),
-        ]);
-        // Oba odjednom — inače jedan frame bez Boota i bez children.
+      try {
+        if (naNaslovnici) {
+          await Promise.all([
+            sesija.catch(() => {
+              // Gost-sesija ne smije zauvijek držati boot (prazan ekran / Učitavanje…).
+            }),
+            ucitajKriticneIkone((p) => {
+              napredakBoota = p;
+            }),
+          ]);
+          // Oba odjednom — inače jedan frame bez Boota i bez children.
+          sesijaSpreman = true;
+          navIkoneSpremane = true;
+          ucitajPozadinskeAseteLandinga();
+          preucitajUiZvukove();
+        } else {
+          // Deep link /red ili druga ruta: nikad Boot — samo sesija, ikone u pozadini.
+          navIkoneSpremane = true;
+          await sesija.catch(() => {});
+          sesijaSpreman = true;
+          void ucitajKriticneIkone();
+        }
+      } catch {
         sesijaSpreman = true;
         navIkoneSpremane = true;
-        ucitajPozadinskeAseteLandinga();
-        preucitajUiZvukove();
-      } else {
-        // Deep link /red ili druga ruta: nikad Boot — samo sesija, ikone u pozadini.
-        navIkoneSpremane = true;
-        await sesija;
-        sesijaSpreman = true;
-        void ucitajKriticneIkone();
       }
 
       inicijalizirajGlobalneUiZvukove();

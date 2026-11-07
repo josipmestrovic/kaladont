@@ -5,7 +5,10 @@ for (const sirina of [320, 390, 1440]) {
     await page.setViewportSize({ width: sirina, height: sirina < 1000 ? 568 : 900 });
     await page.goto('/');
     const footer = page.locator('.landing-footer');
-    await expect(footer.locator('.copyright')).toHaveText('© 2026 Kaladont. Sva prava pridržana.');
+    // Boot drži children dok sesija/ikone ne završe — duži timeout umjesto racy provjere „Učitavanje…”.
+    await expect(footer.locator('.copyright')).toHaveText('© 2026 Kaladont. Sva prava pridržana.', {
+      timeout: 20_000,
+    });
     await page.evaluate(() => document.fonts.ready);
     const nav = await footer.locator('nav').boundingBox();
     const copyright = await footer.locator('.copyright').boundingBox();
@@ -20,7 +23,12 @@ for (const sirina of [320, 390, 1440]) {
     await page.screenshot({ path: podaciTesta.outputPath('footer.png') });
     await footer.getByRole('button', { name: 'Uvjeti i privatnost' }).click();
     await page.getByRole('dialog').getByRole('link', { name: 'O igri i licence' }).click();
-    await expect(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toHaveAttribute('href', 'https://creativecommons.org/licenses/by-sa/4.0/deed.hr');
+    await expect(page).toHaveURL('/o-igri');
+    await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toHaveAttribute(
+      'href',
+      'https://creativecommons.org/licenses/by-sa/4.0/deed.hr',
+    );
     await expect(page.getByRole('link', { name: 'CC BY 4.0', exact: true })).toBeVisible();
     await expect(page.getByText(/Micaha Laniera/)).toBeVisible();
     await expect(page.getByText(/The Ultimate Games Icons Library/)).toHaveCount(0);
