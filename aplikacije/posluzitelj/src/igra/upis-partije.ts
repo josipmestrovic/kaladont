@@ -325,6 +325,7 @@ export async function zakljuciPartijuUBazi(
         odigrane: 0,
         pobjede: 0,
         iskustvoUkupno: 0,
+        dovrseneIgre: 0,
         novaDostignuca: [...nova],
         dnkPrije: [],
         dnkPoslije: [],

@@ -324,28 +324,29 @@ export async function stvoriPorukuGostSazetak(ulaz: {
   igracId: string;
   jeGost: boolean;
   dovrseneNakon: number;
-  tx: TxSanducic;
+  tx?: TxSanducic;
   izvorTip: string;
   izvorId: string;
   mod?: string | null;
 }): Promise<boolean> {
   if (!ulaz.jeGost || ulaz.dovrseneNakon <= 0) return false;
+  const db = ulaz.tx ?? baza;
   const potrosenoDo = Math.floor(ulaz.dovrseneNakon / 5) * 5;
   for (let prag = 5; prag <= potrosenoDo; prag += 5) {
     const kljuc = kljucPrekretniceGostSazetak(prag);
     if (prag === ulaz.dovrseneNakon) {
       // Utrka registracija ↔ kraj igre: pri stvaranju ponovno provjeri vrstu.
-      const [stanje] = await ulaz.tx
+      const [stanje] = await db
         .select({ vrsta: igraci.vrsta })
         .from(igraci)
         .where(eq(igraci.id, ulaz.igracId));
       if (stanje?.vrsta !== 'gost') {
-        await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, ulaz.tx);
+        await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, db);
         return false;
       }
-      const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, ulaz.tx);
+      const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, db);
       if (!nova) return false;
-      const snapshot = await dohvatiSnapshotGostSazetka(ulaz.igracId, ulaz.dovrseneNakon, ulaz.tx);
+      const snapshot = await dohvatiSnapshotGostSazetka(ulaz.igracId, ulaz.dovrseneNakon, db);
       const red = await stvoriPoruku({
         igracId: ulaz.igracId,
         tip: TIP_SANDUCIC_GOST_SAZETAK_5,
@@ -357,7 +358,7 @@ export async function stvoriPorukuGostSazetak(ulaz: {
       }, { tx: ulaz.tx, emitiraj: false });
       return red != null;
     }
-    await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, ulaz.tx);
+    await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, db);
   }
   return false;
 }
@@ -365,7 +366,7 @@ export async function stvoriPorukuGostSazetak(ulaz: {
 async function dohvatiSnapshotGostSazetka(
   igracId: string,
   odigrano: number,
-  tx: TxSanducic,
+  tx: typeof baza | TxSanducic,
 ): Promise<Record<string, unknown>> {
   const [igrac] = await tx
     .select({
@@ -418,15 +419,26 @@ export async function obradiDovrsenuIgruSanducic(ulaz: {
   emitiraj?: boolean;
 }): Promise<boolean> {
   if (ulaz.jeBot) return false;
-  const db = ulaz.tx ?? baza;
+  if (!ulaz.tx) {
+    let stvorena = false;
+    await baza.transaction(async (tx) => {
+      stvorena = await obradiDovrsenuIgruSanducic({ ...ulaz, tx, emitiraj: false });
+    });
+    if (stvorena && ulaz.emitiraj !== false) {
+      emitirajPromjenuSanducica(ulaz.igracId, 'nova');
+    }
+    return stvorena;
+  }
+
+  const tx = ulaz.tx;
   const kljuc = kljucPrekretniceDovrseneIgre(ulaz.izvorTip, ulaz.izvorId);
   let dovrseneNakon = ulaz.dovrseneNakon;
   let jeGost = ulaz.jeGost;
 
   if (dovrseneNakon == null) {
-    const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, db);
+    const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, tx);
     if (!nova) return false;
-    const [azurirani] = await db
+    const [azurirani] = await tx
       .update(igraci)
       .set({ dovrseneIgre: sql`${igraci.dovrseneIgre} + 1` })
       .where(eq(igraci.id, ulaz.igracId))
@@ -435,24 +447,20 @@ export async function obradiDovrsenuIgruSanducic(ulaz: {
     dovrseneNakon = azurirani.dovrseneIgre;
     jeGost = azurirani.vrsta === 'gost';
   } else if (jeGost == null) {
-    const [red] = await db
+    const [red] = await tx
       .select({ vrsta: igraci.vrsta })
       .from(igraci)
       .where(eq(igraci.id, ulaz.igracId));
     jeGost = red?.vrsta === 'gost';
   }
 
-  const stvorena = await stvoriPorukuGostSazetak({
+  return stvoriPorukuGostSazetak({
     igracId: ulaz.igracId,
     jeGost: jeGost === true,
     dovrseneNakon,
-    tx: db,
+    tx,
     izvorTip: ulaz.izvorTip,
     izvorId: ulaz.izvorId,
     mod: ulaz.mod,
   });
-  if (stvorena && ulaz.emitiraj !== false && !ulaz.tx) {
-    emitirajPromjenuSanducica(ulaz.igracId, 'nova');
-  }
-  return stvorena;
 }
