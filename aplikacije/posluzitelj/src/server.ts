@@ -164,7 +164,11 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   };
   await app.register(cors, { origin: corsOrigin, credentials: true });
   await app.register(cookie);
-  await app.register(rateLimit, { max: 150, timeWindow: '1 minute' });
+  // Test/E2E dijeli jedan IP za desetke gost-sesija + /profil — 150/min gasi sandučic/avatar.
+  await app.register(rateLimit, {
+    max: konfiguracija.NODE_ENV === 'test' ? 2_000 : 150,
+    timeWindow: '1 minute',
+  });
   let opozoviSocketSesije: (sesijaId: string) => void = () => {};
   let opozoviSocketSesijeIgraca: (igracId: string) => void = () => {};
   let dohvatiZivoStanjeBotova: () => import('./admin/rute.js').ZivoStanjeBotova | null = () => null;

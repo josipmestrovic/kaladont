@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
+  import { inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
@@ -17,15 +18,21 @@
   let profil = $state<Profil | null>(null);
   let jeGost = $state(true);
 
-  async function ucitajProfil() {
-    try {
-      const odgovor = await api<Profil>('/profil');
-      profil = odgovor;
-      jeGost = !odgovor.email;
-    } catch {
-      profil = null;
-      jeGost = true;
+  async function ucitajProfil(pokusaji = 3) {
+    for (let i = 0; i < pokusaji; i += 1) {
+      try {
+        const odgovor = await api<Profil>('/profil');
+        profil = odgovor;
+        jeGost = !odgovor.email;
+        return;
+      } catch {
+        // Ako boot nije stigao registrirati gosta (rate limit / 5xx), pokušaj ponovo.
+        await inicijalizirajGostSesiju().catch(() => {});
+        if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+      }
     }
+    profil = null;
+    jeGost = true;
   }
 
   onMount(() => {

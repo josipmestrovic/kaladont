@@ -42,7 +42,8 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   await page.goto('/');
 
   await expect(page.locator('.header')).toHaveCount(0);
-  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible();
+  // Avatar ovisi o gost-sesiji + /profil — duži timeout zbog boot/retry pod CI opterećenjem.
+  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('link', { name: 'Obavijesti' })).toBeVisible();
   await expect(page.getByText('v0.3.0-closed-alpha.1')).toHaveCount(0);
   await expect(page.getByText('Hrvatska multiplayer igra riječi')).toHaveCount(0);
@@ -89,7 +90,7 @@ test('mobilna naslovnica skriva header i prikazuje poveznice u footeru', async (
 
   await expect(page.locator('.ilustracija')).toHaveCount(0);
   await expect(page.locator('.header')).toHaveCount(0);
-  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible();
+  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
   const footer = page.locator('.landing-footer');
   await expect(footer.getByRole('link', { name: 'O igri' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toBeVisible();

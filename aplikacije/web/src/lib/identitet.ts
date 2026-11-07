@@ -24,20 +24,37 @@ export async function inicijalizirajGostSesiju(): Promise<void> {
 
   const postojeci = localStorage.getItem(KLJUC_GOST_TOKEN);
   if (postojeci?.startsWith('gost.')) {
-    const provjera = await fetch(apiUrl('/profil'), {
-      headers: { authorization: `Bearer ${postojeci}` },
-    });
-    if (provjera.ok) return;
-    // 401 → novi gost; ostale greške (5xx/mreža) ne blokiraju boot — token ostaje za retry.
-    if (provjera.status !== 401) return;
+    try {
+      const provjera = await fetch(apiUrl('/profil'), {
+        headers: { authorization: `Bearer ${postojeci}` },
+      });
+      if (provjera.ok) return;
+      // 401 → lokalni/nevaljani token; ostale greške — ostavi token i kasnije retryaj profil.
+      if (provjera.status !== 401) return;
+    } catch {
+      // Mreža pala — ne briši token, boot ide dalje.
+      return;
+    }
     localStorage.removeItem(KLJUC_GOST_TOKEN);
     localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
   }
 
-  const odgovor = await fetch(apiUrl('/racuni/gost-sesija'), { method: 'POST' });
-  if (!odgovor.ok) return;
-  const tijelo = (await odgovor.json()) as { token: string };
-  localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);
+  for (let pokusaj = 0; pokusaj < 3; pokusaj += 1) {
+    try {
+      const odgovor = await fetch(apiUrl('/racuni/gost-sesija'), { method: 'POST' });
+      if (!odgovor.ok) {
+        if (pokusaj < 2) await new Promise((r) => setTimeout(r, 200 * (pokusaj + 1)));
+        continue;
+      }
+      const tijelo = (await odgovor.json()) as { token?: string };
+      if (tijelo.token) {
+        localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);
+        return;
+      }
+    } catch {
+      if (pokusaj < 2) await new Promise((r) => setTimeout(r, 200 * (pokusaj + 1)));
+    }
+  }
 }
 
 /** Sprema nečitljivi sesijski token nakon prijave/registracije (racuni/sesije.ts na serveru). */
