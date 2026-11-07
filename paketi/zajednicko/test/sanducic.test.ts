@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { noviKolekcionarskiPragovi } from '../src/kolekcija.js';
 import {
   hrvatskiBrojObavijesti,
+  kljucPrekretniceForme10,
+  kljucPrekretniceGostSazetak,
   renderirajSanducicPoruku,
   tekstSanducicToasta,
   tekstZavrsnogSazetka,
   TIP_SANDUCIC_DOBRODOSLICA,
+  TIP_SANDUCIC_FORMA_10,
+  TIP_SANDUCIC_GOST_SAZETAK_5,
   TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
   TIP_SANDUCIC_NOVA_XP_RAZINA,
   TIP_SANDUCIC_NOVA_ZVJEZDICA,
@@ -89,5 +93,42 @@ describe('sandučic tekstovi', () => {
     expect(noviKolekcionarskiPragovi(9, 10).map((p) => p.prag)).toEqual([10]);
     expect(noviKolekcionarskiPragovi(9, 25).map((p) => p.prag)).toEqual([10, 25]);
     expect(noviKolekcionarskiPragovi(10, 10)).toEqual([]);
+  });
+
+  it('renderira PR4 predloške (forma i gost sažetak)', () => {
+    expect(kljucPrekretniceForme10('dva_igraca', 10)).toBe('forma_10:dva_igraca:10');
+    expect(kljucPrekretniceGostSazetak(15)).toBe('gost_sazetak:15');
+
+    const dobra = renderirajSanducicPoruku(TIP_SANDUCIC_FORMA_10, {
+      mod: 'Dvoboj',
+      nazivForme: 'Dobra',
+      pobjede: 4,
+      trenutniNiz: 2,
+    });
+    expect(dobra.tekst).toContain('4 pobjede');
+    expect(dobra.tekst).toContain('Bravo');
+    expect(dobra.poveznica).toBe('/profil#statistika');
+
+    const losa = renderirajSanducicPoruku(TIP_SANDUCIC_FORMA_10, {
+      mod: 'Četveroboj',
+      nazivForme: 'Loša',
+      pobjede: 0,
+      trenutniNiz: 0,
+    });
+    expect(losa.tekst).toContain('Nova igra, nova prilika');
+
+    const gost = renderirajSanducicPoruku(TIP_SANDUCIC_GOST_SAZETAK_5, {
+      odigrano: 5,
+      pobjede: 2,
+      razina: 3,
+      brojDostignuca: 2,
+      brojZvjezdica: 3,
+    });
+    expect(gost.tekst).toContain('Odigrano: 5');
+    expect(gost.poveznica).toBe('/registracija');
+
+    const reg = renderirajSanducicPoruku(TIP_SANDUCIC_GOST_SAZETAK_5, { registriran: true });
+    expect(reg.tekst).toContain('sačuvan registracijom');
+    expect(reg.poveznica).toBeNull();
   });
 });

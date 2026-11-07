@@ -16,8 +16,15 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Traka je potpuno transparentna, bez donjeg obruba i bez sjene, tako da se vizualno stapa s pozadinom stranice.
 - Naslovnica nema zajednički header ni avatar, neovisno o širini zaslona ili vrsti korisnika.
 - **Lijevo na svim drugim stranicama s headerom:** klikabilna narančasta povratna strelica s tekstom „Nazad”, koja koristi povijest preglednika. Ako prethodna ruta nije root `/` ili nije poznata, uz nju se prikazuje `GiFastBackwardButton` s tekstom „Početna” i poveznicom na `/`. Obje akcije preslikavaju uzorak „O igri”: ikona 59 × 59 px, ukupna visina 80 px te ista veličina i težina fonta na desktopu i mobitelu.
-- **Desno:** avatar korisnika ili gosta i njegov nadimak u horizontalnom rasporedu na desktopu i mobitelu; klik vodi na `/profil`. Avatar je povećan tako da njegova visina odgovara ukupnoj visini notebook ikone i teksta „O igri”. Dugi nadimak skraćuje se elipsom umjesto širenja headera.
+- **Desno:** avatar korisnika ili gosta i njegov nadimak u horizontalnom rasporedu na desktopu i mobitelu; klik vodi na `/profil`. Uz avatar je ikona sandučica (mailbox) s crvenom točkicom dok ima nepročitanih poruka; klik vodi na `/obavijesti`. Avatar je povećan tako da njegova visina odgovara ukupnoj visini notebook ikone i teksta „O igri”. Dugi nadimak skraćuje se elipsom umjesto širenja headera.
 - **Admin:** ispod glavnog headera vidi dodatnu navigaciju sa svim admin površinama: **Rječnik**, **Prijave** i **Mišljenja korisnika**. Ta navigacija je samo pogodnost; server zasebno štiti svaku admin rutu.
+
+## Sandučic (mailbox)
+
+- Na naslovnici kompaktna zona profil + sandučic gore desno (bez ostatka header navigacije). Ulaz je isključivo ikona; nema stavke u glavnoj navigaciji ni bannera.
+- Toast „Imaš N novih obavijesti” + Pročitaj na dopuštenim ekranima; potisnut u `/red`, aktivnoj partiji i tijekom završnog odbrojavanja. Na završnom ekranu rezultata diskretan klikabilan sažetak umjesto toasta.
+- Pročitano ≠ najavljeno: nestanak toasta ne čita poruku; crvena točka prati nepročitane.
+- Viewer `/obavijesti`: lista, detalj, označi sve pročitanim; prazno i greška razdvojeni.
 
 ## Globalne obavijesti
 

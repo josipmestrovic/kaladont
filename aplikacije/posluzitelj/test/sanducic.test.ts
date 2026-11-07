@@ -6,6 +6,8 @@ import {
   TIP_SANDUCIC_DOBRODOSLICA,
   TIP_SANDUCIC_EMAIL_POTVRDEN,
   TIP_SANDUCIC_FEEDBACK,
+  TIP_SANDUCIC_FORMA_10,
+  TIP_SANDUCIC_GOST_SAZETAK_5,
   TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
   TIP_SANDUCIC_NOVA_XP_RAZINA,
   TIP_SANDUCIC_NOVA_ZVJEZDICA,
@@ -21,10 +23,13 @@ import { obrisiRacun } from '../src/racuni/brisanje.js';
 import { ocistiStareSanducicPoruke, ROK_SANDUCIC_PORUKE_MS } from '../src/sanducic/ciscenje.js';
 import {
   mozdaObavijestiPrvuIgru,
+  obradiDovrsenuIgruSanducic,
   stvoriDobrodoslicu,
   stvoriPorukeKolekcije,
   stvoriPorukeXpRazina,
   stvoriPorukeZvjezdica,
+  stvoriPorukuForme10,
+  stvoriPorukuGostSazetak,
   stvoriPorukuPotvrdeEmaila,
   stvoriPorukuPromjeneRanga,
 } from '../src/sanducic/okidaci.js';
@@ -414,5 +419,157 @@ describe('sandučic', () => {
     expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_NOVA_ZVJEZDICA)).toHaveLength(2);
     expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA)).toHaveLength(1);
     expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_PROMJENA_RANGA)).toHaveLength(1);
+  });
+
+  it('PR4: forma_10 na 10/20, baseline nižih pragova, dedupe', async () => {
+    const igrac = await noviIgrac();
+    await baza.transaction(async (tx) => {
+      expect(await stvoriPorukuForme10({
+        igracId: igrac.id,
+        mod: 'dva_igraca',
+        odigraneNakon: 9,
+        nazivForme: 'Prolazna',
+        pobjede: 2,
+        trenutniNiz: 0,
+        tx,
+        izvorId: randomUUID(),
+      })).toBe(false);
+
+      expect(await stvoriPorukuForme10({
+        igracId: igrac.id,
+        mod: 'dva_igraca',
+        odigraneNakon: 10,
+        nazivForme: 'Dobra',
+        pobjede: 4,
+        trenutniNiz: 2,
+        tx,
+        izvorId: randomUUID(),
+      })).toBe(true);
+
+      expect(await stvoriPorukuForme10({
+        igracId: igrac.id,
+        mod: 'dva_igraca',
+        odigraneNakon: 11,
+        nazivForme: 'Dobra',
+        pobjede: 4,
+        trenutniNiz: 1,
+        tx,
+        izvorId: randomUUID(),
+      })).toBe(false);
+
+      expect(await stvoriPorukuForme10({
+        igracId: igrac.id,
+        mod: 'dva_igraca',
+        odigraneNakon: 20,
+        nazivForme: 'Odlična',
+        pobjede: 6,
+        trenutniNiz: 3,
+        tx,
+        izvorId: randomUUID(),
+      })).toBe(true);
+
+      expect(await stvoriPorukuForme10({
+        igracId: igrac.id,
+        mod: 'dva_igraca',
+        odigraneNakon: 20,
+        nazivForme: 'Odlična',
+        pobjede: 6,
+        trenutniNiz: 3,
+        tx,
+        izvorId: randomUUID(),
+      })).toBe(false);
+
+      // Četveroboj zasebno; snapshot forme po prosjeku bodova (naziv u podacima).
+      expect(await stvoriPorukuForme10({
+        igracId: igrac.id,
+        mod: 'cetiri_igraca',
+        odigraneNakon: 10,
+        nazivForme: 'Dobra',
+        pobjede: 1,
+        trenutniNiz: 0,
+        tx,
+        izvorId: randomUUID(),
+      })).toBe(true);
+    });
+
+    const redovi = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
+    const forme = redovi.filter((r) => r.tip === TIP_SANDUCIC_FORMA_10);
+    expect(forme).toHaveLength(3);
+    expect(forme.find((r) => r.deduplikacijskiKljuc === 'forma_10:dva_igraca:10')?.podaci?.pobjede).toBe(4);
+    expect(forme.find((r) => r.deduplikacijskiKljuc === 'forma_10:dva_igraca:20')?.podaci?.nazivForme).toBe('Odlična');
+  });
+
+  it('PR4: gost_sazetak_5 na 5/10; registrirani i bot ne; trening claim', async () => {
+    const gost = await noviIgrac('gost');
+    const reg = await noviIgrac('registriran');
+
+    await baza.transaction(async (tx) => {
+      expect(await stvoriPorukuGostSazetak({
+        igracId: gost.id,
+        jeGost: true,
+        dovrseneNakon: 4,
+        tx,
+        izvorTip: 'trening',
+        izvorId: randomUUID(),
+      })).toBe(false);
+
+      expect(await stvoriPorukuGostSazetak({
+        igracId: gost.id,
+        jeGost: true,
+        dovrseneNakon: 5,
+        tx,
+        izvorTip: 'trening',
+        izvorId: randomUUID(),
+      })).toBe(true);
+
+      expect(await stvoriPorukuGostSazetak({
+        igracId: gost.id,
+        jeGost: true,
+        dovrseneNakon: 10,
+        tx,
+        izvorTip: 'javna',
+        izvorId: randomUUID(),
+      })).toBe(true);
+
+      expect(await stvoriPorukuGostSazetak({
+        igracId: reg.id,
+        jeGost: false,
+        dovrseneNakon: 5,
+        tx,
+        izvorTip: 'trening',
+        izvorId: randomUUID(),
+      })).toBe(false);
+    });
+
+    const treningId = randomUUID();
+    expect(await obradiDovrsenuIgruSanducic({
+      igracId: gost.id,
+      jeBot: false,
+      izvorTip: 'trening',
+      izvorId: treningId,
+    })).toBe(false); // 6. igra — nije prag
+    const [nakon] = await baza.select({ dovrseneIgre: igraci.dovrseneIgre }).from(igraci).where(eq(igraci.id, gost.id));
+    expect(nakon?.dovrseneIgre).toBe(1);
+    expect(await obradiDovrsenuIgruSanducic({
+      igracId: gost.id,
+      jeBot: false,
+      izvorTip: 'trening',
+      izvorId: treningId,
+    })).toBe(false); // retry claim
+    const [nakonRetry] = await baza.select({ dovrseneIgre: igraci.dovrseneIgre }).from(igraci).where(eq(igraci.id, gost.id));
+    expect(nakonRetry?.dovrseneIgre).toBe(1);
+
+    expect(await obradiDovrsenuIgruSanducic({
+      igracId: gost.id,
+      jeBot: true,
+      izvorTip: 'trening',
+      izvorId: randomUUID(),
+    })).toBe(false);
+
+    await stvoriDobrodoslicu(gost.id, `gost-reg-${gost.id}@example.com`);
+    const gostPoruke = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, gost.id));
+    const sazeci = gostPoruke.filter((r) => r.tip === TIP_SANDUCIC_GOST_SAZETAK_5);
+    expect(sazeci.length).toBeGreaterThanOrEqual(2);
+    expect(sazeci.every((r) => r.podaci?.registriran === true)).toBe(true);
   });
 });
