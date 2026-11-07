@@ -34,18 +34,24 @@ export async function osigurajAuthToken(): Promise<string> {
 
 /**
  * Nakon 401/neuspjelog /profil — zamijeni nevaljani gost token i uskladi socket/sandučic.
- * Bez ovoga avatar može oživjeti, a socket ostaje na NEVALJAN_TOKEN bez reconnecta.
+ * `emitirajIdentitet` default true; profil loader ga gasi da ne uđe u event petlju.
+ * @returns true ako je token stvarno zamijenjen
  */
-export async function osvjeziGostSesijuNakon401(): Promise<void> {
+export async function osvjeziGostSesijuNakon401(
+  opcije: { emitirajIdentitet?: boolean } = {},
+): Promise<boolean> {
+  const emitirajIdentitet = opcije.emitirajIdentitet !== false;
   const prije = dohvatiAuthToken();
   zadnjiValjaniGostToken = null;
   await inicijalizirajGostSesiju();
   const poslije = dohvatiAuthToken();
-  if (typeof window === 'undefined' || !poslije || poslije === prije) return;
+  if (!poslije || poslije === prije) return false;
+  if (typeof window === 'undefined') return true;
   // Dinamički import — socket.ts već uvozi identitet (nema kružni graph na loadu).
   const { osvjeziSocketIdentitet } = await import('./socket.js');
   await osvjeziSocketIdentitet().catch(() => {});
-  window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
+  if (emitirajIdentitet) window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
+  return true;
 }
 
 /** Jedan in-flight init — paralelni pozivi ne smiju oboje obrisati tuđi valjani token. */

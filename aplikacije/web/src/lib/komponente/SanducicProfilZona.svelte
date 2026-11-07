@@ -21,40 +21,40 @@
   let zakazanoUcitavanje = false;
 
   async function ucitajProfil(pokusaji = 3) {
-    // osvjeziGostSesijuNakon401 emitira identitet-promijenjen usred loada — ne dropaj taj reload.
+    // Vanjski identitet event usred loada — jedan follow-up, bez do/while petlje.
     if (ucitavanjeProfila) {
       zakazanoUcitavanje = true;
       return;
     }
     ucitavanjeProfila = true;
     try {
-      do {
-        zakazanoUcitavanje = false;
-        let uspjeh = false;
-        for (let i = 0; i < pokusaji; i += 1) {
-          try {
-            const odgovor = await api<Profil>('/profil');
-            profil = odgovor;
-            jeGost = !odgovor.email;
-            uspjeh = true;
-            break;
-          } catch {
-            // Zamjena gost tokena + socket reconnect + identitet event (sandučic/badge).
-            await osvjeziGostSesijuNakon401().catch(() => {});
-            if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+      let oporavakOdrađen = false;
+      let pokusaj = 0;
+      while (pokusaj < pokusaji) {
+        try {
+          const odgovor = await api<Profil>('/profil');
+          profil = odgovor;
+          jeGost = !odgovor.email;
+          return;
+        } catch {
+          if (!oporavakOdrađen) {
+            oporavakOdrađen = true;
+            // Bez identitet eventa — inače bismo opet ušli u ovaj loader i mintali goste u petlji.
+            await osvjeziGostSesijuNakon401({ emitirajIdentitet: false }).catch(() => {});
+            continue; // isti pokusaj brojač: jedan free retry nakon zamjene tokena
           }
+          pokusaj += 1;
+          if (pokusaj < pokusaji) await new Promise((r) => setTimeout(r, 250 * pokusaj));
         }
-        if (uspjeh) {
-          // Ovaj load već koristi novi token — ne treba još jedan krug zbog eventa.
-          zakazanoUcitavanje = false;
-          break;
-        }
-        profil = null;
-        jeGost = true;
-      } while (zakazanoUcitavanje);
+      }
+      profil = null;
+      jeGost = true;
     } finally {
       ucitavanjeProfila = false;
-      if (zakazanoUcitavanje) void ucitajProfil();
+      if (zakazanoUcitavanje) {
+        zakazanoUcitavanje = false;
+        void ucitajProfil();
+      }
     }
   }
 
