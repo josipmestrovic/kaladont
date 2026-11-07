@@ -164,7 +164,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   };
   await app.register(cors, { origin: corsOrigin, credentials: true });
   await app.register(cookie);
-  // Test/E2E dijeli jedan IP za desetke gost-sesija + /profil — 150/min gasi sandučic/avatar.
+  // U testu jedan IP radi cijeli E2E (gost-sesija + /profil po kontekstu); produkcija ostaje 150/min.
   await app.register(rateLimit, {
     max: konfiguracija.NODE_ENV === 'test' ? 2_000 : 150,
     timeWindow: '1 minute',

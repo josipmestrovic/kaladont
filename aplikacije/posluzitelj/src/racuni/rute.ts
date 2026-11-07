@@ -208,8 +208,7 @@ export async function registrirajRacuneRute(
     return { ok: true, igracId, nadimak: konacniNadimak, sesijskiToken: sesija.token };
   });
 
-  // Bez globalnog limota — svaki boot (i E2E kontekst) zove ovo; 150/min inače gasi avatar/sandučic.
-  app.post('/racuni/gost-sesija', { config: { rateLimit: false } }, async (_zahtjev, odgovor) => {
+  app.post('/racuni/gost-sesija', async (_zahtjev, odgovor) => {
     return odgovor.send({ ok: true, ...(await stvoriGostSesiju()) });
   });
 

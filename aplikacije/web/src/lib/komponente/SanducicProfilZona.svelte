@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
-  import { inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
@@ -26,8 +25,7 @@
         jeGost = !odgovor.email;
         return;
       } catch {
-        // Ako boot nije stigao registrirati gosta (rate limit / 5xx), pokušaj ponovo.
-        await inicijalizirajGostSesiju().catch(() => {});
+        // Layout već radi gost-sesiju; ovdje samo pričekaj da token stigne u storage.
         if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
       }
     }
