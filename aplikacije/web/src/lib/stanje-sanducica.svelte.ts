@@ -2,7 +2,7 @@
  * Trajni sandučic: sažetak, toast najava, ACK pročitano/najavljeno.
  * Postojeći toastovi dostignuća ostaju odvojeni.
  */
-import { tekstSanducicToasta, type SanducicPorukaSazetak, type SanducicPromjena } from 'zajednicko';
+import { tekstSanducicToasta, type SanducicPorukaSazetak } from 'zajednicko';
 import { api } from './api.js';
 import { dohvatiAuthToken } from './identitet.js';
 import { dohvatiSocket } from './socket.js';
@@ -181,7 +181,7 @@ export function pokreniSanducic(): () => void {
   putanja = window.location.pathname;
 
   const socket = dohvatiSocket();
-  const naPromjenu = (_payload: SanducicPromjena) => {
+  const naPromjenu = () => {
     void osvjeziSazetakSanducica();
   };
   const naSpoj = () => {
