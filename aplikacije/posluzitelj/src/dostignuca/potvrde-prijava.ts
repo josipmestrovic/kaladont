@@ -13,6 +13,11 @@ import type { MisijeTx } from '../misije/tipovi.js';
 import { obrisiRacunPoId, type IshodBrisanja } from '../racuni/brisanje.js';
 import { deaktivirajRijec, dodajRijec, NevaljanaRijecError, normalizirajRijecRjecnika } from '../rjecnik/administracija.js';
 import { dodijeliDoprinos } from './dodjela.js';
+import {
+  emitirajPromjeneSanducica,
+  stvoriPorukeUvazenePrijaveIgraca,
+  stvoriPorukeUvazenePrijaveRijeci,
+} from '../sanducic/okidaci.js';
 
 const RAZLOZI_PRIJAVE_IGRACA = ['pogrdan_nadimak', 'neprimjereno_ponasanje', 'drugo'] as const;
 type RazlogPrijaveIgraca = (typeof RAZLOZI_PRIJAVE_IGRACA)[number];
@@ -89,17 +94,18 @@ export async function potvrdiIspravakRjecnika(ulaz: {
   adminId: string;
   smjer: 'dodaj' | 'deaktiviraj';
 }): Promise<RezultatPotvrdeRijeci> {
-  return baza.transaction(async (tx) => {
+  let sanducicIgraci: string[] = [];
+  const rezultat = await baza.transaction(async (tx) => {
     const [prijava] = await tx.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).limit(1);
-    if (!prijava) return { ok: false, status: 404, greska: 'Prijava nije pronađena.' };
+    if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
     if (ulaz.smjer === 'dodaj' && prijava.tip !== 'za_dodavanje') {
-      return { ok: false, status: 400, greska: 'Ova prijava nije za dodavanje riječi.' };
+      return { ok: false as const, status: 400 as const, greska: 'Ova prijava nije za dodavanje riječi.' };
     }
     if (ulaz.smjer === 'deaktiviraj' && prijava.tip !== 'za_brisanje') {
-      return { ok: false, status: 400, greska: 'Ova prijava nije za brisanje riječi.' };
+      return { ok: false as const, status: 400 as const, greska: 'Ova prijava nije za brisanje riječi.' };
     }
     if (prijava.potvrdenaAkcija) {
-      return { ok: true, rijec: normalizirajRijecRjecnika(prijava.rijec), promjena: 'nema', obavijesti: [] };
+      return { ok: true as const, rijec: normalizirajRijecRjecnika(prijava.rijec), promjena: 'nema' as const, obavijesti: [] };
     }
 
     let promjena;
@@ -108,7 +114,7 @@ export async function potvrdiIspravakRjecnika(ulaz: {
         ? await dodajRijec(prijava.rijec, 'Prijava igrača — riječ dodana', ulaz.adminId, 'imenica', undefined, prijava.id, tx)
         : await deaktivirajRijec(prijava.rijec, 'Prijava igrača — riječ uklonjena', ulaz.adminId, prijava.id, tx);
     } catch (greska) {
-      if (greska instanceof NevaljanaRijecError) return { ok: false, status: 400, greska: greska.message };
+      if (greska instanceof NevaljanaRijecError) return { ok: false as const, status: 400 as const, greska: greska.message };
       throw greska;
     }
 
@@ -121,7 +127,7 @@ export async function potvrdiIspravakRjecnika(ulaz: {
           rijesioId: ulaz.adminId,
         }).where(eq(prijave.id, prijava.id));
       }
-      return { ok: true, rijec: promjena.rijec, promjena: 'nema', obavijesti: [] };
+      return { ok: true as const, rijec: promjena.rijec, promjena: 'nema' as const, obavijesti: [] };
     }
 
     const akcija = promjena.promjena;
@@ -140,6 +146,17 @@ export async function potvrdiIspravakRjecnika(ulaz: {
       izmjenaRjecnikaId: promjena.izmjenaId,
     }).where(inArray(prijave.id, ids));
 
+    const mailboxPrijavitelji = [
+      { prijavaId: prijava.id, igracId: prijava.igracId },
+      ...povezane.map((red) => ({ prijavaId: red.id, igracId: red.igracId })),
+    ];
+    sanducicIgraci = await stvoriPorukeUvazenePrijaveRijeci({
+      prijavitelji: mailboxPrijavitelji,
+      rijec: promjena.rijec,
+      smjer: ulaz.smjer,
+      tx,
+    });
+
     const prijavitelji = await kvalificiraniPrijavitelji(tx, [prijava.igracId, ...povezane.map((red) => red.igracId)]);
     const obavijesti = await nagradi(tx, prijavitelji, {
       dostignuceId: ID_DOSTIGNUCA_JEZICNI_DETEKTIV,
@@ -147,22 +164,25 @@ export async function potvrdiIspravakRjecnika(ulaz: {
       izvor: 'potvrda_prijave_rijeci',
       kontekst: { rijec: promjena.rijec },
     });
-    return { ok: true, rijec: promjena.rijec, promjena: akcija, obavijesti };
+    return { ok: true as const, rijec: promjena.rijec, promjena: akcija, obavijesti };
   });
+  if (rezultat.ok && sanducicIgraci.length > 0) emitirajPromjeneSanducica(sanducicIgraci);
+  return rezultat;
 }
 
 export async function potvrdiUklanjanjeRacuna(ulaz: {
   prijavaId: number;
   adminId: string;
 }): Promise<RezultatPotvrdeRacuna> {
-  return baza.transaction(async (tx) => {
+  let sanducicIgraci: string[] = [];
+  const rezultat = await baza.transaction(async (tx) => {
     const [prijava] = await tx.select().from(prijaveIgraca).where(eq(prijaveIgraca.id, ulaz.prijavaId)).limit(1);
-    if (!prijava) return { ok: false, status: 404, greska: 'Prijava nije pronađena.' };
+    if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
     if (prijava.prijaviteljId === prijava.prijavljeniIgracId) {
-      return { ok: false, status: 400, greska: 'Prijava samog sebe nije valjana.' };
+      return { ok: false as const, status: 400 as const, greska: 'Prijava samog sebe nije valjana.' };
     }
     if (prijava.potvrdenaAkcija) {
-      return { ok: true, ishod: 'vec-obrisan', osvjeziLjestvicu: false, obavijesti: [] };
+      return { ok: true as const, ishod: 'vec-obrisan' as const, osvjeziLjestvicu: false, obavijesti: [] };
     }
 
     const brisanje = await obrisiRacunPoId(prijava.prijavljeniIgracId, tx);
@@ -170,9 +190,9 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
       potvrdenaAkcija: prijaveIgraca.potvrdenaAkcija,
     }).from(prijaveIgraca).where(eq(prijaveIgraca.id, prijava.id)).for('update').limit(1);
 
-    if (brisanje.ishod === 'nije-pronaden') return { ok: false, status: 404, greska: 'Račun nije pronađen.' };
+    if (brisanje.ishod === 'nije-pronaden') return { ok: false as const, status: 404 as const, greska: 'Račun nije pronađen.' };
     if (brisanje.ishod === 'zasticen') {
-      return { ok: false, status: 400, greska: 'Botove i admin račune nije moguće obrisati ovim putem.' };
+      return { ok: false as const, status: 400 as const, greska: 'Botove i admin račune nije moguće obrisati ovim putem.' };
     }
     if (brisanje.ishod === 'vec-obrisan' || svjeza?.potvrdenaAkcija) {
       if (!svjeza?.potvrdenaAkcija) {
@@ -182,7 +202,7 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
           rijesioId: ulaz.adminId,
         }).where(eq(prijaveIgraca.id, prijava.id));
       }
-      return { ok: true, ishod: 'vec-obrisan', osvjeziLjestvicu: false, obavijesti: [] };
+      return { ok: true as const, ishod: 'vec-obrisan' as const, osvjeziLjestvicu: false, obavijesti: [] };
     }
 
     const razlog = jeRazlogPrijave(prijava.razlog) ? prijava.razlog : 'drugo';
@@ -194,7 +214,12 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
         potvrdenaAkcija: 'soft_brisanje',
         potvrdeniRazlog: razlog,
       }).where(eq(prijaveIgraca.id, prijava.id));
-      return { ok: true, ishod: 'obrisan', osvjeziLjestvicu: brisanje.osvjeziLjestvicu, obavijesti: [] };
+      sanducicIgraci = await stvoriPorukeUvazenePrijaveIgraca({
+        prijavitelji: [{ prijavaId: prijava.id, igracId: prijava.prijaviteljId }],
+        razlog,
+        tx,
+      });
+      return { ok: true as const, ishod: 'obrisan' as const, osvjeziLjestvicu: brisanje.osvjeziLjestvicu, obavijesti: [] };
     }
 
     const povezane = await tx.select({
@@ -215,6 +240,15 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
       potvrdeniRazlog: 'pogrdan_nadimak',
     }).where(inArray(prijaveIgraca.id, ids));
 
+    sanducicIgraci = await stvoriPorukeUvazenePrijaveIgraca({
+      prijavitelji: [
+        { prijavaId: prijava.id, igracId: prijava.prijaviteljId },
+        ...povezane.map((red) => ({ prijavaId: red.id, igracId: red.prijaviteljId })),
+      ],
+      razlog: 'pogrdan_nadimak',
+      tx,
+    });
+
     const prijavitelji = await kvalificiraniPrijavitelji(
       tx,
       [prijava.prijaviteljId, ...povezane.map((red) => red.prijaviteljId)],
@@ -226,6 +260,8 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
       izvor: 'potvrda_prijave_igraca',
       kontekst: null,
     });
-    return { ok: true, ishod: 'obrisan', osvjeziLjestvicu: brisanje.osvjeziLjestvicu, obavijesti };
+    return { ok: true as const, ishod: 'obrisan' as const, osvjeziLjestvicu: brisanje.osvjeziLjestvicu, obavijesti };
   });
+  if (rezultat.ok && sanducicIgraci.length > 0) emitirajPromjeneSanducica(sanducicIgraci);
+  return rezultat;
 }

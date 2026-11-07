@@ -81,7 +81,7 @@
     </form>
   {:else}
     <p class="napomena">
-      Na tvoju email adresu nećemo slati nikakve obavijesti, isključivo je koristimo kako bi ti omogućili pristup računu ako zaboraviš lozinku.
+      Email koristimo za potvrdu računa i oporavak lozinke. Obavijesti u igri (sandučic) ostaju unutar aplikacije — ne šaljemo marketinške emailove.
     </p>
 
     <form onsubmit={dovrsiregistraciju}>
