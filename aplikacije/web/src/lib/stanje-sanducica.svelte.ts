@@ -15,6 +15,7 @@ let toastPoruka = $state<string | null>(null);
 let toastIds = $state<string[]>([]);
 let toastAkcijaFokus = $state(false);
 let ucitavanje: Promise<void> | null = null;
+let trebaPonovnoUcitati = false;
 let pokrenuto = false;
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 let putanja = '/';
@@ -41,12 +42,17 @@ export function dohvatiStanjeSanducica() {
 
 export function postaviPutanjuSanducica(nova: string): void {
   putanja = nova;
+  if (!smijeToastati()) {
+    // Potisni vidljivi toast bez ACK-a — inače bi timer označio poruke najavljenima
+    // i one bi nestale iz završnog sažetka.
+    zatvoriToast(false, true);
+  }
   void razmotriNajavu();
 }
 
 export function postaviZavrsniEkranSanducica(aktivan: boolean): void {
   zavrsniEkranAktivan = aktivan;
-  if (aktivan) zatvoriToast(false);
+  if (aktivan) zatvoriToast(false, true);
   void razmotriNajavu();
 }
 
@@ -62,7 +68,8 @@ function ocistiLokalno(): void {
   brojNeprocitanih = 0;
   zaNajavu = [];
   lokalnoNajavljeno.clear();
-  zatvoriToast(false);
+  trebaPonovnoUcitati = false;
+  zatvoriToast(false, true);
 }
 
 export function ocistiStanjeSanducica(): void {
@@ -84,11 +91,12 @@ async function potvrdiNajavu(ids: string[]): Promise<void> {
   }
 }
 
-function zatvoriToast(potvrdi: boolean): void {
-  if (toastAkcijaFokus && potvrdi === false && toastPoruka) return;
+function zatvoriToast(potvrdi: boolean, forsiranje = false): void {
+  if (!forsiranje && toastAkcijaFokus && potvrdi === false && toastPoruka) return;
   const ids = toastIds;
   toastPoruka = null;
   toastIds = [];
+  toastAkcijaFokus = false;
   if (toastTimer !== null) {
     clearTimeout(toastTimer);
     toastTimer = null;
@@ -116,9 +124,9 @@ function pokaziToast(poruke: SanducicPorukaSazetak[]): void {
 }
 
 async function razmotriNajavu(): Promise<void> {
+  if (!smijeToastati()) return;
   const kandidati = zaNajavu.filter((p) => !lokalnoNajavljeno.has(p.id));
   if (kandidati.length === 0) return;
-  if (!smijeToastati()) return;
   if (toastPoruka) return;
   pokaziToast(kandidati);
 }
@@ -139,21 +147,31 @@ export async function osvjeziSazetakSanducica(): Promise<void> {
     ocistiLokalno();
     return;
   }
-  if (ucitavanje) return ucitavanje;
+  if (ucitavanje) {
+    // Ne gubi događaje koji stignu usred GET-a — nakon završetka ponovi dohvat.
+    trebaPonovnoUcitati = true;
+    return ucitavanje;
+  }
+
   ucitavanje = (async () => {
-    try {
-      const odgovor = await api<{ ok: true; brojNeprocitanih: number; zaNajavu: SanducicPorukaSazetak[] }>(
-        '/sanducic/sazetak',
-      );
-      brojNeprocitanih = odgovor.brojNeprocitanih;
-      zaNajavu = odgovor.zaNajavu.filter((p) => !lokalnoNajavljeno.has(p.id));
-      await razmotriNajavu();
-    } catch {
-      // Sandučic nije kritičan za igru.
-    } finally {
-      ucitavanje = null;
-    }
-  })();
+    do {
+      trebaPonovnoUcitati = false;
+      try {
+        const odgovor = await api<{ ok: true; brojNeprocitanih: number; zaNajavu: SanducicPorukaSazetak[] }>(
+          '/sanducic/sazetak',
+        );
+        brojNeprocitanih = odgovor.brojNeprocitanih;
+        zaNajavu = odgovor.zaNajavu.filter((p) => !lokalnoNajavljeno.has(p.id));
+        await razmotriNajavu();
+      } catch {
+        // Sandučic nije kritičan za igru.
+      }
+    } while (trebaPonovnoUcitati);
+  })().finally(() => {
+    ucitavanje = null;
+    if (trebaPonovnoUcitati) void osvjeziSazetakSanducica();
+  });
+
   return ucitavanje;
 }
 

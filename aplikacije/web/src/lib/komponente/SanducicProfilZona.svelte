@@ -48,7 +48,7 @@
   <div class="sanducic-profil-traka">
     <div class="sanducic-profil-zona" aria-label="Profil i obavijesti">
       <SanducicIkona velicina={44} />
-      <a href="/profil" class="profil-link" aria-label="Moj profil, {profil.nadimak}">
+      <a href="/profil" class="profil-link" aria-label="Profil: {profil.nadimak}">
         <Avatar
           avatarId={profil.avatarId}
           avatarConfig={profil.avatarConfig}
