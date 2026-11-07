@@ -42,6 +42,8 @@ import {
   type RazlogEliminacije,
   type NacinIspadanja,
   kolekcijskiKljucGrupe,
+  kolekcionarskaRazina,
+  PRAGOVI_KOLEKCIONARSKE_RAZINE,
   osnovnaRijecIzGrupe,
   type PocetakPartije,
   type PrihvacenPotez,
@@ -91,18 +93,6 @@ const ODGODA_POCETKA_PRIVATNE_PARTIJE_MS = 0;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
 const POCETNI_ODMAK_RETRYJA_REZULTATA_MS = 1_000;
 const MAKSIMALNI_ODMAK_RETRYJA_REZULTATA_MS = 30_000;
-const PRAGOVI_KOLEKCIONARSKE_RAZINE = [
-  { prag: 0, naziv: 'Početnik' },
-  { prag: 10, naziv: 'Prvi koraci' },
-  { prag: 25, naziv: 'Sakupljač' },
-  { prag: 50, naziv: 'Tragač' },
-  { prag: 100, naziv: 'Poznavatelj' },
-  { prag: 250, naziv: 'Lovac na riječi' },
-  { prag: 500, naziv: 'Kolekcionar' },
-  { prag: 1_000, naziv: 'Veliki kolekcionar' },
-  { prag: 2_500, naziv: 'Majstor riječi' },
-  { prag: 10_000, naziv: 'Legenda rječnika' },
-] as const;
 const SOBA_PARTIJE = (partijaId: string) => `partija:${partijaId}`;
 
 export interface SudionikPartije {
@@ -466,7 +456,7 @@ export function stvoriUpraviteljPartija(
   }
 
   async function ucitajGrupeZaDostignuca(igraciPartije: readonly SudionikPartije[]): Promise<Map<string, Set<string>>> {
-    const igracIds = igraciPartije.filter((igrac) => igrac.vrsta !== 'gost').map((igrac) => igrac.igracId);
+    const igracIds = igraciPartije.filter((igrac) => igrac.upravljac === 'covjek').map((igrac) => igrac.igracId);
     const retci = igracIds.length ? await baza.select({ igracId: otkljucaneGrupeIgraca.igracId, grupa: otkljucaneGrupeIgraca.grupa })
       .from(otkljucaneGrupeIgraca)
       .where(and(inArray(otkljucaneGrupeIgraca.igracId, igracIds), eq(otkljucaneGrupeIgraca.zaDostignuca, true))) : [];
@@ -500,7 +490,7 @@ export function stvoriUpraviteljPartija(
   }
 
   async function ucitajNapredakDostignuca(igraciPartije: readonly SudionikPartije[]): Promise<Map<string, Record<string, number>>> {
-    const igracIds = igraciPartije.filter((igrac) => igrac.vrsta !== 'gost').map((igrac) => igrac.igracId);
+    const igracIds = igraciPartije.filter((igrac) => igrac.upravljac === 'covjek').map((igrac) => igrac.igracId);
     const retci = igracIds.length === 0 ? [] : await baza
       .select()
       .from(napredakDostignucaIgraca)
@@ -542,7 +532,7 @@ export function stvoriUpraviteljPartija(
   function dodajNapredakDostignuca(stanje: StanjeStola, igracId: string, napredak: DeltaNapretkaDostignuca): void {
     if (!stanje.politika.dajeDostignucaIKolekcije) return;
     const sudionik = stanje.sudionici.find((s) => s.igracId === igracId);
-    if (!sudionik || sudionik.vrsta === 'gost') return;
+    if (!sudionik || sudionik.upravljac !== 'covjek') return;
     const postojeci = stanje.napredakDostignuca.get(igracId) ?? {};
     for (const [kljuc, vrijednost] of Object.entries(napredak) as [keyof DeltaNapretkaDostignuca, number | undefined][]) {
       if (vrijednost === undefined) continue;
@@ -558,7 +548,7 @@ export function stvoriUpraviteljPartija(
 
   function najaviNovaDostignuca(stanje: StanjeStola, igracId: string): void {
     if (!stanje.politika.dajeDostignucaIKolekcije) return;
-    if (stanje.sudionici.find((s) => s.igracId === igracId)?.vrsta === 'gost') return;
+    if (stanje.sudionici.find((s) => s.igracId === igracId)?.upravljac !== 'covjek') return;
     const prije = stanje.napredakDostignucaPrije.get(igracId) ?? {};
     const delta = stanje.napredakDostignuca.get(igracId) ?? {};
     const razinaIskustva = stanje.sudionici.find((s) => s.igracId === igracId)?.razina ?? 0;
@@ -609,8 +599,7 @@ export function stvoriUpraviteljPartija(
       });
     }
     const ukupnoOtkljucano = trenutniKljuc.size;
-    let trenutna: (typeof PRAGOVI_KOLEKCIONARSKE_RAZINE)[number] = PRAGOVI_KOLEKCIONARSKE_RAZINE[0]!;
-    for (const prag of PRAGOVI_KOLEKCIONARSKE_RAZINE) if (ukupnoOtkljucano >= prag.prag) trenutna = prag;
+    const trenutna = kolekcionarskaRazina(ukupnoOtkljucano);
     const sljedeci = PRAGOVI_KOLEKCIONARSKE_RAZINE.find((prag) => prag.prag > ukupnoOtkljucano) ?? null;
     const dodaneKategorije = [...novePoVrsti.entries()]
       .filter(([vrsta]) => vrsta !== 'pridjev' && vrsta !== 'prilog')
@@ -1163,7 +1152,7 @@ export function stvoriUpraviteljPartija(
         async () => {
           type NagradaTreninga = Awaited<ReturnType<typeof zabiljeziPobjeduTreninga>>;
           let nagrada: NagradaTreninga = null;
-          if (pobjednik?.upravljac === 'covjek' && pobjednik.vrsta !== 'gost') {
+          if (pobjednik?.upravljac === 'covjek') {
             try {
               const statistika = stanje.statistikeRijeci.get(pobjednikId);
               nagrada = await zabiljeziPobjeduTreninga(stanje.partijaId, pobjednikId, zavrsenoU, {
@@ -1828,7 +1817,7 @@ export function stvoriUpraviteljPartija(
     const prethodniNapadacId = stanje.napadacId;
     const sudionik = stanje.sudionici.find((stavka) => stavka.igracId === igracId);
     const gamifikacijaAktivna = stanje.politika.dajeDostignucaIKolekcije;
-    const kolekcijaAktivna = gamifikacijaAktivna || (stanje.politika.zapisujeKolekcijuTreninga && sudionik?.upravljac === 'covjek' && sudionik.vrsta !== 'gost');
+    const kolekcijaAktivna = gamifikacijaAktivna || (stanje.politika.zapisujeKolekcijuTreninga && sudionik?.upravljac === 'covjek');
     const trenutniStreak = gamifikacijaAktivna ? (stanje.streakovi.get(igracId) ?? 0) + 1 : 0;
     if (stanje.kontekst === 'trening' && sudionik?.upravljac === 'covjek') zakaziNeaktivnostTreninga(stanje);
     if (gamifikacijaAktivna) stanje.streakovi.set(igracId, trenutniStreak);

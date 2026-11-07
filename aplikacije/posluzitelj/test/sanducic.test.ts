@@ -6,6 +6,10 @@ import {
   TIP_SANDUCIC_DOBRODOSLICA,
   TIP_SANDUCIC_EMAIL_POTVRDEN,
   TIP_SANDUCIC_FEEDBACK,
+  TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
+  TIP_SANDUCIC_NOVA_XP_RAZINA,
+  TIP_SANDUCIC_NOVA_ZVJEZDICA,
+  TIP_SANDUCIC_PROMJENA_RANGA,
   TIP_SANDUCIC_PRVA_IGRA,
   TIP_SANDUCIC_TEST,
 } from 'zajednicko';
@@ -18,7 +22,11 @@ import { ocistiStareSanducicPoruke, ROK_SANDUCIC_PORUKE_MS } from '../src/sanduc
 import {
   mozdaObavijestiPrvuIgru,
   stvoriDobrodoslicu,
+  stvoriPorukeKolekcije,
+  stvoriPorukeXpRazina,
+  stvoriPorukeZvjezdica,
   stvoriPorukuPotvrdeEmaila,
+  stvoriPorukuPromjeneRanga,
 } from '../src/sanducic/okidaci.js';
 import {
   dohvatiSazetak,
@@ -314,5 +322,97 @@ describe('sandučic', () => {
     expect(odgovor.status).toBe(200);
     const redovi = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
     expect(redovi.some((r) => r.tip === TIP_SANDUCIC_FEEDBACK)).toBe(true);
+  });
+
+  it('PR3: XP/zvjezdica/kolekcija dedupe + lazy baseline; rang po partiji', async () => {
+    const igrac = await noviIgrac();
+    const baseline = await noviIgrac();
+    await baza.transaction(async (tx) => {
+      const xpPrvi = await stvoriPorukeXpRazina({
+        igracId: igrac.id,
+        razinaPrije: 1,
+        razinaPoslije: 3,
+        tx,
+      });
+      expect(xpPrvi).toBe(2);
+      const xpPonovo = await stvoriPorukeXpRazina({
+        igracId: igrac.id,
+        razinaPrije: 1,
+        razinaPoslije: 3,
+        tx,
+      });
+      expect(xpPonovo).toBe(0);
+
+      const xpBaseline = await stvoriPorukeXpRazina({
+        igracId: baseline.id,
+        razinaPrije: 5,
+        razinaPoslije: 6,
+        tx,
+      });
+      expect(xpBaseline).toBe(1);
+      const prekretnice = await tx.select().from(sanducicPrekretnice).where(eq(sanducicPrekretnice.igracId, baseline.id));
+      expect(prekretnice.some((r) => r.kljuc === 'xp_razina:5')).toBe(true);
+      expect(prekretnice.some((r) => r.kljuc === 'xp_razina:6')).toBe(true);
+
+      const zvijezde = await stvoriPorukeZvjezdica({
+        igracId: igrac.id,
+        dostignuceId: 'zagrijan',
+        staraRazina: 0,
+        novaRazina: 2,
+        tx,
+      });
+      expect(zvijezde).toBe(2);
+      const zvijezdePonovo = await stvoriPorukeZvjezdica({
+        igracId: igrac.id,
+        dostignuceId: 'zagrijan',
+        staraRazina: 0,
+        novaRazina: 2,
+        tx,
+      });
+      expect(zvijezdePonovo).toBe(0);
+
+      const kolekcija = await stvoriPorukeKolekcije({
+        igracId: igrac.id,
+        brojPrije: 9,
+        brojPoslije: 10,
+        tx,
+      });
+      expect(kolekcija).toBe(1);
+      const kolekcijaPonovo = await stvoriPorukeKolekcije({
+        igracId: igrac.id,
+        brojPrije: 9,
+        brojPoslije: 10,
+        tx,
+      });
+      expect(kolekcijaPonovo).toBe(0);
+
+      const partijaId = randomUUID();
+      const rang = await stvoriPorukuPromjeneRanga({
+        igracId: igrac.id,
+        mod: 'dva_igraca',
+        rangPrije: 'Početnik',
+        rangPoslije: 'Piskaralo',
+        napredak: true,
+        tx,
+        izvorId: partijaId,
+      });
+      expect(rang).toBe(true);
+      const rangPonovo = await stvoriPorukuPromjeneRanga({
+        igracId: igrac.id,
+        mod: 'dva_igraca',
+        rangPrije: 'Početnik',
+        rangPoslije: 'Piskaralo',
+        napredak: true,
+        tx,
+        izvorId: partijaId,
+      });
+      expect(rangPonovo).toBe(false);
+    });
+
+    const redovi = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
+    expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_NOVA_XP_RAZINA)).toHaveLength(2);
+    expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_NOVA_ZVJEZDICA)).toHaveLength(2);
+    expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA)).toHaveLength(1);
+    expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_PROMJENA_RANGA)).toHaveLength(1);
   });
 });

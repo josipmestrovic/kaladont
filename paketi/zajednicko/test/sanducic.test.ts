@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { noviKolekcionarskiPragovi } from '../src/kolekcija.js';
 import {
   hrvatskiBrojObavijesti,
   renderirajSanducicPoruku,
   tekstSanducicToasta,
   tekstZavrsnogSazetka,
   TIP_SANDUCIC_DOBRODOSLICA,
+  TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
+  TIP_SANDUCIC_NOVA_XP_RAZINA,
+  TIP_SANDUCIC_NOVA_ZVJEZDICA,
   TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA,
+  TIP_SANDUCIC_PROMJENA_RANGA,
   TIP_SANDUCIC_PRVA_IGRA,
 } from '../src/sanducic.js';
 
@@ -38,5 +43,51 @@ describe('sandučic tekstovi', () => {
       razlog: 'pogrdan_nadimak',
     });
     expect(nadimak.tekst).toContain('vulgarni nadimak');
+  });
+
+  it('renderira PR3 predloške (XP, zvjezdica, kolekcija, rang)', () => {
+    const xp = renderirajSanducicPoruku(TIP_SANDUCIC_NOVA_XP_RAZINA, { razina: 3 });
+    expect(xp.tekst).toContain('LVL 3');
+    expect(xp.poveznica).toBe('/profil');
+
+    const prvaZvijezda = renderirajSanducicPoruku(TIP_SANDUCIC_NOVA_ZVJEZDICA, {
+      naziv: 'Zagrijan',
+      zvjezdice: 1,
+    });
+    expect(prvaZvijezda.naslov).toBe('Novo dostignuće!');
+    expect(prvaZvijezda.tekst).toContain('Zagrijan');
+
+    const novaZvijezda = renderirajSanducicPoruku(TIP_SANDUCIC_NOVA_ZVJEZDICA, {
+      naziv: 'Zagrijan',
+      zvjezdice: 2,
+    });
+    expect(novaZvijezda.naslov).toBe('Nova zvjezdica!');
+    expect(novaZvijezda.tekst).toContain('2 zvjezdice');
+
+    const kolekcija = renderirajSanducicPoruku(TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA, {
+      naziv: 'Prvi koraci',
+    });
+    expect(kolekcija.tekst).toContain('Prvi koraci');
+
+    const napredak = renderirajSanducicPoruku(TIP_SANDUCIC_PROMJENA_RANGA, {
+      mod: 'Dvoboj',
+      rang: 'Piskaralo',
+      napredak: true,
+    });
+    expect(napredak.naslov).toBe('Novi rang!');
+    expect(napredak.tekst).toContain('Dvoboj');
+
+    const pad = renderirajSanducicPoruku(TIP_SANDUCIC_PROMJENA_RANGA, {
+      mod: 'Četveroboj',
+      rang: 'Početnik',
+      napredak: false,
+    });
+    expect(pad.naslov).toBe('Promjena ranga');
+  });
+
+  it('računa nove kolekcionarske pragove', () => {
+    expect(noviKolekcionarskiPragovi(9, 10).map((p) => p.prag)).toEqual([10]);
+    expect(noviKolekcionarskiPragovi(9, 25).map((p) => p.prag)).toEqual([10, 25]);
+    expect(noviKolekcionarskiPragovi(10, 10)).toEqual([]);
   });
 });

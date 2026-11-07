@@ -12,6 +12,8 @@ import {
   izracunajRazinuDostignuca,
   jeDostignuceNovo,
   kolekcijskiKljucGrupe,
+  kolekcionarskaRazina,
+  PRAGOVI_KOLEKCIONARSKE_RAZINE,
   osnovnaRijecIzGrupe,
   stanjeIskustva,
   bonusPobjednickogNiza,
@@ -79,19 +81,6 @@ const MAKSIMALNO_POTEZA_PO_STRANICI = 500;
 const ZIVOTNI_VIJEK_TOP_RIJECI_MS = 30_000;
 const MAKSIMALNO_PARTIJA_PO_STRANICI = 20;
 const MAKSIMALNO_RIJECI_PO_STRANICI = 50;
-const PRAGOVI_KOLEKCIONARSKE_RAZINE = [
-  { prag: 0, naziv: 'Početnik' },
-  { prag: 10, naziv: 'Prvi koraci' },
-  { prag: 25, naziv: 'Sakupljač' },
-  { prag: 50, naziv: 'Tragač' },
-  { prag: 100, naziv: 'Poznavatelj' },
-  { prag: 250, naziv: 'Lovac na riječi' },
-  { prag: 500, naziv: 'Kolekcionar' },
-  { prag: 1_000, naziv: 'Veliki kolekcionar' },
-  { prag: 2_500, naziv: 'Majstor riječi' },
-  { prag: 10_000, naziv: 'Legenda rječnika' },
-] as const;
-
 type TopRijeciCache = {
   stvoreno: number;
   retci: { rijec: string | null; brojUpotreba: number }[];
@@ -314,11 +303,8 @@ function javnaStatistika(statistika: Awaited<ReturnType<typeof dohvatiStatistiku
   };
 }
 
-function kolekcionarskaRazina(otkljucano: number, ukupno: number) {
-  let trenutna: (typeof PRAGOVI_KOLEKCIONARSKE_RAZINE)[number] = PRAGOVI_KOLEKCIONARSKE_RAZINE[0]!;
-  for (const prag of PRAGOVI_KOLEKCIONARSKE_RAZINE) {
-    if (otkljucano >= prag.prag) trenutna = prag;
-  }
+function opisKolekcionarskeRazine(otkljucano: number, ukupno: number) {
+  const trenutna = kolekcionarskaRazina(otkljucano);
   const sljedeci = PRAGOVI_KOLEKCIONARSKE_RAZINE.find((prag) => prag.prag > otkljucano) ?? null;
   return {
     naziv: trenutna.naziv,
@@ -357,7 +343,7 @@ async function dohvatiKolekciju(igracId: string, rjecnik: RjecnikUMemoriji) {
   return {
     ukupnoOtkljucano: ukupno,
     ukupnoDostupno: rjecnik.brojKolekcijskihGrupa(),
-    kolekcionarskaRazina: kolekcionarskaRazina(ukupno, rjecnik.brojKolekcijskihGrupa()),
+    kolekcionarskaRazina: opisKolekcionarskeRazine(ukupno, rjecnik.brojKolekcijskihGrupa()),
     posebneKategorije: {
       duge: { otkljucano: obliciDugi, ukupno: rjecnik.brojDugihOblika(), otkljucanoPoTieru: obliciDugiPoTieru, ukupnoPoTieru: rjecnik.brojDugihOblikaPoTieru() },
       rijetke: { otkljucano: obliciRijetki, ukupno: rjecnik.brojRijetkihOblika(), otkljucanoPoTieru: obliciRijetkiPoTieru, ukupnoPoTieru: rjecnik.brojRijetkihOblikaPoTieru() },
