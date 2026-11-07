@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
+  import { osvjeziGostSesijuNakon401 } from '$lib/identitet.js';
   import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
@@ -20,12 +21,13 @@
   async function ucitajProfil(pokusaji = 3) {
     for (let i = 0; i < pokusaji; i += 1) {
       try {
-        // api() zove osigurajAuthToken — nema praznog Bearera nakon odjave.
         const odgovor = await api<Profil>('/profil');
         profil = odgovor;
         jeGost = !odgovor.email;
         return;
       } catch {
+        // Nevaljani leftover gost.* inače ostaje u osigurajAuthToken cacheu.
+        await osvjeziGostSesijuNakon401().catch(() => {});
         if (i < pokusaji - 1) await new Promise((r) => setTimeout(r, 250 * (i + 1)));
       }
     }

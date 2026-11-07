@@ -15,12 +15,27 @@ export function dohvatiGostToken(): string {
   return localStorage.getItem(KLJUC_GOST_TOKEN) ?? '';
 }
 
-/** Vraća bearer token; ako nema sesije, prvo registrira gosta na poslužitelju. */
+/** Gost token koji je u ovoj kartici prošao /profil (ili tek stigao iz gost-sesije). */
+let zadnjiValjaniGostToken: string | null = null;
+
+/** Vraća bearer token; nevaljani leftover gost.* se zamijeni prije HTTP/socket poziva. */
 export async function osigurajAuthToken(): Promise<string> {
-  const postojeci = dohvatiAuthToken();
-  if (postojeci) return postojeci;
+  if (typeof localStorage === 'undefined') return dohvatiAuthToken();
+  const sesijski = localStorage.getItem(KLJUC_SESIJSKI_TOKEN);
+  if (sesijski) return sesijski;
+
+  const gost = localStorage.getItem(KLJUC_GOST_TOKEN) ?? '';
+  if (gost && gost === zadnjiValjaniGostToken) return gost;
+
+  // Cache puni samo init (uspješan /profil ili novi token) — 5xx ne smije cacheirati slijepo.
   await inicijalizirajGostSesiju();
   return dohvatiAuthToken();
+}
+
+/** Nakon 401/neuspjelog /profil — zaboravi cache da idući osigurajAuthToken ponovo validira. */
+export async function osvjeziGostSesijuNakon401(): Promise<void> {
+  zadnjiValjaniGostToken = null;
+  await inicijalizirajGostSesiju();
 }
 
 /** Jedan in-flight init — paralelni pozivi ne smiju oboje obrisati tuđi valjani token. */
@@ -37,7 +52,10 @@ export async function inicijalizirajGostSesiju(): Promise<void> {
         const provjera = await fetch(apiUrl('/profil'), {
           headers: { authorization: `Bearer ${postojeci}` },
         });
-        if (provjera.ok) return;
+        if (provjera.ok) {
+          zadnjiValjaniGostToken = postojeci;
+          return;
+        }
         // 401 → lokalni/nevaljani token; ostale greške — ostavi token i kasnije retryaj profil.
         if (provjera.status !== 401) return;
       } catch {
@@ -48,6 +66,7 @@ export async function inicijalizirajGostSesiju(): Promise<void> {
       if (localStorage.getItem(KLJUC_GOST_TOKEN) === postojeci) {
         localStorage.removeItem(KLJUC_GOST_TOKEN);
         localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
+        zadnjiValjaniGostToken = null;
       } else {
         return;
       }
@@ -63,6 +82,7 @@ export async function inicijalizirajGostSesiju(): Promise<void> {
         const tijelo = (await odgovor.json()) as { token?: string };
         if (tijelo.token) {
           localStorage.setItem(KLJUC_GOST_TOKEN, tijelo.token);
+          zadnjiValjaniGostToken = tijelo.token;
           return;
         }
       } catch {
@@ -92,6 +112,7 @@ export async function prijediNaGostujucuSesiju(): Promise<void> {
   localStorage.removeItem(KLJUC_SESIJSKI_TOKEN);
   localStorage.removeItem(KLJUC_GOST_TOKEN);
   localStorage.removeItem(KLJUC_ONBORDING_ZAVRSEN);
+  zadnjiValjaniGostToken = null;
   await inicijalizirajGostSesiju();
 }
 
