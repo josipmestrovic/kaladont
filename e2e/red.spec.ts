@@ -606,7 +606,10 @@ for (const zaslon of [
         await provjeri();
         const vrijemeRezultata = Date.now();
         for (const { stranica } of igraci) {
+          // install sam ne pauzira sat — bez pauseAt vrijeme ide dalje dok traju expect/screenshot,
+          // a sandučic timeri/fetchevi to dodatno usporavaju pa fastForward(3s) pogodi 1–2 umjesto 5.
           await stranica.clock.install({ time: new Date(vrijemeRezultata) });
+          await stranica.clock.pauseAt(new Date(vrijemeRezultata));
           await stranica.evaluate(async ({ id, vrijeme }) => {
             const putanja = '/src/lib/socket.ts';
             const { dohvatiSocket } = await import(putanja);

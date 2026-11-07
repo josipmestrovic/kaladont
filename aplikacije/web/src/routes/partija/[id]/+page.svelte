@@ -821,8 +821,8 @@
     const aktivan = Boolean(stanje.kraj && prikaziRezultate);
     postaviZavrsniEkranSanducica(aktivan);
     if (!aktivan) {
-      brojSanducicSazetka = 0;
-      zavrsniSazetakPotvrden = false;
+      if (brojSanducicSazetka !== 0) brojSanducicSazetka = 0;
+      if (zavrsniSazetakPotvrden) zavrsniSazetakPotvrden = false;
       return;
     }
     // Reaktivno na osvježen sažetak (npr. poruke stigle tijekom igre).

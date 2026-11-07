@@ -51,9 +51,10 @@ export function postaviPutanjuSanducica(nova: string): void {
 }
 
 export function postaviZavrsniEkranSanducica(aktivan: boolean): void {
+  if (zavrsniEkranAktivan === aktivan) return;
   zavrsniEkranAktivan = aktivan;
   if (aktivan) zatvoriToast(false, true);
-  void razmotriNajavu();
+  else void razmotriNajavu();
 }
 
 function smijeToastati(): boolean {

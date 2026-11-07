@@ -182,7 +182,9 @@
 
   .status-obavijesti :global(.veza-obavijest),
   .status-obavijesti :global(.obavijest-citanja-naglas),
-  .status-obavijesti :global(.red-dostignuca) {
+  .status-obavijesti :global(.red-dostignuca),
+  .status-obavijesti :global(.sanducic-toast),
+  .status-obavijesti :global(.uspjeh-obavijest) {
     position: relative;
     inset: auto;
     width: 100%;
