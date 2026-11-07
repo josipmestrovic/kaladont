@@ -127,7 +127,13 @@ async function razmotriNajavu(): Promise<void> {
   if (!smijeToastati()) return;
   const kandidati = zaNajavu.filter((p) => !lokalnoNajavljeno.has(p.id));
   if (kandidati.length === 0) return;
-  if (toastPoruka) return;
+  if (toastPoruka) {
+    // Proširi već otvoreni paket da ACK na zatvaranje pokrije i kasnije ID-eve.
+    const poznati = new Set(toastIds);
+    if (kandidati.every((p) => poznati.has(p.id)) && kandidati.length === toastIds.length) return;
+    pokaziToast(kandidati);
+    return;
+  }
   pokaziToast(kandidati);
 }
 
@@ -162,11 +168,12 @@ export async function osvjeziSazetakSanducica(): Promise<void> {
         );
         brojNeprocitanih = odgovor.brojNeprocitanih;
         zaNajavu = odgovor.zaNajavu.filter((p) => !lokalnoNajavljeno.has(p.id));
-        await razmotriNajavu();
       } catch {
         // Sandučic nije kritičan za igru.
       }
     } while (trebaPonovnoUcitati);
+    // Najavu tek nakon konačnog sažetka — inače prvi prolaz otvori toast, a kasniji ID-evi ostanu van ACK-a.
+    await razmotriNajavu();
   })().finally(() => {
     ucitavanje = null;
     if (trebaPonovnoUcitati) void osvjeziSazetakSanducica();

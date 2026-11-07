@@ -34,7 +34,8 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   await page.goto('/');
 
   await expect(page.locator('.header')).toHaveCount(0);
-  await expect(page.locator('.avatar')).toHaveCount(0);
+  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Obavijesti' })).toBeVisible();
   await expect(page.getByText('v0.3.0-closed-alpha.1')).toHaveCount(0);
   await expect(page.getByText('Hrvatska multiplayer igra riječi')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'KALADONT online' })).toBeVisible();
@@ -80,7 +81,7 @@ test('mobilna naslovnica skriva header i prikazuje poveznice u footeru', async (
 
   await expect(page.locator('.ilustracija')).toHaveCount(0);
   await expect(page.locator('.header')).toHaveCount(0);
-  await expect(page.locator('.avatar')).toHaveCount(0);
+  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible();
   const footer = page.locator('.landing-footer');
   await expect(footer.getByRole('link', { name: 'O igri' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toBeVisible();
@@ -149,7 +150,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await expect(page).toHaveURL('/');
 
   await page.getByRole('link', { name: 'Pravila' }).click();
-  await page.getByRole('link', { name: 'Moj profil' }).click();
+  await page.getByRole('banner').getByRole('link', { name: 'Moj profil' }).click();
   await expect(page).toHaveURL('/profil');
   const pocetna = page.getByRole('link', { name: 'Početna' });
   await expect(pocetna).toBeVisible();

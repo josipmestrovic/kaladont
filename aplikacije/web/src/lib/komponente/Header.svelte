@@ -98,7 +98,7 @@
           <a
             href="/profil"
             class="profil-link"
-            aria-label="Profil: {profil.nadimak}"
+            aria-label="Moj profil"
           >
             <span class="header-avatar">
               <Avatar
