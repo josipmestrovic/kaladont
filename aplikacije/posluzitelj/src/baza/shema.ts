@@ -812,6 +812,15 @@ export const sanducicPoruke = pgTable('sanducic_poruke', {
   index('idx_sanducic_poruke_stvorena').on(tablica.stvorenaAt),
 ]);
 
+/** Potrošeni pragovi sandučica bez stvaranja povijesne pošte (baseline / O7). */
+export const sanducicPrekretnice = pgTable('sanducic_prekretnice', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  kljuc: text('kljuc').notNull(),
+  ostvarenoAt: timestamp('ostvareno_at', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.kljuc] }),
+]);
+
 export const ishodiMisijaIgara = pgTable('ishodi_misija_igara', {
   id: uuid('id').primaryKey().defaultRandom(),
   igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),

@@ -5,6 +5,7 @@ import { dohvatiDefinicijuDostignuca, izracunajNovaDostignuca } from 'zajednicko
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, igraci, napredakDostignucaIgraca, povratneInformacije } from '../baza/shema.js';
 import { zahtijevajAdmina, zahtijevajPrijavu, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
+import { emitirajPromjeneSanducica, stvoriZahvaluZaFeedback } from '../sanducic/okidaci.js';
 
 const ShemaOcjena = z.object({
   pravila: z.number().int().min(1).max(5),
@@ -99,16 +100,20 @@ export async function registrirajPovratneInformacijeRute(app: FastifyInstance): 
           set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
         });
       }
+      const sanducic = await stvoriZahvaluZaFeedback(igrac.id, povratnaInformacija!.id, tx);
       return {
         id: povratnaInformacija!.id,
         anketaIspunjena: nakon!.anketaIspunjena,
         brojPoslanih: nakon!.povratneInformacije,
         novaDostignuca: novaDostignuca.filter((dostignuce) => dostignuce.id === definicija.id),
+        sanducic,
       };
     });
 
     if ('greska' in ishod) return odgovor.code(409).send({ ok: false, greska: ishod.greska });
-    return { ok: true, ...ishod };
+    if (ishod.sanducic) emitirajPromjeneSanducica([igrac.id]);
+    const { sanducic: _sanducic, ...odgovorIshoda } = ishod;
+    return { ok: true, ...odgovorIshoda };
   });
 
   app.get<{ Querystring: { status?: string } }>('/admin/povratne-informacije', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {

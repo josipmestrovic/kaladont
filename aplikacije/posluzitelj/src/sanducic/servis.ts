@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import {
   renderirajSanducicPoruku,
   type SanducicPorukaDetalj,
@@ -8,6 +8,7 @@ import {
 import { baza } from '../baza/klijent.js';
 import { sanducicPoruke } from '../baza/shema.js';
 import { granicaZadrzavanjaSanducica } from './ciscenje.js';
+import type { TxSanducic } from './prekretnice.js';
 
 type SocketZaSanducic = {
   emit(dogadaj: 'sanducic:promjena', payload: SanducicPromjena): void;
@@ -38,7 +39,18 @@ export interface UlazStvaranjaPoruke {
   stvorenaAt?: Date;
 }
 
+export interface OpcijeStvaranjaPoruke {
+  /** Ako je zadano, insert ide u tu transakciju. */
+  tx?: TxSanducic;
+  /**
+   * Socket emit. Default: `true` bez tx, `false` s tx
+   * (caller emitira nakon commit-a).
+   */
+  emitiraj?: boolean;
+}
+
 type RedPoruke = typeof sanducicPoruke.$inferSelect;
+type DbZaSanducic = typeof baza | TxSanducic;
 
 function uSazetak(red: RedPoruke): SanducicPorukaSazetak {
   const render = renderirajSanducicPoruku(red.tip, red.podaci ?? {});
@@ -69,8 +81,12 @@ function uvjetSvjeze(igracId: string, sada = new Date()) {
 }
 
 /** Idempotentan insert; null ako je dedup već postojao. */
-export async function stvoriPoruku(ulaz: UlazStvaranjaPoruke): Promise<RedPoruke | null> {
-  const [red] = await baza
+export async function stvoriPoruku(
+  ulaz: UlazStvaranjaPoruke,
+  opcije: OpcijeStvaranjaPoruke = {},
+): Promise<RedPoruke | null> {
+  const db: DbZaSanducic = opcije.tx ?? baza;
+  const [red] = await db
     .insert(sanducicPoruke)
     .values({
       igracId: ulaz.igracId,
@@ -87,8 +103,29 @@ export async function stvoriPoruku(ulaz: UlazStvaranjaPoruke): Promise<RedPoruke
     })
     .returning();
 
-  if (red) emitirajPromjenuSanducica(ulaz.igracId, 'nova');
+  const trebaEmitirati = opcije.emitiraj ?? (opcije.tx == null);
+  if (red && trebaEmitirati) emitirajPromjenuSanducica(ulaz.igracId, 'nova');
   return red ?? null;
+}
+
+/** Ažurira JSON podake postojeće poruke tipa (npr. dobrodošlica nakon potvrde emaila). */
+export async function azurirajPodatkePorukePoTipu(
+  igracId: string,
+  tip: string,
+  patch: Record<string, unknown>,
+  opcije: OpcijeStvaranjaPoruke = {},
+): Promise<boolean> {
+  const db: DbZaSanducic = opcije.tx ?? baza;
+  const [red] = await db
+    .update(sanducicPoruke)
+    .set({
+      podaci: sql`coalesce(${sanducicPoruke.podaci}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`,
+    })
+    .where(and(eq(sanducicPoruke.igracId, igracId), eq(sanducicPoruke.tip, tip)))
+    .returning({ id: sanducicPoruke.id });
+  const trebaEmitirati = opcije.emitiraj ?? (opcije.tx == null);
+  if (red && trebaEmitirati) emitirajPromjenuSanducica(igracId, 'stanje');
+  return red != null;
 }
 
 export async function dohvatiSazetak(igracId: string): Promise<{

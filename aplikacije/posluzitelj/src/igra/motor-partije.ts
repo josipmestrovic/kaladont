@@ -65,6 +65,7 @@ import { osigurajUpisePoteza, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, 
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { zabiljeziPobjeduTreninga } from '../trening/upis-napretka.js';
+import { mozdaObavijestiPrvuIgru } from '../sanducic/okidaci.js';
 import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
 import { stvoriStvarniSat, type Sat, type SatHandle } from './sat.js';
 import {
@@ -1180,6 +1181,7 @@ export function stvoriUpraviteljPartija(
               throw greska;
             }
           }
+          await obavijestiPrvuIgruSudionicima(stanje, 'trening');
           for (const p of plasmani) {
             const ishod = p.igracId === pobjednikId ? nagrada?.ishodMisija : null;
             const novaDostignuca = [
@@ -1262,7 +1264,8 @@ export function stvoriUpraviteljPartija(
         stanje,
         () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, privatniRezultati, stanje.mod, privatneStatistike, true, new Map(
           [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
-        )).then((agregati) => {
+        )).then(async (agregati) => {
+          await obavijestiPrvuIgruSudionicima(stanje, 'privatna');
           if (stanje.kodSobe) {
             postavke.naPrivatnaPartijaZavrsila?.(stanje.kodSobe, stanje.partijaId, pobjednikId, plasmani);
           }
@@ -1348,7 +1351,8 @@ export function stvoriUpraviteljPartija(
       stanje,
       () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod, statistike, false, new Map(
         [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
-      ), zavrsenoU, osnovniBrutoPoIgracu).then((agregati) => {
+      ), zavrsenoU, osnovniBrutoPoIgracu).then(async (agregati) => {
+        await obavijestiPrvuIgruSudionicima(stanje, 'javna');
         const plasmaniSOcjenama = plasmani.map((p) => ({
           ...p,
           ocjenaIgre: agregati.get(p.igracId)?.ocjenaIgre ?? null,
@@ -1430,6 +1434,20 @@ export function stvoriUpraviteljPartija(
         zakaziBrisanjeNakonSpremanja(stanje);
       },
     );
+  }
+
+  async function obavijestiPrvuIgruSudionicima(
+    stanje: StanjeStola,
+    kontekst: 'javna' | 'privatna' | 'trening',
+  ): Promise<void> {
+    await Promise.all(stanje.sudionici.map((sudionik) => mozdaObavijestiPrvuIgru({
+      igracId: sudionik.igracId,
+      jeGost: sudionik.vrsta === 'gost',
+      jeBot: sudionik.upravljac === 'bot',
+      izvorId: stanje.partijaId,
+      kontekst,
+      mod: stanje.mod,
+    })));
   }
 
   function nacinIspadanjaZaIgraca(

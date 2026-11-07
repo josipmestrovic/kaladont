@@ -22,6 +22,7 @@ import {
   provjeriTokenPotvrdeEmaila,
   provjeriTokenResetaLozinke,
 } from './tokeni.js';
+import { stvoriDobrodoslicu, stvoriPorukuPotvrdeEmaila } from '../sanducic/okidaci.js';
 
 export interface OpcijeAuthRateLimita {
   omogucen: boolean;
@@ -203,6 +204,7 @@ export async function registrirajRacuneRute(
     const sesija = await izdajSesiju(igracId);
     postaviSesijskiKolacic(odgovor, sesija.token);
 
+    await stvoriDobrodoslicu(igracId, normaliziraniEmail);
     await posaljiPotvrduEmailaSigurno(app, igracId, normaliziraniEmail);
 
     return { ok: true, igracId, nadimak: konacniNadimak, sesijskiToken: sesija.token };
@@ -275,6 +277,7 @@ export async function registrirajRacuneRute(
       emailPotvrdaZatrazenAt: null,
       emailPotvrdaPoslanaAt: null,
     }).where(eq(igraci.id, igrac.id));
+    await stvoriPorukuPotvrdeEmaila(igrac.id);
     return { ok: true };
   });
 

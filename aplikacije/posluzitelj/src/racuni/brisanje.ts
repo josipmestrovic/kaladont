@@ -30,6 +30,7 @@ import {
   nagradeMisija,
   obavijestiIgraca,
   sanducicPoruke,
+  sanducicPrekretnice,
   nizAktivnostiIgraca,
   otkljucaneGrupeIgraca,
   otkljucaneRijeciIgraca,
@@ -69,6 +70,7 @@ async function obrisiRacunUTransakciji(
   await transakcija.delete(evidencijaDnevnihPobjedaModova).where(eq(evidencijaDnevnihPobjedaModova.igracId, igrac.id));
   await transakcija.delete(obavijestiIgraca).where(eq(obavijestiIgraca.igracId, igrac.id));
   await transakcija.delete(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
+  await transakcija.delete(sanducicPrekretnice).where(eq(sanducicPrekretnice.igracId, igrac.id));
   await transakcija.delete(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igrac.id));
   await transakcija.delete(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igrac.id));
   await transakcija.delete(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igrac.id));

@@ -2,13 +2,24 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { TIP_SANDUCIC_TEST } from 'zajednicko';
+import {
+  TIP_SANDUCIC_DOBRODOSLICA,
+  TIP_SANDUCIC_EMAIL_POTVRDEN,
+  TIP_SANDUCIC_FEEDBACK,
+  TIP_SANDUCIC_PRVA_IGRA,
+  TIP_SANDUCIC_TEST,
+} from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { igraci, sanducicPoruke } from '../src/baza/shema.js';
+import { igraci, sanducicPoruke, sanducicPrekretnice } from '../src/baza/shema.js';
 import { izdajSesiju, stvoriGostSesiju } from '../src/racuni/sesije.js';
 import { obrisiRacun } from '../src/racuni/brisanje.js';
 import { ocistiStareSanducicPoruke, ROK_SANDUCIC_PORUKE_MS } from '../src/sanducic/ciscenje.js';
+import {
+  mozdaObavijestiPrvuIgru,
+  stvoriDobrodoslicu,
+  stvoriPorukuPotvrdeEmaila,
+} from '../src/sanducic/okidaci.js';
 import {
   dohvatiSazetak,
   oznaciProcitane,
@@ -54,6 +65,7 @@ afterEach(async () => {
   if (igraciZaBrisanje.length === 0) return;
   for (const id of igraciZaBrisanje.splice(0)) {
     await baza.delete(sanducicPoruke).where(eq(sanducicPoruke.igracId, id));
+    await baza.delete(sanducicPrekretnice).where(eq(sanducicPrekretnice.igracId, id));
     await baza.delete(igraci).where(eq(igraci.id, id));
   }
 });
@@ -194,5 +206,106 @@ describe('sandučic', () => {
     expect(await obrisiRacun(igrac.email!, true)).toBe('obrisan');
     const preostale = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
     expect(preostale).toHaveLength(0);
+  });
+
+  it('dobrodošlica i potvrda emaila su jednokratne; patchira CTA', async () => {
+    const igrac = await noviIgrac();
+    await stvoriDobrodoslicu(igrac.id, igrac.email!);
+    await stvoriDobrodoslicu(igrac.id, igrac.email!);
+    let redovi = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
+    expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_DOBRODOSLICA)).toHaveLength(1);
+
+    await stvoriPorukuPotvrdeEmaila(igrac.id);
+    await stvoriPorukuPotvrdeEmaila(igrac.id);
+    redovi = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
+    expect(redovi.filter((r) => r.tip === TIP_SANDUCIC_EMAIL_POTVRDEN)).toHaveLength(1);
+    const dobrodoslica = redovi.find((r) => r.tip === TIP_SANDUCIC_DOBRODOSLICA);
+    expect(dobrodoslica?.podaci?.emailPotvrdjen).toBe(true);
+  });
+
+  it('prva igra jednom; baseline prekretnica blokira poruku; bot ne dobiva', async () => {
+    const igrac = await noviIgrac();
+    await mozdaObavijestiPrvuIgru({
+      igracId: igrac.id,
+      jeGost: false,
+      jeBot: false,
+      izvorId: randomUUID(),
+      kontekst: 'javna',
+      mod: 'dva_igraca',
+    });
+    await mozdaObavijestiPrvuIgru({
+      igracId: igrac.id,
+      jeGost: false,
+      jeBot: false,
+      izvorId: randomUUID(),
+      kontekst: 'privatna',
+    });
+    let poruke = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
+    expect(poruke.filter((r) => r.tip === TIP_SANDUCIC_PRVA_IGRA)).toHaveLength(1);
+
+    const baseline = await noviIgrac();
+    await baza.insert(sanducicPrekretnice).values({ igracId: baseline.id, kljuc: 'prva_igra' });
+    await mozdaObavijestiPrvuIgru({
+      igracId: baseline.id,
+      jeGost: false,
+      jeBot: false,
+      izvorId: randomUUID(),
+      kontekst: 'trening',
+    });
+    poruke = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, baseline.id));
+    expect(poruke.filter((r) => r.tip === TIP_SANDUCIC_PRVA_IGRA)).toHaveLength(0);
+
+    const botId = randomUUID();
+    igraciZaBrisanje.push(botId);
+    await baza.insert(igraci).values({
+      id: botId,
+      vrsta: 'registriran',
+      upravljac: 'bot',
+      nadimak: `Bot ${botId.slice(0, 6)}`,
+    });
+    await mozdaObavijestiPrvuIgru({
+      igracId: botId,
+      jeGost: false,
+      jeBot: true,
+      izvorId: randomUUID(),
+      kontekst: 'javna',
+    });
+    poruke = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, botId));
+    expect(poruke).toHaveLength(0);
+  });
+
+  it('gost zadržava sandučic poruke nakon registracije istog ID-a', async () => {
+    const gost = await noviIgrac('gost');
+    await stvoriPoruku({
+      igracId: gost.id,
+      tip: TIP_SANDUCIC_TEST,
+      deduplikacijskiKljuc: 'test:prije-rega',
+    });
+    const email = `reg-${gost.id}@example.com`;
+    await baza.update(igraci).set({
+      vrsta: 'registriran',
+      email,
+      lozinkaHash: 'lozinka123',
+      emailPotvrdjen: false,
+    }).where(eq(igraci.id, gost.id));
+    await stvoriDobrodoslicu(gost.id, email);
+
+    const redovi = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, gost.id));
+    expect(redovi.map((r) => r.deduplikacijskiKljuc).sort()).toEqual(['dobrodoslica', 'test:prije-rega']);
+  });
+
+  it('HTTP feedback stvara zahvalu u sandučicu', async () => {
+    const igrac = await noviIgrac();
+    const odgovor = await fetch(`${adresa}/api/povratne-informacije`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${igrac.token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ poruka: 'Ovo je dovoljno duga povratna informacija za test.' }),
+    });
+    expect(odgovor.status).toBe(200);
+    const redovi = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
+    expect(redovi.some((r) => r.tip === TIP_SANDUCIC_FEEDBACK)).toBe(true);
   });
 });
