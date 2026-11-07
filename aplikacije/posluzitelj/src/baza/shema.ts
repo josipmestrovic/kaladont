@@ -791,6 +791,27 @@ export const obavijestiIgraca = pgTable('obavijesti_igraca', {
   index('idx_obavijesti_igraca_neprikazane').on(tablica.igracId).where(sql`${tablica.prikazanoU} is null`),
 ]);
 
+/** Trajni sandučic (mailbox) — odvojen od toast reda dostignuća. Retention 3 dana. */
+export const sanducicPoruke = pgTable('sanducic_poruke', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  tip: text('tip').notNull(),
+  podaci: jsonb('podaci').$type<Record<string, unknown>>().notNull().default({}),
+  izvorTip: text('izvor_tip'),
+  izvorId: text('izvor_id'),
+  mod: text('mod'),
+  deduplikacijskiKljuc: text('deduplikacijski_kljuc').notNull(),
+  stvorenaAt: timestamp('stvorena_at', { withTimezone: true }).notNull().defaultNow(),
+  procitanoAt: timestamp('procitano_at', { withTimezone: true }),
+  najavljenoAt: timestamp('najavljeno_at', { withTimezone: true }),
+}, (tablica) => [
+  uniqueIndex('uq_sanducic_poruke_igrac_dedup').on(tablica.igracId, tablica.deduplikacijskiKljuc),
+  index('idx_sanducic_poruke_lista').on(tablica.igracId, tablica.stvorenaAt),
+  index('idx_sanducic_poruke_neprocitane').on(tablica.igracId).where(sql`${tablica.procitanoAt} is null`),
+  index('idx_sanducic_poruke_nenajavljene').on(tablica.igracId).where(sql`${tablica.najavljenoAt} is null`),
+  index('idx_sanducic_poruke_stvorena').on(tablica.stvorenaAt),
+]);
+
 export const ishodiMisijaIgara = pgTable('ishodi_misija_igara', {
   id: uuid('id').primaryKey().defaultRandom(),
   igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),

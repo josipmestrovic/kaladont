@@ -8,6 +8,7 @@
   import { inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { pokreniEvidencijuAktivnogDana } from '$lib/aktivnost-dana.js';
   import { pokreniObavijestiDostignuca } from '$lib/obavijesti-dostignuca.svelte.js';
+  import { pokreniSanducic, postaviPutanjuSanducica } from '$lib/stanje-sanducica.svelte.js';
   import {
     inicijalizirajAudio,
     inicijalizirajGlobalneUiZvukove,
@@ -22,6 +23,7 @@
   import UspjehObavijest from '$lib/komponente/UspjehObavijest.svelte';
   import DostignuceObavijest from '$lib/komponente/DostignuceObavijest.svelte';
   import CitanjeNaglasObavijest from '$lib/komponente/CitanjeNaglasObavijest.svelte';
+  import SanducicToast from '$lib/komponente/SanducicToast.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import BootUcitavanje from '$lib/komponente/BootUcitavanje.svelte';
 
@@ -45,6 +47,7 @@
   afterNavigate(({ to, type }) => {
     if (!to) return;
     const novaPutanja = putanja(to);
+    postaviPutanjuSanducica(to.url.pathname);
     if (povijestAplikacije.length === 0) {
       povijestAplikacije = [novaPutanja];
       indeksPovijesti = 0;
@@ -82,8 +85,10 @@
 
     let zaustaviEvidenciju = () => {};
     let zaustaviObavijesti = () => {};
+    let zaustaviSanducic = () => {};
     const naNaslovnici = $page.url.pathname === '/';
     const sesija = inicijalizirajGostSesiju();
+    postaviPutanjuSanducica($page.url.pathname);
 
     void (async () => {
       if (naNaslovnici) {
@@ -110,11 +115,13 @@
       pokreniSlusateljeIgre();
       zaustaviEvidenciju = pokreniEvidencijuAktivnogDana();
       zaustaviObavijesti = pokreniObavijestiDostignuca();
+      zaustaviSanducic = pokreniSanducic();
     })();
 
     return () => {
       zaustaviEvidenciju();
       zaustaviObavijesti();
+      zaustaviSanducic();
     };
   });
 </script>
@@ -123,6 +130,7 @@
   <div class="status-obavijesti">
     <VezaObavijest />
     <UspjehObavijest />
+    <SanducicToast />
     <DostignuceObavijest />
     <CitanjeNaglasObavijest />
   </div>

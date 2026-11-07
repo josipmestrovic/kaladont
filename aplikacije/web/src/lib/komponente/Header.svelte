@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
   import Avatar from './Avatar.svelte';
+  import SanducicIkona from './SanducicIkona.svelte';
   import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
 
   interface Profil {
@@ -93,17 +94,22 @@
 
     <div class="desno">
       {#if profil}
-          {#if jeGost}
-            <a href="/profil" class="profil-link" aria-label="Moj profil">
-              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} gost velicina={44} /></span>
-              <span class="profil-ime">{profil.nadimak}</span>
-            </a>
-          {:else}
-            <a href="/profil" class="profil-link registrirani-profil" aria-label="Moj profil">
-              <span class="header-avatar"><Avatar avatarId={profil.avatarId} avatarConfig={profil.avatarConfig} rang={vratiVeciRang(profil.rang, profil.rang1v1)} velicina={44} /></span>
-              <span class="profil-ime">{profil.nadimak}</span>
-            </a>
-          {/if}
+          <SanducicIkona velicina={44} />
+          <a
+            href="/profil"
+            class="profil-link"
+            aria-label="Moj profil, {profil.nadimak}"
+          >
+            <span class="header-avatar">
+              <Avatar
+                avatarId={profil.avatarId}
+                avatarConfig={profil.avatarConfig}
+                rang={vratiVeciRang(profil.rang, profil.rang1v1)}
+                gost={jeGost}
+                velicina={44}
+              />
+            </span>
+          </a>
       {/if}
     </div>
   </div>
@@ -242,33 +248,13 @@
   }
 
   .profil-link {
-    display: flex;
-    flex-direction: row;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
     text-decoration: none;
     cursor: pointer;
-  }
-
-  .profil-ime {
-    max-width: 150px;
-    overflow: hidden;
-    color: var(--boja-tekst-osnovni);
-    font-weight: 700;
-    font-size: 25px;
-    letter-spacing: 0.6px;
-    line-height: 1.2;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .profil-link:hover .profil-ime {
-    color: var(--boja-akcent);
-  }
-
-  @media (max-width: 999px) {
-    .profil-link { gap: 0; }
-    .profil-ime { display: none; }
   }
 
   @media (max-width: 999px) {

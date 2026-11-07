@@ -17,17 +17,26 @@
   import PanelPrijavaRijeci from '$lib/komponente/PanelPrijavaRijeci.svelte';
   import PanelPrijavaIgraca from '$lib/komponente/PanelPrijavaIgraca.svelte';
   import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
+  import {
+    dohvatiBrojZaZavrsniSazetak,
+    dohvatiStanjeSanducica,
+    postaviZavrsniEkranSanducica,
+    potvrdiZavrsniSazetak,
+  } from '$lib/stanje-sanducica.svelte.js';
   import { pustiAudio } from '$lib/audio-manager.js';
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
-  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, zadnjaDva } from 'zajednicko';
+  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
   const stanjeVeze = dohvatiStanjeVeze();
+  const stanjeSanducica = dohvatiStanjeSanducica();
   const partijaId = $derived($page.params.id);
+  let brojSanducicSazetka = $state(0);
+  let zavrsniSazetakPotvrden = $state(false);
 
   let unosNastavkaRijeci = $state('');
   let neZnamDijalog = $state(false);
@@ -808,6 +817,24 @@
     return () => clearInterval(intervalId);
   });
 
+  $effect(() => {
+    const aktivan = Boolean(stanje.kraj && prikaziRezultate);
+    postaviZavrsniEkranSanducica(aktivan);
+    if (!aktivan) {
+      brojSanducicSazetka = 0;
+      zavrsniSazetakPotvrden = false;
+      return;
+    }
+    // Reaktivno na osvježen sažetak (npr. poruke stigle tijekom igre).
+    void stanjeSanducica.zaNajavu;
+    if (zavrsniSazetakPotvrden) return;
+    const broj = dohvatiBrojZaZavrsniSazetak();
+    if (broj <= 0) return;
+    brojSanducicSazetka = broj;
+    zavrsniSazetakPotvrden = true;
+    void potvrdiZavrsniSazetak();
+  });
+
   async function ucitajPoteze(prikaziZadnjuRijec = true, ucitajJos = false) {
     if (ucitavanjePovijesti || !partijaId) return;
     ucitavanjePovijesti = true;
@@ -1039,7 +1066,10 @@
     };
   });
 
-  onDestroy(zaustaviGovor);
+  onDestroy(() => {
+    zaustaviGovor();
+    postaviZavrsniEkranSanducica(false);
+  });
 </script>
 
 <svelte:head>
@@ -1371,6 +1401,13 @@
         </div>
       {/if}
     {/if}
+  {/if}
+  {#if brojSanducicSazetka > 0}
+    <p class="sanducic-zavrsni-sazetak">
+      <img src="/ikone/81-mailbox.webp" alt="" aria-hidden="true" width="28" height="28" />
+      <span>{tekstZavrsnogSazetka(brojSanducicSazetka)}</span>
+      <a href="/obavijesti">Otvori</a>
+    </p>
   {/if}
   {#if jeTrening}
     <div class="kraj-akcije">
@@ -3118,6 +3155,24 @@
       row-gap: 10px;
     }
   }
+  .sanducic-zavrsni-sazetak {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--boja-akcent) 35%, transparent);
+    background: color-mix(in srgb, var(--boja-akcent) 8%, transparent);
+    font-weight: 600;
+  }
+
+  .sanducic-zavrsni-sazetak a {
+    color: var(--boja-akcent);
+    font-weight: 700;
+  }
+
   .kraj-akcije {
     display: flex;
     flex-wrap: wrap;

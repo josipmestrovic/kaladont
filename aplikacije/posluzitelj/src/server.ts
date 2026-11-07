@@ -26,6 +26,9 @@ import { registrirajLjestviceRute } from './ljestvice/rute.js';
 import { registrirajMisijeRute } from './misije/rute.js';
 import { registrirajDostignucaRute } from './dostignuca/rute.js';
 import { postaviVezeZaObavijestiDostignuca, emitirajNovostiDostignuca } from './dostignuca/obavijesti.js';
+import { registrirajSanducicRute } from './sanducic/rute.js';
+import { postaviVezeZaSanducic } from './sanducic/servis.js';
+import { ocistiStareSanducicPoruke } from './sanducic/ciscenje.js';
 import { obradiNeobradeneTop10Dokaze } from './dostignuca/top10.js';
 import { registrirajPrijaveRute } from './prijave/rute.js';
 import { registrirajAdminRute } from './admin/rute.js';
@@ -185,6 +188,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       await registrirajLjestviceRute(apiApp);
       await registrirajMisijeRute(apiApp);
       await registrirajDostignucaRute(apiApp);
+      await registrirajSanducicRute(apiApp);
       await registrirajPrijaveRute(apiApp);
       await registrirajPovratneInformacijeRute(apiApp);
       await registrirajAdminRute(apiApp, rjecnik, () => dohvatiZivoStanjeBotova(), {
@@ -383,6 +387,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     jeAktivnaVeza: (igracId: string, socketId: string) => registarVeza.dohvatiSocketId(igracId) === socketId,
   };
   postaviVezeZaObavijestiDostignuca(aktivneVeze);
+  postaviVezeZaSanducic(aktivneVeze);
   const upravitelj = stvoriUpraviteljPartija(
     io,
     rjecnik,
@@ -500,6 +505,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     void ocistiIstekleNepotvrdjeneRacune().catch((greska) => app.log.error({ greska }, 'Čišćenje nepotvrđenih računa nije uspjelo'));
   }, 24 * 60 * 60 * 1000);
   cistacNepotvrdjenih.unref();
+
+  void ocistiStareSanducicPoruke().then((broj) => {
+    if (broj > 0) app.log.info({ broj }, 'Obrisane su istekle sandučic poruke');
+  }).catch((greska) => app.log.error({ greska }, 'Čišćenje sandučica nije uspjelo'));
+  const cistacSanducica = setInterval(() => {
+    void ocistiStareSanducicPoruke().catch((greska) => app.log.error({ greska }, 'Čišćenje sandučica nije uspjelo'));
+  }, 6 * 60 * 60 * 1000);
+  cistacSanducica.unref();
 
   io.use(async (socket, next) => {
     const pocetakAutorizacije = performance.now();
