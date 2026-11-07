@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
-  import { jeRegistriranKorisnik, obrisiSesijskiToken } from '$lib/identitet.js';
+  import { jeRegistriranKorisnik, prijediNaGostujucuSesiju } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import { ucitajModalIgraAsete, urlAseta } from '$lib/asetovi-core.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
@@ -30,7 +30,8 @@
   async function odjaviSe() {
     if (!confirm('Jeste li sigurni da se želite odjaviti?')) return;
     await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
-    obrisiSesijskiToken();
+    // Novi gost token prije socketa/profila — prazan Bearer ostavlja avatar/sandučic mrtvim.
+    await prijediNaGostujucuSesiju();
     await osvjeziSocketIdentitet().catch(() => {});
     window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
     window.location.assign('/');

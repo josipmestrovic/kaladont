@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
-  import { obrisiSesijskiToken, prijediNaGostujucuSesiju } from '$lib/identitet.js';
+  import { prijediNaGostujucuSesiju } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
 
   interface Profil {
@@ -46,7 +46,6 @@
   async function igrajKaoGost(): Promise<void> {
     saljeSe = true;
     await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
-    obrisiSesijskiToken();
     await prijediNaGostujucuSesiju();
     await osvjeziSocketIdentitet();
     window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));

@@ -1,7 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
 import type { DogadajiKlijentPoslužitelj, DogadajiPosluziteljKlijent } from 'zajednicko';
 import { ADRESA_POSLUZITELJA } from './konfiguracija.js';
-import { dohvatiAuthToken } from './identitet.js';
+import { dohvatiAuthToken, inicijalizirajGostSesiju } from './identitet.js';
 export { dohvatiStanjeVeze } from './stanje-veze.svelte.js';
 export { oznaciPartijuDostupnom } from './stanje-veze.svelte.js';
 export type { StanjeSocketVeze, StanjeVeze } from './stanje-veze.svelte.js';
@@ -81,6 +81,7 @@ export function dohvatiSocket(): KaladontSocket {
 
 /** Ponovno spaja postojeću vezu kako bi poslužitelj učitao svježi token i profilne podatke. */
 export async function osvjeziSocketIdentitet(): Promise<void> {
+  if (!dohvatiAuthToken()) await inicijalizirajGostSesiju();
   const aktivniSocket = dohvatiSocket();
   aktivniSocket.io.reconnection(true);
   postaviStanjeVeze('ponovno_spajanje');
