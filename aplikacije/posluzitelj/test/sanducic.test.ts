@@ -35,6 +35,7 @@ import {
 } from '../src/sanducic/okidaci.js';
 import {
   dohvatiSazetak,
+  obrisiSvePoruke,
   oznaciProcitane,
   oznaciSveProcitane,
   potvrdiNajavu,
@@ -571,5 +572,66 @@ describe('sandučic', () => {
     const sazeci = gostPoruke.filter((r) => r.tip === TIP_SANDUCIC_GOST_SAZETAK_5);
     expect(sazeci.length).toBeGreaterThanOrEqual(2);
     expect(sazeci.every((r) => r.podaci?.registriran === true)).toBe(true);
+  });
+
+  it('PR5: ulazak u feed označava sve pročitanima; obrisi-sve briše samo vlastite', async () => {
+    const igrac = await noviIgrac();
+    const drugi = await noviIgrac();
+    await stvoriPoruku({
+      igracId: igrac.id,
+      tip: TIP_SANDUCIC_TEST,
+      deduplikacijskiKljuc: 'test:pr5-a',
+      podaci: { tekst: 'Prva feed poruka' },
+    });
+    await stvoriPoruku({
+      igracId: igrac.id,
+      tip: TIP_SANDUCIC_TEST,
+      deduplikacijskiKljuc: 'test:pr5-b',
+      podaci: { tekst: 'Druga feed poruka' },
+    });
+    await stvoriPoruku({
+      igracId: drugi.id,
+      tip: TIP_SANDUCIC_TEST,
+      deduplikacijskiKljuc: 'test:pr5-tudja',
+    });
+
+    expect((await dohvatiSazetak(igrac.id)).brojNeprocitanih).toBe(2);
+
+    const procitanoSve = await fetch(`${adresa}/api/sanducic/procitano-sve`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${igrac.token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ doAt: new Date().toISOString() }),
+    });
+    expect(procitanoSve.status).toBe(200);
+    expect((await dohvatiSazetak(igrac.id)).brojNeprocitanih).toBe(0);
+    expect((await dohvatiSazetak(drugi.id)).brojNeprocitanih).toBe(1);
+
+    const seed = await fetch(`${adresa}/api/sanducic/test`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${igrac.token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ tekst: 'Seed u test okruženju' }),
+    });
+    expect(seed.status).toBe(200);
+
+    const obrisi = await fetch(`${adresa}/api/sanducic/obrisi-sve`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${igrac.token}`,
+        'content-type': 'application/json',
+      },
+      body: '{}',
+    });
+    expect(obrisi.status).toBe(200);
+    const tijelo = await obrisi.json() as { ok: true; obrisano: number };
+    expect(tijelo.obrisano).toBeGreaterThanOrEqual(3);
+    expect(await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id))).toHaveLength(0);
+    expect(await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, drugi.id))).toHaveLength(1);
+    expect(await obrisiSvePoruke(drugi.id)).toBe(1);
   });
 });

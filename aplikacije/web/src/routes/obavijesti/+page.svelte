@@ -3,19 +3,19 @@
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
   import {
-    oznaciSanducicProcitane,
+    obrisiSavSanducic,
     oznaciSavSanducicProcitanim,
     osvjeziSazetakSanducica,
   } from '$lib/stanje-sanducica.svelte.js';
   import type { SanducicPorukaDetalj } from 'zajednicko';
 
   let poruke = $state<SanducicPorukaDetalj[]>([]);
+  let noveIds = $state<Set<string>>(new Set());
   let sljedeciCursor = $state<string | null>(null);
   let ucitavanje = $state(true);
   let greska = $state<string | null>(null);
-  let filter = $state<'sve' | 'neprocitane'>('sve');
-  let odabrana = $state<SanducicPorukaDetalj | null>(null);
-  let oznacavanje = $state(false);
+  let brisanje = $state(false);
+  let istaknutiId = $state<string | null>(null);
 
   function formatirajVrijeme(iso: string): string {
     try {
@@ -35,42 +35,51 @@
     greska = null;
     try {
       const params = new URLSearchParams();
-      if (filter === 'neprocitane') params.set('filter', 'neprocitane');
       if (!reset && sljedeciCursor) params.set('cursor', sljedeciCursor);
       const odgovor = await api<{ ok: true; poruke: SanducicPorukaDetalj[]; sljedeciCursor: string | null }>(
         `/sanducic?${params.toString()}`,
       );
-      poruke = reset ? odgovor.poruke : [...poruke, ...odgovor.poruke];
-      sljedeciCursor = odgovor.sljedeciCursor;
+      if (reset) {
+        const granica = new Date();
+        noveIds = new Set(odgovor.poruke.filter((p) => !p.procitano).map((p) => p.id));
+        poruke = odgovor.poruke.map((p) => ({ ...p, procitano: true }));
+        sljedeciCursor = odgovor.sljedeciCursor;
+        // Feed ostaje vidljiv i ako mark-all padne — badge se može osvježiti kasnije.
+        try {
+          await oznaciSavSanducicProcitanim(granica);
+        } catch {
+          // Lista je već učitana; crvena točka može ostati dok korisnik ne osvježi.
+        }
+      } else {
+        poruke = [...poruke, ...odgovor.poruke];
+        sljedeciCursor = odgovor.sljedeciCursor;
+      }
     } catch {
       greska = 'Ne mogu učitati obavijesti.';
-      if (reset) poruke = [];
+      if (reset) {
+        poruke = [];
+        noveIds = new Set();
+      }
     } finally {
       ucitavanje = false;
     }
   }
 
-  async function otvori(poruka: SanducicPorukaDetalj): Promise<void> {
-    odabrana = poruka;
-    if (!poruka.procitano) {
-      try {
-        await oznaciSanducicProcitane([poruka.id]);
-        poruke = poruke.map((p) => (p.id === poruka.id ? { ...p, procitano: true } : p));
-        odabrana = { ...poruka, procitano: true };
-      } catch {
-        // Detalj i dalje ostaje otvoren.
-      }
-    }
-  }
-
-  async function oznaciSve(): Promise<void> {
-    oznacavanje = true;
+  async function obrisiSve(): Promise<void> {
+    if (poruke.length === 0 || brisanje) return;
+    if (!confirm('Želiš li obrisati sve obavijesti?')) return;
+    brisanje = true;
     try {
-      await oznaciSavSanducicProcitanim();
-      await ucitaj(true);
+      await obrisiSavSanducic();
+      poruke = [];
+      noveIds = new Set();
+      sljedeciCursor = null;
+      istaknutiId = null;
       await osvjeziSazetakSanducica();
+    } catch {
+      greska = 'Ne mogu obrisati obavijesti.';
     } finally {
-      oznacavanje = false;
+      brisanje = false;
     }
   }
 
@@ -78,18 +87,11 @@
     void (async () => {
       await ucitaj(true);
       const id = $page.url.searchParams.get('id');
-      if (id) {
-        const lokalna = poruke.find((p) => p.id === id);
-        if (lokalna) {
-          await otvori(lokalna);
-        } else {
-          try {
-            const odgovor = await api<{ ok: true; poruka: SanducicPorukaDetalj }>(`/sanducic/${id}`);
-            await otvori(odgovor.poruka);
-          } catch {
-            // Ignoriraj nepostojeći deep-link.
-          }
-        }
+      if (id && poruke.some((p) => p.id === id)) {
+        istaknutiId = id;
+        queueMicrotask(() => {
+          document.getElementById(`obavijest-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
       }
     })();
   });
@@ -103,12 +105,13 @@
   <header class="zaglavlje">
     <h1>Obavijesti</h1>
     <div class="akcije">
-      <div class="filteri" role="group" aria-label="Filter obavijesti">
-        <button type="button" class:aktivan={filter === 'sve'} onclick={() => { filter = 'sve'; void ucitaj(true); }}>Sve</button>
-        <button type="button" class:aktivan={filter === 'neprocitane'} onclick={() => { filter = 'neprocitane'; void ucitaj(true); }}>Nepročitane</button>
-      </div>
-      <button type="button" class="oznaci-sve" disabled={oznacavanje || poruke.every((p) => p.procitano)} onclick={() => void oznaciSve()}>
-        Označi sve pročitanim
+      <button
+        type="button"
+        class="obrisi-sve"
+        disabled={brisanje || poruke.length === 0}
+        onclick={() => void obrisiSve()}
+      >
+        Obriši sve obavijesti
       </button>
     </div>
   </header>
@@ -125,23 +128,23 @@
   {:else}
     <ul class="lista">
       {#each poruke as poruka (poruka.id)}
-        <li>
-          <button
-            type="button"
-            class="stavka"
-            class:neprocitano={!poruka.procitano}
-            class:odabrano={odabrana?.id === poruka.id}
-            onclick={() => void otvori(poruka)}
-          >
+        <li id="obavijest-{poruka.id}">
+          <article class="stavka" class:novo={noveIds.has(poruka.id)} class:istaknuto={istaknutiId === poruka.id}>
             <img class="ikona" src="/ikone/81-mailbox.webp" alt="" aria-hidden="true" width="36" height="36" />
-            <span class="tekst">
-              <strong>{poruka.naslov}</strong>
+            <div class="tekst">
+              <div class="naslovni-red">
+                <strong>{poruka.naslov}</strong>
+                {#if noveIds.has(poruka.id)}
+                  <span class="oznaka-novo">Novo</span>
+                {/if}
+              </div>
+              <p class="tijelo">{poruka.tekst}</p>
               <time datetime={poruka.stvorenaAt}>{formatirajVrijeme(poruka.stvorenaAt)}</time>
-            </span>
-            {#if !poruka.procitano}
-              <span class="tockica" aria-label="Nepročitano"></span>
-            {/if}
-          </button>
+              {#if poruka.poveznica}
+                <a class="poveznica" href={poruka.poveznica}>Otvori</a>
+              {/if}
+            </div>
+          </article>
         </li>
       {/each}
     </ul>
@@ -151,18 +154,6 @@
         Učitaj starije
       </button>
     {/if}
-  {/if}
-
-  {#if odabrana}
-    <article class="detalj" aria-live="polite">
-      <h2>{odabrana.naslov}</h2>
-      <time datetime={odabrana.stvorenaAt}>{formatirajVrijeme(odabrana.stvorenaAt)}</time>
-      <p>{odabrana.tekst}</p>
-      {#if odabrana.poveznica}
-        <a href={odabrana.poveznica}>Otvori</a>
-      {/if}
-      <button type="button" class="zatvori-detalj" onclick={() => (odabrana = null)}>Zatvori</button>
-    </article>
   {/if}
 </main>
 
@@ -190,19 +181,12 @@
     flex-wrap: wrap;
     gap: 12px;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
   }
 
-  .filteri {
-    display: inline-flex;
-    gap: 6px;
-  }
-
-  .filteri button,
-  .oznaci-sve,
+  .obrisi-sve,
   .ucitaj-jos,
-  .greska button,
-  .zatvori-detalj {
+  .greska button {
     min-height: 40px;
     padding: 8px 14px;
     border: 1px solid color-mix(in srgb, var(--boja-tekst-osnovni) 20%, transparent);
@@ -213,9 +197,9 @@
     font-weight: 600;
   }
 
-  .filteri button.aktivan {
-    border-color: var(--boja-akcent);
-    color: var(--boja-akcent);
+  .obrisi-sve:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .stanje,
@@ -235,7 +219,7 @@
   .stavka {
     width: 100%;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
     padding: 12px;
     border: 1px solid color-mix(in srgb, var(--boja-tekst-osnovni) 12%, transparent);
@@ -243,27 +227,47 @@
     background: transparent;
     color: inherit;
     text-align: left;
-    cursor: pointer;
   }
 
-  .stavka.neprocitano {
+  .stavka.novo {
     border-color: color-mix(in srgb, var(--boja-akcent) 45%, transparent);
     background: color-mix(in srgb, var(--boja-akcent) 8%, transparent);
   }
 
-  .stavka.odabrano {
+  .stavka.istaknuto {
     outline: 2px solid var(--boja-akcent);
   }
 
   .tekst {
     display: grid;
-    gap: 2px;
+    gap: 6px;
     min-width: 0;
     flex: 1;
   }
 
-  .tekst strong {
+  .naslovni-red {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .naslovni-red strong {
     font-size: 1.05rem;
+  }
+
+  .oznaka-novo {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--boja-akcent);
+  }
+
+  .tijelo {
+    margin: 0;
+    line-height: 1.45;
+    white-space: pre-wrap;
   }
 
   .tekst time {
@@ -271,35 +275,14 @@
     opacity: 0.75;
   }
 
-  .tockica {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #e23b3b;
+  .poveznica {
+    font-weight: 600;
+    color: var(--boja-akcent);
+    width: fit-content;
+  }
+
+  .ikona {
     flex-shrink: 0;
-  }
-
-  .detalj {
-    display: grid;
-    gap: 8px;
-    padding: 16px;
-    border-radius: 12px;
-    border: 1px solid color-mix(in srgb, var(--boja-tekst-osnovni) 15%, transparent);
-  }
-
-  .detalj h2 {
-    margin: 0;
-    font-family: var(--font-naslov);
-  }
-
-  .detalj time {
-    opacity: 0.75;
-    font-size: 0.9rem;
-  }
-
-  .detalj p {
-    margin: 0;
-    line-height: 1.45;
-    white-space: pre-wrap;
+    margin-top: 2px;
   }
 </style>

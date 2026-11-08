@@ -7,6 +7,7 @@ import {
   dohvatiJednu,
   dohvatiListu,
   dohvatiSazetak,
+  obrisiSvePoruke,
   oznaciProcitane,
   oznaciSveProcitane,
   potvrdiNajavu,
@@ -85,8 +86,15 @@ export async function registrirajSanducicRute(app: FastifyInstance): Promise<voi
     return { ok: true, najavljene };
   });
 
-  // Samo lokalni razvoj — omogućuje ručno testiranje UI-ja bez produkcijskih okidača.
-  if (konfiguracija.NODE_ENV === 'development') {
+  app.post('/sanducic/obrisi-sve', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'private, no-store');
+    const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+    const obrisano = await obrisiSvePoruke(igrac.id);
+    return { ok: true, obrisano };
+  });
+
+  // Development + lokalni/CI test — seed bez produkcijskih okidača. Nikad staging/production.
+  if (konfiguracija.NODE_ENV === 'development' || konfiguracija.NODE_ENV === 'test') {
     app.post('/sanducic/test', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
       odgovor.header('Cache-Control', 'private, no-store');
       const tijelo = ShemaTest.safeParse(zahtjev.body ?? {});
