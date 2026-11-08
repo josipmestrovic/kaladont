@@ -44,8 +44,12 @@
         noveIds = new Set(odgovor.poruke.filter((p) => !p.procitano).map((p) => p.id));
         poruke = odgovor.poruke.map((p) => ({ ...p, procitano: true }));
         sljedeciCursor = odgovor.sljedeciCursor;
-        // Feed = obavijesti: ulazak označava sve dosad stvorene pročitanima.
-        await oznaciSavSanducicProcitanim(granica);
+        // Feed ostaje vidljiv i ako mark-all padne — badge se može osvježiti kasnije.
+        try {
+          await oznaciSavSanducicProcitanim(granica);
+        } catch {
+          // Lista je već učitana; crvena točka može ostati dok korisnik ne osvježi.
+        }
       } else {
         poruke = [...poruke, ...odgovor.poruke];
         sljedeciCursor = odgovor.sljedeciCursor;
