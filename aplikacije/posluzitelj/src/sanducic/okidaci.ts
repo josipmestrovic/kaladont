@@ -1,9 +1,16 @@
+import { eq, sql } from 'drizzle-orm';
 import {
   dohvatiDefinicijuDostignuca,
+  kljucPrekretniceDovrseneIgre,
+  kljucPrekretniceForme10,
+  kljucPrekretniceGostSazetak,
   noviKolekcionarskiPragovi,
+  stanjeIskustva,
   TIP_SANDUCIC_DOBRODOSLICA,
   TIP_SANDUCIC_EMAIL_POTVRDEN,
   TIP_SANDUCIC_FEEDBACK,
+  TIP_SANDUCIC_FORMA_10,
+  TIP_SANDUCIC_GOST_SAZETAK_5,
   TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
   TIP_SANDUCIC_NOVA_XP_RAZINA,
   TIP_SANDUCIC_NOVA_ZVJEZDICA,
@@ -14,6 +21,7 @@ import {
   TIP_SANDUCIC_PRVA_IGRA,
 } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
+import { dostignucaIgraca, igraci, napredakDostignucaIgraca } from '../baza/shema.js';
 import {
   azurirajPodatkePorukePoTipu,
   emitirajPromjenuSanducica,
@@ -32,6 +40,7 @@ export async function stvoriDobrodoslicu(igracId: string, email: string): Promis
   });
   // Gost→reg: stara „prva igra” više ne smije voditi na /registracija.
   await azurirajPodatkePorukePoTipu(igracId, TIP_SANDUCIC_PRVA_IGRA, { gost: false });
+  await azurirajPodatkePorukePoTipu(igracId, TIP_SANDUCIC_GOST_SAZETAK_5, { registriran: true });
 }
 
 export async function stvoriPorukuPotvrdeEmaila(igracId: string): Promise<void> {
@@ -268,4 +277,190 @@ export async function stvoriPorukuPromjeneRanga(ulaz: {
     mod: ulaz.mod,
   }, { tx: ulaz.tx, emitiraj: false });
   return red != null;
+}
+
+/** Forma svakih 10 javnih igara po modu (O1). Lazy baseline nižih pragova. */
+export async function stvoriPorukuForme10(ulaz: {
+  igracId: string;
+  mod: 'dva_igraca' | 'cetiri_igraca';
+  odigraneNakon: number;
+  nazivForme: string | null;
+  pobjede: number;
+  trenutniNiz: number;
+  tx: TxSanducic;
+  izvorId: string;
+}): Promise<boolean> {
+  const potrosenoDo = Math.floor(ulaz.odigraneNakon / 10) * 10;
+  for (let prag = 10; prag <= potrosenoDo; prag += 10) {
+    const kljuc = kljucPrekretniceForme10(ulaz.mod, prag);
+    if (prag === ulaz.odigraneNakon) {
+      const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, ulaz.tx);
+      if (!nova) return false;
+      const nazivModa = ulaz.mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj';
+      const red = await stvoriPoruku({
+        igracId: ulaz.igracId,
+        tip: TIP_SANDUCIC_FORMA_10,
+        deduplikacijskiKljuc: kljuc,
+        podaci: {
+          mod: nazivModa,
+          nazivForme: ulaz.nazivForme,
+          pobjede: ulaz.pobjede,
+          trenutniNiz: ulaz.trenutniNiz,
+          prag,
+        },
+        izvorTip: 'partija',
+        izvorId: ulaz.izvorId,
+        mod: ulaz.mod,
+      }, { tx: ulaz.tx, emitiraj: false });
+      return red != null;
+    }
+    await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, ulaz.tx);
+  }
+  return false;
+}
+
+/** Gostujući sažetak svakih 5 dovršenih igara svih načina (O2). */
+export async function stvoriPorukuGostSazetak(ulaz: {
+  igracId: string;
+  jeGost: boolean;
+  dovrseneNakon: number;
+  tx?: TxSanducic;
+  izvorTip: string;
+  izvorId: string;
+  mod?: string | null;
+}): Promise<boolean> {
+  if (!ulaz.jeGost || ulaz.dovrseneNakon <= 0) return false;
+  const db = ulaz.tx ?? baza;
+  const potrosenoDo = Math.floor(ulaz.dovrseneNakon / 5) * 5;
+  for (let prag = 5; prag <= potrosenoDo; prag += 5) {
+    const kljuc = kljucPrekretniceGostSazetak(prag);
+    if (prag === ulaz.dovrseneNakon) {
+      // Utrka registracija ↔ kraj igre: pri stvaranju ponovno provjeri vrstu.
+      const [stanje] = await db
+        .select({ vrsta: igraci.vrsta })
+        .from(igraci)
+        .where(eq(igraci.id, ulaz.igracId));
+      if (stanje?.vrsta !== 'gost') {
+        await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, db);
+        return false;
+      }
+      const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, db);
+      if (!nova) return false;
+      const snapshot = await dohvatiSnapshotGostSazetka(ulaz.igracId, ulaz.dovrseneNakon, db);
+      const red = await stvoriPoruku({
+        igracId: ulaz.igracId,
+        tip: TIP_SANDUCIC_GOST_SAZETAK_5,
+        deduplikacijskiKljuc: kljuc,
+        podaci: { ...snapshot, prag, registriran: false },
+        izvorTip: ulaz.izvorTip,
+        izvorId: ulaz.izvorId,
+        mod: ulaz.mod ?? null,
+      }, { tx: ulaz.tx, emitiraj: false });
+      return red != null;
+    }
+    await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, db);
+  }
+  return false;
+}
+
+async function dohvatiSnapshotGostSazetka(
+  igracId: string,
+  odigrano: number,
+  tx: typeof baza | TxSanducic,
+): Promise<Record<string, unknown>> {
+  const [igrac] = await tx
+    .select({
+      pobjede: igraci.pobjede,
+      pobjede1v1: igraci.pobjede1v1,
+      iskustvoUkupno: igraci.iskustvoUkupno,
+    })
+    .from(igraci)
+    .where(eq(igraci.id, igracId));
+  const [napredak] = await tx
+    .select({ treningPobjede: napredakDostignucaIgraca.treningPobjede })
+    .from(napredakDostignucaIgraca)
+    .where(eq(napredakDostignucaIgraca.igracId, igracId));
+  const dostignuca = await tx
+    .select({
+      dostignuceId: dostignucaIgraca.dostignuceId,
+      razina: dostignucaIgraca.razina,
+    })
+    .from(dostignucaIgraca)
+    .where(eq(dostignucaIgraca.igracId, igracId));
+  const otkljucana = dostignuca.filter((d) => d.razina > 0);
+  const brojZvjezdica = otkljucana.reduce((zbroj, d) => zbroj + d.razina, 0);
+  const nazivi = otkljucana
+    .slice(0, 2)
+    .map((d) => dohvatiDefinicijuDostignuca(d.dostignuceId)?.naziv ?? d.dostignuceId);
+  return {
+    odigrano,
+    pobjede: (igrac?.pobjede ?? 0) + (igrac?.pobjede1v1 ?? 0) + (napredak?.treningPobjede ?? 0),
+    razina: stanjeIskustva(igrac?.iskustvoUkupno ?? 0).razina,
+    brojDostignuca: otkljucana.length,
+    brojZvjezdica,
+    naziviDostignuca: nazivi,
+  };
+}
+
+/**
+ * Idempotentan upis dovršene igre (svi načini) + eventualni gost sažetak.
+ * Claim prekretnicom sprječava dupli brojač kod retryja (npr. trening).
+ */
+export async function obradiDovrsenuIgruSanducic(ulaz: {
+  igracId: string;
+  jeBot: boolean;
+  izvorTip: 'javna' | 'privatna' | 'trening';
+  izvorId: string;
+  mod?: string | null;
+  /** Ako je brojač već povećan u istoj transakciji (javna partija). */
+  dovrseneNakon?: number;
+  jeGost?: boolean;
+  tx?: TxSanducic;
+  emitiraj?: boolean;
+}): Promise<boolean> {
+  if (ulaz.jeBot) return false;
+  if (!ulaz.tx) {
+    let stvorena = false;
+    await baza.transaction(async (tx) => {
+      stvorena = await obradiDovrsenuIgruSanducic({ ...ulaz, tx, emitiraj: false });
+    });
+    if (stvorena && ulaz.emitiraj !== false) {
+      emitirajPromjenuSanducica(ulaz.igracId, 'nova');
+    }
+    return stvorena;
+  }
+
+  const tx = ulaz.tx;
+  const kljuc = kljucPrekretniceDovrseneIgre(ulaz.izvorTip, ulaz.izvorId);
+  let dovrseneNakon = ulaz.dovrseneNakon;
+  let jeGost = ulaz.jeGost;
+
+  if (dovrseneNakon == null) {
+    const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, tx);
+    if (!nova) return false;
+    const [azurirani] = await tx
+      .update(igraci)
+      .set({ dovrseneIgre: sql`${igraci.dovrseneIgre} + 1` })
+      .where(eq(igraci.id, ulaz.igracId))
+      .returning({ dovrseneIgre: igraci.dovrseneIgre, vrsta: igraci.vrsta });
+    if (!azurirani) return false;
+    dovrseneNakon = azurirani.dovrseneIgre;
+    jeGost = azurirani.vrsta === 'gost';
+  } else if (jeGost == null) {
+    const [red] = await tx
+      .select({ vrsta: igraci.vrsta })
+      .from(igraci)
+      .where(eq(igraci.id, ulaz.igracId));
+    jeGost = red?.vrsta === 'gost';
+  }
+
+  return stvoriPorukuGostSazetak({
+    igracId: ulaz.igracId,
+    jeGost: jeGost === true,
+    dovrseneNakon,
+    tx,
+    izvorTip: ulaz.izvorTip,
+    izvorId: ulaz.izvorId,
+    mod: ulaz.mod,
+  });
 }

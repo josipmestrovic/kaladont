@@ -67,6 +67,7 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | pobjede_1v1 | integer | Agregat 1v1 moda |
 | eliminacije_1v1 | integer | Agregat 1v1 moda |
 | bodovi_1v1 | integer | Agregat 1v1 moda |
+| dovrsene_igre | integer | Broj svih dovršenih igara (javna + privatna + trening); za periodične sandučic sažetke gostiju. Ne ulazi u rang/formu. |
 | iskustvo_ukupno | integer | Trajni XP iz javnih modova; razina se izvodi iz njega |
 | stvoren | timestamptz | |
 | zadnja_aktivnost | timestamptz | Za čišćenje starih gostiju |
@@ -258,6 +259,10 @@ Revizijski trag **ručnih** promjena rječnika. Masovni uvoz se ne bilježi ovdj
 | prijava_id | integer FK, null | Ako je izmjena potekla iz prijave |
 | admin_id | uuid FK, null | null = skripta uvoza |
 | vrijeme | timestamptz | |
+
+## sanducic_poruke / sanducic_prekretnice
+
+Trajni mailbox ljudskog igrača (gost i registrirani). `sanducic_poruke` drži tip, tipizirani `podaci` (snapshot), `deduplikacijski_kljuc`, `procitano_at` i `najavljeno_at`. Jedinstvenost `(igrac_id, deduplikacijski_kljuc)`. Poruke starije od 3 dana se hard-brišu. `sanducic_prekretnice` bilježi potrošene pragove (prva igra, XP razine, zvjezdice, kolekcija, `forma_10:{mod}:{prag}`, `gost_sazetak:{prag}`, claim `dovrsena:{tip}:{id}`) bez poplave povijesne pošte pri uključivanju.
 
 ## Izvedeni podaci (bez tablica)
 

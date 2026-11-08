@@ -17,9 +17,12 @@ import { priznajCistuPetica, priznajDnevnuPobjeduModa, priznajRijetkuGrdosiju, p
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca } from '../misije/obracun.js';
 import {
   emitirajPromjeneSanducica,
+  obradiDovrsenuIgruSanducic,
   stvoriPorukeKolekcije,
   stvoriPorukeXpRazina,
   stvoriPorukeZvjezdica,
+  stvoriPorukuForme10,
+  stvoriPorukuGostSazetak,
   stvoriPorukuPromjeneRanga,
 } from '../sanducic/okidaci.js';
 import type { MisijeTx } from '../misije/tipovi.js';
@@ -219,6 +222,7 @@ interface AgregatZakljucka {
   odigrane: number;
   pobjede: number;
   iskustvoUkupno: number;
+  dovrseneIgre: number;
   novaDostignuca: NovoDostignuce[];
   dnkPrije: DnkOs[];
   dnkPoslije: DnkOs[];
@@ -321,6 +325,7 @@ export async function zakljuciPartijuUBazi(
         odigrane: 0,
         pobjede: 0,
         iskustvoUkupno: 0,
+        dovrseneIgre: 0,
         novaDostignuca: [...nova],
         dnkPrije: [],
         dnkPoslije: [],
@@ -403,6 +408,7 @@ export async function zakljuciPartijuUBazi(
             odigrane: stanjeIgraca.odigrane,
             pobjede: stanjeIgraca.pobjede,
             iskustvoUkupno: stanjeIgraca.iskustvoUkupno,
+            dovrseneIgre: 0,
             novaDostignuca: [],
             dnkPrije: [],
             dnkPoslije: [],
@@ -551,9 +557,18 @@ export async function zakljuciPartijuUBazi(
             eliminacije1v1: sql`${igraci.eliminacije1v1} + ${r.eliminacije}`,
             bodovi1v1: sql`${igraci.bodovi1v1} + ${r.bodovi}`,
             iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
+            ...(upravljac === 'covjek'
+              ? { dovrseneIgre: sql`${igraci.dovrseneIgre} + 1` }
+              : {}),
           })
           .where(eq(igraci.id, r.igracId))
-          .returning({ bodoviUkupno: igraci.bodovi1v1, odigrane: igraci.odigrane1v1, pobjede: igraci.pobjede1v1, iskustvoUkupno: igraci.iskustvoUkupno });
+          .returning({
+            bodoviUkupno: igraci.bodovi1v1,
+            odigrane: igraci.odigrane1v1,
+            pobjede: igraci.pobjede1v1,
+            iskustvoUkupno: igraci.iskustvoUkupno,
+            dovrseneIgre: igraci.dovrseneIgre,
+          });
 
         if (azurirani) {
           agregati.set(r.igracId, {
@@ -585,9 +600,18 @@ export async function zakljuciPartijuUBazi(
             eliminacijeUkupno: sql`${igraci.eliminacijeUkupno} + ${r.eliminacije}`,
             bodoviUkupno: sql`${igraci.bodoviUkupno} + ${r.bodovi}`,
             iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
+            ...(upravljac === 'covjek'
+              ? { dovrseneIgre: sql`${igraci.dovrseneIgre} + 1` }
+              : {}),
           })
           .where(eq(igraci.id, r.igracId))
-          .returning({ bodoviUkupno: igraci.bodoviUkupno, odigrane: igraci.odigrane, pobjede: igraci.pobjede, iskustvoUkupno: igraci.iskustvoUkupno });
+          .returning({
+            bodoviUkupno: igraci.bodoviUkupno,
+            odigrane: igraci.odigrane,
+            pobjede: igraci.pobjede,
+            iskustvoUkupno: igraci.iskustvoUkupno,
+            dovrseneIgre: igraci.dovrseneIgre,
+          });
 
         if (azurirani) {
           agregati.set(r.igracId, {
@@ -881,6 +905,19 @@ export async function zakljuciPartijuUBazi(
         pridruziDostignuca(r.igracId, privatnik.novaDostignuca, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
       }
 
+      if (samoStatistika && jeLjudskiRacun(vrstaIgraca, upravljac)) {
+        const gostPoruka = await obradiDovrsenuIgruSanducic({
+          igracId: r.igracId,
+          jeBot: false,
+          izvorTip: 'privatna',
+          izvorId: partijaId,
+          mod,
+          tx,
+          emitiraj: false,
+        });
+        if (gostPoruka) sanducicIgraci.add(r.igracId);
+      }
+
       if (!samoStatistika && r.plasman === 1 && jeLjudskiRacun(vrstaIgraca, upravljac)) {
         const kruna = await priznajDnevnuPobjeduModa(tx, { igracId: r.igracId, mod, zavrsenoU });
         primijeniDodjelu(r.igracId, kruna, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
@@ -1076,7 +1113,7 @@ export async function zakljuciPartijuUBazi(
         zapamtiObavijesti(igracId, ishod.noveObavijesti ?? []);
       }
 
-      // Sandučic: XP i rang nakon konačnog XP-a (uključujući misije).
+      // Sandučic: XP, rang, forma_10 i gost sažetak nakon konačnog XP-a (uključujući misije).
       for (const [igracId, agregat] of agregati) {
         if (agregat.upravljac !== 'covjek') continue;
         const razinaPrije = stanjeIskustva(agregat.iskustvoPrijePartije).razina;
@@ -1115,6 +1152,29 @@ export async function zakljuciPartijuUBazi(
           izvorId: partijaId,
         });
         if (rangPoruka) sanducicIgraci.add(igracId);
+
+        const formaPoruka = await stvoriPorukuForme10({
+          igracId,
+          mod,
+          odigraneNakon: agregat.odigrane,
+          nazivForme: agregat.forma?.naziv ?? null,
+          pobjede: agregat.forma?.brojPobjeda ?? 0,
+          trenutniNiz: agregat.nizPoslije,
+          tx,
+          izvorId: partijaId,
+        });
+        if (formaPoruka) sanducicIgraci.add(igracId);
+
+        const gostPoruka = await stvoriPorukuGostSazetak({
+          igracId,
+          jeGost: agregat.vrstaIgraca === 'gost',
+          dovrseneNakon: agregat.dovrseneIgre,
+          tx,
+          izvorTip: 'partija',
+          izvorId: partijaId,
+          mod,
+        });
+        if (gostPoruka) sanducicIgraci.add(igracId);
       }
     }
 

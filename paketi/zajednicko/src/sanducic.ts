@@ -12,6 +12,8 @@ export const TIP_SANDUCIC_NOVA_XP_RAZINA = 'nova_xp_razina' as const;
 export const TIP_SANDUCIC_NOVA_ZVJEZDICA = 'nova_zvjezdica' as const;
 export const TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA = 'nova_kolekcionarska_razina' as const;
 export const TIP_SANDUCIC_PROMJENA_RANGA = 'promjena_ranga' as const;
+export const TIP_SANDUCIC_FORMA_10 = 'forma_10' as const;
+export const TIP_SANDUCIC_GOST_SAZETAK_5 = 'gost_sazetak_5' as const;
 
 export const KLJUC_PREKRETNICE_PRVA_IGRA = 'prva_igra' as const;
 
@@ -28,7 +30,21 @@ export type TipSanducicPoruke =
   | typeof TIP_SANDUCIC_NOVA_ZVJEZDICA
   | typeof TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA
   | typeof TIP_SANDUCIC_PROMJENA_RANGA
+  | typeof TIP_SANDUCIC_FORMA_10
+  | typeof TIP_SANDUCIC_GOST_SAZETAK_5
   | (string & {});
+
+export function kljucPrekretniceForme10(mod: string, prag: number): string {
+  return `forma_10:${mod}:${prag}`;
+}
+
+export function kljucPrekretniceGostSazetak(prag: number): string {
+  return `gost_sazetak:${prag}`;
+}
+
+export function kljucPrekretniceDovrseneIgre(izvorTip: string, izvorId: string): string {
+  return `dovrsena:${izvorTip}:${izvorId}`;
+}
 
 export interface SanducicPorukaSazetak {
   id: string;
@@ -179,7 +195,73 @@ const PREDLOSCI: Record<string, Predlozak> = {
     },
     poveznica: () => '/profil',
   },
+  [TIP_SANDUCIC_FORMA_10]: {
+    naslov: 'Komentar forme',
+    tekst: (podaci) => tekstForme10(podaci),
+    poveznica: () => '/profil#statistika',
+  },
+  [TIP_SANDUCIC_GOST_SAZETAK_5]: {
+    naslov: 'Tvoj sažetak',
+    tekst: (podaci) => {
+      if (podaci.registriran === true) {
+        return 'Napredak je sačuvan registracijom. Hvala što igraš Kaladont! :)';
+      }
+      const odigrano = brojPolje(podaci, 'odigrano');
+      const pobjede = brojPolje(podaci, 'pobjede');
+      const razina = brojPolje(podaci, 'razina');
+      const brojDostignuca = brojPolje(podaci, 'brojDostignuca');
+      const brojZvjezdica = brojPolje(podaci, 'brojZvjezdica');
+      const redovi = [
+        `Odigrano: ${odigrano ?? '?'} · Pobjede: ${pobjede ?? '?'} · LVL: ${razina ?? '?'}`,
+        `Dostignuća: ${brojDostignuca ?? 0}, ukupno ${brojZvjezdica ?? 0} ${oblikZvjezdice(brojZvjezdica ?? 0)}.`,
+        'Registriraj se da sačuvaš napredak i pristupaš mu s različitih uređaja. Kao gost možeš izgubiti pristup napretku.',
+      ];
+      return redovi.join('\n');
+    },
+    poveznica: (podaci) => (podaci.registriran === true ? null : '/registracija'),
+  },
 };
+
+function brojPolje(podaci: Record<string, unknown>, kljuc: string): number | null {
+  const vrijednost = podaci[kljuc];
+  const broj = typeof vrijednost === 'number' ? vrijednost : Number(vrijednost);
+  return Number.isFinite(broj) ? broj : null;
+}
+
+function oblikPobjede(broj: number): string {
+  if (broj === 1) return 'pobjeda';
+  if (broj >= 2 && broj <= 4) return 'pobjede';
+  return 'pobjeda';
+}
+
+function komentarForme(naziv: string | null): string {
+  switch (naziv) {
+    case 'Dobra':
+    case 'Odlična':
+    case 'Izvanredna':
+    case 'Sjajna':
+    case 'Top forma':
+      return 'Bravo, samo tako nastavi! Hvala što igraš Kaladont! :)';
+    case 'Prolazna':
+      return 'Sljedeći niz počinje jednom pobjedom. Hvala što igraš Kaladont! :)';
+    case 'Slaba':
+    case 'Loša':
+      return 'Nova igra, nova prilika — samo hrabro! Hvala što igraš Kaladont! :)';
+    default:
+      return 'Hvala što igraš Kaladont! :)';
+  }
+}
+
+function tekstForme10(podaci: Record<string, unknown>): string {
+  const mod = tekstPolje(podaci, 'mod') || 'Igra';
+  const forma = tekstPolje(podaci, 'nazivForme') || 'nepoznata';
+  const pobjede = brojPolje(podaci, 'pobjede') ?? 0;
+  const trenutniNiz = brojPolje(podaci, 'trenutniNiz') ?? 0;
+  return [
+    `${mod} · zadnjih 10: ${pobjede} ${oblikPobjede(pobjede)}. Forma: ${forma}. Trenutni niz: ${trenutniNiz}.`,
+    komentarForme(tekstPolje(podaci, 'nazivForme') || null),
+  ].join(' ');
+}
 
 function oblikZvjezdice(broj: number): string {
   if (broj === 1) return 'zvjezdicu';

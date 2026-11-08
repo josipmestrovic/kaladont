@@ -90,6 +90,8 @@ export const igraci = pgTable('igraci', {
   pobjede1v1: integer('pobjede_1v1').notNull().default(0),
   eliminacije1v1: integer('eliminacije_1v1').notNull().default(0),
   bodovi1v1: integer('bodovi_1v1').notNull().default(0),
+  /** Svi dovršeni načini (javna, privatna, trening); za periodične sandučic sažetke. */
+  dovrseneIgre: integer('dovrsene_igre').notNull().default(0),
   iskustvoUkupno: integer('iskustvo_ukupno').notNull().default(0),
   stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
   zadnjaAktivnost: timestamp('zadnja_aktivnost', { withTimezone: true }).notNull().defaultNow(),

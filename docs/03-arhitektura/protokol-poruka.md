@@ -50,6 +50,7 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 | `partija:kraj` | `KrajPartije` | Konačni plasmani, bodovi i privatni XP obračun primatelja; opcionalni `prikazRezultataOdIso` je zajednički rok prikaza detalja, 8 s od završetka igre, ne mijenja se pri reconnectu |
 | `trening:neaktivnost` | `{ upozorenje: boolean, upozorenjeIso: string, zatvaraIso: string }` | Samo aktivnom ljudskom sudioniku treninga; apsolutni rok upozorenja i tehničkog zatvaranja, obnovljiv je kroz `StanjePartije` |
 | `iskustvo:obracun` | `ObracunIskustvaTijekomPartije` | Privatni XP obračun eliminiranog igrača |
+| `sanducic:promjena` | `{ razlog: 'nova' \| 'stanje' }` | Privatni signal vlasniku pretinca; bez sadržaja poruke — klijent dohvaća `GET /api/sanducic/sazetak` |
 | `reakcija:nova` | `{ igracId: string, poruka: BrzaPoruka }` | |
 | `greska` | `{ kod: KodGreske, poruka: string }` | Općenite greške (npr. `PREBRZO`) |
 

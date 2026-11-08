@@ -40,3 +40,20 @@ Stari `GET /api/ljestvica` ostaje privremeno radi kompatibilnosti.
 `POST /api/prijave-igraca` — tijelo `{ partijaId, prijavljeniIgracId, razlog }` (UI šalje `pogrdan_nadimak`). Partija `u_tijeku` ili `zavrsena`; admin lista ne vraća `prijaviteljId`.
 
 Admin (sesija `vrsta=admin`): `GET /api/admin/prijave?status=nova&tip=…`, `POST …/obrisi-rijec|dodaj-rijec|dismiss`; `GET /api/admin/prijave-igraca`, `POST …/obrisi-racun|dismiss`. Izmjene rječnika zovu `ponovoUcitaj()`.
+
+## Sandučic (mailbox)
+
+Autorizirani gost ili registrirani (`zahtijevajIdentifikaciju`). Primatelj je uvijek iz sesije; klijent ne bira tuđi pretinac. Odgovori imaju `Cache-Control: private, no-store`. Poruke starije od 3 dana brišu se periodički.
+
+| Operacija | Ruta | Opis |
+|---|---|---|
+| Sažetak | `GET /api/sanducic/sazetak` | `brojNeprocitanih` + paket `zaNajavu` (nenajavljene i nepročitane) |
+| Lista | `GET /api/sanducic?filter=sve\|neprocitano&cursor=…` | Paginacija, najnovije prve |
+| Detalj | `GET /api/sanducic/:id` | Jedna vlastita poruka |
+| Pročitaj | `POST /api/sanducic/procitano` | Tijelo `{ id }` — idempotentno |
+| Pročitaj sve | `POST /api/sanducic/procitano-sve` | Granica koja ne proguta kasnije poruke |
+| Potvrdi najavu | `POST /api/sanducic/najavi` | Tijelo `{ ids: string[] }` — samo stvarno prikazani paket |
+
+UI viewer: `/obavijesti`. Socket signal `sanducic:promjena` (bez privatnog sadržaja) potiče klijent na ponovni dohvat sažetka.
+
+Periodični tipovi: `forma_10` (javni Dvoboj/Četveroboj, svakih 10 igara toga moda, snapshot forme) i `gost_sazetak_5` (gost, svakih 5 dovršenih igara svih načina). Baseline postojećih igrača troši već dosegnute pragove bez poplave pošte; trening porazi u povijesti nisu pouzdano rekonstruibilni.

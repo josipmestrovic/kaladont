@@ -67,7 +67,7 @@ import { osigurajUpisePoteza, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, 
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { zabiljeziPobjeduTreninga } from '../trening/upis-napretka.js';
-import { mozdaObavijestiPrvuIgru } from '../sanducic/okidaci.js';
+import { mozdaObavijestiPrvuIgru, obradiDovrsenuIgruSanducic } from '../sanducic/okidaci.js';
 import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
 import { stvoriStvarniSat, type Sat, type SatHandle } from './sat.js';
 import {
@@ -1171,6 +1171,7 @@ export function stvoriUpraviteljPartija(
             }
           }
           await obavijestiPrvuIgruSudionicima(stanje, 'trening');
+          await obradiDovrseneIgreTreninga(stanje);
           for (const p of plasmani) {
             const ishod = p.igracId === pobjednikId ? nagrada?.ishodMisija : null;
             const novaDostignuca = [
@@ -1443,6 +1444,24 @@ export function stvoriUpraviteljPartija(
       console.error('sanducic:prva_igra nije uspjela', {
         partijaId: stanje.partijaId,
         kontekst,
+        greska,
+      });
+    }
+  }
+
+  /** Brojač svih dovršenih igara + gost sažetak (O2). Za javnu/privatnu radi upis-partije. */
+  async function obradiDovrseneIgreTreninga(stanje: StanjeStola): Promise<void> {
+    try {
+      await Promise.all(stanje.sudionici.map((sudionik) => obradiDovrsenuIgruSanducic({
+        igracId: sudionik.igracId,
+        jeBot: sudionik.upravljac === 'bot',
+        izvorTip: 'trening',
+        izvorId: stanje.partijaId,
+        mod: stanje.mod,
+      })));
+    } catch (greska) {
+      console.error('sanducic:dovrsene_igre trening nije uspio', {
+        partijaId: stanje.partijaId,
         greska,
       });
     }
