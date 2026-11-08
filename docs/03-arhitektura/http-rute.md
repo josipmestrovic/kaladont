@@ -48,12 +48,14 @@ Autorizirani gost ili registrirani (`zahtijevajIdentifikaciju`). Primatelj je uv
 | Operacija | Ruta | Opis |
 |---|---|---|
 | Sažetak | `GET /api/sanducic/sazetak` | `brojNeprocitanih` + paket `zaNajavu` (nenajavljene i nepročitane) |
-| Lista | `GET /api/sanducic?filter=sve\|neprocitano&cursor=…` | Paginacija, najnovije prve |
-| Detalj | `GET /api/sanducic/:id` | Jedna vlastita poruka |
-| Pročitaj | `POST /api/sanducic/procitano` | Tijelo `{ id }` — idempotentno |
-| Pročitaj sve | `POST /api/sanducic/procitano-sve` | Granica koja ne proguta kasnije poruke |
+| Lista | `GET /api/sanducic?cursor=…` | Paginacija, najnovije prve; feed prikazuje `naslov` + `tekst` |
+| Detalj | `GET /api/sanducic/:id` | Jedna vlastita poruka (deep-link) |
+| Pročitaj | `POST /api/sanducic/procitano` | Tijelo `{ ids: string[] }` — idempotentno |
+| Pročitaj sve | `POST /api/sanducic/procitano-sve` | Ulazak u `/obavijesti` automatski šalje ovu rutu; granica ne proguta kasnije poruke |
 | Potvrdi najavu | `POST /api/sanducic/najavi` | Tijelo `{ ids: string[] }` — samo stvarno prikazani paket |
+| Obriši sve | `POST /api/sanducic/obrisi-sve` | Hard-delete svih vlastitih poruka |
+| Seed (samo development/test) | `POST /api/sanducic/test` | Ručni/E2E umetak poruke; nije dostupno u staging/production |
 
-UI viewer: `/obavijesti`. Socket signal `sanducic:promjena` (bez privatnog sadržaja) potiče klijent na ponovni dohvat sažetka.
+UI viewer: `/obavijesti` (feed, auto-pročitano na ulazu). Socket signal `sanducic:promjena` (bez privatnog sadržaja) potiče klijent na ponovni dohvat sažetka.
 
 Periodični tipovi: `forma_10` (javni Dvoboj/Četveroboj, svakih 10 igara toga moda, snapshot forme) i `gost_sazetak_5` (gost, svakih 5 dovršenih igara svih načina). Baseline postojećih igrača troši već dosegnute pragove bez poplave pošte; trening porazi u povijesti nisu pouzdano rekonstruibilni.

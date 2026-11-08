@@ -250,3 +250,13 @@ export async function potvrdiNajavu(igracId: string, ids: readonly string[]): Pr
     .returning({ id: sanducicPoruke.id });
   return azurirane.map((red) => red.id);
 }
+
+/** Hard-delete svih poruka vlasnika (feed „Obriši sve”). */
+export async function obrisiSvePoruke(igracId: string): Promise<number> {
+  const obrisane = await baza
+    .delete(sanducicPoruke)
+    .where(eq(sanducicPoruke.igracId, igracId))
+    .returning({ id: sanducicPoruke.id });
+  if (obrisane.length > 0) emitirajPromjenuSanducica(igracId, 'stanje');
+  return obrisane.length;
+}

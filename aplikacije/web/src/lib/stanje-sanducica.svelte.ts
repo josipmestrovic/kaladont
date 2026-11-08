@@ -194,11 +194,17 @@ export async function oznaciSanducicProcitane(ids: string[]): Promise<void> {
   await osvjeziSazetakSanducica();
 }
 
-export async function oznaciSavSanducicProcitanim(): Promise<void> {
+export async function oznaciSavSanducicProcitanim(doAt = new Date()): Promise<void> {
   await api('/sanducic/procitano-sve', {
     method: 'POST',
-    body: JSON.stringify({ doAt: new Date().toISOString() }),
+    body: JSON.stringify({ doAt: doAt.toISOString() }),
   });
+  await osvjeziSazetakSanducica();
+}
+
+export async function obrisiSavSanducic(): Promise<void> {
+  await api('/sanducic/obrisi-sve', { method: 'POST', body: '{}' });
+  ocistiLokalno();
   await osvjeziSazetakSanducica();
 }
 

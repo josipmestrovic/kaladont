@@ -24,7 +24,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Na naslovnici kompaktna zona profil + sandučic gore desno (bez ostatka header navigacije). Ulaz je isključivo ikona; nema stavke u glavnoj navigaciji ni bannera.
 - Toast „Imaš N novih obavijesti” + Pročitaj na dopuštenim ekranima; potisnut u `/red`, aktivnoj partiji i tijekom završnog odbrojavanja. Na završnom ekranu rezultata diskretan klikabilan sažetak umjesto toasta.
 - Pročitano ≠ najavljeno: nestanak toasta ne čita poruku; crvena točka prati nepročitane.
-- Viewer `/obavijesti`: lista, detalj, označi sve pročitanim; prazno i greška razdvojeni.
+- Viewer `/obavijesti` je feed obavijesti: ulazak odmah označava sve pročitanima (točka nestaje), stavke pokazuju naslov i puni tekst bez zasebnog detalja, vizualna oznaka „Novo” za poruke koje su baš bile nepročitane. Umjesto „Označi sve pročitanim” postoji „Obriši sve obavijesti”. Prazno i greška razdvojeni.
 
 ## Globalne obavijesti
 
