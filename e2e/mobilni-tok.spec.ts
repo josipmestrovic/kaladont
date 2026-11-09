@@ -343,11 +343,12 @@ test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', a
   }, sesijskiToken);
   await page.setViewportSize({ width: 320, height: 760 });
 
-  await page.goto('/profil');
+  // Javni prvo (ne s /profil) — WebKit inače prekine goto raceom natrag na /profil.
+  await page.goto(`/profil/javni/${drugiId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(new RegExp(`/profil/javni/${drugiId}$`));
   await expect(page.getByRole('navigation', { name: 'Sadržaj profila' }).getByRole('button', { name: 'Aktivnost' })).toHaveCount(0);
 
-  await page.goto(`/profil/javni/${drugiId}`);
-  await expect(page).toHaveURL(new RegExp(`/profil/javni/${drugiId}$`));
+  await page.goto('/profil', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('navigation', { name: 'Sadržaj profila' }).getByRole('button', { name: 'Aktivnost' })).toHaveCount(0);
 
   const zaglavlja = { authorization: `Bearer ${sesijskiToken}` };

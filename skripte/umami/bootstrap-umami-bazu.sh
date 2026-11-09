@@ -49,6 +49,18 @@ done
 [[ -n "${UMAMI_BAZA_LOZINKA:-}" ]] || { echo 'Postavi UMAMI_BAZA_LOZINKA u okolini' >&2; exit 2; }
 [[ -f "$COMPOSE_DATOTEKA" ]] || { echo "Compose datoteka ne postoji: $COMPOSE_DATOTEKA" >&2; exit 2; }
 
+# Zabranjene slabe/placeholder vrijednosti (Compose više nema poznate defaulte).
+if [[ "$UMAMI_BAZA_LOZINKA" == "umami" || ${#UMAMI_BAZA_LOZINKA} -lt 16 ]]; then
+  echo 'UMAMI_BAZA_LOZINKA mora biti >= 16 znakova i ne smije biti „umami”.' >&2
+  exit 2
+fi
+if [[ -n "${UMAMI_APP_SECRET:-}" ]]; then
+  if [[ "$UMAMI_APP_SECRET" == "promijeni-umami-app-secret" || ${#UMAMI_APP_SECRET} -lt 32 ]]; then
+    echo 'UMAMI_APP_SECRET mora biti >= 32 znakova i ne smije biti placeholder.' >&2
+    exit 2
+  fi
+fi
+
 # Escapiranje jednog navodnika za SQL literal.
 lozinka_sql="${UMAMI_BAZA_LOZINKA//\'/\'\'}"
 

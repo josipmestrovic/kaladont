@@ -19,6 +19,8 @@ kaladont.hr {
     }
 }
 
+# DNS za analitika.* tek nakon healthy Umami + promjene default admin lozinke (runbook §4–5).
+# Tracker putanje (/script.js, /api/*) moraju ostati javne za CSP na kaladont.hr.
 analitika.kaladont.hr {
     encode gzip
     header {

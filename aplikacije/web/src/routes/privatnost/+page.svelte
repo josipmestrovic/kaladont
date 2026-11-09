@@ -1,3 +1,7 @@
+<script lang="ts">
+  let { data } = $props();
+</script>
+
 <svelte:head>
   <title>Privatnost | Kaladont</title>
 </svelte:head>
@@ -29,23 +33,27 @@
     <p>Ne koristimo kolačiće za praćenje, oglašavanje ni profiliranje.</p>
   </section>
 
+  {#if data.umami}
   <section>
     <h2>Web analitika</h2>
     <p>
-      Koristimo self-hosted Umami na <code>analitika.kaladont.hr</code> (isti hosting kao igra, EU).
-      Mjeri anonimne posjete, izvore prometa i odabrane događaje (npr. klik na „Igraj” ili forum).
-      Ne koristi kolačiće za praćenje, ne profilira korisnike i ne šalje podatke trećim stranama za
-      oglašavanje. Ne bilježimo email, UUID gosta ni sadržaj foruma.
+      Kad je analitika uključena, koristimo self-hosted Umami na <code>analitika.kaladont.hr</code>
+      (isti hosting kao igra, EU). Mjeri anonimne posjete, izvore prometa i odabrane događaje
+      (npr. klik na „Igraj” ili forum). Ne koristi kolačiće za praćenje, ne profilira korisnike i ne
+      šalje podatke trećim stranama za oglašavanje. Ne bilježimo email, UUID gosta ni sadržaj foruma.
     </p>
   </section>
+  {/if}
 
   <section>
     <h2>Zašto ih koristimo?</h2>
     <p>
       Podatke obrađujemo kako bismo omogućili račun, prijavu, oporavak lozinke, multiplayer igru,
       povijest partija, zaštitu od zlouporabe i rješavanje prijava grešaka. Email potvrde i upute za
-      reset šalju se preko Resenda. Anonimnu web analitiku koristimo da vidimo odakle dolaze posjetitelji
-      i koje pozive na akciju koriste.
+      reset šalju se preko Resenda.
+      {#if data.umami}
+        Anonimnu web analitiku koristimo da vidimo odakle dolaze posjetitelji i koje pozive na akciju koriste.
+      {/if}
     </p>
   </section>
 
@@ -81,7 +89,9 @@
     <h2>Izvršitelji obrade</h2>
     <p>
       Kaladont se za hosting i bazu oslanja na Hetzner u Njemačkoj, a za transakcijske emailove na Resend.
-      Web analitiku vodi vlastiti Umami na istom VPS-u; podaci se ne koriste za oglašavanje.
+      {#if data.umami}
+        Web analitiku vodi vlastiti Umami na istom VPS-u; podaci se ne koriste za oglašavanje.
+      {/if}
     </p>
   </section>
 

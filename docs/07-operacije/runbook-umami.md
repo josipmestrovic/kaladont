@@ -70,9 +70,12 @@ To **ne dira** `kaladont_prod`.
 ## 3. Podigni Umami kontejner
 
 Umami je iza Compose profila `umami` — obični deploy igre **ne** pokreće ga i **ne** traži Umami tajne.
+Compose **nema** poznate defaulte za `UMAMI_BAZA_LOZINKA` / `UMAMI_APP_SECRET` — bez pravih tajni kontejner neće zdravije dignuti.
 
 ```bash
 cd /opt/kaladont
+# Fail-fast na prazne/slabe tajne (skripta iz repoa):
+bash /putanja/do/skripte/umami/provjeri-umami-tajne.sh
 sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml --env-file .env up -d umami
 sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml ps
 ```
@@ -105,6 +108,8 @@ Mora pokazati baš `<PROD_IPV4>`. Pričekaj propagaciju (često minute, ponekad 
 ---
 
 ## 5. Prvi login + Website ID
+
+> **Visoki rizik:** UI na `analitika.kaladont.hr` je javan (TLS + Umami login). DNS uključi tek kad je kontejner healthy, pa **odmah** promijeni default admin lozinku — ne ostavljaj `admin`/`umami` ni minutu dulje nego što treba za prvi login.
 
 1. Otvori `https://analitika.kaladont.hr`
 2. Default prijava (obično `admin` / `umami`) — **odmah promijeni lozinku**; spremi u Bitwarden

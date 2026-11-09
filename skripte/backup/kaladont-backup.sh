@@ -187,6 +187,10 @@ EOF
 rezultat_igre="$(napravi_dump "$BAZA_IME")"
 rezultat_umami=''
 if [[ -n "$UMAMI_BAZA_IME" ]]; then
+  # Samo siguran identifikator baze (slova/brojevi/_), bez SQL interpolacije.
+  if [[ ! "$UMAMI_BAZA_IME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    kaladont_umri "UMAMI_BAZA_IME nije valjan identifikator: ${UMAMI_BAZA_IME}"
+  fi
   # Ako baza još nije bootstrapana, ne ruši dnevni/pre-migracijski backup igre.
   if (
     cd "$COMPOSE_PROJECT_DIR"
