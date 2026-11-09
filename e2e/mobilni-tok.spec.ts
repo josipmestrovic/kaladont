@@ -312,15 +312,28 @@ test('mobilna naslovnica prikazuje poveznicu Misije', async ({ page }) => {
 });
 
 test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', async ({ page }) => {
+  const sufiks = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const odgovor = await page.request.post('http://127.0.0.1:3001/api/racuni/registracija', {
     data: {
-      email: `aktivnost-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+      email: `aktivnost-${sufiks}@example.com`,
       lozinka: 'lozinka123',
       nadimak: 'AktivIgrac',
     },
   });
   expect(odgovor.ok()).toBe(true);
   const { igracId, sesijskiToken } = (await odgovor.json()) as { igracId: string; sesijskiToken: string };
+
+  // Tuđi javni profil — vlastiti /profil/javni/:id preusmjerava na /profil (WebKit race).
+  const drugi = await page.request.post('http://127.0.0.1:3001/api/racuni/registracija', {
+    data: {
+      email: `javni-${sufiks}@example.com`,
+      lozinka: 'lozinka123',
+      nadimak: 'JavniIgrac',
+    },
+  });
+  expect(drugi.ok()).toBe(true);
+  const { igracId: drugiId } = (await drugi.json()) as { igracId: string };
+
   await page.addInitScript((token) => {
     localStorage.setItem('kaladont_sesijski_token', token);
   }, sesijskiToken);
@@ -329,7 +342,8 @@ test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', a
   await page.goto('/profil');
   await expect(page.getByRole('navigation', { name: 'Sadržaj profila' }).getByRole('button', { name: 'Aktivnost' })).toHaveCount(0);
 
-  await page.goto(`/profil/javni/${igracId}`);
+  await page.goto(`/profil/javni/${drugiId}`);
+  await expect(page).toHaveURL(new RegExp(`/profil/javni/${drugiId}$`));
   await expect(page.getByRole('navigation', { name: 'Sadržaj profila' }).getByRole('button', { name: 'Aktivnost' })).toHaveCount(0);
 
   const zaglavlja = { authorization: `Bearer ${sesijskiToken}` };
