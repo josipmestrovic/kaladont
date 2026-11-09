@@ -277,11 +277,14 @@ jobs:
           # Osnovni stack (bez Umami profila) — rutinski deploy ne smije tražiti UMAMI tajne.
           docker compose -f docker-compose.prod.yml config >/dev/null
           # Profil umami + sintetičke tajne — validacija Umami servisa.
-          UMAMI_BAZA_LOZINKA=ci-umami-baza-lozinka UMAMI_APP_SECRET=ci-umami-app-secret-32chars-min \
+          UMAMI_BAZA_LOZINKA=ci-umami-baza-lozinka UMAMI_APP_SECRET=ci-umami-app-secret-0123456789ab \
             docker compose --profile umami -f docker-compose.prod.yml config >/dev/null
           # Fail-fast skripta: odbij slabe tajne, prihvati valjane.
-          ! UMAMI_BAZA_LOZINKA=umami UMAMI_APP_SECRET=short bash skripte/umami/provjeri-umami-tajne.sh
-          UMAMI_BAZA_LOZINKA=ci-umami-baza-lozinka UMAMI_APP_SECRET=ci-umami-app-secret-32chars-min \
+          if UMAMI_BAZA_LOZINKA=umami UMAMI_APP_SECRET=short bash skripte/umami/provjeri-umami-tajne.sh; then
+            echo 'provjeri-umami-tajne.sh je prošao sa slabim tajnama' >&2
+            exit 1
+          fi
+          UMAMI_BAZA_LOZINKA=ci-umami-baza-lozinka UMAMI_APP_SECRET=ci-umami-app-secret-0123456789ab \
             bash skripte/umami/provjeri-umami-tajne.sh
 
       - name: Validirati produkcijsku konfiguraciju (sintetika)
