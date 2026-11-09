@@ -186,29 +186,38 @@ export function jsonLdSkripta(podaci: Record<string, unknown> | Record<string, u
 
 export function breadcrumbPravila(tema: PravilaTema) {
   const meta = metaPravilaTeme(tema);
+  const itemListElement: {
+    '@type': 'ListItem';
+    position: number;
+    name: string;
+    item: string;
+  }[] = [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Naslovnica',
+      item: kanonskiUrl('/'),
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Pravila Kaladonta',
+      item: kanonskiUrl('/pravila-kaladonta'),
+    },
+  ];
+  // Hub (`kako-igrati`) je `/pravila-kaladonta` — ne dupliciraj isti URL kao treću stavku.
+  if (tema !== 'kako-igrati') {
+    itemListElement.push({
+      '@type': 'ListItem',
+      position: 3,
+      name: meta.naziv,
+      item: kanonskiUrl(putanjaPravilaTeme(tema)),
+    });
+  }
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Naslovnica',
-        item: kanonskiUrl('/'),
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'Pravila Kaladonta',
-        item: kanonskiUrl('/pravila-kaladonta'),
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: meta.naziv,
-        item: kanonskiUrl(putanjaPravilaTeme(tema)),
-      },
-    ],
+    itemListElement,
   };
 }
 

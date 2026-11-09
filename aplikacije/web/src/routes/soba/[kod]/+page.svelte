@@ -44,6 +44,9 @@
         void goto('/potvrdi-email');
         return;
       }
+      // Soft greške (npr. race na kick) ne smiju zamijeniti lobby terminalnim overlayem —
+      // inače „Vrati se na početnu” zatvara sobu za sve.
+      if (stanjeSobe) return;
       greska = p.poruka;
     };
 

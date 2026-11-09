@@ -552,8 +552,8 @@ export function registrirajPrivatneSobe(
         return;
       }
 
+      // Idempotentno: član je već otišao ili je već izbačen — bez greske da ne sruši lobby vlasniku.
       if (!soba.clanoviMap.has(metaId)) {
-        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Taj igrač nije u sobi.' });
         return;
       }
 
