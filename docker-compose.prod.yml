@@ -38,6 +38,8 @@ services:
       NADZOR_EVENT_LOOP_MS_PRAG: ${NADZOR_EVENT_LOOP_MS_PRAG:-100}
       NADZOR_HTTP_MS_PRAG: ${NADZOR_HTTP_MS_PRAG:-1000}
       UMAMI_URL: ${UMAMI_URL:-}
+      PUBLIC_UMAMI_URL: ${UMAMI_URL:-}
+      PUBLIC_UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
       ONEMOGUCI_TIMER_POTEZA: "false"
       ODGODA_POCETKA_PARTIJE_MS: "10000"
       TOLERANCIJA_PREKIDA_MS: "10000"
@@ -61,6 +63,28 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - javna
+      - privatna
+
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.1
+    restart: unless-stopped
+    init: true
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_BAZA_LOZINKA:?Postavi UMAMI_BAZA_LOZINKA}@baza:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?Postavi UMAMI_APP_SECRET}
+    depends_on:
+      baza:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     networks:
       - javna
       - privatna

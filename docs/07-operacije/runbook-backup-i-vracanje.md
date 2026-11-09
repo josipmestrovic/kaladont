@@ -22,7 +22,7 @@ Na produkcijskom VPS-u systemd timer oko 04:00 UTC pokreće verzionirani backup 
 
 1. šalje `/start` signal zasebnom Healthchecks.io checku;
 2. provjerava dostupnost baze, slobodan lokalni prostor i sve obvezne varijable;
-3. radi `pg_dump -Fc` u cjevovodu izravno u `age` (nema plaintext dump datoteke na disku);
+3. radi `pg_dump -Fc` u cjevovodu izravno u `age` (nema plaintext dump datoteke na disku); ako je u `backup.env` postavljen `UMAMI_BAZA_IME` (npr. `umami`), nakon dumpa igre radi i zasebni šifrirani dump te baze (`kaladont_umami_…dump.age`) — Umami restore nije kritičan za igru, ali se čuva istim tokom;
 4. šifrira javnim `age` recipientom **prije** napuštanja VPS-a;
 5. računa SHA-256 šifrirane datoteke i `.sha256` sidecar;
 6. prenosi `.age` + sidecar na Storage Box podračun preko SFTP-a (port 23);

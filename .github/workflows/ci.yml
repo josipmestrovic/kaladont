@@ -105,6 +105,9 @@ jobs:
       EMAIL_API_KLJUC: ''
       DEV_MAIL: dev@example.com
       UMAMI_URL: ''
+      UMAMI_WEBSITE_ID: ''
+      PUBLIC_UMAMI_URL: ''
+      PUBLIC_UMAMI_WEBSITE_ID: ''
       ODGODA_POCETKA_PARTIJE_MS: '0'
       ADMIN_TAJNI_KLJUC: ci-admin-secret
 
@@ -231,6 +234,9 @@ jobs:
       EMAIL_API_KLJUC: ''
       DEV_MAIL: dev@example.com
       UMAMI_URL: ''
+      UMAMI_WEBSITE_ID: ''
+      PUBLIC_UMAMI_URL: ''
+      PUBLIC_UMAMI_WEBSITE_ID: ''
       ODGODA_POCETKA_PARTIJE_MS: '0'
       ADMIN_TAJNI_KLJUC: ci-admin-secret
       CANDIDATE_TAG: ci-${{ github.sha }}-${{ github.run_id }}

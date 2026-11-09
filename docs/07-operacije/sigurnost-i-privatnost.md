@@ -96,7 +96,7 @@ Jedan Storage Box koristi odvojene podračune za forum i produkciju, tako da kom
 | Potezi partija              | svi          | povijest, prijave grešaka, integritet igre           | legitimni interes          |
 | IP u logovima               | svi          | sigurnost (rate limit, zlouporaba), kratka retencija | legitimni interes          |
 
-- **Bez kolačića za praćenje**: početni MVP nema web analitiku; sesijski kolačić nužan je za rad. Nakon naknadnog uključivanja Umami je cookieless i ne profilira korisnike, pa se ne uvodi analitički kolačić.
+- **Bez kolačića za praćenje**: sesijski kolačić nužan je za rad. Self-hosted Umami (kad je `UMAMI_URL` + `UMAMI_WEBSITE_ID` postavljeni) cookieless je i ne profilira korisnike, pa se ne uvodi analitički kolačić ni cookie banner.
 - **Brisanje računa**: korisnik se javlja na `info@kaladont.hr` s registrirane email adrese. Operater zahtjev obrađuje ručno u roku do 7 dana. Uklanjaju se email, lozinka, potvrda emaila, sesije i privatni napredak; račun se anonimizira kao „Obrisani igrač”. Zajedničke partije, potezi, plasmani i prijave ostaju radi integriteta igre i drugih igrača.
 - **Rokovi**: sesije najviše 30 dana; IP i sigurnosni logovi 30 dana; email komunikacija o zahtjevu 12 mjeseci; anonimizirana povijest partija dok je potrebna za integritet; backup kopije prema redovnoj operativnoj retenciji.
 - Gosti: UUID nije izravno osobni podatak, ali se prema njemu odnosimo kao da jest (iste retencije).
@@ -112,7 +112,7 @@ Jedan Storage Box koristi odvojene podračune za forum i produkciju, tako da kom
 | UptimeRobot     | javni HTTP nadzor `/zdravlje`                                                     | javni URL, status i vrijeme odgovora | samo email alarmi; endpoint ne vraća osobne podatke                                                                                            |
 | Healthchecks.io | heartbeat backupa i provjere diska                                                | naziv posla i vrijeme pinga          | ping URL je tajna; ne šalju se logovi, dumpovi ni podaci igrača                                                                                |
 | XHosting        | DNS upravljanje domene                                                            | domena i infrastrukturne IP adrese   | podrška postavlja A i Resend DNS zapise; nema pristup aplikaciji ni bazi                                                                       |
-| Umami (kasnije) | cookieless web analitika                                                          | anonimni posjeti i odabrani događaji | nije dio prvog lansiranja; dodaje se u popis obrade prije uključivanja                                                                         |
+| Umami (self-host) | cookieless web analitika na `analitika.kaladont.hr`                             | anonimni posjeti i odabrani događaji | isti VPS/Hetzner; gašenje ostavljanjem `UMAMI_URL` / `UMAMI_WEBSITE_ID` praznima                                                                |
 
 Popis se održava ažurnim na `/privatnost` stranici; novi izvršitelj = izmjena ovog dokumenta **prije** uvođenja.
 

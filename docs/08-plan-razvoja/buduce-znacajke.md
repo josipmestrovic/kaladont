@@ -6,7 +6,7 @@ Ništa odavde ne ulazi u MVP. Redoslijed će odrediti stvarni podaci ([metrike-u
 
 | Značajka                        | Bilješka                                                                                                                 | Preduvjet                                                               |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| **Umami analitika**             | Self-hosted, cookieless mjerenje izvora prometa te klikova na „IGRAJ” i forum; dodaje se kao zaseban produkcijski servis | Stabilan javni rani pristup i provjeren backup/nadzor postojećeg stacka |
+| **Umami analitika**             | Compose + Caddy + klijentski tracker u repou; uključuje se DNS-om, bootstrapom baze i `UMAMI_WEBSITE_ID` nakon stabilizacije | Stabilan javni rani pristup; slobodan RAM na CX23; backup obuhvat baze `umami` |
 | **Dinamička najava održavanja** | Admin zada poruku i termin bez posebnog deploya; do tada se banner objavljuje prethodnim redovnim izdanjem               | Dogovoren model administrativnih postavki                               |
 
 ## Visok prioritet (kandidati za v2)

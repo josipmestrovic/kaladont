@@ -4,7 +4,7 @@
 
 <main class="stranica-obavijesti">
   <h1>Pravila privatnosti</h1>
-  <p class="datum">Zadnje ažuriranje: 17. rujna 2026.</p>
+  <p class="datum">Zadnje ažuriranje: 9. studenoga 2026.</p>
 
   <section>
     <h2>Tko obrađuje podatke?</h2>
@@ -30,11 +30,22 @@
   </section>
 
   <section>
+    <h2>Web analitika</h2>
+    <p>
+      Koristimo self-hosted Umami na <code>analitika.kaladont.hr</code> (isti hosting kao igra, EU).
+      Mjeri anonimne posjete, izvore prometa i odabrane događaje (npr. klik na „Igraj” ili forum).
+      Ne koristi kolačiće za praćenje, ne profilira korisnike i ne šalje podatke trećim stranama za
+      oglašavanje. Ne bilježimo email, UUID gosta ni sadržaj foruma.
+    </p>
+  </section>
+
+  <section>
     <h2>Zašto ih koristimo?</h2>
     <p>
       Podatke obrađujemo kako bismo omogućili račun, prijavu, oporavak lozinke, multiplayer igru,
       povijest partija, zaštitu od zlouporabe i rješavanje prijava grešaka. Email potvrde i upute za
-      reset šalju se preko Resenda.
+      reset šalju se preko Resenda. Anonimnu web analitiku koristimo da vidimo odakle dolaze posjetitelji
+      i koje pozive na akciju koriste.
     </p>
   </section>
 
@@ -70,7 +81,7 @@
     <h2>Izvršitelji obrade</h2>
     <p>
       Kaladont se za hosting i bazu oslanja na Hetzner u Njemačkoj, a za transakcijske emailove na Resend.
-      Podaci se ne koriste za oglašavanje i ne uvodimo analitiku trećih strana bez zasebne izmjene ove obavijesti.
+      Web analitiku vodi vlastiti Umami na istom VPS-u; podaci se ne koriste za oglašavanje.
     </p>
   </section>
 

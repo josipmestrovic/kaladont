@@ -46,7 +46,7 @@ flowchart TD
 | **Engine partije**              | Stanje stola, potezi, timeri (30 s), eliminacije, bodovi; koristi pravila iz `zajednicko`                                                                                       |
 | **Rječnik u memoriji**          | `Map<prvaDva, Set<rijec>>` + skup svih riječi; mrtvi parovi; učitava se pri startu, osvježava signalom                                                                          |
 | **PostgreSQL**                  | Trajni podaci: igrači, partije, potezi, riječi, prijave, izmjene rječnika                                                                                                       |
-| **Umami (nakon stabilizacije)** | Opcionalna anonimna analitika posjeta (self-hosted, bez kolačića); nije dio početnog produkcijskog stacka ni uvjet lansiranja ([ADR-014](odluke/014-operativni-model-mvp-a.md)) |
+| **Umami (nakon stabilizacije)** | Self-hosted cookieless analitika (`analitika.kaladont.hr`); u Composeu, tracker se pali tek s `UMAMI_WEBSITE_ID`; nije uvjet lansiranja ([ADR-014](odluke/014-operativni-model-mvp-a.md)) |
 
 ## Ključni tokovi
 

@@ -12,6 +12,7 @@
   import SanducicProfilZona from '$lib/komponente/SanducicProfilZona.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import { naslovnicaJsonLd } from '$lib/seo.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
@@ -20,6 +21,7 @@
   function otvoriModal(vrsta: 'igra' | 'pravno') {
     otvoreniModal = vrsta;
     if (vrsta === 'igra') {
+      zabiljeziUmamiDogadjaj('igraj-klik');
       ucitajModalIgraAsete();
       zagrijGameplayZvukove();
     }
@@ -120,6 +122,13 @@
     <nav aria-label="Dodatne poveznice">
       <a href="/o-igri">
         <span>O igri</span>
+      </a>
+      <a
+        href="https://forum.kaladont.hr"
+        rel="noopener noreferrer"
+        onclick={() => zabiljeziUmamiDogadjaj('forum-klik-landing')}
+      >
+        <span>Pridruži se zajednici</span>
       </a>
       <a href="/povratne-informacije">
         <span>Pomozi poboljšati igru</span>

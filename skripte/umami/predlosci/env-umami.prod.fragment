@@ -1,0 +1,11 @@
+# Dodaj u /opt/kaladont/.env na produkciji (mode 600, vlasnik deploy).
+# Tracker ostavi prazan dok ne završiš DNS + Umami Website ID (vidi docs/07-operacije/runbook-umami.md).
+
+UMAMI_BAZA_LOZINKA=
+UMAMI_APP_SECRET=
+UMAMI_URL=
+UMAMI_WEBSITE_ID=
+
+# Nakon koraka 5–6 u runbooku:
+# UMAMI_URL=https://analitika.kaladont.hr
+# UMAMI_WEBSITE_ID=

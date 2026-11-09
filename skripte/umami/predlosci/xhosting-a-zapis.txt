@@ -1,0 +1,11 @@
+Predmet: A zapis analitika.kaladont.hr
+
+Poštovani,
+
+molim A zapis analitika.kaladont.hr na <PROD_IPV4> (ista IPv4 kao kaladont.hr).
+
+Nameservere, forum.kaladont.hr, mail zapise i postojeće A zapise ne dirati.
+Molim potvrdu nakon primjene.
+
+Hvala,
+Josip
