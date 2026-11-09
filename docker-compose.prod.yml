@@ -84,6 +84,9 @@ services:
     depends_on:
       baza:
         condition: service_healthy
+    # Samo localhost — admin UI preko SSH tunela (nije na javnoj IP). Tracker ide preko Caddyja.
+    ports:
+      - "127.0.0.1:3002:3000"
     expose:
       - "3000"
     healthcheck:

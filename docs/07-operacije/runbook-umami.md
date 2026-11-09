@@ -109,12 +109,21 @@ Mora pokazati baš `<PROD_IPV4>`. Pričekaj propagaciju (često minute, ponekad 
 
 ## 5. Prvi login + Website ID
 
-> **Visoki rizik:** UI na `analitika.kaladont.hr` je javan (TLS + Umami login). DNS uključi tek kad je kontejner healthy, pa **odmah** promijeni default admin lozinku — ne ostavljaj `admin`/`umami` ni minutu dulje nego što treba za prvi login.
+Admin UI **nije** na `https://analitika.kaladont.hr` (Caddy propušta samo tracker). Umami sluša `127.0.0.1:3002` na VPS-u.
 
-1. Otvori `https://analitika.kaladont.hr`
-2. Default prijava (obično `admin` / `umami`) — **odmah promijeni lozinku**; spremi u Bitwarden
-3. Websites → Add → site za `kaladont.hr`
-4. Kopiraj **Website ID**
+Na Windowsu (novi PowerShell):
+
+```powershell
+ssh -L 3002:127.0.0.1:3002 kaladont@kaladont-produkcija
+```
+
+Zatim u pregledniku: `http://127.0.0.1:3002`
+
+1. Default prijava (obično `admin` / `umami`) — **odmah promijeni lozinku**; spremi u Bitwarden
+2. Websites → Add → site za `kaladont.hr`
+3. Kopiraj **Website ID**
+
+Provjera da admin nije javan: `https://analitika.kaladont.hr/` treba vratiti **403**.
 
 ---
 
@@ -174,7 +183,7 @@ sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml stop um
 sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml start umami
 ```
 
-Napomena: CSP na `kaladont.hr` dopušta `https://analitika.kaladont.hr` — `UMAMI_URL` mora biti točno ta vrijednost. Umami UI je javan uz lozinku; odmah promijeni default admin lozinku.
+Napomena: CSP na `kaladont.hr` dopušta `https://analitika.kaladont.hr` — `UMAMI_URL` mora biti točno ta vrijednost. Admin UI ostaje na SSH tunelu (`127.0.0.1:3002`), ne na javnom hostu.
 
 ---
 
