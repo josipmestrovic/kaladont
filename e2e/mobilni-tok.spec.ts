@@ -311,9 +311,13 @@ test('mobilna naslovnica prikazuje poveznicu Misije', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Misije', exact: true })).toBeVisible();
 });
 
-test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', async ({ page }) => {
+test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', async ({ page, playwright }) => {
   const sufiks = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const odgovor = await page.request.post('http://127.0.0.1:3001/api/racuni/registracija', {
+  // Odvojeni API konteksti — page.request dijeli kolačić sesije pa druga registracija padne na 409.
+  const apiVlasnik = await playwright.request.newContext();
+  const apiJavni = await playwright.request.newContext();
+  try {
+  const odgovor = await apiVlasnik.post('http://127.0.0.1:3001/api/racuni/registracija', {
     data: {
       email: `aktivnost-${sufiks}@example.com`,
       lozinka: 'lozinka123',
@@ -324,7 +328,7 @@ test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', a
   const { igracId, sesijskiToken } = (await odgovor.json()) as { igracId: string; sesijskiToken: string };
 
   // Tuđi javni profil — vlastiti /profil/javni/:id preusmjerava na /profil (WebKit race).
-  const drugi = await page.request.post('http://127.0.0.1:3001/api/racuni/registracija', {
+  const drugi = await apiJavni.post('http://127.0.0.1:3001/api/racuni/registracija', {
     data: {
       email: `javni-${sufiks}@example.com`,
       lozinka: 'lozinka123',
@@ -351,6 +355,10 @@ test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', a
   const povijest = await page.request.get(`http://127.0.0.1:3001/api/povijest/${igracId}`, { headers: zaglavlja });
   expect(aktivnost.status()).toBe(403);
   expect(povijest.status()).toBe(403);
+  } finally {
+    await apiVlasnik.dispose();
+    await apiJavni.dispose();
+  }
 });
 
 test('mobilni tok registracije čuva fokus, tipkovničku navigaciju i raspored', async ({ page }) => {
