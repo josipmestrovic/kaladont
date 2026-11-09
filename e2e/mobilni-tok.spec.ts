@@ -312,12 +312,12 @@ test('mobilna naslovnica prikazuje poveznicu Misije', async ({ page }) => {
 });
 
 test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', async ({ page }) => {
-  const sufiks = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const sufiks = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const odgovor = await page.request.post('http://127.0.0.1:3001/api/racuni/registracija', {
     data: {
       email: `aktivnost-${sufiks}@example.com`,
       lozinka: 'lozinka123',
-      nadimak: 'AktivIgrac',
+      nadimak: `Ak${sufiks}`.slice(0, 12),
     },
   });
   expect(odgovor.ok()).toBe(true);
@@ -328,7 +328,7 @@ test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', a
     data: {
       email: `javni-${sufiks}@example.com`,
       lozinka: 'lozinka123',
-      nadimak: 'JavniIgrac',
+      nadimak: `Jv${sufiks}`.slice(0, 12),
     },
   });
   expect(drugi.ok()).toBe(true);
