@@ -24,6 +24,8 @@
 
   let stanjeSobe = $state<StanjePrivatneSobe | null>(null);
   let greska = $state<string | null>(null);
+  /** Soft greška u lobbyju (npr. pokreni / kick) — ne zamjenjuje čekaonicu. */
+  let obavijest = $state<string | null>(null);
   let kopirano = $state(false);
   let jeUPartiji = $state(false);
 
@@ -37,6 +39,7 @@
     const naStanjeSobe = (novoStanje: StanjePrivatneSobe) => {
       stanjeSobe = novoStanje;
       greska = null;
+      obavijest = null;
     };
 
     const naGresku = (p: { kod?: string; poruka: string }) => {
@@ -44,9 +47,12 @@
         void goto('/potvrdi-email');
         return;
       }
-      // Soft greške (npr. race na kick) ne smiju zamijeniti lobby terminalnim overlayem —
-      // inače „Vrati se na početnu” zatvara sobu za sve.
-      if (stanjeSobe) return;
+      // Dok smo u lobbyju, greške (pokreni, kick…) ostaju inline — terminalni overlay
+      // bi preko „početna” zatvorio sobu za sve.
+      if (stanjeSobe) {
+        obavijest = p.poruka;
+        return;
+      }
       greska = p.poruka;
     };
 
@@ -170,6 +176,9 @@
         </div>
 
         <div class="akcija-sekcija">
+          {#if obavijest}
+            <p role="alert" class="lobby-obavijest">{obavijest}</p>
+          {/if}
           {#if jeVlasnik}
             <button
               type="button"
@@ -423,6 +432,14 @@
 
   .akcija-sekcija {
     margin-top: 8px;
+  }
+
+  .lobby-obavijest {
+    margin: 0 0 10px;
+    color: var(--boja-poraz-tekst);
+    font-weight: 700;
+    font-size: var(--tekst-sitni);
+    text-align: center;
   }
 
   .glavni-gumb {
