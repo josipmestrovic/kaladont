@@ -53,9 +53,14 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   const footer = page.locator('.landing-footer');
   const oIgri = footer.getByRole('link', { name: 'O igri' });
   await expect(oIgri).toHaveAttribute('href', '/o-igri');
-  await expect(footer.getByRole('link', { name: 'Forum' })).toHaveAttribute('href', 'https://forum.kaladont.hr');
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toHaveAttribute('href', '/povratne-informacije');
   await expect(footer.getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
+
+  await footer.getByRole('button', { name: 'Uvjeti i privatnost' }).click();
+  const pravni = page.getByRole('dialog', { name: 'Što te zanima?' });
+  await expect(pravni.getByRole('link', { name: /Forum/ })).toHaveAttribute('href', 'https://forum.kaladont.hr');
+  await page.keyboard.press('Escape');
+  await expect(pravni).toBeHidden();
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByRole('button', { name: 'Igraj' })).toBeVisible();
@@ -94,7 +99,6 @@ test('mobilna naslovnica skriva header i prikazuje poveznice u footeru', async (
   await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
   const footer = page.locator('.landing-footer');
   await expect(footer.getByRole('link', { name: 'O igri' })).toBeVisible();
-  await expect(footer.getByRole('link', { name: 'Forum' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toBeVisible();
   await expect(footer.getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
 
