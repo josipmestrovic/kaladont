@@ -28,7 +28,7 @@
   import BootUcitavanje from '$lib/komponente/BootUcitavanje.svelte';
   import { jeIndeksabilnaPutanja } from '$lib/seo.js';
 
-  let { children } = $props();
+  let { children, data } = $props();
   let sesijaSpreman = $state(false);
   let navIkoneSpremane = $state(false);
   let napredakBoota = $state(0);
@@ -139,6 +139,13 @@
 
 <svelte:head>
   <meta name="robots" content={robotsMeta} />
+  {#if data.umami}
+    <script
+      defer
+      src="{data.umami.url}/script.js"
+      data-website-id={data.umami.websiteId}
+    ></script>
+  {/if}
 </svelte:head>
 
 <div class:landing-shell={$page.url.pathname === '/'} class="aplikacija">

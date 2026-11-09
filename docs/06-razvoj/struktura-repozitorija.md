@@ -39,7 +39,7 @@ kaladont/
 └── README.md
 ```
 
-Planirani operativni artefakti ne smiju se koristiti u uputama kao da već postoje. Njihov ciljani ugovor opisuju [CI/CD](../07-operacije/ci-cd.md), [produkcija i objava](../07-operacije/produkcija-i-objava.md) te [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Umami se dodaje tek nakon stabilizacije i nije dio početnog produkcijskog Composea.
+Planirani operativni artefakti ne smiju se koristiti u uputama kao da već postoje. Njihov ciljani ugovor opisuju [CI/CD](../07-operacije/ci-cd.md), [produkcija i objava](../07-operacije/produkcija-i-objava.md) te [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Umami je u Composeu, ali se DNS/bootstrap/website ID uključuju tek nakon stabilizacije; tracker ostaje isključen dok su env prazni.
 
 ## Pravila ovisnosti između slojeva
 

@@ -149,7 +149,7 @@ VPS ne dobiva trajni GHCR token. Workflow tijekom svakog deploya prosljeđuje kr
 
 ## Korak 7 — DNS preko XHostinga
 
-XHosting podršci pošalji zahtjev za A zapis `staging.kaladont.hr` prema zaštićenoj staging Primary IPv4. Za produkciju se, tek nakon staging dokaza, traže A zapisi `kaladont.hr` i `www.kaladont.hr` prema produkcijskoj Primary IPv4. `analitika` se ne dodaje dok se naknadno ne uvodi Umami; AAAA zapisi se ne dodaju u početnoj postavi.
+XHosting podršci pošalji zahtjev za A zapis `staging.kaladont.hr` prema zaštićenoj staging Primary IPv4. Za produkciju se, tek nakon staging dokaza, traže A zapisi `kaladont.hr` i `www.kaladont.hr` prema produkcijskoj Primary IPv4. Zapis `analitika.kaladont.hr` (ista produkcijska IPv4) traži tek pri uključivanju Umamija — vidi [runbook-umami.md](runbook-umami.md); AAAA zapisi se ne dodaju u početnoj postavi.
 
 Provjera prije nastavka, iz Windows PowerShella:
 

@@ -34,7 +34,7 @@ Ciljane datoteke su `docker-compose.staging.yml` i `docker-compose.prod.yml`; ko
 
 PostgreSQL i Caddy slike navode čitljivu točnu verziju i nepromjenjivi digest. Redovna objava aplikacije ne mijenja PostgreSQL motor niti njegov volume. Patch nadogradnja servisa ide kroz PR, staging i ručnu produkcijsku promociju; nadogradnja PostgreSQL-a na novu glavnu verziju zaseban je planirani zahvat.
 
-Discourse **nije** dio ovih composeova. Umami također nije dio početnog produkcijskog Composea; dodaje se nakon stabilizacije javnog pristupa kao zaseban, dokumentiran korak.
+Discourse **nije** dio ovih composeova. Umami servis jest u Composeu, ali tracker ostaje isključen (`UMAMI_URL` / `UMAMI_WEBSITE_ID` prazni) dok se nakon stabilizacije ne odradi DNS, bootstrap baze i website ID.
 
 Hetzner Cloud Firewall i UFW dopuštaju samo 22/tcp, 80/tcp i 443/tcp. Compose ne smije objaviti aplikacijski port 3000 ni PostgreSQL port 5432 na hostu, jer Dockerovi objavljeni portovi mogu zaobići očekivana UFW pravila.
 
@@ -109,4 +109,6 @@ Slike su tagirane SHA-om commita i identificirane digestom. Automatskog rollback
 
 ## Umami nakon stabilizacije
 
-Umami nije preduvjet javnog ranog pristupa. Kada se postojeći stack stabilizira, dodaje se kao zaseban produkcijski servis na istom VPS-u, s `analitika.kaladont.hr`, vlastitim migracijama, backup obuhvatom i nadzorom. Ta promjena prolazi isti PR → staging provjera konfiguracije → ručna produkcijska promocija tok; prije nje se od XHostinga zasebno traži DNS zapis.
+Umami nije preduvjet javnog ranog pristupa. **Nema zasebnog VPS-a** — servis je u produkcijskom Composeu iza profila `umami` (`ghcr.io/umami-software/umami:3.4.1`), Caddy host `analitika.kaladont.hr` na **istoj** Primary IPv4 kao `kaladont.hr`. Obični deploy ne pokreće Umami i ne traži Umami tajne. Staging **nema** Umami. Tracker ostaje isključen dok su `UMAMI_URL` / `UMAMI_WEBSITE_ID` prazni.
+
+Početnički copy-paste postupak: [runbook-umami.md](runbook-umami.md).

@@ -65,7 +65,7 @@ Storage Box i VPS-ovi ostaju kod istog pružatelja. Za MVP se prihvaća da ova p
 
 ### Granica lansiranja
 
-Umami nije preduvjet javnog ranog pristupa. Početno se koriste vlastite metrike iz baze, a Umami se dodaje nakon stabilizacije kao zaseban, provjeren korak na produkcijskom VPS-u.
+Umami nije preduvjet javnog ranog pristupa. Početno se koriste vlastite metrike iz baze; Umami servis može biti u Composeu, ali se DNS, bootstrap baze i `UMAMI_WEBSITE_ID` uključuju tek nakon stabilizacije na produkcijskom VPS-u.
 
 Produkcijski VPS ne stvara se dok staging ne prođe puni deploy, ručnu partiju, šifrirani backup i restore drill. Dokumentirane naredbe za nepostojeće Docker, CI/CD, backup i administrativne artefakte opisuju ciljano stanje i ne smiju se izvršavati dok odgovarajući production-readiness kriteriji nisu ispunjeni.
 

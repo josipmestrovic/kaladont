@@ -20,6 +20,10 @@ const shemaKonfiguracije = z.object({
   NADZOR_EVENT_LOOP_MS_PRAG: z.coerce.number().positive().default(100),
   NADZOR_HTTP_MS_PRAG: z.coerce.number().positive().default(1000),
   UMAMI_URL: z.string().default(''),
+  /** Website ID za klijentski tracker; prazno = analitika isključena. */
+  UMAMI_WEBSITE_ID: z.string().default(''),
+  PUBLIC_UMAMI_URL: z.string().default(''),
+  PUBLIC_UMAMI_WEBSITE_ID: z.string().default(''),
   ONEMOGUCI_TIMER_POTEZA: z.enum(['true', 'false']).default('false'),
   TRAJANJE_POTEZA_MS: z.coerce.number().int().positive().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 30_000 : 5_000),
   ODGODA_POCETKA_PARTIJE_MS: z.coerce.number().int().nonnegative().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 10_000 : 0),

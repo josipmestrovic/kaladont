@@ -219,6 +219,21 @@
         Želiš sitne detalje? <a href="/pravila-kaladonta">Detaljna pravila →</a>
       </p>
     </section>
+
+    <section>
+      <h2>Zajednica</h2>
+      <p>
+        Rasprave, dogovori za partije i povratne informacije žive na forumu.
+        Čitanje je otvoreno; račun trebaš tek kad želiš sudjelovati.
+      </p>
+      <p class="poveznica">
+        <a
+          href="https://forum.kaladont.hr"
+          rel="noopener noreferrer"
+          data-umami-event="forum-klik-o-igri"
+        >Pridruži se zajednici →</a>
+      </p>
+    </section>
   </article>
 
   <article class="licence">

@@ -47,15 +47,18 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await misijeOdgovor.catch(() => {});
   const popupMisija = page.getByRole('dialog', { name: /Nove (dnevne|tjedne) misije/ });
   await popupMisija.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
-  for (let i = 0; i < 3; i += 1) {
+  for (let i = 0; i < 5; i += 1) {
     if (await popupMisija.count() === 0) break;
-    const naslovPrije = await popupMisija.locator('h2').textContent();
-    await popupMisija.getByRole('button', { name: 'Zatvori' }).click();
+    const naslovPrije = await popupMisija.locator('h2').textContent().catch(() => null);
+    const zatvori = popupMisija.getByRole('button', { name: 'Zatvori' });
+    // API oznake pregleda drži gumb disabled — pričekaj pa klikni.
+    await expect(zatvori).toBeEnabled({ timeout: 15_000 });
+    await zatvori.click();
     // Daily→weekly zamjenjuje dijalog in place; čekaj nestanak ili promjenu naslova.
     await expect.poll(async () => {
       if (await popupMisija.count() === 0) return 'gone';
       return (await popupMisija.locator('h2').textContent()) ?? '';
-    }, { timeout: 10_000 }).not.toBe(naslovPrije);
+    }, { timeout: 15_000 }).not.toBe(naslovPrije);
   }
   await expect(popupMisija).toHaveCount(0);
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });

@@ -1186,21 +1186,11 @@ U pravom incidentu produkcijska zaštićena Primary IPv4 prebacuje se na zamjens
 - DPA, cijene, domena i rizik jednog pružatelja;
 - velika revizija operativnih dokumenata.
 
-## 30. Umami dolazi kasnije
+## 30. Umami nakon stabilizacije
 
-Javni rani pristup smije krenuti bez Umamija. Od prvog dana mjerimo partije, čekanje, registracije, povratak i prijave iz baze.
+Javni rani pristup smije krenuti bez trackera. **Ne kupuješ novi VPS** — Umami je dodatni kontejner na postojećoj produkciji; staging ga nema.
 
-Tek nakon stabilizacije:
-
-1. provjeri stvarni RAM/CPU/disk produkcije;
-2. kroz PR dodaj pinani Umami servis i baznu konfiguraciju;
-3. uključi ga u backup, health granice i privatnost;
-4. testiraj konfiguraciju na stagingu bez produkcijskih podataka;
-5. XHostingu zatraži A zapis `analitika.kaladont.hr`;
-6. ručno promoviraj isti digest/config release;
-7. provjeri da pad Umamija ne ruši igru.
-
-Umami ne dobiva zaseban VPS dok mjerenje ne pokaže stvarnu potrebu.
+Kad stack miruje, slijedi točno: [runbook-umami.md](runbook-umami.md) (tajne → bootstrap → compose → XHosting A zapis na istu IP → Website ID → env → backup → izolacijski test).
 
 ## 31. Naredbe koje ne izvršavaš naslijepo
 

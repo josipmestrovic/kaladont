@@ -16,6 +16,7 @@ services:
       - caddy_prod_konfiguracija:/config
     networks:
       - javna
+      - analitika
 
   aplikacija:
     image: ${KALADONT_IMAGE:?Postavi GHCR image digest}
@@ -38,6 +39,9 @@ services:
       NADZOR_EVENT_LOOP_MS_PRAG: ${NADZOR_EVENT_LOOP_MS_PRAG:-100}
       NADZOR_HTTP_MS_PRAG: ${NADZOR_HTTP_MS_PRAG:-1000}
       UMAMI_URL: ${UMAMI_URL:-}
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
+      PUBLIC_UMAMI_URL: ${UMAMI_URL:-}
+      PUBLIC_UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
       ONEMOGUCI_TIMER_POTEZA: "false"
       ODGODA_POCETKA_PARTIJE_MS: "10000"
       TOLERANCIJA_PREKIDA_MS: "10000"
@@ -65,6 +69,41 @@ services:
       - javna
       - privatna
 
+  # Uključivanje: docker compose --profile umami -f docker-compose.prod.yml up -d
+  # Dok profil nije aktivan, obični deploy/config ne traži UMAMI_* tajne.
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.1
+    profiles: ["umami"]
+    restart: unless-stopped
+    init: true
+    environment:
+      # Bez :? — inače `compose config` bez profila pada na starijim Compose verzijama.
+      # Prazni defaulti (ne poznati „umami”/placeholder): bez tajni u .env kontejner neće zdravije dignuti.
+      # Pri --profile umami postavi prave tajne (vidi runbook-umami.md + bootstrap-umami-bazu.sh).
+      DATABASE_URL: postgresql://umami:${UMAMI_BAZA_LOZINKA:-}@baza:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:-}
+    depends_on:
+      baza:
+        condition: service_healthy
+    # Samo localhost — admin UI preko SSH tunela (nije na javnoj IP). Tracker ide preko Caddyja.
+    ports:
+      - "127.0.0.1:3002:3000"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    # analitika = Caddy tracker; umami_db = Postgres; umami_loopback = host 127.0.0.1:3002
+    # (samo internal mreze → Docker tiho ne bind-a published ports).
+    # Nije na javna/privatna → aplikacija ne vidi Umami admin.
+    networks:
+      - analitika
+      - umami_db
+      - umami_loopback
+
   baza:
     image: postgres:16.15-alpine
     restart: unless-stopped
@@ -81,6 +120,7 @@ services:
       retries: 5
     networks:
       - privatna
+      - umami_db
 
 volumes:
   caddy_prod_podaci:
@@ -91,3 +131,9 @@ networks:
   javna:
   privatna:
     internal: true
+  analitika:
+    internal: true
+  umami_db:
+    internal: true
+  # Ne-internal: jedina mreža koja omogućuje publish 127.0.0.1:3002 (SSH tunnel).
+  umami_loopback:

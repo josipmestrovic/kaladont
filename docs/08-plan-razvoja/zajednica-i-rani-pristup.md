@@ -77,7 +77,7 @@ Ne koristimo masovne privatne poruke, identične kopirane objave, plaćene oglas
 
 Javni rani pristup počinje s podacima igre: završene partije, čekanje u redu, D1/D7 povratak i prijave po 100 partija. Aktivnost foruma promatra se zasebno. Ti su podaci dovoljni za prve odluke o kvaliteti i zadržavanju igrača.
 
-Nakon stabilizacije uključuje se Umami bez kolačića. Tada dodatno mjerimo izvore prometa, klikove na „IGRAJ” te anonimne događaje `forum-klik-landing` i `forum-klik-o-igri`. Ne šalju se identifikatori korisnika, emailovi ni sadržaj objava. Umami nije preduvjet javnog starta ([ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md)).
+Nakon stabilizacije uključuje se Umami bez kolačića (`analitika.kaladont.hr`). Tada dodatno mjerimo izvore prometa, klikove na „IGRAJ” (`igraj-klik`) te anonimne događaje `forum-klik-landing` (naslovnica) i `forum-klik-o-igri` (`/o-igri`). Ne šalju se identifikatori korisnika, emailovi ni sadržaj objava. Tracker ostaje isključen dok `UMAMI_WEBSITE_ID` nije postavljen; Umami nije preduvjet javnog starta ([ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md)).
 
 Prije šireg javnog poziva prvi val mora odigrati najmanje 20 partija bez kritične greške. Nakon četiri tjedna javnog ranog pristupa koristimo postojeće pragove:
 

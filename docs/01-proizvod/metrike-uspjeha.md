@@ -1,6 +1,6 @@
 # Metrike uspjeha
 
-MVP je test tržišta — bez brojki nema zaključka. Od prvog dana mjerimo **vlastite metrike** izvedene iz tablica igre. Self-hosted Umami dodaje se nakon stabilizacije javnog ranog pristupa; ne blokira lansiranje ([ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md)).
+MVP je test tržišta — bez brojki nema zaključka. Od prvog dana mjerimo **vlastite metrike** izvedene iz tablica igre. Self-hosted Umami (cookieless) dodaje se nakon stabilizacije stacka na `analitika.kaladont.hr`; tracker je isključen dok `UMAMI_URL` i `UMAMI_WEBSITE_ID` nisu postavljeni ([ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md)).
 
 ## Sjevernjača
 
@@ -31,7 +31,7 @@ MVP je test tržišta — bez brojki nema zaključka. Od prvog dana mjerimo **vl
 
 **Od prvog dana:** broj započetih i završenih partija, čekanje, razlozi ispadanja, D1/D7 povratak, registracije, prijave i reakcije računaju se iz baze. Na tim podacima temelje se početne odluke o kvaliteti igre.
 
-**Nakon uključivanja Umamija:** dobivamo broj jedinstvenih posjetitelja, izvore dolazaka te klikove na „IGRAJ” i forum. Do tada te metrike nisu dostupne i ne procjenjuju se iz serverskih logova.
+**Nakon uključivanja Umamija** (`UMAMI_WEBSITE_ID` + DNS `analitika.kaladont.hr`): jedinstveni posjetitelji, izvori dolazaka te eventi `igraj-klik`, `forum-klik-landing`, `forum-klik-o-igri`. Dok website ID nije postavljen, te metrike nisu dostupne i ne procjenjuju se iz serverskih logova.
 
 ## Pragovi odluke (nakon 4 tjedna od lansiranja)
 
