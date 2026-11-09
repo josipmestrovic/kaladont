@@ -261,8 +261,9 @@
     font-weight: 700;
   }
 
-  /* Na niskim ekranima ostaje u DOM-u za SEO, bez dodatnog scrolla. */
-  @media (max-height: 760px) {
+  /* Na niskim / srednjim ekranima ostaje u DOM-u za SEO, bez dodatnog scrolla
+     (uključujući 1440×900 s fontom za disleksiju). */
+  @media (max-height: 950px) {
     .seo-uvod {
       position: absolute;
       width: 1px;

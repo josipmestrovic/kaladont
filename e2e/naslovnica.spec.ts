@@ -143,7 +143,8 @@ test('na niskom desktop ekranu ilustracija se skriva', async ({ page }) => {
 
 test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: 'Pravila' }).click();
+  const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
+  await navigacija.getByRole('link', { name: 'Pravila' }).click();
   await expect(page).toHaveURL('/pravila-kaladonta');
 
   const povratak = page.getByRole('button', { name: 'Nazad' });
@@ -158,7 +159,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await povratak.click();
   await expect(page).toHaveURL('/');
 
-  await page.getByRole('link', { name: 'Pravila' }).click();
+  await navigacija.getByRole('link', { name: 'Pravila' }).click();
   await page.getByRole('banner').getByRole('link', { name: 'Moj profil' }).click();
   await expect(page).toHaveURL('/profil');
   const pocetna = page.getByRole('link', { name: 'Početna' });
