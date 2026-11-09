@@ -49,7 +49,7 @@
       Linux: 'upute-linux',
     };
     const sidro = odjeljci[govornoOkruzenje.platforma] ?? 'upute-opcenito';
-    return `/pomoc?tema=pristupacnost#${sidro}`;
+    return `/pravila-kaladonta/pristupacnost#${sidro}`;
   }
 
   onMount(() => {

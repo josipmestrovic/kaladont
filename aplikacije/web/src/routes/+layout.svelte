@@ -26,6 +26,7 @@
   import SanducicToast from '$lib/komponente/SanducicToast.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import BootUcitavanje from '$lib/komponente/BootUcitavanje.svelte';
+  import { jeIndeksabilnaPutanja } from '$lib/seo.js';
 
   let { children } = $props();
   let sesijaSpreman = $state(false);
@@ -76,6 +77,9 @@
       ((!sesijaSpreman && $page.url.pathname === '/red') || (sesijaSpreman && $navigating !== null)),
   );
   const brojMjestaKostura = $derived(urlCilja.searchParams.get('mod') === 'dva_igraca' ? 2 : 4);
+  const robotsMeta = $derived(
+    jeIndeksabilnaPutanja($page.url.pathname) ? 'index, follow' : 'noindex, follow',
+  );
 
   onMount(() => {
     inicijalizirajTemu();
@@ -132,6 +136,10 @@
     };
   });
 </script>
+
+<svelte:head>
+  <meta name="robots" content={robotsMeta} />
+</svelte:head>
 
 <div class:landing-shell={$page.url.pathname === '/'} class="aplikacija">
   <div class="status-obavijesti">

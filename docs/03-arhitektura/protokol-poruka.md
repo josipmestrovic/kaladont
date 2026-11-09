@@ -27,6 +27,7 @@ Poslužitelj razrješava identitet (ili stvara novog gosta) i veže socket uz `i
 | `potez:rijec` | `{ rijec: string, turnToken?: string }` | Pokušaj poteza vezan uz trenutačni potez |
 | `potez:ne-znam` | `{ turnToken?: string }` | Predaja poteza (klijent traži potvrdu prije slanja) |
 | `reakcija:posalji` | `{ poruka: BrzaPoruka }` | Predefinirana brza poruka (rate limit 1/2 s) |
+| `soba:izbaci` | `{ igracId: string }` | Vlasnik izbacuje člana iz privatne čekaonice; izbačeni ostaje blokiran za taj kod sobe |
 
 ```ts
 type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
@@ -52,7 +53,8 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 | `iskustvo:obracun` | `ObracunIskustvaTijekomPartije` | Privatni XP obračun eliminiranog igrača |
 | `sanducic:promjena` | `{ razlog: 'nova' \| 'stanje' }` | Privatni signal vlasniku pretinca; bez sadržaja poruke — klijent dohvaća `GET /api/sanducic/sazetak` |
 | `reakcija:nova` | `{ igracId: string, poruka: BrzaPoruka }` | |
-| `greska` | `{ kod: KodGreske, poruka: string }` | Općenite greške (npr. `PREBRZO`) |
+| `soba:izbacen` | `{ kod: string }` | Ciljanom igraču: vlasnik ga je izbacio iz privatne sobe |
+| `greska` | `{ kod: KodGreske, poruka: string }` | Općenite greške (npr. `PREBRZO`, `IZBACEN_IZ_SOBE`) |
 
 ## Validacija ulaznih događaja
 

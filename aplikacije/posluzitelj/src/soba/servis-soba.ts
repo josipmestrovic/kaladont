@@ -47,6 +47,10 @@ const ShemaKodSobe = z
   .object({ kod: z.string().trim().regex(/^[A-Z0-9]{6}$/i) })
   .strict();
 
+const ShemaIzbaciIzSobe = z
+  .object({ igracId: z.string().uuid() })
+  .strict();
+
 const PORUKA_NEVALJANOG_PAYLOADA = 'Poslane postavke nisu ispravne.';
 
 const ALFABET_KODA = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -91,6 +95,7 @@ export interface Soba {
   pobjedeUSeriji: Map<string, number>;
   bodoviUSeriji: Map<string, number>;
   obradenePartije: Set<string>;
+  izbaceniIds: Set<string>;
 }
 
 export function dodijeliRezultatSobeAkoNijeObraden(
@@ -339,6 +344,7 @@ export function registrirajPrivatneSobe(
         pobjedeUSeriji: new Map(),
         bodoviUSeriji: new Map(),
         obradenePartije: new Set(),
+        izbaceniIds: new Set(),
       };
 
       sobe.set(kod, soba);
@@ -375,9 +381,14 @@ export function registrirajPrivatneSobe(
         return;
       }
 
-      ponistiBrisanjeSobe(soba);
-
       const igracId = socket.data.igracId;
+
+      if (soba.izbaceniIds.has(igracId)) {
+        socket.emit('greska', { kod: 'IZBACEN_IZ_SOBE', poruka: 'Nemaš pristup ovoj sobi.' });
+        return;
+      }
+
+      ponistiBrisanjeSobe(soba);
 
       if (soba.clanoviMap.has(igracId)) {
         sobaPoIgracu.set(igracId, kod);
@@ -508,6 +519,61 @@ export function registrirajPrivatneSobe(
       }
       soba.partijaId = partijaId;
 
+      emitirajStanje(soba);
+    }));
+
+    socket.on('soba:izbaci', omotajSocketHandler(socket, 'soba:izbaci', opcije.zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+      const [payload, ...dodatniArgumenti] = argumenti;
+      const rezultat = ShemaIzbaciIzSobe.safeParse(payload);
+      if (!rezultat.success || dodatniArgumenti.length > 0) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: PORUKA_NEVALJANOG_PAYLOADA });
+        return;
+      }
+      if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:izbaci')) return;
+
+      const vlasnikId = socket.data.igracId;
+      const kod = sobaPoIgracu.get(vlasnikId);
+      if (!kod) return;
+
+      const soba = sobe.get(kod);
+      if (!soba || soba.vlasnikId !== vlasnikId) {
+        socket.emit('greska', { kod: 'NISI_VLASNIK', poruka: 'Samo vlasnik sobe može izbaciti igrača.' });
+        return;
+      }
+
+      if (soba.status !== 'cekanje') {
+        socket.emit('greska', { kod: 'SOBA_U_TIJEKU', poruka: 'Ne možeš izbaciti igrača dok je partija u tijeku.' });
+        return;
+      }
+
+      const metaId = rezultat.data.igracId;
+      if (metaId === vlasnikId) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Ne možeš izbaciti sebe iz sobe.' });
+        return;
+      }
+
+      // Idempotentno: član je već otišao ili je već izbačen — bez greske da ne sruši lobby vlasniku.
+      if (!soba.clanoviMap.has(metaId)) {
+        return;
+      }
+
+      soba.izbaceniIds.add(metaId);
+      soba.clanoviMap.delete(metaId);
+      soba.pobjedeUSeriji.delete(metaId);
+      soba.bodoviUSeriji.delete(metaId);
+      if (sobaPoIgracu.get(metaId) === kod) sobaPoIgracu.delete(metaId);
+
+      const sobaSocketi = io.sockets.adapter.rooms.get(SOBA_PREFIX(kod));
+      if (sobaSocketi) {
+        for (const socketId of [...sobaSocketi]) {
+          const ciljni = io.sockets.sockets.get(socketId);
+          if (!ciljni || ciljni.data.igracId !== metaId) continue;
+          ciljni.emit('soba:izbacen', { kod });
+          ciljni.leave(SOBA_PREFIX(kod));
+        }
+      }
+
+      zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
       emitirajStanje(soba);
     }));
 

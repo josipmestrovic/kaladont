@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
 
 export function load() {
-  redirect(307, '/pravila-kaladonta?tema=pravila');
+  redirect(308, '/pravila-kaladonta');
 }

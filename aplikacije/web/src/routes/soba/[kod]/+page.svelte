@@ -24,6 +24,8 @@
 
   let stanjeSobe = $state<StanjePrivatneSobe | null>(null);
   let greska = $state<string | null>(null);
+  /** Soft greška u lobbyju (npr. pokreni / kick) — ne zamjenjuje čekaonicu. */
+  let obavijest = $state<string | null>(null);
   let kopirano = $state(false);
   let jeUPartiji = $state(false);
 
@@ -37,11 +39,18 @@
     const naStanjeSobe = (novoStanje: StanjePrivatneSobe) => {
       stanjeSobe = novoStanje;
       greska = null;
+      obavijest = null;
     };
 
     const naGresku = (p: { kod?: string; poruka: string }) => {
       if (p.kod === 'EMAIL_NIJE_POTVRDEN') {
         void goto('/potvrdi-email');
+        return;
+      }
+      // Dok smo u lobbyju, greške (pokreni, kick…) ostaju inline — terminalni overlay
+      // bi preko „početna” zatvorio sobu za sve.
+      if (stanjeSobe) {
+        obavijest = p.poruka;
         return;
       }
       greska = p.poruka;
@@ -57,10 +66,16 @@
       stanjeSobe = null;
     };
 
+    const naIzbacen = () => {
+      greska = 'Vlasnik te je izbacio iz sobe.';
+      stanjeSobe = null;
+    };
+
     socket.on('soba:stanje', naStanjeSobe);
     socket.on('greska', naGresku);
     socket.on('partija:pocetak', naPocetak);
     socket.on('soba:vlasnik-napustio', naVlasnikNapustio);
+    socket.on('soba:izbacen', naIzbacen);
 
     socket.emit('soba:udji', { kod: kodSobe });
 
@@ -69,6 +84,7 @@
       socket.off('greska', naGresku);
       socket.off('partija:pocetak', naPocetak);
       socket.off('soba:vlasnik-napustio', naVlasnikNapustio);
+      socket.off('soba:izbacen', naIzbacen);
     };
   });
 
@@ -94,6 +110,12 @@
     if (!jeVlasnik) return;
     const socket = dohvatiSocket();
     socket.emit('soba:pokreni');
+  }
+
+  function izbaciClana(igracId: string) {
+    if (!jeVlasnik || !stanjeSobe || stanjeSobe.status !== 'cekanje') return;
+    const socket = dohvatiSocket();
+    socket.emit('soba:izbaci', { igracId });
   }
 </script>
 
@@ -134,15 +156,29 @@
                   <span class="vlasnik-bedz">Vlasnik sobe</span>
                 {/if}
               </div>
-              <div class="clan-rezultat">
-                 <span class="pobjede-broj">{clan.pobjedeUSobi} pob.</span>
-                 <span class="bodovi-broj">({clan.bodoviUSobi} bod.)</span>
+              <div class="clan-desno">
+                <div class="clan-rezultat">
+                  <span class="pobjede-broj">{clan.pobjedeUSobi} pob.</span>
+                  <span class="bodovi-broj">({clan.bodoviUSobi} bod.)</span>
+                </div>
+                {#if jeVlasnik && !clan.jeVlasnik && stanjeSobe.status === 'cekanje'}
+                  <button
+                    type="button"
+                    class="izbaci-gumb"
+                    onclick={() => izbaciClana(clan.igracId)}
+                  >
+                    Izbaci
+                  </button>
+                {/if}
               </div>
             </div>
           {/each}
         </div>
 
         <div class="akcija-sekcija">
+          {#if obavijest}
+            <p role="alert" class="lobby-obavijest">{obavijest}</p>
+          {/if}
           {#if jeVlasnik}
             <button
               type="button"
@@ -295,11 +331,34 @@
     background: var(--boja-povrsina-2);
   }
 
+  .clan-desno {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+  }
+
   .clan-rezultat {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     font-size: var(--tekst-sitni);
+  }
+
+  .izbaci-gumb {
+    background: transparent;
+    border: 1px solid var(--boja-obrub);
+    color: var(--boja-poraz-tekst);
+    font-weight: 600;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: var(--radijus-pill);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .izbaci-gumb:hover {
+    background: var(--boja-povrsina);
   }
 
   .pobjede-broj {
@@ -373,6 +432,14 @@
 
   .akcija-sekcija {
     margin-top: 8px;
+  }
+
+  .lobby-obavijest {
+    margin: 0 0 10px;
+    color: var(--boja-poraz-tekst);
+    font-weight: 700;
+    font-size: var(--tekst-sitni);
+    text-align: center;
   }
 
   .glavni-gumb {

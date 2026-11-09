@@ -108,6 +108,10 @@ export interface PayloadUdjiUSobu {
   kod: string;
 }
 
+export interface PayloadIzbaciIzSobe {
+  igracId: string;
+}
+
 /** Javna partija (bodovi, rang, XP), privatna soba ili trening u kojem se ništa ne bilježi. */
 export type KontekstPartije = 'javna' | 'privatna' | 'trening';
 
@@ -353,6 +357,7 @@ export type KodGreske =
   | 'SOBA_NE_POSTOJI'
   | 'SOBA_U_TIJEKU'
   | 'SOBA_PUNA'
+  | 'IZBACEN_IZ_SOBE'
   | 'NISI_VLASNIK'
   | 'NEDOVOLJNO_IGRACA'
   | 'VEC_U_PARTIJI'
@@ -403,6 +408,7 @@ export interface DogadajiKlijentPoslužitelj {
   'soba:izadji': () => void;
   'soba:stanje': () => void;
   'soba:pokreni': () => void;
+  'soba:izbaci': (payload: PayloadIzbaciIzSobe) => void;
 }
 
 /** Mapa svih događaja poslužitelj -> klijent, za tipiziranu upotrebu Socket.IO. */
@@ -428,6 +434,7 @@ export interface DogadajiPosluziteljKlijent {
   'soba:stvorena': (payload: { kod: string }) => void;
   'soba:stanje': (payload: StanjePrivatneSobe) => void;
   'soba:vlasnik-napustio': (payload: { kod: string }) => void;
+  'soba:izbacen': (payload: { kod: string }) => void;
   'veza:zatvorena': (payload: ZatvaranjeVeze) => void;
   greska: (payload: PayloadGreska) => void;
 }
