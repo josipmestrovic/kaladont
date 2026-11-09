@@ -67,8 +67,11 @@ services:
       - javna
       - privatna
 
+  # Uključivanje: docker compose --profile umami -f docker-compose.prod.yml up -d
+  # Dok profil nije aktivan, obični deploy/config ne traži UMAMI_* tajne.
   umami:
     image: ghcr.io/umami-software/umami:3.4.1
+    profiles: ["umami"]
     restart: unless-stopped
     init: true
     environment:

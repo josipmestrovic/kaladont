@@ -126,7 +126,7 @@
       <a
         href="https://forum.kaladont.hr"
         rel="noopener noreferrer"
-        onclick={() => zabiljeziUmamiDogadjaj('forum-klik-landing')}
+        data-umami-event="forum-klik-landing"
       >
         <span>Pridruži se zajednici</span>
       </a>

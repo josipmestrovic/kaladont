@@ -187,12 +187,25 @@ EOF
 rezultat_igre="$(napravi_dump "$BAZA_IME")"
 rezultat_umami=''
 if [[ -n "$UMAMI_BAZA_IME" ]]; then
-  (
+  # Ako baza još nije bootstrapana, ne ruši dnevni/pre-migracijski backup igre.
+  if (
     cd "$COMPOSE_PROJECT_DIR"
     docker compose -f "$COMPOSE_DATOTEKA" exec -T "$BAZA_SERVIS" \
-      pg_isready -U "$BAZA_KORISNIK" -d "$UMAMI_BAZA_IME"
-  ) >/dev/null
-  rezultat_umami="$(napravi_dump "$UMAMI_BAZA_IME")"
+      psql -U "$BAZA_KORISNIK" -d postgres -Atc \
+      "SELECT 1 FROM pg_database WHERE datname = '${UMAMI_BAZA_IME}'"
+  ) 2>/dev/null | grep -qx 1; then
+    if (
+      cd "$COMPOSE_PROJECT_DIR"
+      docker compose -f "$COMPOSE_DATOTEKA" exec -T "$BAZA_SERVIS" \
+        pg_isready -U "$BAZA_KORISNIK" -d "$UMAMI_BAZA_IME"
+    ) >/dev/null; then
+      rezultat_umami="$(napravi_dump "$UMAMI_BAZA_IME")"
+    else
+      kaladont_log "Upozorenje: UMAMI_BAZA_IME=${UMAMI_BAZA_IME} postoji, ali nije spremna — preskačem Umami dump"
+    fi
+  else
+    kaladont_log "Upozorenje: baza ${UMAMI_BAZA_IME} ne postoji — preskačem Umami dump (bootstrap još nije napravljen)"
+  fi
 fi
 
 # Retencija (samo nakon uspješne verifikacije svih dumpova).

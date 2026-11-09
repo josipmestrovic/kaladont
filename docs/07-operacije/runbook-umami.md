@@ -69,13 +69,15 @@ To **ne dira** `kaladont_prod`.
 
 ## 3. Podigni Umami kontejner
 
+Umami je iza Compose profila `umami` — obični deploy igre **ne** pokreće ga i **ne** traži Umami tajne.
+
 ```bash
 cd /opt/kaladont
-sudo -u deploy docker compose -f docker-compose.prod.yml --env-file .env up -d umami
-sudo -u deploy docker compose -f docker-compose.prod.yml ps
+sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml --env-file .env up -d umami
+sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml ps
 ```
 
-`umami` treba biti `running` / healthy. Ako pada, `docker compose logs umami --tail=80` (često: baza nije bootstrapana ili kriva lozinka).
+`umami` treba biti `running` / healthy. Ako pada, `docker compose --profile umami -f docker-compose.prod.yml logs umami --tail=80` (često: baza nije bootstrapana ili kriva lozinka).
 
 Ako je Caddy već star bez `analitika` bloka, treba redeploy/compose koji povuče novi `Caddyfile`, zatim:
 
@@ -158,14 +160,16 @@ Sljedeći uspješan `kaladont-backup` dumpa i bazu `umami` (artefakt `kaladont_u
 
 ```bash
 cd /opt/kaladont
-sudo -u deploy docker compose -f docker-compose.prod.yml stop umami
+sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml stop umami
 ```
 
 `https://kaladont.hr` mora i dalje raditi (partija, login). Zatim:
 
 ```bash
-sudo -u deploy docker compose -f docker-compose.prod.yml start umami
+sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml start umami
 ```
+
+Napomena: CSP na `kaladont.hr` dopušta `https://analitika.kaladont.hr` — `UMAMI_URL` mora biti točno ta vrijednost. Umami UI je javan uz lozinku; odmah promijeni default admin lozinku.
 
 ---
 

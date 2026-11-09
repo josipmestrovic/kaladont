@@ -1,7 +1,6 @@
 <script lang="ts">
   import StatistikaRjecnika from '$lib/komponente/StatistikaRjecnika.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
-  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 </script>
 
 <SeoGlava
@@ -231,7 +230,7 @@
         <a
           href="https://forum.kaladont.hr"
           rel="noopener noreferrer"
-          onclick={() => zabiljeziUmamiDogadjaj('forum-klik-o-igri')}
+          data-umami-event="forum-klik-o-igri"
         >Pridruži se zajednici →</a>
       </p>
     </section>

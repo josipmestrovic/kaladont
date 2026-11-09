@@ -273,7 +273,12 @@ jobs:
           LJESTVICE_POCETAK: '2026-01-01T00:00:00+01:00'
           VERZIJA: ci-provjera
           DIGEST: sha256:0000000000000000000000000000000000000000000000000000000000000001
-        run: docker compose -f docker-compose.prod.yml config >/dev/null
+        run: |
+          # Osnovni stack (bez Umami profila) — rutinski deploy ne smije tražiti UMAMI tajne.
+          docker compose -f docker-compose.prod.yml config >/dev/null
+          # Profil umami + sintetičke tajne — validacija Umami servisa.
+          UMAMI_BAZA_LOZINKA=ci-umami-baza UMAMI_APP_SECRET=ci-umami-app-secret \
+            docker compose --profile umami -f docker-compose.prod.yml config >/dev/null
 
       - name: Validirati produkcijsku konfiguraciju (sintetika)
         run: pnpm --filter posluzitelj exec tsx src/cli/provjera-produkcijske-konfiguracije.ts

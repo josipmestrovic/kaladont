@@ -109,6 +109,6 @@ Slike su tagirane SHA-om commita i identificirane digestom. Automatskog rollback
 
 ## Umami nakon stabilizacije
 
-Umami nije preduvjet javnog ranog pristupa. **Nema zasebnog VPS-a** — servis je samo u produkcijskom Composeu (`ghcr.io/umami-software/umami:3.4.1`), Caddy host `analitika.kaladont.hr` na **istoj** Primary IPv4 kao `kaladont.hr`. Staging **nema** Umami. Tracker ostaje isključen dok su `UMAMI_URL` / `UMAMI_WEBSITE_ID` prazni.
+Umami nije preduvjet javnog ranog pristupa. **Nema zasebnog VPS-a** — servis je u produkcijskom Composeu iza profila `umami` (`ghcr.io/umami-software/umami:3.4.1`), Caddy host `analitika.kaladont.hr` na **istoj** Primary IPv4 kao `kaladont.hr`. Obični deploy ne pokreće Umami i ne traži Umami tajne. Staging **nema** Umami. Tracker ostaje isključen dok su `UMAMI_URL` / `UMAMI_WEBSITE_ID` prazni.
 
 Početnički copy-paste postupak: [runbook-umami.md](runbook-umami.md).
