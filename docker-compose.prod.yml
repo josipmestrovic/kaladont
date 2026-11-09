@@ -16,6 +16,7 @@ services:
       - caddy_prod_konfiguracija:/config
     networks:
       - javna
+      - analitika
 
   aplikacija:
     image: ${KALADONT_IMAGE:?Postavi GHCR image digest}
@@ -95,9 +96,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    # analitika = Caddy tracker; umami_db = Postgres. Nije na javna/privatna → aplikacija ne vidi Umami admin.
     networks:
-      - javna
-      - privatna
+      - analitika
+      - umami_db
 
   baza:
     image: postgres:16.15-alpine
@@ -115,6 +117,7 @@ services:
       retries: 5
     networks:
       - privatna
+      - umami_db
 
 volumes:
   caddy_prod_podaci:
@@ -124,4 +127,8 @@ volumes:
 networks:
   javna:
   privatna:
+    internal: true
+  analitika:
+    internal: true
+  umami_db:
     internal: true
