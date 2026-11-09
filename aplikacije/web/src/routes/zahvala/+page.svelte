@@ -22,7 +22,7 @@
         <a class="glavna-akcija" href="/red?mod=dva_igraca">Igrati Dvoboj</a>
         <a class="glavna-akcija" href="/red?mod=cetiri_igraca">Igrati Četveroboj</a>
         <a class="sporedna-akcija" href="/soba/kreiraj">Stvoriti privatnu sobu</a>
-        <a class="sporedna-akcija" href="/pravila">Pročitati pravila</a>
+        <a class="sporedna-akcija" href="/pravila-kaladonta">Pročitati pravila</a>
         <a class="sporedna-akcija" href="/profil">Vidjeti svoj profil</a>
         <a class="sporedna-akcija" href="/postavke">Otvoriti postavke</a>
         <a class="sporedna-akcija" href="/ljestvice">Pogledati ljestvice</a>

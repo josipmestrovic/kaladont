@@ -206,7 +206,7 @@ async function pokreniHttpLokalno(adresa: string, trajanjeMs: number, signal: Ab
     { putanja: '/', udio: 60 },
     { putanja: '/ljestvice', udio: 20 },
     { putanja: '/o-igri', udio: 10 },
-    { putanja: '/pravila-kaladonta?tema=pravila', udio: 10 },
+    { putanja: '/pravila-kaladonta', udio: 10 },
   ];
   const latencijiPoStranici = new Map(stranice.map((stranica) => [stranica.putanja, [] as number[]]));
   const pogreskePoStranici = new Map(stranice.map((stranica) => [stranica.putanja, [] as string[]]));

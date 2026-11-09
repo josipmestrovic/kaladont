@@ -273,6 +273,75 @@ describe('privatne sobe', () => {
     }
   });
 
+  it('vlasnik izbacuje člana koji više ne može ući na isti link', async () => {
+    const vlasnik = await spojiIgraca();
+    const clan = await spojiIgraca();
+
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket);
+      await udjiUSobu(clan, kod);
+
+      const izbacen = cekajDogadaj<{ kod: string }>(clan.socket, 'soba:izbacen');
+      const stanjeNakonKicka = cekajDogadaj<StanjePrivatneSobe>(vlasnik.socket, 'soba:stanje');
+      vlasnik.socket.emit('soba:izbaci', { igracId: clan.token });
+
+      expect(await izbacen).toEqual({ kod });
+      const stanje = await stanjeNakonKicka;
+      expect(stanje.clanovi.map((sudionik) => sudionik.igracId)).not.toContain(clan.token);
+      expect(stanje.clanovi).toHaveLength(1);
+
+      const greska = cekajDogadaj<{ kod: string; poruka: string }>(clan.socket, 'greska');
+      clan.socket.emit('soba:udji', { kod });
+      expect(await greska).toEqual(expect.objectContaining({ kod: 'IZBACEN_IZ_SOBE' }));
+    } finally {
+      vlasnik.socket.disconnect();
+      clan.socket.disconnect();
+    }
+  });
+
+  it('ne-vlasnik ne može izbaciti, a vlasnik ne može izbaciti sebe', async () => {
+    const vlasnik = await spojiIgraca();
+    const clan = await spojiIgraca();
+
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket);
+      await udjiUSobu(clan, kod);
+
+      const greskaClana = cekajDogadaj<{ kod: string }>(clan.socket, 'greska');
+      clan.socket.emit('soba:izbaci', { igracId: vlasnik.token });
+      expect((await greskaClana).kod).toBe('NISI_VLASNIK');
+
+      const greskaSebe = cekajDogadaj<{ kod: string }>(vlasnik.socket, 'greska');
+      vlasnik.socket.emit('soba:izbaci', { igracId: vlasnik.token });
+      expect((await greskaSebe).kod).toBe('NEVALJAN_PAYLOAD');
+    } finally {
+      vlasnik.socket.disconnect();
+      clan.socket.disconnect();
+    }
+  });
+
+  it('odbija izbacivanje dok je partija u tijeku', async () => {
+    const vlasnik = await spojiIgraca();
+    const drugi = await spojiIgraca();
+
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket);
+      await udjiUSobu(drugi, kod);
+      const pocetak = cekajDogadaj<PocetakPartije>(vlasnik.socket, 'partija:pocetak');
+      vlasnik.socket.emit('soba:pokreni');
+      await pocetak;
+
+      const greska = cekajDogadaj<{ kod: string }>(vlasnik.socket, 'greska');
+      vlasnik.socket.emit('soba:izbaci', { igracId: drugi.token });
+      expect((await greska).kod).toBe('SOBA_U_TIJEKU');
+    } finally {
+      vlasnik.socket.emit('partija:izadji');
+      drugi.socket.emit('partija:izadji');
+      vlasnik.socket.disconnect();
+      drugi.socket.disconnect();
+    }
+  });
+
   it('reconnect istog člana vraća ga u privatnu sobu bez duplikata', async () => {
     const vlasnik = await spojiIgraca();
     const clan = await spojiIgraca();

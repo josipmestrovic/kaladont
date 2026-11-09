@@ -1,14 +1,13 @@
 <script lang="ts">
   import StatistikaRjecnika from '$lib/komponente/StatistikaRjecnika.svelte';
+  import SeoGlava from '$lib/komponente/SeoGlava.svelte';
 </script>
 
-<svelte:head>
-  <title>O igri | Kaladont</title>
-  <meta
-    name="description"
-    content="Kaladont, hrvatska igra riječi: natjecanje, rangovi, ljestvice i pametan rječnik. Saznaj kako se igra."
-  />
-</svelte:head>
+<SeoGlava
+  title="O igri | Kaladont"
+  description="Novosti, release napomene i pregled Kaladonta — hrvatske online igre riječi."
+  putanja="/o-igri"
+/>
 
 <main class="o-igri">
   <header class="zaglavlje">

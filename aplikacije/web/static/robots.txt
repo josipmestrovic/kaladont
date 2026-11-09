@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /red
+Disallow: /partija
+Disallow: /soba
+Disallow: /postavke
+Disallow: /obavijesti
+Disallow: /profil
+Disallow: /prijava
+Disallow: /registracija
+Disallow: /misije
+Disallow: /zagrijavanje
+
+Sitemap: https://kaladont.hr/sitemap.xml

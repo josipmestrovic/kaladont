@@ -82,7 +82,7 @@
       </div>
     </div>
   {/if}
-  <a class="dnk-pomoc" href="/pravila-kaladonta?tema=dnk#sadrzaj-pomoci">Što je Kaladont DNK?</a>
+  <a class="dnk-pomoc" href="/pravila-kaladonta/dnk#sadrzaj-pomoci">Što je Kaladont DNK?</a>
 </section>
 
 <style>

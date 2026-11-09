@@ -317,7 +317,7 @@
 
     <p class="napomena">
       Napredak se potvrđuje nakon spremanja igre. Trening vrijedi samo na misijama označenim „Zagrijavanje”.
-      <a href="/pravila">Pravila</a>
+      <a href="/pravila-kaladonta">Pravila</a>
     </p>
   {/if}
 </main>

@@ -1,6 +1,8 @@
 import { redirect } from '@sveltejs/kit';
+import { normalizirajTemu, putanjaPravilaTeme } from '$lib/seo.js';
+import type { PageServerLoad } from './$types';
 
-export function load({ url }) {
-  const query = url.searchParams.toString();
-  redirect(308, `/pravila-kaladonta${query ? `?${query}` : ''}`);
-}
+export const load: PageServerLoad = ({ url }) => {
+  const tema = normalizirajTemu(url.searchParams.get('tema'));
+  redirect(308, putanjaPravilaTeme(tema ?? 'kako-igrati'));
+};

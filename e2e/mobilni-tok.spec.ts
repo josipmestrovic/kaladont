@@ -127,7 +127,7 @@ test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomican
   for (const sirina of [320, 360, 390, 768, 999]) {
     await page.setViewportSize({ width: sirina, height: 760 });
     for (const tema of ['nacini', 'bodovi', 'napredak']) {
-      await page.goto(`/pravila-kaladonta?tema=${tema}`);
+      await page.goto(`/pravila-kaladonta/${tema}`);
       const tablice = page.locator('table');
       await expect(tablice.first()).toBeVisible();
       const neoznacene = await page
@@ -153,7 +153,7 @@ test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomican
     }
   }
 
-  await page.goto('/pravila-kaladonta?tema=bodovi');
+  await page.goto('/pravila-kaladonta/bodovi');
   const rangovi = page.locator('.tablica-rangova tbody tr');
   await expect(rangovi).toHaveCount(10);
   await expect(rangovi.first().locator('td').last()).toContainText('< 0,30');
@@ -179,7 +179,7 @@ for (const svijetla of [false, true]) {
         { svijetlaTema: svijetla, font: disleksijskiFont },
       );
       await page.setViewportSize({ width: 320, height: 760 });
-      await page.goto('/pravila-kaladonta?tema=napredak', { waitUntil: 'domcontentloaded' });
+      await page.goto('/pravila-kaladonta/napredak', { waitUntil: 'domcontentloaded' });
       await page.evaluate(() => document.fonts.ready);
       const prelijevanje = await page.locator('table').evaluateAll((elementi) =>
         elementi.some((tablica) => {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Pomoc from '../pomoc/+page.svelte';
+  import PravilaSadrzaj from '$lib/komponente/PravilaSadrzaj.svelte';
 </script>
 
-<Pomoc />
+<PravilaSadrzaj tema="kako-igrati" />

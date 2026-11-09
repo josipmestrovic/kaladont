@@ -117,7 +117,7 @@ Testni računi i partije ostaju u staging bazi. Nakon svakog testa provjeriti `/
 
 ### Miješani test igre i javnih stranica
 
-`test:opterecenje:mijesano` je zaseban, ručni CLI; nije pozvan iz `pnpm test`, CI-ja ni objave. Na stagingu zahtijeva lokalni k6 i interaktivni terminal. Botovi koriste Socket.IO polling s nadogradnjom na WebSocket, a HTTP korisnici šalju javne GET zahtjeve na naslovnicu (60%), ljestvice (20%), novosti (10%) i `/pravila-kaladonta?tema=pravila` (10%). Svaki pokus dobiva svoju trajnu mapu `%LOCALAPPDATA%\Kaladont\opterecenje\<runId>` na Windowsu, odnosno `~/.kaladont/opterecenje/<runId>` na drugim sustavima. Izvještaji i snimka rječnika ne spremaju se u repozitorij.
+`test:opterecenje:mijesano` je zaseban, ručni CLI; nije pozvan iz `pnpm test`, CI-ja ni objave. Na stagingu zahtijeva lokalni k6 i interaktivni terminal. Botovi koriste Socket.IO polling s nadogradnjom na WebSocket, a HTTP korisnici šalju javne GET zahtjeve na naslovnicu (60%), ljestvice (20%), novosti (10%) i `/pravila-kaladonta` (10%). Svaki pokus dobiva svoju trajnu mapu `%LOCALAPPDATA%\Kaladont\opterecenje\<runId>` na Windowsu, odnosno `~/.kaladont/opterecenje/<runId>` na drugim sustavima. Izvještaji i snimka rječnika ne spremaju se u repozitorij.
 
 Snimku pripremiti jednokratno na staging VPS-u, unutar aplikacijskog kontejnera, i prenijeti je na generator samo odobrenim SSH/SCP kanalom. Ne otvarati PostgreSQL prema internetu. Primjer izvoza:
 

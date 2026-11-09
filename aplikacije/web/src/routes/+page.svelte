@@ -10,6 +10,8 @@
   import KontrolePristupacnosti from '$lib/komponente/KontrolePristupacnosti.svelte';
   import PopupNovihMisija from '$lib/komponente/PopupNovihMisija.svelte';
   import SanducicProfilZona from '$lib/komponente/SanducicProfilZona.svelte';
+  import SeoGlava from '$lib/komponente/SeoGlava.svelte';
+  import { naslovnicaJsonLd } from '$lib/seo.js';
   import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
@@ -44,10 +46,12 @@
 
 <svelte:window onkeydown={zatvoriNaEscape} />
 
-<svelte:head>
-  <title>Kaladont Multiplayer Online</title>
-  <meta name="description" content="Igraj Kaladont online u Dvoboju, Četveroboju ili privatnoj sobi sa svojom ekipom." />
-</svelte:head>
+<SeoGlava
+  title="Kaladont — online hrvatska igra riječi"
+  description="Igraj Kaladont online u Dvoboju, Četveroboju ili privatnoj sobi. Hrvatska multiplayer igra riječi na zadnja dva slova."
+  putanja="/"
+  jsonLd={naslovnicaJsonLd()}
+/>
 
 <main class="landing">
   <SanducicProfilZona />
@@ -55,6 +59,10 @@
     <header class="landing-tekst">
       <img class="demo-oznaka" src="/slike/demo-slika.webp" alt="Demo verzija igre" width="120" height="48" />
       <h1 id="naslov-kaladont"><span class="ime-igre">KALADONT</span> <span class="vrsta-igre">online</span></h1>
+      <p class="seo-uvod">
+        Hrvatska online igra riječi: reci riječ na zadnja dva slova prethodne i ostani zadnji za stolom.
+        <a href="/pravila-kaladonta">Pročitaj pravila</a>.
+      </p>
     </header>
 
     <div class="navigacijski-blok">
@@ -77,7 +85,7 @@
         <img class="ikona-sucelja" src={urlAseta('/ikone/09-ljestvice.png')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Ljestvice</span>
       </a>
-      <a href="/pravila" class="navigacijska-stavka">
+      <a href="/pravila-kaladonta" class="navigacijska-stavka">
         <img class="ikona-sucelja" src={urlAseta('/ikone/08-pravila.png')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Pravila</span>
       </a>
@@ -237,6 +245,35 @@
     margin: 0;
     font-size: var(--velicina-naslova);
     line-height: 0.88;
+  }
+
+  .seo-uvod {
+    max-width: 34rem;
+    margin: clamp(4px, 0.8dvh, 10px) 0 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: clamp(12px, 1.6dvh, 15px);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .seo-uvod a {
+    color: var(--boja-pozadina-primarna);
+    font-weight: 700;
+  }
+
+  /* Na niskim ekranima ostaje u DOM-u za SEO, bez dodatnog scrolla. */
+  @media (max-height: 760px) {
+    .seo-uvod {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
   }
 
   .navigacijski-blok {

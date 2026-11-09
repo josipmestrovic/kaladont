@@ -58,7 +58,7 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByRole('button', { name: 'Igraj' })).toBeVisible();
-  await expect(navigacija.getByRole('link', { name: 'Pravila' })).toHaveAttribute('href', '/pravila');
+  await expect(navigacija.getByRole('link', { name: 'Pravila' })).toHaveAttribute('href', '/pravila-kaladonta');
   await expect(navigacija.getByRole('link', { name: 'Misije' })).toHaveAttribute('href', '/misije');
   await expect(navigacija.getByRole('link', { name: 'Ljestvice' })).toHaveAttribute('href', '/ljestvice');
   await expect(navigacija.getByRole('link', { name: 'Moj profil' })).toHaveAttribute('href', '/profil');
@@ -144,7 +144,7 @@ test('na niskom desktop ekranu ilustracija se skriva', async ({ page }) => {
 test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Pravila' }).click();
-  await expect(page).toHaveURL(/\/pravila-kaladonta\?tema=pravila$/);
+  await expect(page).toHaveURL('/pravila-kaladonta');
 
   const povratak = page.getByRole('button', { name: 'Nazad' });
   await expect(povratak).toBeVisible();
