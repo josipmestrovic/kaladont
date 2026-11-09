@@ -63,7 +63,11 @@
       <h1 id="naslov-kaladont"><span class="ime-igre">KALADONT</span> <span class="vrsta-igre">online</span></h1>
       <p class="seo-uvod">
         Hrvatska online igra riječi: reci riječ na zadnja dva slova prethodne i ostani zadnji za stolom.
-        <a href="/pravila-kaladonta">Pročitaj pravila</a>.
+        <a href="/pravila-kaladonta">Pročitaj pravila</a>
+        ili se
+        <a href="https://forum.kaladont.hr" rel="noopener noreferrer" data-umami-event="forum-klik-landing"
+          >pridruži zajednici</a
+        >.
       </p>
     </header>
 
@@ -122,13 +126,6 @@
     <nav aria-label="Dodatne poveznice">
       <a href="/o-igri">
         <span>O igri</span>
-      </a>
-      <a
-        href="https://forum.kaladont.hr"
-        rel="noopener noreferrer"
-        data-umami-event="forum-klik-landing"
-      >
-        <span>Pridruži se zajednici</span>
       </a>
       <a href="/povratne-informacije">
         <span>Pomozi poboljšati igru</span>

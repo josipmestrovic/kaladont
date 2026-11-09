@@ -75,8 +75,10 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      DATABASE_URL: postgresql://umami:${UMAMI_BAZA_LOZINKA:?Postavi UMAMI_BAZA_LOZINKA}@baza:5432/umami
-      APP_SECRET: ${UMAMI_APP_SECRET:?Postavi UMAMI_APP_SECRET}
+      # Bez :? — inače `compose config` bez profila pada na starijim Compose verzijama.
+      # Pri --profile umami postavi prave tajne u .env (vidi runbook-umami.md).
+      DATABASE_URL: postgresql://umami:${UMAMI_BAZA_LOZINKA:-umami}@baza:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:-promijeni-umami-app-secret}
     depends_on:
       baza:
         condition: service_healthy
