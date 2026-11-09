@@ -109,7 +109,7 @@ Mora pokazati baš `<PROD_IPV4>`. Pričekaj propagaciju (često minute, ponekad 
 
 ## 5. Prvi login + Website ID
 
-Admin UI **nije** na `https://analitika.kaladont.hr` (Caddy propušta samo tracker). Umami sluša `127.0.0.1:3002` na VPS-u.
+Admin UI **nije** na `https://analitika.kaladont.hr` (Caddy propušta samo tracker). Umami publisha `127.0.0.1:3002` preko mreze `umami_loopback` (ne-internal — inače Docker ne bind-a port).
 
 Na Windowsu (novi PowerShell):
 
