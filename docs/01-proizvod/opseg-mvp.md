@@ -8,9 +8,11 @@ Jedina svrha MVP-a: **provjeriti hoće li ljudi igrati**. Sve što tome ne prido
 | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Igra kao gost          | Jedan klik s landinga, generirano ime, trajni anonimni ID                                                      |
 | Zajednički red čekanja | Ljudi imaju prednost; nakon 30 s (Dvoboj) odnosno 20/30/40 s (Četveroboj) prazna mjesta popunjavaju botovi; real-time popunjavanje s imenima + prosjek čekanja zadnjih 100 partija |
-| Partija 4 igrača       | 30 s po potezu, ispadanje, bodovi (plasman + eliminacije + bonus), emoji reakcije, promatranje nakon ispadanja |
+| Dvoboj (2 igrača)      | 30 s po potezu, ispadanje prvog = kraj, bodovi i rangovi kao u javnoj igri                                     |
+| Četveroboj (4 igrača)  | 30 s po potezu, ispadanje do posljednjeg, bodovi (plasman + eliminacije + bonus), emoji reakcije, promatranje nakon ispadanja |
+| Privatna soba          | 2–8 igrača; vlasnik bira trajanje poteza i vrste riječi; vlastita privremena ljestvica, bez utjecaja na javne bodove/rang ([pravila-igre.md](../02-pravila-igre/pravila-igre.md)) |
 | Botovi za popunu       | Trajni identiteti, isti obračun za ljude, nenapadačka politika riječi; oznaka vidljiva samo administratoru ([ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md)) |
-| Zagrijavanje           | Dvoboj bez natjecateljske statistike/XP-a/kolekcije; registriranima se bilježi pobjednički napredak Zagrijanog ([botovi.md](../02-pravila-igre/botovi.md)) |
+| Zagrijavanje           | Dvoboj protiv računala bez natjecateljske statistike/XP-a/kolekcije; registriranima se bilježi pobjednički napredak Zagrijanog ([botovi.md](../02-pravila-igre/botovi.md)) |
 | Registracija           | Email + lozinka; gost postaje račun bez gubitka statistike                                                     |
 | Rangovi                | Prikazni (Prvopisac → Kaladont), nakon 10 kalibracijskih partija                                               |
 | Javna ljestvica        | Top 100 po prosjeku bodova                                                                                     |
@@ -20,7 +22,7 @@ Jedina svrha MVP-a: **provjeriti hoće li ljudi igrati**. Sve što tome ne prido
 | Povijest partije       | Svi potezi; dostupna tijekom i nakon igre                                                                      |
 | Prijave grešaka        | S poteza u povijesti; baza + email notifikacija                                                                |
 | Admin stranica         | Prijave sa statusima, dodavanje/uklanjanje riječi                                                              |
-| Mjerenje               | Vlastite metrike izvedene iz podataka igre                                                                     |
+| Mjerenje               | Vlastite metrike izvedene iz podataka igre; web analitika Umami na produkciji ([runbook-umami.md](../07-operacije/runbook-umami.md)) |
 | Statične stranice      | Pravila, O igri (atribucija hrLex), Privatnost, Uvjeti                                                         |
 
 ## Svjesno NE ulazi u MVP
@@ -31,12 +33,10 @@ Jedina svrha MVP-a: **provjeriti hoće li ljudi igrati**. Sve što tome ne prido
 | Botovi s vidljivom oznakom, chatom ili više težina | Prvo osnovna popuna i trening; vidi ADR-017                        | [ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md) |
 | Tekstualni chat                     | Trošak moderacije                                                                | [pravila-igre.md](../02-pravila-igre/pravila-igre.md)             |
 | Monetizacija                        | Prvo dokaz retencije                                                             | [vizija-proizvoda.md](vizija-proizvoda.md)                        |
-| Privatne sobe / igra s prijateljima | Nakon validacije javne igre                                                      | [buduce-znacajke.md](../08-plan-razvoja/buduce-znacajke.md)       |
 | Mobilne aplikacije                  | Mobile-first web pokriva potrebu                                                 | —                                                                 |
 | Turniri, prijatelji, poruke         | v2+                                                                              | buduce-znacajke.md                                                |
 | Oporavak gost-računa                | Trajnost je pogodnost registracije                                               | RS-19                                                             |
-| Web analitika (Umami)               | Vlastite metrike dovoljne su za javni start; Umami se dodaje nakon stabilizacije | [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md) |
 
 ## Definicija gotovog MVP-a
 
-MVP je gotov kada nepoznat čovjek na mobitelu može: doći na kaladont.hr → kliknuti IGRAJ → odigrati cijelu partiju s tri druga čovjeka → vidjeti svoj plasman i bodove → registrirati se i zadržati statistiku → prijaviti riječ koja ne treba biti u rječniku ili koja nedostaje u rječniku
+MVP je gotov kada nepoznat čovjek na mobitelu može: doći na kaladont.hr → kliknuti IGRAJ → odabrati Dvoboj ili Četveroboj → odigrati cijelu partiju → vidjeti svoj plasman i bodove → registrirati se i zadržati statistiku → prijaviti riječ koja ne treba biti u rječniku ili koja nedostaje u rječniku

@@ -2,7 +2,7 @@
 
 Monorepo s pnpm workspaces. Nazivi foldera hrvatski, bez dijakritika.
 
-> **Napomena o statusu:** prikaz ispod opisuje ciljnu logičku strukturu. Aplikacijski paketi postoje, ali operativni artefakti označeni s **planirano u Fazi 8** još nisu implementirani. Stvarno stanje uvijek se provjerava u radnom stablu, ne pretpostavlja iz ovog dijagrama.
+> **Napomena o statusu:** prikaz je sažetak stvarnog monorepa. Detalji CI/CD i objave: [ci-cd.md](../07-operacije/ci-cd.md), [produkcija-i-objava.md](../07-operacije/produkcija-i-objava.md), [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md).
 
 ```text
 kaladont/
@@ -30,16 +30,16 @@ kaladont/
 │   └── uvoz-rjecnika/          # hrLex → Postgres (podaci/ je u .gitignore)
 ├── docs/                       # ova dokumentacija
 ├── .github/
-│   ├── workflows/              # planirano u Fazi 8: CI, staging i produkcija
+│   ├── workflows/              # CI, GHCR, staging, promocija produkcije
 │   └── copilot-instructions.md
-├── Dockerfile                  # planirano u Fazi 8: runtime + jednokratni alati
-├── docker-compose.staging.yml  # planirano u Fazi 8: Caddy + aplikacija + baza
-├── docker-compose.prod.yml     # planirano u Fazi 8: Caddy + aplikacija + baza
+├── Dockerfile                  # runtime + jednokratni alati
+├── docker-compose.staging.yml  # Caddy + aplikacija + baza (staging)
+├── docker-compose.prod.yml     # Caddy + aplikacija + baza (produkcija)
 ├── LICENCA.md
 └── README.md
 ```
 
-Planirani operativni artefakti ne smiju se koristiti u uputama kao da već postoje. Njihov ciljani ugovor opisuju [CI/CD](../07-operacije/ci-cd.md), [produkcija i objava](../07-operacije/produkcija-i-objava.md) te [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Umami je u Composeu, ali se DNS/bootstrap/website ID uključuju tek nakon stabilizacije; tracker ostaje isključen dok su env prazni.
+Umami je u produkcijskom Composeu (profil `umami`); tracker ostaje isključen dok su `UMAMI_URL` / `UMAMI_WEBSITE_ID` prazni. Postupak: [runbook-umami.md](../07-operacije/runbook-umami.md).
 
 ## Pravila ovisnosti između slojeva
 

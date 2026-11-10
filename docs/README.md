@@ -1,6 +1,6 @@
 # Dokumentacija projekta Kaladont
 
-Kaladont je hrvatska višeigračka igra riječi na domeni **kaladont.hr**. Ova dokumentacija je jedini izvor istine projekta: svaka odluka o pravilima, arhitekturi i dizajnu ovdje je zapisana **prije** implementacije.
+Kaladont je hrvatska višeigračka igra riječi na domeni **kaladont.hr**. Ova dokumentacija je izvor istine za pravila, arhitekturu i operativne postupke; usklađuje se s kodom kako se projekt razvija.
 
 ## Kako čitati
 
@@ -100,11 +100,11 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 
 ## Ključne brojke (brzi podsjetnik)
 
-| Parametar                | Vrijednost                                |
-| ------------------------ | ----------------------------------------- |
-| Igrača po partiji        | točno 4                                   |
-| Vrijeme po potezu        | 30 sekundi                                |
-| Bodovi po partiji (stol) | 10 (plasmani 6 + eliminacije 3 + bonus 1) |
-| Maksimum po igraču       | 7 bodova                                  |
-| Kalibracija              | 10 partija (rang „Piskaralo")             |
-| Najviši rang             | Kaladont                                  |
+| Parametar                | Vrijednost                                                                |
+| ------------------------ | ------------------------------------------------------------------------- |
+| Igrača po partiji        | Dvoboj 2; Četveroboj 4; privatna soba 2–8                               |
+| Vrijeme po potezu        | javni modovi 30 s; privatna soba 15 / 30 / 60 s ili bez tajmera           |
+| Bodovi po partiji (stol) | 10 u Četveroboju (plasmani 6 + eliminacije 3 + bonus 1)                   |
+| Maksimum po igraču       | 7 bodova (Četveroboj)                                                     |
+| Kalibracija              | 10 partija (rang „Piskaralo")                                             |
+| Najviši rang             | Kaladont                                                                  |

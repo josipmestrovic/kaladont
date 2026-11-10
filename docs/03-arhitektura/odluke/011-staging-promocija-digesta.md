@@ -1,9 +1,11 @@
 # ADR-011: Staging okruženje i promocija istog image digesta
 
-- **Status:** djelomično zamijenjen [ADR-om 014](014-operativni-model-mvp-a.md)
+- **Status:** djelomično zamijenjen [ADR-om 014](014-operativni-model-mvp-a.md); dijelovi o ručnom stagingu supersedirani automatskim workflowom
 - **Datum:** 2026-09-03
 
-> **Napomena 2026-09-09:** važeći operativni ritam za prve closed testove opisuju [ADR-014](014-operativni-model-mvp-a.md) i [release shema](../../07-operacije/release-shema.md). Staging se trenutno ažurira ručno punim GHCR digestom; automatski staging workflow i produkcijski promotion workflow ostaju ciljano stanje.
+> **Napomena 2026-09-09:** važeći operativni ritam za prve closed testove opisuju [ADR-014](014-operativni-model-mvp-a.md) i [release shema](../../07-operacije/release-shema.md). Staging se tada ažurirao ručno punim GHCR digestom.
+>
+> **Napomena 2026-11-10:** automatski staging workflow (`objavi-staging.yml`) i ručni produkcijski promotion workflow (`promoviraj-produkciju`) postoje u repozitoriju. Aktualni status okruženja: [produkcija-i-objava.md](../../07-operacije/produkcija-i-objava.md). Izvorni tekst odluke ispod ostaje povijesni.
 
 ## Kontekst
 
@@ -13,10 +15,10 @@ ADR-009 definira jedan produkcijski VPS i deploy s `main` grane. Prije javnog la
 
 Dva odvojena, jednako konfigurirana Hetzner VPS-a:
 
-- **Staging** (`staging.kaladont.hr`): trenutno je ručno postavljen i ručno se ažurira nakon zelenog CI-ja i GHCR objave. Javan je uz `noindex` (bez Basic Autha zbog Socket.IO promptova), s vlastitom bazom i stvarnim hrLex rječnikom. Automatski staging workflow još nije implementiran.
+- **Staging** (`staging.kaladont.hr`): u izvornom tekstu odluke bio je ručno postavljen i ručno ažuriran nakon zelenog CI-ja i GHCR objave, s vlastitom bazom i stvarnim hrLex rječnikom. *(Aktualno: automatski staging deploy postoji — vidi napomenu 2026-11-10.)*
 - **Produkcija** (`kaladont.hr`): objava **isključivo ručnom promocijom** — GitHub Actions workflow s obveznim odobrenjem (GitHub Environment `produkcija`) postavlja **identičan image digest** koji je već prošao staging. Slika se ne builda ponovno i ništa se ne kopira sa staging stroja.
 
-Izvorni ciljani tok ove odluke bio je: `merge u main → CI + smoke test slike → GHCR (tag sha + digest) → auto-deploy staging → ručna provjera → odobrenje → isti digest u produkciju`. Važeći početni tok nakon ADR-014 koristi ručno ažuriranje staginga punim digestom dok automatski staging workflow ne postoji.
+Izvorni ciljani tok ove odluke bio je: `merge u main → CI + smoke test slike → GHCR (tag sha + digest) → auto-deploy staging → ručna provjera → odobrenje → isti digest u produkciju`. Nakon ADR-014 privremeno je vrijedilo ručno ažuriranje staginga punim digestom; automatski staging workflow kasnije je uveden (napomena 2026-11-10).
 
 Rollback = ponovno pokretanje promocije s prethodnim poznato-zdravim digestom. Baza se ne vraća; migracije moraju biti kompatibilne unatrag barem jedan ciklus.
 
