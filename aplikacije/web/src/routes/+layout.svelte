@@ -142,7 +142,7 @@
     <DostignuceObavijest />
     <CitanjeNaglasObavijest />
   </div>
-  {#if $page.url.pathname === '/'}<PadajuceRijeci />{/if}
+  {#if $page.url.pathname === '/' && sesijaSpreman}<PadajuceRijeci />{/if}
   {#if sesijaSpreman && !bezHeadera}
     <Header {prethodnaPutanja} {mozeNaprijed} />
   {/if}
@@ -150,7 +150,8 @@
     {#if prikaziKosturCekanja}
       <RedCekanjaKostur ukupnoMjesta={brojMjestaKostura} />
     {:else if prikaziChildren}
-      <div class="stranica-sadrzaj">
+      <!-- Indeksabilni SSR ostaje u DOM-u; inert sprječava klikove prije gost-sesije/hidracije. -->
+      <div class="stranica-sadrzaj" inert={!sesijaSpreman ? true : undefined}>
         {@render children()}
       </div>
     {/if}
