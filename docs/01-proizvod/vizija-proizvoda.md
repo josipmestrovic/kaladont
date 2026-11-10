@@ -2,7 +2,7 @@
 
 ## Što je Kaladont
 
-Digitalna verzija igre riječi koju u Hrvatskoj svi znaju s dugih vožnji i školskih klupa: reci riječ na posljednja dva slova prethodne. Četvero igrača za stolom, 30 sekundi po potezu, ispadanje do posljednjeg — kratke, napete partije koje se igraju „još samo jednu".
+Digitalna verzija igre riječi koju u Hrvatskoj svi znaju s dugih vožnji i školskih klupa: reci riječ na posljednja dva grafema prethodne. Dvoboj (2) ili Četveroboj (4) za stolom, 30 sekundi po potezu u javnim igrama, ispadanje do posljednjeg — kratke, napete partije koje se igraju „još samo jednu". Privatna soba (2–8) i Zagrijavanje proširuju isti temelj.
 
 ## Zašto
 

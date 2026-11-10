@@ -1,10 +1,10 @@
 # Produkcija i objava
 
-> **Status 2026-10-01: staging deploy je automatiziran, produkcija nije postavljena.** CI smoke test, GHCR promotion i `objavi-staging.yml` koriste isti image digest; staging health provjerava verziju i digest nakon deploya. Staging VPS `staging.kaladont.hr` ručno je inicijalno postavljen s HTTPS-om, privatnom bazom i vlastitim hrLex rječnikom. Produkcijski VPS/promotion i backup automatika nisu potvrđeni kao implementirani. Ovaj dokument opisuje postojeći staging tok i preostalu produkcijsku pripremu.
+> **Status 2026-11-10:** staging deploy je automatiziran; produkcijski VPS postoji ([runbook-ssh-produkcija.md](runbook-ssh-produkcija.md)). CI smoke test, GHCR i `objavi-staging.yml` koriste isti image digest; staging health provjerava verziju i digest nakon deploya. Staging je na `staging.kaladont.hr` (HTTPS, vlastita baza, hrLex). Produkcijska promocija ostaje **ručni** workflow (`promoviraj-produkciju`) istog digesta sa staginga — ovaj dokument ne tvrdi širinu javnog pristupa na `kaladont.hr`.
 
 Izvor odluke je [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md). Lokalni Windows razvoj ostaje odvojen i opisan u [postavljanju razvojne okoline](../06-razvoj/postavljanje-okoline.md).
 
-**Stvarno stanje:** CI koristi mali sintetički fixture, dok staging ima vlastiti stvarni hrLex uvoz. Nakon zelenog CI-ja GHCR objavi candidate i promovira isti manifest; staging workflow zatim automatski deploya puni digest i provjerava javni health. Operater ručno obavlja staging checklistu. Produkcijski VPS i promocija ostaju izvan potvrđenog automatiziranog toka.
+**Stvarno stanje:** CI koristi mali sintetički fixture, dok staging ima vlastiti stvarni hrLex uvoz. Nakon zelenog CI-ja GHCR objavi candidate i promovira isti manifest; staging workflow zatim automatski deploya puni digest i provjerava javni health. Operater ručno obavlja staging checklistu, zatim po potrebi ručno promovira digest u produkciju.
 
 ## Okruženja
 
@@ -18,7 +18,7 @@ Aplikacija živi na **dva odvojena Hetzner VPS-a**; postojeći treći VPS nosi D
 
 Oba nova VPS-a koriste Ubuntu 24.04 LTS, arhitekturu x86/amd64 i istu Hetzner lokaciju kao forum. U početku imaju samo Primary IPv4; automatsko brisanje IP adrese isključeno je, a resurs je zaštićen od slučajnog brisanja. Zamjenski VPS u istoj lokaciji zato može preuzeti istu IP adresu bez čekanja XHosting DNS promjene.
 
-Staging i produkcija ne dijele bazu, `.env`, tajne, Docker mrežu ni volumene. **Produkcijski podaci nikad ne idu na staging**; staging koristi trajne sintetičke podatke i vlastiti uvoz rječnika. Produkcijski VPS stvara se tek kada staging prođe puni deploy, ručnu partiju te šifrirani backup i restore drill. Odabir veličine i trošak opisani su u [dimenzioniranju poslužitelja](dimenzioniranje-posluzitelja.md).
+Staging i produkcija ne dijele bazu, `.env`, tajne, Docker mrežu ni volumene. **Produkcijski podaci nikad ne idu na staging**; staging koristi trajne sintetičke podatke i vlastiti uvoz rječnika. Odabir veličine i trošak opisani su u [dimenzioniranju poslužitelja](dimenzioniranje-posluzitelja.md).
 
 ## Sastav aplikacijskog VPS-a
 

@@ -26,7 +26,6 @@ coverage
 
 # Documentation and unrelated project material
 docs
-farmaceut-header-test
 *.md
 !README.md
 
