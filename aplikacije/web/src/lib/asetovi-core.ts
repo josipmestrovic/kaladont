@@ -2,7 +2,7 @@ import { IKONE_DOSTIGNUCA } from './ikone-dostignuca.js';
 
 const TIMEOUT_ASETA_MS = 8_000;
 
-/** Blocking gate — samo glavna navigacija na landingu. */
+/** Glavna navigacija na landingu — warm-up u pozadini. */
 export const KRITICNE_IKONE: readonly string[] = [
   '/ikone/07-igraj.png',
   '/ikone/61-korisnicki-profil.webp',
@@ -23,7 +23,7 @@ export const MODAL_IGRA_IKONE: readonly string[] = [
   '/ikone/67-zagrijavanje-bot.webp',
 ];
 
-/** Idle nakon reveal na landingu — ne blokira children(). */
+/** Idle warm-up na landingu — ne blokira children(). */
 export const POZADINSKE_SLIKE_LANDINGA: readonly string[] = [
   '/ikone/01-sto-je-novo.png',
   '/ikone/02-pomozi-poboljsati-igru.png',
@@ -34,7 +34,6 @@ export const POZADINSKE_SLIKE_LANDINGA: readonly string[] = [
   '/slike/demo-slika.webp',
   '/slike/2-5-d-components/Tube-body.png',
   '/slike/2-5-d-components/Cap.png',
-  '/slike/2-5-d-components/Pointing-hand.png',
   '/slike/2-5-d-components/Speech-Bubble-kaladont.png',
 ];
 
@@ -88,31 +87,15 @@ async function dohvatiBlobUrl(url: string, spremiBlob: boolean): Promise<void> {
       blobUrlovi.set(url, URL.createObjectURL(blob));
     }
   } catch {
-    // Pojedinačni asset ne smije blokirati boot.
+    // Pojedinačni asset ne smije zaustaviti warm-up ostalih.
   }
 }
 
-/** Samo kritične nav ikone — await prije spreman. */
-export async function ucitajKriticneIkone(onProgress?: (napredak: number) => void): Promise<void> {
-  if (typeof window === 'undefined') {
-    onProgress?.(1);
-    return;
-  }
+/** Warm-up kritičnih nav ikona (blob cache za urlAseta). */
+export async function ucitajKriticneIkone(): Promise<void> {
+  if (typeof window === 'undefined') return;
 
-  const urls = [...KRITICNE_IKONE];
-  const ukupno = urls.length;
-  let gotovo = 0;
-  const prijavi = () => onProgress?.(ukupno === 0 ? 1 : Math.min(1, gotovo / ukupno));
-  prijavi();
-
-  await Promise.all(
-    urls.map(async (url) => {
-      await dohvatiBlobUrl(url, true);
-      gotovo += 1;
-      prijavi();
-    }),
-  );
-  onProgress?.(1);
+  await Promise.all(KRITICNE_IKONE.map((url) => dohvatiBlobUrl(url, true)));
 }
 
 function pokreniUPozadini(posao: () => void): void {

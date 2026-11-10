@@ -5,7 +5,6 @@
   <div class="tijelo-slojevi">
     <img class="tijelo" src="/slike/2-5-d-components/Tube-body.png" alt="" />
     <img class="kapa" src="/slike/2-5-d-components/Cap.png" alt="" />
-    <img class="ruka" src="/slike/2-5-d-components/Pointing-hand.png" alt="" />
     <img class="oblak" src="/slike/2-5-d-components/Speech-Bubble-kaladont.png" alt="" />
   </div>
 </div>
@@ -51,15 +50,6 @@
     animation: lebdenje-kape 3.8s ease-in-out infinite;
   }
 
-  .ruka {
-    top: 40.85%;
-    right: 31.28%;
-    z-index: 3;
-    width: 46.67%;
-    transform-origin: 20% 80%;
-    animation: dizanje-palca 2.8s ease-in-out infinite;
-  }
-
   .oblak {
     top: -5.96%;
     right: -1.79%;
@@ -80,11 +70,6 @@
     50% { transform: translateY(-5px) rotate(1deg); }
   }
 
-  @keyframes dizanje-palca {
-    0%, 100% { transform: translateY(4px) rotate(-6deg); }
-    50% { transform: translateY(-7px) rotate(3deg); }
-  }
-
   @keyframes lebdenje-oblaka {
     0%, 100% { transform: translate3d(0, 0, 0) rotateY(-3deg) rotateZ(-1deg); }
     50% { transform: translate3d(8px, -10px, 26px) rotateY(5deg) rotateZ(1deg); }
@@ -93,8 +78,7 @@
   @media (prefers-reduced-motion: reduce) {
     .tijelo-slojevi,
     .oblak,
-    .kapa,
-    .ruka { animation: none; }
+    .kapa { animation: none; }
   }
 
   @media (max-width: 999px), (max-height: 520px) {

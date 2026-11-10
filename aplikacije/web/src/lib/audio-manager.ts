@@ -206,7 +206,7 @@ function pokreniUPozadini(posao: () => void): void {
   else window.setTimeout(posao, 0);
 }
 
-/** Fire-and-forget nakon reveal — klik/hover (idle OK). */
+/** Fire-and-forget warm-up — klik/hover (idle OK). */
 export function preucitajUiZvukove(): void {
   if (uiZvukoviPokrenuti) return;
   uiZvukoviPokrenuti = true;

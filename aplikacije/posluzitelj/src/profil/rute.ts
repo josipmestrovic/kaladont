@@ -685,8 +685,8 @@ export async function registrirajProfilRute(
     };
   });
 
-  // Isti editor avatara koriste gosti i registrirani igraci; avatarId ostaje radi starih racuna.
-  app.put('/profil/avatar', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
+  // Samo registrirani uređuju avatar; gosti zadržavaju zadani avatarConfig.
+  app.put('/profil/avatar', { preHandler: zahtijevajPrijavu }, async (zahtjev, odgovor) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
     const tijelo = zahtjev.body as unknown;
     if (typeof tijelo === 'object' && tijelo !== null && 'avatarConfig' in tijelo) {

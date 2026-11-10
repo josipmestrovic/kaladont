@@ -11,7 +11,11 @@
   import PopupNovihMisija from '$lib/komponente/PopupNovihMisija.svelte';
   import SanducicProfilZona from '$lib/komponente/SanducicProfilZona.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
-  import { naslovnicaJsonLd } from '$lib/seo.js';
+  import {
+    NASLOVNICA_SEO_DESCRIPTION,
+    NASLOVNICA_SEO_TITLE,
+    naslovnicaJsonLd,
+  } from '$lib/seo.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import { X } from 'lucide-svelte';
 
@@ -49,8 +53,8 @@
 <svelte:window onkeydown={zatvoriNaEscape} />
 
 <SeoGlava
-  title="Kaladont — online hrvatska igra riječi"
-  description="Igraj Kaladont online u Dvoboju, Četveroboju ili privatnoj sobi. Hrvatska multiplayer igra riječi na zadnja dva slova."
+  title={NASLOVNICA_SEO_TITLE}
+  description={NASLOVNICA_SEO_DESCRIPTION}
   putanja="/"
   jsonLd={naslovnicaJsonLd()}
 />

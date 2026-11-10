@@ -25,13 +25,10 @@
   import CitanjeNaglasObavijest from '$lib/komponente/CitanjeNaglasObavijest.svelte';
   import SanducicToast from '$lib/komponente/SanducicToast.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
-  import BootUcitavanje from '$lib/komponente/BootUcitavanje.svelte';
   import { jeIndeksabilnaPutanja } from '$lib/seo.js';
 
   let { children, data } = $props();
   let sesijaSpreman = $state(false);
-  let navIkoneSpremane = $state(false);
-  let napredakBoota = $state(0);
   let prethodnaPutanja = $state<string | null>(null);
   let mozeNaprijed = $state(false);
   let povijestAplikacije: string[] = [];
@@ -70,13 +67,17 @@
     $page.url.pathname === '/' || $page.url.pathname === '/red' || $page.url.pathname.startsWith('/partija/'),
   );
   const urlCilja = $derived($navigating?.to?.url ?? $page.url);
-  const prikaziBoot = $derived($page.url.pathname === '/' && !navIkoneSpremane);
   // Kostur na /red: dok sesija nije gotova ili dok traje navigacija prema redu.
   const prikaziKosturCekanja = $derived(
     urlCilja.pathname === '/red' &&
       ((!sesijaSpreman && $page.url.pathname === '/red') || (sesijaSpreman && $navigating !== null)),
   );
   const brojMjestaKostura = $derived(urlCilja.searchParams.get('mod') === 'dva_igraca' ? 2 : 4);
+  // Indeksabilne rute: children odmah (SSR + klijent, bez flasha).
+  // Ostalo: čekaj gost-sesiju da socket/API imaju token prije interakcije.
+  const prikaziChildren = $derived(
+    jeIndeksabilnaPutanja($page.url.pathname) || sesijaSpreman,
+  );
   const robotsMeta = $derived(
     jeIndeksabilnaPutanja($page.url.pathname) ? 'index, follow' : 'noindex, follow',
   );
@@ -96,30 +97,15 @@
 
     void (async () => {
       try {
+        void ucitajKriticneIkone();
+        await sesija.catch(() => {});
+        sesijaSpreman = true;
         if (naNaslovnici) {
-          await Promise.all([
-            sesija.catch(() => {
-              // Gost-sesija ne smije zauvijek držati boot (prazan ekran / Učitavanje…).
-            }),
-            ucitajKriticneIkone((p) => {
-              napredakBoota = p;
-            }),
-          ]);
-          // Oba odjednom — inače jedan frame bez Boota i bez children.
-          sesijaSpreman = true;
-          navIkoneSpremane = true;
           ucitajPozadinskeAseteLandinga();
           preucitajUiZvukove();
-        } else {
-          // Deep link /red ili druga ruta: nikad Boot — samo sesija, ikone u pozadini.
-          navIkoneSpremane = true;
-          await sesija.catch(() => {});
-          sesijaSpreman = true;
-          void ucitajKriticneIkone();
         }
       } catch {
         sesijaSpreman = true;
-        navIkoneSpremane = true;
       }
 
       inicijalizirajGlobalneUiZvukove();
@@ -156,17 +142,18 @@
     <DostignuceObavijest />
     <CitanjeNaglasObavijest />
   </div>
-  {#if $page.url.pathname === '/' && sesijaSpreman && navIkoneSpremane}<PadajuceRijeci />{/if}
+  {#if $page.url.pathname === '/' && sesijaSpreman}<PadajuceRijeci />{/if}
   {#if sesijaSpreman && !bezHeadera}
     <Header {prethodnaPutanja} {mozeNaprijed} />
   {/if}
   <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">
-    {#if prikaziBoot}
-      <BootUcitavanje napredak={napredakBoota} />
-    {:else if prikaziKosturCekanja}
+    {#if prikaziKosturCekanja}
       <RedCekanjaKostur ukupnoMjesta={brojMjestaKostura} />
-    {:else if sesijaSpreman}
-      {@render children()}
+    {:else if prikaziChildren}
+      <!-- Indeksabilni SSR ostaje u DOM-u; inert sprječava klikove prije gost-sesije/hidracije. -->
+      <div class="stranica-sadrzaj" inert={!sesijaSpreman ? true : undefined}>
+        {@render children()}
+      </div>
     {/if}
   </div>
 </div>
@@ -221,6 +208,10 @@
     margin: 0 auto;
     padding: 0 16px;
     overflow-x: clip;
+  }
+
+  .stranica-sadrzaj {
+    display: contents;
   }
 
   @media (min-width: 1000px) {

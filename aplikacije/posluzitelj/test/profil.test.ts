@@ -355,23 +355,7 @@ describe('PUT /profil/avatar', () => {
     expect(odgovor.status).toBe(401);
   });
 
-  it('dopušta gostu da odabere avatar (onboarding)', async () => {
-    const gost = await stvoriGosta();
-    try {
-      const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
-        body: JSON.stringify({ avatarId: 3 }),
-      });
-      expect(odgovor.status).toBe(200);
-      const tijelo = (await odgovor.json()) as { ok: boolean; avatarId: number };
-      expect(tijelo.avatarId).toBe(3);
-    } finally {
-      await baza.delete(igraci).where(eq(igraci.id, gost.id));
-    }
-  });
-
-  it('dopušta gostu da spremi konfiguraciju avatara', async () => {
+  it('odbija gostu uređivanje avatara', async () => {
     const gost = await stvoriGosta();
     try {
       const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
@@ -379,26 +363,60 @@ describe('PUT /profil/avatar', () => {
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
         body: JSON.stringify({ avatarConfig: ZADANI_AVATAR_CONFIG }),
       });
-      expect(odgovor.status).toBe(200);
-      const tijelo = (await odgovor.json()) as { ok: boolean; avatarConfig: unknown };
-      expect(validirajAvatarConfig(tijelo.avatarConfig)).toBe(true);
+      expect(odgovor.status).toBe(401);
     } finally {
       await baza.delete(igraci).where(eq(igraci.id, gost.id));
     }
   });
 
-  it('odbija avatarId izvan raspona', async () => {
+  it('gost sesija odmah ima zadani avatarConfig', async () => {
     const gost = await stvoriGosta();
     try {
-      const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
-        body: JSON.stringify({ avatarId: 999 }),
+      const odgovor = await fetch(`${adresa}/api/profil`, {
+        headers: { authorization: `Bearer ${gost.token}` },
       });
-      expect(odgovor.status).toBe(400);
+      expect(odgovor.status).toBe(200);
+      const tijelo = (await odgovor.json()) as { avatarConfig: unknown };
+      expect(validirajAvatarConfig(tijelo.avatarConfig)).toBe(true);
+      expect(tijelo.avatarConfig).toEqual(ZADANI_AVATAR_CONFIG);
     } finally {
       await baza.delete(igraci).where(eq(igraci.id, gost.id));
     }
+  });
+
+  it('dopušta registriranom spremanje konfiguracije avatara', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
+
+    const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${sesijskiToken}` },
+      body: JSON.stringify({ avatarConfig: ZADANI_AVATAR_CONFIG }),
+    });
+    expect(odgovor.status).toBe(200);
+    const tijelo = (await odgovor.json()) as { ok: boolean; avatarConfig: unknown };
+    expect(tijelo.ok).toBe(true);
+    expect(validirajAvatarConfig(tijelo.avatarConfig)).toBe(true);
+  });
+
+  it('odbija avatarId izvan raspona', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+    });
+    const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
+
+    const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${sesijskiToken}` },
+      body: JSON.stringify({ avatarId: 999 }),
+    });
+    expect(odgovor.status).toBe(400);
   });
 });
 
