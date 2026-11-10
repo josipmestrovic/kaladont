@@ -1,7 +1,6 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
   import { afterNavigate, beforeNavigate } from '$app/navigation';
   import { navigating, page } from '$app/stores';
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
@@ -74,10 +73,6 @@
       ((!sesijaSpreman && $page.url.pathname === '/red') || (sesijaSpreman && $navigating !== null)),
   );
   const brojMjestaKostura = $derived(urlCilja.searchParams.get('mod') === 'dva_igraca' ? 2 : 4);
-  // Naslovnica: children uvijek. Ostalo: SSR odmah, klijent čeka sesiju.
-  const prikaziChildren = $derived(
-    $page.url.pathname === '/' || !browser || sesijaSpreman,
-  );
   const robotsMeta = $derived(
     jeIndeksabilnaPutanja($page.url.pathname) ? 'index, follow' : 'noindex, follow',
   );
@@ -149,7 +144,7 @@
   <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">
     {#if prikaziKosturCekanja}
       <RedCekanjaKostur ukupnoMjesta={brojMjestaKostura} />
-    {:else if prikaziChildren}
+    {:else}
       <div class="stranica-sadrzaj">
         {@render children()}
       </div>
