@@ -48,7 +48,7 @@ Status se zapisuje u [evidenciju održavanja](odrzavanje.md#evidencija-drillova-
 | Staging closed test | Workflow automatski postavi digest, a operater provjeri staging.                  | Mali ručno odabrani krug testera. | `staging-provjereno` ili `odbačeno`.         |
 | Produkcija          | Operater ručno promovira isti staging-provjereni digest u vrijeme slabog prometa. | Svi korisnici.                    | `promovirano` ili rollback.                  |
 
-Staging tijekom prvih closed testova ostaje bez Basic Autha zbog Socket.IO promptova. Koristi `X-Robots-Tag: noindex, nofollow`, ali to nije kontrola pristupa. Link se dijeli samo malom ručno odabranom krugu testera. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway.
+Staging štiti pristup cookie gateom (`STAGING_PRISTUP_SIFRA`, `/pristup`) i šalje `X-Robots-Tag: noindex, nofollow`. Link i šifru dijeliti samo malom ručno odabranom krugu testera.
 
 ## Tok za današnji ručni staging
 

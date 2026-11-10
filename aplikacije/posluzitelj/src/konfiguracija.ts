@@ -36,6 +36,8 @@ const shemaKonfiguracije = z.object({
   SOCKET_PROZOR_DOGADAJA_MS: z.coerce.number().int().positive().default(60_000),
   SOCKET_DOGADAJI_PO_PROZORU: z.coerce.number().int().positive().default(30),
   STAGING_TEST_IP: z.string().default(''),
+  /** Shared šifra za cookie gate na stagingu; obavezna kad je NODE_ENV=staging. */
+  STAGING_PRISTUP_SIFRA: z.string().default(''),
   ADMIN_TAJNI_KLJUC: z.string().default(''),
   SIMULACIJA_ADRESA: z.string().url().default('http://localhost:3000'),
   VERZIJA: z.string().default('lokalno'),
@@ -53,6 +55,10 @@ export const konfiguracija = shemaKonfiguracije.parse(process.env);
 
 if (konfiguracija.STAGING_TEST_IP && (konfiguracija.NODE_ENV !== 'staging' || konfiguracija.STAGING_TEST_IP.split(',').some((adresa) => !isIP(adresa.trim())))) {
   throw new Error('STAGING_TEST_IP smije sadržavati samo valjane IP adrese odvojene zarezom i samo u staging okruženju.');
+}
+
+if (konfiguracija.NODE_ENV === 'staging' && !konfiguracija.STAGING_PRISTUP_SIFRA) {
+  throw new Error('STAGING_PRISTUP_SIFRA mora biti postavljena u staging okruženju.');
 }
 
 if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'production') {

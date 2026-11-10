@@ -60,6 +60,11 @@ import { omotajSocketHandler } from './sigurnost/socket-handler.js';
 import { MetrikeNadzora } from './nadzor/metrike.js';
 import { AlarmiNadzora } from './nadzor/alarmi.js';
 import { pokusajPoslatiEmail } from './email.js';
+import {
+  imaValjanPristupCookie,
+  postavkeStagingPristupa,
+  registrirajStagingPristup,
+} from './sigurnost/staging-pristup.js';
 
 export const MAX_SOCKET_PORUKA_BAJTOVA = 16 * 1024;
 
@@ -116,6 +121,8 @@ export interface OpcijePosluzitelja {
   okruzenjeSigurnosti?: Okruzenje;
   authRateLimit?: Partial<OpcijeAuthRateLimita>;
   socketOgranicenja?: Partial<PostavkeSocketOgranicenja>;
+  /** Samo testovi: prisilno uključi ili isključi staging cookie gate. */
+  stagingPristup?: { aktivan?: boolean; sifra?: string };
   /** Samo testovi: prisilno uključi popunu botovima i skrati pragove. */
   popunaBotovima?: { dvoboj?: boolean; cetveroboj?: boolean; pragoviMs?: Partial<Record<'cetiri_igraca' | 'dva_igraca', readonly number[]>> };
 }
@@ -169,6 +176,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     max: konfiguracija.NODE_ENV === 'test' ? 2_000 : 150,
     timeWindow: '1 minute',
   });
+  const stagingPristup = postavkeStagingPristupa(okruzenjeSigurnosti, opcije.stagingPristup);
+  registrirajStagingPristup(app, stagingPristup);
   let opozoviSocketSesije: (sesijaId: string) => void = () => {};
   let opozoviSocketSesijeIgraca: (igracId: string) => void = () => {};
   let dohvatiZivoStanjeBotova: () => import('./admin/rute.js').ZivoStanjeBotova | null = () => null;
@@ -336,10 +345,13 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
         zahtjev.socket.remoteAddress,
       );
       const testnaIpDopustena = jeDopustenaTestnaIp(okruzenjeSigurnosti, konfiguracija.STAGING_TEST_IP, ip);
+      const stagingPristupDopusten = !stagingPristup.aktivan
+        || testnaIpDopustena
+        || imaValjanPristupCookie(zahtjev.headers.cookie);
       const handshakeDopusten = testnaIpDopustena || ogranicivacHandshaka.dopusti(`ip:${ip}`, socketOgranicenja.handshakePoIpMinuti);
       const vezaDopustena = io.sockets.sockets.size < socketOgranicenja.maksimalnoAktivnihVeza;
       metrike.zabiljeziPrihvat(originDopusten, handshakeDopusten, vezaDopustena);
-      povratniPoziv(null, originDopusten && handshakeDopusten && vezaDopustena);
+      povratniPoziv(null, originDopusten && handshakeDopusten && vezaDopustena && stagingPristupDopusten);
     },
   });
 
@@ -520,6 +532,20 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   io.use(async (socket, next) => {
     const pocetakAutorizacije = performance.now();
+    if (stagingPristup.aktivan) {
+      const ip = dohvatiIpKlijenta(
+        okruzenjeSigurnosti,
+        socket.handshake.headers['x-kaladont-ip-klijenta'],
+        socket.handshake.headers['x-forwarded-for'],
+        socket.handshake.address,
+      );
+      const testnaIpDopustena = jeDopustenaTestnaIp(okruzenjeSigurnosti, konfiguracija.STAGING_TEST_IP, ip);
+      if (!testnaIpDopustena && !imaValjanPristupCookie(socket.handshake.headers.cookie)) {
+        metrike.zabiljeziAutorizaciju(false, performance.now() - pocetakAutorizacije);
+        next(new Error('Staging zahtijeva pristupnu šifru.'));
+        return;
+      }
+    }
     const token = socket.handshake.auth?.token;
     if (!jeValjaniToken(token)) {
       metrike.zabiljeziAutorizaciju(false, performance.now() - pocetakAutorizacije);

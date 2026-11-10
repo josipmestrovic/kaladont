@@ -133,7 +133,7 @@ VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kra
 
 Ako staging deploy padne prije završetka migracija, stvarni `.env` ostaje na prethodnom release zapisu; skripta ga može idempotentno potvrditi ili vratiti na isti prethodni zapis. Nakon što su migracije pokrenute nema automatskog rollbacka slike: workflow završava crveno s dijagnostikom, a operater ručno odlučuje je li povrat na prethodni digest siguran s obzirom na kompatibilnost sheme.
 
-Staging tijekom privremenog multiplayer testiranja nema Basic Auth kako browser ne bi izazivao ponovne promptove na Socket.IO zahtjevima. `X-Robots-Tag: noindex, nofollow` nije kontrola pristupa; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway.
+Staging koristi session-based cookie gate (`STAGING_PRISTUP_SIFRA`); HTTP Basic Auth se ne koristi zbog Socket.IO. `X-Robots-Tag: noindex, nofollow` ostaje uputa tražilicama. Javni health ostaje `/zdravlje`.
 
 ## Ručna produkcija — `promoviraj-produkciju.yml` (isporučeno)
 
@@ -165,7 +165,7 @@ Automatski zeleni deploy nije dovoljan za promociju. Za svaki release kandidat o
 | `PROD_HOST`, `PROD_SSH_KLJUC`, `PROD_SSH_KNOWN_HOSTS`          | `produkcija` | SSH kao fiksni korisnik `deploy` uz pinani host fingerprint                          |
 | ugrađeni `GITHUB_TOKEN`                                        | job-scoped   | Push privatne slike i kratkotrajni udaljeni pull; nikad se ne sprema kao ručna tajna |
 
-Aplikacijske tajne (baza, email, sesije, Storage Box i Healthchecks URL) žive u VPS konfiguraciji s pravima 600, dostupnoj samo računu koji je mora čitati i rootu, te u Bitwardenu prema [sigurnosnoj matrici](sigurnost-i-privatnost.md). Staging trenutno nema Basic Auth hash jer je Basic Auth uklonjen zbog Socket.IO promptova. Ne ulaze u repozitorij ni workflow logove.
+Aplikacijske tajne (baza, email, sesije, Storage Box i Healthchecks URL) žive u VPS konfiguraciji s pravima 600, dostupnoj samo računu koji je mora čitati i rootu, te u Bitwardenu prema [sigurnosnoj matrici](sigurnost-i-privatnost.md). `STAGING_PRISTUP_SIFRA` živi samo u staging VPS `.env` i Bitwardenu. Ne ulaze u repozitorij ni workflow logove.
 
 ## Pravila
 
