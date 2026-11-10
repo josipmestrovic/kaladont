@@ -89,7 +89,7 @@ Ovo je najvažniji odjeljak. Kućica se označava tek kada postoji konkretan art
 
 - [ ] Postoji produkcijski multi-stage `Dockerfile` za `linux/amd64` i aplikacija u njemu radi kao ne-root korisnik.
 - [ ] Postoje `docker-compose.staging.yml` i `docker-compose.prod.yml`.
-- [ ] Postoje staging i produkcijska Caddy konfiguracija; staging je najmanje `noindex`, a prije šireg dijeljenja dobiva VPN, IP allowlist ili drugi gateway.
+- [ ] Postoje staging i produkcijska Caddy konfiguracija; staging je `noindex` i ima session-based cookie gate (`STAGING_PRISTUP_SIFRA`).
 - [ ] PostgreSQL i Caddy koriste točnu verziju i digest, ne `latest`.
 - [ ] Ista aplikacijska slika sadrži jednokratne alate za migracije, uvoz rječnika i admin CLI.
 - [ ] Postoji mali sintetički rječnik za CI koji nije hrLex derivat.
@@ -166,7 +166,7 @@ Stvori kolekciju ili mapu `Kaladont / Operacije` i odvojene zapise:
 - `Storage Box glavni račun`;
 - `Storage Box produkcija`;
 - `age recovery ključ`;
-- `Staging pristup` (privremeno bez Caddy Basic Autha za multiplayer testiranje);
+- `Staging pristup` (`STAGING_PRISTUP_SIFRA` za cookie gate);
 - `Resend produkcija`;
 - `UptimeRobot`;
 - `Healthchecks.io`.
@@ -703,7 +703,7 @@ Ciljana konfiguracija mora obuhvatiti barem:
 - oznaku staging okruženja;
 - aplikacijski digest/verziju;
 - Resend staging ključ/način i popis punih allowlistanih adresa;
-- staging pristupni model i kasniji gateway (trenutno nema Basic Autha zbog Socket.IO promptova);
+- `STAGING_PRISTUP_SIFRA` (shared šifra za cookie gate na `/pristup`);
 - Storage Box podračun/ključ i javni `age` recipient;
 - zasebne Healthchecks ping URL-ove;
 - `ONEMOGUCI_TIMER_POTEZA` izostavljen ili strogo `false`.
@@ -718,9 +718,7 @@ Rezultat odmah spremi u Bitwarden i deploy-owned `.env` s pravima 600; ne lijepi
 
 ## 16. Staging pristup
 
-Privremeni staging nema Caddy Basic Auth jer browser HTTP Basic izaziva ponavljajuće promptove na API i Socket.IO polling/upgrade zahtjevima. Staging je zato javno dostupan uz `X-Robots-Tag: noindex, nofollow`, što nije sigurnosna kontrola. Ne dijeli staging URL izvan testiranja. Prije šireg dijeljenja uvedi VPN, IP allowlist ili drugi session-based gateway.
-
-`/zdravlje` i ostatak aplikacije prolaze kroz isti Caddy reverse proxy bez dodatnog browser prompta, pa Socket.IO može stabilno koristiti polling i WebSocket upgrade.
+Staging koristi session-based cookie gate u aplikaciji, ne Caddy Basic Auth (Basic bi ponavljao promptove na API i Socket.IO). U staging `.env` postavi `STAGING_PRISTUP_SIFRA` (generiraj `openssl rand -base64 24`, spremi u Bitwarden). Posjetitelj bez cookieja na HTML rutama ide na `/pristup`; API i Socket.IO bez cookieja dobiju 401. Nakon točne šifre postavlja se httpOnly cookie (~14 dana). Javni ostaje samo `/zdravlje`. Caddy i dalje šalje `X-Robots-Tag: noindex, nofollow`. Šifru i URL dijeliti samo closed test krugu.
 
 ## 17. Zatraži staging DNS od XHostinga
 
@@ -807,15 +805,18 @@ Invoke-RestMethod https://staging.kaladont.hr/zdravlje
 
 Očekuješ `ok: true`, bazu `dostupna`, broj riječi veći od nule i digest iz workflowa.
 
-Provjeri da je naslovnica dostupna bez Basic Autha i da staging šalje `noindex` zaglavlje:
+Provjeri cookie gate i `noindex` zaglavlje:
 
 ```powershell
-$odgovor = Invoke-WebRequest https://staging.kaladont.hr/ -UseBasicParsing
-$odgovor.StatusCode
-$odgovor.Headers["X-Robots-Tag"]
+$bezSifre = Invoke-WebRequest https://staging.kaladont.hr/ -UseBasicParsing -MaximumRedirection 0 -ErrorAction SilentlyContinue
+$bezSifre.StatusCode
+$bezSifre.Headers["Location"]
+$pristup = Invoke-WebRequest https://staging.kaladont.hr/pristup -UseBasicParsing
+$pristup.StatusCode
+$pristup.Headers["X-Robots-Tag"]
 ```
 
-Očekuješ `200` i `X-Robots-Tag: noindex, nofollow`. Staging URL dijeli se samo malom closed test krugu; prije šireg dijeljenja uvedi VPN, IP allowlist ili drugi gateway.
+Očekuješ redirect (`302`) s `/` na `/pristup`, zatim `200` na `/pristup`. `X-Robots-Tag` ostaje `noindex, nofollow` (Caddy ga šalje na cijelom hostu). Staging URL i šifru dijeli samo malom closed test krugu.
 
 Na VPS-u provjeri javne portove:
 
@@ -911,7 +912,7 @@ Ponovi staging odjeljke 9–16, ali s ovim razlikama:
 | Deploy ključ         | novi `kaladont_deploy_produkcija`, nikad staging ključ |
 | GitHub Environment   | `produkcija`                                           |
 | Hetzner daily backup | uključen                                               |
-| Basic Auth           | nema ga                                                |
+| Staging cookie gate  | nema ga (samo staging)                                 |
 | Podaci               | vlastita prazna produkcijska baza; ništa sa staginga   |
 | Storage Box          | trajni zasebni produkcijski podračun                   |
 | Email                | pravi Resend, bez ograničenja primatelja na stagingu   |
@@ -1227,7 +1228,7 @@ Ako naredba sadrži `-v`, `--volumes`, `rm`, `prune`, `drop`, `delete`, `reset` 
 - [ ] Javno su otvoreni samo 22/80/443.
 - [ ] CI gradi, testira i objavljuje privatni digest.
 - [ ] Merge u `main` automatski deploya staging.
-- [ ] `/zdravlje` je javno i zdravo; staging ima `noindex`, bez Basic Autha za prvi mali closed test krug.
+- [ ] `/zdravlje` je javno i zdravo; staging ima `noindex` i cookie gate (`STAGING_PRISTUP_SIFRA`); bez cookieja ostalo je 401/redirect na `/pristup`.
 - [ ] Cijela partija prolazi u četiri izolirana browser konteksta.
 - [ ] Email stiže na testne adrese na više uređaja.
 - [ ] Admin CLI radi bez ručnog SQL-a.

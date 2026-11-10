@@ -127,7 +127,7 @@ sudo -u deploy touch /opt/kaladont/.env
 sudo chmod 600 /opt/kaladont/.env
 ```
 
-Konačan popis varijabli mora potjecati iz implementirane centralne konfiguracijske sheme. Najmanje obuhvaća internu `BAZA_URL`, jedinstvenu `SESIJA_TAJNA`, oznaku okruženja, digest/verziju i Resend konfiguraciju. Privremeni multiplayer staging nema Caddy Basic Auth jer bi izazivao ponavljajuće promptove na Socket.IO prometu; prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway. `ONEMOGUCI_TIMER_POTEZA` ne postavlja se; aplikacija mora odbiti produkcijski/staging start ako je uključena.
+Konačan popis varijabli mora potjecati iz implementirane centralne konfiguracijske sheme. Najmanje obuhvaća internu `BAZA_URL`, jedinstvenu `SESIJA_TAJNA`, oznaku okruženja, digest/verziju, Resend konfiguraciju i na stagingu `STAGING_PRISTUP_SIFRA` (shared šifra za cookie gate). HTTP Basic Auth se ne koristi zbog Socket.IO promptova; gate je u aplikaciji (`/pristup`). `ONEMOGUCI_TIMER_POTEZA` ne postavlja se; aplikacija mora odbiti produkcijski/staging start ako je uključena.
 
 PostgreSQL i Caddy navode se točnom verzijom i digestom, bez `latest`. Aplikacija se navodi isključivo punim GHCR digestom.
 
@@ -165,7 +165,7 @@ Rezultat mora sadržavati točno sačuvanu staging Primary IPv4. Caddy ne može 
 2. Ručni staging postupak validira konfiguraciju, povlači točan digest i provjerava postojeću bazu/rječnik.
 3. Puni hrLex uvoz izveden je jednokratno na stagingu; kasniji deployi ga ne ponavljaju.
 4. Staging mora imati javni `/zdravlje` 200 s dostupnom bazom, `brojRijeci > 0` i očekivanim digestom.
-5. Staging je privremeno bez Basic Autha zbog Socket.IO prometa; prije šireg dijeljenja treba uvesti gateway zaštitu.
+5. Staging ima session-based cookie gate (`STAGING_PRISTUP_SIFRA`); bez cookieja sve osim `/zdravlje` i `/pristup` vraća 401 ili redirect.
 6. Ručno odigraj cijelu partiju u četiri odvojene sesije, testiraj Resend na više testnih adresa i dodijeli prvi admin: `docker compose -f docker-compose.staging.yml run --rm --no-deps aplikacija node dist/cli/dodijeli-admina.js --email=… --potvrdi`. U `.env` moraju postojati i `BAZA_LOZINKA` (vlasnik) i `BAZA_APP_LOZINKA` (runtime uloga `kaladont_app`).
 7. Napravi šifrirani staging dump na privremeni Storage Box podračun i vrati ga u praznu izoliranu bazu.
 8. Tek nakon svih zelenih koraka ponovi provisioning za produkciju i ručno promoviraj staging digest.
@@ -188,7 +188,7 @@ Rezultat mora sadržavati točno sačuvanu staging Primary IPv4. Caddy ne može 
 - [ ] `https://<domena>/zdravlje` vraća 200 uz `brojRijeci > 0`
 - [ ] `http://` preusmjerava na `https://`; na produkciji `www` preusmjerava na golu domenu
 - [ ] Partija odigrana kroz preglednik (WebSocket radi kroz Caddy)
-- [ ] Staging bez vjerodajnica vraća 401 osim `/zdravlje`; prisutan je `X-Robots-Tag: noindex`
+- [ ] Staging bez cookieja vraća 401 (API) ili redirect na `/pristup` (HTML), osim javnog `/zdravlje`; prisutan je `X-Robots-Tag: noindex`
 - [ ] Resend na stagingu šalje samo točno allowlistanim adresama; produkcijski SPF/DKIM prolaze provjeru
 - [ ] Backup je šifriran, prenesen i **vraćen** u praznu izoliranu bazu
 - [ ] UptimeRobot i Healthchecks.io poslali su probni e-mail alarm i poruku oporavka

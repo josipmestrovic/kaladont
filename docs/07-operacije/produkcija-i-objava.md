@@ -67,7 +67,7 @@ www.kaladont.hr {
 }
 ```
 
-Staging je tijekom privremenog multiplayer testiranja bez Basic Autha kako browser ne bi ponavljao promptove na HTTP i Socket.IO zahtjevima. Cijelo okruženje šalje `X-Robots-Tag: noindex, nofollow`; to nije kontrola pristupa. Prije šireg dijeljenja treba uvesti VPN, IP allowlist ili drugi gateway. Produkcija nema ovaj staging gateway i koristi samo javni reverse proxy:
+Staging zatvara javni pristup **session-based šifrom** u aplikaciji (`STAGING_PRISTUP_SIFRA`, ruta `/pristup`, httpOnly cookie). Caddy i dalje samo reverse-proxya i šalje `X-Robots-Tag: noindex, nofollow` (uputa tražilicama, ne kontrola pristupa). HTTP Basic Auth se namjerno ne koristi jer bi browser ponavljao promptove na API i Socket.IO. Javni ostaje samo `/zdravlje`. Produkcija nema ovaj staging gateway:
 
 ```text
 staging.kaladont.hr {
@@ -87,7 +87,7 @@ Detaljni koraci za početnika nalaze se u [Operacije for dummies](operacije-for-
 1. Dovršiti sve production-readiness blokere u kodu i repozitoriju; CI mora izgraditi i smoke-testirati stvarnu sliku.
 2. Postaviti Storage Box i dokazati off-server backup/restore postojećeg Discoursea.
 3. Stvoriti samo staging Primary IPv4 i VPS; očvrsnuti SSH, firewall i Docker.
-4. Zatražiti staging A zapis od XHostinga i postaviti Caddy HTTPS; staging je privremeno bez Basic Autha zbog Socket.IO promptova.
+4. Zatražiti staging A zapis od XHostinga i postaviti Caddy HTTPS; u staging `.env` postaviti `STAGING_PRISTUP_SIFRA` (cookie gate na `/pristup`).
 5. Prvi workflow osigurava app DB ulogu (`kaladont_app`), izvršava migracije vlasničkim URL-om, uvozi hrLex samo ako je rječnik ispod praga, pokreće aplikaciju i provjerava `/zdravlje`. Prvi admin se dodjeljuje ručno: `node dist/cli/dodijeli-admina.js --email=… --potvrdi`.
 6. Ručno odigrati staging partiju i dokazati šifrirani backup/restore staging baze.
 7. Tek tada stvoriti i postaviti produkcijski Primary IPv4/VPS, Resend DNS, backup i monitoring.

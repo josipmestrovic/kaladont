@@ -55,7 +55,7 @@ Kod alarma pregledati vrijeme/izdanje i trend, zatim `docker stats`, `top`, dost
 
 ## Health check
 
-**Implementirani javni ugovor:** `GET /zdravlje` provjerava bazu i učitani rječnik te vraća sigurna, strojno stabilna polja. Endpoint ne traži staging Basic Auth:
+**Implementirani javni ugovor:** `GET /zdravlje` provjerava bazu i učitani rječnik te vraća sigurna, strojno stabilna polja. Endpoint je izuzet od staging cookie gatea:
 
 ```json
 {
