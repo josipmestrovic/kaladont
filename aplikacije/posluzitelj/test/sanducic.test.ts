@@ -134,18 +134,20 @@ describe('sandučic', () => {
 
   it('oznaciSve ne gutaju poruke stvorene nakon granice', async () => {
     const igrac = await noviIgrac();
+    // Relativno prema sada — fiksni datumi ispadaju iz 3-dnevnog retentiona.
+    const sada = new Date();
     const stara = await stvoriPoruku({
       igracId: igrac.id,
       tip: TIP_SANDUCIC_TEST,
       deduplikacijskiKljuc: 'test:stara',
-      stvorenaAt: new Date('2026-11-07T10:00:00.000Z'),
+      stvorenaAt: new Date(sada.getTime() - 60_000),
     });
-    const granica = new Date('2026-11-07T10:00:30.000Z');
+    const granica = new Date(sada.getTime() - 30_000);
     const nova = await stvoriPoruku({
       igracId: igrac.id,
       tip: TIP_SANDUCIC_TEST,
       deduplikacijskiKljuc: 'test:nova',
-      stvorenaAt: new Date('2026-11-07T10:01:00.000Z'),
+      stvorenaAt: sada,
     });
     const broj = await oznaciSveProcitane(igrac.id, granica);
     expect(broj).toBe(1);
