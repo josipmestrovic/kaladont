@@ -73,6 +73,11 @@
       ((!sesijaSpreman && $page.url.pathname === '/red') || (sesijaSpreman && $navigating !== null)),
   );
   const brojMjestaKostura = $derived(urlCilja.searchParams.get('mod') === 'dva_igraca' ? 2 : 4);
+  // Indeksabilne rute: children odmah (SSR + klijent, bez flasha).
+  // Ostalo: čekaj gost-sesiju da socket/API imaju token prije interakcije.
+  const prikaziChildren = $derived(
+    jeIndeksabilnaPutanja($page.url.pathname) || sesijaSpreman,
+  );
   const robotsMeta = $derived(
     jeIndeksabilnaPutanja($page.url.pathname) ? 'index, follow' : 'noindex, follow',
   );
@@ -144,7 +149,7 @@
   <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">
     {#if prikaziKosturCekanja}
       <RedCekanjaKostur ukupnoMjesta={brojMjestaKostura} />
-    {:else}
+    {:else if prikaziChildren}
       <div class="stranica-sadrzaj">
         {@render children()}
       </div>
