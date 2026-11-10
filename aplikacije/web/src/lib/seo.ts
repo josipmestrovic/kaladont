@@ -27,9 +27,9 @@ export const PRAVILA_TEME_META: {
   {
     id: 'kako-igrati',
     naziv: 'Kako igrati',
-    title: 'Kako igrati Kaladont — pravila online igre riječi',
+    title: 'Pravila - Kaladont Online',
     description:
-      'Saznaj kako se igra Kaladont online: povezivanje riječi na zadnja dva slova, ispadanje, digrafi i pametan rječnik.',
+      'Pročitajte pravila igre kaladont koja se odnose na našu online multiplayer verziju. Kaladont možete besplatno igrati bez potrebe za registracijom.',
   },
   {
     id: 'nacini',
@@ -236,6 +236,10 @@ export function faqPageJsonLd() {
   };
 }
 
+export const NASLOVNICA_SEO_TITLE = 'Kaladont Online - Multiplayer igra riječi';
+export const NASLOVNICA_SEO_DESCRIPTION =
+  'Zaigraj kaladont i pokušaj ostati zadnji za stolom! Testiraj svoje znanje jezika, osvajaj nagrade, rangiraj se na ljestvicama i još mnogo toga.';
+
 export function naslovnicaJsonLd() {
   return [
     {
@@ -244,8 +248,7 @@ export function naslovnicaJsonLd() {
       name: 'Kaladont',
       url: kanonskiUrl('/'),
       inLanguage: 'hr',
-      description:
-        'Hrvatska online igra riječi: igraj Dvoboj, Četveroboj ili privatnu sobu sa svojom ekipom.',
+      description: NASLOVNICA_SEO_DESCRIPTION,
     },
     {
       '@context': 'https://schema.org',
@@ -256,8 +259,7 @@ export function naslovnicaJsonLd() {
       operatingSystem: 'Web',
       inLanguage: 'hr',
       isAccessibleForFree: true,
-      description:
-        'Multiplayer igra riječi na hrvatskom: reci riječ na zadnja dva slova prethodne i ostani zadnji za stolom.',
+      description: NASLOVNICA_SEO_DESCRIPTION,
       offers: {
         '@type': 'Offer',
         price: '0',
@@ -267,11 +269,7 @@ export function naslovnicaJsonLd() {
   ];
 }
 
-/** Jedini indeksabilni HTML putovi: naslovnica i hub pravila. */
+/** Jedini indeksabilni HTML putovi: naslovnica i hub pravila (teme su noindex, follow). */
 export function jeIndeksabilnaPutanja(pathname: string): boolean {
-  if (pathname === '/') return true;
-  if (pathname === '/pravila-kaladonta') return true;
-  if (!pathname.startsWith('/pravila-kaladonta/')) return false;
-  const tema = pathname.slice('/pravila-kaladonta/'.length);
-  return jePravilaTema(tema) && tema !== 'kako-igrati';
+  return pathname === '/' || pathname === '/pravila-kaladonta';
 }

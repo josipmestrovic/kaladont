@@ -1,11 +1,30 @@
 import { expect, test } from '@playwright/test';
 
+const NASLOVNICA_TITLE = 'Kaladont Online - Multiplayer igra riječi';
+const NASLOVNICA_DESCRIPTION =
+  'Zaigraj kaladont i pokušaj ostati zadnji za stolom! Testiraj svoje znanje jezika, osvajaj nagrade, rangiraj se na ljestvicama i još mnogo toga.';
+
+test('naslovnica SSR šalje title i description crawleru', async ({ page, request }) => {
+  const odgovor = await request.get('/');
+  expect(odgovor.ok()).toBe(true);
+  const html = await odgovor.text();
+  expect(html).toContain(`<title>${NASLOVNICA_TITLE}</title>`);
+  expect(html).toContain(`content="${NASLOVNICA_DESCRIPTION}"`);
+  expect(html).toContain('KALADONT');
+  expect(html).toContain('/pravila-kaladonta');
+
+  await page.goto('/');
+  await expect(page).toHaveTitle(NASLOVNICA_TITLE);
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', NASLOVNICA_DESCRIPTION);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+});
+
 for (const sirina of [320, 390, 1440]) {
   test(`copyright i licence ostaju dostupni ${sirina}px`, async ({ page }, podaciTesta) => {
     await page.setViewportSize({ width: sirina, height: sirina < 1000 ? 568 : 900 });
     await page.goto('/');
     const footer = page.locator('.landing-footer');
-    // Boot drži children dok sesija/ikone ne završe — duži timeout umjesto racy provjere „Učitavanje…”.
+    // Duži timeout zbog gost-sesije / CI latency.
     await expect(footer.locator('.copyright')).toHaveText('© 2026 Kaladont. Sva prava pridržana.', {
       timeout: 20_000,
     });
@@ -42,7 +61,7 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   await page.goto('/');
 
   await expect(page.locator('.header')).toHaveCount(0);
-  // Avatar ovisi o gost-sesiji + /profil — duži timeout zbog boot/retry pod CI opterećenjem.
+  // Avatar ovisi o gost-sesiji + /profil — duži timeout zbog CI opterećenja.
   await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('link', { name: 'Obavijesti' })).toBeVisible();
   await expect(page.getByText('v0.3.0-closed-alpha.1')).toHaveCount(0);

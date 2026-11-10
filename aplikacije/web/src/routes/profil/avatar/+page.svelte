@@ -11,13 +11,20 @@
   let ucitavanje = $state(true);
   let spremanje = $state(false);
   let greska = $state<string | null>(null);
+  let jeGost = $state(false);
 
   // Zadnji korak registracije vodi ovamo; tada se mijenjaju natpisi i odrediste nakon spremanja.
   const zavrsavaRegistraciju = $derived($page.url.searchParams.get('registracija') === '1');
 
   onMount(async () => {
     try {
-      const profil = await api<{ avatarConfig: AvatarConfigV1 | null }>('/profil');
+      const profil = await api<{ avatarConfig: AvatarConfigV1 | null; email: string | null; vrsta: string }>(
+        '/profil',
+      );
+      jeGost = profil.vrsta === 'gost' || !profil.email;
+      if (jeGost && !zavrsavaRegistraciju) {
+        return;
+      }
       konfiguracija = profil.avatarConfig ?? ZADANI_AVATAR_CONFIG;
     } catch (e) {
       greska = e instanceof Error ? e.message : 'Avatar nije moguće učitati.';
@@ -55,6 +62,17 @@
   {#if greska}<p role="alert" class="greska">{greska}</p>{/if}
   {#if ucitavanje}
     <p>Učitavanje avatara…</p>
+  {:else if jeGost && !zavrsavaRegistraciju}
+    <section class="gost-gate" aria-labelledby="avatar-gost-naslov">
+      <h1 id="avatar-gost-naslov">Avatar za registrirane igrače</h1>
+      <p>
+        Gosti koriste zadani avatar. Prijavi se ili otvori račun da urediš svoj izgled.
+      </p>
+      <div class="gost-akcije">
+        <a href="/prijava" class="gumb">Prijavi se</a>
+        <a href="/registracija" class="gumb sekundarni">Registriraj se</a>
+      </div>
+    </section>
   {:else}
     <AvatarEditor
       pocetnaKonfiguracija={konfiguracija}
@@ -68,6 +86,59 @@
 </main>
 
 <style>
-  .avatar-stranica { width: 100%; max-width: 980px; margin: 0 auto; }
-  .greska { color: var(--boja-poraz-tekst); font-weight: 700; }
+  .avatar-stranica {
+    width: 100%;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+
+  .greska {
+    color: var(--boja-poraz-tekst);
+    font-weight: 700;
+  }
+
+  .gost-gate {
+    display: grid;
+    gap: 12px;
+    padding: 20px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 10px;
+    background: var(--boja-povrsina-2);
+  }
+
+  .gost-gate h1 {
+    margin: 0;
+    font-size: 1.35rem;
+  }
+
+  .gost-gate p {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+  }
+
+  .gost-akcije {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .gumb {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: 1px solid var(--boja-cta-pozadina);
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  .gumb.sekundarni {
+    background: transparent;
+    color: var(--boja-tekst-osnovni);
+    border-color: var(--boja-obrub);
+  }
 </style>

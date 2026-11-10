@@ -109,21 +109,14 @@ Mora pokazati baš `<PROD_IPV4>`. Pričekaj propagaciju (često minute, ponekad 
 
 ## 5. Prvi login + Website ID
 
-Admin UI **nije** na `https://analitika.kaladont.hr` (Caddy propušta samo tracker). Umami publisha `127.0.0.1:3002` preko mreze `umami_loopback` (ne-internal — inače Docker ne bind-a port).
+Admin UI je na **`https://analitika.kaladont.hr`** (Caddy reverse_proxy na `umami:3000`). Tracker (`/script.js`, `/api/send`) ide na isti host.
 
-Na Windowsu (novi PowerShell):
+1. Otvori `https://analitika.kaladont.hr`
+2. Default prijava (obično `admin` / `umami`) — **odmah promijeni lozinku**; spremi u Bitwarden
+3. Websites → Add → site za `kaladont.hr`
+4. Kopiraj **Website ID**
 
-```powershell
-ssh -L 3002:127.0.0.1:3002 kaladont@kaladont-produkcija
-```
-
-Zatim u pregledniku: `http://127.0.0.1:3002`
-
-1. Default prijava (obično `admin` / `umami`) — **odmah promijeni lozinku**; spremi u Bitwarden
-2. Websites → Add → site za `kaladont.hr`
-3. Kopiraj **Website ID**
-
-Provjera da admin nije javan: `https://analitika.kaladont.hr/` treba vratiti **403**.
+Opcionalni backup bez javnog UI-a: Compose i dalje publisha `127.0.0.1:3002` (`umami_loopback`); SSH tunnel `-L 3002:127.0.0.1:3002` ako treba.
 
 ---
 
@@ -183,7 +176,7 @@ sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml stop um
 sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml start umami
 ```
 
-Napomena: CSP na `kaladont.hr` dopušta `https://analitika.kaladont.hr` — `UMAMI_URL` mora biti točno ta vrijednost. Admin UI ostaje na SSH tunelu (`127.0.0.1:3002`), ne na javnom hostu.
+Napomena: CSP na `kaladont.hr` dopušta `https://analitika.kaladont.hr` — `UMAMI_URL` mora biti točno ta vrijednost. Admin UI je na tom istom javnom hostu.
 
 ---
 

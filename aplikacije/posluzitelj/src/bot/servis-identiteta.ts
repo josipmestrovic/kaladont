@@ -1,6 +1,6 @@
 import { randomUUID, randomInt } from 'node:crypto';
 import { and, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
-import { nasumicnaKonfiguracijaAvatara, UZORAK_NADIMKA, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA } from 'zajednicko';
+import { nasumicnaKonfiguracijaAvatara, UZORAK_NADIMKA, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, ZADANI_AVATAR_CONFIG } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { botovi, izmjeneBotova, igraci, postavkeBotova } from '../baza/shema.js';
 import {
@@ -190,8 +190,8 @@ async function stvoriBotaUTransakciji(tx: BotTransaction, ulaz: UlazNovogBota, a
   const [igrac] = await tx.insert(igraci).values({
     vrsta: 'registriran', upravljac: 'bot', nadimak,
     avatarId: ulaz.tip === 'gost' ? 0 : randomInt(0, 8),
-    avatarConfig: ulaz.tip === 'gost' ? null : nasumicnaKonfiguracijaAvatara(nasumicni),
-    avatarRevision: ulaz.tip === 'gost' ? 0 : 1,
+    avatarConfig: ulaz.tip === 'gost' ? ZADANI_AVATAR_CONFIG : nasumicnaKonfiguracijaAvatara(nasumicni),
+    avatarRevision: 1,
     email: null, lozinkaHash: null, emailPotvrdjen: true, registriranAt: sql`now()`,
   }).returning({ id: igraci.id });
   if (!igrac) throw new Error('Umetanje bot računa nije uspjelo.');

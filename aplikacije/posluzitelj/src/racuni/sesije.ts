@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { and, eq, gt, lt } from 'drizzle-orm';
+import { ZADANI_AVATAR_CONFIG } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { igraci, sesije } from '../baza/shema.js';
 
@@ -70,7 +71,7 @@ export async function stvoriGostSesijuZaToken(token: string): Promise<{ igracId:
   if (!/^gost\.[A-Za-z0-9_-]{32,43}$/.test(token)) throw new Error('Nevaljan gostujući token');
   const [igrac] = await baza
     .insert(igraci)
-    .values({ vrsta: 'gost', nadimak: 'Gost', avatarId: 0 })
+    .values({ vrsta: 'gost', nadimak: 'Gost', avatarId: 0, avatarConfig: ZADANI_AVATAR_CONFIG, avatarRevision: 1 })
     .returning({ id: igraci.id });
   if (!igrac) throw new Error('Stvaranje gosta nije uspjelo');
   const istek = new Date(Date.now() + TRAJANJE_SESIJE_MS);

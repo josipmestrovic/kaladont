@@ -19,8 +19,8 @@ kaladont.hr {
     }
 }
 
-# Javno samo tracker (/script.js, /api/send). Admin UI nije na internetu — SSH tunnel
-# na 127.0.0.1:3002 (runbook-umami.md §5). DNS tek kad je Umami healthy.
+# Tracker + Umami admin UI na istom hostu (jak admin password / Bitwarden).
+# Opcionalni loopback 127.0.0.1:3002 ostaje u Composeu kao backup (runbook-umami.md §5).
 analitika.kaladont.hr {
     encode gzip
     header {
@@ -30,15 +30,7 @@ analitika.kaladont.hr {
         Strict-Transport-Security "max-age=31536000"
     }
 
-    @tracker {
-        path /script.js /api/send /api/send/*
-    }
-    handle @tracker {
-        reverse_proxy umami:3000
-    }
-    handle {
-        respond "Umami admin nije javno dostupan. Koristi SSH tunnel (runbook §5)." 403
-    }
+    reverse_proxy umami:3000
 }
 
 www.kaladont.hr {
