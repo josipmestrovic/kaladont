@@ -177,7 +177,7 @@
         body: JSON.stringify({ broj: brojNovihBotova, tip: tipNovogBota }),
       });
       if (!aktivan) return;
-      poruka = `Stvoreno ${odgovor.stvoreno.length} ${tipNovogBota === 'gost' ? 'botova prikazanih kao Gost' : 'imenovanih botova'}. Aktivnih ukupno: ${odgovor.aktivnoPoslije}.`;
+      poruka = `Stvoreno ${odgovor.stvoreno.length} imenovanih botova. Aktivnih ukupno: ${odgovor.aktivnoPoslije}.`;
       tab = 'pregled';
       await ucitajPregled();
     } catch (pogreska) { if (aktivan) greska = pogreska instanceof Error ? pogreska.message : 'Stvaranje botova nije uspjelo.'; }
