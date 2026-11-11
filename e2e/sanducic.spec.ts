@@ -45,7 +45,8 @@ test('feed prikazuje tekst, auto-čita i briše sve', async ({ page }) => {
 
   await page.getByRole('link', { name: 'Obavijesti', exact: true }).click();
   await expect(page.getByText('Nema novih obavijesti.')).toBeVisible();
-  await page.getByRole('button', { name: 'Sve' }).click();
+  // exact: inače hvata i „Prikaži sve” / „Obriši sve obavijesti”
+  await page.getByRole('button', { name: 'Sve', exact: true }).click();
   await expect(page.getByText(tekst)).toBeVisible();
   page.once('dialog', (dijalog) => dijalog.accept());
   await page.getByRole('button', { name: 'Obriši sve obavijesti' }).click();

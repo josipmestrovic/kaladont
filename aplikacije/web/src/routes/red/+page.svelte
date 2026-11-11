@@ -74,6 +74,8 @@
       cekanjeStanjaTimeout = null;
       brojPokusajaUlaska = 0;
       stanjeUcitano = true;
+      // Tijekom odbrojavanja zadrži lobby red; kasniji red:stanje (npr. match lock) ne smije isprazniti sjedala.
+      if (countdown !== null) return;
       const noviIgraci = new Set(
         novoStanje.mjesta.filter(Boolean).map((mjesto) => `${mjesto!.nadimak}:${mjesto!.avatarId}`),
       );
