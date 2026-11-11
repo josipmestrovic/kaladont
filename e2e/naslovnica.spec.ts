@@ -208,8 +208,8 @@ for (const sirina of [320, 390]) {
     await page.evaluate(() => document.fonts.ready);
 
     const demo = page.locator('.demo-oznaka');
-    const h1 = page.locator('#naslov-kaladont');
     await expect(demo).toBeVisible();
+    await expect(page.locator('#naslov-kaladont')).toBeVisible();
 
     const poravnanje = await page.evaluate(() => {
       const oznaka = document.querySelector('.demo-oznaka') as HTMLElement;
