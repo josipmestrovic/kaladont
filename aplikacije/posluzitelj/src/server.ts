@@ -181,7 +181,9 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   let opozoviSocketSesije: (sesijaId: string) => void = () => {};
   let opozoviSocketSesijeIgraca: (igracId: string) => void = () => {};
   let dohvatiZivoStanjeBotova: () => import('./admin/rute.js').ZivoStanjeBotova | null = () => null;
-  const rjecnik = await ucitajRjecnik();
+  const rjecnik = await ucitajRjecnik({
+    dopustiVlastitaImena: konfiguracija.DOPUSTI_VLASTITA_IMENA === 'true',
+  });
   app.log.info(`Rječnik učitan: ${rjecnik.brojRijeci()} riječi`);
   const zadanePostavkeBotova = ucitajKonfiguracijuBota({ ...process.env, NODE_ENV: konfiguracija.NODE_ENV });
   let zapisPostavkiBotova = await ucitajTrajnePostavkeBotova(zadanePostavkeBotova);
@@ -744,6 +746,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
       igracMozeIgrati,
       ukloniIzJavnogReda: redServis.ukloniIzReda,
+      dopustiVlastitaImena: konfiguracija.DOPUSTI_VLASTITA_IMENA === 'true',
     },
   );
   igracImaPrivatnuSobu = sobaServis.imaPrivatnuSobu;

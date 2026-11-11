@@ -231,6 +231,8 @@ export interface PlasmanPartije {
   bodovi: number;
   eliminacije: number;
   nacinIspadanja: NacinIspadanja | null;
+  /** true ako je registriran/admin (nije gost ni bot) — može se otvoriti javni profil. */
+  javniProfil: boolean;
   /** Ocjena igre (1–5); null ako nije dostupna (privatna / trening). */
   ocjenaIgre?: number | null;
 }

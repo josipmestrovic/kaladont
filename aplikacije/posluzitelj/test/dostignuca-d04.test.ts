@@ -26,9 +26,12 @@ const rijeciZaBrisanje: string[] = [];
 const prijaveRijeciZaBrisanje: number[] = [];
 const prijaveIgracaZaBrisanje: number[] = [];
 
+/** Samo hrvatska mala slova (bez q/w/x/y) — usklađeno s jeDopustenOblikRijeci. */
+const HR_SLOVA = 'abcčćdđefghijklmnoprsštuvzž';
+
 function slucajnaRijec(): string {
   let rijec = 'd';
-  while (rijec.length < 14) rijec += String.fromCharCode(97 + Math.floor(Math.random() * 26));
+  while (rijec.length < 14) rijec += HR_SLOVA[Math.floor(Math.random() * HR_SLOVA.length)]!;
   return rijec;
 }
 

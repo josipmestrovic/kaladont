@@ -175,6 +175,7 @@ export async function obracunajMisijeZaIgraca(
       predlozakId: dodjela.predlozakId,
       vrsta: dodjela.vrsta,
       naziv: snapshot.naziv,
+      opis: snapshot.opis,
       opisNapretka: opisNapretka(snapshot.naziv, prijeNapretka, rezultat.noviNapredak, dodjela.cilj),
       prije: prijeNapretka,
       poslije: rezultat.noviNapredak,

@@ -760,6 +760,7 @@
 
   let sustavBrojac = $state(5);
   let sustavBrojacIntervalId: ReturnType<typeof setInterval> | null = null;
+  let aplauzPobjedeZaPartijuId: string | null = null;
 
   $effect(() => {
     if (!stanje.sustavBiraRijec || !stanje.istekIzboraIso) {
@@ -770,8 +771,14 @@
       return;
     }
     const istekMs = new Date(stanje.istekIzboraIso).getTime();
+    let zadnjaOdsviranaSek = Number.POSITIVE_INFINITY;
     const azurirajBrojac = () => {
-      sustavBrojac = Math.max(0, Math.ceil((istekMs - Date.now()) / 1000));
+      const preostalo = Math.max(0, Math.ceil((istekMs - Date.now()) / 1000));
+      sustavBrojac = preostalo;
+      if (preostalo > 0 && preostalo < zadnjaOdsviranaSek) {
+        zadnjaOdsviranaSek = preostalo;
+        pustiAudio('odbrojavanje-single-count-sound');
+      }
     };
     azurirajBrojac();
     sustavBrojacIntervalId = setInterval(azurirajBrojac, 250);
@@ -795,6 +802,14 @@
     rezervniRokRezultataMs ??= Date.now() + 8_000;
     const rok = kraj.prikazRezultataOdIso ? Date.parse(kraj.prikazRezultataOdIso) : rezervniRokRezultataMs;
 
+    if (aplauzPobjedeZaPartijuId !== kraj.partijaId) {
+      aplauzPobjedeZaPartijuId = kraj.partijaId;
+      const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
+      if (pobjednikId && pobjednikId === stanje.mojIgracId) {
+        pustiAudio('aplauz-kaladont');
+      }
+    }
+
     const otkrijRezultate = () => {
       stanje.rezultatiPrikazaniPartijaId = kraj.partijaId;
       prikaziRezultate = true;
@@ -807,9 +822,15 @@
       return;
     }
 
+    let zadnjaOdsviranaSek = Number.POSITIVE_INFINITY;
     const azuriraj = () => {
       const preostaloMs = rok - Date.now();
-      sekundeDoRezultata = Math.max(0, Math.ceil(preostaloMs / 1_000));
+      const preostalo = Math.max(0, Math.ceil(preostaloMs / 1_000));
+      sekundeDoRezultata = preostalo;
+      if (preostalo > 0 && preostalo < zadnjaOdsviranaSek) {
+        zadnjaOdsviranaSek = preostalo;
+        pustiAudio('odbrojavanje-single-count-sound');
+      }
       if (preostaloMs <= 0) otkrijRezultate();
     };
     azuriraj();
@@ -1094,7 +1115,7 @@
     {:else if iskoristenaRijec}
       <strong class="odbijena-rijec">{iskoristenaRijec}</strong> je već bilo.
     {:else if vlastitoImeRijec}
-      Riječ <strong>{vlastitoImeRijec}</strong> je odbijena jer prema pravilima igre imena i nazivi nisu dopušteni.
+      <strong class="odbijena-rijec">{vlastitoImeRijec}</strong> — Osobna imena, nazive mjesta, marki i slične vlastite nazive ne priznajemo. Probaj s drugom riječi.
     {:else}
       {porukaPoteza}
     {/if}
@@ -1208,9 +1229,13 @@
         <span class="plasman-broj">{igrac.plasman}.</span>
         <span class="plasman-ime">
           <span class="plasman-ime-redak">
-            <span class="nadimak">{igrac.nadimak}</span>
             {#if igrac.igracId === stanje.mojIgracId}
+              <a href="/profil" class="nadimak">{igrac.nadimak}</a>
               <span class="oznaka-ti" aria-label="To si ti">TI</span>
+            {:else if igrac.javniProfil}
+              <a href={`/profil/javni/${igrac.igracId}`} class="nadimak">{igrac.nadimak}</a>
+            {:else}
+              <span class="nadimak">{igrac.nadimak}</span>
             {/if}
           </span>
           {#if ocjenaIgraca !== null && ocjenaIgraca !== undefined}
@@ -1887,7 +1912,7 @@
     margin: 8px 0;
     color: var(--boja-isticanje-slova);
     font-family: var(--font-naslov);
-    font-size: 16px;
+    font-size: calc(16px * 1.2);
   }
   .odbrojavanje-najava {
     margin: 8px 0 0;
@@ -2741,7 +2766,7 @@
     max-width: 620px;
     margin: 0 auto;
     color: var(--boja-tekst-osnovni);
-    font-size: 16px;
+    font-size: calc(16px * 1.35);
     font-weight: 600;
     line-height: 1.2;
   }
@@ -2756,7 +2781,7 @@
     margin: 0;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-naslov);
-    font-size: var(--tekst-baza);
+    font-size: calc(var(--tekst-baza) * 1.35);
   }
   .sustav-bira-tekst strong {
     color: var(--boja-isticanje-slova);
@@ -3123,6 +3148,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .plasman-ime-redak a.nadimak {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .plasman-ime-redak a.nadimak:hover {
+    text-decoration-thickness: 2px;
   }
   .plasman-ocjena {
     display: inline-flex;

@@ -196,6 +196,9 @@ export async function stvoriPorukeZvjezdica(ulaz: {
   izvorId?: string;
 }): Promise<number> {
   if (ulaz.novaRazina <= ulaz.staraRazina) return 0;
+  // Botovi skupljaju dostignuća na profilu, ali nemaju sandučić/sesije.
+  const [racun] = await ulaz.tx.select({ upravljac: igraci.upravljac }).from(igraci).where(eq(igraci.id, ulaz.igracId)).limit(1);
+  if (racun?.upravljac === 'bot') return 0;
   const definicija = dohvatiDefinicijuDostignuca(ulaz.dostignuceId);
   const naziv = definicija?.naziv ?? ulaz.dostignuceId;
   for (let razina = 1; razina <= ulaz.staraRazina; razina += 1) {

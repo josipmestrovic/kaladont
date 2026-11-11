@@ -28,7 +28,10 @@ Kontrola zvuka prikazuje se na landingu i u `/postavke`; tijekom čekanja i akti
 | Klik na `IGRAJ` i ulazak u sobu | svi u sobi | ulazni signal | Isti zvuk kao za svaki drugi ulazak. Jednom po stvarnom ulasku. |
 | Drugi igrač uđe u sobu | svi u sobi | ulazni signal | Ne svirati za ponovljeno stanje ili reconnect. |
 | Igrač izađe iz sobe | svi u sobi | izlazni signal | Jednom po stvarnom izlasku; tiši od ulaska. |
-| Svaka sekunda odbrojavanja u čekaonici | svi u sobi | `odbrojavanje-single-count-sound` | Svira na svaku cijelu sekundu prikazanog odbrojavanja, ne samo zadnje 3. Najviše jednom po sekundi. |
+| Svaka sekunda odbrojavanja u čekaonici | svi u sobi | `odbrojavanje-single-count-sound` | Svira na svaku cijelu sekundu prikazanog odbrojavanja, ne samo zadnje 3. Najviše jednom po sekundi. Isto vrijedi za privatnu sobu. |
+| Svaka sekunda „Nova runda za” | svi u partiji | `odbrojavanje-single-count-sound` | Nakon eliminacije, dok sustav bira novu riječ. Najviše jednom po sekundi. |
+| Svaka sekunda „Rezultati za” | svi u partiji | `odbrojavanje-single-count-sound` | Završno odbrojavanje do detaljnih rezultata. Najviše jednom po sekundi. |
+| Početak završnog odbrojavanja (pobjeda) | samo pobjednik | `aplauz-kaladont` | Jednom kad krene „Rezultati za”, neovisno o razlogu zadnje eliminacije. Kaladont-aplauz na eliminaciji i dalje čuju svi. |
 | Početak partije | svi | `pocetak-partije` | Jednom, točno kad odbrojavanje u čekaonici istekne i partija krene (ne na najavu budućeg početka). |
 | Zadnjih 5 sekundi poteza (30s timer) | svi za stolom | `pred-istek-vremena` | Isti prag kao vizualni puls prstena oko igrača na potezu; jednom po potezu koji uđe u tu fazu. |
 | Prihvaćena riječ | samo autoru poteza | potvrđujući ton | Ostali ne čuju tu potvrdu; njihov osobni signal dolazi kada je njihov red. |

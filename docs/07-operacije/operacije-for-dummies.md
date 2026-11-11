@@ -953,7 +953,7 @@ Oba moraju pokazati `<PROD_IPV4>`.
 
 ### 21.2. Resend
 
-U Resendu dodaj domenu `kaladont.hr` i kao produkcijski pošiljatelj koristi `noreply@kaladont.hr`. Ljudski kontakt i Reply-To je `info@kaladont.hr`.
+U Resendu dodaj domenu `kaladont.hr` i kao produkcijski pošiljatelj koristi `info@kaladont.hr` (isti pretinac prima odgovore; ne koristi no-reply).
 
 Resend će prikazati DNS zapise. Nemoj ih prepisivati iz ovog dokumenta jer su vrijednosti jedinstvene. XHostingu pošalji:
 
@@ -974,7 +974,7 @@ Hvala.
 
 Nastavi tek kada Resend označi domenu verificiranom i SPF/DKIM prolaze. API ključ spremi u Bitwarden i produkcijski VPS `.env`; ne u GitHub ni git.
 
-Prije javnog lansiranja pošalji stvarnu potvrdu registracije i reset lozinke na adresu koju kontroliraš. Provjeri pošiljatelja, poveznicu, istek tokena i Reply-To.
+Prije javnog lansiranja pošalji stvarnu potvrdu registracije i reset lozinke na adresu koju kontroliraš. Provjeri pošiljatelja (`info@kaladont.hr`), poveznicu, istek tokena i da „Odgovori” stigne na isti pretinac.
 
 ## 22. Produkcijski backup i monitoring prije aplikacije
 

@@ -423,6 +423,8 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     for (const p of plasmani) {
       expect(p.bodovi).toBeGreaterThanOrEqual(0);
       expect(p.bodovi).toBeLessThanOrEqual(7);
+      // spojiIgraca koristi gost.* tokene — javni profil samo za registrirane/admine
+      expect(p.javniProfil).toBe(false);
     }
     expect(krajPoruka!.mojeIskustvo).not.toBeNull();
     expect(krajPoruka!.mojeIskustvo!.osvojenoIskustvo).toBeGreaterThanOrEqual(0);

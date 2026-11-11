@@ -2,14 +2,18 @@
  * Ručna administracija rječnika - reusable primitiva (koristi je admin ruta iz Faze 7,
  * vidi PLAN-IMPLEMENTACIJE.md).
  */
-import { eq } from 'drizzle-orm';
-import { grafemi, kljucGrupe, type VrstaRijeci } from 'zajednicko';
+import { and, asc, eq, sql } from 'drizzle-orm';
+import {
+  DOPUSTENA_SLOVA_RIJECI_SQL,
+  grafemi,
+  jeDopustenOblikRijeci,
+  kljucGrupe,
+  type VrstaRijeci,
+} from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { izmjeneRjecnika, rijeci } from '../baza/shema.js';
 import type { MisijeTx } from '../misije/tipovi.js';
-
-const DOPUSTENA_SLOVA = /^[a-zšđčćž]+$/;
 
 type Izvrsitelj = MisijeTx | typeof baza;
 
@@ -18,6 +22,9 @@ export class NevaljanaRijecError extends Error {}
 export type PromjenaRjecnika =
   | { promjena: 'nema'; rijec: string }
   | { promjena: 'dodana' | 'reaktivirana' | 'deaktivirana' | 'vracena'; rijec: string; izmjenaId: number };
+
+/** Fiksni razlog za masovno čišćenje nstandardnih oblika. */
+export const RAZLOG_CISCENJA_NSTANDARDNIH = 'automatsko čišćenje: nstandardna slova';
 
 export function normalizirajRijecRjecnika(ulaz: string): string {
   return ulaz.normalize('NFC').trim().toLowerCase();
@@ -46,7 +53,7 @@ async function zabiljeziIzmjenu(
 
 function provjeriOblik(rijecUlaz: string): { rijec: string; prvaDva: string; zadnjaDva: string } {
   const rijec = normalizirajRijecRjecnika(rijecUlaz);
-  if (rijec.length < 2 || !DOPUSTENA_SLOVA.test(rijec)) {
+  if (rijec.length < 2 || !jeDopustenOblikRijeci(rijec)) {
     throw new NevaljanaRijecError(`Neispravan oblik riječi: "${rijecUlaz}"`);
   }
   const svi = grafemi(rijec);
@@ -126,9 +133,50 @@ export async function vratiRijec(
   db: Izvrsitelj = baza,
 ): Promise<PromjenaRjecnika> {
   const rijec = normalizirajRijecRjecnika(rijecUlaz);
+  if (!jeDopustenOblikRijeci(rijec)) {
+    throw new NevaljanaRijecError(`Neispravan oblik riječi: "${rijecUlaz}"`);
+  }
   const [postojeca] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
   if (!postojeca || postojeca.aktivna) return { promjena: 'nema', rijec };
   await db.update(rijeci).set({ aktivna: true }).where(eq(rijeci.rijec, rijec));
   const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId });
   return { promjena: 'vracena', rijec, izmjenaId };
+}
+
+const uvjetNstandardneAktivne = and(
+  eq(rijeci.aktivna, true),
+  sql`${rijeci.rijec} !~ ${DOPUSTENA_SLOVA_RIJECI_SQL}`,
+);
+
+/** Aktivne riječi s nstandardnim znakovima (bez vlastita_imena tablice). */
+export async function popisNstandardnihAktivnihRijeci(): Promise<Array<{ rijec: string; frekvencija: number }>> {
+  return baza
+    .select({ rijec: rijeci.rijec, frekvencija: rijeci.frekvencija })
+    .from(rijeci)
+    .where(uvjetNstandardneAktivne)
+    .orderBy(asc(rijeci.rijec));
+}
+
+/** Soft-delete svih aktivnih nstandardnih riječi + audit u jednoj transakciji. */
+export async function deaktivirajNstandardneRijeci(adminId: string): Promise<{ deaktivirano: number }> {
+  return baza.transaction(async (tx) => {
+    const deaktivirane = await tx
+      .update(rijeci)
+      .set({ aktivna: false })
+      .where(uvjetNstandardneAktivne)
+      .returning({ rijec: rijeci.rijec });
+
+    if (deaktivirane.length === 0) return { deaktivirano: 0 };
+
+    await tx.insert(izmjeneRjecnika).values(
+      deaktivirane.map((red) => ({
+        rijec: red.rijec,
+        akcija: 'uklonjena' as const,
+        razlog: RAZLOG_CISCENJA_NSTANDARDNIH,
+        adminId,
+      })),
+    );
+
+    return { deaktivirano: deaktivirane.length };
+  });
 }

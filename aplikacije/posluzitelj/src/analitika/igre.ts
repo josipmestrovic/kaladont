@@ -129,6 +129,9 @@ function popisDana(odDan: string, doDanUkljucivo: string): string[] {
   return dani;
 }
 
+/** Pragovi broja igara po igraču za KPI ponavljanja (2+, 3+, …). */
+const PRAGOVI_PONAVLJANJA = [2, 3, 4, 5, 10, 20] as const;
+
 export async function agregirajDnevneIgre(opcije: {
   odDan: string;
   doDan: string;
@@ -193,7 +196,7 @@ export async function agregirajDnevneIgre(opcije: {
     .groupBy(analitikaSudjelovanja.igracId, analitikaSudjelovanja.vrstaRacunaNaPocetku);
 
   // Isti igrač može imati više vrsta ako se registrirao između igara — brojimo sudjelovanja po vrsti,
-  // a jedinstvene igrače i 2+ po igrac_id.
+  // a jedinstvene igrače i pragove ponavljanja po igrac_id.
   const poIgracu = new Map<string, { brojIgara: number; gost: number; registriran: number }>();
   for (const red of sudjelovanja) {
     const postojeci = poIgracu.get(red.igracId) ?? { brojIgara: 0, gost: 0, registriran: 0 };
@@ -206,22 +209,31 @@ export async function agregirajDnevneIgre(opcije: {
   let sudjelovanjaGost = 0;
   let sudjelovanjaRegistriran = 0;
   let igraciUkupno = 0;
-  let igraciS2Plus = 0;
+  const brojeviPoPragu = Object.fromEntries(PRAGOVI_PONAVLJANJA.map((prag) => [prag, 0])) as Record<
+    (typeof PRAGOVI_PONAVLJANJA)[number],
+    number
+  >;
   for (const podatak of poIgracu.values()) {
     igraciUkupno += 1;
-    if (podatak.brojIgara >= 2) igraciS2Plus += 1;
+    for (const prag of PRAGOVI_PONAVLJANJA) {
+      if (podatak.brojIgara >= prag) brojeviPoPragu[prag] += 1;
+    }
     sudjelovanjaGost += podatak.gost;
     sudjelovanjaRegistriran += podatak.registriran;
   }
   const sudjelovanjaUkupno = sudjelovanjaGost + sudjelovanjaRegistriran;
+  const ponavljanja = PRAGOVI_PONAVLJANJA.map((prag) => ({
+    prag,
+    broj: brojeviPoPragu[prag],
+    postotak: igraciUkupno === 0 ? null : (brojeviPoPragu[prag] / igraciUkupno) * 100,
+  }));
 
   return {
     vremenskaZona: ANALITIKA_VREMENSKA_ZONA,
     dani,
     ljudi: {
       igraci: igraciUkupno,
-      igraciS2Plus,
-      postotakS2Plus: igraciUkupno === 0 ? null : (igraciS2Plus / igraciUkupno) * 100,
+      ponavljanja,
       sudjelovanjaGost,
       sudjelovanjaRegistriran,
       postotakGost: sudjelovanjaUkupno === 0 ? null : (sudjelovanjaGost / sudjelovanjaUkupno) * 100,

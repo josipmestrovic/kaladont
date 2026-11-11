@@ -358,7 +358,7 @@ U `nano` spremi s `Ctrl+O`, Enter, zatvori s `Ctrl+X`. Stvarne vrijednosti unosi
 | `CADDY_EMAIL`, `DEV_MAIL` | Stvarni pretinci koje pratiš za TLS obavijesti i tehničke alarme. Provjeri primitak. |
 | `BAZA_LOZINKA` | U Bitwardenu generiraj npr. 48 slučajnih slova i brojeva. Današnji Compose umeće je izravno u URL baze pa ovaj odabir izbjegava probleme s rezerviranim URL znakovima. Promjena teksta u `.env` naknadno ne mijenja lozinku postojeće PostgreSQL uloge. |
 | `SESIJA_TAJNA`, `ADMIN_TAJNI_KLJUC` | Svakoj dodijeli **vlastitu** novu kriptografski nasumičnu vrijednost. Ne koristi onu sa staginga. |
-| `EMAIL_API_KLJUC`, `EMAIL_POSILJATELJ` | Produkcijski Resend ključ s pravom slanja za verificiranu domenu, pošiljatelj `noreply@kaladont.hr`. |
+| `EMAIL_API_KLJUC`, `EMAIL_POSILJATELJ` | Produkcijski Resend ključ s pravom slanja za verificiranu domenu, pošiljatelj `info@kaladont.hr` (bez no-reply). |
 | `JAVNA_ADRESA` | `https://kaladont.hr`. Utječe na poveznice potvrde i oporavka računa. |
 | `LJESTVICE_POCETAK` | Odaberi stvarni početak javnog praćenja ljestvica u ISO 8601 s pomakom, primjer oblika `2026-11-15T10:00:00+01:00`. Primjer nije odabrani datum lansiranja. |
 | `KALADONT_IMAGE`, `VERZIJA`, `DIGEST` | Iz provjerenog releasea: `ghcr.io/josipmestrovic/kaladont@sha256:…`, puni commit SHA, puni `sha256:…`. Novi workflow treba ažurirati ova tri polja zajedno. |
@@ -376,7 +376,7 @@ BAZA_LOZINKA=__ZAMIJENI_DB_LOZINKOM__
 SESIJA_TAJNA=__ZAMIJENI_TAJNOM_SESIJE__
 ADMIN_TAJNI_KLJUC=__ZAMIJENI_ZASEBNOM_ADMIN_TAJNOM__
 EMAIL_API_KLJUC=__ZAMIJENI_RESEND_KLJUCEM__
-EMAIL_POSILJATELJ=noreply@kaladont.hr
+EMAIL_POSILJATELJ=info@kaladont.hr
 JAVNA_ADRESA=https://kaladont.hr
 LJESTVICE_POCETAK=__ZAMIJENI_ISO_DATUMOM_S_VREMENSKIM_POMAKOM__
 KALADONT_IMAGE=ghcr.io/josipmestrovic/kaladont@sha256:__ZAMIJENI_64_HEX_DIGESTOM__
@@ -412,11 +412,11 @@ Očekuješ `600 deploy:deploy` i drugu naredbu bez pogreške. Običan `docker co
 3. Kontaktiraj XHosting postojećim provjerenim kanalom za domenu. Predložak za kopiranje:
 
 > **Predmet · Verifikacija Resend slanja za kaladont.hr**  
-> Poštovani, molim postavite zapise iz priložene tablice kako bismo mogli slati potvrde registracije i reset lozinke s noreply@kaladont.hr. Za svaki zapis navodim tip, host, vrijednost i prioritet točno kako ih prikazuje Resend. Molim zadržite postojeće zapise za primanje pošte na kaladont.hr i javite ako neki predloženi zapis kolidira s postojećim.  
+> Poštovani, molim postavite zapise iz priložene tablice kako bismo mogli slati potvrde registracije i reset lozinke s info@kaladont.hr. Za svaki zapis navodim tip, host, vrijednost i prioritet točno kako ih prikazuje Resend. Molim zadržite postojeće zapise za primanje pošte na kaladont.hr i javite ako neki predloženi zapis kolidira s postojećim.  
 > [Ovdje zalijepi samo tablicu javnih DNS zapisa.]  
 > Molim potvrdu nakon primjene. Hvala, Josip.
 
-Ne šalješ Resend API ključ niti dodaješ drugi SPF na istom imenu. Ako postoji konflikt, XHosting provjerava kako sačuvati postojeće slanje. U Resendu pričekaj **Verified**, a zatim testiraj stvarni inbox. Ako projekt želi odgovore na `info@kaladont.hr`, provjeri da pretinac prima mail i gdje odlazi „Odgovori”. Trenutačni adapter šalje `from`, ali nema posebno `reply_to` polje. Dogovori očekivano ponašanje i testiraj ga. [Resend · domene](https://resend.com/docs/dashboard/domains/introduction) · [API ključevi](https://resend.com/docs/dashboard/api-keys/introduction) · [DPA](https://resend.com/legal/dpa)
+Ne šalješ Resend API ključ niti dodaješ drugi SPF na istom imenu. Ako postoji konflikt, XHosting provjerava kako sačuvati postojeće slanje. U Resendu pričekaj **Verified**, a zatim testiraj stvarni inbox. Pošiljatelj je `info@kaladont.hr` (bez no-reply), pa „Odgovori” ide na isti pretinac. Provjeri da pretinac prima mail i da testni reply stigne. [Resend · domene](https://resend.com/docs/dashboard/domains/introduction) · [API ključevi](https://resend.com/docs/dashboard/api-keys/introduction) · [DPA](https://resend.com/legal/dpa)
 
 ### 7.2 A zapisi za web · nakon pripreme produkcijskog IP-a
 

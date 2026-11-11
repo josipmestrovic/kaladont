@@ -133,7 +133,7 @@ export function validirajPotez(params: ParametriValidacije): RezultatValidacije 
 
   if (!jePosebnaRijec && !params.rjecnik.jePostojecaRijec(rijecNormalizirana)) {
     if (params.rjecnik.jeVlastitoIme?.(rijecNormalizirana) && params.rjecnik.grupeZa(rijecNormalizirana).length > 0) {
-      return { valjano: false, kod: 'VLASTITO_IME', poruka: PORUKE.vlastitoImeNijeDopusteno(rijecNormalizirana) };
+      return { valjano: false, kod: 'VLASTITO_IME', poruka: PORUKE.vlastitoImeNijeDopusteno() };
     }
     return { valjano: false, kod: 'RIJEC_NE_POSTOJI', poruka: PORUKE.rijecNePostoji(rijecNormalizirana) };
   }

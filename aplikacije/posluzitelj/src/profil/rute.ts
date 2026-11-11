@@ -317,6 +317,7 @@ function opisKolekcionarskeRazine(otkljucano: number, ukupno: number) {
 }
 
 async function dohvatiKolekciju(igracId: string, rjecnik: RjecnikUMemoriji) {
+  const dopustiVlastitaImena = konfiguracija.DOPUSTI_VLASTITA_IMENA === 'true';
   const [grupe, oblici] = await Promise.all([
     baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId)),
     baza.select({ rijec: otkljucaneRijeciIgraca.rijec, dugaTier: otkljucaneRijeciIgraca.dugaTier, rijetkaTier: otkljucaneRijeciIgraca.rijetkaTier }).from(otkljucaneRijeciIgraca).where(eq(otkljucaneRijeciIgraca.igracId, igracId)),
@@ -325,6 +326,8 @@ async function dohvatiKolekciju(igracId: string, rjecnik: RjecnikUMemoriji) {
   for (const redak of grupe) {
     const kljuc = kolekcijskiKljucGrupe(redak.grupa);
     const vrsta = kljuc.split(':')[0] ?? 'ostalo';
+    // Usklađeno s rječnikom: neigriva čista imena ne ulaze u otključano ni u dostupno.
+    if (!dopustiVlastitaImena && vrsta === 'vlastito_ime') continue;
     const postojeca = kolekcijske.get(kljuc) ?? { osnovnaRijec: osnovnaRijecIzGrupe(redak.grupa), vrste: new Set<string>() };
     postojeca.vrste.add(vrsta);
     kolekcijske.set(kljuc, postojeca);
@@ -947,7 +950,9 @@ export async function registrirajProfilRute(
         bodovi: sudioniciPartije.bodovi,
         eliminacije: sudioniciPartije.eliminacije,
         nacinIspadanja: sudioniciPartije.nacinIspadanja,
-        javniProfil: sql<boolean>`${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null`,
+        javniProfil: sql<boolean>`${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null and not exists (
+          select 1 from botovi b where b.igrac_id = ${igraci.id} and b.tip = 'gost'
+        )`,
       })
       .from(sudioniciPartije)
       .innerJoin(igraci, eq(igraci.id, sudioniciPartije.igracId))

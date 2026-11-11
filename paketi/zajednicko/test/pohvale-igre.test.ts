@@ -26,7 +26,7 @@ describe('odrediPohvaleIgre', () => {
     });
   });
 
-  it('P01-02: cetiri_igraca — bot 9 ulazi u max pa čovjek 7 ne dobiva niz; bot ne dobiva zapis', () => {
+  it('P01-02: cetiri_igraca — bot 9 osvaja niz i XP; čovjek 7 ne dobiva', () => {
     const pohvale = odrediPohvaleIgre([
       s('h1', 'covjek', 4, 50),
       s('h2', 'covjek', 7, 60),
@@ -34,10 +34,12 @@ describe('odrediPohvaleIgre', () => {
       s('bot', 'bot', 9, 200),
     ]);
 
-    expect(pohvale.has('bot')).toBe(false);
+    expect(pohvale.get('bot')).toEqual([
+      { vrsta: 'najduzi_niz', vrijednost: 9, dijeljenoPrvoMjesto: false },
+      { vrsta: 'najvise_xp', vrijednost: 200, dijeljenoPrvoMjesto: false },
+    ]);
     expect(pohvale.get('h2')?.some((p) => p.vrsta === 'najduzi_niz')).toBeFalsy();
     expect(pohvale.get('h2')?.some((p) => p.vrsta === 'najvise_xp')).toBeFalsy();
-    expect(pohvale.size).toBe(0);
   });
 
   it('P01-02c: cetiri_igraca — bez jačeg bota čovjek 7 osvaja niz', () => {
@@ -131,12 +133,17 @@ describe('odrediPohvaleIgre', () => {
     });
   });
 
-  it('P01-02b: bot s većim XP-om sprječava ljudsku XP pohvalu', () => {
+  it('P01-02b: bot s većim XP-om osvaja XP pohvalu', () => {
     const pohvale = odrediPohvaleIgre([
       s('h', 'covjek', 5, 100),
       s('bot', 'bot', 1, 250),
     ]);
     expect(pohvale.get('h')?.some((p) => p.vrsta === 'najvise_xp')).toBeFalsy();
+    expect(pohvale.get('bot')).toContainEqual({
+      vrsta: 'najvise_xp',
+      vrijednost: 250,
+      dijeljenoPrvoMjesto: false,
+    });
     expect(pohvale.get('h')).toContainEqual({
       vrsta: 'najduzi_niz',
       vrijednost: 5,
@@ -144,7 +151,7 @@ describe('odrediPohvaleIgre', () => {
     });
   });
 
-  it('P01-03b: izjednačenje čovjek+bot — čovjek dobiva dijeljeno', () => {
+  it('P01-03b: izjednačenje čovjek+bot — oboje dobivaju dijeljeno', () => {
     const pohvale = odrediPohvaleIgre([
       s('h', 'covjek', 7, 100),
       s('bot', 'bot', 7, 100),
@@ -153,7 +160,10 @@ describe('odrediPohvaleIgre', () => {
       { vrsta: 'najduzi_niz', vrijednost: 7, dijeljenoPrvoMjesto: true },
       { vrsta: 'najvise_xp', vrijednost: 100, dijeljenoPrvoMjesto: true },
     ]);
-    expect(pohvale.has('bot')).toBe(false);
+    expect(pohvale.get('bot')).toEqual([
+      { vrsta: 'najduzi_niz', vrijednost: 7, dijeljenoPrvoMjesto: true },
+      { vrsta: 'najvise_xp', vrijednost: 100, dijeljenoPrvoMjesto: true },
+    ]);
   });
 });
 

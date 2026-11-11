@@ -90,11 +90,14 @@
   let ucitavanjeRijeci = $state(false);
   let aktivniTab = $state<'4p' | '1v1'>('1v1');
   let aktivniPogled = $state<'statistika' | 'dostignuca' | 'rijeci' | 'povijest'>('statistika');
-  let velicinaAvatara = $state(240);
+  let velicinaAvatara = $state(198);
 
   onMount(() => {
     const prilagodiAvatar = () => {
-      velicinaAvatara = window.innerWidth < 1000 ? 136 : 240;
+      const sirina = window.innerWidth;
+      if (sirina >= 1000) velicinaAvatara = 198;
+      else if (sirina < 380) velicinaAvatara = 136;
+      else velicinaAvatara = 160;
     };
     prilagodiAvatar();
     window.addEventListener('resize', prilagodiAvatar);

@@ -116,17 +116,23 @@ export function dodijeliRezultatSobeAkoNijeObraden(
   }
 }
 
-function normalizirajPostavke(p?: Partial<PostavkePrivatneSobe>): PostavkePrivatneSobe {
+function normalizirajPostavke(
+  p: Partial<PostavkePrivatneSobe> | undefined,
+  dopustiVlastitaImena: boolean,
+): PostavkePrivatneSobe {
   const trajanjePotezaSek =
     p?.trajanjePotezaSek === 0 || p?.trajanjePotezaSek === 15 || p?.trajanjePotezaSek === 60
       ? p.trajanjePotezaSek
       : 30;
 
+  const dostupneVrste = dopustiVlastitaImena
+    ? SVE_VRSTE_RIJECI
+    : SVE_VRSTE_RIJECI.filter((vrsta) => vrsta !== 'vlastito_ime');
   const dopusteniSkup = new Set(p?.dopusteneVrste ?? []);
-  const filtrirane = SVE_VRSTE_RIJECI.filter((v) => dopusteniSkup.has(v));
+  const filtrirane = dostupneVrste.filter((v) => dopusteniSkup.has(v));
   const dopusteneVrste = filtrirane.length > 0
-    ? SVE_VRSTE_RIJECI.filter((vrsta) => vrsta === 'imenica' || dopusteniSkup.has(vrsta))
-    : [...SVE_VRSTE_RIJECI];
+    ? dostupneVrste.filter((vrsta) => vrsta === 'imenica' || dopusteniSkup.has(vrsta))
+    : [...dostupneVrste];
 
   return {
     trajanjePotezaSek,
@@ -152,8 +158,10 @@ export function registrirajPrivatneSobe(
     igracImaAktivnuPartiju: (igracId: string) => boolean;
     igracMozeIgrati: (socket: KaladontSocket) => boolean;
     ukloniIzJavnogReda: (igracId: string) => void;
+    dopustiVlastitaImena?: boolean;
   },
 ) {
+  const dopustiVlastitaImena = opcije.dopustiVlastitaImena !== false;
   const sobe = new Map<string, Soba>(); // kod -> Soba
   const sobaPoIgracu = new Map<string, string>(); // igracId -> kod
 
@@ -307,7 +315,7 @@ export function registrirajPrivatneSobe(
       }
       izadjiIzSobe(socket);
 
-      const postavke = normalizirajPostavke(rezultat.data?.postavke);
+      const postavke = normalizirajPostavke(rezultat.data?.postavke, dopustiVlastitaImena);
       opcije.ukloniIzJavnogReda(socket.data.igracId);
       let kod = generirajKodSobe();
       while (sobe.has(kod)) kod = generirajKodSobe();

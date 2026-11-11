@@ -32,6 +32,7 @@ test('feed prikazuje tekst, auto-čita i briše sve', async ({ page }) => {
   await page.getByRole('link', { name: /Obavijesti/ }).first().click();
   await expect(page).toHaveURL('/obavijesti');
   await expect(page.getByRole('heading', { name: 'Obavijesti' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nove' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText(tekst)).toBeVisible();
   await expect(page.getByText('Novo', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Označi sve pročitanim' })).toHaveCount(0);
@@ -43,6 +44,10 @@ test('feed prikazuje tekst, auto-čita i briše sve', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Obavijesti,/ })).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Obavijesti', exact: true }).click();
+  await expect(page.getByText('Nema novih obavijesti.')).toBeVisible();
+  // exact: inače hvata i „Prikaži sve” / „Obriši sve obavijesti”
+  await page.getByRole('button', { name: 'Sve', exact: true }).click();
+  await expect(page.getByText(tekst)).toBeVisible();
   page.once('dialog', (dijalog) => dijalog.accept());
   await page.getByRole('button', { name: 'Obriši sve obavijesti' }).click();
   await expect(page.getByText('Zasad nema obavijesti.')).toBeVisible();

@@ -44,7 +44,7 @@ describe('validirajPotez', () => {
       rjecnik: rjecnikSImenom,
     });
     expect(rezultat.kod).toBe('VLASTITO_IME');
-    expect(rezultat.poruka).toBe(PORUKE.vlastitoImeNijeDopusteno('italija'));
+    expect(rezultat.poruka).toBe(PORUKE.vlastitoImeNijeDopusteno());
   });
 
   it('prihvaca preklopljenu rijec ako postoji i kao dopustena opca rijec', () => {

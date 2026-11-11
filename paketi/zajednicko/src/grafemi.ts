@@ -3,6 +3,23 @@
  * Vidi docs/02-pravila-igre/digrafi-i-grafemi.md i ADR-006.
  */
 
+/**
+ * Mala slova hrvatske abecede (bez q/w/x/y). Namjerno nije `a-z` — taj raspon propušta strana slova.
+ * Vidi docs/04-rjecnik/uvoz-rjecnika.md.
+ */
+export const DOPUSTENA_SLOVA_RIJECI = /^[abcčćdđefghijklmnoprsštuvzž]+$/;
+
+/** Isti skup kao {@link DOPUSTENA_SLOVA_RIJECI}, za Postgres `~` / `!~`. */
+export const DOPUSTENA_SLOVA_RIJECI_SQL = '^[abcčćdđefghijklmnoprsštuvzž]+$';
+
+/**
+ * True ako oblik (nakon NFC) sadrži samo mala hrvatska slova.
+ * Ne radi lower-case — pozivatelj normalizira (`toLowerCase`) kad treba.
+ */
+export function jeDopustenOblikRijeci(rijec: string): boolean {
+  return DOPUSTENA_SLOVA_RIJECI.test(rijec.normalize('NFC'));
+}
+
 const DIGRAFI = ['dž', 'lj', 'nj'];
 
 /**

@@ -8,7 +8,7 @@ import { izracunajNovaDostignuca, izracunajOcjenuIgre, izracunajRang, kolekcijsk
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { obradiNeobradeneTop10Dokaze, zabiljeziTop10NakonPromjene } from '../dostignuca/top10.js';
 import { ocistiMemorijuLjestvica } from '../ljestvice/servis.js';
@@ -27,6 +27,7 @@ import {
 } from '../sanducic/okidaci.js';
 import type { MisijeTx } from '../misije/tipovi.js';
 import type { SudionikPartije } from './motor-partije.js';
+import { primaProfilnuGamifikaciju, type BotTipPrezentacije } from './gamifikacija-racuna.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
 
 async function brojKolekcijskihStavki(tx: MisijeTx, igracId: string): Promise<number> {
@@ -238,6 +239,7 @@ interface AgregatZakljucka {
   pohvale: PohvalaIgre[];
   upravljac: 'covjek' | 'bot';
   vrstaIgraca: 'gost' | 'registriran' | 'admin';
+  botTip: BotTipPrezentacije | null;
   iskustvoPrijePartije: number;
   promjeneMisija?: PromjenaMisije[];
   ukupnoIskustvo?: UkupnoIskustvoIshoda;
@@ -279,9 +281,9 @@ function jeNamjerniIzlazak(nacin: string): boolean {
   return nacin === 'prekid' || nacin === 'odspajanje' || nacin === 'napustanje';
 }
 
-/** O4: ljudski igrač uključuje gosta — nagrade iz igre moraju biti usklađene s mailboxom. */
-function jeLjudskiRacun(vrsta: string, upravljac: string): boolean {
-  return upravljac === 'covjek' && (vrsta === 'registriran' || vrsta === 'admin' || vrsta === 'gost');
+/** Sandučić / misije / sesije: samo ljudski računi (botovi nemaju inbox). */
+function jeLjudskiZaSanducic(upravljac: string): boolean {
+  return upravljac === 'covjek';
 }
 
 /** Zaključuje partiju transakcijski i vraća ažurirane agregate (bodovi_ukupno, odigrane) po igraču. */
@@ -341,6 +343,7 @@ export async function zakljuciPartijuUBazi(
         pohvale: [],
         upravljac,
         vrstaIgraca,
+        botTip: null,
         iskustvoPrijePartije,
       });
       return;
@@ -424,6 +427,7 @@ export async function zakljuciPartijuUBazi(
             pohvale: pohvalePoIgracu.get(r.igracId) ?? [],
             upravljac: stanjeIgraca.upravljac,
             vrstaIgraca: stanjeIgraca.vrstaIgraca,
+            botTip: null,
             iskustvoPrijePartije: stanjeIgraca.iskustvoUkupno,
           });
           if (!samoStatistika && (stanjeIgraca.vrstaIgraca === 'registriran' || stanjeIgraca.vrstaIgraca === 'admin') && stanjeIgraca.upravljac === 'covjek') {
@@ -458,9 +462,14 @@ export async function zakljuciPartijuUBazi(
         bodovi: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
         eliminacije: mod === 'dva_igraca' ? igraci.eliminacije1v1 : igraci.eliminacijeUkupno,
         iskustvoUkupno: igraci.iskustvoUkupno,
-      }).from(igraci).where(eq(igraci.id, r.igracId));
+        botTip: botovi.tip,
+      }).from(igraci)
+        .leftJoin(botovi, eq(botovi.igracId, igraci.id))
+        .where(eq(igraci.id, r.igracId));
       const upravljac = stariIgrac?.upravljac ?? 'covjek';
       const vrstaIgraca = stariIgrac?.vrsta ?? 'gost';
+      const botTip = (stariIgrac?.botTip ?? null) as BotTipPrezentacije | null;
+      const primaGamifikaciju = primaProfilnuGamifikaciju(vrstaIgraca, upravljac, botTip);
       const [staraDnkStatistika] = await tx.select().from(dnkStatistikeIgraca)
         .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)))
         .limit(1);
@@ -588,6 +597,7 @@ export async function zakljuciPartijuUBazi(
             pohvale: [],
             upravljac,
             vrstaIgraca,
+            botTip,
             iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
           });
         }
@@ -631,6 +641,7 @@ export async function zakljuciPartijuUBazi(
             pohvale: [],
             upravljac,
             vrstaIgraca,
+            botTip,
             iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
           });
         }
@@ -639,7 +650,7 @@ export async function zakljuciPartijuUBazi(
       const statistika = statistike.get(r.igracId);
       if (statistika) {
         if (statistika.grupe.length > 0) {
-          const kolekcijaPrije = upravljac === 'covjek' ? await brojKolekcijskihStavki(tx, r.igracId) : 0;
+          const kolekcijaPrije = jeLjudskiZaSanducic(upravljac) ? await brojKolekcijskihStavki(tx, r.igracId) : 0;
           const grupeNovootkljucane = await tx.insert(otkljucaneGrupeIgraca)
             .values(statistika.grupe.map(({ grupa, tier }) => ({ igracId: r.igracId, grupa, tier, zaDostignuca: true })))
             .onConflictDoNothing()
@@ -654,7 +665,7 @@ export async function zakljuciPartijuUBazi(
             .returning({ grupa: otkljucaneGrupeIgraca.grupa });
           const promijenjene = new Set([...grupeNovootkljucane, ...grupePromovirane].map(({ grupa }) => grupa));
           brojNovihRijetkihGrupa.set(r.igracId, statistika.grupe.filter(({ grupa, tier }) => promijenjene.has(grupa) && tier !== null).length);
-          if (upravljac === 'covjek' && (grupeNovootkljucane.length > 0 || grupePromovirane.length > 0)) {
+          if (jeLjudskiZaSanducic(upravljac) && (grupeNovootkljucane.length > 0 || grupePromovirane.length > 0)) {
             const kolekcijaPoslije = await brojKolekcijskihStavki(tx, r.igracId);
             const broj = await stvoriPorukeKolekcije({
               igracId: r.igracId,
@@ -743,7 +754,7 @@ export async function zakljuciPartijuUBazi(
       }
 
       const zapisNapretka = napredakDostignuca.get(r.igracId);
-      if (zapisNapretka && jeLjudskiRacun(vrstaIgraca, upravljac)) {
+      if (zapisNapretka && primaGamifikaciju) {
         const delta: DeltaNapretkaDostignuca = { ...zapisNapretka.delta };
         delta.rijetkeLeksemskeGrupe = brojNovihRijetkihGrupa.get(r.igracId) ?? 0;
         if (!samoStatistika && r.plasman === 1) delta.javnePobjede = (delta.javnePobjede ?? 0) + 1;
@@ -823,6 +834,7 @@ export async function zakljuciPartijuUBazi(
               set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
             });
             for (const dostignuce of nova) {
+              if (!jeLjudskiZaSanducic(upravljac)) continue;
               const broj = await stvoriPorukeZvjezdica({
                 igracId: r.igracId,
                 dostignuceId: dostignuce.id,
@@ -896,7 +908,7 @@ export async function zakljuciPartijuUBazi(
 
       if (
         samoStatistika
-        && jeLjudskiRacun(vrstaIgraca, upravljac)
+        && primaGamifikaciju
         && (statistike.get(r.igracId)?.prihvaceniPotezi ?? 0) >= 1
         && !jeNamjerniIzlazak(r.nacinIspadanja)
       ) {
@@ -905,7 +917,7 @@ export async function zakljuciPartijuUBazi(
         pridruziDostignuca(r.igracId, privatnik.novaDostignuca, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
       }
 
-      if (samoStatistika && jeLjudskiRacun(vrstaIgraca, upravljac)) {
+      if (samoStatistika && jeLjudskiZaSanducic(upravljac)) {
         const gostPoruka = await obradiDovrsenuIgruSanducic({
           igracId: r.igracId,
           jeBot: false,
@@ -918,7 +930,7 @@ export async function zakljuciPartijuUBazi(
         if (gostPoruka) sanducicIgraci.add(r.igracId);
       }
 
-      if (!samoStatistika && r.plasman === 1 && jeLjudskiRacun(vrstaIgraca, upravljac)) {
+      if (!samoStatistika && r.plasman === 1 && primaGamifikaciju) {
         const kruna = await priznajDnevnuPobjeduModa(tx, { igracId: r.igracId, mod, zavrsenoU });
         primijeniDodjelu(r.igracId, kruna, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
         const statistikaPobjede = statistike.get(r.igracId);
@@ -933,7 +945,7 @@ export async function zakljuciPartijuUBazi(
         }
       }
 
-      if (jeLjudskiRacun(vrstaIgraca, upravljac)) {
+      if (primaGamifikaciju) {
         const oblici = statistike.get(r.igracId)?.dugeRijetkeRijeci ?? [];
         for (const oblik of oblici) {
           const grdosija = await priznajRijetkuGrdosiju(tx, {
@@ -979,7 +991,7 @@ export async function zakljuciPartijuUBazi(
             vrsta: pohvaleIgre.vrsta,
           });
           if (umetnuto.length === 0) continue;
-          if (!jeLjudskiRacun(agregat.vrstaIgraca, agregat.upravljac)) continue;
+          if (!primaProfilnuGamifikaciju(agregat.vrstaIgraca, agregat.upravljac, agregat.botTip)) continue;
 
           const deltaPohvale: DeltaNapretkaDostignuca = pohvala.vrsta === 'najduzi_niz'
             ? { pohvaleNizUkupno: 1 }
@@ -1031,6 +1043,7 @@ export async function zakljuciPartijuUBazi(
               set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
             });
             for (const dostignuce of novaPohvala) {
+              if (!jeLjudskiZaSanducic(agregat.upravljac)) continue;
               const broj = await stvoriPorukeZvjezdica({
                 igracId,
                 dostignuceId: dostignuce.id,
@@ -1052,7 +1065,7 @@ export async function zakljuciPartijuUBazi(
           && pohvale.some((pohvala) => pohvala.vrsta === 'najvise_xp');
         if (!imaObje) continue;
         const agregat = agregati.get(igracId);
-        if (!agregat || !jeLjudskiRacun(agregat.vrstaIgraca, agregat.upravljac)) continue;
+        if (!agregat || !primaProfilnuGamifikaciju(agregat.vrstaIgraca, agregat.upravljac, agregat.botTip)) continue;
         const sve = await priznajSvePohvale(tx, { igracId, partijaId, zavrsenoU });
         primijeniDodjelu(igracId, sve, agregat.upravljac, agregat.vrstaIgraca, agregat.iskustvoPrijePartije);
       }
@@ -1113,9 +1126,9 @@ export async function zakljuciPartijuUBazi(
         zapamtiObavijesti(igracId, ishod.noveObavijesti ?? []);
       }
 
-      // Sandučic: XP, rang, forma_10 i gost sažetak nakon konačnog XP-a (uključujući misije).
+      // Sandučic: XP, rang, forma_10 i gost sažetak nakon konačnog XP-a (uključujući misije). Botovi nemaju inbox.
       for (const [igracId, agregat] of agregati) {
-        if (agregat.upravljac !== 'covjek') continue;
+        if (!jeLjudskiZaSanducic(agregat.upravljac)) continue;
         const razinaPrije = stanjeIskustva(agregat.iskustvoPrijePartije).razina;
         const razinaPoslije = stanjeIskustva(agregat.iskustvoUkupno).razina;
         const xpBroj = await stvoriPorukeXpRazina({
@@ -1207,7 +1220,7 @@ export async function zakljuciPartijuUBazi(
           agregat.vrstaIgraca,
           agregat.iskustvoPrijePartije,
         );
-        if (obavijesti.length > 0) sanducicIgraci.add(igracId);
+        if (obavijesti.length > 0 && agregat.upravljac === 'covjek') sanducicIgraci.add(igracId);
       }
       if (javniZavrsetak) ocistiMemorijuLjestvica();
     } catch (greska) {
@@ -1219,7 +1232,7 @@ export async function zakljuciPartijuUBazi(
     emitirajNovostiDostignuca(igracId, obavijesti);
   }
   for (const [igracId, agregat] of agregati) {
-    if (agregat.novaDostignuca.length > 0) sanducicIgraci.add(igracId);
+    if (agregat.novaDostignuca.length > 0 && jeLjudskiZaSanducic(agregat.upravljac)) sanducicIgraci.add(igracId);
   }
   emitirajPromjeneSanducica([...sanducicIgraci]);
 

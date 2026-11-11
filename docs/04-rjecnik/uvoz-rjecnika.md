@@ -49,10 +49,12 @@ Kratice i ostali nepoznati oblici ne prolaze filtar; vlastita imena se normalizi
 
 Odbacuju se oblici koji:
 
-- sadrže bilo što osim malih slova hrvatske abecede (crtice, razmaci, brojke, strana slova poput q/w/x/y),
+- sadrže bilo što osim malih slova hrvatske abecede `a–ž` bez `q/w/x/y` (regex `^[abcčćdđefghijklmnoprsštuvzž]+$` iz `zajednicko`; namjerno nije `a-z`, jer taj raspon propušta strana slova), uključujući crtice, razmake i brojke,
 - počinju velikim slovom (ostaci vlastitih imena),
 - imaju manje od **2 grafema** (jednografemske riječi poput „i", „u" ne mogu nikad biti valjan potez),
 - su duplikati (isti oblik s više redaka → jedan zapis: frekvencije se zbroje, vrste i grupe se uniraju).
+
+Već uvezeni aktivni oblici s nstandardnim znakovima čiste se admin tabom **Čišćenje** (`GET`/`POST /admin/rjecnik/ciscenje-nstandardnih`): soft-delete + zapis u `izmjene_rjecnika`, zatim `ponovoUcitaj()`.
 
 **Bez praga frekvencije** — ulaze svi oblici (odluka u [ADR-005](../03-arhitektura/odluke/005-hrlex-izvor-rjecnika.md)). Frekvencija se sprema informativno.
 

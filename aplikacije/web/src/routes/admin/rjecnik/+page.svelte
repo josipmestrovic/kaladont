@@ -25,8 +25,15 @@
     izmjene: IzmjenaRjecnika[];
   }
 
-  type AkcijaRjecnik = 'dodaj' | 'deaktiviraj' | 'vrati' | null;
+  interface NstandardnaRijec {
+    rijec: string;
+    frekvencija: number;
+  }
 
+  type TabRjecnik = 'rucno' | 'izmjene' | 'test' | 'ciscenje';
+  type AkcijaRjecnik = 'dodaj' | 'deaktiviraj' | 'vrati' | 'ciscenje' | null;
+
+  let tab = $state<TabRjecnik>('rucno');
   let rucnoDodane = $state<IzmjenaRjecnika[]>([]);
   let greska = $state<string | null>(null);
   let novaRijec = $state('');
@@ -37,6 +44,10 @@
   let detaljiRijeci = $state<DetaljiRijeci | null>(null);
   let testiranjeGreska = $state<string | null>(null);
   let akcijaUTijeku = $state<AkcijaRjecnik>(null);
+  let nstandardne = $state<NstandardnaRijec[]>([]);
+  let nstandardneUkupno = $state(0);
+  let ciscenjeGreska = $state<string | null>(null);
+  let ciscenjeUcitavanje = $state(false);
 
   const VRSTE_RIJECI = [
     'imenica', 'glagol', 'pridjev', 'prilog', 'zamjenica', 'broj',
@@ -51,6 +62,28 @@
     } catch (e) {
       greska = e instanceof Error ? e.message : 'Nemaš pristup admin stranici.';
     }
+  }
+
+  async function ucitajCiscenje() {
+    ciscenjeUcitavanje = true;
+    ciscenjeGreska = null;
+    try {
+      const odgovor = await api<{ ukupno: number; rijeci: NstandardnaRijec[] }>(
+        '/admin/rjecnik/ciscenje-nstandardnih',
+      );
+      nstandardneUkupno = odgovor.ukupno;
+      nstandardne = odgovor.rijeci;
+    } catch (e) {
+      ciscenjeGreska = e instanceof Error ? e.message : 'Čišćenje se ne može učitati.';
+    } finally {
+      ciscenjeUcitavanje = false;
+    }
+  }
+
+  function odaberiTab(novi: TabRjecnik) {
+    tab = novi;
+    if (novi === 'ciscenje') void ucitajCiscenje();
+    if (novi === 'izmjene') void ucitaj();
   }
 
   onMount(() => {
@@ -130,6 +163,24 @@
     }
   }
 
+  async function potvrdiCiscenje() {
+    if (akcijaUTijeku !== null || nstandardneUkupno === 0) return;
+    akcijaUTijeku = 'ciscenje';
+    ciscenjeGreska = null;
+    try {
+      const odgovor = await api<{ deaktivirano: number }>('/admin/rjecnik/ciscenje-nstandardnih', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      pokaziUspjeh(`Deaktivirano ${odgovor.deaktivirano} nstandardnih riječi.`);
+      await Promise.all([ucitajCiscenje(), ucitaj()]);
+    } catch (err) {
+      ciscenjeGreska = err instanceof Error ? err.message : 'Čišćenje nije uspjelo.';
+    } finally {
+      akcijaUTijeku = null;
+    }
+  }
+
   async function testRijeci_f() {
     if (!testRijec.trim()) return;
     testiranjeGreska = null;
@@ -151,99 +202,176 @@
 {#if greska}
   <p class="greska" role="alert">{greska}</p>
 {:else}
-  <h2>Ručno dodavanje</h2>
-  <form class="forma-rjecnik" onsubmit={dodajRijec}>
-    <label>Riječ <input type="text" bind:value={novaRijec} required disabled={akcijaUTijeku !== null} /></label>
-    <label>Vrsta
-      <select bind:value={vrstaRijeci} required disabled={akcijaUTijeku !== null}>
-        {#each VRSTE_RIJECI as vrsta (vrsta)}
-          <option value={vrsta}>{vrsta}</option>
-        {/each}
-      </select>
-    </label>
-    <label>Razlog <input type="text" bind:value={razlogRijeci} required disabled={akcijaUTijeku !== null} /></label>
-    <button type="submit" disabled={akcijaUTijeku !== null}>{akcijaUTijeku === 'dodaj' ? 'Radim…' : 'Dodaj riječ'}</button>
-  </form>
-  {#if porukaRjecnik}<p class="greska" role="alert">{porukaRjecnik}</p>{/if}
+  <div class="tabovi" role="tablist" aria-label="Administracija rječnika">
+    <button type="button" role="tab" aria-selected={tab === 'rucno'} class:odabran={tab === 'rucno'} onclick={() => odaberiTab('rucno')}>Ručno</button>
+    <button type="button" role="tab" aria-selected={tab === 'izmjene'} class:odabran={tab === 'izmjene'} onclick={() => odaberiTab('izmjene')}>Izmjene</button>
+    <button type="button" role="tab" aria-selected={tab === 'test'} class:odabran={tab === 'test'} onclick={() => odaberiTab('test')}>Test</button>
+    <button type="button" role="tab" aria-selected={tab === 'ciscenje'} class:odabran={tab === 'ciscenje'} onclick={() => odaberiTab('ciscenje')}>Čišćenje</button>
+  </div>
 
-  <h2>Ručno dodane riječi</h2>
-  {#if rucnoDodane.length === 0}
-    <p>Nema ručno dodanih riječi.</p>
-  {:else}
-    <table class="tablica">
-      <thead>
-        <tr>
-          <th>Riječ</th>
-          <th>Akcija</th>
-          <th>Razlog</th>
-          <th>Vrijeme</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each rucnoDodane as izmjena (izmjena.id)}
-          <tr>
-            <td class="rijec">{izmjena.rijec}</td>
-            <td class="akcija">{izmjena.akcija}</td>
-            <td>{izmjena.razlog}</td>
-            <td class="vrijeme">{new Date(izmjena.vrijeme).toLocaleString('hr-HR')}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+  {#if tab === 'rucno'}
+    <h2>Ručno dodavanje</h2>
+    <form class="forma-rjecnik" onsubmit={dodajRijec}>
+      <label>Riječ <input type="text" bind:value={novaRijec} required disabled={akcijaUTijeku !== null} /></label>
+      <label>Vrsta
+        <select bind:value={vrstaRijeci} required disabled={akcijaUTijeku !== null}>
+          {#each VRSTE_RIJECI as vrsta (vrsta)}
+            <option value={vrsta}>{vrsta}</option>
+          {/each}
+        </select>
+      </label>
+      <label>Razlog <input type="text" bind:value={razlogRijeci} required disabled={akcijaUTijeku !== null} /></label>
+      <button type="submit" disabled={akcijaUTijeku !== null}>{akcijaUTijeku === 'dodaj' ? 'Radim…' : 'Dodaj riječ'}</button>
+    </form>
+    {#if porukaRjecnik}<p class="greska" role="alert">{porukaRjecnik}</p>{/if}
   {/if}
 
-  <h2>Test riječi</h2>
-  <div class="test-rijeci">
-    <form onsubmit={(e) => { e.preventDefault(); void testRijeci_f(); }}>
-      <input type="text" bind:value={testRijec} placeholder="Unesi riječ za testiranje..." />
-      <button type="submit">Test</button>
-    </form>
-    {#if testiranjeGreska}
-      <p class="greska">{testiranjeGreska}</p>
+  {#if tab === 'izmjene'}
+    <h2>Ručno dodane riječi</h2>
+    {#if rucnoDodane.length === 0}
+      <p>Nema ručno dodanih riječi.</p>
+    {:else}
+      <table class="tablica">
+        <thead>
+          <tr>
+            <th>Riječ</th>
+            <th>Akcija</th>
+            <th>Razlog</th>
+            <th>Vrijeme</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each rucnoDodane as izmjena (izmjena.id)}
+            <tr>
+              <td class="rijec">{izmjena.rijec}</td>
+              <td class="akcija">{izmjena.akcija}</td>
+              <td>{izmjena.razlog}</td>
+              <td class="vrijeme">{new Date(izmjena.vrijeme).toLocaleString('hr-HR')}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     {/if}
-    {#if detaljiRijeci}
-      {#if detaljiRijeci.rijec}
-        <div class="rezultati">
-          <h3>{detaljiRijeci.rijec.rijec}</h3>
-          <p>Prva dva: <strong>{detaljiRijeci.rijec.prvaDva}</strong></p>
-          <p>Zadnja dva: <strong>{detaljiRijeci.rijec.zadnjaDva}</strong></p>
-          <p>Status: <strong>{detaljiRijeci.rijec.aktivna ? 'Aktivna' : 'Deaktivna'}</strong></p>
-          <div class="akcije-rijeci">
-            {#if detaljiRijeci.rijec.aktivna}
-              <button type="button" disabled={akcijaUTijeku !== null} onclick={() => void deaktivirajTrenutnu()}>
-                {akcijaUTijeku === 'deaktiviraj' ? 'Radim…' : 'Deaktiviraj'}
-              </button>
-            {:else}
-              <button type="button" disabled={akcijaUTijeku !== null} onclick={() => void vratiTrenutnu()}>
-                {akcijaUTijeku === 'vrati' ? 'Radim…' : 'Vrati u igru'}
-              </button>
+  {/if}
+
+  {#if tab === 'test'}
+    <h2>Test riječi</h2>
+    <div class="test-rijeci">
+      <form onsubmit={(e) => { e.preventDefault(); void testRijeci_f(); }}>
+        <input type="text" bind:value={testRijec} placeholder="Unesi riječ za testiranje..." />
+        <button type="submit">Test</button>
+      </form>
+      {#if testiranjeGreska}
+        <p class="greska">{testiranjeGreska}</p>
+      {/if}
+      {#if porukaRjecnik}<p class="greska" role="alert">{porukaRjecnik}</p>{/if}
+      {#if detaljiRijeci}
+        {#if detaljiRijeci.rijec}
+          <div class="rezultati">
+            <h3>{detaljiRijeci.rijec.rijec}</h3>
+            <p>Prva dva: <strong>{detaljiRijeci.rijec.prvaDva}</strong></p>
+            <p>Zadnja dva: <strong>{detaljiRijeci.rijec.zadnjaDva}</strong></p>
+            <p>Status: <strong>{detaljiRijeci.rijec.aktivna ? 'Aktivna' : 'Deaktivna'}</strong></p>
+            <div class="akcije-rijeci">
+              {#if detaljiRijeci.rijec.aktivna}
+                <button type="button" disabled={akcijaUTijeku !== null} onclick={() => void deaktivirajTrenutnu()}>
+                  {akcijaUTijeku === 'deaktiviraj' ? 'Radim…' : 'Deaktiviraj'}
+                </button>
+              {:else}
+                <button type="button" disabled={akcijaUTijeku !== null} onclick={() => void vratiTrenutnu()}>
+                  {akcijaUTijeku === 'vrati' ? 'Radim…' : 'Vrati u igru'}
+                </button>
+              {/if}
+            </div>
+            {#if detaljiRijeci.nastavci.length > 0}
+              <h4>Mogući nastavci ({detaljiRijeci.nastavci.length})</h4>
+              <p class="lista">{detaljiRijeci.nastavci.map((r) => r.rijec).join(', ')}</p>
+            {/if}
+            {#if detaljiRijeci.prethodnici.length > 0}
+              <h4>Mogući prethodnici ({detaljiRijeci.prethodnici.length})</h4>
+              <p class="lista">{detaljiRijeci.prethodnici.map((r) => r.rijec).join(', ')}</p>
+            {/if}
+            {#if detaljiRijeci.izmjene.length > 0}
+              <h4>Povijest izmjena</h4>
+              <ul class="izmjene">
+                {#each detaljiRijeci.izmjene as izmjena (izmjena.id)}
+                  <li>{izmjena.akcija}: {izmjena.razlog} ({new Date(izmjena.vrijeme).toLocaleString('hr-HR')})</li>
+                {/each}
+              </ul>
             {/if}
           </div>
-          {#if detaljiRijeci.nastavci.length > 0}
-            <h4>Mogući nastavci ({detaljiRijeci.nastavci.length})</h4>
-            <p class="lista">{detaljiRijeci.nastavci.map((r) => r.rijec).join(', ')}</p>
-          {/if}
-          {#if detaljiRijeci.prethodnici.length > 0}
-            <h4>Mogući prethodnici ({detaljiRijeci.prethodnici.length})</h4>
-            <p class="lista">{detaljiRijeci.prethodnici.map((r) => r.rijec).join(', ')}</p>
-          {/if}
-          {#if detaljiRijeci.izmjene.length > 0}
-            <h4>Povijest izmjena</h4>
-            <ul class="izmjene">
-              {#each detaljiRijeci.izmjene as izmjena (izmjena.id)}
-                <li>{izmjena.akcija}: {izmjena.razlog} ({new Date(izmjena.vrijeme).toLocaleString('hr-HR')})</li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      {:else}
-        <p class="info">Riječ nije pronađena u bazi.</p>
+        {:else}
+          <p class="info">Riječ nije pronađena u bazi.</p>
+        {/if}
       {/if}
+    </div>
+  {/if}
+
+  {#if tab === 'ciscenje'}
+    <h2>Automatsko čišćenje</h2>
+    <p class="opis-ciscenja">
+      Aktivne riječi koje sadrže znakove izvan hrvatske abecede (uključujući q/w/x/y).
+      Potvrda ih soft-deaktivira; više nisu igrive.
+    </p>
+    {#if ciscenjeGreska}
+      <p class="greska" role="alert">{ciscenjeGreska}</p>
     {/if}
-  </div>
+    {#if ciscenjeUcitavanje}
+      <p>Učitavam kandidate…</p>
+    {:else if nstandardneUkupno === 0}
+      <p class="info">Nema aktivnih nstandardnih riječi.</p>
+    {:else}
+      <p><strong>{nstandardneUkupno}</strong> aktivnih kandidata</p>
+      <button
+        type="button"
+        class="gumb-ciscenje"
+        disabled={akcijaUTijeku !== null}
+        onclick={() => void potvrdiCiscenje()}
+      >
+        {akcijaUTijeku === 'ciscenje' ? 'Radim…' : 'Deaktiviraj sve'}
+      </button>
+      <table class="tablica">
+        <thead>
+          <tr>
+            <th>Riječ</th>
+            <th>Frekvencija</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each nstandardne as stavka (stavka.rijec)}
+            <tr>
+              <td class="rijec">{stavka.rijec}</td>
+              <td>{stavka.frekvencija}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  {/if}
 {/if}
 
 <style>
+  .tabovi {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 20px;
+  }
+
+  .tabovi button {
+    padding: 8px 14px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f5f5f5;
+    cursor: pointer;
+  }
+
+  .tabovi button.odabran {
+    background: #0066cc;
+    border-color: #0066cc;
+    color: white;
+  }
+
   .tablica {
     width: 100%;
     border-collapse: collapse;
@@ -362,5 +490,25 @@
     display: flex;
     gap: 8px;
     margin: 10px 0;
+  }
+
+  .opis-ciscenja {
+    color: #555;
+    max-width: 52rem;
+  }
+
+  .gumb-ciscenje {
+    padding: 8px 16px;
+    background: #b33;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 8px 0;
+  }
+
+  .gumb-ciscenje:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 </style>

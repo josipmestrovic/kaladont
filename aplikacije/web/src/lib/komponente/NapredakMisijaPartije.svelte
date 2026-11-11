@@ -3,50 +3,80 @@
 
   let { promjene }: { promjene: PromjenaMisije[] } = $props();
 
-  const sortirane = $derived([...promjene].sort((a, b) => {
+  function sortiraj(a: PromjenaMisije, b: PromjenaMisije): number {
     if (a.upravoDovrsena !== b.upravoDovrsena) return a.upravoDovrsena ? -1 : 1;
     return a.naziv.localeCompare(b.naziv, 'hr');
-  }));
+  }
+
+  const dnevne = $derived(promjene.filter((p) => p.vrsta === 'dnevna').sort(sortiraj));
+  const tjedne = $derived(promjene.filter((p) => p.vrsta === 'tjedna').sort(sortiraj));
 </script>
 
-{#if sortirane.length > 0}
+{#snippet stavka(promjena: PromjenaMisije)}
+  <li>
+    {#if promjena.upravoDovrsena}
+      <p class="zavrsena">
+        <strong>Misija završena!</strong>
+        <span>{promjena.naziv}</span>
+      </p>
+      {#if promjena.opis}
+        <p class="opis">{promjena.opis}</p>
+      {/if}
+      {#if promjena.xpStvarnoDodijeljeno > 0}
+        <p class="xp">Dodijeljeno +{promjena.xpStvarnoDodijeljeno} XP</p>
+      {:else if promjena.xpNominalno > 0}
+        <p class="xp">Na najvećoj si razini; dodijeljeno 0 XP.</p>
+      {/if}
+    {:else}
+      <p>
+        <span class="sr-only">Napredak misije: </span>
+        {promjena.opisNapretka}
+      </p>
+      {#if promjena.opis}
+        <p class="opis">{promjena.opis}</p>
+      {/if}
+      <div
+        class="traka"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={promjena.cilj}
+        aria-valuenow={promjena.poslije}
+        aria-label={`${promjena.naziv}: ${promjena.poslije} od ${promjena.cilj}`}
+      >
+        <span style={`width: ${promjena.cilj <= 0 ? 100 : Math.min(100, (promjena.poslije / promjena.cilj) * 100)}%`}></span>
+      </div>
+    {/if}
+  </li>
+{/snippet}
+
+{#if dnevne.length > 0 || tjedne.length > 0}
   <section class="napredak-misija" aria-labelledby="napredak-misija-naslov">
     <header class="zaglavlje">
       <h3 id="napredak-misija-naslov">Misije</h3>
       <a href="/misije" class="sve-misije">Sve misije</a>
     </header>
-    <ul>
-      {#each sortirane as promjena (promjena.dodjelaId)}
-        <li>
-          {#if promjena.upravoDovrsena}
-            <p class="zavrsena">
-              <strong>Misija završena!</strong>
-              <span>{promjena.naziv}</span>
-            </p>
-            {#if promjena.xpStvarnoDodijeljeno > 0}
-              <p class="xp">Dodijeljeno +{promjena.xpStvarnoDodijeljeno} XP</p>
-            {:else if promjena.xpNominalno > 0}
-              <p class="xp">Na najvećoj si razini; dodijeljeno 0 XP.</p>
-            {/if}
-          {:else}
-            <p>
-              <span class="sr-only">Napredak misije: </span>
-              {promjena.opisNapretka}
-            </p>
-            <div
-              class="traka"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={promjena.cilj}
-              aria-valuenow={promjena.poslije}
-              aria-label={`${promjena.naziv}: ${promjena.poslije} od ${promjena.cilj}`}
-            >
-              <span style={`width: ${promjena.cilj <= 0 ? 100 : Math.min(100, (promjena.poslije / promjena.cilj) * 100)}%`}></span>
-            </div>
-          {/if}
-        </li>
-      {/each}
-    </ul>
+
+    {#if dnevne.length > 0}
+      <section class="skupina" aria-labelledby="napredak-dnevne-naslov">
+        <h4 id="napredak-dnevne-naslov">Dnevne</h4>
+        <ul>
+          {#each dnevne as promjena (promjena.dodjelaId)}
+            {@render stavka(promjena)}
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
+    {#if tjedne.length > 0}
+      <section class="skupina" aria-labelledby="napredak-tjedne-naslov">
+        <h4 id="napredak-tjedne-naslov">Tjedne</h4>
+        <ul>
+          {#each tjedne as promjena (promjena.dodjelaId)}
+            {@render stavka(promjena)}
+          {/each}
+        </ul>
+      </section>
+    {/if}
   </section>
 {/if}
 
@@ -74,6 +104,20 @@
     font-weight: 700;
     text-decoration: underline;
   }
+  .skupina {
+    display: grid;
+    gap: 10px;
+  }
+  .skupina + .skupina {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--boja-obrub);
+  }
+  h4 {
+    margin: 0;
+    color: var(--boja-tekst);
+    font-size: 1rem;
+  }
   ul {
     display: grid;
     gap: 10px;
@@ -89,6 +133,11 @@
     color: var(--boja-tekst);
     display: grid;
     gap: 2px;
+  }
+  .opis {
+    margin-top: 2px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni, 0.9rem);
   }
   .xp {
     margin-top: 4px;
