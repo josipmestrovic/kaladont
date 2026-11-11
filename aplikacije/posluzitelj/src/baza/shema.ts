@@ -541,6 +541,13 @@ export const izmjeneRjecnika = pgTable('izmjene_rjecnika', {
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Odobreni skup sigurnih početnih riječi (admin CRUD; seed iz POCETNI_SEED_SIGURNIH_RIJECI). */
+export const sigurnePocetneRijeci = pgTable('sigurne_pocetne_rijeci', {
+  rijec: text('rijec').primaryKey(),
+  dodanaU: timestamp('dodana_u', { withTimezone: true }).notNull().defaultNow(),
+  dodaoAdminId: uuid('dodao_admin_id').references(() => igraci.id),
+});
+
 /** Osobno stanje sustava misija; zaključava se pri dotoku/zamjeni/obračunu. */
 export const stanjeMisijaIgraca = pgTable('stanje_misija_igraca', {
   igracId: uuid('igrac_id').primaryKey().references(() => igraci.id, { onDelete: 'cascade' }),
@@ -870,13 +877,14 @@ export const izvorPocetneAnalitike = pgEnum('izvor_pocetne_analitike', [
 export const statusOtvaranjaAnalitike = pgEnum('status_otvaranja_analitike', [
   'otvoren',
   'dva_odgovora_ok',
+  'tri_odgovora_ok',
   'rani_incident',
   'zatvoren_drugim',
   'nepotpuno',
 ]);
 export const upravljacAnalitike = pgEnum('upravljac_analitike', ['covjek', 'bot']);
 
-/** Prozor prva dva odgovora nakon sustavske početne riječi (minimalna analitika). */
+/** Prozor prva tri odgovora nakon sustavske početne riječi (minimalna analitika). */
 export const analitikaOtvaranja = pgTable('analitika_otvaranja', {
   id: uuid('id').primaryKey().defaultRandom(),
   igraId: uuid('igra_id').notNull(),
@@ -889,6 +897,7 @@ export const analitikaOtvaranja = pgTable('analitika_otvaranja', {
   brojOdgovora: smallint('broj_odgovora').notNull().default(0),
   odgovor1: text('odgovor_1'),
   odgovor2: text('odgovor_2'),
+  odgovor3: text('odgovor_3'),
   status: statusOtvaranjaAnalitike('status').notNull().default('otvoren'),
   incidentPozicija: smallint('incident_pozicija'),
   incidentRijecUzrok: text('incident_rijec_uzrok'),
@@ -902,10 +911,10 @@ export const analitikaOtvaranja = pgTable('analitika_otvaranja', {
   uniqueIndex('uq_analitika_otvaranja_igra_redni').on(tablica.igraId, tablica.redniBrojOtvaranja),
   index('idx_analitika_otvaranja_dodijeljeno').on(tablica.dodijeljenoU, tablica.kontekst),
   index('idx_analitika_otvaranja_status').on(tablica.status, tablica.dodijeljenoU),
-  check('chk_analitika_otvaranja_broj_odgovora', sql`${tablica.brojOdgovora} >= 0 and ${tablica.brojOdgovora} <= 2`),
+  check('chk_analitika_otvaranja_broj_odgovora', sql`${tablica.brojOdgovora} >= 0 and ${tablica.brojOdgovora} <= 3`),
   check(
     'chk_analitika_otvaranja_incident_pozicija',
-    sql`${tablica.incidentPozicija} is null or ${tablica.incidentPozicija} in (1, 2)`,
+    sql`${tablica.incidentPozicija} is null or ${tablica.incidentPozicija} in (1, 2, 3)`,
   ),
 ]);
 

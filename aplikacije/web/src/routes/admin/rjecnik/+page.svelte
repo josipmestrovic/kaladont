@@ -1,5 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import {
+    grafemi,
+    iskustvoZaDuljinu,
+    iskustvoZaRijetkost,
+    nazivOznakeDuljine,
+    nazivOznakeRijetkosti,
+    tierDuljineIskustva,
+    tierRijetkostiIskustva,
+  } from 'zajednicko';
   import { api } from '$lib/api.js';
   import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
 
@@ -19,6 +28,10 @@
       prvaDva: string;
       zadnjaDva: string;
       aktivna: boolean;
+      frekvencija: number;
+      vrste: string[];
+      grupe: string[];
+      napomena?: string | null;
     } | null;
     nastavci: Array<{ rijec: string }>;
     prethodnici: Array<{ rijec: string }>;
@@ -30,15 +43,22 @@
     frekvencija: number;
   }
 
-  type TabRjecnik = 'rucno' | 'izmjene' | 'test' | 'ciscenje';
-  type AkcijaRjecnik = 'dodaj' | 'deaktiviraj' | 'vrati' | 'ciscenje' | null;
+  interface SigurnaRijecRedak {
+    rijec: string;
+    dodanaU: string;
+    dodaoAdminId: string | null;
+  }
+
+  type TabRjecnik = 'rucno' | 'izmjene' | 'test' | 'sigurni' | 'ciscenje';
+  type AkcijaRjecnik = 'dodaj' | 'deaktiviraj' | 'vrati' | 'ciscenje' | 'sigurni' | null;
+  type TierRijetkostiRucno = 'ucestala' | 'rijetka' | 'srednje_rijetka' | 'jako_rijetka';
 
   let tab = $state<TabRjecnik>('rucno');
   let rucnoDodane = $state<IzmjenaRjecnika[]>([]);
   let greska = $state<string | null>(null);
   let novaRijec = $state('');
-  let razlogRijeci = $state('');
   let vrstaRijeci = $state('imenica');
+  let tierRijetkosti = $state<TierRijetkostiRucno>('ucestala');
   let porukaRjecnik = $state<string | null>(null);
   let testRijec = $state('');
   let detaljiRijeci = $state<DetaljiRijeci | null>(null);
@@ -48,11 +68,46 @@
   let nstandardneUkupno = $state(0);
   let ciscenjeGreska = $state<string | null>(null);
   let ciscenjeUcitavanje = $state(false);
+  let sigurne = $state<SigurnaRijecRedak[]>([]);
+  let sigurneUkupno = $state(0);
+  let novaSigurna = $state('');
+  let sigurneGreska = $state<string | null>(null);
+  let sigurneUcitavanje = $state(false);
 
   const VRSTE_RIJECI = [
     'imenica', 'glagol', 'pridjev', 'prilog', 'zamjenica', 'broj',
     'prijedlog', 'veznik', 'cestica', 'uzvik', 'vlastito_ime',
   ] as const;
+
+  const TIERI_RIJETKOSTI: { vrijednost: TierRijetkostiRucno; oznaka: string }[] = [
+    { vrijednost: 'ucestala', oznaka: 'Učestala / obična (0 EXP)' },
+    { vrijednost: 'rijetka', oznaka: 'Rijetka (15 EXP)' },
+    { vrijednost: 'srednje_rijetka', oznaka: 'Srednje rijetka (30 EXP)' },
+    { vrijednost: 'jako_rijetka', oznaka: 'Jako rijetka (50 EXP)' },
+  ];
+
+  function oznakaVrste(vrsta: string): string {
+    return vrsta === 'vlastito_ime' ? 'vlastito ime' : vrsta.replaceAll('_', ' ');
+  }
+
+  function metaRijetkosti(rijec: string, frekvencija: number) {
+    const broj = grafemi(rijec).length;
+    const tier = tierRijetkostiIskustva(frekvencija, broj);
+    return {
+      tier,
+      naziv: nazivOznakeRijetkosti(tier) ?? 'Učestala / obična',
+      exp: iskustvoZaRijetkost(tier),
+    };
+  }
+
+  function metaDuljine(rijec: string) {
+    const tier = tierDuljineIskustva(rijec);
+    return {
+      tier,
+      naziv: nazivOznakeDuljine(tier) ?? 'Obična duljina',
+      exp: iskustvoZaDuljinu(tier),
+    };
+  }
 
   async function ucitaj() {
     try {
@@ -80,10 +135,27 @@
     }
   }
 
+  async function ucitajSigurniSkup() {
+    sigurneUcitavanje = true;
+    sigurneGreska = null;
+    try {
+      const odgovor = await api<{ ukupno: number; rijeci: SigurnaRijecRedak[] }>(
+        '/admin/rjecnik/sigurni-skup',
+      );
+      sigurneUkupno = odgovor.ukupno;
+      sigurne = odgovor.rijeci;
+    } catch (e) {
+      sigurneGreska = e instanceof Error ? e.message : 'Sigurni skup se ne može učitati.';
+    } finally {
+      sigurneUcitavanje = false;
+    }
+  }
+
   function odaberiTab(novi: TabRjecnik) {
     tab = novi;
     if (novi === 'ciscenje') void ucitajCiscenje();
     if (novi === 'izmjene') void ucitaj();
+    if (novi === 'sigurni') void ucitajSigurniSkup();
   }
 
   onMount(() => {
@@ -96,22 +168,58 @@
     akcijaUTijeku = 'dodaj';
     porukaRjecnik = null;
     const rijec = novaRijec;
-    const razlog = razlogRijeci;
     const vrsta = vrstaRijeci;
+    const tier = tierRijetkosti;
     pokaziUspjeh(`Riječ „${rijec}” dodana.`);
     novaRijec = '';
-    razlogRijeci = '';
     try {
       await api('/admin/rjecnik/dodaj', {
         method: 'POST',
-        body: JSON.stringify({ rijec, razlog, vrsta }),
+        body: JSON.stringify({ rijec, vrsta, tierRijetkosti: tier }),
       });
       void ucitaj();
     } catch (err) {
       novaRijec = rijec;
-      razlogRijeci = razlog;
       vrstaRijeci = vrsta;
+      tierRijetkosti = tier;
       porukaRjecnik = err instanceof Error ? err.message : 'Neuspjelo dodavanje riječi.';
+    } finally {
+      akcijaUTijeku = null;
+    }
+  }
+
+  async function dodajSigurnu(e: SubmitEvent) {
+    e.preventDefault();
+    if (akcijaUTijeku !== null || !novaSigurna.trim()) return;
+    akcijaUTijeku = 'sigurni';
+    sigurneGreska = null;
+    const rijec = novaSigurna;
+    try {
+      await api('/admin/rjecnik/sigurni-skup', {
+        method: 'POST',
+        body: JSON.stringify({ rijec }),
+      });
+      pokaziUspjeh(`„${rijec}” dodana u sigurni skup.`);
+      novaSigurna = '';
+      await ucitajSigurniSkup();
+    } catch (err) {
+      sigurneGreska = err instanceof Error ? err.message : 'Dodavanje u sigurni skup nije uspjelo.';
+    } finally {
+      akcijaUTijeku = null;
+    }
+  }
+
+  async function izbaciSigurnu(rijec: string) {
+    if (akcijaUTijeku !== null) return;
+    if (!confirm(`Izbaciti „${rijec}” iz sigurnog skupa?`)) return;
+    akcijaUTijeku = 'sigurni';
+    sigurneGreska = null;
+    try {
+      await api(`/admin/rjecnik/sigurni-skup/${encodeURIComponent(rijec)}`, { method: 'DELETE' });
+      pokaziUspjeh(`„${rijec}” izbačena iz sigurnog skupa.`);
+      await ucitajSigurniSkup();
+    } catch (err) {
+      sigurneGreska = err instanceof Error ? err.message : 'Izbacivanje nije uspjelo.';
     } finally {
       akcijaUTijeku = null;
     }
@@ -206,6 +314,7 @@
     <button type="button" role="tab" aria-selected={tab === 'rucno'} class:odabran={tab === 'rucno'} onclick={() => odaberiTab('rucno')}>Ručno</button>
     <button type="button" role="tab" aria-selected={tab === 'izmjene'} class:odabran={tab === 'izmjene'} onclick={() => odaberiTab('izmjene')}>Izmjene</button>
     <button type="button" role="tab" aria-selected={tab === 'test'} class:odabran={tab === 'test'} onclick={() => odaberiTab('test')}>Test</button>
+    <button type="button" role="tab" aria-selected={tab === 'sigurni'} class:odabran={tab === 'sigurni'} onclick={() => odaberiTab('sigurni')}>Sigurni skup</button>
     <button type="button" role="tab" aria-selected={tab === 'ciscenje'} class:odabran={tab === 'ciscenje'} onclick={() => odaberiTab('ciscenje')}>Čišćenje</button>
   </div>
 
@@ -216,11 +325,17 @@
       <label>Vrsta
         <select bind:value={vrstaRijeci} required disabled={akcijaUTijeku !== null}>
           {#each VRSTE_RIJECI as vrsta (vrsta)}
-            <option value={vrsta}>{vrsta}</option>
+            <option value={vrsta}>{oznakaVrste(vrsta)}</option>
           {/each}
         </select>
       </label>
-      <label>Razlog <input type="text" bind:value={razlogRijeci} required disabled={akcijaUTijeku !== null} /></label>
+      <label>Rijetkost
+        <select bind:value={tierRijetkosti} required disabled={akcijaUTijeku !== null}>
+          {#each TIERI_RIJETKOSTI as tier (tier.vrijednost)}
+            <option value={tier.vrijednost}>{tier.oznaka}</option>
+          {/each}
+        </select>
+      </label>
       <button type="submit" disabled={akcijaUTijeku !== null}>{akcijaUTijeku === 'dodaj' ? 'Radim…' : 'Dodaj riječ'}</button>
     </form>
     {#if porukaRjecnik}<p class="greska" role="alert">{porukaRjecnik}</p>{/if}
@@ -267,11 +382,18 @@
       {#if porukaRjecnik}<p class="greska" role="alert">{porukaRjecnik}</p>{/if}
       {#if detaljiRijeci}
         {#if detaljiRijeci.rijec}
+          {@const rijetkost = metaRijetkosti(detaljiRijeci.rijec.rijec, detaljiRijeci.rijec.frekvencija)}
+          {@const duljina = metaDuljine(detaljiRijeci.rijec.rijec)}
           <div class="rezultati">
             <h3>{detaljiRijeci.rijec.rijec}</h3>
             <p>Prva dva: <strong>{detaljiRijeci.rijec.prvaDva}</strong></p>
             <p>Zadnja dva: <strong>{detaljiRijeci.rijec.zadnjaDva}</strong></p>
             <p>Status: <strong>{detaljiRijeci.rijec.aktivna ? 'Aktivna' : 'Deaktivna'}</strong></p>
+            <p>Frekvencija: <strong>{detaljiRijeci.rijec.frekvencija}</strong></p>
+            <p>Rijetkost: <strong>{rijetkost.naziv}</strong> ({rijetkost.exp} EXP)</p>
+            <p>Duljina: <strong>{duljina.naziv}</strong> ({duljina.exp} EXP)</p>
+            <p>Vrste: <strong>{detaljiRijeci.rijec.vrste.map(oznakaVrste).join(', ') || '—'}</strong></p>
+            <p>Grupe: <strong>{detaljiRijeci.rijec.grupe.join(', ') || '—'}</strong></p>
             <div class="akcije-rijeci">
               {#if detaljiRijeci.rijec.aktivna}
                 <button type="button" disabled={akcijaUTijeku !== null} onclick={() => void deaktivirajTrenutnu()}>
@@ -305,6 +427,50 @@
         {/if}
       {/if}
     </div>
+  {/if}
+
+  {#if tab === 'sigurni'}
+    <h2>Sigurni skup</h2>
+    <p class="opis-ciscenja">
+      Odobrene početne riječi za otvaranje runde. Odabir i dalje radi 2-ply provjeru u trenutku partije
+      (nastavak + nastavak svakog odgovora).
+    </p>
+    <form class="forma-rjecnik" onsubmit={dodajSigurnu}>
+      <label>Riječ <input type="text" bind:value={novaSigurna} required disabled={akcijaUTijeku !== null} /></label>
+      <button type="submit" disabled={akcijaUTijeku !== null}>{akcijaUTijeku === 'sigurni' ? 'Radim…' : 'Dodaj u skup'}</button>
+    </form>
+    {#if sigurneGreska}<p class="greska" role="alert">{sigurneGreska}</p>{/if}
+    {#if sigurneUcitavanje}
+      <p>Učitavam skup…</p>
+    {:else}
+      <p><strong>{sigurneUkupno}</strong> riječi u skupu</p>
+      {#if sigurne.length === 0}
+        <p class="info">Skup je prazan.</p>
+      {:else}
+        <table class="tablica">
+          <thead>
+            <tr>
+              <th>Riječ</th>
+              <th>Dodana</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each sigurne as stavka (stavka.rijec)}
+              <tr>
+                <td class="rijec">{stavka.rijec}</td>
+                <td class="vrijeme">{new Date(stavka.dodanaU).toLocaleString('hr-HR')}</td>
+                <td>
+                  <button type="button" disabled={akcijaUTijeku !== null} onclick={() => void izbaciSigurnu(stavka.rijec)}>
+                    Izbaci
+                  </button>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+    {/if}
   {/if}
 
   {#if tab === 'ciscenje'}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
+  import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
 
   interface AgregatPocetnih {
     od: string;
@@ -16,7 +17,10 @@
     udioRanihIncidenata: number | null;
     incidentiNa1: number;
     incidentiNa2: number;
+    incidentiNa3: number;
     dvaOdgovoraOk: number;
+    triOdgovoraOk: number;
+    prozorOk: number;
     nepotpuna: number;
     zatvorenaDrugim: number;
   }
@@ -31,6 +35,7 @@
     izvor: string;
     odgovor1: string | null;
     odgovor2: string | null;
+    odgovor3: string | null;
     incidentPozicija: number | null;
     incidentRijecUzrok: string | null;
     incidentRazlog: string | null;
@@ -70,10 +75,37 @@
   let greska = $state<string | null>(null);
   let odabraniId = $state<string | null>(null);
   let detalj = $state<Record<string, unknown> | null>(null);
+  let uklanjanjeUTijeku = $state<string | null>(null);
 
   function postotak(vrijednost: number | null): string {
     if (vrijednost === null) return '—';
     return `${vrijednost.toFixed(1)} %`;
+  }
+
+  function lanacIncidente(incident: IncidentRedak): string {
+    const dijelovi = [incident.sustavskaRijec ?? '—', incident.odgovor1 ?? '—'];
+    if (incident.odgovor2) dijelovi.push(incident.odgovor2);
+    if (incident.odgovor3) dijelovi.push(incident.odgovor3);
+    return dijelovi.join(' → ');
+  }
+
+  async function izbaciIzSigurnogSkupa(rijec: string | null) {
+    if (!rijec || uklanjanjeUTijeku) return;
+    if (!confirm(`Izbaciti „${rijec}” iz sigurnog skupa?`)) return;
+    uklanjanjeUTijeku = rijec;
+    greska = null;
+    try {
+      const odgovor = await api<{ ok: boolean; promjena: string; rijec: string }>(
+        `/admin/rjecnik/sigurni-skup/${encodeURIComponent(rijec)}`,
+        { method: 'DELETE' },
+      );
+      if (odgovor.promjena === 'uklonjena') pokaziUspjeh(`„${rijec}” izbačena iz sigurnog skupa.`);
+      else pokaziUspjeh(`„${rijec}” nije bila u sigurnom skupu.`);
+    } catch (e) {
+      greska = e instanceof Error ? e.message : 'Izbacivanje iz sigurnog skupa nije uspjelo.';
+    } finally {
+      uklanjanjeUTijeku = null;
+    }
   }
 
   function query(): string {
@@ -206,8 +238,8 @@
       <div><dt>Dodijeljene početne</dt><dd>{agregat.dodijeljene}</dd></div>
       <div><dt>Rezervni odabir</dt><dd>{agregat.rezervni} ({postotak(agregat.udioRezervnog)})</dd></div>
       <div><dt>Rani incidenti</dt><dd>{agregat.raniIncidenti} ({postotak(agregat.udioRanihIncidenata)})</dd></div>
-      <div><dt>Incidenti na 1 / 2</dt><dd>{agregat.incidentiNa1} / {agregat.incidentiNa2}</dd></div>
-      <div><dt>Dva odgovora OK</dt><dd>{agregat.dvaOdgovoraOk}</dd></div>
+      <div><dt>Incidenti na 1 / 2 / 3</dt><dd>{agregat.incidentiNa1} / {agregat.incidentiNa2} / {agregat.incidentiNa3}</dd></div>
+      <div><dt>3 odgovora OK</dt><dd>{agregat.prozorOk} <span class="meta">(3: {agregat.triOdgovoraOk}, legacy 2: {agregat.dvaOdgovoraOk})</span></dd></div>
       <div><dt>Nepotpuna / drugim</dt><dd>{agregat.nepotpuna} / {agregat.zatvorenaDrugim}</dd></div>
       <div><dt>Nema kandidata</dt><dd>{agregat.nemaKandidata}</dd></div>
     </dl>
@@ -236,14 +268,21 @@
           <tr>
             <td>{new Date(incident.dodijeljenoU).toLocaleString('hr-HR')}</td>
             <td>{incident.kontekst}</td>
-            <td>
-              {incident.sustavskaRijec ?? '—'}
-              → {incident.odgovor1 ?? '—'}
-              {#if incident.odgovor2}→ {incident.odgovor2}{/if}
-            </td>
+            <td>{lanacIncidente(incident)}</td>
             <td>{incident.incidentPozicija ?? '—'}</td>
             <td>{incident.izvor}</td>
-            <td><button type="button" onclick={() => void otvoriDetalj(incident.id)}>Detalj</button></td>
+            <td class="akcije-inc">
+              <button type="button" onclick={() => void otvoriDetalj(incident.id)}>Detalj</button>
+              {#if incident.sustavskaRijec}
+                <button
+                  type="button"
+                  disabled={uklanjanjeUTijeku === incident.sustavskaRijec}
+                  onclick={() => void izbaciIzSigurnogSkupa(incident.sustavskaRijec)}
+                >
+                  {uklanjanjeUTijeku === incident.sustavskaRijec ? 'Radim…' : 'Izbaci iz sigurnog skupa'}
+                </button>
+              {/if}
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -275,5 +314,6 @@
   table { width: 100%; border-collapse: collapse; margin-top: 12px; }
   th, td { border-bottom: 1px solid #ddd; text-align: left; padding: 8px; vertical-align: top; }
   .stranicenje { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
+  .akcije-inc { display: flex; flex-wrap: wrap; gap: 8px; }
   pre { background: #f6f6f6; padding: 12px; overflow: auto; }
 </style>

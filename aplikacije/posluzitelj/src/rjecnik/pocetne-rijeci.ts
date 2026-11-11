@@ -1,6 +1,7 @@
 import { zadnjaDva, type VrstaRijeci } from 'zajednicko';
 
-export const SKUP_SIGURNIH_RIJECI = [
+/** Početni seed odobrenog skupa (migracija + testovi). Runtime izvor je tablica `sigurne_pocetne_rijeci`. */
+export const POCETNI_SEED_SIGURNIH_RIJECI = [
   'šećer',
   'biser',
   'bager',
@@ -55,6 +56,9 @@ export const SKUP_SIGURNIH_RIJECI = [
   'noću',
 ] as const;
 
+/** @deprecated Koristi `POCETNI_SEED_SIGURNIH_RIJECI` ili runtime listu iz baze. */
+export const SKUP_SIGURNIH_RIJECI = POCETNI_SEED_SIGURNIH_RIJECI;
+
 interface OpcijeSigurnogOdabira {
   iskoristeneGrupe: ReadonlySet<string>;
   dopusteneVrste?: ReadonlySet<VrstaRijeci>;
@@ -63,6 +67,8 @@ interface OpcijeSigurnogOdabira {
   rijeciNa(prefiks: string): readonly string[];
   jeIgriva(rijec: string, iskoristeneGrupe: ReadonlySet<string>, dopusteneVrste?: ReadonlySet<VrstaRijeci>): boolean;
   nasumicniPomak?: number;
+  /** Runtime kandidati; default seed (za unit testove bez baze). */
+  kandidati?: readonly string[];
 }
 
 function dodajGrupe(iskoristeneGrupe: ReadonlySet<string>, grupe: readonly string[]): Set<string> {
@@ -72,11 +78,13 @@ function dodajGrupe(iskoristeneGrupe: ReadonlySet<string>, grupe: readonly strin
 }
 
 export function odaberiSigurnuPocetnuRijec(opcije: OpcijeSigurnogOdabira): string | null {
-  const brojKandidata = SKUP_SIGURNIH_RIJECI.length;
+  const kandidati = opcije.kandidati ?? POCETNI_SEED_SIGURNIH_RIJECI;
+  const brojKandidata = kandidati.length;
+  if (brojKandidata === 0) return null;
   const pomak = opcije.nasumicniPomak ?? Math.floor(Math.random() * brojKandidata);
 
   for (let indeks = 0; indeks < brojKandidata; indeks += 1) {
-    const kandidat = SKUP_SIGURNIH_RIJECI[(pomak + indeks) % brojKandidata]!;
+    const kandidat = kandidati[(pomak + indeks) % brojKandidata]!;
     if (!opcije.jeIgriva(kandidat, opcije.iskoristeneGrupe, opcije.dopusteneVrste)) continue;
 
     const nakonKandidata = dodajGrupe(opcije.iskoristeneGrupe, opcije.grupeZa(kandidat));

@@ -1,5 +1,5 @@
 /**
- * Trajni zapisi prozora prva dva odgovora nakon sustavske početne riječi.
+ * Trajni zapisi prozora prva tri odgovora nakon sustavske početne riječi.
  * Upisi su asinkroni i ne smiju blokirati hot-path igre.
  */
 import { and, desc, eq, gte, lt, sql, type SQL } from 'drizzle-orm';
@@ -14,6 +14,7 @@ export type IzvorOtvaranjaAnalitike = 'sigurni_skup' | 'rezervni_odabir' | 'nema
 export type StatusOtvaranjaAnalitike =
   | 'otvoren'
   | 'dva_odgovora_ok'
+  | 'tri_odgovora_ok'
   | 'rani_incident'
   | 'zatvoren_drugim'
   | 'nepotpuno';
@@ -31,8 +32,9 @@ export interface ZapisOtvaranjaAnalitike {
   brojOdgovora?: number;
   odgovor1?: string | null;
   odgovor2?: string | null;
+  odgovor3?: string | null;
   status?: StatusOtvaranjaAnalitike;
-  incidentPozicija?: 1 | 2 | null;
+  incidentPozicija?: 1 | 2 | 3 | null;
   incidentRijecUzrok?: string | null;
   incidentRazlog?: string | null;
   incidentAutorUpravljac?: UpravljacOtvaranjaAnalitike | null;
@@ -58,6 +60,7 @@ export async function upsertOtvaranjaAnalitike(zapis: ZapisOtvaranjaAnalitike): 
     brojOdgovora: zapis.brojOdgovora ?? 0,
     odgovor1: zapis.odgovor1 ?? null,
     odgovor2: zapis.odgovor2 ?? null,
+    odgovor3: zapis.odgovor3 ?? null,
     status: zapis.status ?? 'otvoren',
     incidentPozicija: zapis.incidentPozicija ?? null,
     incidentRijecUzrok: zapis.incidentRijecUzrok ?? null,
@@ -84,6 +87,7 @@ export async function upsertOtvaranjaAnalitike(zapis: ZapisOtvaranjaAnalitike): 
         brojOdgovora: vrijednosti.brojOdgovora,
         odgovor1: vrijednosti.odgovor1,
         odgovor2: vrijednosti.odgovor2,
+        odgovor3: vrijednosti.odgovor3,
         status: vrijednosti.status,
         incidentPozicija: vrijednosti.incidentPozicija,
         incidentRijecUzrok: vrijednosti.incidentRijecUzrok,
@@ -128,7 +132,9 @@ export async function agregirajPocetneRijeci(filter: FilterRazdobljaAnalitike) {
       raniIncidenti: sql<number>`count(*) filter (where ${analitikaOtvaranja.status} = 'rani_incident')::int`,
       incidentiNa1: sql<number>`count(*) filter (where ${analitikaOtvaranja.status} = 'rani_incident' and ${analitikaOtvaranja.incidentPozicija} = 1)::int`,
       incidentiNa2: sql<number>`count(*) filter (where ${analitikaOtvaranja.status} = 'rani_incident' and ${analitikaOtvaranja.incidentPozicija} = 2)::int`,
+      incidentiNa3: sql<number>`count(*) filter (where ${analitikaOtvaranja.status} = 'rani_incident' and ${analitikaOtvaranja.incidentPozicija} = 3)::int`,
       dvaOdgovoraOk: sql<number>`count(*) filter (where ${analitikaOtvaranja.status} = 'dva_odgovora_ok')::int`,
+      triOdgovoraOk: sql<number>`count(*) filter (where ${analitikaOtvaranja.status} = 'tri_odgovora_ok')::int`,
       nepotpuna: sql<number>`count(*) filter (where ${analitikaOtvaranja.status} in ('otvoren', 'nepotpuno'))::int`,
       zatvorenaDrugim: sql<number>`count(*) filter (where ${analitikaOtvaranja.status} = 'zatvoren_drugim')::int`,
     })
@@ -138,6 +144,8 @@ export async function agregirajPocetneRijeci(filter: FilterRazdobljaAnalitike) {
   const dodijeljene = red?.dodijeljene ?? 0;
   const rezervni = red?.rezervni ?? 0;
   const raniIncidenti = red?.raniIncidenti ?? 0;
+  const dvaOdgovoraOk = red?.dvaOdgovoraOk ?? 0;
+  const triOdgovoraOk = red?.triOdgovoraOk ?? 0;
   return {
     dodijeljene,
     rezervni,
@@ -147,7 +155,11 @@ export async function agregirajPocetneRijeci(filter: FilterRazdobljaAnalitike) {
     udioRanihIncidenata: dodijeljene === 0 ? null : (raniIncidenti / dodijeljene) * 100,
     incidentiNa1: red?.incidentiNa1 ?? 0,
     incidentiNa2: red?.incidentiNa2 ?? 0,
-    dvaOdgovoraOk: red?.dvaOdgovoraOk ?? 0,
+    incidentiNa3: red?.incidentiNa3 ?? 0,
+    dvaOdgovoraOk,
+    triOdgovoraOk,
+    /** Uspješno zatvoreni prozori (legacy 2 + novi 3). */
+    prozorOk: dvaOdgovoraOk + triOdgovoraOk,
     nepotpuna: red?.nepotpuna ?? 0,
     zatvorenaDrugim: red?.zatvorenaDrugim ?? 0,
     vremenskaZona: ANALITIKA_VREMENSKA_ZONA,
@@ -172,6 +184,7 @@ export async function listajRaneIncidente(filter: FilterRazdobljaAnalitike & { s
       izvor: analitikaOtvaranja.izvor,
       odgovor1: analitikaOtvaranja.odgovor1,
       odgovor2: analitikaOtvaranja.odgovor2,
+      odgovor3: analitikaOtvaranja.odgovor3,
       incidentPozicija: analitikaOtvaranja.incidentPozicija,
       incidentRijecUzrok: analitikaOtvaranja.incidentRijecUzrok,
       incidentRazlog: analitikaOtvaranja.incidentRazlog,
