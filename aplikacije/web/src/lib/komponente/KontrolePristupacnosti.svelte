@@ -129,6 +129,27 @@
     font-size: var(--tekst-sitni);
   }
 
+  /* Naslovnica / neugrađeno: na mobitelu +20% radi čitljivosti prekidača. */
+  @media (max-width: 999px) {
+    .kontrole-pristupacnosti:not(.ugradeno) .naziv-kontrole {
+      font-size: calc(var(--tekst-sitni) * 1.2);
+    }
+  }
+
+  /* Uži telefoni: ~15% manje od mobilnog (+20%) da stanu uz switch. */
+  @media (max-width: 479px) {
+    .kontrole-pristupacnosti:not(.ugradeno) .naziv-kontrole {
+      font-size: calc(var(--tekst-sitni) * 1.02);
+    }
+  }
+
+  @media (max-width: 479px) {
+    .kontrole-pristupacnosti:not(.ugradeno) .kontrola-pristupacnosti {
+      gap: 4px;
+      padding-inline: 5px;
+    }
+  }
+
   @media (max-width: 420px) {
     .kontrole-pristupacnosti {
       gap: 4px;

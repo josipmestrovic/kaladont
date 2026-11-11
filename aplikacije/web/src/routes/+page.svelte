@@ -211,6 +211,7 @@
     --landing-razmak: clamp(6px, 2dvh, 28px);
     --visina-stavke: clamp(40px, 6.2dvh, 66px);
     --razmak-stavki: clamp(4px, 1dvh, 10px);
+    --razmak-pristupacnosti: clamp(10px, 1.6dvh, 20px);
     --velicina-ikone: calc(var(--visina-stavke) * 0.84);
     --font-stavke: clamp(16px, 2.7dvh, 23px);
     --velicina-naslova: clamp(48px, 9dvh, 86px);
@@ -244,19 +245,20 @@
   }
 
   .landing-tekst {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     padding-top: clamp(10px, 2dvh, 28px);
     text-align: left;
   }
 
   .demo-oznaka {
-    display: inline-block;
-    width: clamp(88px, 10vw, 128px);
+    display: block;
+    width: clamp(52px, calc(var(--velicina-naslova) * 0.9), 96px);
     height: auto;
-    margin: 0 0 4px 6px;
+    margin: 0 0 4px;
     transform: rotate(-4deg);
     object-fit: contain;
-    vertical-align: middle;
   }
 
   h1 {
@@ -297,7 +299,7 @@
 
   .navigacijski-blok {
     display: grid;
-    gap: var(--razmak-stavki);
+    gap: var(--razmak-pristupacnosti);
   }
 
   .ime-igre,
@@ -320,7 +322,7 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: var(--landing-razmak);
+      gap: max(var(--landing-razmak), var(--razmak-pristupacnosti));
     }
 
     .ime-igre,
@@ -355,6 +357,15 @@
     display: flex;
     width: min(100%, 480px);
     margin: 0 0 0 auto;
+  }
+
+  .kontrole-pristupacnosti-naslovnica :global(.naziv-kontrole) {
+    white-space: nowrap;
+  }
+
+  .kontrole-pristupacnosti-naslovnica :global(.kontrola-pristupacnosti) {
+    gap: 6px;
+    padding-inline: 8px;
   }
 
   .navigacijska-stavka {
@@ -474,22 +485,34 @@
       gap: clamp(4px, 1dvh, 10px);
     }
 
-    .kontrole-pristupacnosti-naslovnica {
-      margin-inline: auto;
+    .kontrole-pristupacnosti-naslovnica :global(.kontrola-pristupacnosti) {
+      gap: 4px;
+      padding-inline: 6px;
     }
 
     .landing {
       --landing-padding: clamp(4px, 0.8dvh, 8px);
       --landing-razmak: clamp(4px, 1.6dvh, 18px);
       --visina-stavke: clamp(34px, 5.4dvh, 56px);
-      --razmak-stavki: clamp(3px, 0.8dvh, 8px);
+      --razmak-stavki: clamp(6px, 1.2dvh, 12px);
+      --razmak-pristupacnosti: clamp(12px, 2.2dvh, 20px);
       --font-stavke: clamp(15px, 2.4dvh, 20px);
       --velicina-naslova: clamp(30px, 5.5dvh, 52px);
       --visina-kontrole: clamp(32px, 5dvh, 48px);
     }
 
     .izbornik { width: min(100%, 440px); margin: 0 auto; }
-    .landing-tekst { text-align: center; }
+    .landing-tekst {
+      width: 100%;
+      margin-inline: 0;
+      text-align: left;
+      align-items: flex-start;
+    }
+    .glavna-navigacija,
+    .kontrole-pristupacnosti-naslovnica {
+      width: 100%;
+      margin-inline: 0;
+    }
     .desktop-navigacija-red { display: block; }
     h1 { line-height: 0.95; }
     :global(html[data-font-disleksiju]) h1 { font-size: calc(var(--velicina-naslova) * 0.7); }
@@ -501,21 +524,92 @@
     .landing-footer button { padding: clamp(2px, 0.6dvh, 8px) 6px; font-size: clamp(12px, 2dvh, var(--tekst-sitni)); line-height: 1.2; }
   }
 
+  /* Ispod 430px: manji naslov + rezerviran prostor desno za sandučic/avatar. */
+  @media (max-width: 429px) {
+    .landing {
+      --velicina-naslova: clamp(26px, 4.7dvh, 44px);
+    }
+
+    .landing-tekst {
+      max-width: calc(100% - 96px);
+      padding-right: 4px;
+      box-sizing: border-box;
+    }
+  }
+
   @media (max-width: 999px) and (max-height: 700px) {
     .landing {
       --landing-razmak: 4px;
-      --razmak-stavki: 2px;
-      --visina-stavke: clamp(32px, 5dvh, 48px);
+      --razmak-stavki: clamp(4px, 0.9dvh, 8px);
+      --razmak-pristupacnosti: clamp(8px, 1.6dvh, 14px);
+      --visina-stavke: clamp(30px, 4.8dvh, 44px);
       --velicina-naslova: clamp(28px, 5dvh, 44px);
+      --landing-padding: 2px;
+    }
+
+    .landing-tekst {
+      padding-top: clamp(4px, 1dvh, 12px);
+    }
+  }
+
+  @media (max-width: 429px) and (max-height: 700px) {
+    .landing {
+      --velicina-naslova: clamp(24px, 4.3dvh, 38px);
     }
   }
 
   @media (max-width: 999px) {
     :global(html[data-font-disleksiju]) .landing {
-      --visina-stavke: clamp(32px, 5dvh, 50px);
+      --visina-stavke: clamp(30px, 4.8dvh, 46px);
       --font-stavke: clamp(14px, 2.2dvh, 18px);
-      --razmak-stavki: clamp(2px, 0.6dvh, 6px);
+      --razmak-stavki: clamp(4px, 0.9dvh, 8px);
+      --razmak-pristupacnosti: clamp(8px, 1.6dvh, 14px);
       --landing-razmak: clamp(3px, 1.2dvh, 12px);
+    }
+  }
+
+  @media (max-width: 999px) and (max-height: 700px) {
+    :global(html[data-font-disleksiju]) .landing {
+      --visina-stavke: clamp(26px, 4.1dvh, 40px);
+      --visina-kontrole: clamp(26px, 4.1dvh, 38px);
+      --razmak-stavki: clamp(2px, 0.6dvh, 5px);
+      --razmak-pristupacnosti: clamp(5px, 1dvh, 10px);
+      --landing-padding: 0px;
+      --landing-razmak: 2px;
+      --velicina-naslova: clamp(24px, 4.5dvh, 40px);
+    }
+
+    :global(html[data-font-disleksiju]) .landing-tekst {
+      padding-top: 2px;
+    }
+
+    :global(html[data-font-disleksiju]) .izbornik {
+      gap: 2px;
+    }
+  }
+
+  @media (max-width: 429px) and (max-height: 700px) {
+    :global(html[data-font-disleksiju]) .landing {
+      --visina-stavke: clamp(24px, 3.9dvh, 38px);
+      --visina-kontrole: clamp(22px, 3.6dvh, 34px);
+      --razmak-stavki: 2px;
+      --razmak-pristupacnosti: 4px;
+      --velicina-naslova: clamp(22px, 4dvh, 34px);
+    }
+
+    :global(html[data-font-disleksiju]) .kontrole-pristupacnosti-naslovnica :global(.kontrola-pristupacnosti) {
+      padding-block: 4px;
+      padding-inline: 4px;
+      min-height: var(--visina-kontrole);
+    }
+
+    :global(html[data-font-disleksiju]) .landing-footer {
+      gap: 0;
+    }
+
+    :global(html[data-font-disleksiju]) .landing-footer a,
+    :global(html[data-font-disleksiju]) .landing-footer button {
+      padding-block: 1px;
     }
   }
 
