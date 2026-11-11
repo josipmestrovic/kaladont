@@ -110,13 +110,23 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     return brojGrafema >= 15 ? 2 : brojGrafema >= 12 ? 1 : brojGrafema >= 10 ? 0 : -1;
   }
 
+  function jeKolekcijskiKljucDostupan(kljuc: string): boolean {
+    return dopustiVlastitaImena || !kljuc.startsWith('vlastito_ime:');
+  }
+
   function osvjeziIzvedeneBrojace(): void {
-    brojKolekcijskih = kolekcijskiBrojac.size;
+    // Kad su čista vlastita imena isključena iz igre, ne broje se ni u kolekcijskim ukupno
+    // (inače bi traka „Vlastita imena” i ukupnoDostupno ostali nedostižni).
+    brojKolekcijskih = [...kolekcijskiBrojac.keys()].filter(jeKolekcijskiKljucDostupan).length;
     kolekcijskihPoVrsti = new Map(
-      [...kolekcijskiBrojacPoVrsti.entries()].map(([vrsta, mapa]) => [vrsta, mapa.size]),
+      [...kolekcijskiBrojacPoVrsti.entries()]
+        .filter(([vrsta]) => dopustiVlastitaImena || vrsta !== 'vlastito_ime')
+        .map(([vrsta, mapa]) => [vrsta, [...mapa.keys()].filter(jeKolekcijskiKljucDostupan).length]),
     );
     kolekcijskihKljuceviPoVrsti = new Map(
-      [...kolekcijskiBrojacPoVrsti.entries()].map(([vrsta, mapa]) => [vrsta, new Set(mapa.keys())]),
+      [...kolekcijskiBrojacPoVrsti.entries()]
+        .filter(([vrsta]) => dopustiVlastitaImena || vrsta !== 'vlastito_ime')
+        .map(([vrsta, mapa]) => [vrsta, new Set([...mapa.keys()].filter(jeKolekcijskiKljucDostupan))]),
     );
     brojDugih = dugeRijeci.reduce((zbroj, skup) => zbroj + skup.size, 0);
     brojRijetkih = rijetkiOblici.reduce((zbroj, skup) => zbroj + skup.size, 0);

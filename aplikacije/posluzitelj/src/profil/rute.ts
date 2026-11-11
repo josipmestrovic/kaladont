@@ -317,6 +317,7 @@ function opisKolekcionarskeRazine(otkljucano: number, ukupno: number) {
 }
 
 async function dohvatiKolekciju(igracId: string, rjecnik: RjecnikUMemoriji) {
+  const dopustiVlastitaImena = konfiguracija.DOPUSTI_VLASTITA_IMENA === 'true';
   const [grupe, oblici] = await Promise.all([
     baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId)),
     baza.select({ rijec: otkljucaneRijeciIgraca.rijec, dugaTier: otkljucaneRijeciIgraca.dugaTier, rijetkaTier: otkljucaneRijeciIgraca.rijetkaTier }).from(otkljucaneRijeciIgraca).where(eq(otkljucaneRijeciIgraca.igracId, igracId)),
@@ -325,6 +326,8 @@ async function dohvatiKolekciju(igracId: string, rjecnik: RjecnikUMemoriji) {
   for (const redak of grupe) {
     const kljuc = kolekcijskiKljucGrupe(redak.grupa);
     const vrsta = kljuc.split(':')[0] ?? 'ostalo';
+    // Usklađeno s rječnikom: neigriva čista imena ne ulaze u otključano ni u dostupno.
+    if (!dopustiVlastitaImena && vrsta === 'vlastito_ime') continue;
     const postojeca = kolekcijske.get(kljuc) ?? { osnovnaRijec: osnovnaRijecIzGrupe(redak.grupa), vrste: new Set<string>() };
     postojeca.vrste.add(vrsta);
     kolekcijske.set(kljuc, postojeca);

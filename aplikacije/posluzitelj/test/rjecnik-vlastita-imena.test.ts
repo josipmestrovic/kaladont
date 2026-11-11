@@ -7,6 +7,8 @@ describe('DOPUSTI_VLASTITA_IMENA filter u rječniku', () => {
     const rjecnik = await ucitajRjecnik({ dopustiVlastitaImena: false });
     const ime = 'wqxxxvlastitoime';
     const opca = 'wpxxxopcarjec';
+    const kolekcijaPrije = rjecnik.brojKolekcijskihGrupa();
+    const vlastitaPrije = rjecnik.brojKolekcijskihGrupaPoVrsti().get('vlastito_ime') ?? 0;
 
     rjecnik.primijeniUbaci({
       rijec: ime,
@@ -28,6 +30,9 @@ describe('DOPUSTI_VLASTITA_IMENA filter u rječniku', () => {
     expect(rjecnik.postojeRijeciNa('wq')).toBe(false);
     expect(rjecnik.jePostojecaRijec(opca)).toBe(true);
     expect(rjecnik.postojeRijeciNa('wp')).toBe(true);
+    // Ime ne povećava dostupnu kolekciju; opća riječ da.
+    expect(rjecnik.brojKolekcijskihGrupa()).toBe(kolekcijaPrije + 1);
+    expect(rjecnik.brojKolekcijskihGrupaPoVrsti().get('vlastito_ime') ?? 0).toBe(vlastitaPrije);
 
     const odbijeno = validirajPotez({
       rijec: ime,
@@ -37,7 +42,7 @@ describe('DOPUSTI_VLASTITA_IMENA filter u rječniku', () => {
       rjecnik,
     });
     expect(odbijeno.kod).toBe('VLASTITO_IME');
-    expect(odbijeno.poruka).toBe(PORUKE.vlastitoImeNijeDopusteno(ime));
+    expect(odbijeno.poruka).toBe(PORUKE.vlastitoImeNijeDopusteno());
 
     const prihvaceno = validirajPotez({
       rijec: opca,
