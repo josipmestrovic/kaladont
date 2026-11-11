@@ -7,8 +7,8 @@ async function registrirajSe(page: Page, nadimak: string): Promise<void> {
   await page.getByRole('button', { name: 'Dalje', exact: true }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
-  await page.getByRole('checkbox').nth(0).check();
-  await page.getByRole('checkbox').nth(1).check();
+  await page.getByRole('checkbox', { name: /najmanje 16 godina/i }).check();
+  await page.getByRole('checkbox', { name: /Uvjete korištenja/i }).check();
   const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
   await expect(daljeAvatar).toBeEnabled();
   await daljeAvatar.click();

@@ -1,10 +1,9 @@
 import type { Page } from '@playwright/test';
 
-/** Na koraku 2 registracije označi obje obavezne kućice. */
+/** Na koraku 2 registracije označi obje obavezne kućice (ne i vidljivost lozinke). */
 export async function oznaciPrihvatNaRegistraciji(page: Page): Promise<void> {
-  const kucice = page.getByRole('checkbox');
-  await kucice.nth(0).check();
-  await kucice.nth(1).check();
+  await page.getByRole('checkbox', { name: /najmanje 16 godina/i }).check();
+  await page.getByRole('checkbox', { name: /Uvjete korištenja/i }).check();
 }
 
 export const PRIHVAT_REGISTRACIJE = {
