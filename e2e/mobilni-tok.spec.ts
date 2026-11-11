@@ -403,6 +403,70 @@ test('mobilni igrač ulazi u privatnu partiju i vidi aktivni input', async ({
   }
 });
 
+test('mobilni scroll partije ne drži avatare sticky preko zone igre', async ({
+  browser,
+  context,
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const igraci: E2EIgrac[] = [
+    { kontekst: context, stranica: page },
+    ...(await dodajIgrace(browser, 1)),
+  ];
+  try {
+    for (const igrac of igraci) {
+      await igrac.stranica.setViewportSize({ width: 390, height: 844 });
+    }
+    const vlasnik = igraci[0]!.stranica;
+    const gost = igraci[1]!.stranica;
+
+    await vlasnik.goto('/soba/kreiraj');
+    await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
+    await expect(vlasnik).toHaveURL(/\/soba\/[A-Z0-9]+$/);
+    const kodSobe = await vlasnik.locator('.oznaka-koda strong').innerText();
+    await gost.goto(`/soba/${kodSobe}`);
+    await vlasnik.getByRole('button', { name: 'Započni igru' }).click();
+    await expect(vlasnik).toHaveURL(/\/partija\/[0-9a-f-]+$/);
+    await expect(gost).toHaveURL(vlasnik.url());
+
+    const igracNaPotezu = await cekajIgracaNaPotezu(igraci);
+    const stranica = igracNaPotezu.stranica;
+    const zona = stranica.locator('.bijela-zona-igre');
+    const igraciRed = stranica.locator('.igraci-red');
+    await expect(zona).toBeVisible();
+    await expect(igraciRed).toBeVisible();
+
+    await zona.scrollIntoViewIfNeeded();
+    await stranica.evaluate(() => window.scrollBy(0, 120));
+
+    const rezultat = await stranica.evaluate(() => {
+      const red = document.querySelector('.igraci-red');
+      const zonaIgre = document.querySelector('.bijela-zona-igre');
+      if (!red || !zonaIgre) return { sticky: true, preklapanje: true, horizontalno: true };
+      const stil = getComputedStyle(red);
+      const redBox = red.getBoundingClientRect();
+      const zonaBox = zonaIgre.getBoundingClientRect();
+      const preklapanje =
+        redBox.bottom > zonaBox.top + 4 &&
+        redBox.top < zonaBox.bottom - 4 &&
+        redBox.left < zonaBox.right - 4 &&
+        redBox.right > zonaBox.left + 4;
+      return {
+        sticky: stil.position === 'sticky',
+        preklapanje,
+        horizontalno: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      };
+    });
+
+    expect(rezultat.sticky).toBe(false);
+    expect(rezultat.preklapanje).toBe(false);
+    expect(rezultat.horizontalno).toBe(false);
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
 test('mobilni prekid mreže zaključava potez i reconnect vraća stanje partije', async ({
   browser,
   context,

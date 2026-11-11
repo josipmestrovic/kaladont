@@ -2301,9 +2301,7 @@
     opacity: 1;
   }
   .igraci-red {
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    position: static;
     list-style: none;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3109,6 +3107,9 @@
   }
   @media (min-width: 1000px) {
     .igraci-red {
+      position: sticky;
+      top: 0;
+      z-index: 10;
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
