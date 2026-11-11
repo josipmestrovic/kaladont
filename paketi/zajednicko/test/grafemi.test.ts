@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { grafemi, prvaDva, zadnjaDva } from '../src/grafemi.js';
+import {
+  DOPUSTENA_SLOVA_RIJECI,
+  grafemi,
+  jeDopustenOblikRijeci,
+  prvaDva,
+  zadnjaDva,
+} from '../src/grafemi.js';
+
+describe('jeDopustenOblikRijeci', () => {
+  it('prihvaća hrvatske oblike', () => {
+    expect(jeDopustenOblikRijeci('auto')).toBe(true);
+    expect(jeDopustenOblikRijeci('kuća')).toBe(true);
+  });
+
+  it('odbija strana slova, crtice, brojke i velika slova', () => {
+    expect(jeDopustenOblikRijeci('taxi')).toBe(false);
+    expect(jeDopustenOblikRijeci('whisky')).toBe(false);
+    expect(jeDopustenOblikRijeci('test-1')).toBe(false);
+    expect(jeDopustenOblikRijeci('Foo')).toBe(false);
+    expect(DOPUSTENA_SLOVA_RIJECI.test('Foo')).toBe(false);
+  });
+});
 
 describe('grafemi', () => {
   it('parsira digraf nj pohlepno', () => {

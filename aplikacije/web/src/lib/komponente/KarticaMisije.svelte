@@ -40,14 +40,14 @@
   }
 
   function tekstNapretka(m: MisijaDto): string {
-    if (m.metrika === 'niz_max') return `Najdulji niz u jednoj partiji: ${m.napredak} / ${m.cilj}`;
-    if (m.metrika === 'partije_s_nizom') return `Partije s traženim nizom: ${m.napredak} / ${m.cilj}`;
-    if (m.metrika === 'partije_s_rijecima') return `Partije s dovoljno riječi: ${m.napredak} / ${m.cilj}`;
+    if (m.metrika === 'niz_max') return `Najdulji niz u jednoj igri: ${m.napredak} / ${m.cilj}`;
+    if (m.metrika === 'partije_s_nizom') return `Igre s traženim nizom: ${m.napredak} / ${m.cilj}`;
+    if (m.metrika === 'partije_s_rijecima') return `Igre s dovoljno riječi: ${m.napredak} / ${m.cilj}`;
     if (m.metrika === 'razliciti_poceci') return `Različiti počeci riječi: ${m.napredak} / ${m.cilj}`;
-    if (m.metrika === 'dani') return `Različiti dani s javnom partijom: ${m.napredak} / ${m.cilj}`;
+    if (m.metrika === 'dani') return `Različiti dani s javnom igrom: ${m.napredak} / ${m.cilj}`;
     if (m.metrika === 'duge_i_rijetke') return `Takve riječi: ${m.napredak} / ${m.cilj}`;
     if (m.metrika === 'pobjede' || m.metrika === 'trening_pobjede') return `Pobjede: ${m.napredak} / ${m.cilj}`;
-    if (m.metrika === 'partije') return `Partije: ${m.napredak} / ${m.cilj}`;
+    if (m.metrika === 'partije') return `Igre: ${m.napredak} / ${m.cilj}`;
     if (m.metrika === 'rijeci' || m.metrika === 'rijeci_u_partiji_max') return `Riječi: ${m.napredak} / ${m.cilj}`;
     return `${m.napredak} / ${m.cilj}`;
   }

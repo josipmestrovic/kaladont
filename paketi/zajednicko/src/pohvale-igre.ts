@@ -26,17 +26,13 @@ function odrediPobjednikeZaVrstu(
   vrsta: VrstaPohvaleIgre,
 ): PobjednikPohvale[] {
   if (sudionici.length === 0) return [];
-  if (!sudionici.some((s) => s.upravljac === 'covjek')) return [];
 
   const maksimum = Math.max(...sudionici.map((s) => metrika(s, vrsta)));
   if (maksimum <= 0) return [];
 
   const naVrhu = sudionici.filter((s) => metrika(s, vrsta) === maksimum);
-  const ljudi = naVrhu.filter((s) => s.upravljac === 'covjek');
-  if (ljudi.length === 0) return [];
-
   const dijeljenoPrvoMjesto = naVrhu.length > 1;
-  return ljudi.map((s) => ({
+  return naVrhu.map((s) => ({
     igracId: s.igracId,
     vrsta,
     vrijednost: maksimum,
@@ -44,7 +40,7 @@ function odrediPobjednikeZaVrstu(
   }));
 }
 
-/** Deterministički određuje usporedne pohvale za javnu igru. Botovi ulaze u max, nagrada ide samo ljudima. */
+/** Deterministički određuje usporedne pohvale za javnu igru. Botovi ulaze u max i mogu dobiti nagradu. */
 export function odrediPohvaleIgre(sudionici: readonly SudionikZaPohvalu[]): PohvalePoIgracu {
   const rezultat: PohvalePoIgracu = new Map();
   const dodaj = (pobjede: ReturnType<typeof odrediPobjednikeZaVrstu>) => {

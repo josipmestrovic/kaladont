@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { izracunajRazinuDostignuca, dohvatiDefinicijuDostignuca, ukupnoIskustvoZaRazinu } from 'zajednicko';
 import { baza } from '../src/baza/klijent.js';
-import { dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, pohvaleIgre, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { osigurajUpisePoteza, ponistiPartijeUTijekuUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 import type { ZapisPoteza, ZapisStatistikeRijeci } from '../src/igra/upis-partije.js';
 
@@ -405,6 +405,7 @@ describe('P01 pohvale igre', () => {
   afterEach(async () => {
     for (const partijaId of obracuniZaBrisanje.splice(0)) {
       await baza.delete(pohvaleIgre).where(eq(pohvaleIgre.igraId, partijaId));
+      await baza.delete(rezultatiFormeIgraca).where(eq(rezultatiFormeIgraca.partijaId, partijaId));
       await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
       await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
       await baza.delete(partije).where(eq(partije.id, partijaId));
@@ -413,6 +414,7 @@ describe('P01 pohvale igre', () => {
       await baza.delete(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, id));
       await baza.delete(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, id));
       await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, id));
+      await baza.delete(botovi).where(eq(botovi.igracId, id));
       await baza.delete(igraci).where(eq(igraci.id, id));
     }
   });
@@ -558,12 +560,13 @@ describe('P01 pohvale igre', () => {
     expect(audit).toHaveLength(0);
   });
 
-  it('P01-12/13: gost dobiva DTO pohvalu i brojač (O4); bot ne dobiva zapis', async () => {
+  it('P01-12/13: gost dobiva DTO pohvalu i brojač (O4); imenovani bot također može dobiti pohvalu', async () => {
     await baza.insert(igraci).values([
       { id: gostId, vrsta: 'gost', upravljac: 'covjek', nadimak: 'Gost' },
       { id: botId, vrsta: 'registriran', upravljac: 'bot', nadimak: 'Bot' },
       { id: igracA, vrsta: 'registriran', upravljac: 'covjek', nadimak: 'A' },
     ]);
+    await baza.insert(botovi).values({ igracId: botId, kljucSeeda: `test-imenovani-${botId}`, tip: 'imenovani', aktivan: true });
     const partijaId = randomUUID();
     obracuniZaBrisanje.push(partijaId);
     await baza.insert(partije).values({ id: partijaId, mod: 'cetiri_igraca', status: 'u_tijeku' });
@@ -593,12 +596,14 @@ describe('P01 pohvale igre', () => {
     );
     expect(agregati.get(gostId)?.pohvale.some((p) => p.vrsta === 'najduzi_niz')).toBe(true);
     expect(agregati.get(gostId)?.pohvale.some((p) => p.vrsta === 'najvise_xp')).toBeFalsy();
-    expect(agregati.get(botId)?.pohvale ?? []).toEqual([]);
+    expect(agregati.get(botId)?.pohvale.some((p) => p.vrsta === 'najvise_xp')).toBe(true);
     const [napredakGost] = await baza.select().from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, gostId));
     expect(napredakGost?.pohvaleNizUkupno ?? 0).toBe(1);
+    const [napredakBot] = await baza.select().from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, botId));
+    expect(napredakBot?.pohvaleXpUkupno ?? 0).toBe(1);
     const auditBot = await baza.select().from(pohvaleIgre)
       .where(and(eq(pohvaleIgre.igraId, partijaId), eq(pohvaleIgre.igracId, botId)));
-    expect(auditBot).toHaveLength(0);
+    expect(auditBot).toHaveLength(1);
   });
 });
 

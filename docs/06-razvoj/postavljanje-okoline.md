@@ -64,7 +64,7 @@ stagingu i produkciji.
 | `UMAMI_WEBSITE_ID` / `PUBLIC_UMAMI_WEBSITE_ID` | Prazno = tracker se ne učitava. Vrijednost iz Umami dashboarda nakon bootstrapa. |
 | `UMAMI_BAZA_LOZINKA`, `UMAMI_APP_SECRET` | Samo produkcijski Compose za Umami servis; staging i lokalno ne trebaju. |
 | `ONEMOGUCI_TIMER_POTEZA`    | **Samo za lokalno testiranje** — vidi napomenu ispod. `false` ili izbrisano u produkciji.                                                                                                                     |
-| `ODGODA_POCETKA_PARTIJE_MS` | Odgoda početka partije (odbrojavanje u čekaonici), zadano 10000 ms. Testovi postavljaju 0; ne mijenjati u produkciji. Neovisno o `ONEMOGUCI_TIMER_POTEZA` — odbrojavanje radi i s isključenim timerom poteza. |
+| `ODGODA_POCETKA_PARTIJE_MS` | Odgoda početka partije (odbrojavanje u čekaonici), zadano 6000 ms. Testovi postavljaju 0; ne mijenjati u produkciji. Neovisno o `ONEMOGUCI_TIMER_POTEZA` — odbrojavanje radi i s isključenim timerom poteza. Vrijedi za javni red, trening i privatne sobe. |
 | `TOLERANCIJA_PREKIDA_MS`    | Tolerancija mrežnog prekida tijekom aktivne partije. Zadano 10000 ms; staging i produkcija zahtijevaju točno tu vrijednost. Timer poteza ne pauzira se.                                                       |
 | `POSLUZUJ_WEB`              | `true` kada isti Fastify proces treba posluživati izgrađeni SvelteKit frontend; u lokalnom razvoju ostaje `false`.                                                                             |
 | `TRENING_OMOGUCEN`          | Zagrijavanje protiv „Računala” (ADR-017). Zadano `true`; `false` isključuje pokretanje novih treninga.                                                                                              |

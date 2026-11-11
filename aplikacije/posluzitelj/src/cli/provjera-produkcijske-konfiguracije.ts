@@ -14,7 +14,7 @@ const sintetika: Record<string, string> = {
   DEV_MAIL: 'ops@example.com',
   ONEMOGUCI_TIMER_POTEZA: 'false',
   TOLERANCIJA_PREKIDA_MS: '10000',
-  ODGODA_POCETKA_PARTIJE_MS: '10000',
+  ODGODA_POCETKA_PARTIJE_MS: '6000',
   LJESTVICE_POCETAK: '2026-01-01T00:00:00+01:00',
   VERZIJA: 'ci-provjera',
   DIGEST: 'ci-provjera',

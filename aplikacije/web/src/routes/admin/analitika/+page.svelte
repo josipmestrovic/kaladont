@@ -41,8 +41,7 @@
     dani: { dan: string; zapocete: number; zavrsene: number }[];
     ljudi: {
       igraci: number;
-      igraciS2Plus: number;
-      postotakS2Plus: number | null;
+      ponavljanja: { prag: number; broj: number; postotak: number | null }[];
       postotakGost: number | null;
       postotakRegistriran: number | null;
       sudjelovanjaGost: number;
@@ -178,7 +177,9 @@
     <dl class="kartice">
       <div><dt>Gost sudjelovanja</dt><dd>{postotak(dnevno.ljudi.postotakGost)}</dd></div>
       <div><dt>Registrirani sudjelovanja</dt><dd>{postotak(dnevno.ljudi.postotakRegistriran)}</dd></div>
-      <div><dt>Igrači s 2+ igrama</dt><dd>{dnevno.ljudi.igraciS2Plus} / {dnevno.ljudi.igraci} ({postotak(dnevno.ljudi.postotakS2Plus)})</dd></div>
+      {#each dnevno.ljudi.ponavljanja as p (p.prag)}
+        <div><dt>Igrači s {p.prag}+ igrama</dt><dd>{p.broj} / {dnevno.ljudi.igraci} ({postotak(p.postotak)})</dd></div>
+      {/each}
     </dl>
     <table>
       <thead>

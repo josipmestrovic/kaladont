@@ -947,7 +947,9 @@ export async function registrirajProfilRute(
         bodovi: sudioniciPartije.bodovi,
         eliminacije: sudioniciPartije.eliminacije,
         nacinIspadanja: sudioniciPartije.nacinIspadanja,
-        javniProfil: sql<boolean>`${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null`,
+        javniProfil: sql<boolean>`${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null and not exists (
+          select 1 from botovi b where b.igrac_id = ${igraci.id} and b.tip = 'gost'
+        )`,
       })
       .from(sudioniciPartije)
       .innerJoin(igraci, eq(igraci.id, sudioniciPartije.igracId))

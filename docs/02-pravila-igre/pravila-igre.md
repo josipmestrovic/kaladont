@@ -43,7 +43,7 @@ Riječ je valjana samo ako zadovoljava sve uvjete:
 | 3 | Njezina leksemska grupa nije već potrošena u toj partiji | „Već je iskorišten oblik te riječi: 'X'.” |
 | 4 | Dijakritici su upisani točno | Pokriveno provjerom riječi i početka |
 
-Baza za igrive poteze prihvaća imenice, glagole, pridjeve, priloge, zamjenice, brojeve, prijedloge, veznike, čestice, usklike i vlastita imena, u svim uvezenim oblicima. Privatnoj sobi vlasnik može ograničiti vrste, ali imenice ostaju dopuštene. Vlastita imena poput „Ana”, „Italija” i „Zagreb” su dopuštena kao zasebna vrsta. Kratice te riječi s brojkama, crticama ili razmacima nisu u igrivom rječniku.
+Baza za igrive poteze prihvaća imenice, glagole, pridjeve, priloge, zamjenice, brojeve, prijedloge, veznike, čestice i usklike, u svim uvezenim oblicima. Privatnoj sobi vlasnik može ograničiti vrste, ali imenice ostaju dopuštene. Čista vlastita imena i nazivi (osobna imena, mjesta, marke i slično) zadano nisu igriva na stagingu i produkciji; uključuju se samo kad je `DOPUSTI_VLASTITA_IMENA=true`. Riječ koja je i obična riječ i vlastito ime i dalje prolazi kao obična. Kratice te riječi s brojkama, crticama ili razmacima nisu u igrivom rječniku.
 
 Nevaljan pokušaj ne eliminira igrača. Potez se odbija uz objašnjenje, a vrijeme nastavlja teći.
 

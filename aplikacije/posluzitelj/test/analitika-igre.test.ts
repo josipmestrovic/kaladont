@@ -88,13 +88,13 @@ describe('analitika igre', () => {
 
     // A ima 2 igre → ulazi u 2+; B,C,D imaju po 1 u “sve” kontekstu uz A → barem 1 s 2+
     expect(sve.ljudi.igraci).toBeGreaterThanOrEqual(4);
-    expect(sve.ljudi.igraciS2Plus).toBeGreaterThanOrEqual(1);
+    expect(sve.ljudi.ponavljanja.find((p) => p.prag === 2)?.broj).toBeGreaterThanOrEqual(1);
     expect(sve.ljudi.postotakGost).not.toBeNull();
     expect(sve.ljudi.postotakRegistriran).not.toBeNull();
 
     const samoJedan = await agregirajDnevneIgre({ odDan: dan, doDan: dan, kontekst: 'javna' });
     // U javnim: A=2, B=1, C=1, D=1 → 25% s 2+
     expect(samoJedan.ljudi.igraci).toBeGreaterThanOrEqual(4);
-    expect(samoJedan.ljudi.igraciS2Plus).toBeGreaterThanOrEqual(1);
+    expect(samoJedan.ljudi.ponavljanja.find((p) => p.prag === 2)?.broj).toBeGreaterThanOrEqual(1);
   });
 });

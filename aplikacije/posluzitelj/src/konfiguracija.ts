@@ -26,7 +26,7 @@ const shemaKonfiguracije = z.object({
   PUBLIC_UMAMI_WEBSITE_ID: z.string().default(''),
   ONEMOGUCI_TIMER_POTEZA: z.enum(['true', 'false']).default('false'),
   TRAJANJE_POTEZA_MS: z.coerce.number().int().positive().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 30_000 : 5_000),
-  ODGODA_POCETKA_PARTIJE_MS: z.coerce.number().int().nonnegative().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 10_000 : 0),
+  ODGODA_POCETKA_PARTIJE_MS: z.coerce.number().int().nonnegative().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 6_000 : 0),
   TOLERANCIJA_PREKIDA_MS: z.coerce.number().int().nonnegative().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 10_000 : 1_000),
   HTTP_DOKUMENTI_PO_IP_MINUTI: z.coerce.number().int().positive().default(30),
   SOCKET_HANDSHAKE_PO_IP_MINUTI: z.coerce.number().int().positive().default(30),
@@ -49,6 +49,10 @@ const shemaKonfiguracije = z.object({
   BOTOVI_DVOBOJ: z.enum(['true', 'false']).default('false'),
   BOTOVI_CETVEROBOJ: z.enum(['true', 'false']).default('false'),
   MAKSIMALNO_AKTIVNIH_TRENINGA: z.coerce.number().int().positive().default(100),
+  /** Čista vlastita imena/nazivi kao igrive riječi. Zadano isključeno na staging/produkciji. */
+  DOPUSTI_VLASTITA_IMENA: z.enum(['true', 'false']).default(() =>
+    process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 'false' : 'true',
+  ),
 });
 
 export const konfiguracija = shemaKonfiguracije.parse(process.env);

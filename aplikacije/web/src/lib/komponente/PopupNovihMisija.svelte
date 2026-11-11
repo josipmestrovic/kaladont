@@ -109,6 +109,9 @@
               <li>
                 <strong>{misija.naziv}</strong>
                 <span>{misija.opis}</span>
+                {#if misija.cilj > 1}
+                  <span class="napredak">{misija.napredak} / {misija.cilj}</span>
+                {/if}
                 <em>{misija.xpNagrada.toLocaleString('hr-HR')} XP</em>
               </li>
             {/each}
@@ -192,6 +195,11 @@
   .kartice em {
     color: var(--boja-tekst-sekundarni);
     font-style: normal;
+  }
+  .kartice .napredak {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--boja-tekst);
   }
   .kartice em {
     color: var(--boja-isticanje-tekst);

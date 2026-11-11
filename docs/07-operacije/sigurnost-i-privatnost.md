@@ -107,7 +107,7 @@ Jedan Storage Box koristi odvojene podračune za forum i produkciju, tako da kom
 | Servis          | Uloga                                                                             | Podaci                               | Napomena                                                                                                                                       |
 | --------------- | --------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hetzner (DE)    | hosting VPS-ova, pomoćni server backup i Storage Box                              | svi podaci igre; šifrirani dumpovi   | EU; DPA sklopljen pri otvaranju računa; isti pružatelj za server i backup prihvaćen je MVP rizik                                               |
-| Resend          | transakcijski email (potvrda registracije, reset lozinke, obavijesti o prijavama) | email adrese primatelja              | produkcijski pošiljatelj `noreply@kaladont.hr`; prije aktivacije provjeriti DPA/EU obradu i SPF/DKIM; ljudski kontakt je `info@kaladont.hr` |
+| Resend          | transakcijski email (potvrda registracije, reset lozinke, obavijesti o prijavama) | email adrese primatelja              | produkcijski pošiljatelj i ljudski kontakt `info@kaladont.hr` (bez no-reply); prije aktivacije provjeriti DPA/EU obradu i SPF/DKIM |
 | GitHub / GHCR   | kod, CI i Docker slike                                                            | bez podataka igrača                  | tajne aplikacije nikad u repozitoriju ni logovima                                                                                              |
 | UptimeRobot     | javni HTTP nadzor `/zdravlje`                                                     | javni URL, status i vrijeme odgovora | samo email alarmi; endpoint ne vraća osobne podatke                                                                                            |
 | Healthchecks.io | heartbeat backupa i provjere diska                                                | naziv posla i vrijeme pinga          | ping URL je tajna; ne šalju se logovi, dumpovi ni podaci igrača                                                                                |
@@ -118,7 +118,7 @@ Popis se održava ažurnim na `/privatnost` stranici; novi izvršitelj = izmjena
 
 ### Email po okruženju
 
-- Produkcija šalje preko Resenda s verificirane domene i pošiljatelja `noreply@kaladont.hr`; odgovori i ljudski upiti vode na `info@kaladont.hr`. `JAVNA_ADRESA` je `https://kaladont.hr`, pa email potvrde i reset poveznice vode na javnu domenu.
+- Produkcija šalje preko Resenda s verificirane domene i pošiljatelja `info@kaladont.hr` (isti pretinac prima odgovore i ljudske upite; bez no-reply). `JAVNA_ADRESA` je `https://kaladont.hr`, pa email potvrde i reset poveznice vode na javnu domenu.
 - Staging koristi zasebnu konfiguraciju i `JAVNA_ADRESA=https://staging.kaladont.hr`; transakcijski email namjerno se šalje na bilo koju adresu radi testiranja potvrde i reseta. Pristup siteu štiti cookie gate (`STAGING_PRISTUP_SIFRA`); šifru dijeliti samo closed test krugu.
 - Razvoj bez API ključa ispisuje testnu poruku lokalno. Takav stub nije dokaz produkcijskog slanja.
 

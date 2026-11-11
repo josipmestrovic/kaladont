@@ -8,7 +8,14 @@ import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { SVE_VRSTE_RIJECI, type PregledNadzora } from 'zajednicko';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
-import { dodajRijec, deaktivirajRijec, vratiRijec, NevaljanaRijecError } from '../rjecnik/administracija.js';
+import {
+  dodajRijec,
+  deaktivirajRijec,
+  vratiRijec,
+  NevaljanaRijecError,
+  popisNstandardnihAktivnihRijeci,
+  deaktivirajNstandardneRijeci,
+} from '../rjecnik/administracija.js';
 import { igraci, prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza/shema.js';
 import { baza } from '../baza/klijent.js';
 import { zahtijevajAdmina, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
@@ -366,9 +373,28 @@ export async function registrirajAdminRute(
       return odgovor.code(400).send({ ok: false, greska: 'Polja "rijec" i "razlog" su obavezna.' });
     }
     const admin = (zahtjev as ZahtjevSIgracem).igrac!;
-    await vratiRijec(rezultat.data.rijec, rezultat.data.razlog, admin.id);
-    await uskladiRjecnikNakonUbaci(rjecnik, rezultat.data.rijec);
-    return { ok: true, brojRijeci: rjecnik.brojRijeci() };
+    try {
+      await vratiRijec(rezultat.data.rijec, rezultat.data.razlog, admin.id);
+      await uskladiRjecnikNakonUbaci(rjecnik, rezultat.data.rijec);
+      return { ok: true, brojRijeci: rjecnik.brojRijeci() };
+    } catch (greska) {
+      if (greska instanceof NevaljanaRijecError) {
+        return odgovor.code(400).send({ ok: false, greska: greska.message });
+      }
+      throw greska;
+    }
+  });
+
+  app.get('/admin/rjecnik/ciscenje-nstandardnih', { preHandler: zahtijevajAdmina }, async () => {
+    const popis = await popisNstandardnihAktivnihRijeci();
+    return { ok: true, ukupno: popis.length, rijeci: popis };
+  });
+
+  app.post('/admin/rjecnik/ciscenje-nstandardnih', { preHandler: zahtijevajAdmina }, async (zahtjev) => {
+    const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+    const { deaktivirano } = await deaktivirajNstandardneRijeci(admin.id);
+    if (deaktivirano > 0) await rjecnik.ponovoUcitaj();
+    return { ok: true, deaktivirano, brojRijeci: rjecnik.brojRijeci() };
   });
 
   app.get('/admin/rjecnik/rucno-dodano', { preHandler: zahtijevajAdmina }, async () => {

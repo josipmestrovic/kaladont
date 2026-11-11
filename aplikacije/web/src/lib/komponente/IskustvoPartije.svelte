@@ -58,7 +58,7 @@
 <style>
   .iskustvo-partije { margin: 24px 0 0; padding: 16px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina-2); }
   header, li { display: flex; justify-content: space-between; gap: 12px; }
-  header { color: var(--boja-isticanje-tekst); font-size: var(--tekst-veliki); }
+  header { color: var(--boja-isticanje-tekst); font-size: calc(var(--tekst-baza) * 1.2); }
   p { margin: 8px 0; color: var(--boja-tekst-sekundarni); }
   .max, .razina-povecana { color: var(--boja-isticanje-tekst); font-weight: 700; }
   .traka { height: 8px; overflow: hidden; border-radius: 4px; background: var(--boja-krem); }

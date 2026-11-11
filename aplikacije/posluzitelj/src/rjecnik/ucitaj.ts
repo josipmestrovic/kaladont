@@ -59,7 +59,13 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   primijeniUklanjanje(rijec: string): void;
 }
 
-export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
+export interface OpcijeUcitavanjaRjecnika {
+  /** Ako je false, čista vlastita imena nisu igriva, ali ostaju prepoznatljiva (VLASTITO_IME). */
+  dopustiVlastitaImena?: boolean;
+}
+
+export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<RjecnikUMemoriji> {
+  const dopustiVlastitaImena = opcije?.dopustiVlastitaImena !== false;
   // let (ne const) - ponovoUcitaj() mora moći zamijeniti sadržaj bez mijenjanja referenci koje
   // motor-partije.ts već drži na ovaj objekt (closures ispod vide novo stanje odmah)
   let rijecGrupe = new Map<string, string | readonly string[]>();
@@ -368,6 +374,18 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     return typeof v === 'string' ? [v] : v;
   }
 
+  /** Čisto vlastito ime/naziv — sve vrste su vlastito_ime (preklopljene opće riječi ostaju igrive). */
+  function jeCistoVlastitoIme(rijec: string): boolean {
+    const vrste = vrsteZa(rijec);
+    return vrste.length > 0 && vrste.every((vrsta) => vrsta === 'vlastito_ime');
+  }
+
+  function jePostojecaRijec(rijec: string): boolean {
+    if (!rijecGrupe.has(rijec)) return false;
+    if (!dopustiVlastitaImena && jeCistoVlastitoIme(rijec)) return false;
+    return true;
+  }
+
   function jeOsnovniOblik(rijec: string): boolean {
     const grupe = grupeZa(rijec);
     if (grupe.length === 0) return false;
@@ -391,6 +409,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     samoOsnovniOblici?: boolean,
     minDuljinaRijeci?: number,
   ): boolean {
+    if (!jePostojecaRijec(rijec)) return false;
     const grupe = rijecGrupe.get(rijec);
     if (grupe === undefined) return false;
 
@@ -409,6 +428,15 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
 
     if (typeof grupe === 'string') return !iskoristeneGrupe.has(grupe);
     return grupe.every((grupa) => !iskoristeneGrupe.has(grupa));
+  }
+
+  function postojeRijeciNa(dvaGrafema: string): boolean {
+    const lista = poPrefiksu.get(dvaGrafema);
+    if (!lista) return false;
+    for (const rijec of lista) {
+      if (jePostojecaRijec(rijec)) return true;
+    }
+    return false;
   }
 
   function imaSlobodnuRijecNa(
@@ -452,6 +480,7 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     rijecGrupe.delete(rijec);
     rijecFrekvencija.delete(rijec);
     rijecVrste.delete(rijec);
+    skupVlastitihImena.delete(rijec);
     const prefiks = prvaDva(rijec);
     const lista = poPrefiksu.get(prefiks);
     if (lista) {
@@ -496,6 +525,8 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     rijecGrupe.set(rijec, grupe.length === 1 ? grupe[0]! : grupe);
     rijecFrekvencija.set(rijec, frekvencija);
     rijecVrste.set(rijec, vrste.length === 1 ? vrste[0]! : vrste);
+    if (vrste.includes('vlastito_ime')) skupVlastitihImena.add(rijec);
+    else skupVlastitihImena.delete(rijec);
 
     const prefiks = zapis.prvaDva.normalize('NFC').toLowerCase();
     const lista = poPrefiksu.get(prefiks);
@@ -536,13 +567,13 @@ export async function ucitajRjecnik(): Promise<RjecnikUMemoriji> {
     brojRijetkihOblikaPoTieru: () => [...brojRijetkihPoTieru],
     brojPoKategoriji: () => kategorije,
     ciljeviRijeci: () => ciljevi,
-    jePostojecaRijec: (rijec) => rijecGrupe.has(rijec),
+    jePostojecaRijec,
     jeVlastitoIme,
     grupeZa,
     frekvencijaZa,
     vrsteZa,
     jeOsnovniOblik,
-    postojeRijeciNa: (dvaGrafema) => (poPrefiksu.get(dvaGrafema)?.length ?? 0) > 0,
+    postojeRijeciNa,
     imaSlobodnuRijecNa,
     igriviKandidati,
     verzijaRjecnika: () => verzija,

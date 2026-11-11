@@ -37,7 +37,7 @@ Tipični povodi prijave:
 - Tri reda: riječi za brisanje, riječi za dodavanje, računi s pogrdnim nadimkom.
 - Jedan klik: **Obriši** / **Dodaj** / **Dismiss** (riječi); **Obriši račun** / **Pusti** (igrači).
 - Jedan-klik **Dodaj** koristi default vrstu `imenica`; ručni obrazac i dalje bira vrstu.
-- Ručni rječnik: pretraga, deaktivacija/vraćanje, dodavanje s obaveznom vrstom.
+- Ručni rječnik: tabovi Ručno / Izmjene / Test / Čišćenje; pretraga, deaktivacija/vraćanje, dodavanje s obaveznom vrstom; masovno soft-brisanje aktivnih nstandardnih oblika (q/w/x/y i ostalo izvan hrvatske abecede).
 - Nakon izmjene `ponovoUcitaj()` osvježava RAM — aktivne partije odmah vide novu validaciju za buduće poteze. Restart nije potreban.
 - Bez email obavijesti; admin se ulogira i pregleda.
 

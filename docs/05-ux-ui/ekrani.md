@@ -24,7 +24,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Na naslovnici kompaktna zona profil + sandučic gore desno (bez ostatka header navigacije). Ulaz je isključivo ikona; nema stavke u glavnoj navigaciji ni bannera.
 - Toast „Imaš N novih obavijesti” + Pročitaj na dopuštenim ekranima; potisnut u `/red`, aktivnoj partiji i tijekom završnog odbrojavanja. Na završnom ekranu rezultata diskretan klikabilan sažetak umjesto toasta.
 - Pročitano ≠ najavljeno: nestanak toasta ne čita poruku; crvena točka prati nepročitane.
-- Viewer `/obavijesti` je feed obavijesti: ulazak odmah označava sve pročitanima (točka nestaje), stavke pokazuju naslov i puni tekst bez zasebnog detalja, vizualna oznaka „Novo” za poruke koje su baš bile nepročitane. Umjesto „Označi sve pročitanim” postoji „Obriši sve obavijesti”. Prazno i greška razdvojeni.
+- Viewer `/obavijesti` je feed obavijesti: po defaultu filter **Nove** (nepročitane), s prekidačem **Sve** za cijeli feed. Ulazak odmah označava sve pročitanima (točka nestaje); stavke pokazuju naslov i puni tekst bez zasebnog detalja, vizualna oznaka „Novo” za poruke koje su baš bile nepročitane. LVL i nazivi dostignuća/kolekcionarskih razina ističu se boldom u stilu igre. Umjesto „Označi sve pročitanim” postoji „Obriši sve obavijesti”. Prazno (Nove vs Sve) i greška razdvojeni.
 
 ## Globalne obavijesti
 
@@ -51,7 +51,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 ## 2. Red čekanja (`/red?mod=cetiri_igraca|dva_igraca`)
 
 - Ovisno o odabranom modu (4p ili 1v1), čekaonica prikazuje 4 ili 2 kružna mjesta.
-- Čim se skupe 4 (ili 2) igrača, pokreće se numerički countdown 3-2-1 i partija kreće.
+- Čim se skupe 4 (ili 2) igrača, pokreće se numerički countdown (6 s u stagingu/produkciji) i partija kreće.
 - Kad je popuna botovima uključena ([botovi.md](../02-pravila-igre/botovi.md)), rezervirani bot pojavljuje se na praznom mjestu kao sudionik koji čeka od trenutka rezervacije (Četveroboj: 20/30/40 s); u Dvoboju bot ulazi i partija kreće u istom trenutku (30 s). Prikaz ne nosi oznaku bota ni odbrojavanje do praga.
 - Gosti idu ravno u čekaonicu klikom na odabrani mod bez zapreka ili prompta za ime.
 
@@ -80,7 +80,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Uz izraz „skup sigurnih riječi” prikazuje se pojašnjenje na klik ili dodir: „Zbirka riječi koja uvijek ima nastavak te njihov nastavak isto ima nastavak.” Uz svaki korisniku vidljiv izraz „mrtva slova” prikazuje se pojašnjenje: „Riječi koje nemaju nastavka. Sustav automatski izbacuje sljedećeg igrača u slučaju takvih riječi.”
 - Generira se kod sobe i pozivni link. Gosti i registrirani mogu ući kao gosti ili igrači.
 - U čekaonici vlasnik može **Izbaci** ostale igrače; izbačeni više ne mogu ući na isti link dok soba postoji.
-- Soba živi u memoriji poslužitelja bez spremanja u bazu. Svaka igra je zasebna partija i počinje odmah; po završetku soba ostaje aktivna 5 minuta za novu partiju s istim postavkama.
+- Soba živi u memoriji poslužitelja bez spremanja u bazu. Nakon „Započni igru” slijedi isto numeričko odbrojavanje kao u javnoj čekaonici (6 s u stagingu/produkciji), zatim partija; po završetku soba ostaje aktivna 5 minuta za novu partiju s istim postavkama.
 - Iznad pravila sobe prikazuje se njezina kumulativna ljestvica: poredana je po osvojenim bodovima, zatim po pobjedama, a vodeći igrač dobiva krunu. Ti rezultati ne mijenjaju globalne ljestvice ni agregate igrača.
 - Na sjedalima se igračima prikazuje **viši rang** (između 4p i 1v1 ranga).
 

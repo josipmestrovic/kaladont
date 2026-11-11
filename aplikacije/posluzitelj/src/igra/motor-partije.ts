@@ -66,6 +66,7 @@ import type { StavkaReda } from '../red/red-cekanja.js';
 import { osigurajUpisePoteza, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisPoteza, type ZapisStatistikeRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
+import { imaJavniProfil, primaProfilnuGamifikacijuUIgri } from './gamifikacija-racuna.js';
 import { zabiljeziPobjeduTreninga } from '../trening/upis-napretka.js';
 import { mozdaObavijestiPrvuIgru, obradiDovrsenuIgruSanducic } from '../sanducic/okidaci.js';
 import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
@@ -89,7 +90,6 @@ const PROZOR_ISTODOBNIH_PREKIDA_MS = 25;
 // UX ekran mora trajati 5 s u razvoju, stagingu i produkciji. Samo testno okruženje
 // preskače čekanje kako integracijski testovi ne bi čekali stvarno vrijeme.
 const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;
-const ODGODA_POCETKA_PRIVATNE_PARTIJE_MS = 0;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
 const POCETNI_ODMAK_RETRYJA_REZULTATA_MS = 1_000;
 const MAKSIMALNI_ODMAK_RETRYJA_REZULTATA_MS = 30_000;
@@ -456,7 +456,7 @@ export function stvoriUpraviteljPartija(
   }
 
   async function ucitajGrupeZaDostignuca(igraciPartije: readonly SudionikPartije[]): Promise<Map<string, Set<string>>> {
-    const igracIds = igraciPartije.filter((igrac) => igrac.upravljac === 'covjek').map((igrac) => igrac.igracId);
+    const igracIds = igraciPartije.filter((igrac) => primaProfilnuGamifikacijuUIgri(igrac)).map((igrac) => igrac.igracId);
     const retci = igracIds.length ? await baza.select({ igracId: otkljucaneGrupeIgraca.igracId, grupa: otkljucaneGrupeIgraca.grupa })
       .from(otkljucaneGrupeIgraca)
       .where(and(inArray(otkljucaneGrupeIgraca.igracId, igracIds), eq(otkljucaneGrupeIgraca.zaDostignuca, true))) : [];
@@ -490,7 +490,7 @@ export function stvoriUpraviteljPartija(
   }
 
   async function ucitajNapredakDostignuca(igraciPartije: readonly SudionikPartije[]): Promise<Map<string, Record<string, number>>> {
-    const igracIds = igraciPartije.filter((igrac) => igrac.upravljac === 'covjek').map((igrac) => igrac.igracId);
+    const igracIds = igraciPartije.filter((igrac) => primaProfilnuGamifikacijuUIgri(igrac)).map((igrac) => igrac.igracId);
     const retci = igracIds.length === 0 ? [] : await baza
       .select()
       .from(napredakDostignucaIgraca)
@@ -532,7 +532,7 @@ export function stvoriUpraviteljPartija(
   function dodajNapredakDostignuca(stanje: StanjeStola, igracId: string, napredak: DeltaNapretkaDostignuca): void {
     if (!stanje.politika.dajeDostignucaIKolekcije) return;
     const sudionik = stanje.sudionici.find((s) => s.igracId === igracId);
-    if (!sudionik || sudionik.upravljac !== 'covjek') return;
+    if (!sudionik || !primaProfilnuGamifikacijuUIgri(sudionik)) return;
     const postojeci = stanje.napredakDostignuca.get(igracId) ?? {};
     for (const [kljuc, vrijednost] of Object.entries(napredak) as [keyof DeltaNapretkaDostignuca, number | undefined][]) {
       if (vrijednost === undefined) continue;
@@ -548,7 +548,8 @@ export function stvoriUpraviteljPartija(
 
   function najaviNovaDostignuca(stanje: StanjeStola, igracId: string): void {
     if (!stanje.politika.dajeDostignucaIKolekcije) return;
-    if (stanje.sudionici.find((s) => s.igracId === igracId)?.upravljac !== 'covjek') return;
+    const sudionikNajave = stanje.sudionici.find((s) => s.igracId === igracId);
+    if (!sudionikNajave || !primaProfilnuGamifikacijuUIgri(sudionikNajave)) return;
     const prije = stanje.napredakDostignucaPrije.get(igracId) ?? {};
     const delta = stanje.napredakDostignuca.get(igracId) ?? {};
     const razinaIskustva = stanje.sudionici.find((s) => s.igracId === igracId)?.razina ?? 0;
@@ -1131,13 +1132,15 @@ export function stvoriUpraviteljPartija(
         bodovi = izracunajBodove({ plasman: plasman as 1 | 2 | 3 | 4, eliminacije }, stanje.mod);
       }
 
+      const sudionik = stanje.sudionici.find((s) => s.igracId === igracId);
       return {
         igracId,
-        nadimak: stanje.sudionici.find((sudionik) => sudionik.igracId === igracId)?.nadimak ?? 'Nepoznati igrač',
+        nadimak: sudionik?.nadimak ?? 'Nepoznati igrač',
         plasman: plasman as 1 | 2 | 3 | 4,
         bodovi,
         eliminacije,
         nacinIspadanja: (plasman === 1 ? 'pobjednik' : nacinIspadanjaZaIgraca(stanje, igracId)) as NacinIspadanja,
+        javniProfil: sudionik ? imaJavniProfil(sudionik) : false,
       };
     });
 
@@ -1896,7 +1899,8 @@ export function stvoriUpraviteljPartija(
         // Provjera je !== null (tier 0 nije truthy). Skup oblika ide u završni obračun, ne u brojač usred igre.
         // Isti normalizirani oblik ne ulazi dvaput. Ne uključuje bota, gosta, trening ni sustavsku početnu riječ.
         if (
-          sudionik?.upravljac === 'covjek'
+          sudionik
+          && primaProfilnuGamifikacijuUIgri(sudionik)
           && (sudionik.vrsta === 'registriran' || sudionik.vrsta === 'admin')
           && stanje.kontekst !== 'trening'
           && brojGrafema >= PRAGOVI_DULJINE.duga
@@ -2519,7 +2523,7 @@ export function stvoriUpraviteljPartija(
     });
     const partijaId = randomUUID();
     const prviIgracId = sudionici[0]!.igracId;
-      const odgodaMs = ODGODA_POCETKA_PRIVATNE_PARTIJE_MS;
+    const odgodaMs = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PARTIJE_MS;
     const pocetakIso = new Date(sat.sada() + odgodaMs).toISOString();
 
     const stanje: StanjeStola = {

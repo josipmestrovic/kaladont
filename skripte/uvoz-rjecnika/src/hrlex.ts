@@ -9,7 +9,7 @@ import { createGunzip } from 'node:zlib';
 import { Readable } from 'node:stream';
 import { finished } from 'node:stream/promises';
 import path from 'node:path';
-import { grafemi, kljucGrupe, type StupanjRijeci, type VrstaRijeci } from 'zajednicko';
+import { grafemi, jeDopustenOblikRijeci, kljucGrupe, type StupanjRijeci, type VrstaRijeci } from 'zajednicko';
 
 export const PODACI_DIR = process.env.HRLEX_PODACI_DIR?.trim()
   ? path.resolve(process.env.HRLEX_PODACI_DIR.trim())
@@ -19,9 +19,6 @@ export const PUTANJA_GZ = path.join(PODACI_DIR, 'hrLex_v1.3.gz');
 const URL_HRLEX =
   'https://www.clarin.si/repository/xmlui/bitstream/handle/11356/1232/hrLex_v1.3.gz';
 const MD5_OCEKIVANI = 'e55a21f10bbb4f6c22afe31a65803649';
-
-// Mala slova hrvatske abecede (bez q/w/x/y); š/đ/č/ć/ž su dopušteni.
-const DOPUSTENA_SLOVA = /^[a-zšđčćž]+$/;
 
 /** UPOS -> kategorija u igri (uvoz-rjecnika.md); null = otpada. */
 export const UPOS_U_VRSTU: Record<string, VrstaRijeci | null> = {
@@ -139,14 +136,14 @@ export async function agregirajHrLex(): Promise<RezultatAgregacije> {
     if (!oblik || !upos) continue;
     ukupnoRedaka += 1;
 
-    if (msd && /^Nc.sn/.test(msd) && oblik.length >= 2 && DOPUSTENA_SLOVA.test(oblik)) {
+    if (msd && /^Nc.sn/.test(msd) && oblik.length >= 2 && jeDopustenOblikRijeci(oblik)) {
       stariFiltar += 1;
     }
 
     if (upos === 'PROPN') {
       ukupnoPropnRedaka += 1;
       const oblikNormaliziran = oblik.normalize('NFC').toLowerCase();
-      if (!DOPUSTENA_SLOVA.test(oblikNormaliziran)) {
+      if (!jeDopustenOblikRijeci(oblikNormaliziran)) {
         odbaceniCiscenje += 1;
         continue;
       }
@@ -197,7 +194,7 @@ export async function agregirajHrLex(): Promise<RezultatAgregacije> {
       odbaceniRimski += 1;
       continue;
     }
-    if (oblik !== oblik.toLowerCase() || !DOPUSTENA_SLOVA.test(oblik)) {
+    if (oblik !== oblik.toLowerCase() || !jeDopustenOblikRijeci(oblik)) {
       odbaceniCiscenje += 1;
       continue;
     }

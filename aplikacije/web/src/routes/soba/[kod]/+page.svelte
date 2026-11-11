@@ -4,7 +4,8 @@
   import { goto } from '$app/navigation';
   import { dohvatiSocket } from '$lib/socket.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
-  import type { StanjePrivatneSobe, VrstaRijeci } from 'zajednicko';
+  import { aktivirajAudio, pustiAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
+  import type { PocetakPartije, StanjePrivatneSobe, VrstaRijeci } from 'zajednicko';
 
   const kodSobe = $derived($page.params.kod?.toUpperCase() ?? '');
 
@@ -28,12 +29,42 @@
   let obavijest = $state<string | null>(null);
   let kopirano = $state(false);
   let jeUPartiji = $state(false);
+  let countdown = $state<number | null>(null);
+  let odbrojavanjePartije: ReturnType<typeof setInterval> | null = null;
 
   const jeVlasnik = $derived(
     Boolean(stanjeSobe && stanjeSobe.vlasnikId === stanjeSobe.mojIgracId)
   );
 
+  function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {
+    if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
+    const pocetakMs = new Date(pocetakIso).getTime();
+    if (pocetakMs - Date.now() < -3000) {
+      jeUPartiji = true;
+      void goto(`/partija/${partijaId}`);
+      return;
+    }
+    let zadnjaOdsviranaSek = Number.POSITIVE_INFINITY;
+    const azuriraj = () => {
+      const preostalo = Math.max(0, Math.ceil((pocetakMs - Date.now()) / 1000));
+      countdown = preostalo;
+      if (preostalo > 0 && preostalo < zadnjaOdsviranaSek) {
+        zadnjaOdsviranaSek = preostalo;
+        pustiAudio('odbrojavanje-single-count-sound');
+      }
+      if (preostalo <= 0) {
+        if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
+        odbrojavanjePartije = null;
+        jeUPartiji = true;
+        void goto(`/partija/${partijaId}`);
+      }
+    };
+    odbrojavanjePartije = setInterval(azuriraj, 250);
+    azuriraj();
+  }
+
   onMount(() => {
+    zagrijGameplayZvukove();
     const socket = dohvatiSocket();
 
     const naStanjeSobe = (novoStanje: StanjePrivatneSobe) => {
@@ -56,9 +87,8 @@
       greska = p.poruka;
     };
 
-    const naPocetak = (payload: { partijaId: string }) => {
-      jeUPartiji = true;
-      void goto(`/partija/${payload.partijaId}`);
+    const naPocetak = (payload: PocetakPartije) => {
+      pokreniOdbrojavanje(payload.pocetakIso, payload.partijaId);
     };
 
     const naVlasnikNapustio = () => {
@@ -77,6 +107,7 @@
     socket.on('soba:vlasnik-napustio', naVlasnikNapustio);
     socket.on('soba:izbacen', naIzbacen);
 
+    aktivirajAudio();
     socket.emit('soba:udji', { kod: kodSobe });
 
     return () => {
@@ -89,6 +120,7 @@
   });
 
   onDestroy(() => {
+    if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
     if (!jeUPartiji) {
       const socket = dohvatiSocket();
       socket.emit('soba:izadji');
@@ -179,7 +211,9 @@
           {#if obavijest}
             <p role="alert" class="lobby-obavijest">{obavijest}</p>
           {/if}
-          {#if jeVlasnik}
+          {#if countdown !== null}
+            <p class="odbrojavanje-tekst" aria-live="polite">Svi igrači su tu! Igra kreće za {countdown}…</p>
+          {:else if jeVlasnik}
             <button
               type="button"
               class="glavni-gumb"
@@ -461,11 +495,18 @@
     cursor: default;
   }
 
-  .cekanje-tekst {
+  .cekanje-tekst,
+  .odbrojavanje-tekst {
     margin: 0;
     font-weight: 600;
     color: var(--boja-tekst-sekundarni);
     text-align: center;
+  }
+
+  .odbrojavanje-tekst {
+    color: var(--boja-isticanje-slova);
+    font-family: var(--font-naslov);
+    font-size: var(--tekst-baza);
   }
 
   .lista-pravila {

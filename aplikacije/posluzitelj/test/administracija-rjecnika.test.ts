@@ -1,23 +1,31 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { igraci, izmjeneRjecnika, rijeci } from '../src/baza/shema.js';
+import { RAZLOG_CISCENJA_NSTANDARDNIH } from '../src/rjecnik/administracija.js';
 
 let app: FastifyInstance;
 let adresa: string;
-// samo slova (bez brojki) - dodajRijec odbija sve osim hrvatskih malih slova
-const NASUMICNI_SUFIKS = Array.from({ length: 6 }, () =>
-  String.fromCharCode(97 + Math.floor(Math.random() * 26)),
+// samo hrvatska mala slova bez q/w/x/y — inače bi „normalna” riječ upala u čišćenje
+const HR_SLOVA = 'abcdefghijklmnoprstuvz';
+const NASUMICNI_SUFIKS = Array.from(
+  { length: 6 },
+  () => HR_SLOVA[Math.floor(Math.random() * HR_SLOVA.length)]!,
 ).join('');
 const TESTNA_RIJEC = `testnarijec${NASUMICNI_SUFIKS}`;
+const RIJEC_S_X = `taksix${NASUMICNI_SUFIKS}`;
+const RIJEC_S_Y = `whisky${NASUMICNI_SUFIKS}`;
+const RIJEC_NORMALNA = `cista${NASUMICNI_SUFIKS}`;
 const EMAIL_ADMIN = `admin-${NASUMICNI_SUFIKS}@example.com`;
 const EMAIL_OBICAN = `obican-${NASUMICNI_SUFIKS}@example.com`;
 const LOZINKA = 'lozinka123';
+const RIJEC_CISCENJA = [RIJEC_S_X, RIJEC_S_Y, RIJEC_NORMALNA];
 
 let adminToken: string;
 let obicanToken: string;
+let adminId: string;
 
 beforeAll(async () => {
   ({ app } = await izgradiPosluzitelj());
@@ -31,11 +39,12 @@ beforeAll(async () => {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL_ADMIN, lozinka: LOZINKA }),
   });
-  const { igracId: adminId, sesijskiToken } = (await registracijaAdmin.json()) as {
+  const registracija = (await registracijaAdmin.json()) as {
     igracId: string;
     sesijskiToken: string;
   };
-  adminToken = sesijskiToken;
+  adminId = registracija.igracId;
+  adminToken = registracija.sesijskiToken;
   // rucna promocija u admina - jedini nacin u ovoj fazi (nema self-service)
   await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, adminId));
 
@@ -50,9 +59,13 @@ beforeAll(async () => {
 afterEach(async () => {
   await baza.delete(izmjeneRjecnika).where(eq(izmjeneRjecnika.rijec, TESTNA_RIJEC));
   await baza.delete(rijeci).where(eq(rijeci.rijec, TESTNA_RIJEC));
+  await baza.delete(izmjeneRjecnika).where(inArray(izmjeneRjecnika.rijec, RIJEC_CISCENJA));
+  await baza.delete(rijeci).where(inArray(rijeci.rijec, RIJEC_CISCENJA));
 });
 
 afterAll(async () => {
+  // Bulk čišćenje ostavlja audit retke s admin_id — mora prije brisanja računa.
+  await baza.delete(izmjeneRjecnika).where(eq(izmjeneRjecnika.adminId, adminId));
   await baza.delete(igraci).where(eq(igraci.email, EMAIL_ADMIN));
   await baza.delete(igraci).where(eq(igraci.email, EMAIL_OBICAN));
   await app.close();
@@ -131,6 +144,111 @@ describe('POST /admin/rjecnik/dodaj', () => {
     expect(vracanje.status).toBe(200);
     const [poslijeVracanja] = await baza.select().from(rijeci).where(eq(rijeci.rijec, TESTNA_RIJEC));
     expect(poslijeVracanja?.aktivna).toBe(true);
+  });
+});
+
+describe('čišćenje nstandardnih riječi', () => {
+  async function seedNstandardne() {
+    await baza.insert(rijeci).values([
+      {
+        rijec: RIJEC_S_X,
+        prvaDva: 'ta',
+        zadnjaDva: NASUMICNI_SUFIKS.slice(-2),
+        vrste: ['imenica'],
+        grupe: [`imenica:${RIJEC_S_X}`],
+        frekvencija: 3,
+        aktivna: true,
+      },
+      {
+        rijec: RIJEC_S_Y,
+        prvaDva: 'wh',
+        zadnjaDva: NASUMICNI_SUFIKS.slice(-2),
+        vrste: ['imenica'],
+        grupe: [`imenica:${RIJEC_S_Y}`],
+        frekvencija: 2,
+        aktivna: true,
+      },
+      {
+        rijec: RIJEC_NORMALNA,
+        prvaDva: 'ci',
+        zadnjaDva: NASUMICNI_SUFIKS.slice(-2),
+        vrste: ['imenica'],
+        grupe: [`imenica:${RIJEC_NORMALNA}`],
+        frekvencija: 9,
+        aktivna: true,
+      },
+    ]);
+  }
+
+  it('non-admin ne smije pregledavati ni potvrditi čišćenje', async () => {
+    const get = await fetch(`${adresa}/api/admin/rjecnik/ciscenje-nstandardnih`, {
+      headers: { authorization: `Bearer ${obicanToken}` },
+    });
+    expect(get.status).toBe(403);
+
+    const post = await fetch(`${adresa}/api/admin/rjecnik/ciscenje-nstandardnih`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${obicanToken}` },
+      body: '{}',
+    });
+    expect(post.status).toBe(403);
+  });
+
+  it('GET vraća samo aktivne nstandardne; POST ih deaktivira i blokira vraćanje', { timeout: 90_000 }, async () => {
+    await seedNstandardne();
+
+    const preview = await fetch(`${adresa}/api/admin/rjecnik/ciscenje-nstandardnih`, {
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(preview.status).toBe(200);
+    const previewTijelo = (await preview.json()) as {
+      ok: boolean;
+      ukupno: number;
+      rijeci: { rijec: string; frekvencija: number }[];
+    };
+    const kandidati = previewTijelo.rijeci.map((r) => r.rijec);
+    expect(kandidati).toEqual(expect.arrayContaining([RIJEC_S_X, RIJEC_S_Y]));
+    expect(kandidati).not.toContain(RIJEC_NORMALNA);
+
+    const potvrda = await fetch(`${adresa}/api/admin/rjecnik/ciscenje-nstandardnih`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
+      body: '{}',
+    });
+    expect(potvrda.status).toBe(200);
+    const potvrdaTijelo = (await potvrda.json()) as { ok: boolean; deaktivirano: number };
+    expect(potvrdaTijelo.deaktivirano).toBeGreaterThanOrEqual(2);
+
+    const [x, y, normalna] = await Promise.all([
+      baza.select().from(rijeci).where(eq(rijeci.rijec, RIJEC_S_X)),
+      baza.select().from(rijeci).where(eq(rijeci.rijec, RIJEC_S_Y)),
+      baza.select().from(rijeci).where(eq(rijeci.rijec, RIJEC_NORMALNA)),
+    ]);
+    expect(x[0]?.aktivna).toBe(false);
+    expect(y[0]?.aktivna).toBe(false);
+    expect(normalna[0]?.aktivna).toBe(true);
+
+    const izmjene = await baza
+      .select()
+      .from(izmjeneRjecnika)
+      .where(inArray(izmjeneRjecnika.rijec, [RIJEC_S_X, RIJEC_S_Y]));
+    expect(izmjene.length).toBe(2);
+    expect(izmjene.every((i) => i.akcija === 'uklonjena' && i.razlog === RAZLOG_CISCENJA_NSTANDARDNIH)).toBe(true);
+
+    const previewPoslije = await fetch(`${adresa}/api/admin/rjecnik/ciscenje-nstandardnih`, {
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const previewPoslijeTijelo = (await previewPoslije.json()) as { rijeci: { rijec: string }[] };
+    const kandidatiPoslije = previewPoslijeTijelo.rijeci.map((r) => r.rijec);
+    expect(kandidatiPoslije).not.toContain(RIJEC_S_X);
+    expect(kandidatiPoslije).not.toContain(RIJEC_S_Y);
+
+    const vracanje = await fetch(`${adresa}/api/admin/rjecnik/vrati`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ rijec: RIJEC_S_X, razlog: 'pokusaj vracanja nstandardne' }),
+    });
+    expect(vracanje.status).toBe(400);
   });
 });
 
