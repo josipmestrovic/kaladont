@@ -278,7 +278,7 @@ describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
     const arhivaOdgovor = await fetch(`${adresa}/api/partije/${javnaPartijaId}/plasmani`);
     const arhiva = (await arhivaOdgovor.json()) as { partija: { plasmani: { igracId: string; nadimak: string; plasman: number; bodovi: number }[] } };
     expect(arhivaOdgovor.status).toBe(200);
-    expect(arhiva.partija.plasmani).toEqual([{ igracId, nadimak: 'Povijesni Nadimak', plasman: 1, bodovi: 2, eliminacije: 0, nacinIspadanja: 'pobjednik', javniProfil: true }]);
+    expect(arhiva.partija.plasmani).toEqual([{ igracId, nadimak: 'Povijesni Nadimak', plasman: 1, bodovi: 2, eliminacije: 0, nacinIspadanja: 'pobjednik', javniProfil: true, jeBot: false }]);
   });
 });
 
