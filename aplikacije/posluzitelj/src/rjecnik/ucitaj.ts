@@ -320,8 +320,8 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     poPrefiksu = novoPoPrefiksu;
     pocetneImenickeRijeci = novePocetneImenickeRijeci;
     try {
-      const izBaze = await ucitajSigurnePocetneRijeciIzBaze();
-      if (izBaze.length > 0) sigurnePocetneRijeci = izBaze;
+      // Uspješan load (uključivo prazan skup) zamjenjuje seed; catch samo za nestalu tablicu.
+      sigurnePocetneRijeci = await ucitajSigurnePocetneRijeciIzBaze();
     } catch {
       // Tablica možda još nije migrirana u testovima — zadrži seed.
     }

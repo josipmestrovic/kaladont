@@ -91,15 +91,28 @@ export async function dodajRijec(
   lemaUlaz?: string,
   prijavaId?: number | null,
   db: Izvrsitelj = baza,
-  frekvencija: number = DEFAULT_FREKVENCIJA_RUCNO,
+  /** Ako je zadana, postavlja se pri insertu i pri eksplicitnoj reaktivaciji iz admina. Inače insert koristi default, reaktivacija čuva postojeću frekvenciju. */
+  frekvencija?: number,
 ): Promise<PromjenaRjecnika> {
   const { rijec, prvaDva, zadnjaDva } = provjeriOblik(rijecUlaz);
   const lema = normalizirajRijecRjecnika(lemaUlaz ?? rijec);
   const grupa = kljucGrupe(vrsta, lema);
-  const frekvencijaVrijednost = Number.isFinite(frekvencija) && frekvencija >= 0 ? Math.floor(frekvencija) : DEFAULT_FREKVENCIJA_RUCNO;
+  const frekvencijaEksplicitna =
+    frekvencija !== undefined && Number.isFinite(frekvencija) && frekvencija >= 0
+      ? Math.floor(frekvencija)
+      : undefined;
+  const frekvencijaZaInsert = frekvencijaEksplicitna ?? DEFAULT_FREKVENCIJA_RUCNO;
 
   const [postojeca] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
   if (postojeca?.aktivna) return { promjena: 'nema', rijec };
+
+  async function reaktiviraj(): Promise<PromjenaRjecnika> {
+    const set: { aktivna: boolean; frekvencija?: number } = { aktivna: true };
+    if (frekvencijaEksplicitna !== undefined) set.frekvencija = frekvencijaEksplicitna;
+    await db.update(rijeci).set(set).where(eq(rijeci.rijec, rijec));
+    const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId, prijavaId });
+    return { promjena: 'reaktivirana', rijec, izmjenaId };
+  }
 
   if (!postojeca) {
     try {
@@ -109,7 +122,7 @@ export async function dodajRijec(
         zadnjaDva,
         vrste: [vrsta],
         grupe: [grupa],
-        frekvencija: frekvencijaVrijednost,
+        frekvencija: frekvencijaZaInsert,
         aktivna: true,
         napomena: 'ručno dodano',
       });
@@ -117,17 +130,13 @@ export async function dodajRijec(
       if (!jeJedinstvenostPrekrsena(greska)) throw greska;
       const [ponovo] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
       if (!ponovo || ponovo.aktivna) return { promjena: 'nema', rijec };
-      await db.update(rijeci).set({ aktivna: true, frekvencija: frekvencijaVrijednost }).where(eq(rijeci.rijec, rijec));
-      const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId, prijavaId });
-      return { promjena: 'reaktivirana', rijec, izmjenaId };
+      return reaktiviraj();
     }
     const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'dodana', razlog, adminId, prijavaId });
     return { promjena: 'dodana', rijec, izmjenaId };
   }
 
-  await db.update(rijeci).set({ aktivna: true, frekvencija: frekvencijaVrijednost }).where(eq(rijeci.rijec, rijec));
-  const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId, prijavaId });
-  return { promjena: 'reaktivirana', rijec, izmjenaId };
+  return reaktiviraj();
 }
 
 /** Soft-delete (aktivna=false). Već neaktivna ili nepostojeća riječ je no-op. */
