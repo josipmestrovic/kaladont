@@ -34,7 +34,7 @@ const ShemaPrijavaIgraca = z.object({
 });
 
 class GreskaPrijave extends Error {
-  constructor(public readonly status: 404 | 403 | 409 | 429, poruka: string) {
+  constructor(public readonly status: 400 | 404 | 403 | 409 | 429, poruka: string) {
     super(poruka);
   }
 }

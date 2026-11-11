@@ -90,6 +90,8 @@ const PROZOR_ISTODOBNIH_PREKIDA_MS = 25;
 // UX ekran mora trajati 5 s u razvoju, stagingu i produkciji. Samo testno okruženje
 // preskače čekanje kako integracijski testovi ne bi čekali stvarno vrijeme.
 const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;
+/** Privatna soba: domaćin je već pokrenuo igru — bez dodatnog odbrojavanja. */
+const ODGODA_POCETKA_PRIVATNE_PARTIJE_MS = 0;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
 const POCETNI_ODMAK_RETRYJA_REZULTATA_MS = 1_000;
 const MAKSIMALNI_ODMAK_RETRYJA_REZULTATA_MS = 30_000;
@@ -709,7 +711,19 @@ export function stvoriUpraviteljPartija(
     const poruka: StanjePartije = {
       partijaId: stanje.partijaId,
       mojIgracId: socket.data.igracId,
-      sjedala: stanje.sudionici.map(({ igracId, vrsta, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre }) => ({ igracId, nadimak, jeGost: vrsta === 'gost', avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre })),
+      sjedala: stanje.sudionici.map(({ igracId, vrsta, upravljac, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre }) => ({
+        igracId,
+        nadimak,
+        jeGost: upravljac !== 'bot' && vrsta === 'gost',
+        jeBot: upravljac === 'bot',
+        avatarId,
+        avatarConfig,
+        avatarRevision,
+        rang,
+        razina,
+        trenutniNiz,
+        razinaVatre,
+      })),
       turnToken: stanje.turnToken,
       naPotezuId: stanje.naPotezuId,
       trazenaSlova: stanje.trazenaSlova,
@@ -2526,7 +2540,7 @@ export function stvoriUpraviteljPartija(
     });
     const partijaId = randomUUID();
     const prviIgracId = sudionici[0]!.igracId;
-    const odgodaMs = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PARTIJE_MS;
+    const odgodaMs = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PRIVATNE_PARTIJE_MS;
     const pocetakIso = new Date(sat.sada() + odgodaMs).toISOString();
 
     const stanje: StanjeStola = {

@@ -765,7 +765,6 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
     igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
     ukloniIzJavnogReda: redServis.ukloniIzReda,
-    razlogBlokadeIgre,
     provjeriDogadaj,
     zapisSocketHandlerGreske,
   });

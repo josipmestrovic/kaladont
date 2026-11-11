@@ -14,13 +14,14 @@ export function primaProfilnuGamifikacijuUIgri(
 
 /**
  * U upisu iz baze: botovi nikad ne primaju osobni napredak (XP, rang, dostignuća…).
- * `botTip` ostaje u potpisu radi kompatibilnosti pozivatelja.
+ * Treći argument ostaje radi kompatibilnosti pozivatelja (tip bota više ne utječe).
  */
 export function primaProfilnuGamifikaciju(
   vrsta: string,
   upravljac: string,
-  _botTip: BotTipPrezentacije | null = null,
+  botTip: BotTipPrezentacije | null = null,
 ): boolean {
+  void botTip;
   if (upravljac === 'bot') return false;
   if (upravljac === 'covjek') {
     return vrsta === 'registriran' || vrsta === 'admin' || vrsta === 'gost';
