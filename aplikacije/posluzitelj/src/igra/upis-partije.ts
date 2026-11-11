@@ -494,7 +494,7 @@ export async function zakljuciPartijuUBazi(
           novaDostignuca: [],
           dnkPrije: [],
           dnkPoslije: [],
-          ocjenaIgre: 0,
+          ocjenaIgre: null,
           bonusOcjenaIgre: 0,
           nizPrije: 0,
           nizPoslije: 0,
