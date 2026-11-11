@@ -11,7 +11,7 @@ Jedina svrha MVP-a: **provjeriti hoće li ljudi igrati**. Sve što tome ne prido
 | Dvoboj (2 igrača)      | 30 s po potezu, ispadanje prvog = kraj, bodovi i rangovi kao u javnoj igri                                     |
 | Četveroboj (4 igrača)  | 30 s po potezu, ispadanje do posljednjeg, bodovi (plasman + eliminacije + bonus), emoji reakcije, promatranje nakon ispadanja |
 | Privatna soba          | 2–8 igrača; vlasnik bira trajanje poteza i vrste riječi; vlastita privremena ljestvica, bez utjecaja na javne bodove/rang ([pravila-igre.md](../02-pravila-igre/pravila-igre.md)) |
-| Botovi za popunu       | Trajni identiteti, isti obračun za ljude, nenapadačka politika riječi; oznaka vidljiva samo administratoru ([ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md)) |
+| Botovi za popunu       | Trajni imenovani identiteti, isti obračun za ljude, bez XP/ranga/ljestvica/javnog profila; na završnom poretku oznaka „Bot”; namjenski avatari ([ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md)) |
 | Zagrijavanje           | Dvoboj protiv računala bez natjecateljske statistike/XP-a/kolekcije; registriranima se bilježi pobjednički napredak Zagrijanog ([botovi.md](../02-pravila-igre/botovi.md)) |
 | Registracija           | Email + lozinka; gost postaje račun bez gubitka statistike                                                     |
 | Rangovi                | Prikazni (Prvopisac → Kaladont), nakon 10 kalibracijskih partija                                               |
@@ -30,7 +30,7 @@ Jedina svrha MVP-a: **provjeriti hoće li ljudi igrati**. Sve što tome ne prido
 | Značajka                            | Zašto ne                                                                         | Gdje je zapisano                                                  |
 | ----------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | Matchmaking po rangu                | Premala baza igrača — fragmentirao bi red                                        | [ADR-008](../03-arhitektura/odluke/008-bez-matchmakinga-u-mvp.md) |
-| Botovi s vidljivom oznakom, chatom ili više težina | Prvo osnovna popuna i trening; vidi ADR-017                        | [ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md) |
+| Botovi s chatom ili više težina | Osnovna popuna + transparentnost avatarom/završnim poretkom; vidi ADR-017 | [ADR-017](../03-arhitektura/odluke/017-botovi-i-zagrijavanje.md) |
 | Tekstualni chat                     | Trošak moderacije                                                                | [pravila-igre.md](../02-pravila-igre/pravila-igre.md)             |
 | Monetizacija                        | Prvo dokaz retencije                                                             | [vizija-proizvoda.md](vizija-proizvoda.md)                        |
 | Mobilne aplikacije                  | Mobile-first web pokriva potrebu                                                 | —                                                                 |

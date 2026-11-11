@@ -324,7 +324,7 @@ describe('API obavijesti dostignuća', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, lozinka: 'lozinka123', nadimak: 'Obavijest' }),
+      body: JSON.stringify({ email, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true, nadimak: 'Obavijest' }),
     });
     expect(registracija.status).toBe(200);
     const tijelo = (await registracija.json()) as { sesijskiToken: string; igracId: string };

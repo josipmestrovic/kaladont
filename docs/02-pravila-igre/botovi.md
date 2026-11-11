@@ -63,9 +63,9 @@ Postavke se učitavaju jednom pri pokretanju procesa. Ako trajni zapis još ne p
 - Među dostupnim kandidatima istog prioriteta izbjegavaju se posljednja dva različita bot-protivnika čovjeka, zajednički za oba moda, bez dodatnog čekanja. Povijest nastaje samo nakon uspješnog početka, istječe nakon 24 h, ograničena je na 50.000 zapisa i ne preživljava restart.
 - Trajan profil, nadimak i avatar; statistika nastaje stvarnim odigranim javnim partijama.
 - Prije sljedeće rezervacije nakon spremljene igre osvježavaju se agregati i stvarni nizovi za oba javna moda. Bot sa zastarjelim profilom ostaje nedostupan dok osvježavanje ne uspije; neuspjeh ne zaustavlja druge slobodne botove.
-- Administrator vidi oznaku bota; običan igrač ne. Imenovani botovi ulaze na javne ljestvice jednako kao ljudi (isti minimum igara, metrike i razdoblja); gost-botovi ne. Imenovani botovi imaju javni profil kao registrirani igrači.
-- Jedan identitet igra najviše jednu partiju istodobno. Zamjenski fond v4 ima 80 imenovanih i 20 botova prikazanih kao „Gost”; tvrdi maksimum aktivnog fonda je 100. Stari identiteti se deaktiviraju, ne preimenuju niti brišu. Gost-bot je trajan račun kojim upravlja bot, nema javni profil ni ljestvicu, a nije običan privremeni gost.
-- Administrator može stvarati imenovane ili gost-botove, aktivirati/deaktivirati ih te mijenjati validirane postavke. Deaktivacija odmah sprječava nove rezervacije i oslobađa čekajuće rezervacije; već započete partije se dovršavaju. Sve promjene identiteta bilježe se s administratorom i vremenom.
+- Botovi nemaju javni profil, ne ulaze na ljudske ljestvice i ne dobivaju korisnički rang, XP, dostignuća ni misije. Ljudski rezultat u partiji s botovima ostaje valjan. Na završnom poretku bot ima nadimak i oznaku „Bot” (bez linka na profil); u čekaonici i tijekom partije nema bedža „Bot”, već namjenski avatar.
+- Jedan identitet igra najviše jednu partiju istodobno. Aktivni fond ima 80 imenovanih botova i 0 gost-botova; povijesni gost-botovi ostaju u bazi deaktivirani. Tvrdi maksimum aktivnog fonda ostaje 100. Stari identiteti se deaktiviraju, ne preimenuju niti brišu.
+- Administrator može stvarati samo imenovane botove, aktivirati/deaktivirati ih te mijenjati validirane postavke. Deaktivacija odmah sprječava nove rezervacije i oslobađa čekajuće rezervacije; već započete partije se dovršavaju. Sve promjene identiteta bilježe se s administratorom i vremenom.
 - Bot identitet ne može se prijaviti, resetirati lozinku ni biti preuzet.
 
 ## Zagrijavanje

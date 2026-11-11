@@ -16,9 +16,12 @@
     nizPobjeda?: number;
     /** Fiksna ilustracija (npr. bot za Zagrijavanje) umjesto konfiguracije / kataloga. */
     vanjskaSlika?: string | null;
+    /** Pristupačni opis (npr. Bot: Nadimak). */
+    opisSlike?: string | null;
   }
 
-  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null, razinaVatre = 0, nizPobjeda = 0, vanjskaSlika = null }: Props = $props();
+  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null, razinaVatre = 0, nizPobjeda = 0, vanjskaSlika = null, opisSlike = null }: Props = $props();
+  const altTekst = $derived(opisSlike ?? nazivAvatara(avatarId));
 
   const border = $derived(!prikaziRangBorder || vanjskaSlika ? null : bojaBordera(rang));
   const debljina = $derived(border ? debljinaBorderaRanga(velicina) : 0);
@@ -39,11 +42,11 @@
     {/if}
     <div class="avatar-sadrzaj">
       {#if vanjskaSlika}
-        <img class="vanjska-slika" src={vanjskaSlika} alt={nazivAvatara(avatarId)} />
+        <img class="vanjska-slika" src={vanjskaSlika} alt={altTekst} />
       {:else if konfiguracijaPrikaza}
         <AvatarKonfiguracijaPreview konfiguracija={konfiguracijaPrikaza} velicina={velicina} />
       {:else}
-        <img src={putanjaAvatara(avatarId)} alt={nazivAvatara(avatarId)} />
+        <img src={putanjaAvatara(avatarId)} alt={altTekst} />
       {/if}
     </div>
 </div>

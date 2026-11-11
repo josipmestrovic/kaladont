@@ -560,7 +560,7 @@ describe('P01 pohvale igre', () => {
     expect(audit).toHaveLength(0);
   });
 
-  it('P01-12/13: gost dobiva DTO pohvalu i brojač (O4); imenovani bot također može dobiti pohvalu', async () => {
+  it('P01-12/13: gost dobiva DTO pohvalu i brojač (O4); bot osvaja XP pohvalu bez profilnog napretka', async () => {
     await baza.insert(igraci).values([
       { id: gostId, vrsta: 'gost', upravljac: 'covjek', nadimak: 'Gost' },
       { id: botId, vrsta: 'registriran', upravljac: 'bot', nadimak: 'Bot' },
@@ -600,10 +600,11 @@ describe('P01 pohvale igre', () => {
     const [napredakGost] = await baza.select().from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, gostId));
     expect(napredakGost?.pohvaleNizUkupno ?? 0).toBe(1);
     const [napredakBot] = await baza.select().from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, botId));
-    expect(napredakBot?.pohvaleXpUkupno ?? 0).toBe(1);
+    expect(napredakBot?.pohvaleXpUkupno ?? 0).toBe(0);
     const auditBot = await baza.select().from(pohvaleIgre)
       .where(and(eq(pohvaleIgre.igraId, partijaId), eq(pohvaleIgre.igracId, botId)));
     expect(auditBot).toHaveLength(1);
+    expect(auditBot[0]?.vrsta).toBe('najvise_xp');
   });
 });
 

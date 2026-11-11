@@ -148,7 +148,7 @@ describe('POST /prijave-igraca', () => {
       url: '/api/racuni/registracija',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: `admin-prijave-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+      body: JSON.stringify({ email: `admin-prijave-${Date.now()}@example.com`, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(registracija.statusCode).toBe(200);
     const admin = registracija.json() as { igracId: string; sesijskiToken: string };
@@ -182,7 +182,7 @@ describe('POST /prijave-igraca', () => {
       url: '/api/racuni/registracija',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: `admin-brisanje-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+      body: JSON.stringify({ email: `admin-brisanje-${Date.now()}@example.com`, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const admin = registracija.json() as { igracId: string; sesijskiToken: string };
     igracIds.push(admin.igracId);
@@ -217,25 +217,33 @@ describe('POST /prijave-igraca', () => {
     await baza.update(partije).set({ status: 'zavrsena', pobjednikId: igracId }).where(eq(partije.id, partijaId));
     await baza.update(igraci).set({ upravljac: 'bot' }).where(eq(igraci.id, drugiIgracId));
 
-    const prijavaOdgovor = await app.inject({
+    const prijavaBota = await app.inject({
       url: '/api/prijave-igraca',
       method: 'POST',
       headers: { authorization: `Bearer ${sesijskiToken}`, 'content-type': 'application/json' },
       body: JSON.stringify({ partijaId, prijavljeniIgracId: drugiIgracId, razlog: 'pogrdan_nadimak' }),
     });
-    expect(prijavaOdgovor.statusCode).toBe(200);
+    expect(prijavaBota.statusCode).toBe(400);
+    expect(prijavaBota.json()).toMatchObject({ ok: false });
 
     const registracija = await app.inject({
       url: '/api/racuni/registracija',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: `admin-zasticen-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+      body: JSON.stringify({ email: `admin-zasticen-${Date.now()}@example.com`, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const admin = registracija.json() as { igracId: string; sesijskiToken: string };
     igracIds.push(admin.igracId);
     await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, admin.igracId));
 
-    const [prijava] = await baza.select().from(prijaveIgraca).where(eq(prijaveIgraca.partijaId, partijaId)).limit(1);
+    // Ručni unos prijave: API više ne prima prijave botova, ali admin put mora i dalje odbiti brisanje.
+    const [prijava] = await baza.insert(prijaveIgraca).values({
+      partijaId,
+      prijaviteljId: igracId,
+      prijavljeniIgracId: drugiIgracId,
+      razlog: 'pogrdan_nadimak',
+      poruka: 'Test bot zaštite',
+    }).returning();
     const brisanjeBota = await app.inject({
       url: `/api/admin/prijave-igraca/${prijava!.id}/obrisi-racun`,
       method: 'POST',

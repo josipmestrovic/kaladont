@@ -199,7 +199,17 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
       - name: Instalirati Chromium i WebKit za E2E
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: |
+          set -euo pipefail
+          # --with-deps povremeno padne na privremenom DNS-u apt mirrora; retry pa fallback bez apta.
+          if ! pnpm exec playwright install --with-deps chromium webkit; then
+            echo "Ponovni pokušaj Playwright install --with-deps…"
+            sleep 20
+            if ! pnpm exec playwright install --with-deps chromium webkit; then
+              echo "Apt deps nedostupni — instaliram samo preglednike (cache/runner deps)."
+              pnpm exec playwright install chromium webkit
+            fi
+          fi
 
       - name: Pokrenuti kritične Playwright E2E testove
         env:
@@ -393,7 +403,16 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
       - name: Instalirati Chromium za image E2E
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          set -euo pipefail
+          if ! pnpm exec playwright install --with-deps chromium; then
+            echo "Ponovni pokušaj Playwright install --with-deps…"
+            sleep 20
+            if ! pnpm exec playwright install --with-deps chromium; then
+              echo "Apt deps nedostupni — instaliram samo Chromium (cache/runner deps)."
+              pnpm exec playwright install chromium
+            fi
+          fi
 
       - name: Pokrenuti CI bazu
         run: docker compose -f docker-compose.ci.yml up -d --wait --wait-timeout 60 baza

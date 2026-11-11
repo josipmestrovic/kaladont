@@ -595,6 +595,8 @@ Prije proglašenja releasea uspješnim sve mora biti označeno:
 - [ ] `/zdravlje` i naslovnica provjereni su i s VPS-a pomoću `curl` naredbi.
 - [ ] Četiri odvojene sesije prošle osnovnu partiju.
 - [ ] Promijenjeno područje posebno testirano.
+- [ ] **Uvjeti 16+:** `/uvjeti` datum 11. 11. 2026.; dijalog (2 kućice) za gosta i postojeći račun prije reda/sobe/Zagrijavanja; registracija zahtijeva kućice.
+- [ ] **Botovi:** 0 aktivnih gost-botova; završni poredak pokazuje „Bot” bez linka na profil; ljestvica i javni profil bez botova; namjenski avatari (bez broken image).
 - [ ] Logovi pregledani.
 - [ ] Release evidentiran kao `staging-provjereno` ili `odbačeno`.
 

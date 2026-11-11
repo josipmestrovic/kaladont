@@ -10,6 +10,8 @@
   let nadimak = $state('');
   let email = $state('');
   let lozinka = $state('');
+  let potvrdaDob16 = $state(false);
+  let prihvacamUvjete = $state(false);
   let slanjeUTijeku = $state(false);
   let poruka = $state<string | null>(null);
 
@@ -24,13 +26,19 @@
   // Racun se stvara ovdje jer je editor avatara autenticirana ruta; avatar je zadnji korak tijeka.
   async function dovrsiregistraciju(e: SubmitEvent): Promise<void> {
     e.preventDefault();
-    if (slanjeUTijeku || !email || lozinka.length < 8) return;
+    if (slanjeUTijeku || !email || lozinka.length < 8 || !potvrdaDob16 || !prihvacamUvjete) return;
     slanjeUTijeku = true;
     poruka = null;
     try {
       const odgovor = await api<{ sesijskiToken: string }>('/racuni/registracija', {
         method: 'POST',
-        body: JSON.stringify({ email, lozinka, nadimak: nadimak.trim() }),
+        body: JSON.stringify({
+          email,
+          lozinka,
+          nadimak: nadimak.trim(),
+          potvrdaDob16: true,
+          prihvacamUvjete: true,
+        }),
       });
       spremiSesijskiToken(odgovor.sesijskiToken);
       await osvjeziSocketIdentitet();
@@ -92,7 +100,26 @@
 
       <UnosLozinke bind:vrijednost={lozinka} oznaka="Lozinka (min. 8 znakova)" najmanjaDuljina={8} />
 
-      <button type="submit" class="glavni-gumb" disabled={!email || lozinka.length < 8 || slanjeUTijeku}>
+      <label class="checkbox-redak">
+        <input type="checkbox" bind:checked={potvrdaDob16} />
+        <span>Potvrđujem da imam najmanje 16 godina.</span>
+      </label>
+      <label class="checkbox-redak">
+        <input type="checkbox" bind:checked={prihvacamUvjete} />
+        <span>
+          Pročitao/la sam i prihvaćam
+          <a href="/uvjeti" target="_blank" rel="noopener noreferrer">Uvjete korištenja</a>.
+        </span>
+      </label>
+      <p class="napomena-privatnost">
+        <a href="/privatnost" target="_blank" rel="noopener noreferrer">Pravila privatnosti</a>
+      </p>
+
+      <button
+        type="submit"
+        class="glavni-gumb"
+        disabled={!email || lozinka.length < 8 || !potvrdaDob16 || !prihvacamUvjete || slanjeUTijeku}
+      >
         {slanjeUTijeku ? 'Stvaram račun…' : 'Dalje: stvori avatar'}
       </button>
     </form>
@@ -186,5 +213,32 @@
     color: var(--boja-poraz-tekst);
     margin: 0;
     font-weight: 600;
+  }
+
+  .checkbox-redak {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--boja-tekst-sekundarni);
+    line-height: 1.4;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .checkbox-redak input {
+    margin-top: 3px;
+    flex-shrink: 0;
+  }
+
+  .checkbox-redak a,
+  .napomena-privatnost a {
+    color: var(--boja-tekst-naslov);
+    font-weight: 700;
+  }
+
+  .napomena-privatnost {
+    margin: -4px 0 0;
+    font-size: var(--tekst-sitni);
+    color: var(--boja-tekst-sekundarni);
   }
 </style>

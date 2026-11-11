@@ -90,6 +90,8 @@ const PROZOR_ISTODOBNIH_PREKIDA_MS = 25;
 // UX ekran mora trajati 5 s u razvoju, stagingu i produkciji. Samo testno okruženje
 // preskače čekanje kako integracijski testovi ne bi čekali stvarno vrijeme.
 const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;
+/** Privatna soba: domaćin je već pokrenuo igru — bez dodatnog odbrojavanja. */
+const ODGODA_POCETKA_PRIVATNE_PARTIJE_MS = 0;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
 const POCETNI_ODMAK_RETRYJA_REZULTATA_MS = 1_000;
 const MAKSIMALNI_ODMAK_RETRYJA_REZULTATA_MS = 30_000;
@@ -709,7 +711,19 @@ export function stvoriUpraviteljPartija(
     const poruka: StanjePartije = {
       partijaId: stanje.partijaId,
       mojIgracId: socket.data.igracId,
-      sjedala: stanje.sudionici.map(({ igracId, vrsta, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre }) => ({ igracId, nadimak, jeGost: vrsta === 'gost', avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre })),
+      sjedala: stanje.sudionici.map(({ igracId, vrsta, upravljac, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre }) => ({
+        igracId,
+        nadimak,
+        jeGost: upravljac !== 'bot' && vrsta === 'gost',
+        jeBot: upravljac === 'bot',
+        avatarId,
+        avatarConfig,
+        avatarRevision,
+        rang,
+        razina,
+        trenutniNiz,
+        razinaVatre,
+      })),
       turnToken: stanje.turnToken,
       naPotezuId: stanje.naPotezuId,
       trazenaSlova: stanje.trazenaSlova,
@@ -873,23 +887,25 @@ export function stvoriUpraviteljPartija(
     const politika = politikaZaKontekst(kontekst);
     const izmjesano = promijesajNiz(sudioniciUlaz);
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
+      const upravljac = s.upravljac ?? 'covjek';
+      const jeBot = upravljac === 'bot';
       const odigrane = mod === 'dva_igraca' ? (s.odigrane1v1 ?? 0) : s.odigrane;
       const bodoviUkupno = mod === 'dva_igraca' ? (s.bodovi1v1 ?? 0) : s.bodoviUkupno;
       const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
-      const rang = izracunajRang(odigrane, prosjekBodova, mod);
+      const rang = jeBot ? null : izracunajRang(odigrane, prosjekBodova, mod);
       return {
         igracId: s.igracId,
         vrsta: s.vrsta,
-        upravljac: s.upravljac ?? 'covjek',
+        upravljac,
         nadimak: s.nadimak,
         avatarId: s.avatarId,
         avatarConfig: s.avatarConfig,
         avatarRevision: s.avatarRevision,
         rang: rang === 'Piskaralo' ? null : rang,
         sjedalo,
-        razina: stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
-        trenutniNiz: mod === 'dva_igraca' ? (s.trenutniNiz1v1 ?? 0) : (s.trenutniNiz4p ?? 0),
-        razinaVatre: razinaVatre(mod === 'dva_igraca' ? (s.trenutniNiz1v1 ?? 0) : (s.trenutniNiz4p ?? 0), mod),
+        razina: jeBot ? 0 : stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
+        trenutniNiz: jeBot ? 0 : (mod === 'dva_igraca' ? (s.trenutniNiz1v1 ?? 0) : (s.trenutniNiz4p ?? 0)),
+        razinaVatre: jeBot ? 0 : razinaVatre(mod === 'dva_igraca' ? (s.trenutniNiz1v1 ?? 0) : (s.trenutniNiz4p ?? 0), mod),
       };
     });
     const partijaId = randomUUID();
@@ -1039,7 +1055,7 @@ export function stvoriUpraviteljPartija(
       const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
         partijaId,
         pocetakIso,
-        sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, jeGost: s.vrsta === 'gost', avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
+        sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, jeGost: s.upravljac !== 'bot' && s.vrsta === 'gost', jeBot: s.upravljac === 'bot', avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
         mod,
         kontekst,
       };
@@ -1141,6 +1157,7 @@ export function stvoriUpraviteljPartija(
         eliminacije,
         nacinIspadanja: (plasman === 1 ? 'pobjednik' : nacinIspadanjaZaIgraca(stanje, igracId)) as NacinIspadanja,
         javniProfil: sudionik ? imaJavniProfil(sudionik) : false,
+        jeBot: sudionik?.upravljac === 'bot',
       };
     });
 
@@ -2523,7 +2540,7 @@ export function stvoriUpraviteljPartija(
     });
     const partijaId = randomUUID();
     const prviIgracId = sudionici[0]!.igracId;
-    const odgodaMs = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PARTIJE_MS;
+    const odgodaMs = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PRIVATNE_PARTIJE_MS;
     const pocetakIso = new Date(sat.sada() + odgodaMs).toISOString();
 
     const stanje: StanjeStola = {
@@ -2616,7 +2633,7 @@ export function stvoriUpraviteljPartija(
     const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
       partijaId,
       pocetakIso,
-      sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, jeGost: s.vrsta === 'gost', avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
+      sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, jeGost: s.upravljac !== 'bot' && s.vrsta === 'gost', jeBot: s.upravljac === 'bot', avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
       kontekst: 'privatna',
       jePrivatna: true,
       kodSobe,

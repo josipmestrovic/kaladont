@@ -72,7 +72,7 @@ describe('bot identitet', () => {
     await expect(razrijesiIdentitet(sesija.token)).rejects.toThrow();
   });
 
-  it('imenovani bot ulazi na ljestvicu jednako kao čovjek; gost-bot ne', async () => {
+  it('nijedan bot ne ulazi na ljestvicu; samo ljudski igrači', async () => {
     const OD = new Date('2002-03-05T23:00:00Z');
     const DO = new Date('2002-03-12T23:00:00Z');
     const imenovaniId = await noviBot(`Im${randomUUID().slice(0, 6)}`);
@@ -93,9 +93,8 @@ describe('bot identitet', () => {
     const poredak = await izracunajPoredak('dva_igraca', 'prosjek_bodova', 'tjedno', OD, DO);
     const idovi = [...poredak.poIgracu.keys()];
     expect(idovi).toContain(covjekId);
-    expect(idovi).toContain(imenovaniId);
+    expect(idovi).not.toContain(imenovaniId);
     expect(idovi).not.toContain(gostId);
-    expect(poredak.poIgracu.get(imenovaniId)?.odigraneIgre).toBe(6);
     expect(poredak.poIgracu.get(covjekId)?.odigraneIgre).toBe(6);
   });
 });

@@ -33,12 +33,12 @@ beforeAll(async () => {
 
   const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, lozinka, nadimak: 'Mislilac' }),
+    body: JSON.stringify({ email, lozinka, nadimak: 'Mislilac', potvrdaDob16: true, prihvacamUvjete: true }),
   });
   ({ igracId, sesijskiToken: token } = await registracija.json() as { igracId: string; sesijskiToken: string });
   const registracijaAdmin = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: emailAdmin, lozinka, nadimak: 'AdminMisli' }),
+    body: JSON.stringify({ email: emailAdmin, lozinka, nadimak: 'AdminMisli', potvrdaDob16: true, prihvacamUvjete: true }),
   });
   const admin = await registracijaAdmin.json() as { igracId: string; sesijskiToken: string };
   tokenAdmin = admin.sesijskiToken;

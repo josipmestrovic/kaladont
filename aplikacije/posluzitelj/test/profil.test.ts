@@ -58,7 +58,7 @@ describe('GET /profil', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
 
@@ -77,7 +77,7 @@ describe('GET /profil', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
 
@@ -109,7 +109,7 @@ describe('GET /profil', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
     const headers = { authorization: `Bearer ${sesijskiToken}` };
@@ -134,7 +134,7 @@ describe('GET /aktivnost i /povijest', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
     const headers = { authorization: `Bearer ${sesijskiToken}` };
@@ -173,7 +173,7 @@ describe('GET /ljestvica', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
     await baza
@@ -198,7 +198,7 @@ describe('GET /ljestvica', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
     const partijaId = randomUUID();
@@ -250,7 +250,7 @@ describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
     await baza.update(igraci).set({ vrsta: 'admin' }).where(eq(igraci.id, igracId));
@@ -278,7 +278,7 @@ describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
     const arhivaOdgovor = await fetch(`${adresa}/api/partije/${javnaPartijaId}/plasmani`);
     const arhiva = (await arhivaOdgovor.json()) as { partija: { plasmani: { igracId: string; nadimak: string; plasman: number; bodovi: number }[] } };
     expect(arhivaOdgovor.status).toBe(200);
-    expect(arhiva.partija.plasmani).toEqual([{ igracId, nadimak: 'Povijesni Nadimak', plasman: 1, bodovi: 2, eliminacije: 0, nacinIspadanja: 'pobjednik', javniProfil: true }]);
+    expect(arhiva.partija.plasmani).toEqual([{ igracId, nadimak: 'Povijesni Nadimak', plasman: 1, bodovi: 2, eliminacije: 0, nacinIspadanja: 'pobjednik', javniProfil: true, jeBot: false }]);
   });
 });
 
@@ -388,7 +388,7 @@ describe('PUT /profil/avatar', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
 
@@ -407,7 +407,7 @@ describe('PUT /profil/avatar', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
 

@@ -108,7 +108,7 @@ describe('analitika otvaranja upis i admin', () => {
       url: '/api/racuni/registracija',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: `obicni-analitika-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+      body: JSON.stringify({ email: `obicni-analitika-${Date.now()}@example.com`, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(registracija.statusCode).toBe(200);
     const { sesijskiToken } = registracija.json() as { sesijskiToken: string };
@@ -125,7 +125,7 @@ describe('analitika otvaranja upis i admin', () => {
       url: '/api/racuni/registracija',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: `admin-analitika-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+      body: JSON.stringify({ email: `admin-analitika-${Date.now()}@example.com`, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(registracija.statusCode).toBe(200);
     const { igracId, sesijskiToken } = registracija.json() as { igracId: string; sesijskiToken: string };

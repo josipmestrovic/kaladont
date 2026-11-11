@@ -4,7 +4,6 @@
   import { SVE_VRSTE_RIJECI, type PostavkePrivatneSobe, type VrstaRijeci } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
-
   const OZNACI_VRSTA: Record<VrstaRijeci, string> = {
     imenica: 'Imenice',
     glagol: 'Glagoli',
@@ -70,7 +69,7 @@
     };
   });
 
-  function stvoriSobu(e: SubmitEvent) {
+  async function stvoriSobu(e: SubmitEvent) {
     e.preventDefault();
     if (slanjeUTijeku) return;
     slanjeUTijeku = true;

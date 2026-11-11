@@ -164,14 +164,15 @@ describe('dostignuća D03 Top 10', () => {
     partijeZaBrisanje.splice(0);
   });
 
-  it('deseto mjesto ulazi, jedanaesto ne; bot i gost zauzimaju mjesto bez nagrade', async () => {
+  it('deseto mjesto ulazi, jedanaesto ne; bot nije na ljestvici, gost zauzima mjesto bez nagrade', async () => {
     const bot = await noviIgrac('BotD03', 'registriran', 'bot');
     const gost = await noviIgrac('GostD03', 'gost');
     await igre(bot, 10, 500, 'cetiri_igraca', DAN);
     await igre(gost, 10, 400, 'cetiri_igraca', DAN);
 
+    // Botovi su isključeni s ljestvice; gost zauzima 1/10 bez nagrade → treba 9 ljudskih nagrada.
     const nagrađeni: string[] = [];
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 9; i += 1) {
       const id = await noviIgrac(`H${i}`);
       nagrađeni.push(id);
       await igre(id, 10, 300 - i * 20, 'cetiri_igraca', DAN);
@@ -182,7 +183,7 @@ describe('dostignuća D03 Top 10', () => {
     const pocetak = performance.now();
     await snimi('cetiri_igraca', DAN);
     const trajanjeMs = performance.now() - pocetak;
-    console.info(`D03 snimka i dodjela (11 rangiranih): ${trajanjeMs.toFixed(0)} ms`);
+    console.info(`D03 snimka i dodjela (gost+9+1 ljudskih, bot izvan): ${trajanjeMs.toFixed(0)} ms`);
     expect(trajanjeMs).toBeLessThan(15_000);
 
     for (const id of nagrađeni) {

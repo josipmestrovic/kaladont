@@ -37,7 +37,7 @@ beforeAll(async () => {
   const registracijaAdmin = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL_ADMIN, lozinka: LOZINKA }),
+    body: JSON.stringify({ email: EMAIL_ADMIN, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
   });
   const registracija = (await registracijaAdmin.json()) as {
     igracId: string;
@@ -51,7 +51,7 @@ beforeAll(async () => {
   const registracijaObican = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL_OBICAN, lozinka: LOZINKA }),
+    body: JSON.stringify({ email: EMAIL_OBICAN, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
   });
   ({ sesijskiToken: obicanToken } = (await registracijaObican.json()) as { sesijskiToken: string });
 });

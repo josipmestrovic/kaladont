@@ -6,21 +6,19 @@ import {
 } from '../src/igra/gamifikacija-racuna.js';
 
 describe('gamifikacija-racuna', () => {
-  it('imenovani bot u igri prima gamifikaciju i ima javni profil', () => {
-    const bot = { upravljac: 'bot' as const, vrsta: 'registriran' as const };
-    expect(primaProfilnuGamifikacijuUIgri(bot)).toBe(true);
-    expect(imaJavniProfil(bot)).toBe(true);
-  });
-
-  it('gost-bot u igri ne prima gamifikaciju ni javni profil', () => {
+  it('nijedan bot ne prima gamifikaciju ni javni profil', () => {
+    const imenovani = { upravljac: 'bot' as const, vrsta: 'registriran' as const };
     const gostBot = { upravljac: 'bot' as const, vrsta: 'gost' as const };
+    expect(primaProfilnuGamifikacijuUIgri(imenovani)).toBe(false);
+    expect(imaJavniProfil(imenovani)).toBe(false);
     expect(primaProfilnuGamifikacijuUIgri(gostBot)).toBe(false);
     expect(imaJavniProfil(gostBot)).toBe(false);
   });
 
-  it('u upisu tip gost isključuje botove i kad je igraci.vrsta=registriran', () => {
-    expect(primaProfilnuGamifikaciju('registriran', 'bot', 'imenovani')).toBe(true);
+  it('u upisu botovi nikad ne primaju profilnu gamifikaciju', () => {
+    expect(primaProfilnuGamifikaciju('registriran', 'bot', 'imenovani')).toBe(false);
     expect(primaProfilnuGamifikaciju('registriran', 'bot', 'gost')).toBe(false);
     expect(primaProfilnuGamifikaciju('gost', 'covjek')).toBe(true);
+    expect(primaProfilnuGamifikaciju('registriran', 'covjek')).toBe(true);
   });
 });

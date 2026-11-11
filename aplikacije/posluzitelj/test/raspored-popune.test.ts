@@ -27,7 +27,7 @@ describe('povrat namjere reda nakon neuspjelog početka', () => {
       for (const socket of io.sockets.sockets.values()) socket.leave('red-cekanja-1v1');
       oznaciPocetak();
       return new Promise<RezultatPokretanja>((resolve) => { dovrsiPokusaj = resolve; });
-    }, () => false, () => false, () => true, () => true, () => true, () => undefined);
+    }, () => false, () => false, () => true, async () => null, () => true, () => undefined);
     try {
       await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
       const podaci = http.address();

@@ -89,6 +89,7 @@ export interface PodaciSocketa {
   bodovi1v1: number;
   iskustvoUkupno: number;
   emailPotvrdjen: boolean;
+  uvjetiPrihvaceni: boolean;
   trenutniNiz4p: number;
   trenutniNiz1v1: number;
 }
@@ -358,8 +359,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   });
 
   const registarVeza = new RegistarVeza();
-  const igracMozeIgrati = (socket: KaladontSocket): boolean =>
-    socket.data.vrsta === 'gost' || socket.data.emailPotvrdjen;
+  const razlogBlokadeIgre = async (
+    socket: KaladontSocket,
+  ): Promise<{ kod: 'EMAIL_NIJE_POTVRDEN'; poruka: string } | null> => {
+    if (socket.data.vrsta !== 'gost' && !socket.data.emailPotvrdjen) {
+      return { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' };
+    }
+    return null;
+  };
 
   const zatvoriSocketSesiju = (socket: KaladontSocket) => {
     socket.emit('veza:zatvorena', { kod: 'SESIJA_ISTEKLA', poruka: 'Sesija je istekla ili je opozvana.' });
@@ -573,6 +580,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       socket.data.bodovi1v1 = identitet.bodovi1v1;
       socket.data.iskustvoUkupno = identitet.iskustvoUkupno;
       socket.data.emailPotvrdjen = identitet.emailPotvrdjen;
+      socket.data.uvjetiPrihvaceni = identitet.uvjetiPrihvaceni;
       const nizovi = await baza.select({ mod: nizoviPobjedaIgraca.mod, trenutniNiz: nizoviPobjedaIgraca.trenutniNiz })
         .from(nizoviPobjedaIgraca).where(eq(nizoviPobjedaIgraca.igracId, identitet.igracId));
       socket.data.trenutniNiz4p = nizovi.find((niz) => niz.mod === 'cetiri_igraca')?.trenutniNiz ?? 0;
@@ -639,7 +647,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     upravitelj.imaAktivnuPartiju,
     (igracId) => igracImaPrivatnuSobu(igracId),
     () => upravitelj.mozePokrenutiPartiju() && upravitelj.brojAktivnihPartija() < socketOgranicenja.maksimalnoAktivnihPartija,
-    igracMozeIgrati,
+    razlogBlokadeIgre,
     provjeriDogadaj,
     zapisSocketHandlerGreske,
     {
@@ -744,7 +752,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       provjeriDogadaj,
       zapisSocketHandlerGreske,
       igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
-      igracMozeIgrati,
+      razlogBlokadeIgre,
       ukloniIzJavnogReda: redServis.ukloniIzReda,
       dopustiVlastitaImena: konfiguracija.DOPUSTI_VLASTITA_IMENA === 'true',
     },

@@ -45,7 +45,7 @@ async function registriraj(nadimak = 'Aktivni'): Promise<{ token: string; igracI
   const odgovor = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, lozinka: 'lozinka123', nadimak }),
+    body: JSON.stringify({ email, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true, nadimak }),
   });
   expect(odgovor.status).toBe(200);
   const tijelo = (await odgovor.json()) as { sesijskiToken: string; igracId: string };

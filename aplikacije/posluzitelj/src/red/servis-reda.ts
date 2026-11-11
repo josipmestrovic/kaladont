@@ -38,7 +38,7 @@ export function registrirajRedCekanja(
   igracImaAktivnuPartiju: (igracId: string) => boolean,
   igracImaPrivatnuSobu: (igracId: string) => boolean,
   mozeStvoritiPartiju: () => boolean,
-  igracMozeIgrati: (socket: import('../server.js').KaladontSocket) => boolean,
+  razlogBlokadeIgre: (socket: import('../server.js').KaladontSocket) => Promise<{ kod: 'EMAIL_NIJE_POTVRDEN'; poruka: string } | null>,
   provjeriDogadaj: ProvjeriOgranicenjeDogadaja,
   zapisSocketHandlerGreske: ZapisSocketHandlerGreske,
   popunaOpcije?: OpcijePopuneReda,
@@ -86,20 +86,22 @@ export function registrirajRedCekanja(
       const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
       const rang = izracunajRang(odigrane, prosjekBodova, mod);
 
+      const jeBot = stavka.upravljac === 'bot';
       mjesta[indeks] = {
         igracId: stavka.igracId,
         nadimak: stavka.nadimak,
-        jeGost: stavka.vrsta === 'gost',
+        jeGost: !jeBot && stavka.vrsta === 'gost',
+        jeBot,
         avatarId: stavka.avatarId,
         avatarConfig: stavka.avatarConfig,
         avatarRevision: stavka.avatarRevision,
-        rang: rang === 'Piskaralo' ? null : rang,
-        razina: stanjeIskustva(stavka.iskustvoUkupno ?? 0).razina,
-        odigrane,
-        prosjekBodova,
-        postotakPobjeda: odigrane > 0 ? (pobjede / odigrane) * 100 : 0,
-        trenutniNiz: mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0),
-        razinaVatre: razinaVatre(mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0), mod),
+        rang: jeBot || rang === 'Piskaralo' ? null : rang,
+        razina: jeBot ? 0 : stanjeIskustva(stavka.iskustvoUkupno ?? 0).razina,
+        odigrane: jeBot ? 0 : odigrane,
+        prosjekBodova: jeBot ? 0 : prosjekBodova,
+        postotakPobjeda: jeBot || odigrane <= 0 ? 0 : (pobjede / odigrane) * 100,
+        trenutniNiz: jeBot ? 0 : (mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0)),
+        razinaVatre: jeBot ? 0 : razinaVatre(mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0), mod),
       };
     });
     return { mojIgracId, mod, mjesta, prosjekCekanjaSek: dohvatiProsjekCekanjaSek() };
@@ -193,7 +195,7 @@ export function registrirajRedCekanja(
       socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
     }));
 
-    socket.on('red:udji', omotajSocketHandler(socket, 'red:udji', zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+    socket.on('red:udji', omotajSocketHandler(socket, 'red:udji', zapisSocketHandlerGreske, async (...argumenti: unknown[]) => {
       const [payload, mogucaPotvrda, ...dodatniArgumenti] = argumenti;
       const rezultat = ShemaPayloadReda.safeParse(payload);
       const potvrda = typeof mogucaPotvrda === 'function'
@@ -207,8 +209,9 @@ export function registrirajRedCekanja(
         potvrda?.(null);
         return;
       }
-      if (!igracMozeIgrati(socket)) {
-        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
+      const blokada = await razlogBlokadeIgre(socket);
+      if (blokada) {
+        socket.emit('greska', blokada);
         potvrda?.(null);
         return;
       }

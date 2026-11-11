@@ -42,7 +42,8 @@ export async function stvoriBotovePoKljucima(ulazi: readonly UlazNovogBota[], ad
   if (new Set(ulazi.map((ulaz) => ulaz.kljucSeeda)).size !== ulazi.length) throw new Error('Ključevi botova u zahtjevu moraju biti jedinstveni.');
   for (const ulaz of ulazi) {
     if (!/^[a-z0-9][a-z0-9-]{2,79}$/.test(ulaz.kljucSeeda)) throw new Error('Neispravan verzionirani ključ bota.');
-    if (ulaz.tip !== 'gost' && ulaz.tip !== 'imenovani') throw new Error('Nepoznata vrsta prezentacije bota.');
+    if (ulaz.tip === 'gost') throw new Error('Novi gost-botovi nisu dopušteni.');
+    if (ulaz.tip !== 'imenovani') throw new Error('Nepoznata vrsta prezentacije bota.');
     if (ulaz.nadimak && (!UZORAK_NADIMKA.test(ulaz.nadimak) || ulaz.nadimak.length < MINIMALNA_DULJINA_NADIMKA || ulaz.nadimak.length > MAKSIMALNA_DULJINA_NADIMKA)) throw new Error('Nadimak ne prolazi provjeru formata.');
   }
 
@@ -65,11 +66,12 @@ export async function stvoriBotovePoKljucima(ulazi: readonly UlazNovogBota[], ad
 }
 
 export async function stvoriNoveBotove(broj: number, tip: 'imenovani' | 'gost', adminId: string, aktivniLimit = MAKSIMALNO_AKTIVNIH_BOTOVA): Promise<RezultatStvaranjaBotova> {
+  if (tip === 'gost') throw new Error('Novi gost-botovi nisu dopušteni.');
   if (!Number.isInteger(broj) || broj < 1 || broj > 100) throw new Error('Broj novih botova mora biti cijeli broj od 1 do 100.');
   const serija = randomUUID();
   return stvoriBotovePoKljucima(Array.from({ length: broj }, (_, indeks) => ({
     kljucSeeda: `bot-admin-${tip}-${serija}-${String(indeks + 1).padStart(3, '0')}`,
-    tip,
+    tip: 'imenovani',
   })), adminId, aktivniLimit);
 }
 

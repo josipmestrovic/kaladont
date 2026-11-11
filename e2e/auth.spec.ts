@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { oznaciPrihvatNaRegistraciji } from './pomocnici/uvjeti.js';
 
 test('registracija i prijava zadržavaju sesiju nakon reloadanja', async ({ page }) => {
   const email = `e2e-${Date.now()}@example.com`;
@@ -7,10 +8,13 @@ test('registracija i prijava zadržavaju sesiju nakon reloadanja', async ({ page
   const nadimak = page.getByPlaceholder('Tvoj nadimak');
   await nadimak.fill('E2EIgrac');
   await expect(nadimak).toHaveValue('E2EIgrac');
-  await page.getByRole('button', { name: 'Dalje' }).click();
+  await page.getByRole('button', { name: 'Dalje', exact: true }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
-  await page.getByRole('button', { name: 'Dalje' }).click();
+  await oznaciPrihvatNaRegistraciji(page);
+  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
+  await expect(daljeAvatar).toBeEnabled();
+  await daljeAvatar.click();
 
   await expect(page).toHaveURL('/profil/avatar?registracija=1');
   await page.getByRole('button', { name: 'Završi registraciju' }).click();
@@ -30,10 +34,13 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
 
   await page.goto('/registracija');
   await page.getByPlaceholder('Tvoj nadimak').fill('LogoutIgrac');
-  await page.getByRole('button', { name: 'Dalje' }).click();
+  await page.getByRole('button', { name: 'Dalje', exact: true }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
-  await page.getByRole('button', { name: 'Dalje' }).click();
+  await oznaciPrihvatNaRegistraciji(page);
+  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
+  await expect(daljeAvatar).toBeEnabled();
+  await daljeAvatar.click();
   await expect(page).toHaveURL('/profil/avatar?registracija=1');
   await page.getByRole('button', { name: 'Završi registraciju' }).click();
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
@@ -78,7 +85,33 @@ test('stranica privatnosti prikazuje GDPR kontakt i postupak brisanja', async ({
   await expect(page.getByRole('heading', { name: 'Pravila privatnosti' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'info@kaladont.hr' }).first()).toBeVisible();
   await expect(page.getByText(/roku do 7 dana/)).toBeVisible();
-  await expect(page.getByText(/piši farmaceut/)).toBeVisible();
+  await expect(page.getByText(/STACK/)).toBeVisible();
+});
+
+test('stranica uvjeta prikazuje 16+ i datum objave', async ({ page }) => {
+  await page.goto('/uvjeti');
+  await expect(page.getByRole('heading', { name: 'Uvjeti korištenja' })).toBeVisible();
+  await expect(page.getByText(/najmanje 16 godina/i).first()).toBeVisible();
+  await expect(page.getByText(/11\. studenoga 2026/)).toBeVisible();
+  await expect(page.getByText(/nemaju javne korisničke profile/i)).toBeVisible();
+});
+
+test('registracija bez kućica ne prolazi', async ({ page }) => {
+  await page.goto('/registracija');
+  await page.getByPlaceholder('Tvoj nadimak').fill('BezKucica');
+  await page.getByRole('button', { name: 'Dalje', exact: true }).click();
+  await page.getByLabel('Email').fill(`bez-kucica-${Date.now()}@example.com`);
+  await page.getByLabel('Lozinka').fill('lozinka123');
+  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
+  await expect(daljeAvatar).toBeDisabled();
+  await expect(page).toHaveURL('/registracija');
+  await expect(page.getByRole('checkbox').first()).toBeVisible();
+});
+
+test('gost ulazi u red bez dijaloga Uvjeta', async ({ page }) => {
+  await page.goto('/red');
+  await expect(page.getByRole('dialog', { name: /16 godina/i })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/red/);
 });
 
 test('izbornik uvjeta i privatnosti vodi na pravne stranice', async ({ page }) => {

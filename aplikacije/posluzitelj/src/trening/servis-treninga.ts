@@ -43,7 +43,7 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
   }
 
   io.on('connection', (socket) => {
-    socket.on('trening:zapocni', omotajSocketHandler(socket, 'trening:zapocni', opcije.zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+    socket.on('trening:zapocni', omotajSocketHandler(socket, 'trening:zapocni', opcije.zapisSocketHandlerGreske, async (...argumenti: unknown[]) => {
       const [prvi, drugi, ...dodatni] = argumenti;
       const potvrda = typeof prvi === 'function' ? prvi as PotvrdaTreninga : typeof drugi === 'function' ? drugi as PotvrdaTreninga : undefined;
       const payload = typeof prvi === 'function' ? undefined : prvi;
@@ -60,6 +60,7 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
         odbij(socket, potvrda, 'TRENING_NEDOSTUPAN', 'Zagrijavanje trenutačno nije dostupno.');
         return;
       }
+      // Zagrijavanje ostaje otvoreno i bez potvrđenog emaila (ADR-017 / protokol §6).
       if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {
         odbij(socket, potvrda, 'VEC_U_PARTIJI', 'Već si u partiji. Završi je prije treninga.');
         return;

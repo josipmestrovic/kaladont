@@ -470,6 +470,48 @@ export async function zakljuciPartijuUBazi(
       const vrstaIgraca = stariIgrac?.vrsta ?? 'gost';
       const botTip = (stariIgrac?.botTip ?? null) as BotTipPrezentacije | null;
       const primaGamifikaciju = primaProfilnuGamifikaciju(vrstaIgraca, upravljac, botTip);
+
+      // Bot: samo zapis sudionika/povijesti partije; bez nizova, forme, kolekcije, DNK, XP/ranga.
+      // Pohvale se i dalje dodjeljuju kasnije iz agregata + osnovniBrutoPoIgracu.
+      if (!samoStatistika && upravljac === 'bot') {
+        await tx
+          .update(sudioniciPartije)
+          .set({
+            plasman: r.plasman,
+            bodovi: r.bodovi,
+            eliminacije: r.eliminacije,
+            iskustvo: r.iskustvo,
+            nacinIspadanja: r.nacinIspadanja,
+            ...sazetakMetrika(statistike.get(r.igracId)),
+          })
+          .where(and(eq(sudioniciPartije.partijaId, partijaId), eq(sudioniciPartije.igracId, r.igracId)));
+        agregati.set(r.igracId, {
+          bodoviUkupno: stariIgrac?.bodovi ?? 0,
+          odigrane: stariIgrac?.odigrane ?? 0,
+          pobjede: 0,
+          iskustvoUkupno: stariIgrac?.iskustvoUkupno ?? 0,
+          dovrseneIgre: 0,
+          novaDostignuca: [],
+          dnkPrije: [],
+          dnkPoslije: [],
+          ocjenaIgre: null,
+          bonusOcjenaIgre: 0,
+          nizPrije: 0,
+          nizPoslije: 0,
+          najboljiNiz: 0,
+          osnovniXp: 0,
+          bonusPobjednickogNizaPostotak: 0,
+          bonusPobjednickogNizaXp: 0,
+          forma: null,
+          pohvale: [],
+          upravljac,
+          vrstaIgraca,
+          botTip,
+          iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
+        });
+        continue;
+      }
+
       const [staraDnkStatistika] = await tx.select().from(dnkStatistikeIgraca)
         .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)))
         .limit(1);
@@ -566,9 +608,7 @@ export async function zakljuciPartijuUBazi(
             eliminacije1v1: sql`${igraci.eliminacije1v1} + ${r.eliminacije}`,
             bodovi1v1: sql`${igraci.bodovi1v1} + ${r.bodovi}`,
             iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
-            ...(upravljac === 'covjek'
-              ? { dovrseneIgre: sql`${igraci.dovrseneIgre} + 1` }
-              : {}),
+            dovrseneIgre: sql`${igraci.dovrseneIgre} + 1`,
           })
           .where(eq(igraci.id, r.igracId))
           .returning({
@@ -610,9 +650,7 @@ export async function zakljuciPartijuUBazi(
             eliminacijeUkupno: sql`${igraci.eliminacijeUkupno} + ${r.eliminacije}`,
             bodoviUkupno: sql`${igraci.bodoviUkupno} + ${r.bodovi}`,
             iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
-            ...(upravljac === 'covjek'
-              ? { dovrseneIgre: sql`${igraci.dovrseneIgre} + 1` }
-              : {}),
+            dovrseneIgre: sql`${igraci.dovrseneIgre} + 1`,
           })
           .where(eq(igraci.id, r.igracId))
           .returning({
@@ -889,7 +927,7 @@ export async function zakljuciPartijuUBazi(
         });
         agregatZaDnk.bonusOcjenaIgre = postotakXpZaOcjenu(agregatZaDnk.ocjenaIgre);
         const bonusIskustva = Math.round(r.iskustvo * agregatZaDnk.bonusOcjenaIgre / 100);
-        if (bonusIskustva > 0 && !samoStatistika) {
+        if (bonusIskustva > 0 && !samoStatistika && primaGamifikaciju) {
           const [azuriranoIskustvo] = await tx.update(igraci)
             .set({ iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${bonusIskustva}, ${MAKSIMALNO_ISKUSTVO})` })
             .where(eq(igraci.id, r.igracId))

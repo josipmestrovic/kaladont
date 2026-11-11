@@ -20,7 +20,9 @@ export async function stvoriIgrace(browser: Browser, broj: number): Promise<E2EI
 }
 
 export async function udjiUJavniRed(igraci: readonly E2EIgrac[], mod: 'dva_igraca' | 'cetiri_igraca') {
-  await Promise.all(igraci.map((igrac) => igrac.stranica.goto(`/red?mod=${mod}`)));
+  await Promise.all(igraci.map(async (igrac) => {
+    await igrac.stranica.goto(`/red?mod=${mod}`);
+  }));
 }
 
 export async function cekajIstuPartiju(igraci: readonly E2EIgrac[]): Promise<string> {

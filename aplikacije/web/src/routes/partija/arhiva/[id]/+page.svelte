@@ -12,6 +12,7 @@
     eliminacije: number;
     nacinIspadanja: string | null;
     javniProfil: boolean;
+    jeBot?: boolean;
   }
 
   interface Arhiva {
@@ -89,11 +90,18 @@
             {:else}
               <span>{igrac.nadimak}</span>
             {/if}
+            {#if igrac.jeBot}
+              <small>Bot</small>
+            {:else if !igrac.javniProfil}
+              <small>Gost</small>
+            {/if}
             <small>{igrac.bodovi} bodova · {igrac.eliminacije} eliminacija</small>
           </div>
-          <button type="button" class="prijavi-gumb" title="Prijavi igrača" aria-label={`Prijavi igrača ${igrac.nadimak}`} onclick={() => { prijavljeniIgrac = igrac; porukaPrijave = null; }}>
-            ⚑
-          </button>
+          {#if !igrac.jeBot}
+            <button type="button" class="prijavi-gumb" title="Prijavi igrača" aria-label={`Prijavi igrača ${igrac.nadimak}`} onclick={() => { prijavljeniIgrac = igrac; porukaPrijave = null; }}>
+              ⚑
+            </button>
+          {/if}
         </article>
       {/each}
     </section>

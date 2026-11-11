@@ -11,7 +11,7 @@ const shemaKonfiguracije = z.object({
   BAZA_URL: z.string().min(1, 'BAZA_URL nije postavljen'),
   SESIJA_TAJNA: z.string().min(1, 'SESIJA_TAJNA nije postavljen'),
   EMAIL_API_KLJUC: z.string().default(''),
-  EMAIL_POSILJATELJ: z.string().email().default('noreply@kaladont.hr'),
+  EMAIL_POSILJATELJ: z.string().email().default('info@kaladont.hr'),
   JAVNA_ADRESA: z.string().url().default('http://localhost:3000'),
   DEV_MAIL: z.string().email().default('dev@example.com'),
   NADZOR_EMAIL_OMOGUCEN: z.enum(['true', 'false']).default('false'),

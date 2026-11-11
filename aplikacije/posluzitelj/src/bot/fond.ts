@@ -32,7 +32,14 @@ export async function ucitajIdentiteteBotova(igracIdovi?: readonly string[], ukl
     iskustvoUkupno: igraci.iskustvoUkupno,
   }).from(botovi)
     .innerJoin(igraci, eq(igraci.id, botovi.igracId))
-    .where(and(ukljuciNeaktivne ? undefined : eq(botovi.aktivan, true), eq(igraci.upravljac, 'bot'), isNull(igraci.obrisanAt), igracIdovi ? inArray(igraci.id, [...igracIdovi]) : undefined));
+    .where(and(
+      ukljuciNeaktivne ? undefined : eq(botovi.aktivan, true),
+      // Aktivni fond više ne uključuje gost-botove (povijesni tip='gost' ostaje u bazi).
+      ukljuciNeaktivne ? undefined : eq(botovi.tip, 'imenovani'),
+      eq(igraci.upravljac, 'bot'),
+      isNull(igraci.obrisanAt),
+      igracIdovi ? inArray(igraci.id, [...igracIdovi]) : undefined,
+    ));
   const nizovi = retci.length ? await baza.select().from(nizoviPobjedaIgraca).where(inArray(nizoviPobjedaIgraca.igracId, retci.map((redak) => redak.igracId))) : [];
   const poIgracu = new Map<string, { dva: number; cetiri: number }>();
   for (const niz of nizovi) {

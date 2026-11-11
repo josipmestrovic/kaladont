@@ -4,10 +4,14 @@ async function registrirajSe(page: Page, nadimak: string): Promise<void> {
   const email = `e2e-misije-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
   await page.goto('/registracija');
   await page.getByPlaceholder('Tvoj nadimak').fill(nadimak);
-  await page.getByRole('button', { name: 'Dalje' }).click();
+  await page.getByRole('button', { name: 'Dalje', exact: true }).click();
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
-  await page.getByRole('button', { name: 'Dalje' }).click();
+  await page.getByRole('checkbox', { name: /najmanje 16 godina/i }).check();
+  await page.getByRole('checkbox', { name: /Uvjete korištenja/i }).check();
+  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
+  await expect(daljeAvatar).toBeEnabled();
+  await daljeAvatar.click();
   await expect(page).toHaveURL('/profil/avatar?registracija=1');
   await page.getByRole('button', { name: 'Završi registraciju' }).click();
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');

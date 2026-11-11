@@ -72,13 +72,7 @@ function upitPoretka(mod: ModPartije, metrika: MetrikaLjestvice, od: Date, doTre
       where p.status = 'zavrsena' and p.mod = ${mod}
         and p.kraj >= ${od.toISOString()}::timestamptz and p.kraj < ${doTrenutka.toISOString()}::timestamptz
         and i.obrisan_at is null
-        and (
-          i.upravljac = 'covjek'
-          or exists (
-            select 1 from botovi b
-            where b.igrac_id = i.id and b.tip = 'imenovani'
-          )
-        )
+        and i.upravljac = 'covjek'
         and not exists (
           select 1 from obracuni_partija o
           where o.partija_id = p.id and o.vrsta = 'privatna_gamifikacija'

@@ -19,3 +19,4 @@ export * from './aktivni-dani.js';
 export * from './nadzor.js';
 export * from './sanducic.js';
 export * from './kolekcija.js';
+export * from './uvjeti.js';

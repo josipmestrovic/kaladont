@@ -54,6 +54,7 @@ export interface StanjeReda {
     igracId: string;
     nadimak: string;
     jeGost: boolean;
+    jeBot: boolean;
     avatarId: number;
     avatarConfig: AvatarConfigV1 | null;
     avatarRevision: number;
@@ -120,7 +121,7 @@ export interface PocetakPartije {
   mojIgracId: string;
   /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
   pocetakIso: string;
-  sjedala: { igracId: string; nadimak: string; jeGost: boolean; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[];
+  sjedala: { igracId: string; nadimak: string; jeGost: boolean; jeBot: boolean; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[];
   mod?: 'cetiri_igraca' | 'dva_igraca';
   kontekst?: KontekstPartije;
   jePrivatna?: boolean;
@@ -233,6 +234,8 @@ export interface PlasmanPartije {
   nacinIspadanja: NacinIspadanja | null;
   /** true ako je registriran/admin (nije gost ni bot) — može se otvoriti javni profil. */
   javniProfil: boolean;
+  /** true ako je računalni protivnik. */
+  jeBot?: boolean;
   /** Ocjena igre (1–5); null ako nije dostupna (privatna / trening). */
   ocjenaIgre?: number | null;
 }
@@ -365,6 +368,7 @@ export type KodGreske =
   | 'VEC_U_PARTIJI'
   | 'VEC_U_SOBI'
   | 'EMAIL_NIJE_POTVRDEN'
+  | 'UVJETI_NISU_PRIHVACENI'
   | 'PREVISE_SOBA'
   | 'PREVISE_PARTIJA'
   | 'UPIS_PARTIJE_NEUSPJEO'
