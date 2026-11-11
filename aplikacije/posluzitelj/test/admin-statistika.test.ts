@@ -28,7 +28,7 @@ beforeAll(async () => {
   adresa = `http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`;
   const registriraj = async (email: string) => {
     const odgovor = await fetch(`${adresa}/api/racuni/registracija`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, lozinka: 'lozinka123' }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     return (await odgovor.json()) as { igracId: string; sesijskiToken: string };
   };
@@ -81,14 +81,14 @@ describe('GET /admin/statistike/cekanje', () => {
     expect((await spremi({ ...prije.konfiguracija, udioBrzih: 0.9, udioUobicajenih: 0.9 })).status).toBe(400);
     expect((await spremi({ ...prije.konfiguracija, brziRazvoj: true })).status).toBe(400);
     const odgovori = await Promise.all([
-      spremi({ ...prije.konfiguracija, vjerojatnostOstavljanjaKa: 0.22 }),
-      spremi({ ...prije.konfiguracija, vjerojatnostOstavljanjaKa: 0.33 }),
+      spremi({ ...prije.konfiguracija, brziRazvoj: false, vjerojatnostOstavljanjaKa: 0.22 }),
+      spremi({ ...prije.konfiguracija, brziRazvoj: false, vjerojatnostOstavljanjaKa: 0.33 }),
     ]);
     expect(odgovori.map((stavka) => stavka.status).sort()).toEqual([200, 409]);
     const uspjeh = await odgovori.find((stavka) => stavka.status === 200)!.json() as ZapisPostavkiBotova;
     stvoreneRevizije.push(uspjeh.revizija);
     expect(uspjeh.revizija).toBe(prije.revizija + 1);
-    expect((await spremi()).status).toBe(409);
+    expect((await spremi({ ...prije.konfiguracija, brziRazvoj: false }, prije.revizija)).status).toBe(409);
     const trajno = await ucitajTrajnePostavkeBotova(ZADANA_KONFIGURACIJA_BOTA);
     expect({ ok: true, ...trajno }).toEqual(uspjeh);
     const [audit] = await baza.select().from(izmjenePostavkiBotova).where(eq(izmjenePostavkiBotova.revizija, uspjeh.revizija));
@@ -135,33 +135,38 @@ describe('GET /admin/statistike/cekanje', () => {
     expect(drugi.fond).toEqual(pregled.fond);
     expect(drugi.botovi).toEqual(pregled.botovi);
     expect(new Set(pregled.botovi.map((bot) => bot.igracId)).size).toBe(pregled.botovi.length);
-    expect(pregled.botovi.every((bot) => bot.status === 'slobodan' && bot.plan === null && bot.rezervacija === null)).toBe(true);
+    // Povijesni deaktivirani gost-botovi ostaju u pregledu; aktivni imenovani moraju biti slobodni.
+    expect(pregled.botovi.filter((bot) => bot.aktivan).every((bot) => bot.status === 'slobodan' && bot.plan === null && bot.rezervacija === null)).toBe(true);
+    expect(pregled.botovi.filter((bot) => !bot.aktivan).every((bot) => bot.status === 'deaktiviran')).toBe(true);
     expect(JSON.stringify(pregled)).not.toContain(adminToken);
     expect(JSON.stringify(pregled)).not.toContain('@example.com');
   });
 
-  it('stvara, deaktivira i aktivira gosta-bota uz privatnost profila, drain i audit', async () => {
+  it('odbija novo stvaranje gost-bota; imenovani bot nema javni profil i može se deaktivirati', async () => {
     const putanja = `${adresa}/api/admin/botovi`;
     const headers = { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' };
+    const odbijenGost = await fetch(putanja, { method: 'POST', headers, body: JSON.stringify({ broj: 1, tip: 'gost' }) });
+    expect(odbijenGost.status).toBe(400);
+
     const prije = posluzitelj.fondBotova.stanje().ukupno;
-    const odgovor = await fetch(putanja, { method: 'POST', headers, body: JSON.stringify({ broj: 1, tip: 'gost' }) });
+    const odgovor = await fetch(putanja, { method: 'POST', headers, body: JSON.stringify({ broj: 1, tip: 'imenovani' }) });
     expect(odgovor.status).toBe(200);
     const stvoren = await odgovor.json() as { stvoreno: { igracId: string; kljucSeeda: string; tip: string }[]; aktivnoPoslije: number };
-    const gostBot = stvoren.stvoreno[0]!;
-    stvoreniBotovi.push(gostBot);
-    expect(gostBot.tip).toBe('gost');
+    const imenovani = stvoren.stvoreno[0]!;
+    stvoreniBotovi.push(imenovani);
+    expect(imenovani.tip).toBe('imenovani');
     expect(stvoren.aktivnoPoslije).toBe(prije + 1);
-    expect((await fetch(`${adresa}/api/profil/javni/${gostBot.igracId}`)).status).toBe(404);
+    expect((await fetch(`${adresa}/api/profil/javni/${imenovani.igracId}`)).status).toBe(404);
 
-    const aktivacija = `${adresa}/api/admin/botovi/${gostBot.igracId}/aktivacija`;
+    const aktivacija = `${adresa}/api/admin/botovi/${imenovani.igracId}/aktivacija`;
     const deaktiviran = await fetch(aktivacija, { method: 'PUT', headers, body: JSON.stringify({ aktivan: false }) });
     expect(deaktiviran.status).toBe(200);
     expect(await deaktiviran.json()).toMatchObject({ ok: true, aktivan: false, dovrsavaIgru: false });
     const pregled = await (await fetch(`${adresa}/api/admin/botovi/pregled`, { headers: { authorization: `Bearer ${adminToken}` } })).json() as { botovi: { igracId: string; status: string; tip: string }[] };
-    expect(pregled.botovi.find((bot) => bot.igracId === gostBot.igracId)).toMatchObject({ status: 'deaktiviran', tip: 'gost' });
+    expect(pregled.botovi.find((bot) => bot.igracId === imenovani.igracId)).toMatchObject({ status: 'deaktiviran', tip: 'imenovani' });
     const aktiviran = await fetch(aktivacija, { method: 'PUT', headers, body: JSON.stringify({ aktivan: true }) });
     expect(aktiviran.status).toBe(200);
-    expect(await baza.select().from(izmjeneBotova).where(eq(izmjeneBotova.botId, gostBot.igracId))).toHaveLength(3);
+    expect(await baza.select().from(izmjeneBotova).where(eq(izmjeneBotova.botId, imenovani.igracId))).toHaveLength(3);
   });
 
   it('traži administratora', async () => {

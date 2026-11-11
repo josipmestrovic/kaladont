@@ -6,11 +6,13 @@ import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import { and, asc, desc, eq, gte, isNull, notExists, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
+  AKTUALNA_VERZIJA_UVJETA,
   DEFINICIJE_DOSTIGNUCA,
   validirajAvatarConfig,
   izracunajRang,
   izracunajRazinuDostignuca,
   jeDostignuceNovo,
+  jePrihvacenaAktualnaVerzijaUvjeta,
   kolekcijskiKljucGrupe,
   kolekcionarskaRazina,
   PRAGOVI_KOLEKCIONARSKE_RAZINE,
@@ -371,9 +373,9 @@ async function dohvatiKolekciju(igracId: string, rjecnik: RjecnikUMemoriji) {
 async function dohvatiJavniProfil(igracId: string) {
   const [igrac] = await baza.select({ id: igraci.id }).from(igraci).where(and(
     eq(igraci.id, igracId),
+    eq(igraci.upravljac, 'covjek'),
     sql`${igraci.vrsta} in ('registriran', 'admin')`,
     isNull(igraci.obrisanAt),
-    notExists(baza.select({ id: botovi.igracId }).from(botovi).where(and(eq(botovi.igracId, igraci.id), eq(botovi.tip, 'gost')))),
   )).limit(1);
   return igrac ?? null;
 }
@@ -591,6 +593,12 @@ export async function registrirajProfilRute(
       email: igrac.email,
       emailNaCekanju: igrac.emailNaCekanju,
       emailPotvrdjen: igrac.emailPotvrdjen,
+      potvrdaDob16: igrac.potvrdaDob16,
+      uvjetiVerzija: igrac.uvjetiVerzija,
+      uvjetiPrihvaceniAt: igrac.uvjetiPrihvaceniAt,
+      aktualnaVerzijaUvjeta: AKTUALNA_VERZIJA_UVJETA,
+      uvjetiPrihvaceni: jePrihvacenaAktualnaVerzijaUvjeta(igrac.potvrdaDob16, igrac.uvjetiVerzija),
+      trebaPrihvatitiUvjete: !jePrihvacenaAktualnaVerzijaUvjeta(igrac.potvrdaDob16, igrac.uvjetiVerzija),
       odigrane: igrac.odigrane,
       pobjede: igrac.pobjede,
       eliminacijeUkupno: igrac.eliminacijeUkupno,
@@ -626,9 +634,9 @@ export async function registrirajProfilRute(
       .from(igraci)
       .where(and(
         eq(igraci.id, zahtjev.params.igracId),
+        eq(igraci.upravljac, 'covjek'),
         sql`${igraci.vrsta} in ('registriran', 'admin')`,
         isNull(igraci.obrisanAt),
-        notExists(baza.select({ id: botovi.igracId }).from(botovi).where(and(eq(botovi.igracId, igraci.id), eq(botovi.tip, 'gost')))),
       ))
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
@@ -792,7 +800,7 @@ export async function registrirajProfilRute(
       const kandidati = await baza
         .select()
         .from(igraci)
-        .where(and(gte(colOdigrane, 10), isNull(igraci.obrisanAt)))
+        .where(and(eq(igraci.upravljac, 'covjek'), gte(colOdigrane, 10), isNull(igraci.obrisanAt)))
         .orderBy(desc(sql`${colBodovi}::float / ${colOdigrane}`))
         .limit(limit);
 
@@ -827,7 +835,7 @@ export async function registrirajProfilRute(
             .select({ boljihOdMene: sql<number>`count(*)::int` })
             .from(igraci)
             .where(
-              sql`${colOdigrane} >= 10 and ${colBodovi}::float / ${colOdigrane} > ${prosjekMoj}`,
+              sql`${igraci.upravljac} = 'covjek' and ${colOdigrane} >= 10 and ${colBodovi}::float / ${colOdigrane} > ${prosjekMoj}`,
             );
           mojeMjesto = {
             mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
@@ -950,9 +958,8 @@ export async function registrirajProfilRute(
         bodovi: sudioniciPartije.bodovi,
         eliminacije: sudioniciPartije.eliminacije,
         nacinIspadanja: sudioniciPartije.nacinIspadanja,
-        javniProfil: sql<boolean>`${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null and not exists (
-          select 1 from botovi b where b.igrac_id = ${igraci.id} and b.tip = 'gost'
-        )`,
+        javniProfil: sql<boolean>`${igraci.upravljac} = 'covjek' and ${igraci.vrsta} in ('registriran', 'admin') and ${igraci.obrisanAt} is null`,
+        jeBot: sql<boolean>`${igraci.upravljac} = 'bot'`,
       })
       .from(sudioniciPartije)
       .innerJoin(igraci, eq(igraci.id, sudioniciPartije.igracId))

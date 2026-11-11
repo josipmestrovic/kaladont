@@ -9,7 +9,7 @@ const sintetika: Record<string, string> = {
   BAZA_APP_LOZINKA: 'ci-sintetika-app',
   SESIJA_TAJNA: 'ci-produkcijska-sesija-tajna-ne-promijeni-me',
   EMAIL_API_KLJUC: 're_ci_sinteticki_kljuc',
-  EMAIL_POSILJATELJ: 'noreply@kaladont.hr',
+  EMAIL_POSILJATELJ: 'info@kaladont.hr',
   JAVNA_ADRESA: 'https://kaladont.hr',
   DEV_MAIL: 'ops@example.com',
   ONEMOGUCI_TIMER_POTEZA: 'false',

@@ -148,7 +148,7 @@ describe('POST /prijave-igraca', () => {
       url: '/api/racuni/registracija',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: `admin-prijave-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+      body: JSON.stringify({ email: `admin-prijave-${Date.now()}@example.com`, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(registracija.statusCode).toBe(200);
     const admin = registracija.json() as { igracId: string; sesijskiToken: string };
@@ -182,7 +182,7 @@ describe('POST /prijave-igraca', () => {
       url: '/api/racuni/registracija',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: `admin-brisanje-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+      body: JSON.stringify({ email: `admin-brisanje-${Date.now()}@example.com`, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const admin = registracija.json() as { igracId: string; sesijskiToken: string };
     igracIds.push(admin.igracId);
@@ -229,7 +229,7 @@ describe('POST /prijave-igraca', () => {
       url: '/api/racuni/registracija',
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: `admin-zasticen-${Date.now()}@example.com`, lozinka: 'lozinka123' }),
+      body: JSON.stringify({ email: `admin-zasticen-${Date.now()}@example.com`, lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const admin = registracija.json() as { igracId: string; sesijskiToken: string };
     igracIds.push(admin.igracId);

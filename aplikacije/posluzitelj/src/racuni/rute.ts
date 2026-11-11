@@ -14,7 +14,15 @@ import { BROJ_AVATARA } from '../identitet/identitet.js';
 import { dohvatiSesijuZahtjeva, zahtijevajPrijavu, type ZahtjevSIgracem } from './autentikacija.js';
 import { zabiljeziAktivniDan } from './aktivnost-dana.js';
 import { izdajSesiju, opozoviSesiju, stvoriGostSesiju } from './sesije.js';
-import { MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA, validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
+import {
+  AKTUALNA_VERZIJA_UVJETA,
+  MAKSIMALNA_DULJINA_NADIMKA,
+  MINIMALNA_DULJINA_NADIMKA,
+  PORUKA_NEVALJANOG_NADIMKA,
+  UZORAK_NADIMKA,
+  validirajAvatarConfig,
+  type AvatarConfigV1,
+} from 'zajednicko';
 import {
   izdajTokenPotvrdeEmaila,
   emailHashPotvrde,
@@ -58,6 +66,8 @@ const ShemaRegistracije = z.object({
     .max(BROJ_AVATARA - 1)
     .optional(),
   avatarConfig: z.unknown().optional(),
+  potvrdaDob16: z.literal(true, { message: 'Potvrdi da imaš najmanje 16 godina.' }),
+  prihvacamUvjete: z.literal(true, { message: 'Prihvati Uvjete korištenja.' }),
 });
 
 const ShemaPrijave = z.object({
@@ -134,6 +144,11 @@ export async function registrirajRacuneRute(
       return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
     }
     const kanonskiAvatarConfig = avatarConfig as AvatarConfigV1 | undefined;
+    const prihvatUvjeta = {
+      potvrdaDob16: true as const,
+      uvjetiVerzija: AKTUALNA_VERZIJA_UVJETA,
+      uvjetiPrihvaceniAt: new Date(),
+    };
 
     const [postojeciEmail] = await baza
       .select()
@@ -167,6 +182,7 @@ export async function registrirajRacuneRute(
           lozinkaHash,
           emailPotvrdjen: false,
           emailPotvrdaZatrazenAt: new Date(),
+          ...prihvatUvjeta,
           ...(nadimak ? { nadimak } : {}),
           ...(avatarId !== undefined ? { avatarId } : {}),
           ...(kanonskiAvatarConfig ? { avatarConfig: kanonskiAvatarConfig, avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
@@ -192,6 +208,7 @@ export async function registrirajRacuneRute(
           nadimak: nadimak ?? normaliziraniEmail.split('@')[0]!,
           avatarId: avatarId ?? Math.floor(Math.random() * BROJ_AVATARA),
           avatarConfig: kanonskiAvatarConfig ?? null,
+          ...prihvatUvjeta,
         })
         .returning();
       if (!novi) {

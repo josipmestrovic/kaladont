@@ -6,7 +6,7 @@ async function registrirajIgraca(page: import('@playwright/test').Page) {
   const odgovor = await page.request.post(`${POSLUZITELJ}/api/racuni/registracija`, {
     data: {
       email: `profil-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
-      lozinka: 'lozinka123',
+      lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true,
       nadimak: 'ProfilIgrac',
     },
   });

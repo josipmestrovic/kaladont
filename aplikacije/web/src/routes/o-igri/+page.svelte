@@ -154,7 +154,8 @@
         <li>rangovi idu od Prvopisca do Kaladonta, nema matchmakinga po rangu dok se ne poveća baza igrača, ali imamo osnovu da ga uvedemo</li>
         <li>forma pokazuje kako ti ide zadnjih 10 igara</li>
         <li>niz pobjeda pali „vatru” na profilu</li>
-        <li>botovi pune prazna mjesta u redu, ali ne ulaze na ljestvice</li>
+        <li>botovi pune prazna mjesta u redu, nemaju javni profil ni rang i ne ulaze na ljestvice</li>
+        <li>Kaladont je namijenjen osobama od 16 godina nadalje (gost i registrirani račun)</li>
       </ul>
     </section>
 
@@ -209,7 +210,7 @@
     <section>
       <h2>Za napomenuti</h2>
       <ul>
-        <li>u javnom redu prazna mjesta mogu popuniti botovi, ovo privremeno radi samo za javnu igru dok se ne poveća baza igrača</li>
+        <li>u javnom redu prazna mjesta mogu popuniti botovi (prepoznatljivi ilustrirani avatari; na završnom poretku oznaka „Bot”); ovo privremeno radi samo za javnu igru dok se ne poveća baza igrača</li>
         <li>za stolom koristite brze reakcije na stolici tako što kliknete na svoj avatar</li>
         <li>font za disleksiju i čitanje novih riječi naglas su eksperimentalne funkcionalnosti</li>
         <li>prijavi ako neka riječ nije riječ ili je netočna, time nam puno pomažeš</li>
@@ -273,7 +274,8 @@
     <h2>Kontakt</h2>
     <p>
       Pitanja, prijedlozi ili prijave grešaka: koristi gumb „Prijavi” u igri, ili nam piši na
-      <a href="mailto:kontakt@kaladont.hr">kontakt@kaladont.hr</a>.
+      <a href="mailto:info@kaladont.hr">info@kaladont.hr</a>. Više u
+      <a href="/uvjeti">Uvjetima korištenja</a> i <a href="/privatnost">Pravilima privatnosti</a>.
     </p>
   </article>
 </main>

@@ -42,7 +42,7 @@ beforeAll(async () => {
   const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL_ADMIN, lozinka: LOZINKA }),
+    body: JSON.stringify({ email: EMAIL_ADMIN, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
   });
   const tijelo = (await registracija.json()) as { igracId: string; sesijskiToken: string };
   adminId = tijelo.igracId;

@@ -74,7 +74,7 @@
   let ucitavanje = $state(false);
   let spremanje = $state(false);
   let stvaranje = $state(false);
-  let tipNovogBota = $state<'imenovani' | 'gost'>('imenovani');
+  let tipNovogBota = $state<'imenovani'>('imenovani');
   let brojNovihBotova = $state(1);
   let filterStatus = $state('sve');
   let filterTip = $state('sve');
@@ -306,7 +306,7 @@
     <p class="revizija" class:zastario={pregledZastario}>Snimka {datum(pregled.vrijemeIso)} · {pregledZastario ? 'Zastarjelo' : 'Aktualno'} · revizija postavki {pregled.revizijaPostavki}</p>
     <dl class="fond"><div><dt>Aktivni fond</dt><dd>{pregled.fond.ukupno}</dd></div><div><dt>Slobodni</dt><dd>{pregled.fond.slobodni}</dd></div><div><dt>Rezervirani</dt><dd>{pregled.fond.rezervirani}</dd></div><div><dt>U partiji</dt><dd>{pregled.fond.uPartiji}</dd></div><div><dt>Iscrpljenja</dt><dd>{pregled.fond.iscrpljenja}</dd></div></dl>
     <form class="stvori" onsubmit={(event) => { event.preventDefault(); void stvoriBotove(); }}>
-      <label>Tip računalnog protivnika<select bind:value={tipNovogBota}><option value="imenovani">Imenovani bot</option><option value="gost">Bot prikazan kao Gost</option></select></label>
+      <label>Tip računalnog protivnika<select bind:value={tipNovogBota}><option value="imenovani">Imenovani bot</option></select></label>
       <label>Broj<input type="number" min="1" max="30" bind:value={brojNovihBotova} /></label>
       <button type="submit" disabled={stvaranje}><Save size={16} />{stvaranje ? 'Stvaranje…' : 'Stvori botove'}</button>
     </form>

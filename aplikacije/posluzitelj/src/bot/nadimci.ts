@@ -40,7 +40,7 @@ export const KANDIDATI_NADIMAKA_BOTOVA: readonly string[] = [...JEZGRI].filter((
   nadimak.length >= MINIMALNA_DULJINA_NADIMKA && nadimak.length <= MAKSIMALNA_DULJINA_NADIMKA && UZORAK_NADIMKA.test(nadimak),
 );
 
-/** Curirani zamjenski fond v4: 80 imenovanih (+ 20 gost u servisu). */
+/** Curirani zamjenski fond: 80 imenovanih, bez aktivnih gost-botova. */
 export const NADIMCI_POCETNOG_FONDA_V4: readonly { nadimak: string; pocetnoSlovo: 'malo' | 'veliko' }[] = [
   'kaladontaš', 'Lik33', 'Mare', 'burek', 'Nika_7', 'jos5min', 'Fićo', 'iva_k', 'Gogo82', 'šogi',
   'TinaM', 'samo_gledam', 'Žućo', 'kokica', 'Bero', 'katastrofica', 'TetaVesna', 'nabrzinu', 'Maya', 'silver',
@@ -59,8 +59,9 @@ export const NADIMCI_POCETNOG_FONDA_V4: readonly { nadimak: string; pocetnoSlovo
 export const NADIMCI_POCETNOG_FONDA_V3 = NADIMCI_POCETNOG_FONDA_V4;
 
 export const BROJ_IMENOVANIH_FONDA_V4 = 80;
-export const BROJ_GOSTIJU_FONDA_V4 = 20;
-export const CILJ_AKTIVNIH_FONDA_V4 = BROJ_IMENOVANIH_FONDA_V4 + BROJ_GOSTIJU_FONDA_V4;
+/** Povijesni gost-botovi ostaju u bazi, ali novi fond nema aktivnih gost-botova. */
+export const BROJ_GOSTIJU_FONDA_V4 = 0;
+export const CILJ_AKTIVNIH_FONDA_V4 = BROJ_IMENOVANIH_FONDA_V4;
 
 if (KANDIDATI_NADIMAKA_BOTOVA.length < 200) throw new Error('Fond nadimaka botova mora imati najmanje 200 različitih kandidata.');
 if (NADIMCI_POCETNOG_FONDA_V4.length !== BROJ_IMENOVANIH_FONDA_V4) throw new Error(`Početni fond v4 mora imati ${BROJ_IMENOVANIH_FONDA_V4} nadimaka.`);

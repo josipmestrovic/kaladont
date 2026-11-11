@@ -91,8 +91,8 @@ export async function registrirajAdminRute(
   app.post('/admin/botovi', { preHandler: zahtijevajAdmina, config: { rateLimit: { max: 3, timeWindow: '1 minute' } } }, async (zahtjev, odgovor) => {
     odgovor.header('Cache-Control', 'no-store');
     if (!postavke?.stvoriBotove) return odgovor.code(503).send({ ok: false, greska: 'Stvaranje botova nije dostupno.' });
-    const ulaz = z.object({ broj: z.number().int().min(1).max(30), tip: z.enum(['imenovani', 'gost']) }).strict().safeParse(zahtjev.body);
-    if (!ulaz.success) return odgovor.code(400).send({ ok: false, greska: 'Odaberi 1–30 botova i tip imenovani ili gost.' });
+    const ulaz = z.object({ broj: z.number().int().min(1).max(30), tip: z.literal('imenovani') }).strict().safeParse(zahtjev.body);
+    if (!ulaz.success) return odgovor.code(400).send({ ok: false, greska: 'Odaberi 1–30 imenovanih botova. Gost-botovi više nisu dopušteni.' });
     try {
       const rezultat = await postavke.stvoriBotove(ulaz.data.broj, ulaz.data.tip, (zahtjev as ZahtjevSIgracem).igrac!.id);
       return { ok: true, ...rezultat };

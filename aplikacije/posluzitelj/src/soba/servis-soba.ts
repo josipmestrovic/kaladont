@@ -156,7 +156,7 @@ export function registrirajPrivatneSobe(
     provjeriDogadaj: ProvjeriOgranicenjeDogadaja;
     zapisSocketHandlerGreske: ZapisSocketHandlerGreske;
     igracImaAktivnuPartiju: (igracId: string) => boolean;
-    igracMozeIgrati: (socket: KaladontSocket) => boolean;
+    razlogBlokadeIgre: (socket: KaladontSocket) => Promise<{ kod: 'EMAIL_NIJE_POTVRDEN'; poruka: string } | null>;
     ukloniIzJavnogReda: (igracId: string) => void;
     dopustiVlastitaImena?: boolean;
   },
@@ -285,7 +285,7 @@ export function registrirajPrivatneSobe(
   }
 
   io.on('connection', (socket) => {
-    socket.on('soba:stvori', omotajSocketHandler(socket, 'soba:stvori', opcije.zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+    socket.on('soba:stvori', omotajSocketHandler(socket, 'soba:stvori', opcije.zapisSocketHandlerGreske, async (...argumenti: unknown[]) => {
       const [payload, ...dodatniArgumenti] = argumenti;
       const rezultat = ShemaStvoriSobu.safeParse(payload);
       if (!rezultat.success || dodatniArgumenti.length > 0) {
@@ -293,8 +293,9 @@ export function registrirajPrivatneSobe(
         return;
       }
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:stvori')) return;
-      if (!opcije.igracMozeIgrati(socket)) {
-        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
+      const blokadaIgre = await opcije.razlogBlokadeIgre(socket);
+      if (blokadaIgre) {
+        socket.emit('greska', blokadaIgre);
         return;
       }
       if (!opcije.mozeStvoritiPartiju()) {
@@ -364,7 +365,7 @@ export function registrirajPrivatneSobe(
       emitirajStanje(soba);
     }));
 
-    socket.on('soba:udji', omotajSocketHandler(socket, 'soba:udji', opcije.zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+    socket.on('soba:udji', omotajSocketHandler(socket, 'soba:udji', opcije.zapisSocketHandlerGreske, async (...argumenti: unknown[]) => {
       const [payload, ...dodatniArgumenti] = argumenti;
       const rezultat = ShemaKodSobe.safeParse(payload);
       if (!rezultat.success || dodatniArgumenti.length > 0) {
@@ -372,8 +373,9 @@ export function registrirajPrivatneSobe(
         return;
       }
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:udji')) return;
-      if (!opcije.igracMozeIgrati(socket)) {
-        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
+      const blokadaIgre = await opcije.razlogBlokadeIgre(socket);
+      if (blokadaIgre) {
+        socket.emit('greska', blokadaIgre);
         return;
       }
       const kod = rezultat.data.kod.toUpperCase();
@@ -465,14 +467,15 @@ export function registrirajPrivatneSobe(
       }
     }));
 
-    socket.on('soba:pokreni', omotajSocketHandler(socket, 'soba:pokreni', opcije.zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+    socket.on('soba:pokreni', omotajSocketHandler(socket, 'soba:pokreni', opcije.zapisSocketHandlerGreske, async (...argumenti: unknown[]) => {
       if (argumenti.length > 0) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: PORUKA_NEVALJANOG_PAYLOADA });
         return;
       }
       if (!opcije.provjeriDogadaj(socket.data.igracId, 'soba:pokreni')) return;
-      if (!opcije.igracMozeIgrati(socket)) {
-        socket.emit('greska', { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' });
+      const blokadaIgre = await opcije.razlogBlokadeIgre(socket);
+      if (blokadaIgre) {
+        socket.emit('greska', blokadaIgre);
         return;
       }
       if (!opcije.mozeStvoritiPartiju()) {

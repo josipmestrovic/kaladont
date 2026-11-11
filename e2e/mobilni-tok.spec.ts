@@ -319,7 +319,7 @@ test('mobilni korisnik ne vidi aktivnost profila ni neovlaštene API podatke', a
   const odgovor = await api.post('http://127.0.0.1:3001/api/racuni/registracija', {
     data: {
       email: `aktivnost-${sufiks}@example.com`,
-      lozinka: 'lozinka123',
+      lozinka: 'lozinka123', potvrdaDob16: true, prihvacamUvjete: true,
       nadimak: `Ak${sufiks}`.slice(0, 12),
     },
   });

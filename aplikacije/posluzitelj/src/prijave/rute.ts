@@ -5,7 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { baza } from '../baza/klijent.js';
-import { partije, potezi, prijave, prijaveIgraca, sudioniciPartije } from '../baza/shema.js';
+import { igraci, partije, potezi, prijave, prijaveIgraca, sudioniciPartije } from '../baza/shema.js';
 import { zahtijevajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
 import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
 
@@ -184,11 +184,17 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
         )).limit(1);
         if (!sudionik) throw new GreskaPrijave(403, 'Samo sudionici partije mogu prijaviti igrača.');
 
-        const [prijavljeni] = await tx.select({ igracId: sudioniciPartije.igracId }).from(sudioniciPartije).where(and(
-          eq(sudioniciPartije.partijaId, rezultat.data.partijaId),
-          eq(sudioniciPartije.igracId, rezultat.data.prijavljeniIgracId),
-        )).limit(1);
+        const [prijavljeni] = await tx.select({
+          igracId: sudioniciPartije.igracId,
+          upravljac: igraci.upravljac,
+        }).from(sudioniciPartije)
+          .innerJoin(igraci, eq(igraci.id, sudioniciPartije.igracId))
+          .where(and(
+            eq(sudioniciPartije.partijaId, rezultat.data.partijaId),
+            eq(sudioniciPartije.igracId, rezultat.data.prijavljeniIgracId),
+          )).limit(1);
         if (!prijavljeni) throw new GreskaPrijave(404, 'Igrač nije sudjelovao u toj partiji.');
+        if (prijavljeni.upravljac === 'bot') throw new GreskaPrijave(400, 'Računalnog protivnika nije moguće prijaviti.');
 
         await tx.insert(prijaveIgraca).values({
           partijaId: rezultat.data.partijaId,

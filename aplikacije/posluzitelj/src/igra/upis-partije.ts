@@ -557,7 +557,33 @@ export async function zakljuciPartijuUBazi(
           .where(and(eq(sudioniciPartije.partijaId, partijaId), eq(sudioniciPartije.igracId, r.igracId)));
       }
 
-      if (!samoStatistika && mod === 'dva_igraca') {
+      if (!samoStatistika && upravljac === 'bot') {
+        // Botovi ostaju u sudionicima/povijesti, ali bez osobnog XP-a, ranga ni agregata profila.
+        agregati.set(r.igracId, {
+          bodoviUkupno: stariIgrac?.bodovi ?? 0,
+          odigrane: stariIgrac?.odigrane ?? 0,
+          pobjede: 0,
+          iskustvoUkupno: stariIgrac?.iskustvoUkupno ?? 0,
+          dovrseneIgre: 0,
+          novaDostignuca: [],
+          dnkPrije: prije,
+          dnkPoslije: [],
+          ocjenaIgre: 0,
+          bonusOcjenaIgre: 0,
+          nizPrije,
+          nizPoslije,
+          najboljiNiz,
+          osnovniXp: 0,
+          bonusPobjednickogNizaPostotak: 0,
+          bonusPobjednickogNizaXp: 0,
+          forma: null,
+          pohvale: [],
+          upravljac,
+          vrstaIgraca,
+          botTip,
+          iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
+        });
+      } else if (!samoStatistika && mod === 'dva_igraca') {
         const [azurirani] = await tx
           .update(igraci)
           .set({
@@ -566,9 +592,7 @@ export async function zakljuciPartijuUBazi(
             eliminacije1v1: sql`${igraci.eliminacije1v1} + ${r.eliminacije}`,
             bodovi1v1: sql`${igraci.bodovi1v1} + ${r.bodovi}`,
             iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
-            ...(upravljac === 'covjek'
-              ? { dovrseneIgre: sql`${igraci.dovrseneIgre} + 1` }
-              : {}),
+            dovrseneIgre: sql`${igraci.dovrseneIgre} + 1`,
           })
           .where(eq(igraci.id, r.igracId))
           .returning({
@@ -610,9 +634,7 @@ export async function zakljuciPartijuUBazi(
             eliminacijeUkupno: sql`${igraci.eliminacijeUkupno} + ${r.eliminacije}`,
             bodoviUkupno: sql`${igraci.bodoviUkupno} + ${r.bodovi}`,
             iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
-            ...(upravljac === 'covjek'
-              ? { dovrseneIgre: sql`${igraci.dovrseneIgre} + 1` }
-              : {}),
+            dovrseneIgre: sql`${igraci.dovrseneIgre} + 1`,
           })
           .where(eq(igraci.id, r.igracId))
           .returning({

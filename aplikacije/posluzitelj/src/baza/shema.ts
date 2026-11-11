@@ -80,6 +80,11 @@ export const igraci = pgTable('igraci', {
   emailPotvrdjen: boolean('email_potvrdjen').notNull().default(false),
   emailPotvrdaZatrazenAt: timestamp('email_potvrda_zatrazen_at', { withTimezone: true }),
   emailPotvrdaPoslanaAt: timestamp('email_potvrda_poslana_at', { withTimezone: true }),
+  /** Korisnikova izjava da ima najmanje 16 godina (nije neovisna verifikacija). */
+  potvrdaDob16: boolean('potvrda_dob_16').notNull().default(false),
+  /** Verzija Uvjeta koju je igrač prihvatio; null = nije prihvatio. */
+  uvjetiVerzija: text('uvjeti_verzija'),
+  uvjetiPrihvaceniAt: timestamp('uvjeti_prihvaceni_at', { withTimezone: true }),
   obrisanAt: timestamp('obrisan_at', { withTimezone: true }),
   registriranAt: timestamp('registriran_at', { withTimezone: true }),
   odigrane: integer('odigrane').notNull().default(0),

@@ -57,6 +57,9 @@ Jedinstvena tablica za goste, registrirane i administratore. Registracija gosta 
 | lozinka_hash | text, null | argon2id |
 | reset_lozinke_verzija | integer, default 0 | Brojač jednokratnih reset tokena; uspješan reset atomski povećava vrijednost |
 | email_potvrdjen | boolean | |
+| potvrda_dob_16 | boolean | Korisnikova izjava ≥16 (nije verifikacija dobi) |
+| uvjeti_verzija | text, null | Verzija prihvaćenih Uvjeta; null = nije prihvatio |
+| uvjeti_prihvaceni_at | timestamptz, null | Trenutak prihvata |
 | email_potvrda_zatrazen_at, email_potvrda_poslana_at | timestamptz, null | Rok čišćenja nepotvrđenog računa i server-side cooldown ručnog ponovnog slanja |
 | obrisan_at | timestamptz, null | Vrijeme ručne anonimizacije računa; obrisani račun više se ne može autentificirati |
 | odigrane | integer | Agregat 4p moda (izvor istine: `sudionici_partije`) |
@@ -82,13 +85,13 @@ Indeksi: parcijalni unique funkcionalni indeks na `lower(email)` uz `email IS NO
 
 ## botovi
 
-Konfiguracija javnog bota (ADR-017). Identitet, avatar i statistika žive u `igraci` (`vrsta = registriran`, `upravljac = bot`, bez e-maila i lozinke). Stvara ih idempotentan seed po stabilnom ključu; ponovni seed ne mijenja postojeće. Imenovani botovi imaju javni profil i ulaze u ljestvice kao ljudi; gost-botovi (`tip = gost`) nemaju ni profil ni ljestvicu. Privremeno „Računalo” u Zagrijavanju nema redak ni ovdje ni u `igraci`.
+Konfiguracija javnog bota (ADR-017, nadograđeno 2026-11-11). Identitet i avatar žive u `igraci` (`vrsta = registriran`, `upravljac = bot`, bez e-maila i lozinke). Stvara ih idempotentan seed po stabilnom ključu; ponovni seed ne mijenja postojeće. Botovi nemaju javni profil niti ulaze u ljestvice; `tip = gost` je povijesni podatak (novi se ne stvaraju). Privremeno „Računalo” u Zagrijavanju nema redak ni ovdje ni u `igraci`.
 
 | Stupac | Tip | Opis |
 |---|---|---|
 | igrac_id | uuid PK, FK → igraci | |
 | kljuc_seeda | text, unique | Stabilan ključ (`bot-001` …) za idempotentan seed |
-| tip | enum `imenovani` / `gost` | Prezentacija; gost-bot nema javni profil ni ljestvicu |
+| tip | enum `imenovani` / `gost` | Povijesna prezentacija; aktivni fond koristi samo `imenovani` |
 | aktivan | boolean | Neaktivan bot ne ulazi u fond popune |
 | verzija_profila | smallint | Verzija ponašanja/konfiguracije radi usporedbe rezultata |
 | stvoren | timestamptz | |

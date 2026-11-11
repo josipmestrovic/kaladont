@@ -9,6 +9,7 @@ import { baza } from '../src/baza/klijent.js';
 import { dostignucaIgraca, igraci, otkljucaneGrupeIgraca, pobjedeTreninga } from '../src/baza/shema.js';
 import { izdajSesiju } from '../src/racuni/sesije.js';
 import { zabiljeziPobjeduTreninga } from '../src/trening/upis-napretka.js';
+import { PRIHVAT_UVJETA_ZA_TEST } from './pomocnici/uvjeti.js';
 
 let posluzitelj: Posluzitelj;
 let adresa: string;
@@ -124,7 +125,7 @@ describe('Zagrijavanje', () => {
     const igracId = randomUUID();
     igraciZaBrisanje.push(igracId);
     const email = `trening-${igracId}@example.com`;
-    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: `Tr${igracId.slice(0, 6)}`, email, emailPotvrdjen: true });
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: `Tr${igracId.slice(0, 6)}`, email, emailPotvrdjen: true, ...PRIHVAT_UVJETA_ZA_TEST });
     const sesija = await izdajSesiju(igracId);
     const socket = await spoji(sesija.token);
     let odigraoRijec = false;
@@ -225,7 +226,7 @@ describe('Zagrijavanje', () => {
   it('Zagrijan se otključava na 1/5/20/50/100 pobjeda i ponovljeni trening ne broji dvaput', async () => {
     const igracId = randomUUID();
     igraciZaBrisanje.push(igracId);
-    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: `Pob${igracId.slice(0, 6)}`, email: `pobjede-${igracId}@example.com`, emailPotvrdjen: true });
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: `Pob${igracId.slice(0, 6)}`, email: `pobjede-${igracId}@example.com`, emailPotvrdjen: true, ...PRIHVAT_UVJETA_ZA_TEST });
     const ids: string[] = [];
     for (let broj = 1; broj <= 100; broj += 1) {
       const treningId = randomUUID();

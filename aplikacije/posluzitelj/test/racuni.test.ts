@@ -34,7 +34,7 @@ describe('POST /racuni/registracija', () => {
     const odgovor = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'TestIgrac' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true, nadimak: 'TestIgrac' }),
     });
     expect(odgovor.status).toBe(200);
     const tijelo = (await odgovor.json()) as {
@@ -66,7 +66,7 @@ describe('POST /racuni/registracija', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'CvIgrac' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true, nadimak: 'CvIgrac' }),
     });
     expect(registracija.status).toBe(200);
     const odgovor = (await registracija.json()) as { igracId: string };
@@ -84,7 +84,7 @@ describe('POST /racuni/registracija', () => {
       const ponovljeniPokusaj = await fetch(`${adresa}/api/racuni/registracija`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${gost.token}` },
-        body: JSON.stringify({ email: ponovljeniEmail, lozinka: LOZINKA }),
+        body: JSON.stringify({ email: ponovljeniEmail, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
       });
       expect(ponovljeniPokusaj.status).toBe(409);
       const duplikati = await baza.select({ id: igraci.id }).from(igraci).where(eq(igraci.email, ponovljeniEmail));
@@ -98,12 +98,12 @@ describe('POST /racuni/registracija', () => {
     await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const drugi = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: 'nekaDrugaLozinka1' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nekaDrugaLozinka1', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(drugi.status).toBe(409);
   });
@@ -112,14 +112,14 @@ describe('POST /racuni/registracija', () => {
     const prvi = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL.toUpperCase(), lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL.toUpperCase(), lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(prvi.status).toBe(200);
 
     const drugi = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: 'nekaDrugaLozinka1' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nekaDrugaLozinka1', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(drugi.status).toBe(409);
 
@@ -131,7 +131,7 @@ describe('POST /racuni/registracija', () => {
     const odgovor = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, nadimak: 'PredugackiNadimak' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true, nadimak: 'PredugackiNadimak' }),
     });
     expect(odgovor.status).toBe(400);
   });
@@ -142,7 +142,7 @@ describe('POST /racuni/prijava', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const registrirani = (await registracija.json()) as { igracId: string };
     const [prijePrijave] = await baza.select({ registriranAt: igraci.registriranAt }).from(igraci).where(eq(igraci.id, registrirani.igracId));
@@ -150,7 +150,7 @@ describe('POST /racuni/prijava', () => {
     const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(odgovor.status).toBe(200);
     const tijelo = (await odgovor.json()) as { ok: boolean; sesijskiToken: string };
@@ -163,13 +163,13 @@ describe('POST /racuni/prijava', () => {
     await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
 
     const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: 'kriva-lozinka' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: 'kriva-lozinka', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(odgovor.status).toBe(401);
   });
@@ -178,7 +178,7 @@ describe('POST /racuni/prijava', () => {
     const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'ne-postoji-nikad@example.com', lozinka: 'bilo-sto-123' }),
+      body: JSON.stringify({ email: 'ne-postoji-nikad@example.com', lozinka: 'bilo-sto-123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(odgovor.status).toBe(401);
   });
@@ -214,7 +214,7 @@ describe('guest identitet odvaja javni ID od pristupnog tokena', () => {
         body: JSON.stringify({
           gostToken: gost.igracId,
           email,
-          lozinka: LOZINKA,
+          lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true,
           nadimak: 'JavniIdTest',
         }),
       });
@@ -233,7 +233,7 @@ describe('POST /racuni/odjava', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
     const zaglavlja = { authorization: `Bearer ${sesijskiToken}` };
@@ -252,13 +252,13 @@ describe('POST /racuni/odjava', () => {
     await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const prijava = async () => {
       const odgovor = await fetch(`${adresa}/api/racuni/prijava`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+        body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
       });
       return ((await odgovor.json()) as { sesijskiToken: string }).sesijskiToken;
     };
@@ -283,7 +283,7 @@ describe('potvrda emaila i reset lozinke', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId } = (await registracija.json()) as { igracId: string };
     const token = izdajTokenPotvrdeEmaila(igracId, EMAIL);
@@ -311,7 +311,7 @@ describe('potvrda emaila i reset lozinke', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
     const resend = await fetch(`${adresa}/api/racuni/ponovno-poslati-potvrdu`, {
@@ -327,7 +327,7 @@ describe('potvrda emaila i reset lozinke', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as {
       igracId: string;
@@ -336,7 +336,7 @@ describe('potvrda emaila i reset lozinke', () => {
     const drugaPrijava = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { sesijskiToken: drugiToken } = (await drugaPrijava.json()) as { sesijskiToken: string };
     const [redak] = await baza
@@ -366,7 +366,7 @@ describe('potvrda emaila i reset lozinke', () => {
     const prijava = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka123' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka123', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     expect(prijava.status).toBe(200);
   });
@@ -375,7 +375,7 @@ describe('potvrda emaila i reset lozinke', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId } = (await registracija.json()) as { igracId: string };
     const [redak] = await baza
@@ -408,12 +408,12 @@ describe('potvrda emaila i reset lozinke', () => {
     const prijavaA = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka-a' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka-a', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const prijavaB = await fetch(`${adresa}/api/racuni/prijava`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka-b' }),
+      body: JSON.stringify({ email: EMAIL, lozinka: 'nova-lozinka-b', potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const uspjesnePrijave = [prijavaA.status, prijavaB.status].filter((s) => s === 200);
     expect(uspjesnePrijave).toHaveLength(1);
@@ -423,7 +423,7 @@ describe('potvrda emaila i reset lozinke', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as {
       igracId: string;
@@ -473,7 +473,7 @@ describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim 
       const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, lozinka: LOZINKA, nadimak: 'HttpImposter' }),
+        body: JSON.stringify({ email, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true, nadimak: 'HttpImposter' }),
       });
       expect(registracija.status).toBe(200);
       const { igracId } = (await registracija.json()) as { igracId: string };
@@ -500,7 +500,7 @@ describe('HTTP auth ne dopušta impersonaciju registriranog/admin računa golim 
       const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, lozinka: LOZINKA, nadimak: 'HttpAdmin' }),
+        body: JSON.stringify({ email, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true, nadimak: 'HttpAdmin' }),
       });
       expect(registracija.status).toBe(200);
       const { igracId, sesijskiToken } = (await registracija.json()) as {
@@ -531,7 +531,7 @@ describe('Socket.IO auth sa sesijskim tokenom', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
 
@@ -548,7 +548,7 @@ describe('Socket.IO auth sa sesijskim tokenom', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
     const socket = await new Promise<ReturnType<typeof ioClient>>((resolve, reject) => {
@@ -585,7 +585,7 @@ describe('Socket.IO auth sa sesijskim tokenom', () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA }),
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId } = (await registracija.json()) as { igracId: string };
 

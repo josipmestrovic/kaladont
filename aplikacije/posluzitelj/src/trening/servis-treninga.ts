@@ -23,6 +23,7 @@ export interface OpcijeServisaTreninga {
   igracImaAktivnuPartiju: (igracId: string) => boolean;
   igracImaPrivatnuSobu: (igracId: string) => boolean;
   ukloniIzJavnogReda: (igracId: string) => void;
+  razlogBlokadeIgre: (socket: KaladontSocket) => Promise<{ kod: KodGreske; poruka: string } | null>;
   provjeriDogadaj: ProvjeriOgranicenjeDogadaja;
   zapisSocketHandlerGreske: ZapisSocketHandlerGreske;
 }
@@ -43,7 +44,7 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
   }
 
   io.on('connection', (socket) => {
-    socket.on('trening:zapocni', omotajSocketHandler(socket, 'trening:zapocni', opcije.zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
+    socket.on('trening:zapocni', omotajSocketHandler(socket, 'trening:zapocni', opcije.zapisSocketHandlerGreske, async (...argumenti: unknown[]) => {
       const [prvi, drugi, ...dodatni] = argumenti;
       const potvrda = typeof prvi === 'function' ? prvi as PotvrdaTreninga : typeof drugi === 'function' ? drugi as PotvrdaTreninga : undefined;
       const payload = typeof prvi === 'function' ? undefined : prvi;
@@ -58,6 +59,11 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
       }
       if (!opcije.omogucen()) {
         odbij(socket, potvrda, 'TRENING_NEDOSTUPAN', 'Zagrijavanje trenutačno nije dostupno.');
+        return;
+      }
+      const blokada = await opcije.razlogBlokadeIgre(socket);
+      if (blokada) {
+        odbij(socket, potvrda, blokada.kod, blokada.poruka);
         return;
       }
       if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {

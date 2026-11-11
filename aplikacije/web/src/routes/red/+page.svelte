@@ -8,6 +8,7 @@
   import { aktivirajAudio, pustiAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
+  import { putanjaBotAvatara } from '$lib/bot-avatari.js';
   import type { PayloadGreska, PocetakPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
 
   const igra = dohvatiStanjeIgre();
@@ -206,15 +207,27 @@
       class:moje-sjedalo={mjesto?.igracId === stanje.mojIgracId}
     >
       {#if mjesto}
-        <Avatar avatarId={mjesto.avatarId} avatarConfig={mjesto.avatarConfig} rang={mjesto.rang} gost={mjesto.jeGost} velicina={84} razinaVatre={mjesto.razinaVatre} nizPobjeda={mjesto.trenutniNiz} />
+        <Avatar
+          avatarId={mjesto.avatarId}
+          avatarConfig={mjesto.avatarConfig}
+          rang={mjesto.jeBot ? null : mjesto.rang}
+          gost={mjesto.jeGost}
+          velicina={84}
+          razinaVatre={mjesto.jeBot ? 0 : mjesto.razinaVatre}
+          nizPobjeda={mjesto.jeBot ? 0 : mjesto.trenutniNiz}
+          vanjskaSlika={mjesto.jeBot ? putanjaBotAvatara(mjesto.igracId) : null}
+          opisSlike={mjesto.jeBot ? `Bot: ${mjesto.nadimak}` : null}
+        />
         <div class="podaci">
           <strong>
             {mjesto.nadimak}
             {#if mjesto.igracId === stanje.mojIgracId}<span class="oznaka-ti">TI</span>{/if}
           </strong>
-          <span class="rang-i-razina">{mjesto.rang ?? 'Piskaralo'}</span>
-          <span class="statistika-lobbyja"><span>Prosjek bodova: {mjesto.prosjekBodova.toFixed(2)}</span><span>Pobjede: {mjesto.postotakPobjeda.toFixed(0)}%</span><span>Odigrane igre: {mjesto.odigrane}</span></span>
-          <span class="razina-oznaka">LVL {mjesto.razina}</span>
+          {#if !mjesto.jeBot}
+            <span class="rang-i-razina">{mjesto.rang ?? 'Piskaralo'}</span>
+            <span class="statistika-lobbyja"><span>Prosjek bodova: {mjesto.prosjekBodova.toFixed(2)}</span><span>Pobjede: {mjesto.postotakPobjeda.toFixed(0)}%</span><span>Odigrane igre: {mjesto.odigrane}</span></span>
+            <span class="razina-oznaka">LVL {mjesto.razina}</span>
+          {/if}
         </div>
       {:else}
         <span class="prazno">Prazno mjesto</span>

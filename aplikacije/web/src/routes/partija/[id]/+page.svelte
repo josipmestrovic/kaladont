@@ -26,6 +26,7 @@
   import { pustiAudio } from '$lib/audio-manager.js';
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
+  import { putanjaBotAvatara } from '$lib/bot-avatari.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
@@ -89,8 +90,16 @@
   let prethodnaPartijaObavijesti: string | null | undefined;
   const jeTrening = $derived(stanje.kontekst === 'trening' || stanje.kraj?.kontekst === 'trening');
   const IKONA_RACUNALA = '/ikone/67-zagrijavanje-bot.webp';
-  function slikaSjedala(igracId: string): string | null {
-    return igracId.startsWith('racunalo-') ? IKONA_RACUNALA : null;
+  function slikaSjedala(igracId: string, jeBot = false): string | null {
+    if (igracId.startsWith('racunalo-')) return IKONA_RACUNALA;
+    if (jeBot) return putanjaBotAvatara(igracId);
+    return null;
+  }
+  function statusSjedala(sjedalo: { jeBot?: boolean; jeGost?: boolean; rang: string | null; razina: number }): string | null {
+    // U čekaonici/partiji nema bedža „Bot”; status Bot ide samo na završni poredak.
+    if (sjedalo.jeBot) return null;
+    if (sjedalo.jeGost) return 'Gost';
+    return `${sjedalo.rang ?? 'Piskaralo'} | LVL ${sjedalo.razina}`;
   }
   let sekundeDoRezultata = $state(8);
   let rezervniRokRezultataMs: number | null = null;
@@ -1237,6 +1246,11 @@
             {:else}
               <span class="nadimak">{igrac.nadimak}</span>
             {/if}
+            {#if igrac.jeBot}
+              <span class="oznaka-statusa">Bot</span>
+            {:else if !igrac.javniProfil && igrac.igracId !== stanje.mojIgracId}
+              <span class="oznaka-statusa">Gost</span>
+            {/if}
           </span>
           {#if ocjenaIgraca !== null && ocjenaIgraca !== undefined}
             <span class="plasman-ocjena" aria-label={`Ocjena: ${ocjenaIgraca} od 5 zvjezdica`}>
@@ -1503,7 +1517,7 @@
                 {/if}
                 <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                   {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId)} /></span>
+                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.jeBot === true)} /></span>
                   {/key}
                   {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                     <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -1512,7 +1526,9 @@
               </span>
               <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.nadimak}>
                 <span class="redak-imena"><span class="nadimak">{sjedalo.nadimak}</span><span class="oznaka-ti" aria-label="To si ti">TI</span></span>
-                <span class="rang-razina">{sjedalo.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {sjedalo.razina}</span>
+                {#if statusSjedala(sjedalo)}
+                  <span class="rang-razina">{statusSjedala(sjedalo)}</span>
+                {/if}
               </span>
             </div>
           {:else}
@@ -1535,7 +1551,7 @@
                 {/if}
                 <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                   {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId)} /></span>
+                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.jeBot === true)} /></span>
                   {/key}
                   {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                     <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -1544,7 +1560,9 @@
               </span>
               <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.nadimak}>
                 <span class="redak-imena"><span class="nadimak">{sjedalo.nadimak}</span><span class="oznaka-ti" aria-label="To si ti">TI</span></span>
-                <span class="rang-razina">{sjedalo.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {sjedalo.razina}</span>
+                {#if statusSjedala(sjedalo)}
+                  <span class="rang-razina">{statusSjedala(sjedalo)}</span>
+                {/if}
               </span>
             </button>
             <div class="reakcije-overlay" aria-live="polite">
@@ -1580,7 +1598,7 @@
               </div>
             {/if}
           {/if}
-        {:else if sjedalo.igracId.startsWith('racunalo-') || jeTrening}
+        {:else if sjedalo.igracId.startsWith('racunalo-') || sjedalo.jeBot || jeTrening}
           <div class="tudje-sjedalo bez-akcije">
             <span class="avatar-s-bubbleom">
               {#if zadnjiPotezIgraca(sjedalo.igracId)}
@@ -1591,7 +1609,7 @@
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                 {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId)} /></span>
+                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.jeBot === true)} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                   <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -1600,7 +1618,9 @@
             </span>
             <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.nadimak}>
               <span class="redak-imena"><span class="nadimak">{sjedalo.nadimak}</span></span>
-              <span class="rang-razina">{sjedalo.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {sjedalo.razina}</span>
+              {#if statusSjedala(sjedalo)}
+                  <span class="rang-razina">{statusSjedala(sjedalo)}</span>
+                {/if}
             </span>
           </div>
         {:else}
@@ -1621,7 +1641,7 @@
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                 {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId)} /></span>
+                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.jeBot === true)} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                   <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -1630,7 +1650,9 @@
             </span>
             <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.nadimak}>
               <span class="redak-imena"><span class="nadimak">{sjedalo.nadimak}</span></span>
-              <span class="rang-razina">{sjedalo.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {sjedalo.razina}</span>
+              {#if statusSjedala(sjedalo)}
+                  <span class="rang-razina">{statusSjedala(sjedalo)}</span>
+                {/if}
             </span>
           </button>
           {#if izbornikPrijaveIgracaId === sjedalo.igracId}
@@ -2372,6 +2394,12 @@
     letter-spacing: 0.04em;
     text-decoration: none;
     vertical-align: middle;
+  }
+  .oznaka-statusa {
+    margin-left: 6px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+    font-weight: 600;
   }
   .avatar-omot {
     margin-bottom: 0;
