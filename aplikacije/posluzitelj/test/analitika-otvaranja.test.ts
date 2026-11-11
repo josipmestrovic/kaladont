@@ -103,6 +103,61 @@ describe('analitika otvaranja upis i admin', () => {
     expect(agregat.incidentiNa1).toBeGreaterThanOrEqual(1);
   });
 
+  it('bilježi rani incident na trećem odgovoru i tri_odgovora_ok', async () => {
+    const igraId = randomUUID();
+    const dodijeljenoU = new Date();
+    await upsertOtvaranjaAnalitike({
+      igraId,
+      redniBrojOtvaranja: 1,
+      kontekst: 'javna',
+      mod: 'dva_igraca',
+      brojSudionika: 2,
+      sustavskaRijec: 'raspored',
+      izvor: 'sigurni_skup',
+      brojOdgovora: 3,
+      odgovor1: 'editiranje',
+      odgovor2: 'njegovatelj',
+      odgovor3: 'jabuka',
+      status: 'rani_incident',
+      incidentPozicija: 3,
+      incidentRijecUzrok: 'jabuka',
+      incidentRazlog: 'mrtva_slova_baza',
+      incidentAutorUpravljac: 'covjek',
+      incidentZrtvaUpravljac: 'covjek',
+      dodijeljenoU,
+      zatvorenoU: dodijeljenoU,
+    });
+
+    const [red] = await baza.select().from(analitikaOtvaranja).where(eq(analitikaOtvaranja.igraId, igraId));
+    expect(red?.incidentPozicija).toBe(3);
+    expect(red?.odgovor3).toBe('jabuka');
+
+    const igraOk = randomUUID();
+    await upsertOtvaranjaAnalitike({
+      igraId: igraOk,
+      redniBrojOtvaranja: 1,
+      kontekst: 'javna',
+      mod: 'dva_igraca',
+      brojSudionika: 2,
+      sustavskaRijec: 'šećer',
+      izvor: 'sigurni_skup',
+      brojOdgovora: 3,
+      odgovor1: 'a',
+      odgovor2: 'b',
+      odgovor3: 'c',
+      status: 'tri_odgovora_ok',
+      dodijeljenoU,
+      zatvorenoU: dodijeljenoU,
+    });
+
+    const dan = danasZagrebIso(dodijeljenoU);
+    const { od, do: kraj } = graniceDanaZagreb(dan);
+    const agregat = await agregirajPocetneRijeci({ od, do: kraj, kontekst: 'javna' });
+    expect(agregat.incidentiNa3).toBeGreaterThanOrEqual(1);
+    expect(agregat.triOdgovoraOk).toBeGreaterThanOrEqual(1);
+    expect(agregat.prozorOk).toBeGreaterThanOrEqual(agregat.triOdgovoraOk);
+  });
+
   it('odbija običnog korisnika na admin analitici', async () => {
     const registracija = await app.inject({
       url: '/api/racuni/registracija',

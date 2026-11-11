@@ -63,6 +63,24 @@ function provjeriOblik(rijecUlaz: string): { rijec: string; prvaDva: string; zad
   return { rijec, prvaDva: svi.slice(0, 2).join(''), zadnjaDva: svi.slice(-2).join('') };
 }
 
+/** Tier rijetkosti za ručno dodavanje → reprezentativna frekvencija (iskustvo.ts pragovi). */
+export type TierRijetkostiRucno = 'ucestala' | 'rijetka' | 'srednje_rijetka' | 'jako_rijetka';
+
+export const FREKVENCIJA_ZA_TIER_RIJETKOSTI: Record<TierRijetkostiRucno, number> = {
+  ucestala: 100,
+  rijetka: 50,
+  srednje_rijetka: 5,
+  jako_rijetka: 0,
+};
+
+export const DEFAULT_FREKVENCIJA_RUCNO = FREKVENCIJA_ZA_TIER_RIJETKOSTI.ucestala;
+export const RAZLOG_RUCNOG_DODAVANJA = 'Ručno dodavanje';
+
+export function frekvencijaIzTieraRijetkosti(tier: TierRijetkostiRucno | undefined): number {
+  if (!tier) return DEFAULT_FREKVENCIJA_RUCNO;
+  return FREKVENCIJA_ZA_TIER_RIJETKOSTI[tier];
+}
+
 /** Dodaje riječ u rječnik i bilježi izmjenu. Već aktivna riječ je no-op bez zapisa izmjene.
  * Ne osvježava memoriju — pozovi `rjecnik.primijeniUbaci` / `uskladiRjecnikNakonUbaci`. */
 export async function dodajRijec(
@@ -73,10 +91,12 @@ export async function dodajRijec(
   lemaUlaz?: string,
   prijavaId?: number | null,
   db: Izvrsitelj = baza,
+  frekvencija: number = DEFAULT_FREKVENCIJA_RUCNO,
 ): Promise<PromjenaRjecnika> {
   const { rijec, prvaDva, zadnjaDva } = provjeriOblik(rijecUlaz);
   const lema = normalizirajRijecRjecnika(lemaUlaz ?? rijec);
   const grupa = kljucGrupe(vrsta, lema);
+  const frekvencijaVrijednost = Number.isFinite(frekvencija) && frekvencija >= 0 ? Math.floor(frekvencija) : DEFAULT_FREKVENCIJA_RUCNO;
 
   const [postojeca] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
   if (postojeca?.aktivna) return { promjena: 'nema', rijec };
@@ -89,6 +109,7 @@ export async function dodajRijec(
         zadnjaDva,
         vrste: [vrsta],
         grupe: [grupa],
+        frekvencija: frekvencijaVrijednost,
         aktivna: true,
         napomena: 'ručno dodano',
       });
@@ -96,7 +117,7 @@ export async function dodajRijec(
       if (!jeJedinstvenostPrekrsena(greska)) throw greska;
       const [ponovo] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
       if (!ponovo || ponovo.aktivna) return { promjena: 'nema', rijec };
-      await db.update(rijeci).set({ aktivna: true }).where(eq(rijeci.rijec, rijec));
+      await db.update(rijeci).set({ aktivna: true, frekvencija: frekvencijaVrijednost }).where(eq(rijeci.rijec, rijec));
       const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId, prijavaId });
       return { promjena: 'reaktivirana', rijec, izmjenaId };
     }
@@ -104,7 +125,7 @@ export async function dodajRijec(
     return { promjena: 'dodana', rijec, izmjenaId };
   }
 
-  await db.update(rijeci).set({ aktivna: true }).where(eq(rijeci.rijec, rijec));
+  await db.update(rijeci).set({ aktivna: true, frekvencija: frekvencijaVrijednost }).where(eq(rijeci.rijec, rijec));
   const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId, prijavaId });
   return { promjena: 'reaktivirana', rijec, izmjenaId };
 }

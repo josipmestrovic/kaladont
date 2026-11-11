@@ -207,12 +207,13 @@ interface StanjeStola {
   zadnjiIzvorPocetne: IzvorPocetneRijeci | 'nema_kandidata' | null;
   /** Brojač sustavskih otvaranja u ovoj igri (za analitiku). */
   analitikaOtvaranjaRedni: number;
-  /** Otvoreni prozor prva dva odgovora; null kad nema aktivnog mjerenja. */
+  /** Otvoreni prozor prva tri odgovora; null kad nema aktivnog mjerenja. */
   analitikaProzor: {
     redniBroj: number;
     brojOdgovora: number;
     odgovor1: string | null;
     odgovor2: string | null;
+    odgovor3: string | null;
     sustavskaRijec: string | null;
     izvor: IzvorOtvaranjaAnalitike;
     status: StatusOtvaranjaAnalitike;
@@ -1506,7 +1507,7 @@ export function stvoriUpraviteljPartija(
     dodatak: {
       status?: StatusOtvaranjaAnalitike;
       zatvorenoU?: Date | null;
-      incidentPozicija?: 1 | 2 | null;
+      incidentPozicija?: 1 | 2 | 3 | null;
       incidentRijecUzrok?: string | null;
       incidentRazlog?: string | null;
       incidentAutorUpravljac?: UpravljacOtvaranjaAnalitike | null;
@@ -1527,6 +1528,7 @@ export function stvoriUpraviteljPartija(
       brojOdgovora: prozor.brojOdgovora,
       odgovor1: prozor.odgovor1,
       odgovor2: prozor.odgovor2,
+      odgovor3: prozor.odgovor3,
       status: prozor.status,
       incidentPozicija: dodatak.incidentPozicija ?? null,
       incidentRijecUzrok: dodatak.incidentRijecUzrok ?? null,
@@ -1553,6 +1555,7 @@ export function stvoriUpraviteljPartija(
       brojOdgovora: 0,
       odgovor1: null,
       odgovor2: null,
+      odgovor3: null,
       sustavskaRijec,
       izvor,
       status,
@@ -1567,10 +1570,11 @@ export function stvoriUpraviteljPartija(
 
   function zabiljeziAnalitikaOdgovor(stanje: StanjeStola, rijec: string): void {
     const prozor = stanje.analitikaProzor;
-    if (!prozor || prozor.status !== 'otvoren' || prozor.brojOdgovora >= 2) return;
+    if (!prozor || prozor.status !== 'otvoren' || prozor.brojOdgovora >= 3) return;
     prozor.brojOdgovora += 1;
     if (prozor.brojOdgovora === 1) prozor.odgovor1 = rijec;
-    else prozor.odgovor2 = rijec;
+    else if (prozor.brojOdgovora === 2) prozor.odgovor2 = rijec;
+    else prozor.odgovor3 = rijec;
   }
 
   function zatvoriAnalitikaProzorDrugim(stanje: StanjeStola): void {
@@ -1588,13 +1592,15 @@ export function stvoriUpraviteljPartija(
   ): void {
     const prozor = stanje.analitikaProzor;
     if (!prozor || prozor.status !== 'otvoren') return;
-    if (prozor.brojOdgovora !== 1 && prozor.brojOdgovora !== 2) return;
-    const pozicija = prozor.brojOdgovora as 1 | 2;
+    if (prozor.brojOdgovora < 1 || prozor.brojOdgovora > 3) return;
+    const pozicija = prozor.brojOdgovora as 1 | 2 | 3;
+    const uzrok =
+      pozicija === 1 ? prozor.odgovor1 : pozicija === 2 ? prozor.odgovor2 : prozor.odgovor3;
     syncAnalitikaProzor(stanje, {
       status: 'rani_incident',
       zatvorenoU: new Date(sat.sada()),
       incidentPozicija: pozicija,
-      incidentRijecUzrok: pozicija === 1 ? prozor.odgovor1 : prozor.odgovor2,
+      incidentRijecUzrok: uzrok,
       incidentRazlog: razlog,
       incidentAutorUpravljac: upravljacZaAnalitiku(stanje, autorId),
       incidentZrtvaUpravljac: upravljacZaAnalitiku(stanje, zrtvaId),
@@ -1602,10 +1608,10 @@ export function stvoriUpraviteljPartija(
     stanje.analitikaProzor = null;
   }
 
-  function mozdaZatvoriAnalitikaProzorDvaOdgovora(stanje: StanjeStola): void {
+  function mozdaZatvoriAnalitikaProzorTriOdgovora(stanje: StanjeStola): void {
     const prozor = stanje.analitikaProzor;
-    if (!prozor || prozor.status !== 'otvoren' || prozor.brojOdgovora !== 2) return;
-    syncAnalitikaProzor(stanje, { status: 'dva_odgovora_ok', zatvorenoU: new Date(sat.sada()) });
+    if (!prozor || prozor.status !== 'otvoren' || prozor.brojOdgovora !== 3) return;
+    syncAnalitikaProzor(stanje, { status: 'tri_odgovora_ok', zatvorenoU: new Date(sat.sada()) });
     stanje.analitikaProzor = null;
   }
 
@@ -2077,7 +2083,7 @@ export function stvoriUpraviteljPartija(
       // Ne stavljaj žrtvu na potez i ne šalji stanje s aktivnim redom — odmah slijedi
       // eliminacija i 8 s izbora riječi; inače se eliminatoru/sljedećem otvori forma.
       if (zrtva) {
-        if (stanje.analitikaProzor && (stanje.analitikaProzor.brojOdgovora === 1 || stanje.analitikaProzor.brojOdgovora === 2)) {
+        if (stanje.analitikaProzor && stanje.analitikaProzor.brojOdgovora >= 1 && stanje.analitikaProzor.brojOdgovora <= 3) {
           zatvoriAnalitikaProzorRanimIncidentom(stanje, razlogMrtvihSlova, igracId, zrtva);
         } else {
           zatvoriAnalitikaProzorDrugim(stanje);
@@ -2100,7 +2106,7 @@ export function stvoriUpraviteljPartija(
       return;
     }
 
-    mozdaZatvoriAnalitikaProzorDvaOdgovora(stanje);
+    mozdaZatvoriAnalitikaProzorTriOdgovora(stanje);
 
     const sljedeci = sljedeciAktivni(stanje, igracId);
     if (!sljedeci) return; // ne bi se smjelo dogoditi dok je aktivnih > 1

@@ -8,7 +8,8 @@ import { asc, eq, gt, and } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { rijeci, vlastitaImena } from '../baza/shema.js';
 import { grafemi, prvaDva, zadnjaDva } from 'zajednicko';
-import { odaberiSigurnuPocetnuRijec } from './pocetne-rijeci.js';
+import { odaberiSigurnuPocetnuRijec, POCETNI_SEED_SIGURNIH_RIJECI } from './pocetne-rijeci.js';
+import { ucitajSigurnePocetneRijeciIzBaze } from './sigurni-skup.js';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
 
@@ -57,6 +58,13 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   }): void;
   /** Brzo uklanjanje iz memorije nakon soft-deletea — bez punog učitavanja. */
   primijeniUklanjanje(rijec: string): void;
+  /** Trenutni skup sigurnih početnih riječi (runtime). */
+  popisSigurnihPocetnih(): readonly string[];
+  jeUSigurnomSkupu(rijec: string): boolean;
+  /** Inkrementalno dodavanje u in-memory sigurni skup (nakon DB inserta). */
+  dodajUSigurniSkupMemoriju(rijec: string): void;
+  /** Inkrementalno uklanjanje iz in-memory sigurnog skupa (nakon DB deletea). */
+  ukloniIzSigurnogSkupaMemoriju(rijec: string): void;
 }
 
 export interface OpcijeUcitavanjaRjecnika {
@@ -74,6 +82,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
   let skupVlastitihImena = new Set<string>();
   let poPrefiksu = new Map<string, string[]>();
   let pocetneImenickeRijeci: string[] = [];
+  let sigurnePocetneRijeci: string[] = [...POCETNI_SEED_SIGURNIH_RIJECI];
   let kategorije: KategorijaRjecnika[] = [];
   let brojKolekcijskih = 0;
   let kolekcijskihPoVrsti = new Map<VrstaRijeci, number>();
@@ -310,6 +319,12 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     skupVlastitihImena = noviSkupVlastitihImena;
     poPrefiksu = novoPoPrefiksu;
     pocetneImenickeRijeci = novePocetneImenickeRijeci;
+    try {
+      const izBaze = await ucitajSigurnePocetneRijeciIzBaze();
+      if (izBaze.length > 0) sigurnePocetneRijeci = izBaze;
+    } catch {
+      // Tablica možda još nije migrirana u testovima — zadrži seed.
+    }
     kategorije = [...noviBrojPoVrsti.entries()]
       .map(([vrsta, brojOblika]) => ({ vrsta, brojOblika }))
       .sort((a, b) => b.brojOblika - a.brojOblika);
@@ -591,6 +606,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
       const sigurnaRijec = odaberiSigurnuPocetnuRijec({
         iskoristeneGrupe,
         dopusteneVrste,
+        kandidati: sigurnePocetneRijeci,
         grupeZa,
         vrsteZa,
         rijeciNa: (prefiks) => poPrefiksu.get(prefiks) ?? [],
@@ -630,5 +646,17 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     ponovoUcitaj: ucitaj,
     primijeniUbaci,
     primijeniUklanjanje,
+    popisSigurnihPocetnih: () => sigurnePocetneRijeci,
+    jeUSigurnomSkupu: (rijec) => sigurnePocetneRijeci.includes(rijec.normalize('NFC').trim().toLowerCase()),
+    dodajUSigurniSkupMemoriju: (rijec) => {
+      const normalizirana = rijec.normalize('NFC').trim().toLowerCase();
+      if (!sigurnePocetneRijeci.includes(normalizirana)) {
+        sigurnePocetneRijeci = [...sigurnePocetneRijeci, normalizirana].sort((a, b) => a.localeCompare(b, 'hr'));
+      }
+    },
+    ukloniIzSigurnogSkupaMemoriju: (rijec) => {
+      const normalizirana = rijec.normalize('NFC').trim().toLowerCase();
+      sigurnePocetneRijeci = sigurnePocetneRijeci.filter((r) => r !== normalizirana);
+    },
   };
 }

@@ -15,7 +15,15 @@ import {
   NevaljanaRijecError,
   popisNstandardnihAktivnihRijeci,
   deaktivirajNstandardneRijeci,
+  frekvencijaIzTieraRijetkosti,
+  RAZLOG_RUCNOG_DODAVANJA,
+  type TierRijetkostiRucno,
 } from '../rjecnik/administracija.js';
+import {
+  dodajUSigurniSkup,
+  popisSigurnihPocetnihRijeci,
+  ukloniIzSigurnogSkupa,
+} from '../rjecnik/sigurni-skup.js';
 import { igraci, prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza/shema.js';
 import { baza } from '../baza/klijent.js';
 import { zahtijevajAdmina, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
@@ -72,10 +80,15 @@ async function uskladiRjecnikNakonUbaci(rjecnik: RjecnikUMemoriji, rijecUlaz: st
 }
 
 const ShemaRijec = z.object({ rijec: z.string().min(2), razlog: z.string().min(1) });
-const ShemaDodajRijec = ShemaRijec.extend({
+const ShemaDodajRijec = z.object({
+  rijec: z.string().min(2),
   vrsta: z.enum(SVE_VRSTE_RIJECI as [string, ...string[]]),
   lema: z.string().min(2).optional(),
+  razlog: z.string().min(1).optional(),
+  tierRijetkosti: z.enum(['ucestala', 'rijetka', 'srednje_rijetka', 'jako_rijetka']).optional(),
+  frekvencija: z.number().int().nonnegative().optional(),
 });
+const ShemaSigurnaRijec = z.object({ rijec: z.string().min(2) });
 const ShemaRijesiPrijavu = z.object({
   status: z.enum(['pregledana', 'rijesena']),
   napomenaAdmina: z.string().optional(),
@@ -335,16 +348,23 @@ export async function registrirajAdminRute(
     if (!rezultat.success) {
       return odgovor
         .code(400)
-        .send({ ok: false, greska: 'Polja "rijec", "razlog" i "vrsta" su obavezna ("lema" opcionalna).' });
+        .send({ ok: false, greska: 'Polja "rijec" i "vrsta" su obavezna ("lema", "tierRijetkosti" i "razlog" opcionalni).' });
     }
     const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+    const razlog = rezultat.data.razlog?.trim() || RAZLOG_RUCNOG_DODAVANJA;
+    const frekvencija =
+      rezultat.data.frekvencija ??
+      frekvencijaIzTieraRijetkosti(rezultat.data.tierRijetkosti as TierRijetkostiRucno | undefined);
     try {
       await dodajRijec(
         rezultat.data.rijec,
-        rezultat.data.razlog,
+        razlog,
         admin.id,
         rezultat.data.vrsta as (typeof SVE_VRSTE_RIJECI)[number],
         rezultat.data.lema,
+        undefined,
+        undefined,
+        frekvencija,
       );
       await uskladiRjecnikNakonUbaci(rjecnik, rezultat.data.rijec);
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
@@ -355,6 +375,45 @@ export async function registrirajAdminRute(
       throw greska;
     }
   });
+
+  app.get('/admin/rjecnik/sigurni-skup', { preHandler: zahtijevajAdmina }, async () => {
+    const popis = await popisSigurnihPocetnihRijeci();
+    return { ok: true, ukupno: popis.length, rijeci: popis };
+  });
+
+  app.post('/admin/rjecnik/sigurni-skup', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    const rezultat = ShemaSigurnaRijec.safeParse(zahtjev.body);
+    if (!rezultat.success) {
+      return odgovor.code(400).send({ ok: false, greska: 'Polje "rijec" je obavezno.' });
+    }
+    const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+    try {
+      const ishod = await dodajUSigurniSkup(rezultat.data.rijec, admin.id);
+      if (ishod.promjena === 'dodana') rjecnik.dodajUSigurniSkupMemoriju(ishod.rijec);
+      return { ok: true, promjena: ishod.promjena, rijec: ishod.rijec, ukupno: rjecnik.popisSigurnihPocetnih().length };
+    } catch (greska) {
+      if (greska instanceof NevaljanaRijecError) {
+        return odgovor.code(400).send({ ok: false, greska: greska.message });
+      }
+      throw greska;
+    }
+  });
+
+  app.delete<{ Params: { rijec: string } }>(
+    '/admin/rjecnik/sigurni-skup/:rijec',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev) => {
+      const ishod = await ukloniIzSigurnogSkupa(zahtjev.params.rijec);
+      if (ishod.promjena === 'uklonjena') rjecnik.ukloniIzSigurnogSkupaMemoriju(ishod.rijec);
+      return {
+        ok: true,
+        promjena: ishod.promjena,
+        rijec: ishod.rijec,
+        uSkupu: rjecnik.jeUSigurnomSkupu(ishod.rijec),
+        ukupno: rjecnik.popisSigurnihPocetnih().length,
+      };
+    },
+  );
 
   app.post('/admin/rjecnik/deaktiviraj', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
     const rezultat = ShemaRijec.safeParse(zahtjev.body);

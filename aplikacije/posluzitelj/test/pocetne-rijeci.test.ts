@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VrstaRijeci } from 'zajednicko';
-import { odaberiSigurnuPocetnuRijec, SKUP_SIGURNIH_RIJECI } from '../src/rjecnik/pocetne-rijeci.js';
+import { odaberiSigurnuPocetnuRijec, POCETNI_SEED_SIGURNIH_RIJECI, SKUP_SIGURNIH_RIJECI } from '../src/rjecnik/pocetne-rijeci.js';
 
 interface TestnaRijec {
   grupe: string[];
@@ -32,11 +32,12 @@ function odaberi(
 }
 
 describe('skup sigurnih početnih riječi', () => {
-  it('sadrži 52 odobrene riječi bez kruha i sluha', () => {
-    expect(SKUP_SIGURNIH_RIJECI).toHaveLength(52);
-    expect(SKUP_SIGURNIH_RIJECI).not.toContain('kruh');
-    expect(SKUP_SIGURNIH_RIJECI).not.toContain('sluh');
-    expect(SKUP_SIGURNIH_RIJECI).toEqual(expect.arrayContaining([
+  it('seed sadrži 52 odobrene riječi bez kruha i sluha', () => {
+    expect(POCETNI_SEED_SIGURNIH_RIJECI).toHaveLength(52);
+    expect(SKUP_SIGURNIH_RIJECI).toEqual(POCETNI_SEED_SIGURNIH_RIJECI);
+    expect(POCETNI_SEED_SIGURNIH_RIJECI).not.toContain('kruh');
+    expect(POCETNI_SEED_SIGURNIH_RIJECI).not.toContain('sluh');
+    expect(POCETNI_SEED_SIGURNIH_RIJECI).toEqual(expect.arrayContaining([
       'velik',
       'lijep',
       'loš',

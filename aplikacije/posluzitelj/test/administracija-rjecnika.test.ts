@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { eq, inArray } from 'drizzle-orm';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { igraci, izmjeneRjecnika, rijeci } from '../src/baza/shema.js';
+import { igraci, izmjeneRjecnika, rijeci, sigurnePocetneRijeci } from '../src/baza/shema.js';
 import { RAZLOG_CISCENJA_NSTANDARDNIH } from '../src/rjecnik/administracija.js';
 
 let app: FastifyInstance;
@@ -57,6 +57,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  await baza.delete(sigurnePocetneRijeci).where(eq(sigurnePocetneRijeci.rijec, TESTNA_RIJEC));
   await baza.delete(izmjeneRjecnika).where(eq(izmjeneRjecnika.rijec, TESTNA_RIJEC));
   await baza.delete(rijeci).where(eq(rijeci.rijec, TESTNA_RIJEC));
   await baza.delete(izmjeneRjecnika).where(inArray(izmjeneRjecnika.rijec, RIJEC_CISCENJA));
@@ -94,7 +95,7 @@ describe('POST /admin/rjecnik/dodaj', () => {
     const odgovor = await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
-      body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'ručni test', vrsta: 'imenica' }),
+      body: JSON.stringify({ rijec: TESTNA_RIJEC, vrsta: 'imenica' }),
     });
     expect(odgovor.status).toBe(200);
     const tijelo = (await odgovor.json()) as { ok: boolean; brojRijeci: number };
@@ -108,13 +109,54 @@ describe('POST /admin/rjecnik/dodaj', () => {
     expect(redak?.aktivna).toBe(true);
     expect(redak?.vrste).toEqual(['imenica']);
     expect(redak?.grupe).toEqual([`imenica:${TESTNA_RIJEC}`]);
+    expect(redak?.frekvencija).toBe(100);
+  });
+
+  it('admin može eksplicitno postaviti jako rijetku frekvenciju', async () => {
+    const odgovor = await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ rijec: TESTNA_RIJEC, vrsta: 'imenica', tierRijetkosti: 'jako_rijetka' }),
+    });
+    expect(odgovor.status).toBe(200);
+    const [redak] = await baza.select().from(rijeci).where(eq(rijeci.rijec, TESTNA_RIJEC));
+    expect(redak?.frekvencija).toBe(0);
+  });
+
+  it('admin dodaje i izbacuje riječ iz sigurnog skupa', async () => {
+    await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ rijec: TESTNA_RIJEC, vrsta: 'imenica' }),
+    });
+
+    const dodaj = await fetch(`${adresa}/api/admin/rjecnik/sigurni-skup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ rijec: TESTNA_RIJEC }),
+    });
+    expect(dodaj.status).toBe(200);
+    expect(((await dodaj.json()) as { promjena: string }).promjena).toBe('dodana');
+
+    const lista = await fetch(`${adresa}/api/admin/rjecnik/sigurni-skup`, {
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const tijeloListe = (await lista.json()) as { rijeci: { rijec: string }[] };
+    expect(tijeloListe.rijeci.some((r) => r.rijec === TESTNA_RIJEC)).toBe(true);
+
+    const izbaci = await fetch(`${adresa}/api/admin/rjecnik/sigurni-skup/${encodeURIComponent(TESTNA_RIJEC)}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(izbaci.status).toBe(200);
+    expect(((await izbaci.json()) as { promjena: string }).promjena).toBe('uklonjena');
   });
 
   it('odbija dodavanje bez vrste riječi (ADR-013)', async () => {
     const odgovor = await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
-      body: JSON.stringify({ rijec: TESTNA_RIJEC, razlog: 'bez vrste' }),
+      body: JSON.stringify({ rijec: TESTNA_RIJEC }),
     });
     expect(odgovor.status).toBe(400);
   });
