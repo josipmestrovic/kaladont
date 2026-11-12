@@ -159,6 +159,7 @@
       });
       prijavljeneOdbijene = new Set(prijavljeneOdbijene).add(normalizirana);
       brojDodavanje += 1;
+      if (brojDodavanje >= LIMIT_PRIJAVA) oznaciLimitDodavanja();
       pokaziUspjeh(PORUKA_ZAHVALE, TRAJANJE_ZAHVALE_MS);
     } catch (greskaPrijava) {
       const poruka = greskaPrijava instanceof Error ? greskaPrijava.message : 'Prijava nije uspjela.';

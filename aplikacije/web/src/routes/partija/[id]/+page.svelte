@@ -1158,7 +1158,7 @@
       {#if !jeTrening && partijaId}
         {#if prijavljeneOdbijeneRijeci.has(normaliziranaNepostojeca)}
           <span class="poruka-poteza-prijavljeno">Prijavljeno</span>
-        {:else if limitDodavanjeDosegnut}
+        {:else if limitDodavanjeDosegnut || brojPrijavaDodavanje >= LIMIT_PRIJAVA_DODAVANJE}
           <span class="poruka-poteza-prijavljeno">Limit prijava dosegnut</span>
         {:else}
           <button
