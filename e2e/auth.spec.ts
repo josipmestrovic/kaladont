@@ -117,10 +117,9 @@ test('gost ulazi u red bez dijaloga Uvjeta', async ({ page }) => {
 test('izbornik uvjeta i privatnosti vodi na pravne stranice', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('button', { name: 'Uvjeti i privatnost' }).click();
-  const dijalog = page.getByRole('dialog', { name: 'Što te zanima?' });
-  await expect(dijalog.getByRole('link', { name: /Uvjeti korištenja/ })).toHaveAttribute('href', '/uvjeti');
-  await expect(dijalog.getByRole('link', { name: /Pravila privatnosti/ })).toHaveAttribute('href', '/privatnost');
+  const footer = page.locator('.landing-footer');
+  await expect(footer.getByRole('link', { name: 'Uvjeti' })).toHaveAttribute('href', '/uvjeti');
+  await expect(footer.getByRole('link', { name: 'Privatnost' })).toHaveAttribute('href', '/privatnost');
 });
 
 test('prijava s krivom lozinkom prikazuje grešku', async ({ page }) => {

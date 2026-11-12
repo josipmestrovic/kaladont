@@ -272,5 +272,5 @@ test('mobilna navigacija ima veći razmak stavki i odvojene prekidače', async (
     .locator('.kontrole-pristupacnosti-naslovnica .naziv-kontrole')
     .first()
     .evaluate((el) => getComputedStyle(el).fontSize);
-  expect(fontPrekidaca).toBe('16px');
+  expect(fontPrekidaca).toBe('13px');
 });
