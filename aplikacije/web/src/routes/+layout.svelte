@@ -29,6 +29,7 @@
 
   let { children, data } = $props();
   let sesijaSpreman = $state(false);
+  let desktopPadajuceRijeci = $state(false);
   let prethodnaPutanja = $state<string | null>(null);
   let mozeNaprijed = $state(false);
   let povijestAplikacije: string[] = [];
@@ -95,6 +96,14 @@
     const sesija = inicijalizirajGostSesiju();
     postaviPutanjuSanducica($page.url.pathname);
 
+    // Padajuće riječi samo iznad 1000px — ne montirati na mobitelu/tabletu.
+    const upitPadajucih = window.matchMedia('(min-width: 1001px)');
+    const osvjeziPadajuce = () => {
+      desktopPadajuceRijeci = upitPadajucih.matches;
+    };
+    osvjeziPadajuce();
+    upitPadajucih.addEventListener('change', osvjeziPadajuce);
+
     void (async () => {
       try {
         void ucitajKriticneIkone();
@@ -116,6 +125,7 @@
     })();
 
     return () => {
+      upitPadajucih.removeEventListener('change', osvjeziPadajuce);
       zaustaviEvidenciju();
       zaustaviObavijesti();
       zaustaviSanducic();
@@ -142,7 +152,7 @@
     <DostignuceObavijest />
     <CitanjeNaglasObavijest />
   </div>
-  {#if $page.url.pathname === '/' && sesijaSpreman}<PadajuceRijeci />{/if}
+  {#if $page.url.pathname === '/' && sesijaSpreman && desktopPadajuceRijeci}<PadajuceRijeci />{/if}
   {#if sesijaSpreman && !bezHeadera}
     <Header {prethodnaPutanja} {mozeNaprijed} />
   {/if}

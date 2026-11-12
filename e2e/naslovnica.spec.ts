@@ -199,3 +199,106 @@ test('ruta partije nema header ni na završnom prikazu', async ({ page }) => {
   await page.goto('/partija/nepostojeca-partija');
   await expect(page.getByRole('banner')).toHaveCount(0);
 });
+
+for (const sirina of [320, 390]) {
+  test(`DEMO i H1 dijele lijevi rub na ${sirina}px`, async ({ page }) => {
+    await page.setViewportSize({ width: sirina, height: 844 });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'KALADONT online' })).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+
+    const demo = page.locator('.demo-oznaka');
+    await expect(demo).toBeVisible();
+    await expect(page.locator('#naslov-kaladont')).toBeVisible();
+
+    const poravnanje = await page.evaluate(() => {
+      const oznaka = document.querySelector('.demo-oznaka') as HTMLElement;
+      const naslov = document.querySelector('#naslov-kaladont') as HTMLElement;
+      const navigacija = document.querySelector('.glavna-navigacija') as HTMLElement;
+      const spremljeniTransform = oznaka.style.transform;
+      oznaka.style.transform = 'none';
+      const demoRect = oznaka.getBoundingClientRect();
+      const h1Rect = naslov.getBoundingClientRect();
+      const navRect = navigacija.getBoundingClientRect();
+      oznaka.style.transform = spremljeniTransform;
+      return {
+        razlikaDemoH1: Math.abs(demoRect.left - h1Rect.left),
+        razlikaH1Nav: Math.abs(h1Rect.left - navRect.left),
+        demoSirina: demoRect.width,
+        h1Sirina: h1Rect.width,
+      };
+    });
+    expect(poravnanje.razlikaDemoH1).toBeLessThanOrEqual(2);
+    expect(poravnanje.razlikaH1Nav).toBeLessThanOrEqual(2);
+    expect(poravnanje.demoSirina).toBeLessThan(poravnanje.h1Sirina);
+  });
+}
+
+test('padajuće riječi nisu montirane na 1000px i manje', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.goto('/');
+  await expect(page.locator('.landing-footer')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.pozadina-rijeci')).toHaveCount(0);
+});
+
+test('padajuće riječi montirane iznad 1000px i demontiraju se pri suženju', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page.locator('.landing-footer')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.pozadina-rijeci')).toHaveCount(1);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.pozadina-rijeci')).toHaveCount(0);
+});
+
+test('mobilna navigacija ima veći razmak stavki i odvojene prekidače', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('.landing-footer')).toBeVisible({ timeout: 20_000 });
+
+  const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
+  const igraj = navigacija.getByRole('button', { name: 'Igraj' });
+  const profil = navigacija.getByRole('link', { name: 'Moj profil' });
+  const zadnjaStavka = navigacija.getByRole('link', { name: 'Registriraj se' });
+  const kontrole = page.locator('.kontrole-pristupacnosti-naslovnica');
+
+  const igrajBox = await igraj.boundingBox();
+  const profilBox = await profil.boundingBox();
+  const zadnjaBox = await zadnjaStavka.boundingBox();
+  const kontroleBox = await kontrole.boundingBox();
+  expect(igrajBox && profilBox && zadnjaBox && kontroleBox).toBeTruthy();
+
+  const razmakStavki = profilBox!.y - (igrajBox!.y + igrajBox!.height);
+  const razmakPrekidaca = kontroleBox!.y - (zadnjaBox!.y + zadnjaBox!.height);
+  expect(razmakStavki).toBeGreaterThanOrEqual(5);
+  expect(razmakPrekidaca).toBeGreaterThan(razmakStavki);
+
+  const fontPrekidaca = await page
+    .locator('.kontrole-pristupacnosti-naslovnica .naziv-kontrole')
+    .first()
+    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  const ocekivaniFont = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.fontSize = 'var(--tekst-sitni)';
+    document.body.appendChild(probe);
+    const bazni = parseFloat(getComputedStyle(probe).fontSize);
+    probe.remove();
+    // 390px < 480 → mobilni +20% umanjeno za ~15%.
+    return bazni * 1.02;
+  });
+  expect(fontPrekidaca).toBeCloseTo(ocekivaniFont, 0);
+
+  const jedanRed = await page
+    .getByRole('group', { name: 'Postavke pristupačnosti' })
+    .locator('.naziv-kontrole')
+    .first()
+    .evaluate((el) => {
+      const stil = getComputedStyle(el);
+      const visinaRetka =
+        stil.lineHeight === 'normal'
+          ? parseFloat(stil.fontSize) * 1.2
+          : parseFloat(stil.lineHeight);
+      return el.scrollHeight <= Math.ceil(visinaRetka * 1.35);
+    });
+  expect(jedanRed).toBe(true);
+});
