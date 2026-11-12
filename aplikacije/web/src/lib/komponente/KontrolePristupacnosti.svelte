@@ -58,6 +58,8 @@
     justify-content: space-between;
     gap: 12px;
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .kontrola-pristupacnosti {
@@ -73,6 +75,7 @@
     border-radius: 8px;
     background: var(--boja-povrsina);
     color: var(--boja-tekst-osnovni);
+    text-align: left;
     cursor: pointer;
   }
 
@@ -126,20 +129,14 @@
     display: block;
     min-width: 0;
     line-height: 1.2;
-    font-size: var(--tekst-sitni);
+    white-space: normal;
+    text-align: left;
+    font-size: 16px;
   }
 
-  /* Naslovnica / neugrađeno: na mobitelu +20% radi čitljivosti prekidača. */
-  @media (max-width: 999px) {
-    .kontrole-pristupacnosti:not(.ugradeno) .naziv-kontrole {
-      font-size: calc(var(--tekst-sitni) * 1.2);
-    }
-  }
-
-  /* Uži telefoni: ~15% manje od mobilnog (+20%) da stanu uz switch. */
-  @media (max-width: 479px) {
-    .kontrole-pristupacnosti:not(.ugradeno) .naziv-kontrole {
-      font-size: calc(var(--tekst-sitni) * 1.02);
+  @media (min-width: 1000px) {
+    .naziv-kontrole {
+      font-size: 18px;
     }
   }
 

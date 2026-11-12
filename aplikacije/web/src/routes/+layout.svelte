@@ -63,9 +63,9 @@
     mozeNaprijed = indeksPovijesti < povijestAplikacije.length - 1;
   });
 
-  // Naslovnica, čekaonica i aktivna partija nemaju zajedničko zaglavlje.
+  // Čekaonica i partija nemaju zajedničko zaglavlje. Naslovnica ima Header u načinu „samo desno”.
   const bezHeadera = $derived(
-    $page.url.pathname === '/' || $page.url.pathname === '/red' || $page.url.pathname.startsWith('/partija/'),
+    $page.url.pathname === '/red' || $page.url.pathname.startsWith('/partija/'),
   );
   const urlCilja = $derived($navigating?.to?.url ?? $page.url);
   // Kostur na /red: dok sesija nije gotova ili dok traje navigacija prema redu.
@@ -179,6 +179,12 @@
   .aplikacija .stranica {
     position: relative;
     z-index: 1;
+  }
+
+  /* Naslovnički Header mora ostati absolute overlay (ne relative iz pravila iznad). */
+  .aplikacija.landing-shell :global(.header.header--naslovnica) {
+    position: absolute;
+    z-index: 5;
   }
 
   .aplikacija.landing-shell {

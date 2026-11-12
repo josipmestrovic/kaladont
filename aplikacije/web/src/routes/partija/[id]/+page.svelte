@@ -44,8 +44,15 @@
   let slanjeUTijeku = $state(false);
   let odbijeneRijeci = $state<string[]>([]);
   let lokalniPoteziZaPrijavu = $state<{ id: number; rijec: string | null; igracId: string | null; vrsta: string; redniBroj: number; trazenaSlova: string | null; vrijeme: string }[]>([]);
+  let prijavljeneOdbijeneRijeci = $state<Set<string>>(new Set());
+  let prijavaOdbijeneUTijeku = $state<Set<string>>(new Set());
+  let brojPrijavaDodavanje = $state(0);
+  let limitDodavanjeDosegnut = $state(false);
   let prijavljeniIgraci = $state<Set<string>>(new Set());
   let prijavaIgracaUTijeku = $state<Set<string>>(new Set());
+  const LIMIT_PRIJAVA_DODAVANJE = 3;
+  const PORUKA_ZAHVALE_PRIJAVA = 'Hvala! Tvoja prijava nam pomaže poboljšati rječnik.';
+  const TRAJANJE_ZAHVALE_PRIJAVA_MS = 7000;
   let izbornikPrijaveIgracaId = $state<string | null>(null);
   let slanjeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let porukaPoteza = $state<string | null>(null);
@@ -530,6 +537,34 @@
       const novi = new Set(prijavaIgracaUTijeku);
       novi.delete(igracId);
       prijavaIgracaUTijeku = novi;
+    }
+  }
+
+  async function prijaviOdbijenuRijecIzPoruke(rijec: string) {
+    if (!partijaId || jeTrening) return;
+    const normalizirana = rijec.normalize('NFC').trim().toLowerCase();
+    if (!normalizirana || prijavljeneOdbijeneRijeci.has(normalizirana) || prijavaOdbijeneUTijeku.has(normalizirana)) return;
+    if (limitDodavanjeDosegnut || brojPrijavaDodavanje >= LIMIT_PRIJAVA_DODAVANJE) {
+      limitDodavanjeDosegnut = true;
+      return;
+    }
+    prijavaOdbijeneUTijeku = new Set(prijavaOdbijeneUTijeku).add(normalizirana);
+    try {
+      await api<{ ok: boolean; poruka?: string }>('/prijave', {
+        method: 'POST',
+        body: JSON.stringify({ partijaId, tip: 'za_dodavanje', rijec: normalizirana }),
+      });
+      prijavljeneOdbijeneRijeci = new Set(prijavljeneOdbijeneRijeci).add(normalizirana);
+      brojPrijavaDodavanje += 1;
+      if (brojPrijavaDodavanje >= LIMIT_PRIJAVA_DODAVANJE) limitDodavanjeDosegnut = true;
+      pokaziUspjeh(PORUKA_ZAHVALE_PRIJAVA, TRAJANJE_ZAHVALE_PRIJAVA_MS);
+    } catch (greskaPrijava) {
+      const poruka = greskaPrijava instanceof Error ? greskaPrijava.message : '';
+      if (/limit|dosegnut/i.test(poruka)) limitDodavanjeDosegnut = true;
+    } finally {
+      const novi = new Set(prijavaOdbijeneUTijeku);
+      novi.delete(normalizirana);
+      prijavaOdbijeneUTijeku = novi;
     }
   }
 
@@ -1118,7 +1153,24 @@
 {#snippet porukaOdbijenogPoteza()}
   <p class="poruka-poteza" role="alert">
     {#if nepostojecaRijec}
-      <strong class="odbijena-rijec">{nepostojecaRijec}</strong> ne postoji u našoj bazi.
+      {@const normaliziranaNepostojeca = nepostojecaRijec.normalize('NFC').trim().toLowerCase()}
+      <strong class="odbijena-rijec">{nepostojecaRijec}</strong> ne postoji u našem rječniku. Misliš da je greška?
+      {#if !jeTrening && partijaId}
+        {#if prijavljeneOdbijeneRijeci.has(normaliziranaNepostojeca)}
+          <span class="poruka-poteza-prijavljeno">Prijavljeno</span>
+        {:else if limitDodavanjeDosegnut || brojPrijavaDodavanje >= LIMIT_PRIJAVA_DODAVANJE}
+          <span class="poruka-poteza-prijavljeno">Limit prijava dosegnut</span>
+        {:else}
+          <button
+            type="button"
+            class="poruka-poteza-prijavi"
+            disabled={prijavaOdbijeneUTijeku.has(normaliziranaNepostojeca)}
+            onclick={() => void prijaviOdbijenuRijecIzPoruke(normaliziranaNepostojeca)}
+          >
+            {prijavaOdbijeneUTijeku.has(normaliziranaNepostojeca) ? 'Šaljem...' : 'Prijavi'}
+          </button>
+        {/if}
+      {/if}
     {:else if iskoristeniOblik}
       {uvodPorukeOblika}<strong class="odbijena-rijec">{iskoristeniOblik}</strong>{krajPorukeOblika}
     {:else if iskoristenaRijec}
@@ -1476,6 +1528,9 @@
     partijaId={partijaId!}
     potezi={lokalniPoteziZaPrijavu}
     {odbijeneRijeci}
+    bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
+    bind:brojDodavanje={brojPrijavaDodavanje}
+    bind:limitDodavanjeDosegnut
     ucitavanje={ucitavanjePotezaPrijava}
     greska={greskaPotezaPrijava}
     imaJos={imaJosPotezaPrijava}
@@ -1834,6 +1889,9 @@
       partijaId={partijaId}
       potezi={lokalniPoteziZaPrijavu}
       {odbijeneRijeci}
+      bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
+      bind:brojDodavanje={brojPrijavaDodavanje}
+      bind:limitDodavanjeDosegnut
       ucitavanje={ucitavanjePotezaPrijava}
       greska={greskaPotezaPrijava}
       imaJos={imaJosPotezaPrijava}
@@ -2905,6 +2963,30 @@
     font-weight: 800;
     color: var(--boja-isticanje-slova);
   }
+  .poruka-poteza .poruka-poteza-prijavi {
+    display: inline;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    line-height: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .poruka-poteza .poruka-poteza-prijavi:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+  .poruka-poteza-prijavljeno {
+    font-weight: 700;
+  }
   @keyframes podrhtavanje-unosa {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-5px); }
@@ -3018,6 +3100,9 @@
     }
     form button {
       margin-top: 0;
+    }
+    form .poruka-poteza {
+      grid-column: 1 / -1;
     }
   }
   .reakcija-oblak,

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
+  import { osvjeziGostSesijuNakon401 } from '$lib/identitet.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
   import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
@@ -19,8 +20,11 @@
   let { prethodnaPutanja = null, mozeNaprijed = false } = $props<{ prethodnaPutanja?: string | null; mozeNaprijed?: boolean }>();
   let profil = $state<Profil | null>(null);
   let jeGost = $state(true);
+  let ucitavanjeProfila = false;
+  let zakazanoUcitavanje = false;
   const jeNaslovna = $derived($page.url.pathname === '/');
   const prikaziPovratakNaPocetnu = $derived(!jeNaslovna && prethodnaPutanja !== '/');
+  const prikaziAdminNav = $derived(!jeNaslovna && profil?.vrsta === 'admin');
 
   function vratiSe() {
     window.history.back();
@@ -30,14 +34,41 @@
     window.history.forward();
   }
 
-  async function ucitajProfil() {
+  async function ucitajProfil(pokusaji = 3) {
+    // Vanjski identitet event usred loada — jedan follow-up, bez do/while petlje.
+    if (ucitavanjeProfila) {
+      zakazanoUcitavanje = true;
+      return;
+    }
+    ucitavanjeProfila = true;
     try {
-      const odgovor = await api<Profil>('/profil');
-      profil = odgovor;
-      jeGost = !odgovor.email;
-    } catch {
+      let oporavakOdrađen = false;
+      let pokusaj = 0;
+      while (pokusaj < pokusaji) {
+        try {
+          const odgovor = await api<Profil>('/profil');
+          profil = odgovor;
+          jeGost = !odgovor.email;
+          return;
+        } catch {
+          if (!oporavakOdrađen) {
+            oporavakOdrađen = true;
+            // Bez identitet eventa — inače bismo opet ušli u ovaj loader i mintali goste u petlji.
+            await osvjeziGostSesijuNakon401({ emitirajIdentitet: false }).catch(() => {});
+            continue; // isti pokusaj brojač: jedan free retry nakon zamjene tokena
+          }
+          pokusaj += 1;
+          if (pokusaj < pokusaji) await new Promise((r) => setTimeout(r, 250 * pokusaj));
+        }
+      }
       profil = null;
       jeGost = true;
+    } finally {
+      ucitavanjeProfila = false;
+      if (zakazanoUcitavanje) {
+        zakazanoUcitavanje = false;
+        void ucitajProfil();
+      }
     }
   }
 
@@ -59,22 +90,9 @@
   });
 </script>
 
-<header class="header">
+<header class="header" class:header--naslovnica={jeNaslovna}>
   <div class="header-sadrzaj">
-    {#if jeNaslovna}
-      <div class="naslovne-akcije">
-        <a href="/o-igri" class="novosti-link" aria-label="O igri">
-          <img class="header-ikona" src="/ikone/01-sto-je-novo.png" alt="" aria-hidden="true" />
-          <span>O igri</span>
-        </a>
-        {#if profil && !jeGost}
-          <a href="/povratne-informacije" class="novosti-link" aria-label="Pomozi poboljšati igru">
-            <img class="header-ikona" src="/ikone/02-pomozi-poboljsati-igru.png" alt="" aria-hidden="true" />
-            <span>Pomozi poboljšati igru</span>
-          </a>
-        {/if}
-      </div>
-    {:else}
+    {#if !jeNaslovna}
       <div class="lijeve-akcije">
         <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
           <img class="header-ikona" src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
@@ -90,15 +108,17 @@
           </button>
         {/if}
       </div>
+    {:else}
+      <div class="lijeve-akcije lijeve-akcije--prazno" aria-hidden="true"></div>
     {/if}
 
-    <div class="desno">
+    <div class="desno" aria-label={jeNaslovna ? 'Profil i obavijesti' : undefined}>
       {#if profil}
           <SanducicIkona velicina={44} />
           <a
             href="/profil"
             class="profil-link"
-            aria-label="Moj profil"
+            aria-label={jeNaslovna ? `Profil: ${profil.nadimak}` : 'Moj profil'}
           >
             <span class="header-avatar">
               <Avatar
@@ -115,7 +135,7 @@
   </div>
 </header>
 
-{#if profil?.vrsta === 'admin'}
+{#if prikaziAdminNav}
   <nav class="admin-navigacija" aria-label="Administracija">
     <a href="/admin">Nadzor</a>
     <a href="/admin/analitika">Analitika</a>
@@ -132,6 +152,25 @@
     background: transparent;
     font-family: var(--font-naslov);
     font-size: var(--tekst-baza);
+  }
+
+  /* Overlay na naslovnici — ne gura landing sadržaj dolje. */
+  .header--naslovnica {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    margin-top: 0;
+    pointer-events: none;
+  }
+
+  .header--naslovnica .header-sadrzaj {
+    pointer-events: none;
+  }
+
+  .header--naslovnica .desno {
+    pointer-events: auto;
   }
 
   .header-sadrzaj {
@@ -151,29 +190,6 @@
     }
   }
 
-  .novosti-link {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    height: 80px;
-    gap: 3px;
-    padding: 0;
-    color: var(--boja-tekst-osnovni);
-    font-size: 25px;
-    font-weight: 700;
-    line-height: 1.2;
-    white-space: nowrap;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .naslovne-akcije {
-    display: flex;
-    align-items: center;
-    gap: 36px;
-  }
-
   .header-ikona {
     width: 44px;
     height: 44px;
@@ -181,17 +197,16 @@
     object-fit: contain;
   }
 
-  .novosti-link:hover,
-  .novosti-link:focus-visible {
-    color: var(--boja-akcent);
-    text-decoration: none;
-  }
-
   .lijeve-akcije {
     display: flex;
     align-items: center;
     gap: 8px;
     min-height: 44px;
+  }
+
+  .lijeve-akcije--prazno {
+    min-width: 0;
+    min-height: 0;
   }
 
   .header-akcija {
@@ -259,29 +274,7 @@
 
   @media (max-width: 999px) {
     .header-sadrzaj { padding-inline: 16px; }
-    .novosti-link { font-size: 22px; }
-    .naslovne-akcije .header-ikona {
-      width: 33px;
-      height: 33px;
-    }
     .lijeve-akcije { gap: 4px; }
-    .naslovne-akcije {
-      height: 80px;
-      flex-direction: column;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 0;
-    }
-    .naslovne-akcije .novosti-link {
-      width: max-content;
-      height: 33px;
-      flex-direction: row;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 6px;
-      text-align: left;
-      font-size: 16px;
-    }
     .desno { margin-left: 0; }
   }
 </style>

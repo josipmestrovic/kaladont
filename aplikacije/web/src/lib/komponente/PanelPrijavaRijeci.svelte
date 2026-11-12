@@ -25,6 +25,9 @@
     naUcitajJos,
     naOtvori,
     otvorenoPocetno = false,
+    prijavljeneOdbijene = $bindable(new Set<string>()),
+    brojDodavanje = $bindable(0),
+    limitDodavanjeDosegnut = $bindable(false),
   }: {
     partijaId: string;
     potezi: Potez[];
@@ -35,6 +38,9 @@
     naUcitajJos?: () => void;
     naOtvori?: () => void;
     otvorenoPocetno?: boolean;
+    prijavljeneOdbijene?: Set<string>;
+    brojDodavanje?: number;
+    limitDodavanjeDosegnut?: boolean;
   } = $props();
 
   let otvoreno = $state(otvorenoPocetno);
@@ -53,12 +59,9 @@
   }
   let prikaz: 'odigrane' | 'odbijene' = $state('odigrane');
   let prijavljeniPotezi = $state<Set<number>>(new Set());
-  let prijavljeneOdbijene = $state<Set<string>>(new Set());
   let prijavaUTijeku = $state<Set<string>>(new Set());
   let brojBrisanje = $state(0);
-  let brojDodavanje = $state(0);
   let limitBrisanjeDosegnut = $state(false);
-  let limitDodavanjeDosegnut = $state(false);
   let porukaGreske = $state<string | null>(null);
   let vidljivoPrihvacenih = $state(VELICINA_STRANICE);
   let vidljivoOdbijenih = $state(VELICINA_STRANICE);
@@ -156,6 +159,8 @@
       });
       prijavljeneOdbijene = new Set(prijavljeneOdbijene).add(normalizirana);
       brojDodavanje += 1;
+      // Samo flag — bez porukaGreske, da uspjeh ne pokaže crveni alert.
+      if (brojDodavanje >= LIMIT_PRIJAVA) limitDodavanjeDosegnut = true;
       pokaziUspjeh(PORUKA_ZAHVALE, TRAJANJE_ZAHVALE_MS);
     } catch (greskaPrijava) {
       const poruka = greskaPrijava instanceof Error ? greskaPrijava.message : 'Prijava nije uspjela.';

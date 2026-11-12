@@ -9,7 +9,6 @@
   import Kaladont2d5d from '$lib/komponente/Kaladont2d5d.svelte';
   import KontrolePristupacnosti from '$lib/komponente/KontrolePristupacnosti.svelte';
   import PopupNovihMisija from '$lib/komponente/PopupNovihMisija.svelte';
-  import SanducicProfilZona from '$lib/komponente/SanducicProfilZona.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
     NASLOVNICA_SEO_DESCRIPTION,
@@ -20,15 +19,13 @@
   import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
-  let otvoreniModal = $state<'igra' | 'pravno' | null>(null);
+  let otvoreniModal = $state<'igra' | null>(null);
 
-  function otvoriModal(vrsta: 'igra' | 'pravno') {
+  function otvoriModal(vrsta: 'igra') {
     otvoreniModal = vrsta;
-    if (vrsta === 'igra') {
-      zabiljeziUmamiDogadjaj('igraj-klik');
-      ucitajModalIgraAsete();
-      zagrijGameplayZvukove();
-    }
+    zabiljeziUmamiDogadjaj('igraj-klik');
+    ucitajModalIgraAsete();
+    zagrijGameplayZvukove();
   }
 
   function zatvoriNaEscape(dogadaj: KeyboardEvent) {
@@ -60,7 +57,6 @@
 />
 
 <main class="landing">
-  <SanducicProfilZona />
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <header class="landing-tekst">
       <img class="demo-oznaka" src="/slike/demo-slika.webp" alt="Demo verzija igre" width="120" height="48" />
@@ -128,13 +124,10 @@
 
   <footer class="landing-footer">
     <nav aria-label="Dodatne poveznice">
-      <a href="/o-igri">
-        <span>O igri</span>
-      </a>
-      <a href="/povratne-informacije">
-        <span>Pomozi poboljšati igru</span>
-      </a>
-      <button type="button" onclick={() => otvoriModal('pravno')}>Uvjeti i privatnost</button>
+      <a href="/o-igri">O igri</a>
+      <a href="/povratne-informacije">Pomozi poboljšati igru</a>
+      <a href="/uvjeti">Uvjeti</a>
+      <a href="/privatnost">Privatnost</a>
     </nav>
     <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
   </footer>
@@ -160,51 +153,28 @@
         <X size={22} aria-hidden="true" />
       </button>
 
-      {#if otvoreniModal === 'igra'}
-        <p class="modal-nadnaslov">Odaberi stol</p>
-        <h2 id="modal-naslov">Kako želiš igrati?</h2>
-        <div class="modal-opcije">
-          <a href="/red?mod=dva_igraca" class="modal-opcija">
-            <img src="/ikone/17-soba-2-igraca.png" alt="" aria-hidden="true" /><span><strong>Dvoboj</strong><small>2 igrača</small></span>
-          </a>
-          <a href="/red?mod=cetiri_igraca" class="modal-opcija">
-            <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" /><span><strong>Četveroboj</strong><small>4 igrača</small></span>
-          </a>
-          <a href="/zagrijavanje" class="modal-opcija">
-            <img src="/ikone/67-zagrijavanje-bot.webp" alt="" aria-hidden="true" /><span><strong>Zagrijavanje</strong><small>Igraj dvoboj protiv računala.</small></span>
-          </a>
-          <a href="/soba/kreiraj" class="modal-opcija">
-            <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" /><span><strong>Privatna soba</strong><small>Prilagodi pravila i pozovi svoju ekipu.</small></span>
-          </a>
-        </div>
-      {:else}
-        <h2 id="modal-naslov">Što te zanima?</h2>
-        <div class="modal-opcije pravne-opcije">
-          <a href="/uvjeti" class="modal-opcija pravna-opcija">
-            <span><strong>Uvjeti korištenja</strong><small>Pravila korištenja igre i odgovornosti igrača.</small></span>
-          </a>
-          <a href="/privatnost" class="modal-opcija pravna-opcija">
-            <span><strong>Pravila privatnosti</strong><small>Koje podatke koristimo, zašto i koliko dugo.</small></span>
-          </a>
-          <a href="/o-igri" class="modal-opcija pravna-opcija">
-            <span><strong>O igri i licence</strong><small>Pregled igre, izvori rječnika, avatara i licence korištenih materijala.</small></span>
-          </a>
-          <a
-            href="https://forum.kaladont.hr"
-            rel="noopener noreferrer"
-            class="modal-opcija pravna-opcija"
-            data-umami-event="forum-klik-landing"
-          >
-            <span><strong>Forum</strong><small>Pridruži se zajednici na forum.kaladont.hr.</small></span>
-          </a>
-        </div>
-      {/if}
+      <p class="modal-nadnaslov">Odaberi stol</p>
+      <h2 id="modal-naslov">Kako želiš igrati?</h2>
+      <div class="modal-opcije">
+        <a href="/red?mod=dva_igraca" class="modal-opcija">
+          <img src="/ikone/17-soba-2-igraca.png" alt="" aria-hidden="true" /><span><strong>Dvoboj</strong><small>2 igrača</small></span>
+        </a>
+        <a href="/red?mod=cetiri_igraca" class="modal-opcija">
+          <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" /><span><strong>Četveroboj</strong><small>4 igrača</small></span>
+        </a>
+        <a href="/zagrijavanje" class="modal-opcija">
+          <img src="/ikone/67-zagrijavanje-bot.webp" alt="" aria-hidden="true" /><span><strong>Zagrijavanje</strong><small>Igraj dvoboj protiv računala.</small></span>
+        </a>
+        <a href="/soba/kreiraj" class="modal-opcija">
+          <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" /><span><strong>Privatna soba</strong><small>Prilagodi pravila i pozovi svoju ekipu.</small></span>
+        </a>
+      </div>
     </div>
   </div>
 {/if}
 
 <style>
-  /* Sve vertikalne mjere skaliraju se s visinom ekrana kako bi naslovnica stala bez scrolla (do ~560px). */
+  /* Fiksni font navigacije (20 mobitel / 24 desktop); vertikalni scroll na naslovnici je dopušten. */
   /* Visine računaju na do 8 navigacijskih stavki (gost + Misije). */
   .landing {
     --landing-padding: clamp(6px, 2.2dvh, 32px);
@@ -213,7 +183,7 @@
     --razmak-stavki: clamp(4px, 1dvh, 10px);
     --razmak-pristupacnosti: clamp(10px, 1.6dvh, 20px);
     --velicina-ikone: calc(var(--visina-stavke) * 0.84);
-    --font-stavke: clamp(16px, 2.7dvh, 23px);
+    --font-stavke: 24px;
     --velicina-naslova: clamp(48px, 9dvh, 86px);
     --visina-kontrole: clamp(36px, 5.5dvh, 52px);
     --visina-ilustracije: min(470px, calc(8 * var(--visina-stavke) + 7 * var(--razmak-stavki)));
@@ -241,6 +211,8 @@
     justify-content: space-between;
     gap: clamp(6px, 1.2dvh, 14px);
     width: min(100%, 980px);
+    min-width: 0;
+    max-width: 100%;
     text-align: center;
   }
 
@@ -300,6 +272,8 @@
   .navigacijski-blok {
     display: grid;
     gap: var(--razmak-pristupacnosti);
+    min-width: 0;
+    width: 100%;
   }
 
   .ime-igre,
@@ -329,7 +303,7 @@
     .vrsta-igre { display: inline; }
   }
 
-  @media (min-width: 1000px) and (max-height: 720px) {
+  @media (min-width: 1000px) and (max-height: 600px) {
     .landing {
       --visina-stavke: clamp(36px, 5.5dvh, 52px);
       --razmak-stavki: clamp(3px, 0.7dvh, 6px);
@@ -343,6 +317,8 @@
     display: grid;
     gap: var(--razmak-stavki);
     width: min(100%, 480px);
+    min-width: 0;
+    max-width: 100%;
     margin: 0 0 0 auto;
   }
 
@@ -351,16 +327,17 @@
     align-items: flex-end;
     justify-content: space-between;
     gap: 32px;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .kontrole-pristupacnosti-naslovnica {
     display: flex;
     width: min(100%, 480px);
+    min-width: 0;
+    max-width: 100%;
     margin: 0 0 0 auto;
-  }
-
-  .kontrole-pristupacnosti-naslovnica :global(.naziv-kontrole) {
-    white-space: nowrap;
+    text-align: left;
   }
 
   .kontrole-pristupacnosti-naslovnica :global(.kontrola-pristupacnosti) {
@@ -370,6 +347,8 @@
 
   .navigacijska-stavka {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     height: var(--visina-stavke);
     display: grid;
     grid-template-columns: calc(var(--velicina-ikone) + 4px) minmax(0, 1fr) 24px;
@@ -389,6 +368,14 @@
     text-decoration: none;
     cursor: pointer;
     transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .navigacijska-stavka > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
   }
 
   .navigacijska-stavka::after {
@@ -425,8 +412,6 @@
     color: white;
   }
 
-  .navigacijska-stavka > span { text-align: left; }
-
   .navigacijska-stavka.primarna::after { color: var(--boja-mint); }
 
   :global(html[data-tema='svijetla']) .navigacijska-stavka.primarna::after { color: var(--boja-zuta-krema); }
@@ -447,7 +432,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px 16px;
-    width: min(1100px, calc(100% - 32px));
+    width: min(100%, 980px);
   }
 
   .copyright { flex: none; font-size: 12px; line-height: 16px; color: var(--boja-tekst-sekundarni); white-space: nowrap; }
@@ -460,8 +445,7 @@
     gap: 8px 18px;
   }
 
-  .landing-footer a,
-  .landing-footer button {
+  .landing-footer a {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -475,14 +459,17 @@
     cursor: pointer;
   }
 
-  .landing-footer a { text-decoration: underline; }
-  .landing-footer a:hover,
-  .landing-footer button:hover { color: var(--boja-akcent-tekst); }
+  .landing-footer a:hover { color: var(--boja-akcent-tekst); }
+
+  @media (min-width: 1000px) {
+    .landing-footer a { padding-inline: 0; }
+  }
 
   @media (max-width: 999px) {
     .izbornik {
       justify-content: flex-start;
-      gap: clamp(4px, 1dvh, 10px);
+      /* Više prostora između naslova i navigacije na mobitelu. */
+      gap: 24px;
     }
 
     .kontrole-pristupacnosti-naslovnica :global(.kontrola-pristupacnosti) {
@@ -496,7 +483,7 @@
       --visina-stavke: clamp(34px, 5.4dvh, 56px);
       --razmak-stavki: clamp(6px, 1.2dvh, 12px);
       --razmak-pristupacnosti: clamp(12px, 2.2dvh, 20px);
-      --font-stavke: clamp(15px, 2.4dvh, 20px);
+      --font-stavke: 20px;
       --velicina-naslova: clamp(30px, 5.5dvh, 52px);
       --visina-kontrole: clamp(32px, 5dvh, 48px);
     }
@@ -520,8 +507,7 @@
     .landing-footer { flex-direction: column; gap: 2px; }
     .landing-footer nav { justify-content: center; gap: 0 8px; }
     .copyright { font-size: 11px; line-height: 14px; }
-    .landing-footer a,
-    .landing-footer button { padding: clamp(2px, 0.6dvh, 8px) 6px; font-size: clamp(12px, 2dvh, var(--tekst-sitni)); line-height: 1.2; }
+    .landing-footer a { padding: clamp(2px, 0.6dvh, 8px) 6px; font-size: clamp(12px, 2dvh, var(--tekst-sitni)); line-height: 1.2; }
   }
 
   /* Ispod 430px: manji naslov + rezerviran prostor desno za sandučic/avatar. */
@@ -534,6 +520,24 @@
       max-width: calc(100% - 96px);
       padding-right: 4px;
       box-sizing: border-box;
+    }
+  }
+
+  /* Uski telefoni: tipke i kontrole moraju nastaviti se sužavati unutar paddingsa stranice. */
+  @media (max-width: 379px) {
+    .navigacijska-stavka {
+      gap: 8px;
+      padding-inline: 12px;
+      grid-template-columns: calc(var(--velicina-ikone) + 2px) minmax(0, 1fr) 18px;
+    }
+
+    .navigacijska-stavka::after {
+      font-size: 22px;
+    }
+
+    .kontrole-pristupacnosti-naslovnica :global(.kontrola-pristupacnosti) {
+      gap: 4px;
+      padding-inline: 4px;
     }
   }
 
@@ -561,7 +565,6 @@
   @media (max-width: 999px) {
     :global(html[data-font-disleksiju]) .landing {
       --visina-stavke: clamp(30px, 4.8dvh, 46px);
-      --font-stavke: clamp(14px, 2.2dvh, 18px);
       --razmak-stavki: clamp(4px, 0.9dvh, 8px);
       --razmak-pristupacnosti: clamp(8px, 1.6dvh, 14px);
       --landing-razmak: clamp(3px, 1.2dvh, 12px);
@@ -584,7 +587,7 @@
     }
 
     :global(html[data-font-disleksiju]) .izbornik {
-      gap: 2px;
+      gap: 16px;
     }
   }
 
@@ -607,8 +610,7 @@
       gap: 0;
     }
 
-    :global(html[data-font-disleksiju]) .landing-footer a,
-    :global(html[data-font-disleksiju]) .landing-footer button {
+    :global(html[data-font-disleksiju]) .landing-footer a {
       padding-block: 1px;
     }
   }
@@ -680,7 +682,6 @@
   }
 
   .modal-opcija:hover { border-color: var(--boja-mint); }
-  .pravna-opcija { grid-template-columns: 1fr; text-align: center; }
   .modal-opcija > img { width: 56px; height: 56px; object-fit: contain; }
   .modal-opcija span { display: grid; gap: 2px; }
   .modal-opcija strong { color: var(--boja-mint-tamni); font-family: var(--font-naslov); font-size: 19px; }
