@@ -25,6 +25,7 @@
     naUcitajJos,
     naOtvori,
     otvorenoPocetno = false,
+    prijavljeneOdbijene = $bindable(new Set<string>()),
   }: {
     partijaId: string;
     potezi: Potez[];
@@ -35,6 +36,7 @@
     naUcitajJos?: () => void;
     naOtvori?: () => void;
     otvorenoPocetno?: boolean;
+    prijavljeneOdbijene?: Set<string>;
   } = $props();
 
   let otvoreno = $state(otvorenoPocetno);
@@ -53,7 +55,6 @@
   }
   let prikaz: 'odigrane' | 'odbijene' = $state('odigrane');
   let prijavljeniPotezi = $state<Set<number>>(new Set());
-  let prijavljeneOdbijene = $state<Set<string>>(new Set());
   let prijavaUTijeku = $state<Set<string>>(new Set());
   let brojBrisanje = $state(0);
   let brojDodavanje = $state(0);

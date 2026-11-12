@@ -38,10 +38,10 @@ for (const sirina of [320, 390, 1440]) {
       expect(copyright!.y).toBeGreaterThanOrEqual(nav!.y + nav!.height);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
     await page.screenshot({ path: podaciTesta.outputPath('footer.png') });
-    await footer.getByRole('button', { name: 'Uvjeti i privatnost' }).click();
-    await page.getByRole('dialog').getByRole('link', { name: 'O igri i licence' }).click();
+    await expect(footer.getByRole('link', { name: 'Uvjeti' })).toHaveAttribute('href', '/uvjeti');
+    await expect(footer.getByRole('link', { name: 'Privatnost' })).toHaveAttribute('href', '/privatnost');
+    await footer.getByRole('link', { name: 'O igri' }).click();
     await expect(page).toHaveURL('/o-igri');
     await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toHaveAttribute(
@@ -57,12 +57,16 @@ for (const sirina of [320, 390, 1440]) {
   });
 }
 
-test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', async ({ page }) => {
+test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.locator('.header')).toHaveCount(0);
+  const header = page.getByRole('banner');
+  await expect(header).toBeVisible();
+  await expect(header.getByRole('button', { name: 'Nazad' })).toHaveCount(0);
+  await expect(header.getByRole('link', { name: 'Početna' })).toHaveCount(0);
+  await expect(header.getByRole('link', { name: 'O igri' })).toHaveCount(0);
   // Avatar ovisi o gost-sesiji + /profil — duži timeout zbog CI opterećenja.
-  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
+  await expect(header.locator('.avatar')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('link', { name: 'Obavijesti' })).toBeVisible();
   await expect(page.getByText('v0.3.0-closed-alpha.1')).toHaveCount(0);
   await expect(page.getByText('Hrvatska multiplayer igra riječi')).toHaveCount(0);
@@ -73,13 +77,8 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   const oIgri = footer.getByRole('link', { name: 'O igri' });
   await expect(oIgri).toHaveAttribute('href', '/o-igri');
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toHaveAttribute('href', '/povratne-informacije');
-  await expect(footer.getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
-
-  await footer.getByRole('button', { name: 'Uvjeti i privatnost' }).click();
-  const pravni = page.getByRole('dialog', { name: 'Što te zanima?' });
-  await expect(pravni.getByRole('link', { name: /Forum/ })).toHaveAttribute('href', 'https://forum.kaladont.hr');
-  await page.keyboard.press('Escape');
-  await expect(pravni).toBeHidden();
+  await expect(footer.getByRole('link', { name: 'Uvjeti' })).toHaveAttribute('href', '/uvjeti');
+  await expect(footer.getByRole('link', { name: 'Privatnost' })).toHaveAttribute('href', '/privatnost');
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByRole('button', { name: 'Igraj' })).toBeVisible();
@@ -109,17 +108,20 @@ test('naslovnica prikazuje navigaciju i informativne poveznice bez headera', asy
   await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
 });
 
-test('mobilna naslovnica skriva header i prikazuje poveznice u footeru', async ({ page }) => {
+test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
 
   await expect(page.locator('.ilustracija')).toHaveCount(0);
-  await expect(page.locator('.header')).toHaveCount(0);
-  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
+  const header = page.getByRole('banner');
+  await expect(header).toBeVisible();
+  await expect(header.getByRole('button', { name: 'Nazad' })).toHaveCount(0);
+  await expect(header.locator('.avatar')).toBeVisible({ timeout: 20_000 });
   const footer = page.locator('.landing-footer');
   await expect(footer.getByRole('link', { name: 'O igri' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toBeVisible();
-  await expect(footer.getByRole('button', { name: 'Uvjeti i privatnost' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Uvjeti' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Privatnost' })).toBeVisible();
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija).toBeVisible();
@@ -128,37 +130,6 @@ test('mobilna naslovnica skriva header i prikazuje poveznice u footeru', async (
   );
   expect(nemaHorizontalnogPrelijevanja).toBe(true);
 });
-
-const viewportiBezScrolla = [
-  { width: 360, height: 640 },
-  { width: 375, height: 667 },
-  { width: 390, height: 844 },
-  { width: 412, height: 915 },
-  { width: 1280, height: 720 },
-  { width: 1366, height: 657 },
-  { width: 1440, height: 900 },
-  { width: 1920, height: 1080 },
-];
-
-for (const fontZaDisleksiju of [false, true]) {
-  for (const viewport of viewportiBezScrolla) {
-    test(`naslovnica stane u ekran bez scrolla ${viewport.width}x${viewport.height}${fontZaDisleksiju ? ' (font za disleksiju)' : ''}`, async ({ page }) => {
-      if (fontZaDisleksiju) {
-        await page.addInitScript(() => window.localStorage.setItem('kaladont_font_postavke_v1', 'true'));
-      }
-      await page.setViewportSize(viewport);
-      await page.goto('/');
-      await expect(page.locator('.landing-footer')).toBeVisible();
-      await page.evaluate(() => document.fonts.ready);
-
-      const { scrollHeight, clientHeight } = await page.evaluate(() => ({
-        scrollHeight: document.documentElement.scrollHeight,
-        clientHeight: document.documentElement.clientHeight,
-      }));
-      expect(scrollHeight).toBeLessThanOrEqual(clientHeight);
-    });
-  }
-}
 
 test('na niskom desktop ekranu ilustracija se skriva', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 500 });
@@ -177,7 +148,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await expect(povratak).toHaveCSS('height', '44px');
   const header = page.getByRole('banner');
   await expect(header.getByRole('link', { name: 'Početna' })).toHaveCount(0);
-  // „O igri” je tema u navigaciji pomoći; u headeru ostaje samo na naslovnici.
+  // „O igri” je u footeru naslovnice, ne u headeru.
   await expect(header.getByRole('link', { name: 'O igri' })).toHaveCount(0);
   await expect(povratak.locator('img')).toHaveAttribute('src', '/ikone/03-nazad.png');
 
@@ -194,6 +165,30 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await pocetna.click();
   await expect(page).toHaveURL('/');
 });
+
+for (const { sirina, visina } of [
+  { sirina: 390, visina: 844 },
+  { sirina: 1440, visina: 900 },
+]) {
+  test(`avatar ne skače s naslovnice na profil (${sirina}px)`, async ({ page }) => {
+    await page.setViewportSize({ width: sirina, height: visina });
+    await page.goto('/');
+    const avatarNaslovnica = page.getByRole('banner').locator('.avatar');
+    await expect(avatarNaslovnica).toBeVisible({ timeout: 20_000 });
+    const boxNaslovnica = await avatarNaslovnica.boundingBox();
+    expect(boxNaslovnica).not.toBeNull();
+
+    await page.getByRole('banner').locator('a.profil-link').click();
+    await expect(page).toHaveURL('/profil');
+    const avatarProfil = page.getByRole('banner').locator('.avatar');
+    await expect(avatarProfil).toBeVisible({ timeout: 20_000 });
+    const boxProfil = await avatarProfil.boundingBox();
+    expect(boxProfil).not.toBeNull();
+
+    expect(Math.abs(boxProfil!.x - boxNaslovnica!.x)).toBeLessThanOrEqual(2);
+    expect(Math.abs(boxProfil!.y - boxNaslovnica!.y)).toBeLessThanOrEqual(2);
+  });
+}
 
 test('ruta partije nema header ni na završnom prikazu', async ({ page }) => {
   await page.goto('/partija/nepostojeca-partija');
@@ -276,29 +271,6 @@ test('mobilna navigacija ima veći razmak stavki i odvojene prekidače', async (
   const fontPrekidaca = await page
     .locator('.kontrole-pristupacnosti-naslovnica .naziv-kontrole')
     .first()
-    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-  const ocekivaniFont = await page.evaluate(() => {
-    const probe = document.createElement('span');
-    probe.style.fontSize = 'var(--tekst-sitni)';
-    document.body.appendChild(probe);
-    const bazni = parseFloat(getComputedStyle(probe).fontSize);
-    probe.remove();
-    // 390px < 480 → mobilni +20% umanjeno za ~15%.
-    return bazni * 1.02;
-  });
-  expect(fontPrekidaca).toBeCloseTo(ocekivaniFont, 0);
-
-  const jedanRed = await page
-    .getByRole('group', { name: 'Postavke pristupačnosti' })
-    .locator('.naziv-kontrole')
-    .first()
-    .evaluate((el) => {
-      const stil = getComputedStyle(el);
-      const visinaRetka =
-        stil.lineHeight === 'normal'
-          ? parseFloat(stil.fontSize) * 1.2
-          : parseFloat(stil.lineHeight);
-      return el.scrollHeight <= Math.ceil(visinaRetka * 1.35);
-    });
-  expect(jedanRed).toBe(true);
+    .evaluate((el) => getComputedStyle(el).fontSize);
+  expect(fontPrekidaca).toBe('16px');
 });

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function cekajGostSesiju(page: Page): Promise<string> {
   await page.goto('/');
-  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('banner').locator('.avatar')).toBeVisible({ timeout: 20_000 });
   const token = await page.evaluate(() => localStorage.getItem('kaladont_gost_token') ?? '');
   expect(token.length).toBeGreaterThan(10);
   return token;
@@ -39,7 +39,7 @@ test('feed prikazuje tekst, auto-čita i briše sve', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeVisible();
 
   await page.goto('/');
-  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('banner').locator('.avatar')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('link', { name: 'Obavijesti', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /Obavijesti,/ })).toHaveCount(0);
 
@@ -62,6 +62,6 @@ test('toast se potisne u redu bez gubitka badgea', async ({ page }) => {
   await expect(page.locator('.sanducic-toast')).toHaveCount(0);
 
   await page.goto('/');
-  await expect(page.locator('.sanducic-profil-zona .avatar')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('banner').locator('.avatar')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('link', { name: /Obavijesti,/ })).toBeVisible({ timeout: 15_000 });
 });

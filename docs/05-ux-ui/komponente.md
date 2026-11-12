@@ -38,7 +38,7 @@ Ovaj dokument je ulazni brief za Figma agenta u fazi Brandinga i Wireframea — 
 
 | Komponenta | Opis |
 |---|---|
-| Header | ne prikazuje se na naslovnici, čekaonici ni ruti partije; drugdje prikazuje akcije „Nazad” i uvjetno „Početna”, a desno horizontalni profilni blok. Admin dodatno vidi zasebnu navigaciju Rječnik, Prijave i Mišljenja korisnika. |
+| Header | jedna komponenta: na naslovnici samo desni blok (sandučic + avatar, overlay); ne prikazuje se u čekaonici ni na ruti partije (globalni layout); drugdje „Nazad”, uvjetno „Početna”/„Naprijed” i isti desni profilni blok. Admin (ne na naslovnici) vidi zasebnu navigaciju Nadzor, Analitika, Prijave, Rječnik i Mišljenja korisnika. |
 | Stol | ovalni vektorski stol + 4 SjedaloKartica u luku + WordChip u sredini + CountdownRing na aktivnom; klijent vlastito sjedalo prikazuje prvo, a sjedalo igrača na potezu neposredno desno od njega |
 | RedCekanjaPrikaz | 4 kružna mjesta, tekst stanja, prosjek čekanja |
 | PovijestLista | redak po potezu: runda, igrač, riječ/razlog, trajanje, gumb Prijavi |
