@@ -46,8 +46,11 @@
   let lokalniPoteziZaPrijavu = $state<{ id: number; rijec: string | null; igracId: string | null; vrsta: string; redniBroj: number; trazenaSlova: string | null; vrijeme: string }[]>([]);
   let prijavljeneOdbijeneRijeci = $state<Set<string>>(new Set());
   let prijavaOdbijeneUTijeku = $state<Set<string>>(new Set());
+  let brojPrijavaDodavanje = $state(0);
+  let limitDodavanjeDosegnut = $state(false);
   let prijavljeniIgraci = $state<Set<string>>(new Set());
   let prijavaIgracaUTijeku = $state<Set<string>>(new Set());
+  const LIMIT_PRIJAVA_DODAVANJE = 3;
   const PORUKA_ZAHVALE_PRIJAVA = 'Hvala! Tvoja prijava nam pomaže poboljšati rječnik.';
   const TRAJANJE_ZAHVALE_PRIJAVA_MS = 7000;
   let izbornikPrijaveIgracaId = $state<string | null>(null);
@@ -541,6 +544,10 @@
     if (!partijaId || jeTrening) return;
     const normalizirana = rijec.normalize('NFC').trim().toLowerCase();
     if (!normalizirana || prijavljeneOdbijeneRijeci.has(normalizirana) || prijavaOdbijeneUTijeku.has(normalizirana)) return;
+    if (limitDodavanjeDosegnut || brojPrijavaDodavanje >= LIMIT_PRIJAVA_DODAVANJE) {
+      limitDodavanjeDosegnut = true;
+      return;
+    }
     prijavaOdbijeneUTijeku = new Set(prijavaOdbijeneUTijeku).add(normalizirana);
     try {
       await api<{ ok: boolean; poruka?: string }>('/prijave', {
@@ -548,9 +555,12 @@
         body: JSON.stringify({ partijaId, tip: 'za_dodavanje', rijec: normalizirana }),
       });
       prijavljeneOdbijeneRijeci = new Set(prijavljeneOdbijeneRijeci).add(normalizirana);
+      brojPrijavaDodavanje += 1;
+      if (brojPrijavaDodavanje >= LIMIT_PRIJAVA_DODAVANJE) limitDodavanjeDosegnut = true;
       pokaziUspjeh(PORUKA_ZAHVALE_PRIJAVA, TRAJANJE_ZAHVALE_PRIJAVA_MS);
-    } catch {
-      /* toast nije potreban za grešku; ostaje gumb aktivan */
+    } catch (greskaPrijava) {
+      const poruka = greskaPrijava instanceof Error ? greskaPrijava.message : '';
+      if (/limit|dosegnut/i.test(poruka)) limitDodavanjeDosegnut = true;
     } finally {
       const novi = new Set(prijavaOdbijeneUTijeku);
       novi.delete(normalizirana);
@@ -1148,6 +1158,8 @@
       {#if !jeTrening && partijaId}
         {#if prijavljeneOdbijeneRijeci.has(normaliziranaNepostojeca)}
           <span class="poruka-poteza-prijavljeno">Prijavljeno</span>
+        {:else if limitDodavanjeDosegnut}
+          <span class="poruka-poteza-prijavljeno">Limit prijava dosegnut</span>
         {:else}
           <button
             type="button"
@@ -1517,6 +1529,8 @@
     potezi={lokalniPoteziZaPrijavu}
     {odbijeneRijeci}
     bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
+    bind:brojDodavanje={brojPrijavaDodavanje}
+    bind:limitDodavanjeDosegnut
     ucitavanje={ucitavanjePotezaPrijava}
     greska={greskaPotezaPrijava}
     imaJos={imaJosPotezaPrijava}
@@ -1876,6 +1890,8 @@
       potezi={lokalniPoteziZaPrijavu}
       {odbijeneRijeci}
       bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
+      bind:brojDodavanje={brojPrijavaDodavanje}
+      bind:limitDodavanjeDosegnut
       ucitavanje={ucitavanjePotezaPrijava}
       greska={greskaPotezaPrijava}
       imaJos={imaJosPotezaPrijava}

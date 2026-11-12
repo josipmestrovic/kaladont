@@ -131,7 +131,7 @@
     line-height: 1.2;
     white-space: normal;
     text-align: left;
-    font-size: 13px;
+    font-size: 16px;
   }
 
   @media (min-width: 1000px) {
