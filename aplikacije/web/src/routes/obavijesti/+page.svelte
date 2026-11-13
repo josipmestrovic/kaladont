@@ -11,6 +11,14 @@
     TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
     TIP_SANDUCIC_NOVA_XP_RAZINA,
     TIP_SANDUCIC_NOVA_ZVJEZDICA,
+    TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA,
+    TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA,
+    TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA,
+    TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA,
+    TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA,
+    TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA,
+    dohvatiDefinicijuDostignuca,
+    normalizirajNapomenuPrijave,
     type SanducicPorukaDetalj,
   } from 'zajednicko';
 
@@ -57,6 +65,17 @@
     if (broj === 1) return 'zvjezdicu';
     if (broj >= 2 && broj <= 4) return 'zvjezdice';
     return 'zvjezdica';
+  }
+
+  function jePrijavaTip(tip: string): boolean {
+    return (
+      tip === TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA
+      || tip === TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA
+      || tip === TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA
+      || tip === TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA
+      || tip === TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA
+      || tip === TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA
+    );
   }
 
   function mapirajProcitano(lista: SanducicPorukaDetalj[]): SanducicPorukaDetalj[] {
@@ -250,25 +269,59 @@
               </div>
               {#if poruka.tip === TIP_SANDUCIC_NOVA_XP_RAZINA}
                 <p class="tijelo">
-                  Bravo! Dosegnuo/la si
-                  <strong class="istaknuto-lvl">LVL {brojPolje(poruka.podaci, 'razina') ?? '?'}</strong>!
+                  Bravo! Dosegnuo/la si <strong class="istaknuto-lvl">LVL {brojPolje(poruka.podaci, 'razina') ?? '?'}</strong>!
                 </p>
               {:else if poruka.tip === TIP_SANDUCIC_NOVA_ZVJEZDICA}
                 {@const naziv = tekstPolje(poruka.podaci, 'naziv') || 'dostignuće'}
                 {@const broj = brojPolje(poruka.podaci, 'zvjezdice') ?? 1}
+                {@const opis = dohvatiDefinicijuDostignuca(tekstPolje(poruka.podaci, 'dostignuceId'))?.opis}
                 <p class="tijelo tijelo-dostignuce">
                   {#if broj <= 1}
                     Bravo! Otključano dostignuće <strong>{naziv}</strong>: {broj}.
                   {:else}
-                    Bravo! Dostignuće <strong>{naziv}</strong> sada ima {broj}
-                    {oblikZvjezdice(broj)}!
+                    Bravo! Dostignuće <strong>{naziv}</strong> sada ima <span class="neprekidaj">{broj} {oblikZvjezdice(broj)}!</span>
                   {/if}
                 </p>
+                {#if opis}
+                  <p class="opis-dostignuca">{opis}</p>
+                {/if}
               {:else if poruka.tip === TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA}
                 <p class="tijelo tijelo-dostignuce">
-                  Bravo! Otključana kolekcionarska razina
-                  <strong>{tekstPolje(poruka.podaci, 'naziv') || 'nova razina'}</strong>!
+                  Bravo! Otključana kolekcionarska razina <strong>{tekstPolje(poruka.podaci, 'naziv') || 'nova razina'}</strong>!
                 </p>
+              {:else if jePrijavaTip(poruka.tip)}
+                {@const rijec = tekstPolje(poruka.podaci, 'rijec') || 'prijavljena riječ'}
+                {@const nadimak = tekstPolje(poruka.podaci, 'nadimak') || 'korisnika'}
+                {@const napomena = normalizirajNapomenuPrijave(poruka.podaci.napomena)}
+                <p class="tijelo tijelo-prijava">
+                  {#if poruka.tip === TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA}
+                    Riječ „<strong>{rijec}</strong>” koju si prijavio/la <strong>JE DODANA</strong> u rječnik. Hvala na pomoći! :)
+                  {:else if poruka.tip === TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA}
+                    Riječ „<strong>{rijec}</strong>” koju si prijavio/la <strong>NIJE DODANA</strong> u rječnik. Hvala na pokušaju! :)
+                  {:else if poruka.tip === TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA}
+                    Riječ „<strong>{rijec}</strong>” koju si prijavio/la <strong>JE UKLONJENA</strong> iz rječnika. Hvala na pomoći! :)
+                  {:else if poruka.tip === TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA}
+                    Riječ „<strong>{rijec}</strong>” koju si prijavio/la <strong>NIJE UKLONJENA</strong> iz rječnika. Hvala što si pokušao pomoć i samo tako nastavi!
+                  {:else if poruka.tip === TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA}
+                    {#if poruka.podaci.razlog === 'pogrdan_nadimak'}
+                      Tvoja prijava vulgarnog nadimka za korisnika „<strong>{nadimak}</strong>” <strong>JE UVAŽENA</strong>. Hvala ti što pomažeš poboljšati Kaladont! :)
+                    {:else}
+                      Tvoja prijava igrača „<strong>{nadimak}</strong>” <strong>JE UVAŽENA</strong>. Hvala ti što pomažeš poboljšati Kaladont! :)
+                    {/if}
+                  {:else}
+                    {#if poruka.podaci.razlog === 'pogrdan_nadimak'}
+                      Tvoja prijava vulgarnog nadimka za korisnika „<strong>{nadimak}</strong>” <strong>NIJE UVAŽENA</strong>.
+                    {:else}
+                      Tvoja prijava igrača „<strong>{nadimak}</strong>” <strong>NIJE UVAŽENA</strong>.
+                    {/if}
+                  {/if}
+                </p>
+                {#if napomena}
+                  <p class="dodatna-napomena">
+                    <span class="oznaka">Dodatna napomena</span>
+                    <span class="tekst-napomene">{napomena}</span>
+                  </p>
+                {/if}
               {:else}
                 <p class="tijelo">{poruka.tekst}</p>
               {/if}
@@ -422,15 +475,50 @@
     white-space: pre-wrap;
   }
 
+  .tijelo-dostignuce,
+  .tijelo-prijava {
+    white-space: normal;
+  }
+
   .tijelo strong,
   .istaknuto-lvl {
     color: var(--boja-isticanje-tekst);
     font-weight: 700;
   }
 
-  .tijelo-dostignuce strong {
+  .tijelo-dostignuce strong,
+  .tijelo-prijava strong {
     color: var(--boja-zlato-tekst);
     font-weight: 800;
+  }
+
+  .neprekidaj {
+    white-space: nowrap;
+  }
+
+  .opis-dostignuca {
+    margin: 4px 0 0;
+    line-height: 1.4;
+    font-size: 0.92rem;
+    opacity: 0.85;
+  }
+
+  .dodatna-napomena {
+    margin: 6px 0 0;
+    line-height: 1.45;
+    color: var(--boja-zlato-tekst);
+    font-weight: 700;
+  }
+
+  .dodatna-napomena .oznaka {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 800;
+    margin-bottom: 2px;
+  }
+
+  .dodatna-napomena .tekst-napomene {
+    white-space: pre-wrap;
   }
 
   .tekst time {

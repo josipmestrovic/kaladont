@@ -3,6 +3,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { eq, inArray, or } from 'drizzle-orm';
 import { baza } from '../src/baza/klijent.js';
 import {
+  TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA,
+  TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA,
+  TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA,
+  TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA,
+} from 'zajednicko';
+import {
   dokaziDostignucaCinkaros,
   dokaziDostignucaJezicniDetektiv,
   dostignucaIgraca,
@@ -14,9 +20,15 @@ import {
   prijave,
   prijaveIgraca,
   rijeci,
+  sanducicPoruke,
   sudioniciPartije,
 } from '../src/baza/shema.js';
-import { potvrdiIspravakRjecnika, potvrdiUklanjanjeRacuna } from '../src/dostignuca/potvrde-prijava.js';
+import {
+  odbaciPrijavuIgraca,
+  odbaciPrijavuRijeci,
+  potvrdiIspravakRjecnika,
+  potvrdiUklanjanjeRacuna,
+} from '../src/dostignuca/potvrde-prijava.js';
 import { dovrsiTop10NakonBrisanja, obrisiRacunPoId } from '../src/racuni/brisanje.js';
 import { dodajRijec } from '../src/rjecnik/administracija.js';
 
@@ -136,6 +148,7 @@ describe('dostignuća D04 potvrđene prijave', () => {
       prijaveIgracaZaBrisanje.length = 0;
     }
     if (igraciZaBrisanje.length > 0) {
+      await baza.delete(sanducicPoruke).where(inArray(sanducicPoruke.igracId, igraciZaBrisanje));
       await baza.delete(dokaziDostignucaJezicniDetektiv).where(inArray(dokaziDostignucaJezicniDetektiv.igracId, igraciZaBrisanje));
       await baza.delete(dokaziDostignucaCinkaros).where(or(
         inArray(dokaziDostignucaCinkaros.igracId, igraciZaBrisanje),
@@ -202,6 +215,8 @@ describe('dostignuća D04 potvrđene prijave', () => {
     const dodana = await potvrdiIspravakRjecnika({ prijavaId: idNove, adminId, smjer: 'dodaj' });
     expect(dodana).toMatchObject({ ok: true, promjena: 'dodana', rijec: nova });
     expect((await brojac(igracId)).jezicniDetektivi).toBe(1);
+    const [novaUBazi] = await baza.select({ frekvencija: rijeci.frekvencija }).from(rijeci).where(eq(rijeci.rijec, nova));
+    expect(novaUBazi?.frekvencija).toBe(100);
 
     const idNeaktivne = await prijavaRijeci(partijaId, igracId, 'za_dodavanje', neaktivna);
     const reaktivirana = await potvrdiIspravakRjecnika({ prijavaId: idNeaktivne, adminId, smjer: 'dodaj' });
@@ -227,6 +242,48 @@ describe('dostignuća D04 potvrđene prijave', () => {
     const ponovo = await potvrdiIspravakRjecnika({ prijavaId: idNove, adminId, smjer: 'dodaj' });
     expect(ponovo).toMatchObject({ ok: true, promjena: 'nema', obavijesti: [] });
     expect(await brojDokazaRijeci(igracId)).toBe(3);
+  });
+
+  it('prihvaćanje prijave za dodavanje može postaviti frekvenciju (tier rijetkosti)', async () => {
+    const adminId = await noviIgrac('Moderator');
+    const igracId = await noviIgrac('Detektiv');
+    const partijaId = await novaPartija();
+    const rijec = slucajnaRijec();
+    const neaktivna = slucajnaRijec();
+    rijeciZaBrisanje.push(rijec, neaktivna);
+
+    await baza.insert(rijeci).values({
+      rijec: neaktivna,
+      prvaDva: neaktivna.slice(0, 2),
+      zadnjaDva: neaktivna.slice(-2),
+      frekvencija: 100,
+      aktivna: false,
+    });
+
+    const idNove = await prijavaRijeci(partijaId, igracId, 'za_dodavanje', rijec);
+    const dodana = await potvrdiIspravakRjecnika({
+      prijavaId: idNove,
+      adminId,
+      smjer: 'dodaj',
+      frekvencija: 0,
+    });
+    expect(dodana).toMatchObject({ ok: true, promjena: 'dodana', rijec });
+    const [novaUBazi] = await baza.select({ frekvencija: rijeci.frekvencija }).from(rijeci).where(eq(rijeci.rijec, rijec));
+    expect(novaUBazi?.frekvencija).toBe(0);
+
+    const idNeaktivne = await prijavaRijeci(partijaId, igracId, 'za_dodavanje', neaktivna);
+    const reaktivirana = await potvrdiIspravakRjecnika({
+      prijavaId: idNeaktivne,
+      adminId,
+      smjer: 'dodaj',
+      frekvencija: 5,
+    });
+    expect(reaktivirana).toMatchObject({ ok: true, promjena: 'reaktivirana' });
+    const [reaktiviranaUBazi] = await baza
+      .select({ frekvencija: rijeci.frekvencija, aktivna: rijeci.aktivna })
+      .from(rijeci)
+      .where(eq(rijeci.rijec, neaktivna));
+    expect(reaktiviranaUBazi).toMatchObject({ aktivna: true, frekvencija: 5 });
   });
 
   it('isti prijavitelj i ista riječ broje se jednom, a različiti prijavitelji svaki dobiju svoj doprinos', async () => {
@@ -386,5 +443,106 @@ describe('dostignuća D04 potvrđene prijave', () => {
     expect(glasniIshod).toMatchObject({ ok: true, ishod: 'obrisan', osvjeziLjestvicu: true });
     await dovrsiTop10NakonBrisanja();
     expect((await brojac(prijavitelj)).cinkarosi).toBe(2);
+  });
+
+  it('odbacivanje riječi šalje sandučic svim prijaviteljima i ne daje detektiva', async () => {
+    const adminId = await noviIgrac('Moderator');
+    const prvi = await noviIgrac('Prvi');
+    const drugi = await noviIgrac('Drugi');
+    const partijaId = await novaPartija();
+    const rijec = slucajnaRijec();
+    rijeciZaBrisanje.push(rijec);
+    const idPrvog = await prijavaRijeci(partijaId, prvi, 'za_dodavanje', rijec);
+    await prijavaRijeci(await novaPartija(), drugi, 'za_dodavanje', rijec);
+
+    const rezultat = await odbaciPrijavuRijeci({
+      prijavaId: idPrvog,
+      adminId,
+      napomena: 'Nije u standardu.',
+    });
+    expect(rezultat).toMatchObject({ ok: true });
+    expect((await brojac(prvi)).jezicniDetektivi).toBe(0);
+    expect((await brojac(drugi)).jezicniDetektivi).toBe(0);
+
+    const poruke = await baza.select({
+      igracId: sanducicPoruke.igracId,
+      tip: sanducicPoruke.tip,
+      podaci: sanducicPoruke.podaci,
+    }).from(sanducicPoruke).where(inArray(sanducicPoruke.igracId, [prvi, drugi]));
+    expect(poruke).toHaveLength(2);
+    for (const poruka of poruke) {
+      expect(poruka.tip).toBe(TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA);
+      expect(poruka.podaci).toMatchObject({ rijec, napomena: 'Nije u standardu.' });
+    }
+
+    const statusi = await baza.select({ status: prijave.status, napomenaAdmina: prijave.napomenaAdmina })
+      .from(prijave)
+      .where(inArray(prijave.igracId, [prvi, drugi]));
+    expect(statusi.every((s) => s.status === 'rijesena' && s.napomenaAdmina === 'dismiss')).toBe(true);
+  });
+
+  it('uvažavanje šalje napomenu i nadimak u sandučic', async () => {
+    const adminId = await noviIgrac('Moderator');
+    const prijavitelj = await noviIgrac('Prijavitelj');
+    const rijec = slucajnaRijec();
+    rijeciZaBrisanje.push(rijec);
+    const idRijeci = await prijavaRijeci(await novaPartija(), prijavitelj, 'za_dodavanje', rijec);
+    await potvrdiIspravakRjecnika({
+      prijavaId: idRijeci,
+      adminId,
+      smjer: 'dodaj',
+      napomena: 'Hvala na prijavi!',
+    });
+    const [porukaRijeci] = await baza.select({ tip: sanducicPoruke.tip, podaci: sanducicPoruke.podaci })
+      .from(sanducicPoruke)
+      .where(eq(sanducicPoruke.igracId, prijavitelj));
+    expect(porukaRijeci).toMatchObject({
+      tip: TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA,
+      podaci: { rijec, napomena: 'Hvala na prijavi!' },
+    });
+
+    const metaNadimak = `Glupan${slucajnaRijec().slice(0, 4)}`;
+    const meta = await noviIgrac(metaNadimak);
+    const drugi = await noviIgrac('Drugi');
+    const idIgraca = await prijavaIgraca(await novaPartija(), prijavitelj, meta);
+    await prijavaIgraca(await novaPartija(), drugi, meta);
+    await potvrdiUklanjanjeRacuna({ prijavaId: idIgraca, adminId, napomena: 'Uvaženo.' });
+
+    const porukeIgraca = await baza.select({
+      igracId: sanducicPoruke.igracId,
+      tip: sanducicPoruke.tip,
+      podaci: sanducicPoruke.podaci,
+    }).from(sanducicPoruke).where(inArray(sanducicPoruke.igracId, [prijavitelj, drugi]));
+    const uvazene = porukeIgraca.filter((p) => p.tip === TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA);
+    expect(uvazene).toHaveLength(2);
+    for (const poruka of uvazene) {
+      expect(poruka.podaci).toMatchObject({
+        razlog: 'pogrdan_nadimak',
+        nadimak: metaNadimak,
+        napomena: 'Uvaženo.',
+      });
+    }
+  });
+
+  it('odbacivanje nadimka šalje fan-out bez Cinkaroša', async () => {
+    const adminId = await noviIgrac('Moderator');
+    const prvi = await noviIgrac('Prvi');
+    const drugi = await noviIgrac('Drugi');
+    const metaNadimak = `Xyz${slucajnaRijec().slice(0, 5)}`;
+    const meta = await noviIgrac(metaNadimak);
+    const id = await prijavaIgraca(await novaPartija(), prvi, meta);
+    await prijavaIgraca(await novaPartija(), drugi, meta);
+
+    expect(await odbaciPrijavuIgraca({ prijavaId: id, adminId })).toMatchObject({ ok: true });
+    expect((await brojac(prvi)).cinkarosi).toBe(0);
+    expect((await brojac(drugi)).cinkarosi).toBe(0);
+
+    const poruke = await baza.select({
+      tip: sanducicPoruke.tip,
+      podaci: sanducicPoruke.podaci,
+    }).from(sanducicPoruke).where(inArray(sanducicPoruke.igracId, [prvi, drugi]));
+    expect(poruke).toHaveLength(2);
+    expect(poruke.every((p) => p.tip === TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA)).toBe(true);
+    expect(poruke[0]?.podaci).toMatchObject({ nadimak: metaNadimak, razlog: 'pogrdan_nadimak' });
   });
 });

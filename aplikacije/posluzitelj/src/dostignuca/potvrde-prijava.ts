@@ -15,6 +15,8 @@ import { deaktivirajRijec, dodajRijec, NevaljanaRijecError, normalizirajRijecRje
 import { dodijeliDoprinos } from './dodjela.js';
 import {
   emitirajPromjeneSanducica,
+  stvoriPorukeOdbacenihPrijaveIgraca,
+  stvoriPorukeOdbacenihPrijaveRijeci,
   stvoriPorukeUvazenePrijaveIgraca,
   stvoriPorukeUvazenePrijaveRijeci,
 } from '../sanducic/okidaci.js';
@@ -44,6 +46,10 @@ export type RezultatPotvrdeRacuna =
       osvjeziLjestvicu: boolean;
       obavijesti: ObavijestiPotvrde[];
     };
+
+export type RezultatOdbacivanja =
+  | { ok: false; status: 400 | 404; greska: string }
+  | { ok: true };
 
 function jeRazlogPrijave(razlog: string): razlog is RazlogPrijaveIgraca {
   return (RAZLOZI_PRIJAVE_IGRACA as readonly string[]).includes(razlog);
@@ -89,10 +95,18 @@ async function nagradi(
   return obavijesti;
 }
 
+async function nadimakIgraca(tx: MisijeTx, igracId: string): Promise<string> {
+  const [red] = await tx.select({ nadimak: igraci.nadimak }).from(igraci).where(eq(igraci.id, igracId)).limit(1);
+  return red?.nadimak?.trim() || '???';
+}
+
 export async function potvrdiIspravakRjecnika(ulaz: {
   prijavaId: number;
   adminId: string;
   smjer: 'dodaj' | 'deaktiviraj';
+  /** Samo za smjer `dodaj`: reprezentativna frekvencija (tier rijetkosti). */
+  frekvencija?: number;
+  napomena?: string;
 }): Promise<RezultatPotvrdeRijeci> {
   let sanducicIgraci: string[] = [];
   const rezultat = await baza.transaction(async (tx) => {
@@ -111,7 +125,7 @@ export async function potvrdiIspravakRjecnika(ulaz: {
     let promjena;
     try {
       promjena = ulaz.smjer === 'dodaj'
-        ? await dodajRijec(prijava.rijec, 'Prijava igrača — riječ dodana', ulaz.adminId, 'imenica', undefined, prijava.id, tx)
+        ? await dodajRijec(prijava.rijec, 'Prijava igrača — riječ dodana', ulaz.adminId, 'imenica', undefined, prijava.id, tx, ulaz.frekvencija)
         : await deaktivirajRijec(prijava.rijec, 'Prijava igrača — riječ uklonjena', ulaz.adminId, prijava.id, tx);
     } catch (greska) {
       if (greska instanceof NevaljanaRijecError) return { ok: false as const, status: 400 as const, greska: greska.message };
@@ -154,6 +168,7 @@ export async function potvrdiIspravakRjecnika(ulaz: {
       prijavitelji: mailboxPrijavitelji,
       rijec: promjena.rijec,
       smjer: ulaz.smjer,
+      napomena: ulaz.napomena,
       tx,
     });
 
@@ -170,9 +185,53 @@ export async function potvrdiIspravakRjecnika(ulaz: {
   return rezultat;
 }
 
+export async function odbaciPrijavuRijeci(ulaz: {
+  prijavaId: number;
+  adminId: string;
+  napomena?: string;
+}): Promise<RezultatOdbacivanja> {
+  let sanducicIgraci: string[] = [];
+  const rezultat = await baza.transaction(async (tx) => {
+    const [prijava] = await tx.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).limit(1);
+    if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
+    if (prijava.status === 'rijesena' || prijava.potvrdenaAkcija) {
+      return { ok: true as const };
+    }
+
+    const rijec = normalizirajRijecRjecnika(prijava.rijec);
+    const povezane = await tx.select({ id: prijave.id, igracId: prijave.igracId }).from(prijave).where(and(
+      eq(prijave.tip, prijava.tip),
+      isNull(prijave.potvrdenaAkcija),
+      sql`normalize(lower(btrim(${prijave.rijec})), NFC) = ${rijec}`,
+      or(inArray(prijave.status, ['nova', 'pregledana']), eq(prijave.id, prijava.id)),
+    )).for('update');
+    const ids = [...new Set([...povezane.map((red) => red.id), prijava.id])];
+    await tx.update(prijave).set({
+      status: 'rijesena',
+      napomenaAdmina: 'dismiss',
+      rijesioId: ulaz.adminId,
+    }).where(inArray(prijave.id, ids));
+
+    sanducicIgraci = await stvoriPorukeOdbacenihPrijaveRijeci({
+      prijavitelji: [
+        { prijavaId: prijava.id, igracId: prijava.igracId },
+        ...povezane.map((red) => ({ prijavaId: red.id, igracId: red.igracId })),
+      ],
+      rijec,
+      tipPrijave: prijava.tip,
+      napomena: ulaz.napomena,
+      tx,
+    });
+    return { ok: true as const };
+  });
+  if (rezultat.ok && sanducicIgraci.length > 0) emitirajPromjeneSanducica(sanducicIgraci);
+  return rezultat;
+}
+
 export async function potvrdiUklanjanjeRacuna(ulaz: {
   prijavaId: number;
   adminId: string;
+  napomena?: string;
 }): Promise<RezultatPotvrdeRacuna> {
   let sanducicIgraci: string[] = [];
   const rezultat = await baza.transaction(async (tx) => {
@@ -185,6 +244,7 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
       return { ok: true as const, ishod: 'vec-obrisan' as const, osvjeziLjestvicu: false, obavijesti: [] };
     }
 
+    const nadimak = await nadimakIgraca(tx, prijava.prijavljeniIgracId);
     const brisanje = await obrisiRacunPoId(prijava.prijavljeniIgracId, tx);
     const [svjeza] = await tx.select({
       potvrdenaAkcija: prijaveIgraca.potvrdenaAkcija,
@@ -217,6 +277,8 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
       sanducicIgraci = await stvoriPorukeUvazenePrijaveIgraca({
         prijavitelji: [{ prijavaId: prijava.id, igracId: prijava.prijaviteljId }],
         razlog,
+        nadimak,
+        napomena: ulaz.napomena,
         tx,
       });
       return { ok: true as const, ishod: 'obrisan' as const, osvjeziLjestvicu: brisanje.osvjeziLjestvicu, obavijesti: [] };
@@ -246,6 +308,8 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
         ...povezane.map((red) => ({ prijavaId: red.id, igracId: red.prijaviteljId })),
       ],
       razlog: 'pogrdan_nadimak',
+      nadimak,
+      napomena: ulaz.napomena,
       tx,
     });
 
@@ -261,6 +325,70 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
       kontekst: null,
     });
     return { ok: true as const, ishod: 'obrisan' as const, osvjeziLjestvicu: brisanje.osvjeziLjestvicu, obavijesti };
+  });
+  if (rezultat.ok && sanducicIgraci.length > 0) emitirajPromjeneSanducica(sanducicIgraci);
+  return rezultat;
+}
+
+export async function odbaciPrijavuIgraca(ulaz: {
+  prijavaId: number;
+  adminId: string;
+  napomena?: string;
+}): Promise<RezultatOdbacivanja> {
+  let sanducicIgraci: string[] = [];
+  const rezultat = await baza.transaction(async (tx) => {
+    const [prijava] = await tx.select().from(prijaveIgraca).where(eq(prijaveIgraca.id, ulaz.prijavaId)).limit(1);
+    if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
+    if (prijava.status === 'rijesena' || prijava.potvrdenaAkcija) {
+      return { ok: true as const };
+    }
+
+    const nadimak = await nadimakIgraca(tx, prijava.prijavljeniIgracId);
+    const razlog = jeRazlogPrijave(prijava.razlog) ? prijava.razlog : 'drugo';
+
+    if (razlog !== 'pogrdan_nadimak') {
+      await tx.update(prijaveIgraca).set({
+        status: 'rijesena',
+        napomenaAdmina: 'dismiss',
+        rijesioId: ulaz.adminId,
+      }).where(eq(prijaveIgraca.id, prijava.id));
+      sanducicIgraci = await stvoriPorukeOdbacenihPrijaveIgraca({
+        prijavitelji: [{ prijavaId: prijava.id, igracId: prijava.prijaviteljId }],
+        razlog,
+        nadimak,
+        napomena: ulaz.napomena,
+        tx,
+      });
+      return { ok: true as const };
+    }
+
+    const povezane = await tx.select({
+      id: prijaveIgraca.id,
+      prijaviteljId: prijaveIgraca.prijaviteljId,
+    }).from(prijaveIgraca).where(and(
+      eq(prijaveIgraca.prijavljeniIgracId, prijava.prijavljeniIgracId),
+      eq(prijaveIgraca.razlog, 'pogrdan_nadimak'),
+      isNull(prijaveIgraca.potvrdenaAkcija),
+      or(inArray(prijaveIgraca.status, ['nova', 'pregledana']), eq(prijaveIgraca.id, prijava.id)),
+    )).for('update');
+    const ids = [...new Set([...povezane.map((red) => red.id), prijava.id])];
+    await tx.update(prijaveIgraca).set({
+      status: 'rijesena',
+      napomenaAdmina: 'dismiss',
+      rijesioId: ulaz.adminId,
+    }).where(inArray(prijaveIgraca.id, ids));
+
+    sanducicIgraci = await stvoriPorukeOdbacenihPrijaveIgraca({
+      prijavitelji: [
+        { prijavaId: prijava.id, igracId: prijava.prijaviteljId },
+        ...povezane.map((red) => ({ prijavaId: red.id, igracId: red.prijaviteljId })),
+      ],
+      razlog: 'pogrdan_nadimak',
+      nadimak,
+      napomena: ulaz.napomena,
+      tx,
+    });
+    return { ok: true as const };
   });
   if (rezultat.ok && sanducicIgraci.length > 0) emitirajPromjeneSanducica(sanducicIgraci);
   return rezultat;

@@ -195,7 +195,7 @@
           - parseFloat(stil.paddingLeft) - parseFloat(stil.paddingRight)
           - parseFloat(stil.borderLeftWidth) - parseFloat(stil.borderRightWidth);
         const tekst = element.querySelector('strong');
-        const osnovnaVelicina = matchMedia('(min-width: 1000px)').matches ? 20 : 18;
+        const osnovnaVelicina = matchMedia('(min-width: 1000px)').matches ? 22 : 18;
         for (let velicina = osnovnaVelicina; velicina >= 12; velicina -= 1) {
           element.style.fontSize = `${velicina}px`;
           if (!tekst || tekst.getBoundingClientRect().width <= sirina) break;
@@ -2401,6 +2401,9 @@
   .aktivna-partija-sadrzaj .bijela-zona-igre {
     order: 1;
   }
+  .aktivna-partija-sadrzaj :global(.panel-prijava-rijeci) {
+    order: 2;
+  }
   .igraci-red li {
     position: relative;
     box-sizing: border-box;
@@ -2555,15 +2558,15 @@
   }
 
   .trenutni-streak {
-    display: flex;
-    flex-direction: column;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 2px;
-    margin: 8px 0 12px;
+    justify-content: flex-start;
+    gap: 4px;
+    margin: 4px 0 8px;
     color: var(--boja-tekst-sekundarni);
-    text-align: center;
+    text-align: left;
     font-size: var(--tekst-mali);
+    width: 100%;
   }
 
   .streak-vatre {
@@ -2575,8 +2578,8 @@
   }
 
   .trenutni-streak .streak-vatre img {
-    width: 3em;
-    height: 3em;
+    width: 20px;
+    height: 20px;
     object-fit: contain;
   }
 
@@ -2585,14 +2588,14 @@
   }
 
   .streak-broj-okvir {
-    display: block;
+    display: inline-block;
     overflow: hidden;
     line-height: 1.2;
     min-height: 1.2em;
   }
 
   .streak-broj-slide {
-    display: block;
+    display: inline-block;
     animation: streak-broj-ulaz 220ms ease-out;
   }
 
@@ -3133,14 +3136,31 @@
     box-sizing: border-box;
     width: max-content;
     max-width: 100%;
-    padding: 3px 6px;
+    padding: 2px 8px;
+    border: none;
+    border-radius: 12px;
+    background: #1a1815;
+    color: var(--boja-krem);
     font-family: var(--font-naslov);
     font-size: 18px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: normal;
     text-align: center;
     transform: translateX(-50%);
     animation: rijec-oblak-dolazak 220ms ease-out both;
+  }
+  .rijec-oblak .trenutna-rijec {
+    color: var(--boja-krem);
+    font-size: inherit;
+    line-height: inherit;
+  }
+  .rijec-oblak .trenutna-rijec-zavrsetak {
+    color: var(--boja-zuta-krema);
+    text-decoration: underline;
+    text-decoration-color: var(--boja-zuta-krema);
+    text-decoration-thickness: from-font;
+    text-underline-position: from-font;
+    text-underline-offset: 0;
   }
   .reakcija-oblak::after {
     content: '';
@@ -3161,9 +3181,8 @@
     bottom: -5px;
     width: 8px;
     height: 8px;
-    border-right: 1px solid var(--boja-obrub-jaci);
-    border-bottom: 1px solid var(--boja-obrub-jaci);
-    background: var(--boja-povrsina);
+    border: none;
+    background: #1a1815;
     transform: translateX(-50%) rotate(45deg);
   }
   @keyframes reakcija-dolazak {
@@ -3201,13 +3220,13 @@
   .igraci-red.dvoboj {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .rijec-oblak .trenutna-rijec { font-size: inherit; }
   @media (min-width: 1000px) {
     .unos-rijeci { font-size: 20px; }
     .ime-igraca { font-size: 20px; }
     .rang-razina { font-size: 18px; }
     .red-label { font-size: 18px; min-height: 45px; }
-    .rijec-oblak, .trenutna-rijec { font-size: 20px; }
+    .trenutna-rijec { font-size: 20px; }
+    .rijec-oblak { font-size: 22px; }
     .trenutni-streak { margin-bottom: 8px; }
   }
   @media (max-height: 500px) and (min-width: 500px) {
