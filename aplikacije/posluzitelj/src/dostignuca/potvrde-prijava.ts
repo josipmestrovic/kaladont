@@ -118,7 +118,8 @@ export async function potvrdiIspravakRjecnika(ulaz: {
     if (ulaz.smjer === 'deaktiviraj' && prijava.tip !== 'za_brisanje') {
       return { ok: false as const, status: 400 as const, greska: 'Ova prijava nije za brisanje riječi.' };
     }
-    if (prijava.potvrdenaAkcija) {
+    // Odbacivanje i ostala rješenja bez potvrđene akcije moraju ostati ne-ponovljiva.
+    if (prijava.potvrdenaAkcija || prijava.status === 'rijesena') {
       return { ok: true as const, rijec: normalizirajRijecRjecnika(prijava.rijec), promjena: 'nema' as const, obavijesti: [] };
     }
 
@@ -240,7 +241,7 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
     if (prijava.prijaviteljId === prijava.prijavljeniIgracId) {
       return { ok: false as const, status: 400 as const, greska: 'Prijava samog sebe nije valjana.' };
     }
-    if (prijava.potvrdenaAkcija) {
+    if (prijava.potvrdenaAkcija || prijava.status === 'rijesena') {
       return { ok: true as const, ishod: 'vec-obrisan' as const, osvjeziLjestvicu: false, obavijesti: [] };
     }
 

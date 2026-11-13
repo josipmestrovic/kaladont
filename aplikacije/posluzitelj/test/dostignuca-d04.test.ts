@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import { baza } from '../src/baza/klijent.js';
 import {
   TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA,
@@ -479,6 +479,23 @@ describe('dostignuća D04 potvrđene prijave', () => {
       .from(prijave)
       .where(inArray(prijave.igracId, [prvi, drugi]));
     expect(statusi.every((s) => s.status === 'rijesena' && s.napomenaAdmina === 'dismiss')).toBe(true);
+
+    // Kasniji Dodaj na odbačenu prijavu ne smije mijenjati rječnik ni slati uvažavanje.
+    const ponovno = await potvrdiIspravakRjecnika({
+      prijavaId: idPrvog,
+      adminId,
+      smjer: 'dodaj',
+    });
+    expect(ponovno).toMatchObject({ ok: true, promjena: 'nema' });
+    const [rijecUBazi] = await baza.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec));
+    expect(rijecUBazi?.aktivna ?? false).toBe(false);
+    const uvazene = await baza.select({ tip: sanducicPoruke.tip })
+      .from(sanducicPoruke)
+      .where(and(
+        inArray(sanducicPoruke.igracId, [prvi, drugi]),
+        eq(sanducicPoruke.tip, TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA),
+      ));
+    expect(uvazene).toHaveLength(0);
   });
 
   it('uvažavanje šalje napomenu i nadimak u sandučic', async () => {

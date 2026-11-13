@@ -3136,7 +3136,7 @@
     box-sizing: border-box;
     width: max-content;
     max-width: 100%;
-    padding: 2px 8px;
+    padding: 2px 6px;
     border: none;
     border-radius: 12px;
     background: #1a1815;
@@ -3144,7 +3144,7 @@
     font-family: var(--font-naslov);
     font-size: 18px;
     font-weight: 700;
-    line-height: normal;
+    line-height: 1.2;
     text-align: center;
     transform: translateX(-50%);
     animation: rijec-oblak-dolazak 220ms ease-out both;
@@ -3160,7 +3160,7 @@
     text-decoration-color: var(--boja-zuta-krema);
     text-decoration-thickness: from-font;
     text-underline-position: from-font;
-    text-underline-offset: 0;
+    text-underline-offset: 1px;
   }
   .reakcija-oblak::after {
     content: '';
