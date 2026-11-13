@@ -274,7 +274,8 @@ export async function registrirajAdminRute(
         napomena: napomenaIzTijela(zahtjev.body),
       });
       if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
-      rjecnik.primijeniUklanjanje(rezultat.rijec);
+      // Idempotentno rješenje (npr. dismiss) ne smije dirati RAM rječnik.
+      if (rezultat.promjena === 'deaktivirana') rjecnik.primijeniUklanjanje(rezultat.rijec);
       for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
     },
@@ -303,7 +304,9 @@ export async function registrirajAdminRute(
         napomena: normalizirajNapomenuPrijave(parsirano.data.napomena),
       });
       if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
-      await uskladiRjecnikNakonUbaci(rjecnik, rezultat.rijec);
+      if (rezultat.promjena === 'dodana' || rezultat.promjena === 'reaktivirana') {
+        await uskladiRjecnikNakonUbaci(rjecnik, rezultat.rijec);
+      }
       for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
     },

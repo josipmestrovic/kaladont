@@ -110,7 +110,7 @@ export async function potvrdiIspravakRjecnika(ulaz: {
 }): Promise<RezultatPotvrdeRijeci> {
   let sanducicIgraci: string[] = [];
   const rezultat = await baza.transaction(async (tx) => {
-    const [prijava] = await tx.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).limit(1);
+    const [prijava] = await tx.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).for('update').limit(1);
     if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
     if (ulaz.smjer === 'dodaj' && prijava.tip !== 'za_dodavanje') {
       return { ok: false as const, status: 400 as const, greska: 'Ova prijava nije za dodavanje riječi.' };
@@ -133,15 +133,12 @@ export async function potvrdiIspravakRjecnika(ulaz: {
       throw greska;
     }
 
-    const [svjeza] = await tx.select({ potvrdenaAkcija: prijave.potvrdenaAkcija }).from(prijave).where(eq(prijave.id, prijava.id)).for('update').limit(1);
-    if (svjeza?.potvrdenaAkcija || promjena.promjena === 'nema' || promjena.promjena === 'vracena') {
-      if (!svjeza?.potvrdenaAkcija) {
-        await tx.update(prijave).set({
-          status: 'rijesena',
-          napomenaAdmina: 'nema_promjene',
-          rijesioId: ulaz.adminId,
-        }).where(eq(prijave.id, prijava.id));
-      }
+    if (promjena.promjena === 'nema' || promjena.promjena === 'vracena') {
+      await tx.update(prijave).set({
+        status: 'rijesena',
+        napomenaAdmina: 'nema_promjene',
+        rijesioId: ulaz.adminId,
+      }).where(eq(prijave.id, prijava.id));
       return { ok: true as const, rijec: promjena.rijec, promjena: 'nema' as const, obavijesti: [] };
     }
 
@@ -193,7 +190,7 @@ export async function odbaciPrijavuRijeci(ulaz: {
 }): Promise<RezultatOdbacivanja> {
   let sanducicIgraci: string[] = [];
   const rezultat = await baza.transaction(async (tx) => {
-    const [prijava] = await tx.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).limit(1);
+    const [prijava] = await tx.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).for('update').limit(1);
     if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
     if (prijava.status === 'rijesena' || prijava.potvrdenaAkcija) {
       return { ok: true as const };
@@ -236,7 +233,7 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
 }): Promise<RezultatPotvrdeRacuna> {
   let sanducicIgraci: string[] = [];
   const rezultat = await baza.transaction(async (tx) => {
-    const [prijava] = await tx.select().from(prijaveIgraca).where(eq(prijaveIgraca.id, ulaz.prijavaId)).limit(1);
+    const [prijava] = await tx.select().from(prijaveIgraca).where(eq(prijaveIgraca.id, ulaz.prijavaId)).for('update').limit(1);
     if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
     if (prijava.prijaviteljId === prijava.prijavljeniIgracId) {
       return { ok: false as const, status: 400 as const, greska: 'Prijava samog sebe nije valjana.' };
@@ -247,22 +244,17 @@ export async function potvrdiUklanjanjeRacuna(ulaz: {
 
     const nadimak = await nadimakIgraca(tx, prijava.prijavljeniIgracId);
     const brisanje = await obrisiRacunPoId(prijava.prijavljeniIgracId, tx);
-    const [svjeza] = await tx.select({
-      potvrdenaAkcija: prijaveIgraca.potvrdenaAkcija,
-    }).from(prijaveIgraca).where(eq(prijaveIgraca.id, prijava.id)).for('update').limit(1);
 
     if (brisanje.ishod === 'nije-pronaden') return { ok: false as const, status: 404 as const, greska: 'Račun nije pronađen.' };
     if (brisanje.ishod === 'zasticen') {
       return { ok: false as const, status: 400 as const, greska: 'Botove i admin račune nije moguće obrisati ovim putem.' };
     }
-    if (brisanje.ishod === 'vec-obrisan' || svjeza?.potvrdenaAkcija) {
-      if (!svjeza?.potvrdenaAkcija) {
-        await tx.update(prijaveIgraca).set({
-          status: 'rijesena',
-          napomenaAdmina: 'racun_vec_obrisan',
-          rijesioId: ulaz.adminId,
-        }).where(eq(prijaveIgraca.id, prijava.id));
-      }
+    if (brisanje.ishod === 'vec-obrisan') {
+      await tx.update(prijaveIgraca).set({
+        status: 'rijesena',
+        napomenaAdmina: 'racun_vec_obrisan',
+        rijesioId: ulaz.adminId,
+      }).where(eq(prijaveIgraca.id, prijava.id));
       return { ok: true as const, ishod: 'vec-obrisan' as const, osvjeziLjestvicu: false, obavijesti: [] };
     }
 
@@ -338,7 +330,7 @@ export async function odbaciPrijavuIgraca(ulaz: {
 }): Promise<RezultatOdbacivanja> {
   let sanducicIgraci: string[] = [];
   const rezultat = await baza.transaction(async (tx) => {
-    const [prijava] = await tx.select().from(prijaveIgraca).where(eq(prijaveIgraca.id, ulaz.prijavaId)).limit(1);
+    const [prijava] = await tx.select().from(prijaveIgraca).where(eq(prijaveIgraca.id, ulaz.prijavaId)).for('update').limit(1);
     if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
     if (prijava.status === 'rijesena' || prijava.potvrdenaAkcija) {
       return { ok: true as const };
