@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { desc, eq, and, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
-import { SVE_VRSTE_RIJECI, type PregledNadzora } from 'zajednicko';
+import { MAKSIMALNA_DULJINA_NAPOMENE_PRIJAVE, normalizirajNapomenuPrijave, SVE_VRSTE_RIJECI, type PregledNadzora } from 'zajednicko';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import {
   dodajRijec,
@@ -28,7 +28,12 @@ import { igraci, prijave, prijaveIgraca, rijeci, izmjeneRjecnika } from '../baza
 import { baza } from '../baza/klijent.js';
 import { zahtijevajAdmina, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
 import { dovrsiTop10NakonBrisanja } from '../racuni/brisanje.js';
-import { potvrdiIspravakRjecnika, potvrdiUklanjanjeRacuna } from '../dostignuca/potvrde-prijava.js';
+import {
+  odbaciPrijavuIgraca,
+  odbaciPrijavuRijeci,
+  potvrdiIspravakRjecnika,
+  potvrdiUklanjanjeRacuna,
+} from '../dostignuca/potvrde-prijava.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { izracunajStatistikuCekanja } from './statistika-cekanja.js';
 import { ShemaKonfiguracijeBota, type KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
@@ -93,6 +98,19 @@ const ShemaRijesiPrijavu = z.object({
   status: z.enum(['pregledana', 'rijesena']),
   napomenaAdmina: z.string().optional(),
 });
+const ShemaNapomenaPrijave = z.object({
+  napomena: z.string().max(MAKSIMALNA_DULJINA_NAPOMENE_PRIJAVE).optional(),
+});
+const ShemaDodajPrijavljenuRijec = ShemaNapomenaPrijave.extend({
+  tierRijetkosti: z.enum(['ucestala', 'rijetka', 'srednje_rijetka', 'jako_rijetka']).optional(),
+  frekvencija: z.number().int().nonnegative().optional(),
+});
+
+function napomenaIzTijela(tijelo: unknown): string | undefined {
+  const parsirano = ShemaNapomenaPrijave.safeParse(tijelo ?? {});
+  if (!parsirano.success) return undefined;
+  return normalizirajNapomenuPrijave(parsirano.data.napomena);
+}
 
 export async function registrirajAdminRute(
   app: FastifyInstance,
@@ -232,12 +250,14 @@ export async function registrirajAdminRute(
   app.post<{ Params: { id: string } }>(
     '/admin/prijave/:id/dismiss',
     { preHandler: zahtijevajAdmina },
-    async (zahtjev) => {
+    async (zahtjev, odgovor) => {
       const admin = (zahtjev as ZahtjevSIgracem).igrac!;
-      await baza
-        .update(prijave)
-        .set({ status: 'rijesena', napomenaAdmina: 'dismiss', rijesioId: admin.id })
-        .where(eq(prijave.id, Number(zahtjev.params.id)));
+      const rezultat = await odbaciPrijavuRijeci({
+        prijavaId: Number(zahtjev.params.id),
+        adminId: admin.id,
+        napomena: napomenaIzTijela(zahtjev.body),
+      });
+      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
       return { ok: true };
     },
   );
@@ -251,9 +271,11 @@ export async function registrirajAdminRute(
         prijavaId: Number(zahtjev.params.id),
         adminId: admin.id,
         smjer: 'deaktiviraj',
+        napomena: napomenaIzTijela(zahtjev.body),
       });
       if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
-      rjecnik.primijeniUklanjanje(rezultat.rijec);
+      // Idempotentno rješenje (npr. dismiss) ne smije dirati RAM rječnik.
+      if (rezultat.promjena === 'deaktivirana') rjecnik.primijeniUklanjanje(rezultat.rijec);
       for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
     },
@@ -263,14 +285,28 @@ export async function registrirajAdminRute(
     '/admin/prijave/:id/dodaj-rijec',
     { preHandler: zahtijevajAdmina },
     async (zahtjev, odgovor) => {
+      const parsirano = ShemaDodajPrijavljenuRijec.safeParse(zahtjev.body ?? {});
+      if (!parsirano.success) {
+        return odgovor.code(400).send({
+          ok: false,
+          greska: 'Neispravno tijelo: opcionalni "tierRijetkosti", "frekvencija" ili "napomena".',
+        });
+      }
+      const frekvencija =
+        parsirano.data.frekvencija ??
+        frekvencijaIzTieraRijetkosti(parsirano.data.tierRijetkosti as TierRijetkostiRucno | undefined);
       const admin = (zahtjev as ZahtjevSIgracem).igrac!;
       const rezultat = await potvrdiIspravakRjecnika({
         prijavaId: Number(zahtjev.params.id),
         adminId: admin.id,
         smjer: 'dodaj',
+        frekvencija,
+        napomena: normalizirajNapomenuPrijave(parsirano.data.napomena),
       });
       if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
-      await uskladiRjecnikNakonUbaci(rjecnik, rezultat.rijec);
+      if (rezultat.promjena === 'dodana' || rezultat.promjena === 'reaktivirana') {
+        await uskladiRjecnikNakonUbaci(rjecnik, rezultat.rijec);
+      }
       for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
     },
@@ -316,13 +352,14 @@ export async function registrirajAdminRute(
   app.post<{ Params: { id: string } }>(
     '/admin/prijave-igraca/:id/dismiss',
     { preHandler: zahtijevajAdmina },
-    async (zahtjev) => {
+    async (zahtjev, odgovor) => {
       const admin = (zahtjev as ZahtjevSIgracem).igrac!;
-      await baza.update(prijaveIgraca).set({
-        status: 'rijesena',
-        napomenaAdmina: 'dismiss',
-        rijesioId: admin.id,
-      }).where(eq(prijaveIgraca.id, Number(zahtjev.params.id)));
+      const rezultat = await odbaciPrijavuIgraca({
+        prijavaId: Number(zahtjev.params.id),
+        adminId: admin.id,
+        napomena: napomenaIzTijela(zahtjev.body),
+      });
+      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
       return { ok: true };
     },
   );
@@ -335,6 +372,7 @@ export async function registrirajAdminRute(
       const rezultat = await potvrdiUklanjanjeRacuna({
         prijavaId: Number(zahtjev.params.id),
         adminId: admin.id,
+        napomena: napomenaIzTijela(zahtjev.body),
       });
       if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
       if (rezultat.osvjeziLjestvicu) await dovrsiTop10NakonBrisanja();

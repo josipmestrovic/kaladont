@@ -14,8 +14,11 @@ import {
   TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
   TIP_SANDUCIC_NOVA_XP_RAZINA,
   TIP_SANDUCIC_NOVA_ZVJEZDICA,
+  TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA,
   TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA,
   TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA,
+  TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA,
+  TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA,
   TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA,
   TIP_SANDUCIC_PROMJENA_RANGA,
   TIP_SANDUCIC_PRVA_IGRA,
@@ -105,22 +108,29 @@ export async function stvoriZahvaluZaFeedback(
   return red != null;
 }
 
-export async function stvoriPorukeUvazenePrijaveRijeci(ulaz: {
+function podaciPrijaveRijeci(rijec: string, napomena?: string): Record<string, unknown> {
+  return napomena ? { rijec, napomena } : { rijec };
+}
+
+function podaciPrijaveIgraca(razlog: string, nadimak: string, napomena?: string): Record<string, unknown> {
+  return napomena ? { razlog, nadimak, napomena } : { razlog, nadimak };
+}
+
+async function stvoriPorukePrijaveRijeci(ulaz: {
   prijavitelji: readonly { prijavaId: number; igracId: string }[];
   rijec: string;
-  smjer: 'dodaj' | 'deaktiviraj';
+  tip: string;
+  napomena?: string;
   tx: TxSanducic;
 }): Promise<string[]> {
-  const tip = ulaz.smjer === 'dodaj'
-    ? TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA
-    : TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA;
   const obavijesteni: string[] = [];
+  const podaci = podaciPrijaveRijeci(ulaz.rijec, ulaz.napomena);
   for (const prijavitelj of ulaz.prijavitelji) {
     const red = await stvoriPoruku({
       igracId: prijavitelj.igracId,
-      tip,
+      tip: ulaz.tip,
       deduplikacijskiKljuc: `prijava:${prijavitelj.prijavaId}`,
-      podaci: { rijec: ulaz.rijec },
+      podaci,
       izvorTip: 'prijava_rijeci',
       izvorId: String(prijavitelj.prijavaId),
     }, { tx: ulaz.tx, emitiraj: false });
@@ -129,24 +139,96 @@ export async function stvoriPorukeUvazenePrijaveRijeci(ulaz: {
   return obavijesteni;
 }
 
-export async function stvoriPorukeUvazenePrijaveIgraca(ulaz: {
+async function stvoriPorukePrijaveIgraca(ulaz: {
   prijavitelji: readonly { prijavaId: number; igracId: string }[];
   razlog: string;
+  nadimak: string;
+  tip: string;
+  napomena?: string;
   tx: TxSanducic;
 }): Promise<string[]> {
   const obavijesteni: string[] = [];
+  const podaci = podaciPrijaveIgraca(ulaz.razlog, ulaz.nadimak, ulaz.napomena);
   for (const prijavitelj of ulaz.prijavitelji) {
     const red = await stvoriPoruku({
       igracId: prijavitelj.igracId,
-      tip: TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA,
+      tip: ulaz.tip,
       deduplikacijskiKljuc: `prijava_igraca:${prijavitelj.prijavaId}`,
-      podaci: { razlog: ulaz.razlog },
+      podaci,
       izvorTip: 'prijava_igraca',
       izvorId: String(prijavitelj.prijavaId),
     }, { tx: ulaz.tx, emitiraj: false });
     if (red) obavijesteni.push(prijavitelj.igracId);
   }
   return obavijesteni;
+}
+
+export async function stvoriPorukeUvazenePrijaveRijeci(ulaz: {
+  prijavitelji: readonly { prijavaId: number; igracId: string }[];
+  rijec: string;
+  smjer: 'dodaj' | 'deaktiviraj';
+  napomena?: string;
+  tx: TxSanducic;
+}): Promise<string[]> {
+  return stvoriPorukePrijaveRijeci({
+    prijavitelji: ulaz.prijavitelji,
+    rijec: ulaz.rijec,
+    tip: ulaz.smjer === 'dodaj' ? TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA : TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA,
+    napomena: ulaz.napomena,
+    tx: ulaz.tx,
+  });
+}
+
+export async function stvoriPorukeOdbacenihPrijaveRijeci(ulaz: {
+  prijavitelji: readonly { prijavaId: number; igracId: string }[];
+  rijec: string;
+  tipPrijave: 'za_dodavanje' | 'za_brisanje';
+  napomena?: string;
+  tx: TxSanducic;
+}): Promise<string[]> {
+  return stvoriPorukePrijaveRijeci({
+    prijavitelji: ulaz.prijavitelji,
+    rijec: ulaz.rijec,
+    tip: ulaz.tipPrijave === 'za_dodavanje'
+      ? TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA
+      : TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA,
+    napomena: ulaz.napomena,
+    tx: ulaz.tx,
+  });
+}
+
+export async function stvoriPorukeUvazenePrijaveIgraca(ulaz: {
+  prijavitelji: readonly { prijavaId: number; igracId: string }[];
+  razlog: string;
+  nadimak: string;
+  napomena?: string;
+  tx: TxSanducic;
+}): Promise<string[]> {
+  return stvoriPorukePrijaveIgraca({
+    prijavitelji: ulaz.prijavitelji,
+    razlog: ulaz.razlog,
+    nadimak: ulaz.nadimak,
+    tip: TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA,
+    napomena: ulaz.napomena,
+    tx: ulaz.tx,
+  });
+}
+
+export async function stvoriPorukeOdbacenihPrijaveIgraca(ulaz: {
+  prijavitelji: readonly { prijavaId: number; igracId: string }[];
+  razlog: string;
+  nadimak: string;
+  napomena?: string;
+  tx: TxSanducic;
+}): Promise<string[]> {
+  return stvoriPorukePrijaveIgraca({
+    prijavitelji: ulaz.prijavitelji,
+    razlog: ulaz.razlog,
+    nadimak: ulaz.nadimak,
+    tip: TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA,
+    napomena: ulaz.napomena,
+    tx: ulaz.tx,
+  });
 }
 
 export function emitirajPromjeneSanducica(igracIds: readonly string[]): void {

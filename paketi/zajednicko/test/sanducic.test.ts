@@ -13,9 +13,14 @@ import {
   TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
   TIP_SANDUCIC_NOVA_XP_RAZINA,
   TIP_SANDUCIC_NOVA_ZVJEZDICA,
+  TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA,
   TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA,
+  TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA,
+  TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA,
+  TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA,
   TIP_SANDUCIC_PROMJENA_RANGA,
   TIP_SANDUCIC_PRVA_IGRA,
+  normalizirajNapomenuPrijave,
 } from '../src/sanducic.js';
 
 describe('sandučic tekstovi', () => {
@@ -45,28 +50,68 @@ describe('sandučic tekstovi', () => {
 
     const nadimak = renderirajSanducicPoruku(TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA, {
       razlog: 'pogrdan_nadimak',
+      nadimak: 'Glupan',
     });
-    expect(nadimak.tekst).toContain('vulgarni nadimak');
+    expect(nadimak.tekst).toContain('vulgarnog nadimka');
+    expect(nadimak.tekst).toContain('„Glupan”');
+    expect(nadimak.tekst).toContain('je uvažena');
+  });
+
+  it('renderira odbijene prijave i appenda admin napomenu', () => {
+    expect(normalizirajNapomenuPrijave('  hej  ')).toBe('hej');
+    expect(normalizirajNapomenuPrijave('   ')).toBeUndefined();
+
+    const nijeDodana = renderirajSanducicPoruku(TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA, {
+      rijec: 'test',
+      napomena: 'Nije u standardu.',
+    });
+    expect(nijeDodana.naslov).toBe('Riječ nije dodana');
+    expect(nijeDodana.tekst).toContain('nije dodana u rječnik');
+    expect(nijeDodana.tekst).toContain('\n\nNije u standardu.');
+
+    const nijeUklonjena = renderirajSanducicPoruku(TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA, {
+      rijec: 'kuća',
+    });
+    expect(nijeUklonjena.naslov).toBe('Riječ nije uklonjena');
+    expect(nijeUklonjena.tekst).toContain('nije uklonjena iz rječnika');
+    expect(nijeUklonjena.tekst).not.toContain('\n\n');
+
+    const dodanaSNapomenom = renderirajSanducicPoruku(TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA, {
+      rijec: 'kuća',
+      napomena: 'Hvala!',
+    });
+    expect(dodanaSNapomenom.tekst.endsWith('\n\nHvala!')).toBe(true);
+
+    const nijeUvazena = renderirajSanducicPoruku(TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA, {
+      razlog: 'pogrdan_nadimak',
+      nadimak: 'Xyz',
+    });
+    expect(nijeUvazena.naslov).toBe('Prijava nije uvažena');
+    expect(nijeUvazena.tekst).toBe('Tvoja prijava vulgarnog nadimka za korisnika „Xyz” nije uvažena.');
   });
 
   it('renderira PR3 predloške (XP, zvjezdica, kolekcija, rang)', () => {
     const xp = renderirajSanducicPoruku(TIP_SANDUCIC_NOVA_XP_RAZINA, { razina: 3 });
     expect(xp.tekst).toContain('LVL 3');
-    expect(xp.poveznica).toBe('/profil');
+    expect(xp.poveznica).toBeNull();
 
     const prvaZvijezda = renderirajSanducicPoruku(TIP_SANDUCIC_NOVA_ZVJEZDICA, {
       naziv: 'Zagrijan',
       zvjezdice: 1,
+      dostignuceId: 'zagrijan',
     });
     expect(prvaZvijezda.naslov).toBe('Novo dostignuće!');
     expect(prvaZvijezda.tekst).toContain('Zagrijan');
+    expect(prvaZvijezda.poveznica).toBeNull();
 
     const novaZvijezda = renderirajSanducicPoruku(TIP_SANDUCIC_NOVA_ZVJEZDICA, {
       naziv: 'Zagrijan',
       zvjezdice: 2,
+      dostignuceId: 'zagrijan',
     });
     expect(novaZvijezda.naslov).toBe('Nova zvjezdica!');
     expect(novaZvijezda.tekst).toContain('2 zvjezdice');
+    expect(novaZvijezda.poveznica).toBeNull();
 
     const kolekcija = renderirajSanducicPoruku(TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA, {
       naziv: 'Prvi koraci',
@@ -107,7 +152,7 @@ describe('sandučic tekstovi', () => {
     });
     expect(dobra.tekst).toContain('4 pobjede');
     expect(dobra.tekst).toContain('Bravo');
-    expect(dobra.poveznica).toBe('/profil#statistika');
+    expect(dobra.poveznica).toBeNull();
 
     const losa = renderirajSanducicPoruku(TIP_SANDUCIC_FORMA_10, {
       mod: 'Četveroboj',

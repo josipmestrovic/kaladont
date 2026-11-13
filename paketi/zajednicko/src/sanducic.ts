@@ -7,7 +7,11 @@ export const TIP_SANDUCIC_PRVA_IGRA = 'prva_igra' as const;
 export const TIP_SANDUCIC_FEEDBACK = 'feedback' as const;
 export const TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA = 'prijava_rijec_dodana' as const;
 export const TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA = 'prijava_rijec_uklonjena' as const;
+export const TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA = 'prijava_rijec_nije_dodana' as const;
+export const TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA = 'prijava_rijec_nije_uklonjena' as const;
 export const TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA = 'prijava_igraca_uvazena' as const;
+export const TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA = 'prijava_igraca_nije_uvazena' as const;
+export const MAKSIMALNA_DULJINA_NAPOMENE_PRIJAVE = 300;
 export const TIP_SANDUCIC_NOVA_XP_RAZINA = 'nova_xp_razina' as const;
 export const TIP_SANDUCIC_NOVA_ZVJEZDICA = 'nova_zvjezdica' as const;
 export const TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA = 'nova_kolekcionarska_razina' as const;
@@ -25,7 +29,10 @@ export type TipSanducicPoruke =
   | typeof TIP_SANDUCIC_FEEDBACK
   | typeof TIP_SANDUCIC_PRIJAVA_RIJEC_DODANA
   | typeof TIP_SANDUCIC_PRIJAVA_RIJEC_UKLONJENA
+  | typeof TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA
+  | typeof TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA
   | typeof TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA
+  | typeof TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA
   | typeof TIP_SANDUCIC_NOVA_XP_RAZINA
   | typeof TIP_SANDUCIC_NOVA_ZVJEZDICA
   | typeof TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA
@@ -90,6 +97,19 @@ function tekstPolje(podaci: Record<string, unknown>, kljuc: string): string {
   return typeof vrijednost === 'string' ? vrijednost : '';
 }
 
+/** Opcionalna admin napomena: trim, max 300; prazno → undefined. */
+export function normalizirajNapomenuPrijave(ulaz: unknown): string | undefined {
+  if (typeof ulaz !== 'string') return undefined;
+  const trimano = ulaz.trim();
+  if (!trimano) return undefined;
+  return trimano.slice(0, MAKSIMALNA_DULJINA_NAPOMENE_PRIJAVE);
+}
+
+function sNapomenom(bazniTekst: string, podaci: Record<string, unknown>): string {
+  const napomena = normalizirajNapomenuPrijave(podaci.napomena);
+  return napomena ? `${bazniTekst}\n\n${napomena}` : bazniTekst;
+}
+
 type Predlozak = {
   naslov: string | ((podaci: Record<string, unknown>) => string);
   tekst: (podaci: Record<string, unknown>) => string;
@@ -134,7 +154,7 @@ const PREDLOSCI: Record<string, Predlozak> = {
     naslov: 'Riječ je dodana',
     tekst: (podaci) => {
       const rijec = tekstPolje(podaci, 'rijec') || 'prijavljena riječ';
-      return `Riječ „${rijec}” koju si prijavio/la dodana je u rječnik. Hvala na pomoći! :)`;
+      return sNapomenom(`Riječ „${rijec}” koju si prijavio/la dodana je u rječnik. Hvala na pomoći! :)`, podaci);
     },
     poveznica: () => null,
   },
@@ -142,15 +162,49 @@ const PREDLOSCI: Record<string, Predlozak> = {
     naslov: 'Riječ je uklonjena',
     tekst: (podaci) => {
       const rijec = tekstPolje(podaci, 'rijec') || 'prijavljena riječ';
-      return `Riječ „${rijec}” koju si prijavio/la uklonjena je iz rječnika. Hvala na pomoći! :)`;
+      return sNapomenom(`Riječ „${rijec}” koju si prijavio/la uklonjena je iz rječnika. Hvala na pomoći! :)`, podaci);
+    },
+    poveznica: () => null,
+  },
+  [TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_DODANA]: {
+    naslov: 'Riječ nije dodana',
+    tekst: (podaci) => {
+      const rijec = tekstPolje(podaci, 'rijec') || 'prijavljena riječ';
+      return sNapomenom(`Riječ „${rijec}” koju si prijavio/la nije dodana u rječnik. Hvala na pokušaju! :)`, podaci);
+    },
+    poveznica: () => null,
+  },
+  [TIP_SANDUCIC_PRIJAVA_RIJEC_NIJE_UKLONJENA]: {
+    naslov: 'Riječ nije uklonjena',
+    tekst: (podaci) => {
+      const rijec = tekstPolje(podaci, 'rijec') || 'prijavljena riječ';
+      return sNapomenom(
+        `Riječ „${rijec}” koju si prijavio/la nije uklonjena iz rječnika. Hvala što si pokušao pomoć i samo tako nastavi!`,
+        podaci,
+      );
     },
     poveznica: () => null,
   },
   [TIP_SANDUCIC_PRIJAVA_IGRACA_UVAZENA]: {
     naslov: 'Prijava je uvažena',
-    tekst: (podaci) => (podaci.razlog === 'pogrdan_nadimak'
-      ? 'Tvoja prijava za vulgarni nadimak je uvažena. Hvala ti što pomažeš poboljšati Kaladont! :)'
-      : 'Tvoja prijava igrača je uvažena. Hvala ti što pomažeš poboljšati Kaladont! :)'),
+    tekst: (podaci) => {
+      const nadimak = tekstPolje(podaci, 'nadimak') || 'korisnika';
+      const bazni = podaci.razlog === 'pogrdan_nadimak'
+        ? `Tvoja prijava vulgarnog nadimka za korisnika „${nadimak}” je uvažena. Hvala ti što pomažeš poboljšati Kaladont! :)`
+        : `Tvoja prijava igrača „${nadimak}” je uvažena. Hvala ti što pomažeš poboljšati Kaladont! :)`;
+      return sNapomenom(bazni, podaci);
+    },
+    poveznica: () => null,
+  },
+  [TIP_SANDUCIC_PRIJAVA_IGRACA_NIJE_UVAZENA]: {
+    naslov: 'Prijava nije uvažena',
+    tekst: (podaci) => {
+      const nadimak = tekstPolje(podaci, 'nadimak') || 'korisnika';
+      const bazni = podaci.razlog === 'pogrdan_nadimak'
+        ? `Tvoja prijava vulgarnog nadimka za korisnika „${nadimak}” nije uvažena.`
+        : `Tvoja prijava igrača „${nadimak}” nije uvažena.`;
+      return sNapomenom(bazni, podaci);
+    },
     poveznica: () => null,
   },
   [TIP_SANDUCIC_NOVA_XP_RAZINA]: {
@@ -159,7 +213,7 @@ const PREDLOSCI: Record<string, Predlozak> = {
       const razina = typeof podaci.razina === 'number' ? podaci.razina : Number(podaci.razina);
       return `Bravo! Dosegnuo/la si LVL ${Number.isFinite(razina) ? razina : '?'}!`;
     },
-    poveznica: () => '/profil',
+    poveznica: () => null,
   },
   [TIP_SANDUCIC_NOVA_ZVJEZDICA]: {
     naslov: (podaci) => {
@@ -173,7 +227,7 @@ const PREDLOSCI: Record<string, Predlozak> = {
       if (broj <= 1) return `Bravo! Otključano dostignuće ${naziv}: ${broj}.`;
       return `Bravo! Dostignuće ${naziv} sada ima ${broj} ${oblikZvjezdice(broj)}!`;
     },
-    poveznica: () => '/profil',
+    poveznica: () => null,
   },
   [TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA]: {
     naslov: 'Nova kolekcionarska razina!',
@@ -181,7 +235,7 @@ const PREDLOSCI: Record<string, Predlozak> = {
       const naziv = tekstPolje(podaci, 'naziv') || 'nova razina';
       return `Bravo! Otključana kolekcionarska razina ${naziv}!`;
     },
-    poveznica: () => '/profil',
+    poveznica: () => null,
   },
   [TIP_SANDUCIC_PROMJENA_RANGA]: {
     naslov: (podaci) => (podaci.napredak === true ? 'Novi rang!' : 'Promjena ranga'),
@@ -193,12 +247,12 @@ const PREDLOSCI: Record<string, Predlozak> = {
       }
       return `${mod}: tvoj rang sada je ${rang}. Sretno u sljedećoj igri!`;
     },
-    poveznica: () => '/profil',
+    poveznica: () => null,
   },
   [TIP_SANDUCIC_FORMA_10]: {
     naslov: 'Komentar forme',
     tekst: (podaci) => tekstForme10(podaci),
-    poveznica: () => '/profil#statistika',
+    poveznica: () => null,
   },
   [TIP_SANDUCIC_GOST_SAZETAK_5]: {
     naslov: 'Tvoj sažetak',
