@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import DostignuceKartica from '$lib/komponente/DostignuceKartica.svelte';
   import DostignucaIstaknuta from '$lib/komponente/DostignucaIstaknuta.svelte';
-  import KaladontDnkGraf from '$lib/komponente/KaladontDnkGraf.svelte';
   import FormaIgraca from '$lib/komponente/FormaIgraca.svelte';
   import AktivnostPartije from '$lib/komponente/AktivnostPartije.svelte';
   import StilIgrePojasnjenje from '$lib/komponente/StilIgrePojasnjenje.svelte';
   import KolekcijaRijeci from '$lib/komponente/KolekcijaRijeci.svelte';
+  import OpcenitoProfil from '$lib/komponente/OpcenitoProfil.svelte';
   import Podizbornik from '$lib/komponente/Podizbornik.svelte';
-  import { PRAGOVI_DULJINE, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
+  import { PRAGOVI_DULJINE, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil, type ModPartije } from 'zajednicko';
 
   interface StatistikaRijeci {
     najduziStreak: number;
@@ -46,11 +46,18 @@
     /** PR09: broj javnih partija u univerzalnom rangu. */
     rangBrojPartija?: number;
     rangUcinak?: number;
-    dnk: {
-      cetiriIgraca: DnkProfil & { metrike: DnkMetrike };
-      dvaIgraca: DnkProfil & { metrike: DnkMetrike };
-    };
-    forma: { cetiriIgraca: FormaProfil; dvaIgraca: FormaProfil };
+    odigraneJavne?: number;
+    pobjedeJavne?: number;
+    dnk: DnkProfil & { metrike: DnkMetrike };
+    formati?: Record<ModPartije, {
+      odigrane: number;
+      pobjede: number;
+      eliminacije: number;
+      bodovi: number;
+      prosjekBodova: number;
+      forma: FormaProfil;
+    }>;
+    forma: { cetiriIgraca: FormaProfil; triIgraca?: FormaProfil; dvaIgraca: FormaProfil };
     prosjecnaOcjenaIgre: number | null;
     iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
     stilIgre: 'agresivan' | 'uravnotežen' | 'dobrica' | 'neodređen';
@@ -86,14 +93,49 @@
     id: string; naziv: string; opis: string; kategorija: 'napredak' | 'rijeci' | 'vjestina' | 'kaladont' | 'igra';
     pragovi: readonly number[]; vrijediUPrivatnoj: boolean; brojac: BrojacDostignuca; razina: number; vrijednost: number; sljedeciPrag: number | null; novo?: boolean;
   }
+  type PogledProfila = 'opcenito' | 'statistika' | 'dostignuca' | 'rijeci' | 'povijest';
+  type TabFormata = '1v1' | '3p' | '4p';
+
   let profil = $state<JavniProfil | null>(null);
   let greska = $state<string | null>(null);
   let otvoreniPopup = $state<'duge' | 'rijetke' | null>(null);
   let rijeciPoKategoriji = $state<Record<string, string[]>>({});
   let ucitavanjeRijeci = $state(false);
-  let aktivniTab = $state<'4p' | '1v1'>('1v1');
-  let aktivniPogled = $state<'statistika' | 'dostignuca' | 'rijeci' | 'povijest'>('statistika');
+  let aktivniTab = $state<TabFormata>('1v1');
+  let aktivniPogled = $state<PogledProfila>('opcenito');
   let velicinaAvatara = $state(198);
+
+  function formaZaTab(tab: TabFormata): FormaProfil | null {
+    if (!profil) return null;
+    if (profil.formati) {
+      const kljuc: ModPartije = tab === '1v1' ? 'dva_igraca' : tab === '3p' ? 'tri_igraca' : 'cetiri_igraca';
+      return profil.formati[kljuc]?.forma ?? null;
+    }
+    if (tab === '1v1') return profil.forma.dvaIgraca;
+    if (tab === '4p') return profil.forma.cetiriIgraca;
+    return profil.forma.triIgraca ?? null;
+  }
+
+  const headerForma = $derived.by(() => {
+    if (!profil) return null;
+    if (aktivniPogled === 'statistika') return formaZaTab(aktivniTab);
+    const kandidati: FormaProfil[] = [];
+    for (const tab of ['4p', '3p', '1v1'] as const) {
+      const forma = formaZaTab(tab);
+      if (forma) kandidati.push(forma);
+    }
+    if (kandidati.length === 0) return null;
+    return kandidati.reduce((najbolji, trenutni) =>
+      trenutni.trenutniNiz > najbolji.trenutniNiz ? trenutni : najbolji);
+  });
+
+  function pogledIzHasha(hash: string): PogledProfila | null {
+    const cisti = hash.replace(/^#/, '');
+    if (cisti === 'opcenito' || cisti === 'statistika' || cisti === 'dostignuca' || cisti === 'rijeci' || cisti === 'povijest') {
+      return cisti;
+    }
+    return null;
+  }
 
   onMount(() => {
     const prilagodiAvatar = () => {
@@ -107,6 +149,12 @@
     void (async () => {
       try {
         profil = await api<JavniProfil>(`/profil/javni/${$page.params.igracId}`);
+        const izHasha = pogledIzHasha(window.location.hash);
+        if (izHasha) {
+          aktivniPogled = izHasha;
+          await tick();
+          document.getElementById(izHasha)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       } catch (e) {
         greska = e instanceof Error ? e.message : 'Profil nije moguće učitati.';
       }
@@ -149,14 +197,14 @@
           avatarConfig={profil.avatarConfig}
           rang={profil.rang === 'Piskaralo' ? null : profil.rang}
           velicina={velicinaAvatara}
-          razinaVatre={aktivniTab === '4p' ? profil.forma.cetiriIgraca.razinaVatre : profil.forma.dvaIgraca.razinaVatre}
-          nizPobjeda={aktivniTab === '4p' ? profil.forma.cetiriIgraca.trenutniNiz : profil.forma.dvaIgraca.trenutniNiz}
+          razinaVatre={headerForma?.razinaVatre ?? 0}
+          nizPobjeda={headerForma?.trenutniNiz ?? 0}
         />
         <div class="info-profila">
           <div class="profil-gornji-red">
             <div class="profil-identitet">
               <h1>{profil.nadimak}</h1>
-              <p class="rang-oznaka">{profil.rang ?? 'Piskaralo'} · {(profil.rangBrojPartija ?? profil.odigrane + profil.odigrane1v1)} odigranih igara</p>
+              <p class="rang-oznaka">{profil.rang ?? 'Piskaralo'}</p>
               <div class="iskustvo-profila">
                 <strong>LVL {profil.iskustvo.razina}</strong>
                 {#if profil.iskustvo.doIduce === null}
@@ -179,6 +227,7 @@
     </div>
 
     <nav class="pogled-tabovi" aria-label="Sadržaj profila">
+      <button type="button" class:aktivan={aktivniPogled === 'opcenito'} onclick={() => (aktivniPogled = 'opcenito')}>Općenito</button>
       <button type="button" class:aktivan={aktivniPogled === 'statistika'} onclick={() => (aktivniPogled = 'statistika')}>Statistika</button>
       <button type="button" class:aktivan={aktivniPogled === 'dostignuca'} onclick={() => (aktivniPogled = 'dostignuca')}>Dostignuća</button>
       <button type="button" class:aktivan={aktivniPogled === 'rijeci'} onclick={() => (aktivniPogled = 'rijeci')}>Kolekcija riječi</button>
@@ -187,47 +236,49 @@
       {/if}
     </nav>
 
-    {#if aktivniPogled === 'statistika'}
+    {#if aktivniPogled === 'opcenito'}
+      <OpcenitoProfil
+        dnk={profil.dnk}
+        odigraneJavne={profil.odigraneJavne ?? (profil.odigrane + profil.odigrane1v1)}
+        pobjedeJavne={profil.pobjedeJavne ?? (profil.pobjede + profil.pobjede1v1)}
+        odigrane2p={profil.formati?.dva_igraca.odigrane ?? profil.odigrane1v1}
+        odigrane3p={profil.formati?.tri_igraca.odigrane ?? 0}
+        odigrane4p={profil.formati?.cetiri_igraca.odigrane ?? profil.odigrane}
+        prosjecnaOcjenaIgre={profil.prosjecnaOcjenaIgre}
+        naslovDnk="Kaladont DNK"
+      />
+    {:else if aktivniPogled === 'statistika'}
     <Podizbornik
-      stavke={[{ kljuc: '1v1', naziv: 'Dvoboj' }, { kljuc: '4p', naziv: 'Četveroboj' }]}
+      stavke={[
+        { kljuc: '1v1', naziv: 'Dvoboj' },
+        { kljuc: '3p', naziv: 'Troboj' },
+        { kljuc: '4p', naziv: 'Četveroboj' },
+      ]}
       aktivna={aktivniTab}
-      ariaLabel="Način igre"
-      promijeni={(kljuc) => (aktivniTab = kljuc as '4p' | '1v1')}
+      ariaLabel="Format igre"
+      promijeni={(kljuc) => (aktivniTab = kljuc as TabFormata)}
     />
-    <section class="statistika-sekcija">
-      <h2>Rezultati — {aktivniTab === '4p' ? 'Četveroboj' : 'Dvoboj'}</h2>
+    {@const formatKljuc: ModPartije = aktivniTab === '1v1' ? 'dva_igraca' : aktivniTab === '3p' ? 'tri_igraca' : 'cetiri_igraca'}
+    {@const formatStat = profil.formati?.[formatKljuc]}
+    {@const odigraneFmt = formatStat?.odigrane ?? (aktivniTab === '1v1' ? profil.odigrane1v1 : aktivniTab === '4p' ? profil.odigrane : 0)}
+    {@const pobjedeFmt = formatStat?.pobjede ?? (aktivniTab === '1v1' ? profil.pobjede1v1 : aktivniTab === '4p' ? profil.pobjede : 0)}
+    {@const formaFmt = formaZaTab(aktivniTab)}
+    <section id="statistika" class="statistika-sekcija">
+      <h2>Rezultati — {aktivniTab === '4p' ? 'Četveroboj' : aktivniTab === '3p' ? 'Troboj' : 'Dvoboj'}</h2>
       <div class="mrezica-kartica">
-        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.odigrane : profil.odigrane1v1}</strong><span>Odigrane igre</span></div>
-        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.pobjede : profil.pobjede1v1}</strong><span>Pobjede</span></div>
-        <div class="stat-kartica"><strong>{aktivniTab === '4p' ? profil.odigrane - profil.pobjede : profil.odigrane1v1 - profil.pobjede1v1}</strong><span>Porazi</span></div>
+        <div class="stat-kartica"><strong>{odigraneFmt}</strong><span>Odigrane igre</span></div>
+        <div class="stat-kartica"><strong>{pobjedeFmt}</strong><span>Pobjede</span></div>
+        <div class="stat-kartica"><strong>{Math.max(0, odigraneFmt - pobjedeFmt)}</strong><span>Porazi</span></div>
+        {#if formatStat}
+          <div class="stat-kartica"><strong>{formatStat.prosjekBodova.toFixed(2)}</strong><span>Prosjek bodova</span></div>
+        {/if}
       </div>
-      <KaladontDnkGraf
-        profil={aktivniTab === '4p' ? profil.dnk.cetiriIgraca : profil.dnk.dvaIgraca}
-        naslov={aktivniTab === '4p' ? 'Kaladont DNK — Četveroboj' : 'Kaladont DNK — Dvoboj'}
-      />
-      <FormaIgraca
-        forma={aktivniTab === '4p' ? profil.forma.cetiriIgraca : profil.forma.dvaIgraca}
-        mod={aktivniTab === '4p' ? 'cetiri_igraca' : 'dva_igraca'}
-      />
-      <section class="ostalo-kartica">
-        <h3>Ostalo</h3>
-        <div class="mrezica-kartica">
-        {#if profil.prosjecnaOcjenaIgre !== null}
-          {@const ocjena = Math.round(profil.prosjecnaOcjenaIgre)}
-          <div class="stat-kartica"><strong class="stat-broj"><span class="ocjena-zvjezdice" aria-label={`Prosječna ocjena ${ocjena} od 5`}>{#each Array.from({ length: 5 }, (_, i) => i < ocjena) as jeIspunjena}<img src={jeIspunjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />{/each}</span></strong><span>Prosječna ocjena igre</span></div>
-        {/if}
-        {#if aktivniTab === '4p'}
-          <div class="stat-kartica"><strong>{profil.dnk.cetiriIgraca.metrike.eliminacijePoPartiji.toFixed(2)}</strong><span>Eliminacije po igri</span></div>
-        {/if}
-        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).nizPrihvacenihRijeci}</strong><span>Niz prihvaćenih riječi</span></div>
-        <div class="stat-kartica"><strong>{((aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).prosjekPrihvacenogPotezaMs / 1000).toFixed(1)} s</strong><span>Prosjek prihvaćenog poteza</span></div>
-        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).dugeRijeciPoPartiji.toFixed(2)}</strong><span>Duge riječi po igri</span></div>
-        <div class="stat-kartica"><strong>{(aktivniTab === '4p' ? profil.dnk.cetiriIgraca.metrike : profil.dnk.dvaIgraca.metrike).rijetkeRijeciPoPartiji.toFixed(2)}</strong><span>Rijetke riječi po igri</span></div>
-        </div>
-      </section>
+      {#if formaFmt}
+        <FormaIgraca forma={formaFmt} mod={formatKljuc} />
+      {/if}
     </section>
     {:else if aktivniPogled === 'dostignuca'}
-    <section class="statistika-sekcija">
+    <section id="dostignuca" class="statistika-sekcija">
       <div class="dostignuca-sažetak"><strong>{profil.dostignuca.ukupnoZvjezdica} / {profil.dostignuca.maksimalnoZvjezdica} zvjezdica</strong><span>{profil.dostignuca.ukupnoOtkljucanih} otključanih dostignuća</span></div>
       <div class="dostignuca-mrezica">{#each profil.dostignuca.dostignuca as dostignuce (dostignuce.id)}<DostignuceKartica {dostignuce} />{/each}</div>
     </section>

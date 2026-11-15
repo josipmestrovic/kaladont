@@ -37,7 +37,7 @@
       </div>
     </div>
     <span class:otkljucan={profil.otkljucan} class="dnk-status">
-      {profil.otkljucan ? `${profil.odigrano} igara` : `Otključava se nakon 10 igara`}
+      {profil.otkljucan ? `${profil.odigrano} igara` : `${profil.odigrano} / 10`}
     </span>
   </div>
 

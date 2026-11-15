@@ -446,9 +446,9 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
 
     const igracKraja = igraci.find((igrac) => igrac.igracId === igracKrajaId)!;
     const profil = await fetch(`${adresa}/api/profil`, { headers: { authorization: `Bearer ${igracKraja.authToken}` } });
-    const podaciProfila = (await profil.json()) as { dnk: { cetiriIgraca: { osi: unknown[] } } };
+    const podaciProfila = (await profil.json()) as { dnk: { osi: unknown[] } };
     expect(profil.status).toBe(200);
-    expect(krajPoruka!.mojDnk?.poslije).toEqual(podaciProfila.dnk.cetiriIgraca.osi);
+    expect(krajPoruka!.mojDnk?.poslije).toEqual(podaciProfila.dnk.osi);
 
     for (const igrac of igraci) igrac.socket.disconnect();
   });
