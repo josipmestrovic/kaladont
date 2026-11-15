@@ -306,7 +306,10 @@ async function glavno(): Promise<void> {
 
 }
 
-const pokrenutIzravno = process.argv[1]?.replace(/\\/g, '/').endsWith('/cli/backfill-univerzalni-rang.ts');
+const putanjaUlaza = process.argv[1]?.replace(/\\/g, '/') ?? '';
+const pokrenutIzravno =
+  putanjaUlaza.endsWith('/cli/backfill-univerzalni-rang.ts')
+  || putanjaUlaza.endsWith('/cli/backfill-univerzalni-rang.js');
 if (pokrenutIzravno) {
   glavno().catch((pogreska: unknown) => {
     console.error(pogreska instanceof Error ? pogreska.message : String(pogreska));
