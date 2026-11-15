@@ -39,6 +39,13 @@ export interface DogadajPoteza {
   kontekst: KontekstPartije;
   zavrsena: boolean;
   izborUToku: boolean;
+  /**
+   * PR05: eksplicitna faza. Bot (PR07) planira jednu odluku po tokenu;
+   * novi token u dokaz_nastavka dopušta isti bot da odigra dokaz nakon vlastite riječi.
+   */
+  faza?: import('zajednicko').FazaPoteza;
+  /** PR05: pravilnik stola — bot bira politiku „ka” / dokaza po pravilniku. */
+  pravila?: import('zajednicko').PravilnikPartije;
   naPotezuId: string | null;
   turnToken: string;
   trazenaSlova: string | null;
@@ -49,4 +56,10 @@ export interface DogadajPoteza {
   iskoristeneGrupe: ReadonlySet<string>;
   dopusteneVrste?: ReadonlySet<import('zajednicko').VrstaRijeci>;
   sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot'; aktivan: boolean }[];
+  /** PR05: tko dokazuje / tko čeka — bot ne emitira ispadanje čekača prije potvrde. */
+  dokaz?: {
+    autorId: string;
+    cekateljId: string;
+    cekateljVecIspao: boolean;
+  } | null;
 }

@@ -60,6 +60,9 @@ import {
   type IzvorPocetneRijeci,
   type ModPartije,
   type PravilnikPartije,
+  type FazaPoteza,
+  type RazlogOtvaranjaDokaza,
+  type DokazZatrazen,
   javnaSjedalaZaMod,
   ZADANI_PRAVILNIK,
 } from 'zajednicko';
@@ -76,9 +79,12 @@ import { mozdaObavijestiPrvuIgru, obradiDovrsenuIgruSanducic } from '../sanducic
 import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
 import { stvoriStvarniSat, type Sat, type SatHandle } from './sat.js';
 import {
+  ishodDokaza,
   odlukaNakonEliminacije,
   odrediMetuPosebneRijeci,
   sljedeciAktivniIza,
+  trebaOtvoritiDokaz,
+  zrtvaMrtvihSlova,
 } from './odluke-pravila.js';
 import {
   zabiljeziOtvaranjeAnalitike,
@@ -213,8 +219,8 @@ interface StanjeStola {
   eliminirani: string[]; // redoslijed ispadanja - prvi ispali je na indeksu 0
   /**
    * Token aktualnog poteza.
-   * // PR05: uz token će ići eksplicitna faza (obican_potez | dokaz_nastavka | sustav_bira).
-   * Za sada je „faza” izvedena iz `izborUToku` + aktivnog reda.
+   * // PR05: uz token ide eksplicitna faza (obican_potez | dokaz_nastavka | sustav_bira).
+   * // PR05: pri rotaciji u dokaz_nastavka dodijeli svjež token (bot PR07 smije ponovno odigrati).
    */
   turnToken: string;
   naPotezuId: string;
@@ -223,6 +229,22 @@ interface StanjeStola {
   zadnjaRijec: string | null; // zadnja izgovorena/dodijeljena riječ - za obrazloženje eliminacije mrtvim slovima
   zadnjaRijecIgracId: string | null;
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
+  /**
+   * PR05: aktivni izazov dokaza; null izvan dokaz_nastavka.
+   * // PR05: Ne znam != napusti — cekateljVecIspao false dok Bruno samo čeka.
+   * // PR05: ne zvati spremiRaniPorazUBazi za Brunu dok je cekateljVecIspao=false.
+   * // PR05→PR14: UI čita faza+dokaz iz partija:stanje / dokaz:zatrazen; lokalno ne sudi.
+   */
+  dokaz: {
+    izazovId: string;
+    izvornaRijec: string;
+    trazenaSlova: string;
+    autorId: string;
+    cekateljId: string;
+    razlogOtvaranja: RazlogOtvaranjaDokaza;
+    cekateljVecIspao: boolean;
+    pocetakMs: number;
+  } | null;
   /** Izvor zadnje sustavske početne riječi; `nema_kandidata` kad odabir nije uspio. */
   zadnjiIzvorPocetne: IzvorPocetneRijeci | 'nema_kandidata' | null;
   /** Brojač sustavskih otvaranja u ovoj igri (za analitiku). */
@@ -328,6 +350,38 @@ export function stvoriUpraviteljPartija(
     return true;
   }
 
+  /** PR05: kanonska faza iz živog stanja (za snimku, reconnect, botove). */
+  function fazaStola(stanje: StanjeStola): FazaPoteza {
+    if (stanje.zavrsena) return 'zavrsena';
+    if (stanje.izborUToku) return 'sustav_bira';
+    if (stanje.dokaz) return 'dokaz_nastavka';
+    return 'obican_potez';
+  }
+
+  function snimkaDokazaZaKlijenta(stanje: StanjeStola): StanjePartije['dokaz'] {
+    if (!stanje.dokaz) return null;
+    const d = stanje.dokaz;
+    const trajanjeMs =
+      stanje.trajanjePotezaSek !== undefined
+        ? stanje.trajanjePotezaSek * 1000
+        : trajanjePotezaMs;
+    const istek =
+      timerOnemogucen || trajanjeMs <= 0
+        ? ''
+        : new Date(d.pocetakMs + trajanjeMs).toISOString();
+    return {
+      izazovId: d.izazovId,
+      izvornaRijec: d.izvornaRijec,
+      trazenaSlova: d.trazenaSlova,
+      autorId: d.autorId,
+      cekateljId: d.cekateljId,
+      razlogOtvaranja: d.razlogOtvaranja,
+      cekateljVecIspao: d.cekateljVecIspao,
+      pocetakIso: new Date(d.pocetakMs).toISOString(),
+      istekPotezaIso: istek,
+    };
+  }
+
   function snimkaPoteza(stanje: StanjeStola): import('./politika-ucinka.js').DogadajPoteza {
     const trajanjeMs = stanje.trajanjePotezaSek !== undefined ? stanje.trajanjePotezaSek * 1000 : trajanjePotezaMs;
     const imaTimer = !timerOnemogucen && trajanjeMs > 0 && !stanje.izborUToku && !stanje.zavrsena;
@@ -336,6 +390,9 @@ export function stvoriUpraviteljPartija(
         kontekst: stanje.kontekst,
         zavrsena: stanje.zavrsena,
         izborUToku: stanje.izborUToku,
+        // PR05→PR07: bot čita fazu/pravila; ne emitiraj ispadanje Brunе prije potvrde.
+        faza: fazaStola(stanje),
+        pravila: stanje.pravila,
         naPotezuId: stanje.zavrsena ? null : stanje.naPotezuId,
         turnToken: stanje.turnToken,
         trazenaSlova: stanje.trazenaSlova,
@@ -346,6 +403,13 @@ export function stvoriUpraviteljPartija(
         iskoristeneGrupe: stanje.iskoristeneGrupe,
         dopusteneVrste: stanje.dopusteneVrste,
         sudionici: stanje.sudionici.map((s) => ({ igracId: s.igracId, upravljac: s.upravljac, aktivan: stanje.aktivni.has(s.igracId) })),
+        dokaz: stanje.dokaz
+          ? {
+              autorId: stanje.dokaz.autorId,
+              cekateljId: stanje.dokaz.cekateljId,
+              cekateljVecIspao: stanje.dokaz.cekateljVecIspao,
+            }
+          : null,
       };
   }
 
@@ -690,7 +754,7 @@ export function stvoriUpraviteljPartija(
 
   /**
    * Jedina točka rotacije tokena poteza.
-   * // PR05: pri rotaciji snimiti i fazu (npr. dokaz_nastavka dobiva svjež token).
+   * // PR05: dokaz_nastavka dobiva svjež token (zakašnjeli obični potez / dvostruko Ne znam ne mijenjaju fazu).
    */
   function noviTurnToken(stanje: StanjeStola): string {
     namjerniIsteciBotova.delete(stanje.partijaId);
@@ -700,7 +764,7 @@ export function stvoriUpraviteljPartija(
 
   /**
    * Rani upis potvrđenog poraza — samo iz potvrđene eliminacije.
-   * // PR05: ne zvati dok traje dokaz_nastavka / odgođena eliminacija.
+   * // PR05: ne zvati za Brunu koji je samo kliknuo „Ne znam” (još nije potvrđen).
    */
   function upisiPotvrdjeniRaniPoraz(
     stanje: StanjeStola,
@@ -741,6 +805,25 @@ export function stvoriUpraviteljPartija(
     const token = stanje.turnToken;
     stanje.timerHandle = sat.zakazi(() => {
       if (stanje.zavrsena || stanje.izborUToku || stanje.turnToken !== token) return;
+      // PR05: istek u dokazu = neuspjeh dokaza (Ana), ne „istek Brunе” i ne novi dokaz.
+      if (stanje.dokaz) {
+        zakljuciDokazNeuspjehom(stanje, 'istek');
+        return;
+      }
+      // PR05: na običnom potezu u dokazi_nastavak istek može otvoriti dokaz (kao Ne znam).
+      if (
+        trebaOtvoritiDokaz({
+          pravilnik: stanje.pravila,
+          fazaJeObicanPotez: fazaStola(stanje) === 'obican_potez',
+          autorId: stanje.napadacId,
+          autorJosAktivan: !!stanje.napadacId && stanje.aktivni.has(stanje.napadacId),
+          igracNaPotezuId: stanje.naPotezuId,
+          dogadajIgracId: stanje.naPotezuId,
+        })
+      ) {
+        otvoriDokazNastavka(stanje, stanje.naPotezuId, 'istek', false);
+        return;
+      }
       eliminirajIgraca(stanje, stanje.naPotezuId, 'istek');
     }, trajanjeMs);
   }
@@ -802,6 +885,9 @@ export function stvoriUpraviteljPartija(
       dopusteneVrste: stanje.dopusteneVrste ? [...stanje.dopusteneVrste] : undefined,
       statusSpremanja: stanje.statusSpremanja,
       ...(stanje.treningNeaktivnost && stanje.kontekst === 'trening' ? { treningNeaktivnost: { ...stanje.treningNeaktivnost } } : {}),
+      // PR05→PR14: reconnect vraća baš ovu snimku (faza+dokaz), bez ponovnog izvlačenja roka.
+      faza: fazaStola(stanje),
+      dokaz: snimkaDokazaZaKlijenta(stanje),
     };
     socket.emit('partija:stanje', poruka);
   }
@@ -1053,6 +1139,8 @@ export function stvoriUpraviteljPartija(
       obradaPrekidaZakazana: false,
       rezultatiKraja: new Map(),
       zavrsena: false,
+      // PR05: nema dokaza do Brunina Ne znam/isteka/napusti.
+      dokaz: null,
     };
 
     partije.set(partijaId, stanje);
@@ -1819,12 +1907,20 @@ export function stvoriUpraviteljPartija(
   /**
    * Jedini put potvrđene eliminacije: plasman, jedan uzročnik, jedan emit, rani upis.
    * Kaladont i obični razlozi prolaze ovuda (PR02).
+   * // PR05: opcije.uzrocnikId forsira kredit (uspješan dokaz) ili null (vlastita mrtva / propali dokaz).
+   * // PR05: odgodiNastavakRadiDokaza — Bruno napustio na potezu, Ana još dokazuje.
    */
   function primijeniPotvrdjenuEliminaciju(
     stanje: StanjeStola,
     igracId: string,
     razlog: RazlogEliminacije,
     kontekstPrekida?: Pick<PrekidUTijeku, 'bioNaPotezu' | 'napadacId'>,
+    opcije?: {
+      uzrocnikId?: string | null;
+      odgodiNastavakRadiDokaza?: boolean;
+      /** Ne otvaraj novu rundu nakon elim (npr. slijedi još jedna elim u istom zatvaranju dokaza). */
+      preskociNastavak?: boolean;
+    },
   ): void {
     if (stanje.zavrsena || !stanje.aktivni.has(igracId)) return;
 
@@ -1869,11 +1965,21 @@ export function stvoriUpraviteljPartija(
     // napadac nikad nije sam eliminirani igrac (npr. otvarač runde koji istekne prije ijedne riječi)
     const bioNaPotezuKodPrekida = kontekstPrekida?.bioNaPotezu ?? igracId === stanje.naPotezuId;
     const jeSamoeliminacijaIzvanPoteza = razlog === 'prekid' && !bioNaPotezuKodPrekida; // RS-10
-    const napadac = jeSamoeliminacijaIzvanPoteza
-      ? null
-      : razlog === 'prekid' && kontekstPrekida
-        ? kontekstPrekida.napadacId
-        : stanje.napadacId;
+    let napadac: string | null;
+    if (opcije && 'uzrocnikId' in opcije) {
+      // PR05: eksplicitno — cement/propali dokaz = null; uspješan dokaz = Ana.
+      napadac = opcije.uzrocnikId ?? null;
+    } else if (jeSamoeliminacijaIzvanPoteza) {
+      napadac = null;
+    } else if (razlog === 'prekid' && kontekstPrekida) {
+      napadac = kontekstPrekida.napadacId;
+    } else {
+      napadac = stanje.napadacId;
+    }
+    // Nikad kredit samom sebi (vlastita mrtva u dokazi_nastavak).
+    if (napadac === igracId) napadac = null;
+
+    // PR05→PR12/13: propali dokaz i vlastita mrtva ne daju Lovac/Slijepa ni XP eliminacije.
     const stavkaEliminacije = stanje.politika.dajeNapredak && napadac
       ? { vrsta: 'eliminacije' as const, naziv: 'Eliminacija', kolicina: 1, poStavci: ISKUSTVO_ELIMINACIJA, iskustvo: ISKUSTVO_ELIMINACIJA }
       : null;
@@ -1916,6 +2022,8 @@ export function stvoriUpraviteljPartija(
       aktivneVeze.dohvatiSocket(igracId)?.emit('iskustvo:obracun', { partijaId: stanje.partijaId, mojeIskustvo: obracun });
     }
 
+    if (opcije?.preskociNastavak) return;
+
     // Sigurno mjesto za završetak: nakon svih obveznih prijelaza ovog događaja.
     const odluka = odlukaNakonEliminacije({
       brojAktivnih: stanje.aktivni.size,
@@ -1925,6 +2033,7 @@ export function stvoriUpraviteljPartija(
       naPotezuId: stanje.naPotezuId,
       bioNaPotezu: bioNaPotezuKodPrekida,
       jeSamoeliminacijaIzvanPoteza,
+      odgodiNastavakRadiDokaza: opcije?.odgodiNastavakRadiDokaza,
     });
 
     if (odluka.vrsta === 'zakljuci') {
@@ -1959,8 +2068,247 @@ export function stvoriUpraviteljPartija(
     igracId: string,
     razlog: RazlogEliminacije,
     kontekstPrekida?: Pick<PrekidUTijeku, 'bioNaPotezu' | 'napadacId'>,
+    opcije?: {
+      uzrocnikId?: string | null;
+      odgodiNastavakRadiDokaza?: boolean;
+      preskociNastavak?: boolean;
+    },
   ): void {
-    primijeniPotvrdjenuEliminaciju(stanje, igracId, razlog, kontekstPrekida);
+    primijeniPotvrdjenuEliminaciju(stanje, igracId, razlog, kontekstPrekida, opcije);
+  }
+
+  /**
+   * PR05: otvori dokaz Ani. Bruno ostaje aktivan osim ako je već potvrđen napuštanjem.
+   * // PR05: ne raditi ovo na svaku prihvaćenu riječ — samo Ne znam / istek / napusti na potezu.
+   * // PR05→PR07: novi turnToken; bot dokazivač smije odigrati nakon vlastite riječi.
+   */
+  function otvoriDokazNastavka(
+    stanje: StanjeStola,
+    cekateljId: string,
+    razlogOtvaranja: RazlogOtvaranjaDokaza,
+    cekateljVecIspao: boolean,
+  ): void {
+    const autorId = stanje.napadacId;
+    if (!autorId || !stanje.zadnjaRijec || !stanje.trazenaSlova) return;
+    if (!stanje.aktivni.has(autorId)) return;
+    // Jedan izazov odjednom; dvostruko Ne znam / stari token ne mijenjaju fazu.
+    if (stanje.dokaz) return;
+
+    if (stanje.timerHandle) {
+      sat.otkazi(stanje.timerHandle);
+      stanje.timerHandle = null;
+    }
+
+    const izazovId = randomUUID();
+    const pocetakMs = sat.sada();
+    stanje.dokaz = {
+      izazovId,
+      izvornaRijec: stanje.zadnjaRijec,
+      trazenaSlova: stanje.trazenaSlova,
+      autorId,
+      cekateljId,
+      razlogOtvaranja,
+      cekateljVecIspao,
+      pocetakMs,
+    };
+    stanje.naPotezuId = autorId;
+    noviTurnToken(stanje);
+    postaviTimer(stanje);
+
+    const snimka = snimkaDokazaZaKlijenta(stanje)!;
+    const poruka: DokazZatrazen = {
+      partijaId: stanje.partijaId,
+      izazovId,
+      autorId,
+      cekateljId,
+      izvornaRijec: stanje.zadnjaRijec,
+      trazenaSlova: stanje.trazenaSlova,
+      razlogOtvaranja,
+      cekateljVecIspao,
+      turnToken: stanje.turnToken,
+      istekPotezaIso: snimka.istekPotezaIso,
+      serverVrijemeIso: new Date(sat.sada()).toISOString(),
+      naPotezuId: autorId,
+    };
+    // Odvojeno od partija:eliminacija — Bruno na Ne znam još nije ispao.
+    io.to(SOBA_PARTIJE(stanje.partijaId)).emit('dokaz:zatrazen', poruka);
+    posaljiStanjeSvima(stanje);
+    objaviPromjenuPoteza(stanje);
+  }
+
+  /**
+   * PR05: uspješan dokaz — Bruno ispada (ako već nije), Anin kredit, uvijek nova sistemska.
+   * Kaladont/kalodont kao dokaz: jedna eliminacija Brunе, BEZ ponovne KA-ZNA obrade.
+   */
+  function zakljuciDokazUspjehom(stanje: StanjeStola): void {
+    const dokaz = stanje.dokaz;
+    if (!dokaz) return;
+    const ishod = ishodDokaza({
+      uspjeh: true,
+      autorId: dokaz.autorId,
+      cekateljId: dokaz.cekateljId,
+      cekateljVecIspao: dokaz.cekateljVecIspao,
+    });
+    // Sidro uvijek = čekač (Bruno): prvi aktivni iza njega dobiva sistemsku — ne nastavak s dokazane riječi.
+    const sidro = ishod.sidroNoveRundeId;
+    stanje.dokaz = null;
+    if (stanje.timerHandle) {
+      sat.otkazi(stanje.timerHandle);
+      stanje.timerHandle = null;
+    }
+
+    if (ishod.zrtvaId && stanje.aktivni.has(ishod.zrtvaId)) {
+      eliminirajIgraca(stanje, ishod.zrtvaId, 'ne_znam', undefined, {
+        uzrocnikId: ishod.uzrocnikId,
+        // Ne koristi default sidro=uzročnik; runda ide iza Brunе.
+        preskociNastavak: true,
+      });
+      if (stanje.zavrsena) return;
+      if (stanje.aktivni.size <= 1) {
+        zakljuciPartiju(stanje);
+        return;
+      }
+      zapocniIzborRijeciSustava(stanje, sidro);
+      return;
+    }
+
+    // Bruno već ispao napuštanjem — kredit Ani tek SADA (ne pri samom prekidu).
+    if (ishod.uzrocnikId && stanje.politika.dajeNapredak) {
+      stanje.eliminacijeBrojac.set(
+        ishod.uzrocnikId,
+        (stanje.eliminacijeBrojac.get(ishod.uzrocnikId) ?? 0) + 1,
+      );
+      dodajNapredakDostignuca(stanje, ishod.uzrocnikId, { izazvaneEliminacije: 1 });
+      const stavka = {
+        vrsta: 'eliminacije' as const,
+        naziv: 'Eliminacija',
+        kolicina: 1,
+        poStavci: ISKUSTVO_ELIMINACIJA,
+        iskustvo: ISKUSTVO_ELIMINACIJA,
+      };
+      dodajStavkuIskustva(stanje, ishod.uzrocnikId, stavka);
+    }
+    if (stanje.aktivni.size <= 1) {
+      zakljuciPartiju(stanje);
+      return;
+    }
+    zapocniIzborRijeciSustava(stanje, sidro);
+  }
+
+  /**
+   * PR05: neuspjeh dokaza — samo Ana ispada, Bruno ostaje (ako je još aktivan), bez kredita.
+   */
+  /**
+   * PR05: konačni odlazak (izadji ili istek 10 s tolerancije).
+   * - Bruno na potezu + aktivan autor → potvrdi Brunin prekid BEZ kredita, zatim otvori dokaz Ani.
+   * - Ana u dokazu → neuspjeh dokaza.
+   * - Bruno već čeka u dokazu → samo njegov odlazak; izazov ostaje (cekateljVecIspao=true).
+   * - Ostalo → redovna eliminacija prekidom.
+   * // PR05: Ne znam != napusti — Ne znam nikad ne upisuje odlazak.
+   */
+  function obradiPotvrdeniOdlazak(
+    stanje: StanjeStola,
+    igracId: string,
+    kontekstPrekida: Pick<PrekidUTijeku, 'bioNaPotezu' | 'napadacId'>,
+  ): void {
+    // Autor dokazuje pa napušta → neuspjeh (Bruno ostaje ako je aktivan).
+    if (stanje.dokaz && igracId === stanje.dokaz.autorId) {
+      zakljuciDokazNeuspjehom(stanje, 'prekid');
+      return;
+    }
+
+    // Čekač napušta tijekom već otvorenog dokaza — samo stvarni odlazak; izazov ima jednu konačnu odluku.
+    if (stanje.dokaz && igracId === stanje.dokaz.cekateljId) {
+      stanje.dokaz.cekateljVecIspao = true;
+      eliminirajIgraca(stanje, igracId, 'prekid', kontekstPrekida, {
+        uzrocnikId: null,
+        odgodiNastavakRadiDokaza: true,
+      });
+      // Ana i dalje dokazuje; stol ostaje u dokazu.
+      if (!stanje.zavrsena && stanje.dokaz && stanje.aktivni.has(stanje.dokaz.autorId)) {
+        posaljiStanjeSvima(stanje);
+        objaviPromjenuPoteza(stanje);
+      } else if (!stanje.zavrsena && stanje.dokaz) {
+        // Nema autora — zatvori izazov prema preostalim aktivnima.
+        zakljuciDokazNeuspjehom(stanje, 'prekid');
+      }
+      return;
+    }
+
+    // Bruno na običnom potezu, ima autora → prekid + dokaz (kredit tek ako Ana uspije).
+    const naObicnom =
+      !stanje.dokaz
+      && !stanje.izborUToku
+      && kontekstPrekida.bioNaPotezu
+      && trebaOtvoritiDokaz({
+        pravilnik: stanje.pravila,
+        fazaJeObicanPotez: true,
+        autorId: kontekstPrekida.napadacId,
+        autorJosAktivan: !!kontekstPrekida.napadacId && stanje.aktivni.has(kontekstPrekida.napadacId),
+        igracNaPotezuId: stanje.naPotezuId,
+        dogadajIgracId: igracId,
+      });
+
+    if (naObicnom) {
+      eliminirajIgraca(stanje, igracId, 'prekid', kontekstPrekida, {
+        uzrocnikId: null,
+        odgodiNastavakRadiDokaza: true,
+      });
+      if (stanje.zavrsena) return;
+      const autorId = kontekstPrekida.napadacId;
+      if (autorId && stanje.aktivni.has(autorId)) {
+        // napadacId mora ostati autor za snimku dokaza.
+        stanje.napadacId = autorId;
+        otvoriDokazNastavka(stanje, igracId, 'prekid_na_potezu', true);
+      }
+      return;
+    }
+
+    // Treći izvan poteza / klasik / ka_zna / bez autora — redovni prekid.
+    eliminirajIgraca(stanje, igracId, 'prekid', kontekstPrekida);
+  }
+
+  function zakljuciDokazNeuspjehom(
+    stanje: StanjeStola,
+    razlog: 'ne_znam' | 'istek' | 'prekid',
+  ): void {
+    const dokaz = stanje.dokaz;
+    if (!dokaz) return;
+    const ishod = ishodDokaza({
+      uspjeh: false,
+      autorId: dokaz.autorId,
+      cekateljId: dokaz.cekateljId,
+      cekateljVecIspao: dokaz.cekateljVecIspao,
+    });
+    const sidro = ishod.sidroNoveRundeId;
+    stanje.dokaz = null;
+    if (stanje.timerHandle) {
+      sat.otkazi(stanje.timerHandle);
+      stanje.timerHandle = null;
+    }
+
+    // neuspjeh: zrtva je uvijek autor (Ana).
+    const zrtvaId = ishod.vrsta === 'neuspjeh' ? ishod.zrtvaId : dokaz.autorId;
+    if (stanje.aktivni.has(zrtvaId)) {
+      eliminirajIgraca(stanje, zrtvaId, razlog, undefined, {
+        uzrocnikId: null,
+        preskociNastavak: true,
+      });
+      if (stanje.zavrsena) return;
+      if (stanje.aktivni.size <= 1) {
+        zakljuciPartiju(stanje);
+        return;
+      }
+      zapocniIzborRijeciSustava(stanje, sidro);
+      return;
+    }
+
+    // Autor već vani — zatvori izazov; ako nema aktivnih, kraj bez pobjednika.
+    if (stanje.aktivni.size <= 1) {
+      zakljuciPartiju(stanje);
+      return;
+    }
+    zapocniIzborRijeciSustava(stanje, sidro);
   }
 
   function obradiPrihvacenPotez(
@@ -2159,6 +2507,28 @@ export function stvoriUpraviteljPartija(
       trajanjeMs,
     });
 
+    // PR05: uspješan dokaz — jedan prihvat (+ XP riječi gore), zatim Bruno van / kredit, BEZ
+    // KA-ZNA obrade kaladonta i BEZ mrtva-slova lanca na dokazanu riječ. Uvijek nova sistemska.
+    // PR05→PR12/13: uspješan dokaz = jedan prihvat + jedna izazvana eliminacija.
+    if (stanje.dokaz) {
+      const cekateljId = stanje.dokaz.cekateljId;
+      emitirajPrihvacenPotezSvima(stanje, {
+        igracId,
+        rijec: rijecNormalizirana,
+        trazenaSlova: stanje.dokaz.trazenaSlova,
+        sljedeciId: cekateljId,
+        turnToken: stanje.turnToken,
+        istekPotezaIso: '',
+        serverVrijemeIso: new Date(sat.sada()).toISOString(),
+        brojIskoristenih: stanje.brojOdigranih,
+        streak: trenutniStreak,
+        nagrada,
+        iskustvo: stavkePotezaIskustva,
+      }, izvorniSocket);
+      zakljuciDokazUspjehom(stanje);
+      return;
+    }
+
     // Kaladont/kalodont: meta po pravilniku (Klasični = sljedeći, KA-ZNA = autor).
     if (RIJECI_KALADONT.has(rijecNormalizirana)) {
       const brojAktivnihPrije = stanje.aktivni.size;
@@ -2183,6 +2553,8 @@ export function stvoriUpraviteljPartija(
     }
 
     const novaTrazenaSlova = zadnjaDva(rijecNormalizirana);
+    // PR05: mrtva slova != dokaz. Provjera i dalje ide nakon SVAKE prihvaćene riječi (cement).
+    // Dokaz se NE otvara ovdje — samo instant elim. U dokazi_nastavak žrtva = autor, bez kredita.
     const razlogMrtvihSlova = odrediRazlogMrtvihSlova(
       novaTrazenaSlova,
       stanje.iskoristeneGrupe,
@@ -2191,7 +2563,13 @@ export function stvoriUpraviteljPartija(
     );
 
     if (razlogMrtvihSlova) {
-      const zrtva = sljedeciAktivni(stanje, igracId);
+      const sljedeci = sljedeciAktivni(stanje, igracId);
+      const metaMrtvih = zrtvaMrtvihSlova({
+        pravilnik: stanje.pravila,
+        autorId: igracId,
+        sljedeciId: sljedeci,
+      });
+      const zrtva = metaMrtvih.zrtvaId;
       stanje.trazenaSlova = novaTrazenaSlova;
       // Ne stavljaj žrtvu na potez i ne šalji stanje s aktivnim redom — odmah slijedi
       // eliminacija i 8 s izbora riječi; inače se eliminatoru/sljedećem otvori forma.
@@ -2214,7 +2592,9 @@ export function stvoriUpraviteljPartija(
           nagrada,
           iskustvo: stavkePotezaIskustva,
         }, izvorniSocket);
-        eliminirajIgraca(stanje, zrtva, razlogMrtvihSlova);
+        eliminirajIgraca(stanje, zrtva, razlogMrtvihSlova, undefined, {
+          uzrocnikId: metaMrtvih.uzrocnikId,
+        });
       }
       return;
     }
@@ -2352,6 +2732,30 @@ export function stvoriUpraviteljPartija(
     }
     if (stanje.izborUToku) return { ishod: 'ignoriran', razlog: 'sustav_bira' };
     if (stanje.naPotezuId !== igracId) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
+
+    // PR05: u dokazu Anin „Ne znam” = neuspjeh dokaza (Bruno ostaje, bez kredita).
+    if (stanje.dokaz) {
+      if (igracId !== stanje.dokaz.autorId) return { ishod: 'ignoriran', razlog: 'nije_na_potezu' };
+      zakljuciDokazNeuspjehom(stanje, 'ne_znam');
+      return { ishod: 'prihvacen' };
+    }
+
+    // PR05: samo dokazi_nastavak + aktivan autor → otvori dokaz; Bruno NE dobiva rani poraz.
+    // klasik/ka_zna i sistemska riječ (napadacId null) → redovna eliminacija.
+    if (
+      trebaOtvoritiDokaz({
+        pravilnik: stanje.pravila,
+        fazaJeObicanPotez: fazaStola(stanje) === 'obican_potez',
+        autorId: stanje.napadacId,
+        autorJosAktivan: !!stanje.napadacId && stanje.aktivni.has(stanje.napadacId),
+        igracNaPotezuId: stanje.naPotezuId,
+        dogadajIgracId: igracId,
+      })
+    ) {
+      otvoriDokazNastavka(stanje, igracId, 'ne_znam', false);
+      return { ishod: 'prihvacen' };
+    }
+
     eliminirajIgraca(stanje, igracId, 'ne_znam');
     return { ishod: 'prihvacen' };
   }
@@ -2441,7 +2845,8 @@ export function stvoriUpraviteljPartija(
       if (stanje.prekidiUTijeku.get(igracId) !== prekid) continue;
       stanje.prekidiUTijeku.delete(igracId);
       sat.otkazi(prekid.timerHandle);
-      eliminirajIgraca(stanje, igracId, 'prekid', prekid);
+      // PR05: istek tolerancije = konačni odlazak (isti put kao partija:izadji).
+      obradiPotvrdeniOdlazak(stanje, igracId, prekid);
     }
   }
 
@@ -2592,7 +2997,10 @@ export function stvoriUpraviteljPartija(
 
       if (prekiniPrazanPocetak(stanje, socket.data.igracId)) return;
       if (!stanje.zavrsena && stanje.aktivni.has(socket.data.igracId)) {
-        eliminirajIgraca(stanje, socket.data.igracId, 'prekid');
+        obradiPotvrdeniOdlazak(stanje, socket.data.igracId, {
+          bioNaPotezu: !stanje.izborUToku && stanje.naPotezuId === socket.data.igracId,
+          napadacId: stanje.napadacId,
+        });
       }
 
       socket.leave(SOBA_PARTIJE(stanje.partijaId));
@@ -2708,6 +3116,7 @@ export function stvoriUpraviteljPartija(
       obradaPrekidaZakazana: false,
       rezultatiKraja: new Map(),
       zavrsena: false,
+      dokaz: null,
       jePrivatna: true,
       kodSobe,
       trajanjePotezaSek: postavkeSobe.trajanjePotezaSek,

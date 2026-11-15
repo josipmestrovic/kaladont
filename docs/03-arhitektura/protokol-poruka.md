@@ -44,6 +44,7 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
 | `potez:prihvacen` | `PrihvacenPotez` | Valjan potez; svi za stolom |
 | `potez:odbijen` | `OdbijenPotez` | Samo igraču koji je pokušao |
 | `partija:eliminacija` | `Eliminacija` | Netko je ispao; svi za stolom |
+| `dokaz:zatrazen` | `DokazZatrazen` | PR05: u `dokazi_nastavak` otvoren dokaz autoru; Bruno koji je samo rekao „Ne znam” još nije ispao. Stari klijent ignorira nepoznati događaj. |
 | `partija:sustav-bira-rijec` | `SustavBiraRijec` | Jedan prijelaz od 8 s nakon eliminacije ili Kaladont-efekta; nitko ne može igrati, rok je `istekIzboraIso`, bez zasebnog splash ekrana |
 | `partija:runda-otvorena` | `RundaOtvorena` | Sustav je otkrio odabranu riječ; red ide na sljedećeg aktivnog igrača nakon napadača |
 | `partija:spremanje-rezultata` | `SpremanjeRezultataPartije` | Igra je završila, ali se konačni rezultat još pokušava spremiti; šalje se pri svakom ponovnom pokušaju/reconnectu |
@@ -119,6 +120,21 @@ interface PocetakPartije {
   // što sustav odabere prvu riječ (vidi partija:sustav-bira-rijec / partija:runda-otvorena)
 }
 
+/** PR05: eksplicitna faza poteza; izostanak = stari klijent izvodi iz sustavBiraRijec. */
+type FazaPoteza = "obican_potez" | "dokaz_nastavka" | "sustav_bira" | "zavrsena";
+
+interface SnimkaDokaza {
+  izazovId: string;
+  izvornaRijec: string;
+  trazenaSlova: string;
+  autorId: string;
+  cekateljId: string;
+  razlogOtvaranja: "ne_znam" | "istek" | "prekid_na_potezu";
+  cekateljVecIspao: boolean; // true samo nakon napusti/konačnog prekida Brunе
+  pocetakIso: string;
+  istekPotezaIso: string;
+}
+
 interface StanjePartije {
   partijaId: string;
   mojIgracId: string;
@@ -137,6 +153,24 @@ interface StanjePartije {
   zadnjaRijecVrsta: "rijec" | "sustav_rijec" | null;
   zavrsena: boolean;                      // završena partija nije aktivna za nove poteze
   statusSpremanja: "nije_zavrsena" | "spremanje_rezultata" | "rezultati_spremljeni";
+  faza?: FazaPoteza;                      // PR05 aditivno
+  dokaz?: SnimkaDokaza | null;            // PR05: samo tijekom dokaz_nastavka
+}
+
+/** PR05: odvojeno od eliminacije — otvoren dokaz, Bruno može još biti aktivan. */
+interface DokazZatrazen {
+  partijaId: string;
+  izazovId: string;
+  autorId: string;
+  cekateljId: string;
+  izvornaRijec: string;
+  trazenaSlova: string;
+  razlogOtvaranja: "ne_znam" | "istek" | "prekid_na_potezu";
+  cekateljVecIspao: boolean;
+  turnToken: string;
+  istekPotezaIso: string;
+  serverVrijemeIso: string;
+  naPotezuId: string;
 }
 
 /** Sustav je počeo birati riječ za otvaranje runde. */

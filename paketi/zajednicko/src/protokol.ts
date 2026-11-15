@@ -151,6 +151,36 @@ export interface PocetakPartije {
   kodSobe?: string;
 }
 
+/**
+ * Eksplicitna faza poteza (PR05).
+ * Izostanak na starom payloadu = izvedi iz `sustavBiraRijec` + zavrsena (običan potez).
+ * // PR05→PR14: UI ne sudi lokalno — čita faza/dokaz iz snimke.
+ * // PR05→PR07: bot planira najviše jednu odluku po (partijaId, igracId, turnToken); novi token za dokaz dopušta drugi potez.
+ */
+export type FazaPoteza = 'obican_potez' | 'dokaz_nastavka' | 'sustav_bira' | 'zavrsena';
+
+/** Zašto je otvoren dokaz nastavka (samo dokazi_nastavak). */
+export type RazlogOtvaranjaDokaza = 'ne_znam' | 'istek' | 'prekid_na_potezu';
+
+/**
+ * Snimka aktivnog izazova dokaza.
+ * Bruno koji je samo kliknuo „Ne znam” NIJE ispao (`cekateljVecIspao=false`);
+ * Bruno koji je napustio na potezu JEST potvrđen (`cekateljVecIspao=true`) — Ana dokazuje za kredit.
+ * // PR05: Ne znam != napusti; Ne znam ne upisuje rani poraz.
+ */
+export interface SnimkaDokaza {
+  izazovId: string;
+  izvornaRijec: string;
+  trazenaSlova: string;
+  autorId: string;
+  cekateljId: string;
+  razlogOtvaranja: RazlogOtvaranjaDokaza;
+  /** true kad je čekač već potvrđen (napusti/prekid); false dok čeka odluku nakon „Ne znam”/isteka. */
+  cekateljVecIspao: boolean;
+  pocetakIso: string;
+  istekPotezaIso: string;
+}
+
 export interface StanjePartije {
   partijaId: string;
   mojIgracId: string;
@@ -179,6 +209,30 @@ export interface StanjePartije {
   trajanjePotezaSek?: number;
   dopusteneVrste?: VrstaRijeci[];
   treningNeaktivnost?: { upozorenjeIso: string; zatvaraIso: string; upozorenje: boolean };
+  /** PR05 aditivno; stari klijent ignorira. */
+  faza?: FazaPoteza;
+  /** PR05: popunjeno samo dok traje dokaz_nastavka. */
+  dokaz?: SnimkaDokaza | null;
+}
+
+/**
+ * Motor je otvorio dokaz autoru (PR05). Emitira se ODVOJENO od eliminacije —
+ * Bruno još nije ispao ako je samo „Ne znam”.
+ * // PR05→PR14: „Ana dokazuje nastavak…” bez oznake „Ispao si” za Brunu.
+ */
+export interface DokazZatrazen {
+  partijaId: string;
+  izazovId: string;
+  autorId: string;
+  cekateljId: string;
+  izvornaRijec: string;
+  trazenaSlova: string;
+  razlogOtvaranja: RazlogOtvaranjaDokaza;
+  cekateljVecIspao: boolean;
+  turnToken: string;
+  istekPotezaIso: string;
+  serverVrijemeIso: string;
+  naPotezuId: string;
 }
 
 export interface TreningNeaktivnost {
@@ -463,6 +517,8 @@ export interface DogadajiPosluziteljKlijent {
   'rijec:otkljucana': (payload: OtkljucavanjeRijeci) => void;
   'potez:odbijen': (payload: OdbijenPotez) => void;
   'partija:eliminacija': (payload: Eliminacija) => void;
+  /** PR05: odgođena eliminacija — dokaz zatražen; stari klijent ignorira nepoznati događaj. */
+  'dokaz:zatrazen': (payload: DokazZatrazen) => void;
   'partija:sustav-bira-rijec': (payload: SustavBiraRijec) => void;
   'partija:runda-otvorena': (payload: RundaOtvorena) => void;
   'partija:spremanje-rezultata': (payload: SpremanjeRezultataPartije) => void;
