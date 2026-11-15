@@ -97,6 +97,12 @@ export const igraci = pgTable('igraci', {
   pobjede1v1: integer('pobjede_1v1').notNull().default(0),
   eliminacije1v1: integer('eliminacije_1v1').notNull().default(0),
   bodovi1v1: integer('bodovi_1v1').notNull().default(0),
+  /**
+   * PR09 univerzalni rang: zbroj doprinosa u rang-jedinicama (2520 = 1 prikazni bod)
+   * i broj valjanih javnih partija. Legacy odigrane/bodovi* ostaju za formatne statistike i rollback.
+   */
+  rangSumaJedinica: bigint('rang_suma_jedinica', { mode: 'number' }).notNull().default(0),
+  rangBrojPartija: integer('rang_broj_partija').notNull().default(0),
   /** Svi dovršeni načini (javna, privatna, trening); za periodične sandučic sažetke. */
   dovrseneIgre: integer('dovrsene_igre').notNull().default(0),
   iskustvoUkupno: integer('iskustvo_ukupno').notNull().default(0),
@@ -153,7 +159,10 @@ export const rezultatiFormeIgraca = pgTable(
   ],
 );
 
-/** Agregati javnih igara po formatu. Troboj piše ovdje; 2p/4p ostaju na stupcima `igraci` do PR09. */
+/**
+ * Agregati javnih igara po formatu (Troboj; 2p/4p i dalje na stupcima `igraci` za formatne statistike).
+ * PR09: univerzalni rang je na `igraci.rang_*` + `sudionici_partije.rang_*`, ne ovdje.
+ */
 export const statistikeModaIgraca = pgTable(
   'statistike_moda_igraca',
   {
@@ -422,6 +431,13 @@ export const sudioniciPartije = pgTable(
     iskustvo: integer('iskustvo').notNull().default(0),
     nacinIspadanja: nacinIspadanja('nacin_ispadanja'),
     cekanjeMs: integer('cekanje_ms').notNull().default(0),
+    /**
+     * PR09: doprinos univerzalnom rangu u jedinicama (252000×N×b/S).
+     * NULL = još nije izračunat / partija ne ulazi u rang (privatna, nepotpuna, …).
+     */
+    rangDoprinosJedinice: bigint('rang_doprinos_jedinice', { mode: 'number' }),
+    /** PR09: verzija formule (1); NULL = nije upisan doprinos. */
+    rangIzracunVerzija: smallint('rang_izracun_verzija'),
     // NULL = sažetak nije zabilježen (stare igre); 1 = svi stupci ispod su pouzdani.
     metrikeVerzija: smallint('metrike_verzija'),
     prihvaceneRijeci: integer('prihvacene_rijeci'),

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { RANGOVI, RANGOVI_1V1 } from 'zajednicko';
+  import { RANGOVI } from 'zajednicko';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import { bojaBordera } from '$lib/avatari.js';
@@ -22,10 +22,12 @@
   const naslovPovezanih = $derived(tema === 'kako-igrati' ? 'Saznaj više o' : 'Možda će te zanimati i ovo');
 
   function rasponRanga(indeks: number, rangovi: readonly { minimalniProsjek: number }[]): string {
-    const formatiraj = (prag: number) => prag.toFixed(2).replace('.', ',');
+    // PR09: univerzalni učinak (cijeli brojevi 0/60/80/…).
+    const formatiraj = (prag: number) =>
+      Number.isInteger(prag) ? String(prag) : prag.toFixed(2).replace('.', ',');
     if (indeks === 0) return `< ${formatiraj(rangovi[1]!.minimalniProsjek)}`;
-    if (indeks === rangovi.length - 1) return `> ${formatiraj(rangovi[indeks]!.minimalniProsjek)}`;
-    return `${formatiraj(rangovi[indeks]!.minimalniProsjek)} - ${formatiraj(rangovi[indeks + 1]!.minimalniProsjek)}`;
+    if (indeks === rangovi.length - 1) return `≥ ${formatiraj(rangovi[indeks]!.minimalniProsjek)}`;
+    return `${formatiraj(rangovi[indeks]!.minimalniProsjek)} – < ${formatiraj(rangovi[indeks + 1]!.minimalniProsjek)}`;
   }
 
   const opisMrtvihSlova =
@@ -233,15 +235,15 @@
 
       <section>
         <h3>Pragovi rangova</h3>
+        <p>Jedan rang za sve javne formate (Dvoboj, Troboj, Četveroboj). Učinak je prosjek doprinosa po partijama; kalibracija traje 10 javnih igara.</p>
         <div class="tablica-omotac">
           <table class="tablica-mobilni-retci tablica-rangova tablica-s-oznakama">
-            <thead><tr><th scope="col">Rang</th><th scope="col">Četveroboj · prosjek bodova</th><th scope="col">Dvoboj · prosjek bodova</th></tr></thead>
+            <thead><tr><th scope="col">Rang</th><th scope="col">Minimalni učinak</th></tr></thead>
             <tbody>
               {#each RANGOVI as rang, indeks}
                 <tr>
                   <th scope="row"><span class="rang-uzorak" style:--boja-ranga={bojaBordera(rang.naziv)} aria-hidden="true"></span>{rang.naziv}</th>
-                  <td data-label="Četveroboj · prosjek bodova">{rasponRanga(indeks, RANGOVI)}</td>
-                  <td data-label="Dvoboj · prosjek bodova">{rasponRanga(indeks, RANGOVI_1V1)}</td>
+                  <td data-label="Minimalni učinak">{rasponRanga(indeks, RANGOVI)}</td>
                 </tr>
               {/each}
             </tbody>
@@ -503,7 +505,7 @@
       </details>
       <details>
         <summary>Zašto piše Piskaralo?</summary>
-        <p>Rang i DNK stižu nakon 10 javnih igara u tom načinu. Dvoboj i Četveroboj broje se odvojeno.</p>
+        <p>Rang stiže nakon 10 javnih igara ukupno (svi formati zajedno). Do tada si Piskaralo. DNK kalibracija također broji 10 javnih partija.</p>
       </details>
       <details>
         <summary>Zašto nisam na ljestvici?</summary>

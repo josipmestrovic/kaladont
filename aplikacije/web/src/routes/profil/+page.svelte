@@ -13,7 +13,7 @@
   import KolekcijaRijeci from '$lib/komponente/KolekcijaRijeci.svelte';
   import Podizbornik from '$lib/komponente/Podizbornik.svelte';
   import { ucitajAseteProfila } from '$lib/asetovi-core.js';
-  import { PRAGOVI_DULJINE, vratiVeciRang, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
+  import { PRAGOVI_DULJINE, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil } from 'zajednicko';
 
     interface StatistikaRijeci {
       najduziStreak: number;
@@ -49,6 +49,9 @@
     bodovi1v1: number;
     prosjekBodova1v1: number;
     rang1v1: string;
+    /** PR09: broj javnih partija u univerzalnom rangu. */
+    rangBrojPartija?: number;
+    rangUcinak?: number;
     dnk: {
       cetiriIgraca: DnkProfil & { metrike: DnkMetrike };
       dvaIgraca: DnkProfil & { metrike: DnkMetrike };
@@ -182,7 +185,7 @@
             <Avatar
               avatarId={profil.avatarId}
               avatarConfig={profil.avatarConfig}
-              rang={vratiVeciRang(profil.rang, profil.rang1v1)}
+              rang={profil.rang === 'Piskaralo' ? null : profil.rang}
               gost={jeGost}
               velicina={velicinaAvatara}
               razinaVatre={aktivniTab === '4p' ? profil.forma.cetiriIgraca.razinaVatre : profil.forma.dvaIgraca.razinaVatre}
@@ -195,7 +198,7 @@
               <div class="profil-identitet">
                 <h1>{profil.nadimak}</h1>
                 <span class="rang-oznaka">
-                  {vratiVeciRang(profil.rang, profil.rang1v1) ?? 'Piskaralo'}
+                  {profil.rang ?? 'Piskaralo'}
                 </span>
                 <div class="iskustvo-profila">
                   <strong>LVL {profil.iskustvo.razina}</strong>

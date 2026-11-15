@@ -3,9 +3,8 @@
  */
 import {
   SVE_VRSTE_RIJECI,
-  izracunajRang,
+  izracunajRangIzAgregata,
   stanjeIskustva,
-  vratiVeciRang,
   ZADANI_PRAVILNIK,
   type PostavkePrivatneSobe,
   type StanjePrivatneSobe,
@@ -88,6 +87,9 @@ export interface Soba {
       odigrane1v1?: number;
       pobjede1v1?: number;
       bodovi1v1?: number;
+      /** PR09 univerzalni rang. */
+      rangBrojPartija?: number;
+      rangSumaJedinica?: number;
       iskustvoUkupno?: number;
     }
   >;
@@ -205,17 +207,8 @@ export function registrirajPrivatneSobe(
 
   function izradiStanje(soba: Soba, mojIgracId: string): StanjePrivatneSobe {
     const clanovi = [...soba.clanoviMap.values()].map((c) => {
-      const odig4 = c.odigrane ?? 0;
-      const bod4 = c.bodoviUkupno ?? 0;
-      const prosjek4 = odig4 > 0 ? bod4 / odig4 : 0;
-      const rang4 = izracunajRang(odig4, prosjek4, 'cetiri_igraca');
-
-      const odig1 = c.odigrane1v1 ?? 0;
-      const bod1 = c.bodovi1v1 ?? 0;
-      const prosjek1 = odig1 > 0 ? bod1 / odig1 : 0;
-      const rang1 = izracunajRang(odig1, prosjek1, 'dva_igraca');
-
-      const veciRang = vratiVeciRang(rang4, rang1);
+      // PR09: jedan univerzalni rang; vratiVeciRang više ne određuje prikaz.
+      const rang = izracunajRangIzAgregata(c.rangSumaJedinica ?? 0, c.rangBrojPartija ?? 0);
 
       return {
         igracId: c.igracId,
@@ -224,7 +217,7 @@ export function registrirajPrivatneSobe(
         avatarId: c.avatarId,
         avatarConfig: c.avatarConfig,
         avatarRevision: c.avatarRevision,
-        rang: veciRang === 'Piskaralo' ? null : veciRang,
+        rang: rang === 'Piskaralo' ? null : rang,
         razina: stanjeIskustva(c.iskustvoUkupno ?? 0).razina,
         jeVlasnik: c.igracId === soba.vlasnikId,
           pobjedeUSobi: soba.pobjedeUSeriji.get(c.igracId) ?? 0,
@@ -346,6 +339,8 @@ export function registrirajPrivatneSobe(
               odigrane1v1: socket.data.odigrane1v1 ?? 0,
               pobjede1v1: socket.data.pobjede1v1 ?? 0,
               bodovi1v1: socket.data.bodovi1v1 ?? 0,
+              rangBrojPartija: socket.data.rangBrojPartija ?? 0,
+              rangSumaJedinica: socket.data.rangSumaJedinica ?? 0,
               iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
             },
           ],
@@ -437,6 +432,8 @@ export function registrirajPrivatneSobe(
         odigrane1v1: socket.data.odigrane1v1 ?? 0,
         pobjede1v1: socket.data.pobjede1v1 ?? 0,
         bodovi1v1: socket.data.bodovi1v1 ?? 0,
+        rangBrojPartija: socket.data.rangBrojPartija ?? 0,
+        rangSumaJedinica: socket.data.rangSumaJedinica ?? 0,
         iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
       });
       sobaPoIgracu.set(igracId, kod);

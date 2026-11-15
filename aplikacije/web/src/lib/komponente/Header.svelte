@@ -5,7 +5,7 @@
   import { osvjeziGostSesijuNakon401 } from '$lib/identitet.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
-  import { vratiVeciRang, type AvatarConfigV1 } from 'zajednicko';
+  import { type AvatarConfigV1 } from 'zajednicko';
 
   interface Profil {
     nadimak: string;
@@ -124,7 +124,7 @@
               <Avatar
                 avatarId={profil.avatarId}
                 avatarConfig={profil.avatarConfig}
-                rang={vratiVeciRang(profil.rang, profil.rang1v1)}
+                rang={profil.rang === 'Piskaralo' ? null : profil.rang}
                 gost={jeGost}
                 velicina={44}
               />

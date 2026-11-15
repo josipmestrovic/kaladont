@@ -134,6 +134,8 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
         odigrane1v1: socket.data.odigrane1v1 ?? 0,
         pobjede1v1: socket.data.pobjede1v1 ?? 0,
         bodovi1v1: socket.data.bodovi1v1 ?? 0,
+        rangBrojPartija: socket.data.rangBrojPartija ?? 0,
+        rangSumaJedinica: socket.data.rangSumaJedinica ?? 0,
         iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
         trenutniNiz4p: 0,
         trenutniNiz1v1: 0,

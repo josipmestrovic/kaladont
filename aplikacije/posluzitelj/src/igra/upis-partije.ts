@@ -4,7 +4,7 @@
  * uspješan upis početka i svih poteza prije isplate XP-a (idempotentni retry).
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajNovaDostignuca, izracunajOcjenuIgre, izracunajRang, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, RANGOVI, RANGOVI_1V1, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajOcjenuIgre, jeNapredakUniverzalnogRanga, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
@@ -30,6 +30,7 @@ import type { MisijeTx } from '../misije/tipovi.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { primaProfilnuGamifikaciju, type BotTipPrezentacije } from './gamifikacija-racuna.js';
 import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
+import { upisiUniverzalniRangZaStol, type RangSudionikUlaz, type RangUpisRezultat } from './univerzalni-rang.js';
 
 async function brojKolekcijskihStavki(tx: MisijeTx, igracId: string): Promise<number> {
   const redovi = await tx
@@ -37,15 +38,6 @@ async function brojKolekcijskihStavki(tx: MisijeTx, igracId: string): Promise<nu
     .from(otkljucaneGrupeIgraca)
     .where(eq(otkljucaneGrupeIgraca.igracId, igracId));
   return new Set(redovi.map((red) => kolekcijskiKljucGrupe(red.grupa))).size;
-}
-
-function jeNapredakRanga(prije: string, poslije: string, mod: ModPartije): boolean {
-  if (prije === poslije) return false;
-  if (poslije === 'Piskaralo') return false;
-  if (prije === 'Piskaralo') return true;
-  // Troboj privremeno dijeli četverobojsku hijerarhiju do PR09.
-  const lista = mod === 'dva_igraca' ? RANGOVI_1V1 : RANGOVI;
-  return lista.findIndex((r) => r.naziv === poslije) >= lista.findIndex((r) => r.naziv === prije);
 }
 
 type BrojaciModa = { odigrane: number; bodovi: number; eliminacije: number; pobjede: number };
@@ -334,6 +326,10 @@ interface AgregatZakljucka {
   promjeneMisija?: PromjenaMisije[];
   ukupnoIskustvo?: UkupnoIskustvoIshoda;
   misijeStanjeVerzija?: number;
+  /** PR09: univerzalni rang nakon ove partije (ako je upisan). */
+  rangBrojPartija?: number;
+  rangSumaJedinica?: number;
+  rangNaziv?: string;
 }
 
 function dnkPodaciIzRedaka(
@@ -1326,6 +1322,30 @@ export async function zakljuciPartijuUBazi(
       }
       }
 
+      // PR09: univerzalni rang nakon što su svi sirovi bodovi upisani (isti konačni rezultat za sva sjedala).
+      // HINT: legacy odigrane/bodovi* već inkrementirani gore; ovdje samo rang_*. Gosti/botovi u N/S, bez agregata.
+      const rangSudionici: RangSudionikUlaz[] = [];
+      for (const r of rezultati) {
+        const a = agregati.get(r.igracId);
+        if (!a) continue;
+        rangSudionici.push({
+          igracId: r.igracId,
+          bodovi: r.bodovi,
+          upravljac: a.upravljac,
+          vrstaIgraca: a.vrstaIgraca,
+        });
+      }
+      const rangPoIgracu: Map<string, RangUpisRezultat> = rangSudionici.length > 0
+        ? await upisiUniverzalniRangZaStol(tx, partijaId, rangSudionici, mod)
+        : new Map();
+      for (const [igracId, rangRez] of rangPoIgracu) {
+        const agregat = agregati.get(igracId);
+        if (!agregat) continue;
+        agregat.rangBrojPartija = rangRez.rangBrojPoslije;
+        agregat.rangSumaJedinica = rangRez.rangSumaPoslije;
+        agregat.rangNaziv = rangRez.rangPoslije;
+      }
+
       // Sandučic: XP, rang, forma_10 i gost sažetak nakon konačnog XP-a (uključujući misije). Botovi nemaju inbox.
       for (const [igracId, agregat] of agregati) {
         if (!jeLjudskiZaSanducic(agregat.upravljac)) continue;
@@ -1343,28 +1363,20 @@ export async function zakljuciPartijuUBazi(
 
         const rezultat = rezultati.find((r) => r.igracId === igracId);
         if (!rezultat) continue;
-        const odigranePrije = Math.max(0, agregat.odigrane - 1);
-        const bodoviPrije = Math.max(0, agregat.bodoviUkupno - rezultat.bodovi);
-        const rangPrije = izracunajRang(
-          odigranePrije,
-          odigranePrije > 0 ? bodoviPrije / odigranePrije : 0,
-          mod,
-        );
-        const rangPoslije = izracunajRang(
-          agregat.odigrane,
-          agregat.odigrane > 0 ? agregat.bodoviUkupno / agregat.odigrane : 0,
-          mod,
-        );
-        const rangPoruka = await stvoriPorukuPromjeneRanga({
-          igracId,
-          mod,
-          rangPrije,
-          rangPoslije,
-          napredak: jeNapredakRanga(rangPrije, rangPoslije, mod),
-          tx,
-          izvorId: partijaId,
-        });
-        if (rangPoruka) sanducicIgraci.add(igracId);
+        // PR09: obavijest o rangu samo iz univerzalnog agregata (ne po formatu).
+        const rangRez = rangPoIgracu.get(igracId);
+        if (rangRez && rangRez.novoUpisan) {
+          const rangPoruka = await stvoriPorukuPromjeneRanga({
+            igracId,
+            mod,
+            rangPrije: rangRez.rangPrije,
+            rangPoslije: rangRez.rangPoslije,
+            napredak: jeNapredakUniverzalnogRanga(rangRez.rangPrije, rangRez.rangPoslije),
+            tx,
+            izvorId: partijaId,
+          });
+          if (rangPoruka) sanducicIgraci.add(igracId);
+        }
 
         const formaPoruka = await stvoriPorukuForme10({
           igracId,

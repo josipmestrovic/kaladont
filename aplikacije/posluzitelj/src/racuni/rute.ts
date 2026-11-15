@@ -31,6 +31,7 @@ import {
   provjeriTokenResetaLozinke,
 } from './tokeni.js';
 import { stvoriDobrodoslicu, stvoriPorukuPotvrdeEmaila } from '../sanducic/okidaci.js';
+import { preuzmiGostovskeRangDoprinose } from '../igra/univerzalni-rang.js';
 
 export interface OpcijeAuthRateLimita {
   omogucen: boolean;
@@ -172,25 +173,36 @@ export async function registrirajRacuneRute(
     let konacniNadimak: string;
 
     if (postojeciGost) {
-      // RS-20: gost -> registriran je UPDATE istog retka, statistika ostaje
-      const [azuriraniGost] = await baza
-        .update(igraci)
-        .set({
-          vrsta: 'registriran',
-          registriranAt: sql`now()`,
-          email: normaliziraniEmail,
-          lozinkaHash,
-          emailPotvrdjen: false,
-          emailPotvrdaZatrazenAt: new Date(),
-          ...prihvatUvjeta,
-          ...(nadimak ? { nadimak } : {}),
-          ...(avatarId !== undefined ? { avatarId } : {}),
-          ...(kanonskiAvatarConfig ? { avatarConfig: kanonskiAvatarConfig, avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
-        })
-        .where(and(eq(igraci.id, postojeciGost.id), eq(igraci.vrsta, 'gost')))
-        .returning({ id: igraci.id });
-      if (!azuriraniGost) {
-        return odgovor.code(409).send({ ok: false, greska: 'Registracija nije uspjela jer se stanje računa promijenilo.' });
+      // RS-20: gost → registriran + PR09 preuzimanje doprinosa u istoj transakciji.
+      try {
+        await baza.transaction(async (tx) => {
+          const [azuriraniGost] = await tx
+            .update(igraci)
+            .set({
+              vrsta: 'registriran',
+              registriranAt: sql`now()`,
+              email: normaliziraniEmail,
+              lozinkaHash,
+              emailPotvrdjen: false,
+              emailPotvrdaZatrazenAt: new Date(),
+              ...prihvatUvjeta,
+              ...(nadimak ? { nadimak } : {}),
+              ...(avatarId !== undefined ? { avatarId } : {}),
+              ...(kanonskiAvatarConfig ? { avatarConfig: kanonskiAvatarConfig, avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
+            })
+            .where(and(eq(igraci.id, postojeciGost.id), eq(igraci.vrsta, 'gost')))
+            .returning({ id: igraci.id });
+          if (!azuriraniGost) {
+            throw new Error('RS20_KONFLIKT');
+          }
+          await preuzmiGostovskeRangDoprinose(tx, postojeciGost.id);
+        });
+      } catch (greska) {
+        if (greska instanceof Error && greska.message === 'RS20_KONFLIKT') {
+          return odgovor.code(409).send({ ok: false, greska: 'Registracija nije uspjela jer se stanje računa promijenilo.' });
+        }
+        console.error('PR09: registracija gosta / preuzimanje rang doprinosa nije uspjelo', greska);
+        return odgovor.code(500).send({ ok: false, greska: 'Registracija nije uspjela. Pokušaj ponovno.' });
       }
       igracId = postojeciGost.id;
       konacniNadimak = nadimak ?? postojeciGost.nadimak;

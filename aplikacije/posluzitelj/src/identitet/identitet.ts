@@ -34,6 +34,9 @@ export interface Identitet {
   odigrane3p: number;
   pobjede3p: number;
   bodovi3p: number;
+  /** PR09 univerzalni rang agregat. */
+  rangBrojPartija: number;
+  rangSumaJedinica: number;
   iskustvoUkupno: number;
   emailPotvrdjen: boolean;
   uvjetiPrihvaceni: boolean;
@@ -73,6 +76,8 @@ async function uIdentitet(redak: typeof igraci.$inferSelect): Promise<Identitet>
     pobjede1v1: redak.pobjede1v1,
     bodovi1v1: redak.bodovi1v1,
     ...troboj,
+    rangBrojPartija: redak.rangBrojPartija,
+    rangSumaJedinica: Number(redak.rangSumaJedinica ?? 0),
     iskustvoUkupno: redak.iskustvoUkupno,
     emailPotvrdjen: redak.emailPotvrdjen,
     uvjetiPrihvaceni: jePrihvacenaAktualnaVerzijaUvjeta(redak.potvrdaDob16, redak.uvjetiVerzija),

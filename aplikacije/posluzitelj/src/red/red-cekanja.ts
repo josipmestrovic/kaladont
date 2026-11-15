@@ -21,6 +21,9 @@ export interface StavkaReda {
   odigrane3p?: number;
   pobjede3p?: number;
   bodovi3p?: number;
+  /** PR09: univerzalni rang (ne ovisi o modu reda). */
+  rangBrojPartija?: number;
+  rangSumaJedinica?: number;
   iskustvoUkupno?: number;
   trenutniNiz4p?: number;
   trenutniNiz1v1?: number;

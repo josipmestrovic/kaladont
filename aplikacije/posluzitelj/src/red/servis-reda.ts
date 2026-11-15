@@ -8,7 +8,7 @@
  */
 import type { KljucJavnogReda, ModPartije, PravilnikPartije, StanjeReda } from 'zajednicko';
 import {
-  izracunajRang,
+  izracunajRangIzAgregata,
   javnaSjedalaZaMod,
   kanonskaPravilaZaKljuc,
   KLJUCEVI_JAVNOG_REDA,
@@ -163,7 +163,8 @@ export function registrirajRedCekanja(
           : (stavka.trenutniNiz4p ?? 0);
 
       const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
-      const rang = izracunajRang(odigrane, prosjekBodova, mod);
+      // PR09: prikazni rang je univerzalan (ne ovisi o modu reda).
+      const rang = izracunajRangIzAgregata(stavka.rangSumaJedinica ?? 0, stavka.rangBrojPartija ?? 0);
 
       const jeBot = stavka.upravljac === 'bot';
       mjesta[indeks] = {
@@ -379,6 +380,8 @@ export function registrirajRedCekanja(
         odigrane3p: socket.data.odigrane3p ?? 0,
         pobjede3p: socket.data.pobjede3p ?? 0,
         bodovi3p: socket.data.bodovi3p ?? 0,
+        rangBrojPartija: socket.data.rangBrojPartija ?? 0,
+        rangSumaJedinica: socket.data.rangSumaJedinica ?? 0,
         iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
         trenutniNiz4p: socket.data.trenutniNiz4p ?? 0,
         trenutniNiz1v1: socket.data.trenutniNiz1v1 ?? 0,

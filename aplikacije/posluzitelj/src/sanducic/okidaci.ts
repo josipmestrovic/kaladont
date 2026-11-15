@@ -352,11 +352,12 @@ export async function stvoriPorukuPromjeneRanga(ulaz: {
   izvorId: string;
 }): Promise<boolean> {
   if (ulaz.rangPrije === ulaz.rangPoslije) return false;
+  // PR09: rang je univerzalan; u copyju i dalje možemo spomenuti format partije koja ga je pomaknula.
   const nazivModa = nazivFormata(ulaz.mod);
   const red = await stvoriPoruku({
     igracId: ulaz.igracId,
     tip: TIP_SANDUCIC_PROMJENA_RANGA,
-    deduplikacijskiKljuc: `rang:${ulaz.mod}:${ulaz.izvorId}`,
+    deduplikacijskiKljuc: `rang:univerzalni:${ulaz.izvorId}`,
     podaci: {
       mod: nazivModa,
       rang: ulaz.rangPoslije,

@@ -169,16 +169,23 @@ describe('GET /ljestvica', () => {
     expect(Array.isArray(tijelo.ljestvica)).toBe(true);
   });
 
-  it('računa 1v1 rang i za listu i za vlastito mjesto', async () => {
+  it('prikazuje univerzalni rang na legacy ljestvici (PR09)', async () => {
     const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
+    // Formatni brojači kvalifikuju za listu; naslovni rang dolazi iz univerzalnog agregata.
+    // Učinak 178 × 10 partija × 2520 jedinica = prag Kaladonta.
     await baza
       .update(igraci)
-      .set({ odigrane1v1: 10, bodovi1v1: 10 })
+      .set({
+        odigrane1v1: 10,
+        bodovi1v1: 10,
+        rangBrojPartija: 10,
+        rangSumaJedinica: 178 * 10 * 2520,
+      })
       .where(eq(igraci.id, igracId));
 
     const odgovor = await fetch(`${adresa}/api/ljestvica?mod=dva_igraca&limit=100`, {
