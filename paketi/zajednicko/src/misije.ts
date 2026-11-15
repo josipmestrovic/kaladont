@@ -128,7 +128,8 @@ export interface StanjeMisijaDto {
 export interface MetrikeMisijaIgre {
   izvorId: string;
   kontekst: KontekstIzvoraMisije;
-  mod: 'dva_igraca' | 'cetiri_igraca';
+  /** PR08: trening smije biti tri_igraca; filtri misija za trening i dalje ignorišu mod. */
+  mod: 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca';
   igracId: string;
   zavrsenoU: Date;
   plasman: number;
