@@ -4,7 +4,7 @@
  * uspješan upis početka i svih poteza prije isplate XP-a (idempotentni retry).
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajNovaDostignuca, izracunajOcjenuIgre, jeNapredakUniverzalnogRanga, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajOcjenuIgre, izracunajUniverzalniUcinak, jeNapredakUniverzalnogRanga, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
@@ -29,7 +29,12 @@ import {
 import type { MisijeTx } from '../misije/tipovi.js';
 import type { SudionikPartije } from './motor-partije.js';
 import { primaProfilnuGamifikaciju, type BotTipPrezentacije } from './gamifikacija-racuna.js';
-import { izracunajDnk, type DnkPodaci } from './izracun-dnk.js';
+import {
+  izracunajDnk,
+  prazniDnkBrojaci,
+  zbrojiDnkRedove,
+  type DnkPodaciZajednicki,
+} from './izracun-dnk.js';
 import { upisiUniverzalniRangZaStol, type RangSudionikUlaz, type RangUpisRezultat } from './univerzalni-rang.js';
 
 async function brojKolekcijskihStavki(tx: MisijeTx, igracId: string): Promise<number> {
@@ -80,6 +85,58 @@ async function dohvatiBrojaceModa(
     bodovi: red?.bodovi ?? 0,
     eliminacije: red?.eliminacije ?? 0,
     pobjede: red?.pobjede ?? 0,
+  };
+}
+
+/** N2/N3/N4 + eliminacije za zajednički DNK (PR10). */
+async function dohvatiBrojaceSvihFormata(tx: MisijeTx, igracId: string): Promise<{
+  n2: number;
+  n3: number;
+  n4: number;
+  eliminacijeUkupno: number;
+}> {
+  const [dva, cetiri, troboj] = await Promise.all([
+    dohvatiBrojaceModa(tx, igracId, 'dva_igraca'),
+    dohvatiBrojaceModa(tx, igracId, 'cetiri_igraca'),
+    dohvatiBrojaceModa(tx, igracId, 'tri_igraca'),
+  ]);
+  return {
+    n2: dva.odigrane,
+    n3: troboj.odigrane,
+    n4: cetiri.odigrane,
+    eliminacijeUkupno: dva.eliminacije + troboj.eliminacije + cetiri.eliminacije,
+  };
+}
+
+async function dohvatiZbrojeneDnkBrojace(tx: MisijeTx, igracId: string) {
+  const redovi = await tx.select().from(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igracId));
+  return zbrojiDnkRedove(redovi);
+}
+
+async function dohvatiZajednickiDnkPodaci(
+  tx: MisijeTx,
+  igracId: string,
+  univerzalniUcinak: number,
+): Promise<DnkPodaciZajednicki> {
+  const [formati, brojaci] = await Promise.all([
+    dohvatiBrojaceSvihFormata(tx, igracId),
+    dohvatiZbrojeneDnkBrojace(tx, igracId),
+  ]);
+  return {
+    n2: formati.n2,
+    n3: formati.n3,
+    n4: formati.n4,
+    eliminacijeUkupno: formati.eliminacijeUkupno,
+    prihvaceniPotezi: brojaci.prihvaceniPotezi,
+    ukupnoTrajanjePrihvaceniPoteziMs: brojaci.ukupnoTrajanjePrihvaceniPoteziMs,
+    najduziStreak: brojaci.najduziStreak,
+    dugeRijeci: brojaci.dugeRijeci,
+    srednjeDugeRijeci: brojaci.srednjeDugeRijeci,
+    jakoDugeRijeci: brojaci.jakoDugeRijeci,
+    rijetkeRijeci: brojaci.rijetkeRijeci,
+    srednjeRijetkeRijeci: brojaci.srednjeRijetkeRijeci,
+    jakoRijetkeRijeci: brojaci.jakoRijetkeRijeci,
+    univerzalniUcinak,
   };
 }
 
@@ -330,16 +387,10 @@ interface AgregatZakljucka {
   rangBrojPartija?: number;
   rangSumaJedinica?: number;
   rangNaziv?: string;
-}
-
-function dnkPodaciIzRedaka(
-  redak: { odigrane: number; bodovi: number; eliminacije: number },
-  statistika: Pick<
-    DnkPodaci,
-    'prihvaceniPotezi' | 'ukupnoTrajanjePrihvaceniPoteziMs' | 'najduziStreak' | 'dugeRijeci' | 'srednjeDugeRijeci' | 'jakoDugeRijeci' | 'rijetkeRijeci' | 'srednjeRijetkeRijeci' | 'jakoRijetkeRijeci'
-  >,
-): DnkPodaci {
-  return { ...redak, ...statistika };
+  /** PR10: N2+N3+N4 nakon partije — za mojDnk unlock (ne formatni odigrane). */
+  javnePartijeUkupno?: number;
+  /** Privremeni brojači za finalni dnkPoslije nakon upisa ranga. */
+  dnkPoslijePodaci?: DnkPodaciZajednicki;
 }
 
 /** Sažetak igre za vremenske ljestvice; bez statistike ostaje NULL (nepoznato), nikad 0. */
@@ -603,25 +654,23 @@ export async function zakljuciPartijuUBazi(
         continue;
       }
 
-      const [staraDnkStatistika] = await tx.select().from(dnkStatistikeIgraca)
-        .where(and(eq(dnkStatistikeIgraca.igracId, r.igracId), eq(dnkStatistikeIgraca.mod, mod)))
+      // PR10: zbroj svih dnk_statistike redova + N2/N3/N4 za zajedničke osi.
+      const [rangPrijeRed] = await tx
+        .select({
+          rangSumaJedinica: igraci.rangSumaJedinica,
+          rangBrojPartija: igraci.rangBrojPartija,
+        })
+        .from(igraci)
+        .where(eq(igraci.id, r.igracId))
         .limit(1);
-      const prije = stariIgrac
-        ? izracunajDnk(
-          dnkPodaciIzRedaka(stariIgrac, {
-            prihvaceniPotezi: staraDnkStatistika?.prihvaceniPotezi ?? 0,
-            ukupnoTrajanjePrihvaceniPoteziMs: staraDnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
-            najduziStreak: staraDnkStatistika?.najduziStreak ?? 0,
-            dugeRijeci: staraDnkStatistika?.dugeRijeci ?? 0,
-            srednjeDugeRijeci: staraDnkStatistika?.srednjeDugeRijeci ?? 0,
-            jakoDugeRijeci: staraDnkStatistika?.jakoDugeRijeci ?? 0,
-            rijetkeRijeci: staraDnkStatistika?.rijetkeRijeci ?? 0,
-            srednjeRijetkeRijeci: staraDnkStatistika?.srednjeRijetkeRijeci ?? 0,
-            jakoRijetkeRijeci: staraDnkStatistika?.jakoRijetkeRijeci ?? 0,
-          }),
-          mod,
-        )
-        : [];
+      const ucinakPrije = izracunajUniverzalniUcinak(
+        Number(rangPrijeRed?.rangSumaJedinica ?? 0),
+        rangPrijeRed?.rangBrojPartija ?? 0,
+      );
+      const zajednickiPrije = stariIgrac
+        ? await dohvatiZajednickiDnkPodaci(tx, r.igracId, ucinakPrije)
+        : null;
+      const prije = zajednickiPrije ? izracunajDnk(zajednickiPrije) : [];
       const [stariNiz] = !samoStatistika
         ? await tx.select().from(nizoviPobjedaIgraca).where(and(
           eq(nizoviPobjedaIgraca.igracId, r.igracId),
@@ -1044,32 +1093,36 @@ export async function zakljuciPartijuUBazi(
       const agregatZaDnk = agregati.get(r.igracId);
       if (agregatZaDnk) {
         const statistika = statistike.get(r.igracId);
-        const povijesniDnk = {
-          prihvaceniPotezi: staraDnkStatistika?.prihvaceniPotezi ?? 0,
-          ukupnoTrajanjePrihvaceniPoteziMs: staraDnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
-          najduziStreak: staraDnkStatistika?.najduziStreak ?? 0,
-          dugeRijeci: staraDnkStatistika?.dugeRijeci ?? 0,
-          srednjeDugeRijeci: staraDnkStatistika?.srednjeDugeRijeci ?? 0,
-          jakoDugeRijeci: staraDnkStatistika?.jakoDugeRijeci ?? 0,
-          rijetkeRijeci: staraDnkStatistika?.rijetkeRijeci ?? 0,
-          srednjeRijetkeRijeci: staraDnkStatistika?.srednjeRijetkeRijeci ?? 0,
-          jakoRijetkeRijeci: staraDnkStatistika?.jakoRijetkeRijeci ?? 0,
+        // Zbroj svih moda (zajednickiPrije) + delta ove partije.
+        const bazaPrije = zajednickiPrije ?? {
+          n2: 0,
+          n3: 0,
+          n4: 0,
+          eliminacijeUkupno: 0,
+          ...prazniDnkBrojaci(),
+          univerzalniUcinak: ucinakPrije,
         };
-        const ukupniDnk: DnkPodaci = {
-          odigrane: agregatZaDnk.odigrane,
-          bodovi: agregatZaDnk.bodoviUkupno,
-          eliminacije: (stariIgrac?.eliminacije ?? 0) + r.eliminacije,
-          prihvaceniPotezi: povijesniDnk.prihvaceniPotezi + (statistika?.prihvaceniPotezi ?? 0),
-          ukupnoTrajanjePrihvaceniPoteziMs: povijesniDnk.ukupnoTrajanjePrihvaceniPoteziMs + (statistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0),
-          najduziStreak: Math.max(povijesniDnk.najduziStreak, statistika?.najduziStreak ?? 0),
-          dugeRijeci: povijesniDnk.dugeRijeci + (statistika?.upisaneDugeRijeci ?? 0),
-          srednjeDugeRijeci: povijesniDnk.srednjeDugeRijeci + (statistika?.upisaneSrednjeDugeRijeci ?? 0),
-          jakoDugeRijeci: povijesniDnk.jakoDugeRijeci + (statistika?.upisaneJakoDugeRijeci ?? 0),
-          rijetkeRijeci: povijesniDnk.rijetkeRijeci + (statistika?.otkriveneRijetkeGrupe ?? 0),
-          srednjeRijetkeRijeci: povijesniDnk.srednjeRijetkeRijeci + (statistika?.otkriveneSrednjeRijetkeGrupe ?? 0),
-          jakoRijetkeRijeci: povijesniDnk.jakoRijetkeRijeci + (statistika?.otkriveneJakoRijetkeGrupe ?? 0),
+        const ukupniDnk: DnkPodaciZajednicki = {
+          n2: bazaPrije.n2 + (mod === 'dva_igraca' ? 1 : 0),
+          n3: bazaPrije.n3 + (mod === 'tri_igraca' ? 1 : 0),
+          n4: bazaPrije.n4 + (mod === 'cetiri_igraca' ? 1 : 0),
+          eliminacijeUkupno: bazaPrije.eliminacijeUkupno + r.eliminacije,
+          prihvaceniPotezi: bazaPrije.prihvaceniPotezi + (statistika?.prihvaceniPotezi ?? 0),
+          ukupnoTrajanjePrihvaceniPoteziMs:
+            bazaPrije.ukupnoTrajanjePrihvaceniPoteziMs + (statistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0),
+          najduziStreak: Math.max(bazaPrije.najduziStreak, statistika?.najduziStreak ?? 0),
+          dugeRijeci: bazaPrije.dugeRijeci + (statistika?.upisaneDugeRijeci ?? 0),
+          srednjeDugeRijeci: bazaPrije.srednjeDugeRijeci + (statistika?.upisaneSrednjeDugeRijeci ?? 0),
+          jakoDugeRijeci: bazaPrije.jakoDugeRijeci + (statistika?.upisaneJakoDugeRijeci ?? 0),
+          rijetkeRijeci: bazaPrije.rijetkeRijeci + (statistika?.otkriveneRijetkeGrupe ?? 0),
+          srednjeRijetkeRijeci: bazaPrije.srednjeRijetkeRijeci + (statistika?.otkriveneSrednjeRijetkeGrupe ?? 0),
+          jakoRijetkeRijeci: bazaPrije.jakoRijetkeRijeci + (statistika?.otkriveneJakoRijetkeGrupe ?? 0),
+          // Vještina se finalizira nakon PR09 upisa ranga (dnkPoslijePodaci).
+          univerzalniUcinak: ucinakPrije,
         };
-        agregatZaDnk.dnkPoslije = izracunajDnk(ukupniDnk, mod);
+        agregatZaDnk.javnePartijeUkupno = ukupniDnk.n2 + ukupniDnk.n3 + ukupniDnk.n4;
+        agregatZaDnk.dnkPoslijePodaci = ukupniDnk;
+        agregatZaDnk.dnkPoslije = izracunajDnk(ukupniDnk);
         agregatZaDnk.ocjenaIgre = izracunajOcjenuIgre({
           pobjeda: r.plasman === 1,
           prihvaceniPotezi: statistika?.prihvaceniPotezi ?? 0,
@@ -1344,6 +1397,14 @@ export async function zakljuciPartijuUBazi(
         agregat.rangBrojPartija = rangRez.rangBrojPoslije;
         agregat.rangSumaJedinica = rangRez.rangSumaPoslije;
         agregat.rangNaziv = rangRez.rangPoslije;
+        // PR10: Vještina na završnom ekranu koristi učinak nakon ove partije.
+        if (agregat.dnkPoslijePodaci) {
+          agregat.dnkPoslijePodaci = {
+            ...agregat.dnkPoslijePodaci,
+            univerzalniUcinak: izracunajUniverzalniUcinak(rangRez.rangSumaPoslije, rangRez.rangBrojPoslije),
+          };
+          agregat.dnkPoslije = izracunajDnk(agregat.dnkPoslijePodaci);
+        }
       }
 
       // Sandučic: XP, rang, forma_10 i gost sažetak nakon konačnog XP-a (uključujući misije). Botovi nemaju inbox.

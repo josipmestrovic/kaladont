@@ -244,11 +244,18 @@ describe('GET /ljestvica', () => {
     const odgovor = await fetch(`${adresa}/api/profil`, {
       headers: { authorization: `Bearer ${sesijskiToken}` },
     });
-    const tijelo = (await odgovor.json()) as { dnk: { cetiriIgraca: { osi: unknown[] } } };
+    const tijelo = (await odgovor.json()) as {
+      dnk: { osi: unknown[]; odigrano: number };
+      odigraneJavne?: number;
+      formati?: { cetiri_igraca: { odigrane: number }; dva_igraca: { odigrane: number }; tri_igraca: { odigrane: number } };
+    };
 
     expect(odgovor.status).toBe(200);
     expect(dnkNakonPartije).toBeDefined();
-    expect(tijelo.dnk.cetiriIgraca.osi).toEqual(dnkNakonPartije);
+    // PR10: jedan zajednički dnk; osi s API-ja === dnkPoslije nakon partije.
+    expect(tijelo.dnk.osi).toEqual(dnkNakonPartije);
+    expect(tijelo.odigraneJavne).toBe(tijelo.dnk.odigrano);
+    expect(tijelo.formati?.cetiri_igraca.odigrane).toBeGreaterThanOrEqual(1);
   });
 });
 

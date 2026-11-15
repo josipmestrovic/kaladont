@@ -1,11 +1,15 @@
 /**
- * Kaladont DNK: stil igre i profilni pregled za javne partije.
+ * Kaladont DNK: jedan radar za sve javne Dvoboje, Troboje i Četveroboje (PR10).
  * Server je kanonski izvor izračuna; klijent prima gotov profil.
+ *
+ * HINT (lanac 0.2.0): N2/N3/N4 dolaze iz formatnih agregata; Vještina iz PR09
+ * univerzalnog učinka (skala /178 = prag „Kaladont”). Ne koristiti igraci.dovrseneIgre.
  */
 
-import { odbijNepodrzaniMod, type ModPartije } from './katalog-partije.js';
+import type { ModPartije } from './katalog-partije.js';
+import { BROJ_PARTIJA_ZA_KALIBRACIJU } from './rangovi.js';
 
-/** DNK po formatu; Troboj ulazi u tip, izračun do PR10 odbija nepodržane puteve. */
+/** @deprecated PR10: DNK više nije po formatu; ostaje za tipove koji još nose kontekst partije. */
 export type ModDnk = ModPartije;
 
 export type DnkKljuc =
@@ -26,23 +30,35 @@ export interface DnkOs {
 }
 
 export interface DnkProfil {
-  mod: ModDnk;
+  /** Opcionalno: format više nije os DNK-a (PR10). */
+  mod?: ModDnk;
   otkljucan: boolean;
   odigrano: number;
   preostaloDoOtkljucavanja: number;
   osi: DnkOs[];
 }
 
-export interface DnkUlaz {
-  mod: ModDnk;
-  odigrano: number;
-  prosjekBodova?: number;
-  eliminacijePoPartiji?: number;
-  najduziStreak?: number;
-  prosjekPrihvacenogPotezaMs?: number;
-  ponderiraneDuge?: number;
-  ponderiraneRijetke?: number;
+/**
+ * Ulaz zajedničkog DNK-a (PR10).
+ * ponderiraneDuge/Rijetke = zbroj kategorija s ponderima 1/1,5/2 (ne prosjek po partiji).
+ */
+export interface DnkUlazZajednicki {
+  n2: number;
+  n3: number;
+  n4: number;
+  /** Potvrđene izazvane eliminacije (svih formata). */
+  eliminacijeUkupno: number;
+  najduziStreak: number;
+  prihvaceniPotezi: number;
+  ukupnoTrajanjePrihvaceniPoteziMs: number;
+  ponderiraneDuge: number;
+  ponderiraneRijetke: number;
+  /** izracunajUniverzalniUcinak iz PR09; isti učinak → ista Vještina. */
+  univerzalniUcinak: number;
 }
+
+/** @deprecated Koristi DnkUlazZajednicki. Zadržano ime kao alias za migraciju pozivatelja. */
+export type DnkUlaz = DnkUlazZajednicki;
 
 export interface DnkPrag {
   naziv: string;
@@ -52,78 +68,28 @@ export interface DnkPrag {
   max: number;
 }
 
+/** Gornja skala Vještine = prag ranga „Kaladont” (PR09 početni balans). */
+export const DNK_VJESTINA_SKALA_UCINKA = 178;
+
+/** Pojasevi 0–100 za oznake osi (osim brzine, koja zadržava vremenske oznake). */
+export const DNK_POJASEVI_0_100: readonly DnkPrag[] = [
+  { naziv: '1', vrijednost: 10, oznaka: '1', min: 0, max: 19.999 },
+  { naziv: '2', vrijednost: 30, oznaka: '2', min: 20, max: 39.999 },
+  { naziv: '3', vrijednost: 50, oznaka: '3', min: 40, max: 59.999 },
+  { naziv: '4', vrijednost: 70, oznaka: '4', min: 60, max: 79.999 },
+  { naziv: '5', vrijednost: 90, oznaka: '5', min: 80, max: 100 },
+];
+
+const OZNAKE_VJESTINA = ['Prvopisac', 'Riječarac', 'Jezičar', 'Lektor', 'Književnik'] as const;
+const OZNAKE_TAKTIKA = ['Pacifist', 'Dobrica', 'Taktičar', 'Napadač', 'Agresivac'] as const;
+const OZNAKE_FOKUS = ['Zagrijava se', 'Sabran', 'Usredotočen', 'Neuzdrman', 'Zen majstor'] as const;
+const OZNAKE_DUGE = ['Sažet', 'Rječit', 'Dugorečiv', 'Rastezljivac', 'Majstor dugih riječi'] as const;
+const OZNAKE_RIJETKE = ['Sigurne riječi', 'Tragač', 'Istraživač', 'Lovac na rijetkosti', 'Rječnički arheolog'] as const;
+
 export const DNK_PRAGOVI = {
-  vjestina: {
-    4: { min: 0, max: 100 },
-    1: { min: 0, max: 100 },
-  },
-  taktika: {
-    cetiri_igraca: [
-      { naziv: 'Pacifist', vrijednost: 0, oznaka: 'Pacifist', min: 0, max: 0.24 },
-      { naziv: 'Dobrica', vrijednost: 0.25, oznaka: 'Dobrica', min: 0.25, max: 0.49 },
-      { naziv: 'Taktičar', vrijednost: 0.5, oznaka: 'Taktičar', min: 0.5, max: 0.84 },
-      { naziv: 'Napadač', vrijednost: 0.85, oznaka: 'Napadač', min: 0.85, max: 1.19 },
-      { naziv: 'Agresivac', vrijednost: 1.2, oznaka: 'Agresivac', min: 1.2, max: 1.5 },
-    ],
-    dva_igraca: [
-      { naziv: 'Pacifist', vrijednost: 0, oznaka: 'Pacifist', min: 0, max: 0.09 },
-      { naziv: 'Dobrica', vrijednost: 0.1, oznaka: 'Dobrica', min: 0.1, max: 0.24 },
-      { naziv: 'Taktičar', vrijednost: 0.25, oznaka: 'Taktičar', min: 0.25, max: 0.44 },
-      { naziv: 'Napadač', vrijednost: 0.45, oznaka: 'Napadač', min: 0.45, max: 0.64 },
-      { naziv: 'Agresivac', vrijednost: 0.65, oznaka: 'Agresivac', min: 0.65, max: 0.8 },
-    ],
-  },
-  fokus: {
-    cetiri_igraca: [
-      { naziv: 'Zagrijava se', vrijednost: 0, oznaka: 'Zagrijava se', min: 0, max: 1 },
-      { naziv: 'Sabran', vrijednost: 2, oznaka: 'Sabran', min: 2, max: 4 },
-      { naziv: 'Usredotočen', vrijednost: 5, oznaka: 'Usredotočen', min: 5, max: 7 },
-      { naziv: 'Neuzdrman', vrijednost: 8, oznaka: 'Neuzdrman', min: 8, max: 11 },
-      { naziv: 'Zen majstor', vrijednost: 12, oznaka: 'Zen majstor', min: 12, max: 100 },
-    ],
-    dva_igraca: [
-      { naziv: 'Zagrijava se', vrijednost: 0, oznaka: 'Zagrijava se', min: 0, max: 1 },
-      { naziv: 'Sabran', vrijednost: 2, oznaka: 'Sabran', min: 2, max: 3 },
-      { naziv: 'Usredotočen', vrijednost: 4, oznaka: 'Usredotočen', min: 4, max: 5 },
-      { naziv: 'Neuzdrman', vrijednost: 6, oznaka: 'Neuzdrman', min: 6, max: 7 },
-      { naziv: 'Zen majstor', vrijednost: 8, oznaka: 'Zen majstor', min: 8, max: 100 },
-    ],
-  },
   brzina: {
     minMs: 4000,
-    maxMs: 14000,
-  },
-  duge_rijeci: {
-    cetiri_igraca: [
-      { naziv: 'Sažet', vrijednost: 0.1, oznaka: 'Sažet', min: 0, max: 0.24 },
-      { naziv: 'Rječit', vrijednost: 0.25, oznaka: 'Rječit', min: 0.25, max: 0.69 },
-      { naziv: 'Dugorečiv', vrijednost: 0.7, oznaka: 'Dugorečiv', min: 0.7, max: 1.19 },
-      { naziv: 'Rastezljivac', vrijednost: 1.2, oznaka: 'Rastezljivac', min: 1.2, max: 1.99 },
-      { naziv: 'Majstor dugih riječi', vrijednost: 2, oznaka: 'Majstor dugih riječi', min: 2, max: 100 },
-    ],
-    dva_igraca: [
-      { naziv: 'Sažet', vrijednost: 0.1, oznaka: 'Sažet', min: 0, max: 0.14 },
-      { naziv: 'Rječit', vrijednost: 0.15, oznaka: 'Rječit', min: 0.15, max: 0.49 },
-      { naziv: 'Dugorečiv', vrijednost: 0.5, oznaka: 'Dugorečiv', min: 0.5, max: 0.89 },
-      { naziv: 'Rastezljivac', vrijednost: 0.9, oznaka: 'Rastezljivac', min: 0.9, max: 1.49 },
-      { naziv: 'Majstor dugih riječi', vrijednost: 1.5, oznaka: 'Majstor dugih riječi', min: 1.5, max: 100 },
-    ],
-  },
-  rijetke_rijeci: {
-    cetiri_igraca: [
-      { naziv: 'Sigurne riječi', vrijednost: 0.05, oznaka: 'Sigurne riječi', min: 0, max: 0.04 },
-      { naziv: 'Tragač', vrijednost: 0.05, oznaka: 'Tragač', min: 0.05, max: 0.19 },
-      { naziv: 'Istraživač', vrijednost: 0.2, oznaka: 'Istraživač', min: 0.2, max: 0.39 },
-      { naziv: 'Lovac na rijetkosti', vrijednost: 0.4, oznaka: 'Lovac na rijetkosti', min: 0.4, max: 0.74 },
-      { naziv: 'Rječnički arheolog', vrijednost: 0.75, oznaka: 'Rječnički arheolog', min: 0.75, max: 100 },
-    ],
-    dva_igraca: [
-      { naziv: 'Sigurne riječi', vrijednost: 0.05, oznaka: 'Sigurne riječi', min: 0, max: 0.04 },
-      { naziv: 'Tragač', vrijednost: 0.05, oznaka: 'Tragač', min: 0.05, max: 0.14 },
-      { naziv: 'Istraživač', vrijednost: 0.15, oznaka: 'Istraživač', min: 0.15, max: 0.29 },
-      { naziv: 'Lovac na rijetkosti', vrijednost: 0.3, oznaka: 'Lovac na rijetkosti', min: 0.3, max: 0.49 },
-      { naziv: 'Rječnički arheolog', vrijednost: 0.5, oznaka: 'Rječnički arheolog', min: 0.5, max: 100 },
-    ],
+    maxMs: 15000,
   },
 } as const;
 
@@ -147,8 +113,9 @@ export function izracunajDnkTier(vrijednost: number, pragovi: readonly { min: nu
   return pragovi.findIndex((prag) => prag === match) + 1;
 }
 
+/** Otključavanje nakon 10 javnih partija ukupno (N2+N3+N4). */
 export function jeDnkOtkljucan(odigrano: number): boolean {
-  return odigrano >= 10;
+  return odigrano >= BROJ_PARTIJA_ZA_KALIBRACIJU;
 }
 
 export function izracunajOcjenuDnk(osi: readonly DnkOs[]): number {
@@ -191,126 +158,161 @@ export function postotakXpZaOcjenu(ocjena: number): number {
   return Math.max(0, Math.min(20, Math.max(0, ocjena - 1) * 5));
 }
 
-/** Troboj privremeno dijeli četverobojske DNK pragove do PR10. */
-function dnkSkalaModa(mod: ModPartije): 'dva_igraca' | 'cetiri_igraca' {
-  return mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
+function oznakaIzPojasa(vrijednost: number, oznake: readonly string[]): { oznaka: string; tier: number } {
+  const clipped = Math.max(0, Math.min(100, vrijednost));
+  const indeks = clipped < 20 ? 0 : clipped < 40 ? 1 : clipped < 60 ? 2 : clipped < 80 ? 3 : 4;
+  return { oznaka: oznake[indeks]!, tier: indeks + 1 };
 }
 
-export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
-  // Troboj privremeno dijeli četverobojske nazivnike do jednog DNK-a (PR10).
-  if (ulaz.mod !== 'tri_igraca') {
-    odbijNepodrzaniMod(ulaz.mod, 'izracunajKaladontDnk');
-  }
-  const mod = ulaz.mod;
-  const skala = dnkSkalaModa(mod);
-  const otkljucan = jeDnkOtkljucan(ulaz.odigrano);
-  const prosjekBodova = ulaz.prosjekBodova ?? 0;
-  const eliminacijePoPartiji = ulaz.eliminacijePoPartiji ?? 0;
-  const najduziStreak = ulaz.najduziStreak ?? 0;
-  const prosjekPrihvacenogPotezaMs = ulaz.prosjekPrihvacenogPotezaMs ?? 0;
-  const ponderiraneDuge = ulaz.ponderiraneDuge ?? 0;
-  const ponderiraneRijetke = ulaz.ponderiraneRijetke ?? 0;
+function ogranicenaOs(vrijednost: number): number {
+  return Math.max(0, Math.min(100, Math.round(vrijednost)));
+}
 
-  const vrijednostVjestina = otkljucan ? Math.max(10, Math.min(100, (prosjekBodova / 5.7) * 100)) : 0;
-  const vrijednostTaktika = Math.max(0, Math.min(100, (eliminacijePoPartiji / (skala === 'dva_igraca' ? 0.8 : 1.5)) * 100));
-  const vrijednostFokus = Math.max(0, Math.min(100, (najduziStreak / (skala === 'dva_igraca' ? 8 : 12)) * 100));
-  const vrijednostBrzina = Math.max(0, Math.min(100, prosjekPrihvacenogPotezaMs <= 4000 ? 100 : 100 - ((prosjekPrihvacenogPotezaMs - 4000) / 11000) * 100));
-  const vrijednostDuge = Math.max(0, Math.min(100, (ponderiraneDuge / (skala === 'dva_igraca' ? 1.5 : 2)) * 100));
-  const vrijednostRijetke = Math.max(0, Math.min(100, (ponderiraneRijetke / (skala === 'dva_igraca' ? 0.5 : 0.75)) * 100));
+/** Nazivnici PR10 (početni balans). */
+export function nazivnikTaktike(n2: number, n3: number, n4: number): number {
+  return 0.8 * n2 + 1.15 * n3 + 1.5 * n4;
+}
+
+export function nazivnikDugih(n2: number, n3: number, n4: number): number {
+  return 1.5 * n2 + 1.75 * n3 + 2 * n4;
+}
+
+export function nazivnikRijetkih(n2: number, n3: number, n4: number): number {
+  return 0.5 * n2 + 0.625 * n3 + 0.75 * n4;
+}
+
+export function vrijednostBrzineMs(prosjekPrihvacenogPotezaMs: number): number {
+  if (prosjekPrihvacenogPotezaMs <= 0) return 0;
+  if (prosjekPrihvacenogPotezaMs <= 4000) return 100;
+  if (prosjekPrihvacenogPotezaMs >= 15000) return 0;
+  return 100 - ((prosjekPrihvacenogPotezaMs - 4000) / 11000) * 100;
+}
+
+/**
+ * Jedan Kaladont DNK za sve javne formate.
+ * HINT: n2/n3/n4 moraju biti stvarne odigrane javne partije (ne dovrseneIgre).
+ */
+export function izracunajKaladontDnk(ulaz: DnkUlazZajednicki): DnkProfil {
+  const n2 = Math.max(0, ulaz.n2);
+  const n3 = Math.max(0, ulaz.n3);
+  const n4 = Math.max(0, ulaz.n4);
+  const odigrano = n2 + n3 + n4;
+  const otkljucan = jeDnkOtkljucan(odigrano);
+
+  const eliminacijeUkupno = Math.max(0, ulaz.eliminacijeUkupno);
+  const najduziStreak = Math.max(0, ulaz.najduziStreak);
+  const prihvaceniPotezi = Math.max(0, ulaz.prihvaceniPotezi);
+  const ukupnoMs = Math.max(0, ulaz.ukupnoTrajanjePrihvaceniPoteziMs);
+  const prosjekPrihvacenogPotezaMs = prihvaceniPotezi > 0 ? ukupnoMs / prihvaceniPotezi : 0;
+  const ponderiraneDuge = Math.max(0, ulaz.ponderiraneDuge);
+  const ponderiraneRijetke = Math.max(0, ulaz.ponderiraneRijetke);
+  const univerzalniUcinak = Math.max(0, ulaz.univerzalniUcinak);
+
+  const nt = nazivnikTaktike(n2, n3, n4);
+  const nd = nazivnikDugih(n2, n3, n4);
+  const nr = nazivnikRijetkih(n2, n3, n4);
+
+  const vrijednostVjestina = otkljucan
+    ? Math.max(0, Math.min(100, (100 * univerzalniUcinak) / DNK_VJESTINA_SKALA_UCINKA))
+    : 0;
+  const vrijednostTaktika = nt > 0 ? Math.max(0, Math.min(100, (100 * eliminacijeUkupno) / nt)) : 0;
+  const vrijednostFokus = Math.max(0, Math.min(100, (100 * najduziStreak) / 10));
+  const vrijednostBrzina = vrijednostBrzineMs(prosjekPrihvacenogPotezaMs);
+  const vrijednostDuge = nd > 0 ? Math.max(0, Math.min(100, (100 * ponderiraneDuge) / nd)) : 0;
+  const vrijednostRijetke = nr > 0 ? Math.max(0, Math.min(100, (100 * ponderiraneRijetke) / nr)) : 0;
+
+  const vjestina = ogranicenaOs(vrijednostVjestina);
+  const taktika = ogranicenaOs(vrijednostTaktika);
+  const fokus = ogranicenaOs(vrijednostFokus);
+  const brzina = ogranicenaOs(vrijednostBrzina);
+  const duge = ogranicenaOs(vrijednostDuge);
+  const rijetke = ogranicenaOs(vrijednostRijetke);
+
+  const ozV = oznakaIzPojasa(vjestina, OZNAKE_VJESTINA);
+  const ozT = oznakaIzPojasa(taktika, OZNAKE_TAKTIKA);
+  const ozF = oznakaIzPojasa(fokus, OZNAKE_FOKUS);
+  const ozD = oznakaIzPojasa(duge, OZNAKE_DUGE);
+  const ozR = oznakaIzPojasa(rijetke, OZNAKE_RIJETKE);
+
+  let oznakaBrzina = 'Skupljamo podatke';
+  let tierBrzina = 1;
+  if (prosjekPrihvacenogPotezaMs > 0) {
+    const sekunde = prosjekPrihvacenogPotezaMs / 1000;
+    if (sekunde >= 15) {
+      oznakaBrzina = 'Promišljen';
+      tierBrzina = 1;
+    } else if (sekunde > 10) {
+      oznakaBrzina = 'Staloženi';
+      tierBrzina = 2;
+    } else if (sekunde > 7) {
+      oznakaBrzina = 'Brzi';
+      tierBrzina = 3;
+    } else if (sekunde > 4) {
+      oznakaBrzina = 'Brzopotezaš';
+      tierBrzina = 4;
+    } else {
+      oznakaBrzina = 'Munjevit';
+      tierBrzina = 5;
+    }
+  }
 
   const osi: DnkOs[] = [
-    { kljuc: 'vjestina', naziv: 'Vještina', vrijednost: Math.round(vrijednostVjestina), tier: 1, oznaka: 'N/A', detalj: `Prosjek bodova: ${prosjekBodova.toFixed(2)}` },
-    { kljuc: 'taktika', naziv: 'Taktika', vrijednost: Math.round(vrijednostTaktika), tier: 1, oznaka: 'Taktičar', detalj: `Eliminacije po partiji: ${eliminacijePoPartiji.toFixed(2)}` },
-    { kljuc: 'fokus', naziv: 'Fokus', vrijednost: Math.round(vrijednostFokus), tier: 1, oznaka: 'Sabran', detalj: `Niz prihvaćenih riječi: ${najduziStreak}` },
-    { kljuc: 'brzina', naziv: 'Brzina', vrijednost: Math.round(vrijednostBrzina), tier: 1, oznaka: 'Skupljamo podatke', detalj: prosjekPrihvacenogPotezaMs > 0 ? `Prosjek prihvaćenog poteza: ${(prosjekPrihvacenogPotezaMs / 1000).toFixed(1)} s` : 'Nema dovoljno podataka' },
-    { kljuc: 'duge_rijeci', naziv: 'Duge riječi', vrijednost: Math.round(vrijednostDuge), tier: 1, oznaka: 'Sažet', detalj: '' },
-    { kljuc: 'rijetke_rijeci', naziv: 'Rijetke riječi', vrijednost: Math.round(vrijednostRijetke), tier: 1, oznaka: 'Sigurne riječi', detalj: '' },
+    {
+      kljuc: 'vjestina',
+      naziv: 'Vještina',
+      vrijednost: vjestina,
+      tier: ozV.tier,
+      oznaka: ozV.oznaka,
+      detalj: `Univerzalni učinak: ${univerzalniUcinak.toFixed(1)}`,
+    },
+    {
+      kljuc: 'taktika',
+      naziv: 'Taktika',
+      vrijednost: taktika,
+      tier: ozT.tier,
+      oznaka: ozT.oznaka,
+      detalj: `Izazvane eliminacije: ${eliminacijeUkupno}`,
+    },
+    {
+      kljuc: 'fokus',
+      naziv: 'Fokus',
+      vrijednost: fokus,
+      tier: ozF.tier,
+      oznaka: ozF.oznaka,
+      detalj: `Niz prihvaćenih riječi: ${najduziStreak}`,
+    },
+    {
+      kljuc: 'brzina',
+      naziv: 'Brzina',
+      vrijednost: brzina,
+      tier: tierBrzina,
+      oznaka: oznakaBrzina,
+      detalj: prosjekPrihvacenogPotezaMs > 0
+        ? `Prosjek prihvaćenog poteza: ${(prosjekPrihvacenogPotezaMs / 1000).toFixed(1)} s`
+        : 'Nema dovoljno podataka',
+    },
+    {
+      kljuc: 'duge_rijeci',
+      naziv: 'Duge riječi',
+      vrijednost: duge,
+      tier: ozD.tier,
+      oznaka: ozD.oznaka,
+      detalj: '',
+    },
+    {
+      kljuc: 'rijetke_rijeci',
+      naziv: 'Rijetke riječi',
+      vrijednost: rijetke,
+      tier: ozR.tier,
+      oznaka: ozR.oznaka,
+      detalj: '',
+    },
   ];
-
-  const vjestinaPrag: readonly DnkPrag[] = skala === 'dva_igraca' ? [
-    { min: 0, max: 0.29, naziv: 'Prvopisac', oznaka: 'Prvopisac', vrijednost: 0 },
-    { min: 0.3, max: 0.39, naziv: 'Riječarac', oznaka: 'Riječarac', vrijednost: 0.35 },
-    { min: 0.4, max: 0.46, naziv: 'Jezičar', oznaka: 'Jezičar', vrijednost: 0.43 },
-    { min: 0.47, max: 0.53, naziv: 'Lektor', oznaka: 'Lektor', vrijednost: 0.5 },
-    { min: 0.54, max: 0.6, naziv: 'Književnik', oznaka: 'Književnik', vrijednost: 0.57 },
-    { min: 0.61, max: 0.67, naziv: 'Jezikoslovac', oznaka: 'Jezikoslovac', vrijednost: 0.64 },
-    { min: 0.68, max: 0.74, naziv: 'Doktor riječi', oznaka: 'Doktor riječi', vrijednost: 0.71 },
-    { min: 0.75, max: 0.81, naziv: 'Jezični maestro', oznaka: 'Jezični maestro', vrijednost: 0.78 },
-    { min: 0.82, max: 0.88, naziv: 'Gospodar rječnika', oznaka: 'Gospodar rječnika', vrijednost: 0.85 },
-    { min: 0.89, max: 1, naziv: 'Kaladont', oznaka: 'Kaladont', vrijednost: 0.95 },
-  ] : [
-    { min: 0, max: 1.49, naziv: 'Prvopisac', oznaka: 'Prvopisac', vrijednost: 0 },
-    { min: 1.5, max: 2.09, naziv: 'Riječarac', oznaka: 'Riječarac', vrijednost: 1.8 },
-    { min: 2.1, max: 2.49, naziv: 'Jezičar', oznaka: 'Jezičar', vrijednost: 2.3 },
-    { min: 2.5, max: 2.89, naziv: 'Lektor', oznaka: 'Lektor', vrijednost: 2.7 },
-    { min: 2.9, max: 3.29, naziv: 'Književnik', oznaka: 'Književnik', vrijednost: 3.1 },
-    { min: 3.3, max: 3.79, naziv: 'Jezikoslovac', oznaka: 'Jezikoslovac', vrijednost: 3.5 },
-    { min: 3.8, max: 4.39, naziv: 'Doktor riječi', oznaka: 'Doktor riječi', vrijednost: 4.1 },
-    { min: 4.4, max: 4.99, naziv: 'Jezični maestro', oznaka: 'Jezični maestro', vrijednost: 4.7 },
-    { min: 5.0, max: 5.69, naziv: 'Gospodar rječnika', oznaka: 'Gospodar rječnika', vrijednost: 5.3 },
-    { min: 5.7, max: 10, naziv: 'Kaladont', oznaka: 'Kaladont', vrijednost: 7.5 },
-  ];
-
-  for (let i = 0; i < osi.length; i += 1) {
-    const os = osi[i]!;
-    if (os.kljuc === 'vjestina') {
-      const match = izracunajPragZaVrijednost(prosjekBodova, vjestinaPrag);
-      os.oznaka = match.oznaka;
-      os.detalj = `Prosjek bodova: ${prosjekBodova.toFixed(2)}`;
-      os.vrijednost = Math.max(10, Math.min(100, Math.round((prosjekBodova / (skala === 'dva_igraca' ? 0.89 : 5.7)) * 100)));
-      os.tier = Math.max(1, Math.min(10, Math.round(os.vrijednost / 10)));
-      continue;
-    }
-    if (os.kljuc === 'taktika') {
-      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.taktika[skala];
-      const match = izracunajPragZaVrijednost(eliminacijePoPartiji, pragovi);
-      os.oznaka = match.oznaka;
-      os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
-      continue;
-    }
-    if (os.kljuc === 'fokus') {
-      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.fokus[skala];
-      const match = izracunajPragZaVrijednost(najduziStreak, pragovi);
-      os.oznaka = match.oznaka;
-      os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
-      continue;
-    }
-    if (os.kljuc === 'brzina') {
-      if (prosjekPrihvacenogPotezaMs <= 0) {
-        os.oznaka = 'Skupljamo podatke';
-        os.vrijednost = 0;
-        os.tier = 1;
-        continue;
-      }
-      const sekunde = prosjekPrihvacenogPotezaMs / 1000;
-      if (sekunde > 14) os.oznaka = 'Promišljen';
-      else if (sekunde > 10) os.oznaka = 'Staloženi';
-      else if (sekunde > 7) os.oznaka = 'Brzi';
-      else if (sekunde > 4) os.oznaka = 'Brzopotezaš';
-      else os.oznaka = 'Munjevit';
-      os.tier = sekunde <= 4 ? 5 : sekunde <= 7 ? 4 : sekunde <= 10 ? 3 : sekunde <= 14 ? 2 : 1;
-      continue;
-    }
-    if (os.kljuc === 'duge_rijeci') {
-      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.duge_rijeci[skala];
-      const match = izracunajPragZaVrijednost(ponderiraneDuge, pragovi);
-      os.oznaka = match.oznaka;
-      os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
-      continue;
-    }
-    if (os.kljuc === 'rijetke_rijeci') {
-      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.rijetke_rijeci[skala];
-      const match = izracunajPragZaVrijednost(ponderiraneRijetke, pragovi);
-      os.oznaka = match.oznaka;
-      os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
-    }
-  }
 
   return {
-    mod,
     otkljucan,
-    odigrano: ulaz.odigrano,
-    preostaloDoOtkljucavanja: Math.max(0, 10 - ulaz.odigrano),
+    odigrano,
+    preostaloDoOtkljucavanja: Math.max(0, BROJ_PARTIJA_ZA_KALIBRACIJU - odigrano),
     osi,
   };
 }
