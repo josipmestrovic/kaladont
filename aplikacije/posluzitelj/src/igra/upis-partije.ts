@@ -1095,8 +1095,11 @@ export async function zakljuciPartijuUBazi(
       }
 
       if (!samoStatistika && r.plasman === 1 && primaGamifikaciju) {
-        const kruna = await priznajDnevnuPobjeduModa(tx, { igracId: r.igracId, mod, zavrsenoU });
-        primijeniDodjelu(r.igracId, kruna, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+        // Dvostruka kruna prati samo Dvoboj+Četveroboj; Troboj ne ulazi do šireg dostignuća.
+        if (mod === 'dva_igraca' || mod === 'cetiri_igraca') {
+          const kruna = await priznajDnevnuPobjeduModa(tx, { igracId: r.igracId, mod, zavrsenoU });
+          primijeniDodjelu(r.igracId, kruna, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+        }
         const statistikaPobjede = statistike.get(r.igracId);
         // Čista petica: pobjeda, ≥5 prihvaćenih riječi i točno 0 pravih pogrešnih unosa.
         // pogresniUnosi broji samo odbijene riječi koje lome niz (nevažeća riječ, krivi nastavak,
@@ -1235,6 +1238,8 @@ export async function zakljuciPartijuUBazi(
       }
 
       // Misije: nakon partijskog XP-a i pohvala, prije commita.
+      // MetrikeMisijaIgre još ne poznaje Troboj — preskoči do proširenja kataloga misija.
+      if (mod === 'dva_igraca' || mod === 'cetiri_igraca') {
       const igraciZaMisije = [...agregati.entries()]
         .filter(([, a]) => a.upravljac === 'covjek' && (a.vrstaIgraca === 'registriran' || a.vrstaIgraca === 'admin'))
         .sort(([a], [b]) => a.localeCompare(b));
@@ -1288,6 +1293,7 @@ export async function zakljuciPartijuUBazi(
           agregat.novaDostignuca = [...poId.values()];
         }
         zapamtiObavijesti(igracId, ishod.noveObavijesti ?? []);
+      }
       }
 
       // Sandučic: XP, rang, forma_10 i gost sažetak nakon konačnog XP-a (uključujući misije). Botovi nemaju inbox.
