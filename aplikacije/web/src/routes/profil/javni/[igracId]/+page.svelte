@@ -137,6 +137,14 @@
     return null;
   }
 
+  async function primijeniHashPogled() {
+    const izHasha = pogledIzHasha(window.location.hash);
+    if (!izHasha || !profil) return;
+    aktivniPogled = izHasha;
+    await tick();
+    document.getElementById(izHasha)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   onMount(() => {
     const prilagodiAvatar = () => {
       const sirina = window.innerWidth;
@@ -144,22 +152,22 @@
       else if (sirina < 380) velicinaAvatara = 136;
       else velicinaAvatara = 160;
     };
+    const naPromjenuHasha = () => { void primijeniHashPogled(); };
     prilagodiAvatar();
     window.addEventListener('resize', prilagodiAvatar);
+    window.addEventListener('hashchange', naPromjenuHasha);
     void (async () => {
       try {
         profil = await api<JavniProfil>(`/profil/javni/${$page.params.igracId}`);
-        const izHasha = pogledIzHasha(window.location.hash);
-        if (izHasha) {
-          aktivniPogled = izHasha;
-          await tick();
-          document.getElementById(izHasha)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        if (profil) await primijeniHashPogled();
       } catch (e) {
         greska = e instanceof Error ? e.message : 'Profil nije moguće učitati.';
       }
     })();
-    return () => window.removeEventListener('resize', prilagodiAvatar);
+    return () => {
+      window.removeEventListener('resize', prilagodiAvatar);
+      window.removeEventListener('hashchange', naPromjenuHasha);
+    };
   });
 
   function listaRijeci(kategorija: string): string[] {

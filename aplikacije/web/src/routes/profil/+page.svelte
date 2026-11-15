@@ -165,6 +165,14 @@
     return null;
   }
 
+  async function primijeniHashPogled() {
+    const izHasha = pogledIzHasha(window.location.hash);
+    if (!izHasha || !profil) return;
+    promijeniPogled(izHasha);
+    await tick();
+    document.getElementById(izHasha)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   onMount(() => {
     ucitajAseteProfila();
     const prilagodiAvatar = () => {
@@ -173,24 +181,23 @@
       else if (sirina < 380) velicinaAvatara = 136; // uski mobitel: 160 − 15%
       else velicinaAvatara = 160;
     };
+    const naPromjenuHasha = () => { void primijeniHashPogled(); };
     prilagodiAvatar();
     window.addEventListener('resize', prilagodiAvatar);
+    // HINT: hashchange pokriva goto /profil#statistika bez remounta.
+    window.addEventListener('hashchange', naPromjenuHasha);
     void (async () => {
       try {
         profil = await api<Profil>('/profil');
-        if (profil) {
-          const izHasha = pogledIzHasha(window.location.hash);
-          if (izHasha) {
-            promijeniPogled(izHasha);
-            await tick();
-            document.getElementById(izHasha)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }
+        if (profil) await primijeniHashPogled();
       } catch (e) {
         greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje profila.';
       }
     })();
-    return () => window.removeEventListener('resize', prilagodiAvatar);
+    return () => {
+      window.removeEventListener('resize', prilagodiAvatar);
+      window.removeEventListener('hashchange', naPromjenuHasha);
+    };
   });
 
   function listaRijeci(kategorija: string): string[] {
