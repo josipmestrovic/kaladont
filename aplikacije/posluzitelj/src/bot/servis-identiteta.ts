@@ -9,7 +9,8 @@ import {
   KANDIDATI_NADIMAKA_BOTOVA,
   NADIMCI_POCETNOG_FONDA_V4,
 } from './nadimci.js';
-import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA } from './konfiguracija-bota.js';
+import { ZADANA_KONFIGURACIJA_BOTA } from './konfiguracija-bota.js';
+import { parsajSpremljenuKonfiguraciju } from './trajne-postavke.js';
 
 export const MAKSIMALNO_AKTIVNIH_BOTOVA = 100;
 const ZAKLJUCAVANJE_FONDA_BOTOVA = 1_784_120_339;
@@ -17,8 +18,9 @@ const PREFIKS_FONDA_V4 = 'bot-v4-';
 
 export async function dohvatiLimitAktivnihBotova(): Promise<number> {
   const [zapis] = await baza.select({ konfiguracija: postavkeBotova.konfiguracija }).from(postavkeBotova).where(eq(postavkeBotova.id, 1));
+  // Stari v3 JSON mora proći kroz deep-merge (tri_igraca / botoviTroboj), ne kroz goli Shema.parse.
   return zapis
-    ? ShemaKonfiguracijeBota.parse({ ...ZADANA_KONFIGURACIJA_BOTA, ...(zapis.konfiguracija as object) }).maksimalnoAktivnihBotova
+    ? parsajSpremljenuKonfiguraciju(zapis.konfiguracija).maksimalnoAktivnihBotova
     : ZADANA_KONFIGURACIJA_BOTA.maksimalnoAktivnihBotova;
 }
 

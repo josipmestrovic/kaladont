@@ -3,7 +3,8 @@ import { konfiguracija } from '../konfiguracija.js';
 import { baza, zatvoriBazu } from '../baza/klijent.js';
 import { igraci, partije, postavkeBotova, sudioniciPartije } from '../baza/shema.js';
 import { pregledZamjeneFondaBotova, zamijeniFondBotova } from '../bot/servis-identiteta.js';
-import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA } from '../bot/konfiguracija-bota.js';
+import { ZADANA_KONFIGURACIJA_BOTA } from '../bot/konfiguracija-bota.js';
+import { parsajSpremljenuKonfiguraciju } from '../bot/trajne-postavke.js';
 
 async function glavno(): Promise<void> {
   const primijeni = process.argv.includes('--primijeni=DA');
@@ -30,7 +31,7 @@ async function glavno(): Promise<void> {
   if (Number(aktivnePartije?.broj ?? 0) > 0) throw new Error('Postoje spremljene aktivne partije. Pričekaj završetak i ponovi pregled.');
   const [trajni] = await baza.select({ konfiguracija: postavkeBotova.konfiguracija }).from(postavkeBotova).where(eq(postavkeBotova.id, 1));
   const aktivniLimit = trajni
-    ? ShemaKonfiguracijeBota.parse({ ...ZADANA_KONFIGURACIJA_BOTA, ...(trajni.konfiguracija as object) }).maksimalnoAktivnihBotova
+    ? parsajSpremljenuKonfiguraciju(trajni.konfiguracija).maksimalnoAktivnihBotova
     : ZADANA_KONFIGURACIJA_BOTA.maksimalnoAktivnihBotova;
   const rezultat = await zamijeniFondBotova(null, aktivniLimit);
   console.log(`Zamjena završena: ${JSON.stringify(rezultat)}`);
