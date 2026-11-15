@@ -28,7 +28,11 @@ import {
 import { konfiguracija } from '../konfiguracija.js';
 import { baza, zatvoriBazu } from '../baza/klijent.js';
 import { igraci, obracuniPartija, partije, sudioniciPartije } from '../baza/shema.js';
-import { upisiUniverzalniRangZaStol, type RangSudionikUlaz } from '../igra/univerzalni-rang.js';
+import {
+  primaUniverzalniRangAgregat,
+  upisiUniverzalniRangZaStol,
+  type RangSudionikUlaz,
+} from '../igra/univerzalni-rang.js';
 
 const VELICINA_SERIJE = 100;
 
@@ -175,6 +179,7 @@ async function obradiSeriju(odId: string | null, primijeni: boolean): Promise<{
         bodovi: sudioniciPartije.bodovi,
         plasman: sudioniciPartije.plasman,
         rangIzracunVerzija: sudioniciPartije.rangIzracunVerzija,
+        rangDoprinosJedinice: sudioniciPartije.rangDoprinosJedinice,
         upravljac: igraci.upravljac,
         vrsta: igraci.vrsta,
       })
@@ -191,8 +196,17 @@ async function obradiSeriju(odId: string | null, primijeni: boolean): Promise<{
       continue;
     }
 
-    const sviVecUpisani = sudionici.every((s) => s.rangIzracunVerzija === RANG_IZRACUN_VERZIJA);
-    if (sviVecUpisani) {
+    // Gost/bot namjerno nemaju verziju — gotovo = doprinos upisan;
+    // registrirani/admin gotovo = verzija stamped (agregat uzet).
+    const sviGotovi = sudionici.every((s) => {
+      const upravljac = s.upravljac === 'bot' ? 'bot' : 'covjek';
+      const vrsta = s.vrsta === 'admin' || s.vrsta === 'registriran' || s.vrsta === 'gost' ? s.vrsta : 'gost';
+      if (primaUniverzalniRangAgregat(upravljac, vrsta)) {
+        return s.rangIzracunVerzija === RANG_IZRACUN_VERZIJA;
+      }
+      return s.rangDoprinosJedinice != null;
+    });
+    if (sviGotovi) {
       preskoceno += 1;
       continue;
     }

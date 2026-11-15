@@ -81,10 +81,14 @@ export async function upisiUniverzalniRangZaSudionika(
 
   const vecUpisan = postojeci?.rangIzracunVerzija === RANG_IZRACUN_VERZIJA;
 
+  // Čitaj vrstu/upravljača iz zaključanog retka (ne iz snapshot-a pozivatelja):
+  // gost može postati registriran tijekom spremanja rezultata.
   const [agregatPrije] = await tx
     .select({
       rangBrojPartija: igraci.rangBrojPartija,
       rangSumaJedinica: igraci.rangSumaJedinica,
+      upravljac: igraci.upravljac,
+      vrsta: igraci.vrsta,
     })
     .from(igraci)
     .where(eq(igraci.id, sud.igracId))
@@ -94,9 +98,15 @@ export async function upisiUniverzalniRangZaSudionika(
   const rangSumaPrije = Number(agregatPrije?.rangSumaJedinica ?? 0);
   const rangPrije = izracunajRangIzAgregata(rangSumaPrije, rangBrojPrije);
 
+  const upravljacDb = agregatPrije?.upravljac === 'bot' ? 'bot' : 'covjek';
+  const vrstaDb: RangSudionikUlaz['vrstaIgraca'] =
+    agregatPrije?.vrsta === 'admin' || agregatPrije?.vrsta === 'registriran' || agregatPrije?.vrsta === 'gost'
+      ? agregatPrije.vrsta
+      : sud.vrstaIgraca;
+
   // HINT (Bugbot): verziju stavi SAMO uz inkrement agregata. Gost/bot: doprinos bez
   // verzije — RS-20 `preuzmiGostovskeRangDoprinose` ih pokupi pri registraciji.
-  const smijeAgregat = primaUniverzalniRangAgregat(sud.upravljac, sud.vrstaIgraca);
+  const smijeAgregat = primaUniverzalniRangAgregat(upravljacDb, vrstaDb);
   const sadaUpisujemoAgregat = !vecUpisan && smijeAgregat;
 
   await tx
