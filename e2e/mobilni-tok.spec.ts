@@ -165,8 +165,9 @@ test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomican
   await page.goto('/pravila-kaladonta/bodovi');
   const rangovi = page.locator('.tablica-rangova tbody tr');
   await expect(rangovi).toHaveCount(10);
-  await expect(rangovi.first().locator('td').last()).toContainText('< 0,30');
-  await expect(rangovi.last().locator('td').last()).toContainText('> 0,89');
+  // PR09: univerzalni pragovi (cijeli brojevi), ne stari udio pobjeda.
+  await expect(rangovi.first().locator('td').last()).toContainText('< 60');
+  await expect(rangovi.last().locator('td').last()).toContainText('≥ 178');
   await expect(rangovi.first().locator('.rang-uzorak')).toHaveCSS('border-top-width', '5px');
 
   await page.setViewportSize({ width: 1000, height: 760 });

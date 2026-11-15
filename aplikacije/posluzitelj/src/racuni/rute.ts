@@ -31,6 +31,7 @@ import {
   provjeriTokenResetaLozinke,
 } from './tokeni.js';
 import { stvoriDobrodoslicu, stvoriPorukuPotvrdeEmaila } from '../sanducic/okidaci.js';
+import { preuzmiGostovskeRangDoprinose } from '../igra/univerzalni-rang.js';
 
 export interface OpcijeAuthRateLimita {
   omogucen: boolean;
@@ -194,6 +195,14 @@ export async function registrirajRacuneRute(
       }
       igracId = postojeciGost.id;
       konacniNadimak = nadimak ?? postojeciGost.nadimak;
+      // PR09 / Bugbot: gostove javne doprinose bez verzije uvrsti u univerzalni agregat.
+      try {
+        await baza.transaction(async (tx) => {
+          await preuzmiGostovskeRangDoprinose(tx, igracId);
+        });
+      } catch (greska) {
+        console.error('PR09: preuzimanje gostovskih rang doprinosa nije uspjelo', greska);
+      }
     } else {
       const [novi] = await baza
         .insert(igraci)

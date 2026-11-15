@@ -131,13 +131,11 @@ function hijerarhijaRanga(rang: string | null): number {
 }
 
 /**
- * @deprecated PR09 — prikazni rang više nije max(2p,4p). Vrati prvi ne-null rang.
- * Zadržano dok web/poslužitelj potpuno ne pređu na jedan izvor.
+ * @deprecated PR09 — prikazni rang više nije max(2p,4p).
+ * Zadržano za ops usporedbu (`backfill --usporedi`) i eventualni stari klijent:
+ * vraća viši naziv po hijerarhiji rangova (isti poredak imena kao prije).
  */
 export function vratiVeciRang(rang1: string | null, rang2: string | null): string | null {
-  if (rang1 && rang1 !== 'Piskaralo') return rang1;
-  if (rang2 && rang2 !== 'Piskaralo') return rang2;
-  if (rang1 === 'Piskaralo' || rang2 === 'Piskaralo') return null;
   const h1 = hijerarhijaRanga(rang1);
   const h2 = hijerarhijaRanga(rang2);
   if (h1 < 0 && h2 < 0) return null;

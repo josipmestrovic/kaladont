@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { izracunajDoprinoseStola, primaUniverzalniRangAgregat } from '../src/igra/univerzalni-rang.js';
+import { vratiVeciRang } from 'zajednicko';
 
 describe('univerzalni-rang (PR09)', () => {
   it('prima agregat samo registrirani/admin ljudi', () => {
@@ -7,6 +8,12 @@ describe('univerzalni-rang (PR09)', () => {
     expect(primaUniverzalniRangAgregat('covjek', 'admin')).toBe(true);
     expect(primaUniverzalniRangAgregat('covjek', 'gost')).toBe(false);
     expect(primaUniverzalniRangAgregat('bot', 'registriran')).toBe(false);
+  });
+
+  it('vratiVeciRang i dalje bira viši naziv (za --usporedi)', () => {
+    expect(vratiVeciRang('Lektor', 'Kaladont')).toBe('Kaladont');
+    expect(vratiVeciRang('Kaladont', 'Lektor')).toBe('Kaladont');
+    expect(vratiVeciRang(null, 'Lektor')).toBe('Lektor');
   });
 
   it('izračuna doprinose stola za Troboj 4,2,0', () => {

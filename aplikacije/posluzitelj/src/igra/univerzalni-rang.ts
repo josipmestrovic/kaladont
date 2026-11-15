@@ -94,11 +94,19 @@ export async function upisiUniverzalniRangZaSudionika(
   const rangSumaPrije = Number(agregatPrije?.rangSumaJedinica ?? 0);
   const rangPrije = izracunajRangIzAgregata(rangSumaPrije, rangBrojPrije);
 
+  // HINT (Bugbot): verziju stavi SAMO uz inkrement agregata. Gost/bot: doprinos bez
+  // verzije — RS-20 `preuzmiGostovskeRangDoprinose` ih pokupi pri registraciji.
+  const smijeAgregat = primaUniverzalniRangAgregat(sud.upravljac, sud.vrstaIgraca);
+  const sadaUpisujemoAgregat = !vecUpisan && smijeAgregat;
+
   await tx
     .update(sudioniciPartije)
     .set({
       rangDoprinosJedinice: doprinosJedinice,
-      rangIzracunVerzija: RANG_IZRACUN_VERZIJA,
+      // Ne stampaj verziju gostu/botu: inače backfill/registracija misle da je agregat već uzet.
+      rangIzracunVerzija: sadaUpisujemoAgregat || vecUpisan
+        ? RANG_IZRACUN_VERZIJA
+        : (postojeci?.rangIzracunVerzija ?? null),
     })
     .where(and(eq(sudioniciPartije.partijaId, partijaId), eq(sudioniciPartije.igracId, sud.igracId)));
 
@@ -106,7 +114,7 @@ export async function upisiUniverzalniRangZaSudionika(
   let rangSumaPoslije = rangSumaPrije;
   let novoUpisan = false;
 
-  if (!vecUpisan && primaUniverzalniRangAgregat(sud.upravljac, sud.vrstaIgraca)) {
+  if (sadaUpisujemoAgregat) {
     const [azurirani] = await tx
       .update(igraci)
       .set({
@@ -136,6 +144,55 @@ export async function upisiUniverzalniRangZaSudionika(
     rangPrije,
     rangPoslije,
   };
+}
+
+/**
+ * RS-20: gost → registriran — pokupi javne doprinose koji još nemaju verziju
+ * (odigrane kao gost) i dodaj ih u univerzalni agregat. Idempotentno.
+ */
+export async function preuzmiGostovskeRangDoprinose(
+  tx: MisijeTx,
+  igracId: string,
+): Promise<{ preuzeto: number; sumaJedinica: number }> {
+  await tx.execute(sql`select id from igraci where id = ${igracId} for update`);
+
+  const redovi = await tx
+    .select({
+      partijaId: sudioniciPartije.partijaId,
+      doprinos: sudioniciPartije.rangDoprinosJedinice,
+    })
+    .from(sudioniciPartije)
+    .where(and(
+      eq(sudioniciPartije.igracId, igracId),
+      sql`${sudioniciPartije.rangDoprinosJedinice} is not null`,
+      sql`${sudioniciPartije.rangIzracunVerzija} is null`,
+    ));
+
+  if (redovi.length === 0) return { preuzeto: 0, sumaJedinica: 0 };
+
+  let suma = 0;
+  for (const red of redovi) {
+    const doprinos = Number(red.doprinos ?? 0);
+    suma += doprinos;
+    await tx
+      .update(sudioniciPartije)
+      .set({ rangIzracunVerzija: RANG_IZRACUN_VERZIJA })
+      .where(and(
+        eq(sudioniciPartije.partijaId, red.partijaId),
+        eq(sudioniciPartije.igracId, igracId),
+        sql`${sudioniciPartije.rangIzracunVerzija} is null`,
+      ));
+  }
+
+  await tx
+    .update(igraci)
+    .set({
+      rangSumaJedinica: sql`${igraci.rangSumaJedinica} + ${suma}`,
+      rangBrojPartija: sql`${igraci.rangBrojPartija} + ${redovi.length}`,
+    })
+    .where(eq(igraci.id, igracId));
+
+  return { preuzeto: redovi.length, sumaJedinica: suma };
 }
 
 /**
