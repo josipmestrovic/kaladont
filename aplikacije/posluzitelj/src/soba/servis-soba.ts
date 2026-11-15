@@ -6,6 +6,7 @@ import {
   izracunajRang,
   stanjeIskustva,
   vratiVeciRang,
+  ZADANI_PRAVILNIK,
   type PostavkePrivatneSobe,
   type StanjePrivatneSobe,
   type AvatarConfigV1,
@@ -35,6 +36,7 @@ const ShemaPostavkePrivatneSobe = z
     trajanjePotezaSek: z.union([z.literal(0), z.literal(15), z.literal(30), z.literal(60)]).optional(),
     dopusteneVrste: z.array(ShemaVrstaRijeci).max(11).optional(),
     eliminacijskiBodovi: z.boolean().optional(),
+    pravila: z.enum(['klasicni', 'ka_zna', 'dokazi_nastavak']).optional(),
   })
   .strict();
 
@@ -138,6 +140,7 @@ function normalizirajPostavke(
     trajanjePotezaSek,
     dopusteneVrste,
     eliminacijskiBodovi: Boolean(p?.eliminacijskiBodovi),
+    pravila: p?.pravila ?? ZADANI_PRAVILNIK,
   };
 }
 

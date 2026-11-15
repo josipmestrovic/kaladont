@@ -161,6 +161,7 @@ describe('privatne sobe', () => {
     try {
       const { stanje } = await stvoriSobu(vlasnik.socket);
       expect(stanje.postavke.dopusteneVrste).toEqual(SVE_VRSTE_RIJECI);
+      expect(stanje.postavke.pravila).toBe('ka_zna');
     } finally {
       vlasnik.socket.disconnect();
     }
@@ -377,7 +378,7 @@ describe('privatne sobe', () => {
       const { kod, stanje: pocetnoStanje } = await stvoriSobu(vlasnik.socket, postavke);
       expect(pocetnoStanje.kod).toBe(kod);
       expect(pocetnoStanje.status).toBe('cekanje');
-      expect(pocetnoStanje.postavke).toEqual(postavke);
+      expect(pocetnoStanje.postavke).toEqual({ ...postavke, pravila: 'ka_zna' });
 
       const stanjeNakonUlaska = cekajDogadaj<StanjePrivatneSobe>(vlasnik.socket, 'soba:stanje');
       gost.socket.emit('soba:udji', { kod });

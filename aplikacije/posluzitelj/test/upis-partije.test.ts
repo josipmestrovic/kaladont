@@ -671,6 +671,42 @@ describe('pouzdan upis poteza', () => {
     expect(redovi[0]?.rijec).toBe('mama');
   });
 
+  it('upisuje default ka_zna i odabranaPravila bez lažnog Troboja', async () => {
+    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Upis Pravila' });
+    const partijaId = randomUUID();
+    partijeZaBrisanje.push(partijaId);
+    await zapisiPocetakPartije(partijaId, [{
+      igracId,
+      nadimak: 'Upis Pravila',
+      sjedalo: 0,
+      avatarId: 1,
+      avatarConfig: null,
+      avatarRevision: 0,
+      rang: null,
+      razina: 1,
+      trenutniNiz: 0,
+      razinaVatre: 0,
+      upravljac: 'covjek',
+      vrsta: 'registriran',
+      odabranaPravila: 'klasicni',
+    }], new Map([[igracId, 0]]), 'dva_igraca', 0, { pravila: 'ka_zna', spojeniDvoboj: false });
+
+    const [partija] = await baza.select({
+      mod: partije.mod,
+      pravila: partije.pravila,
+      spojeniDvoboj: partije.spojeniDvoboj,
+    }).from(partije).where(eq(partije.id, partijaId));
+    expect(partija).toEqual({ mod: 'dva_igraca', pravila: 'ka_zna', spojeniDvoboj: false });
+
+    const [sudionik] = await baza.select({
+      odabranaPravila: sudioniciPartije.odabranaPravila,
+    }).from(sudioniciPartije).where(and(
+      eq(sudioniciPartije.partijaId, partijaId),
+      eq(sudioniciPartije.igracId, igracId),
+    ));
+    expect(sudionik?.odabranaPravila).toBe('klasicni');
+  });
+
   it('nakon privremenog kvara osigurava potpunu povijest i jedan XP', async () => {
     await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: 'Upis Retry', iskustvoUkupno: 100 });
     const partijaId = randomUUID();

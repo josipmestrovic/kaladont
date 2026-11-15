@@ -169,7 +169,7 @@ function stilIgre(
   return 'dobrica';
 }
 
-async function dohvatiStatistiku(igracId: string, mod: 'cetiri_igraca' | 'dva_igraca') {
+async function dohvatiStatistiku(igracId: string, mod: import('zajednicko').ModPartije) {
   const [statistika] = await baza
     .select()
     .from(statistikeRijeciIgraca)
@@ -180,7 +180,7 @@ async function dohvatiStatistiku(igracId: string, mod: 'cetiri_igraca' | 'dva_ig
   return statistika ?? null;
 }
 
-async function dohvatiFormu(igracId: string, mod: 'cetiri_igraca' | 'dva_igraca') {
+async function dohvatiFormu(igracId: string, mod: import('zajednicko').ModPartije) {
   const rezultati = await baza.select({
     partijaId: rezultatiFormeIgraca.partijaId,
     kraj: rezultatiFormeIgraca.zavrseno,
@@ -210,7 +210,7 @@ async function dohvatiFormu(igracId: string, mod: 'cetiri_igraca' | 'dva_igraca'
   };
 }
 
-async function dohvatiDnkStatistiku(igracId: string, mod: 'cetiri_igraca' | 'dva_igraca') {
+async function dohvatiDnkStatistiku(igracId: string, mod: import('zajednicko').ModPartije) {
   const [statistika] = await baza
     .select()
     .from(dnkStatistikeIgraca)
@@ -389,7 +389,7 @@ function izracunajDnkProfil(
     eliminacije1v1: number;
   },
   dnkStatistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
-  mod: 'cetiri_igraca' | 'dva_igraca',
+  mod: import('zajednicko').ModPartije,
 ): DnkProfil & { metrike: {
   eliminacijePoPartiji: number;
   nizPrihvacenihRijeci: number;
@@ -397,6 +397,9 @@ function izracunajDnkProfil(
   dugeRijeciPoPartiji: number;
   rijetkeRijeciPoPartiji: number;
 } } {
+  if (mod === 'tri_igraca') {
+    throw new Error('sastaviDnkProfil: Troboj DNK još nije podržan (PR10).');
+  }
   const odigrano = mod === 'dva_igraca' ? igrac.odigrane1v1 : igrac.odigrane;
   const bodovi = mod === 'dva_igraca' ? igrac.bodovi1v1 : igrac.bodoviUkupno;
   const eliminacije = mod === 'dva_igraca' ? igrac.eliminacije1v1 : igrac.eliminacijeUkupno;
@@ -870,7 +873,7 @@ export async function registrirajProfilRute(
 
   const dohvatiAktivnost = async (
     igracId: string,
-    mod: 'cetiri_igraca' | 'dva_igraca' | undefined,
+    mod: import('zajednicko').ModPartije | undefined,
     limitUlaz: string | undefined,
     cursorUlaz: string | undefined,
     odgovor: { code: (status: number) => { send: (tijelo: unknown) => unknown } },
@@ -923,7 +926,9 @@ export async function registrirajProfilRute(
 
   const registrirajAktivnostRutu = (putanja: '/aktivnost/:igracId' | '/povijest/:igracId') => {
     app.get<{ Params: { igracId: string }; Querystring: { limit?: string; cursor?: string; mod?: string } }>(putanja, { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
-      const mod = zahtjev.query.mod === 'cetiri_igraca' || zahtjev.query.mod === 'dva_igraca' ? zahtjev.query.mod : undefined;
+      const mod = zahtjev.query.mod === 'cetiri_igraca' || zahtjev.query.mod === 'dva_igraca' || zahtjev.query.mod === 'tri_igraca'
+        ? zahtjev.query.mod
+        : undefined;
       const rezultat = await dohvatiAktivnost(zahtjev.params.igracId, mod, zahtjev.query.limit, zahtjev.query.cursor, odgovor);
       if (putanja === '/povijest/:igracId' && typeof rezultat === 'object' && rezultat !== null && 'aktivnost' in rezultat) {
         return { ...rezultat, partije: rezultat.aktivnost };

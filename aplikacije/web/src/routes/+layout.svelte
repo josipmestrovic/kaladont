@@ -73,7 +73,12 @@
     urlCilja.pathname === '/red' &&
       ((!sesijaSpreman && $page.url.pathname === '/red') || (sesijaSpreman && $navigating !== null)),
   );
-  const brojMjestaKostura = $derived(urlCilja.searchParams.get('mod') === 'dva_igraca' ? 2 : 4);
+  const brojMjestaKostura = $derived((() => {
+    const mod = urlCilja.searchParams.get('mod');
+    if (mod === 'dva_igraca') return 2;
+    if (mod === 'tri_igraca') return 3;
+    return 4;
+  })());
   // Indeksabilne rute: children odmah (SSR + klijent, bez flasha).
   // Ostalo: čekaj gost-sesiju da socket/API imaju token prije interakcije.
   const prikaziChildren = $derived(

@@ -16,6 +16,8 @@
   import { apiUrl } from '$lib/api-url.js';
   import { dohvatiAuthToken } from '$lib/identitet.js';
 
+  type ModPartije = import('zajednicko').ModPartije;
+  /** Ljestvice UI do PR03/06 samo Dvoboj i Četveroboj. */
   type Mod = 'cetiri_igraca' | 'dva_igraca';
   type Kategorija = 'igraci' | 'rijeci';
 
@@ -25,7 +27,8 @@
     brojUpotreba: number;
   }
 
-  const PRAVILA_BODOVANJA: Record<Mod, string> = {
+  /** Troboj bodovanje dolazi u PR03 — do tada ljestvice prikazuju samo Dvoboj/Četveroboj. */
+  const PRAVILA_BODOVANJA: Record<'cetiri_igraca' | 'dva_igraca', string> = {
     cetiri_igraca:
       'Plasman: 1. mjesto 3 boda, 2. mjesto 2, 3. mjesto 1, 4. mjesto 0. Uz to +1 za pobjedu i +1 po eliminaciji (najviše 3). Maksimum je 7 bodova po igri.',
     dva_igraca: 'Pobjednik dobiva 1 bod, poraženi 0. Eliminacije ne dodaju bodove.',
@@ -100,7 +103,7 @@
   // Stari ?prikaz=oko_mene bez potrebe prikazuje Top 10; normalizirani prikaz ide u API.
   const prikaz = $derived<PrikazLjestvice>(prikazUrl === 'oko_mene' && mozeOkoMene ? 'oko_mene' : 'top');
 
-  function nazivMetrike(me: MetrikaLjestvice, m: Mod = mod): string {
+  function nazivMetrike(me: MetrikaLjestvice, m: ModPartije = mod): string {
     if (me === 'niz_pobjeda') return 'Niz pobjeda';
     return m === 'dva_igraca' ? 'Udio pobjeda' : 'Prosjek bodova';
   }
@@ -212,7 +215,7 @@
     }
   }
 
-  function vrijednostRetka(redak: RedakLjestvice, m: Mod, me: MetrikaLjestvice): string {
+  function vrijednostRetka(redak: RedakLjestvice, m: ModPartije, me: MetrikaLjestvice): string {
     if (redak.vrijednost.vrsta === 'niz_pobjeda') return String(redak.vrijednost.broj);
     if (m === 'dva_igraca' && me === 'prosjek_bodova') {
       return `${new Intl.NumberFormat('hr-HR', { maximumFractionDigits: 0 }).format(redak.vrijednost.prosjek * 100)} %`;

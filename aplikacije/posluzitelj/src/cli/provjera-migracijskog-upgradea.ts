@@ -1,7 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config as ucitajDotenv } from 'dotenv';
 import postgres from 'postgres';
+
+// Isto kao migracije / konfiguracija — lokalni CLI čita root .env.
+ucitajDotenv({ path: path.resolve(process.cwd(), '../../.env') });
 
 const argumenti = new Map(
   process.argv.slice(2).map((argument) => {
@@ -139,6 +143,37 @@ async function provjeriPodatke(veza: postgres.Sql): Promise<void> {
     ) AS postoji;
   `);
   if (!indeks?.postoji) throw new Error('Očekivani indeks prijava nije nastao nakon migracije.');
+
+  const [partijaPravila] = await veza.unsafe<
+    { pravila: string; spojeni_dvoboj: boolean }[]
+  >(`
+    SELECT pravila::text AS pravila, spojeni_dvoboj
+    FROM partije
+    WHERE id = '00000000-0000-4000-8000-000000000301';
+  `);
+  if (!partijaPravila || partijaPravila.pravila !== 'ka_zna' || partijaPravila.spojeni_dvoboj !== false) {
+    throw new Error('Stara partija nije dobila default pravila=ka_zna / spojeni_dvoboj=false.');
+  }
+
+  const [sudionikPravila] = await veza.unsafe<{ odabrana_pravila: string }[]>(`
+    SELECT odabrana_pravila::text AS odabrana_pravila
+    FROM sudionici_partije
+    WHERE partija_id = '00000000-0000-4000-8000-000000000301'
+      AND igrac_id = '00000000-0000-4000-8000-000000000101';
+  `);
+  if (!sudionikPravila || sudionikPravila.odabrana_pravila !== 'ka_zna') {
+    throw new Error('Stari sudionik nije dobio default odabrana_pravila=ka_zna.');
+  }
+
+  const [enumTroboj] = await veza.unsafe<{ postoji: boolean }[]>(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_enum e
+      JOIN pg_type t ON t.oid = e.enumtypid
+      WHERE t.typname = 'mod_partije' AND e.enumlabel = 'tri_igraca'
+    ) AS postoji;
+  `);
+  if (!enumTroboj?.postoji) throw new Error('Enum mod_partije nema vrijednost tri_igraca.');
 }
 
 async function glavno(): Promise<void> {

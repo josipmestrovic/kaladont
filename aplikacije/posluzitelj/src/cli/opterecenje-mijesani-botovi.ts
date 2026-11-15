@@ -3,6 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   Eliminacija,
   KrajPartije,
+  ModPartije,
   PrihvacenPotez,
   PocetakPartije,
   RundaOtvorena,
@@ -40,7 +41,7 @@ export interface BotIgrac {
 
 interface MjerenaPartija {
   id: string;
-  mod: NacinBotIgre;
+  mod: ModPartije;
   kontekst: 'javna' | 'privatna' | 'trening';
   jePrivatna: boolean;
   kodSobe: string | null;

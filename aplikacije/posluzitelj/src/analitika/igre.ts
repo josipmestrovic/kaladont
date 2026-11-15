@@ -23,7 +23,7 @@ export interface SudionikAnalitike {
 export interface ZapisPocetkaIgre {
   igraId: string;
   kontekst: KontekstOtvaranjaAnalitike;
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: import('zajednicko').ModPartije;
   pocetakU: Date;
   sudionici: readonly SudionikAnalitike[];
 }
@@ -69,7 +69,7 @@ export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> 
 
 export interface MetaKrajaIgre {
   kontekst: KontekstOtvaranjaAnalitike;
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: import('zajednicko').ModPartije;
   pocetakU: Date;
 }
 

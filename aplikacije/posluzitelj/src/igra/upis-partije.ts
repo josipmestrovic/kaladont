@@ -4,8 +4,8 @@
  * uspješan upis početka i svih poteza prije isplate XP-a (idempotentni retry).
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajNovaDostignuca, izracunajOcjenuIgre, izracunajRang, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, RANGOVI, RANGOVI_1V1, stanjeIskustva, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
-import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajOcjenuIgre, izracunajRang, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, RANGOVI, RANGOVI_1V1, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
+import { bonusPobjednickogNiza, izracunajFormu, odbijNepodrzaniMod } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
 import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
@@ -38,7 +38,8 @@ async function brojKolekcijskihStavki(tx: MisijeTx, igracId: string): Promise<nu
   return new Set(redovi.map((red) => kolekcijskiKljucGrupe(red.grupa))).size;
 }
 
-function jeNapredakRanga(prije: string, poslije: string, mod: 'dva_igraca' | 'cetiri_igraca'): boolean {
+function jeNapredakRanga(prije: string, poslije: string, mod: ModPartije): boolean {
+  odbijNepodrzaniMod(mod, 'jeNapredakRanga');
   if (prije === poslije) return false;
   if (poslije === 'Piskaralo') return false;
   if (prije === 'Piskaralo') return true;
@@ -50,8 +51,12 @@ export async function zapisiPocetakPartije(
   partijaId: string,
   sudionici: SudionikPartije[],
   cekanjeMsPoIgracu: Map<string, number>,
-  mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
+  mod: ModPartije = 'cetiri_igraca',
   brojBotova = 0,
+  opcije: {
+    pravila?: PravilnikPartije;
+    spojeniDvoboj?: boolean;
+  } = {},
 ): Promise<void> {
   const [postojeca] = await baza
     .select({ id: partije.id })
@@ -60,15 +65,26 @@ export async function zapisiPocetakPartije(
     .limit(1);
   if (postojeca) return;
 
+  const pravila = opcije.pravila ?? ZADANI_PRAVILNIK;
+  const spojeniDvoboj = opcije.spojeniDvoboj ?? false;
+
   try {
     await baza.transaction(async (tx) => {
-      await tx.insert(partije).values({ id: partijaId, mod, status: 'u_tijeku', brojBotova });
+      await tx.insert(partije).values({
+        id: partijaId,
+        mod,
+        pravila,
+        spojeniDvoboj,
+        status: 'u_tijeku',
+        brojBotova,
+      });
       await tx.insert(sudioniciPartije).values(
         sudionici.map((s) => ({
           partijaId,
           igracId: s.igracId,
           nadimak: s.nadimak,
           sjedalo: s.sjedalo,
+          odabranaPravila: s.odabranaPravila ?? pravila,
           cekanjeMs: cekanjeMsPoIgracu.get(s.igracId) ?? 0,
         })),
       );
@@ -133,7 +149,7 @@ export async function osigurajUpisePoteza(zapisi: readonly ZapisPoteza[]): Promi
 export function spremiRaniPorazUBazi(zapis: {
   partijaId: string;
   igracId: string;
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: ModPartije;
   plasman: 1 | 2 | 3 | 4;
   bodovi: number;
   eliminacije: number;
@@ -291,7 +307,7 @@ export async function zakljuciPartijuUBazi(
   partijaId: string,
   pobjednikId: string,
   rezultati: ZapisSudionika[],
-  mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
+  mod: ModPartije = 'cetiri_igraca',
   statistike: Map<string, ZapisStatistikeRijeci> = new Map(),
   samoStatistika = false,
   napredakDostignuca: Map<string, ZapisNapretkaDostignuca> = new Map(),
@@ -299,6 +315,7 @@ export async function zakljuciPartijuUBazi(
   /** Osnovni bruto XP prije bonusa niza/ocjene (iz motora); za rangiranje pohvale. */
   osnovniBrutoPoIgracu: Map<string, number> = new Map(),
 ): Promise<Map<string, AgregatZakljucka>> {
+  odbijNepodrzaniMod(mod, 'zakljuciPartijuUBazi');
   const agregati = new Map<string, AgregatZakljucka>();
   const obavijestiPoIgracu = new Map<string, ObavijestOtkljucanogDostignuca[]>();
   const sanducicIgraci = new Set<string>();

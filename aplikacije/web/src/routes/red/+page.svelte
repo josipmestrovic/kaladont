@@ -9,14 +9,17 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
-  import type { PayloadGreska, PocetakPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
+  import type { ModPartije, PayloadGreska, PocetakPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
+  import { javnaSjedalaZaMod } from 'zajednicko';
 
   const igra = dohvatiStanjeIgre();
 
-  const trazeneMod = $derived(
-    $page.url.searchParams.get('mod') === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca'
-  );
-  const ukupnoMjesta = $derived(trazeneMod === 'dva_igraca' ? 2 : 4);
+  const trazeneMod = $derived(((): ModPartije => {
+    const mod = $page.url.searchParams.get('mod');
+    if (mod === 'dva_igraca' || mod === 'tri_igraca' || mod === 'cetiri_igraca') return mod;
+    return 'cetiri_igraca';
+  })());
+  const ukupnoMjesta = $derived(javnaSjedalaZaMod(trazeneMod));
 
   let stanje = $state<StanjeReda>({
     mojIgracId: '',

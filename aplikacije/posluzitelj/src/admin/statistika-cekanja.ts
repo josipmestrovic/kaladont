@@ -7,7 +7,7 @@ import { baza } from '../baza/klijent.js';
 
 export interface RedakCekanjaPoDanu extends Record<string, unknown> {
   dan: string;
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: import('zajednicko').ModPartije;
   partije: number;
   prosjekCekanjaMs: number | null;
   medijanCekanjaMs: number | null;
@@ -19,7 +19,7 @@ export interface RedakCekanjaPoDanu extends Record<string, unknown> {
 }
 
 export interface RedakPobjedaPoSastavu extends Record<string, unknown> {
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: import('zajednicko').ModPartije;
   brojBotova: number;
   partije: number;
   pobjedeLjudi: number;

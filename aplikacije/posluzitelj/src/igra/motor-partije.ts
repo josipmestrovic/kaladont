@@ -58,6 +58,9 @@ import {
   type KontekstPartije,
   type BrzaPoruka,
   type IzvorPocetneRijeci,
+  type ModPartije,
+  type PravilnikPartije,
+  ZADANI_PRAVILNIK,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
@@ -110,6 +113,8 @@ export interface SudionikPartije {
   razina: number;
   trenutniNiz: number;
   razinaVatre: 0 | 1 | 2 | 3;
+  /** UI odabir pravilnika; izostanak = ka_zna pri upisu. */
+  odabranaPravila?: PravilnikPartije;
 }
 
 export interface AktivneVezeIgraca {
@@ -190,7 +195,11 @@ interface MetapodatakOtkljucanjaKolekcije {
 interface StanjeStola {
   partijaId: string;
   pocetakPartijeMs: number;
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: ModPartije;
+  /** Izvršeni pravilnik stola. */
+  pravila: PravilnikPartije;
+  /** Zajednički javni Dvoboj; PR01 uvijek false. */
+  spojeniDvoboj: boolean;
   kontekst: KontekstPartije;
   politika: PolitikaUcinkaPartije;
   sudionici: SudionikPartije[]; // svi 4 ili 2, fiksni redoslijed po sjedalu
@@ -712,7 +721,7 @@ export function stvoriUpraviteljPartija(
     const poruka: StanjePartije = {
       partijaId: stanje.partijaId,
       mojIgracId: socket.data.igracId,
-      sjedala: stanje.sudionici.map(({ igracId, vrsta, upravljac, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre }) => ({
+      sjedala: stanje.sudionici.map(({ igracId, vrsta, upravljac, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre, odabranaPravila }) => ({
         igracId,
         nadimak,
         jeGost: upravljac !== 'bot' && vrsta === 'gost',
@@ -724,6 +733,7 @@ export function stvoriUpraviteljPartija(
         razina,
         trenutniNiz,
         razinaVatre,
+        odabranaPravila,
       })),
       turnToken: stanje.turnToken,
       naPotezuId: stanje.naPotezuId,
@@ -740,6 +750,8 @@ export function stvoriUpraviteljPartija(
       zadnjaRijecVrsta: stanje.zadnjaRijecVrsta,
       zavrsena: stanje.zavrsena,
       mod: stanje.mod,
+      pravila: stanje.pravila,
+      spojeniDvoboj: stanje.spojeniDvoboj,
       kontekst: stanje.kontekst,
       jePrivatna: stanje.jePrivatna,
       kodSobe: stanje.kodSobe,
@@ -878,10 +890,15 @@ export function stvoriUpraviteljPartija(
 
   function zapocniPartiju(
     sudioniciUlaz: StavkaReda[],
-    mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca',
-    opcije: { kontekst?: 'javna' | 'trening' } = {},
+    mod: ModPartije = 'cetiri_igraca',
+    opcije: { kontekst?: 'javna' | 'trening'; pravila?: PravilnikPartije } = {},
   ): Promise<RezultatPokretanja> {
+    if (mod === 'tri_igraca') {
+      console.error('zapocniPartiju: Troboj još nije podržan (PR03/PR06).');
+      return Promise.resolve('greska');
+    }
     const kontekst = opcije.kontekst ?? 'javna';
+    const pravilaStola = opcije.pravila ?? ZADANI_PRAVILNIK;
     if (zaustavljanje) return Promise.resolve('zaustavljanje');
     if (partije.size >= maksimalnoAktivnihPartija) return Promise.resolve('limit');
     if (kontekst === 'trening' && brojAktivnihTreninga() >= maksimalnoAktivnihTreninga) return Promise.resolve('limit');
@@ -907,6 +924,7 @@ export function stvoriUpraviteljPartija(
         razina: jeBot ? 0 : stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
         trenutniNiz: jeBot ? 0 : (mod === 'dva_igraca' ? (s.trenutniNiz1v1 ?? 0) : (s.trenutniNiz4p ?? 0)),
         razinaVatre: jeBot ? 0 : razinaVatre(mod === 'dva_igraca' ? (s.trenutniNiz1v1 ?? 0) : (s.trenutniNiz4p ?? 0), mod),
+        odabranaPravila: s.odabranaPravila ?? pravilaStola,
       };
     });
     const partijaId = randomUUID();
@@ -917,6 +935,8 @@ export function stvoriUpraviteljPartija(
       partijaId,
       pocetakPartijeMs: sat.sada(),
       mod,
+      pravila: pravilaStola,
+      spojeniDvoboj: false,
       kontekst,
       politika,
       trajanjePotezaSek: kontekst === 'trening' ? 0 : undefined,
@@ -1001,7 +1021,10 @@ export function stvoriUpraviteljPartija(
         let pocetakUspio = false;
         const osiguraj = async () => {
           if (pocetakUspio) return;
-          await zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod, sudionici.length - ljudi.length);
+          await zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod, sudionici.length - ljudi.length, {
+            pravila: pravilaStola,
+            spojeniDvoboj: false,
+          });
           pocetakUspio = true;
         };
         stanje.osigurajPocetakPartije = osiguraj;
@@ -1056,8 +1079,23 @@ export function stvoriUpraviteljPartija(
       const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
         partijaId,
         pocetakIso,
-        sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, jeGost: s.upravljac !== 'bot' && s.vrsta === 'gost', jeBot: s.upravljac === 'bot', avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
+        sjedala: sudionici.map((s) => ({
+          igracId: s.igracId,
+          nadimak: s.nadimak,
+          jeGost: s.upravljac !== 'bot' && s.vrsta === 'gost',
+          jeBot: s.upravljac === 'bot',
+          avatarId: s.avatarId,
+          avatarConfig: s.avatarConfig,
+          avatarRevision: s.avatarRevision,
+          rang: s.rang,
+          razina: s.razina,
+          trenutniNiz: s.trenutniNiz,
+          razinaVatre: s.razinaVatre,
+          odabranaPravila: s.odabranaPravila,
+        })),
         mod,
+        pravila: pravilaStola,
+        spojeniDvoboj: false,
         kontekst,
       };
       for (const s of sudionici) {
@@ -1216,6 +1254,8 @@ export function stvoriUpraviteljPartija(
               ukupnoIskustvo: ishod?.ukupnoIskustvo,
               misijeStanjeVerzija: ishod?.misijeStanjeVerzija,
               mod: stanje.mod,
+              pravila: stanje.pravila,
+              spojeniDvoboj: stanje.spojeniDvoboj,
               kontekst: 'trening',
             };
             stanje.rezultatiKraja.set(p.igracId, poruka);
@@ -1293,6 +1333,9 @@ export function stvoriUpraviteljPartija(
               bonusOcjenaIgre: 0,
               novaDostignuca: agregati.get(p.igracId)?.novaDostignuca ?? [],
               kolekcija: kolekcijaZaKraj(stanje, p.igracId),
+              mod: stanje.mod,
+              pravila: stanje.pravila,
+              spojeniDvoboj: stanje.spojeniDvoboj,
               kontekst: 'privatna',
               jePrivatna: true,
               kodSobe: stanje.kodSobe,
@@ -1429,6 +1472,8 @@ export function stvoriUpraviteljPartija(
             ukupnoIskustvo: agregat?.ukupnoIskustvo,
             misijeStanjeVerzija: agregat?.misijeStanjeVerzija,
             mod: stanje.mod,
+            pravila: stanje.pravila,
+            spojeniDvoboj: stanje.spojeniDvoboj,
             kontekst: 'javna',
           };
           stanje.rezultatiKraja.set(p.igracId, poruka);
@@ -2526,6 +2571,7 @@ export function stvoriUpraviteljPartija(
   ): string {
     if (zaustavljanje || partije.size >= maksimalnoAktivnihPartija) return '';
     const izmjesano = promijesajNiz(sudioniciUlaz);
+    const pravilaSobe = postavkeSobe.pravila ?? ZADANI_PRAVILNIK;
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const prosjekBodova = s.odigrane > 0 ? s.bodoviUkupno / s.odigrane : 0;
       const rang = izracunajRang(s.odigrane, prosjekBodova);
@@ -2542,6 +2588,7 @@ export function stvoriUpraviteljPartija(
         razina: stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
         trenutniNiz: 0,
         razinaVatre: 0,
+        odabranaPravila: pravilaSobe,
       };
     });
     const partijaId = randomUUID();
@@ -2553,6 +2600,8 @@ export function stvoriUpraviteljPartija(
       partijaId,
       pocetakPartijeMs: sat.sada(),
       mod: 'cetiri_igraca',
+      pravila: pravilaSobe,
+      spojeniDvoboj: false,
       kontekst: 'privatna',
       politika: politikaZaKontekst('privatna'),
       sudionici,
@@ -2629,6 +2678,8 @@ export function stvoriUpraviteljPartija(
         sudionici,
         new Map(sudionici.map((s) => [s.igracId, 0])),
         'cetiri_igraca',
+        0,
+        { pravila: pravilaSobe, spojeniDvoboj: false },
       );
       pocetakPrivatneUspio = true;
     };
@@ -2639,7 +2690,23 @@ export function stvoriUpraviteljPartija(
     const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
       partijaId,
       pocetakIso,
-      sjedala: sudionici.map((s) => ({ igracId: s.igracId, nadimak: s.nadimak, jeGost: s.upravljac !== 'bot' && s.vrsta === 'gost', jeBot: s.upravljac === 'bot', avatarId: s.avatarId, avatarConfig: s.avatarConfig, avatarRevision: s.avatarRevision, rang: s.rang, razina: s.razina, trenutniNiz: s.trenutniNiz, razinaVatre: s.razinaVatre })),
+      sjedala: sudionici.map((s) => ({
+        igracId: s.igracId,
+        nadimak: s.nadimak,
+        jeGost: s.upravljac !== 'bot' && s.vrsta === 'gost',
+        jeBot: s.upravljac === 'bot',
+        avatarId: s.avatarId,
+        avatarConfig: s.avatarConfig,
+        avatarRevision: s.avatarRevision,
+        rang: s.rang,
+        razina: s.razina,
+        trenutniNiz: s.trenutniNiz,
+        razinaVatre: s.razinaVatre,
+        odabranaPravila: s.odabranaPravila,
+      })),
+      mod: 'cetiri_igraca',
+      pravila: pravilaSobe,
+      spojeniDvoboj: false,
       kontekst: 'privatna',
       jePrivatna: true,
       kodSobe,

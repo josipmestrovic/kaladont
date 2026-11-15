@@ -336,9 +336,15 @@ export async function stvoriPorukeKolekcije(ulaz: {
   return broj;
 }
 
+function nazivFormata(mod: import('zajednicko').ModPartije): string {
+  if (mod === 'dva_igraca') return 'Dvoboj';
+  if (mod === 'tri_igraca') return 'Troboj';
+  return 'Četveroboj';
+}
+
 export async function stvoriPorukuPromjeneRanga(ulaz: {
   igracId: string;
-  mod: 'dva_igraca' | 'cetiri_igraca';
+  mod: import('zajednicko').ModPartije;
   rangPrije: string;
   rangPoslije: string;
   napredak: boolean;
@@ -346,7 +352,7 @@ export async function stvoriPorukuPromjeneRanga(ulaz: {
   izvorId: string;
 }): Promise<boolean> {
   if (ulaz.rangPrije === ulaz.rangPoslije) return false;
-  const nazivModa = ulaz.mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj';
+  const nazivModa = nazivFormata(ulaz.mod);
   const red = await stvoriPoruku({
     igracId: ulaz.igracId,
     tip: TIP_SANDUCIC_PROMJENA_RANGA,
@@ -367,7 +373,7 @@ export async function stvoriPorukuPromjeneRanga(ulaz: {
 /** Forma svakih 10 javnih igara po modu (O1). Lazy baseline nižih pragova. */
 export async function stvoriPorukuForme10(ulaz: {
   igracId: string;
-  mod: 'dva_igraca' | 'cetiri_igraca';
+  mod: import('zajednicko').ModPartije;
   odigraneNakon: number;
   nazivForme: string | null;
   pobjede: number;
@@ -381,7 +387,7 @@ export async function stvoriPorukuForme10(ulaz: {
     if (prag === ulaz.odigraneNakon) {
       const nova = await pokusajOstvaritiPrekretnicu(ulaz.igracId, kljuc, ulaz.tx);
       if (!nova) return false;
-      const nazivModa = ulaz.mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj';
+      const nazivModa = nazivFormata(ulaz.mod);
       const red = await stvoriPoruku({
         igracId: ulaz.igracId,
         tip: TIP_SANDUCIC_FORMA_10,

@@ -15,7 +15,7 @@ export interface DnkPodaci {
   jakoRijetkeRijeci: number;
 }
 
-export function izracunajDnk(podaci: DnkPodaci, mod: 'cetiri_igraca' | 'dva_igraca'): DnkOs[] {
+export function izracunajDnk(podaci: DnkPodaci, mod: import('zajednicko').ModPartije): DnkOs[] {
   const prosjekPrihvacenogPotezaMs = podaci.prihvaceniPotezi > 0
     ? podaci.ukupnoTrajanjePrihvaceniPoteziMs / podaci.prihvaceniPotezi
     : 0;

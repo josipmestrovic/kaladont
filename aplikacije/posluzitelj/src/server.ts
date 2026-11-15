@@ -761,7 +761,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   const treningServis = registrirajTrening(io, {
     omogucen: () => postavkeBotova.treningOmogucen && upravitelj.mozePokrenutiPartiju(),
-    zapocniTrening: (sudionici) => upravitelj.zapocniPartiju(sudionici, 'dva_igraca', { kontekst: 'trening' }),
+    zapocniTrening: (sudionici, pravila) => upravitelj.zapocniPartiju(sudionici, 'dva_igraca', { kontekst: 'trening', pravila }),
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
     igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
     ukloniIzJavnogReda: redServis.ukloniIzReda,

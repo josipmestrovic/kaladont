@@ -428,6 +428,20 @@
       "when": 1794960000000,
       "tag": "0060_analitika_tri_odgovora",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1794970000000,
+      "tag": "0061_mod_tri_igraca",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1794980000000,
+      "tag": "0062_pravilnik_partije",
+      "breakpoints": true
     }
   ]
 }

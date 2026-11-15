@@ -3,7 +3,15 @@
  * Igrač smije imati samo jedan aktivni kontekst igranja; ulazak u trening napušta javni red.
  */
 import { randomUUID } from 'node:crypto';
-import { AVATAR_RACUNALA, type KodGreske, type PotvrdaTreninga } from 'zajednicko';
+import {
+  AVATAR_RACUNALA,
+  PRAVILNICI_PARTIJE,
+  ZADANI_PRAVILNIK,
+  type KodGreske,
+  type PotvrdaTreninga,
+  type PravilnikPartije,
+} from 'zajednicko';
+import { z } from 'zod';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
 import type { RezultatPokretanja } from '../igra/politika-ucinka.js';
@@ -13,13 +21,17 @@ import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenj
 export const NADIMAK_RACUNALA = 'Računalo';
 const PREFIKS_RACUNALA = 'racunalo-';
 
+const ShemaTreningZapocni = z.object({
+  pravila: z.enum(PRAVILNICI_PARTIJE).optional(),
+}).strict().optional();
+
 export function jeRacunalo(igracId: string): boolean {
   return igracId.startsWith(PREFIKS_RACUNALA);
 }
 
 export interface OpcijeServisaTreninga {
   omogucen: () => boolean;
-  zapocniTrening: (sudionici: StavkaReda[]) => Promise<RezultatPokretanja>;
+  zapocniTrening: (sudionici: StavkaReda[], pravila: PravilnikPartije) => Promise<RezultatPokretanja>;
   igracImaAktivnuPartiju: (igracId: string) => boolean;
   igracImaPrivatnuSobu: (igracId: string) => boolean;
   ukloniIzJavnogReda: (igracId: string) => void;
@@ -47,7 +59,8 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
       const [prvi, drugi, ...dodatni] = argumenti;
       const potvrda = typeof prvi === 'function' ? prvi as PotvrdaTreninga : typeof drugi === 'function' ? drugi as PotvrdaTreninga : undefined;
       const payload = typeof prvi === 'function' ? undefined : prvi;
-      const neispravno = (payload !== undefined && payload !== null) || dodatni.length > 0 || (typeof prvi !== 'function' && drugi !== undefined && !potvrda);
+      const parse = ShemaTreningZapocni.safeParse(payload);
+      const neispravno = !parse.success || dodatni.length > 0 || (typeof prvi !== 'function' && drugi !== undefined && !potvrda);
       if (neispravno) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
         return;
@@ -71,6 +84,8 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
       }
       opcije.ukloniIzJavnogReda(socket.data.igracId);
 
+      const pravila = parse.data?.pravila ?? ZADANI_PRAVILNIK;
+
       const covjek: StavkaReda = {
         igracId: socket.data.igracId,
         vrsta: socket.data.vrsta,
@@ -89,6 +104,7 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
         trenutniNiz4p: 0,
         trenutniNiz1v1: 0,
         usaoU: Date.now(),
+        odabranaPravila: pravila,
       };
       // Računalo nema redak u bazi ni javni profil; identitet vrijedi samo za ovu partiju.
       const racunalo: StavkaReda = {
@@ -104,9 +120,10 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
         bodoviUkupno: 0,
         iskustvoUkupno: 0,
         usaoU: Date.now(),
+        odabranaPravila: pravila,
       };
 
-      void opcije.zapocniTrening([covjek, racunalo]).then((rezultat) => {
+      void opcije.zapocniTrening([covjek, racunalo], pravila).then((rezultat) => {
         if (rezultat === 'pokrenuta') {
           brojaci.zapoceti += 1;
           potvrda?.({ pokrenut: true });

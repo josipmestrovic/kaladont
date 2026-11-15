@@ -32,7 +32,7 @@ interface StanjeIgre {
   zadnjaRijec: string | null;
   zadnjaRijecIgracId: string | null;
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
-  mod: 'cetiri_igraca' | 'dva_igraca' | null;
+  mod: import('zajednicko').ModPartije | null;
   kontekst: 'javna' | 'privatna' | 'trening' | null;
   treningNeaktivnost: Omit<TreningNeaktivnost, 'partijaId'> | null;
   jePrivatna: boolean;
