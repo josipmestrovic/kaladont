@@ -1834,18 +1834,21 @@ describe('motor partije - Dokaži nastavak (PR05)', () => {
 
       const potroseneNakon = uzGrupe(potrosene, await grupeRijeci(anaRijec));
       const dokazRijec = await pronadjiRijecNaPrefiks(dokaz.trazenaSlova, potroseneNakon);
-      // Nakon uspjeha: re-emit eliminacije s bodZa=Ana (Bugbot — kredit vidljiv prije kraja).
-      const kreditPromise = cekajEventNaBiloKojem<Eliminacija>(
-        igraciListe.map((ig) => ig.socket),
-        'partija:eliminacija',
-        (e) => e.igracId === bruno.token && e.bodZa === ana.token,
-        10_000,
-        'PR05 kredit nakon izadji+dokaz',
-      );
+      // Kredit ide u snimku (partija:stanje), ne drugim partija:eliminacija (Bugbot duplicate).
+      const stanjeSKreditom = new Promise<StanjePartije>((resolve) => {
+        function handler(s: StanjePartije) {
+          const elim = s.eliminacije.find((e) => e.igracId === bruno.token && e.bodZa === ana.token);
+          if (!elim) return;
+          ana.socket.off('partija:stanje', handler);
+          resolve(s);
+        }
+        ana.socket.on('partija:stanje', handler);
+      });
       const novaRundaPromise = cekajSljedecuRundu(ana.socket, runda.runda);
       ana.socket.emit('potez:rijec', { rijec: dokazRijec, turnToken: dokaz.turnToken });
-      const kredit = await kreditPromise;
-      expect(kredit.bodZa).toBe(ana.token);
+      const snimka = await stanjeSKreditom;
+      expect(snimka.eliminacije.filter((e) => e.igracId === bruno.token)).toHaveLength(1);
+      expect(snimka.eliminacije.find((e) => e.igracId === bruno.token)?.bodZa).toBe(ana.token);
       const novaRunda = await novaRundaPromise;
       const aktivni = new Set(pocetak.sjedala.map((s) => s.igracId).filter((id) => id !== bruno.token));
       expect(novaRunda.naPotezuId).toBe(sljedeciUKrugu(pocetak.sjedala, bruno.token, aktivni));

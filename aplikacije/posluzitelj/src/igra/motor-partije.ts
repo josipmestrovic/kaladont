@@ -2173,7 +2173,8 @@ export function stvoriUpraviteljPartija(
     }
 
     // Bruno već ispao napuštanjem — kredit Ani tek SADA (ne pri samom prekidu).
-    // Bugbot: ažuriraj snimku eliminacije + re-emit da reconnect/UI vide bodZa prije kraja.
+    // Bugbot: NE re-emitaj partija:eliminacija (klijent bi dodao drugi red → lažni kraj).
+    // Umjesto toga zakrpi snimku i pošalji partija:stanje (reconnect + živi stol vide bodZa).
     if (ishod.uzrocnikId) {
       const stavka = stanje.politika.dajeNapredak
         ? {
@@ -2192,20 +2193,18 @@ export function stvoriUpraviteljPartija(
         dodajNapredakDostignuca(stanje, ishod.uzrocnikId, { izazvaneEliminacije: 1 });
         dodajStavkuIskustva(stanje, ishod.uzrocnikId, stavka!);
       }
-      // Pronađi Bruninu potvrđenu eliminaciju (prekid) i upiši uzročnika.
       for (let i = stanje.eliminacije.length - 1; i >= 0; i -= 1) {
         const elim = stanje.eliminacije[i]!;
         if (elim.igracId !== dokaz.cekateljId) continue;
         if (elim.bodZa != null) break;
-        const azurirano: Eliminacija = {
+        stanje.eliminacije[i] = {
           ...elim,
           bodZa: ishod.uzrocnikId,
           iskustvo: stavka,
         };
-        stanje.eliminacije[i] = azurirano;
-        io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', azurirano);
         break;
       }
+      posaljiStanjeSvima(stanje);
     }
     if (stanje.aktivni.size <= 1) {
       zakljuciPartiju(stanje);
