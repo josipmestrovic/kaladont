@@ -1,10 +1,35 @@
 import { and, eq } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { izmjenePostavkiBotova, postavkeBotova } from '../baza/shema.js';
-import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from './konfiguracija-bota.js';
+import { ShemaKonfiguracijeBota, VERZIJA_BOT_POLITIKE, ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from './konfiguracija-bota.js';
 
-function parsajSpremljenuKonfiguraciju(sirovo: unknown): KonfiguracijaBota {
-  return ShemaKonfiguracijeBota.parse({ ...ZADANA_KONFIGURACIJA_BOTA, ...(sirovo && typeof sirovo === 'object' ? sirovo : {}) });
+/**
+ * Stare spremljene konfiguracije (verzija 3, bez tri_igraca / botoviTroboj) moraju
+ * dobiti zadane vrijednosti i novu verziju politike bez ručnog admin upisa.
+ */
+export function parsajSpremljenuKonfiguraciju(sirovo: unknown): KonfiguracijaBota {
+  const ulaz = sirovo && typeof sirovo === 'object' ? (sirovo as Record<string, unknown>) : {};
+  const zadano = ZADANA_KONFIGURACIJA_BOTA;
+  const pragoviUlaz = ulaz.pragoviPopuneMs && typeof ulaz.pragoviPopuneMs === 'object'
+    ? (ulaz.pragoviPopuneMs as Record<string, unknown>)
+    : {};
+  const odstupanjaUlaz = ulaz.odstupanjaPopuneMs && typeof ulaz.odstupanjaPopuneMs === 'object'
+    ? (ulaz.odstupanjaPopuneMs as Record<string, unknown>)
+    : {};
+  return ShemaKonfiguracijeBota.parse({
+    ...zadano,
+    ...ulaz,
+    verzija: VERZIJA_BOT_POLITIKE,
+    pragoviPopuneMs: {
+      ...zadano.pragoviPopuneMs,
+      ...pragoviUlaz,
+    },
+    odstupanjaPopuneMs: {
+      ...zadano.odstupanjaPopuneMs,
+      ...odstupanjaUlaz,
+    },
+    botoviTroboj: typeof ulaz.botoviTroboj === 'boolean' ? ulaz.botoviTroboj : zadano.botoviTroboj,
+  });
 }
 
 export interface ZapisPostavkiBotova {

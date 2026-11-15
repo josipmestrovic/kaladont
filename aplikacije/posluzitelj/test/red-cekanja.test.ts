@@ -277,7 +277,7 @@ describe('red čekanja', () => {
     }
   });
 
-  it('stari ulaz bez pravila dobiva ka_zna; Troboj i nevažeći pravilnik se odbijaju', async () => {
+  it('stari ulaz bez pravila dobiva ka_zna; Troboj ulazi; nevažeći pravilnik se odbija', async () => {
     const igrac = await spojiSe();
     try {
       const stanje = await new Promise<StanjeReda>((resolve) => {
@@ -287,12 +287,13 @@ describe('red čekanja', () => {
       expect(stanje.pravila).toBe('ka_zna');
       igrac.emit('red:izadji');
 
-      const greskaTroboj = new Promise<{ kod: string }>((resolve) => igrac.once('greska', resolve));
-      const potvrdaTroboj = new Promise<StanjeReda | null>((resolve) => {
-        igrac.emit('red:udji', { mod: 'tri_igraca' }, resolve);
+      const potvrdaTroboj = await new Promise<StanjeReda | null>((resolve) => {
+        igrac.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' }, resolve);
       });
-      expect(await greskaTroboj).toMatchObject({ kod: 'NEVALJAN_PAYLOAD' });
-      expect(await potvrdaTroboj).toBeNull();
+      expect(potvrdaTroboj?.mod).toBe('tri_igraca');
+      expect(potvrdaTroboj?.pravila).toBe('klasicni');
+      expect(potvrdaTroboj?.mjesta).toHaveLength(3);
+      igrac.emit('red:izadji');
 
       const greskaPravila = new Promise<{ kod: string }>((resolve) => igrac.once('greska', resolve));
       igrac.emit('red:udji', { mod: 'dva_igraca', pravila: 'nepoznato' });

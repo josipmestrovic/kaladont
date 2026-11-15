@@ -2,12 +2,26 @@
  * Spaja RedCekanja na Socket.IO evente (red:udji, red:izadji, red:stanje).
  * RS-16: heartbeat/disconnect uklanja igrača iz reda u real-timeu.
  * RS-17: sastavljanje stola je atomarno (RedCekanja.pokusajSastaviStol).
+ *
+ * PR06: 9 UI izbora → 8 serverskih ključeva (kljucJavnogReda). Spojeni Dvoboj
+ * Klasični+KA-ZNA dijeli jedan red; Troboj i Četveroboj imaju zaseban red po pravilniku.
  */
-import type { PravilnikPartije, StanjeReda } from 'zajednicko';
-import { izracunajRang, MODOVI_PARTIJE, PRAVILNICI_PARTIJE, razinaVatre, stanjeIskustva, ZADANI_PRAVILNIK } from 'zajednicko';
+import type { KljucJavnogReda, ModPartije, PravilnikPartije, StanjeReda } from 'zajednicko';
+import {
+  izracunajRang,
+  javnaSjedalaZaMod,
+  kanonskaPravilaZaKljuc,
+  KLJUCEVI_JAVNOG_REDA,
+  kljucJavnogReda,
+  MODOVI_PARTIJE,
+  PRAVILNICI_PARTIJE,
+  razinaVatre,
+  stanjeIskustva,
+  ZADANI_PRAVILNIK,
+} from 'zajednicko';
 import { z } from 'zod';
 import type { KaladontIo } from '../server.js';
-import { RedCekanja, prvaCetvorica, prviPar, type StavkaReda } from './red-cekanja.js';
+import { RedCekanja, prvihN, type StavkaReda } from './red-cekanja.js';
 import { dohvatiProsjekCekanjaSek } from './prosjek-cekanja.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost/socket-handler.js';
@@ -15,42 +29,54 @@ import type { RezultatPokretanja } from '../igra/politika-ucinka.js';
 import { PRAGOVI_POPUNE_MS, PopunaReda } from './raspored-popune.js';
 import type { FondBotova } from '../bot/fond.js';
 
-const SOBA_REDA_4P = 'red-cekanja-4p';
-const SOBA_REDA_1V1 = 'red-cekanja-1v1';
-/** Tipovi koje Zod prihvaća; Troboj se zatim eksplicitno odbija (PR06). */
 const ShemaPayloadReda = z.object({
   mod: z.enum(MODOVI_PARTIJE).optional(),
   pravila: z.enum(PRAVILNICI_PARTIJE).optional(),
 }).strict().optional();
 const PORUKA_NEVALJANOG_PAYLOADA = 'Poslana poruka nije ispravna.';
 
-/** Javni redovi do PR06: samo Dvoboj i Četveroboj. */
-type PodrzaniJavniRed = 'cetiri_igraca' | 'dva_igraca';
+function sobaZaKljuc(kljuc: KljucJavnogReda): string {
+  return `red-cekanja-${kljuc}`;
+}
 
 function razrijesiUlazReda(payload: { mod?: string; pravila?: PravilnikPartije } | undefined):
-  | { ok: true; mod: PodrzaniJavniRed; pravila: PravilnikPartije }
+  | { ok: true; mod: ModPartije; pravila: PravilnikPartije; kljuc: KljucJavnogReda }
   | { ok: false } {
-  if (payload?.mod === 'tri_igraca') return { ok: false };
-  const mod: PodrzaniJavniRed = payload?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
+  const mod: ModPartije =
+    payload?.mod === 'dva_igraca' ? 'dva_igraca'
+      : payload?.mod === 'tri_igraca' ? 'tri_igraca'
+        : 'cetiri_igraca';
   const pravila = payload?.pravila ?? ZADANI_PRAVILNIK;
-  return { ok: true, mod, pravila };
+  return { ok: true, mod, pravila, kljuc: kljucJavnogReda(mod, pravila) };
 }
 
 export interface OpcijePopuneReda {
   fond: FondBotova;
-  omogucena: (mod: PodrzaniJavniRed) => boolean;
+  omogucena: (mod: ModPartije) => boolean;
   botJeZauzet: (igracId: string) => boolean;
   sada?: () => number;
-  /** Samo za testove: kraći pragovi od produkcijskih 30 / 20-30-40 s. */
-  pragoviMs?: Partial<Record<PodrzaniJavniRed, readonly number[]>>;
-  odstupanjaMs?: Partial<Record<PodrzaniJavniRed, readonly number[]>>;
-  dohvatiRaspored?: (mod: PodrzaniJavniRed) => { pragoviMs: readonly number[]; odstupanjaMs?: readonly number[] };
+  /** Samo za testove: kraći pragovi od produkcijskih. */
+  pragoviMs?: Partial<Record<ModPartije, readonly number[]>>;
+  odstupanjaMs?: Partial<Record<ModPartije, readonly number[]>>;
+  dohvatiRaspored?: (mod: ModPartije) => { pragoviMs: readonly number[]; odstupanjaMs?: readonly number[] };
   dohvatiOdmaciNeuspjelogPokretanja?: () => readonly number[];
+}
+
+interface KanalReda {
+  kljuc: KljucJavnogReda;
+  mod: ModPartije;
+  soba: string;
+  red: RedCekanja;
+  popuna: PopunaReda | null;
 }
 
 export function registrirajRedCekanja(
   io: KaladontIo,
-  naStolSastavljen: (stol: StavkaReda[], mod: PodrzaniJavniRed) => Promise<RezultatPokretanja | void> | RezultatPokretanja | void,
+  naStolSastavljen: (
+    stol: StavkaReda[],
+    mod: ModPartije,
+    meta: { pravila: PravilnikPartije; spojeniDvoboj: boolean; kljuc: KljucJavnogReda },
+  ) => Promise<RezultatPokretanja | void> | RezultatPokretanja | void,
   igracImaAktivnuPartiju: (igracId: string) => boolean,
   igracImaPrivatnuSobu: (igracId: string) => boolean,
   mozeStvoritiPartiju: () => boolean,
@@ -59,46 +85,82 @@ export function registrirajRedCekanja(
   zapisSocketHandlerGreske: ZapisSocketHandlerGreske,
   popunaOpcije?: OpcijePopuneReda,
 ): { ukloniIzReda: (igracId: string) => void; osvjeziPopunu: () => void; zaustaviPopunu: () => void } {
-  const red4p = new RedCekanja(prvaCetvorica);
-  const red1v1 = new RedCekanja(prviPar);
-  const namjere = new Map<string, { mod: PodrzaniJavniRed; pravila: PravilnikPartije; generacija: number }>();
+  /** Namjera: ključ reda + UI odabir. Identičan resend ≠ promjena pravilnika. */
+  const namjere = new Map<string, { kljuc: KljucJavnogReda; mod: ModPartije; pravila: PravilnikPartije; generacija: number }>();
   let generacijaUlaska = 0;
   let zaustavljen = false;
-  const ponavljanja = new Map<PodrzaniJavniRed, NodeJS.Timeout>();
-  const greskePokretanja = new Map<PodrzaniJavniRed, number>();
+  const ponavljanja = new Map<KljucJavnogReda, NodeJS.Timeout>();
+  const greskePokretanja = new Map<KljucJavnogReda, number>();
 
-  function stvoriPopunu(mod: PodrzaniJavniRed): PopunaReda | null {
+  const kanali = new Map<KljucJavnogReda, KanalReda>();
+
+  function stvoriPopunu(kanal: Omit<KanalReda, 'popuna'>): PopunaReda | null {
     if (!popunaOpcije) return null;
+    const { mod, kljuc, red } = kanal;
     return new PopunaReda({
-      red: mod === 'dva_igraca' ? red1v1 : red4p,
+      red,
       fond: popunaOpcije.fond,
-      velicinaStola: mod === 'dva_igraca' ? 2 : 4,
+      velicinaStola: javnaSjedalaZaMod(mod),
+      // Jedan bot ≠ dvije rezervacije: grupaId mora biti jedinstven po ključu reda.
+      grupaId: `popuna-${kljuc}`,
       pragoviMs: popunaOpcije.pragoviMs?.[mod] ?? PRAGOVI_POPUNE_MS[mod],
       odstupanjaMs: popunaOpcije.odstupanjaMs?.[mod],
       dohvatiRaspored: popunaOpcije.dohvatiRaspored ? () => popunaOpcije.dohvatiRaspored!(mod) : undefined,
-      omogucena: () => !zaustavljen && !ponavljanja.has(mod) && popunaOpcije.omogucena(mod) && mozeStvoritiPartiju(),
-      pokreniStol: (stol) => pokreniStolSRezultatom(stol, mod),
+      omogucena: () => !zaustavljen && !ponavljanja.has(kljuc) && popunaOpcije.omogucena(mod) && mozeStvoritiPartiju(),
+      pokreniStol: (stol) => pokreniStolSRezultatom(stol, kljuc),
       botJeZauzet: popunaOpcije.botJeZauzet,
-      naPromjenu: () => posaljiStanje(mod),
+      naPromjenu: () => posaljiStanje(kljuc),
       sada: popunaOpcije.sada,
     });
   }
-  const popuna4p = stvoriPopunu('cetiri_igraca');
-  const popuna1v1 = stvoriPopunu('dva_igraca');
-  const popunaZa = (mod: PodrzaniJavniRed) => (mod === 'dva_igraca' ? popuna1v1 : popuna4p);
 
-  function izracunajStanje(mojIgracId: string, mod: PodrzaniJavniRed, pravila: PravilnikPartije = ZADANI_PRAVILNIK): StanjeReda {
-    const red = mod === 'dva_igraca' ? red1v1 : red4p;
-    const maks = mod === 'dva_igraca' ? 2 : 4;
-    // Rezervirani botovi prikazuju se kao sudionici koji čekaju; rokove i dalje određuje poslužitelj.
-    const stavke = [...red.stanje(), ...(popunaZa(mod)?.rezerviraniBotovi() ?? [])];
+  for (const kljuc of KLJUCEVI_JAVNOG_REDA) {
+    const { mod } = kanonskaPravilaZaKljuc(kljuc);
+    const bazaKanala = {
+      kljuc,
+      mod,
+      soba: sobaZaKljuc(kljuc),
+      red: new RedCekanja(prvihN(javnaSjedalaZaMod(mod))),
+    };
+    kanali.set(kljuc, { ...bazaKanala, popuna: stvoriPopunu(bazaKanala) });
+  }
+
+  function kanalZa(kljuc: KljucJavnogReda): KanalReda {
+    return kanali.get(kljuc)!;
+  }
+
+  function leaveSvihSobaReda(socket: { leave: (soba: string) => void }): void {
+    for (const kljuc of KLJUCEVI_JAVNOG_REDA) socket.leave(sobaZaKljuc(kljuc));
+  }
+
+  function izracunajStanje(mojIgracId: string, kljuc: KljucJavnogReda, pravila: PravilnikPartije = ZADANI_PRAVILNIK): StanjeReda {
+    const kanal = kanalZa(kljuc);
+    const { mod } = kanal;
+    const maks = javnaSjedalaZaMod(mod);
+    const stavke = [...kanal.red.stanje(), ...(kanal.popuna?.rezerviraniBotovi() ?? [])];
     const mjesta: StanjeReda['mjesta'] = Array.from({ length: maks }, () => null);
 
     stavke.slice(0, maks).forEach((stavka, indeks) => {
-      const odigrane = mod === 'dva_igraca' ? (stavka.odigrane1v1 ?? 0) : stavka.odigrane;
-      const pobjede = mod === 'dva_igraca' ? (stavka.pobjede1v1 ?? 0) : stavka.pobjede;
-      const bodoviUkupno = mod === 'dva_igraca' ? (stavka.bodovi1v1 ?? 0) : stavka.bodoviUkupno;
-      const trenutniNiz = mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0);
+      const odigrane = mod === 'dva_igraca'
+        ? (stavka.odigrane1v1 ?? 0)
+        : mod === 'tri_igraca'
+          ? (stavka.odigrane3p ?? 0)
+          : stavka.odigrane;
+      const pobjede = mod === 'dva_igraca'
+        ? (stavka.pobjede1v1 ?? 0)
+        : mod === 'tri_igraca'
+          ? (stavka.pobjede3p ?? 0)
+          : stavka.pobjede;
+      const bodoviUkupno = mod === 'dva_igraca'
+        ? (stavka.bodovi1v1 ?? 0)
+        : mod === 'tri_igraca'
+          ? (stavka.bodovi3p ?? 0)
+          : stavka.bodoviUkupno;
+      const trenutniNiz = mod === 'dva_igraca'
+        ? (stavka.trenutniNiz1v1 ?? 0)
+        : mod === 'tri_igraca'
+          ? (stavka.trenutniNiz3p ?? 0)
+          : (stavka.trenutniNiz4p ?? 0);
 
       const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
       const rang = izracunajRang(odigrane, prosjekBodova, mod);
@@ -125,67 +187,86 @@ export function registrirajRedCekanja(
     return { mojIgracId, mod, pravila, mjesta, prosjekCekanjaSek: dohvatiProsjekCekanjaSek() };
   }
 
-  function posaljiStanje(mod: PodrzaniJavniRed): void {
-    const sobaSve = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
+  function posaljiStanje(kljuc: KljucJavnogReda): void {
+    const sobaSve = sobaZaKljuc(kljuc);
     const socketIdovi = io.sockets.adapter.rooms.get(sobaSve);
     if (!socketIdovi) return;
     for (const socketId of socketIdovi) {
       const socket = io.sockets.sockets.get(socketId);
       if (!socket) continue;
       const pravila = namjere.get(socket.data.igracId)?.pravila ?? ZADANI_PRAVILNIK;
-      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod, pravila));
+      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, kljuc, pravila));
     }
   }
 
-  function ukloniIzSvihRedova(igracId: string) {
-    namjere.delete(igracId);
-    red4p.izadji(igracId);
-    red1v1.izadji(igracId);
+  function posaljiStanjeSvih(): void {
+    for (const kljuc of KLJUCEVI_JAVNOG_REDA) posaljiStanje(kljuc);
   }
 
-  /** Nakon neuspjelog starta vraća samo ljude koji još čekaju isti način; zadržava izvorni usaoU. */
-  function vratiURed(stol: readonly StavkaReda[], mod: PodrzaniJavniRed, generacije: ReadonlyMap<string, number>): void {
-    const red = mod === 'dva_igraca' ? red1v1 : red4p;
-    const soba = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
+  function osvjeziSvePopune(): void {
+    for (const kanal of kanali.values()) kanal.popuna?.osvjezi();
+  }
+
+  /** Uklanja iz svih redova; vraća stari ključ radi osvježavanja popune. */
+  function ukloniIzSvihRedova(igracId: string): KljucJavnogReda | undefined {
+    const stari = namjere.get(igracId)?.kljuc;
+    namjere.delete(igracId);
+    for (const kanal of kanali.values()) kanal.red.izadji(igracId);
+    return stari;
+  }
+
+  /** Nakon neuspjelog starta vraća samo ljude koji još čekaju isti ključ; zadržava izvorni usaoU. */
+  function vratiURed(stol: readonly StavkaReda[], kljuc: KljucJavnogReda, generacije: ReadonlyMap<string, number>): void {
+    const kanal = kanalZa(kljuc);
     for (const stavka of stol) {
       if (stavka.upravljac === 'bot') continue;
       const namjera = namjere.get(stavka.igracId);
       const socket = [...io.sockets.sockets.values()].find((veza) => veza.connected && veza.data.igracId === stavka.igracId);
-      if (!zaustavljen && socket && namjera?.mod === mod && namjera.generacija === generacije.get(stavka.igracId) && !igracImaAktivnuPartiju(stavka.igracId) && !igracImaPrivatnuSobu(stavka.igracId)) {
-        socket.join(soba);
-        red.udji(stavka);
+      if (
+        !zaustavljen
+        && socket
+        && namjera?.kljuc === kljuc
+        && namjera.generacija === generacije.get(stavka.igracId)
+        && !igracImaAktivnuPartiju(stavka.igracId)
+        && !igracImaPrivatnuSobu(stavka.igracId)
+      ) {
+        socket.join(kanal.soba);
+        kanal.red.udji(stavka);
       }
     }
   }
 
-  function pokreniStolSRezultatom(stol: StavkaReda[], mod: PodrzaniJavniRed): Promise<RezultatPokretanja> {
-    const generacije = new Map(stol.filter((stavka) => stavka.upravljac !== 'bot').map((stavka) => [stavka.igracId, namjere.get(stavka.igracId)?.generacija ?? -1]));
+  function pokreniStolSRezultatom(stol: StavkaReda[], kljuc: KljucJavnogReda): Promise<RezultatPokretanja> {
+    const kanal = kanalZa(kljuc);
+    const meta = kanonskaPravilaZaKljuc(kljuc);
+    const generacije = new Map(
+      stol.filter((stavka) => stavka.upravljac !== 'bot').map((stavka) => [stavka.igracId, namjere.get(stavka.igracId)?.generacija ?? -1]),
+    );
     const obradiNeuspjeh = () => {
-      vratiURed(stol, mod, generacije);
-      if (zaustavljen || ponavljanja.has(mod)) return;
-      const broj = (greskePokretanja.get(mod) ?? 0) + 1;
-      greskePokretanja.set(mod, broj);
+      vratiURed(stol, kljuc, generacije);
+      if (zaustavljen || ponavljanja.has(kljuc)) return;
+      const broj = (greskePokretanja.get(kljuc) ?? 0) + 1;
+      greskePokretanja.set(kljuc, broj);
       const odmaci = popunaOpcije?.dohvatiOdmaciNeuspjelogPokretanja?.() ?? [1_000, 2_000, 4_000, 5_000];
       const odmak = odmaci[Math.min(broj - 1, odmaci.length - 1)] ?? 5_000;
       const timer = setTimeout(() => {
-        ponavljanja.delete(mod);
+        ponavljanja.delete(kljuc);
         if (zaustavljen) return;
-        const red = mod === 'dva_igraca' ? red1v1 : red4p;
-        const noviStol = red.pokusajSastaviStol();
-        if (noviStol) pokreniStol(noviStol, mod);
-        else popunaZa(mod)?.osvjezi();
+        const noviStol = kanal.red.pokusajSastaviStol();
+        if (noviStol) pokreniStol(noviStol, kljuc);
+        else kanal.popuna?.osvjezi();
       }, odmak);
       timer.unref();
-      ponavljanja.set(mod, timer);
+      ponavljanja.set(kljuc, timer);
     };
     return Promise.resolve()
-      .then(() => naStolSastavljen(stol, mod))
+      .then(() => naStolSastavljen(stol, meta.mod, { pravila: meta.pravila, spojeniDvoboj: meta.spojeniDvoboj, kljuc }))
       .then((rezultat) => {
         const konacni: RezultatPokretanja = rezultat ?? 'pokrenuta';
         if (konacni !== 'pokrenuta') obradiNeuspjeh();
         else {
           popunaOpcije?.fond.zapamtiProtivnike(stol);
-          greskePokretanja.delete(mod);
+          greskePokretanja.delete(kljuc);
           for (const [igracId, generacija] of generacije) {
             if (namjere.get(igracId)?.generacija === generacija) namjere.delete(igracId);
           }
@@ -196,11 +277,11 @@ export function registrirajRedCekanja(
         obradiNeuspjeh();
         return 'greska' as const;
       })
-      .finally(() => posaljiStanje(mod));
+      .finally(() => posaljiStanje(kljuc));
   }
 
-  function pokreniStol(stol: StavkaReda[], mod: PodrzaniJavniRed): void {
-    void pokreniStolSRezultatom(stol, mod).finally(() => popunaZa(mod)?.osvjezi());
+  function pokreniStol(stol: StavkaReda[], kljuc: KljucJavnogReda): void {
+    void pokreniStolSRezultatom(stol, kljuc).finally(() => kanalZa(kljuc).popuna?.osvjezi());
   }
 
   io.on('connection', (socket) => {
@@ -216,7 +297,7 @@ export function registrirajRedCekanja(
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: PORUKA_NEVALJANOG_PAYLOADA });
         return;
       }
-      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, ulaz.mod, ulaz.pravila));
+      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, ulaz.kljuc, ulaz.pravila));
     }));
 
     socket.on('red:udji', omotajSocketHandler(socket, 'red:udji', zapisSocketHandlerGreske, async (...argumenti: unknown[]) => {
@@ -245,10 +326,8 @@ export function registrirajRedCekanja(
         potvrda?.(null);
         return;
       }
-      const { mod, pravila } = ulaz;
-      const sobaZaUlaz = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
-      const suprotnaSoba = mod === 'dva_igraca' ? SOBA_REDA_4P : SOBA_REDA_1V1;
-      const red = mod === 'dva_igraca' ? red1v1 : red4p;
+      const { mod, pravila, kljuc } = ulaz;
+      const kanal = kanalZa(kljuc);
 
       if (igracImaAktivnuPartiju(socket.data.igracId)) {
         potvrda?.(null);
@@ -265,18 +344,26 @@ export function registrirajRedCekanja(
         return;
       }
 
-      socket.leave(suprotnaSoba);
-      socket.join(sobaZaUlaz);
-
-      if (red.stanje().some((s) => s.igracId === socket.data.igracId)) {
-        potvrda?.(izracunajStanje(socket.data.igracId, mod, pravila));
+      // Identičan zahtjev (isti ključ + ista odabranaPravila) = no-op; zadrži usaoU.
+      // Promjena pravilnika (čak i unutar 2-zajednicki) uklanja članstvo i rezervaciju.
+      const postojeca = namjere.get(socket.data.igracId);
+      if (
+        postojeca?.kljuc === kljuc
+        && postojeca.pravila === pravila
+        && kanal.red.stanje().some((s) => s.igracId === socket.data.igracId)
+      ) {
+        leaveSvihSobaReda(socket);
+        socket.join(kanal.soba);
+        potvrda?.(izracunajStanje(socket.data.igracId, kljuc, pravila));
         return;
       }
 
-      ukloniIzSvihRedova(socket.data.igracId);
-      namjere.set(socket.data.igracId, { mod, pravila, generacija: ++generacijaUlaska });
+      const stariKljuc = ukloniIzSvihRedova(socket.data.igracId);
+      leaveSvihSobaReda(socket);
+      socket.join(kanal.soba);
+      namjere.set(socket.data.igracId, { kljuc, mod, pravila, generacija: ++generacijaUlaska });
 
-      red.udji({
+      kanal.red.udji({
         igracId: socket.data.igracId,
         vrsta: socket.data.vrsta,
         nadimak: socket.data.nadimak,
@@ -299,12 +386,16 @@ export function registrirajRedCekanja(
         usaoU: Date.now(),
         odabranaPravila: pravila,
       });
-      potvrda?.(izracunajStanje(socket.data.igracId, mod, pravila));
-      posaljiStanje(mod);
+      potvrda?.(izracunajStanje(socket.data.igracId, kljuc, pravila));
+      if (stariKljuc && stariKljuc !== kljuc) {
+        kanalZa(stariKljuc).popuna?.osvjezi();
+        posaljiStanje(stariKljuc);
+      }
+      posaljiStanje(kljuc);
 
-      const stol = ponavljanja.has(mod) ? null : red.pokusajSastaviStol();
-      if (stol) pokreniStol(stol, mod);
-      else popunaZa(mod)?.osvjezi();
+      const stol = ponavljanja.has(kljuc) ? null : kanal.red.pokusajSastaviStol();
+      if (stol) pokreniStol(stol, kljuc);
+      else kanal.popuna?.osvjezi();
     }));
 
     socket.on('red:izadji', omotajSocketHandler(socket, 'red:izadji', zapisSocketHandlerGreske, (...argumenti: unknown[]) => {
@@ -313,41 +404,33 @@ export function registrirajRedCekanja(
         return;
       }
       if (!provjeriDogadaj(socket.data.igracId, 'red:izadji')) return;
-      ukloniIzSvihRedova(socket.data.igracId);
-      socket.leave(SOBA_REDA_4P);
-      socket.leave(SOBA_REDA_1V1);
-      popuna4p?.osvjezi();
-      popuna1v1?.osvjezi();
-      posaljiStanje('cetiri_igraca');
-      posaljiStanje('dva_igraca');
+      const stariKljuc = ukloniIzSvihRedova(socket.data.igracId);
+      leaveSvihSobaReda(socket);
+      osvjeziSvePopune();
+      if (stariKljuc) posaljiStanje(stariKljuc);
+      else posaljiStanjeSvih();
     }));
 
     socket.on('disconnect', omotajSocketHandler(socket, 'disconnect', zapisSocketHandlerGreske, () => {
-      ukloniIzSvihRedova(socket.data.igracId);
-      popuna4p?.osvjezi();
-      popuna1v1?.osvjezi();
-      posaljiStanje('cetiri_igraca');
-      posaljiStanje('dva_igraca');
+      const stariKljuc = ukloniIzSvihRedova(socket.data.igracId);
+      osvjeziSvePopune();
+      if (stariKljuc) posaljiStanje(stariKljuc);
+      else posaljiStanjeSvih();
     }));
   });
 
   return {
     ukloniIzReda: (igracId: string) => {
-      ukloniIzSvihRedova(igracId);
-      popuna4p?.osvjezi();
-      popuna1v1?.osvjezi();
+      const stariKljuc = ukloniIzSvihRedova(igracId);
+      osvjeziSvePopune();
       for (const socket of io.sockets.sockets.values()) {
-        if (socket.data.igracId === igracId) {
-          socket.leave(SOBA_REDA_4P);
-          socket.leave(SOBA_REDA_1V1);
-        }
+        if (socket.data.igracId === igracId) leaveSvihSobaReda(socket);
       }
-      posaljiStanje('cetiri_igraca');
-      posaljiStanje('dva_igraca');
+      if (stariKljuc) posaljiStanje(stariKljuc);
+      else posaljiStanjeSvih();
     },
     osvjeziPopunu: () => {
-      popuna4p?.osvjezi();
-      popuna1v1?.osvjezi();
+      osvjeziSvePopune();
     },
     zaustaviPopunu: () => {
       zaustavljen = true;
@@ -355,8 +438,7 @@ export function registrirajRedCekanja(
       ponavljanja.clear();
       namjere.clear();
       greskePokretanja.clear();
-      popuna4p?.zaustavi();
-      popuna1v1?.zaustavi();
+      for (const kanal of kanali.values()) kanal.popuna?.zaustavi();
     },
   };
 }

@@ -7,14 +7,16 @@ import type { RezultatPokretanja } from '../igra/politika-ucinka.js';
 import type { FondBotova, Rezervacija } from '../bot/fond.js';
 import type { RedCekanja, StavkaReda } from './red-cekanja.js';
 
-export const PRAGOVI_POPUNE_MS: Record<'dva_igraca' | 'cetiri_igraca', readonly number[]> = {
+/** Pragovi po veličini stola (ne po ključu reda). Troboj: 20/30 s — prva dva četverobojska. */
+export const PRAGOVI_POPUNE_MS: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]> = {
   dva_igraca: [30_000],
+  tri_igraca: [20_000, 30_000],
   cetiri_igraca: [20_000, 30_000, 40_000],
 };
 
 export function pragoviPopuneZaOkruzenje(okruzenje: string, brziRazvoj = true): typeof PRAGOVI_POPUNE_MS {
   return okruzenje === 'development' && brziRazvoj
-    ? { dva_igraca: [1_000], cetiri_igraca: [1_000, 1_000, 1_000] }
+    ? { dva_igraca: [1_000], tri_igraca: [1_000, 1_000], cetiri_igraca: [1_000, 1_000, 1_000] }
     : PRAGOVI_POPUNE_MS;
 }
 
@@ -33,6 +35,11 @@ export interface OvisnostiPopune {
   red: RedCekanja;
   fond: FondBotova;
   velicinaStola: number;
+  /**
+   * Jedinstveni ID rezervacijske grupe po ključu reda (PR06).
+   * Bez toga bi tri reda iste veličine dijelila `popuna-3` i bot bi mogao biti rezerviran dvostruko.
+   */
+  grupaId?: string;
   pragoviMs: readonly number[];
   odstupanjaMs?: readonly number[];
   dohvatiRaspored?: () => { pragoviMs: readonly number[]; odstupanjaMs?: readonly number[] };
@@ -60,7 +67,7 @@ export class PopunaReda {
   private pragoviEpizode: number[] | null = null;
 
   constructor(private readonly ovisnosti: OvisnostiPopune) {
-    this.grupaId = `popuna-${ovisnosti.velicinaStola}`;
+    this.grupaId = ovisnosti.grupaId ?? `popuna-${ovisnosti.velicinaStola}`;
     this.sada = ovisnosti.sada ?? Date.now;
     this.zakazi = ovisnosti.zakazi ?? ((posao, ms) => setTimeout(posao, ms));
     this.otkazi = ovisnosti.otkazi ?? ((handle) => clearTimeout(handle));
