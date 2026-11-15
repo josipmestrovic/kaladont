@@ -130,3 +130,13 @@ Partija sadrži kanonski uređeni niz sjedala koji je poslužitelj nasumično do
 **Odluka:** lokalni prikaz izvodi se samo iz kanonskog niza i lokalnog `igracId`; ne mijenja se kad se promijeni igrač na potezu. Potez i timer ističu sjedalo prema ID-u igrača, a eliminirani igrači ostaju na mjestu. Prikaz sjedala čeka dok nisu dostupni i lokalni identitet i njegov zapis sjedala; reconnect koristi isti kanonski niz.
 *Obrazloženje: promjena aktivnog igrača ne smije premještati sjedala ni avatare i otežavati praćenje poteza.*
 
+**RS-31 — Dokaži nastavak: mrtva slova eliminiraju autora (PR05).**
+U pravilniku `dokazi_nastavak` Ana odigra valjanu riječ (npr. „cement”) na čiji nastavak nema igrive riječi (rupa u bazi ili potrošene grupe).
+**Odluka:** odmah ispada **Ana** (autor), bez eliminacijskog boda. Bruno ostaje. Nema faze dokaza. Nova sistemska riječ ide prvom aktivnom iza Ane. U Klasičnom i KA-ZNA i dalje vrijedi RS-02/RS-03 (žrtva = sljedeći).
+*Testovi:* `mrtva slova (cement): ispada autor…` u `motor-partije.test.ts`; `zrtvaMrtvihSlova` u `odluke-pravila.test.ts`.
+
+**RS-32 — Dokaži nastavak: odgođena eliminacija nakon „Ne znam”/isteka/napusti (PR05).**
+Bruno na potezu kaže „Ne znam”, istekne mu rok, ili napusti partiju, a postoji aktivan autor Anine riječi.
+**Odluka:** otvara se faza `dokaz_nastavka` (event `dokaz:zatrazen`). „Ne znam”/istek: Bruno **ostaje aktivan**, bez ranog poraza. Napusti/konačni prekid: Bruno je potvrđen (`prekid`), zatim Ana dokazuje za kredit. Uspjeh → Bruno ispada (ako već nije) s Aninim kreditom; uvijek nova **sistemska** riječ iza Brunе. Neuspjeh → Ana ispada bez kredita. Posebna riječ na običnom potezu i dalje KA-ZNA; kao dokaz ne pokreće drugu žrtvu. Sustavska riječ + „Ne znam” = redovna eliminacija (nema autora).
+*Testovi:* `Bruno Ne znam → dokaz…`, `Ana Ne znam → Ana ispada…`, `sistemska + Ne znam`, `Bruno izadji…` u `motor-partije.test.ts`.
+
