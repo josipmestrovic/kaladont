@@ -442,6 +442,13 @@
       "when": 1794980000000,
       "tag": "0062_pravilnik_partije",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1794990000000,
+      "tag": "0063_statistike_moda_igraca",
+      "breakpoints": true
     }
   ]
 }

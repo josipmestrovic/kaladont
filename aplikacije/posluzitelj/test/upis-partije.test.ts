@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { izracunajRazinuDostignuca, dohvatiDefinicijuDostignuca, ukupnoIskustvoZaRazinu } from 'zajednicko';
 import { baza } from '../src/baza/klijent.js';
-import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeModaIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { osigurajUpisePoteza, ponistiPartijeUTijekuUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 import type { ZapisPoteza, ZapisStatistikeRijeci } from '../src/igra/upis-partije.js';
 
@@ -758,5 +758,126 @@ describe('pouzdan upis poteza', () => {
     expect(obracuni).toHaveLength(1);
     expect(nakonPrvih?.iskustvoUkupno).toBeGreaterThan(100);
     expect(nakonPonovnog?.iskustvoUkupno).toBe(nakonPrvih?.iskustvoUkupno);
+  });
+});
+
+describe('upis Troboja (PR03)', () => {
+  const ana = randomUUID();
+  const bruno = randomUUID();
+  const cvita = randomUUID();
+  const igraciIds = [ana, bruno, cvita];
+  const obracuniZaBrisanje: string[] = [];
+
+  afterEach(async () => {
+    for (const partijaId of obracuniZaBrisanje.splice(0)) {
+      await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+      await baza.delete(rezultatiFormeIgraca).where(eq(rezultatiFormeIgraca.partijaId, partijaId));
+      await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+      await baza.delete(partije).where(eq(partije.id, partijaId));
+    }
+    for (const igracId of igraciIds) {
+      await baza.delete(statistikeModaIgraca).where(eq(statistikeModaIgraca.igracId, igracId));
+      await baza.delete(nizoviPobjedaIgraca).where(eq(nizoviPobjedaIgraca.igracId, igracId));
+      await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igracId));
+      await baza.delete(igraci).where(eq(igraci.id, igracId));
+    }
+  });
+
+  it('upiše Troboj u statistike_moda_igraca, ne dira Četveroboj, i ostaje idempotentan', async () => {
+    await baza.insert(igraci).values([
+      { id: ana, vrsta: 'registriran', nadimak: 'Ana Troboj' },
+      { id: bruno, vrsta: 'registriran', nadimak: 'Bruno Troboj' },
+      { id: cvita, vrsta: 'registriran', nadimak: 'Cvita Troboj' },
+    ]);
+
+    const partijaId = randomUUID();
+    obracuniZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'tri_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values([
+      { partijaId, igracId: ana, sjedalo: 0 },
+      { partijaId, igracId: bruno, sjedalo: 1 },
+      { partijaId, igracId: cvita, sjedalo: 2 },
+    ]);
+
+    const rezultati = [
+      { igracId: ana, plasman: 1, bodovi: 5, eliminacije: 2, iskustvo: 40, nacinIspadanja: 'pobjednik' as const },
+      { igracId: bruno, plasman: 2, bodovi: 1, eliminacije: 0, iskustvo: 10, nacinIspadanja: 'ne_znam' as const },
+      { igracId: cvita, plasman: 3, bodovi: 0, eliminacije: 0, iskustvo: 5, nacinIspadanja: 'ne_znam' as const },
+    ];
+
+    await Promise.all([
+      zakljuciPartijuUBazi(partijaId, ana, rezultati, 'tri_igraca'),
+      zakljuciPartijuUBazi(partijaId, ana, rezultati, 'tri_igraca'),
+    ]);
+    await zakljuciPartijuUBazi(partijaId, ana, rezultati, 'tri_igraca');
+
+    const sudionici = await baza.select({
+      igracId: sudioniciPartije.igracId,
+      plasman: sudioniciPartije.plasman,
+      bodovi: sudioniciPartije.bodovi,
+    }).from(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+    expect(sudionici).toHaveLength(3);
+    expect(sudionici.find((s) => s.igracId === ana)).toMatchObject({ plasman: 1, bodovi: 5 });
+
+    const [anaMod] = await baza.select().from(statistikeModaIgraca)
+      .where(and(eq(statistikeModaIgraca.igracId, ana), eq(statistikeModaIgraca.mod, 'tri_igraca')));
+    expect(anaMod).toMatchObject({ odigrane: 1, pobjede: 1, eliminacije: 2, bodovi: 5 });
+
+    const [anaIgrac] = await baza.select({
+      odigrane: igraci.odigrane,
+      pobjede: igraci.pobjede,
+      bodoviUkupno: igraci.bodoviUkupno,
+      odigrane1v1: igraci.odigrane1v1,
+      dovrseneIgre: igraci.dovrseneIgre,
+    }).from(igraci).where(eq(igraci.id, ana));
+    expect(anaIgrac).toMatchObject({
+      odigrane: 0,
+      pobjede: 0,
+      bodoviUkupno: 0,
+      odigrane1v1: 0,
+      dovrseneIgre: 1,
+    });
+
+    const [niz] = await baza.select().from(nizoviPobjedaIgraca)
+      .where(and(eq(nizoviPobjedaIgraca.igracId, ana), eq(nizoviPobjedaIgraca.mod, 'tri_igraca')));
+    expect(niz?.trenutniNiz).toBe(1);
+
+    const forme = await baza.select().from(rezultatiFormeIgraca).where(eq(rezultatiFormeIgraca.partijaId, partijaId));
+    expect(forme).toHaveLength(3);
+
+    const obracuni = await baza.select().from(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+    expect(obracuni).toHaveLength(1);
+  });
+
+  it('nastavlja Troboj niz kroz dvije partije, a poraz ga prekida', async () => {
+    await baza.insert(igraci).values({ id: ana, vrsta: 'registriran', nadimak: 'Ana Niz' });
+
+    for (const plasman of [1, 1, 2] as const) {
+      const partijaId = randomUUID();
+      obracuniZaBrisanje.push(partijaId);
+      await baza.insert(partije).values({ id: partijaId, mod: 'tri_igraca', status: 'u_tijeku' });
+      await baza.insert(sudioniciPartije).values({ partijaId, igracId: ana, sjedalo: 0 });
+      await zakljuciPartijuUBazi(
+        partijaId,
+        ana,
+        [{
+          igracId: ana,
+          plasman,
+          bodovi: plasman === 1 ? 3 : 1,
+          eliminacije: 0,
+          iskustvo: 10,
+          nacinIspadanja: plasman === 1 ? 'pobjednik' : 'ne_znam',
+        }],
+        'tri_igraca',
+      );
+    }
+
+    const [niz] = await baza.select().from(nizoviPobjedaIgraca)
+      .where(and(eq(nizoviPobjedaIgraca.igracId, ana), eq(nizoviPobjedaIgraca.mod, 'tri_igraca')));
+    expect(niz).toMatchObject({ trenutniNiz: 0, najboljiNiz: 2 });
+
+    const [mod] = await baza.select().from(statistikeModaIgraca)
+      .where(and(eq(statistikeModaIgraca.igracId, ana), eq(statistikeModaIgraca.mod, 'tri_igraca')));
+    expect(mod).toMatchObject({ odigrane: 3, pobjede: 2 });
   });
 });

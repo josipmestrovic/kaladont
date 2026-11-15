@@ -153,6 +153,21 @@ export const rezultatiFormeIgraca = pgTable(
   ],
 );
 
+/** Agregati javnih igara po formatu. Troboj piše ovdje; 2p/4p ostaju na stupcima `igraci` do PR09. */
+export const statistikeModaIgraca = pgTable(
+  'statistike_moda_igraca',
+  {
+    igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+    mod: modPartije('mod').notNull(),
+    odigrane: integer('odigrane').notNull().default(0),
+    pobjede: integer('pobjede').notNull().default(0),
+    eliminacije: integer('eliminacije').notNull().default(0),
+    bodovi: integer('bodovi').notNull().default(0),
+    azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.mod] })],
+);
+
 export const statistikeRijeciIgraca = pgTable(
   'statistike_rijeci_igraca',
   {

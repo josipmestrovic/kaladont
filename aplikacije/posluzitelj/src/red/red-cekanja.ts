@@ -18,9 +18,13 @@ export interface StavkaReda {
   odigrane1v1?: number;
   pobjede1v1?: number;
   bodovi1v1?: number;
+  odigrane3p?: number;
+  pobjede3p?: number;
+  bodovi3p?: number;
   iskustvoUkupno?: number;
   trenutniNiz4p?: number;
   trenutniNiz1v1?: number;
+  trenutniNiz3p?: number;
   usaoU: number;
   /** UI odabir pravilnika; izostanak = ka_zna. */
   odabranaPravila?: PravilnikPartije;

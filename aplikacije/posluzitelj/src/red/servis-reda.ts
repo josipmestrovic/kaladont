@@ -98,6 +98,7 @@ export function registrirajRedCekanja(
       const odigrane = mod === 'dva_igraca' ? (stavka.odigrane1v1 ?? 0) : stavka.odigrane;
       const pobjede = mod === 'dva_igraca' ? (stavka.pobjede1v1 ?? 0) : stavka.pobjede;
       const bodoviUkupno = mod === 'dva_igraca' ? (stavka.bodovi1v1 ?? 0) : stavka.bodoviUkupno;
+      const trenutniNiz = mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0);
 
       const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
       const rang = izracunajRang(odigrane, prosjekBodova, mod);
@@ -116,8 +117,8 @@ export function registrirajRedCekanja(
         odigrane: jeBot ? 0 : odigrane,
         prosjekBodova: jeBot ? 0 : prosjekBodova,
         postotakPobjeda: jeBot || odigrane <= 0 ? 0 : (pobjede / odigrane) * 100,
-        trenutniNiz: jeBot ? 0 : (mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0)),
-        razinaVatre: jeBot ? 0 : razinaVatre(mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0), mod),
+        trenutniNiz: jeBot ? 0 : trenutniNiz,
+        razinaVatre: jeBot ? 0 : razinaVatre(trenutniNiz, mod),
         odabranaPravila: stavka.odabranaPravila ?? ZADANI_PRAVILNIK,
       };
     });
@@ -288,9 +289,13 @@ export function registrirajRedCekanja(
         odigrane1v1: socket.data.odigrane1v1 ?? 0,
         pobjede1v1: socket.data.pobjede1v1 ?? 0,
         bodovi1v1: socket.data.bodovi1v1 ?? 0,
+        odigrane3p: socket.data.odigrane3p ?? 0,
+        pobjede3p: socket.data.pobjede3p ?? 0,
+        bodovi3p: socket.data.bodovi3p ?? 0,
         iskustvoUkupno: socket.data.iskustvoUkupno ?? 0,
         trenutniNiz4p: socket.data.trenutniNiz4p ?? 0,
         trenutniNiz1v1: socket.data.trenutniNiz1v1 ?? 0,
+        trenutniNiz3p: socket.data.trenutniNiz3p ?? 0,
         usaoU: Date.now(),
         odabranaPravila: pravila,
       });

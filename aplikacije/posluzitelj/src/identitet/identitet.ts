@@ -5,7 +5,7 @@
  */
 import { and, eq, lt } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
-import { igraci } from '../baza/shema.js';
+import { igraci, statistikeModaIgraca } from '../baza/shema.js';
 import { jePrihvacenaAktualnaVerzijaUvjeta, validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
 import { dohvatiSesiju, jeGostSesijskiToken, jeSesijskiToken, stvoriGostSesijuZaToken } from '../racuni/sesije.js';
 
@@ -31,13 +31,34 @@ export interface Identitet {
   odigrane1v1: number;
   pobjede1v1: number;
   bodovi1v1: number;
+  odigrane3p: number;
+  pobjede3p: number;
+  bodovi3p: number;
   iskustvoUkupno: number;
   emailPotvrdjen: boolean;
   uvjetiPrihvaceni: boolean;
   sesijaId?: string;
 }
 
-function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
+async function dohvatiTrobojBrojace(igracId: string): Promise<{ odigrane3p: number; pobjede3p: number; bodovi3p: number }> {
+  const [red] = await baza
+    .select({
+      odigrane3p: statistikeModaIgraca.odigrane,
+      pobjede3p: statistikeModaIgraca.pobjede,
+      bodovi3p: statistikeModaIgraca.bodovi,
+    })
+    .from(statistikeModaIgraca)
+    .where(and(eq(statistikeModaIgraca.igracId, igracId), eq(statistikeModaIgraca.mod, 'tri_igraca')))
+    .limit(1);
+  return {
+    odigrane3p: red?.odigrane3p ?? 0,
+    pobjede3p: red?.pobjede3p ?? 0,
+    bodovi3p: red?.bodovi3p ?? 0,
+  };
+}
+
+async function uIdentitet(redak: typeof igraci.$inferSelect): Promise<Identitet> {
+  const troboj = await dohvatiTrobojBrojace(redak.id);
   return {
     igracId: redak.id,
     nadimak: redak.nadimak,
@@ -51,6 +72,7 @@ function uIdentitet(redak: typeof igraci.$inferSelect): Identitet {
     odigrane1v1: redak.odigrane1v1,
     pobjede1v1: redak.pobjede1v1,
     bodovi1v1: redak.bodovi1v1,
+    ...troboj,
     iskustvoUkupno: redak.iskustvoUkupno,
     emailPotvrdjen: redak.emailPotvrdjen,
     uvjetiPrihvaceni: jePrihvacenaAktualnaVerzijaUvjeta(redak.potvrdaDob16, redak.uvjetiVerzija),
@@ -83,7 +105,7 @@ export async function razrijesiIdentitet(token: string): Promise<Identitet> {
       throw new Error('Sesijski token ne odgovara nijednom igraču');
     }
     await osvjeziZadnjuAktivnostAkoTreba(postojeci);
-    return { ...uIdentitet(postojeci), sesijaId: 'sesijaId' in sesija ? sesija.sesijaId : sesija.id };
+    return { ...(await uIdentitet(postojeci)), sesijaId: 'sesijaId' in sesija ? sesija.sesijaId : sesija.id };
   }
 
   throw new Error('Nevaljan ili istekao gostujući sesijski token');

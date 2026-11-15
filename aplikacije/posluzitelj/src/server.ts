@@ -87,11 +87,15 @@ export interface PodaciSocketa {
   odigrane1v1: number;
   pobjede1v1: number;
   bodovi1v1: number;
+  odigrane3p: number;
+  pobjede3p: number;
+  bodovi3p: number;
   iskustvoUkupno: number;
   emailPotvrdjen: boolean;
   uvjetiPrihvaceni: boolean;
   trenutniNiz4p: number;
   trenutniNiz1v1: number;
+  trenutniNiz3p: number;
 }
 
 export type KaladontIo = SocketIoServer<
@@ -115,6 +119,12 @@ export interface Posluzitelj {
   brojaciTreninga: import('./trening/servis-treninga.js').BrojaciTreninga;
   brojaciBota: import('./bot/kontroler.js').BrojaciBota;
   fondBotova: FondBotova;
+  /** Direktni start javne partije (testovi / Troboj do PR06 reda). */
+  zapocniJavnuPartiju: (
+    sudionici: import('./red/red-cekanja.js').StavkaReda[],
+    mod: import('zajednicko').ModPartije,
+    pravila?: import('zajednicko').PravilnikPartije,
+  ) => Promise<import('./igra/politika-ucinka.js').RezultatPokretanja>;
 }
 
 export interface OpcijePosluzitelja {
@@ -578,6 +588,9 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       socket.data.odigrane1v1 = identitet.odigrane1v1;
       socket.data.pobjede1v1 = identitet.pobjede1v1;
       socket.data.bodovi1v1 = identitet.bodovi1v1;
+      socket.data.odigrane3p = identitet.odigrane3p;
+      socket.data.pobjede3p = identitet.pobjede3p;
+      socket.data.bodovi3p = identitet.bodovi3p;
       socket.data.iskustvoUkupno = identitet.iskustvoUkupno;
       socket.data.emailPotvrdjen = identitet.emailPotvrdjen;
       socket.data.uvjetiPrihvaceni = identitet.uvjetiPrihvaceni;
@@ -585,6 +598,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
         .from(nizoviPobjedaIgraca).where(eq(nizoviPobjedaIgraca.igracId, identitet.igracId));
       socket.data.trenutniNiz4p = nizovi.find((niz) => niz.mod === 'cetiri_igraca')?.trenutniNiz ?? 0;
       socket.data.trenutniNiz1v1 = nizovi.find((niz) => niz.mod === 'dva_igraca')?.trenutniNiz ?? 0;
+      socket.data.trenutniNiz3p = nizovi.find((niz) => niz.mod === 'tri_igraca')?.trenutniNiz ?? 0;
       metrike.zabiljeziAutorizaciju(true, performance.now() - pocetakAutorizacije);
       next();
     } catch (greska) {
@@ -851,5 +865,13 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     app.log.error({ greska }, 'Oporavak neobrađenih Top 10 dokaza nije uspio');
   });
 
-  return { app, io, zaustavi, brojaciTreninga: treningServis.brojaci, brojaciBota: botKontroler.brojaci, fondBotova };
+  return {
+    app,
+    io,
+    zaustavi,
+    brojaciTreninga: treningServis.brojaci,
+    brojaciBota: botKontroler.brojaci,
+    fondBotova,
+    zapocniJavnuPartiju: (sudionici, mod, pravila) => upravitelj.zapocniPartiju(sudionici, mod, { pravila }),
+  };
 }
