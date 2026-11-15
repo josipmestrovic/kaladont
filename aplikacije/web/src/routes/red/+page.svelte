@@ -9,15 +9,17 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
-  import type { ModPartije, PayloadGreska, PocetakPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
+  import type { PayloadGreska, PocetakPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
   import { javnaSjedalaZaMod } from 'zajednicko';
 
   const igra = dohvatiStanjeIgre();
 
-  const trazeneMod = $derived(((): ModPartije => {
+  /** Javni red do PR06: samo Dvoboj/Četveroboj — Troboj URL ne smije ostati u skeleton petlji. */
+  type PodrzaniRedMod = 'dva_igraca' | 'cetiri_igraca';
+  const nepodrzanTroboj = $derived($page.url.searchParams.get('mod') === 'tri_igraca');
+  const trazeneMod = $derived(((): PodrzaniRedMod => {
     const mod = $page.url.searchParams.get('mod');
-    if (mod === 'dva_igraca' || mod === 'tri_igraca' || mod === 'cetiri_igraca') return mod;
-    return 'cetiri_igraca';
+    return mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
   })());
   const ukupnoMjesta = $derived(javnaSjedalaZaMod(trazeneMod));
 
@@ -70,6 +72,11 @@
   onMount(() => {
     zagrijGameplayZvukove();
     pokreniSlusateljeIgre();
+    if (nepodrzanTroboj) {
+      poruka = 'Troboj još nije dostupan u javnom redu.';
+      stanjeUcitano = true;
+      return;
+    }
     const socket = dohvatiSocket();
 
     const naStanjeReda = (novoStanje: StanjeReda) => {
@@ -186,7 +193,13 @@
   <title>Čekaonica | Kaladont</title>
 </svelte:head>
 
-{#if !stanjeUcitano || !stanjeUskladjeno}
+{#if nepodrzanTroboj}
+<main class="red-sadrzaj">
+  <h1>Troboj nije dostupan</h1>
+  <p role="alert">{poruka ?? 'Troboj još nije dostupan u javnom redu.'}</p>
+  <button type="button" onclick={odustani}>Natrag</button>
+</main>
+{:else if !stanjeUcitano || !stanjeUskladjeno}
   <RedCekanjaKostur ukupnoMjesta={ukupnoMjesta} />
 {:else}
 <main class="red-sadrzaj">

@@ -75,8 +75,8 @@
   );
   const brojMjestaKostura = $derived((() => {
     const mod = urlCilja.searchParams.get('mod');
+    // Troboj nije u javnom redu do PR06 — kostur ne smije sugerirati 3 sjedala.
     if (mod === 'dva_igraca') return 2;
-    if (mod === 'tri_igraca') return 3;
     return 4;
   })());
   // Indeksabilne rute: children odmah (SSR + klijent, bez flasha).

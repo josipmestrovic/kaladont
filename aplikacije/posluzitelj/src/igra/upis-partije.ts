@@ -65,6 +65,7 @@ export async function zapisiPocetakPartije(
     .limit(1);
   if (postojeca) return;
 
+  odbijNepodrzaniMod(mod, 'zapisiPocetakPartije');
   const pravila = opcije.pravila ?? ZADANI_PRAVILNIK;
   const spojeniDvoboj = opcije.spojeniDvoboj ?? false;
 

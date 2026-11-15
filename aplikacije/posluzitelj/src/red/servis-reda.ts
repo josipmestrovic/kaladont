@@ -61,7 +61,7 @@ export function registrirajRedCekanja(
 ): { ukloniIzReda: (igracId: string) => void; osvjeziPopunu: () => void; zaustaviPopunu: () => void } {
   const red4p = new RedCekanja(prvaCetvorica);
   const red1v1 = new RedCekanja(prviPar);
-  const namjere = new Map<string, { mod: PodrzaniJavniRed; generacija: number }>();
+  const namjere = new Map<string, { mod: PodrzaniJavniRed; pravila: PravilnikPartije; generacija: number }>();
   let generacijaUlaska = 0;
   let zaustavljen = false;
   const ponavljanja = new Map<PodrzaniJavniRed, NodeJS.Timeout>();
@@ -130,7 +130,9 @@ export function registrirajRedCekanja(
     if (!socketIdovi) return;
     for (const socketId of socketIdovi) {
       const socket = io.sockets.sockets.get(socketId);
-      if (socket) socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
+      if (!socket) continue;
+      const pravila = namjere.get(socket.data.igracId)?.pravila ?? ZADANI_PRAVILNIK;
+      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod, pravila));
     }
   }
 
@@ -271,7 +273,7 @@ export function registrirajRedCekanja(
       }
 
       ukloniIzSvihRedova(socket.data.igracId);
-      namjere.set(socket.data.igracId, { mod, generacija: ++generacijaUlaska });
+      namjere.set(socket.data.igracId, { mod, pravila, generacija: ++generacijaUlaska });
 
       red.udji({
         igracId: socket.data.igracId,
