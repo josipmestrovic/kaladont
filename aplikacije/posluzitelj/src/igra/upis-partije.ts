@@ -8,7 +8,8 @@ import { izracunajNovaDostignuca, izracunajOcjenuIgre, izracunajRang, kolekcijsk
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
-import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeModaIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeModaIgraca, statistikeRijeciIgraca, sudioniciPartije, ucinakPosebneRijeci } from '../baza/shema.js';
+import type { VrstaMetePosebneRijeci } from './odluke-pravila.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { obradiNeobradeneTop10Dokaze, zabiljeziTop10NakonPromjene } from '../dostignuca/top10.js';
 import { ocistiMemorijuLjestvica } from '../ljestvice/servis.js';
@@ -180,6 +181,28 @@ export async function zapisiPotez(zapis: ZapisPoteza): Promise<void> {
   } catch (greska) {
     if (jeJedinstvenostPrekrsena(greska)) return;
     console.error('Neuspio upis poteza:', greska);
+    throw greska;
+  }
+}
+
+export type ZapisUcinakPosebneRijeci = {
+  partijaId: string;
+  redniBroj: number;
+  rijec: string;
+  uzrocnikId: string | null;
+  zrtvaId: string | null;
+  vrstaMete: VrstaMetePosebneRijeci | null;
+  brojAktivnihPrije: number;
+  ucinak: 'eliminacija' | 'bez_zrtve';
+};
+
+/** Idempotentan upis činjenica posebne riječi (PR04 → PR12/13). */
+export async function zapisiUcinakPosebneRijeci(zapis: ZapisUcinakPosebneRijeci): Promise<void> {
+  try {
+    await baza.insert(ucinakPosebneRijeci).values(zapis).onConflictDoNothing();
+  } catch (greska) {
+    if (jeJedinstvenostPrekrsena(greska)) return;
+    console.error('Neuspio upis učinka posebne riječi:', greska);
     throw greska;
   }
 }

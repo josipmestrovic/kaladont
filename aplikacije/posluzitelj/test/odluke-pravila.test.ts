@@ -22,7 +22,7 @@ describe('odluke-pravila', () => {
         poredak,
         aktivni: new Set(poredak),
       }),
-    ).toBe('A');
+    ).toEqual({ zrtvaId: 'A', vrstaMete: 'prethodni' });
     expect(
       odrediMetuPosebneRijeci({
         pravilnik: 'ka_zna',
@@ -31,7 +31,7 @@ describe('odluke-pravila', () => {
         poredak,
         aktivni: new Set(poredak),
       }),
-    ).toBeNull();
+    ).toEqual({ zrtvaId: null, vrstaMete: null });
     // Motor mora dodatno provjeriti aktivni.has(zrtva) — inače hang (Bugbot).
     expect(
       odrediMetuPosebneRijeci({
@@ -41,7 +41,60 @@ describe('odluke-pravila', () => {
         poredak,
         aktivni: new Set(['B', 'C']),
       }),
-    ).toBe('A');
+    ).toEqual({ zrtvaId: 'A', vrstaMete: 'prethodni' });
+  });
+
+  it('odrediMetuPosebneRijeci (Klasični) vraća sljedećeg aktivnog iza sayera', () => {
+    expect(
+      odrediMetuPosebneRijeci({
+        pravilnik: 'klasicni',
+        autorPrethodneRijeci: 'A',
+        sayerId: 'B',
+        poredak,
+        aktivni: new Set(poredak),
+      }),
+    ).toEqual({ zrtvaId: 'C', vrstaMete: 'sljedeci' });
+    expect(
+      odrediMetuPosebneRijeci({
+        pravilnik: 'klasicni',
+        autorPrethodneRijeci: 'A',
+        sayerId: 'B',
+        poredak: ['A', 'B', 'C'],
+        aktivni: new Set(['A', 'B', 'C']),
+      }),
+    ).toEqual({ zrtvaId: 'C', vrstaMete: 'sljedeci' });
+    // 2 aktivna → protivnik (jedini drugi u krugu).
+    expect(
+      odrediMetuPosebneRijeci({
+        pravilnik: 'klasicni',
+        autorPrethodneRijeci: 'A',
+        sayerId: 'B',
+        poredak,
+        aktivni: new Set(['A', 'B']),
+      }),
+    ).toEqual({ zrtvaId: 'A', vrstaMete: 'sljedeci' });
+    // Preskače već eliminirano sjedalo.
+    expect(
+      odrediMetuPosebneRijeci({
+        pravilnik: 'klasicni',
+        autorPrethodneRijeci: 'A',
+        sayerId: 'B',
+        poredak,
+        aktivni: new Set(['A', 'B', 'D']),
+      }),
+    ).toEqual({ zrtvaId: 'D', vrstaMete: 'sljedeci' });
+  });
+
+  it('odrediMetuPosebneRijeci (Dokaži nastavak, običan potez) koristi KA-ZNA granu', () => {
+    expect(
+      odrediMetuPosebneRijeci({
+        pravilnik: 'dokazi_nastavak',
+        autorPrethodneRijeci: 'A',
+        sayerId: 'B',
+        poredak,
+        aktivni: new Set(poredak),
+      }),
+    ).toEqual({ zrtvaId: 'A', vrstaMete: 'prethodni' });
   });
 
   it('odlukaNakonEliminacije: jedan aktivni → zaključi; inače otvori rundu', () => {

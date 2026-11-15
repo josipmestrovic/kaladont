@@ -1,5 +1,5 @@
 /**
- * Pure odluke pravila za motor partije (PR02).
+ * Pure odluke pravila za motor partije (PR02/PR04).
  * Upravitelj izvršava timer, socket i upis; ovdje su samo identiteti i razlozi.
  */
 import type { PravilnikPartije } from 'zajednicko';
@@ -12,6 +12,14 @@ export type IgracNaPotezu = string;
 export type Zrtva = string;
 /** Sjedalo iza kojeg sustav sidri otvaranje runde. */
 export type SidroNastavka = string;
+
+/** Meta posebne riječi: prethodni autor (KA-ZNA) ili sljedeći u krugu (Klasični). */
+export type VrstaMetePosebneRijeci = 'prethodni' | 'sljedeci';
+
+export type IshodMetePosebneRijeci = {
+  zrtvaId: Zrtva | null;
+  vrstaMete: VrstaMetePosebneRijeci | null;
+};
 
 export type SljedecaRadnja =
   | { vrsta: 'zakljuci'; razlog: 'jedan_ili_nula_aktivnih' }
@@ -36,8 +44,8 @@ export function sljedeciAktivniIza(
 
 /**
  * Meta posebne riječi (kaladont/kalodont).
- * PR02: samo KA-ZNA — žrtva je stvarni autor prethodne riječi.
- * // PR04: klasicni → prvi aktivni iza sayera (uz barem 3 aktivna prije poteza).
+ * Klasični → prvi aktivni iza sayera (i uz 2 aktivna = protivnik).
+ * KA-ZNA i Dokaži nastavak (običan potez) → stvarni autor prethodne riječi.
  */
 export function odrediMetuPosebneRijeci(ulaz: {
   pravilnik: PravilnikPartije;
@@ -45,13 +53,16 @@ export function odrediMetuPosebneRijeci(ulaz: {
   sayerId: string;
   poredak: readonly string[];
   aktivni: ReadonlySet<string>;
-}): Zrtva | null {
-  // PR04: if (ulaz.pravilnik === 'klasicni') return sljedeciAktivniIza(...)
-  void ulaz.pravilnik;
-  void ulaz.sayerId;
-  void ulaz.poredak;
-  void ulaz.aktivni;
-  return ulaz.autorPrethodneRijeci;
+}): IshodMetePosebneRijeci {
+  if (ulaz.pravilnik === 'klasicni') {
+    const zrtvaId = sljedeciAktivniIza(ulaz.poredak, ulaz.aktivni, ulaz.sayerId);
+    return { zrtvaId, vrstaMete: zrtvaId ? 'sljedeci' : null };
+  }
+
+  // ka_zna i dokazi_nastavak (običan potez): žrtva je stvarni autor.
+  const autor = ulaz.autorPrethodneRijeci;
+  if (!autor) return { zrtvaId: null, vrstaMete: null };
+  return { zrtvaId: autor, vrstaMete: 'prethodni' };
 }
 
 /**
