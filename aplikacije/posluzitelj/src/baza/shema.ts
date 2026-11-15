@@ -472,6 +472,31 @@ export const potezi = pgTable('potezi', {
   uniqueIndex('uq_potezi_partija_id_redni_broj').on(tablica.partijaId, tablica.redniBroj),
 ]);
 
+/** Meta / učinak kaladont|kalodont — činjenice za PR12/13; ne nagađati iz konačnog poretka. */
+export const vrstaMetePosebneRijeci = pgEnum('vrsta_mete_posebne_rijeci', ['prethodni', 'sljedeci']);
+export const ishodUcinakPosebneRijeci = pgEnum('ishod_ucinak_posebne_rijeci', ['eliminacija', 'bez_zrtve']);
+
+export const ucinakPosebneRijeci = pgTable(
+  'ucinak_posebne_rijeci',
+  {
+    partijaId: uuid('partija_id')
+      .notNull()
+      .references(() => partije.id, { onDelete: 'cascade' }),
+    redniBroj: smallint('redni_broj').notNull(),
+    rijec: text('rijec').notNull(),
+    uzrocnikId: uuid('uzrocnik_id').references(() => igraci.id),
+    zrtvaId: uuid('zrtva_id').references(() => igraci.id),
+    vrstaMete: vrstaMetePosebneRijeci('vrsta_mete'),
+    brojAktivnihPrije: smallint('broj_aktivnih_prije').notNull(),
+    ucinak: ishodUcinakPosebneRijeci('ucinak').notNull(),
+    vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (tablica) => [
+    primaryKey({ columns: [tablica.partijaId, tablica.redniBroj] }),
+    check('chk_ucinak_posebne_broj_aktivnih', sql`${tablica.brojAktivnihPrije} >= 0`),
+  ],
+);
+
 export const rijeci = pgTable(
   'rijeci',
   {

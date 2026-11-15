@@ -9,12 +9,13 @@ import {
   type Eliminacija,
   type KrajPartije,
   type PocetakPartije,
+  type PravilnikPartije,
   type RundaOtvorena,
   type StanjePartije,
 } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { partije, rijeci, sesije, sudioniciPartije } from '../src/baza/shema.js';
+import { partije, rijeci, sesije, sudioniciPartije, ucinakPosebneRijeci } from '../src/baza/shema.js';
 import { stvoriKontroliraniSat } from '../src/igra/sat.js';
 
 let app: FastifyInstance;
@@ -1453,5 +1454,117 @@ describe('motor partije - Troboj (PR03)', () => {
     expect(partija?.mod).toBe('tri_igraca');
 
     for (const igrac of igraciListe) igrac.socket.disconnect();
+  });
+});
+
+describe('motor partije - Klasični vs KA-ZNA (PR04)', () => {
+  function stavkeZaIgrace(igraciListe: Igrac[]) {
+    return igraciListe.map((igrac) => ({
+      igracId: igrac.igracId,
+      vrsta: 'gost' as const,
+      nadimak: `PR04-${igrac.igracId.slice(0, 4)}`,
+      avatarId: 0,
+      avatarConfig: null,
+      avatarRevision: 0,
+      odigrane: 0,
+      pobjede: 0,
+      bodoviUkupno: 0,
+      odigrane3p: 0,
+      pobjede3p: 0,
+      bodovi3p: 0,
+      iskustvoUkupno: 0,
+      trenutniNiz3p: 0,
+      usaoU: Date.now(),
+    }));
+  }
+
+  async function odigrajKaladontNaTroje(
+    pravila: PravilnikPartije,
+    posebnaRijec: 'kaladont' | 'kalodont' = 'kaladont',
+  ) {
+    const igraciListe = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca()]);
+    const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
+      igraciListe[0]!.socket.once('partija:pocetak', resolve);
+    });
+    const rundaPromise = cekajRunduOtvorenu(igraciListe[0]!.socket);
+    const rezultat = await zapocniJavnuPartiju(stavkeZaIgrace(igraciListe), 'tri_igraca', pravila);
+    expect(rezultat).toBe('pokrenuta');
+    const pocetak = await pocetakPromise;
+    const runda = await rundaPromise;
+    expect(pocetak.pravila ?? 'ka_zna').toBe(pravila);
+    // Kratka pauza da upis početka partije stigne prije poteza (CI FK šum).
+    await odgodi(150);
+
+    const lanac = await pronadjiLanacDoKa(runda.trazenaSlova, new Set(await grupeRijeci(runda.rijec)));
+    expect(lanac).not.toBeNull();
+
+    let naPotezu = igraciListe.find((ig) => ig.token === runda.naPotezuId)!;
+    let autorKa = naPotezu.token;
+    for (const rijec of lanac!) {
+      const prihvacenoPromise = cekajPrihvacenOdIgraca(naPotezu.socket, naPotezu.token);
+      naPotezu.socket.emit('potez:rijec', { rijec });
+      const prihvaceno = await Promise.race([
+        prihvacenoPromise,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(`Timeout čekajući potez:prihvacen (${rijec})`)), 8_000);
+        }),
+      ]);
+      autorKa = naPotezu.token;
+      naPotezu = igraciListe.find((ig) => ig.token === prihvaceno.sljedeciId)!;
+    }
+    const sayer = naPotezu;
+    const ocekivanaZrtva = pravila === 'klasicni'
+      ? sljedeciUKrugu(pocetak.sjedala, sayer.token, new Set(pocetak.sjedala.map((s) => s.igracId)))
+      : autorKa;
+
+    const eliminacijaPromise = cekajEventNaBiloKojem<Eliminacija>(
+      igraciListe.map((ig) => ig.socket),
+      'partija:eliminacija',
+      (e) => e.razlog === 'kaladont',
+      10_000,
+      `PR04 ${pravila}`,
+    );
+    const novaRundaPromise = cekajRunduOtvorenu(
+      igraciListe.find((ig) => ig.token !== sayer.token && ig.token !== ocekivanaZrtva)!.socket,
+    );
+
+    sayer.socket.emit('potez:rijec', { rijec: posebnaRijec });
+    const eliminacija = await eliminacijaPromise;
+    expect(eliminacija.igracId).toBe(ocekivanaZrtva);
+    expect(eliminacija.bodZa).toBe(sayer.token);
+    const novaRunda = await novaRundaPromise;
+    expect(zadnjaDva(novaRunda.rijec)).not.toBe('ka');
+
+    await odgodi(200);
+    const ucinci = await baza
+      .select()
+      .from(ucinakPosebneRijeci)
+      .where(eq(ucinakPosebneRijeci.partijaId, pocetak.partijaId));
+    expect(ucinci).toHaveLength(1);
+    expect(ucinci[0]).toMatchObject({
+      rijec: posebnaRijec,
+      uzrocnikId: sayer.token,
+      zrtvaId: ocekivanaZrtva,
+      vrstaMete: pravila === 'klasicni' ? 'sljedeci' : 'prethodni',
+      brojAktivnihPrije: 3,
+      ucinak: 'eliminacija',
+    });
+
+    for (const igrac of igraciListe) igrac.socket.disconnect();
+    return { pocetak, sayerId: sayer.token, zrtvaId: ocekivanaZrtva, autorKa };
+  }
+
+  it('isti lanac s troje: Klasični i KA-ZNA daju različitu žrtvu', async () => {
+    const klasikni = await odigrajKaladontNaTroje('klasicni');
+    const kazna = await odigrajKaladontNaTroje('ka_zna');
+    expect(klasikni.zrtvaId).not.toBe(klasikni.autorKa);
+    expect(kazna.zrtvaId).toBe(kazna.autorKa);
+  });
+
+  it('kalodont i dokazi_nastavak (običan potez) rade KA-ZNA granom', async () => {
+    const kalodont = await odigrajKaladontNaTroje('ka_zna', 'kalodont');
+    expect(kalodont.zrtvaId).toBe(kalodont.autorKa);
+    const dokazi = await odigrajKaladontNaTroje('dokazi_nastavak', 'kaladont');
+    expect(dokazi.zrtvaId).toBe(dokazi.autorKa);
   });
 });

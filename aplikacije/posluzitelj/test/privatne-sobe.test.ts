@@ -120,6 +120,34 @@ describe('privatne sobe', () => {
     expect(soba.bodoviUSeriji.get('igrac-b')).toBe(0);
   });
 
+  it('PR04: eliminacijskiBodovi mijenja samo privremeni poredak sobe', () => {
+    // Ista privatna formula kao motor: pobjednik 2 + (elimBodovi ? eliminacije : 0).
+    const plasmaniSElim = [
+      { igracId: 'napadac', bodovi: 2 + 1 },
+      { igracId: 'zrtva', bodovi: 0 },
+    ];
+    const plasmaniBezElim = [
+      { igracId: 'napadac', bodovi: 2 },
+      { igracId: 'zrtva', bodovi: 0 },
+    ];
+    const sobaS = {
+      obradenePartije: new Set<string>(),
+      pobjedeUSeriji: new Map<string, number>(),
+      bodoviUSeriji: new Map<string, number>(),
+    };
+    const sobaBez = {
+      obradenePartije: new Set<string>(),
+      pobjedeUSeriji: new Map<string, number>(),
+      bodoviUSeriji: new Map<string, number>(),
+    };
+    dodijeliRezultatSobeAkoNijeObraden(sobaS, 'p-elim', 'napadac', plasmaniSElim);
+    dodijeliRezultatSobeAkoNijeObraden(sobaBez, 'p-bez', 'napadac', plasmaniBezElim);
+    expect(sobaS.bodoviUSeriji.get('napadac')).toBe(3);
+    expect(sobaBez.bodoviUSeriji.get('napadac')).toBe(2);
+    expect(sobaS.pobjedeUSeriji.get('napadac')).toBe(1);
+    expect(sobaBez.pobjedeUSeriji.get('napadac')).toBe(1);
+  });
+
   it('kontrolirano odbija neispravne Socket.IO payloadove bez rušenja procesa', async () => {
     const vlasnik = await spojiIgraca();
 

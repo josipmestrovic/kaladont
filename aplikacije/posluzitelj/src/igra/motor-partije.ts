@@ -67,7 +67,7 @@ import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
-import { osigurajUpisePoteza, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zakljuciPartijuUBazi, type ZapisPoteza, type ZapisStatistikeRijeci } from './upis-partije.js';
+import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { imaJavniProfil, primaProfilnuGamifikacijuUIgri } from './gamifikacija-racuna.js';
@@ -285,6 +285,8 @@ interface StanjeStola {
   upisiPotezaUTijeku: Promise<void>[];
   /** Payloadi poteza; `uspio` omogućuje da završni tok retrya samo neuspjelo. */
   zapisiPotezaZaOsigurati: { zapis: ZapisPoteza; uspio: boolean }[];
+  /** Činjenice posebne riječi; završni tok retrya samo `!uspio` (PR04). */
+  zapisiUcinakaZaOsigurati: { zapis: ZapisUcinakPosebneRijeci; uspio: boolean }[];
   /** Retryable upis početka partije; null ako politika ne zapisuje povijest. */
   osigurajPocetakPartije: (() => Promise<void>) | null;
   treningNeaktivnost: { upozorenjeIso: string; zatvaraIso: string; upozorenje: boolean } | null;
@@ -885,6 +887,11 @@ export function stvoriUpraviteljPartija(
         await osigurajUpisePoteza(nedostaju.map((stavka) => stavka.zapis));
         for (const stavka of nedostaju) stavka.uspio = true;
       }
+      const nedostajuUcinak = stanje.zapisiUcinakaZaOsigurati.filter((stavka) => !stavka.uspio);
+      if (nedostajuUcinak.length > 0) {
+        await osigurajUpiseUcinakaPosebneRijeci(nedostajuUcinak.map((stavka) => stavka.zapis));
+        for (const stavka of nedostajuUcinak) stavka.uspio = true;
+      }
       await upis();
     };
     stanje.zavrsnoSpremanje = upisSaCekanjemPoteza;
@@ -1034,6 +1041,7 @@ export function stvoriUpraviteljPartija(
       ponoviZavrsnoSpremanje: null,
       upisiPotezaUTijeku: [],
       zapisiPotezaZaOsigurati: [],
+      zapisiUcinakaZaOsigurati: [],
       osigurajPocetakPartije: null,
       treningNeaktivnost: null,
       treningRokovi: null,
@@ -2151,8 +2159,9 @@ export function stvoriUpraviteljPartija(
       trajanjeMs,
     });
 
-    // Kaladont/kalodont: eliminira se onaj tko je omogucio "ka" otvaranje, ne sljedeci igrac (pravila-igre.md)
+    // Kaladont/kalodont: meta po pravilniku (Klasični = sljedeći, KA-ZNA = autor).
     if (RIJECI_KALADONT.has(rijecNormalizirana)) {
+      const brojAktivnihPrije = stanje.aktivni.size;
       zatvoriAnalitikaProzorDrugim(stanje);
       dodajNapredakDostignuca(stanje, igracId, { kaladontIzvedbe: 1 });
       const sljedeci = sljedeciAktivni(stanje, igracId) ?? igracId;
@@ -2169,7 +2178,7 @@ export function stvoriUpraviteljPartija(
         nagrada,
         iskustvo: stavkePotezaIskustva,
       }, izvorniSocket);
-      obradiKaladontEfekt(stanje, igracId, prethodniNapadacId);
+      obradiKaladontEfekt(stanje, igracId, prethodniNapadacId, rijecNormalizirana, brojAktivnihPrije);
       return;
     }
 
@@ -2238,24 +2247,49 @@ export function stvoriUpraviteljPartija(
   }
 
   /**
-   * Igrac je izgovorio "kaladont"/"kalodont": meta po pravilniku (PR02 = KA-ZNA autor),
-   * zatim jedan put potvrđene eliminacije. Sustavska riječ bez autora → samo nova runda (RS-26).
+   * Igrac je izgovorio "kaladont"/"kalodont": meta po pravilniku,
+   * zatim jedan put potvrđene eliminacije. Bez stvarne žrtve → nova runda, bez boda (RS-26).
    */
-  function obradiKaladontEfekt(stanje: StanjeStola, sayerId: string, prethodniId: string | null): void {
-    const zrtva = odrediMetuPosebneRijeci({
+  function obradiKaladontEfekt(
+    stanje: StanjeStola,
+    sayerId: string,
+    prethodniId: string | null,
+    rijec: string,
+    brojAktivnihPrije: number,
+  ): void {
+    const ishod = odrediMetuPosebneRijeci({
       pravilnik: stanje.pravila,
       autorPrethodneRijeci: prethodniId,
       sayerId,
       poredak: stanje.sudionici.map((s) => s.igracId),
       aktivni: stanje.aktivni,
     });
+    const zrtvaAktivna = ishod.zrtvaId && stanje.aktivni.has(ishod.zrtvaId) ? ishod.zrtvaId : null;
+    const zapis = {
+      partijaId: stanje.partijaId,
+      redniBroj: stanje.redniBroj,
+      rijec,
+      uzrocnikId: sayerId,
+      zrtvaId: zrtvaAktivna,
+      vrstaMete: ishod.vrstaMete,
+      brojAktivnihPrije,
+      ucinak: (zrtvaAktivna ? 'eliminacija' : 'bez_zrtve') as 'eliminacija' | 'bez_zrtve',
+    };
+    if (stanje.politika.zapisujePovijest) {
+      const stavka = { zapis, uspio: false };
+      stanje.zapisiUcinakaZaOsigurati.push(stavka);
+      // Fire-and-forget; završni tok retrya samo !uspio (isti stil kao spremiPotezAkoTreba).
+      stanje.upisiPotezaUTijeku.push(
+        zapisiUcinakPosebneRijeci(zapis).then(() => { stavka.uspio = true; }).catch(() => undefined),
+      );
+    }
     // Autor već ispao ili sustavska riječ (RS-26 / PR04): bez ponovne žrtve, samo nova runda.
-    if (!zrtva || !stanje.aktivni.has(zrtva)) {
+    if (!zrtvaAktivna) {
       zapocniIzborRijeciSustava(stanje, sayerId);
       return;
     }
     // napadacId je već sayer (postavljen u obradiPrihvacenPotez) → bodZa = sayer
-    primijeniPotvrdjenuEliminaciju(stanje, zrtva, 'kaladont');
+    primijeniPotvrdjenuEliminaciju(stanje, zrtvaAktivna, 'kaladont');
   }
 
   function jePrebrzo(stanje: StanjeStola, igracId: string): boolean {
@@ -2662,6 +2696,7 @@ export function stvoriUpraviteljPartija(
       ponoviZavrsnoSpremanje: null,
       upisiPotezaUTijeku: [],
       zapisiPotezaZaOsigurati: [],
+      zapisiUcinakaZaOsigurati: [],
       osigurajPocetakPartije: null,
       treningNeaktivnost: null,
       treningRokovi: null,
