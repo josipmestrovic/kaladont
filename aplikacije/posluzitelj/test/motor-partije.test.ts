@@ -959,11 +959,28 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       expect(eliminacija.igracId).toBe(igracKojiJeOmoguciKa); // otvarac je omogucio "ka" - on ispada
       expect(eliminacija.razlog).toBe('kaladont');
       expect(eliminacija.bodZa).toBe(sayer.token); // bod ide onome tko je izgovorio kaladont
+      // Rani upis čvrsto potvrđenog kaladont poraza (PR02 — isti put kao ne_znam)
+      const istekRaniKaladont = Date.now() + 2_000;
+      let raniKaladont: { plasman: number | null; nacinIspadanja: string | null } | undefined;
+      while (Date.now() < istekRaniKaladont) {
+        const [red] = await baza
+          .select({ plasman: sudioniciPartije.plasman, nacinIspadanja: sudioniciPartije.nacinIspadanja })
+          .from(sudioniciPartije)
+          .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, igracKojiJeOmoguciKa)));
+        if (red?.plasman != null) {
+          raniKaladont = red;
+          break;
+        }
+        await odgodi(20);
+      }
+      expect(raniKaladont?.nacinIspadanja).toBe('kaladont');
+      expect(raniKaladont?.plasman).toBeGreaterThan(1);
       const obracunZrtve = await obracunZrtvePromise;
       expect(obracunZrtve.partijaId).toBe(pocetak.partijaId);
       expect(obracunZrtve.mojeIskustvo).toEqual(expect.objectContaining({ osvojenoIskustvo: expect.any(Number) }));
 
       const novaRunda = await novaRundaPromise;
+      expect(zadnjaDva(novaRunda.rijec)).not.toBe('ka');
       sayer.socket.off('partija:stanje', slusateljStanja);
       // Nakon eliminacije, a prije nove runde, stanje ne smije izgledati kao aktivan potez.
       for (const snimka of stanjaPrijeRunde) {
@@ -1192,7 +1209,26 @@ describe('motor partije - otvarač runde nakon eliminacije', () => {
 
       const eliminacija = await eliminacijaPromise;
       expect(eliminacija.razlog).toBe('ne_znam');
+      expect(eliminacija.bodZa).toBe(autor.token);
+      // Rani upis potvrđenog poraza (PR02 unificirani put)
+      const istekRani = Date.now() + 2_000;
+      let raniRed: { plasman: number | null; nacinIspadanja: string | null } | undefined;
+      while (Date.now() < istekRani) {
+        const [red] = await baza
+          .select({ plasman: sudioniciPartije.plasman, nacinIspadanja: sudioniciPartije.nacinIspadanja })
+          .from(sudioniciPartije)
+          .where(and(eq(sudioniciPartije.partijaId, pocetak.partijaId), eq(sudioniciPartije.igracId, eliminirani.token)));
+        if (red?.plasman != null) {
+          raniRed = red;
+          break;
+        }
+        await odgodi(20);
+      }
+      expect(raniRed?.nacinIspadanja).toBe('ne_znam');
+      expect(raniRed?.plasman).toBeGreaterThan(1);
+
       const novaRunda = await novaRundaPromise;
+      expect(zadnjaDva(novaRunda.rijec)).not.toBe('ka');
       const aktivni = new Set(
         pocetak.sjedala.map((sjedalo) => sjedalo.igracId).filter((id) => id !== eliminirani.token),
       );

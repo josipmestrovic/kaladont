@@ -38,6 +38,8 @@ Provjera poštuje vrste riječi dopuštene u privatnoj sobi i sve leksemske grup
 
 Ako trenutačno nema sigurnog kandidata iz skupa, sustav koristi rezervni odabir: kratku aktivnu riječ koja ima barem jedan slobodan nastavak. Za razliku od sigurnog kandidata, rezervna riječ ne jamči da će svaki mogući odgovor imati vlastiti nastavak; sljedeći igrač ipak dobiva barem jedan valjan potez. Ako ni rezervni odabir nema kandidata, primjenjuje se RS-27 i partija se sigurnosno završava.
 
+**Zabrana sistemskog „ka” (PR02).** Na sva tri puta (sigurni skup, rezervne imenice, rezervne kratke riječi) kandidat se odbacuje ako `zadnjaDva` nakon normalizacije daje `ka`. Admin dodavanje u sigurni skup isto pravilo odbija s jasnom porukom. Igračev potez koji završava na „ka” ostaje legalan.
+
 Skup se primjenjuje u javnim i privatnim partijama, pri početku partije te nakon eliminacije ili Kaladont efekta.
 
 ## Analitika ranih incidenata

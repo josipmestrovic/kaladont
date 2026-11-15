@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { VrstaRijeci } from 'zajednicko';
-import { odaberiSigurnuPocetnuRijec, POCETNI_SEED_SIGURNIH_RIJECI, SKUP_SIGURNIH_RIJECI } from '../src/rjecnik/pocetne-rijeci.js';
+import {
+  nijeSistemskoOtvaranjeNaKa,
+  odaberiRezervnuPocetnuRijec,
+  odaberiSigurnuPocetnuRijec,
+  POCETNI_SEED_SIGURNIH_RIJECI,
+  SKUP_SIGURNIH_RIJECI,
+} from '../src/rjecnik/pocetne-rijeci.js';
 
 interface TestnaRijec {
   grupe: string[];
@@ -131,5 +137,63 @@ describe('skup sigurnih početnih riječi', () => {
     });
 
     expect(rezultat).toBe('sladoled');
+  });
+
+  it('seed nema završetak „ka”', () => {
+    for (const rijec of POCETNI_SEED_SIGURNIH_RIJECI) {
+      expect(nijeSistemskoOtvaranjeNaKa(rijec), rijec).toBe(true);
+    }
+  });
+});
+
+describe('PR02 — sistemsko otvaranje bez „ka”', () => {
+  it('nijeSistemskoOtvaranjeNaKa: šećer ok, jabuka/baka ne', () => {
+    expect(nijeSistemskoOtvaranjeNaKa('šećer')).toBe(true);
+    expect(nijeSistemskoOtvaranjeNaKa('jabuka')).toBe(false);
+    expect(nijeSistemskoOtvaranjeNaKa('baka')).toBe(false);
+    expect(nijeSistemskoOtvaranjeNaKa('BAKA')).toBe(false);
+  });
+
+  it('put 1: odobreni skup bira šećer, preskače baka (na „ka”)', () => {
+    // 2-ply: šećer → er → erupcija → ja → jastuk; baka je na „ka” pa se preskače.
+    const rezultat = odaberiSigurnuPocetnuRijec({
+      iskoristeneGrupe: new Set(),
+      nasumicniPomak: 0,
+      kandidati: ['baka', 'šećer'],
+      grupeZa: (rijec) => [`imenica:${rijec}`],
+      vrsteZa: () => ['imenica'],
+      rijeciNa: (prefiks) =>
+        ({
+          er: ['erupcija'],
+          ja: ['jastuk'],
+          ka: ['kamen'],
+        })[prefiks] ?? [],
+      jeIgriva: (rijec, potrosene) =>
+        ['baka', 'šećer', 'erupcija', 'jastuk', 'kamen'].includes(rijec)
+        && !potrosene.has(`imenica:${rijec}`),
+    });
+    expect(rezultat).toBe('šećer');
+  });
+
+  it('put 2: rezervni imenički preskače „ka” i uzima dopuštenog', () => {
+    const rezultat = odaberiRezervnuPocetnuRijec({
+      kandidati: ['baka', 'med', 'luka'],
+      iskoristeneGrupe: new Set(),
+      nasumicniPomak: 0,
+      jeIgriva: (rijec) => ['baka', 'med', 'luka'].includes(rijec),
+      imaSlobodanNastavak: (rijec) => rijec === 'med' || rijec === 'baka' || rijec === 'luka',
+    });
+    expect(rezultat).toBe('med');
+  });
+
+  it('put 3: samo riječi na „ka” → null (RS-27 ulaz)', () => {
+    const rezultat = odaberiRezervnuPocetnuRijec({
+      kandidati: ['baka', 'luka', 'ruka'],
+      iskoristeneGrupe: new Set(),
+      nasumicniPomak: 0,
+      jeIgriva: () => true,
+      imaSlobodanNastavak: () => true,
+    });
+    expect(rezultat).toBeNull();
   });
 });

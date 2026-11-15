@@ -1,5 +1,14 @@
 import { zadnjaDva, type VrstaRijeci } from 'zajednicko';
 
+/**
+ * Sustav nikad ne otvara riječju koja završava na „ka” (PR02).
+ * Igračev potez na „ka” ostaje legalan — ovo vrijedi samo za sistemski odabir.
+ */
+export function nijeSistemskoOtvaranjeNaKa(rijec: string): boolean {
+  const normalizirana = rijec.normalize('NFC').trim().toLowerCase();
+  return zadnjaDva(normalizirana) !== 'ka';
+}
+
 /** Početni seed odobrenog skupa (migracija + testovi). Runtime izvor je tablica `sigurne_pocetne_rijeci`. */
 export const POCETNI_SEED_SIGURNIH_RIJECI = [
   'šećer',
@@ -85,6 +94,8 @@ export function odaberiSigurnuPocetnuRijec(opcije: OpcijeSigurnogOdabira): strin
 
   for (let indeks = 0; indeks < brojKandidata; indeks += 1) {
     const kandidat = kandidati[(pomak + indeks) % brojKandidata]!;
+    // Već spremljen nedopušten kandidat (završetak „ka”) se preskače.
+    if (!nijeSistemskoOtvaranjeNaKa(kandidat)) continue;
     if (!opcije.jeIgriva(kandidat, opcije.iskoristeneGrupe, opcije.dopusteneVrste)) continue;
 
     const nakonKandidata = dodajGrupe(opcije.iskoristeneGrupe, opcije.grupeZa(kandidat));
@@ -103,5 +114,33 @@ export function odaberiSigurnuPocetnuRijec(opcije: OpcijeSigurnogOdabira): strin
     if (svakiOdgovorImaNastavak) return kandidat;
   }
 
+  return null;
+}
+
+interface OpcijeRezervnogOdabira {
+  kandidati: readonly string[];
+  iskoristeneGrupe: ReadonlySet<string>;
+  dopusteneVrste?: ReadonlySet<VrstaRijeci>;
+  jeIgriva: (rijec: string, iskoristeneGrupe: ReadonlySet<string>, dopusteneVrste?: ReadonlySet<VrstaRijeci>) => boolean;
+  imaSlobodanNastavak: (rijec: string) => boolean;
+  nasumicniPomak?: number;
+}
+
+/**
+ * Rezervni put (imenice ili kratke riječi): 1-ply nastavak, bez završetka „ka”.
+ * Koriste ga oba rezervna puta u `nasumicnaPocetnaRijec`.
+ */
+export function odaberiRezervnuPocetnuRijec(opcije: OpcijeRezervnogOdabira): string | null {
+  const broj = opcije.kandidati.length;
+  if (broj === 0) return null;
+  const pomak = opcije.nasumicniPomak ?? Math.floor(Math.random() * broj);
+
+  for (let indeks = 0; indeks < broj; indeks += 1) {
+    const kandidat = opcije.kandidati[(pomak + indeks) % broj]!;
+    if (!nijeSistemskoOtvaranjeNaKa(kandidat)) continue;
+    if (!opcije.jeIgriva(kandidat, opcije.iskoristeneGrupe, opcije.dopusteneVrste)) continue;
+    if (!opcije.imaSlobodanNastavak(kandidat)) continue;
+    return kandidat;
+  }
   return null;
 }

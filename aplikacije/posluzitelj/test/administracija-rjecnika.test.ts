@@ -152,6 +152,27 @@ describe('POST /admin/rjecnik/dodaj', () => {
     expect(((await izbaci.json()) as { promjena: string }).promjena).toBe('uklonjena');
   });
 
+  it('PR02: admin ne smije dodati početnu riječ koja završava na „ka”', async () => {
+    const rijecNaKa = `ba${NASUMICNI_SUFIKS}ka`;
+    await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ rijec: rijecNaKa, vrsta: 'imenica' }),
+    });
+
+    const dodaj = await fetch(`${adresa}/api/admin/rjecnik/sigurni-skup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ rijec: rijecNaKa }),
+    });
+    expect(dodaj.status).toBe(400);
+    const tijelo = (await dodaj.json()) as { greska?: string; poruka?: string };
+    const tekst = tijelo.greska ?? tijelo.poruka ?? JSON.stringify(tijelo);
+    expect(tekst).toMatch(/ka/i);
+
+    await baza.delete(rijeci).where(eq(rijeci.rijec, rijecNaKa));
+  });
+
   it('odbija dodavanje bez vrste riječi (ADR-013)', async () => {
     const odgovor = await fetch(`${adresa}/api/admin/rjecnik/dodaj`, {
       method: 'POST',

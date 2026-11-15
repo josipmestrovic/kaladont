@@ -8,7 +8,12 @@ import { asc, eq, gt, and } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { rijeci, vlastitaImena } from '../baza/shema.js';
 import { grafemi, prvaDva, zadnjaDva } from 'zajednicko';
-import { odaberiSigurnuPocetnuRijec, POCETNI_SEED_SIGURNIH_RIJECI } from './pocetne-rijeci.js';
+import {
+  nijeSistemskoOtvaranjeNaKa,
+  odaberiRezervnuPocetnuRijec,
+  odaberiSigurnuPocetnuRijec,
+  POCETNI_SEED_SIGURNIH_RIJECI,
+} from './pocetne-rijeci.js';
 import { ucitajSigurnePocetneRijeciIzBaze } from './sigurni-skup.js';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
@@ -603,6 +608,15 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     igriviKandidati,
     verzijaRjecnika: () => verzija,
     nasumicnaPocetnaRijec: (iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci) => {
+      const jeIgrivaPocetna = (rijec: string, potroseneGrupe: ReadonlySet<string>, vrste?: ReadonlySet<VrstaRijeci>) =>
+        jeIgriva(rijec, potroseneGrupe, vrste, samoOsnovniOblici, minDuljinaRijeci);
+      const imaSlobodanNastavak = (rijec: string) => {
+        const nakonOdabira = new Set(iskoristeneGrupe);
+        for (const grupa of grupeZa(rijec)) nakonOdabira.add(grupa);
+        return imaSlobodnuRijecNa(zadnjaDva(rijec), nakonOdabira, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci);
+      };
+
+      // Put 1: odobreni (sigurni) skup — 2-ply; kandidati na „ka” se preskaču.
       const sigurnaRijec = odaberiSigurnuPocetnuRijec({
         iskoristeneGrupe,
         dopusteneVrste,
@@ -610,37 +624,31 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
         grupeZa,
         vrsteZa,
         rijeciNa: (prefiks) => poPrefiksu.get(prefiks) ?? [],
-        jeIgriva: (rijec, potroseneGrupe, vrste) =>
-          jeIgriva(rijec, potroseneGrupe, vrste, samoOsnovniOblici, minDuljinaRijeci),
+        jeIgriva: jeIgrivaPocetna,
       });
       if (sigurnaRijec) return { rijec: sigurnaRijec, izvor: 'sigurni_skup' };
 
+      // Put 2: rezervni imenički (kratke imenice).
       if (!dopusteneVrste || dopusteneVrste.has('imenica')) {
-        const ukupno = pocetneImenickeRijeci.length;
-        if (ukupno > 0) {
-          const pomak = Math.floor(Math.random() * ukupno);
-          for (let i = 0; i < ukupno; i += 1) {
-            const rijec = pocetneImenickeRijeci[(pomak + i) % ukupno]!;
-            if (!jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) continue;
-            const nakonOdabira = new Set(iskoristeneGrupe);
-            for (const grupa of grupeZa(rijec)) nakonOdabira.add(grupa);
-            if (imaSlobodnuRijecNa(zadnjaDva(rijec), nakonOdabira, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
-              return { rijec, izvor: 'rezervni_odabir' };
-            }
-          }
-        }
+        const rezervnaImenica = odaberiRezervnuPocetnuRijec({
+          kandidati: pocetneImenickeRijeci,
+          iskoristeneGrupe,
+          dopusteneVrste,
+          jeIgriva: jeIgrivaPocetna,
+          imaSlobodanNastavak,
+        });
+        if (rezervnaImenica) return { rijec: rezervnaImenica, izvor: 'rezervni_odabir' };
       }
 
-      // Ako nema odgovarajuće imenice, tražimo bilo koju kratku riječ iz dopuštenih vrsta.
+      // Put 3: rezervni kratki — iteracija po mapi (bez kopiranja ~1,2 M ključeva).
       for (const [rijec] of rijecGrupe) {
         if (rijec.length >= 6) continue;
-        if (!jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) continue;
-        const nakonOdabira = new Set(iskoristeneGrupe);
-        for (const grupa of grupeZa(rijec)) nakonOdabira.add(grupa);
-        if (imaSlobodnuRijecNa(zadnjaDva(rijec), nakonOdabira, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
-          return { rijec, izvor: 'rezervni_odabir' };
-        }
+        if (!nijeSistemskoOtvaranjeNaKa(rijec)) continue;
+        if (!jeIgrivaPocetna(rijec, iskoristeneGrupe, dopusteneVrste)) continue;
+        if (!imaSlobodanNastavak(rijec)) continue;
+        return { rijec, izvor: 'rezervni_odabir' };
       }
+
       return null;
     },
     ponovoUcitaj: ucitaj,
@@ -650,6 +658,8 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     jeUSigurnomSkupu: (rijec) => sigurnePocetneRijeci.includes(rijec.normalize('NFC').trim().toLowerCase()),
     dodajUSigurniSkupMemoriju: (rijec) => {
       const normalizirana = rijec.normalize('NFC').trim().toLowerCase();
+      // Runtime skip: ne dodaj u memoriju ako završava na „ka” (admin put već odbija).
+      if (!nijeSistemskoOtvaranjeNaKa(normalizirana)) return;
       if (!sigurnePocetneRijeci.includes(normalizirana)) {
         sigurnePocetneRijeci = [...sigurnePocetneRijeci, normalizirana].sort((a, b) => a.localeCompare(b, 'hr'));
       }

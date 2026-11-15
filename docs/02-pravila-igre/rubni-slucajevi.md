@@ -6,8 +6,9 @@ Svaki rubni slučaj ima oznaku (RS-xx), odluku i obrazloženje. Ovaj katalog je 
 
 **RS-01 — Otvaranje runde: sustav bira riječ, ne igrač.**
 Prijašnja verzija pravila dopuštala je napadaču da sam upiše početnu riječ runde, što je omogućavalo namještanje ishoda (namjerno odabrana nejasna riječ kako bi sljedeći igrač zagarantirano ispao).
-**Odluka:** igrač nikad ne bira otvarajuću riječ. Sustav pri prvoj rundi, nakon svake eliminacije i nakon kaladont-efekta prvo nasumično bira iz [skupa sigurnih riječi](../04-rjecnik/pocetne-rijeci.md). Sigurna riječ ima dopušten nastavak, a svaki njezin trenutačno dopušten odgovor ima daljnji nastavak. Ako nema dostupne sigurne riječi, sustav koristi rezervni odabir riječi s barem jednim slobodnim nastavkom. Pravilo vrijedi u javnim i privatnim partijama — vidi [pravila-igre.md](pravila-igre.md#otvaranje-runde-sustav-bira-rije%C4%8D).
+**Odluka:** igrač nikad ne bira otvarajuću riječ. Sustav pri prvoj rundi, nakon svake eliminacije i nakon kaladont-efekta prvo nasumično bira iz [skupa sigurnih riječi](../04-rjecnik/pocetne-rijeci.md). Sigurna riječ ima dopušten nastavak, a svaki njezin trenutačno dopušten odgovor ima daljnji nastavak. Ako nema dostupne sigurne riječi, sustav koristi rezervni odabir riječi s barem jednim slobodnim nastavkom. **Sustav nikad ne otvara riječju koja nakon normalizacije završava na „ka”** (odobreni skup, rezervni imenički i rezervni kratki put; već spremljen nedopušten kandidat se preskače). Legalnost običnog igračevog poteza na „ka” ostaje. Pravilo vrijedi u javnim i privatnim partijama — vidi [pravila-igre.md](pravila-igre.md#otvaranje-runde-sustav-bira-rije%C4%8D).
 *Obrazloženje: bez ovog pravila napadač lančano eliminira sve za stolom bez igre.*
+*Testovi:* `PR02 — sistemsko otvaranje bez „ka”` u `aplikacije/posluzitelj/test/pocetne-rijeci.test.ts` (`put 1…`, `put 2…`, `put 3…`); `nakon ne znam otvara rundu…` i `kaladont: eliminira…` u `motor-partije.test.ts` (otvaranje nakon eliminacije nije na „ka”); `PR02: admin ne smije dodati početnu riječ…` u `administracija-rjecnika.test.ts`.
 
 **RS-02 — Mrtva slova (baza nema riječ).**
 Igrač A kaže valjanu riječ čija zadnja dva grafema nemaju nijednu riječ u bazi.
@@ -107,9 +108,10 @@ Sustav nasumično odabere riječ za otvaranje runde čija zadnja dva grafema isp
 *Obrazloženje: otkad riječ runde uvijek bira sustav (RS-01), ovaj rubni slučaj zamjenjuje stari "slobodna otvarajuća riječ" scenarij koji više nije moguć jer igrač ne bira riječi.*
 
 **RS-27 — Rječnik iscrpljen tijekom automatskog biranja riječi.**
-Sustav ne pronađe kandidat ni u skupu sigurnih riječi ni u rezervnom odabiru, pa nijedna neiskorištena riječ sa slobodnim nastavkom više ne postoji.
+Sustav ne pronađe kandidat ni u skupu sigurnih riječi ni u rezervnom odabiru, pa nijedna neiskorištena riječ sa slobodnim nastavkom više ne postoji (uključujući slučaj kad preostaju samo riječi na „ka”, koje sistemsko otvaranje preskače — vidi RS-01).
 **Odluka:** ekstremni rubni slučaj — server sigurnosno završava partiju istog trenutka (kao da je preostali aktivni igrač pobjednik), bez dodatne poruke igračima o razlogu.
 *Obrazloženje: praktički nedostižno s rječnikom realne veličine, ali sustav mora imati siguran izlaz umjesto da zapne bez ijedne valjane riječi.*
+*Testovi:* `put 3: samo riječi na „ka” → null (RS-27 ulaz)` u `aplikacije/posluzitelj/test/pocetne-rijeci.test.ts`; motor zatvara preko `nema_kandidata` u `objaviRijecSustava`.
 
 ## Leksemske grupe (ADR-013)
 
