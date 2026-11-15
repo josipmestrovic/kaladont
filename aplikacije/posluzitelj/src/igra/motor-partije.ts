@@ -2173,20 +2173,39 @@ export function stvoriUpraviteljPartija(
     }
 
     // Bruno već ispao napuštanjem — kredit Ani tek SADA (ne pri samom prekidu).
-    if (ishod.uzrocnikId && stanje.politika.dajeNapredak) {
-      stanje.eliminacijeBrojac.set(
-        ishod.uzrocnikId,
-        (stanje.eliminacijeBrojac.get(ishod.uzrocnikId) ?? 0) + 1,
-      );
-      dodajNapredakDostignuca(stanje, ishod.uzrocnikId, { izazvaneEliminacije: 1 });
-      const stavka = {
-        vrsta: 'eliminacije' as const,
-        naziv: 'Eliminacija',
-        kolicina: 1,
-        poStavci: ISKUSTVO_ELIMINACIJA,
-        iskustvo: ISKUSTVO_ELIMINACIJA,
-      };
-      dodajStavkuIskustva(stanje, ishod.uzrocnikId, stavka);
+    // Bugbot: ažuriraj snimku eliminacije + re-emit da reconnect/UI vide bodZa prije kraja.
+    if (ishod.uzrocnikId) {
+      const stavka = stanje.politika.dajeNapredak
+        ? {
+            vrsta: 'eliminacije' as const,
+            naziv: 'Eliminacija',
+            kolicina: 1,
+            poStavci: ISKUSTVO_ELIMINACIJA,
+            iskustvo: ISKUSTVO_ELIMINACIJA,
+          }
+        : null;
+      if (stanje.politika.dajeNapredak) {
+        stanje.eliminacijeBrojac.set(
+          ishod.uzrocnikId,
+          (stanje.eliminacijeBrojac.get(ishod.uzrocnikId) ?? 0) + 1,
+        );
+        dodajNapredakDostignuca(stanje, ishod.uzrocnikId, { izazvaneEliminacije: 1 });
+        dodajStavkuIskustva(stanje, ishod.uzrocnikId, stavka!);
+      }
+      // Pronađi Bruninu potvrđenu eliminaciju (prekid) i upiši uzročnika.
+      for (let i = stanje.eliminacije.length - 1; i >= 0; i -= 1) {
+        const elim = stanje.eliminacije[i]!;
+        if (elim.igracId !== dokaz.cekateljId) continue;
+        if (elim.bodZa != null) break;
+        const azurirano: Eliminacija = {
+          ...elim,
+          bodZa: ishod.uzrocnikId,
+          iskustvo: stavka,
+        };
+        stanje.eliminacije[i] = azurirano;
+        io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', azurirano);
+        break;
+      }
     }
     if (stanje.aktivni.size <= 1) {
       zakljuciPartiju(stanje);
@@ -2195,9 +2214,6 @@ export function stvoriUpraviteljPartija(
     zapocniIzborRijeciSustava(stanje, sidro);
   }
 
-  /**
-   * PR05: neuspjeh dokaza — samo Ana ispada, Bruno ostaje (ako je još aktivan), bez kredita.
-   */
   /**
    * PR05: konačni odlazak (izadji ili istek 10 s tolerancije).
    * - Bruno na potezu + aktivan autor → potvrdi Brunin prekid BEZ kredita, zatim otvori dokaz Ani.
@@ -2268,6 +2284,7 @@ export function stvoriUpraviteljPartija(
     eliminirajIgraca(stanje, igracId, 'prekid', kontekstPrekida);
   }
 
+  /** PR05: neuspjeh dokaza — samo Ana ispada, Bruno ostaje (ako je još aktivan), bez kredita. */
   function zakljuciDokazNeuspjehom(
     stanje: StanjeStola,
     razlog: 'ne_znam' | 'istek' | 'prekid',
