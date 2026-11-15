@@ -294,7 +294,7 @@ export class FondBotova {
       ...identitet,
       vrsta: gost ? 'gost' : 'registriran',
       upravljac: 'bot',
-      ...(gost ? { odigrane: 0, pobjede: 0, bodoviUkupno: 0, odigrane1v1: 0, pobjede1v1: 0, bodovi1v1: 0, iskustvoUkupno: 0 } : {}),
+      ...(gost ? { odigrane: 0, pobjede: 0, bodoviUkupno: 0, odigrane1v1: 0, pobjede1v1: 0, bodovi1v1: 0, rangBrojPartija: 0, rangSumaJedinica: 0, iskustvoUkupno: 0 } : {}),
       trenutniNiz4p: gost ? 0 : identitet.trenutniNiz4p ?? 0,
       trenutniNiz1v1: gost ? 0 : identitet.trenutniNiz1v1 ?? 0,
       usaoU: this.rezervacije.get(igracId)?.rezerviranoU ?? this.sada(),

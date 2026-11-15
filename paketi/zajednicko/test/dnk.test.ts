@@ -96,10 +96,10 @@ describe('DNK zajednicko', () => {
   });
 });
 
-describe('1v1 rangovi', () => {
-  it('1v1 Kaladont je moguć i Piskaralo ne otključava rang', () => {
-    expect(izracunajRang(10, 0.89, 'dva_igraca')).toBe('Kaladont');
-    expect(izracunajRang(9, 1.5, 'dva_igraca')).toBe('Piskaralo');
-    expect(izracunajRang(10, 0.4, 'dva_igraca')).toBe('Jezičar');
+describe('univerzalni rang (PR09)', () => {
+  it('Kaladont na pragu 178; Piskaralo ispod 10 partija', () => {
+    expect(izracunajRang(10, 178)).toBe('Kaladont');
+    expect(izracunajRang(9, 200)).toBe('Piskaralo');
+    expect(izracunajRang(10, 80)).toBe('Jezičar');
   });
 });

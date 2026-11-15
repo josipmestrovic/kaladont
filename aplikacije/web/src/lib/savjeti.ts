@@ -1,5 +1,6 @@
 const SAVJETI_ZAJEDNICKI = [
-  'Nakon 10 završenih partija dobivaš rang prema prosjeku bodova. Do tada si Piskaralo.',
+  // PR09: jedan univerzalni rang nakon 10 javnih partija.
+  'Nakon 10 završenih javnih partija dobivaš rang prema univerzalnom učinku. Do tada si Piskaralo.',
   'Igrač koji ne zna riječ ispada, osim kod Kaladonta: tada ispada onaj tko je omogućio „ka”.',
   'Radi pravednosti, sustav uvijek određuje prvu riječ i bira samo riječ koja ima slobodan nastavak.',
   'Sustav ne bira riječ koja bi mogla postaviti klopku bez nastavka — osim ako su sve riječi već potrošene.',
@@ -12,13 +13,13 @@ const SAVJETI_ZAJEDNICKI = [
 const SAVJETI_CETIRI_IGRACA = [
   'U Četveroboju plasman, eliminacije i pobjednički bonus ulaze u bodovanje.',
   'Savršena igra u Četveroboju nosi 7 bodova: pobjeda, bonus i sve 3 eliminacije.',
-  'Najviši rang u Četveroboju zove se Kaladont i traži prosjek 5,70 ili više.',
+  'Najviši rang zove se Kaladont i traži univerzalni učinak 178 ili više.',
 ] as const;
 
 const SAVJETI_DVA_IGRACA = [
   'U dvoboju pobjeda donosi 1 bod, a poraz 0 bodova.',
-  'Dvoboj ima vlastiti rang i statistiku, odvojene od Četveroboja.',
-  'Najviši rang u dvoboju zove se Kaladont i traži prosjek 0,89 ili više.',
+  'Rang je zajednički za sve javne formate — Dvoboj, Troboj i Četveroboj grade isti učinak.',
+  'Najviši rang zove se Kaladont i traži univerzalni učinak 178 ili više.',
 ] as const;
 
 export function dohvatiSavjete(mod: import('zajednicko').ModPartije): readonly string[] {

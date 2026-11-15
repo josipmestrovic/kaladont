@@ -106,5 +106,5 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | Vrijeme po potezu        | javni modovi 30 s; privatna soba 15 / 30 / 60 s ili bez tajmera           |
 | Bodovi po partiji (stol) | 10 u Četveroboju (plasmani 6 + eliminacije 3 + bonus 1)                   |
 | Maksimum po igraču       | 7 bodova (Četveroboj)                                                     |
-| Kalibracija              | 10 partija (rang „Piskaralo")                                             |
+| Kalibracija              | 10 javnih partija ukupno (rang „Piskaralo"; PR09 univerzalni rang)        |
 | Najviši rang             | Kaladont                                                                  |

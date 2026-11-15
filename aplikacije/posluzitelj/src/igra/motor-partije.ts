@@ -12,7 +12,7 @@ import {
   validirajPotez,
   odrediRazlogMrtvihSlova,
   izracunajBodove,
-  izracunajRang,
+  izracunajRangIzAgregata,
   stanjeIskustva,
   grafemi,
   prvaDva,
@@ -1048,10 +1048,9 @@ export function stvoriUpraviteljPartija(
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const upravljac = s.upravljac ?? 'covjek';
       const jeBot = upravljac === 'bot';
-      const odigrane = mod === 'dva_igraca' ? (s.odigrane1v1 ?? 0) : mod === 'tri_igraca' ? (s.odigrane3p ?? 0) : s.odigrane;
-      const bodoviUkupno = mod === 'dva_igraca' ? (s.bodovi1v1 ?? 0) : mod === 'tri_igraca' ? (s.bodovi3p ?? 0) : s.bodoviUkupno;
-      const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
-      const rang = jeBot ? null : izracunajRang(odigrane, prosjekBodova, mod);
+      // PR09: sjedalo prikazuje univerzalni rang, ne formatni prosjek.
+      const rangNaziv = jeBot ? null : izracunajRangIzAgregata(s.rangSumaJedinica ?? 0, s.rangBrojPartija ?? 0);
+      const rang = rangNaziv === 'Piskaralo' ? null : rangNaziv;
       const trenutniNiz = jeBot
         ? 0
         : mod === 'dva_igraca'
@@ -1067,7 +1066,7 @@ export function stvoriUpraviteljPartija(
         avatarId: s.avatarId,
         avatarConfig: s.avatarConfig,
         avatarRevision: s.avatarRevision,
-        rang: rang === 'Piskaralo' ? null : rang,
+        rang,
         sjedalo,
         razina: jeBot ? 0 : stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
         trenutniNiz,
@@ -1584,6 +1583,11 @@ export function stvoriUpraviteljPartija(
               socket.data.pobjede = agregat.pobjede;
               socket.data.bodoviUkupno = agregat.bodoviUkupno;
               socket.data.trenutniNiz4p = agregat.nizPoslije;
+            }
+            // PR09: osvježi univerzalni rang na socketu za sljedeći red/sobu.
+            if (typeof agregat.rangBrojPartija === 'number') {
+              socket.data.rangBrojPartija = agregat.rangBrojPartija;
+              socket.data.rangSumaJedinica = agregat.rangSumaJedinica ?? 0;
             }
           }
           const poruka: KrajPartije = {
@@ -3052,8 +3056,7 @@ export function stvoriUpraviteljPartija(
     const izmjesano = promijesajNiz(sudioniciUlaz);
     const pravilaSobe = postavkeSobe.pravila ?? ZADANI_PRAVILNIK;
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
-      const prosjekBodova = s.odigrane > 0 ? s.bodoviUkupno / s.odigrane : 0;
-      const rang = izracunajRang(s.odigrane, prosjekBodova);
+      const rangNaziv = izracunajRangIzAgregata(s.rangSumaJedinica ?? 0, s.rangBrojPartija ?? 0);
       return {
         igracId: s.igracId,
         vrsta: s.vrsta,
@@ -3062,7 +3065,7 @@ export function stvoriUpraviteljPartija(
         avatarId: s.avatarId,
         avatarConfig: s.avatarConfig,
         avatarRevision: s.avatarRevision,
-        rang: rang === 'Piskaralo' ? null : rang,
+        rang: rangNaziv === 'Piskaralo' ? null : rangNaziv,
         sjedalo,
         razina: stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
         trenutniNiz: 0,

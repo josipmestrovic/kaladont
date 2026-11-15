@@ -54,43 +54,41 @@ Stranica `/ljestvice` ima zasebne poretke za Četveroboj i Dvoboj, po metrici i 
 
 ## Rangovi
 
-Rang je **prikazni status** izračunat iz rezultata javnih partija. Ne utječe na prihvaćanje riječi, odabir protivnika ni ishod partije; može rasti ili padati s novim rezultatima. Četveroboj i Dvoboj imaju zasebne rangove i kalibraciju.
+Rang je **prikazni status** izračunat iz rezultata javnih partija. Ne utječe na prihvaćanje riječi, odabir protivnika ni ishod partije; može rasti ili padati s novim rezultatima.
 
-Dok igrač ne završi 10 javnih partija u pojedinom modu, njegov je status **Piskaralo**. Nakon desete partije rang odgovara prosjeku bodova tog moda.
+**Od 0.2.0 (PR09) postoji jedan univerzalni rang** za sve javne formate (Dvoboj, Troboj, Četveroboj) i sva tri pravilnika. Privatne, trening i poništene partije ne ulaze. Rang ne utječe na matchmaking.
 
-### Rangovi za Četveroboj
+Dok igrač ne završi **10 javnih partija ukupno**, status je **Piskaralo**. Nakon desete partije rang odgovara **univerzalnom učinku**.
 
-Prosjek se računa kao zbroj bodova u javnim partijama Četveroboja podijeljen njihovim brojem.
+### Doprinos jedne partije
 
-| Rang | Prosjek bodova |
+Za završenu javnu partiju s početnim brojem sudionika **N**, sirovim bodovima igrača **b** i zbrojem sirovih bodova stola **S** (uključujući nule ljudi, gostiju i javnih botova):
+
+- ako je **S > 0**: doprinos = **100 × N × b / S**
+- ako je **S = 0** (svi imaju 0): doprinos = **0**
+
+Univerzalni učinak = zbroj doprinosa / broj valjanih javnih partija. Prikazno zaokruživanje ne mijenja rang. Pohranjuje se egzaktno u rang-jedinicama (2520 jedinica = 1 prikazni bod).
+
+Primjeri: Dvoboj `1,0` → `200,0`; Troboj `4,2,0` → `200,100,0`; Četveroboj `7,2,1,0` → `280,80,40,0`.
+
+### Pragovi univerzalnog učinka
+
+| Rang | Minimalni učinak |
 |---|---:|
-| Prvopisac | manje od 1,50 |
-| Riječarac | 1,50–manje od 2,10 |
-| Jezičar | 2,10–manje od 2,50 |
-| Lektor | 2,50–manje od 2,90 |
-| Književnik | 2,90–manje od 3,30 |
-| Jezikoslovac | 3,30–manje od 3,80 |
-| Doktor riječi | 3,80–manje od 4,40 |
-| Jezični maestro | 4,40–manje od 5,00 |
-| Gospodar rječnika | 5,00–manje od 5,70 |
-| Kaladont | 5,70 ili više |
+| Prvopisac | 0 |
+| Riječarac | 60 |
+| Jezičar | 80 |
+| Lektor | 94 |
+| Književnik | 108 |
+| Jezikoslovac | 122 |
+| Doktor riječi | 136 |
+| Jezični maestro | 150 |
+| Gospodar rječnika | 164 |
+| Kaladont | 178 |
 
-### Rangovi u Dvoboju
+Pet pobjeda u deset Dvoboja daje učinak 100 → **Lektor**.
 
-Budući da pobjeda u Dvoboju donosi 1 bod, a poraz 0, prosjek bodova odgovara udjelu pobjeda. Rang se računa iz nezaokružene vrijednosti, ne iz zaokruženog postotka prikazanog na zaslonu.
-
-| Rang | Udio pobjeda |
-|---|---:|
-| Prvopisac | manje od 30 % |
-| Riječarac | 30–manje od 40 % |
-| Jezičar | 40–manje od 47 % |
-| Lektor | 47–manje od 54 % |
-| Književnik | 54–manje od 61 % |
-| Jezikoslovac | 61–manje od 68 % |
-| Doktor riječi | 68–manje od 75 % |
-| Jezični maestro | 75–manje od 82 % |
-| Gospodar rječnika | 82–manje od 89 % |
-| Kaladont | 89 % ili više |
+Operativni prijenos povijesti: `pnpm --filter posluzitelj backfill-univerzalni-rang` (vidi [odrzavanje.md](../07-operacije/odrzavanje.md#pr09-univerzalni-rang-backfill)).
 
 ## XP i razine
 

@@ -141,7 +141,7 @@
             </tr>
             <tr>
               <th scope="row">Rang</th>
-              <td data-label="Kako se boduje">Nakon 10 javnih igara. Do tada si Piskaralo. Odvojeno za Dvoboj i Četveroboj.</td>
+              <td data-label="Kako se boduje">Nakon 10 javnih igara ukupno. Do tada si Piskaralo. Jedan rang za sve javne formate.</td>
             </tr>
             <tr>
               <th scope="row">Ljestvice</th>

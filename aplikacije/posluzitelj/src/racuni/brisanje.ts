@@ -105,6 +105,9 @@ async function obrisiRacunUTransakciji(
       pobjede1v1: 0,
       eliminacije1v1: 0,
       bodovi1v1: 0,
+      // PR09: reset univerzalnog ranga uz legacy brojače.
+      rangSumaJedinica: 0,
+      rangBrojPartija: 0,
       iskustvoUkupno: 0,
     })
     .where(and(eq(igraci.id, igrac.id), isNull(igraci.obrisanAt)));

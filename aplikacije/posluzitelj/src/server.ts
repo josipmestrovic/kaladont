@@ -90,6 +90,9 @@ export interface PodaciSocketa {
   odigrane3p: number;
   pobjede3p: number;
   bodovi3p: number;
+  /** PR09 univerzalni rang. */
+  rangBrojPartija: number;
+  rangSumaJedinica: number;
   iskustvoUkupno: number;
   emailPotvrdjen: boolean;
   uvjetiPrihvaceni: boolean;
@@ -598,6 +601,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       socket.data.odigrane3p = identitet.odigrane3p;
       socket.data.pobjede3p = identitet.pobjede3p;
       socket.data.bodovi3p = identitet.bodovi3p;
+      socket.data.rangBrojPartija = identitet.rangBrojPartija;
+      socket.data.rangSumaJedinica = identitet.rangSumaJedinica;
       socket.data.iskustvoUkupno = identitet.iskustvoUkupno;
       socket.data.emailPotvrdjen = identitet.emailPotvrdjen;
       socket.data.uvjetiPrihvaceni = identitet.uvjetiPrihvaceni;

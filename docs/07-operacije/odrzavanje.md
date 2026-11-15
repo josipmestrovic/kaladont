@@ -62,3 +62,32 @@ Release identitet, statusi i obavezna polja definirani su u [release shemi](rele
 | _(primjer)_ 2026-09-22 06:00 | Produkcijska objava         | `sha256:PLACEHOLDER`; probna partija `PLACEHOLDER` | 4 min    | `promovirano`; health, stranice i cijela partija prošli |
 
 Stvarne tajne, email adrese, privatni ključevi i popisi testera nikad se ne zapisuju u repozitorij.
+
+## PR09: univerzalni rang (backfill)
+
+Nakon deploya koji uključuje migraciju `0065_univerzalni_rang`, **odmah** pokreni CLI prije nego što se osloniš na prikaz ranga na stagingu/produkciji.
+
+```bash
+# 1) Migracije (ako pipeline već nije)
+pnpm --filter posluzitelj migracije
+
+# 2) Usporedba legacy max(2p,4p) vs univerzalni agregat (bez PII)
+pnpm --filter posluzitelj backfill-univerzalni-rang -- --usporedi
+
+# 3) Upis doprinosa + agregata (gostovi se ne agregiraju; nema sandučić obavijesti)
+pnpm --filter posluzitelj backfill-univerzalni-rang -- --primijeni=DA
+
+# Produkcija dodatno:
+pnpm --filter posluzitelj backfill-univerzalni-rang -- --primijeni=DA --odrzavanje-produkcije=DA
+
+# 4) Ponovna usporedba + drugi prolaz (mora biti no-op / samo „već upisano”)
+pnpm --filter posluzitelj backfill-univerzalni-rang -- --usporedi
+pnpm --filter posluzitelj backfill-univerzalni-rang -- --primijeni=DA
+
+# Opcionalno: deterministički rebuild agregata iz već upisanih doprinosa
+pnpm --filter posluzitelj backfill-univerzalni-rang -- --obnovi-agregate=DA
+```
+
+- Restart tijekom rada je siguran: nastavi s `--od=<zadnji-partija-uuid>`.
+- Nepotpune partije (bez plasmana) idu samo u report (`brojNepotpunihPartija`) — ne ruše CI.
+- Legacy stupci `odigrane` / `bodovi_*` ostaju za formatne statistike i rollback starog bina; rang se više ne čita iz njih.

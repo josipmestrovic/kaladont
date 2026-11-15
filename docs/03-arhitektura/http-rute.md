@@ -27,6 +27,8 @@ Sve rute zahtijevaju admin sesiju (401 bez nje, 403 za običnog igrača) i koris
 
 Jednokratna zamjena fonda ima CLI samo za održavanje: `pnpm --filter posluzitelj zamijeni-fond-botova` ispisuje read-only preview s postojećim i ciljnim ključevima; `-- --primijeni=DA --posluzitelj-zaustavljen=DA` primjenjuje transakciju. U produkciji treba i `--odrzavanje-produkcije=DA`. Apply odbija uključene javne popune, uključen trening i spremljene aktivne partije. Operater mora zaustaviti poslužitelj prije applya; ne pokreće se automatski.
 
+**PR09 univerzalni rang:** nakon migracije `0065_univerzalni_rang` pokreni `pnpm --filter posluzitelj backfill-univerzalni-rang` (`--usporedi`, zatim `--primijeni=DA`; u produkciji i `--odrzavanje-produkcije=DA`). Detalji: [odrzavanje.md § PR09](../07-operacije/odrzavanje.md#pr09-univerzalni-rang-backfill).
+
 ## Vremenske ljestvice
 
 `GET /api/ljestvice?mod=cetiri_igraca|dva_igraca&metrika=prosjek_bodova|niz_pobjeda&razdoblje=dnevno|tjedno|mjesecno|godisnje|svih_vremena&prikaz=top|oko_mene` (svi parametri opcionalni; neispravna vrijednost vraća `400`). Identifikacija je opcionalna; „moja” pozicija dolazi isključivo iz sesije. Odgovor (tip `OdgovorLjestvice` u `zajednicko`) sadrži najviše 10 redaka s globalnim mjestima, vlastitu poziciju i statuse za svih pet razdoblja, `razdoblje.do` za odbrojavanje do resetiranja i `izracunatoU` (serverski sat). Zaključano svih vremena vraća prazne retke i `otkljucavaSe`. Odgovor ima `Cache-Control: private, no-store`; poslužitelj poredak drži u memoriji najviše 30 s i nikad preko kraja razdoblja.
