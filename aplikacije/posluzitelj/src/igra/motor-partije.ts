@@ -75,6 +75,11 @@ import { mozdaObavijestiPrvuIgru, obradiDovrsenuIgruSanducic } from '../sanducic
 import { izracunajRokoveNeaktivnostiTreninga, stanjeNeaktivnostiTreninga, ZADANI_ROKOVI_NEAKTIVNOSTI_TRENINGA } from '../trening/neaktivnost.js';
 import { stvoriStvarniSat, type Sat, type SatHandle } from './sat.js';
 import {
+  odlukaNakonEliminacije,
+  odrediMetuPosebneRijeci,
+  sljedeciAktivniIza,
+} from './odluke-pravila.js';
+import {
   zabiljeziOtvaranjeAnalitike,
   type IzvorOtvaranjaAnalitike,
   type StatusOtvaranjaAnalitike,
@@ -205,6 +210,11 @@ interface StanjeStola {
   sudionici: SudionikPartije[]; // svi 4 ili 2, fiksni redoslijed po sjedalu
   aktivni: Set<string>;
   eliminirani: string[]; // redoslijed ispadanja - prvi ispali je na indeksu 0
+  /**
+   * Token aktualnog poteza.
+   * // PR05: uz token će ići eksplicitna faza (obican_potez | dokaz_nastavka | sustav_bira).
+   * Za sada je „faza” izvedena iz `izborUToku` + aktivnog reda.
+   */
   turnToken: string;
   naPotezuId: string;
   napadacId: string | null; // autor zadnje prihvaćene riječi - dobiva bod ako netko ispadne; null dok sustav "drži" rijec
@@ -658,13 +668,11 @@ export function stvoriUpraviteljPartija(
   }
 
   function sljedeciAktivni(stanje: StanjeStola, trenutniId: string): string | null {
-    const poredak = stanje.sudionici.map((s) => s.igracId);
-    const pocetniIndeks = poredak.indexOf(trenutniId);
-    for (let pomak = 1; pomak <= poredak.length; pomak += 1) {
-      const kandidat = poredak[(pocetniIndeks + pomak) % poredak.length]!;
-      if (stanje.aktivni.has(kandidat)) return kandidat;
-    }
-    return null;
+    return sljedeciAktivniIza(
+      stanje.sudionici.map((s) => s.igracId),
+      stanje.aktivni,
+      trenutniId,
+    );
   }
 
   /** Prihvaćena riječ troši SVE svoje leksemske grupe (RS-29); kaladont/kalodont ništa ne troše. */
@@ -677,10 +685,42 @@ export function stvoriUpraviteljPartija(
     }
   }
 
+  /**
+   * Jedina točka rotacije tokena poteza.
+   * // PR05: pri rotaciji snimiti i fazu (npr. dokaz_nastavka dobiva svjež token).
+   */
   function noviTurnToken(stanje: StanjeStola): string {
     namjerniIsteciBotova.delete(stanje.partijaId);
     stanje.turnToken = randomUUID();
     return stanje.turnToken;
+  }
+
+  /**
+   * Rani upis potvrđenog poraza — samo iz potvrđene eliminacije.
+   * // PR05: ne zvati dok traje dokaz_nastavka / odgođena eliminacija.
+   */
+  function upisiPotvrdjeniRaniPoraz(
+    stanje: StanjeStola,
+    igracId: string,
+    plasman: number,
+    razlog: RazlogEliminacije,
+  ): void {
+    if (!stanje.politika.dajeNapredak) return;
+    const nacinIspadanja = razlog.startsWith('mrtva_slova')
+      ? 'mrtva_slova'
+      : razlog as 'ne_znam' | 'istek' | 'prekid' | 'kaladont';
+    void spremiRaniPorazUBazi({
+      partijaId: stanje.partijaId,
+      igracId,
+      mod: stanje.mod,
+      plasman: plasman as 1 | 2 | 3 | 4,
+      bodovi: izracunajBodove(
+        { plasman: plasman as 1 | 2 | 3 | 4, eliminacije: stanje.eliminacijeBrojac.get(igracId) ?? 0 },
+        stanje.mod,
+      ),
+      eliminacije: stanje.eliminacijeBrojac.get(igracId) ?? 0,
+      nacinIspadanja,
+    });
   }
 
   function postaviTimer(stanje: StanjeStola): void {
@@ -1755,7 +1795,11 @@ export function stvoriUpraviteljPartija(
     objaviPromjenuPoteza(stanje);
   }
 
-  function eliminirajIgraca(
+  /**
+   * Jedini put potvrđene eliminacije: plasman, jedan uzročnik, jedan emit, rani upis.
+   * Kaladont i obični razlozi prolaze ovuda (PR02).
+   */
+  function primijeniPotvrdjenuEliminaciju(
     stanje: StanjeStola,
     igracId: string,
     razlog: RazlogEliminacije,
@@ -1779,15 +1823,26 @@ export function stvoriUpraviteljPartija(
     stanje.eliminirani.push(igracId);
     stanje.razloziEliminacije.set(igracId, razlog);
 
+    if (razlog === 'kaladont') {
+      dodajNapredakDostignuca(stanje, igracId, { kaladontZrtve: 1 });
+    }
+
     stanje.redniBroj += 1;
+    const vrstaPoteza = razlog.startsWith('mrtva_slova')
+      ? 'auto_kraj' as const
+      : razlog === 'kaladont'
+        ? 'kaladont' as const
+        : (razlog as 'ne_znam' | 'istek' | 'prekid');
     spremiPotezAkoTreba(stanje, {
       runda: stanje.runda,
       redniBroj: stanje.redniBroj,
       igracId,
-      vrsta: razlog.startsWith('mrtva_slova') ? 'auto_kraj' : (razlog as 'ne_znam' | 'istek' | 'prekid'),
+      vrsta: vrstaPoteza,
       rijec: null,
       trazenaSlova: stanje.trazenaSlova,
-      trajanjeMs: razlog.startsWith('mrtva_slova') ? 0 : sat.sada() - stanje.vrijemePocetkaPotezaMs,
+      trajanjeMs: razlog.startsWith('mrtva_slova') || razlog === 'kaladont'
+        ? 0
+        : sat.sada() - stanje.vrijemePocetkaPotezaMs,
     });
 
     // napadac nikad nije sam eliminirani igrac (npr. otvarač runde koji istekne prije ijedne riječi)
@@ -1816,23 +1871,12 @@ export function stvoriUpraviteljPartija(
       plasman,
       razlog,
       bodZa: napadac,
-        slova: razlog.startsWith('mrtva_slova') ? stanje.trazenaSlova : null,
-      rijecUzrok: razlog.startsWith('mrtva_slova') ? stanje.zadnjaRijec : null,
+      slova: razlog.startsWith('mrtva_slova') ? stanje.trazenaSlova : null,
+      rijecUzrok: razlog.startsWith('mrtva_slova') || razlog === 'kaladont' ? stanje.zadnjaRijec : null,
       iskustvo: stavkaEliminacije,
     };
     stanje.eliminacije.push(poruka);
-    if (stanje.politika.dajeNapredak) {
-      const nacinIspadanja = razlog.startsWith('mrtva_slova') ? 'mrtva_slova' : razlog as 'ne_znam' | 'istek' | 'prekid' | 'kaladont';
-      void spremiRaniPorazUBazi({
-        partijaId: stanje.partijaId,
-        igracId,
-        mod: stanje.mod,
-        plasman: plasman as 1 | 2 | 3 | 4,
-        bodovi: izracunajBodove({ plasman: plasman as 1 | 2 | 3 | 4, eliminacije: stanje.eliminacijeBrojac.get(igracId) ?? 0 }, stanje.mod),
-        eliminacije: stanje.eliminacijeBrojac.get(igracId) ?? 0,
-        nacinIspadanja,
-      });
-    }
+    upisiPotvrdjeniRaniPoraz(stanje, igracId, plasman, razlog);
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', poruka);
     postavke.naEliminacijuZaBotove?.(
       stanje.partijaId,
@@ -1851,14 +1895,24 @@ export function stvoriUpraviteljPartija(
       aktivneVeze.dohvatiSocket(igracId)?.emit('iskustvo:obracun', { partijaId: stanje.partijaId, mojeIskustvo: obracun });
     }
 
-    if (stanje.aktivni.size <= 1) {
+    // Sigurno mjesto za završetak: nakon svih obveznih prijelaza ovog događaja.
+    const odluka = odlukaNakonEliminacije({
+      brojAktivnih: stanje.aktivni.size,
+      razlog,
+      zrtvaId: igracId,
+      uzrocnikId: napadac,
+      naPotezuId: stanje.naPotezuId,
+      bioNaPotezu: bioNaPotezuKodPrekida,
+      jeSamoeliminacijaIzvanPoteza,
+    });
+
+    if (odluka.vrsta === 'zakljuci') {
       zakljuciPartiju(stanje);
       return;
     }
 
-    if (razlog === 'prekid' && stanje.naPotezuId === igracId) {
-      // Ako je odspojeni igrač bio na potezu, preskoči ga i nastavi red bez nove runde.
-      const sljedeci = sljedeciAktivni(stanje, igracId);
+    if (odluka.vrsta === 'preskociSjedalo') {
+      const sljedeci = sljedeciAktivni(stanje, odluka.sljedeciId);
       if (sljedeci) {
         stanje.naPotezuId = sljedeci;
         noviTurnToken(stanje);
@@ -1869,31 +1923,23 @@ export function stvoriUpraviteljPartija(
       return;
     }
 
-    if (jeSamoeliminacijaIzvanPoteza) {
-      // Tijekom tolerancije red je mogao doći do odspojenog igrača. Preskoči ga bez boda i nove runde.
-      if (stanje.naPotezuId === igracId) {
-        const sljedeci = sljedeciAktivni(stanje, igracId);
-        if (sljedeci) {
-          stanje.naPotezuId = sljedeci;
-          noviTurnToken(stanje);
-          if (!stanje.izborUToku) postaviTimer(stanje);
-          posaljiStanjeSvima(stanje);
-          objaviPromjenuPoteza(stanje);
-        }
-      }
-      return;
-    }
+    if (odluka.vrsta === 'nista') return;
 
-    // Anchor za objaviRijecSustava: autor riječi ili eliminirani (bez napadača).
-    // Ne pre-advancati za mrtva_slova — objaviRijecSustava već radi jedan sljedeciAktivni.
-    const noviOtvarac = napadac ?? igracId;
-    // Ne dodjeljuj novi aktivni potez prije izbora riječi — inače sljedeći (često
-    // napadač) dobije formu na ~trenutak, pa se UI čini zamrznutim / neupotrebljivim.
+    // otvoriRundu — sidro je uzročnik ili žrtva; objaviRijecSustava radi sljedeciAktivni.
     if (stanje.timerHandle) {
       sat.otkazi(stanje.timerHandle);
       stanje.timerHandle = null;
     }
-    zapocniIzborRijeciSustava(stanje, noviOtvarac);
+    zapocniIzborRijeciSustava(stanje, odluka.sidroId);
+  }
+
+  function eliminirajIgraca(
+    stanje: StanjeStola,
+    igracId: string,
+    razlog: RazlogEliminacije,
+    kontekstPrekida?: Pick<PrekidUTijeku, 'bioNaPotezu' | 'napadacId'>,
+  ): void {
+    primijeniPotvrdjenuEliminaciju(stanje, igracId, razlog, kontekstPrekida);
   }
 
   function obradiPrihvacenPotez(
@@ -2179,71 +2225,23 @@ export function stvoriUpraviteljPartija(
   }
 
   /**
-   * Igrac je izgovorio "kaladont"/"kalodont": eliminira se prethodniId (tko je omogucio "ka"),
-   * bod ide sayerId. Ako je preostao samo sayer, partija zavrsava. Inace sustav bira novu rijec
-   * i red ide na sljedeceg aktivnog nakon sayera. Ako je "ka" omogucila rijec sustava (nitko nije
-   * kriv), preskace se eliminacija i samo se otvara nova runda.
+   * Igrac je izgovorio "kaladont"/"kalodont": meta po pravilniku (PR02 = KA-ZNA autor),
+   * zatim jedan put potvrđene eliminacije. Sustavska riječ bez autora → samo nova runda (RS-26).
    */
   function obradiKaladontEfekt(stanje: StanjeStola, sayerId: string, prethodniId: string | null): void {
-    if (!prethodniId) {
+    const zrtva = odrediMetuPosebneRijeci({
+      pravilnik: stanje.pravila,
+      autorPrethodneRijeci: prethodniId,
+      sayerId,
+      poredak: stanje.sudionici.map((s) => s.igracId),
+      aktivni: stanje.aktivni,
+    });
+    if (!zrtva) {
       zapocniIzborRijeciSustava(stanje, sayerId);
       return;
     }
-
-    ponistiCekanjePovratka(stanje, prethodniId);
-    stanje.aktivni.delete(prethodniId);
-    stanje.eliminirani.push(prethodniId);
-    stanje.razloziEliminacije.set(prethodniId, 'kaladont');
-    dodajNapredakDostignuca(stanje, prethodniId, { kaladontZrtve: 1 });
-    stanje.eliminacijeBrojac.set(sayerId, (stanje.eliminacijeBrojac.get(sayerId) ?? 0) + 1);
-    const stavkaEliminacije = !stanje.politika.dajeNapredak
-      ? null
-      : { vrsta: 'eliminacije' as const, naziv: 'Eliminacija', kolicina: 1, poStavci: ISKUSTVO_ELIMINACIJA, iskustvo: ISKUSTVO_ELIMINACIJA };
-    if (stavkaEliminacije) dodajStavkuIskustva(stanje, sayerId, stavkaEliminacije);
-
-    stanje.redniBroj += 1;
-    spremiPotezAkoTreba(stanje, {
-      runda: stanje.runda,
-      redniBroj: stanje.redniBroj,
-      igracId: prethodniId,
-      vrsta: 'kaladont',
-      rijec: null,
-      trazenaSlova: stanje.trazenaSlova,
-      trajanjeMs: 0,
-    });
-
-    const plasman = stanje.aktivni.size + 1;
-    const porukaElim: Eliminacija = {
-      igracId: prethodniId,
-      plasman,
-      razlog: 'kaladont',
-      bodZa: sayerId,
-      slova: null,
-      rijecUzrok: stanje.zadnjaRijec,
-      iskustvo: stavkaEliminacije,
-    };
-    stanje.eliminacije.push(porukaElim);
-    io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', porukaElim);
-
-    if (stanje.politika.dajeNapredak) {
-      const obracun = izracunajObracunIskustva(
-        stanje.iskustvoPrije.get(prethodniId) ?? 0,
-        stanje.stavkeIskustva.get(prethodniId) ?? [],
-        stanje.statistikeRijeci.get(prethodniId)?.najduziStreak ?? 0,
-      );
-      aktivneVeze.dohvatiSocket(prethodniId)?.emit('iskustvo:obracun', { partijaId: stanje.partijaId, mojeIskustvo: obracun });
-    }
-
-    if (stanje.aktivni.size <= 1) {
-      zakljuciPartiju(stanje);
-      return;
-    }
-
-    if (stanje.timerHandle) {
-      sat.otkazi(stanje.timerHandle);
-      stanje.timerHandle = null;
-    }
-    zapocniIzborRijeciSustava(stanje, sayerId);
+    // napadacId je već sayer (postavljen u obradiPrihvacenPotez) → bodZa = sayer
+    primijeniPotvrdjenuEliminaciju(stanje, zrtva, 'kaladont');
   }
 
   function jePrebrzo(stanje: StanjeStola, igracId: string): boolean {

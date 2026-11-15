@@ -6,6 +6,7 @@ import { baza } from '../baza/klijent.js';
 import { rijeci, sigurnePocetneRijeci } from '../baza/shema.js';
 import { NevaljanaRijecError, normalizirajRijecRjecnika } from './administracija.js';
 import { jeDopustenOblikRijeci } from 'zajednicko';
+import { nijeSistemskoOtvaranjeNaKa } from './pocetne-rijeci.js';
 
 export type PromjenaSigurnogSkupa =
   | { promjena: 'nema'; rijec: string }
@@ -44,6 +45,9 @@ export async function dodajUSigurniSkup(
   const rijec = normalizirajRijecRjecnika(rijecUlaz);
   if (rijec.length < 2 || !jeDopustenOblikRijeci(rijec)) {
     throw new NevaljanaRijecError(`Neispravan oblik riječi: "${rijecUlaz}"`);
+  }
+  if (!nijeSistemskoOtvaranjeNaKa(rijec)) {
+    throw new NevaljanaRijecError('Početna riječ ne smije završavati na «ka».');
   }
 
   const [uRjecniku] = await baza.select({ rijec: rijeci.rijec }).from(rijeci).where(eq(rijeci.rijec, rijec)).limit(1);
