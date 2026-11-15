@@ -1,14 +1,28 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { dohvatiSocket } from '$lib/socket.js';
   import { dohvatiSavjete } from '$lib/savjeti.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, pustiAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
-  import type { PocetakPartije, PotvrdaTreninga, RundaOtvorena, StanjePartije } from 'zajednicko';
+  import {
+    jePoznatiPravilnik,
+    type PocetakPartije,
+    type PotvrdaTreninga,
+    type PravilnikPartije,
+    type RundaOtvorena,
+    type StanjePartije,
+  } from 'zajednicko';
 
   const igra = dohvatiStanjeIgre();
   const savjeti = dohvatiSavjete('dva_igraca');
+
+  /** PR08 smoke: /zagrijavanje?pravila= — puna Igraj UI matrica dolazi u PR14. */
+  const trazenaPravila = $derived(((): PravilnikPartije | null => {
+    const pravila = $page.url.searchParams.get('pravila');
+    return jePoznatiPravilnik(pravila) ? pravila : null;
+  })());
 
   let poruka = $state<string | null>(null);
   let countdown = $state<number | null>(null);
@@ -62,7 +76,9 @@
       }
       poruka = ishod.poruka;
     };
-    socket.emit('trening:zapocni', potvrda);
+    // Bez queryja: stari oblik (samo callback) → server default ka_zna.
+    if (trazenaPravila) socket.emit('trening:zapocni', { pravila: trazenaPravila }, potvrda);
+    else socket.emit('trening:zapocni', potvrda);
   }
 
   onMount(() => {

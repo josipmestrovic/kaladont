@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajRazinuDostignuca, DEFINICIJE_DOSTIGNUCA, odbijNepodrzaniMod, type MetrikeMisijaIgre, type ModPartije, type ObavijestOtkljucanogDostignuca } from 'zajednicko';
+import { izracunajRazinuDostignuca, DEFINICIJE_DOSTIGNUCA, type MetrikeMisijaIgre, type ModPartije, type ObavijestOtkljucanogDostignuca } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, pobjedeTreninga } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
@@ -95,8 +95,8 @@ export async function zabiljeziPobjeduTreninga(
       });
     }
 
+    // PR08: klasični trening smije biti tri_igraca; nije javni Troboj (politika trening izolira agregate).
     const modTreninga = metrike?.mod ?? 'dva_igraca';
-    odbijNepodrzaniMod(modTreninga, 'zabiljeziPobjeduTreninga');
     const potpuneMetrike: MetrikeMisijaIgre = {
       izvorId: treningId,
       kontekst: 'trening',
