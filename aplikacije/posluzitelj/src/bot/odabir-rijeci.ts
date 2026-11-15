@@ -1,8 +1,12 @@
 /**
  * Čisti odabir botove riječi (ADR-017). Nenapadačka politika: ni jedan kriterij ne gleda
  * protivnikove nastavke; broj kandidata procjenjuje samo težinu TRENUTNOG prefiksa.
+ *
+ * PR07: politika „ka” ovisi o pravilniku + broju aktivnih (Klasični ≥3 bez opreza).
+ * PR05→PR07: faza dokaza koristi isti odabir; motor već daje svjež turnToken.
+ * PR08: broj botova u treningu / privatne sobe nisu ovdje — samo odluka poteza.
  */
-import { grafemi, PRAGOVI_DULJINE, zadnjaDva } from 'zajednicko';
+import { grafemi, PRAGOVI_DULJINE, zadnjaDva, type FazaPoteza, type PravilnikPartije } from 'zajednicko';
 import { promijesajNiz } from '../igra/raspored-sjedala.js';
 import { ZADANA_KONFIGURACIJA_BOTA, type KategorijaRijeci, type KonfiguracijaBota } from './konfiguracija-bota.js';
 import { createHash } from 'node:crypto';
@@ -73,6 +77,22 @@ export interface UlazOdabira {
   grupeZa(rijec: string): readonly string[];
   turnToken?: string;
   oporavak?: boolean;
+  /** PR07: default `ka_zna` kad snimka nema polje (stari događaj / test). */
+  pravila?: PravilnikPartije;
+  /** PR07: default `obican_potez`; dokaz_nastavka ide istim repertoarom (prirodni promašaj). */
+  faza?: FazaPoteza;
+  /** PR07: broj aktivnih sjedala; Klasični s ≥3 uključuje „ka” u pool bez 1,5 % filtera. */
+  brojAktivnih?: number;
+}
+
+/**
+ * PR07: duelistički oprez = KA-ZNA ponašanje (8 % propust tuđeg „ka”, 1,5 % ostavljanje).
+ * false samo u Klasičnom s ≥3 aktivna — tada „ka” ide u ponderirani skup, primljeni „ka” → uvijek kaladont.
+ * Dokaži nastavak na običnom potezu zadržava oprez (posebna riječ = KA-ZNA učinak u motoru).
+ */
+export function oprezKa(pravila: PravilnikPartije = 'ka_zna', brojAktivnih = 2): boolean {
+  if (pravila === 'klasicni') return brojAktivnih < 3;
+  return true;
 }
 
 export type OdlukaBota =
@@ -133,10 +153,18 @@ export function odaberiPotez(
 ): OdlukaBota {
   const sviKandidati = [...ulaz.kandidati];
   let propustKa = false;
+  // PR07: nedostajuća polja = KA-ZNA / 2 aktivna (kompatibilnost starih snimki i testova).
+  const pravila = ulaz.pravila ?? 'ka_zna';
+  const brojAktivnih = ulaz.brojAktivnih ?? 2;
+  const sOprezom = oprezKa(pravila, brojAktivnih);
+  // ulaz.faza: dokaz_nastavka koristi isti repertoar; mrtav nastavak samo prirodno (jeNepoznataBotu).
+  void ulaz.faza;
 
-  // Primljeni KA: većinom kaladont; ponekad propusti i igra običnu riječ na „ka”.
+  // Primljeni KA.
+  // PR07 Klasični ≥3: uvijek kaladont (smije eliminirati sljedećeg). Bez propusta.
+  // Inače: većinom kaladont; ponekad propusti i igra običnu riječ na „ka”.
   if (ulaz.trazenaSlova === 'ka') {
-    if (rng() >= konfig.vjerojatnostPropustaKa) {
+    if (!sOprezom || rng() >= konfig.vjerojatnostPropustaKa) {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
     }
@@ -175,15 +203,22 @@ export function odaberiPotez(
   }
 
   const radni = pozeljni.length ? pozeljni : poznati;
-  const kandidati: string[] = [];
-  const naKa: string[] = [];
-  for (const rijec of radni) {
-    if (zadnjaDva(rijec) === 'ka') naKa.push(rijec);
-    else kandidati.push(rijec);
+  // PR07: bez opreza (Klasični ≥3) — „ka” u istom ponderiranom skupu; nema 1,5 % filtera.
+  // S oprezom — odvoji naKa i primijeni vjerojatnostOstavljanjaKa / prisilni put.
+  let odabranaSkupina: string[];
+  let prisilniKa = false;
+  if (!sOprezom) {
+    odabranaSkupina = [...radni];
+  } else {
+    const kandidati: string[] = [];
+    const naKa: string[] = [];
+    for (const rijec of radni) {
+      if (zadnjaDva(rijec) === 'ka') naKa.push(rijec);
+      else kandidati.push(rijec);
+    }
+    prisilniKa = naKa.length > 0 && kandidati.length === 0;
+    odabranaSkupina = naKa.length && (prisilniKa || rng() < konfig.vjerojatnostOstavljanjaKa) ? naKa : (kandidati.length ? kandidati : naKa);
   }
-
-  const prisilniKa = naKa.length > 0 && kandidati.length === 0;
-  const odabranaSkupina = naKa.length && (prisilniKa || rng() < konfig.vjerojatnostOstavljanjaKa) ? naKa : (kandidati.length ? kandidati : naKa);
   const uobicajene = odabranaSkupina.filter((rijec) => kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig) === 'uobicajena');
   const imenice = uobicajene.filter((rijec) => osnovnaVrsta(rijec, ['imenica']));
   const ostalo = uobicajene.filter((rijec) => osnovnaVrsta(rijec, ['glagol', 'pridjev']));
@@ -195,11 +230,15 @@ export function odaberiPotez(
     izbor = uobicajene.length ? uobicajene : odabranaSkupina;
   }
   const rijec = izaberiPonderirano(izbor, ulaz.frekvencijaZa, rng, konfig);
+  // Bez opreza: izborKa označava samo da je riječ na „ka” (nije „dobrovoljni” 1,5 % hit) — brojač i dalje bilježi.
+  const izborKa = zadnjaDva(rijec) === 'ka'
+    ? (prisilniKa ? 'prisilni' as const : 'dobrovoljni' as const)
+    : undefined;
   return {
     vrsta: 'rijec',
     rijec,
     kategorija: kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig),
-    ...(zadnjaDva(rijec) === 'ka' ? { izborKa: prisilniKa ? 'prisilni' as const : 'dobrovoljni' as const } : {}),
+    ...(izborKa ? { izborKa } : {}),
     ...(propustKa ? { propustKa: true } : {}),
   };
 }
