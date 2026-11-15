@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DogadajPoteza, RezultatNaredbe } from '../src/igra/politika-ucinka.js';
 import { BotKontroler } from '../src/bot/kontroler.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
-import { Vrecica, koeficijentTempaBota, odaberiPotez, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
+import { Vrecica, koeficijentTempaBota, odaberiPotez, oprezKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
 import { BROJ_GOSTIJU_FONDA_V4, BROJ_IMENOVANIH_FONDA_V4, CILJ_AKTIVNIH_FONDA_V4, NADIMCI_POCETNOG_FONDA_V4 } from '../src/bot/nadimci.js';
 import { stavkeZamjeneFondaBotova } from '../src/bot/servis-identiteta.js';
 import { dopustenoBotova, pragoviPopuneZaOkruzenje } from '../src/red/raspored-popune.js';
@@ -220,6 +220,90 @@ describe('odabir riječi bota', () => {
       const odluka = odaberiPotez({ trazenaSlova: 'ma', kandidati: ['mastilo'], ...rijeci }, stanje, konfigBezPropusta, r);
       expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'mastilo', kategorija: 'srednja' });
     }
+  });
+
+  // --- PR07: pravilnik + broj aktivnih mijenjaju politiku „ka” ---
+
+  it('oprezKa: Klasični ≥3 bez opreza; inače duelistički oprez', () => {
+    expect(oprezKa('klasicni', 3)).toBe(false);
+    expect(oprezKa('klasicni', 2)).toBe(true);
+    expect(oprezKa('ka_zna', 5)).toBe(true);
+    expect(oprezKa('dokazi_nastavak', 4)).toBe(true);
+    expect(oprezKa()).toBe(true);
+  });
+
+  it('PR07 Klasični s 3 aktivna: riječ na „ka” ulazi u pool čak uz vjerojatnostOstavljanjaKa 0', () => {
+    const rijeci = laznaRijec({
+      masa: { frekvencija: 900, grupe: ['imenica:masa'] },
+      maska: { frekvencija: 900, grupe: ['imenica:maska'] },
+    });
+    // Jednaki ponderi + RNG koji bira drugi kandidat → maska mora biti dostupna (bez 1,5 % filtera).
+    let brojMaska = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const odluka = odaberiPotez({
+        trazenaSlova: 'ma',
+        kandidati: ['masa', 'maska'],
+        ...rijeci,
+        pravila: 'klasicni',
+        brojAktivnih: 3,
+      }, stvoriStanjeBota(konfigBezPropusta, rng(seed)), konfigBezPropusta, rng(seed));
+      if (odluka.vrsta === 'rijec' && odluka.rijec === 'maska') brojMaska += 1;
+    }
+    expect(brojMaska).toBeGreaterThan(0);
+  });
+
+  it('PR07 Klasični s 2 aktivna: „ka” se izbjegava kao u KA-ZNA', () => {
+    const odluke: string[] = [];
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const odluka = odaberiPotez({
+        trazenaSlova: 'ma',
+        kandidati: ['masa', 'maska'],
+        ...rjecnik,
+        pravila: 'klasicni',
+        brojAktivnih: 2,
+      }, stvoriStanjeBota(konfigBezPropusta, rng(seed)), konfigBezPropusta, rng(seed));
+      if (odluka.vrsta === 'rijec') odluke.push(odluka.rijec);
+    }
+    expect(odluke.every((rijec) => rijec === 'masa')).toBe(true);
+  });
+
+  it('PR07 Klasični ≥3 na primljeni „ka” uvijek igra kaladont (čak uz propust 100 %)', () => {
+    const sPropustom: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostPropustaKa: 1 };
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ka',
+      kandidati: ['kava', 'kamen'],
+      ...laznaRijec({ kava: { frekvencija: 500, grupe: ['imenica:kava'] }, kamen: { frekvencija: 500, grupe: ['imenica:kamen'] } }),
+      pravila: 'klasicni',
+      brojAktivnih: 3,
+    }, stvoriStanjeBota(sPropustom, rng(1)), sPropustom, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'kaladont' });
+  });
+
+  it('PR07 bez polja pravila/faze ponaša se kao KA-ZNA (regresija)', () => {
+    const odluke: string[] = [];
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const odluka = odaberiPotez({
+        trazenaSlova: 'ma',
+        kandidati: ['masa', 'maska'],
+        ...rjecnik,
+      }, stvoriStanjeBota(konfigBezPropusta, rng(seed)), konfigBezPropusta, rng(seed));
+      if (odluka.vrsta === 'rijec') odluke.push(odluka.rijec);
+    }
+    expect(odluke.every((rijec) => rijec === 'masa')).toBe(true);
+  });
+
+  it('PR07 politika ne ovisi o tome je li sljedeći čovjek ili bot (isti ulazi → ista odluka)', () => {
+    const ulaz = {
+      trazenaSlova: 'ma',
+      kandidati: ['masa', 'maska', 'mast'],
+      ...rjecnik,
+      pravila: 'klasicni' as const,
+      brojAktivnih: 3,
+      turnToken: 't-isti',
+    };
+    const a = odaberiPotez(ulaz, stvoriStanjeBota(konfigBezPropusta, rng(11)), konfigBezPropusta, rng(11));
+    const b = odaberiPotez(ulaz, stvoriStanjeBota(konfigBezPropusta, rng(11)), konfigBezPropusta, rng(11));
+    expect(a).toEqual(b);
   });
 
   it('KA izbor 100 % ne gubi kandidata zbog niže frekvencije', () => {
@@ -530,5 +614,145 @@ describe('bot kontroler', () => {
     kontroler.zaustavi();
     expect(kontroler.brojPlaniranih()).toBe(0);
     expect(timeri[0]!.ms).toBe(-1);
+  });
+
+  // --- PR07: faza dokaza, čekač, dvostruki broadcast ---
+
+  it('PR07 dvostruki naPromjenuPoteza istog tokena planira jednom', () => {
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri } = stvori(izvrsi);
+    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't-dupli' }));
+    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't-dupli' }));
+    expect(timeri).toHaveLength(1);
+    expect(kontroler.brojaci.planirano).toBe(1);
+  });
+
+  it('PR07 novi token u dokaz_nastavka dopušta drugi plan istom botu', () => {
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri } = stvori(izvrsi);
+    kontroler.naPromjenuPoteza(dogadaj({
+      turnToken: 't-obicni',
+      faza: 'obican_potez',
+      pravila: 'dokazi_nastavak',
+    }));
+    timeri[0]!.posao();
+    expect(izvrsi).toHaveBeenCalledTimes(1);
+    kontroler.naPromjenuPoteza(dogadaj({
+      turnToken: 't-dokaz',
+      faza: 'dokaz_nastavka',
+      pravila: 'dokazi_nastavak',
+      dokaz: { autorId: 'bot', cekateljId: 'covjek', cekateljVecIspao: false },
+    }));
+    expect(timeri).toHaveLength(2);
+    timeri[1]!.posao();
+    expect(izvrsi).toHaveBeenCalledTimes(2);
+    expect(izvrsi).toHaveBeenLastCalledWith('p1', 'bot', expect.objectContaining({ turnToken: 't-dokaz' }));
+  });
+
+  it('PR07 bot-čekač nije na potezu — ne planira dok dokaz traje', () => {
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri } = stvori(izvrsi);
+    kontroler.naPromjenuPoteza(dogadaj({
+      naPotezuId: 'covjek',
+      faza: 'dokaz_nastavka',
+      pravila: 'dokazi_nastavak',
+      dokaz: { autorId: 'covjek', cekateljId: 'bot', cekateljVecIspao: false },
+      sudionici: [
+        { igracId: 'covjek', upravljac: 'covjek', aktivan: true },
+        { igracId: 'bot', upravljac: 'bot', aktivan: true },
+      ],
+    }));
+    expect(timeri).toHaveLength(0);
+    expect(izvrsi).not.toHaveBeenCalled();
+  });
+
+  it('PR07 naEliminaciju ne šalje reakciju žrtve dok je žrtva čekač otvorenog dokaza', () => {
+    const posaljiReakciju = vi.fn(() => true);
+    const konfigReakcija: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostReakcijeBravoPriIspadanju: 1,
+      vjerojatnostReakcijeHvalaPriIspadanju: 0,
+      vjerojatnostReakcijeSorryPriEliminaciji: 1,
+    };
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigReakcija, {
+      posaljiReakciju,
+      // Deterministički RNG: 0 → uvijek bira reakciju (roll < 1).
+      rng: () => 0,
+    });
+    // Snimka s otvorenim dokazom — bot je čekač.
+    kontroler.naPromjenuPoteza(dogadaj({
+      naPotezuId: 'covjek',
+      faza: 'dokaz_nastavka',
+      pravila: 'dokazi_nastavak',
+      dokaz: { autorId: 'covjek', cekateljId: 'bot', cekateljVecIspao: false },
+    }));
+    kontroler.naEliminaciju(
+      'p1',
+      'javna',
+      'bot',
+      'covjek',
+      [
+        { igracId: 'covjek', upravljac: 'covjek' },
+        { igracId: 'bot', upravljac: 'bot' },
+      ],
+    );
+    // Nema zakazane reakcije žrtve (guard); eliminator nije bot pa ni sorry.
+    const reakcije = timeri.filter((t) => t.ms >= 2_000);
+    expect(reakcije).toHaveLength(0);
+    for (const t of reakcije) t.posao();
+    expect(posaljiReakciju).not.toHaveBeenCalled();
+  });
+
+  it('PR07 naEliminaciju šalje reakciju žrtve kad dokaz nije otvoren (potvrđena eliminacija)', () => {
+    const posaljiReakciju = vi.fn(() => true);
+    const konfigReakcija: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostReakcijeBravoPriIspadanju: 1,
+      vjerojatnostReakcijeHvalaPriIspadanju: 0,
+    };
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigReakcija, {
+      posaljiReakciju,
+      rng: () => 0,
+    });
+    // Običan potez bez dokaza — potvrđeno ispadanje bota.
+    kontroler.naPromjenuPoteza(dogadaj({ naPotezuId: 'covjek', dokaz: null }));
+    kontroler.naEliminaciju(
+      'p1',
+      'javna',
+      'bot',
+      'covjek',
+      [
+        { igracId: 'covjek', upravljac: 'covjek' },
+        { igracId: 'bot', upravljac: 'bot' },
+      ],
+    );
+    const reakcije = timeri.filter((t) => t.ms >= 2_000);
+    expect(reakcije.length).toBeGreaterThanOrEqual(1);
+    for (const t of reakcije) t.posao();
+    expect(posaljiReakciju).toHaveBeenCalledWith('p1', 'bot', expect.any(String));
+  });
+
+  it('PR07 Klasični Troboj: kontroler prosljeđuje broj aktivnih — na primljeni ka uvijek kaladont', () => {
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri } = stvori(izvrsi, () => 1, { ...konfigBezPropusta, vjerojatnostPropustaKa: 1 }, {
+      rjecnik: {
+        igriviKandidati: () => ['kava'],
+        frekvencijaZa: () => 500,
+        grupeZa: (r) => [`imenica:${r}`],
+        verzijaRjecnika: () => 1,
+      },
+    });
+    kontroler.naPromjenuPoteza(dogadaj({
+      trazenaSlova: 'ka',
+      pravila: 'klasicni',
+      faza: 'obican_potez',
+      sudionici: [
+        { igracId: 'covjek', upravljac: 'covjek', aktivan: true },
+        { igracId: 'bot', upravljac: 'bot', aktivan: true },
+        { igracId: 'bot2', upravljac: 'bot', aktivan: true },
+      ],
+    }));
+    timeri[0]!.posao();
+    expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', { vrsta: 'rijec', rijec: 'kaladont', turnToken: 't1' });
   });
 });

@@ -1,6 +1,10 @@
 /**
  * Bot kontroler (ADR-017): sluša promjene poteza iz motora i za bota na potezu planira
  * točno jednu akciju po (partijaId, igracId, turnToken). Pri buđenju sve ponovno provjerava.
+ *
+ * PR05→PR07: snimka nosi faza/pravila/dokaz; novi token u dokaz_nastavka dopušta isti bot ponovno.
+ * PR07: odaberiPotez dobiva pravilnik + broj aktivnih; čekač dokaza ne dobiva reakciju ispadanja.
+ * PR08: trening tempo (1–3 s) ostaje ovdje; broj Računala u Zagrijavanju nije u ovom PR-u.
  */
 import type { BrzaPoruka } from 'zajednicko';
 import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js';
@@ -108,7 +112,12 @@ export class BotKontroler {
     }
   }
 
-  /** Javna partija: eliminator (sorry) i žrtva-bot (bravo/hvala, međusobno isključivo). */
+  /**
+   * Javna partija: eliminator (sorry) i žrtva-bot (bravo/hvala, međusobno isključivo).
+   * PR07: dok je dokaz otvoren, čekač (dokaz.cekateljId) nije potvrđeno ispao — ne emitiraj
+   * reakciju ispadanja niti tretiraj ga kao promatrača. Motor zove ovo tek iz potvrđene
+   * eliminacije; guard je obrana ako snimka još drži dokaz dok stigne rani signal.
+   */
   naEliminaciju(
     partijaId: string,
     kontekst: DogadajPoteza['kontekst'],
@@ -122,11 +131,14 @@ export class BotKontroler {
     }
     const konfiguracija = this.konfiguracijePartija.get(partijaId)!;
     const jeBot = (igracId: string | null) => Boolean(igracId && sudionici.some((s) => s.igracId === igracId && s.upravljac === 'bot'));
+    // PR07: čekač dokaza — bez reakcije žrtve dok dokaz traje.
+    const dokaz = this.aktualniPotezi.get(partijaId)?.dokaz;
+    const zrtvaJeCekateljDokaza = Boolean(dokaz && dokaz.cekateljId === zrtvaId);
     if (jeBot(bodZaId) && bodZaId) {
       const poruka = odaberiReakcijuPriEliminacijiProtivnika(konfiguracija, this.rng);
       if (poruka) this.zakaziReakciju(partijaId, bodZaId, poruka);
     }
-    if (jeBot(zrtvaId)) {
+    if (jeBot(zrtvaId) && !zrtvaJeCekateljDokaza) {
       const poruka = odaberiReakcijuPriIspadanju(konfiguracija, this.rng);
       if (poruka) this.zakaziReakciju(partijaId, zrtvaId, poruka);
     }
@@ -147,6 +159,8 @@ export class BotKontroler {
       // Zakazane reakcije (2–5 s) smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
       return;
     }
+    // PR07: bot-čekač nakon „Ne znam” nije naPotezuId — ne planiramo mu potez ni reakciju ispadanja.
+    // Dokazivač (autor) dobiva svjež turnToken u dokaz_nastavka i smije odigrati drugi potez.
     if (dogadaj.izborUToku || !dogadaj.naPotezuId || !dogadaj.trazenaSlova) return;
     const sudionik = dogadaj.sudionici.find((s) => s.igracId === dogadaj.naPotezuId);
     if (!sudionik || sudionik.upravljac !== 'bot' || !sudionik.aktivan) return;
@@ -248,6 +262,7 @@ export class BotKontroler {
       ista.verzijaRjecnika = verzijaRjecnika;
       return ista.odluka;
     }
+    // PR07: politika „ka” / dokaza iz snimke; tip sljedećeg (čovjek/bot) namjerno se ne prosljeđuje.
     const odluka = odaberiPotez({
       trazenaSlova: dogadaj.trazenaSlova!,
       kandidati,
@@ -255,6 +270,9 @@ export class BotKontroler {
       grupeZa: (rijec) => this.ovisnosti.rjecnik.grupeZa(rijec),
       turnToken: dogadaj.turnToken,
       oporavak: oporavak || ista !== undefined,
+      pravila: dogadaj.pravila ?? 'ka_zna',
+      faza: dogadaj.faza ?? 'obican_potez',
+      brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng);
     if (odluka.vrsta === 'rijec' && odluka.propustKa) this.brojaci.propustPrimljenogKa += 1;
     if (odluka.vrsta === 'rijec' && odluka.izborKa && stanjeBota.zadnjiTokenKa !== dogadaj.turnToken) {
