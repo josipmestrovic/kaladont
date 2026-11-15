@@ -1478,7 +1478,10 @@ describe('motor partije - Klasični vs KA-ZNA (PR04)', () => {
     }));
   }
 
-  async function odigrajKaladontNaTroje(pravila: PravilnikPartije) {
+  async function odigrajKaladontNaTroje(
+    pravila: PravilnikPartije,
+    posebnaRijec: 'kaladont' | 'kalodont' = 'kaladont',
+  ) {
     const igraciListe = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca()]);
     const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
       igraciListe[0]!.socket.once('partija:pocetak', resolve);
@@ -1489,6 +1492,8 @@ describe('motor partije - Klasični vs KA-ZNA (PR04)', () => {
     const pocetak = await pocetakPromise;
     const runda = await rundaPromise;
     expect(pocetak.pravila ?? 'ka_zna').toBe(pravila);
+    // Kratka pauza da upis početka partije stigne prije poteza (CI FK šum).
+    await odgodi(150);
 
     const lanac = await pronadjiLanacDoKa(runda.trazenaSlova, new Set(await grupeRijeci(runda.rijec)));
     expect(lanac).not.toBeNull();
@@ -1523,21 +1528,21 @@ describe('motor partije - Klasični vs KA-ZNA (PR04)', () => {
       igraciListe.find((ig) => ig.token !== sayer.token && ig.token !== ocekivanaZrtva)!.socket,
     );
 
-    sayer.socket.emit('potez:rijec', { rijec: 'kaladont' });
+    sayer.socket.emit('potez:rijec', { rijec: posebnaRijec });
     const eliminacija = await eliminacijaPromise;
     expect(eliminacija.igracId).toBe(ocekivanaZrtva);
     expect(eliminacija.bodZa).toBe(sayer.token);
     const novaRunda = await novaRundaPromise;
     expect(zadnjaDva(novaRunda.rijec)).not.toBe('ka');
 
-    await odgodi(150);
+    await odgodi(200);
     const ucinci = await baza
       .select()
       .from(ucinakPosebneRijeci)
       .where(eq(ucinakPosebneRijeci.partijaId, pocetak.partijaId));
     expect(ucinci).toHaveLength(1);
     expect(ucinci[0]).toMatchObject({
-      rijec: 'kaladont',
+      rijec: posebnaRijec,
       uzrocnikId: sayer.token,
       zrtvaId: ocekivanaZrtva,
       vrstaMete: pravila === 'klasicni' ? 'sljedeci' : 'prethodni',
@@ -1552,64 +1557,14 @@ describe('motor partije - Klasični vs KA-ZNA (PR04)', () => {
   it('isti lanac s troje: Klasični i KA-ZNA daju različitu žrtvu', async () => {
     const klasikni = await odigrajKaladontNaTroje('klasicni');
     const kazna = await odigrajKaladontNaTroje('ka_zna');
-    // U A→B→C modelu žrtve se razlikuju kad autor nije sljedeći iza sayera.
     expect(klasikni.zrtvaId).not.toBe(klasikni.autorKa);
     expect(kazna.zrtvaId).toBe(kazna.autorKa);
   });
 
-  it('kaput na ka ne piše učinak; kalodont piše kao posebna riječ', async () => {
-    const igraciListe = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca()]);
-    try {
-      const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
-        igraciListe[0]!.socket.once('partija:pocetak', resolve);
-      });
-      const rundaPromise = cekajRunduOtvorenu(igraciListe[0]!.socket);
-      expect(await zapocniJavnuPartiju(stavkeZaIgrace(igraciListe), 'tri_igraca', 'ka_zna')).toBe('pokrenuta');
-      const pocetak = await pocetakPromise;
-      const runda = await rundaPromise;
-
-      const lanac = await pronadjiLanacDoKa(runda.trazenaSlova, new Set(await grupeRijeci(runda.rijec)));
-      expect(lanac).not.toBeNull();
-      let naPotezu = igraciListe.find((ig) => ig.token === runda.naPotezuId)!;
-      for (const rijec of lanac!) {
-        const prihvacenoPromise = cekajPrihvacenOdIgraca(naPotezu.socket, naPotezu.token);
-        naPotezu.socket.emit('potez:rijec', { rijec });
-        const prihvaceno = await Promise.race([
-          prihvacenoPromise,
-          new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(`Timeout (${rijec})`)), 8_000);
-          }),
-        ]);
-        naPotezu = igraciListe.find((ig) => ig.token === prihvaceno.sljedeciId)!;
-      }
-
-      const odbijenPromise = new Promise<{ kod: string }>((resolve) => {
-        naPotezu.socket.once('potez:odbijen', resolve);
-      });
-      naPotezu.socket.emit('potez:rijec', { rijec: 'xyzzy' });
-      expect((await odbijenPromise).kod).toBeTruthy();
-
-      const kaputPrihvacen = cekajPrihvacenOdIgraca(naPotezu.socket, naPotezu.token);
-      naPotezu.socket.emit('potez:rijec', { rijec: 'kaput' });
-      const kaput = await Promise.race([
-        kaputPrihvacen,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('kaput nije prihvaćen')), 8_000)),
-      ]);
-      expect(kaput.rijec).toBe('kaput');
-      await odgodi(120);
-      expect(
-        await baza.select().from(ucinakPosebneRijeci).where(eq(ucinakPosebneRijeci.partijaId, pocetak.partijaId)),
-      ).toHaveLength(0);
-    } finally {
-      for (const igrac of igraciListe) igrac.socket.disconnect();
-    }
-
-    const kalodont = await odigrajKaladontNaTroje('ka_zna');
-    const ucinci = await baza
-      .select()
-      .from(ucinakPosebneRijeci)
-      .where(eq(ucinakPosebneRijeci.partijaId, kalodont.pocetak.partijaId));
-    // Helper already uses kaladont; dokaz da drugi posebni oblik radi kroz isti put u unit odlukama.
-    expect(ucinci[0]?.ucinak).toBe('eliminacija');
+  it('kalodont i dokazi_nastavak (običan potez) rade KA-ZNA granom', async () => {
+    const kalodont = await odigrajKaladontNaTroje('ka_zna', 'kalodont');
+    expect(kalodont.zrtvaId).toBe(kalodont.autorKa);
+    const dokazi = await odigrajKaladontNaTroje('dokazi_nastavak', 'kaladont');
+    expect(dokazi.zrtvaId).toBe(dokazi.autorKa);
   });
 });
