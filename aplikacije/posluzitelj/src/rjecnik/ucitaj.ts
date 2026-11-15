@@ -640,16 +640,14 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
         if (rezervnaImenica) return { rijec: rezervnaImenica, izvor: 'rezervni_odabir' };
       }
 
-      // Put 3: rezervni kratki (bilo koja kratka riječ iz dopuštenih vrsta).
-      const kratke = [...rijecGrupe.keys()].filter((rijec) => rijec.length < 6);
-      const rezervnaKratka = odaberiRezervnuPocetnuRijec({
-        kandidati: kratke,
-        iskoristeneGrupe,
-        dopusteneVrste,
-        jeIgriva: jeIgrivaPocetna,
-        imaSlobodanNastavak,
-      });
-      if (rezervnaKratka) return { rijec: rezervnaKratka, izvor: 'rezervni_odabir' };
+      // Put 3: rezervni kratki — iteracija po mapi (bez kopiranja ~1,2 M ključeva).
+      for (const [rijec] of rijecGrupe) {
+        if (rijec.length >= 6) continue;
+        if (!nijeSistemskoOtvaranjeNaKa(rijec)) continue;
+        if (!jeIgrivaPocetna(rijec, iskoristeneGrupe, dopusteneVrste)) continue;
+        if (!imaSlobodanNastavak(rijec)) continue;
+        return { rijec, izvor: 'rezervni_odabir' };
+      }
 
       return null;
     },

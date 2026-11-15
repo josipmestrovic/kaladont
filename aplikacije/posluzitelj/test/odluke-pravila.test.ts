@@ -32,6 +32,16 @@ describe('odluke-pravila', () => {
         aktivni: new Set(poredak),
       }),
     ).toBeNull();
+    // Motor mora dodatno provjeriti aktivni.has(zrtva) — inače hang (Bugbot).
+    expect(
+      odrediMetuPosebneRijeci({
+        pravilnik: 'ka_zna',
+        autorPrethodneRijeci: 'A',
+        sayerId: 'B',
+        poredak,
+        aktivni: new Set(['B', 'C']),
+      }),
+    ).toBe('A');
   });
 
   it('odlukaNakonEliminacije: jedan aktivni → zaključi; inače otvori rundu', () => {

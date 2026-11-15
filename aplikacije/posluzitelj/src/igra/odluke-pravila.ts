@@ -66,7 +66,7 @@ export function odlukaNakonEliminacije(ulaz: {
   naPotezuId: string;
   bioNaPotezu: boolean;
   jeSamoeliminacijaIzvanPoteza: boolean;
-}): Omit<SljedecaRadnja, never> {
+}): SljedecaRadnja {
   if (ulaz.brojAktivnih <= 1) {
     return { vrsta: 'zakljuci', razlog: 'jedan_ili_nula_aktivnih' };
   }

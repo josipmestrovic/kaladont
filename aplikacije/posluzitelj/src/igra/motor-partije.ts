@@ -2236,7 +2236,8 @@ export function stvoriUpraviteljPartija(
       poredak: stanje.sudionici.map((s) => s.igracId),
       aktivni: stanje.aktivni,
     });
-    if (!zrtva) {
+    // Autor već ispao ili sustavska riječ (RS-26 / PR04): bez ponovne žrtve, samo nova runda.
+    if (!zrtva || !stanje.aktivni.has(zrtva)) {
       zapocniIzborRijeciSustava(stanje, sayerId);
       return;
     }
