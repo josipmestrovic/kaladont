@@ -5,10 +5,10 @@
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { izracunajNovaDostignuca, izracunajOcjenuIgre, izracunajRang, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, RANGOVI, RANGOVI_1V1, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
-import { bonusPobjednickogNiza, izracunajFormu, odbijNepodrzaniMod } from 'zajednicko';
+import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
-import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
+import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeModaIgraca, statistikeRijeciIgraca, sudioniciPartije } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { obradiNeobradeneTop10Dokaze, zabiljeziTop10NakonPromjene } from '../dostignuca/top10.js';
 import { ocistiMemorijuLjestvica } from '../ljestvice/servis.js';
@@ -39,12 +39,55 @@ async function brojKolekcijskihStavki(tx: MisijeTx, igracId: string): Promise<nu
 }
 
 function jeNapredakRanga(prije: string, poslije: string, mod: ModPartije): boolean {
-  odbijNepodrzaniMod(mod, 'jeNapredakRanga');
   if (prije === poslije) return false;
   if (poslije === 'Piskaralo') return false;
   if (prije === 'Piskaralo') return true;
+  // Troboj privremeno dijeli četverobojsku hijerarhiju do PR09.
   const lista = mod === 'dva_igraca' ? RANGOVI_1V1 : RANGOVI;
   return lista.findIndex((r) => r.naziv === poslije) >= lista.findIndex((r) => r.naziv === prije);
+}
+
+type BrojaciModa = { odigrane: number; bodovi: number; eliminacije: number; pobjede: number };
+
+async function dohvatiBrojaceModa(
+  tx: MisijeTx,
+  igracId: string,
+  mod: ModPartije,
+): Promise<BrojaciModa> {
+  if (mod === 'tri_igraca') {
+    const [red] = await tx
+      .select({
+        odigrane: statistikeModaIgraca.odigrane,
+        bodovi: statistikeModaIgraca.bodovi,
+        eliminacije: statistikeModaIgraca.eliminacije,
+        pobjede: statistikeModaIgraca.pobjede,
+      })
+      .from(statistikeModaIgraca)
+      .where(and(eq(statistikeModaIgraca.igracId, igracId), eq(statistikeModaIgraca.mod, mod)))
+      .limit(1);
+    return {
+      odigrane: red?.odigrane ?? 0,
+      bodovi: red?.bodovi ?? 0,
+      eliminacije: red?.eliminacije ?? 0,
+      pobjede: red?.pobjede ?? 0,
+    };
+  }
+  const [red] = await tx
+    .select({
+      odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
+      bodovi: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
+      eliminacije: mod === 'dva_igraca' ? igraci.eliminacije1v1 : igraci.eliminacijeUkupno,
+      pobjede: mod === 'dva_igraca' ? igraci.pobjede1v1 : igraci.pobjede,
+    })
+    .from(igraci)
+    .where(eq(igraci.id, igracId))
+    .limit(1);
+  return {
+    odigrane: red?.odigrane ?? 0,
+    bodovi: red?.bodovi ?? 0,
+    eliminacije: red?.eliminacije ?? 0,
+    pobjede: red?.pobjede ?? 0,
+  };
 }
 
 export async function zapisiPocetakPartije(
@@ -65,7 +108,6 @@ export async function zapisiPocetakPartije(
     .limit(1);
   if (postojeca) return;
 
-  odbijNepodrzaniMod(mod, 'zapisiPocetakPartije');
   const pravila = opcije.pravila ?? ZADANI_PRAVILNIK;
   const spojeniDvoboj = opcije.spojeniDvoboj ?? false;
 
@@ -151,7 +193,7 @@ export function spremiRaniPorazUBazi(zapis: {
   partijaId: string;
   igracId: string;
   mod: ModPartije;
-  plasman: 1 | 2 | 3 | 4;
+  plasman: number;
   bodovi: number;
   eliminacije: number;
   nacinIspadanja: 'ne_znam' | 'istek' | 'mrtva_slova' | 'prekid' | 'kaladont';
@@ -196,7 +238,8 @@ export function spremiRaniPorazUBazi(zapis: {
 
 export interface ZapisSudionika {
   igracId: string;
-  plasman: 1 | 2 | 3 | 4;
+  /** Javni 1..n; privatni može biti 1–8. */
+  plasman: number;
   bodovi: number;
   eliminacije: number;
   iskustvo: number;
@@ -316,7 +359,6 @@ export async function zakljuciPartijuUBazi(
   /** Osnovni bruto XP prije bonusa niza/ocjene (iz motora); za rangiranje pohvale. */
   osnovniBrutoPoIgracu: Map<string, number> = new Map(),
 ): Promise<Map<string, AgregatZakljucka>> {
-  odbijNepodrzaniMod(mod, 'zakljuciPartijuUBazi');
   const agregati = new Map<string, AgregatZakljucka>();
   const obavijestiPoIgracu = new Map<string, ObavijestOtkljucanogDostignuca[]>();
   const sanducicIgraci = new Set<string>();
@@ -414,9 +456,6 @@ export async function zakljuciPartijuUBazi(
       for (const r of rezultati) {
         const [stanjeIgraca] = await tx
           .select({
-            bodoviUkupno: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
-            odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
-            pobjede: mod === 'dva_igraca' ? igraci.pobjede1v1 : igraci.pobjede,
             iskustvoUkupno: igraci.iskustvoUkupno,
             upravljac: igraci.upravljac,
             vrstaIgraca: igraci.vrsta,
@@ -424,10 +463,11 @@ export async function zakljuciPartijuUBazi(
           .from(igraci)
           .where(eq(igraci.id, r.igracId));
         if (stanjeIgraca) {
+          const brojaci = await dohvatiBrojaceModa(tx, r.igracId, mod);
           agregati.set(r.igracId, {
-            bodoviUkupno: stanjeIgraca.bodoviUkupno,
-            odigrane: stanjeIgraca.odigrane,
-            pobjede: stanjeIgraca.pobjede,
+            bodoviUkupno: brojaci.bodovi,
+            odigrane: brojaci.odigrane,
+            pobjede: brojaci.pobjede,
             iskustvoUkupno: stanjeIgraca.iskustvoUkupno,
             dovrseneIgre: 0,
             novaDostignuca: [],
@@ -473,17 +513,24 @@ export async function zakljuciPartijuUBazi(
     }
 
     for (const r of rezultati) {
-      const [stariIgrac] = await tx.select({
+      const [stariIgracOsnova] = await tx.select({
         vrsta: igraci.vrsta,
         upravljac: igraci.upravljac,
-        odigrane: mod === 'dva_igraca' ? igraci.odigrane1v1 : igraci.odigrane,
-        bodovi: mod === 'dva_igraca' ? igraci.bodovi1v1 : igraci.bodoviUkupno,
-        eliminacije: mod === 'dva_igraca' ? igraci.eliminacije1v1 : igraci.eliminacijeUkupno,
         iskustvoUkupno: igraci.iskustvoUkupno,
         botTip: botovi.tip,
       }).from(igraci)
         .leftJoin(botovi, eq(botovi.igracId, igraci.id))
         .where(eq(igraci.id, r.igracId));
+      const brojaciPrije = await dohvatiBrojaceModa(tx, r.igracId, mod);
+      const stariIgrac = stariIgracOsnova
+        ? {
+          ...stariIgracOsnova,
+          odigrane: brojaciPrije.odigrane,
+          bodovi: brojaciPrije.bodovi,
+          eliminacije: brojaciPrije.eliminacije,
+          pobjede: brojaciPrije.pobjede,
+        }
+        : undefined;
       const upravljac = stariIgrac?.upravljac ?? 'covjek';
       const vrstaIgraca = stariIgrac?.vrsta ?? 'gost';
       const botTip = (stariIgrac?.botTip ?? null) as BotTipPrezentacije | null;
@@ -659,7 +706,68 @@ export async function zakljuciPartijuUBazi(
             iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
           });
         }
-      } else if (!samoStatistika) {
+      } else if (!samoStatistika && mod === 'tri_igraca') {
+        // Troboj: format u statistike_moda_igraca; XP/dovrseneIgre na igraci; bez diranja 2p/4p stupaca.
+        const [azuriraniXp] = await tx
+          .update(igraci)
+          .set({
+            iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
+            dovrseneIgre: sql`${igraci.dovrseneIgre} + 1`,
+          })
+          .where(eq(igraci.id, r.igracId))
+          .returning({
+            iskustvoUkupno: igraci.iskustvoUkupno,
+            dovrseneIgre: igraci.dovrseneIgre,
+          });
+        const [azuriraniMod] = await tx.insert(statistikeModaIgraca).values({
+          igracId: r.igracId,
+          mod: 'tri_igraca',
+          odigrane: 1,
+          pobjede: r.plasman === 1 ? 1 : 0,
+          eliminacije: r.eliminacije,
+          bodovi: r.bodovi,
+        }).onConflictDoUpdate({
+          target: [statistikeModaIgraca.igracId, statistikeModaIgraca.mod],
+          set: {
+            odigrane: sql`${statistikeModaIgraca.odigrane} + 1`,
+            pobjede: sql`${statistikeModaIgraca.pobjede} + ${r.plasman === 1 ? 1 : 0}`,
+            eliminacije: sql`${statistikeModaIgraca.eliminacije} + ${r.eliminacije}`,
+            bodovi: sql`${statistikeModaIgraca.bodovi} + ${r.bodovi}`,
+            azurirano: new Date(),
+          },
+        }).returning({
+          bodoviUkupno: statistikeModaIgraca.bodovi,
+          odigrane: statistikeModaIgraca.odigrane,
+          pobjede: statistikeModaIgraca.pobjede,
+        });
+
+        if (azuriraniXp && azuriraniMod) {
+          agregati.set(r.igracId, {
+            bodoviUkupno: azuriraniMod.bodoviUkupno,
+            odigrane: azuriraniMod.odigrane,
+            pobjede: azuriraniMod.pobjede,
+            iskustvoUkupno: azuriraniXp.iskustvoUkupno,
+            dovrseneIgre: azuriraniXp.dovrseneIgre,
+            novaDostignuca: [],
+            dnkPrije: prije,
+            dnkPoslije: [],
+            ocjenaIgre: 0,
+            bonusOcjenaIgre: 0,
+            nizPrije,
+            nizPoslije,
+            najboljiNiz,
+            osnovniXp,
+            bonusPobjednickogNizaPostotak,
+            bonusPobjednickogNizaXp,
+            forma,
+            pohvale: [],
+            upravljac,
+            vrstaIgraca,
+            botTip,
+            iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
+          });
+        }
+      } else if (!samoStatistika && mod === 'cetiri_igraca') {
         const [azurirani] = await tx
           .update(igraci)
           .set({

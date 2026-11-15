@@ -1,4 +1,4 @@
-import { odbijNepodrzaniMod, type ModPartije } from './katalog-partije.js';
+import type { ModPartije } from './katalog-partije.js';
 
 export type StatusForme = 'nema_podataka' | 'prikupljanje' | 'pocetna_procjena' | 'puna_procjena';
 export type SmjerTrenda = 'gore' | 'dolje' | 'isto';
@@ -62,6 +62,9 @@ const PRAGOVI_4P: readonly PragForme[] = [
   { naziv: 'Top forma', donjiPrag: 5 },
 ];
 
+/** Troboj: sirovi prosjek × 2,5 / 2 prije usporedbe s četverobojskom skalom. */
+const SKALA_FORME_TROBOJ = 2.5 / 2;
+
 function odrediPrag(vrijednost: number, pragovi: readonly PragForme[]): { naziv: string; razina: number } {
   let odabrani = pragovi[0]!;
   let razina = 1;
@@ -76,10 +79,11 @@ function odrediPrag(vrijednost: number, pragovi: readonly PragForme[]): { naziv:
 }
 
 function vrijednostZaRezultate(rezultati: readonly RezultatForme[], mod: ModPartije): number {
-  odbijNepodrzaniMod(mod, 'vrijednostZaRezultate');
   if (rezultati.length === 0) return 0;
   if (mod === 'dva_igraca') return rezultati.filter((rezultat) => rezultat.plasman === 1).length / rezultati.length;
-  return rezultati.reduce((zbroj, rezultat) => zbroj + rezultat.bodovi, 0) / rezultati.length;
+  const siroviProsjek = rezultati.reduce((zbroj, rezultat) => zbroj + rezultat.bodovi, 0) / rezultati.length;
+  if (mod === 'tri_igraca') return siroviProsjek * SKALA_FORME_TROBOJ;
+  return siroviProsjek;
 }
 
 function brojPobjeda(rezultati: readonly RezultatForme[]): number {
@@ -113,7 +117,6 @@ export function izracunajFormu(rezultatiUlaz: readonly RezultatForme[], mod: Mod
       : brojPartija < 10
         ? 'pocetna_procjena'
         : 'puna_procjena';
-  odbijNepodrzaniMod(mod, 'izracunajFormu');
   const vrijednost = brojPartija === 0 ? null : vrijednostZaRezultate(prozor, mod);
   const prag = vrijednost === null ? null : odrediPrag(vrijednost, mod === 'dva_igraca' ? PRAGOVI_1V1 : PRAGOVI_4P);
   return {
@@ -129,9 +132,8 @@ export function izracunajFormu(rezultatiUlaz: readonly RezultatForme[], mod: Mod
 }
 
 export function bonusPobjednickogNiza(niz: number, mod: ModPartije): number {
-  odbijNepodrzaniMod(mod, 'bonusPobjednickogNiza');
   if (niz <= 1) return 0;
-  const korak = mod === 'dva_igraca' ? 5 : 10;
+  const korak = mod === 'dva_igraca' ? 5 : mod === 'tri_igraca' ? 7.5 : 10;
   return Math.min(100, (niz - 1) * korak);
 }
 
@@ -150,11 +152,16 @@ export function azurirajPobjednickiNiz(
 }
 
 export function razinaVatre(niz: number, mod: ModPartije): RazinaVatre {
-  odbijNepodrzaniMod(mod, 'razinaVatre');
   if (mod === 'dva_igraca') {
     if (niz >= 14) return 3;
     if (niz >= 8) return 2;
     if (niz >= 4) return 1;
+    return 0;
+  }
+  if (mod === 'tri_igraca') {
+    if (niz >= 10) return 3;
+    if (niz >= 6) return 2;
+    if (niz >= 3) return 1;
     return 0;
   }
   if (niz >= 8) return 3;

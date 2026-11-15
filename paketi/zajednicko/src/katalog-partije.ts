@@ -50,7 +50,10 @@ export function jePodrzaniJavniRed(mod: ModPartije): mod is 'dva_igraca' | 'ceti
   return mod === 'dva_igraca' || mod === 'cetiri_igraca';
 }
 
-/** Za putove koji još ne podržavaju Troboj (bodovanje, rang, forma do PR03/09). */
+/**
+ * Za putove koji još ne podržavaju Troboj (javni red do PR06, trening do PR08, profilni DNK do PR10).
+ * Bodovanje, forma, rang i završni DNK snimke za Troboj su otključani u PR03.
+ */
 export function odbijNepodrzaniMod(mod: ModPartije, kontekst: string): asserts mod is 'dva_igraca' | 'cetiri_igraca' {
   if (mod === 'tri_igraca') {
     throw new Error(`${kontekst}: Troboj (tri_igraca) još nije podržan.`);

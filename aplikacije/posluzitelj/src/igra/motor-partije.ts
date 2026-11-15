@@ -60,6 +60,7 @@ import {
   type IzvorPocetneRijeci,
   type ModPartije,
   type PravilnikPartije,
+  javnaSjedalaZaMod,
   ZADANI_PRAVILNIK,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
@@ -713,9 +714,9 @@ export function stvoriUpraviteljPartija(
       partijaId: stanje.partijaId,
       igracId,
       mod: stanje.mod,
-      plasman: plasman as 1 | 2 | 3 | 4,
+      plasman,
       bodovi: izracunajBodove(
-        { plasman: plasman as 1 | 2 | 3 | 4, eliminacije: stanje.eliminacijeBrojac.get(igracId) ?? 0 },
+        { plasman, eliminacije: stanje.eliminacijeBrojac.get(igracId) ?? 0 },
         stanje.mod,
       ),
       eliminacije: stanje.eliminacijeBrojac.get(igracId) ?? 0,
@@ -933,24 +934,31 @@ export function stvoriUpraviteljPartija(
     mod: ModPartije = 'cetiri_igraca',
     opcije: { kontekst?: 'javna' | 'trening'; pravila?: PravilnikPartije } = {},
   ): Promise<RezultatPokretanja> {
-    if (mod === 'tri_igraca') {
-      console.error('zapocniPartiju: Troboj još nije podržan (PR03/PR06).');
-      return Promise.resolve('greska');
-    }
     const kontekst = opcije.kontekst ?? 'javna';
     const pravilaStola = opcije.pravila ?? ZADANI_PRAVILNIK;
     if (zaustavljanje) return Promise.resolve('zaustavljanje');
     if (partije.size >= maksimalnoAktivnihPartija) return Promise.resolve('limit');
     if (kontekst === 'trening' && brojAktivnihTreninga() >= maksimalnoAktivnihTreninga) return Promise.resolve('limit');
+    if (kontekst === 'javna' && sudioniciUlaz.length !== javnaSjedalaZaMod(mod)) {
+      console.error(`zapocniPartiju: očekivano ${javnaSjedalaZaMod(mod)} sudionika za ${mod}, dobiveno ${sudioniciUlaz.length}.`);
+      return Promise.resolve('greska');
+    }
     const politika = politikaZaKontekst(kontekst);
     const izmjesano = promijesajNiz(sudioniciUlaz);
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const upravljac = s.upravljac ?? 'covjek';
       const jeBot = upravljac === 'bot';
-      const odigrane = mod === 'dva_igraca' ? (s.odigrane1v1 ?? 0) : s.odigrane;
-      const bodoviUkupno = mod === 'dva_igraca' ? (s.bodovi1v1 ?? 0) : s.bodoviUkupno;
+      const odigrane = mod === 'dva_igraca' ? (s.odigrane1v1 ?? 0) : mod === 'tri_igraca' ? (s.odigrane3p ?? 0) : s.odigrane;
+      const bodoviUkupno = mod === 'dva_igraca' ? (s.bodovi1v1 ?? 0) : mod === 'tri_igraca' ? (s.bodovi3p ?? 0) : s.bodoviUkupno;
       const prosjekBodova = odigrane > 0 ? bodoviUkupno / odigrane : 0;
       const rang = jeBot ? null : izracunajRang(odigrane, prosjekBodova, mod);
+      const trenutniNiz = jeBot
+        ? 0
+        : mod === 'dva_igraca'
+          ? (s.trenutniNiz1v1 ?? 0)
+          : mod === 'tri_igraca'
+            ? (s.trenutniNiz3p ?? 0)
+            : (s.trenutniNiz4p ?? 0);
       return {
         igracId: s.igracId,
         vrsta: s.vrsta,
@@ -962,8 +970,8 @@ export function stvoriUpraviteljPartija(
         rang: rang === 'Piskaralo' ? null : rang,
         sjedalo,
         razina: jeBot ? 0 : stanjeIskustva(s.iskustvoUkupno ?? 0).razina,
-        trenutniNiz: jeBot ? 0 : (mod === 'dva_igraca' ? (s.trenutniNiz1v1 ?? 0) : (s.trenutniNiz4p ?? 0)),
-        razinaVatre: jeBot ? 0 : razinaVatre(mod === 'dva_igraca' ? (s.trenutniNiz1v1 ?? 0) : (s.trenutniNiz4p ?? 0), mod),
+        trenutniNiz,
+        razinaVatre: jeBot ? 0 : razinaVatre(trenutniNiz, mod),
         odabranaPravila: s.odabranaPravila ?? pravilaStola,
       };
     });
@@ -1224,14 +1232,14 @@ export function stvoriUpraviteljPartija(
         const elimBod = stanje.postavkePrivatneSobe?.eliminacijskiBodovi ? eliminacije : 0;
         bodovi = (plasman === 1 ? pobjednikBodova : 0) + elimBod;
       } else {
-        bodovi = izracunajBodove({ plasman: plasman as 1 | 2 | 3 | 4, eliminacije }, stanje.mod);
+        bodovi = izracunajBodove({ plasman, eliminacije }, stanje.mod);
       }
 
       const sudionik = stanje.sudionici.find((s) => s.igracId === igracId);
       return {
         igracId,
         nadimak: sudionik?.nadimak ?? 'Nepoznati igrač',
-        plasman: plasman as 1 | 2 | 3 | 4,
+        plasman,
         bodovi,
         eliminacije,
         nacinIspadanja: (plasman === 1 ? 'pobjednik' : nacinIspadanjaZaIgraca(stanje, igracId)) as NacinIspadanja,
@@ -1460,13 +1468,18 @@ export function stvoriUpraviteljPartija(
               socket.data.odigrane1v1 = agregat.odigrane;
               socket.data.pobjede1v1 = agregat.pobjede;
               socket.data.bodovi1v1 = agregat.bodoviUkupno;
+              socket.data.trenutniNiz1v1 = agregat.nizPoslije;
+            } else if (stanje.mod === 'tri_igraca') {
+              socket.data.odigrane3p = agregat.odigrane;
+              socket.data.pobjede3p = agregat.pobjede;
+              socket.data.bodovi3p = agregat.bodoviUkupno;
+              socket.data.trenutniNiz3p = agregat.nizPoslije;
             } else {
               socket.data.odigrane = agregat.odigrane;
               socket.data.pobjede = agregat.pobjede;
               socket.data.bodoviUkupno = agregat.bodoviUkupno;
+              socket.data.trenutniNiz4p = agregat.nizPoslije;
             }
-            if (stanje.mod === 'dva_igraca') socket.data.trenutniNiz1v1 = agregat.nizPoslije;
-            else socket.data.trenutniNiz4p = agregat.nizPoslije;
           }
           const poruka: KrajPartije = {
             partijaId: stanje.partijaId,

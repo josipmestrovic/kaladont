@@ -33,9 +33,11 @@ describe('katalog-partije', () => {
     expect(jePodrzaniJavniRed('tri_igraca')).toBe(false);
   });
 
-  it('Troboj ne pada u Četveroboj bodovanje', () => {
-    expect(() => izracunajBodove({ plasman: 1, eliminacije: 0 }, 'tri_igraca')).toThrow(/Troboj/);
-    expect(() => odbijNepodrzaniMod('tri_igraca', 'test')).toThrow(/Troboj/);
+  it('Troboj ima vlastito bodovanje; javni red i stari helper i dalje odbijaju', () => {
+    expect(izracunajBodove({ plasman: 1, eliminacije: 0 }, 'tri_igraca')).toBe(3);
     expect(izracunajBodove({ plasman: 1, eliminacije: 0 }, 'dva_igraca')).toBe(1);
+    expect(izracunajBodove({ plasman: 1, eliminacije: 0 }, 'cetiri_igraca')).toBe(4);
+    expect(() => odbijNepodrzaniMod('tri_igraca', 'test')).toThrow(/Troboj/);
   });
 });
+

@@ -49,11 +49,20 @@ describe('pobjednički niz', () => {
   it('računa bonus po modu i ograničava ga na sto posto', () => {
     expect(bonusPobjednickogNiza(1, 'cetiri_igraca')).toBe(0);
     expect(bonusPobjednickogNiza(3, 'cetiri_igraca')).toBe(20);
+    expect(bonusPobjednickogNiza(3, 'tri_igraca')).toBe(15);
     expect(bonusPobjednickogNiza(21, 'dva_igraca')).toBe(100);
   });
 
   it('računa tri razine vatre po modu', () => {
     expect([0, 2, 3, 5, 8].map((niz) => razinaVatre(niz, 'cetiri_igraca'))).toEqual([0, 0, 1, 2, 3]);
+    expect([0, 2, 3, 6, 10].map((niz) => razinaVatre(niz, 'tri_igraca'))).toEqual([0, 0, 1, 2, 3]);
     expect([0, 3, 4, 8, 14].map((niz) => razinaVatre(niz, 'dva_igraca'))).toEqual([0, 0, 1, 2, 3]);
   });
+
+  it('klasificira Troboj prema sirovom prosjeku × 2,5/2 na četverobojskoj skali', () => {
+    // sirovi 2.0 → 2.5 = Odlična; sirovi 1.4 → 1.75 = Dobra
+    expect(izracunajFormu(rezultati([1, 2, 3, 1, 2, 3, 1, 2, 3, 1], 2), 'tri_igraca').naziv).toBe('Odlična');
+    expect(izracunajFormu(rezultati([1, 2, 3, 1, 2, 3, 1, 2, 3, 1], 1.4), 'tri_igraca').naziv).toBe('Dobra');
+  });
 });
+

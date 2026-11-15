@@ -20,9 +20,10 @@ import { stvoriKontroliraniSat } from '../src/igra/sat.js';
 let app: FastifyInstance;
 let adresa: string;
 let zaustavi: () => Promise<void>;
+let zapocniJavnuPartiju: Awaited<ReturnType<typeof izgradiPosluzitelj>>['zapocniJavnuPartiju'];
 
 beforeAll(async () => {
-  ({ app, zaustavi } = await izgradiPosluzitelj({
+  ({ app, zaustavi, zapocniJavnuPartiju } = await izgradiPosluzitelj({
     postavkeMotora: { tolerancijaPrekidaMs: 50 },
     socketOgranicenja: { handshakePoIpMinuti: 1_000 },
   }));
@@ -1370,3 +1371,87 @@ describe('motor partije - PR02 kolekcija oznake na kraju', () => {
 
 
 
+
+describe('motor partije - Troboj (PR03)', () => {
+  it('tri igrača odigraju punu partiju s jednim obračunom i max 5 bodova', async () => {
+    const igraciListe = await Promise.all([spojiIgraca(), spojiIgraca(), spojiIgraca()]);
+    const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
+      igraciListe[0]!.socket.on('partija:pocetak', resolve);
+    });
+    const rundaPromise = cekajRunduOtvorenu(igraciListe[0]!.socket);
+
+    const rezultat = await zapocniJavnuPartiju(
+      igraciListe.map((igrac) => ({
+        igracId: igrac.igracId,
+        vrsta: 'gost' as const,
+        nadimak: `Troboj-${igrac.igracId.slice(0, 4)}`,
+        avatarId: 0,
+        avatarConfig: null,
+        avatarRevision: 0,
+        odigrane: 0,
+        pobjede: 0,
+        bodoviUkupno: 0,
+        odigrane3p: 0,
+        pobjede3p: 0,
+        bodovi3p: 0,
+        iskustvoUkupno: 0,
+        trenutniNiz3p: 0,
+        usaoU: Date.now(),
+      })),
+      'tri_igraca',
+    );
+    expect(rezultat).toBe('pokrenuta');
+
+    const pocetak = await pocetakPromise;
+    const prvaRunda = await rundaPromise;
+    expect(pocetak.mod).toBe('tri_igraca');
+    expect(pocetak.sjedala).toHaveLength(3);
+    expect(new Set(pocetak.sjedala.map((s) => s.igracId))).toEqual(
+      new Set(igraciListe.map((igrac) => igrac.igracId)),
+    );
+
+    let naPotezuId = prvaRunda.naPotezuId;
+    let krajPoruka: KrajPartije | null = null;
+    const krajevi = new Map<string, KrajPartije>();
+    for (const igrac of igraciListe) {
+      igrac.socket.on('partija:kraj', (poruka: KrajPartije) => {
+        krajevi.set(igrac.igracId, poruka);
+      });
+    }
+
+    for (let i = 0; i < 12 && !krajPoruka; i += 1) {
+      const igrac = igraciListe.find((ig) => ig.igracId === naPotezuId)!;
+      const cekanje = cekajJedanOd(igrac.socket, ['partija:runda-otvorena', 'partija:kraj']);
+      igrac.socket.emit('potez:ne-znam');
+      const { event, payload } = await cekanje;
+      if (event === 'partija:kraj') {
+        krajPoruka = payload as KrajPartije;
+      } else {
+        naPotezuId = (payload as RundaOtvorena).naPotezuId;
+      }
+    }
+
+    expect(krajPoruka).not.toBeNull();
+    expect(krajPoruka!.plasmani).toHaveLength(3);
+    expect(new Set(krajPoruka!.plasmani.map((p) => p.plasman))).toEqual(new Set([1, 2, 3]));
+    for (const p of krajPoruka!.plasmani) {
+      expect(p.bodovi).toBeGreaterThanOrEqual(0);
+      expect(p.bodovi).toBeLessThanOrEqual(5);
+    }
+
+    await new Promise((r) => setTimeout(r, 200));
+    const pobjednici = [...krajevi.values()].map((k) => k.plasmani.find((p) => p.plasman === 1)?.igracId);
+    expect(new Set(pobjednici)).toHaveLength(1);
+
+    const sudionici = await baza
+      .select({ igracId: sudioniciPartije.igracId, plasman: sudioniciPartije.plasman })
+      .from(sudioniciPartije)
+      .where(eq(sudioniciPartije.partijaId, pocetak.partijaId));
+    expect(sudionici).toHaveLength(3);
+
+    const [partija] = await baza.select({ mod: partije.mod }).from(partije).where(eq(partije.id, pocetak.partijaId));
+    expect(partija?.mod).toBe('tri_igraca');
+
+    for (const igrac of igraciListe) igrac.socket.disconnect();
+  });
+});

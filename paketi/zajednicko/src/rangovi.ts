@@ -40,6 +40,8 @@ export const RANGOVI_1V1: readonly PragRanga[] = [
 export const BROJ_PARTIJA_ZA_KALIBRACIJU = 10;
 
 function rangoviPoModu(mod: ModPartije): readonly PragRanga[] {
+  // Troboj privremeno dijeli četverobojsku skalu do univerzalnog ranga (PR09).
+  if (mod === 'tri_igraca') return RANGOVI;
   odbijNepodrzaniMod(mod, 'rangoviPoModu');
   return mod === 'dva_igraca' ? RANGOVI_1V1 : RANGOVI;
 }
