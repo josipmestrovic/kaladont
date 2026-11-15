@@ -3,7 +3,7 @@ import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
-import { RIJECI_KALADONT, type KrajPartije, type PocetakPartije, type PrihvacenPotez, type RundaOtvorena } from 'zajednicko';
+import { RIJECI_KALADONT, type KrajPartije, type PocetakPartije, type PrihvacenPotez, type PravilnikPartije, type RundaOtvorena } from 'zajednicko';
 import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { dostignucaIgraca, igraci, otkljucaneGrupeIgraca, pobjedeTreninga } from '../src/baza/shema.js';
@@ -69,10 +69,14 @@ function cekaj<T>(socket: ClientSocket, dogadaj: string, filter: (p: T) => boole
   });
 }
 
-async function odigrajTreningDoKraja(socket: ClientSocket, zahtijevajPotezBota = false): Promise<{ pocetak: PocetakPartije; kraj: KrajPartije; botIgrao: boolean }> {
+async function odigrajTreningDoKraja(
+  socket: ClientSocket,
+  zahtijevajPotezBota = false,
+  pravila?: PravilnikPartije,
+): Promise<{ pocetak: PocetakPartije; kraj: KrajPartije; botIgrao: boolean }> {
   const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
   const rundaPromise = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena');
-  const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
+  const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 30_000);
   const brojRijeciPrije = posluzitelj.brojaciBota.odigranihRijeci;
   let mojId: string | null = null;
   let odbijPrviPotez: (greska: unknown) => void = () => undefined;
@@ -107,7 +111,11 @@ async function odigrajTreningDoKraja(socket: ClientSocket, zahtijevajPotezBota =
   socket.on('partija:runda-otvorena', naRundu);
   socket.on('potez:prihvacen', naPotez);
   try {
-    const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => socket.emit('trening:zapocni', resolve));
+    // PR08: stari ulaz = samo callback; novi = { pravila } + callback.
+    const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => {
+      if (pravila) socket.emit('trening:zapocni', { pravila }, resolve);
+      else socket.emit('trening:zapocni', resolve);
+    });
     expect(potvrda.pokrenut).toBe(true);
     const pocetak = await pocetakPromise;
     expect((await rundaPromise).istekPotezaIso).toBe('');
@@ -296,5 +304,118 @@ describe('Zagrijavanje', () => {
     } finally {
       socket.disconnect();
     }
+  });
+
+  // PR08 — tri ulaza (klasični Troboj-trening / KA-ZNA / Dokaži) + izolacija javnih agregata.
+  it('PR08 klasični trening: tri_igraca, Računalo 1/2 i različiti avatari', async () => {
+    // Ne čekamo kraj: nakon izlaska čovjeka dva bota mogu još dugo igrati (1–3 s/potez).
+    const prije = await snimkaNapretka();
+    const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
+    try {
+      const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
+      const rundaPromise = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena');
+      const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => {
+        socket.emit('trening:zapocni', { pravila: 'klasicni' }, resolve);
+      });
+      expect(potvrda.pokrenut).toBe(true);
+      const pocetak = await pocetakPromise;
+      expect((await rundaPromise).istekPotezaIso).toBe('');
+      expect(pocetak.mod).toBe('tri_igraca');
+      expect(pocetak.pravila).toBe('klasicni');
+      expect(pocetak.kontekst).toBe('trening');
+      expect(pocetak.sjedala).toHaveLength(3);
+      const racunala = pocetak.sjedala.filter((s) => s.jeBot);
+      expect(racunala).toHaveLength(2);
+      expect(racunala.map((s) => s.nadimak).sort()).toEqual(['Računalo 1', 'Računalo 2']);
+      const avatari = new Set(racunala.map((s) => JSON.stringify(s.avatarConfig)));
+      expect(avatari.size).toBe(2);
+      socket.emit('partija:izadji');
+    } finally {
+      socket.disconnect();
+    }
+    expect(await snimkaNapretka()).toEqual(prije);
+  });
+
+  it('PR08 ka_zna i dokazi_nastavak trening ostaju Dvoboj s jednim Računalom', async () => {
+    for (const pravila of ['ka_zna', 'dokazi_nastavak'] as const) {
+      const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
+      try {
+        const { pocetak } = await odigrajTreningDoKraja(socket, false, pravila);
+        expect(pocetak.mod).toBe('dva_igraca');
+        expect(pocetak.pravila).toBe(pravila);
+        expect(pocetak.sjedala).toHaveLength(2);
+        expect(pocetak.sjedala.filter((s) => s.jeBot)).toHaveLength(1);
+        expect(pocetak.sjedala.some((s) => s.nadimak === 'Računalo')).toBe(true);
+      } finally {
+        socket.disconnect();
+      }
+    }
+  }, 60_000);
+
+  it('PR08 stari ulaz bez payload-a ostaje ka_zna Dvoboj', async () => {
+    const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
+    try {
+      const { pocetak } = await odigrajTreningDoKraja(socket);
+      expect(pocetak.mod).toBe('dva_igraca');
+      expect(pocetak.pravila ?? 'ka_zna').toBe('ka_zna');
+      expect(pocetak.sjedala).toHaveLength(2);
+    } finally {
+      socket.disconnect();
+    }
+  });
+
+  it('PR08 izlazak čovjeka ne upisuje pobjedu treninga', async () => {
+    // Dvoboj: nakon izlaska ostaje 1 Računalo → partija:kraj odmah (u Troboju botovi bi nastavili bez kraj na socketu).
+    const igracId = randomUUID();
+    igraciZaBrisanje.push(igracId);
+    await baza.insert(igraci).values({
+      id: igracId,
+      vrsta: 'registriran',
+      nadimak: `Iz${igracId.slice(0, 6)}`,
+      email: `izlaz-${igracId}@example.com`,
+      emailPotvrdjen: true,
+      ...PRIHVAT_UVJETA_ZA_TEST,
+    });
+    const sesija = await izdajSesiju(igracId);
+    const socket = await spoji(sesija.token);
+    const prije = await baza.select().from(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igracId));
+    try {
+      const runda = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena');
+      const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => {
+        socket.emit('trening:zapocni', { pravila: 'ka_zna' }, resolve);
+      });
+      expect(potvrda.pokrenut).toBe(true);
+      await runda;
+      const kraj = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
+      socket.emit('partija:izadji');
+      await kraj;
+      const poslije = await baza.select().from(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igracId));
+      expect(poslije).toHaveLength(prije.length);
+    } finally {
+      socket.disconnect();
+    }
+  });
+
+  it('PR08 zabiljeziPobjeduTreninga prihvaća tri_igraca bez bacanja', async () => {
+    const igracId = randomUUID();
+    igraciZaBrisanje.push(igracId);
+    await baza.insert(igraci).values({
+      id: igracId,
+      vrsta: 'registriran',
+      nadimak: `T3${igracId.slice(0, 6)}`,
+      email: `troboj-trening-${igracId}@example.com`,
+      emailPotvrdjen: true,
+      ...PRIHVAT_UVJETA_ZA_TEST,
+    });
+    const treningId = randomUUID();
+    const pobjeda = await zabiljeziPobjeduTreninga(treningId, igracId, new Date(), {
+      mod: 'tri_igraca',
+      plasman: 1,
+      nacinIspadanja: 'pobjednik',
+      prihvaceneRijeci: 1,
+      najduziNiz: 1,
+    });
+    expect(pobjeda?.pobjede).toBe(1);
+    expect(pobjeda?.novaRazina).toBe(1);
   });
 });

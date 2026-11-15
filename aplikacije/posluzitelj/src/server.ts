@@ -790,7 +790,11 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   const treningServis = registrirajTrening(io, {
     omogucen: () => postavkeBotova.treningOmogucen && upravitelj.mozePokrenutiPartiju(),
-    zapocniTrening: (sudionici, pravila) => upravitelj.zapocniPartiju(sudionici, 'dva_igraca', { kontekst: 'trening', pravila }),
+    // PR08 — klasični Zagrijavanje je Troboj-trening (ne javni Troboj); ostalo ostaje Dvoboj.
+    zapocniTrening: (sudionici, pravila) => {
+      const mod = pravila === 'klasicni' ? 'tri_igraca' as const : 'dva_igraca' as const;
+      return upravitelj.zapocniPartiju(sudionici, mod, { kontekst: 'trening', pravila });
+    },
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
     igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
     ukloniIzJavnogReda: redServis.ukloniIzReda,

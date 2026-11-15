@@ -3,14 +3,25 @@ import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
-import { SVE_VRSTE_RIJECI, type KrajPartije, type PocetakPartije, type StanjePrivatneSobe } from 'zajednicko';
+import { and, eq, sql } from 'drizzle-orm';
+import {
+  SVE_VRSTE_RIJECI,
+  type DokazZatrazen,
+  type KrajPartije,
+  type PocetakPartije,
+  type PrihvacenPotez,
+  type PravilnikPartije,
+  type RundaOtvorena,
+  type StanjePrivatneSobe,
+} from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { rijeci, sesije } from '../src/baza/shema.js';
+import { igraci, rijeci, sesije } from '../src/baza/shema.js';
 import { dodijeliRezultatSobeAkoNijeObraden } from '../src/soba/servis-soba.js';
 import { izradiGrupuBotova, SimulatorMijesanihBotova } from '../src/cli/opterecenje-mijesani-botovi.js';
 import type { SnimkaRjecnika } from '../src/cli/opterecenje-rjecnik.js';
+import { izdajSesiju } from '../src/racuni/sesije.js';
+import { PRIHVAT_UVJETA_ZA_TEST } from './pomocnici/uvjeti.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -459,6 +470,177 @@ describe('privatne sobe', () => {
       gost.socket.disconnect();
     }
   }, 20_000);
+
+  // PR08 — pravilnik u sobi, stolovi 2/3/8, timer=0 dokaz, gost+registrirani.
+  it('PR08 stvara sobu s eksplicitnim pravilnikom i gost/reg čitaju zaključano stanje', async () => {
+    const vlasnik = await spojiIgraca();
+    const gost = await spojiIgraca();
+    const regId = randomUUID();
+    await baza.insert(igraci).values({
+      id: regId,
+      vrsta: 'registriran',
+      nadimak: `Rg${regId.slice(0, 6)}`,
+      email: `soba-reg-${regId}@example.com`,
+      emailPotvrdjen: true,
+      ...PRIHVAT_UVJETA_ZA_TEST,
+    });
+    const sesija = await izdajSesiju(regId);
+    const registriran = await spojiIgraca(sesija.token);
+
+    try {
+      const { kod, stanje } = await stvoriSobu(vlasnik.socket, {
+        trajanjePotezaSek: 30,
+        eliminacijskiBodovi: false,
+        pravila: 'klasicni',
+      });
+      expect(stanje.postavke.pravila).toBe('klasicni');
+
+      const stanjeGost = await udjiUSobu(gost, kod);
+      expect(stanjeGost.postavke.pravila).toBe('klasicni');
+      const stanjeReg = await udjiUSobu(registriran, kod);
+      expect(stanjeReg.postavke.pravila).toBe('klasicni');
+      expect(stanjeReg.clanovi).toHaveLength(3);
+    } finally {
+      vlasnik.socket.disconnect();
+      gost.socket.disconnect();
+      registriran.socket.disconnect();
+      await baza.delete(igraci).where(eq(igraci.id, regId));
+    }
+  }, 20_000);
+
+  it('PR08 pokreće partiju s 2 i 3 igrača uz različite pravilnike; revanš čuva pravila', async () => {
+    async function pokreniIProvjeri(brojClanova: number, pravila: PravilnikPartije): Promise<TestniIgrac[]> {
+      const igraciSobe = await Promise.all(Array.from({ length: brojClanova }, () => spojiIgraca()));
+      const { kod, stanje } = await stvoriSobu(igraciSobe[0]!.socket, {
+        trajanjePotezaSek: 15,
+        eliminacijskiBodovi: true,
+        pravila,
+      });
+      expect(stanje.postavke.pravila).toBe(pravila);
+      for (const clan of igraciSobe.slice(1)) {
+        expect((await udjiUSobu(clan, kod)).postavke.pravila).toBe(pravila);
+      }
+      const pocetci = igraciSobe.map((ig) => cekajDogadaj<PocetakPartije>(ig.socket, 'partija:pocetak'));
+      igraciSobe[0]!.socket.emit('soba:pokreni');
+      const [pocetak] = await Promise.all(pocetci);
+      expect(pocetak.jePrivatna).toBe(true);
+      expect(pocetak.pravila).toBe(pravila);
+      expect(pocetak.sjedala).toHaveLength(brojClanova);
+      return igraciSobe;
+    }
+
+    // 2 igrača + klasicni: odigraj do kraja i revanš s istim pravilima.
+    const dva = await pokreniIProvjeri(2, 'klasicni');
+    try {
+      const krajPromise = cekajDogadaj<KrajPartije>(dva[0]!.socket, 'partija:kraj');
+      let rezultat = await cekajRunduIliKraj(dva);
+      for (let i = 0; i < 8 && rezultat.vrsta !== 'kraj'; i += 1) {
+        const naPotezu = dva.find((ig) => ig.token === rezultat.runda!.naPotezuId)!;
+        const sljedeci = cekajRunduIliKraj(dva);
+        naPotezu.socket.emit('potez:ne-znam');
+        rezultat = await sljedeci;
+      }
+      await krajPromise;
+
+      const lobbyP = cekajDogadaj<StanjePrivatneSobe>(dva[0]!.socket, 'soba:stanje');
+      dva[0]!.socket.emit('soba:stanje');
+      const lobby = await lobbyP;
+      expect(lobby.status).toBe('cekanje');
+      expect(lobby.postavke.pravila).toBe('klasicni');
+
+      const revanš = cekajDogadaj<PocetakPartije>(dva[0]!.socket, 'partija:pocetak');
+      dva[0]!.socket.emit('soba:pokreni');
+      expect((await revanš).pravila).toBe('klasicni');
+    } finally {
+      for (const ig of dva) ig.socket.disconnect();
+    }
+
+    // 3 igrača + dokazi: samo pokretanje i pravilnik (puna igra pokrivena drugdje).
+    const tri = await pokreniIProvjeri(3, 'dokazi_nastavak');
+    for (const ig of tri) ig.socket.disconnect();
+  }, 40_000);
+
+  it('PR08 lobby prima do 8 igrača i pokreće partiju s pravilnikom', async () => {
+    const igraciSobe = await Promise.all(Array.from({ length: 8 }, () => spojiIgraca()));
+    try {
+      const { kod, stanje } = await stvoriSobu(igraciSobe[0]!.socket, { pravila: 'ka_zna' });
+      expect(stanje.postavke.pravila).toBe('ka_zna');
+      for (const clan of igraciSobe.slice(1)) {
+        const s = await udjiUSobu(clan, kod);
+        expect(s.postavke.pravila).toBe('ka_zna');
+      }
+      const zadnje = await new Promise<StanjePrivatneSobe>((resolve) => {
+        igraciSobe[0]!.socket.once('soba:stanje', resolve);
+        igraciSobe[0]!.socket.emit('soba:stanje');
+      });
+      expect(zadnje.clanovi).toHaveLength(8);
+
+      const pocetak = cekajDogadaj<PocetakPartije>(igraciSobe[0]!.socket, 'partija:pocetak');
+      igraciSobe[0]!.socket.emit('soba:pokreni');
+      const p = await pocetak;
+      expect(p.sjedala).toHaveLength(8);
+      expect(p.pravila).toBe('ka_zna');
+      igraciSobe[0]!.socket.emit('partija:izadji');
+    } finally {
+      for (const ig of igraciSobe) ig.socket.disconnect();
+    }
+  }, 30_000);
+
+  it('PR08 privatno bez timera: dokaz ima prazan istekPotezaIso', async () => {
+    const vlasnik = await spojiIgraca();
+    const gost = await spojiIgraca();
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket, {
+        trajanjePotezaSek: 0,
+        eliminacijskiBodovi: true,
+        pravila: 'dokazi_nastavak',
+      });
+      await udjiUSobu(gost, kod);
+
+      const pocetakV = cekajDogadaj<PocetakPartije>(vlasnik.socket, 'partija:pocetak');
+      const rundaV = cekajDogadaj<RundaOtvorena>(vlasnik.socket, 'partija:runda-otvorena');
+      vlasnik.socket.emit('soba:pokreni');
+      const pocetak = await pocetakV;
+      expect(pocetak.pravila).toBe('dokazi_nastavak');
+      const runda = await rundaV;
+      expect(runda.istekPotezaIso).toBe('');
+
+      const naPotezu = runda.naPotezuId === vlasnik.token ? vlasnik : gost;
+      const drugi = naPotezu.token === vlasnik.token ? gost : vlasnik;
+
+      const [kandidat] = await baza.execute<{ rijec: string }>(sql`
+        select kandidat.rijec from rijeci kandidat
+        join rijeci pocetna on pocetna.rijec = ${runda.rijec}
+        where kandidat.aktivna and kandidat.prva_dva = ${runda.trazenaSlova}
+          and kandidat.zadnja_dva <> 'ka'
+          and not (kandidat.grupe && pocetna.grupe)
+          and exists (
+            select 1 from rijeci nastavak
+            where nastavak.aktivna and nastavak.prva_dva = kandidat.zadnja_dva
+              and not (nastavak.grupe && (pocetna.grupe || kandidat.grupe))
+          )
+        order by kandidat.rijec limit 1
+      `);
+      expect(kandidat?.rijec).toBeTruthy();
+
+      const prihvacen = cekajDogadaj<PrihvacenPotez>(naPotezu.socket, 'potez:prihvacen');
+      const dokazPromise = cekajDogadaj<DokazZatrazen>(naPotezu.socket, 'dokaz:zatrazen');
+      naPotezu.socket.emit('potez:rijec', { rijec: kandidat!.rijec, turnToken: runda.turnToken });
+      const potez = await prihvacen;
+      expect(potez.istekPotezaIso).toBe('');
+      drugi.socket.emit('potez:ne-znam', { turnToken: potez.turnToken });
+      const dokaz = await dokazPromise;
+      expect(dokaz.autorId).toBe(naPotezu.token);
+      expect(dokaz.cekateljId).toBe(drugi.token);
+      expect(dokaz.istekPotezaIso).toBe('');
+
+      naPotezu.socket.emit('potez:ne-znam', { turnToken: dokaz.turnToken });
+      await cekajDogadaj<KrajPartije>(vlasnik.socket, 'partija:kraj');
+    } finally {
+      vlasnik.socket.disconnect();
+      gost.socket.disconnect();
+    }
+  }, 30_000);
 
   it('bot manager odigra Dvoboj, javni Četveroboj, privatni Četveroboj i trening protiv Računala', async () => {
     const grupePoRijeci = new Map<string, string[]>();

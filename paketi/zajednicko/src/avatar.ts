@@ -195,6 +195,34 @@ export const AVATAR_RACUNALA: AvatarConfigV1 = {
   },
 };
 
+/** PR08: drugi privremeni bot u klasičnom Zagrijavanju (Troboj-trening); nije javni profil. */
+export const AVATAR_RACUNALA_2: AvatarConfigV1 = {
+  schemaVersion: AVATAR_SHEMA_VERZIJA,
+  assetVersion: AVATAR_ASSET_VERZIJA,
+  parts: {
+    base: 'base-1',
+    ears: 'k2-rounded',
+    mouth: 'k2-grin',
+    hair: 'k2-spiky',
+    eyes: 'k2-wide',
+    eyebrows: 'k2-bold',
+    nose: 'k2-button',
+    shirt: 'k2-hoodie',
+    glasses: 'k2-hexagon',
+    earrings: null,
+    facialHair: null,
+    background: 'background',
+  },
+  colors: {
+    skin: '#D4C4B0',
+    hair: '#5C3D2E',
+    shirt: '#3D5A40',
+    eyes: '#8B4513',
+    eyebrows: '#5C3D2E',
+    glasses: '#2F4F4F',
+  },
+};
+
 function jeJedanOd<T extends readonly string[]>(vrijednost: unknown, izbori: T): vrijednost is T[number] {
   return typeof vrijednost === 'string' && izbori.includes(vrijednost);
 }
