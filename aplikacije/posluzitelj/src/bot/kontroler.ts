@@ -114,9 +114,11 @@ export class BotKontroler {
 
   /**
    * Javna partija: eliminator (sorry) i žrtva-bot (bravo/hvala, međusobno isključivo).
-   * PR07: dok je dokaz otvoren, čekač (dokaz.cekateljId) nije potvrđeno ispao — ne emitiraj
-   * reakciju ispadanja niti tretiraj ga kao promatrača. Motor zove ovo tek iz potvrđene
-   * eliminacije; guard je obrana ako snimka još drži dokaz dok stigne rani signal.
+   * PR07: ovaj hook zove se SAMO iz potvrđene eliminacije motora — to je signal da smije
+   * reakcija. Čekač dokaza prije potvrde nije na potezu (planiraj ga ne dira) i motor ga
+   * ne šalje ovamo dok dokaz traje. Bugbot: motor u zakljuciDokazUspjehom nullira dokaz
+   * pa tek onda zove eliminirajIgraca bez objave snimke — lokalna snimka može još držati
+   * zastarjeli dokaz; sinkroniziraj i dopusti reakciju žrtve.
    */
   naEliminaciju(
     partijaId: string,
@@ -131,14 +133,16 @@ export class BotKontroler {
     }
     const konfiguracija = this.konfiguracijePartija.get(partijaId)!;
     const jeBot = (igracId: string | null) => Boolean(igracId && sudionici.some((s) => s.igracId === igracId && s.upravljac === 'bot'));
-    // PR07: čekač dokaza — bez reakcije žrtve dok dokaz traje.
-    const dokaz = this.aktualniPotezi.get(partijaId)?.dokaz;
-    const zrtvaJeCekateljDokaza = Boolean(dokaz && dokaz.cekateljId === zrtvaId);
+    // PR07 Bugbot: očisti zastarjeli dokaz kad je žrtva bila čekač — potvrda je ovaj poziv.
+    const snimka = this.aktualniPotezi.get(partijaId);
+    if (snimka?.dokaz?.cekateljId === zrtvaId) {
+      this.aktualniPotezi.set(partijaId, { ...snimka, dokaz: null });
+    }
     if (jeBot(bodZaId) && bodZaId) {
       const poruka = odaberiReakcijuPriEliminacijiProtivnika(konfiguracija, this.rng);
       if (poruka) this.zakaziReakciju(partijaId, bodZaId, poruka);
     }
-    if (jeBot(zrtvaId) && !zrtvaJeCekateljDokaza) {
+    if (jeBot(zrtvaId)) {
       const poruka = odaberiReakcijuPriIspadanju(konfiguracija, this.rng);
       if (poruka) this.zakaziReakciju(partijaId, zrtvaId, poruka);
     }

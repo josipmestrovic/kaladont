@@ -666,26 +666,25 @@ describe('bot kontroler', () => {
     expect(izvrsi).not.toHaveBeenCalled();
   });
 
-  it('PR07 naEliminaciju ne šalje reakciju žrtve dok je žrtva čekač otvorenog dokaza', () => {
+  it('PR07 naEliminaciju šalje reakciju žrtve i kad snimka još drži zastarjeli dokaz (Bugbot)', () => {
+    // Motor nullira stanje.dokaz pa zove eliminirajIgraca bez objave — lokalna snimka zastarjela.
     const posaljiReakciju = vi.fn(() => true);
     const konfigReakcija: KonfiguracijaBota = {
       ...konfigBezPropusta,
       vjerojatnostReakcijeBravoPriIspadanju: 1,
       vjerojatnostReakcijeHvalaPriIspadanju: 0,
-      vjerojatnostReakcijeSorryPriEliminaciji: 1,
     };
     const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigReakcija, {
       posaljiReakciju,
-      // Deterministički RNG: 0 → uvijek bira reakciju (roll < 1).
       rng: () => 0,
     });
-    // Snimka s otvorenim dokazom — bot je čekač.
     kontroler.naPromjenuPoteza(dogadaj({
       naPotezuId: 'covjek',
       faza: 'dokaz_nastavka',
       pravila: 'dokazi_nastavak',
       dokaz: { autorId: 'covjek', cekateljId: 'bot', cekateljVecIspao: false },
     }));
+    // Potvrđena eliminacija čekača (uspješan dokaz) — mora proći reakcija unatoč zastarjeloj snimci.
     kontroler.naEliminaciju(
       'p1',
       'javna',
@@ -696,14 +695,13 @@ describe('bot kontroler', () => {
         { igracId: 'bot', upravljac: 'bot' },
       ],
     );
-    // Nema zakazane reakcije žrtve (guard); eliminator nije bot pa ni sorry.
     const reakcije = timeri.filter((t) => t.ms >= 2_000);
-    expect(reakcije).toHaveLength(0);
+    expect(reakcije.length).toBeGreaterThanOrEqual(1);
     for (const t of reakcije) t.posao();
-    expect(posaljiReakciju).not.toHaveBeenCalled();
+    expect(posaljiReakciju).toHaveBeenCalledWith('p1', 'bot', expect.any(String));
   });
 
-  it('PR07 naEliminaciju šalje reakciju žrtve kad dokaz nije otvoren (potvrđena eliminacija)', () => {
+  it('PR07 naEliminaciju šalje reakciju žrtve kad dokaz nije u snimci', () => {
     const posaljiReakciju = vi.fn(() => true);
     const konfigReakcija: KonfiguracijaBota = {
       ...konfigBezPropusta,
@@ -714,7 +712,6 @@ describe('bot kontroler', () => {
       posaljiReakciju,
       rng: () => 0,
     });
-    // Običan potez bez dokaza — potvrđeno ispadanje bota.
     kontroler.naPromjenuPoteza(dogadaj({ naPotezuId: 'covjek', dokaz: null }));
     kontroler.naEliminaciju(
       'p1',
