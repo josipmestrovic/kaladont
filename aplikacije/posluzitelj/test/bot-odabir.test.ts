@@ -12,9 +12,9 @@ describe('lokalni tempo javnih botova', () => {
   it('u development puni oba reda na 1 s i igra na 2 s, bez promjene treninga', () => {
     const konfiguracija = ucitajKonfiguracijuBota({ NODE_ENV: 'development', BOT_VJEROJATNOST_ISTEKA: '1' });
     const pragovi = pragoviPopuneZaOkruzenje('development');
-    for (const mod of ['dva_igraca', 'cetiri_igraca'] as const) {
+    for (const mod of ['dva_igraca', 'tri_igraca', 'cetiri_igraca'] as const) {
       expect(dopustenoBotova(0, 999, pragovi[mod])).toBe(0);
-      expect(dopustenoBotova(0, 1_000, pragovi[mod])).toBe(mod === 'dva_igraca' ? 1 : 3);
+      expect(dopustenoBotova(0, 1_000, pragovi[mod])).toBe(mod === 'dva_igraca' ? 1 : mod === 'tri_igraca' ? 2 : 3);
     }
     for (const nasumicno of [0, 0.5, 1]) {
       expect(trajanjeRazmisljanjaMs(5_000, konfiguracija, () => nasumicno, 'javna')).toBe(2_000);
@@ -28,7 +28,11 @@ describe('lokalni tempo javnih botova', () => {
     expect(konfiguracija.brziRazvoj).toBe(false);
     expect(konfiguracija.rasponSporih).toEqual([0.55, 0.85]);
     expect(konfiguracija.vjerojatnostIzostankaPoSudjelovanju).toBe(0.02);
-    expect(pragoviPopuneZaOkruzenje(okruzenje)).toEqual({ dva_igraca: [30_000], cetiri_igraca: [20_000, 30_000, 40_000] });
+    expect(pragoviPopuneZaOkruzenje(okruzenje)).toEqual({
+      dva_igraca: [30_000],
+      tri_igraca: [20_000, 30_000],
+      cetiri_igraca: [20_000, 30_000, 40_000],
+    });
   });
 });
 
@@ -298,8 +302,8 @@ describe('validacija admin postavki bota', () => {
     { pragFrekvencije: { uobicajena: 10, srednja: 100 } },
     { rasponPotezaIzostanka: [12, 2] },
     { rasponBrzih: [0.08, 0.6] },
-    { pragoviPopuneMs: { dva_igraca: [3_000], cetiri_igraca: [40_000, 30_000, 20_000] } },
-    { odstupanjaPopuneMs: { dva_igraca: [4_000], cetiri_igraca: [3_000] } },
+    { pragoviPopuneMs: { dva_igraca: [3_000], tri_igraca: [20_000, 30_000], cetiri_igraca: [40_000, 30_000, 20_000] } },
+    { odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [3_000], cetiri_igraca: [3_000, 3_000, 3_000] } },
   ])('odbija nevaljanu kombinaciju %j', (izmjena) => {
     expect(ShemaKonfiguracijeBota.safeParse({ ...ZADANA_KONFIGURACIJA_BOTA, ...izmjena }).success).toBe(false);
   });

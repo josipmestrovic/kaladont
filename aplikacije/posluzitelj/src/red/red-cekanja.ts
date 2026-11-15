@@ -35,21 +35,24 @@ export interface StrategijaUparivanja {
   pokusajSastaviStol(red: readonly StavkaReda[]): StavkaReda[] | null;
 }
 
+/** Uzmi prvih N ljudi iz FIFO reda (prioritet ulaska). */
+export function prvihN(n: 2 | 3 | 4): StrategijaUparivanja {
+  return {
+    pokusajSastaviStol(red) {
+      if (red.length < n) return null;
+      return red.slice(0, n);
+    },
+  };
+}
+
 /** MVP strategija: prva četvorica koja su ušla u red. */
-export const prvaCetvorica: StrategijaUparivanja = {
-  pokusajSastaviStol(red) {
-    if (red.length < 4) return null;
-    return red.slice(0, 4);
-  },
-};
+export const prvaCetvorica: StrategijaUparivanja = prvihN(4);
 
 /** 1v1 strategija: prvi par koji je ušao u red. */
-export const prviPar: StrategijaUparivanja = {
-  pokusajSastaviStol(red) {
-    if (red.length < 2) return null;
-    return red.slice(0, 2);
-  },
-};
+export const prviPar: StrategijaUparivanja = prvihN(2);
+
+/** Troboj: prva trojica. */
+export const prvaTrojica: StrategijaUparivanja = prvihN(3);
 
 export class RedCekanja {
   private stavke: StavkaReda[] = [];

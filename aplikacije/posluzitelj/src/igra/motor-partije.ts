@@ -64,6 +64,7 @@ import {
   type RazlogOtvaranjaDokaza,
   type DokazZatrazen,
   javnaSjedalaZaMod,
+  KLJUCEVI_JAVNOG_REDA,
   ZADANI_PRAVILNIK,
 } from 'zajednicko';
 import type { KaladontIo, KaladontSocket } from '../server.js';
@@ -1025,10 +1026,16 @@ export function stvoriUpraviteljPartija(
   function zapocniPartiju(
     sudioniciUlaz: StavkaReda[],
     mod: ModPartije = 'cetiri_igraca',
-    opcije: { kontekst?: 'javna' | 'trening'; pravila?: PravilnikPartije } = {},
+    opcije: {
+      kontekst?: 'javna' | 'trening';
+      pravila?: PravilnikPartije;
+      /** Kanonski ka_zna u spojenom Dvoboju; UI odabir ostaje na sudioniku (odabranaPravila). */
+      spojeniDvoboj?: boolean;
+    } = {},
   ): Promise<RezultatPokretanja> {
     const kontekst = opcije.kontekst ?? 'javna';
     const pravilaStola = opcije.pravila ?? ZADANI_PRAVILNIK;
+    const spojeniDvoboj = opcije.spojeniDvoboj ?? false;
     if (zaustavljanje) return Promise.resolve('zaustavljanje');
     if (partije.size >= maksimalnoAktivnihPartija) return Promise.resolve('limit');
     if (kontekst === 'trening' && brojAktivnihTreninga() >= maksimalnoAktivnihTreninga) return Promise.resolve('limit');
@@ -1077,7 +1084,7 @@ export function stvoriUpraviteljPartija(
       pocetakPartijeMs: sat.sada(),
       mod,
       pravila: pravilaStola,
-      spojeniDvoboj: false,
+      spojeniDvoboj,
       kontekst,
       politika,
       trajanjePotezaSek: kontekst === 'trening' ? 0 : undefined,
@@ -1149,6 +1156,8 @@ export function stvoriUpraviteljPartija(
 
     for (const s of sudionici) {
       const socket = aktivneVeze.dohvatiSocket(s.igracId);
+      for (const kljuc of KLJUCEVI_JAVNOG_REDA) socket?.leave(`red-cekanja-${kljuc}`);
+      // Kompatibilnost sa starim sobama prije PR06 (ako klijent još visi na njima).
       socket?.leave('red-cekanja-4p');
       socket?.leave('red-cekanja-1v1');
       socket?.join(SOBA_PARTIJE(partijaId));
@@ -1167,7 +1176,7 @@ export function stvoriUpraviteljPartija(
           if (pocetakUspio) return;
           await zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod, sudionici.length - ljudi.length, {
             pravila: pravilaStola,
-            spojeniDvoboj: false,
+            spojeniDvoboj,
           });
           pocetakUspio = true;
         };
@@ -1239,7 +1248,7 @@ export function stvoriUpraviteljPartija(
         })),
         mod,
         pravila: pravilaStola,
-        spojeniDvoboj: false,
+        spojeniDvoboj,
         kontekst,
       };
       for (const s of sudionici) {

@@ -9,7 +9,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIoServer, type Socket } from 'socket.io';
-import { validirajAvatarConfig, ZADANI_PRAVILNIK, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent, type KodRazlogaVeze } from 'zajednicko';
+import { validirajAvatarConfig, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent, type KodRazlogaVeze } from 'zajednicko';
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
@@ -135,7 +135,12 @@ export interface OpcijePosluzitelja {
   /** Samo testovi: prisilno uključi ili isključi staging cookie gate. */
   stagingPristup?: { aktivan?: boolean; sifra?: string };
   /** Samo testovi: prisilno uključi popunu botovima i skrati pragove. */
-  popunaBotovima?: { dvoboj?: boolean; cetveroboj?: boolean; pragoviMs?: Partial<Record<'cetiri_igraca' | 'dva_igraca', readonly number[]>> };
+  popunaBotovima?: {
+    dvoboj?: boolean;
+    troboj?: boolean;
+    cetveroboj?: boolean;
+    pragoviMs?: Partial<Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>>;
+  };
 }
 
 /** Izgrađuje Fastify + Socket.IO instancu (bez pokretanja listen-a) - koristi ga i index.ts i testovi. */
@@ -401,6 +406,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const eventLoop = monitorEventLoopDelay({ resolution: 20 });
   eventLoop.enable();
   const popunaDvobojUkljucena = () => opcije.popunaBotovima?.dvoboj ?? postavkeBotova.botoviDvoboj;
+  const popunaTrobojUkljucena = () => opcije.popunaBotovima?.troboj ?? postavkeBotova.botoviTroboj;
   const popunaCetverobojUkljucena = () => opcije.popunaBotovima?.cetveroboj ?? postavkeBotova.botoviCetveroboj;
   // Kontroler i motor referenciraju se međusobno samo kroz zatvaranja, pa redoslijed stvaranja nije bitan.
   const botKontroler = new BotKontroler({
@@ -480,6 +486,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       botNamjerniIsteci: upravitelj.brojNamjernihIstekaBota(),
       botTehnickeGreske: botKontroler.brojaci.tehnickeGreske,
       botoviDvoboj: popunaDvobojUkljucena(),
+      botoviTroboj: popunaTrobojUkljucena(),
       botoviCetveroboj: popunaCetverobojUkljucena(),
       uptimeSekunde: Math.floor(process.uptime()),
       verzija: konfiguracija.VERZIJA,
@@ -653,11 +660,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   app.log.info({ brojBotova: fondBotova.stanje().ukupno }, 'Fond javnih botova učitan');
   const redServis = registrirajRedCekanja(
     io,
-    async (stol, mod) => {
-      const pravilaStola = stol.find((s) => s.upravljac !== 'bot')?.odabranaPravila
-        ?? stol[0]?.odabranaPravila
-        ?? ZADANI_PRAVILNIK;
-      const rezultat = await upravitelj.zapocniPartiju(stol, mod, { pravila: pravilaStola });
+    async (stol, mod, meta) => {
+      // Kanonska pravila iz ključa reda (spojeni Dvoboj → ka_zna); odabranaPravila ostaje na sudioniku.
+      const rezultat = await upravitelj.zapocniPartiju(stol, mod, {
+        pravila: meta.pravila,
+        spojeniDvoboj: meta.spojeniDvoboj,
+      });
       if (rezultat === 'pokrenuta') void osvjeziProsjekCekanja();
       return rezultat;
     },
@@ -669,7 +677,11 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     zapisSocketHandlerGreske,
     {
       fond: fondBotova,
-      omogucena: (mod) => mod === 'dva_igraca' ? popunaDvobojUkljucena() : popunaCetverobojUkljucena(),
+      omogucena: (mod) => {
+        if (mod === 'dva_igraca') return popunaDvobojUkljucena();
+        if (mod === 'tri_igraca') return popunaTrobojUkljucena();
+        return popunaCetverobojUkljucena();
+      },
       botJeZauzet: upravitelj.imaNezavrsenuObradu,
       pragoviMs: opcije.popunaBotovima?.pragoviMs ?? pragoviPopuneZaOkruzenje(konfiguracija.NODE_ENV, postavkeBotova.brziRazvoj),
       odstupanjaMs: !opcije.popunaBotovima?.pragoviMs && !postavkeBotova.brziRazvoj && konfiguracija.NODE_ENV !== 'test' ? postavkeBotova.odstupanjaPopuneMs : undefined,
@@ -795,6 +807,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     zastavice: {
       trening: postavkeBotova.treningOmogucen,
       botoviDvoboj: popunaDvobojUkljucena(),
+      botoviTroboj: popunaTrobojUkljucena(),
       botoviCetveroboj: popunaCetverobojUkljucena(),
     },
   });

@@ -17,7 +17,7 @@
       fond: { ukupno: number; slobodni: number; rezervirani: number; uPartiji: number; iscrpljenja: number };
       bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number; dobrovoljniKa: number; prisilniKa: number; propustPrimljenogKa: number };
       trening: { aktivni: number; zapoceti: number; odbijeni: number; neuspjeli: number };
-      zastavice: { trening: boolean; botoviDvoboj: boolean; botoviCetveroboj: boolean };
+      zastavice: { trening: boolean; botoviDvoboj: boolean; botoviTroboj: boolean; botoviCetveroboj: boolean };
     } | null;
   }
 
@@ -73,7 +73,7 @@
     {#if statistika.zivo}
       <dl class="zivo-stanje">
         <dt>Zastavice</dt>
-        <dd>Trening {statistika.zivo.zastavice.trening ? 'uključen' : 'isključen'} · Dvoboj botovi {statistika.zivo.zastavice.botoviDvoboj ? 'uključeni' : 'isključeni'} · Četveroboj botovi {statistika.zivo.zastavice.botoviCetveroboj ? 'uključeni' : 'isključeni'}</dd>
+        <dd>Trening {statistika.zivo.zastavice.trening ? 'uključen' : 'isključen'} · Dvoboj botovi {statistika.zivo.zastavice.botoviDvoboj ? 'uključeni' : 'isključeni'} · Troboj botovi {statistika.zivo.zastavice.botoviTroboj ? 'uključeni' : 'isključeni'} · Četveroboj botovi {statistika.zivo.zastavice.botoviCetveroboj ? 'uključeni' : 'isključeni'}</dd>
         <dt>Fond botova</dt>
         <dd>{statistika.zivo.fond.slobodni} slobodnih / {statistika.zivo.fond.rezervirani} rezerviranih / {statistika.zivo.fond.uPartiji} u partiji od {statistika.zivo.fond.ukupno}; iscrpljenja od pokretanja: {statistika.zivo.fond.iscrpljenja}</dd>
         <dt>Botovi od pokretanja</dt>

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RezultatPokretanja } from '../src/igra/politika-ucinka.js';
 import { FondBotova, type IdentitetBota } from '../src/bot/fond.js';
-import { RedCekanja, prvaCetvorica, prviPar, type StavkaReda } from '../src/red/red-cekanja.js';
+import { RedCekanja, prvaCetvorica, prviPar, prvihN, type StavkaReda } from '../src/red/red-cekanja.js';
 import { PRAGOVI_POPUNE_MS, PopunaReda, dopustenoBotova, sljedeciPragMs } from '../src/red/raspored-popune.js';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
@@ -24,7 +24,7 @@ describe('povrat namjere reda nakon neuspjelog početka', () => {
     });
     const servis = registrirajRedCekanja(io as unknown as KaladontIo, (stol) => {
       pocetci.push(stol);
-      for (const socket of io.sockets.sockets.values()) socket.leave('red-cekanja-1v1');
+      for (const socket of io.sockets.sockets.values()) socket.leave('red-cekanja-2-zajednicki');
       oznaciPocetak();
       return new Promise<RezultatPokretanja>((resolve) => { dovrsiPokusaj = resolve; });
     }, () => false, () => false, () => true, async () => null, () => true, () => undefined);
@@ -57,7 +57,7 @@ describe('povrat namjere reda nakon neuspjelog početka', () => {
       dovrsiPokusaj('greska');
       const stanje = await (izlazi ? drugiStanje : stanjeNakon);
       expect(stanje.mjesta.filter(Boolean)).toHaveLength(izlazi ? 1 : 2);
-      expect(io.sockets.sockets.get(prvi.id!)?.rooms.has('red-cekanja-1v1')).toBe(!izlazi);
+      expect(io.sockets.sockets.get(prvi.id!)?.rooms.has('red-cekanja-2-zajednicki')).toBe(!izlazi);
       if (!izlazi) {
         const ponovniPocetak = new Promise<void>((resolve) => { oznaciPocetak = resolve; });
         await ponovniPocetak;
@@ -99,10 +99,11 @@ interface Okolina {
   tik: (ms: number) => Promise<void>;
 }
 
-function okolina(mod: 'dva_igraca' | 'cetiri_igraca', brojBotova = 5): Okolina {
+function okolina(mod: 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', brojBotova = 5): Okolina {
+  const velicina = mod === 'dva_igraca' ? 2 : mod === 'tri_igraca' ? 3 : 4;
   const okolis: Okolina = {
     sada: 100_000,
-    red: new RedCekanja(mod === 'dva_igraca' ? prviPar : prvaCetvorica),
+    red: new RedCekanja(mod === 'dva_igraca' ? prviPar : mod === 'tri_igraca' ? prvihN(3) : prvaCetvorica),
     fond: null as unknown as FondBotova,
     popuna: null as unknown as PopunaReda,
     pokrenuti: [],
@@ -116,7 +117,8 @@ function okolina(mod: 'dva_igraca' | 'cetiri_igraca', brojBotova = 5): Okolina {
   okolis.popuna = new PopunaReda({
     red: okolis.red,
     fond: okolis.fond,
-    velicinaStola: mod === 'dva_igraca' ? 2 : 4,
+    velicinaStola: velicina,
+    grupaId: `popuna-test-${mod}`,
     pragoviMs: PRAGOVI_POPUNE_MS[mod],
     omogucena: () => okolis.omogucena,
     pokreniStol: async (stol) => {
@@ -204,10 +206,31 @@ describe('pragovi popune', () => {
     expect(sljedeciPragMs(0, 40_000, pragovi)).toBeNull();
     expect(dopustenoBotova(0, 29_999, PRAGOVI_POPUNE_MS.dva_igraca)).toBe(0);
     expect(dopustenoBotova(0, 30_000, PRAGOVI_POPUNE_MS.dva_igraca)).toBe(1);
+    const troboj = PRAGOVI_POPUNE_MS.tri_igraca;
+    expect(dopustenoBotova(0, 19_999, troboj)).toBe(0);
+    expect(dopustenoBotova(0, 20_000, troboj)).toBe(1);
+    expect(dopustenoBotova(0, 29_999, troboj)).toBe(1);
+    expect(dopustenoBotova(0, 30_000, troboj)).toBe(2);
   });
 });
 
 describe('popuna reda', () => {
+  it('troboj: jedan čovjek dobiva botove točno na 20/30 s', async () => {
+    const o = okolina('tri_igraca');
+    o.red.udji(covjek('h1', o.sada));
+    o.popuna.osvjezi();
+    await o.tik(19_999);
+    expect(o.popuna.rezerviraniBotovi()).toHaveLength(0);
+    await o.tik(1);
+    expect(o.popuna.rezerviraniBotovi()).toHaveLength(1);
+    expect(o.pokrenuti).toHaveLength(0);
+    await o.tik(9_999);
+    expect(o.popuna.rezerviraniBotovi()).toHaveLength(1);
+    await o.tik(1);
+    expect(o.pokrenuti).toHaveLength(1);
+    expect(o.pokrenuti[0]!.filter((s) => s.upravljac === 'bot')).toHaveLength(2);
+  });
+
   it('dvoboj: jedan čovjek dobiva bota točno na 30 s, ne prije', async () => {
     const o = okolina('dva_igraca');
     o.red.udji(covjek('h1', o.sada));

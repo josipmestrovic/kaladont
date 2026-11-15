@@ -109,6 +109,7 @@ describe('HTTP API namespace', () => {
       expect(tijelo[polje] as number, polje).toBeGreaterThanOrEqual(0);
     }
     expect(typeof tijelo.botoviDvoboj).toBe('boolean');
+    expect(typeof tijelo.botoviTroboj).toBe('boolean');
     expect(typeof tijelo.botoviCetveroboj).toBe('boolean');
     expect(JSON.stringify(tijelo)).not.toMatch(/nadimak|igracId|email/);
   });

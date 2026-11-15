@@ -7,13 +7,17 @@ export {
   MODOVI_PARTIJE,
   PRAVILNICI_PARTIJE,
   ZADANI_PRAVILNIK,
+  KLJUCEVI_JAVNOG_REDA,
   jePoznatiMod,
   jePoznatiPravilnik,
   zadaniPravilnik,
   javnaSjedalaZaMod,
   jePodrzaniJavniRed,
+  kljucJavnogReda,
+  kanonskaPravilaZaKljuc,
   odbijNepodrzaniMod,
   type PravilnikPartije,
+  type KljucJavnogReda,
 } from './katalog-partije.js';
 
 /** Javni plasman Četveroboja; zadržano za postojeće tablice i testove. */

@@ -54,7 +54,7 @@ export interface ZivoStanjeBotova {
   fond: { ukupno: number; slobodni: number; rezervirani: number; uPartiji: number; iscrpljenja: number };
   bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number; dobrovoljniKa: number; prisilniKa: number; propustPrimljenogKa: number };
   trening: { aktivni: number; zapoceti: number; odbijeni: number; neuspjeli: number };
-  zastavice: { trening: boolean; botoviDvoboj: boolean; botoviCetveroboj: boolean };
+  zastavice: { trening: boolean; botoviDvoboj: boolean; botoviTroboj: boolean; botoviCetveroboj: boolean };
 }
 
 async function uskladiRjecnikNakonUbaci(rjecnik: RjecnikUMemoriji, rijecUlaz: string): Promise<void> {

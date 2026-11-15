@@ -5,7 +5,8 @@
 import { z } from 'zod';
 import { PRAGOVI_POPUNE_MS } from '../red/raspored-popune.js';
 
-export const VERZIJA_BOT_POLITIKE = 3;
+/** PR06: +tri_igraca pragovi i botoviTroboj. */
+export const VERZIJA_BOT_POLITIKE = 4;
 
 export type KategorijaRijeci = 'uobicajena' | 'srednja' | 'rijetka';
 
@@ -38,10 +39,11 @@ export interface KonfiguracijaBota {
   rasponSporih: readonly [number, number];
   rasponPotezaIzostanka: readonly [number, number];
   rasponTeskogPotezaNeznanja: readonly [number, number];
-  odstupanjaPopuneMs: Record<'dva_igraca' | 'cetiri_igraca', readonly number[]>;
-  pragoviPopuneMs: Record<'dva_igraca' | 'cetiri_igraca', readonly number[]>;
+  odstupanjaPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
+  pragoviPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
   treningOmogucen: boolean;
   botoviDvoboj: boolean;
+  botoviTroboj: boolean;
   botoviCetveroboj: boolean;
   treningUpozorenjeNeaktivnostiMs: number;
   treningZatvaranjeNeaktivnostiMs: number;
@@ -89,10 +91,11 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   rasponSporih: [0.55, 0.85],
   rasponPotezaIzostanka: [2, 12],
   rasponTeskogPotezaNeznanja: [1, 3],
-  odstupanjaPopuneMs: { dva_igraca: [4_000], cetiri_igraca: [3_000, 3_000, 3_000] },
+  odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [3_000, 3_000], cetiri_igraca: [3_000, 3_000, 3_000] },
   pragoviPopuneMs: structuredClone(PRAGOVI_POPUNE_MS),
   treningOmogucen: true,
   botoviDvoboj: false,
+  botoviTroboj: false,
   botoviCetveroboj: false,
   treningUpozorenjeNeaktivnostiMs: 240_000,
   treningZatvaranjeNeaktivnostiMs: 300_000,
@@ -124,7 +127,11 @@ const Vrijeme = z.number().int().min(0).max(300_000);
 const BrojPoteza = z.number().int().min(1).max(100);
 const Raspon = z.tuple([UdioPoteza, UdioPoteza]).refine(([od, doVrijednosti]) => od <= doVrijednosti, 'Početak raspona mora biti manji od kraja.');
 const RasponPoteza = z.tuple([BrojPoteza, BrojPoteza]).refine(([od, doVrijednosti]) => od <= doVrijednosti, 'Početak raspona mora biti manji od kraja.');
-const Pragovi = z.object({ dva_igraca: z.tuple([Vrijeme]), cetiri_igraca: z.tuple([Vrijeme, Vrijeme, Vrijeme]) }).strict();
+const Pragovi = z.object({
+  dva_igraca: z.tuple([Vrijeme]),
+  tri_igraca: z.tuple([Vrijeme, Vrijeme]),
+  cetiri_igraca: z.tuple([Vrijeme, Vrijeme, Vrijeme]),
+}).strict();
 
 export const ShemaKonfiguracijeBota = z.object({
   verzija: z.literal(VERZIJA_BOT_POLITIKE),
@@ -152,6 +159,7 @@ export const ShemaKonfiguracijeBota = z.object({
   pragoviPopuneMs: Pragovi,
   treningOmogucen: z.boolean(),
   botoviDvoboj: z.boolean(),
+  botoviTroboj: z.boolean(),
   botoviCetveroboj: z.boolean(),
   treningUpozorenjeNeaktivnostiMs: z.number().int().min(60_000).max(86_400_000),
   treningZatvaranjeNeaktivnostiMs: z.number().int().min(60_000).max(86_400_000),
@@ -188,7 +196,7 @@ export const ShemaKonfiguracijeBota = z.object({
     pogreska('vjerojatnostReakcijeHvalaPriIspadanju', 'Ukupna vjerojatnost reakcija pri ispadanju ne smije prelaziti 100 %.');
   }
   if (postavke.rasponBrzih[1] > postavke.rasponUobicajenih[0] || postavke.rasponUobicajenih[1] > postavke.rasponSporih[0]) pogreska('rasponUobicajenih', 'Rasponi kategorija moraju biti poredani.');
-  for (const mod of ['dva_igraca', 'cetiri_igraca'] as const) {
+  for (const mod of ['dva_igraca', 'tri_igraca', 'cetiri_igraca'] as const) {
     const pragovi = postavke.pragoviPopuneMs[mod];
     if (pragovi.some((prag, indeks) => prag < postavke.odstupanjaPopuneMs[mod][indeks]! || (indeks > 0 && prag < pragovi[indeks - 1]!))) pogreska('pragoviPopuneMs', 'Pragovi moraju biti poredani i barem jednaki odstupanju.');
   }
@@ -205,6 +213,7 @@ export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): K
     ...structuredClone(ZADANA_KONFIGURACIJA_BOTA),
     treningOmogucen: env.TRENING_OMOGUCEN !== 'false',
     botoviDvoboj: env.BOTOVI_DVOBOJ === 'true',
+    botoviTroboj: env.BOTOVI_TROBOJ === 'true',
     botoviCetveroboj: env.BOTOVI_CETVEROBOJ === 'true',
     brziRazvoj: lokalnoTestiranje,
     vjerojatnostOstavljanjaKa: postotak(env.BOT_VJEROJATNOST_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa),

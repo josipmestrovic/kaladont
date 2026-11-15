@@ -26,10 +26,11 @@
     rasponSporih: Raspon;
     rasponPotezaIzostanka: Raspon;
     rasponTeskogPotezaNeznanja: Raspon;
-    odstupanjaPopuneMs: { dva_igraca: [number]; cetiri_igraca: [number, number, number] };
-    pragoviPopuneMs: { dva_igraca: [number]; cetiri_igraca: [number, number, number] };
+    odstupanjaPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
+    pragoviPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
     treningOmogucen: boolean;
     botoviDvoboj: boolean;
+    botoviTroboj: boolean;
     botoviCetveroboj: boolean;
     treningUpozorenjeNeaktivnostiMs: number;
     treningZatvaranjeNeaktivnostiMs: number;
@@ -216,6 +217,7 @@
         <fieldset><legend>Uključivanje</legend>
           <label><input type="checkbox" bind:checked={nacrt.treningOmogucen} /> Zagrijavanje</label>
           <label><input type="checkbox" bind:checked={nacrt.botoviDvoboj} /> Botovi u Dvoboju</label>
+          <label><input type="checkbox" bind:checked={nacrt.botoviTroboj} /> Botovi u Troboju</label>
           <label><input type="checkbox" bind:checked={nacrt.botoviCetveroboj} /> Botovi u Četveroboju</label>
           {#if zapis.brziRazvojDopusten}<label><input type="checkbox" bind:checked={nacrt.brziRazvoj} /> Brzi lokalni razvoj</label>{/if}
         </fieldset>
@@ -267,6 +269,10 @@
           <div class="polja">
             <label>Dvoboj: cilj popune (ms)<input type="number" min="0" max="300000" step="1000" bind:value={nacrt.pragoviPopuneMs.dva_igraca[0]} /></label>
             <label>Dvoboj: odstupanje (ms)<input type="number" min="0" max="300000" step="1000" bind:value={nacrt.odstupanjaPopuneMs.dva_igraca[0]} /></label>
+            {#each [0, 1] as mjesto}
+              <label>Troboj: bot {mjesto + 1} cilj (ms)<input type="number" min="0" max="300000" step="1000" bind:value={nacrt.pragoviPopuneMs.tri_igraca[mjesto]} /></label>
+              <label>Troboj: bot {mjesto + 1} odstupanje (ms)<input type="number" min="0" max="300000" step="1000" bind:value={nacrt.odstupanjaPopuneMs.tri_igraca[mjesto]} /></label>
+            {/each}
             {#each [0, 1, 2] as mjesto}
               <label>Četveroboj: bot {mjesto + 1} cilj (ms)<input type="number" min="0" max="300000" step="1000" bind:value={nacrt.pragoviPopuneMs.cetiri_igraca[mjesto]} /></label>
               <label>Četveroboj: bot {mjesto + 1} odstupanje (ms)<input type="number" min="0" max="300000" step="1000" bind:value={nacrt.odstupanjaPopuneMs.cetiri_igraca[mjesto]} /></label>

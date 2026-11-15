@@ -1,6 +1,9 @@
 /**
  * Admin statistika čekanja i botova (ADR-017): mjeri se čekanje ljudi po partiji i broj botova
  * za stolom kako bi se pragovi i fond mogli podešavati na temelju stvarnih podataka.
+ *
+ * PR06: agregacija je po partija_id (jedan red = jedna partija). Spojeni Dvoboj
+ * (Klasični+KA-ZNA) ne smije se brojati dvaput po odabrana_pravila sudionika.
  */
 import { sql } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
