@@ -212,6 +212,13 @@ export async function osigurajUpisePoteza(zapisi: readonly ZapisPoteza[]): Promi
   await Promise.all(zapisi.map((zapis) => zapisiPotez(zapis)));
 }
 
+/** Završni retry za učinke posebnih riječi (isti stil kao `osigurajUpisePoteza`). */
+export async function osigurajUpiseUcinakaPosebneRijeci(
+  zapisi: readonly ZapisUcinakPosebneRijeci[],
+): Promise<void> {
+  await Promise.all(zapisi.map((zapis) => zapisiUcinakPosebneRijeci(zapis)));
+}
+
 export function spremiRaniPorazUBazi(zapis: {
   partijaId: string;
   igracId: string;

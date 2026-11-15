@@ -67,7 +67,7 @@ import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
-import { osigurajUpisePoteza, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, type ZapisPoteza, type ZapisStatistikeRijeci } from './upis-partije.js';
+import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { imaJavniProfil, primaProfilnuGamifikacijuUIgri } from './gamifikacija-racuna.js';
@@ -285,6 +285,8 @@ interface StanjeStola {
   upisiPotezaUTijeku: Promise<void>[];
   /** Payloadi poteza; `uspio` omogućuje da završni tok retrya samo neuspjelo. */
   zapisiPotezaZaOsigurati: { zapis: ZapisPoteza; uspio: boolean }[];
+  /** Činjenice posebne riječi; završni tok retrya samo `!uspio` (PR04). */
+  zapisiUcinakaZaOsigurati: { zapis: ZapisUcinakPosebneRijeci; uspio: boolean }[];
   /** Retryable upis početka partije; null ako politika ne zapisuje povijest. */
   osigurajPocetakPartije: (() => Promise<void>) | null;
   treningNeaktivnost: { upozorenjeIso: string; zatvaraIso: string; upozorenje: boolean } | null;
@@ -885,6 +887,11 @@ export function stvoriUpraviteljPartija(
         await osigurajUpisePoteza(nedostaju.map((stavka) => stavka.zapis));
         for (const stavka of nedostaju) stavka.uspio = true;
       }
+      const nedostajuUcinak = stanje.zapisiUcinakaZaOsigurati.filter((stavka) => !stavka.uspio);
+      if (nedostajuUcinak.length > 0) {
+        await osigurajUpiseUcinakaPosebneRijeci(nedostajuUcinak.map((stavka) => stavka.zapis));
+        for (const stavka of nedostajuUcinak) stavka.uspio = true;
+      }
       await upis();
     };
     stanje.zavrsnoSpremanje = upisSaCekanjemPoteza;
@@ -1034,6 +1041,7 @@ export function stvoriUpraviteljPartija(
       ponoviZavrsnoSpremanje: null,
       upisiPotezaUTijeku: [],
       zapisiPotezaZaOsigurati: [],
+      zapisiUcinakaZaOsigurati: [],
       osigurajPocetakPartije: null,
       treningNeaktivnost: null,
       treningRokovi: null,
@@ -2268,8 +2276,11 @@ export function stvoriUpraviteljPartija(
       ucinak: (zrtvaAktivna ? 'eliminacija' : 'bez_zrtve') as 'eliminacija' | 'bez_zrtve',
     };
     if (stanje.politika.zapisujePovijest) {
+      const stavka = { zapis, uspio: false };
+      stanje.zapisiUcinakaZaOsigurati.push(stavka);
+      // Fire-and-forget; završni tok retrya samo !uspio (isti stil kao spremiPotezAkoTreba).
       stanje.upisiPotezaUTijeku.push(
-        zapisiUcinakPosebneRijeci(zapis).catch(() => undefined),
+        zapisiUcinakPosebneRijeci(zapis).then(() => { stavka.uspio = true; }).catch(() => undefined),
       );
     }
     // Autor već ispao ili sustavska riječ (RS-26 / PR04): bez ponovne žrtve, samo nova runda.
@@ -2685,6 +2696,7 @@ export function stvoriUpraviteljPartija(
       ponoviZavrsnoSpremanje: null,
       upisiPotezaUTijeku: [],
       zapisiPotezaZaOsigurati: [],
+      zapisiUcinakaZaOsigurati: [],
       osigurajPocetakPartije: null,
       treningNeaktivnost: null,
       treningRokovi: null,
