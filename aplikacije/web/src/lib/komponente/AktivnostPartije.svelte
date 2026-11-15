@@ -5,7 +5,7 @@
 
   interface StavkaAktivnosti {
     partijaId: string;
-    mod: 'cetiri_igraca' | 'dva_igraca';
+    mod: import('zajednicko').ModPartije;
     pocetak: string;
     kraj: string;
     plasman: number;
@@ -18,7 +18,7 @@
   }
 
   let { igracId }: Props = $props();
-  let mod = $state<'cetiri_igraca' | 'dva_igraca'>('dva_igraca');
+  let mod = $state<import('zajednicko').ModPartije>('dva_igraca');
   let stavke = $state<StavkaAktivnosti[]>([]);
   let cursor = $state<string | null>(null);
   let prethodniCursori = $state<string[]>([]);
@@ -46,7 +46,7 @@
     }
   }
 
-  function promijeniMod(noviMod: 'cetiri_igraca' | 'dva_igraca') {
+  function promijeniMod(noviMod: import('zajednicko').ModPartije) {
     prethodniCursori = [];
     cursor = null;
     void ucitaj(noviMod);
@@ -78,7 +78,7 @@
     stavke={[{ kljuc: 'dva_igraca', naziv: 'Dvoboj' }, { kljuc: 'cetiri_igraca', naziv: 'Četveroboj' }]}
     aktivna={mod}
     ariaLabel="Način igre"
-    promijeni={(kljuc) => promijeniMod(kljuc as 'cetiri_igraca' | 'dva_igraca')}
+    promijeni={(kljuc) => promijeniMod(kljuc as import('zajednicko').ModPartije)}
   />
   <div class="aktivnost-zaglavlje">
     <div>
@@ -106,7 +106,7 @@
           {#each stavke as stavka (stavka.partijaId)}
             <tr>
               <th scope="row">{formatirajDatum(stavka.kraj)}</th>
-              <td data-label="Mod">{stavka.mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj'}</td>
+              <td data-label="Mod">{stavka.mod === 'dva_igraca' ? 'Dvoboj' : stavka.mod === 'tri_igraca' ? 'Troboj' : 'Četveroboj'}</td>
               <td data-label="Plasman">{stavka.plasman}. mjesto</td>
               <td data-label="Bodovi">{stavka.bodovi}</td>
               <td data-label="Povijest"><a href={`/partija/arhiva/${stavka.partijaId}`}>Vidi igru</a></td>

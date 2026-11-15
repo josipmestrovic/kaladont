@@ -3,7 +3,10 @@
  * Server je kanonski izvor izračuna; klijent prima gotov profil.
  */
 
-export type ModDnk = 'cetiri_igraca' | 'dva_igraca';
+import { odbijNepodrzaniMod, type ModPartije } from './katalog-partije.js';
+
+/** DNK po formatu; Troboj ulazi u tip, izračun do PR10 odbija nepodržane puteve. */
+export type ModDnk = ModPartije;
 
 export type DnkKljuc =
   | 'vjestina'
@@ -189,6 +192,8 @@ export function postotakXpZaOcjenu(ocjena: number): number {
 }
 
 export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
+  odbijNepodrzaniMod(ulaz.mod, 'izracunajKaladontDnk');
+  const mod = ulaz.mod;
   const otkljucan = jeDnkOtkljucan(ulaz.odigrano);
   const prosjekBodova = ulaz.prosjekBodova ?? 0;
   const eliminacijePoPartiji = ulaz.eliminacijePoPartiji ?? 0;
@@ -198,11 +203,11 @@ export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
   const ponderiraneRijetke = ulaz.ponderiraneRijetke ?? 0;
 
   const vrijednostVjestina = otkljucan ? Math.max(10, Math.min(100, (prosjekBodova / 5.7) * 100)) : 0;
-  const vrijednostTaktika = Math.max(0, Math.min(100, (eliminacijePoPartiji / (ulaz.mod === 'dva_igraca' ? 0.8 : 1.5)) * 100));
-  const vrijednostFokus = Math.max(0, Math.min(100, (najduziStreak / (ulaz.mod === 'dva_igraca' ? 8 : 12)) * 100));
+  const vrijednostTaktika = Math.max(0, Math.min(100, (eliminacijePoPartiji / (mod === 'dva_igraca' ? 0.8 : 1.5)) * 100));
+  const vrijednostFokus = Math.max(0, Math.min(100, (najduziStreak / (mod === 'dva_igraca' ? 8 : 12)) * 100));
   const vrijednostBrzina = Math.max(0, Math.min(100, prosjekPrihvacenogPotezaMs <= 4000 ? 100 : 100 - ((prosjekPrihvacenogPotezaMs - 4000) / 11000) * 100));
-  const vrijednostDuge = Math.max(0, Math.min(100, (ponderiraneDuge / (ulaz.mod === 'dva_igraca' ? 1.5 : 2)) * 100));
-  const vrijednostRijetke = Math.max(0, Math.min(100, (ponderiraneRijetke / (ulaz.mod === 'dva_igraca' ? 0.5 : 0.75)) * 100));
+  const vrijednostDuge = Math.max(0, Math.min(100, (ponderiraneDuge / (mod === 'dva_igraca' ? 1.5 : 2)) * 100));
+  const vrijednostRijetke = Math.max(0, Math.min(100, (ponderiraneRijetke / (mod === 'dva_igraca' ? 0.5 : 0.75)) * 100));
 
   const osi: DnkOs[] = [
     { kljuc: 'vjestina', naziv: 'Vještina', vrijednost: Math.round(vrijednostVjestina), tier: 1, oznaka: 'N/A', detalj: `Prosjek bodova: ${prosjekBodova.toFixed(2)}` },
@@ -213,7 +218,7 @@ export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
     { kljuc: 'rijetke_rijeci', naziv: 'Rijetke riječi', vrijednost: Math.round(vrijednostRijetke), tier: 1, oznaka: 'Sigurne riječi', detalj: '' },
   ];
 
-  const vjestinaPrag: readonly DnkPrag[] = ulaz.mod === 'dva_igraca' ? [
+  const vjestinaPrag: readonly DnkPrag[] = mod === 'dva_igraca' ? [
     { min: 0, max: 0.29, naziv: 'Prvopisac', oznaka: 'Prvopisac', vrijednost: 0 },
     { min: 0.3, max: 0.39, naziv: 'Riječarac', oznaka: 'Riječarac', vrijednost: 0.35 },
     { min: 0.4, max: 0.46, naziv: 'Jezičar', oznaka: 'Jezičar', vrijednost: 0.43 },
@@ -243,19 +248,19 @@ export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
       const match = izracunajPragZaVrijednost(prosjekBodova, vjestinaPrag);
       os.oznaka = match.oznaka;
       os.detalj = `Prosjek bodova: ${prosjekBodova.toFixed(2)}`;
-      os.vrijednost = Math.max(10, Math.min(100, Math.round((prosjekBodova / (ulaz.mod === 'dva_igraca' ? 0.89 : 5.7)) * 100)));
+      os.vrijednost = Math.max(10, Math.min(100, Math.round((prosjekBodova / (mod === 'dva_igraca' ? 0.89 : 5.7)) * 100)));
       os.tier = Math.max(1, Math.min(10, Math.round(os.vrijednost / 10)));
       continue;
     }
     if (os.kljuc === 'taktika') {
-      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.taktika[ulaz.mod];
+      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.taktika[mod];
       const match = izracunajPragZaVrijednost(eliminacijePoPartiji, pragovi);
       os.oznaka = match.oznaka;
       os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
       continue;
     }
     if (os.kljuc === 'fokus') {
-      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.fokus[ulaz.mod];
+      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.fokus[mod];
       const match = izracunajPragZaVrijednost(najduziStreak, pragovi);
       os.oznaka = match.oznaka;
       os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
@@ -278,14 +283,14 @@ export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
       continue;
     }
     if (os.kljuc === 'duge_rijeci') {
-      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.duge_rijeci[ulaz.mod];
+      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.duge_rijeci[mod];
       const match = izracunajPragZaVrijednost(ponderiraneDuge, pragovi);
       os.oznaka = match.oznaka;
       os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
       continue;
     }
     if (os.kljuc === 'rijetke_rijeci') {
-      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.rijetke_rijeci[ulaz.mod];
+      const pragovi: readonly DnkPrag[] = DNK_PRAGOVI.rijetke_rijeci[mod];
       const match = izracunajPragZaVrijednost(ponderiraneRijetke, pragovi);
       os.oznaka = match.oznaka;
       os.tier = Math.max(1, Math.min(5, pragovi.findIndex((prag) => prag.oznaka === match.oznaka) + 1));
@@ -293,7 +298,7 @@ export function izracunajKaladontDnk(ulaz: DnkUlaz): DnkProfil {
   }
 
   return {
-    mod: ulaz.mod,
+    mod,
     otkljucan,
     odigrano: ulaz.odigrano,
     preostaloDoOtkljucavanja: Math.max(0, 10 - ulaz.odigrano),

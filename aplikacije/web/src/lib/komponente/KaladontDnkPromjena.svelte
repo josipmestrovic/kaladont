@@ -8,11 +8,13 @@
     otkljucan: boolean;
     upravoOtkljucan: boolean;
     preostaloDoOtkljucavanja: number;
-    mod: 'cetiri_igraca' | 'dva_igraca';
+    mod: import('zajednicko').ModPartije;
   }
 
   let { prije, poslije, odigrano, otkljucan, upravoOtkljucan, preostaloDoOtkljucavanja, mod }: Props = $props();
-  const naslov = $derived(mod === 'dva_igraca' ? 'Kaladont DNK — Dvoboj' : 'Kaladont DNK — Četveroboj');
+  const naslov = $derived(
+    mod === 'dva_igraca' ? 'Kaladont DNK — Dvoboj' : mod === 'tri_igraca' ? 'Kaladont DNK — Troboj' : 'Kaladont DNK — Četveroboj',
+  );
 
   const srediste = 120;
   const radijus = 78;

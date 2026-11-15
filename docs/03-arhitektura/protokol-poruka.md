@@ -62,9 +62,11 @@ Tipovi klijenta nisu validacija mrežnih podataka. Poslužitelj svaki ulazni pay
 
 Ack za `red:udji` je opcionalan: poziv bez callbacka podržan je za fire-and-forget klijente. Ako je callback poslan, mora biti funkcija; poslužitelj ga poziva najviše jednom s `StanjeReda` ili `null`. Klijent koji želi zadani mod uz ack šalje `{}` kao payload; ne šalje eksplicitni `undefined` jer se na žici serijalizira kao `null`. Svi ostali događaji su jednosmjerni i ne prihvaćaju dodatni callback.
 
-Iznimka je `trening:zapocni`: šalje se bez payloada, a opcionalni ack prima `{ pokrenut: true }` ili `{ pokrenut: false, kod, poruka }` (kodovi `VEC_U_PARTIJI`, `VEC_U_SOBI`, `PREVISE_PARTIJA`, `TRENING_NEDOSTUPAN`, `INTERNA`). Sama partija kreće redovnim `partija:pocetak`.
+`trening:zapocni` prihvaća stari oblik (samo opcionalni ack) i novi `{ pravila? }` pa ack. Izostanak `pravila` = `ka_zna`. Ack prima `{ pokrenut: true }` ili `{ pokrenut: false, kod, poruka }` (kodovi `VEC_U_PARTIJI`, `VEC_U_SOBI`, `PREVISE_PARTIJA`, `TRENING_NEDOSTUPAN`, `INTERNA`, `NEVALJAN_PAYLOAD`). Sama partija kreće redovnim `partija:pocetak`.
 
-`PocetakPartije`, `StanjePartije` i `KrajPartije` nose `kontekst: 'javna' | 'privatna' | 'trening'`; klijent ga ne može promijeniti. U treningu nema XP-a, forme, niza, DNK ni kolekcije. Rezultat može nositi dostignuće Zagrijan za registriranog pobjednika, ali nikad bodove ni opće napredovanje riječi. `rijec:otkljucana` i `iskustvo:obracun` se ne šalju. Rezervirani botovi u čekaonici pojavljuju se u `red:stanje` kao sudionici koji čekaju; rokove popune određuje isključivo poslužitelj.
+`red:udji` / `red:stanje`: izostanak `pravila` = `ka_zna`; nepoznat pravilnik ili `mod: 'tri_igraca'` (do PR06) = `NEVALJAN_PAYLOAD` — Troboj se **nikad** ne preusmjerava u Četveroboj.
+
+`PocetakPartije`, `StanjePartije` i `KrajPartije` nose `kontekst: 'javna' | 'privatna' | 'trening'`; klijent ga ne može promijeniti. Aditivno nose `pravila` i `spojeniDvoboj`. U treningu nema XP-a, forme, niza, DNK ni kolekcije. Rezultat može nositi dostignuće Zagrijan za registriranog pobjednika, ali nikad bodove ni opće napredovanje riječi. `rijec:otkljucana` i `iskustvo:obracun` se ne šalju. Rezervirani botovi u čekaonici pojavljuju se u `red:stanje` kao sudionici koji čekaju; rokove popune određuje isključivo poslužitelj. Privatna soba s tri člana nije javni Troboj.
 
 Neaktivnost treninga: `trening:neaktivnost` šalje rokove upozorenja (4 min) i tehničkog zatvaranja (5 min). `StanjePartije.treningNeaktivnost` sadrži iste apsolutne rokove za reconnect. Samo prihvaćen ljudski potez ili valjan `trening:nastavi` resetira ih; heartbeat i potez botova ne resetiraju. Zatvaranje šalje `partija:ponistena` i ne bilježi pobjedu/poraz.
 
@@ -73,23 +75,46 @@ Socket.IO ograničava pojedinačnu ulaznu poruku na najviše **16 KiB**. Valjane
 ## Tipovi payloada
 
 ```ts
+/** Format stola. */
+type ModPartije = 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca';
+/** Pravilnik; izostanak na starom payloadu = ka_zna. */
+type PravilnikPartije = 'klasicni' | 'ka_zna' | 'dokazi_nastavak';
+
+interface PayloadUdjiURed {
+  mod?: ModPartije;
+  pravila?: PravilnikPartije;
+}
+
 interface StanjeReda {
-  /** 4 mjesta; null = prazno. Igrači vide tko sjeda u real-timeu, s punom statistikom. */
+  mod: ModPartije;
+  pravila?: PravilnikPartije;
+  /** 2/3/4 mjesta; null = prazno. Igrači vide tko sjeda u real-timeu, s punom statistikom. */
   mjesta: ({
     nadimak: string;
     avatarId: number;
     rang: string | null;      // null dok je Piskaralo (< 10 partija)
     prosjekBodova: number;
     postotakPobjeda: number;
+    odabranaPravila?: PravilnikPartije;
   } | null)[];
   /** Prosjek čekanja zadnjih 100 partija, u sekundama */
   prosjekCekanjaSek: number;
 }
 
+interface PostavkePrivatneSobe {
+  trajanjePotezaSek: number;
+  dopusteneVrste: VrstaRijeci[];
+  eliminacijskiBodovi: boolean;
+  pravila?: PravilnikPartije; // izostanak = ka_zna
+}
+
 interface PocetakPartije {
   partijaId: string;
   mojIgracId: string; // identitet primatelja; poruka se šalje pojedinačno svakom socketu
-  sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[]; // kanonski redom, sjedala 0..N-1; javno N=2 ili 4, privatno N=2..8
+  sjedala: { igracId: string; nadimak: string; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3; odabranaPravila?: PravilnikPartije }[]; // kanonski redom, sjedala 0..N-1; javno N=2/3/4, privatno N=2..8
+  mod?: ModPartije;
+  pravila?: PravilnikPartije;
+  spojeniDvoboj?: boolean; // PR01 uvijek false; true tek u PR06
   // naPotezuId/istekPotezaIso više se ne šalju ovdje - dolaze tek u RundaOtvorena, nakon
   // što sustav odabere prvu riječ (vidi partija:sustav-bira-rijec / partija:runda-otvorena)
 }

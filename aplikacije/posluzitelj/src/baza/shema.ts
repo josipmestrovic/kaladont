@@ -28,7 +28,9 @@ export const vrstaIgraca = pgEnum('vrsta_igraca', ['gost', 'registriran', 'admin
 export const upravljacIgraca = pgEnum('upravljac_igraca', ['covjek', 'bot']);
 export const tipPrezentacijeBota = pgEnum('tip_prezentacije_bota', ['imenovani', 'gost']);
 export const statusPartije = pgEnum('status_partije', ['u_tijeku', 'zavrsena', 'ponistena']);
-export const modPartije = pgEnum('mod_partije', ['cetiri_igraca', 'dva_igraca']);
+export const modPartije = pgEnum('mod_partije', ['cetiri_igraca', 'dva_igraca', 'tri_igraca']);
+/** Izvršeni / odabrani pravilnik partije (Kaladont 0.2.0). Default povijesti = ka_zna. */
+export const pravilnikPartije = pgEnum('pravilnik_partije', ['klasicni', 'ka_zna', 'dokazi_nastavak']);
 export const nacinIspadanja = pgEnum('nacin_ispadanja', [
   'ne_znam',
   'istek',
@@ -343,6 +345,10 @@ export const botovi = pgTable('botovi', {
 export const partije = pgTable('partije', {
   id: uuid('id').primaryKey().defaultRandom(),
   mod: modPartije('mod').notNull().default('cetiri_igraca'),
+  /** Izvršeni pravilnik stola; stare partije = ka_zna. */
+  pravila: pravilnikPartije('pravila').notNull().default('ka_zna'),
+  /** Zajednički javni Dvoboj (Klasični+KA-ZNA); povijest i PR01 = false. */
+  spojeniDvoboj: boolean('spojeni_dvoboj').notNull().default(false),
   pocetak: timestamp('pocetak', { withTimezone: true }).notNull().defaultNow(),
   kraj: timestamp('kraj', { withTimezone: true }),
   status: statusPartije('status').notNull().default('u_tijeku'),
@@ -393,6 +399,8 @@ export const sudioniciPartije = pgTable(
       .references(() => igraci.id),
     nadimak: text('nadimak').notNull().default('Gost'),
     sjedalo: smallint('sjedalo').notNull(),
+    /** UI odabir pravilnika (spojeni Dvoboj); stare partije = ka_zna. */
+    odabranaPravila: pravilnikPartije('odabrana_pravila').notNull().default('ka_zna'),
     plasman: smallint('plasman'),
     bodovi: smallint('bodovi').notNull().default(0),
     eliminacije: smallint('eliminacije').notNull().default(0),

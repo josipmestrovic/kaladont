@@ -1,4 +1,4 @@
-import type { AvatarConfigV1 } from 'zajednicko';
+import type { AvatarConfigV1, PravilnikPartije } from 'zajednicko';
 
 /**
  * Red čekanja u memoriji - sučelje strategije uparivanja (ADR-008: MVP = prva 4).
@@ -22,6 +22,8 @@ export interface StavkaReda {
   trenutniNiz4p?: number;
   trenutniNiz1v1?: number;
   usaoU: number;
+  /** UI odabir pravilnika; izostanak = ka_zna. */
+  odabranaPravila?: PravilnikPartije;
 }
 
 export interface StrategijaUparivanja {

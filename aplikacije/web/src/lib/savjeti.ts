@@ -21,8 +21,9 @@ const SAVJETI_DVA_IGRACA = [
   'Najviši rang u dvoboju zove se Kaladont i traži prosjek 0,89 ili više.',
 ] as const;
 
-export function dohvatiSavjete(mod: 'cetiri_igraca' | 'dva_igraca'): readonly string[] {
-  return mod === 'dva_igraca'
-    ? [...SAVJETI_DVA_IGRACA, ...SAVJETI_ZAJEDNICKI]
-    : [...SAVJETI_CETIRI_IGRACA, ...SAVJETI_ZAJEDNICKI];
+export function dohvatiSavjete(mod: import('zajednicko').ModPartije): readonly string[] {
+  if (mod === 'dva_igraca') return [...SAVJETI_DVA_IGRACA, ...SAVJETI_ZAJEDNICKI];
+  if (mod === 'cetiri_igraca') return [...SAVJETI_CETIRI_IGRACA, ...SAVJETI_ZAJEDNICKI];
+  // Troboj savjeti dolaze u PR14; do tada samo zajednički.
+  return [...SAVJETI_ZAJEDNICKI];
 }

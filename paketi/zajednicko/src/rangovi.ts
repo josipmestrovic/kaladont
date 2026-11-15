@@ -1,4 +1,4 @@
-import type { ModPartije } from './bodovanje.js';
+import { odbijNepodrzaniMod, type ModPartije } from './katalog-partije.js';
 
 /**
  * Rangovi - iskljucivo prikazni status (ADR-008, bez utjecaja na uparivanje).
@@ -40,6 +40,7 @@ export const RANGOVI_1V1: readonly PragRanga[] = [
 export const BROJ_PARTIJA_ZA_KALIBRACIJU = 10;
 
 function rangoviPoModu(mod: ModPartije): readonly PragRanga[] {
+  odbijNepodrzaniMod(mod, 'rangoviPoModu');
   return mod === 'dva_igraca' ? RANGOVI_1V1 : RANGOVI;
 }
 

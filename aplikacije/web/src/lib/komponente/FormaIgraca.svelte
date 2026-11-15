@@ -3,7 +3,7 @@
 
   interface Props {
     forma: FormaPodaci & { trenutniNiz: number; najboljiNiz: number; razinaVatre: RazinaVatre; sljedeciBonusPostotak: number };
-    mod: 'cetiri_igraca' | 'dva_igraca';
+    mod: import('zajednicko').ModPartije;
   }
 
   let { forma, mod }: Props = $props();

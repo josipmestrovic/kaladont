@@ -276,4 +276,35 @@ describe('red čekanja', () => {
       igrac.disconnect();
     }
   });
+
+  it('stari ulaz bez pravila dobiva ka_zna; Troboj i nevažeći pravilnik se odbijaju', async () => {
+    const igrac = await spojiSe();
+    try {
+      const stanje = await new Promise<StanjeReda>((resolve) => {
+        igrac.emit('red:udji', { mod: 'dva_igraca' }, resolve);
+      });
+      expect(stanje.mod).toBe('dva_igraca');
+      expect(stanje.pravila).toBe('ka_zna');
+      igrac.emit('red:izadji');
+
+      const greskaTroboj = new Promise<{ kod: string }>((resolve) => igrac.once('greska', resolve));
+      const potvrdaTroboj = new Promise<StanjeReda | null>((resolve) => {
+        igrac.emit('red:udji', { mod: 'tri_igraca' }, resolve);
+      });
+      expect(await greskaTroboj).toMatchObject({ kod: 'NEVALJAN_PAYLOAD' });
+      expect(await potvrdaTroboj).toBeNull();
+
+      const greskaPravila = new Promise<{ kod: string }>((resolve) => igrac.once('greska', resolve));
+      igrac.emit('red:udji', { mod: 'dva_igraca', pravila: 'nepoznato' });
+      expect(await greskaPravila).toMatchObject({ kod: 'NEVALJAN_PAYLOAD' });
+
+      const sKlasicnim = await new Promise<StanjeReda>((resolve) => {
+        igrac.emit('red:udji', { mod: 'dva_igraca', pravila: 'klasicni' }, resolve);
+      });
+      expect(sKlasicnim.pravila).toBe('klasicni');
+      expect(sKlasicnim.mjesta.find((m) => m)?.odabranaPravila).toBe('klasicni');
+    } finally {
+      igrac.disconnect();
+    }
+  });
 });

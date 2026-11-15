@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajRazinuDostignuca, DEFINICIJE_DOSTIGNUCA, type MetrikeMisijaIgre, type ObavijestOtkljucanogDostignuca } from 'zajednicko';
+import { izracunajRazinuDostignuca, DEFINICIJE_DOSTIGNUCA, odbijNepodrzaniMod, type MetrikeMisijaIgre, type ModPartije, type ObavijestOtkljucanogDostignuca } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, pobjedeTreninga } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
@@ -20,7 +20,7 @@ export async function zabiljeziPobjeduTreninga(
   igracId: string,
   zavrsenoU: Date = new Date(),
   metrike?: {
-    mod: 'dva_igraca' | 'cetiri_igraca';
+    mod: ModPartije;
     plasman: number;
     nacinIspadanja: string;
     prihvaceneRijeci: number;
@@ -95,10 +95,12 @@ export async function zabiljeziPobjeduTreninga(
       });
     }
 
+    const modTreninga = metrike?.mod ?? 'dva_igraca';
+    odbijNepodrzaniMod(modTreninga, 'zabiljeziPobjeduTreninga');
     const potpuneMetrike: MetrikeMisijaIgre = {
       izvorId: treningId,
       kontekst: 'trening',
-      mod: metrike?.mod ?? 'dva_igraca',
+      mod: modTreninga,
       igracId,
       zavrsenoU,
       plasman: metrike?.plasman ?? 1,

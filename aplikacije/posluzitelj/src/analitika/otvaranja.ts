@@ -25,7 +25,7 @@ export interface ZapisOtvaranjaAnalitike {
   igraId: string;
   redniBrojOtvaranja: number;
   kontekst: KontekstOtvaranjaAnalitike;
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: import('zajednicko').ModPartije;
   brojSudionika: number;
   sustavskaRijec: string | null;
   izvor: IzvorOtvaranjaAnalitike;

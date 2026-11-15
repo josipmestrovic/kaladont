@@ -10,6 +10,7 @@ import type { AvatarConfigV1 } from './avatar.js';
 import type { FormaIgraca } from './forma.js';
 import type { PohvalaIgre } from './pohvale-igre.js';
 import type { PromjenaMisije, UkupnoIskustvoIshoda } from './misije.js';
+import type { ModPartije, PravilnikPartije } from './katalog-partije.js';
 
 export interface PodaciVeze {
   /** Opaque guest token ILI sesijski token registriranog igrača. */
@@ -49,7 +50,9 @@ export interface PayloadAvatarAzuriraj {
 
 export interface StanjeReda {
   mojIgracId: string;
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: ModPartije;
+  /** Izvršni / odabrani pravilnik ulaza; izostanak na starom payloadu = ka_zna. */
+  pravila?: PravilnikPartije;
   mjesta: ({
     igracId: string;
     nadimak: string;
@@ -65,6 +68,7 @@ export interface StanjeReda {
     postotakPobjeda: number;
     trenutniNiz: number;
     razinaVatre: 0 | 1 | 2 | 3;
+    odabranaPravila?: PravilnikPartije;
   } | null)[];
   prosjekCekanjaSek: number;
 }
@@ -75,6 +79,8 @@ export interface PostavkePrivatneSobe {
   trajanjePotezaSek: number; // 15, 30, 60, ili 0 za bez timera
   dopusteneVrste: VrstaRijeci[]; // filter dopuštenih vrsta riječi
   eliminacijskiBodovi: boolean; // +1 bod po eliminaciji
+  /** Izostanak = ka_zna (kompatibilnost starih klijenata). */
+  pravila?: PravilnikPartije;
 }
 
 export interface ClanSobe {
@@ -121,8 +127,25 @@ export interface PocetakPartije {
   mojIgracId: string;
   /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
   pocetakIso: string;
-  sjedala: { igracId: string; nadimak: string; jeGost: boolean; jeBot: boolean; avatarId: number; avatarConfig: AvatarConfigV1 | null; avatarRevision: number; rang: string | null; razina: number; trenutniNiz: number; razinaVatre: 0 | 1 | 2 | 3 }[];
-  mod?: 'cetiri_igraca' | 'dva_igraca';
+  sjedala: {
+    igracId: string;
+    nadimak: string;
+    jeGost: boolean;
+    jeBot: boolean;
+    avatarId: number;
+    avatarConfig: AvatarConfigV1 | null;
+    avatarRevision: number;
+    rang: string | null;
+    razina: number;
+    trenutniNiz: number;
+    razinaVatre: 0 | 1 | 2 | 3;
+    odabranaPravila?: PravilnikPartije;
+  }[];
+  mod?: ModPartije;
+  /** Izvršeni pravilnik stola; izostanak = ka_zna. */
+  pravila?: PravilnikPartije;
+  /** Zajednički javni Dvoboj (Klasični+KA-ZNA); u PR01 uvijek false. */
+  spojeniDvoboj?: boolean;
   kontekst?: KontekstPartije;
   jePrivatna?: boolean;
   kodSobe?: string;
@@ -147,7 +170,9 @@ export interface StanjePartije {
   zadnjaRijecVrsta: 'rijec' | 'sustav_rijec' | null;
   zavrsena: boolean;
   statusSpremanja: 'nije_zavrsena' | 'spremanje_rezultata' | 'rezultati_spremljeni';
-  mod?: 'cetiri_igraca' | 'dva_igraca';
+  mod?: ModPartije;
+  pravila?: PravilnikPartije;
+  spojeniDvoboj?: boolean;
   kontekst?: KontekstPartije;
   jePrivatna?: boolean;
   kodSobe?: string;
@@ -242,7 +267,9 @@ export interface PlasmanPartije {
 
 export interface ArhivaPartije {
   partijaId: string;
-  mod: 'cetiri_igraca' | 'dva_igraca';
+  mod: ModPartije;
+  pravila?: PravilnikPartije;
+  spojeniDvoboj?: boolean;
   pocetak: string;
   kraj: string;
   plasmani: PlasmanPartije[];
@@ -296,7 +323,9 @@ export interface KrajPartije {
   /** Konačno iskustvo nakon partijskog + misijskog XP-a. */
   ukupnoIskustvo?: UkupnoIskustvoIshoda;
   misijeStanjeVerzija?: number;
-  mod?: 'cetiri_igraca' | 'dva_igraca';
+  mod?: ModPartije;
+  pravila?: PravilnikPartije;
+  spojeniDvoboj?: boolean;
   kontekst?: KontekstPartije;
   jePrivatna?: boolean;
   kodSobe?: string;
@@ -388,7 +417,14 @@ export interface StatistikaRjecnika {
 }
 
 export interface PayloadUdjiURed {
-  mod?: 'cetiri_igraca' | 'dva_igraca';
+  mod?: ModPartije;
+  /** Izostanak = ka_zna (stari klijent / stari link). */
+  pravila?: PravilnikPartije;
+}
+
+export interface PayloadTreningZapocni {
+  /** Izostanak = ka_zna. */
+  pravila?: PravilnikPartije;
 }
 
 export type PotvrdaUlaskaURed = (stanje: StanjeReda | null) => void;
@@ -399,7 +435,8 @@ export type PotvrdaTreninga = (ishod: { pokrenut: true } | { pokrenut: false; ko
 /** Mapa svih događaja klijent -> poslužitelj, za tipiziranu upotrebu Socket.IO. */
 export interface DogadajiKlijentPoslužitelj {
   'red:udji': (payload: PayloadUdjiURed | undefined, potvrda?: PotvrdaUlaskaURed) => void;
-  'trening:zapocni': (potvrda?: PotvrdaTreninga) => void;
+  /** Stari klijent šalje samo callback; novi može poslati `{ pravila }` pa callback. */
+  'trening:zapocni': (payloadIliPotvrda?: PayloadTreningZapocni | PotvrdaTreninga, potvrda?: PotvrdaTreninga) => void;
   'trening:nastavi': (payload: Record<string, never>) => void;
   'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;

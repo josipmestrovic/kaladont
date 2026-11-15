@@ -9,7 +9,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIoServer, type Socket } from 'socket.io';
-import { validirajAvatarConfig, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent, type KodRazlogaVeze } from 'zajednicko';
+import { validirajAvatarConfig, ZADANI_PRAVILNIK, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent, type KodRazlogaVeze } from 'zajednicko';
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
@@ -640,7 +640,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const redServis = registrirajRedCekanja(
     io,
     async (stol, mod) => {
-      const rezultat = await upravitelj.zapocniPartiju(stol, mod);
+      const pravilaStola = stol.find((s) => s.upravljac !== 'bot')?.odabranaPravila
+        ?? stol[0]?.odabranaPravila
+        ?? ZADANI_PRAVILNIK;
+      const rezultat = await upravitelj.zapocniPartiju(stol, mod, { pravila: pravilaStola });
       if (rezultat === 'pokrenuta') void osvjeziProsjekCekanja();
       return rezultat;
     },
@@ -761,7 +764,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   const treningServis = registrirajTrening(io, {
     omogucen: () => postavkeBotova.treningOmogucen && upravitelj.mozePokrenutiPartiju(),
-    zapocniTrening: (sudionici) => upravitelj.zapocniPartiju(sudionici, 'dva_igraca', { kontekst: 'trening' }),
+    zapocniTrening: (sudionici, pravila) => upravitelj.zapocniPartiju(sudionici, 'dva_igraca', { kontekst: 'trening', pravila }),
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
     igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
     ukloniIzJavnogReda: redServis.ukloniIzReda,

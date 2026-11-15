@@ -3,8 +3,8 @@
  * RS-16: heartbeat/disconnect uklanja igrača iz reda u real-timeu.
  * RS-17: sastavljanje stola je atomarno (RedCekanja.pokusajSastaviStol).
  */
-import type { StanjeReda } from 'zajednicko';
-import { izracunajRang, razinaVatre, stanjeIskustva } from 'zajednicko';
+import type { PravilnikPartije, StanjeReda } from 'zajednicko';
+import { izracunajRang, MODOVI_PARTIJE, PRAVILNICI_PARTIJE, razinaVatre, stanjeIskustva, ZADANI_PRAVILNIK } from 'zajednicko';
 import { z } from 'zod';
 import type { KaladontIo } from '../server.js';
 import { RedCekanja, prvaCetvorica, prviPar, type StavkaReda } from './red-cekanja.js';
@@ -17,24 +17,40 @@ import type { FondBotova } from '../bot/fond.js';
 
 const SOBA_REDA_4P = 'red-cekanja-4p';
 const SOBA_REDA_1V1 = 'red-cekanja-1v1';
-const ShemaPayloadReda = z.object({ mod: z.enum(['cetiri_igraca', 'dva_igraca']).optional() }).strict().optional();
+/** Tipovi koje Zod prihvaća; Troboj se zatim eksplicitno odbija (PR06). */
+const ShemaPayloadReda = z.object({
+  mod: z.enum(MODOVI_PARTIJE).optional(),
+  pravila: z.enum(PRAVILNICI_PARTIJE).optional(),
+}).strict().optional();
 const PORUKA_NEVALJANOG_PAYLOADA = 'Poslana poruka nije ispravna.';
+
+/** Javni redovi do PR06: samo Dvoboj i Četveroboj. */
+type PodrzaniJavniRed = 'cetiri_igraca' | 'dva_igraca';
+
+function razrijesiUlazReda(payload: { mod?: string; pravila?: PravilnikPartije } | undefined):
+  | { ok: true; mod: PodrzaniJavniRed; pravila: PravilnikPartije }
+  | { ok: false } {
+  if (payload?.mod === 'tri_igraca') return { ok: false };
+  const mod: PodrzaniJavniRed = payload?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
+  const pravila = payload?.pravila ?? ZADANI_PRAVILNIK;
+  return { ok: true, mod, pravila };
+}
 
 export interface OpcijePopuneReda {
   fond: FondBotova;
-  omogucena: (mod: 'cetiri_igraca' | 'dva_igraca') => boolean;
+  omogucena: (mod: PodrzaniJavniRed) => boolean;
   botJeZauzet: (igracId: string) => boolean;
   sada?: () => number;
   /** Samo za testove: kraći pragovi od produkcijskih 30 / 20-30-40 s. */
-  pragoviMs?: Partial<Record<'cetiri_igraca' | 'dva_igraca', readonly number[]>>;
-  odstupanjaMs?: Partial<Record<'cetiri_igraca' | 'dva_igraca', readonly number[]>>;
-  dohvatiRaspored?: (mod: 'cetiri_igraca' | 'dva_igraca') => { pragoviMs: readonly number[]; odstupanjaMs?: readonly number[] };
+  pragoviMs?: Partial<Record<PodrzaniJavniRed, readonly number[]>>;
+  odstupanjaMs?: Partial<Record<PodrzaniJavniRed, readonly number[]>>;
+  dohvatiRaspored?: (mod: PodrzaniJavniRed) => { pragoviMs: readonly number[]; odstupanjaMs?: readonly number[] };
   dohvatiOdmaciNeuspjelogPokretanja?: () => readonly number[];
 }
 
 export function registrirajRedCekanja(
   io: KaladontIo,
-  naStolSastavljen: (stol: StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca') => Promise<RezultatPokretanja | void> | RezultatPokretanja | void,
+  naStolSastavljen: (stol: StavkaReda[], mod: PodrzaniJavniRed) => Promise<RezultatPokretanja | void> | RezultatPokretanja | void,
   igracImaAktivnuPartiju: (igracId: string) => boolean,
   igracImaPrivatnuSobu: (igracId: string) => boolean,
   mozeStvoritiPartiju: () => boolean,
@@ -45,13 +61,13 @@ export function registrirajRedCekanja(
 ): { ukloniIzReda: (igracId: string) => void; osvjeziPopunu: () => void; zaustaviPopunu: () => void } {
   const red4p = new RedCekanja(prvaCetvorica);
   const red1v1 = new RedCekanja(prviPar);
-  const namjere = new Map<string, { mod: 'cetiri_igraca' | 'dva_igraca'; generacija: number }>();
+  const namjere = new Map<string, { mod: PodrzaniJavniRed; pravila: PravilnikPartije; generacija: number }>();
   let generacijaUlaska = 0;
   let zaustavljen = false;
-  const ponavljanja = new Map<'cetiri_igraca' | 'dva_igraca', NodeJS.Timeout>();
-  const greskePokretanja = new Map<'cetiri_igraca' | 'dva_igraca', number>();
+  const ponavljanja = new Map<PodrzaniJavniRed, NodeJS.Timeout>();
+  const greskePokretanja = new Map<PodrzaniJavniRed, number>();
 
-  function stvoriPopunu(mod: 'cetiri_igraca' | 'dva_igraca'): PopunaReda | null {
+  function stvoriPopunu(mod: PodrzaniJavniRed): PopunaReda | null {
     if (!popunaOpcije) return null;
     return new PopunaReda({
       red: mod === 'dva_igraca' ? red1v1 : red4p,
@@ -69,9 +85,9 @@ export function registrirajRedCekanja(
   }
   const popuna4p = stvoriPopunu('cetiri_igraca');
   const popuna1v1 = stvoriPopunu('dva_igraca');
-  const popunaZa = (mod: 'cetiri_igraca' | 'dva_igraca') => (mod === 'dva_igraca' ? popuna1v1 : popuna4p);
+  const popunaZa = (mod: PodrzaniJavniRed) => (mod === 'dva_igraca' ? popuna1v1 : popuna4p);
 
-  function izracunajStanje(mojIgracId: string, mod: 'cetiri_igraca' | 'dva_igraca'): StanjeReda {
+  function izracunajStanje(mojIgracId: string, mod: PodrzaniJavniRed, pravila: PravilnikPartije = ZADANI_PRAVILNIK): StanjeReda {
     const red = mod === 'dva_igraca' ? red1v1 : red4p;
     const maks = mod === 'dva_igraca' ? 2 : 4;
     // Rezervirani botovi prikazuju se kao sudionici koji čekaju; rokove i dalje određuje poslužitelj.
@@ -102,18 +118,21 @@ export function registrirajRedCekanja(
         postotakPobjeda: jeBot || odigrane <= 0 ? 0 : (pobjede / odigrane) * 100,
         trenutniNiz: jeBot ? 0 : (mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0)),
         razinaVatre: jeBot ? 0 : razinaVatre(mod === 'dva_igraca' ? (stavka.trenutniNiz1v1 ?? 0) : (stavka.trenutniNiz4p ?? 0), mod),
+        odabranaPravila: stavka.odabranaPravila ?? ZADANI_PRAVILNIK,
       };
     });
-    return { mojIgracId, mod, mjesta, prosjekCekanjaSek: dohvatiProsjekCekanjaSek() };
+    return { mojIgracId, mod, pravila, mjesta, prosjekCekanjaSek: dohvatiProsjekCekanjaSek() };
   }
 
-  function posaljiStanje(mod: 'cetiri_igraca' | 'dva_igraca'): void {
+  function posaljiStanje(mod: PodrzaniJavniRed): void {
     const sobaSve = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
     const socketIdovi = io.sockets.adapter.rooms.get(sobaSve);
     if (!socketIdovi) return;
     for (const socketId of socketIdovi) {
       const socket = io.sockets.sockets.get(socketId);
-      if (socket) socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
+      if (!socket) continue;
+      const pravila = namjere.get(socket.data.igracId)?.pravila ?? ZADANI_PRAVILNIK;
+      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod, pravila));
     }
   }
 
@@ -124,7 +143,7 @@ export function registrirajRedCekanja(
   }
 
   /** Nakon neuspjelog starta vraća samo ljude koji još čekaju isti način; zadržava izvorni usaoU. */
-  function vratiURed(stol: readonly StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca', generacije: ReadonlyMap<string, number>): void {
+  function vratiURed(stol: readonly StavkaReda[], mod: PodrzaniJavniRed, generacije: ReadonlyMap<string, number>): void {
     const red = mod === 'dva_igraca' ? red1v1 : red4p;
     const soba = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
     for (const stavka of stol) {
@@ -138,7 +157,7 @@ export function registrirajRedCekanja(
     }
   }
 
-  function pokreniStolSRezultatom(stol: StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca'): Promise<RezultatPokretanja> {
+  function pokreniStolSRezultatom(stol: StavkaReda[], mod: PodrzaniJavniRed): Promise<RezultatPokretanja> {
     const generacije = new Map(stol.filter((stavka) => stavka.upravljac !== 'bot').map((stavka) => [stavka.igracId, namjere.get(stavka.igracId)?.generacija ?? -1]));
     const obradiNeuspjeh = () => {
       vratiURed(stol, mod, generacije);
@@ -179,7 +198,7 @@ export function registrirajRedCekanja(
       .finally(() => posaljiStanje(mod));
   }
 
-  function pokreniStol(stol: StavkaReda[], mod: 'cetiri_igraca' | 'dva_igraca'): void {
+  function pokreniStol(stol: StavkaReda[], mod: PodrzaniJavniRed): void {
     void pokreniStolSRezultatom(stol, mod).finally(() => popunaZa(mod)?.osvjezi());
   }
 
@@ -191,8 +210,12 @@ export function registrirajRedCekanja(
         return;
       }
       if (!provjeriDogadaj(socket.data.igracId, 'red:stanje')) return;
-      const mod: 'cetiri_igraca' | 'dva_igraca' = rezultat.data?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
-      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, mod));
+      const ulaz = razrijesiUlazReda(rezultat.data);
+      if (!ulaz.ok) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: PORUKA_NEVALJANOG_PAYLOADA });
+        return;
+      }
+      socket.emit('red:stanje', izracunajStanje(socket.data.igracId, ulaz.mod, ulaz.pravila));
     }));
 
     socket.on('red:udji', omotajSocketHandler(socket, 'red:udji', zapisSocketHandlerGreske, async (...argumenti: unknown[]) => {
@@ -215,7 +238,13 @@ export function registrirajRedCekanja(
         potvrda?.(null);
         return;
       }
-      const mod: 'cetiri_igraca' | 'dva_igraca' = rezultat.data?.mod === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca';
+      const ulaz = razrijesiUlazReda(rezultat.data);
+      if (!ulaz.ok) {
+        socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: PORUKA_NEVALJANOG_PAYLOADA });
+        potvrda?.(null);
+        return;
+      }
+      const { mod, pravila } = ulaz;
       const sobaZaUlaz = mod === 'dva_igraca' ? SOBA_REDA_1V1 : SOBA_REDA_4P;
       const suprotnaSoba = mod === 'dva_igraca' ? SOBA_REDA_4P : SOBA_REDA_1V1;
       const red = mod === 'dva_igraca' ? red1v1 : red4p;
@@ -239,12 +268,12 @@ export function registrirajRedCekanja(
       socket.join(sobaZaUlaz);
 
       if (red.stanje().some((s) => s.igracId === socket.data.igracId)) {
-        potvrda?.(izracunajStanje(socket.data.igracId, mod));
+        potvrda?.(izracunajStanje(socket.data.igracId, mod, pravila));
         return;
       }
 
       ukloniIzSvihRedova(socket.data.igracId);
-      namjere.set(socket.data.igracId, { mod, generacija: ++generacijaUlaska });
+      namjere.set(socket.data.igracId, { mod, pravila, generacija: ++generacijaUlaska });
 
       red.udji({
         igracId: socket.data.igracId,
@@ -263,8 +292,9 @@ export function registrirajRedCekanja(
         trenutniNiz4p: socket.data.trenutniNiz4p ?? 0,
         trenutniNiz1v1: socket.data.trenutniNiz1v1 ?? 0,
         usaoU: Date.now(),
+        odabranaPravila: pravila,
       });
-      potvrda?.(izracunajStanje(socket.data.igracId, mod));
+      potvrda?.(izracunajStanje(socket.data.igracId, mod, pravila));
       posaljiStanje(mod);
 
       const stol = ponavljanja.has(mod) ? null : red.pokusajSastaviStol();

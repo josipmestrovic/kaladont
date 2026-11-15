@@ -1,5 +1,21 @@
 /** Plasman + eliminacije + bonus. Maksimalno 7 bodova po igraču (bodovanje-i-rangovi.md). */
 
+import { odbijNepodrzaniMod, type ModPartije } from './katalog-partije.js';
+
+export type { ModPartije } from './katalog-partije.js';
+export {
+  MODOVI_PARTIJE,
+  PRAVILNICI_PARTIJE,
+  ZADANI_PRAVILNIK,
+  jePoznatiMod,
+  jePoznatiPravilnik,
+  zadaniPravilnik,
+  javnaSjedalaZaMod,
+  jePodrzaniJavniRed,
+  odbijNepodrzaniMod,
+  type PravilnikPartije,
+} from './katalog-partije.js';
+
 export type Plasman = 1 | 2 | 3 | 4;
 
 export const BODOVI_PLASMANA: Record<Plasman, number> = {
@@ -17,10 +33,9 @@ export interface RezultatIgraca {
   eliminacije: number;
 }
 
-export type ModPartije = 'cetiri_igraca' | 'dva_igraca';
-
-/** Bodovi jednog igrača u jednoj partiji: 4p mod = plasman + eliminacije + bonus; 1v1 mod = fiksno 1 bod za pobjedu, 0 za poraz. */
+/** Bodovi jednog igrača u jednoj partiji: 4p mod = plasman + eliminacije + bonus; 1v1 mod = fiksno 1 bod za pobjedu, 0 za poraz. Troboj (PR03) još nije ovdje. */
 export function izracunajBodove(rezultat: RezultatIgraca, mod: ModPartije = 'cetiri_igraca'): number {
+  odbijNepodrzaniMod(mod, 'izracunajBodove');
   if (mod === 'dva_igraca') {
     return rezultat.plasman === 1 ? 1 : 0;
   }

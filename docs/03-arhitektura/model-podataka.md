@@ -152,10 +152,14 @@ Streak raste nakon prihvaćenog igračevog poteza i prekida ga samo odbijena rij
 
 ## partije
 
+Format stola (`mod`), pravilnik (`pravila`) i kontekst igre (`javna` / `privatna` / `trening` u runtimeu) tri su odvojene osi. Privatna soba s 2–8 sjedala **nije** javni Troboj: u bazi i dalje može stajati `mod=cetiri_igraca` uz svoj `pravila`, a kontekst je `privatna`. Trening se ne zapisuje u `partije`.
+
 | Stupac | Tip | Opis |
 |---|---|---|
 | id | uuid PK | |
-| mod | enum: `cetiri_igraca`, `dva_igraca` | Način igre |
+| mod | enum: `cetiri_igraca`, `dva_igraca`, `tri_igraca` | Format javnog stola (veličina) |
+| pravila | enum: `klasicni`, `ka_zna`, `dokazi_nastavak` | Izvršeni pravilnik; default i povijest = `ka_zna` |
+| spojeni_dvoboj | boolean | Zajednički javni Dvoboj (Klasični+KA-ZNA); povijest i do PR06 = `false` |
 | pocetak | timestamptz | |
 | kraj | timestamptz, null | Stvarni trenutak kraja igre, zabilježen jednom u motoru; ponovljeni upis ga ne mijenja. Određuje razdoblje vremenskih ljestvica. |
 | status | enum: `u_tijeku`, `zavrsena`, `ponistena` | `ponistena` je rezerva za tehničke incidente |
@@ -170,6 +174,7 @@ Rezultat svakog igrača u svakoj partiji — **temelj svih statistika i budućeg
 |---|---|---|
 | partija_id | uuid FK | PK (partija_id, igrac_id) |
 | igrac_id | uuid FK | |
+| odabrana_pravila | enum: `klasicni`, `ka_zna`, `dokazi_nastavak` | UI odabir igrača (spojeni Dvoboj); default/povijest = `ka_zna` |
 | sjedalo | smallint | 0–3, nasumično dodijeljeno |
 | plasman | smallint, null | 1–4; null dok partija traje |
 | bodovi | smallint | Plasman + eliminacije + bonus |

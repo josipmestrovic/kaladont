@@ -17,7 +17,7 @@
 
   interface Arhiva {
     partijaId: string;
-    mod: 'cetiri_igraca' | 'dva_igraca';
+    mod: import('zajednicko').ModPartije;
     pocetak: string;
     kraj: string;
     plasmani: Plasman[];
@@ -77,7 +77,7 @@
     <header>
       <p class="oznaka-stanja">Odigrana stara igra</p>
       <h1>Završni poredak</h1>
-      <p>{arhiva.mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj'} · {formatirajDatum(arhiva.kraj)}</p>
+      <p>{arhiva.mod === 'dva_igraca' ? 'Dvoboj' : arhiva.mod === 'tri_igraca' ? 'Troboj' : 'Četveroboj'} · {formatirajDatum(arhiva.kraj)}</p>
     </header>
 
     <section class="plasmani" aria-label="Završni poredak">

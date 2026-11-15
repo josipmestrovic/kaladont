@@ -7,11 +7,11 @@
   interface StatistikaCekanja {
     dani: number;
     poDanu: {
-      dan: string; mod: 'cetiri_igraca' | 'dva_igraca'; partije: number;
+      dan: string; mod: import('zajednicko').ModPartije; partije: number;
       prosjekCekanjaMs: number | null; medijanCekanjaMs: number | null; p95CekanjaMs: number | null;
       partijeBezBotova: number; partijeSJednimBotom: number; partijeSDvaBota: number; partijeSTriBota: number;
     }[];
-    pobjedePoSastavu: { mod: 'cetiri_igraca' | 'dva_igraca'; brojBotova: number; partije: number; pobjedeLjudi: number; udioPobjedaLjudi: number | null }[];
+    pobjedePoSastavu: { mod: import('zajednicko').ModPartije; brojBotova: number; partije: number; pobjedeLjudi: number; udioPobjedaLjudi: number | null }[];
     eliminacijeBotova: { nacinIspadanja: string; broj: number }[];
     zivo: {
       fond: { ukupno: number; slobodni: number; rezervirani: number; uPartiji: number; iscrpljenja: number };
@@ -25,7 +25,9 @@
   let daniStatistike = $state(7);
   let greskaStatistike = $state<string | null>(null);
   let greska = $state<string | null>(null);
-  const nazivModa = (mod: 'cetiri_igraca' | 'dva_igraca') => (mod === 'dva_igraca' ? 'Dvoboj' : 'Četveroboj');
+  const nazivModa = (mod: import('zajednicko').ModPartije) => (
+    mod === 'dva_igraca' ? 'Dvoboj' : mod === 'tri_igraca' ? 'Troboj' : 'Četveroboj'
+  );
   const sekunde = (ms: number | null) => (ms === null ? '–' : `${(ms / 1000).toFixed(1)} s`);
 
   async function ucitajStatistiku() {
