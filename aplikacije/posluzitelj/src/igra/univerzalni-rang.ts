@@ -146,8 +146,10 @@ export async function upisiUniverzalniRangZaStol(
   tx: MisijeTx,
   partijaId: string,
   sudionici: readonly RangSudionikUlaz[],
-  _mod: ModPartije,
+  /** Zadržano zbog pozivatelja (format partije); doprinos ne ovisi o modu. */
+  mod: ModPartije,
 ): Promise<Map<string, RangUpisRezultat>> {
+  void mod;
   const { poIgracu } = izracunajDoprinoseStola(sudionici);
   const sortirani = [...sudionici].sort((a, b) => a.igracId.localeCompare(b.igracId));
   const rezultati = new Map<string, RangUpisRezultat>();

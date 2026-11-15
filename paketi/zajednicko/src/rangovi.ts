@@ -99,7 +99,8 @@ export function izracunajUniverzalniUcinak(sumaJedinica: number, brojPartija: nu
  * Rang iz broja javnih partija i univerzalnog učinka.
  * Treći argument (stari mod) zanemaruje se — zadržan radi kompatibilnosti potpisâ.
  */
-export function izracunajRang(odigrane: number, ucinakIliProsjek: number, _modZanemaren?: string): string {
+export function izracunajRang(odigrane: number, ucinakIliProsjek: number, ..._zanemareniArgs: unknown[]): string {
+  void _zanemareniArgs;
   if (odigrane < BROJ_PARTIJA_ZA_KALIBRACIJU) return 'Piskaralo';
 
   let rang = RANGOVI[0]!.naziv;
