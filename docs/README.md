@@ -72,6 +72,7 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | [objava-staginga-za-pocetnike.md](07-operacije/objava-staginga-za-pocetnike.md) | Svakodnevna staging objava: provjera, direktni push, migracija, test i rollback         |
 | [release-shema.md](07-operacije/release-shema.md)                               | Identitet releasea, staging closed test checklist, promocija i rollback pravila        |
 | [release-notes-v0.2.0.md](07-operacije/release-notes-v0.2.0.md) | Javno izdanje 0.2.0 (Troboj, pravilnici; `/novosti#v0-2-0`) |
+| [release-notes-v0.1.0.md](07-operacije/release-notes-v0.1.0.md) | Prvo javno izdanje 0.1.0 (`/novosti#v0-1-0`) |
 | [release-notes-v0.5.0-closed-alpha.1.md](07-operacije/release-notes-v0.5.0-closed-alpha.1.md) | Novosti i provjere za peto zatvoreno alpha izdanje |
 | [release-notes-v0.4.0-closed-alpha.1.md](07-operacije/release-notes-v0.4.0-closed-alpha.1.md) | Novosti i provjere za četvrto zatvoreno alpha izdanje |
 | [release-notes-v0.3.0-closed-alpha.1.md](07-operacije/release-notes-v0.3.0-closed-alpha.1.md) | Novosti za treće zatvoreno alpha izdanje |

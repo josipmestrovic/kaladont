@@ -6,10 +6,14 @@ import { ShemaKonfiguracijeBota, VERZIJA_BOT_POLITIKE, ZADANA_KONFIGURACIJA_BOTA
 /**
  * Stare spremljene konfiguracije (verzija 3, bez tri_igraca / botoviTroboj) moraju
  * dobiti zadane vrijednosti i novu verziju politike bez ručnog admin upisa.
+ * `zadano` treba biti env-učitan snapshot (BOTOVI_*), ne samo hardkodirani default —
+ * inače nedostajući `botoviTroboj` uvijek padne na false i env se zanemari.
  */
-export function parsajSpremljenuKonfiguraciju(sirovo: unknown): KonfiguracijaBota {
+export function parsajSpremljenuKonfiguraciju(
+  sirovo: unknown,
+  zadano: KonfiguracijaBota = ZADANA_KONFIGURACIJA_BOTA,
+): KonfiguracijaBota {
   const ulaz = sirovo && typeof sirovo === 'object' ? (sirovo as Record<string, unknown>) : {};
-  const zadano = ZADANA_KONFIGURACIJA_BOTA;
   const pragoviUlaz = ulaz.pragoviPopuneMs && typeof ulaz.pragoviPopuneMs === 'object'
     ? (ulaz.pragoviPopuneMs as Record<string, unknown>)
     : {};
@@ -28,7 +32,9 @@ export function parsajSpremljenuKonfiguraciju(sirovo: unknown): KonfiguracijaBot
       ...zadano.odstupanjaPopuneMs,
       ...odstupanjaUlaz,
     },
+    botoviDvoboj: typeof ulaz.botoviDvoboj === 'boolean' ? ulaz.botoviDvoboj : zadano.botoviDvoboj,
     botoviTroboj: typeof ulaz.botoviTroboj === 'boolean' ? ulaz.botoviTroboj : zadano.botoviTroboj,
+    botoviCetveroboj: typeof ulaz.botoviCetveroboj === 'boolean' ? ulaz.botoviCetveroboj : zadano.botoviCetveroboj,
   });
 }
 
@@ -45,7 +51,7 @@ export async function ucitajTrajnePostavkeBotova(zadano: KonfiguracijaBota): Pro
   const [zapis] = await baza.select().from(postavkeBotova).where(eq(postavkeBotova.id, 1));
   return zapis ? {
     revizija: zapis.revizija,
-    konfiguracija: parsajSpremljenuKonfiguraciju(zapis.konfiguracija),
+    konfiguracija: parsajSpremljenuKonfiguraciju(zapis.konfiguracija, zadano),
     azurirano: zapis.azurirano.toISOString(),
     azuriraoId: zapis.azuriraoId,
   } : { revizija: 0, konfiguracija: ShemaKonfiguracijeBota.parse(zadano), azurirano: null, azuriraoId: null };

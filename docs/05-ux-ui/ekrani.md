@@ -197,7 +197,7 @@ Jedna stranica s odabirima u URL-u. Pravila: [bodovanje-i-rangovi.md](../02-prav
 - **O igri** (`/o-igri`) — overview, licence/hrLex, statistika rječnika, CTA foruma; link na **Novosti**. Nije SEO target (`noindex`).
 - `/privatnost`, `/uvjeti` — pravni minimum.
 - `/zahvala` — nakon registracije.
-- **`/novosti`** — javni indeks objava (najnovija prva); prvo izdanje **Kaladont 0.2.0** sa sidrom `#v0-2-0`, datum 17. 11. 2026. Više nije redirect.
+- **`/novosti`** — javni indeks objava (najnovija prva); liste značajki po izdanju. **0.2.0** (`#v0-2-0`, 17. 11. 2026) i izvorno **0.1.0** (`#v0-1-0`, 1. 10. 2026). Više nije redirect.
 
 ## Responzivnost
 

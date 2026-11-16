@@ -173,4 +173,18 @@ describe('PR06 javni redovi', () => {
     expect(parsano.pragoviPopuneMs.tri_igraca).toEqual([20_000, 30_000]);
     expect(parsano.botoviTroboj).toBe(false);
   });
+
+  it('nedostajući botoviTroboj uzima vrijednost iz env zadanih postavki', () => {
+    const stara = {
+      ...ZADANA_KONFIGURACIJA_BOTA,
+      verzija: 3,
+      botoviTroboj: undefined,
+      botoviDvoboj: true,
+      botoviCetveroboj: true,
+    };
+    const izEnv = { ...ZADANA_KONFIGURACIJA_BOTA, botoviTroboj: true, botoviDvoboj: true, botoviCetveroboj: true };
+    const parsano = parsajSpremljenuKonfiguraciju(stara, izEnv);
+    expect(parsano.botoviTroboj).toBe(true);
+    expect(parsano.botoviDvoboj).toBe(true);
+  });
 });

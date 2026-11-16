@@ -302,6 +302,36 @@ describe('popuna javnog reda botovima', () => {
     }
   }, 45_000);
 
+  it('troboj: rezervirani bot se prikazuje u čekaonici, a partija kreće s dva bota', async () => {
+    const lokalni = await izgradiPosluzitelj({
+      socketOgranicenja: { handshakePoIpMinuti: 1_000 },
+      postavkeMotora: { ...postavkeTestMotora, odgodaPocetkaPartijeMs: 5_000 },
+      popunaBotovima: { troboj: true, pragoviMs: { tri_igraca: [50, 100] } },
+    });
+    lokalni.fondBotova.postaviIdentitete((await ucitajIdentiteteBotova()).filter((bot) => testniBotovi.includes(bot.igracId)));
+    let socket: ClientSocket | null = null;
+    try {
+      await lokalni.app.listen({ port: 0, host: '127.0.0.1' });
+      const podaci = lokalni.app.server.address();
+      socket = ioClient(`http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`, { auth: { token: `gost.${randomUUID().replaceAll('-', '')}` }, forceNew: true });
+      await new Promise<void>((resolve, reject) => { socket!.once('connect', resolve); socket!.once('connect_error', reject); });
+      const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak', () => true, 15_000);
+      socket.emit('red:udji', { mod: 'tri_igraca' });
+      const stanjeReda = await cekaj<StanjeReda>(socket, 'red:stanje', (s) => s.mod === 'tri_igraca' && s.mjesta.filter(Boolean).length === 2, 5_000);
+      expect(stanjeReda.mjesta.filter(Boolean)).toHaveLength(2);
+      const pocetak = await pocetakPromise;
+      expect(pocetak.sjedala).toHaveLength(3);
+      expect(pocetak.sjedala.filter((s) => s.igracId !== pocetak.mojIgracId)).toHaveLength(2);
+      const ponistena = cekaj<{ partijaId: string }>(socket, 'partija:ponistena');
+      socket.emit('partija:izadji');
+      expect((await ponistena).partijaId).toBe(pocetak.partijaId);
+      await expect.poll(() => lokalni.fondBotova.stanje().slobodni).toBe(3);
+    } finally {
+      socket?.disconnect();
+      await lokalni.zaustavi();
+    }
+  }, 30_000);
+
   it('četveroboj: rezervirani bot se prikazuje u čekaonici prije pokretanja, a partija kreće s tri bota', async () => {
     // Zaseban server s odgodom prve riječi: izlazak prije runde poništava stol i odmah vraća botove u fond.
     const lokalni = await izgradiPosluzitelj({
