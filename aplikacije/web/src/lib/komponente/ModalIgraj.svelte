@@ -81,7 +81,6 @@
       role="dialog"
       aria-modal="true"
       aria-label="Igraj"
-      aria-labelledby="modal-naslov"
       tabindex="-1"
       onclick={(dogadaj) => dogadaj.stopPropagation()}
       onkeydown={naTipku}
