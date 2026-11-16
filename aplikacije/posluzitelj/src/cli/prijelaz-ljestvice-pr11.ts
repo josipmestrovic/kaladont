@@ -16,10 +16,10 @@
  * u zatvorenim periodima. Ne dira rang/DNK/XP. „Na dvije fronte” pairing ostaje
  * 4p↔2p do PR13; Troboj dokazi se ipak bilježe.
  */
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { kalendarskeGranice, type MetrikaLjestvice, type ModPartije } from 'zajednicko';
 import { baza, zatvoriBazu } from '../baza/klijent.js';
-import { dokaziTop10Ulazaka } from '../baza/shema.js';
+import { dokaziTop10Ulazaka, igraci } from '../baza/shema.js';
 import {
   obradiNeobradeneTop10Dokaze,
   REDOSLIJED_MODOVA_TOP10,
@@ -35,13 +35,21 @@ function imaZastavicu(ime: string): boolean {
   return process.argv.includes(ime);
 }
 
+/** Isto pravilo kao top10.jePrimatelj — gosti/botovi zauzimaju mjesto bez dokaza. */
+function jePrimateljDokaza(igrac: { vrsta: string; upravljac: string; obrisanAt: Date | null }): boolean {
+  if (igrac.obrisanAt) return false;
+  return igrac.upravljac === 'covjek' && (igrac.vrsta === 'registriran' || igrac.vrsta === 'admin');
+}
+
 async function usporediOtvorene(sada: Date): Promise<void> {
   const pocetak = new Date(konfiguracija.LJESTVICE_POCETAK);
   const poModu: Record<string, {
     razdoblje: string;
     uTop10: number;
+    primatelji: number;
+    iskljuceniGostiIliBotovi: number;
     bezDokaza: number;
-    /** Broj igrača u Top10 koji još nemaju dokaz za taj kalendarski početak. */
+    /** Primatelji u Top10 koji još nemaju dokaz (usklađeno s apply). */
     noviKandidati: number;
   }[]> = {};
 
@@ -63,8 +71,27 @@ async function usporediOtvorene(sada: Date): Promise<void> {
         }
       }
 
+      const idovi = [...najbolje.keys()];
+      const ljudi = idovi.length === 0
+        ? []
+        : await baza.select({
+          id: igraci.id,
+          vrsta: igraci.vrsta,
+          upravljac: igraci.upravljac,
+          obrisanAt: igraci.obrisanAt,
+        }).from(igraci).where(and(inArray(igraci.id, idovi), isNull(igraci.obrisanAt)));
+      const poIgracu = new Map(ljudi.map((red) => [red.id, red]));
+
       let bezDokaza = 0;
+      let primatelji = 0;
+      let iskljuceniGostiIliBotovi = 0;
       for (const igracId of najbolje.keys()) {
+        const igrac = poIgracu.get(igracId);
+        if (!igrac || !jePrimateljDokaza(igrac)) {
+          iskljuceniGostiIliBotovi += 1;
+          continue;
+        }
+        primatelji += 1;
         const [red] = await baza
           .select({ igracId: dokaziTop10Ulazaka.igracId })
           .from(dokaziTop10Ulazaka)
@@ -81,6 +108,8 @@ async function usporediOtvorene(sada: Date): Promise<void> {
       poModu[mod]!.push({
         razdoblje: vrsta,
         uTop10: najbolje.size,
+        primatelji,
+        iskljuceniGostiIliBotovi,
         bezDokaza,
         noviKandidati: bezDokaza,
       });
@@ -89,7 +118,7 @@ async function usporediOtvorene(sada: Date): Promise<void> {
 
   console.log(JSON.stringify({
     usporedba: {
-      napomena: 'Bez PII. uTop10 = rangirani ≤10 pod novim minom; noviKandidati = još nemaju dokaz za otvoreni kalendarski početak.',
+      napomena: 'Bez PII. noviKandidati broji samo registrirane/admine (isti filter kao apply); gosti/botovi su u iskljuceniGostiIliBotovi.',
       sada: sada.toISOString(),
       pocetakPracenja: pocetak.toISOString(),
       poModu,
