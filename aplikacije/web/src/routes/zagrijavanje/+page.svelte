@@ -18,11 +18,16 @@
   const igra = dohvatiStanjeIgre();
   const savjeti = dohvatiSavjete('dva_igraca');
 
-  /** PR08 smoke: /zagrijavanje?pravila= — puna Igraj UI matrica dolazi u PR14. */
+  /** PR14: /zagrijavanje?pravila= — bez queryja stari default KA-ZNA. */
   const trazenaPravila = $derived(((): PravilnikPartije | null => {
     const pravila = $page.url.searchParams.get('pravila');
     return jePoznatiPravilnik(pravila) ? pravila : null;
   })());
+  const tekstPripreme = $derived(
+    trazenaPravila === 'klasicni'
+      ? 'Pripremamo igru s dva Računala…'
+      : 'Pripremamo dvoboj protiv Računala…',
+  );
 
   let poruka = $state<string | null>(null);
   let countdown = $state<number | null>(null);
@@ -128,7 +133,7 @@
       <a href="/" class="sporedni-gumb">Povratak na odabir igre</a>
     </div>
   {:else}
-    <h1 aria-live="polite">Pripremamo dvoboj protiv računala…</h1>
+    <h1 aria-live="polite">{tekstPripreme}</h1>
     <p class="napomena">Ovo je trening. Ne bilježi se i ne mijenja statistiku, rang, XP ni formu. Registriranim igračima pobjeda broji dostignuće Zagrijan.</p>
     <a href="/" class="sporedni-gumb">Odustani</a>
   {/if}

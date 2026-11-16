@@ -5,7 +5,8 @@
   import { dohvatiSocket } from '$lib/socket.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import { aktivirajAudio, pustiAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
-  import type { PocetakPartije, StanjePrivatneSobe, VrstaRijeci } from 'zajednicko';
+  import { ZADANI_PRAVILNIK, type PocetakPartije, type StanjePrivatneSobe, type VrstaRijeci } from 'zajednicko';
+  import { nazivPravilnika } from '$lib/igraj-rute.js';
 
   const kodSobe = $derived($page.params.kod?.toUpperCase() ?? '');
 
@@ -248,6 +249,10 @@
 
         <h2>Pravila ove sobe</h2>
         <ul class="lista-pravila">
+          <li>
+            <strong>Pravilnik:</strong>
+            {nazivPravilnika(stanjeSobe.postavke.pravila ?? ZADANI_PRAVILNIK)}
+          </li>
           <li>
             <strong>Bodovanje eliminacija:</strong>
             {stanjeSobe.postavke.eliminacijskiBodovi ? '+1 bod po eliminaciji' : 'Samo pobjeda (2 boda)'}

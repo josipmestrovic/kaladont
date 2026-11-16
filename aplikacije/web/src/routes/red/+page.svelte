@@ -11,10 +11,11 @@
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
   import type { ModPartije, PayloadGreska, PocetakPartije, PravilnikPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
   import { javnaSjedalaZaMod, jePoznatiPravilnik, ZADANI_PRAVILNIK } from 'zajednicko';
+  import { nazivFormata, nazivPravilnika } from '$lib/igraj-rute.js';
 
   const igra = dohvatiStanjeIgre();
 
-  /** PR06 smoke: /red?mod=&pravila= — puna Igraj UI matrica dolazi u PR14. */
+  /** PR14: /red?mod=&pravila= — stare adrese bez pravila → KA-ZNA. */
   const trazeneMod = $derived(((): ModPartije => {
     const mod = $page.url.searchParams.get('mod');
     if (mod === 'dva_igraca') return 'dva_igraca';
@@ -44,6 +45,16 @@
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
   const preostaloIgraca = $derived(Math.max(0, ukupnoMjesta - brojIgraca));
   const stanjeUskladjeno = $derived(stanje.mod === trazeneMod);
+  // HINT PR14: u spojenom Dvoboju svaki vidi svoj odabir kartice, ne stolov kanonski pravilnik.
+  const prikazPravilnika = $derived(((): PravilnikPartije => {
+    const moje = stanje.mjesta.find((m) => m?.igracId === stanje.mojIgracId);
+    if (moje?.odabranaPravila && jePoznatiPravilnik(moje.odabranaPravila)) return moje.odabranaPravila;
+    if (stanje.pravila && jePoznatiPravilnik(stanje.pravila)) return stanje.pravila;
+    return trazenaPravila;
+  })());
+  const naslovLobbyja = $derived(
+    `${nazivPravilnika(prikazPravilnika)} · ${nazivFormata(trazeneMod)}`,
+  );
 
   function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {
     if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
@@ -202,6 +213,8 @@
   <h1>Čekamo još {preostaloIgraca} {preostaloIgraca === 1 ? (trazeneMod === 'dva_igraca' ? 'igrača' : 'igrač') : 'igrača'}...</h1>
 {/if}
 
+<p class="oznaka-izbora" data-testid="red-oznaka-izbora">{naslovLobbyja}</p>
+
 {#if poruka}
   <p role="alert">{poruka}</p>
 {/if}
@@ -335,6 +348,13 @@
     margin: 0 0 8px;
     font-size: var(--naslov-3);
     color: var(--boja-tekst-osnovni);
+  }
+
+  .oznaka-izbora {
+    margin: 0 0 12px;
+    color: var(--boja-mint-tamni);
+    font-size: var(--tekst-mali);
+    font-weight: 800;
   }
 
   .prosjek-cekanja {

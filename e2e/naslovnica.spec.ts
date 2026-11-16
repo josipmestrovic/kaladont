@@ -92,13 +92,24 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
 
   await navigacija.getByRole('button', { name: 'Igraj' }).click();
-  const dijalog = page.getByRole('dialog', { name: 'Kako želiš igrati?' });
+  // HINT PR14: stabilan aria-label „Igraj”; naslov koraka je u h2.
+  const dijalog = page.getByRole('dialog', { name: 'Igraj' });
+  await expect(dijalog.getByRole('heading', { name: 'Kako želiš igrati?' })).toBeVisible();
+  await expect(dijalog.getByRole('button', { name: /Klasični Kaladont/ })).toBeVisible();
+  await expect(dijalog.getByRole('button', { name: /KA-ZNA/ })).toBeVisible();
+  await expect(dijalog.getByRole('button', { name: /Dokaži nastavak/ })).toBeVisible();
+  await expect(dijalog.getByText('U tome slučaju')).toBeVisible();
+
+  await dijalog.getByRole('button', { name: /KA-ZNA/ }).click();
+  await expect(dijalog.getByRole('heading', { name: 'Odaberi stol' })).toBeVisible();
   const opcije = dijalog.getByRole('link');
-  await expect(opcije).toHaveCount(4);
-  await expect(opcije.nth(0)).toHaveAttribute('href', '/red?mod=dva_igraca');
-  await expect(opcije.nth(1)).toHaveAttribute('href', '/red?mod=cetiri_igraca');
-  await expect(opcije.nth(2)).toHaveAttribute('href', '/zagrijavanje');
-  await expect(opcije.nth(3)).toHaveAttribute('href', '/soba/kreiraj');
+  await expect(opcije).toHaveCount(5);
+  await expect(opcije.nth(0)).toHaveAttribute('href', '/red?mod=dva_igraca&pravila=ka_zna');
+  await expect(opcije.nth(1)).toHaveAttribute('href', '/red?mod=tri_igraca&pravila=ka_zna');
+  await expect(opcije.nth(2)).toHaveAttribute('href', '/red?mod=cetiri_igraca&pravila=ka_zna');
+  await expect(opcije.nth(3)).toHaveAttribute('href', '/zagrijavanje?pravila=ka_zna');
+  await expect(opcije.nth(4)).toHaveAttribute('href', '/soba/kreiraj?pravila=ka_zna');
+  await expect(dijalog.getByText('Troboj · 3 igrača')).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(dijalog).toBeHidden();

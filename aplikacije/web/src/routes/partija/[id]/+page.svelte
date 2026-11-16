@@ -27,6 +27,7 @@
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
+  import { putanjaPonovneIgre } from '$lib/igraj-rute.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
@@ -610,12 +611,22 @@
     if (eliminacija.razlog.startsWith('mrtva_slova')) {
       const rijec = eliminacija.rijecUzrok ?? prikazanaRijec?.rijec;
       const slova = eliminacija.slova?.toUpperCase();
-      return `${rijec ? `Trenutna riječ: ${rijec}. ` : ''}Nema nastavka${slova ? ` na ${slova}` : ''}.`;
+      const ime = imeIgraca(eliminacija.igracId);
+      // HINT PR14: vlastita mrtva slova — „Na ‘nt’ nema… Ana ispada.”
+      if (slova) return `Na ‘${slova}’ nema dostupnog nastavka. ${ime} ispada.`;
+      return `${rijec ? `Trenutna riječ: ${rijec}. ` : ''}Nema nastavka. ${ime} ispada.`;
     }
     return `${statusEliminacije(eliminacija)}.`;
   }
 
+  const fazaDokaza = $derived(stanje.faza === 'dokaz_nastavka' && stanje.dokaz !== null);
+  const dokaz = $derived(stanje.dokaz);
+  // HINT: Bruno koji čeka dokaz NIJE u eliminacije dok cekateljVecIspao=false.
   const jeEliminiran = $derived(stanje.eliminacije.some((e) => e.igracId === stanje.mojIgracId));
+  const cekamDokaz = $derived(
+    fazaDokaza && dokaz !== null && dokaz.cekateljId === stanje.mojIgracId && !dokaz.cekateljVecIspao,
+  );
+  const jaDokazujem = $derived(fazaDokaza && dokaz !== null && dokaz.autorId === stanje.mojIgracId);
   const jeNaPotezu = $derived(
     stanje.naPotezuId === stanje.mojIgracId &&
       !jeEliminiran &&
@@ -1502,7 +1513,10 @@
   {/if}
   {#if jeTrening}
     <div class="kraj-akcije">
-      <a href="/zagrijavanje" class="igraj-opet-gumb">Igraj novi trening</a>
+      <a
+        href={putanjaPonovneIgre(stanje.kraj.mod ?? stanje.mod, stanje.kraj.pravila ?? stanje.pravila, 'trening')}
+        class="igraj-opet-gumb"
+      >Igraj novi trening</a>
       <a href="/" class="sporedni-gumb">Povratak na odabir igre</a>
     </div>
   {:else if stanje.kraj.jePrivatna || stanje.jePrivatna}
@@ -1512,9 +1526,11 @@
       <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
     </div>
   {:else}
-    {@const modPartije = stanje.kraj.mod ?? stanje.mod}
     <div class="kraj-akcije">
-      <a href={modPartije === 'dva_igraca' ? '/red?mod=dva_igraca' : '/red?mod=cetiri_igraca'} class="igraj-opet-gumb">Igraj opet</a>
+      <a
+        href={putanjaPonovneIgre(stanje.kraj.mod ?? stanje.mod, stanje.kraj.pravila ?? stanje.pravila, 'javna')}
+        class="igraj-opet-gumb"
+      >Igraj opet</a>
       <a href="/" class="sporedni-gumb">Povratak na naslovnu</a>
     </div>
   {/if}
@@ -1545,10 +1561,14 @@
 {:else}
   <div class="aktivna-partija-sadrzaj">
   {#if prikazanaSjedala.length > 0}
-  <ul class="igraci-red" class:dvoboj={prikazanaSjedala.length === 2}>
+  <ul
+    class="igraci-red"
+    class:dvoboj={prikazanaSjedala.length === 2}
+    class:troboj={prikazanaSjedala.length === 3}
+  >
       {#each prikazanaSjedala as sjedalo (sjedalo.igracId)}
       {@const eliminacija = eliminacijaIgraca(sjedalo.igracId)}
-      {@const pobjednik = !eliminacija && (stanje.kraj !== null || stanje.statusSpremanja !== 'nije_zavrsena')}
+      {@const pobjednik = !eliminacija && stanje.kraj !== null && pobjednikPartije()?.igracId === sjedalo.igracId}
       {@const aktivno = !stanje.sustavBiraRijec && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena' && !eliminacija && sjedalo.igracId === stanje.naPotezuId}
       <li
         data-igrac-id={sjedalo.igracId}
@@ -1753,6 +1773,8 @@
         {/if}
         {#if pobjednikPartije()}
           <p class="pobjednik-sazetak"><strong>{imeIgraca(pobjednikPartije()!.igracId)}</strong> je pobjednik/pobjednica!</p>
+        {:else}
+          <p class="pobjednik-sazetak">Nitko nije pobijedio</p>
         {/if}
         <p class="odbrojavanje-najava" aria-live="polite">
           Rezultati za: <strong>{sekundeDoRezultata}</strong>
@@ -1761,17 +1783,39 @@
     {:else}
       {#if stanje.statusSpremanja === 'spremanje_rezultata'}
         <div class="zavrsni-sazetak" aria-live="polite">
-          {#if stanje.eliminacije.at(-1)}<p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>{/if}
+          {#if stanje.ishodDokazaPoruka}
+            <p class="sustav-bira-obrazlozenje">{stanje.ishodDokazaPoruka}</p>
+          {:else if stanje.eliminacije.at(-1)}
+            <p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>
+          {/if}
           <p class="odbrojavanje-najava">Spremanje rezultata…</p>
         </div>
       {:else if stanje.sustavBiraRijec}
         <div class="sustav-bira-inline" aria-live="polite">
-          {#if stanje.zadnjaEliminacija}
+          {#if stanje.ishodDokazaPoruka}
+            <p class="sustav-bira-obrazlozenje">{stanje.ishodDokazaPoruka}</p>
+          {:else if stanje.zadnjaEliminacija}
             <p class="sustav-bira-obrazlozenje">
               {sazetakEliminacije(stanje.zadnjaEliminacija)}
             </p>
           {/if}
           <p class="sustav-bira-tekst">Nova runda za: <strong>{sustavBrojac}</strong></p>
+        </div>
+      {:else if fazaDokaza && dokaz}
+        <div class="dokaz-zona" aria-live="polite" data-testid="dokaz-zona">
+          {#if jaDokazujem}
+            <p class="dokaz-naslov">
+              Dokaži nastavak na svoju riječ ‘{dokaz.izvornaRijec}’. Traži se ‘{dokaz.trazenaSlova}’.
+            </p>
+          {:else if cekamDokaz}
+            <p class="dokaz-naslov">
+              {imeIgraca(dokaz.autorId)} dokazuje nastavak na svoju riječ.
+            </p>
+          {:else}
+            <p class="dokaz-naslov">
+              {imeIgraca(dokaz.autorId)} dokazuje nastavak na ‘{dokaz.izvornaRijec}’. Traži se ‘{dokaz.trazenaSlova}’.
+            </p>
+          {/if}
         </div>
       {:else}
         {#if stanje.trazenaSlova}
@@ -1835,14 +1879,16 @@
                   inputmode="text"
                   enterkeyhint="send"
                   maxlength={najviseZnakovaNastavka}
-                  aria-label={`Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
+                  aria-label={jaDokazujem
+                    ? `Dokaži nastavak na ${prefiksRijeci.toUpperCase()}`
+                    : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
                   aria-invalid={brojGreskeUnosa > 0 && porukaPoteza !== null}
                   disabled={slanjeUTijeku || !vezaSpremna}
                 />
               </div>
             <div class="potez-gumbi">
               <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
-              {#if !stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === ''}
+              {#if !jaDokazujem && (!stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
                 <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku || !vezaSpremna} onclick={posaljiNeZnam}>Ne znam</button>
               {/if}
             </div>
@@ -1868,7 +1914,11 @@
         {/if}
       {/if}
     {/if}
-    {#if jeEliminiran && !stanje.ponistenaPoruka}
+    {#if cekamDokaz && !stanje.ponistenaPoruka}
+      <aside class="promatranje-traka dokaz-cekam" aria-live="polite" data-testid="dokaz-cekam">
+        <p>Čekaš dokaz. Još nisi ispao.</p>
+      </aside>
+    {:else if jeEliminiran && !stanje.ponistenaPoruka}
       <aside class="promatranje-traka" aria-live="polite">
         {#if stanje.obracunIskustva && !jeTrening}
           <p class="obracun-promatraca">Ukupno iskustva za ovu igru: <strong>{stanje.obracunIskustva.mojeIskustvo.osvojenoIskustvo} XP</strong>.</p>
@@ -3220,6 +3270,34 @@
   .igraci-red.dvoboj {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  /* HINT PR14: Troboj — 3 stupca na desktopu (ne 4 s praznim stupcem). */
+  .igraci-red.troboj {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @media (min-width: 1000px) {
+    .igraci-red.troboj {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .dokaz-zona {
+    margin: 0 0 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--boja-mint) 14%, var(--boja-povrsina));
+    border: 1px solid var(--boja-mint);
+  }
+  .dokaz-naslov {
+    margin: 0;
+    font-size: var(--tekst-mali);
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--boja-tekst-osnovni);
+  }
+  .dokaz-ishod {
+    margin: 0 0 10px;
+    font-weight: 700;
+    color: var(--boja-mint-tamni);
+  }
   @media (min-width: 1000px) {
     .unos-rijeci { font-size: 20px; }
     .ime-igraca { font-size: 20px; }
@@ -3231,6 +3309,8 @@
   }
   @media (max-height: 500px) and (min-width: 500px) {
     .igraci-red { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .igraci-red.dvoboj { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .igraci-red.troboj { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   .plasmani-lista {
     list-style: none;

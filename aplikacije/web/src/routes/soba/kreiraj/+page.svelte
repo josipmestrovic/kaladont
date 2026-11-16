@@ -1,7 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { SVE_VRSTE_RIJECI, type PostavkePrivatneSobe, type VrstaRijeci } from 'zajednicko';
+  import { page } from '$app/stores';
+  import {
+    REDOSLIJED_PRAVILNIKA,
+    TEKSTOVI_PRAVILNIKA,
+    parsajPravilnikIzQuery,
+  } from '$lib/igraj-rute.js';
+  import {
+    SVE_VRSTE_RIJECI,
+    type PostavkePrivatneSobe,
+    type PravilnikPartije,
+    type VrstaRijeci,
+  } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
   const OZNACI_VRSTA: Record<VrstaRijeci, string> = {
@@ -20,6 +31,10 @@
 
   let trajanjePotezaSek = $state(30);
   let eliminacijskiBodovi = $state(true);
+  // HINT PR14: ?pravila= iz Igraj koraka; inače KA-ZNA.
+  let pravilnik = $state<PravilnikPartije>(
+    parsajPravilnikIzQuery($page.url.searchParams.get('pravila')),
+  );
   let odabraneVrste = $state<Set<VrstaRijeci>>(new Set(SVE_VRSTE_RIJECI));
   let poruka = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
@@ -79,6 +94,7 @@
       trajanjePotezaSek,
       eliminacijskiBodovi,
       dopusteneVrste: [...odabraneVrste],
+      pravila: pravilnik,
     };
 
     const socket = dohvatiSocket();
@@ -97,6 +113,26 @@
   </p>
 
   <form onsubmit={stvoriSobu}>
+
+    <section class="grupa">
+      <h2>Pravilnik partije</h2>
+      <p class="objasnjenje-imenica">Gosti na pozivnici nasljeđuju ovaj pravilnik sa servera.</p>
+      <div class="opcije-gumbi" role="radiogroup" aria-label="Pravilnik">
+        {#each REDOSLIJED_PRAVILNIKA as p (p)}
+          <button
+            type="button"
+            class="odabir-gumb"
+            class:odabran={pravilnik === p}
+            role="radio"
+            aria-checked={pravilnik === p}
+            onclick={() => (pravilnik = p)}
+          >
+            {TEKSTOVI_PRAVILNIKA[p].naziv}
+          </button>
+        {/each}
+      </div>
+      <p class="objasnjenje-skupa">{TEKSTOVI_PRAVILNIKA[pravilnik].opis}</p>
+    </section>
 
     <section class="grupa">
       <h2>Pravila igranja i tajmer</h2>
