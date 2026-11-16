@@ -312,7 +312,8 @@
     color: var(--boja-tekst-naslov);
   }
 
-  .zaglavlje > p {
+  /* HINT PR15: ne širiti na .nadnaslov — ta ima akcent boju (Bugbot). */
+  .zaglavlje > p:not(.nadnaslov) {
     margin: 8px 0 0;
     color: var(--boja-tekst-sekundarni);
   }
