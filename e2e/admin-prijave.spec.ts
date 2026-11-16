@@ -137,11 +137,29 @@ test('admin prijave: Dodaj otvara popup rijetkosti i šalje tierRijetkosti + nap
       await ruta.fulfill({ json: { prijave: [] } });
       return;
     }
+    if (metoda === 'POST' && putanja.endsWith('/admin/prijave/303/pregled-dodavanja')) {
+      const tijelo = ruta.request().postDataJSON() as { izvornaRijec?: string; lema?: string };
+      const rijec = tijelo.izvornaRijec ?? tijelo.lema ?? 'novaforma';
+      await ruta.fulfill({
+        json: {
+          ok: true,
+          pregled: {
+            izvornaRijec: rijec,
+            kljucGrupe: `imenica:${rijec}`,
+            brojOblici: 1,
+            imaPreklapanja: false,
+            otisak: 'a'.repeat(64),
+            oblici: [{ rijec, stanje: 'novi', frekvencija: 0 }],
+          },
+        },
+      });
+      return;
+    }
     if (metoda === 'POST' && putanja.endsWith('/admin/prijave/303/dodaj-rijec')) {
       poslanoTijelo = ruta.request().postDataJSON();
       await new Promise((r) => setTimeout(r, 150));
       rijeci = rijeci.filter((p) => p.id !== 303);
-      await ruta.fulfill({ json: { ok: true, brojRijeci: 1 } });
+      await ruta.fulfill({ json: { ok: true, brojRijeci: 1, brojPromjena: 1 } });
       return;
     }
 
@@ -156,17 +174,25 @@ test('admin prijave: Dodaj otvara popup rijetkosti i šalje tierRijetkosti + nap
   await page.getByRole('button', { name: 'Dodaj' }).click();
   const dijalog = page.getByRole('dialog', { name: 'Dodati riječ?' });
   await expect(dijalog).toBeVisible();
-  await expect(dijalog.getByText('novaforma')).toBeVisible();
+  await expect(dijalog.getByRole('heading', { name: 'Dodati riječ?' })).toBeVisible();
+  const potvrdi = dijalog.getByRole('button', { name: /Dodaj \d+ oblika|Dodaj u rječnik/ });
+  await expect(potvrdi).toBeEnabled();
 
   await dijalog.getByLabel('Rijetkost').selectOption('jako_rijetka');
+  await expect(potvrdi).toBeEnabled();
   await dijalog.getByLabel('Napomena (neobavezno)').fill('Super prijava!');
-  await dijalog.getByRole('button', { name: 'Dodaj u rječnik' }).click();
+  await potvrdi.click();
 
   await expect(page.locator('.uspjeh-obavijest', { hasText: 'novaforma' })).toBeVisible();
   await expect(rijecRed).toHaveCount(0);
   await expect(dijalog).toHaveCount(0);
-  await expect.poll(() => poslanoTijelo).toEqual({
+  await expect.poll(() => poslanoTijelo).toMatchObject({
+    izvornaRijec: 'novaforma',
+    vrsta: 'imenica',
+    lema: 'novaforma',
     tierRijetkosti: 'jako_rijetka',
     napomena: 'Super prijava!',
+    otisak: 'a'.repeat(64),
+    potvrdiPreklapanja: false,
   });
 });

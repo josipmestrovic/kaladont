@@ -47,8 +47,11 @@ async function uvezi(): Promise<void> {
           prvaDva: sql`excluded.prva_dva`,
           zadnjaDva: sql`excluded.zadnja_dva`,
           vrste: sql`excluded.vrste`,
-          grupe: sql`excluded.grupe`,
-          frekvencija: sql`excluded.frekvencija`,
+          grupe: sql`(
+            SELECT coalesce(array_agg(DISTINCT g ORDER BY g), '{}'::text[])
+            FROM unnest(array_cat(excluded.grupe, ${rijeci.rucnoDodaneGrupe})) AS g
+          )`,
+          frekvencija: sql`coalesce(${rijeci.rucnaFrekvencija}, excluded.frekvencija)`,
         },
       });
     upisano += chunk.length;

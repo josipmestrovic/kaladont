@@ -28,6 +28,8 @@ export const rijeci = pgTable('rijeci', {
   vrste: text('vrste').array().notNull().default(['imenica']),
   grupe: text('grupe').array().notNull().default([]),
   frekvencija: integer('frekvencija').notNull().default(0),
+  rucnoDodaneGrupe: text('rucno_dodane_grupe').array().notNull().default([]),
+  rucnaFrekvencija: integer('rucna_frekvencija'),
   aktivna: boolean('aktivna').notNull().default(true),
   dodana: timestamp('dodana', { withTimezone: true }).notNull().defaultNow(),
   napomena: text('napomena'),
