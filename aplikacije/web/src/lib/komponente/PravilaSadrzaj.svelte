@@ -73,7 +73,7 @@
           <li>svaka riječ počinje zadnjim <strong>dvama slovima</strong> prethodne (npr. sova → vaza)</li>
           <li>u javnoj igri imaš <strong>30 sekundi</strong> po potezu</li>
           <li>kriva riječ ne izbacuje, samo pokušaj opet</li>
-          <li>„Ne znam” je predaja: ispadaš i gledaš dalje ili možeš izaći i sve će ti se spremiti</li>
+          <li>„Ne znam” je predaja (u Dokaži nastavak može otvoriti dokaz autoru riječi umjesto trenutnog ispadanja)</li>
           <li><strong>lj, nj, dž</strong> broje se kao jedno slovo (konj → onj)</li>
           <li>kvačice su bitne! Jer č nije c, š nije s, ć nije c…</li>
         </ul>
@@ -132,15 +132,19 @@
               </tr>
               <tr>
                 <th scope="row">„Ne znam”</th>
-                <td data-label="Što se događa">Predaja. Možeš ostati gledati.</td>
+                <td data-label="Što se događa">Predaja. U Klasičnom i KA-ZNA ispadaš. U Dokaži nastavak autor može dobiti potez dokaza.</td>
               </tr>
               <tr>
                 <th scope="row">Mrtva slova</th>
-                <td data-label="Što se događa">Nema slobodnog nastavka - ispada sljedeći na redu.</td>
+                <td data-label="Što se događa">Nema slobodnog nastavka — u Dokaži nastavak odmah ispada autor riječi; inače sljedeći na redu.</td>
               </tr>
               <tr>
                 <th scope="row">Kaladont na „ka”</th>
-                <td data-label="Što se događa">Rekao si riječ na ka, protivnik kaže kaladont - ti ispadaš.</td>
+                <td data-label="Što se događa">Ovisi o pravilniku: Klasični — ispada sljedeći; KA-ZNA i Dokaži nastavak — ispada autor „ka”.</td>
+              </tr>
+              <tr>
+                <th scope="row">Dokaz (Dokaži nastavak)</th>
+                <td data-label="Što se događa">Ako Bruno ne zna, Ana mora pokazati nastavak. Uspije — Bruno ispada. Ne uspije — Ana ispada, Bruno ostaje.</td>
               </tr>
               <tr>
                 <th scope="row">Napuštanje</th>
@@ -149,16 +153,17 @@
             </tbody>
           </table>
         </div>
+        <!-- HINT PR15: ne opisuj sva pravila kao KA-ZNA; tri pravilnika imaju različite žrtve. -->
         <aside class="napomena">
-          <strong>Obično</strong> ispada onaj tko ne zna reći nastavak.
-          <strong>Iznimka:</strong> kad netko odigra riječ na <strong>ka</strong>, a protivnik kaže
-          <strong>kaladont</strong> ili <strong>kalodont</strong>, ispada onaj koji je to omogućio
-          (onaj s riječju na ka), ne onaj tko je rekao kaladont.
+          <strong>Tri pravilnika.</strong> U <strong>Klasičnom</strong> „kaladont/kalodont” na „ka” izbacuje sljedećeg na redu.
+          U <strong>KA-ZNA</strong> izbacuje autora riječi na „ka”.
+          U <strong>Dokaži nastavak</strong> „Ne znam” često otvara dokaz autoru; mrtva slova odmah izbacuju autora, bez eliminacijskog boda protivniku.
         </aside>
       </section>
     </section>
   {:else if tema === 'nacini'}
     <section id="sadrzaj-pomoci" class="sadrzaj pregled-igre" aria-label="Kako sve možeš igrati?">
+      <p class="uvod">Pod „Igraj” prvo biraš pravilnik (Klasični Kaladont, KA-ZNA ili Dokaži nastavak), zatim format stola.</p>
       <div class="tablica-omotac">
         <table class="tablica-mobilni-retci tablica-s-oznakama">
           <thead>
@@ -177,6 +182,12 @@
               <td data-label="Dostignuća">Da</td>
             </tr>
             <tr>
+              <th scope="row">Troboj</th>
+              <td data-label="Tko igra">3 igrača</td>
+              <td data-label="Bodovi i rang">Da</td>
+              <td data-label="Dostignuća">Da</td>
+            </tr>
+            <tr>
               <th scope="row">Dvoboj</th>
               <td data-label="Tko igra">2 igrača</td>
               <td data-label="Bodovi i rang">Da</td>
@@ -184,13 +195,13 @@
             </tr>
             <tr>
               <th scope="row">Privatna soba</th>
-              <td data-label="Tko igra">2 do 8 prijatelja, šalješ im link</td>
+              <td data-label="Tko igra">2 do 8 prijatelja, šalješ im link; pravilnik bira domaćin</td>
               <td data-label="Bodovi i rang">Ne</td>
               <td data-label="Dostignuća">Djelomično</td>
             </tr>
             <tr>
               <th scope="row">Zagrijavanje</th>
-              <td data-label="Tko igra">Ti vs. Računalo</td>
+              <td data-label="Tko igra">Ti + 1 ili 2 Računala (Klasični: 2 bota; KA-ZNA i Dokaži nastavak: 1 bot)</td>
               <td data-label="Bodovi i rang">Ne</td>
               <td data-label="Dostignuća">Djelomično</td>
             </tr>
@@ -206,7 +217,7 @@
           <table class="tablica-mobilni-retci">
             <thead><tr><th scope="col">Rezultat</th><th scope="col">Bodovi</th></tr></thead>
             <tbody>
-              <tr><th scope="row">1. mjesto</th><td data-label="Bodovi">4 boda</td></tr>
+              <tr><th scope="row">1. mjesto</th><td data-label="Bodovi">3 + 1 bonus pobjede</td></tr>
               <tr><th scope="row">2. mjesto</th><td data-label="Bodovi">2 boda</td></tr>
               <tr><th scope="row">3. mjesto</th><td data-label="Bodovi">1 bod</td></tr>
               <tr><th scope="row">4. mjesto</th><td data-label="Bodovi">0 bodova</td></tr>
@@ -214,6 +225,25 @@
               <tr class="red-maksimum">
                 <th scope="row"><strong>Maksimalno moguće ostvariti</strong></th>
                 <td data-label="Bodovi"><strong>7 bodova</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h3>Troboj</h3>
+        <div class="tablica-omotac">
+          <table class="tablica-mobilni-retci">
+            <thead><tr><th scope="col">Rezultat</th><th scope="col">Bodovi</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">1. mjesto</th><td data-label="Bodovi">2 + 1 bonus pobjede</td></tr>
+              <tr><th scope="row">2. mjesto</th><td data-label="Bodovi">1 bod</td></tr>
+              <tr><th scope="row">3. mjesto</th><td data-label="Bodovi">0 bodova</td></tr>
+              <tr><th scope="row">Izazvana eliminacija</th><td data-label="Bodovi">+1 bod (najviše 2)</td></tr>
+              <tr class="red-maksimum">
+                <th scope="row"><strong>Maksimalno moguće ostvariti</strong></th>
+                <td data-label="Bodovi"><strong>5 bodova</strong></td>
               </tr>
             </tbody>
           </table>
@@ -296,15 +326,15 @@
         <h4>Pobjede za redom</h4>
         <div class="tablica-omotac">
           <table class="tablica-mobilni-retci">
-            <thead><tr><th scope="col">Uzastopne javne pobjede</th><th scope="col">Četveroboj</th><th scope="col">Dvoboj</th></tr></thead>
+            <thead><tr><th scope="col">Uzastopne javne pobjede</th><th scope="col">Četveroboj</th><th scope="col">Troboj</th><th scope="col">Dvoboj</th></tr></thead>
             <tbody>
-              <tr><th scope="row">1.</th><td data-label="Četveroboj">+0 %</td><td data-label="Dvoboj">+0 %</td></tr>
-              <tr><th scope="row">Svaka sljedeća</th><td data-label="Četveroboj">+10 %</td><td data-label="Dvoboj">+5 %</td></tr>
-              <tr><th scope="row">Najviše</th><td data-label="Četveroboj">+100 % od 11. pobjede</td><td data-label="Dvoboj">+100 % od 21. pobjede</td></tr>
+              <tr><th scope="row">1.</th><td data-label="Četveroboj">+0 %</td><td data-label="Troboj">+0 %</td><td data-label="Dvoboj">+0 %</td></tr>
+              <tr><th scope="row">Svaka sljedeća</th><td data-label="Četveroboj">+10 %</td><td data-label="Troboj">+7,5 %</td><td data-label="Dvoboj">+5 %</td></tr>
+              <tr><th scope="row">Najviše</th><td data-label="Četveroboj">+100 % od 11. pobjede</td><td data-label="Troboj">+100 % od 15. pobjede</td><td data-label="Dvoboj">+100 % od 21. pobjede</td></tr>
             </tbody>
           </table>
         </div>
-        <p>Nizovi Četveroboja i Dvoboja odvojeni su. Poraz prekida niz tog načina. Privatne igre ga ne diraju.</p>
+        <p>Nizovi Četveroboja, Troboja i Dvoboja odvojeni su po veličini stola (pravilnici se spajaju). Poraz prekida niz tog formata. Privatne igre ga ne diraju.</p>
 
         <h4 id="ocjena-partije">Ocjena igre</h4>
         <p>Javna igra uvijek dobiva 1–5 zvjezdica prema učinku u toj partiji (prihvaćene riječi, bodovi, eliminacije, XP). Bez doprinosa je 1, bilo kakav potez barem 2, duže partije lakše daju 3–4, a pobjeda ili vrlo jak učinak daje 5. Ne ovisi o Kaladont DNK-u.</p>
@@ -324,7 +354,8 @@
     </section>
   {:else if tema === 'dnk'}
     <section id="sadrzaj-pomoci" class="sadrzaj dnk-pomoc" aria-label="Kaladont DNK">
-      <p class="uvod">Šest brojeva od 0 do 100. Otključava se nakon 10 javnih igara, zasebno za Dvoboj i Četveroboj. Privatne igre i Zagrijavanje ne ulaze.</p>
+      <!-- HINT PR15: jedan radar za sve javne formate; prag 10 ukupno (PR10). -->
+      <p class="uvod">Šest brojeva od 0 do 100. Jedan radar za sve javne Dvoboje, Troboje i Četveroboje. Otključava se nakon 10 javnih igara ukupno. Privatne igre i Zagrijavanje ne ulaze.</p>
       <div class="tablica-omotac">
         <table class="tablica-mobilni-retci">
           <thead><tr><th scope="col">Os</th><th scope="col">Što mjeri</th></tr></thead>
@@ -473,7 +504,7 @@
       </details>
       <details>
         <summary>Kako igrati bez tajmera?</summary>
-        <p><a href="/zagrijavanje">Zagrijavanje</a> nema tajmer. U privatnoj sobi domaćin bira „Bez tajmera”. Javni Dvoboj i Četveroboj imaju 30 sekundi.</p>
+        <p><a href="/zagrijavanje">Zagrijavanje</a> nema tajmer. U privatnoj sobi domaćin bira „Bez tajmera”. Javni Dvoboj, Troboj i Četveroboj imaju 30 sekundi.</p>
       </details>
       <details>
         <summary>Vide li drugi moj font i čitanje naglas?</summary>
@@ -491,7 +522,7 @@
       </details>
       <details>
         <summary>Zašto sam odmah ispao?</summary>
-        <p>„Ne znam”, istek vremena, <PojamPomoc tekst="mrtva slova" opis={opisMrtvihSlova} id="mrtva-slova-faq" />, Kaladont na tvoje „ka”, ili prekid veze dulji od 10 sekundi.</p>
+        <p>„Ne znam”, istek vremena, <PojamPomoc tekst="mrtva slova" opis={opisMrtvihSlova} id="mrtva-slova-faq" />, posebna riječ na „ka” (u Klasičnom ispada sljedeći, u KA-ZNA autor „ka”), neuspješan dokaz u Dokaži nastavak, ili prekid veze dulji od 10 sekundi.</p>
       </details>
       <details>
         <summary>Kako prijaviti riječ ili problem?</summary>
@@ -505,11 +536,12 @@
       </details>
       <details>
         <summary>Zašto piše Piskaralo?</summary>
-        <p>Rang stiže nakon 10 javnih igara ukupno (svi formati zajedno). Do tada si Piskaralo. DNK kalibracija također broji 10 javnih partija.</p>
+        <p>Rang i Kaladont DNK stižu nakon 10 javnih igara ukupno (Dvoboj, Troboj i Četveroboj zajedno). Do tada si Piskaralo.</p>
       </details>
       <details>
         <summary>Zašto nisam na ljestvici?</summary>
-        <p>Dnevno treba 10 javnih igara tog dana, a tjedno, mjesečno, godišnje i ukupno 20 u tom razdoblju. Igra pripada danu završetka, po hrvatskom vremenu.</p>
+        <!-- HINT PR15: pragovi 5/10 (PR11), ne starih 10/20. -->
+        <p>Dnevno treba 5 javnih igara tog formata u danu, a tjedno, mjesečno, godišnje i ukupno 10 u tom razdoblju. Svaki format (Dvoboj, Troboj, Četveroboj) ima svoju ljestvicu. Igra pripada danu završetka, po hrvatskom vremenu.</p>
       </details>
       <details>
         <summary>Kada dobivam zvjezdicu za Top 10?</summary>

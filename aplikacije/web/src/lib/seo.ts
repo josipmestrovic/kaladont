@@ -34,9 +34,9 @@ export const PRAVILA_TEME_META: {
   {
     id: 'nacini',
     naziv: 'Kako sve možeš igrati?',
-    title: 'Načini igre Kaladont — Dvoboj, Četveroboj i sobe',
+    title: 'Načini igre Kaladont — Dvoboj, Troboj, Četveroboj i sobe',
     description:
-      'Usporedi načine igre Kaladonta: Dvoboj, Četveroboj, Zagrijavanje i privatne sobe — što nude i kada ih birati.',
+      'Usporedi načine igre Kaladonta: Dvoboj, Troboj, Četveroboj, tri pravilnika, Zagrijavanje i privatne sobe.',
   },
   {
     id: 'bodovi',
@@ -99,7 +99,7 @@ export const FAQ_PITANJA: { pitanje: string; odgovor: string }[] = [
   {
     pitanje: 'Kako igrati bez tajmera?',
     odgovor:
-      'Zagrijavanje nema tajmer. U privatnoj sobi domaćin bira „Bez tajmera”. Javni Dvoboj i Četveroboj imaju 30 sekundi.',
+      'Zagrijavanje nema tajmer. U privatnoj sobi domaćin bira „Bez tajmera”. Javni Dvoboj, Troboj i Četveroboj imaju 30 sekundi.',
   },
   {
     pitanje: 'Vide li drugi moj font i čitanje naglas?',
@@ -118,7 +118,7 @@ export const FAQ_PITANJA: { pitanje: string; odgovor: string }[] = [
   {
     pitanje: 'Zašto sam odmah ispao?',
     odgovor:
-      '„Ne znam”, istek vremena, mrtva slova, Kaladont na tvoje „ka”, ili prekid veze dulji od 10 sekundi.',
+      '„Ne znam”, istek vremena, mrtva slova, posebna riječ na „ka” (u Klasičnom ispada sljedeći, u KA-ZNA autor „ka”), neuspješan dokaz u Dokaži nastavak, ili prekid veze dulji od 10 sekundi.',
   },
   {
     pitanje: 'Kako prijaviti riječ ili problem?',
@@ -131,13 +131,15 @@ export const FAQ_PITANJA: { pitanje: string; odgovor: string }[] = [
   },
   {
     pitanje: 'Zašto piše Piskaralo?',
+    // HINT PR15: jedan rang + jedan DNK nakon 10 javnih ukupno (ne po formatu).
     odgovor:
-      'Rang i DNK stižu nakon 10 javnih igara u tom načinu. Dvoboj i Četveroboj broje se odvojeno.',
+      'Rang i Kaladont DNK stižu nakon 10 javnih igara ukupno (Dvoboj, Troboj i Četveroboj zajedno). Do tada si Piskaralo.',
   },
   {
     pitanje: 'Zašto nisam na ljestvici?',
+    // HINT PR15: pragovi PR11 — 5 dnevno, 10 dulje; zasebno po formatu stola.
     odgovor:
-      'Dnevno treba 10 javnih igara tog dana, a tjedno, mjesečno, godišnje i ukupno 20 u tom razdoblju. Igra pripada danu završetka, po hrvatskom vremenu.',
+      'Dnevno treba 5 javnih igara tog formata u danu, a tjedno, mjesečno, godišnje i ukupno 10 u tom razdoblju. Igra pripada danu završetka, po hrvatskom vremenu.',
   },
   {
     pitanje: 'Kada dobivam zvjezdicu za Top 10?',
@@ -269,7 +271,10 @@ export function naslovnicaJsonLd() {
   ];
 }
 
-/** Jedini indeksabilni HTML putovi: naslovnica i hub pravila (teme su noindex, follow). */
+/**
+ * HINT PR15: indeksabilni HTML putovi — naslovnica, hub pravila i /novosti.
+ * Tematske podstranice pravila i /o-igri ostaju noindex, follow.
+ */
 export function jeIndeksabilnaPutanja(pathname: string): boolean {
-  return pathname === '/' || pathname === '/pravila-kaladonta';
+  return pathname === '/' || pathname === '/pravila-kaladonta' || pathname === '/novosti';
 }

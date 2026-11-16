@@ -119,6 +119,8 @@
 
   <footer class="landing-footer">
     <nav aria-label="Dodatne poveznice">
+      <!-- HINT PR15: Novosti prije O igri; /novosti više nije 307 redirect. -->
+      <a href="/novosti">Novosti</a>
       <a href="/o-igri">O igri</a>
       <a href="/povratne-informacije">Pomozi poboljšati igru</a>
       <a href="/uvjeti">Uvjeti</a>

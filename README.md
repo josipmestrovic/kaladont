@@ -4,11 +4,16 @@ Hrvatska online višeigračka igra riječi: reci riječ koja počinje na posljed
 
 ## Kako se igra
 
+<!-- HINT PR15: prvo pravilnik, zatim format; Troboj + tri pravilnika. -->
+
+- **Pravilnici** — Klasični Kaladont, KA-ZNA, Dokaži nastavak (biraju se prije formata).
 - **Dvoboj** — 2 igrača, 30 s po potezu.
+- **Troboj** — 3 igrača, 30 s po potezu.
 - **Četveroboj** — 4 igrača, 30 s po potezu, ispadanje do posljednjeg.
-- **Privatna soba** — 2 do 8 igrača; vlasnik bira trajanje poteza (15 / 30 / 60 s ili bez tajmera) i dopuštene vrste riječi.
-- **Zagrijavanje** — trening Dvoboja protiv računala, bez natjecateljske statistike.
+- **Privatna soba** — 2 do 8 igrača; domaćin bira pravilnik, tajmer i vrste riječi.
+- **Zagrijavanje** — trening odabranog pravilnika protiv Računala, bez natjecateljske statistike.
 - U javnom redu prazna mjesta nakon pragova mogu popuniti **botovi**; ljudima vrijedi isti obračun.
+- Jedan univerzalni **rang** i jedan **Kaladont DNK** za sve javne formate; ljestvice su po formatu (ulaz 5/10).
 
 Službena pravila: [docs/02-pravila-igre/pravila-igre.md](docs/02-pravila-igre/pravila-igre.md).
 

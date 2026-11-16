@@ -14,7 +14,7 @@ Release mora odgovoriti na pet pitanja bez gledanja u privatne bilješke:
 4. koja je odluka donesena nakon provjere;
 5. na koji se prethodni poznato-zdravi digest možemo vratiti.
 
-Za zatvorene testove puni GHCR digest ostaje autoritativan tehnički identitet releasea. SemVer prerelease oznaka služi ljudskoj komunikaciji i GitHub Releaseu, ali sama po sebi ne dokazuje deploy ili staging provjeru. U release bilješkama koristimo oznake `v0.1.0-closed-alpha.1`, `v0.2.0-closed-alpha.1`, `v0.3.0-closed-alpha.1`, `v0.4.0-closed-alpha.1` i `v0.5.0-closed-alpha.1`; svaki status i digest i dalje se evidentiraju zasebno.
+Za zatvorene testove puni GHCR digest ostaje autoritativan tehnički identitet releasea. SemVer prerelease oznaka služi ljudskoj komunikaciji i GitHub Releaseu, ali sama po sebi ne dokazuje deploy ili staging provjeru. U release bilješkama closed-alpha oznake ostaju `v0.1.0-closed-alpha.1` … `v0.5.0-closed-alpha.1`. **Javno izdanje 0.2.0** (stranica `/novosti#v0-2-0`, [release-notes-v0.2.0.md](release-notes-v0.2.0.md)) ima **različit** identitet od `v0.2.0-closed-alpha.1` — ne prepisivati stare bilješke. Ne iskazivati dostupnost novih mogućnosti produkcijskim korisnicima prije `staging-provjereno` i eksplicitne promocije.
 
 ## Identitet releasea
 

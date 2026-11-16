@@ -6,31 +6,38 @@
 stateDiagram-v2
     [*] --> URedu : red-udji
     URedu --> URedu : mjesta se pune / prazne (real-time)
-    URedu --> StolPopunjen : 4 igrača
+    URedu --> StolPopunjen : stol pun (2 ili 3 ili 4)
     StolPopunjen --> SustavBiraRijec : partija:pocetak
-    SustavBiraRijec --> CekanjePoteza : 5s isteklo, riječ objavljena (partija:runda-otvorena)
+    SustavBiraRijec --> CekanjePoteza : riječ objavljena (partija:runda-otvorena)
     CekanjePoteza --> CekanjePoteza : valjana riječ, sljedeći igrač
     CekanjePoteza --> CekaPovratak : detektiran prekid veze
     CekaPovratak --> CekanjePoteza : ista veza identiteta obnovljena unutar 10s
     CekaPovratak --> Eliminacija : tolerancija istekla
-    CekanjePoteza --> Eliminacija : ne znam / istek / dobrovoljni izlazak / mrtva slova
-    Eliminacija --> SustavBiraRijec : ostalo ≥ 2 igrača (sustav ponovno bira riječ)
+    CekanjePoteza --> DokazNastavka : dokazi_nastavak i Ne_znam ili istek uz postojeći nastavak
+    DokazNastavka --> Eliminacija : uspjeh ili neuspjeh dokaza
+    DokazNastavka --> CekaPovratak : prekid autora dokaza
+    CekanjePoteza --> Eliminacija : ne znam / istek / izlazak / mrtva slova / kaladont
+    Eliminacija --> SustavBiraRijec : ostalo ≥ 2 (osim prijelaza u dokaz)
     Eliminacija --> KrajPartije : ostao 1 igrač
     KrajPartije --> SpremanjeRezultata : igra završena, upis u bazu
     SpremanjeRezultata --> SpremanjeRezultata : prolazna greška, ponovni pokušaj
     SpremanjeRezultata --> [*] : upis potvrđen, partija:kraj
     StolPopunjen --> Ponistena : restart ili kontrolirano gašenje
     CekanjePoteza --> Ponistena : restart ili kontrolirano gašenje
+    DokazNastavka --> Ponistena : restart ili kontrolirano gašenje
     Ponistena --> [*] : zapis ponisten, obavijest igračima
 ```
 
 Napomene:
 
-- **SustavBiraRijec:** nakon eliminacije ili Kaladont-efekta traje 8 sekundi; nitko ne može igrati. Server prvo nasumično bira iz skupa sigurnih riječi uz aktualne kategorije i potrošene grupe, a zatim po potrebi koristi rezervni odabir riječi sa slobodnim nastavkom. Prva dodjela ne dodaje ovu pauzu postojećem početnom odbrojavanju. Klijent zadržava avatare i uzročni oblačić te prikazuje kompaktno objašnjenje i „Nova runda za: 8…1”. Dodatna eliminacija tijekom istog prijelaza ne resetira rok. Timer poteza kreće tek po dodjeli riječi; trening ostaje bez timera.
-- **Prikaz rezultata:** `prikazRezultataOdIso` u konačnom rezultatu određuje osamsekundnu pauzu od završetka igre. Spremanje ne čeka taj rok; pri sporoj bazi sučelje zadržava avatare i kratku poruku o spremanju. Ponovno slanje rezultata zadržava izvorni rok.
-- **Mrtva slova** eliminiraju sljedećeg igrača trenutno, bez ulaska u njegovo `CekanjePoteza` (RS-02/RS-03).
-- **CekaPovratak:** mrežni prekid pokreće 10-sekundnu toleranciju samo za prekinutog igrača. Timer poteza ne pauzira se; istek poteza ima prednost ako nastupi prije isteka tolerancije. Dobrovoljni izlazak ne ulazi u ovo stanje.
-- Eliminirani igrač prelazi u ulogu **promatrača** istog stola do `KrajPartije`.
+<!-- HINT PR15: faza DokazNastavka = dokaz:zatrazen; bez nove sistemske riječi između odustajanja i dokaza. -->
+
+- **SustavBiraRijec:** nakon eliminacije ili Kaladont-efekta traje 8 sekundi; nitko ne može igrati. Kandidati nikad ne završavaju na „ka” (PR02). Prva dodjela ne dodaje ovu pauzu postojećem početnom odbrojavanju. Timer poteza kreće tek po dodjeli riječi; trening ostaje bez timera.
+- **DokazNastavka (PR05):** u `dokazi_nastavak` nakon Brunina „Ne znam”/isteka/napuštanja (dok nastavak postoji) emitira se `dokaz:zatrazen`; Ana igra na isti prefiks. Snapshot/reconnect vraća istu fazu i `turnToken`. Između Brunina odustajanja i Anina dokaza **nema** nove sistemske riječi.
+- **Prikaz rezultata:** `prikazRezultataOdIso` određuje osamsekundnu pauzu; spremanje ne čeka taj rok.
+- **Mrtva slova:** u Klasičnom/KA-ZNA eliminiraju sljedećeg (RS-02/03); u Dokaži nastavak autora riječi (RS-31).
+- **CekaPovratak:** 10-sekundna tolerancija; istek poteza ima prednost; dobrovoljni izlazak ne ulazi ovdje.
+- Eliminirani igrač prelazi u ulogu **promatrača** do `KrajPartije`.
 
 ## Slijed poruka za tipičan potez
 

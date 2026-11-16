@@ -74,11 +74,17 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(page.locator('.ilustracija')).toHaveCount(0);
 
   const footer = page.locator('.landing-footer');
+  // HINT PR15: redoslijed Novosti → O igri.
+  const novosti = footer.getByRole('link', { name: 'Novosti' });
   const oIgri = footer.getByRole('link', { name: 'O igri' });
+  await expect(novosti).toHaveAttribute('href', '/novosti');
   await expect(oIgri).toHaveAttribute('href', '/o-igri');
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toHaveAttribute('href', '/povratne-informacije');
   await expect(footer.getByRole('link', { name: 'Uvjeti' })).toHaveAttribute('href', '/uvjeti');
   await expect(footer.getByRole('link', { name: 'Privatnost' })).toHaveAttribute('href', '/privatnost');
+  const footerLinkovi = footer.locator('nav a');
+  await expect(footerLinkovi.nth(0)).toHaveAttribute('href', '/novosti');
+  await expect(footerLinkovi.nth(1)).toHaveAttribute('href', '/o-igri');
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByRole('button', { name: 'Igraj' })).toBeVisible();
@@ -119,6 +125,28 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
 });
 
+test('PR15: /novosti je javna stranica izdanja 0.2.0', async ({ page, request }) => {
+  const odgovor = await request.get('/novosti');
+  expect(odgovor.status()).toBe(200);
+  const html = await odgovor.text();
+  expect(html).toContain('Kaladont 0.2.0');
+  expect(html).toContain('id="v0-2-0"');
+  expect(html).not.toContain('redirect');
+
+  const mapa = await request.get('/sitemap.xml');
+  expect(mapa.ok()).toBe(true);
+  expect(await mapa.text()).toContain('/novosti');
+
+  await page.goto('/novosti#v0-2-0');
+  await expect(page).toHaveTitle(/Novosti/);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+  await expect(page.getByRole('heading', { name: 'Novosti' })).toBeVisible();
+  await expect(page.locator('#v0-2-0')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Kaladont 0.2.0' })).toBeVisible();
+  await expect(page.getByText('17. 11. 2026.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'O igri' })).toHaveAttribute('href', '/o-igri');
+});
+
 test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
@@ -129,6 +157,7 @@ test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ 
   await expect(header.getByRole('button', { name: 'Nazad' })).toHaveCount(0);
   await expect(header.locator('.avatar')).toBeVisible({ timeout: 20_000 });
   const footer = page.locator('.landing-footer');
+  await expect(footer.getByRole('link', { name: 'Novosti' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'O igri' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Pomozi poboljšati igru' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Uvjeti' })).toBeVisible();

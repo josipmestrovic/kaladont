@@ -5,7 +5,7 @@
 
 <SeoGlava
   title="O igri | Kaladont"
-  description="Novosti, release napomene i pregled Kaladonta — hrvatske online igre riječi."
+  description="Pregled Kaladonta — hrvatske online igre riječi: formati, pravilnici, rang i licence."
   putanja="/o-igri"
 />
 
@@ -15,7 +15,8 @@
     <h1>O igri</h1>
     <p>Natječi se s drugima, penji se rangovima i ljestvicama, skupljaj riječi u kolekciju i otključavaj dostignuća!
     I paralelno razvijaš svoje vještine jezika i širiš vokabular.</p>
-    
+    <!-- HINT PR15: novosti žive na /novosti, ne ovdje. -->
+    <p class="poveznica-novosti"><a href="/novosti">Najnovije objave →</a></p>
   </header>
 
   <article class="pregled">
@@ -35,7 +36,7 @@
         <li>svaka riječ počinje zadnjim <strong>dvama slovima</strong> prethodne (npr. sova → vaza)</li>
         <li>u javnoj igri imaš <strong>30 sekundi</strong> po potezu</li>
         <li>kriva riječ ne izbacuje, samo pokušaj opet</li>
-        <li>„Ne znam” je predaja: ispadaš i gledaš dalje ili možeš izaći i sve će ti se spremiti</li>
+        <li>„Ne znam” je predaja (u Dokaži nastavak može otvoriti dokaz autoru riječi)</li>
         <li><strong>lj, nj, dž</strong> broje se kao jedno slovo (konj → onj)</li>
         <li>kvačice su bitne! Jer č nije c, š nije s, ć nije c…</li>
       </ul>
@@ -98,6 +99,12 @@
               <td data-label="Dostignuća">Da</td>
             </tr>
             <tr>
+              <th scope="row">Troboj</th>
+              <td data-label="Tko igra">3 igrača</td>
+              <td data-label="Bodovi i rang">Da</td>
+              <td data-label="Dostignuća">Da</td>
+            </tr>
+            <tr>
               <th scope="row">Dvoboj</th>
               <td data-label="Tko igra">2 igrača</td>
               <td data-label="Bodovi i rang">Da</td>
@@ -105,13 +112,13 @@
             </tr>
             <tr>
               <th scope="row">Privatna soba</th>
-              <td data-label="Tko igra">2 do 8 prijatelja, šalješ im link</td>
+              <td data-label="Tko igra">2 do 8 prijatelja; pravilnik bira domaćin</td>
               <td data-label="Bodovi i rang">Ne</td>
               <td data-label="Dostignuća">Djelomično</td>
             </tr>
             <tr>
               <th scope="row">Zagrijavanje</th>
-              <td data-label="Tko igra">Ti vs. Računalo</td>
+              <td data-label="Tko igra">Ti + 1 ili 2 Računala (ovisno o pravilniku)</td>
               <td data-label="Bodovi i rang">Ne</td>
               <td data-label="Dostignuća">Djelomično</td>
             </tr>
@@ -133,19 +140,23 @@
           <tbody>
             <tr>
               <th scope="row">Četveroboj</th>
-              <td data-label="Kako se boduje">Mjesto + eliminacije (1. mjesto 4 boda).</td>
+              <td data-label="Kako se boduje">Plasman + pobjeda + eliminacije (najviše 7).</td>
+            </tr>
+            <tr>
+              <th scope="row">Troboj</th>
+              <td data-label="Kako se boduje">Plasman + pobjeda + eliminacije (najviše 5).</td>
             </tr>
             <tr>
               <th scope="row">Dvoboj</th>
               <td data-label="Kako se boduje">Pobjeda 1, poraz 0.</td>
             </tr>
             <tr>
-              <th scope="row">Rang</th>
-              <td data-label="Kako se boduje">Nakon 10 javnih igara ukupno. Do tada si Piskaralo. Jedan rang za sve javne formate.</td>
+              <th scope="row">Rang i DNK</th>
+              <td data-label="Kako se boduje">Nakon 10 javnih igara ukupno. Jedan rang i jedan radar za sve formate.</td>
             </tr>
             <tr>
               <th scope="row">Ljestvice</th>
-              <td data-label="Kako se boduje">Dnevne, tjedne, mjesečne… odvojeno za Dvoboj i Četveroboj.</td>
+              <td data-label="Kako se boduje">Zasebno za Dvoboj, Troboj i Četveroboj; dnevno od 5, dulje od 10 partija.</td>
             </tr>
           </tbody>
         </table>
@@ -176,15 +187,19 @@
             </tr>
             <tr>
               <th scope="row">„Ne znam”</th>
-              <td data-label="Što se događa">Predaja. Možeš ostati gledati.</td>
+              <td data-label="Što se događa">Predaja. U Dokaži nastavak može otvoriti dokaz autoru.</td>
             </tr>
             <tr>
               <th scope="row">Mrtva slova</th>
-              <td data-label="Što se događa">Nema slobodnog nastavka - ispada sljedeći na redu.</td>
+              <td data-label="Što se događa">Nema nastavka — u Dokaži nastavak ispada autor; inače sljedeći na redu.</td>
             </tr>
             <tr>
               <th scope="row">Kaladont na „ka”</th>
-              <td data-label="Što se događa">Rekao si riječ na ka, protivnik kaže kaladont - ti ispadaš.</td>
+              <td data-label="Što se događa">Klasični: ispada sljedeći. KA-ZNA: ispada autor „ka”.</td>
+            </tr>
+            <tr>
+              <th scope="row">Dokaz</th>
+              <td data-label="Što se događa">U Dokaži nastavak autor mora pokazati nastavak ili ispada.</td>
             </tr>
             <tr>
               <th scope="row">Napuštanje</th>
@@ -297,9 +312,13 @@
     color: var(--boja-tekst-naslov);
   }
 
-  .zaglavlje > p:last-child {
+  .zaglavlje > p {
     margin: 8px 0 0;
     color: var(--boja-tekst-sekundarni);
+  }
+
+  .poveznica-novosti {
+    margin-top: 12px;
   }
 
   .nadnaslov {
