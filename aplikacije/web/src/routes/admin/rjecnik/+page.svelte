@@ -67,7 +67,7 @@
     brojOblici: number;
     imaPreklapanja: boolean;
     kljucGrupe: string;
-    oblici: Array<{ rijec: string; stanje: string }>;
+    oblici: Array<{ rijec: string; stanje: string; frekvencija: number }>;
   } | null>(null);
   let kljucOperacijeDodavanja = $state('');
   let potvrdiPreklapanja = $state(false);
