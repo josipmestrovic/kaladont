@@ -37,12 +37,20 @@ export type BrojacDostignuca =
   | 'tjedneElite'
   /** Mjeseci u kojima je dosegnut mjesečni Top 10; samo servis dodjele. */
   | 'mjesecneElite'
-  /** Razdoblja s Top 10 u oba moda; samo servis dodjele. */
+  /** Razdoblja s Top 10 u bilo koja dva formata; samo servis dodjele. */
   | 'naDvijeFronte'
   /** Potvrđeni ispravci rječnika po prijavi; samo servis dodjele. */
   | 'jezicniDetektivi'
   /** Potvrđena uklanjanja računa zbog pogrdnog nadimka; samo servis dodjele. */
-  | 'cinkarosi';
+  | 'cinkarosi'
+  /** HINT PR13: javne Troboj pobjede; samo servis dodjele (ne partijska delta). */
+  | 'trobojPobjede'
+  /** HINT PR13: različite javne igre s barem jednim uspješnim dokazom; max 1 / igra. */
+  | 'igreSDokazom'
+  /** HINT PR13: kaladont → sljedeći uz ≥3 aktivna u Klasičnom; više događaja / igra OK. */
+  | 'kaladontSljedeci'
+  /** HINT PR13: pobjede KA-ZNA u kojima je igrač izbacio autora „ka”; 1 / igra. */
+  | 'staraSkolaPobjede';
 
 export const ID_DOSTIGNUCA_STALNO_SI_TU = 'stalno_si_tu';
 export const ID_DOSTIGNUCA_COVJEK_NA_MISIJI = 'covjek_na_misiji';
@@ -58,6 +66,11 @@ export const ID_DOSTIGNUCA_MJESECNA_ELITA = 'mjesecna_elita';
 export const ID_DOSTIGNUCA_NA_DVIJE_FRONTE = 'na_dvije_fronte';
 export const ID_DOSTIGNUCA_JEZICNI_DETEKTIV = 'jezicni_detektiv';
 export const ID_DOSTIGNUCA_CINKAROS = 'cinkaros';
+/** PR13 — ne miješati s katalogom `ka_zna` (žrtva kaladonta) ni pravilnikom `ka_zna`. */
+export const ID_DOSTIGNUCA_TRECA_SRECA = 'treca_sreca';
+export const ID_DOSTIGNUCA_IMAM_NASTAVAK = 'imam_nastavak';
+export const ID_DOSTIGNUCA_SALJI_DALJE = 'salji_dalje';
+export const ID_DOSTIGNUCA_STARA_SKOLA = 'stara_skola';
 
 /** Brojači koji se ne smiju otključati kroz partijsku deltu. */
 export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Set([
@@ -75,6 +88,10 @@ export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Se
   'naDvijeFronte',
   'jezicniDetektivi',
   'cinkarosi',
+  'trobojPobjede',
+  'igreSDokazom',
+  'kaladontSljedeci',
+  'staraSkolaPobjede',
 ]);
 
 export interface DefinicijaDostignuca {
@@ -153,7 +170,8 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
   {
     id: ID_DOSTIGNUCA_DVOSTRUKA_KRUNA,
     naziv: 'Dvostruka kruna',
-    opis: 'Istoga dana pobijedi u javnom Dvoboju i Četveroboju.',
+    // HINT PR13: bilo koja dva različita formata 2/3/4 istog zagrebačkog dana.
+    opis: 'Istoga dana pobijedi u bilo koja dva različita javna formata.',
     kategorija: 'igra',
     pragovi: [1, 3, 10, 25, 50],
     vrijediUPrivatnoj: false,
@@ -216,7 +234,8 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
   {
     id: ID_DOSTIGNUCA_NA_DVIJE_FRONTE,
     naziv: 'Na dvije fronte',
-    opis: 'U istom danu, tjednu ili mjesecu dosegni Top 10 u oba moda.',
+    // HINT PR13: Top 10 u bilo koja dva različita formata (2/3/4) za isto razdoblje.
+    opis: 'U istom danu, tjednu ili mjesecu dosegni Top 10 u bilo koja dva različita formata.',
     kategorija: 'igra',
     pragovi: [1, 2, 3, 4, 5],
     vrijediUPrivatnoj: false,
@@ -239,6 +258,44 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
     pragovi: [1, 2, 3, 4, 5],
     vrijediUPrivatnoj: false,
     brojac: 'cinkarosi',
+  },
+  // --- PR13: četiri nova dostignuća (servisna; kreću od novih događaja). ---
+  {
+    id: ID_DOSTIGNUCA_TRECA_SRECA,
+    naziv: 'Treća sreća',
+    opis: 'Pobijedi u javnim Trobojima.',
+    kategorija: 'igra',
+    pragovi: [1, 5, 15, 40, 100],
+    vrijediUPrivatnoj: false,
+    brojac: 'trobojPobjede',
+  },
+  {
+    id: ID_DOSTIGNUCA_IMAM_NASTAVAK,
+    naziv: 'Imam nastavak',
+    opis: 'Uspješno dokaži nastavak u različitim javnim igrama.',
+    kategorija: 'vjestina',
+    pragovi: [1, 3, 10, 25, 50],
+    vrijediUPrivatnoj: false,
+    brojac: 'igreSDokazom',
+  },
+  {
+    id: ID_DOSTIGNUCA_SALJI_DALJE,
+    naziv: 'Šalji dalje',
+    opis: 'U Klasičnom izbaci sljedećeg kaladontom dok su u igri barem 3 igrača.',
+    kategorija: 'kaladont',
+    pragovi: [1, 3, 10, 25, 50],
+    vrijediUPrivatnoj: false,
+    brojac: 'kaladontSljedeci',
+  },
+  {
+    id: ID_DOSTIGNUCA_STARA_SKOLA,
+    naziv: 'Stara škola',
+    // HINT: odvojeno od dostignuća `ka_zna` (biti izbačen) i pravilnika `ka_zna`.
+    opis: 'Pobijedi javnu igru KA-ZNA u kojoj si osobno izbacio autora „ka”.',
+    kategorija: 'kaladont',
+    pragovi: [1, 3, 10, 25, 50],
+    vrijediUPrivatnoj: false,
+    brojac: 'staraSkolaPobjede',
   },
 ] as const;
 
@@ -276,6 +333,10 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   ID_DOSTIGNUCA_NA_DVIJE_FRONTE,
   ID_DOSTIGNUCA_JEZICNI_DETEKTIV,
   ID_DOSTIGNUCA_CINKAROS,
+  ID_DOSTIGNUCA_TRECA_SRECA,
+  ID_DOSTIGNUCA_IMAM_NASTAVAK,
+  ID_DOSTIGNUCA_SALJI_DALJE,
+  ID_DOSTIGNUCA_STARA_SKOLA,
 ] as const;
 
 export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(

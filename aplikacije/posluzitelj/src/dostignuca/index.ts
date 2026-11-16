@@ -20,7 +20,14 @@ export {
   priznajSvePohvale,
 } from './dodjela-d02.js';
 export {
+  priznajImamNastavak,
+  priznajSaljiDalje,
+  priznajStaruSkolu,
+  priznajTrecuSrecu,
+} from './dodjela-pr13.js';
+export {
   imaJavnuIgruUOtvorenomMjesecu,
   obradiNeobradeneTop10Dokaze,
+  preispitajParoveNaDvijeFronte,
   zabiljeziTop10NakonPromjene,
 } from './top10.js';

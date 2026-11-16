@@ -8,10 +8,10 @@ import {
 } from '../src/dostignuca.js';
 
 describe('dostignuca', () => {
-  it('ima dvadeset i sedam dostignuća i 135 zvjezdica', () => {
-    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(27);
+  it('ima trideset i jedno dostignuće i 155 zvjezdica (PR13)', () => {
+    expect(DEFINICIJE_DOSTIGNUCA).toHaveLength(31);
     expect(DEFINICIJE_DOSTIGNUCA.every((definicija) => definicija.pragovi.length === 5)).toBe(true);
-    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(135);
+    expect(UKUPNO_ZVJEZDICA_DOSTIGNUCA).toBe(155);
   });
 
   it('ne otključava servisna dostignuća kroz izracunajNovaDostignuca', () => {
@@ -32,6 +32,10 @@ describe('dostignuca', () => {
         naDvijeFronte: 5,
         jezicniDetektivi: 50,
         cinkarosi: 5,
+        trobojPobjede: 100,
+        igreSDokazom: 50,
+        kaladontSljedeci: 50,
+        staraSkolaPobjede: 50,
       },
       1,
       true,
@@ -51,6 +55,10 @@ describe('dostignuca', () => {
     expect(idovi).not.toContain('na_dvije_fronte');
     expect(idovi).not.toContain('jezicni_detektiv');
     expect(idovi).not.toContain('cinkaros');
+    expect(idovi).not.toContain('treca_sreca');
+    expect(idovi).not.toContain('imam_nastavak');
+    expect(idovi).not.toContain('salji_dalje');
+    expect(idovi).not.toContain('stara_skola');
   });
 
   it('preskače više razina i vraća najvišu novu razinu', () => {

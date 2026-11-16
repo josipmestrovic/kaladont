@@ -15,6 +15,12 @@ import { obradiNeobradeneTop10Dokaze, zabiljeziTop10NakonPromjene } from '../dos
 import { ocistiMemorijuLjestvica } from '../ljestvice/servis.js';
 import { priznajPrivatnika } from '../dostignuca/dodjela.js';
 import { priznajCistuPetica, priznajDnevnuPobjeduModa, priznajRijetkuGrdosiju, priznajSvePohvale } from '../dostignuca/dodjela-d02.js';
+import {
+  priznajImamNastavak,
+  priznajSaljiDalje,
+  priznajStaruSkolu,
+  priznajTrecuSrecu,
+} from '../dostignuca/dodjela-pr13.js';
 import { dohvatiIshodMisija, obracunajMisijeZaIgraca } from '../misije/obracun.js';
 import {
   emitirajPromjeneSanducica,
@@ -1190,11 +1196,19 @@ export async function zakljuciPartijuUBazi(
       }
 
       if (!samoStatistika && r.plasman === 1 && primaGamifikaciju) {
-        // Dvostruka kruna prati samo Dvoboj+Četveroboj; Troboj ne ulazi do šireg dostignuća.
-        if (mod === 'dva_igraca' || mod === 'cetiri_igraca') {
-          const kruna = await priznajDnevnuPobjeduModa(tx, { igracId: r.igracId, mod, zavrsenoU });
-          primijeniDodjelu(r.igracId, kruna, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
-        }
+        // HINT PR13: Dvostruka kruna prima sve javne formate 2/3/4; ≥2 različita istog dana.
+        const kruna = await priznajDnevnuPobjeduModa(tx, { igracId: r.igracId, mod, zavrsenoU });
+        primijeniDodjelu(r.igracId, kruna, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+
+        // HINT PR13: Treća sreća — samo Troboj pobjeda.
+        const treca = await priznajTrecuSrecu(tx, {
+          igracId: r.igracId,
+          partijaId,
+          mod,
+          zavrsenoU,
+        });
+        primijeniDodjelu(r.igracId, treca, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+
         const statistikaPobjede = statistike.get(r.igracId);
         // Čista petica: pobjeda, ≥5 prihvaćenih riječi i točno 0 pravih pogrešnih unosa.
         // pogresniUnosi broji samo odbijene riječi koje lome niz (nevažeća riječ, krivi nastavak,
@@ -1205,6 +1219,42 @@ export async function zakljuciPartijuUBazi(
           const petica = await priznajCistuPetica(tx, { igracId: r.igracId, partijaId, zavrsenoU });
           primijeniDodjelu(r.igracId, petica, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
         }
+
+        // HINT PR13: Stara škola — pobjeda + elim autora u KA-ZNA (spojeni → kartica).
+        const pravilaStolaPobjeda = kontekstMisija?.pravila ?? ZADANI_PRAVILNIK;
+        const spojeniPobjeda = kontekstMisija?.spojeniDvoboj ?? false;
+        const odabranaPobjeda = kontekstMisija?.odabranaPravilaPoIgracu.get(r.igracId) ?? pravilaStolaPobjeda;
+        const stara = await priznajStaruSkolu(tx, {
+          igracId: r.igracId,
+          partijaId,
+          pravila: pravilaStolaPobjeda,
+          odabranaPravila: odabranaPobjeda,
+          spojeniDvoboj: spojeniPobjeda,
+          zavrsenoU,
+        });
+        primijeniDodjelu(r.igracId, stara, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+      }
+
+      // HINT PR13: Imam nastavak + Šalji dalje — i bez pobjede; samo javni kontekst.
+      // Trening/privatno (samoStatistika) ne napreduju ova četiri.
+      if (!samoStatistika && primaGamifikaciju) {
+        const statistikaIgraca = statistike.get(r.igracId);
+        const imam = await priznajImamNastavak(tx, {
+          igracId: r.igracId,
+          partijaId,
+          uspjesniDokazi: statistikaIgraca?.uspjesniDokazi ?? 0,
+          zavrsenoU,
+        });
+        primijeniDodjelu(r.igracId, imam, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
+
+        const pravilaStola = kontekstMisija?.pravila ?? ZADANI_PRAVILNIK;
+        const salji = await priznajSaljiDalje(tx, {
+          igracId: r.igracId,
+          partijaId,
+          pravila: pravilaStola,
+          zavrsenoU,
+        });
+        primijeniDodjelu(r.igracId, salji, upravljac, vrstaIgraca, stariIgrac?.iskustvoUkupno ?? 0);
       }
 
       if (primaGamifikaciju) {

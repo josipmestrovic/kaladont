@@ -278,6 +278,14 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   naDvijeFronte: integer('na_dvije_fronte').notNull().default(0),
   jezicniDetektivi: integer('jezicni_detektivi').notNull().default(0),
   cinkarosi: integer('cinkarosi').notNull().default(0),
+  /** HINT PR13: javne Troboj pobjede (Treća sreća). */
+  trobojPobjede: integer('troboj_pobjede').notNull().default(0),
+  /** HINT PR13: igre s barem jednim uspješnim dokazom (Imam nastavak). */
+  igreSDokazom: integer('igre_s_dokazom').notNull().default(0),
+  /** HINT PR13: kaladont → sljedeći uz ≥3 aktivna u Klasičnom (Šalji dalje). */
+  kaladontSljedeci: integer('kaladont_sljedeci').notNull().default(0),
+  /** HINT PR13: KA-ZNA pobjede s eliminacijom autora (Stara škola). */
+  staraSkolaPobjede: integer('stara_skola_pobjede').notNull().default(0),
   anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);
@@ -850,6 +858,42 @@ export const dokaziDostignucaCinkaros = pgTable('dokazi_dostignuca_cinkaros', {
 }, (tablica) => [
   primaryKey({ name: 'dokazi_dostignuca_cinkaros_pk', columns: [tablica.igracId, tablica.prijavljeniIgracId] }),
   check('chk_dokazi_cinkaros_nije_samoprijava', sql`${tablica.igracId} <> ${tablica.prijavljeniIgracId}`),
+]);
+
+/** PR13 Treća sreća — jedna javna Troboj pobjeda po partiji. */
+export const dokaziDostignucaTrecaSreca = pgTable('dokazi_dostignuca_treca_sreca', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  partijaId: uuid('partija_id').notNull().references(() => partije.id, { onDelete: 'cascade' }),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_dostignuca_treca_sreca_pk', columns: [tablica.igracId, tablica.partijaId] }),
+]);
+
+/** PR13 Imam nastavak — jedna javna igra s barem jednim uspješnim dokazom. */
+export const dokaziDostignucaImamNastavak = pgTable('dokazi_dostignuca_imam_nastavak', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  partijaId: uuid('partija_id').notNull().references(() => partije.id, { onDelete: 'cascade' }),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_dostignuca_imam_nastavak_pk', columns: [tablica.igracId, tablica.partijaId] }),
+]);
+
+/**
+ * PR13 Šalji dalje — jedan kaladont → sljedeći uz ≥3 aktivna u Klasičnom.
+ * HINT: više događaja po igri; redni_broj = ucinak_posebne_rijeci.redni_broj.
+ */
+export const dokaziDostignucaSaljiDalje = pgTable('dokazi_dostignuca_salji_dalje', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  partijaId: uuid('partija_id').notNull().references(() => partije.id, { onDelete: 'cascade' }),
+  redniBroj: smallint('redni_broj').notNull(),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_dostignuca_salji_dalje_pk', columns: [tablica.igracId, tablica.partijaId, tablica.redniBroj] }),
+]);
+
+/** PR13 Stara škola — jedna KA-ZNA pobjeda s eliminacijom autora „ka”. */
+export const dokaziDostignucaStaraSkola = pgTable('dokazi_dostignuca_stara_skola', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  partijaId: uuid('partija_id').notNull().references(() => partije.id, { onDelete: 'cascade' }),
+}, (tablica) => [
+  primaryKey({ name: 'dokazi_dostignuca_stara_skola_pk', columns: [tablica.igracId, tablica.partijaId] }),
 ]);
 
 /** Trajne osobne obavijesti (seed za kasniji sandučić). Neprikazane čeka klijent. */
