@@ -924,8 +924,8 @@ async function primijeniDodavanjeOblika(
   const imaCilj = postojeca.grupe.includes(ulaz.kljucGrupe);
   const imaDruge = postojeca.grupe.some((g) => g !== ulaz.kljucGrupe);
 
-  // Već aktivna bez homografskog preklapanja i bez novog tiera = no-op za nagrade/prijave
-  // (kao stari dodajRijec). Tiho nadopuni ključ grupe ako nedostaje.
+  // Već aktivna bez homografskog preklapanja i bez novog tiera: tihi group-backfill
+  // broji kao azurirana (RAM sync), ali ne kao nagrada/prijava (znacajnePromjene).
   if (!imaDruge && eksplicitna === undefined && ulaz.stanje !== 'preklapanje') {
     if (!imaCilj) {
       await tx.update(rijeci).set({
@@ -933,11 +933,12 @@ async function primijeniDodavanjeOblika(
         rucnoDodaneGrupe: dodajRucnu(postojeca.rucnoDodaneGrupe),
         vrste: sortirajJedinstvene([...postojeca.vrste, ulaz.vrsta]),
       }).where(eq(rijeci.rijec, rijec));
-    } else {
-      const novaRucna = dodajRucnu(postojeca.rucnoDodaneGrupe);
-      if (novaRucna.length !== postojeca.rucnoDodaneGrupe.length) {
-        await tx.update(rijeci).set({ rucnoDodaneGrupe: novaRucna }).where(eq(rijeci.rijec, rijec));
-      }
+      return { promjena: 'azurirana', rijec, izmjenaId: null };
+    }
+    const novaRucna = dodajRucnu(postojeca.rucnoDodaneGrupe);
+    if (novaRucna.length !== postojeca.rucnoDodaneGrupe.length) {
+      await tx.update(rijeci).set({ rucnoDodaneGrupe: novaRucna }).where(eq(rijeci.rijec, rijec));
+      return { promjena: 'azurirana', rijec, izmjenaId: null };
     }
     return { promjena: 'nema', rijec, izmjenaId: null };
   }
