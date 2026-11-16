@@ -531,6 +531,8 @@ export const rijeci = pgTable(
     vrste: text('vrste').array().notNull().default(['imenica']),
     grupe: text('grupe').array().notNull().default([]),
     frekvencija: integer('frekvencija').notNull().default(0),
+    rucnoDodaneGrupe: text('rucno_dodane_grupe').array().notNull().default([]),
+    rucnaFrekvencija: integer('rucna_frekvencija'),
     aktivna: boolean('aktivna').notNull().default(true),
     dodana: timestamp('dodana', { withTimezone: true }).notNull().defaultNow(),
     napomena: text('napomena'),
@@ -539,6 +541,8 @@ export const rijeci = pgTable(
     // model-podataka.md: trazenje nastavaka i analiza klopki - igra ih ne koristi (ADR-007, radi iz memorije)
     index('idx_rijeci_prva_dva').on(tablica.prvaDva).where(sql`aktivna`),
     index('idx_rijeci_zadnja_dva').on(tablica.zadnjaDva).where(sql`aktivna`),
+    // Admin grupno uklanjanje: aktivna AND grupe && $1
+    index('idx_rijeci_grupe_gin').using('gin', tablica.grupe),
   ],
 );
 
@@ -610,8 +614,28 @@ export const izmjeneRjecnika = pgTable('izmjene_rjecnika', {
   razlog: text('razlog').notNull(),
   prijavaId: integer('prijava_id').references(() => prijave.id),
   adminId: uuid('admin_id').references(() => igraci.id),
+  /** Zajednički ID skupne admin operacije (grupno uklanjanje / dodavanje). */
+  operacijaId: uuid('operacija_id'),
   vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (tablica) => [
+  index('idx_izmjene_rjecnika_operacija_id').on(tablica.operacijaId).where(sql`${tablica.operacijaId} is not null`),
+]);
+
+/** Idempotentni ishodi grupnih admin operacija (retry / dvoklik). */
+export const operacijeRjecnika = pgTable('operacije_rjecnika', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  kljuc: text('kljuc').notNull().unique(),
+  smjer: text('smjer').notNull(),
+  otisak: text('otisak').notNull(),
+  otisakZahtjeva: text('otisak_zahtjeva').notNull(),
+  adminId: uuid('admin_id').references(() => igraci.id),
+  izvornaRijec: text('izvorna_rijec').notNull(),
+  prijavaId: integer('prijava_id').references(() => prijave.id),
+  ishod: jsonb('ishod').notNull(),
+  stvorenoU: timestamp('stvoreno_u', { withTimezone: true }).notNull().defaultNow(),
+}, (tablica) => [
+  check('chk_operacije_rjecnika_smjer', sql`${tablica.smjer} in ('ukloni', 'dodaj')`),
+]);
 
 /** Odobreni skup sigurnih početnih riječi (admin CRUD; seed iz POCETNI_SEED_SIGURNIH_RIJECI). */
 export const sigurnePocetneRijeci = pgTable('sigurne_pocetne_rijeci', {

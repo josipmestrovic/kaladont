@@ -9,7 +9,7 @@
     tierDuljineIskustva,
     tierRijetkostiIskustva,
   } from 'zajednicko';
-  import { api } from '$lib/api.js';
+  import { api, ApiGreska } from '$lib/api.js';
   import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
 
   interface IzmjenaRjecnika {
@@ -57,8 +57,20 @@
   let rucnoDodane = $state<IzmjenaRjecnika[]>([]);
   let greska = $state<string | null>(null);
   let novaRijec = $state('');
+  let lemaRijeci = $state('');
   let vrstaRijeci = $state('imenica');
   let tierRijetkosti = $state<TierRijetkostiRucno>('ucestala');
+  let dodatniOblici = $state<Array<{ id: number; rijec: string; tier: TierRijetkostiRucno | '' }>>([]);
+  let sljedeciIdOblika = $state(1);
+  let pregledDodavanja = $state<{
+    otisak: string;
+    brojOblici: number;
+    imaPreklapanja: boolean;
+    kljucGrupe: string;
+    oblici: Array<{ rijec: string; stanje: string }>;
+  } | null>(null);
+  let kljucOperacijeDodavanja = $state('');
+  let potvrdiPreklapanja = $state(false);
   let porukaRjecnik = $state<string | null>(null);
   let testRijec = $state('');
   let detaljiRijeci = $state<DetaljiRijeci | null>(null);
@@ -73,6 +85,21 @@
   let novaSigurna = $state('');
   let sigurneGreska = $state<string | null>(null);
   let sigurneUcitavanje = $state(false);
+  let dijalogUklanjanja = $state<{
+    rijec: string;
+    pregled: {
+      izvornaRijec: string;
+      izvorniKljucevi: string[];
+      brojAktivnih: number;
+      samoOvajOblik: boolean;
+      otisak: string;
+      poruka?: string;
+      oblici: Array<{ rijec: string }>;
+    } | null;
+    kljucOperacije: string;
+    greska: string | null;
+    ucitavanje: boolean;
+  } | null>(null);
 
   const VRSTE_RIJECI = [
     'imenica', 'glagol', 'pridjev', 'prilog', 'zamjenica', 'broj',
@@ -162,27 +189,75 @@
     void ucitaj();
   });
 
+  function tijeloGrupnogDodavanja() {
+    return {
+      izvornaRijec: novaRijec,
+      vrsta: vrstaRijeci,
+      lema: lemaRijeci.trim() || novaRijec,
+      tierRijetkosti: tierRijetkosti,
+      dodatniOblici: dodatniOblici
+        .filter((red) => red.rijec.trim().length >= 2)
+        .map((red) => ({
+          rijec: red.rijec.trim(),
+          ...(red.tier ? { tierRijetkosti: red.tier } : {}),
+        })),
+    };
+  }
+
+  async function osvjeziPregledDodavanja() {
+    if (!novaRijec.trim()) {
+      pregledDodavanja = null;
+      return;
+    }
+    const odgovor = await api<{ pregled: typeof pregledDodavanja }>('/admin/rjecnik/pregled-dodavanja', {
+      method: 'POST',
+      body: JSON.stringify(tijeloGrupnogDodavanja()),
+    });
+    pregledDodavanja = odgovor.pregled;
+    kljucOperacijeDodavanja = crypto.randomUUID();
+    potvrdiPreklapanja = odgovor.pregled?.imaPreklapanja ?? false;
+  }
+
+  function dodajRedOblika() {
+    dodatniOblici = [...dodatniOblici, { id: sljedeciIdOblika, rijec: '', tier: '' }];
+    sljedeciIdOblika += 1;
+  }
+
   async function dodajRijec(e: SubmitEvent) {
     e.preventDefault();
     if (akcijaUTijeku !== null) return;
     akcijaUTijeku = 'dodaj';
     porukaRjecnik = null;
-    const rijec = novaRijec;
-    const vrsta = vrstaRijeci;
-    const tier = tierRijetkosti;
-    pokaziUspjeh(`Riječ „${rijec}” dodana.`);
-    novaRijec = '';
     try {
-      await api('/admin/rjecnik/dodaj', {
+      if (!pregledDodavanja) await osvjeziPregledDodavanja();
+      if (!pregledDodavanja || !kljucOperacijeDodavanja) {
+        throw new Error('Pregled dodavanja nije spreman.');
+      }
+      const odgovor = await api<{ brojPromjena?: number }>('/admin/rjecnik/dodaj', {
         method: 'POST',
-        body: JSON.stringify({ rijec, vrsta, tierRijetkosti: tier }),
+        body: JSON.stringify({
+          ...tijeloGrupnogDodavanja(),
+          otisak: pregledDodavanja.otisak,
+          kljucOperacije: kljucOperacijeDodavanja,
+          potvrdiPreklapanja,
+          razlog: 'Ručno grupno dodavanje',
+        }),
       });
+      const broj = odgovor.brojPromjena ?? pregledDodavanja.brojOblici;
+      pokaziUspjeh(`Dodano/ažurirano ${broj} oblika.`);
+      novaRijec = '';
+      lemaRijeci = '';
+      dodatniOblici = [];
+      pregledDodavanja = null;
       void ucitaj();
     } catch (err) {
-      novaRijec = rijec;
-      vrstaRijeci = vrsta;
-      tierRijetkosti = tier;
-      porukaRjecnik = err instanceof Error ? err.message : 'Neuspjelo dodavanje riječi.';
+      if (err instanceof ApiGreska && err.status === 409 && err.tijelo.pregled) {
+        pregledDodavanja = err.tijelo.pregled as typeof pregledDodavanja;
+        kljucOperacijeDodavanja = crypto.randomUUID();
+        porukaRjecnik = 'Pregled je zastario — ponovi potvrdu.';
+      } else {
+        porukaRjecnik = err instanceof Error ? err.message : 'Neuspjelo dodavanje riječi.';
+      }
     } finally {
       akcijaUTijeku = null;
     }
@@ -225,24 +300,83 @@
     }
   }
 
-  async function deaktivirajTrenutnu() {
-    if (!detaljiRijeci?.rijec || akcijaUTijeku !== null) return;
+  async function otvoriDeaktivaciju() {
+    if (!detaljiRijeci?.rijec || akcijaUTijeku !== null || dijalogUklanjanja) return;
+    const rijec = detaljiRijeci.rijec.rijec;
+    dijalogUklanjanja = {
+      rijec,
+      pregled: null,
+      kljucOperacije: '',
+      greska: null,
+      ucitavanje: true,
+    };
+    try {
+      const odgovor = await api<{
+        pregled: NonNullable<typeof dijalogUklanjanja>['pregled'];
+      }>(`/admin/rjecnik/pregled-uklanjanja?rijec=${encodeURIComponent(rijec)}`);
+      dijalogUklanjanja = {
+        rijec,
+        pregled: odgovor.pregled,
+        kljucOperacije: crypto.randomUUID(),
+        greska: null,
+        ucitavanje: false,
+      };
+    } catch (err) {
+      dijalogUklanjanja = {
+        rijec,
+        pregled: null,
+        kljucOperacije: '',
+        greska: err instanceof Error ? err.message : 'Pregled nije uspio.',
+        ucitavanje: false,
+      };
+    }
+  }
+
+  function zatvoriDeaktivaciju() {
+    if (akcijaUTijeku === 'deaktiviraj') return;
+    dijalogUklanjanja = null;
+  }
+
+  async function potvrdiDeaktivaciju() {
+    if (!dijalogUklanjanja?.pregled || akcijaUTijeku !== null) return;
     akcijaUTijeku = 'deaktiviraj';
     porukaRjecnik = null;
-    const rijec = detaljiRijeci.rijec.rijec;
-    const prethodno = detaljiRijeci;
-    if (detaljiRijeci.rijec) detaljiRijeci = { ...detaljiRijeci, rijec: { ...detaljiRijeci.rijec, aktivna: false } };
-    pokaziUspjeh(`Riječ „${rijec}” deaktivirana.`);
+    const { rijec, pregled, kljucOperacije } = dijalogUklanjanja;
     try {
-      await api('/admin/rjecnik/deaktiviraj', {
+      const odgovor = await api<{ brojPromjena?: number }>('/admin/rjecnik/deaktiviraj', {
         method: 'POST',
-        body: JSON.stringify({ rijec, razlog: 'Ručna deaktivacija iz admina' }),
+        body: JSON.stringify({
+          rijec,
+          razlog: 'Ručna grupna deaktivacija iz admina',
+          otisak: pregled.otisak,
+          kljucOperacije,
+        }),
       });
+      pokaziUspjeh(
+        (odgovor.brojPromjena ?? pregled.brojAktivnih) === 0
+          ? `Nema promjene za „${rijec}”.`
+          : `Deaktivirano ${odgovor.brojPromjena ?? pregled.brojAktivnih} oblika.`,
+      );
+      dijalogUklanjanja = null;
       void testRijeci_f();
       void ucitaj();
     } catch (err) {
-      detaljiRijeci = prethodno;
-      porukaRjecnik = err instanceof Error ? err.message : 'Deaktivacija nije uspjela.';
+      if (err instanceof ApiGreska && err.status === 409 && err.tijelo.pregled) {
+        dijalogUklanjanja = {
+          rijec,
+          pregled: err.tijelo.pregled as NonNullable<typeof dijalogUklanjanja>['pregled'],
+          kljucOperacije: crypto.randomUUID(),
+          greska: 'Pregled je zastario — potvrdi novi popis.',
+          ucitavanje: false,
+        };
+      } else {
+        if (dijalogUklanjanja) {
+          dijalogUklanjanja = {
+            ...dijalogUklanjanja,
+            greska: err instanceof Error ? err.message : 'Deaktivacija nije uspjela.',
+          };
+        }
+      }
     } finally {
       akcijaUTijeku = null;
     }
@@ -321,7 +455,8 @@
   {#if tab === 'rucno'}
     <h2>Ručno dodavanje</h2>
     <form class="forma-rjecnik" onsubmit={dodajRijec}>
-      <label>Riječ <input type="text" bind:value={novaRijec} required disabled={akcijaUTijeku !== null} /></label>
+      <label>Izvorni oblik <input type="text" bind:value={novaRijec} required disabled={akcijaUTijeku !== null} /></label>
+      <label>Lema <input type="text" bind:value={lemaRijeci} placeholder="default = izvorni oblik" disabled={akcijaUTijeku !== null} /></label>
       <label>Vrsta
         <select bind:value={vrstaRijeci} required disabled={akcijaUTijeku !== null}>
           {#each VRSTE_RIJECI as vrsta (vrsta)}
@@ -329,14 +464,37 @@
           {/each}
         </select>
       </label>
-      <label>Rijetkost
+      <label>Rijetkost izvora
         <select bind:value={tierRijetkosti} required disabled={akcijaUTijeku !== null}>
           {#each TIERI_RIJETKOSTI as tier (tier.vrijednost)}
             <option value={tier.vrijednost}>{tier.oznaka}</option>
           {/each}
         </select>
       </label>
-      <button type="submit" disabled={akcijaUTijeku !== null}>{akcijaUTijeku === 'dodaj' ? 'Radim…' : 'Dodaj riječ'}</button>
+      {#each dodatniOblici as red (red.id)}
+        <div class="red-oblik">
+          <input type="text" bind:value={red.rijec} placeholder="dodatni oblik" disabled={akcijaUTijeku !== null} />
+          <select bind:value={red.tier} disabled={akcijaUTijeku !== null}>
+            <option value="">Zadrži</option>
+            {#each TIERI_RIJETKOSTI as tier (tier.vrijednost)}
+              <option value={tier.vrijednost}>{tier.oznaka}</option>
+            {/each}
+          </select>
+        </div>
+      {/each}
+      <button type="button" class="sporedni" disabled={akcijaUTijeku !== null} onclick={dodajRedOblika}>+ oblik</button>
+      <button type="button" class="sporedni" disabled={akcijaUTijeku !== null} onclick={() => void osvjeziPregledDodavanja()}
+        >Pregled</button
+      >
+      {#if pregledDodavanja}
+        <p class="info-pregled">{pregledDodavanja.brojOblici} oblika · {pregledDodavanja.kljucGrupe}</p>
+        {#if pregledDodavanja.imaPreklapanja}
+          <label
+            ><input type="checkbox" bind:checked={potvrdiPreklapanja} /> Potvrdi preklapanje grupa</label
+          >
+        {/if}
+      {/if}
+      <button type="submit" disabled={akcijaUTijeku !== null}>{akcijaUTijeku === 'dodaj' ? 'Radim…' : pregledDodavanja ? `Dodaj ${pregledDodavanja.brojOblici} oblika` : 'Dodaj (pregled)'}</button>
     </form>
     {#if porukaRjecnik}<p class="greska" role="alert">{porukaRjecnik}</p>{/if}
   {/if}
@@ -396,7 +554,7 @@
             <p>Grupe: <strong>{detaljiRijeci.rijec.grupe.join(', ') || '—'}</strong></p>
             <div class="akcije-rijeci">
               {#if detaljiRijeci.rijec.aktivna}
-                <button type="button" disabled={akcijaUTijeku !== null} onclick={() => void deaktivirajTrenutnu()}>
+                <button type="button" disabled={akcijaUTijeku !== null || dijalogUklanjanja !== null} onclick={() => void otvoriDeaktivaciju()}>
                   {akcijaUTijeku === 'deaktiviraj' ? 'Radim…' : 'Deaktiviraj'}
                 </button>
               {:else}
@@ -514,6 +672,61 @@
       </table>
     {/if}
   {/if}
+{/if}
+
+{#if dijalogUklanjanja}
+  <div
+    class="dijalog-overlay"
+    role="presentation"
+    onclick={zatvoriDeaktivaciju}
+    onkeydown={(e) => e.key === 'Escape' && zatvoriDeaktivaciju()}
+  >
+    <div
+      class="dijalog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dijalog-deaktivacija-naslov"
+      onclick={(e) => e.stopPropagation()}
+    >
+      <h2 id="dijalog-deaktivacija-naslov">Deaktivirati oblike?</h2>
+      <p>Pregled uklanjanja za „{dijalogUklanjanja.rijec}”.</p>
+      {#if dijalogUklanjanja.ucitavanje}
+        <p>Učitavam obuhvat…</p>
+      {:else if dijalogUklanjanja.pregled}
+        {#if dijalogUklanjanja.pregled.poruka}
+          <p class="info">{dijalogUklanjanja.pregled.poruka}</p>
+        {/if}
+        <p class="info">
+          Grupe: <strong>{dijalogUklanjanja.pregled.izvorniKljucevi.join(', ') || '—'}</strong>
+          · {dijalogUklanjanja.pregled.brojAktivnih} aktivnih oblika
+        </p>
+        {#if dijalogUklanjanja.pregled.oblici.length > 0}
+          <ul class="lista-obuhvata">
+            {#each dijalogUklanjanja.pregled.oblici as oblik (oblik.rijec)}
+              <li><code>{oblik.rijec}</code></li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+      {#if dijalogUklanjanja.greska}
+        <p class="greska" role="alert">{dijalogUklanjanja.greska}</p>
+      {/if}
+      <div class="dijalog-gumbi">
+        <button type="button" class="sporedni" disabled={akcijaUTijeku === 'deaktiviraj'} onclick={zatvoriDeaktivaciju}
+          >Odustani</button
+        >
+        <button
+          type="button"
+          disabled={akcijaUTijeku !== null || dijalogUklanjanja.ucitavanje || !dijalogUklanjanja.pregled}
+          onclick={() => void potvrdiDeaktivaciju()}
+        >
+          {akcijaUTijeku === 'deaktiviraj'
+            ? 'Radim…'
+            : `Deaktiviraj ${dijalogUklanjanja.pregled?.brojAktivnih ?? 0} oblika`}
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -676,5 +889,59 @@
   .gumb-ciscenje:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .dijalog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .dijalog {
+    width: min(100%, 480px);
+    max-height: min(90vh, 720px);
+    overflow: auto;
+    padding: 20px 22px;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  }
+
+  .dijalog h2 {
+    margin: 0 0 10px;
+    font-size: 1.25rem;
+  }
+
+  .lista-obuhvata {
+    max-height: 180px;
+    overflow: auto;
+    margin: 0 0 16px;
+    padding: 8px 12px;
+    list-style: none;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    background: #fafafa;
+  }
+
+  .lista-obuhvata li {
+    padding: 2px 0;
+    font-family: monospace;
+  }
+
+  .dijalog-gumbi {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .dijalog-gumbi button.sporedni {
+    background: #f5f5f5;
+    color: #333;
   }
 </style>

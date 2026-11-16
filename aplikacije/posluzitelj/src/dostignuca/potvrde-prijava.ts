@@ -11,7 +11,19 @@ import { baza } from '../baza/klijent.js';
 import { igraci, prijave, prijaveIgraca } from '../baza/shema.js';
 import type { MisijeTx } from '../misije/tipovi.js';
 import { obrisiRacunPoId, type IshodBrisanja } from '../racuni/brisanje.js';
-import { deaktivirajRijec, dodajRijec, NevaljanaRijecError, normalizirajRijecRjecnika } from '../rjecnik/administracija.js';
+import {
+  FREKVENCIJA_ZA_TIER_RIJETKOSTI,
+  normalizirajRijecRjecnika,
+  type TierRijetkostiRucno,
+} from '../rjecnik/administracija.js';
+import {
+  izracunajPregledDodavanja,
+  izracunajPregledUklanjanja,
+  potvrdiGrupnoDodavanje,
+  potvrdiGrupnoUklanjanje,
+  type PregledGrupneIzmjene,
+  type UlazPregledaGrupnogDodavanja,
+} from '../rjecnik/grupne-izmjene.js';
 import { dodijeliDoprinos } from './dodjela.js';
 import {
   emitirajPromjeneSanducica,
@@ -30,12 +42,15 @@ export interface ObavijestiPotvrde {
 }
 
 export type RezultatPotvrdeRijeci =
-  | { ok: false; status: 400 | 404; greska: string }
+  | { ok: false; status: 400 | 404 | 409; greska: string; kod?: string; pregled?: PregledGrupneIzmjene }
   | {
       ok: true;
       rijec: string;
       promjena: 'nema' | 'dodana' | 'reaktivirana' | 'deaktivirana';
       obavijesti: ObavijestiPotvrde[];
+      deaktivirane?: string[];
+      promijenjene?: string[];
+      brojPromjena?: number;
     };
 
 export type RezultatPotvrdeRacuna =
@@ -53,6 +68,14 @@ export type RezultatOdbacivanja =
 
 function jeRazlogPrijave(razlog: string): razlog is RazlogPrijaveIgraca {
   return (RAZLOZI_PRIJAVE_IGRACA as readonly string[]).includes(razlog);
+}
+
+function tierIzFrekvencije(frekvencija: number | undefined): TierRijetkostiRucno | undefined {
+  if (frekvencija === undefined) return undefined;
+  for (const [tier, vrijednost] of Object.entries(FREKVENCIJA_ZA_TIER_RIJETKOSTI)) {
+    if (vrijednost === frekvencija) return tier as TierRijetkostiRucno;
+  }
+  return undefined;
 }
 
 async function kvalificiraniPrijavitelji(tx: MisijeTx, ids: readonly string[], iskljuciId?: string): Promise<string[]> {
@@ -107,80 +130,157 @@ export async function potvrdiIspravakRjecnika(ulaz: {
   /** Samo za smjer `dodaj`: reprezentativna frekvencija (tier rijetkosti). */
   frekvencija?: number;
   napomena?: string;
+  /** Grupno uklanjanje (#75) / dodavanje (#89): otisak pregleda + ključ operacije. */
+  otisak?: string;
+  kljucOperacije?: string;
+  /** Grupno dodavanje (#89): puni payload uz otisak. */
+  grupno?: Partial<UlazPregledaGrupnogDodavanja> & {
+    otisak: string;
+    kljucOperacije: string;
+    potvrdiPreklapanja?: boolean;
+  };
 }): Promise<RezultatPotvrdeRijeci> {
-  let sanducicIgraci: string[] = [];
-  const rezultat = await baza.transaction(async (tx) => {
-    const [prijava] = await tx.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).for('update').limit(1);
-    if (!prijava) return { ok: false as const, status: 404 as const, greska: 'Prijava nije pronađena.' };
-    if (ulaz.smjer === 'dodaj' && prijava.tip !== 'za_dodavanje') {
-      return { ok: false as const, status: 400 as const, greska: 'Ova prijava nije za dodavanje riječi.' };
-    }
-    if (ulaz.smjer === 'deaktiviraj' && prijava.tip !== 'za_brisanje') {
-      return { ok: false as const, status: 400 as const, greska: 'Ova prijava nije za brisanje riječi.' };
-    }
-    // Odbacivanje i ostala rješenja bez potvrđene akcije moraju ostati ne-ponovljiva.
-    if (prijava.potvrdenaAkcija || prijava.status === 'rijesena') {
-      return { ok: true as const, rijec: normalizirajRijecRjecnika(prijava.rijec), promjena: 'nema' as const, obavijesti: [] };
-    }
-
-    let promjena;
-    try {
-      promjena = ulaz.smjer === 'dodaj'
-        ? await dodajRijec(prijava.rijec, 'Prijava igrača — riječ dodana', ulaz.adminId, 'imenica', undefined, prijava.id, tx, ulaz.frekvencija)
-        : await deaktivirajRijec(prijava.rijec, 'Prijava igrača — riječ uklonjena', ulaz.adminId, prijava.id, tx);
-    } catch (greska) {
-      if (greska instanceof NevaljanaRijecError) return { ok: false as const, status: 400 as const, greska: greska.message };
-      throw greska;
-    }
-
-    if (promjena.promjena === 'nema' || promjena.promjena === 'vracena') {
-      await tx.update(prijave).set({
-        status: 'rijesena',
-        napomenaAdmina: 'nema_promjene',
-        rijesioId: ulaz.adminId,
-      }).where(eq(prijave.id, prijava.id));
-      return { ok: true as const, rijec: promjena.rijec, promjena: 'nema' as const, obavijesti: [] };
+  if (ulaz.smjer === 'deaktiviraj') {
+    let otisak = ulaz.otisak;
+    let kljucOperacije = ulaz.kljucOperacije;
+    if (!otisak || !kljucOperacije) {
+      const [prijava] = await baza.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).limit(1);
+      if (!prijava) return { ok: false, status: 404, greska: 'Prijava nije pronađena.' };
+      if (prijava.tip !== 'za_brisanje') {
+        return { ok: false, status: 400, greska: 'Ova prijava nije za brisanje riječi.' };
+      }
+      if (prijava.potvrdenaAkcija || prijava.status === 'rijesena') {
+        return { ok: true, rijec: normalizirajRijecRjecnika(prijava.rijec), promjena: 'nema', obavijesti: [] };
+      }
+      const pregled = await izracunajPregledUklanjanja(baza, prijava.rijec);
+      if (pregled.brojAktivnih > 1) {
+        return {
+          ok: false,
+          status: 409,
+          greska: 'Potreban je pregled grupnog uklanjanja.',
+          kod: 'zastarjeli_pregled',
+          pregled,
+        };
+      }
+      otisak = pregled.otisak;
+      kljucOperacije = `legacy-obrisi-${ulaz.prijavaId}-${otisak.slice(0, 16)}`;
     }
 
-    const akcija = promjena.promjena;
-    const povezane = await tx.select({ id: prijave.id, igracId: prijave.igracId }).from(prijave).where(and(
-      eq(prijave.tip, prijava.tip),
-      isNull(prijave.potvrdenaAkcija),
-      sql`normalize(lower(btrim(${prijave.rijec})), NFC) = ${promjena.rijec}`,
-      or(inArray(prijave.status, ['nova', 'pregledana']), eq(prijave.id, prijava.id)),
-    )).for('update');
-    const ids = [...new Set([...povezane.map((red) => red.id), prijava.id])];
-    await tx.update(prijave).set({
-      status: 'rijesena',
-      napomenaAdmina: akcija === 'deaktivirana' ? 'obrisana' : 'dodana',
-      rijesioId: ulaz.adminId,
-      potvrdenaAkcija: akcija,
-      izmjenaRjecnikaId: promjena.izmjenaId,
-    }).where(inArray(prijave.id, ids));
-
-    const mailboxPrijavitelji = [
-      { prijavaId: prijava.id, igracId: prijava.igracId },
-      ...povezane.map((red) => ({ prijavaId: red.id, igracId: red.igracId })),
-    ];
-    sanducicIgraci = await stvoriPorukeUvazenePrijaveRijeci({
-      prijavitelji: mailboxPrijavitelji,
-      rijec: promjena.rijec,
-      smjer: ulaz.smjer,
+    const grupno = await potvrdiGrupnoUklanjanje({
+      adminId: ulaz.adminId,
+      otisak,
+      kljucOperacije,
+      prijavaId: ulaz.prijavaId,
       napomena: ulaz.napomena,
-      tx,
     });
+    if (!grupno.ok) {
+      return {
+        ok: false,
+        status: grupno.status,
+        greska: grupno.greska,
+        kod: grupno.kod,
+        pregled: grupno.pregled,
+      };
+    }
+    return {
+      ok: true,
+      rijec: grupno.ishod.izvornaRijec,
+      promjena: grupno.ishod.nemaPromjene ? 'nema' : 'deaktivirana',
+      obavijesti: grupno.obavijesti,
+      deaktivirane: grupno.ishod.deaktivirane,
+      brojPromjena: grupno.ishod.brojPromjena,
+    };
+  }
 
-    const prijavitelji = await kvalificiraniPrijavitelji(tx, [prijava.igracId, ...povezane.map((red) => red.igracId)]);
-    const obavijesti = await nagradi(tx, prijavitelji, {
-      dostignuceId: ID_DOSTIGNUCA_JEZICNI_DETEKTIV,
-      dokaz: { vrsta: 'jezicni_detektiv', normaliziranaRijec: promjena.rijec },
-      izvor: 'potvrda_prijave_rijeci',
-      kontekst: { rijec: promjena.rijec },
+  let otisak = ulaz.otisak;
+  let kljucOperacije = ulaz.kljucOperacije;
+  let grupnoUlaz: UlazPregledaGrupnogDodavanja | null = null;
+  let potvrdiPreklapanja = ulaz.grupno?.potvrdiPreklapanja ?? false;
+
+  if (ulaz.grupno?.otisak && ulaz.grupno.kljucOperacije) {
+    otisak = ulaz.grupno.otisak;
+    kljucOperacije = ulaz.grupno.kljucOperacije;
+    potvrdiPreklapanja = ulaz.grupno.potvrdiPreklapanja ?? false;
+    grupnoUlaz = ulaz.grupno;
+  }
+
+  if (!otisak || !kljucOperacije) {
+    const [prijava] = await baza.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).limit(1);
+    if (!prijava) return { ok: false, status: 404, greska: 'Prijava nije pronađena.' };
+    if (prijava.tip !== 'za_dodavanje') {
+      return { ok: false, status: 400, greska: 'Ova prijava nije za dodavanje riječi.' };
+    }
+    if (prijava.potvrdenaAkcija || prijava.status === 'rijesena') {
+      return { ok: true, rijec: normalizirajRijecRjecnika(prijava.rijec), promjena: 'nema', obavijesti: [] };
+    }
+    const lema = grupnoUlaz?.lema ?? normalizirajRijecRjecnika(prijava.rijec);
+    const vrsta = grupnoUlaz?.vrsta ?? 'imenica';
+    const tierIzvora = grupnoUlaz?.tierIzvora ?? tierIzFrekvencije(ulaz.frekvencija);
+    const pregled = await izracunajPregledDodavanja(baza, {
+      izvornaRijec: prijava.rijec,
+      vrsta,
+      lema,
+      stupanj: grupnoUlaz?.stupanj,
+      tierIzvora,
+      dodatniOblici: grupnoUlaz?.dodatniOblici ?? [],
     });
-    return { ok: true as const, rijec: promjena.rijec, promjena: akcija, obavijesti };
+    if (pregled.brojOblici > 1 || pregled.imaPreklapanja) {
+      return {
+        ok: false,
+        status: 409,
+        greska: 'Potreban je pregled grupnog dodavanja.',
+        kod: 'zastarjeli_pregled',
+        pregled,
+      };
+    }
+    otisak = pregled.otisak;
+    kljucOperacije = `legacy-dodaj-${ulaz.prijavaId}-${otisak.slice(0, 16)}`;
+    grupnoUlaz = {
+      izvornaRijec: prijava.rijec,
+      vrsta,
+      lema,
+      stupanj: grupnoUlaz?.stupanj,
+      tierIzvora,
+      dodatniOblici: grupnoUlaz?.dodatniOblici ?? [],
+    };
+  }
+
+  const [prijavaZaglavlje] = await baza.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).limit(1);
+  if (!prijavaZaglavlje) return { ok: false, status: 404, greska: 'Prijava nije pronađena.' };
+  const ulazDodavanja: UlazPregledaGrupnogDodavanja = grupnoUlaz ?? {
+    izvornaRijec: prijavaZaglavlje.rijec,
+    vrsta: 'imenica',
+    lema: normalizirajRijecRjecnika(prijavaZaglavlje.rijec),
+    tierIzvora: tierIzFrekvencije(ulaz.frekvencija),
+    dodatniOblici: [],
+  };
+
+  const grupno = await potvrdiGrupnoDodavanje({
+    adminId: ulaz.adminId,
+    otisak,
+    kljucOperacije,
+    potvrdiPreklapanja,
+    prijavaId: ulaz.prijavaId,
+    napomena: ulaz.napomena,
+    ...ulazDodavanja,
   });
-  if (rezultat.ok && sanducicIgraci.length > 0) emitirajPromjeneSanducica(sanducicIgraci);
-  return rezultat;
+  if (!grupno.ok) {
+    return {
+      ok: false,
+      status: grupno.status,
+      greska: grupno.greska,
+      kod: grupno.kod,
+      pregled: grupno.pregled,
+    };
+  }
+  return {
+    ok: true,
+    rijec: grupno.ishod.izvornaRijec,
+    promjena: grupno.ishod.nemaPromjene ? 'nema' : 'dodana',
+    obavijesti: grupno.obavijesti,
+    promijenjene: grupno.ishod.promijenjene,
+    brojPromjena: grupno.ishod.brojPromjena,
+  };
 }
 
 export async function odbaciPrijavuRijeci(ulaz: {

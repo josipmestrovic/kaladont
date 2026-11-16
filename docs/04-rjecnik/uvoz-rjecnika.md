@@ -70,6 +70,7 @@ Pri učitavanju u memoriju poslužitelj iz tih grupa izvodi zaseban skup za reze
 
 - **Grupni UPSERT** (chunkovi po ~1000 redaka unutar transakcija) — 1,2 milijuna oblika mora proći u minutama, ne satima.
 - `INSERT ... ON CONFLICT (rijec) DO UPDATE` ažurira `prva_dva`, `zadnja_dva`, `frekvencija`, `vrste` i `grupe`; postojeće riječi **zadržavaju** `aktivna` status i napomene (ručne izmjene admina preživljavaju ponovni uvoz).
+- `grupe` = unija korpusa i `rucno_dodane_grupe`; `frekvencija` = `coalesce(rucna_frekvencija, corpus)` (#89).
 - Masovni uvoz **ne piše** po-riječ retke u `izmjene_rjecnika` (milijun redaka revizije bez informacijske vrijednosti) — bilježi se sažetak u izvještaju uvoza; `izmjene_rjecnika` ostaje revizijski trag **ručnih** izmjena.
 
 ### 6. Izvještaj uvoza

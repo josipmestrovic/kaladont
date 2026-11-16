@@ -6,11 +6,17 @@ import type { FastifyInstance } from 'fastify';
 import { desc, eq, and, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
-import { MAKSIMALNA_DULJINA_NAPOMENE_PRIJAVE, normalizirajNapomenuPrijave, SVE_VRSTE_RIJECI, type PregledNadzora } from 'zajednicko';
+import {
+  MAKSIMALNA_DULJINA_NAPOMENE_PRIJAVE,
+  normalizirajNapomenuPrijave,
+  SVE_VRSTE_RIJECI,
+  type PregledNadzora,
+  type StupanjRijeci,
+  type VrstaRijeci,
+} from 'zajednicko';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import {
   dodajRijec,
-  deaktivirajRijec,
   vratiRijec,
   NevaljanaRijecError,
   popisNstandardnihAktivnihRijeci,
@@ -19,6 +25,11 @@ import {
   RAZLOG_RUCNOG_DODAVANJA,
   type TierRijetkostiRucno,
 } from '../rjecnik/administracija.js';
+import {
+  pregledGrupneIzmjene,
+  potvrdiGrupnoDodavanje,
+  potvrdiGrupnoUklanjanje,
+} from '../rjecnik/grupne-izmjene.js';
 import {
   dodajUSigurniSkup,
   popisSigurnihPocetnihRijeci,
@@ -55,6 +66,15 @@ export interface ZivoStanjeBotova {
   bot: { planirano: number; odigranihRijeci: number; namjernihPropusta: number; bezRijeci: number; zastarjelo: number; tehnickeGreske: number; dobrovoljniKa: number; prisilniKa: number; propustPrimljenogKa: number };
   trening: { aktivni: number; zapoceti: number; odbijeni: number; neuspjeli: number };
   zastavice: { trening: boolean; botoviDvoboj: boolean; botoviTroboj: boolean; botoviCetveroboj: boolean };
+}
+
+async function uskladiRjecnikNakonGrupnogDodavanja(
+  rjecnik: RjecnikUMemoriji,
+  rijeci: readonly string[],
+): Promise<void> {
+  for (const rijec of rijeci) {
+    await uskladiRjecnikNakonUbaci(rjecnik, rijec);
+  }
 }
 
 async function uskladiRjecnikNakonUbaci(rjecnik: RjecnikUMemoriji, rijecUlaz: string): Promise<void> {
@@ -105,11 +125,73 @@ const ShemaDodajPrijavljenuRijec = ShemaNapomenaPrijave.extend({
   tierRijetkosti: z.enum(['ucestala', 'rijetka', 'srednje_rijetka', 'jako_rijetka']).optional(),
   frekvencija: z.number().int().nonnegative().optional(),
 });
+const ShemaGrupnoUklanjanje = ShemaNapomenaPrijave.extend({
+  otisak: z.string().regex(/^[a-f0-9]{64}$/i),
+  kljucOperacije: z.string().min(1).max(128),
+  razlog: z.string().min(1).max(500).optional(),
+});
+const ShemaRucnoGrupnoUklanjanje = ShemaGrupnoUklanjanje.extend({
+  rijec: z.string().min(2),
+  razlog: z.string().min(1).max(500),
+});
+
+const ShemaTierRijetkosti = z.enum(['ucestala', 'rijetka', 'srednje_rijetka', 'jako_rijetka']);
+
+const ShemaOblikGrupnogDodavanja = z.object({
+  rijec: z.string().min(2),
+  tierRijetkosti: ShemaTierRijetkosti.optional(),
+});
+
+const ShemaGrupnoDodavanjeTijelo = z.object({
+  izvornaRijec: z.string().min(2).optional(),
+  vrsta: z.enum(SVE_VRSTE_RIJECI as [string, ...string[]]),
+  lema: z.string().min(2),
+  stupanj: z.enum(['poz', 'komp', 'sup']).optional(),
+  tierRijetkosti: ShemaTierRijetkosti.optional(),
+  dodatniOblici: z.array(ShemaOblikGrupnogDodavanja).default([]),
+});
+
+const ShemaGrupnoDodavanjePotvrda = ShemaGrupnoDodavanjeTijelo.extend({
+  otisak: z.string().regex(/^[a-f0-9]{64}$/i),
+  kljucOperacije: z.string().min(1).max(128),
+  potvrdiPreklapanja: z.boolean().optional(),
+  razlog: z.string().min(1).max(500).optional(),
+}).merge(ShemaNapomenaPrijave);
+
+const ShemaRucnoGrupnoDodavanje = ShemaGrupnoDodavanjePotvrda.extend({
+  razlog: z.string().min(1).max(500),
+});
 
 function napomenaIzTijela(tijelo: unknown): string | undefined {
   const parsirano = ShemaNapomenaPrijave.safeParse(tijelo ?? {});
   if (!parsirano.success) return undefined;
   return normalizirajNapomenuPrijave(parsirano.data.napomena);
+}
+
+function mapirajUlazGrupnogDodavanja(data: z.infer<typeof ShemaGrupnoDodavanjeTijelo>) {
+  const izvorna = data.izvornaRijec ?? data.lema;
+  return {
+    izvornaRijec: izvorna,
+    vrsta: data.vrsta as VrstaRijeci,
+    lema: data.lema,
+    stupanj: data.stupanj as StupanjRijeci | undefined,
+    tierIzvora: data.tierRijetkosti as TierRijetkostiRucno | undefined,
+    dodatniOblici: data.dodatniOblici.map((o) => ({
+      rijec: o.rijec,
+      tier: o.tierRijetkosti as TierRijetkostiRucno | undefined,
+    })),
+  };
+}
+
+async function poslijeGrupnogDodavanja(
+  rjecnik: RjecnikUMemoriji,
+  promijenjene: readonly string[],
+  nadopuni: (() => number) | null,
+): Promise<void> {
+  if (promijenjene.length > 0) {
+    await uskladiRjecnikNakonGrupnogDodavanja(rjecnik, promijenjene);
+    nadopuni?.();
+  }
 }
 
 export async function registrirajAdminRute(
@@ -118,6 +200,7 @@ export async function registrirajAdminRute(
   dohvatiZivoStanje: () => ZivoStanjeBotova | null = () => null,
   nadzor?: { pregled: () => PregledNadzora; probnaObavijest: () => Promise<boolean> },
   postavke?: { pregled: () => ZapisPostavkiBotova; zadano: KonfiguracijaBota; brziRazvojDopusten: boolean; pregledBotova?: () => unknown; promijeniAktivacijuBota?: (igracId: string, aktivan: boolean, adminId: string) => Promise<{ aktivan: boolean; dovrsavaIgru: boolean } | null>; stvoriBotove?: (broj: number, tip: 'imenovani' | 'gost', adminId: string) => Promise<{ stvoreno: { igracId: string; kljucSeeda: string; nadimak: string; tip: 'imenovani' | 'gost' }[]; postojalo: number; aktivnoPrije: number; aktivnoPoslije: number }>; spremi: (konfiguracija: KonfiguracijaBota, revizija: number, adminId: string) => Promise<ZapisPostavkiBotova> },
+  nadopuniPotroseneGrupe: (() => number) | null = null,
 ): Promise<void> {
   app.post('/admin/botovi', { preHandler: zahtijevajAdmina, config: { rateLimit: { max: 3, timeWindow: '1 minute' } } }, async (zahtjev, odgovor) => {
     odgovor.header('Cache-Control', 'no-store');
@@ -263,21 +346,68 @@ export async function registrirajAdminRute(
   );
 
   app.post<{ Params: { id: string } }>(
+    '/admin/prijave/:id/pregled-dodavanja',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev, odgovor) => {
+      const tijelo = ShemaGrupnoDodavanjeTijelo.safeParse(zahtjev.body ?? {});
+      if (!tijelo.success) {
+        return odgovor.code(400).send({ ok: false, greska: 'Neispravno tijelo za pregled dodavanja.' });
+      }
+      const rezultat = await pregledGrupneIzmjene({
+        smjer: 'dodaj',
+        prijavaId: Number(zahtjev.params.id),
+        ...mapirajUlazGrupnogDodavanja(tijelo.data),
+      });
+      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
+      return { ok: true, pregled: rezultat.pregled };
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/admin/prijave/:id/pregled-uklanjanja',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev, odgovor) => {
+      const rezultat = await pregledGrupneIzmjene({
+        smjer: 'ukloni',
+        prijavaId: Number(zahtjev.params.id),
+      });
+      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
+      return { ok: true, pregled: rezultat.pregled };
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
     '/admin/prijave/:id/obrisi-rijec',
     { preHandler: zahtijevajAdmina },
     async (zahtjev, odgovor) => {
       const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+      const grupno = ShemaGrupnoUklanjanje.safeParse(zahtjev.body ?? {});
       const rezultat = await potvrdiIspravakRjecnika({
         prijavaId: Number(zahtjev.params.id),
         adminId: admin.id,
         smjer: 'deaktiviraj',
         napomena: napomenaIzTijela(zahtjev.body),
+        otisak: grupno.success ? grupno.data.otisak : undefined,
+        kljucOperacije: grupno.success ? grupno.data.kljucOperacije : undefined,
       });
-      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
-      // Idempotentno rješenje (npr. dismiss) ne smije dirati RAM rječnik.
-      if (rezultat.promjena === 'deaktivirana') rjecnik.primijeniUklanjanje(rezultat.rijec);
+      if (!rezultat.ok) {
+        return odgovor.code(rezultat.status).send({
+          ok: false,
+          greska: rezultat.greska,
+          kod: rezultat.kod,
+          pregled: rezultat.pregled,
+        });
+      }
+      if (rezultat.promjena === 'deaktivirana' && rezultat.deaktivirane?.length) {
+        rjecnik.primijeniUklanjanja(rezultat.deaktivirane);
+      }
       for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
-      return { ok: true, brojRijeci: rjecnik.brojRijeci() };
+      return {
+        ok: true,
+        brojRijeci: rjecnik.brojRijeci(),
+        brojPromjena: rezultat.brojPromjena ?? 0,
+        deaktivirane: rezultat.deaktivirane ?? [],
+      };
     },
   );
 
@@ -292,23 +422,46 @@ export async function registrirajAdminRute(
           greska: 'Neispravno tijelo: opcionalni "tierRijetkosti", "frekvencija" ili "napomena".',
         });
       }
-      const frekvencija =
-        parsirano.data.frekvencija ??
-        frekvencijaIzTieraRijetkosti(parsirano.data.tierRijetkosti as TierRijetkostiRucno | undefined);
+      const grupno = ShemaGrupnoDodavanjePotvrda.safeParse(zahtjev.body ?? {});
       const admin = (zahtjev as ZahtjevSIgracem).igrac!;
       const rezultat = await potvrdiIspravakRjecnika({
         prijavaId: Number(zahtjev.params.id),
         adminId: admin.id,
         smjer: 'dodaj',
-        frekvencija,
         napomena: normalizirajNapomenuPrijave(parsirano.data.napomena),
+        frekvencija:
+          parsirano.data.frekvencija ??
+          frekvencijaIzTieraRijetkosti(parsirano.data.tierRijetkosti as TierRijetkostiRucno | undefined),
+        grupno: grupno.success
+          ? {
+              ...mapirajUlazGrupnogDodavanja(grupno.data),
+              otisak: grupno.data.otisak,
+              kljucOperacije: grupno.data.kljucOperacije,
+              potvrdiPreklapanja: grupno.data.potvrdiPreklapanja,
+            }
+          : undefined,
       });
-      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
-      if (rezultat.promjena === 'dodana' || rezultat.promjena === 'reaktivirana') {
+      if (!rezultat.ok) {
+        return odgovor.code(rezultat.status).send({
+          ok: false,
+          greska: rezultat.greska,
+          kod: rezultat.kod,
+          pregled: rezultat.pregled,
+        });
+      }
+      if (rezultat.promijenjene?.length) {
+        await poslijeGrupnogDodavanja(rjecnik, rezultat.promijenjene, nadopuniPotroseneGrupe);
+      } else if (rezultat.promjena === 'dodana' || rezultat.promjena === 'reaktivirana') {
         await uskladiRjecnikNakonUbaci(rjecnik, rezultat.rijec);
+        nadopuniPotroseneGrupe?.();
       }
       for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
-      return { ok: true, brojRijeci: rjecnik.brojRijeci() };
+      return {
+        ok: true,
+        brojRijeci: rjecnik.brojRijeci(),
+        brojPromjena: rezultat.brojPromjena ?? 0,
+        promijenjene: rezultat.promijenjene ?? [],
+      };
     },
   );
 
@@ -381,18 +534,99 @@ export async function registrirajAdminRute(
     },
   );
 
+  app.post('/admin/rjecnik/pregled-dodavanja', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    const tijelo = ShemaGrupnoDodavanjeTijelo.safeParse(zahtjev.body ?? {});
+    if (!tijelo.success) {
+      return odgovor.code(400).send({ ok: false, greska: 'Neispravno tijelo za pregled dodavanja.' });
+    }
+    const rezultat = await pregledGrupneIzmjene({
+      smjer: 'dodaj',
+      ...mapirajUlazGrupnogDodavanja(tijelo.data),
+    });
+    if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
+    return { ok: true, pregled: rezultat.pregled };
+  });
+
   app.post('/admin/rjecnik/dodaj', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    const admin = (zahtjev as ZahtjevSIgracem).igrac!;
+    const grupno = ShemaRucnoGrupnoDodavanje.safeParse(zahtjev.body);
+    if (grupno.success) {
+      const ulaz = mapirajUlazGrupnogDodavanja(grupno.data);
+      const rezultat = await potvrdiGrupnoDodavanje({
+        adminId: admin.id,
+        otisak: grupno.data.otisak,
+        kljucOperacije: grupno.data.kljucOperacije,
+        potvrdiPreklapanja: grupno.data.potvrdiPreklapanja ?? false,
+        razlog: grupno.data.razlog,
+        napomena: normalizirajNapomenuPrijave(grupno.data.napomena),
+        ...ulaz,
+      });
+      if (!rezultat.ok) {
+        return odgovor.code(rezultat.status).send({
+          ok: false,
+          greska: rezultat.greska,
+          kod: rezultat.kod,
+          pregled: rezultat.pregled,
+        });
+      }
+      await poslijeGrupnogDodavanja(rjecnik, rezultat.ishod.promijenjene, nadopuniPotroseneGrupe);
+      return {
+        ok: true,
+        brojRijeci: rjecnik.brojRijeci(),
+        brojPromjena: rezultat.ishod.brojPromjena,
+        promijenjene: rezultat.ishod.promijenjene,
+      };
+    }
+
     const rezultat = ShemaDodajRijec.safeParse(zahtjev.body);
     if (!rezultat.success) {
       return odgovor
         .code(400)
-        .send({ ok: false, greska: 'Polja "rijec" i "vrsta" su obavezna ("lema", "tierRijetkosti" i "razlog" opcionalni).' });
+        .send({ ok: false, greska: 'Polja "rijec" i "vrsta" su obavezna, ili puni grupni payload s otiskom.' });
     }
-    const admin = (zahtjev as ZahtjevSIgracem).igrac!;
     const razlog = rezultat.data.razlog?.trim() || RAZLOG_RUCNOG_DODAVANJA;
     const frekvencija =
       rezultat.data.frekvencija ??
       frekvencijaIzTieraRijetkosti(rezultat.data.tierRijetkosti as TierRijetkostiRucno | undefined);
+    const lema = rezultat.data.lema ?? rezultat.data.rijec;
+    const pregledRez = await pregledGrupneIzmjene({
+      smjer: 'dodaj',
+      izvornaRijec: rezultat.data.rijec,
+      vrsta: rezultat.data.vrsta as VrstaRijeci,
+      lema,
+      tierIzvora: rezultat.data.tierRijetkosti as TierRijetkostiRucno | undefined,
+      dodatniOblici: [],
+    });
+    if (!pregledRez.ok) return odgovor.code(pregledRez.status).send({ ok: false, greska: pregledRez.greska });
+    if (pregledRez.pregled.smjer === 'dodaj' && pregledRez.pregled.brojOblici >= 1) {
+      const potvrda = await potvrdiGrupnoDodavanje({
+        adminId: admin.id,
+        otisak: pregledRez.pregled.otisak,
+        kljucOperacije: `legacy-dodaj-${pregledRez.pregled.otisak.slice(0, 24)}`,
+        izvornaRijec: rezultat.data.rijec,
+        vrsta: rezultat.data.vrsta as VrstaRijeci,
+        lema,
+        tierIzvora: rezultat.data.tierRijetkosti as TierRijetkostiRucno | undefined,
+        dodatniOblici: [],
+        potvrdiPreklapanja: pregledRez.pregled.imaPreklapanja,
+        razlog,
+      });
+      if (!potvrda.ok) {
+        return odgovor.code(potvrda.status).send({
+          ok: false,
+          greska: potvrda.greska,
+          kod: potvrda.kod,
+          pregled: potvrda.pregled,
+        });
+      }
+      await poslijeGrupnogDodavanja(rjecnik, potvrda.ishod.promijenjene, nadopuniPotroseneGrupe);
+      return {
+        ok: true,
+        brojRijeci: rjecnik.brojRijeci(),
+        brojPromjena: potvrda.ishod.brojPromjena,
+        promijenjene: potvrda.ishod.promijenjene,
+      };
+    }
     try {
       await dodajRijec(
         rezultat.data.rijec,
@@ -405,6 +639,7 @@ export async function registrirajAdminRute(
         frekvencija,
       );
       await uskladiRjecnikNakonUbaci(rjecnik, rezultat.data.rijec);
+      nadopuniPotroseneGrupe?.();
       return { ok: true, brojRijeci: rjecnik.brojRijeci() };
     } catch (greska) {
       if (greska instanceof NevaljanaRijecError) {
@@ -453,15 +688,94 @@ export async function registrirajAdminRute(
     },
   );
 
+  app.get<{ Querystring: { rijec?: string } }>(
+    '/admin/rjecnik/pregled-uklanjanja',
+    { preHandler: zahtijevajAdmina },
+    async (zahtjev, odgovor) => {
+      const rijec = zahtjev.query.rijec?.trim();
+      if (!rijec || rijec.length < 2) {
+        return odgovor.code(400).send({ ok: false, greska: 'Query "rijec" je obavezan.' });
+      }
+      const rezultat = await pregledGrupneIzmjene({ smjer: 'ukloni', rijec });
+      if (!rezultat.ok) return odgovor.code(rezultat.status).send({ ok: false, greska: rezultat.greska });
+      return { ok: true, pregled: rezultat.pregled };
+    },
+  );
+
   app.post('/admin/rjecnik/deaktiviraj', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
-    const rezultat = ShemaRijec.safeParse(zahtjev.body);
-    if (!rezultat.success) {
-      return odgovor.code(400).send({ ok: false, greska: 'Polja "rijec" i "razlog" su obavezna.' });
-    }
     const admin = (zahtjev as ZahtjevSIgracem).igrac!;
-    await deaktivirajRijec(rezultat.data.rijec, rezultat.data.razlog, admin.id);
-    rjecnik.primijeniUklanjanje(rezultat.data.rijec);
-    return { ok: true, brojRijeci: rjecnik.brojRijeci() };
+    const grupno = ShemaRucnoGrupnoUklanjanje.safeParse(zahtjev.body);
+    if (grupno.success) {
+      const rezultat = await potvrdiGrupnoUklanjanje({
+        adminId: admin.id,
+        otisak: grupno.data.otisak,
+        kljucOperacije: grupno.data.kljucOperacije,
+        rijec: grupno.data.rijec,
+        razlog: grupno.data.razlog,
+        napomena: normalizirajNapomenuPrijave(grupno.data.napomena),
+      });
+      if (!rezultat.ok) {
+        return odgovor.code(rezultat.status).send({
+          ok: false,
+          greska: rezultat.greska,
+          kod: rezultat.kod,
+          pregled: rezultat.pregled,
+        });
+      }
+      if (rezultat.ishod.deaktivirane.length > 0) {
+        rjecnik.primijeniUklanjanja(rezultat.ishod.deaktivirane);
+      }
+      for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
+      return {
+        ok: true,
+        brojRijeci: rjecnik.brojRijeci(),
+        brojPromjena: rezultat.ishod.brojPromjena,
+        deaktivirane: rezultat.ishod.deaktivirane,
+      };
+    }
+
+    // Stari jednooblični klijent: ako bi obuhvat bio >1, traži novi pregled.
+    const jednostavno = ShemaRijec.safeParse(zahtjev.body);
+    if (!jednostavno.success) {
+      return odgovor.code(400).send({
+        ok: false,
+        greska: 'Polja "rijec" i "razlog" su obavezna (ili otisak + kljucOperacije za grupno uklanjanje).',
+      });
+    }
+    const pregledRez = await pregledGrupneIzmjene({ smjer: 'ukloni', rijec: jednostavno.data.rijec });
+    if (!pregledRez.ok) return odgovor.code(pregledRez.status).send({ ok: false, greska: pregledRez.greska });
+    if (pregledRez.pregled.brojAktivnih > 1) {
+      return odgovor.code(409).send({
+        ok: false,
+        greska: 'Potreban je pregled grupnog uklanjanja.',
+        kod: 'zastarjeli_pregled',
+        pregled: pregledRez.pregled,
+      });
+    }
+    const rezultat = await potvrdiGrupnoUklanjanje({
+      adminId: admin.id,
+      otisak: pregledRez.pregled.otisak,
+      kljucOperacije: `legacy-deaktiviraj-${pregledRez.pregled.otisak.slice(0, 24)}`,
+      rijec: jednostavno.data.rijec,
+      razlog: jednostavno.data.razlog,
+    });
+    if (!rezultat.ok) {
+      return odgovor.code(rezultat.status).send({
+        ok: false,
+        greska: rezultat.greska,
+        kod: rezultat.kod,
+        pregled: rezultat.pregled,
+      });
+    }
+    if (rezultat.ishod.deaktivirane.length > 0) {
+      rjecnik.primijeniUklanjanja(rezultat.ishod.deaktivirane);
+    }
+    return {
+      ok: true,
+      brojRijeci: rjecnik.brojRijeci(),
+      brojPromjena: rezultat.ishod.brojPromjena,
+      deaktivirane: rezultat.ishod.deaktivirane,
+    };
   });
 
   app.post('/admin/rjecnik/vrati', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {

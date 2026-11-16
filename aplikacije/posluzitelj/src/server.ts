@@ -200,6 +200,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   let opozoviSocketSesije: (sesijaId: string) => void = () => {};
   let opozoviSocketSesijeIgraca: (igracId: string) => void = () => {};
   let dohvatiZivoStanjeBotova: () => import('./admin/rute.js').ZivoStanjeBotova | null = () => null;
+  let nadopuniPotroseneGrupe: () => number = () => 0;
   const rjecnik = await ucitajRjecnik({
     dopustiVlastitaImena: konfiguracija.DOPUSTI_VLASTITA_IMENA === 'true',
   });
@@ -225,7 +226,11 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       await registrirajSanducicRute(apiApp);
       await registrirajPrijaveRute(apiApp);
       await registrirajPovratneInformacijeRute(apiApp);
-      await registrirajAdminRute(apiApp, rjecnik, () => dohvatiZivoStanjeBotova(), {
+      await registrirajAdminRute(
+        apiApp,
+        rjecnik,
+        () => dohvatiZivoStanjeBotova(),
+        {
         pregled: () => ({ ok: true, verzija: konfiguracija.VERZIJA, digest: konfiguracija.DIGEST, uptimeSekunde: process.uptime(), trenutno: metrike.dohvatiTrenutno(), povijest: metrike.dohvatiPovijest(), alarmi: alarmi.dohvatiStanja(), emailOmogucen: alarmi.omogucen }),
         probnaObavijest: () => alarmi.posaljiProbnu(),
       }, {
@@ -252,7 +257,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
           }
           return noviZapis;
         },
-      });
+        () => nadopuniPotroseneGrupe(),
+      );
       await registrirajRjecnikRute(apiApp, rjecnik);
     },
     { prefix: '/api' },
@@ -456,6 +462,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       },
     },
   );
+  nadopuniPotroseneGrupe = () => upravitelj.nadopuniPotroseneGrupe(rjecnik);
 
   app.get('/zdravlje', async (_zahtjev, odgovor) => {
     let bazaDostupna = true;

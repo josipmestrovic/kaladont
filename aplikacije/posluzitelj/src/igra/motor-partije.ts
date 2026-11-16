@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost/socket-handler.js';
 import { and, eq, inArray } from 'drizzle-orm';
 import { konfiguracija } from '../konfiguracija.js';
+import { nadopuniIskoristeneGrupe } from '../rjecnik/iskoristene-grupe.js';
 import { promijesajNiz } from './raspored-sjedala.js';
 import {
   validirajPotez,
@@ -3289,6 +3290,15 @@ export function stvoriUpraviteljPartija(
       stanje.zadnjeReakcije.set(igracId, sada);
       io.to(SOBA_PARTIJE(stanje.partijaId)).emit('reakcija:nova', { igracId, poruka });
       return true;
+    },
+    nadopuniPotroseneGrupe(rjecnikRef: Pick<RjecnikSucelje, 'grupeZa'>): number {
+      let ukupno = 0;
+      for (const stanje of partije.values()) {
+        if (stanje.zavrsena) continue;
+        const odigrani = [...new Set(stanje.potrosioGrupu.values())];
+        ukupno += nadopuniIskoristeneGrupe(rjecnikRef, stanje.iskoristeneGrupe, odigrani);
+      }
+      return ukupno;
     },
   };
 }

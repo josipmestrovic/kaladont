@@ -63,6 +63,8 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   }): void;
   /** Brzo uklanjanje iz memorije nakon soft-deletea — bez punog učitavanja. */
   primijeniUklanjanje(rijec: string): void;
+  /** Skupno uklanjanje: jedna bump verzije rječnika. */
+  primijeniUklanjanja(rijeciUlaz: readonly string[]): void;
   /** Trenutni skup sigurnih početnih riječi (runtime). */
   popisSigurnihPocetnih(): readonly string[];
   jeUSigurnomSkupu(rijec: string): boolean;
@@ -533,8 +535,18 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
   }
 
   function primijeniUklanjanje(rijecUlaz: string): void {
-    const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
-    ukloniOblikIzMemorije(rijec);
+    primijeniUklanjanja([rijecUlaz]);
+  }
+
+  function primijeniUklanjanja(rijeciUlaz: readonly string[]): void {
+    let bilo = false;
+    for (const rijecUlaz of rijeciUlaz) {
+      const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
+      if (!rijecGrupe.has(rijec)) continue;
+      ukloniOblikIzMemorije(rijec);
+      bilo = true;
+    }
+    if (!bilo) return;
     osvjeziIzvedeneBrojace();
     verzija += 1;
   }
@@ -654,6 +666,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     ponovoUcitaj: ucitaj,
     primijeniUbaci,
     primijeniUklanjanje,
+    primijeniUklanjanja,
     popisSigurnihPocetnih: () => sigurnePocetneRijeci,
     jeUSigurnomSkupu: (rijec) => sigurnePocetneRijeci.includes(rijec.normalize('NFC').trim().toLowerCase()),
     dodajUSigurniSkupMemoriju: (rijec) => {

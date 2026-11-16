@@ -470,6 +470,20 @@
       "when": 1795020000000,
       "tag": "0066_dostignuca_pr13",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1795030000000,
+      "tag": "0067_grupne_izmjene_rjecnika",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1795040000000,
+      "tag": "0068_rucne_grupe_rjecnika",
+      "breakpoints": true
     }
   ]
 }
