@@ -82,7 +82,7 @@ async function igre(
   igracId: string,
   broj: number,
   bodovi: number,
-  mod: 'cetiri_igraca' | 'dva_igraca',
+  mod: 'cetiri_igraca' | 'dva_igraca' | 'tri_igraca',
   kraj: Date,
   plasman: number | null = 2,
 ): Promise<void> {
@@ -108,7 +108,7 @@ async function igre(
 }
 
 async function snimi(
-  mod: 'cetiri_igraca' | 'dva_igraca',
+  mod: 'cetiri_igraca' | 'dva_igraca' | 'tri_igraca',
   opazenoU: Date,
   izvor: 'partija' | 'brisanje' = 'partija',
 ): Promise<void> {
@@ -133,7 +133,7 @@ async function brojac(igracId: string) {
   return red ?? { dnevneDesetke: 0, tjedneElite: 0, mjesecneElite: 0, naDvijeFronte: 0 };
 }
 
-async function brojUlazaka(igracId: string, mod?: 'cetiri_igraca' | 'dva_igraca'): Promise<number> {
+async function brojUlazaka(igracId: string, mod?: 'cetiri_igraca' | 'dva_igraca' | 'tri_igraca'): Promise<number> {
   const redovi = await baza.select({ mod: dokaziTop10Ulazaka.mod }).from(dokaziTop10Ulazaka).where(mod
     ? and(eq(dokaziTop10Ulazaka.igracId, igracId), eq(dokaziTop10Ulazaka.mod, mod))
     : eq(dokaziTop10Ulazaka.igracId, igracId));
@@ -165,20 +165,21 @@ describe('dostignuća D03 Top 10', () => {
   });
 
   it('deseto mjesto ulazi, jedanaesto ne; bot nije na ljestvici, gost zauzima mjesto bez nagrade', async () => {
+    // PR11: 5 igara = samo dnevni prag (tjedni/mjesečni = 10) → jedan dokaz po igraču.
     const bot = await noviIgrac('BotD03', 'registriran', 'bot');
     const gost = await noviIgrac('GostD03', 'gost');
-    await igre(bot, 10, 500, 'cetiri_igraca', DAN);
-    await igre(gost, 10, 400, 'cetiri_igraca', DAN);
+    await igre(bot, 5, 500, 'cetiri_igraca', DAN);
+    await igre(gost, 5, 400, 'cetiri_igraca', DAN);
 
     // Botovi su isključeni s ljestvice; gost zauzima 1/10 bez nagrade → treba 9 ljudskih nagrada.
     const nagrađeni: string[] = [];
     for (let i = 0; i < 9; i += 1) {
       const id = await noviIgrac(`H${i}`);
       nagrađeni.push(id);
-      await igre(id, 10, 300 - i * 20, 'cetiri_igraca', DAN);
+      await igre(id, 5, 300 - i * 20, 'cetiri_igraca', DAN);
     }
     const jedanaesti = await noviIgrac('Jedanaesti');
-    await igre(jedanaesti, 10, 100, 'cetiri_igraca', DAN);
+    await igre(jedanaesti, 5, 100, 'cetiri_igraca', DAN);
 
     const pocetak = performance.now();
     await snimi('cetiri_igraca', DAN);
@@ -206,11 +207,11 @@ describe('dostignuća D03 Top 10', () => {
   it('isti dan ne broji dvaput, ispadanje ne oduzima, tuđa igra promakne jedanaestog', async () => {
     const deseti = await noviIgrac('Deseti');
     const jedanaesti = await noviIgrac('Ispod');
-    await igre(deseti, 10, 20, 'cetiri_igraca', DAN);
-    await igre(jedanaesti, 10, 10, 'cetiri_igraca', DAN);
+    await igre(deseti, 5, 20, 'cetiri_igraca', DAN);
+    await igre(jedanaesti, 5, 10, 'cetiri_igraca', DAN);
     for (let i = 0; i < 9; i += 1) {
       const id = await noviIgrac(`Iznad${i}`);
-      await igre(id, 10, 100 + i, 'cetiri_igraca', DAN);
+      await igre(id, 5, 100 + i, 'cetiri_igraca', DAN);
     }
 
     await snimi('cetiri_igraca', DAN);
@@ -221,21 +222,22 @@ describe('dostignuća D03 Top 10', () => {
     expect((await brojac(deseti)).dnevneDesetke).toBe(1);
     expect(await brojUlazaka(deseti)).toBe(1);
 
-    await igre(deseti, 11, 0, 'cetiri_igraca', DAN);
+    await igre(deseti, 6, 0, 'cetiri_igraca', DAN);
     await snimi('cetiri_igraca', DAN);
     expect((await brojac(deseti)).dnevneDesetke).toBe(1);
     expect((await brojac(jedanaesti)).dnevneDesetke).toBe(1);
     expect(await brojUlazaka(jedanaesti)).toBe(1);
   });
 
-  it('devet igara i nepotpun plasman ne ulaze; deseta kroz zaključak partije ulazi bez GET /ljestvice', async () => {
-    const igracId = await noviIgrac('Devet');
-    await igre(igracId, 9, 30, 'cetiri_igraca', DAN, 1);
+  it('PR11: 4 dnevne ne ulaze; peta kroz zaključak partije ulazi; nepotpun plasman ne ulazi', async () => {
+    // Stari test: 9→10. Novi dnevni prag = 5; tjedni = 10 pa 5 igara još ne daje tjednu elitu.
+    const igracId = await noviIgrac('CetiriDnevno');
+    await igre(igracId, 4, 30, 'cetiri_igraca', DAN, 1);
     await snimi('cetiri_igraca', DAN);
     expect(await brojUlazaka(igracId)).toBe(0);
 
     const nepotpun = await noviIgrac('Nepotpun');
-    await igre(nepotpun, 9, 40, 'cetiri_igraca', DAN, 1);
+    await igre(nepotpun, 4, 40, 'cetiri_igraca', DAN, 1);
     await igre(nepotpun, 1, 40, 'cetiri_igraca', DAN, null);
     await snimi('cetiri_igraca', DAN);
     expect(await brojUlazaka(nepotpun)).toBe(0);
@@ -260,6 +262,23 @@ describe('dostignuća D03 Top 10', () => {
     expect(ulazak?.mjesto).toBe(1);
     expect(ulazak?.izvor).toBe('partija');
     expect((await brojac(igracId)).tjedneElite).toBe(0);
+  });
+
+  it('PR11: Troboj Top10 dokaz; ponovljeni snimak ne duplicira; Na dvije fronte ostaje 4p↔2p', async () => {
+    const igracId = await noviIgrac('TrobojTop');
+    await igre(igracId, 5, 4, 'tri_igraca', DAN, 1);
+    await snimi('tri_igraca', DAN);
+    expect(await brojUlazaka(igracId, 'tri_igraca')).toBe(1);
+    expect((await brojac(igracId)).dnevneDesetke).toBe(1);
+
+    await snimi('tri_igraca', DAN);
+    expect(await brojUlazaka(igracId, 'tri_igraca')).toBe(1);
+    expect((await brojac(igracId)).dnevneDesetke).toBe(1);
+    // Bugbot: Troboj+Četveroboj ne smije lažno otključati par (stari non-4p→4p izraz).
+    await igre(igracId, 5, 4, 'cetiri_igraca', DAN, 1);
+    await snimi('cetiri_igraca', DAN);
+    expect(await brojUlazaka(igracId, 'cetiri_igraca')).toBe(1);
+    expect((await brojac(igracId)).naDvijeFronte).toBe(0);
   });
 
   it('oba moda istog dana daju Na dvije fronte jednom, a 20 igara diže tri razdoblja u jednu obavijest', async () => {
@@ -290,8 +309,9 @@ describe('dostignuća D03 Top 10', () => {
   });
 
   it('sljedeći dan daje novi doprinos, a zakašnjela obrada čuva ključ dokaza', async () => {
+    // 5 igara → samo dnevni dokaz (tjedni prag 10).
     const igracId = await noviIgrac('DvaDana');
-    await igre(igracId, 10, 15, 'cetiri_igraca', DAN, 1);
+    await igre(igracId, 5, 15, 'cetiri_igraca', DAN, 1);
     await baza.transaction(async (tx) => {
       await zabiljeziTop10NakonPromjene(tx, {
         modovi: ['cetiri_igraca'],
@@ -308,14 +328,14 @@ describe('dostignuća D03 Top 10', () => {
     expect(dokazi[0]?.kalendarskiPocetak.toISOString()).toBe(prije?.kalendarskiPocetak.toISOString());
     expect((await brojac(igracId)).dnevneDesetke).toBe(1);
 
-    await igre(igracId, 10, 15, 'cetiri_igraca', SLJEDECI_DAN, 1);
+    await igre(igracId, 5, 15, 'cetiri_igraca', SLJEDECI_DAN, 1);
     await snimi('cetiri_igraca', SLJEDECI_DAN);
     expect((await brojac(igracId)).dnevneDesetke).toBe(2);
   });
 
   it('privatna igra ne daje Top 10, a brisanje čisti dokaze i ne radi backfill tekućeg poretka', async () => {
     const igracId = await noviIgrac('Privatno');
-    await igre(igracId, 10, 12, 'cetiri_igraca', DAN, 1);
+    await igre(igracId, 5, 12, 'cetiri_igraca', DAN, 1);
     await snimi('cetiri_igraca', DAN);
     expect((await brojac(igracId)).dnevneDesetke).toBe(1);
 

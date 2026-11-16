@@ -17,8 +17,8 @@
   import { dohvatiAuthToken } from '$lib/identitet.js';
 
   type ModPartije = import('zajednicko').ModPartije;
-  /** Ljestvice UI do PR03/06 samo Dvoboj i Četveroboj. */
-  type Mod = 'cetiri_igraca' | 'dva_igraca';
+  /** PR11: tri ljestvice po veličini stola (Četveroboj / Troboj / Dvoboj). */
+  type Mod = 'cetiri_igraca' | 'tri_igraca' | 'dva_igraca';
   type Kategorija = 'igraci' | 'rijeci';
 
   interface StavkaRijeci {
@@ -27,10 +27,12 @@
     brojUpotreba: number;
   }
 
-  /** Troboj bodovanje dolazi u PR03 — do tada ljestvice prikazuju samo Dvoboj/Četveroboj. */
-  const PRAVILA_BODOVANJA: Record<'cetiri_igraca' | 'dva_igraca', string> = {
+  /** Copy po PR03/pregledu — stil kao postojeći Četveroboj/Dvoboj tekstovi. */
+  const PRAVILA_BODOVANJA: Record<Mod, string> = {
     cetiri_igraca:
       'Plasman: 1. mjesto 3 boda, 2. mjesto 2, 3. mjesto 1, 4. mjesto 0. Uz to +1 za pobjedu i +1 po eliminaciji (najviše 3). Maksimum je 7 bodova po igri.',
+    tri_igraca:
+      'Plasman: 1. mjesto 2 boda, 2. mjesto 1, 3. mjesto 0. Uz to +1 za pobjedu i +1 po eliminaciji. Maksimum je 5 bodova po igri.',
     dva_igraca: 'Pobjednik dobiva 1 bod, poraženi 0. Eliminacije ne dodaju bodove.',
   };
 
@@ -58,7 +60,13 @@
 
   const url = $derived($page.url);
   const kategorija = $derived<Kategorija>(url.searchParams.get('kategorija') === 'rijeci' ? 'rijeci' : 'igraci');
-  const mod = $derived<Mod>(url.searchParams.get('mod') === 'dva_igraca' ? 'dva_igraca' : 'cetiri_igraca');
+  const mod = $derived<Mod>(
+    url.searchParams.get('mod') === 'dva_igraca'
+      ? 'dva_igraca'
+      : url.searchParams.get('mod') === 'tri_igraca'
+        ? 'tri_igraca'
+        : 'cetiri_igraca',
+  );
   const metrika = $derived<MetrikaLjestvice>(
     (METRIKE_LJESTVICA as readonly string[]).includes(url.searchParams.get('metrika') ?? '')
       ? (url.searchParams.get('metrika') as MetrikaLjestvice)
@@ -249,6 +257,7 @@
 {#if kategorija === 'igraci'}
   <div class="modovi" role="group" aria-label="Način igre">
     <button type="button" class="mod-gumb" aria-pressed={mod === 'cetiri_igraca'} class:aktivan={mod === 'cetiri_igraca'} onclick={() => promijeni({ mod: 'cetiri_igraca' })}>Četveroboj</button>
+    <button type="button" class="mod-gumb" aria-pressed={mod === 'tri_igraca'} class:aktivan={mod === 'tri_igraca'} onclick={() => promijeni({ mod: 'tri_igraca' })}>Troboj</button>
     <button type="button" class="mod-gumb" aria-pressed={mod === 'dva_igraca'} class:aktivan={mod === 'dva_igraca'} onclick={() => promijeni({ mod: 'dva_igraca' })}>Dvoboj</button>
   </div>
 

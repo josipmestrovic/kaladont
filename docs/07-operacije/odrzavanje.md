@@ -91,3 +91,26 @@ pnpm --filter posluzitelj backfill-univerzalni-rang -- --obnovi-agregate=DA
 - Restart tijekom rada je siguran: nastavi s `--od=<zadnji-partija-uuid>`.
 - Nepotpune partije (bez plasmana) idu samo u report (`brojNepotpunihPartija`) — ne ruše CI.
 - Legacy stupci `odigrane` / `bodovi_*` ostaju za formatne statistike i rollback starog bina; rang se više ne čita iz njih.
+
+## PR11: prijelaz ljestvica (otvorene tablice / Top10)
+
+Nakon deploya builda koji sadrži PR11 (pragovi 5/10 + Troboj ljestvica), **odmah** pokreni CLI da se upravo kvalificirani igrači u **otvorenim** dnevnim/tjednim/mjesečnim Top10 upišu postojećim idempotentnim putem. Javno čitanje ljestvica već koristi nove minimume bez CLI-ja; CLI je potreban za Top10 dokaze/dostignuća.
+
+```bash
+# 1) Usporedba: tko je u Top10 pod novim minom, a još nema dokaz (bez PII)
+pnpm --filter posluzitelj prijelaz-ljestvice-pr11 -- --usporedi
+
+# 2) Upis snimke za sva tri formata (2/3/4)
+pnpm --filter posluzitelj prijelaz-ljestvice-pr11 -- --primijeni=DA
+
+# Produkcija dodatno:
+pnpm --filter posluzitelj prijelaz-ljestvice-pr11 -- --primijeni=DA --odrzavanje-produkcije=DA
+
+# 3) Ponovna usporedba + drugi prolaz (noviDokazi mora biti 0)
+pnpm --filter posluzitelj prijelaz-ljestvice-pr11 -- --usporedi
+pnpm --filter posluzitelj prijelaz-ljestvice-pr11 -- --primijeni=DA
+```
+
+- Ne skenirati zatvorena razdoblja; ne izmišljati povijesne Top10 ulaske.
+- Dist-only container (isti obrazac kao PR09): `node /tmp/pokreni-prijelaz-ljestvice-pr11.mjs --usporedi` (skopiraj `tmp-ci/pokreni-prijelaz-ljestvice-pr11.mjs`).
+- HINT za produkcijski checklist 0.2.0: uz PR09 backfill (ako još nije) + ovaj PR11 prijelaz.

@@ -20,6 +20,21 @@ Uz bodove za plasman:
 - Maksimum je **7 bodova**: 3 za prvo mjesto, 1 bonus za pobjedu i najviše 3 za eliminacije.
 - Prekid veze izvan igračeva poteza samoeliminira igrača i ne daje nikome eliminacijski bod. Prekid na potezu može donijeti bod igraču koji je otvorio traženi nastavak; pogledaj [Pravila igre](pravila-igre.md#ispadanje).
 
+### Troboj (3 igrača)
+
+| Rezultat | Bodovi za plasman |
+|---|---:|
+| 1. mjesto | 2 |
+| 2. mjesto | 1 |
+| 3. mjesto | 0 |
+
+Uz bodove za plasman:
+
+- Igrač čija riječ izazove eliminaciju dobiva **1 bod za tu eliminaciju**.
+- Pobjednik dobiva dodatni **1 bod za prvo mjesto**.
+- Maksimum je **5 bodova**: 2 za prvo mjesto, 1 bonus za pobjedu i najviše 2 za eliminacije.
+- Prelazak s tri na dva aktivna igrača ne mijenja početni format ni bodovanje.
+
 ### Dvoboj (2 igrača)
 
 - Pobjednik dobiva **1 bod**, a poraženi **0 bodova**.
@@ -34,17 +49,17 @@ Uz bodove za plasman:
 
 ## Javne statistike i ljestvice
 
-Javni modovi imaju zaseban broj partija, pobjeda i eliminacija, prosjek bodova, rang, formu i niz pobjeda. Rezultat Četveroboja ne prenosi se u Dvoboj, ni obratno. XP i trajni napredak u dostignućima zajednički su za oba javna moda.
+Javni formati (Dvoboj, Troboj, Četveroboj) imaju zaseban broj partija, pobjeda i eliminacija, prosjek bodova, formu i niz pobjeda po veličini stola. Pravilnici se spajaju unutar istog formata. Rezultat jednog formata ne prenosi se u drugi. Rang je univerzalan (PR09). XP i trajni napredak u dostignućima zajednički su prema politici konteksta.
 
-Stari ukupni poredak (`GET /api/ljestvica`, najmanje **10 završenih javnih partija u odabranom modu**) ostaje privremeno radi kompatibilnosti; stranica ga više ne prikazuje.
+Stari ukupni poredak (`GET /api/ljestvica`, najmanje **5 završenih javnih partija u odabranom formatu**) ostaje privremeno radi kompatibilnosti; stranica ga više ne prikazuje.
 
 ### Vremenske ljestvice
 
-Stranica `/ljestvice` ima zasebne poretke za Četveroboj i Dvoboj, po metrici i razdoblju. Prva faza: **Prosjek bodova** i **Niz pobjeda**; Niz riječi, Najduža riječ i Najbrži igrači dolaze u sljedećoj fazi.
+Stranica `/ljestvice` ima zasebne poretke za Četveroboj, Troboj i Dvoboj, po metrici i razdoblju. Prva faza: **Prosjek bodova** i **Niz pobjeda**; Niz riječi, Najduža riječ i Najbrži igrači dolaze u sljedećoj fazi.
 
 - **Razdoblja:** Dnevna, Tjedna (ponedjeljak–ponedjeljak), Mjesečna, Godišnja (kalendarska) i Svih vremena. Granice su ponoći po zoni `Europe/Zagreb`, interval `[početak, kraj)`.
 - **Pripadnost:** cijela igra pripada razdoblju u kojem je **završila** (`partije.kraj`). Ulaze samo završene javne igre; privatne (`obracuni_partija.vrsta = privatna_gamifikacija`), aktivne i poništene ne. Privatna igra ne smije promijeniti broj javnih igara, prosjek, niz ni mjesto.
-- **Minimum:** 10 igara u danu; 20 igara unutar svakog duljeg razdoblja posebno. Današnje igre pridonose svim duljim razdobljima, ali rang se dobiva tek kad je minimum tog razdoblja ispunjen.
+- **Minimum (PR11):** **5** igara u danu; **10** igara unutar svakog duljeg razdoblja posebno. Pet Troboja pod raznim pravilima otvara dnevni Troboj; miješanje formata (npr. 2 Dvoboja + 3 Troboja) ne otvara ni jednu od tih dnevnih tablica. Današnje igre pridonose svim duljim razdobljima, ali mjesto se dobiva tek kad je minimum tog razdoblja ispunjen.
 - **Prosjek bodova:** zbroj bodova / broj igara, veći je bolji; prosjek 0 je valjan rezultat.
 - **Niz pobjeda:** najduži niz uzastopnih pobjeda (plasman 1) unutar razdoblja; svaki drugi plasman ga prekida. Igre se slažu redom **ulaska** (`partije.pocetak`, zatim ID), a ne redom završetka stolova. Pobjede izvan razdoblja se ne pribrajaju. Igrač bez pobjede nema rezultat.
 - **Izjednačenje:** glavni rezultat → više odigranih igara u razdoblju → ranije ostvaren rezultat → stabilni ID. Mjesta su jedinstvena (1, 2, 3…); isti poredak koriste tablica, „Oko mene” i vlastita pozicija.

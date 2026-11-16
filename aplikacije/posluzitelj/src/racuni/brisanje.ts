@@ -127,7 +127,8 @@ async function osvjeziLjestvicuAkoTreba(tx: TransakcijaBrisanja, igracId: string
   const opazenoU = new Date();
   if (!(await imaJavnuIgruUOtvorenomMjesecu(tx, igracId, opazenoU))) return false;
   await zabiljeziTop10NakonPromjene(tx, {
-    modovi: ['cetiri_igraca', 'dva_igraca'],
+    // PR11: tri formata; isti red kao REDOSLIJED_MODOVA_TOP10.
+    modovi: ['cetiri_igraca', 'dva_igraca', 'tri_igraca'],
     opazenoU,
     izvor: 'brisanje',
     partijaId: null,

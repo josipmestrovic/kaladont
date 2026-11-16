@@ -22,9 +22,20 @@ async function noviIgrac(nadimak: string, obrisan = false): Promise<string> {
   return id;
 }
 
+type ModTesta = 'cetiri_igraca' | 'dva_igraca' | 'tri_igraca';
+
 async function igra(
   igracId: string,
-  rezultat: { plasman: number | null; bodovi?: number; mod?: 'cetiri_igraca' | 'dva_igraca'; status?: 'zavrsena' | 'u_tijeku' | 'ponistena'; pocetak?: Date; kraj?: Date },
+  rezultat: {
+    plasman: number | null;
+    bodovi?: number;
+    mod?: ModTesta;
+    /** PR11: pravilnik ne smije cijepati ljestvicu unutar istog formata. */
+    pravila?: 'klasicni' | 'ka_zna' | 'dokazi_nastavak';
+    status?: 'zavrsena' | 'u_tijeku' | 'ponistena';
+    pocetak?: Date;
+    kraj?: Date;
+  },
 ): Promise<void> {
   brojac += 1;
   const id = randomUUID();
@@ -33,6 +44,7 @@ async function igra(
   await baza.insert(partije).values({
     id,
     mod: rezultat.mod ?? 'cetiri_igraca',
+    pravila: rezultat.pravila ?? 'ka_zna',
     status: rezultat.status ?? 'zavrsena',
     pocetak,
     kraj: rezultat.kraj ?? new Date(pocetak.getTime() + 30_000),
@@ -46,7 +58,7 @@ async function igra(
   });
 }
 
-async function niz(igracId: string, plasmani: number[], mod: 'cetiri_igraca' | 'dva_igraca' = 'cetiri_igraca') {
+async function niz(igracId: string, plasmani: number[], mod: ModTesta = 'cetiri_igraca') {
   for (const plasman of plasmani) await igra(igracId, { plasman, mod });
 }
 
@@ -61,11 +73,11 @@ afterAll(async () => {
 
 describe('poredak vremenskih ljestvica (stvarni Postgres)', () => {
   it('kvalifikacija, izjednačenje, nizovi, kronologija i isključenja', async () => {
-    // K01: 9 dnevnih igara ne ulazi, 10 ulazi.
-    const devet = await noviIgrac('Devet');
-    await niz(devet, Array(9).fill(1));
-    const deset = await noviIgrac('Deset');
-    await niz(deset, [1, 1, 1, 1, 1, 2, 2, 2, 2, 2]);
+    // PR11 K01: 4 dnevne igre ne ulaze, 5 ulazi (stari prag 10 → 5).
+    const cetiri = await noviIgrac('Cetiri');
+    await niz(cetiri, Array(4).fill(1));
+    const pet = await noviIgrac('Pet');
+    await niz(pet, [1, 1, 1, 2, 2]);
 
     // M01: isti prosjek (2,0), više igara ima prednost.
     const prosjekMalo = await noviIgrac('Prosjek20');
@@ -73,9 +85,9 @@ describe('poredak vremenskih ljestvica (stvarni Postgres)', () => {
     const prosjekVise = await noviIgrac('Prosjek30');
     for (let i = 0; i < 30; i += 1) await igra(prosjekVise, { plasman: 2, bodovi: 2 });
 
-    // P01: P,P,N,P,P,P -> najduži niz 3; dopuna porazima do minimuma.
+    // P01: P,P,N,P,P,P -> najduži niz 3; dopuna porazima do tjednog minimuma 10.
     const nizovi = await noviIgrac('Nizovi');
-    await niz(nizovi, [1, 1, 3, 1, 1, 1, ...Array(14).fill(4)]);
+    await niz(nizovi, [1, 1, 3, 1, 1, 1, ...Array(4).fill(4)]);
 
     // P06: A (poraz) počinje prvi ali završava zadnji; B i C su pobjede -> niz 2 po redoslijedu ulaska.
     const kronologija = await noviIgrac('Kronologija');
@@ -83,36 +95,38 @@ describe('poredak vremenskih ljestvica (stvarni Postgres)', () => {
     await igra(kronologija, { plasman: 4, pocetak: new Date(t), kraj: new Date(t + 600_000) });
     await igra(kronologija, { plasman: 1, pocetak: new Date(t + 60_000), kraj: new Date(t + 120_000) });
     await igra(kronologija, { plasman: 1, pocetak: new Date(t + 900_000), kraj: new Date(t + 960_000) });
-    await niz(kronologija, Array(17).fill(3));
+    await niz(kronologija, Array(7).fill(3));
 
     // K06/K07/K08: drugi mod, aktivna i poništena igra ne ulaze.
     const izolacija = await noviIgrac('Izolacija');
-    await niz(izolacija, Array(20).fill(1), 'dva_igraca');
+    await niz(izolacija, Array(10).fill(1), 'dva_igraca');
     await igra(izolacija, { plasman: 1, status: 'u_tijeku' });
     await igra(izolacija, { plasman: 1, status: 'ponistena' });
 
     // Obrisani igrač ne ulazi u žive poretke.
     const obrisan = await noviIgrac('Obrisan', true);
-    await niz(obrisan, Array(20).fill(1));
+    await niz(obrisan, Array(10).fill(1));
 
     // K11: samo porazi -> niz pobjeda nema rezultata, prosjek 0 je rangiran.
     const porazi = await noviIgrac('Porazi');
-    await niz(porazi, Array(20).fill(4));
+    await niz(porazi, Array(10).fill(4));
 
     // Nepotpun plasman ne smije poboljšati rezultat.
     const nepotpun = await noviIgrac('Nepotpun');
-    await niz(nepotpun, Array(19).fill(1));
+    await niz(nepotpun, Array(9).fill(1));
     await igra(nepotpun, { plasman: null });
 
     const dnevniOd = new Date('2001-03-05T23:00:00Z');
     const dnevniDo = new Date('2001-03-06T23:00:00Z');
     const dnevni = await izracunajPoredak('cetiri_igraca', 'prosjek_bodova', 'dnevno', dnevniOd, dnevniDo);
-    expect(pozicijaIgraca(dnevni, devet)).toMatchObject({ status: 'nedovoljan_broj_igara', odigraneIgre: 9, nedostajeIgara: 1 });
-    expect(pozicijaIgraca(dnevni, deset).status).toBe('rangiran');
+    expect(dnevni.minimumIgara).toBe(5);
+    expect(pozicijaIgraca(dnevni, cetiri)).toMatchObject({ status: 'nedovoljan_broj_igara', odigraneIgre: 4, nedostajeIgara: 1 });
+    expect(pozicijaIgraca(dnevni, pet).status).toBe('rangiran');
     expect(pozicijaIgraca(dnevni, izolacija).status).toBe('nije_igrano');
     expect(pozicijaIgraca(dnevni, null).status).toBe('prijava_potrebna');
 
     const prosjek = await izracunajPoredak('cetiri_igraca', 'prosjek_bodova', 'tjedno', OD, DO);
+    expect(prosjek.minimumIgara).toBe(10);
     const mjesto = (id: string) => pozicijaIgraca(prosjek, id).mjesto;
     expect(mjesto(prosjekVise)).toBeLessThan(mjesto(prosjekMalo)!);
     expect(pozicijaIgraca(prosjek, porazi)).toMatchObject({ status: 'rangiran' });
@@ -128,19 +142,54 @@ describe('poredak vremenskih ljestvica (stvarni Postgres)', () => {
     expect(pozicijaIgraca(pobjede, porazi).status).toBe('nema_rezultata');
 
     const dvoboj = await izracunajPoredak('dva_igraca', 'niz_pobjeda', 'tjedno', OD, DO);
-    expect(pozicijaIgraca(dvoboj, izolacija)).toMatchObject({ status: 'rangiran', mjesto: 1, odigraneIgre: 20 });
+    expect(pozicijaIgraca(dvoboj, izolacija)).toMatchObject({ status: 'rangiran', mjesto: 1, odigraneIgre: 10 });
+  });
+
+  it('PR11: Troboj je zasebna ljestvica; pravilnici iste veličine se spajaju; 9 tjednih ne ulazi', async () => {
+    const troboj = await noviIgrac('TrobojMix');
+    // Pet Troboja pod raznim pravilima → dnevni Troboj otvoren.
+    await igra(troboj, { plasman: 1, bodovi: 3, mod: 'tri_igraca', pravila: 'klasicni' });
+    await igra(troboj, { plasman: 1, bodovi: 3, mod: 'tri_igraca', pravila: 'ka_zna' });
+    await igra(troboj, { plasman: 2, bodovi: 1, mod: 'tri_igraca', pravila: 'dokazi_nastavak' });
+    await igra(troboj, { plasman: 1, bodovi: 3, mod: 'tri_igraca', pravila: 'klasicni' });
+    await igra(troboj, { plasman: 3, bodovi: 0, mod: 'tri_igraca', pravila: 'ka_zna' });
+    // Dvoboj i Četveroboj istog dana ne otvaraju Troboj (već otvoren) ni obrnuto.
+    await niz(troboj, Array(2).fill(1), 'dva_igraca');
+    await niz(troboj, Array(3).fill(1), 'cetiri_igraca');
+
+    const dnevniOd = new Date('2001-03-05T23:00:00Z');
+    const dnevniDo = new Date('2001-03-06T23:00:00Z');
+    const trobojDnevni = await izracunajPoredak('tri_igraca', 'prosjek_bodova', 'dnevno', dnevniOd, dnevniDo);
+    expect(pozicijaIgraca(trobojDnevni, troboj)).toMatchObject({ status: 'rangiran', odigraneIgre: 5 });
+
+    const dvobojDnevni = await izracunajPoredak('dva_igraca', 'prosjek_bodova', 'dnevno', dnevniOd, dnevniDo);
+    expect(pozicijaIgraca(dvobojDnevni, troboj)).toMatchObject({ status: 'nedovoljan_broj_igara', odigraneIgre: 2 });
+
+    const cetiriDnevni = await izracunajPoredak('cetiri_igraca', 'prosjek_bodova', 'dnevno', dnevniOd, dnevniDo);
+    expect(pozicijaIgraca(cetiriDnevni, troboj)).toMatchObject({ status: 'nedovoljan_broj_igara', odigraneIgre: 3 });
+
+    // 9→10 tjedno: igrač s 9 Četveroboja još nije na tjednoj.
+    const gotovoDevet = await noviIgrac('DevetTjedno');
+    await niz(gotovoDevet, Array(9).fill(1), 'cetiri_igraca');
+    const tjedni = await izracunajPoredak('cetiri_igraca', 'prosjek_bodova', 'tjedno', OD, DO);
+    expect(pozicijaIgraca(tjedni, gotovoDevet)).toMatchObject({
+      status: 'nedovoljan_broj_igara',
+      odigraneIgre: 9,
+      nedostajeIgara: 1,
+      minimumIgara: 10,
+    });
   });
 
   it('privatna igra ne mijenja broj javnih igara, prosjek, niz ni mjesto', async () => {
     const igracId = await noviIgrac(`Priv${randomUUID().slice(0, 6)}`);
-    await niz(igracId, Array(20).fill(1));
+    await niz(igracId, Array(10).fill(1));
 
     const prije = await izracunajPoredak('cetiri_igraca', 'prosjek_bodova', 'tjedno', OD, DO);
     const nizPrije = await izracunajPoredak('cetiri_igraca', 'niz_pobjeda', 'tjedno', OD, DO);
     const stavkaPrije = prije.poIgracu.get(igracId)!;
     const pozicijaPrije = pozicijaIgraca(prije, igracId);
     expect(pozicijaPrije.status).toBe('rangiran');
-    expect(stavkaPrije.odigraneIgre).toBe(20);
+    expect(stavkaPrije.odigraneIgre).toBe(10);
 
     // Privatna soba: završena Četveroboj partija bez javnog plasmana + obračun privatna_gamifikacija.
     brojac += 1;
@@ -188,9 +237,15 @@ describe('GET /api/ljestvice', () => {
     expect(dnevna.statusCode).toBe(200);
     expect(dnevna.headers['cache-control']).toBe('private, no-store');
     expect(tijelo.redci.length).toBeLessThanOrEqual(10);
+    expect(tijelo.minimumIgara).toBe(5);
     expect(tijelo.mojaPozicija.status).toBe('prijava_potrebna');
     expect(tijelo.razdoblje.do).not.toBeNull();
     expect(Object.keys(tijelo.pozicijePoRazdobljima)).toEqual(['dnevno', 'tjedno', 'mjesecno', 'godisnje', 'svih_vremena']);
+
+    const troboj = await app.inject({ method: 'GET', url: '/api/ljestvice?mod=tri_igraca&razdoblje=tjedno' });
+    expect(troboj.statusCode).toBe(200);
+    expect(troboj.json<OdgovorLjestvice>().mod).toBe('tri_igraca');
+    expect(troboj.json<OdgovorLjestvice>().minimumIgara).toBe(10);
 
     const svih = (await app.inject({ method: 'GET', url: '/api/ljestvice?razdoblje=svih_vremena' })).json<OdgovorLjestvice>();
     expect(svih.razdoblje.stanje).toBe('zakljucano');

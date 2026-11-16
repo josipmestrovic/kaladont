@@ -51,8 +51,8 @@ describe('razdoblja ljestvica (Europe/Zagreb)', () => {
     const pocetak = new Date('2026-10-15T10:00:00Z');
     const granice = graniceRazdoblja('mjesecno', new Date('2026-10-20T10:00:00Z'), pocetak);
     expect(granice.od.toISOString()).toBe(pocetak.toISOString());
-    expect(minimumIgaraZaRazdoblje('mjesecno')).toBe(20);
-    expect(minimumIgaraZaRazdoblje('dnevno')).toBe(10);
+    expect(minimumIgaraZaRazdoblje('mjesecno')).toBe(10);
+    expect(minimumIgaraZaRazdoblje('dnevno')).toBe(5);
   });
 
   it('svih vremena je zaključano do prve kalendarske godišnjice', () => {

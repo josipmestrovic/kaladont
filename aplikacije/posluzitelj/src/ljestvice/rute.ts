@@ -17,7 +17,8 @@ import { pokusajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentika
 import { dohvatiPoredak, obuhvatiRazdoblja, pozicijaIgraca, type Poredak } from './servis.js';
 
 const ShemaUpitaLjestvice = z.object({
-  mod: z.enum(['cetiri_igraca', 'dva_igraca']).default('cetiri_igraca'),
+  // PR11: tri javne ljestvice po veličini stola (2/3/4); pravilnici se spajaju unutar formata.
+  mod: z.enum(['cetiri_igraca', 'dva_igraca', 'tri_igraca']).default('cetiri_igraca'),
   metrika: z.enum(METRIKE_LJESTVICA).default('prosjek_bodova'),
   razdoblje: z.enum(RAZDOBLJA_LJESTVICA).default('dnevno'),
   prikaz: z.enum(PRIKAZI_LJESTVICA).default('top'),
