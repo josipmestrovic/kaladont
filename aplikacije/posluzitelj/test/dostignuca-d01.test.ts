@@ -88,6 +88,11 @@ function metrike(igracId: string, izvorId: string): MetrikeMisijaIgre {
     eliminacije: 0,
     kaladontIzvedbe: 0,
     razlicitiPoceci: [],
+    pravila: 'ka_zna',
+    odabranaPravila: 'ka_zna',
+    spojeniDvoboj: false,
+    uspjesniDokazi: 0,
+    kaladontSljedeciUzTriPlus: 0,
   };
 }
 

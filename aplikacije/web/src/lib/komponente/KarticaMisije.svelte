@@ -27,14 +27,18 @@
 
   function oznakaKonteksta(m: MisijaDto): string {
     if (m.kontekst === 'trening') return 'Zagrijavanje';
+    // HINT PR12: D21/W21 koriste mod=tri_igraca — badge mora reći Troboj (ne generička „Javna igra”).
     if (m.mod === 'dva_igraca') return 'Dvoboj';
+    if (m.mod === 'tri_igraca') return 'Troboj';
     if (m.mod === 'cetiri_igraca') return 'Četveroboj';
     return 'Javna igra';
   }
 
   function putanjaIgre(m: MisijaDto): string {
     if (m.kontekst === 'trening') return '/zagrijavanje';
+    // HINT PR12: Play na Troboj misiji vodi u /red?mod=tri_igraca (kao D07→četiri, D09→dva).
     if (m.mod === 'dva_igraca') return '/red?mod=dva_igraca';
+    if (m.mod === 'tri_igraca') return '/red?mod=tri_igraca';
     if (m.mod === 'cetiri_igraca') return '/red?mod=cetiri_igraca';
     return '/?igraj=1';
   }
@@ -49,6 +53,9 @@
     if (m.metrika === 'pobjede' || m.metrika === 'trening_pobjede') return `Pobjede: ${m.napredak} / ${m.cilj}`;
     if (m.metrika === 'partije') return `Igre: ${m.napredak} / ${m.cilj}`;
     if (m.metrika === 'rijeci' || m.metrika === 'rijeci_u_partiji_max') return `Riječi: ${m.napredak} / ${m.cilj}`;
+    // PR12 W22/W23: broj igara s događajem (max 1 doprinos po igri).
+    if (m.metrika === 'partije_s_dokazom') return `Igre s uspješnim dokazom: ${m.napredak} / ${m.cilj}`;
+    if (m.metrika === 'kaladont_sljedeci') return `Igre s kaladontom na sljedećeg: ${m.napredak} / ${m.cilj}`;
     return `${m.napredak} / ${m.cilj}`;
   }
 </script>

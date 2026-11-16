@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajRazinuDostignuca, DEFINICIJE_DOSTIGNUCA, type MetrikeMisijaIgre, type ModPartije, type ObavijestOtkljucanogDostignuca } from 'zajednicko';
+import { izracunajRazinuDostignuca, DEFINICIJE_DOSTIGNUCA, ZADANI_PRAVILNIK, type MetrikeMisijaIgre, type ModPartije, type ObavijestOtkljucanogDostignuca } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { dostignucaIgraca, igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, pobjedeTreninga } from '../baza/shema.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
@@ -97,6 +97,8 @@ export async function zabiljeziPobjeduTreninga(
 
     // PR08: klasični trening smije biti tri_igraca; nije javni Troboj (politika trening izolira agregate).
     const modTreninga = metrike?.mod ?? 'dva_igraca';
+    // HINT PR12: trening ne napreduje D21–W24 (kontekst trening + filter).
+    // Polja pravila/dokaza moraju postojati jer je MetrikeMisijaIgre strogi tip.
     const potpuneMetrike: MetrikeMisijaIgre = {
       izvorId: treningId,
       kontekst: 'trening',
@@ -115,6 +117,11 @@ export async function zabiljeziPobjeduTreninga(
       eliminacije: 0,
       kaladontIzvedbe: 0,
       razlicitiPoceci: [],
+      pravila: ZADANI_PRAVILNIK,
+      odabranaPravila: ZADANI_PRAVILNIK,
+      spojeniDvoboj: false,
+      uspjesniDokazi: 0,
+      kaladontSljedeciUzTriPlus: 0,
     };
 
     const ishodMisija = jeRegistriran

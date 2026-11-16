@@ -1,9 +1,11 @@
 import type { StanjeIskustva } from './iskustvo.js';
+import type { ModPartije, PravilnikPartije } from './katalog-partije.js';
 
 export type VrstaMisije = 'dnevna' | 'tjedna';
 export type StatusDodjeleMisije = 'aktivna' | 'dovrsena' | 'zamijenjena' | 'istekla';
 export type KontekstMisije = 'javna' | 'trening';
-export type ModMisije = 'oba' | 'dva_igraca' | 'cetiri_igraca';
+/** HINT PR12: `tri_igraca` za Troboj; `oba` = sva tri javna formata (2/3/4) nakon otključavanja. */
+export type ModMisije = 'oba' | 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca';
 export type SlotMisije = 1 | 2 | 3;
 export type KontekstIzvoraMisije = 'javna' | 'trening';
 
@@ -40,7 +42,11 @@ export type MetrikaMisije =
   | 'kaladont'
   | 'razliciti_poceci'
   | 'dani'
-  | 'oba_moda';
+  | 'oba_moda'
+  /** PR12 W22: +1 po javnoj igri s barem jednim uspješnim dokazom (max 1 doprinos / igra). */
+  | 'partije_s_dokazom'
+  /** PR12 W23: +1 po igri s barem jednim kaladontom na sljedećeg uz ≥3 aktivna prije poteza. */
+  | 'kaladont_sljedeci';
 
 export interface PodciljDefinicijeMisije {
   kljuc: string;
@@ -64,6 +70,13 @@ export interface DefinicijaMisije {
   zahtjevnija: boolean;
   kontekst: KontekstMisije;
   mod: ModMisije;
+  /**
+   * PR12: skup formata (npr. D23 Troboj|Četveroboj). Kad postoji, matcher koristi članstvo
+   * umjesto točnog `mod` (osim što `mod` ostaje u snapshotu za DTO/stare klijente).
+   */
+  modovi?: readonly ModPartije[];
+  /** PR12: filtriraj po pravilniku; u spojenom Dvoboju gleda se odabranaPravila igrača. */
+  pravilnik?: PravilnikPartije;
   aktivna: boolean;
 }
 
@@ -144,6 +157,33 @@ export interface MetrikeMisijaIgre {
   eliminacije: number;
   kaladontIzvedbe: number;
   razlicitiPoceci: string[];
+  /**
+   * PR12: izvršni pravilnik stola. U spojenom Dvoboju stol igra ka_zna;
+   * za misije izbora koristi `odabranaPravila` (vidi `pravilaZaMisijskiFilter`).
+   */
+  pravila: PravilnikPartije;
+  /** PR12: UI izbor igrača (kartica); u spojenom Dvoboju odlučuje za D24/W24/D23… */
+  odabranaPravila: PravilnikPartije;
+  /** PR12: true = zajednički javni Dvoboj (KA-ZNA + Klasični na istom stolu). */
+  spojeniDvoboj: boolean;
+  /**
+   * PR12 W22 / D22: broj uspješnih dokaza ovog igrača u ovoj igri.
+   * HINT: uspješan dokaz već broji i kao prihvaćena riječ; ovo je zasebna činjenica.
+   */
+  uspjesniDokazi: number;
+  /**
+   * PR12 W23: broj običnih kaladonta s metom „sljedeći”, stvarnom žrtvom i ≥3 aktivna prije poteza.
+   * HINT: dokaz koji glasi kaladont NE ide ovim putem (motor zaobilazi KA-ZNA/klasični efekt).
+   */
+  kaladontSljedeciUzTriPlus: number;
+}
+
+/**
+ * PR12: pravilnik koji misija smije usporediti s `snapshot.pravilnik`.
+ * Spojeni Dvoboj → kartica igrača; svi ostali stolovi → stvarni pravilnik.
+ */
+export function pravilaZaMisijskiFilter(metrike: MetrikeMisijaIgre): PravilnikPartije {
+  return metrike.spojeniDvoboj ? metrike.odabranaPravila : metrike.pravila;
 }
 
 export interface PromjenaMisije {
@@ -178,6 +218,16 @@ export const KAPACITET_DNEVNIH_MISIJA = 3;
 export const KAPACITET_TJEDNIH_MISIJA = 3;
 export const PRISTUPACNE_TJEDNE_MISIJE = ['W01', 'W02', 'W10', 'W11', 'W20'] as const;
 
+type OpcijeDefinicijeMisije = {
+  zahtjevnija?: boolean;
+  kontekst?: KontekstMisije;
+  mod?: ModMisije;
+  modovi?: readonly ModPartije[];
+  pravilnik?: PravilnikPartije;
+  pragMetrike?: number;
+  podciljevi?: readonly PodciljDefinicijeMisije[];
+};
+
 function dnevna(
   predlozakId: string,
   naziv: string,
@@ -185,13 +235,7 @@ function dnevna(
   metrika: MetrikaMisije,
   cilj: number,
   obitelj: ObiteljMisije,
-  opts: {
-    zahtjevnija?: boolean;
-    kontekst?: KontekstMisije;
-    mod?: ModMisije;
-    pragMetrike?: number;
-    podciljevi?: readonly PodciljDefinicijeMisije[];
-  } = {},
+  opts: OpcijeDefinicijeMisije = {},
 ): DefinicijaMisije {
   return {
     predlozakId,
@@ -208,6 +252,8 @@ function dnevna(
     zahtjevnija: opts.zahtjevnija ?? false,
     kontekst: opts.kontekst ?? 'javna',
     mod: opts.mod ?? 'oba',
+    modovi: opts.modovi,
+    pravilnik: opts.pravilnik,
     aktivna: true,
   };
 }
@@ -219,13 +265,7 @@ function tjedna(
   metrika: MetrikaMisije,
   cilj: number,
   obitelj: ObiteljMisije,
-  opts: {
-    zahtjevnija?: boolean;
-    kontekst?: KontekstMisije;
-    mod?: ModMisije;
-    pragMetrike?: number;
-    podciljevi?: readonly PodciljDefinicijeMisije[];
-  } = {},
+  opts: OpcijeDefinicijeMisije = {},
 ): DefinicijaMisije {
   return {
     predlozakId,
@@ -242,6 +282,8 @@ function tjedna(
     zahtjevnija: opts.zahtjevnija ?? false,
     kontekst: opts.kontekst ?? 'javna',
     mod: opts.mod ?? 'oba',
+    modovi: opts.modovi,
+    pravilnik: opts.pravilnik,
     aktivna: true,
   };
 }
@@ -273,6 +315,53 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   dnevna('D19', 'Među najboljima', 'Završi 1 Četveroboj na 1. ili 2. mjestu.', 'pobjede', 1, 'plasman', { mod: 'cetiri_igraca' }),
   dnevna('D20', 'Dvije dobre igre', 'U 2 različite igre odigraj barem 3 prihvaćene riječi po igri.', 'partije_s_rijecima', 2, 'ucinak_partije', { pragMetrike: 3 }),
 
+  // --- PR12: četiri nova dnevna (pool 20→24). Copy: „igra”, nikad „partija”. ---
+  // HINT: trening/privatno ne napreduju ovih 8 (kontekst javna + filter).
+  dnevna(
+    'D21',
+    'Za stolom troje',
+    'Završi jedan javni Troboj i odigraj barem jednu prihvaćenu riječ.',
+    'partije',
+    1,
+    'aktivnost',
+    { mod: 'tri_igraca' },
+  ),
+  // HINT D22: maksimum unutar jedne igre (rijeci_u_partiji_max), ne zbroj između igara.
+  // Uspješan dokaz broji kao jedan prihvat.
+  dnevna(
+    'D22',
+    'Stojim iza riječi',
+    'U jednoj javnoj igri Dokaži nastavak odigraj 3 prihvaćene riječi.',
+    'rijeci_u_partiji_max',
+    3,
+    'ucinak_partije',
+    { pravilnik: 'dokazi_nastavak' },
+  ),
+  // HINT D23: početni format 3 ili 4 + Klasični; Dvoboj ne broji.
+  dnevna(
+    'D23',
+    'Idući na redu',
+    'Završi jedan javni klasični Troboj ili Četveroboj i odigraj barem jednu prihvaćenu riječ.',
+    'partije',
+    1,
+    'aktivnost',
+    {
+      mod: 'oba',
+      modovi: ['tri_igraca', 'cetiri_igraca'],
+      pravilnik: 'klasicni',
+    },
+  ),
+  // HINT D24: zbraja riječi između igara; u spojenom Dvoboju vrijedi odabranaPravila.
+  dnevna(
+    'D24',
+    'Po starom',
+    'Odigraj ukupno 4 prihvaćene riječi u javnim igrama KA-ZNA.',
+    'rijeci',
+    4,
+    'kolicina_rijeci',
+    { pravilnik: 'ka_zna' },
+  ),
+
   tjedna('W01', 'Redoviti igrač', 'Završi 15 javnih igara.', 'partije', 15, 'aktivnost'),
   tjedna('W02', 'Sto riječi', 'Odigraj ukupno 100 prihvaćenih riječi.', 'rijeci', 100, 'kolicina_rijeci'),
   tjedna('W03', 'Tri dobra niza', 'U 3 različite igre ostvari niz od barem 5 prihvaćenih riječi bez pogreške.', 'partije_s_nizom', 3, 'niz', { pragMetrike: 5 }),
@@ -298,6 +387,46 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
       { kljuc: 'cetiri_igraca', naziv: 'Četveroboji', cilj: 5 },
     ],
   }),
+
+  // --- PR12: četiri nova tjedna. W21–W24 nisu u PRISTUPACNE_TJEDNE_MISIJE. ---
+  tjedna(
+    'W21',
+    'Tri puta prvi',
+    'Pobijedi u 3 javna Troboja.',
+    'pobjede',
+    3,
+    'plasman',
+    { mod: 'tri_igraca' },
+  ),
+  // HINT W22: max 1 doprinos po igri čak i uz više uspješnih dokaza.
+  tjedna(
+    'W22',
+    'Riječ na provjeri',
+    'Uspješno dokaži vlastiti nastavak u 2 različite javne igre.',
+    'partije_s_dokazom',
+    2,
+    'taktika',
+    { zahtjevnija: true },
+  ),
+  // HINT W23: ≥3 aktivna neposredno prije poteza; stvarna sljedeća žrtva; max 1 / igra.
+  tjedna(
+    'W23',
+    'Dvije dobre zamke',
+    'U 2 različite javne klasične igre izbaci sljedećeg igrača kaladontom dok su u igri barem 3 igrača.',
+    'kaladont_sljedeci',
+    2,
+    'taktika',
+    { zahtjevnija: true, pravilnik: 'klasicni' },
+  ),
+  tjedna(
+    'W24',
+    'Stara škola pobjeđuje',
+    'Pobijedi u 5 javnih igara KA-ZNA.',
+    'pobjede',
+    5,
+    'plasman',
+    { pravilnik: 'ka_zna' },
+  ),
 ] as const;
 
 const poId = new Map(DEFINICIJE_MISIJA.map((d) => [d.predlozakId, d]));
