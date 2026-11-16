@@ -17,6 +17,7 @@ import {
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import {
   dodajRijec,
+  deaktivirajRijec,
   vratiRijec,
   NevaljanaRijecError,
   popisNstandardnihAktivnihRijeci,
@@ -584,49 +585,11 @@ export async function registrirajAdminRute(
         .code(400)
         .send({ ok: false, greska: 'Polja "rijec" i "vrsta" su obavezna, ili puni grupni payload s otiskom.' });
     }
+    // Jednooblični klijent: bez otiska — `dodajRijec` (bez auto-preklapanja / bez operacija cachea).
     const razlog = rezultat.data.razlog?.trim() || RAZLOG_RUCNOG_DODAVANJA;
     const frekvencija =
       rezultat.data.frekvencija ??
       frekvencijaIzTieraRijetkosti(rezultat.data.tierRijetkosti as TierRijetkostiRucno | undefined);
-    const lema = rezultat.data.lema ?? rezultat.data.rijec;
-    const pregledRez = await pregledGrupneIzmjene({
-      smjer: 'dodaj',
-      izvornaRijec: rezultat.data.rijec,
-      vrsta: rezultat.data.vrsta as VrstaRijeci,
-      lema,
-      tierIzvora: rezultat.data.tierRijetkosti as TierRijetkostiRucno | undefined,
-      dodatniOblici: [],
-    });
-    if (!pregledRez.ok) return odgovor.code(pregledRez.status).send({ ok: false, greska: pregledRez.greska });
-    if (pregledRez.pregled.smjer === 'dodaj' && pregledRez.pregled.brojOblici >= 1) {
-      const potvrda = await potvrdiGrupnoDodavanje({
-        adminId: admin.id,
-        otisak: pregledRez.pregled.otisak,
-        kljucOperacije: `legacy-dodaj-${pregledRez.pregled.otisak.slice(0, 24)}`,
-        izvornaRijec: rezultat.data.rijec,
-        vrsta: rezultat.data.vrsta as VrstaRijeci,
-        lema,
-        tierIzvora: rezultat.data.tierRijetkosti as TierRijetkostiRucno | undefined,
-        dodatniOblici: [],
-        potvrdiPreklapanja: pregledRez.pregled.imaPreklapanja,
-        razlog,
-      });
-      if (!potvrda.ok) {
-        return odgovor.code(potvrda.status).send({
-          ok: false,
-          greska: potvrda.greska,
-          kod: potvrda.kod,
-          pregled: potvrda.pregled,
-        });
-      }
-      await poslijeGrupnogDodavanja(rjecnik, potvrda.ishod.promijenjene, nadopuniPotroseneGrupe);
-      return {
-        ok: true,
-        brojRijeci: rjecnik.brojRijeci(),
-        brojPromjena: potvrda.ishod.brojPromjena,
-        promijenjene: potvrda.ishod.promijenjene,
-      };
-    }
     try {
       await dodajRijec(
         rezultat.data.rijec,
@@ -756,30 +719,27 @@ export async function registrirajAdminRute(
         pregled: pregledUklanjanja,
       });
     }
-    const rezultat = await potvrdiGrupnoUklanjanje({
-      adminId: admin.id,
-      otisak: pregledUklanjanja.otisak,
-      kljucOperacije: `legacy-deaktiviraj-${pregledUklanjanja.otisak.slice(0, 24)}`,
-      rijec: jednostavno.data.rijec,
-      razlog: jednostavno.data.razlog,
-    });
-    if (!rezultat.ok) {
-      return odgovor.code(rezultat.status).send({
-        ok: false,
-        greska: rezultat.greska,
-        kod: rezultat.kod,
-        pregled: rezultat.pregled,
-      });
+    try {
+      const ishod = await deaktivirajRijec(
+        jednostavno.data.rijec,
+        jednostavno.data.razlog,
+        admin.id,
+      );
+      if (ishod.promjena === 'deaktivirana') {
+        rjecnik.primijeniUklanjanja([ishod.rijec]);
+      }
+      return {
+        ok: true,
+        brojRijeci: rjecnik.brojRijeci(),
+        brojPromjena: ishod.promjena === 'deaktivirana' ? 1 : 0,
+        deaktivirane: ishod.promjena === 'deaktivirana' ? [ishod.rijec] : [],
+      };
+    } catch (greska) {
+      if (greska instanceof NevaljanaRijecError) {
+        return odgovor.code(400).send({ ok: false, greska: greska.message });
+      }
+      throw greska;
     }
-    if (rezultat.ishod.deaktivirane.length > 0) {
-      rjecnik.primijeniUklanjanja(rezultat.ishod.deaktivirane);
-    }
-    return {
-      ok: true,
-      brojRijeci: rjecnik.brojRijeci(),
-      brojPromjena: rezultat.ishod.brojPromjena,
-      deaktivirane: rezultat.ishod.deaktivirane,
-    };
   });
 
   app.post('/admin/rjecnik/vrati', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {

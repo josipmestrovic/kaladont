@@ -215,7 +215,7 @@
     });
     pregledDodavanja = odgovor.pregled;
     kljucOperacijeDodavanja = crypto.randomUUID();
-    potvrdiPreklapanja = odgovor.pregled?.imaPreklapanja ?? false;
+    potvrdiPreklapanja = false;
   }
 
   function dodajRedOblika() {
@@ -229,9 +229,16 @@
     akcijaUTijeku = 'dodaj';
     porukaRjecnik = null;
     try {
-      if (!pregledDodavanja) await osvjeziPregledDodavanja();
-      if (!pregledDodavanja || !kljucOperacijeDodavanja) {
+      // Prvi klik: samo pregled. Drugi: potvrda (da admin vidi oblike / preklapanja).
+      if (!pregledDodavanja) {
+        await osvjeziPregledDodavanja();
+        return;
+      }
+      if (!kljucOperacijeDodavanja) {
         throw new Error('Pregled dodavanja nije spreman.');
+      }
+      if (pregledDodavanja.imaPreklapanja && !potvrdiPreklapanja) {
+        throw new Error('Potvrdi preklapanje grupa prije dodavanja.');
       }
       const odgovor = await api<{ brojPromjena?: number }>('/admin/rjecnik/dodaj', {
         method: 'POST',
@@ -249,11 +256,13 @@
       lemaRijeci = '';
       dodatniOblici = [];
       pregledDodavanja = null;
+      potvrdiPreklapanja = false;
       void ucitaj();
     } catch (err) {
       if (err instanceof ApiGreska && err.status === 409 && err.tijelo.pregled) {
         pregledDodavanja = err.tijelo.pregled as typeof pregledDodavanja;
         kljucOperacijeDodavanja = crypto.randomUUID();
+        potvrdiPreklapanja = false;
         porukaRjecnik = 'Pregled je zastario — ponovi potvrdu.';
       } else {
         porukaRjecnik = err instanceof Error ? err.message : 'Neuspjelo dodavanje riječi.';
@@ -488,6 +497,11 @@
       >
       {#if pregledDodavanja}
         <p class="info-pregled">{pregledDodavanja.brojOblici} oblika · {pregledDodavanja.kljucGrupe}</p>
+        <ul class="lista-obuhvata">
+          {#each pregledDodavanja.oblici as oblik (oblik.rijec)}
+            <li><code>{oblik.rijec}</code> — {oblik.stanje} (f={oblik.frekvencija})</li>
+          {/each}
+        </ul>
         {#if pregledDodavanja.imaPreklapanja}
           <label
             ><input type="checkbox" bind:checked={potvrdiPreklapanja} /> Potvrdi preklapanje grupa</label

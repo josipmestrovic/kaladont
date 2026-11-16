@@ -102,11 +102,10 @@
 
   function tijeloPregledaDodavanja(izvornaRijec: string) {
     const dodatni = dodatniOblici
-      .map((red) => red.rijec.trim())
-      .filter((rijec) => rijec.length >= 2)
-      .map((rijec, i) => ({
-        rijec,
-        ...(dodatniOblici[i]?.tier ? { tierRijetkosti: dodatniOblici[i]!.tier } : {}),
+      .filter((red) => red.rijec.trim().length >= 2)
+      .map((red) => ({
+        rijec: red.rijec.trim(),
+        ...(red.tier ? { tierRijetkosti: red.tier } : {}),
       }));
     return {
       izvornaRijec,
@@ -130,7 +129,7 @@
       );
       pregledDodavanja = odgovor.pregled;
       kljucOperacije = crypto.randomUUID();
-      potvrdiPreklapanja = odgovor.pregled.imaPreklapanja;
+      potvrdiPreklapanja = false;
     } catch (e) {
       pregledDodavanja = null;
       greskaDijaloga = e instanceof Error ? e.message : 'Pregled nije uspio.';

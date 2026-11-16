@@ -373,11 +373,12 @@ export async function izracunajPregledDodavanja(
     grafemiRijeci(rijec);
     const red = await ucitajOblikZaDodavanje(db, rijec);
     const { stanje, zahtijevaPotvrduPreklapanja } = klasificirajOblikDodavanja(red, kljuc);
+    const planiranaFrekvencija = frekvencijaIzTiera(tier);
     oblici.push({
       rijec,
       stanje,
       aktivna: red?.aktivna ?? false,
-      frekvencija: red?.frekvencija ?? (frekvencijaIzTiera(tier) ?? DEFAULT_FREKVENCIJA_RUCNO),
+      frekvencija: planiranaFrekvencija ?? red?.frekvencija ?? DEFAULT_FREKVENCIJA_RUCNO,
       grupe: red?.grupe ?? [],
       zahtijevaPotvrduPreklapanja,
     });
@@ -922,15 +923,30 @@ async function primijeniDodavanjeOblika(
 
   const imaCilj = postojeca.grupe.includes(ulaz.kljucGrupe);
   const imaDruge = postojeca.grupe.some((g) => g !== ulaz.kljucGrupe);
+
+  // Već aktivna bez homografskog preklapanja i bez novog tiera = no-op za nagrade/prijave
+  // (kao stari dodajRijec). Tiho nadopuni ključ grupe ako nedostaje.
+  if (!imaDruge && eksplicitna === undefined && ulaz.stanje !== 'preklapanje') {
+    if (!imaCilj) {
+      await tx.update(rijeci).set({
+        grupe: unijaGrupe(postojeca.grupe, ulaz.kljucGrupe),
+        rucnoDodaneGrupe: dodajRucnu(postojeca.rucnoDodaneGrupe),
+        vrste: sortirajJedinstvene([...postojeca.vrste, ulaz.vrsta]),
+      }).where(eq(rijeci.rijec, rijec));
+    } else {
+      const novaRucna = dodajRucnu(postojeca.rucnoDodaneGrupe);
+      if (novaRucna.length !== postojeca.rucnoDodaneGrupe.length) {
+        await tx.update(rijeci).set({ rucnoDodaneGrupe: novaRucna }).where(eq(rijeci.rijec, rijec));
+      }
+    }
+    return { promjena: 'nema', rijec, izmjenaId: null };
+  }
+
   let grupe = postojeca.grupe;
   let rucno = postojeca.rucnoDodaneGrupe;
   let trebaZapis = false;
 
-  if (!imaCilj && imaDruge) {
-    grupe = unijaGrupe(grupe, ulaz.kljucGrupe);
-    rucno = dodajRucnu(rucno);
-    trebaZapis = true;
-  } else if (!imaCilj) {
+  if (!imaCilj) {
     grupe = unijaGrupe(grupe, ulaz.kljucGrupe);
     rucno = dodajRucnu(rucno);
     trebaZapis = true;
@@ -971,7 +987,11 @@ async function primijeniDodavanjeOblika(
     prijavaId: ulaz.prijavaId,
     operacijaId: ulaz.operacijaId,
   }).returning({ id: izmjeneRjecnika.id });
-  return { promjena: ulaz.stanje === 'postojeci' && eksplicitna === undefined ? 'azurirana' : 'dodana', rijec, izmjenaId: red?.id ?? null };
+  return {
+    promjena: ulaz.stanje === 'postojeci' && eksplicitna === undefined ? 'azurirana' : 'dodana',
+    rijec,
+    izmjenaId: red?.id ?? null,
+  };
 }
 
 export async function potvrdiGrupnoDodavanje(
@@ -1137,15 +1157,16 @@ export async function potvrdiGrupnoDodavanje(
       }
     }
 
-    const promijenjene = sortirajJedinstvene([...dodane, ...reaktivirane, ...azurirane]);
+    const znacajnePromjene = sortirajJedinstvene([...dodane, ...reaktivirane]);
+    const promijenjene = sortirajJedinstvene([...znacajnePromjene, ...azurirane]);
     let prijavaIds: number[] = [];
     const mailboxPrijavitelji: Array<{ prijavaId: number; igracId: string; rijec: string }> = [];
     let prijaviteljiZaNagradu: Array<{ igracId: string; rijec: string }> = [];
     const obavijesti: ObavijestiGrupnePotvrde[] = [];
 
     if (izvornaPrijava || promijenjene.length > 0) {
-      const pogođene = promijenjene.length > 0
-        ? promijenjene
+      const pogođene = znacajnePromjene.length > 0
+        ? znacajnePromjene
         : sortirajJedinstvene([izvornaRijec]);
       const uvjetRijeci = pogođene.length === 1
         ? sql`normalize(lower(btrim(${prijave.rijec})), NFC) = ${pogođene[0]}`
@@ -1177,7 +1198,8 @@ export async function potvrdiGrupnoDodavanje(
       if (zaRijesiti.length > 0) {
         prijavaIds = zaRijesiti.map((p) => p.id).sort((a, b) => a - b);
         const ids = zaRijesiti.map((p) => p.id);
-        const imaPromjene = promijenjene.length > 0;
+        // Samo dodavanje/reaktivacija broje za detektiva; tihi group-backfill (azurirane) ne.
+        const imaPromjene = znacajnePromjene.length > 0;
         await tx.update(prijave).set({
           status: 'rijesena',
           napomenaAdmina: imaPromjene ? 'dodana' : 'nema_promjene',
@@ -1252,7 +1274,7 @@ export async function potvrdiGrupnoDodavanje(
       azurirane,
       promijenjene,
       brojPromjena: promijenjene.length,
-      nemaPromjene: promijenjene.length === 0,
+      nemaPromjene: znacajnePromjene.length === 0,
       prijavaIds,
     };
 

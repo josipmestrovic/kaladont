@@ -281,10 +281,20 @@ export async function potvrdiIspravakRjecnika(ulaz: {
       pregled: grupno.pregled,
     };
   }
+  const izvorna = grupno.ishod.izvornaRijec;
+  let promjena: 'nema' | 'dodana' | 'reaktivirana' = 'nema';
+  if (grupno.ishod.reaktivirane.includes(izvorna)) promjena = 'reaktivirana';
+  else if (grupno.ishod.dodane.includes(izvorna)) promjena = 'dodana';
+  else if (grupno.ishod.reaktivirane.length > 0 && grupno.ishod.dodane.length === 0) {
+    promjena = 'reaktivirana';
+  } else if (grupno.ishod.dodane.length > 0) {
+    promjena = 'dodana';
+  }
+
   return {
     ok: true,
-    rijec: grupno.ishod.izvornaRijec,
-    promjena: grupno.ishod.nemaPromjene ? 'nema' : 'dodana',
+    rijec: izvorna,
+    promjena,
     obavijesti: grupno.obavijesti,
     promijenjene: grupno.ishod.promijenjene,
     brojPromjena: grupno.ishod.brojPromjena,
