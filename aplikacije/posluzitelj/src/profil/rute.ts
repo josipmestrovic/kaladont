@@ -20,11 +20,10 @@ import {
   osnovnaRijecIzGrupe,
   stanjeIskustva,
   bonusPobjednickogNiza,
-  BROJ_PARTIJA_ZA_KALIBRACIJU,
   izracunajFormu,
-  jeDnkOtkljucan,
   razinaVatre,
   type DnkProfil,
+  type ModPartije,
 } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import {
@@ -39,6 +38,7 @@ import {
   potezi,
   nizoviPobjedaIgraca,
   rezultatiFormeIgraca,
+  statistikeModaIgraca,
   statistikeRijeciIgraca,
   sudioniciPartije,
 } from '../baza/shema.js';
@@ -48,7 +48,12 @@ import { porukaPotvrdeEmaila, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { izdajTokenPotvrdeEmaila } from '../racuni/tokeni.js';
 import { dohvatiNajboljiNizAktivnosti, dohvatiSažetakAktivnostiDana } from '../racuni/aktivnost-dana.js';
-import { izracunajDnk } from '../igra/izracun-dnk.js';
+import {
+  metrikeIzDnkPodataka,
+  sastaviDnkProfil,
+  zbrojiDnkRedove,
+  type DnkPodaciZajednicki,
+} from '../igra/izracun-dnk.js';
 import {
   pokusajIdentifikaciju,
   zahtijevajAdmina,
@@ -211,20 +216,36 @@ async function dohvatiFormu(igracId: string, mod: import('zajednicko').ModPartij
   };
 }
 
-async function dohvatiDnkStatistiku(igracId: string, mod: import('zajednicko').ModPartije) {
-  const [statistika] = await baza
+/** Svi redovi dnk_statistike za igrača (2p/3p/4p); PR10 ih zbraja u runtimeu. */
+async function dohvatiSveDnkStatistike(igracId: string) {
+  return baza
     .select()
     .from(dnkStatistikeIgraca)
-    .where(sql`${dnkStatistikeIgraca.igracId} = ${igracId} and ${dnkStatistikeIgraca.mod} = ${mod}`)
-    .limit(1);
-  return statistika ?? null;
+    .where(eq(dnkStatistikeIgraca.igracId, igracId));
 }
 
-function prosjecnaOcjena(
-  statistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
-): number | null {
-  if (!statistika || statistika.brojOcjenaIgre === 0) return null;
-  return statistika.zbrojOcjenaIgre / statistika.brojOcjenaIgre;
+async function dohvatiBrojacTroboja(igracId: string) {
+  const [red] = await baza
+    .select({
+      odigrane: statistikeModaIgraca.odigrane,
+      pobjede: statistikeModaIgraca.pobjede,
+      eliminacije: statistikeModaIgraca.eliminacije,
+      bodovi: statistikeModaIgraca.bodovi,
+    })
+    .from(statistikeModaIgraca)
+    .where(and(eq(statistikeModaIgraca.igracId, igracId), eq(statistikeModaIgraca.mod, 'tri_igraca')))
+    .limit(1);
+  return {
+    odigrane: red?.odigrane ?? 0,
+    pobjede: red?.pobjede ?? 0,
+    eliminacije: red?.eliminacije ?? 0,
+    bodovi: red?.bodovi ?? 0,
+  };
+}
+
+function prosjecnaOcjenaIzZbroja(zbrojOcjenaIgre: number, brojOcjenaIgre: number): number | null {
+  if (brojOcjenaIgre === 0) return null;
+  return zbrojOcjenaIgre / brojOcjenaIgre;
 }
 
 function stupacZaKategoriju(kategorija: KategorijaRijeci) {
@@ -380,69 +401,113 @@ async function dohvatiJavniProfil(igracId: string) {
   return igrac ?? null;
 }
 
-function izracunajDnkProfil(
-  igrac: {
-    odigrane: number;
-    odigrane1v1: number;
-    bodoviUkupno: number;
-    bodovi1v1: number;
-    eliminacijeUkupno: number;
-    eliminacije1v1: number;
-  },
-  dnkStatistika: Awaited<ReturnType<typeof dohvatiDnkStatistiku>> | null,
-  mod: import('zajednicko').ModPartije,
-): DnkProfil & { metrike: {
-  eliminacijePoPartiji: number;
-  nizPrihvacenihRijeci: number;
-  prosjekPrihvacenogPotezaMs: number;
-  dugeRijeciPoPartiji: number;
-  rijetkeRijeciPoPartiji: number;
-} } {
-  if (mod === 'tri_igraca') {
-    throw new Error('sastaviDnkProfil: Troboj DNK još nije podržan (PR10).');
-  }
-  const odigrano = mod === 'dva_igraca' ? igrac.odigrane1v1 : igrac.odigrane;
-  const bodovi = mod === 'dva_igraca' ? igrac.bodovi1v1 : igrac.bodoviUkupno;
-  const eliminacije = mod === 'dva_igraca' ? igrac.eliminacije1v1 : igrac.eliminacijeUkupno;
-  const eliminacijePoPartiji = odigrano > 0 ? eliminacije / odigrano : 0;
-  const dnkPodaci = {
-    odigrane: odigrano,
-    bodovi,
-    eliminacije,
-    prihvaceniPotezi: dnkStatistika?.prihvaceniPotezi ?? 0,
-    ukupnoTrajanjePrihvaceniPoteziMs: dnkStatistika?.ukupnoTrajanjePrihvaceniPoteziMs ?? 0,
-    najduziStreak: dnkStatistika?.najduziStreak ?? 0,
-    dugeRijeci: dnkStatistika?.dugeRijeci ?? 0,
-    srednjeDugeRijeci: dnkStatistika?.srednjeDugeRijeci ?? 0,
-    jakoDugeRijeci: dnkStatistika?.jakoDugeRijeci ?? 0,
-    rijetkeRijeci: dnkStatistika?.rijetkeRijeci ?? 0,
-    srednjeRijetkeRijeci: dnkStatistika?.srednjeRijetkeRijeci ?? 0,
-    jakoRijetkeRijeci: dnkStatistika?.jakoRijetkeRijeci ?? 0,
-  };
-  const profil: DnkProfil = {
-    mod,
-    otkljucan: jeDnkOtkljucan(odigrano),
-    odigrano,
-    preostaloDoOtkljucavanja: Math.max(0, BROJ_PARTIJA_ZA_KALIBRACIJU - odigrano),
-    osi: izracunajDnk(dnkPodaci, mod),
-  };
-  const prosjekPrihvacenogPotezaMs = dnkPodaci.prihvaceniPotezi > 0
-    ? dnkPodaci.ukupnoTrajanjePrihvaceniPoteziMs / dnkPodaci.prihvaceniPotezi
-    : 0;
-
+/**
+ * Jedan zajednički DNK (PR10).
+ * N2=odigrane1v1, N4=odigrane, N3=statistike_moda; dnk_statistike se zbrajaju.
+ */
+function sastaviZajednickiDnkProfil(
+  podaci: DnkPodaciZajednicki,
+): DnkProfil & { metrike: ReturnType<typeof metrikeIzDnkPodataka> } {
   return {
-    ...profil,
-    metrike: {
-      eliminacijePoPartiji,
-      nizPrihvacenihRijeci: dnkPodaci.najduziStreak,
-      prosjekPrihvacenogPotezaMs,
-      dugeRijeciPoPartiji: odigrano > 0
-        ? (dnkPodaci.dugeRijeci + dnkPodaci.srednjeDugeRijeci + dnkPodaci.jakoDugeRijeci) / odigrano
-        : 0,
-      rijetkeRijeciPoPartiji: odigrano > 0
-        ? (dnkPodaci.rijetkeRijeci + dnkPodaci.srednjeRijetkeRijeci + dnkPodaci.jakoRijetkeRijeci) / odigrano
-        : 0,
+    ...sastaviDnkProfil(podaci),
+    metrike: metrikeIzDnkPodataka(podaci),
+  };
+}
+
+type FormatStatistika = {
+  odigrane: number;
+  pobjede: number;
+  eliminacije: number;
+  bodovi: number;
+  prosjekBodova: number;
+  forma: Awaited<ReturnType<typeof dohvatiFormu>>;
+};
+
+async function sastaviProfilDnkIFormate(igrac: {
+  id: string;
+  odigrane: number;
+  odigrane1v1: number;
+  pobjede: number;
+  pobjede1v1: number;
+  eliminacijeUkupno: number;
+  eliminacije1v1: number;
+  bodoviUkupno: number;
+  bodovi1v1: number;
+  rangSumaJedinica: bigint | number | string;
+  rangBrojPartija: number;
+}): Promise<{
+  dnk: ReturnType<typeof sastaviZajednickiDnkProfil>;
+  formati: Record<ModPartije, FormatStatistika>;
+  odigraneJavne: number;
+  pobjedeJavne: number;
+  eliminacijeJavne: number;
+  prosjecnaOcjenaIgre: number | null;
+  stilIgre: ReturnType<typeof stilIgre>;
+}> {
+  const [dnkRedovi, troboj, formaDva, formaTri, formaCetiri] = await Promise.all([
+    dohvatiSveDnkStatistike(igrac.id),
+    dohvatiBrojacTroboja(igrac.id),
+    dohvatiFormu(igrac.id, 'dva_igraca'),
+    dohvatiFormu(igrac.id, 'tri_igraca'),
+    dohvatiFormu(igrac.id, 'cetiri_igraca'),
+  ]);
+  const zbroj = zbrojiDnkRedove(dnkRedovi);
+  const n2 = igrac.odigrane1v1;
+  const n3 = troboj.odigrane;
+  const n4 = igrac.odigrane;
+  const eliminacijeJavne = igrac.eliminacije1v1 + troboj.eliminacije + igrac.eliminacijeUkupno;
+  const pobjedeJavne = igrac.pobjede1v1 + troboj.pobjede + igrac.pobjede;
+  const odigraneJavne = n2 + n3 + n4;
+  const podaci: DnkPodaciZajednicki = {
+    n2,
+    n3,
+    n4,
+    eliminacijeUkupno: eliminacijeJavne,
+    prihvaceniPotezi: zbroj.prihvaceniPotezi,
+    ukupnoTrajanjePrihvaceniPoteziMs: zbroj.ukupnoTrajanjePrihvaceniPoteziMs,
+    najduziStreak: zbroj.najduziStreak,
+    dugeRijeci: zbroj.dugeRijeci,
+    srednjeDugeRijeci: zbroj.srednjeDugeRijeci,
+    jakoDugeRijeci: zbroj.jakoDugeRijeci,
+    rijetkeRijeci: zbroj.rijetkeRijeci,
+    srednjeRijetkeRijeci: zbroj.srednjeRijetkeRijeci,
+    jakoRijetkeRijeci: zbroj.jakoRijetkeRijeci,
+    univerzalniUcinak: izracunajUniverzalniUcinak(Number(igrac.rangSumaJedinica), igrac.rangBrojPartija),
+  };
+  const formati: Record<ModPartije, FormatStatistika> = {
+    dva_igraca: {
+      odigrane: n2,
+      pobjede: igrac.pobjede1v1,
+      eliminacije: igrac.eliminacije1v1,
+      bodovi: igrac.bodovi1v1,
+      prosjekBodova: prosjekBodova(igrac.bodovi1v1, n2),
+      forma: formaDva,
     },
+    tri_igraca: {
+      odigrane: n3,
+      pobjede: troboj.pobjede,
+      eliminacije: troboj.eliminacije,
+      bodovi: troboj.bodovi,
+      prosjekBodova: prosjekBodova(troboj.bodovi, n3),
+      forma: formaTri,
+    },
+    cetiri_igraca: {
+      odigrane: n4,
+      pobjede: igrac.pobjede,
+      eliminacije: igrac.eliminacijeUkupno,
+      bodovi: igrac.bodoviUkupno,
+      prosjekBodova: prosjekBodova(igrac.bodoviUkupno, n4),
+      forma: formaCetiri,
+    },
+  };
+  return {
+    dnk: sastaviZajednickiDnkProfil(podaci),
+    formati,
+    odigraneJavne,
+    pobjedeJavne,
+    eliminacijeJavne,
+    prosjecnaOcjenaIgre: prosjecnaOcjenaIzZbroja(zbroj.zbrojOcjenaIgre ?? 0, zbroj.brojOcjenaIgre ?? 0),
+    stilIgre: stilIgre(odigraneJavne, eliminacijeJavne),
   };
 }
 
@@ -562,29 +627,15 @@ export async function registrirajProfilRute(
   app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
     odgovor.header('Cache-Control', 'private, no-store');
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    const statistikaCetiri = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
-    const [dnkCetiri, dnkDva] = await Promise.all([
-      dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
-      dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
-    ]);
-    const [formaCetiri, formaDva] = await Promise.all([
-      dohvatiFormu(igrac.id, 'cetiri_igraca'),
-      dohvatiFormu(igrac.id, 'dva_igraca'),
-    ]);
-    const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
-    const prosjek1v1 = prosjekBodova(igrac.bodovi1v1, igrac.odigrane1v1);
-    const stil = stilIgre(
-      igrac.odigrane + igrac.odigrane1v1,
-      igrac.eliminacijeUkupno + igrac.eliminacije1v1,
-    );
-    const [dostignuca, aktivnostDana] = await Promise.all([
+    const [statistikaCetiri, agregat, dostignuca, aktivnostDana] = await Promise.all([
+      dohvatiStatistiku(igrac.id, 'cetiri_igraca'),
+      sastaviProfilDnkIFormate(igrac),
       dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
       igrac.vrsta === 'gost' || igrac.upravljac !== 'covjek'
         ? Promise.resolve(null)
         : dohvatiSažetakAktivnostiDana(igrac.id),
     ]);
-    const profilDnkCetiri = izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca');
-    const profilDnkDva = izracunajDnkProfil(igrac, dnkDva, 'dva_igraca');
+    const rang = izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija);
     return {
       ok: true,
       igracId: igrac.id,
@@ -602,29 +653,35 @@ export async function registrirajProfilRute(
       aktualnaVerzijaUvjeta: AKTUALNA_VERZIJA_UVJETA,
       uvjetiPrihvaceni: jePrihvacenaAktualnaVerzijaUvjeta(igrac.potvrdaDob16, igrac.uvjetiVerzija),
       trebaPrihvatitiUvjete: !jePrihvacenaAktualnaVerzijaUvjeta(igrac.potvrdaDob16, igrac.uvjetiVerzija),
+      // Legacy 4p/1v1 polja (kompatibilnost); Općenito koristi odigraneJavne + formati.
       odigrane: igrac.odigrane,
       pobjede: igrac.pobjede,
       eliminacijeUkupno: igrac.eliminacijeUkupno,
       bodoviUkupno: igrac.bodoviUkupno,
-      prosjekBodova: prosjek4p,
-      // PR09: jedan univerzalni rang. rang1v1 = isti izvor (kompatibilnost starog klijenta).
-      rang: izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija),
+      prosjekBodova: agregat.formati.cetiri_igraca.prosjekBodova,
+      rang,
       rangUcinak: izracunajUniverzalniUcinak(Number(igrac.rangSumaJedinica), igrac.rangBrojPartija),
       rangBrojPartija: igrac.rangBrojPartija,
       odigrane1v1: igrac.odigrane1v1,
       pobjede1v1: igrac.pobjede1v1,
       eliminacije1v1: igrac.eliminacije1v1,
       bodovi1v1: igrac.bodovi1v1,
-      prosjekBodova1v1: prosjek1v1,
-      rang1v1: izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija),
-      dnk: {
-        cetiriIgraca: profilDnkCetiri,
-        dvaIgraca: profilDnkDva,
+      prosjekBodova1v1: agregat.formati.dva_igraca.prosjekBodova,
+      rang1v1: rang,
+      odigraneJavne: agregat.odigraneJavne,
+      pobjedeJavne: agregat.pobjedeJavne,
+      eliminacijeJavne: agregat.eliminacijeJavne,
+      dnk: agregat.dnk,
+      formati: agregat.formati,
+      // HINT PR11+: forma.* alias; UI Statistici čita formati.*.forma
+      forma: {
+        cetiriIgraca: agregat.formati.cetiri_igraca.forma,
+        triIgraca: agregat.formati.tri_igraca.forma,
+        dvaIgraca: agregat.formati.dva_igraca.forma,
       },
-      forma: { cetiriIgraca: formaCetiri, dvaIgraca: formaDva },
-      prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
+      prosjecnaOcjenaIgre: agregat.prosjecnaOcjenaIgre,
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
-      stilIgre: stil,
+      stilIgre: agregat.stilIgre,
       statistikaRijeci: javnaStatistika(statistikaCetiri),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
       dostignuca,
@@ -647,24 +704,12 @@ export async function registrirajProfilRute(
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
 
-    const statistikaCetiri = await dohvatiStatistiku(igrac.id, 'cetiri_igraca');
-    const [dnkCetiri, dnkDva] = await Promise.all([
-      dohvatiDnkStatistiku(igrac.id, 'cetiri_igraca'),
-      dohvatiDnkStatistiku(igrac.id, 'dva_igraca'),
+    const [statistikaCetiri, agregat, dostignuca] = await Promise.all([
+      dohvatiStatistiku(igrac.id, 'cetiri_igraca'),
+      sastaviProfilDnkIFormate(igrac),
+      dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
     ]);
-    const [formaCetiri, formaDva] = await Promise.all([
-      dohvatiFormu(igrac.id, 'cetiri_igraca'),
-      dohvatiFormu(igrac.id, 'dva_igraca'),
-    ]);
-    const prosjek4p = prosjekBodova(igrac.bodoviUkupno, igrac.odigrane);
-    const prosjek1v1 = prosjekBodova(igrac.bodovi1v1, igrac.odigrane1v1);
-    const stil = stilIgre(
-      igrac.odigrane + igrac.odigrane1v1,
-      igrac.eliminacijeUkupno + igrac.eliminacije1v1,
-    );
-    const dostignuca = await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno);
-    const profilDnkCetiri = izracunajDnkProfil(igrac, dnkCetiri, 'cetiri_igraca');
-    const profilDnkDva = izracunajDnkProfil(igrac, dnkDva, 'dva_igraca');
+    const rang = izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija);
     const jeAdmin = (zahtjev as ZahtjevSIgracem).igrac?.vrsta === 'admin';
     return {
       ok: true,
@@ -680,25 +725,29 @@ export async function registrirajProfilRute(
       pobjede: igrac.pobjede,
       eliminacijeUkupno: igrac.eliminacijeUkupno,
       bodoviUkupno: igrac.bodoviUkupno,
-      prosjekBodova: prosjek4p,
-      // PR09: jedan univerzalni rang (rang1v1 alias za stari klijent).
-      rang: izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija),
+      prosjekBodova: agregat.formati.cetiri_igraca.prosjekBodova,
+      rang,
       rangUcinak: izracunajUniverzalniUcinak(Number(igrac.rangSumaJedinica), igrac.rangBrojPartija),
       rangBrojPartija: igrac.rangBrojPartija,
       odigrane1v1: igrac.odigrane1v1,
       pobjede1v1: igrac.pobjede1v1,
       eliminacije1v1: igrac.eliminacije1v1,
       bodovi1v1: igrac.bodovi1v1,
-      prosjekBodova1v1: prosjek1v1,
-      rang1v1: izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija),
-      dnk: {
-        cetiriIgraca: profilDnkCetiri,
-        dvaIgraca: profilDnkDva,
+      prosjekBodova1v1: agregat.formati.dva_igraca.prosjekBodova,
+      rang1v1: rang,
+      odigraneJavne: agregat.odigraneJavne,
+      pobjedeJavne: agregat.pobjedeJavne,
+      eliminacijeJavne: agregat.eliminacijeJavne,
+      dnk: agregat.dnk,
+      formati: agregat.formati,
+      forma: {
+        cetiriIgraca: agregat.formati.cetiri_igraca.forma,
+        triIgraca: agregat.formati.tri_igraca.forma,
+        dvaIgraca: agregat.formati.dva_igraca.forma,
       },
-      forma: { cetiriIgraca: formaCetiri, dvaIgraca: formaDva },
-      prosjecnaOcjenaIgre: prosjecnaOcjena(dnkCetiri) ?? prosjecnaOcjena(dnkDva),
+      prosjecnaOcjenaIgre: agregat.prosjecnaOcjenaIgre,
       iskustvo: stanjeIskustva(igrac.iskustvoUkupno),
-      stilIgre: stil,
+      stilIgre: agregat.stilIgre,
       statistikaRijeci: javnaStatistika(statistikaCetiri),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
       dostignuca,

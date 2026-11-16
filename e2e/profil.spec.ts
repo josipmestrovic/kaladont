@@ -85,6 +85,29 @@ test('profili prikazuju istaknuta dostignuća i tooltip na osobnom i javnom prof
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });
 
+test('PR10: Općenito je default s jednim radarom; #statistika otvara Statistiku', async ({ page }) => {
+  const igrac = await registrirajIgraca(page);
+  await page.addInitScript((token) => {
+    localStorage.setItem('kaladont_sesijski_token', token);
+  }, igrac.sesijskiToken);
+
+  for (const sirina of [380, 1100] as const) {
+    await page.setViewportSize({ width: sirina, height: 900 });
+    await page.goto('/profil');
+    await expect(page.getByRole('heading', { name: 'Općenito', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tvoj Kaladont DNK', level: 3 })).toBeVisible();
+    await expect(page.locator('.dnk-kartica')).toHaveCount(1);
+    await expect(page.getByText('Odigrane javne igre')).toBeVisible();
+    await expect(page.getByText('Dvoboj / Troboj / Četveroboj')).toBeVisible();
+
+    await page.goto('/profil#statistika');
+    await expect(page.locator('#statistika')).toBeVisible();
+    await expect(page.getByLabel('Format igre')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Troboj' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Općenito', level: 2 })).toHaveCount(0);
+  }
+});
+
 test('objašnjenje stila radi na vlastitom i javnom profilu te se zatvara prema očekivanju', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const igrac = await registrirajIgraca(page);

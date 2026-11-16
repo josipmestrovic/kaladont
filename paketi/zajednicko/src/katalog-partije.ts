@@ -116,8 +116,8 @@ export function kanonskaPravilaZaKljuc(kljuc: KljucJavnogReda): {
 }
 
 /**
- * Za putove koji još ne podržavaju Troboj (profilni DNK do PR10).
- * Trening od PR08 smije biti tri_igraca; bodovanje, forma, rang i javni red su otključani.
+ * Za putove koji još ne podržavaju Troboj (npr. stari DNK čitači prije PR10).
+ * HINT: PR10 DNK više ne zove ovu funkciju; zadrži za uske legacy grane.
  */
 export function odbijNepodrzaniMod(mod: ModPartije, kontekst: string): asserts mod is 'dva_igraca' | 'cetiri_igraca' {
   if (mod === 'tri_igraca') {

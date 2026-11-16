@@ -12,9 +12,9 @@
   }
 
   let { prije, poslije, odigrano, otkljucan, upravoOtkljucan, preostaloDoOtkljucavanja, mod }: Props = $props();
-  const naslov = $derived(
-    mod === 'dva_igraca' ? 'Kaladont DNK — Dvoboj' : mod === 'tri_igraca' ? 'Kaladont DNK — Troboj' : 'Kaladont DNK — Četveroboj',
-  );
+  // PR10: jedan radar; mod ostaje kontekst upravo završene partije (ne sufiks naslova).
+  void mod;
+  const naslov = 'Kaladont DNK';
 
   const srediste = 120;
   const radijus = 78;
@@ -51,7 +51,7 @@
     {/if}
   </div>
   {#if upravoOtkljucan}
-    <p class="dnk-poruka"><strong>🎉 ČESTITAMO, OTKLJUČAO SI KALADONT DNK <a href="/profil">NA SVOM PROFILU</a>! 🎊</strong></p>
+    <p class="dnk-poruka"><strong>🎉 ČESTITAMO, OTKLJUČAO SI KALADONT DNK <a href="/profil#opcenito">NA SVOM PROFILU</a>! 🎊</strong></p>
   {:else if otkljucan}
     <p class="dnk-poruka">Ukupno odigrano: <strong>{odigrano}</strong></p>
   {:else}

@@ -1622,14 +1622,18 @@ export function stvoriUpraviteljPartija(
             mojaForma: agregat?.forma ?? undefined,
             mojNiz: agregat ? { prije: agregat.nizPrije, poslije: agregat.nizPoslije, najbolji: agregat.najboljiNiz } : undefined,
             kolekcija: kolekcijaZaKraj(stanje, p.igracId),
-            mojDnk: agregat ? {
-              odigrano: agregat.odigrane,
-              preostaloDoOtkljucavanja: Math.max(0, 10 - agregat.odigrane),
-              otkljucan: agregat.odigrane >= 10,
-              upravoOtkljucan: agregat.odigrane === 10,
-              prije: agregat.dnkPrije,
-              poslije: agregat.dnkPoslije,
-            } : undefined,
+            // PR10: unlock na ukupnim javnim partijama (N2+N3+N4), ne na formatnom brojaču.
+            mojDnk: agregat ? (() => {
+              const odigrano = agregat.javnePartijeUkupno ?? agregat.odigrane;
+              return {
+                odigrano,
+                preostaloDoOtkljucavanja: Math.max(0, 10 - odigrano),
+                otkljucan: odigrano >= 10,
+                upravoOtkljucan: odigrano === 10,
+                prije: agregat.dnkPrije,
+                poslije: agregat.dnkPoslije,
+              };
+            })() : undefined,
             promjeneMisija: agregat?.promjeneMisija,
             ukupnoIskustvo: agregat?.ukupnoIskustvo,
             misijeStanjeVerzija: agregat?.misijeStanjeVerzija,
