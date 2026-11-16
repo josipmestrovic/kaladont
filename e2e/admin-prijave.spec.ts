@@ -174,13 +174,14 @@ test('admin prijave: Dodaj otvara popup rijetkosti i šalje tierRijetkosti + nap
   await page.getByRole('button', { name: 'Dodaj' }).click();
   const dijalog = page.getByRole('dialog', { name: 'Dodati riječ?' });
   await expect(dijalog).toBeVisible();
-  await expect(dijalog.getByText('novaforma')).toBeVisible();
-  await expect(dijalog.getByRole('button', { name: 'Dodaj u rječnik' })).toBeEnabled();
+  await expect(dijalog.getByRole('heading', { name: 'Dodati riječ?' })).toBeVisible();
+  const potvrdi = dijalog.getByRole('button', { name: /Dodaj \d+ oblika|Dodaj u rječnik/ });
+  await expect(potvrdi).toBeEnabled();
 
   await dijalog.getByLabel('Rijetkost').selectOption('jako_rijetka');
-  await expect(dijalog.getByRole('button', { name: 'Dodaj u rječnik' })).toBeEnabled();
+  await expect(potvrdi).toBeEnabled();
   await dijalog.getByLabel('Napomena (neobavezno)').fill('Super prijava!');
-  await dijalog.getByRole('button', { name: 'Dodaj u rječnik' }).click();
+  await potvrdi.click();
 
   await expect(page.locator('.uspjeh-obavijest', { hasText: 'novaforma' })).toBeVisible();
   await expect(rijecRed).toHaveCount(0);
