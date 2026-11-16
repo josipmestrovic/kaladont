@@ -92,8 +92,9 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
 
   await navigacija.getByRole('button', { name: 'Igraj' }).click();
-  // HINT PR14: korak 1 = pravilnici (gumbi), korak 2 = formati (linkovi).
-  const dijalog = page.getByRole('dialog', { name: 'Kako želiš igrati?' });
+  // HINT PR14: stabilan aria-label „Igraj”; naslov koraka je u h2.
+  const dijalog = page.getByRole('dialog', { name: 'Igraj' });
+  await expect(dijalog.getByRole('heading', { name: 'Kako želiš igrati?' })).toBeVisible();
   await expect(dijalog.getByRole('button', { name: /Klasični Kaladont/ })).toBeVisible();
   await expect(dijalog.getByRole('button', { name: /KA-ZNA/ })).toBeVisible();
   await expect(dijalog.getByRole('button', { name: /Dokaži nastavak/ })).toBeVisible();

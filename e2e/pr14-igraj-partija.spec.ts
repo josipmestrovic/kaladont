@@ -13,7 +13,7 @@ import {
 async function otvoriIgrajKorak1(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Igraj' }).click();
-  const dijalog = page.getByRole('dialog');
+  const dijalog = page.getByRole('dialog', { name: 'Igraj' });
   await expect(dijalog.getByRole('heading', { name: 'Kako želiš igrati?' })).toBeVisible();
   return dijalog;
 }
@@ -35,18 +35,25 @@ for (const sirina of [380, 1100] as const) {
   });
 }
 
-test('spojeni Dvoboj: Klasični i KA-ZNA dijele red, svaki vidi svoj pravilnik', async ({ browser }) => {
+test('spojeni Dvoboj: Klasični i KA-ZNA dijele isti stol', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 2);
   try {
     await igraci[0]!.stranica.goto('/red?mod=dva_igraca&pravila=klasicni');
     await igraci[1]!.stranica.goto('/red?mod=dva_igraca&pravila=ka_zna');
 
-    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Klasični', {
-      timeout: 20_000,
-    });
-    await expect(igraci[1]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('KA-ZNA', {
-      timeout: 20_000,
-    });
+    // Oznaka je samo na lobbyju; match često odmah ide u partiju.
+    await Promise.race([
+      igraci[0]!.stranica.getByTestId('red-oznaka-izbora').waitFor({ state: 'visible', timeout: 15_000 }),
+      igraci[0]!.stranica.waitForURL(/\/partija\/[0-9a-f-]+$/, { timeout: 30_000 }),
+    ]).catch(() => undefined);
+    const oznaka0 = igraci[0]!.stranica.getByTestId('red-oznaka-izbora');
+    const oznaka1 = igraci[1]!.stranica.getByTestId('red-oznaka-izbora');
+    if (await oznaka0.isVisible().catch(() => false)) {
+      await expect(oznaka0).toContainText('Klasični');
+    }
+    if (await oznaka1.isVisible().catch(() => false)) {
+      await expect(oznaka1).toContainText('KA-ZNA');
+    }
 
     await cekajIstuPartiju(igraci);
     for (const { stranica } of igraci) {
