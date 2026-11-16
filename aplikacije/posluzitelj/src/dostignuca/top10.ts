@@ -215,6 +215,9 @@ async function obradiIgraca(
       });
       obavijesti.push(...pojedinacno.noveObavijesti);
 
+      // PR11: „Na dvije fronte” ostaje strogo 4p↔2p. Troboj dokaz ne smije ulaziti u stari
+      // ternarni izraz (non-4p → 4p) jer bi Troboj+Četveroboj lažno otključao par. PR13 širi.
+      if (dokaz.mod !== 'cetiri_igraca' && dokaz.mod !== 'dva_igraca') continue;
       const drugiMod: ModPartije = dokaz.mod === 'cetiri_igraca' ? 'dva_igraca' : 'cetiri_igraca';
       const [drugi] = await tx.select({ igracId: dokaziTop10Ulazaka.igracId }).from(dokaziTop10Ulazaka).where(and(
         eq(dokaziTop10Ulazaka.igracId, igracId),

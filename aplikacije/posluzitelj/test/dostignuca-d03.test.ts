@@ -274,7 +274,10 @@ describe('dostignuća D03 Top 10', () => {
     await snimi('tri_igraca', DAN);
     expect(await brojUlazaka(igracId, 'tri_igraca')).toBe(1);
     expect((await brojac(igracId)).dnevneDesetke).toBe(1);
-    // PR13 širi „Na dvije fronte”; ovdje Troboj sam ne otvara par s 4p/2p.
+    // Bugbot: Troboj+Četveroboj ne smije lažno otključati par (stari non-4p→4p izraz).
+    await igre(igracId, 5, 4, 'cetiri_igraca', DAN, 1);
+    await snimi('cetiri_igraca', DAN);
+    expect(await brojUlazaka(igracId, 'cetiri_igraca')).toBe(1);
     expect((await brojac(igracId)).naDvijeFronte).toBe(0);
   });
 
