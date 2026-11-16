@@ -1,19 +1,38 @@
 import type { MetrikeMisijaIgre } from 'zajednicko';
-import { jeTopDvaCetverobojMisija } from 'zajednicko';
+import { jeTopDvaCetverobojMisija, pravilaZaMisijskiFilter } from 'zajednicko';
 import { lokalniDatumIso } from './kalendar.js';
 import type { PodstanjeMisije, SnapshotMisije } from './tipovi.js';
 
 export function smijePrimitiMisijskiNapredak(metrike: MetrikeMisijaIgre): boolean {
+  // HINT: „Ne znam” u Dokaži nastavak samo otvara dokaz — nije nacinIspadanja=prekid.
+  // Potvrđeno napuštanje / prekid i dalje isključuje napredak.
   if (metrike.prihvaceneRijeci < 1) return false;
   if (metrike.nacinIspadanja === 'prekid') return false;
   return true;
 }
 
+/**
+ * PR12: kontekst + format (mod / modovi) + opcionalni pravilnik.
+ * Stari snapshot bez `modovi`/`pravilnik` zadržava staro ponašanje.
+ * `mod === 'oba'` uključuje Troboj (tri_igraca) — generičke D01/W01… broje sva tri formata.
+ * D12/W20 i dalje samo preko imenovanih podciljeva dva+četiri (metrika oba_moda).
+ */
 export function misijaOdgovaraKontekstu(snapshot: SnapshotMisije, metrike: MetrikeMisijaIgre): boolean {
   if (snapshot.kontekst === 'trening') return metrike.kontekst === 'trening';
   if (metrike.kontekst !== 'javna') return false;
-  if (snapshot.mod === 'oba') return true;
-  return snapshot.mod === metrike.mod;
+
+  const modovi = snapshot.modovi;
+  if (modovi && modovi.length > 0) {
+    if (!modovi.includes(metrike.mod)) return false;
+  } else if (snapshot.mod !== 'oba' && snapshot.mod !== metrike.mod) {
+    return false;
+  }
+
+  if (snapshot.pravilnik) {
+    if (pravilaZaMisijskiFilter(metrike) !== snapshot.pravilnik) return false;
+  }
+
+  return true;
 }
 
 function plasmanCiljIspunjen(predlozakId: string, metrike: MetrikeMisijaIgre): boolean {
@@ -138,6 +157,7 @@ export function primijeniMetrikuNaDodjelu(ulaz: {
       break;
     }
     case 'oba_moda': {
+      // HINT: Troboj (tri_igraca) nema podcilj u D12/W20 — namjerno ne napreduje te dodjele.
       const kljuc = metrike.mod;
       const defPod = snapshot.podciljevi?.find((p) => p.kljuc === kljuc);
       if (defPod) {
@@ -151,6 +171,20 @@ export function primijeniMetrikuNaDodjelu(ulaz: {
       delta.podciljevi = podstanje.podciljevi;
       break;
     }
+    // PR12 W22: najviše +1 po igri bez obzira na broj uspješnih dokaza.
+    case 'partije_s_dokazom':
+      if (metrike.uspjesniDokazi >= 1) {
+        napredak = Math.min(cilj, napredak + 1);
+        delta.delta = 1;
+      }
+      break;
+    // PR12 W23: najviše +1 po igri; brojač već filtrira ≥3 aktivna + meta sljedeći.
+    case 'kaladont_sljedeci':
+      if (metrike.kaladontSljedeciUzTriPlus >= 1) {
+        napredak = Math.min(cilj, napredak + 1);
+        delta.delta = 1;
+      }
+      break;
     default:
       break;
   }

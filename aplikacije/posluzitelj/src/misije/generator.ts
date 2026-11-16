@@ -63,7 +63,7 @@ export function odaberiTjedniPaket(
     return true;
   });
 
-  // Pretraži valjane trojke; 20 predložaka je dovoljno malo.
+  // Pretraži valjane trojke; 24 predloška (PR12) je i dalje dovoljno malo za DFS.
   const rezultat: DefinicijaMisije[] = [];
   const koristeno = new Set<string>();
   const obitelji = new Set<string>();
@@ -152,5 +152,8 @@ export function snapshotIzDefinicije(d: DefinicijaMisije) {
     zahtjevnija: d.zahtjevnija,
     kontekst: d.kontekst,
     mod: d.mod,
+    // PR12: trajni snapshot čuva skup formata i pravilnik do isteka dodjele.
+    modovi: d.modovi ? [...d.modovi] : null,
+    pravilnik: d.pravilnik ?? null,
   };
 }

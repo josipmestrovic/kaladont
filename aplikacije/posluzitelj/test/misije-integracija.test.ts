@@ -341,6 +341,11 @@ describe('misije API i stanje', () => {
       eliminacije: 0,
       kaladontIzvedbe: 0,
       razlicitiPoceci: ['ba', 'ka'],
+      pravila: 'ka_zna' as const,
+      odabranaPravila: 'ka_zna' as const,
+      spojeniDvoboj: false,
+      uspjesniDokazi: 0,
+      kaladontSljedeciUzTriPlus: 0,
     };
 
     const prvi = await baza.transaction((tx) =>
@@ -501,6 +506,11 @@ describe('misije API i stanje', () => {
       eliminacije: 0,
       kaladontIzvedbe: 0,
       razlicitiPoceci: ['ba', 'ka'],
+      pravila: 'ka_zna' as const,
+      odabranaPravila: 'ka_zna' as const,
+      spojeniDvoboj: false,
+      uspjesniDokazi: 0,
+      kaladontSljedeciUzTriPlus: 0,
     };
 
     const ishod = await baza.transaction((tx) =>
@@ -511,6 +521,112 @@ describe('misije API i stanje', () => {
     const [nakon] = await baza.select().from(dodjeleMisija).where(eq(dodjeleMisija.id, tjednaId));
     expect(nakon!.napredak).toBeGreaterThan(0);
     expect(['istekla', 'dovrsena']).toContain(nakon!.status);
+  });
+
+  it('PR12: paralelna D22+W22 i retry istog izvora bez dvostruke nagrade', async () => {
+    const { igracId } = await registriraj();
+    const sada = new Date('2026-11-04T12:00:00+01:00');
+    let d22Id = '';
+    let w22Id = '';
+    await baza.transaction(async (tx) => {
+      await osigurajStanjeMisija(tx, igracId, { sada: () => sada, rng: fiksniRng() });
+      const [dnevna] = await tx.select().from(dodjeleMisija).where(and(
+        eq(dodjeleMisija.igracId, igracId),
+        eq(dodjeleMisija.vrsta, 'dnevna'),
+        eq(dodjeleMisija.status, 'aktivna'),
+      ));
+      const [tjedna] = await tx.select().from(dodjeleMisija).where(and(
+        eq(dodjeleMisija.igracId, igracId),
+        eq(dodjeleMisija.vrsta, 'tjedna'),
+        eq(dodjeleMisija.status, 'aktivna'),
+      ));
+      expect(dnevna && tjedna).toBeTruthy();
+      d22Id = dnevna!.id;
+      w22Id = tjedna!.id;
+      const d22 = DEFINICIJE_MISIJA.find((d) => d.predlozakId === 'D22')!;
+      const w22 = DEFINICIJE_MISIJA.find((d) => d.predlozakId === 'W22')!;
+      await tx.update(dodjeleMisija).set({
+        predlozakId: 'D22',
+        cilj: d22.cilj,
+        napredak: 0,
+        snapshot: {
+          predlozakId: d22.predlozakId,
+          verzijaDefinicije: 1,
+          naziv: d22.naziv,
+          opis: d22.opis,
+          metrika: d22.metrika,
+          cilj: d22.cilj,
+          pragMetrike: null,
+          podciljevi: null,
+          xp: d22.xp,
+          obitelj: d22.obitelj,
+          zahtjevnija: false,
+          kontekst: 'javna',
+          mod: 'oba',
+          modovi: null,
+          pravilnik: 'dokazi_nastavak',
+        },
+      }).where(eq(dodjeleMisija.id, d22Id));
+      await tx.update(dodjeleMisija).set({
+        predlozakId: 'W22',
+        cilj: w22.cilj,
+        napredak: 0,
+        snapshot: {
+          predlozakId: w22.predlozakId,
+          verzijaDefinicije: 1,
+          naziv: w22.naziv,
+          opis: w22.opis,
+          metrika: w22.metrika,
+          cilj: w22.cilj,
+          pragMetrike: null,
+          podciljevi: null,
+          xp: w22.xp,
+          obitelj: w22.obitelj,
+          zahtjevnija: true,
+          kontekst: 'javna',
+          mod: 'oba',
+          modovi: null,
+          pravilnik: null,
+        },
+      }).where(eq(dodjeleMisija.id, w22Id));
+    });
+
+    const izvorId = randomUUID();
+    const metrike = {
+      izvorId,
+      kontekst: 'javna' as const,
+      mod: 'tri_igraca' as const,
+      igracId,
+      zavrsenoU: sada,
+      plasman: 2,
+      nacinIspadanja: 'ne_znam',
+      prihvaceneRijeci: 3,
+      najduziNiz: 2,
+      dugeRijeci: 0,
+      jakoDugeRijeci: 0,
+      rijetkeRijeci: 0,
+      jakoRijetkeRijeci: 0,
+      dugeIRijetkeRijeci: 0,
+      eliminacije: 0,
+      kaladontIzvedbe: 0,
+      razlicitiPoceci: ['ce'],
+      pravila: 'dokazi_nastavak' as const,
+      odabranaPravila: 'dokazi_nastavak' as const,
+      spojeniDvoboj: false,
+      uspjesniDokazi: 2,
+      kaladontSljedeciUzTriPlus: 0,
+    };
+
+    const prvi = await baza.transaction((tx) =>
+      obracunajMisijeZaIgraca(tx, metrike, 100, 50, { sada: () => sada, rng: fiksniRng() }),
+    );
+    expect(prvi.promjeneMisija.some((p) => p.predlozakId === 'D22' && p.poslije === 3)).toBe(true);
+    expect(prvi.promjeneMisija.some((p) => p.predlozakId === 'W22' && p.poslije === 1)).toBe(true);
+
+    const drugi = await baza.transaction((tx) =>
+      obracunajMisijeZaIgraca(tx, metrike, 100, 50, { sada: () => sada, rng: fiksniRng() }),
+    );
+    expect(drugi.promjeneMisija).toEqual(prvi.promjeneMisija);
   });
 
   it('soft-delete: neaktivna definicija se ne bira za nove dodjele', async () => {

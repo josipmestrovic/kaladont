@@ -71,7 +71,7 @@ import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
-import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
+import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, type KontekstMisijaZavrseneIgre, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { imaJavniProfil, primaProfilnuGamifikacijuUIgri } from './gamifikacija-racuna.js';
@@ -197,6 +197,13 @@ interface StatistikaRijeciPartije {
   najrjedaRijec: string | null;
   najrjedaRijecFrekvencija: number | null;
   najrjedaTier: number | null;
+  /** PR12 W22: uspješni dokazi ovog igrača u ovoj igri (memorijski brojač → MetrikeMisijaIgre). */
+  uspjesniDokazi: number;
+  /**
+   * PR12 W23: obični kaladont → sljedeći uz ≥3 aktivna prije poteza i stvarnom žrtvom.
+   * HINT: dokaz-kaladont ne prolazi obradiKaladontEfekt — ostaje 0.
+   */
+  kaladontSljedeciUzTriPlus: number;
 }
 
 interface MetapodatakOtkljucanjaKolekcije {
@@ -732,6 +739,51 @@ export function stvoriUpraviteljPartija(
       najrjedaRijec: null,
       najrjedaRijecFrekvencija: null,
       najrjedaTier: null,
+      uspjesniDokazi: 0,
+      kaladontSljedeciUzTriPlus: 0,
+    };
+  }
+
+  /** PR12: mapiranje in-memory statistike → ZapisStatistikeRijeci (uključujući misijske brojače). */
+  function zapisStatistikeZaStol(stanje: StanjeStola, igracId: string, statistika: StatistikaRijeciPartije): ZapisStatistikeRijeci {
+    return {
+      igracId,
+      prihvaceniPotezi: statistika.prihvaceniPotezi,
+      ukupnoTrajanjePrihvaceniPoteziMs: statistika.ukupnoTrajanjePrihvaceniPoteziMs,
+      grupe: [...(stanje.noveGrupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
+      otkljucaneRijeci: [...statistika.otkljucaneRijeci].map(([rijec, oznake]) => ({ rijec, ...oznake })),
+      najduziStreak: statistika.najduziStreak,
+      otkriveneJakoRijetkeGrupe: statistika.otkriveneJakoRijetkeGrupe.size,
+      otkriveneSrednjeRijetkeGrupe: statistika.otkriveneSrednjeRijetkeGrupe.size,
+      otkriveneRijetkeGrupe: statistika.otkriveneRijetkeGrupe.size,
+      upisaneDugeRijeci: statistika.upisaneDugeRijeci,
+      upisaneSrednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
+      upisaneJakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
+      prihvaceneRijetkeRijeci: statistika.prihvaceneRijetkeRijeci,
+      prihvaceneJakoRijetkeRijeci: statistika.prihvaceneJakoRijetkeRijeci,
+      dugeIRijetkeRijeci: statistika.dugeIRijetkeRijeci,
+      pogresniUnosi: statistika.pogresniUnosi,
+      dugeRijetkeRijeci: [...statistika.kvalificiraneDugeRijetkeRijeci],
+      razlicitiPoceci: [...statistika.razlicitiPoceci],
+      najduzaRijec: statistika.najduzaRijec,
+      najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
+      najrjedaRijec: statistika.najrjedaRijec,
+      najrjedaRijecFrekvencija: statistika.najrjedaRijecFrekvencija,
+      najrjedaTier: statistika.najrjedaTier,
+      uspjesniDokazi: statistika.uspjesniDokazi,
+      kaladontSljedeciUzTriPlus: statistika.kaladontSljedeciUzTriPlus,
+    };
+  }
+
+  function kontekstMisijaZaStol(stanje: StanjeStola): KontekstMisijaZavrseneIgre {
+    const odabranaPravilaPoIgracu = new Map<string, PravilnikPartije>();
+    for (const s of stanje.sudionici) {
+      odabranaPravilaPoIgracu.set(s.igracId, s.odabranaPravila ?? stanje.pravila);
+    }
+    return {
+      pravila: stanje.pravila,
+      spojeniDvoboj: stanje.spojeniDvoboj,
+      odabranaPravilaPoIgracu,
     };
   }
 
@@ -1428,32 +1480,12 @@ export function stvoriUpraviteljPartija(
     }
 
     if (stanje.jePrivatna) {
+      // HINT PR12: samoStatistika=true → misije se ionako ne obračunavaju; kontekst radi konzistentnosti.
       const privatneStatistike = new Map<string, ZapisStatistikeRijeci>(
-        [...stanje.statistikeRijeci].map(([igracId, statistika]) => [igracId, {
+        [...stanje.statistikeRijeci].map(([igracId, statistika]) => [
           igracId,
-          prihvaceniPotezi: statistika.prihvaceniPotezi,
-          ukupnoTrajanjePrihvaceniPoteziMs: statistika.ukupnoTrajanjePrihvaceniPoteziMs,
-          grupe: [...(stanje.noveGrupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
-          otkljucaneRijeci: [...statistika.otkljucaneRijeci].map(([rijec, oznake]) => ({ rijec, ...oznake })),
-          najduziStreak: statistika.najduziStreak,
-          otkriveneJakoRijetkeGrupe: statistika.otkriveneJakoRijetkeGrupe.size,
-          otkriveneSrednjeRijetkeGrupe: statistika.otkriveneSrednjeRijetkeGrupe.size,
-          otkriveneRijetkeGrupe: statistika.otkriveneRijetkeGrupe.size,
-          upisaneDugeRijeci: statistika.upisaneDugeRijeci,
-          upisaneSrednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
-          upisaneJakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
-          prihvaceneRijetkeRijeci: statistika.prihvaceneRijetkeRijeci,
-          prihvaceneJakoRijetkeRijeci: statistika.prihvaceneJakoRijetkeRijeci,
-          dugeIRijetkeRijeci: statistika.dugeIRijetkeRijeci,
-          pogresniUnosi: statistika.pogresniUnosi,
-          dugeRijetkeRijeci: [...statistika.kvalificiraneDugeRijetkeRijeci],
-          razlicitiPoceci: [...statistika.razlicitiPoceci],
-          najduzaRijec: statistika.najduzaRijec,
-          najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
-          najrjedaRijec: statistika.najrjedaRijec,
-          najrjedaRijecFrekvencija: statistika.najrjedaRijecFrekvencija,
-          najrjedaTier: statistika.najrjedaTier,
-        }]),
+          zapisStatistikeZaStol(stanje, igracId, statistika),
+        ]),
       );
       const privatniRezultati = plasmani.map((p) => ({
         igracId: p.igracId,
@@ -1467,7 +1499,7 @@ export function stvoriUpraviteljPartija(
         stanje,
         () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, privatniRezultati, stanje.mod, privatneStatistike, true, new Map(
           [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
-        )).then(async (agregati) => {
+        ), zavrsenoU, new Map(), kontekstMisijaZaStol(stanje)).then(async (agregati) => {
           await obavijestiPrvuIgruSudionicima(stanje, 'privatna');
           if (stanje.kodSobe) {
             postavke.naPrivatnaPartijaZavrsila?.(stanje.kodSobe, stanje.partijaId, pobjednikId, plasmani);
@@ -1522,31 +1554,10 @@ export function stvoriUpraviteljPartija(
     stanje.razloziEliminacije.clear();
 
     const statistike = new Map<string, ZapisStatistikeRijeci>(
-      [...stanje.statistikeRijeci].map(([igracId, statistika]) => [igracId, {
+      [...stanje.statistikeRijeci].map(([igracId, statistika]) => [
         igracId,
-        prihvaceniPotezi: statistika.prihvaceniPotezi,
-        ukupnoTrajanjePrihvaceniPoteziMs: statistika.ukupnoTrajanjePrihvaceniPoteziMs,
-        grupe: [...(stanje.noveGrupeSNagradom.get(igracId) ?? [])].map(([grupa, tier]) => ({ grupa, tier })),
-        otkljucaneRijeci: [...statistika.otkljucaneRijeci].map(([rijec, oznake]) => ({ rijec, ...oznake })),
-        najduziStreak: statistika.najduziStreak,
-        otkriveneJakoRijetkeGrupe: statistika.otkriveneJakoRijetkeGrupe.size,
-        otkriveneSrednjeRijetkeGrupe: statistika.otkriveneSrednjeRijetkeGrupe.size,
-        otkriveneRijetkeGrupe: statistika.otkriveneRijetkeGrupe.size,
-        upisaneDugeRijeci: statistika.upisaneDugeRijeci,
-        upisaneSrednjeDugeRijeci: statistika.upisaneSrednjeDugeRijeci,
-        upisaneJakoDugeRijeci: statistika.upisaneJakoDugeRijeci,
-        prihvaceneRijetkeRijeci: statistika.prihvaceneRijetkeRijeci,
-        prihvaceneJakoRijetkeRijeci: statistika.prihvaceneJakoRijetkeRijeci,
-        dugeIRijetkeRijeci: statistika.dugeIRijetkeRijeci,
-        pogresniUnosi: statistika.pogresniUnosi,
-        dugeRijetkeRijeci: [...statistika.kvalificiraneDugeRijetkeRijeci],
-        razlicitiPoceci: [...statistika.razlicitiPoceci],
-        najduzaRijec: statistika.najduzaRijec,
-        najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
-        najrjedaRijec: statistika.najrjedaRijec,
-        najrjedaRijecFrekvencija: statistika.najrjedaRijecFrekvencija,
-        najrjedaTier: statistika.najrjedaTier,
-      }]),
+        zapisStatistikeZaStol(stanje, igracId, statistika),
+      ]),
     );
 
     const osnovniBrutoPoIgracu = new Map(
@@ -1557,7 +1568,7 @@ export function stvoriUpraviteljPartija(
       stanje,
       () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, rezultatiZaUpis, stanje.mod, statistike, false, new Map(
         [...stanje.napredakDostignuca].map(([igracId, delta]) => [igracId, { delta }]),
-      ), zavrsenoU, osnovniBrutoPoIgracu).then(async (agregati) => {
+      ), zavrsenoU, osnovniBrutoPoIgracu, kontekstMisijaZaStol(stanje)).then(async (agregati) => {
         await obavijestiPrvuIgruSudionicima(stanje, 'javna');
         const plasmaniSOcjenama = plasmani.map((p) => ({
           ...p,
@@ -2543,8 +2554,10 @@ export function stvoriUpraviteljPartija(
     // PR05: uspješan dokaz — jedan prihvat (+ XP riječi gore), zatim Bruno van / kredit, BEZ
     // KA-ZNA obrade kaladonta i BEZ mrtva-slova lanca na dokazanu riječ. Uvijek nova sistemska.
     // PR05→PR12/13: uspješan dokaz = jedan prihvat + jedna izazvana eliminacija.
+    // HINT PR12: brojač uspjesniDokazi ide OVDJE (prije zakljuciDokazUspjehom) — W22 max 1/igra.
     if (stanje.dokaz) {
       const cekateljId = stanje.dokaz.cekateljId;
+      statistikaPoteza.uspjesniDokazi += 1;
       emitirajPrihvacenPotezSvima(stanje, {
         igracId,
         rijec: rijecNormalizirana,
@@ -2700,6 +2713,12 @@ export function stvoriUpraviteljPartija(
     if (!zrtvaAktivna) {
       zapocniIzborRijeciSustava(stanje, sayerId);
       return;
+    }
+    // PR12 W23: stvarna žrtva + meta sljedeći + ≥3 aktivna prije poteza.
+    // HINT: pravilnik klasicni filtrira se u misijaOdgovaraKontekstu; brojač je činjenični.
+    if (ishod.vrstaMete === 'sljedeci' && brojAktivnihPrije >= 3) {
+      const statistika = stanje.statistikeRijeci.get(sayerId);
+      if (statistika) statistika.kaladontSljedeciUzTriPlus += 1;
     }
     // napadacId je već sayer (postavljen u obradiPrihvacenPotez) → bodZa = sayer
     primijeniPotvrdjenuEliminaciju(stanje, zrtvaAktivna, 'kaladont');

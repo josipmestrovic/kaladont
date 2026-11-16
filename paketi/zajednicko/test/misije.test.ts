@@ -10,15 +10,15 @@ import {
 } from '../src/misije.js';
 
 describe('katalog misija', () => {
-  it('ima točno 20 dnevnih i 20 tjednih aktivnih predložaka', () => {
-    expect(DEFINICIJE_MISIJA).toHaveLength(40);
-    expect(definicijeMisijaPoVrsti('dnevna')).toHaveLength(20);
-    expect(definicijeMisijaPoVrsti('tjedna')).toHaveLength(20);
+  it('ima točno 24 dnevnih i 24 tjednih aktivnih predložaka (PR12)', () => {
+    expect(DEFINICIJE_MISIJA).toHaveLength(48);
+    expect(definicijeMisijaPoVrsti('dnevna')).toHaveLength(24);
+    expect(definicijeMisijaPoVrsti('tjedna')).toHaveLength(24);
   });
 
   it('ima jedinstvene ID-ove i pozitivne ciljeve', () => {
     const idovi = DEFINICIJE_MISIJA.map((d) => d.predlozakId);
-    expect(new Set(idovi).size).toBe(40);
+    expect(new Set(idovi).size).toBe(48);
     for (const d of DEFINICIJE_MISIJA) {
       expect(d.cilj).toBeGreaterThan(0);
       expect(d.verzijaDefinicije).toBe(1);
@@ -48,6 +48,9 @@ describe('katalog misija', () => {
     expect(jeTopDvaCetverobojMisija('D08')).toBe(false);
     expect(jePristupacnaTjedna('W01')).toBe(true);
     expect(jePristupacnaTjedna('W09')).toBe(false);
+    // HINT PR12: W21–W24 nisu pristupačne.
+    expect(jePristupacnaTjedna('W22')).toBe(false);
+    expect(jePristupacnaTjedna('W23')).toBe(false);
   });
 
   it('ima pragove za W03/D20/W07 i podciljeve za D12/W20', () => {

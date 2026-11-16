@@ -351,7 +351,21 @@ export interface ZapisStatistikeRijeci {
   pogresniUnosi?: number;
   /** Oblici kvalificirani tijekom igre (dugi i bilo kojeg tiera rijetkosti), već normalizirani. */
   dugeRijetkeRijeci?: readonly string[];
+  /** PR12: uspješni dokazi ovog igrača u ovoj igri. */
+  uspjesniDokazi?: number;
+  /** PR12: kaladont → sljedeći uz ≥3 aktivna prije poteza. */
+  kaladontSljedeciUzTriPlus?: number;
 }
+
+/**
+ * PR12: pravilnik / spojeni Dvoboj / odabiri s kartica — ulaz u MetrikeMisijaIgre.
+ * HINT: brojači dokaza/kaladonta idu kroz ZapisStatistikeRijeci, ne ovdje (ne miješati s achievement deltom).
+ */
+export type KontekstMisijaZavrseneIgre = {
+  pravila: PravilnikPartije;
+  spojeniDvoboj: boolean;
+  odabranaPravilaPoIgracu: ReadonlyMap<string, PravilnikPartije>;
+};
 
 export interface ZapisNapretkaDostignuca {
   delta: DeltaNapretkaDostignuca;
@@ -435,6 +449,8 @@ export async function zakljuciPartijuUBazi(
   zavrsenoU: Date = new Date(),
   /** Osnovni bruto XP prije bonusa niza/ocjene (iz motora); za rangiranje pohvale. */
   osnovniBrutoPoIgracu: Map<string, number> = new Map(),
+  /** PR12: pravilnik + odabiri za filter misija (javne igre). */
+  kontekstMisija: KontekstMisijaZavrseneIgre | null = null,
 ): Promise<Map<string, AgregatZakljucka>> {
   const agregati = new Map<string, AgregatZakljucka>();
   const obavijestiPoIgracu = new Map<string, ObavijestOtkljucanogDostignuca[]>();
@@ -1317,8 +1333,12 @@ export async function zakljuciPartijuUBazi(
       }
 
       // Misije: nakon partijskog XP-a i pohvala, prije commita.
-      // MetrikeMisijaIgre još ne poznaje Troboj — preskoči do proširenja kataloga misija.
-      if (mod === 'dva_igraca' || mod === 'cetiri_igraca') {
+      // HINT PR12: ranije se Troboj (tri_igraca) namjerno preskakao dok katalog nije imao
+      // format/pravilnik filtre. Sada sva tri javna formata ulaze; trening/privatno i dalje
+      // ne (samoStatistika / drugi putovi). Generički mod=oba broji Troboj; D12/W20 ne.
+      if (mod === 'dva_igraca' || mod === 'tri_igraca' || mod === 'cetiri_igraca') {
+      const pravilaStola = kontekstMisija?.pravila ?? ZADANI_PRAVILNIK;
+      const spojeniDvoboj = kontekstMisija?.spojeniDvoboj ?? false;
       const igraciZaMisije = [...agregati.entries()]
         .filter(([, a]) => a.upravljac === 'covjek' && (a.vrstaIgraca === 'registriran' || a.vrstaIgraca === 'admin'))
         .sort(([a], [b]) => a.localeCompare(b));
@@ -1331,6 +1351,7 @@ export async function zakljuciPartijuUBazi(
           + (statistika?.upisaneSrednjeDugeRijeci ?? 0)
           + (statistika?.upisaneJakoDugeRijeci ?? 0);
         const delta = napredakDostignuca.get(igracId)?.delta;
+        const odabrana = kontekstMisija?.odabranaPravilaPoIgracu.get(igracId) ?? pravilaStola;
         const metrike: MetrikeMisijaIgre = {
           izvorId: partijaId,
           kontekst: 'javna',
@@ -1349,6 +1370,11 @@ export async function zakljuciPartijuUBazi(
           eliminacije: delta?.izazvaneEliminacije ?? 0,
           kaladontIzvedbe: delta?.kaladontIzvedbe ?? 0,
           razlicitiPoceci: statistika?.razlicitiPoceci ?? [],
+          pravila: pravilaStola,
+          odabranaPravila: odabrana,
+          spojeniDvoboj,
+          uspjesniDokazi: statistika?.uspjesniDokazi ?? 0,
+          kaladontSljedeciUzTriPlus: statistika?.kaladontSljedeciUzTriPlus ?? 0,
         };
         const [xpRed] = await tx.select({ iskustvoUkupno: igraci.iskustvoUkupno })
           .from(igraci).where(eq(igraci.id, igracId)).for('update');
