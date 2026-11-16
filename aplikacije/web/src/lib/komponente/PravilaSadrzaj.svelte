@@ -513,7 +513,7 @@
       </details>
       <details>
         <summary>Kada dobivam zvjezdicu za Top 10?</summary>
-        <p>Čim dosegneš mjesto od 1 do 10 na dnevnoj, tjednoj ili mjesečnoj ljestvici. Ne treba ostati do kraja razdoblja niti otvoriti ljestvice. Ako ispadneš, zvjezdica ostaje. Ponovni ulazak u istom danu, tjednu ili mjesecu ne donosi još jedan napredak. Top 10 u oba moda istog razdoblja broji se i za Na dvije fronte.</p>
+        <p>Čim dosegneš mjesto od 1 do 10 na dnevnoj, tjednoj ili mjesečnoj ljestvici. Ne treba ostati do kraja razdoblja niti otvoriti ljestvice. Ako ispadneš, zvjezdica ostaje. Ponovni ulazak u istom danu, tjednu ili mjesecu ne donosi još jedan napredak. Top 10 u bilo koja dva različita formata istog razdoblja broji se i za Na dvije fronte.</p>
       </details>
       <details>
         <summary>Zašto privatna soba ne daje XP?</summary>

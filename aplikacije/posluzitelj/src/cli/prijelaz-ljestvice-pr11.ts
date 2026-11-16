@@ -13,8 +13,9 @@
  *   3) ponovno --usporedi; drugi --primijeni=DA mora biti no-op
  *
  * HINT: samo OTVORENA razdoblja (dnevno/tjedno/mjesečno). Ne izmišljati ulaske
- * u zatvorenim periodima. Ne dira rang/DNK/XP. „Na dvije fronte” pairing ostaje
- * 4p↔2p do PR13; Troboj dokazi se ipak bilježe.
+ * u zatvorenim periodima. Ne dira rang/DNK/XP.
+ * HINT PR13: „Na dvije fronte” pairing je bilo koja dva formata; obradiNeobradeneTop10Dokaze
+ * na kraju i preispituje već obrađene Troboj parove (preispitajParoveNaDvijeFronte).
  */
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { kalendarskeGranice, type MetrikaLjestvice, type ModPartije } from 'zajednicko';

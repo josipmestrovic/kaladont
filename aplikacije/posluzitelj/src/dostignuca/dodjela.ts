@@ -14,14 +14,18 @@ import {
   dokaziDostignucaCinkaros,
   dokaziDostignucaCistaPetica,
   dokaziDostignucaDvostrukaKruna,
+  dokaziDostignucaImamNastavak,
   dokaziDostignucaJezicniDetektiv,
   dokaziDostignucaMisija,
   dokaziDostignucaPrivatnik,
   dokaziDostignucaNaDvijeFronte,
   dokaziDostignucaRijetkaGrdosija,
+  dokaziDostignucaSaljiDalje,
+  dokaziDostignucaStaraSkola,
   dokaziDostignucaSvePohvale,
   dokaziDostignucaTjedniPaket,
   dokaziDostignucaTop10,
+  dokaziDostignucaTrecaSreca,
   napredakDostignucaIgraca,
   obavijestiIgraca,
 } from '../baza/shema.js';
@@ -49,7 +53,12 @@ type DokazDodjele =
   | { vrsta: 'top10_razdoblje'; kalendarskiPocetak: Date }
   | { vrsta: 'na_dvije_fronte'; vrstaRazdoblja: 'dnevno' | 'tjedno' | 'mjesecno'; kalendarskiPocetak: Date }
   | { vrsta: 'jezicni_detektiv'; normaliziranaRijec: string }
-  | { vrsta: 'cinkaros'; prijavljeniIgracId: string };
+  | { vrsta: 'cinkaros'; prijavljeniIgracId: string }
+  /** PR13 */
+  | { vrsta: 'treca_sreca'; partijaId: string }
+  | { vrsta: 'imam_nastavak'; partijaId: string }
+  | { vrsta: 'salji_dalje'; partijaId: string; redniBroj: number }
+  | { vrsta: 'stara_skola'; partijaId: string };
 
 const STUPCI_SERVISNIH_BROJACA = {
   dovrseneMisije: napredakDostignucaIgraca.dovrseneMisije,
@@ -65,6 +74,10 @@ const STUPCI_SERVISNIH_BROJACA = {
   naDvijeFronte: napredakDostignucaIgraca.naDvijeFronte,
   jezicniDetektivi: napredakDostignucaIgraca.jezicniDetektivi,
   cinkarosi: napredakDostignucaIgraca.cinkarosi,
+  trobojPobjede: napredakDostignucaIgraca.trobojPobjede,
+  igreSDokazom: napredakDostignucaIgraca.igreSDokazom,
+  kaladontSljedeci: napredakDostignucaIgraca.kaladontSljedeci,
+  staraSkolaPobjede: napredakDostignucaIgraca.staraSkolaPobjede,
 } as const;
 
 type ServisniBrojac = keyof typeof STUPCI_SERVISNIH_BROJACA;
@@ -139,6 +152,28 @@ async function umetniDokaz(tx: MisijeTx, parametri: ParametriDodjele) {
       igracId,
       prijavljeniIgracId: dokaz.prijavljeniIgracId,
     }).onConflictDoNothing().returning({ igracId: dokaziDostignucaCinkaros.igracId });
+  }
+  if (dokaz.vrsta === 'treca_sreca') {
+    return tx.insert(dokaziDostignucaTrecaSreca).values({ igracId, partijaId: dokaz.partijaId })
+      .onConflictDoNothing()
+      .returning({ igracId: dokaziDostignucaTrecaSreca.igracId });
+  }
+  if (dokaz.vrsta === 'imam_nastavak') {
+    return tx.insert(dokaziDostignucaImamNastavak).values({ igracId, partijaId: dokaz.partijaId })
+      .onConflictDoNothing()
+      .returning({ igracId: dokaziDostignucaImamNastavak.igracId });
+  }
+  if (dokaz.vrsta === 'salji_dalje') {
+    return tx.insert(dokaziDostignucaSaljiDalje).values({
+      igracId,
+      partijaId: dokaz.partijaId,
+      redniBroj: dokaz.redniBroj,
+    }).onConflictDoNothing().returning({ igracId: dokaziDostignucaSaljiDalje.igracId });
+  }
+  if (dokaz.vrsta === 'stara_skola') {
+    return tx.insert(dokaziDostignucaStaraSkola).values({ igracId, partijaId: dokaz.partijaId })
+      .onConflictDoNothing()
+      .returning({ igracId: dokaziDostignucaStaraSkola.igracId });
   }
   return tx.insert(dokaziDostignucaNaDvijeFronte).values({
     igracId,

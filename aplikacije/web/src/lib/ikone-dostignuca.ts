@@ -26,6 +26,8 @@ export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
   na_dvije_fronte: '/ikone/78-na-dvije-fronte.webp',
   jezicni_detektiv: '/ikone/79-jezicni-detektiv.webp',
   cinkaros: '/ikone/80-cinkaros.webp',
+  // HINT PR13: treca_sreca / imam_nastavak / salji_dalje / stara_skola namjerno
+  // nisu mapirani — ikonaDostignuca pada na /ikone/06-trofej.png dok vlasnik ne dostavi asset.
 };
 
 export function ikonaDostignuca(id: string): string {

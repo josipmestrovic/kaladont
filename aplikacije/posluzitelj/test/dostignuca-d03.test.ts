@@ -264,7 +264,7 @@ describe('dostignuća D03 Top 10', () => {
     expect((await brojac(igracId)).tjedneElite).toBe(0);
   });
 
-  it('PR11: Troboj Top10 dokaz; ponovljeni snimak ne duplicira; Na dvije fronte ostaje 4p↔2p', async () => {
+  it('PR13: Troboj Top10 dokaz; ponovljeni snimak ne duplicira; Troboj+Četveroboj daje Na dvije fronte', async () => {
     const igracId = await noviIgrac('TrobojTop');
     await igre(igracId, 5, 4, 'tri_igraca', DAN, 1);
     await snimi('tri_igraca', DAN);
@@ -274,11 +274,11 @@ describe('dostignuća D03 Top 10', () => {
     await snimi('tri_igraca', DAN);
     expect(await brojUlazaka(igracId, 'tri_igraca')).toBe(1);
     expect((await brojac(igracId)).dnevneDesetke).toBe(1);
-    // Bugbot: Troboj+Četveroboj ne smije lažno otključati par (stari non-4p→4p izraz).
+    // HINT PR13: bilo koja dva formata — Troboj+Četveroboj sada daje par.
     await igre(igracId, 5, 4, 'cetiri_igraca', DAN, 1);
     await snimi('cetiri_igraca', DAN);
     expect(await brojUlazaka(igracId, 'cetiri_igraca')).toBe(1);
-    expect((await brojac(igracId)).naDvijeFronte).toBe(0);
+    expect((await brojac(igracId)).naDvijeFronte).toBe(1);
   });
 
   it('oba moda istog dana daju Na dvije fronte jednom, a 20 igara diže tri razdoblja u jednu obavijest', async () => {

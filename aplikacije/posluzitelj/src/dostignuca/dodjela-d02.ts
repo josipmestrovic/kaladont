@@ -5,6 +5,7 @@ import {
   ID_DOSTIGNUCA_RIJETKA_GRDOSIJA,
   ID_DOSTIGNUCA_SVE_POHVALE,
   lokalniDatumIso,
+  type ModPartije,
 } from 'zajednicko';
 import { evidencijaDnevnihPobjedaModova, igraci } from '../baza/shema.js';
 import type { MisijeTx } from '../misije/tipovi.js';
@@ -15,12 +16,13 @@ function prazanIshod(): IshodDodjele {
 }
 
 /**
- * Zabilježi javnu pobjedu moda na zagrebački datum. Brojač raste jednom po danu
- * tek kad su za taj datum prisutna oba moda. Dodatne pobjede istog dana ne dodaju doprinos.
+ * Zabilježi javnu pobjedu moda na zagrebački datum.
+ * HINT PR13: brojač raste jednom po danu kad su prisutna ≥2 različita formata (2/3/4).
+ * Treći format istog dana ne daje drugi doprinos (dokaz PK = igrac + datum).
  */
 export async function priznajDnevnuPobjeduModa(
   tx: MisijeTx,
-  ulaz: { igracId: string; mod: 'dva_igraca' | 'cetiri_igraca'; zavrsenoU: Date },
+  ulaz: { igracId: string; mod: ModPartije; zavrsenoU: Date },
 ): Promise<IshodDodjele> {
   const lokalniDatum = lokalniDatumIso(ulaz.zavrsenoU);
   await tx.select({ id: igraci.id }).from(igraci).where(eq(igraci.id, ulaz.igracId)).for('update');
@@ -35,7 +37,7 @@ export async function priznajDnevnuPobjeduModa(
     eq(evidencijaDnevnihPobjedaModova.lokalniDatum, lokalniDatum),
   ));
   const prisutni = new Set(modovi.map((red) => red.mod));
-  if (!prisutni.has('dva_igraca') || !prisutni.has('cetiri_igraca')) return prazanIshod();
+  if (prisutni.size < 2) return prazanIshod();
 
   return dodijeliDoprinos(tx, {
     igracId: ulaz.igracId,

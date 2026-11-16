@@ -17,10 +17,10 @@
  *    Prolazni ulazak ostaje zapisan iako sljedeća promjena igrača više ne vidi u Top 10.
  * 3. Nakon commita obrada nagrada uzima pg_advisory_xact_lock po igraču (klasa 872005) i
  *    tek onda FOR UPDATE na njegovim dokazima. Ne uzima lock moda, pa formati ne mogu
- *    deadlockati preko tuđih dostignuća. Par „Na dvije fronte” (PR11 još samo 4p↔2p; PR13
- *    širi na bilo koja dva formata) vidi se pod tim igračevim lockom.
+ *    deadlockati preko tuđih dostignuća. Par „Na dvije fronte” (PR13: bilo koja dva
+ *    formata 2/3/4) vidi se pod tim igračevim lockom.
  */
-import { and, asc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import {
   ID_DOSTIGNUCA_DNEVNA_DESETKA,
   ID_DOSTIGNUCA_MJESECNA_ELITA,
@@ -32,7 +32,7 @@ import {
   type ObavijestOtkljucanogDostignuca,
 } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
-import { dokaziTop10Ulazaka, igraci } from '../baza/shema.js';
+import { dokaziDostignucaNaDvijeFronte, dokaziTop10Ulazaka, igraci } from '../baza/shema.js';
 import { konfiguracija } from '../konfiguracija.js';
 import { izracunajPoredak, obuhvatiRazdoblja, type IzvrsiteljPoretka } from '../ljestvice/servis.js';
 import type { MisijeTx } from '../misije/tipovi.js';
@@ -215,15 +215,12 @@ async function obradiIgraca(
       });
       obavijesti.push(...pojedinacno.noveObavijesti);
 
-      // PR11: „Na dvije fronte” ostaje strogo 4p↔2p. Troboj dokaz ne smije ulaziti u stari
-      // ternarni izraz (non-4p → 4p) jer bi Troboj+Četveroboj lažno otključao par. PR13 širi.
-      if (dokaz.mod !== 'cetiri_igraca' && dokaz.mod !== 'dva_igraca') continue;
-      const drugiMod: ModPartije = dokaz.mod === 'cetiri_igraca' ? 'dva_igraca' : 'cetiri_igraca';
+      // HINT PR13: bilo koji drugi format (2/3/4) za isto razdoblje → Na dvije fronte.
       const [drugi] = await tx.select({ igracId: dokaziTop10Ulazaka.igracId }).from(dokaziTop10Ulazaka).where(and(
         eq(dokaziTop10Ulazaka.igracId, igracId),
         eq(dokaziTop10Ulazaka.vrstaRazdoblja, dokaz.vrstaRazdoblja),
         eq(dokaziTop10Ulazaka.kalendarskiPocetak, dokaz.kalendarskiPocetak),
-        eq(dokaziTop10Ulazaka.mod, drugiMod),
+        ne(dokaziTop10Ulazaka.mod, dokaz.mod),
       )).limit(1);
       if (!drugi) continue;
 
@@ -279,9 +276,114 @@ async function igraciSNeobradenim(partijaId: string | null, limit: number): Prom
   return redovi.map((red) => red.igracId);
 }
 
+/**
+ * HINT PR13: preispitaj parove iz već obrađenih Top10 dokaza.
+ * Ne dira pojedinačne Top10 zvijezde — samo dodaje Na dvije fronte gdje ≥2 formata
+ * već imaju dokaz, a pairing dokaz još ne postoji (npr. Troboj+4p iz PR11 ere).
+ */
+export async function preispitajParoveNaDvijeFronte(
+  opcije: { limit?: number; igracId?: string } = {},
+): Promise<Map<string, ObavijestOtkljucanogDostignuca[]>> {
+  const limit = opcije.limit ?? 200;
+  const uvjeti: SQL[] = [];
+  if (opcije.igracId) uvjeti.push(eq(dokaziTop10Ulazaka.igracId, opcije.igracId));
+
+  // Učitaj Top10 dokaze (opcionalno filtrirane po igraču) i agregiraj u memoriji.
+  // HINT: bez igracId filtera ograniči na nedavne da ne učitamo cijelu povijest u jednom prolazu.
+  const upit = baza
+    .select({
+      igracId: dokaziTop10Ulazaka.igracId,
+      vrstaRazdoblja: dokaziTop10Ulazaka.vrstaRazdoblja,
+      kalendarskiPocetak: dokaziTop10Ulazaka.kalendarskiPocetak,
+      mod: dokaziTop10Ulazaka.mod,
+      opazenoU: dokaziTop10Ulazaka.opazenoU,
+    })
+    .from(dokaziTop10Ulazaka)
+    .orderBy(asc(dokaziTop10Ulazaka.igracId))
+    .limit(opcije.igracId ? 1000 : Math.max(limit * 10, 500));
+  const redovi = uvjeti.length > 0
+    ? await upit.where(and(...uvjeti))
+    : await upit;
+
+  type KljucPara = string;
+  const poKljucu = new Map<KljucPara, {
+    igracId: string;
+    vrstaRazdoblja: string;
+    kalendarskiPocetak: Date;
+    opazenoU: Date;
+    modovi: Set<string>;
+  }>();
+
+  for (const red of redovi) {
+    const kljuc = `${red.igracId}|${red.vrstaRazdoblja}|${red.kalendarskiPocetak.toISOString()}`;
+    const postojeci = poKljucu.get(kljuc);
+    if (postojeci) {
+      postojeci.modovi.add(red.mod);
+      if (red.opazenoU > postojeci.opazenoU) postojeci.opazenoU = red.opazenoU;
+    } else {
+      poKljucu.set(kljuc, {
+        igracId: red.igracId,
+        vrstaRazdoblja: red.vrstaRazdoblja,
+        kalendarskiPocetak: red.kalendarskiPocetak,
+        opazenoU: red.opazenoU,
+        modovi: new Set([red.mod]),
+      });
+    }
+  }
+
+  const kandidati = [...poKljucu.values()]
+    .filter((k) => k.modovi.size >= 2)
+    .slice(0, limit);
+
+  const poIgracu = new Map<string, ObavijestOtkljucanogDostignuca[]>();
+  for (const red of kandidati) {
+    const vrsta = red.vrstaRazdoblja as VrstaTop10;
+    if (!DOSTIGNUCE_PO_VRSTI[vrsta]) continue;
+    try {
+      const obavijesti = await baza.transaction(async (tx) => {
+        await zakljucajIgraca(tx, red.igracId);
+        const [vec] = await tx.select({ igracId: dokaziDostignucaNaDvijeFronte.igracId })
+          .from(dokaziDostignucaNaDvijeFronte)
+          .where(and(
+            eq(dokaziDostignucaNaDvijeFronte.igracId, red.igracId),
+            eq(dokaziDostignucaNaDvijeFronte.vrstaRazdoblja, red.vrstaRazdoblja),
+            eq(dokaziDostignucaNaDvijeFronte.kalendarskiPocetak, red.kalendarskiPocetak),
+          ))
+          .limit(1);
+        if (vec) return [] as ObavijestOtkljucanogDostignuca[];
+
+        const ishod = await dodijeliDoprinos(tx, {
+          igracId: red.igracId,
+          dostignuceId: ID_DOSTIGNUCA_NA_DVIJE_FRONTE,
+          dokaz: {
+            vrsta: 'na_dvije_fronte',
+            vrstaRazdoblja: vrsta,
+            kalendarskiPocetak: red.kalendarskiPocetak,
+          },
+          zavrsenoU: red.opazenoU,
+          izvor: 'top10_prijelaz_pr13',
+          kontekst: {
+            vrstaRazdoblja: vrsta,
+            kalendarskiPocetak: red.kalendarskiPocetak.toISOString(),
+            prijelaz: true,
+          },
+        });
+        return ishod.noveObavijesti;
+      });
+      if (obavijesti.length > 0) {
+        const postojece = poIgracu.get(red.igracId) ?? [];
+        poIgracu.set(red.igracId, [...postojece, ...obavijesti]);
+      }
+    } catch (greska) {
+      console.error('PR13 preispitivanje Na dvije fronte nije uspjelo:', red.igracId, greska);
+    }
+  }
+  return poIgracu;
+}
+
 /** Obrađuje već spremljene dokaze. Prazan partijaId uzima cijeli neobrađeni red, ograničeno. */
 export async function obradiNeobradeneTop10Dokaze(
-  opcije: { partijaId?: string | null; limit?: number } = {},
+  opcije: { partijaId?: string | null; limit?: number; preispitajParove?: boolean } = {},
 ): Promise<Map<string, ObavijestOtkljucanogDostignuca[]>> {
   const partijaId = opcije.partijaId ?? null;
   const igraciNaRedu = await igraciSNeobradenim(partijaId, opcije.limit ?? 100);
@@ -292,6 +394,16 @@ export async function obradiNeobradeneTop10Dokaze(
       if (obavijesti.length > 0) poIgracu.set(igracId, obavijesti);
     } catch (greska) {
       console.error('Obrada Top 10 dokaza nije uspjela:', igracId, greska);
+    }
+  }
+
+  // HINT PR13: nakon redovne obrade, jednokratno pokrij već obrađene Troboj parove.
+  // Za partija-scoped pozive (živi završetak) preskoči — pairing već vidi sve formate.
+  if (opcije.preispitajParove !== false && partijaId == null) {
+    const prijelaz = await preispitajParoveNaDvijeFronte({ limit: opcije.limit ?? 200 });
+    for (const [igracId, obavijesti] of prijelaz) {
+      const postojece = poIgracu.get(igracId) ?? [];
+      poIgracu.set(igracId, [...postojece, ...obavijesti]);
     }
   }
   return poIgracu;
