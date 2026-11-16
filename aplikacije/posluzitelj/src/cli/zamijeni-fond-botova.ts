@@ -18,8 +18,8 @@ async function glavno(): Promise<void> {
     console.log('Samo pregled. Za primjenu: --primijeni=DA --posluzitelj-zaustavljen=DA (u produkciji i --odrzavanje-produkcije=DA).');
     return;
   }
-  if (konfiguracija.BOTOVI_DVOBOJ === 'true' || konfiguracija.BOTOVI_CETVEROBOJ === 'true') {
-    throw new Error('Prije zamjene isključi BOTOVI_DVOBOJ i BOTOVI_CETVEROBOJ te zaustavi poslužitelj.');
+  if (konfiguracija.BOTOVI_DVOBOJ === 'true' || konfiguracija.BOTOVI_TROBOJ === 'true' || konfiguracija.BOTOVI_CETVEROBOJ === 'true') {
+    throw new Error('Prije zamjene isključi BOTOVI_DVOBOJ, BOTOVI_TROBOJ i BOTOVI_CETVEROBOJ te zaustavi poslužitelj.');
   }
   if (konfiguracija.TRENING_OMOGUCEN === 'true' || !process.argv.includes('--posluzitelj-zaustavljen=DA')) {
     throw new Error('Prije zamjene isključi TRENING_OMOGUCEN, ugasi poslužitelj i potvrdi --posluzitelj-zaustavljen=DA.');

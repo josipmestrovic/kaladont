@@ -92,8 +92,8 @@ async function validirajPutanjuSnimke(putanja: string): Promise<string> {
 
 function provjeriPreduvjete(health: HealthSnapshot): void {
   if (!imaMetrikeBotova(health) || health.fondIscrpljenja === null) throw new Error(PORUKA_BEZ_METRIKA_BOTOVA);
-  if (health.botoviDvoboj !== true || health.botoviCetveroboj !== true) {
-    throw new Error('Popuna botovima nije uključena (BOTOVI_DVOBOJ/BOTOVI_CETVEROBOJ); uključi je za termin i ponovno pokreni poslužitelj.');
+  if (health.botoviDvoboj !== true || health.botoviTroboj !== true || health.botoviCetveroboj !== true) {
+    throw new Error('Popuna botovima nije uključena (BOTOVI_DVOBOJ/BOTOVI_TROBOJ/BOTOVI_CETVEROBOJ); uključi je za termin i ponovno pokreni poslužitelj.');
   }
   const potrebno = OCEKIVANI_BOTOVI_POPUNE.dva_igraca + OCEKIVANI_BOTOVI_POPUNE.cetiri_igraca;
   if ((health.fondSlobodni ?? 0) < potrebno) {

@@ -101,6 +101,12 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   // HINT PR14: stabilan aria-label „Igraj”; naslov koraka je u h2.
   const dijalog = page.getByRole('dialog', { name: 'Igraj' });
   await expect(dijalog.getByRole('heading', { name: 'Kako želiš igrati?' })).toBeVisible();
+  const podloga = page.locator('.modal-podloga');
+  await expect(podloga).toHaveCSS('position', 'fixed');
+  const okvir = await podloga.boundingBox();
+  expect(okvir).toBeTruthy();
+  expect(okvir!.width).toBeGreaterThanOrEqual(page.viewportSize()!.width - 2);
+  expect(okvir!.height).toBeGreaterThanOrEqual(page.viewportSize()!.height - 2);
   await expect(dijalog.getByRole('button', { name: /Klasični Kaladont/ })).toBeVisible();
   await expect(dijalog.getByRole('button', { name: /KA-ZNA/ })).toBeVisible();
   await expect(dijalog.getByRole('button', { name: /Dokaži nastavak/ })).toBeVisible();
@@ -125,12 +131,14 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
 });
 
-test('PR15: /novosti je javna stranica izdanja 0.2.0', async ({ page, request }) => {
+test('PR15: /novosti je javna stranica izdanja 0.2.0 i 0.1.0', async ({ page, request }) => {
   const odgovor = await request.get('/novosti');
   expect(odgovor.status()).toBe(200);
   const html = await odgovor.text();
   expect(html).toContain('Kaladont 0.2.0');
   expect(html).toContain('id="v0-2-0"');
+  expect(html).toContain('Kaladont 0.1.0');
+  expect(html).toContain('id="v0-1-0"');
   expect(html).not.toContain('redirect');
 
   const mapa = await request.get('/sitemap.xml');
@@ -144,7 +152,14 @@ test('PR15: /novosti je javna stranica izdanja 0.2.0', async ({ page, request })
   await expect(page.locator('#v0-2-0')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Kaladont 0.2.0' })).toBeVisible();
   await expect(page.getByText('17. 11. 2026.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'O igri' })).toHaveAttribute('href', '/o-igri');
+  await expect(page.locator('#v0-2-0 ul.stavke li').first()).toBeVisible();
+  await expect(page.locator('#v0-1-0')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Kaladont 0.1.0' })).toBeVisible();
+  await expect(page.getByText('1. 10. 2026.')).toBeVisible();
+  await expect(page.locator('#v0-1-0 ul.stavke li').first()).toContainText('Klasični Kaladont');
+  const redoslijed = await page.locator('article.objava').evaluateAll((el) => el.map((e) => e.id));
+  expect(redoslijed).toEqual(['v0-2-0', 'v0-1-0']);
+  await expect(page.getByRole('link', { name: 'O igri' }).first()).toHaveAttribute('href', '/o-igri');
 });
 
 test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ page }) => {
