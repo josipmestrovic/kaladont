@@ -18,6 +18,7 @@
   interface Arhiva {
     partijaId: string;
     mod: import('zajednicko').ModPartije;
+    pravila?: import('zajednicko').PravilnikPartije;
     pocetak: string;
     kraj: string;
     plasmani: Plasman[];
@@ -31,6 +32,29 @@
 
   function formatirajDatum(datum: string): string {
     return new Date(datum).toLocaleString('hr-HR', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  /** PR14: ljudski razlog ispadanja za arhivu. */
+  function tekstIspadanja(nacin: string | null): string {
+    if (!nacin || nacin === 'pobjednik') return '';
+    const mapa: Record<string, string> = {
+      kaladont: 'Kaladont',
+      istek: 'Istek vremena',
+      mrtva_slova: 'Mrtva slova',
+      mrtva_slova_baza: 'Nema nastavka',
+      mrtva_slova_iskoristeno: 'Sve iskorišteno',
+      prekid: 'Izgubljena veza',
+      ne_znam: 'Ne znam',
+      dokaz_neuspjeh: 'Neuspješan dokaz',
+      dokaz_uspjeh: 'Dokazan nastavak (žrtva)',
+    };
+    return mapa[nacin] ?? nacin;
+  }
+
+  function nazivPravilnikaArhive(pravila: string | undefined): string {
+    if (pravila === 'klasicni') return 'Klasični Kaladont';
+    if (pravila === 'dokazi_nastavak') return 'Dokaži nastavak';
+    return 'KA-ZNA';
   }
 
   async function posaljiPrijavu() {
@@ -77,7 +101,11 @@
     <header>
       <p class="oznaka-stanja">Odigrana stara igra</p>
       <h1>Završni poredak</h1>
-      <p>{arhiva.mod === 'dva_igraca' ? 'Dvoboj' : arhiva.mod === 'tri_igraca' ? 'Troboj' : 'Četveroboj'} · {formatirajDatum(arhiva.kraj)}</p>
+      <p>
+        {arhiva.mod === 'dva_igraca' ? 'Dvoboj' : arhiva.mod === 'tri_igraca' ? 'Troboj' : 'Četveroboj'}
+        · {nazivPravilnikaArhive(arhiva.pravila)}
+        · {formatirajDatum(arhiva.kraj)}
+      </p>
     </header>
 
     <section class="plasmani" aria-label="Završni poredak">
@@ -96,6 +124,9 @@
               <small>Gost</small>
             {/if}
             <small>{igrac.bodovi} bodova · {igrac.eliminacije} eliminacija</small>
+            {#if tekstIspadanja(igrac.nacinIspadanja)}
+              <small class="razlog-ispadanja">Ispadanje: {tekstIspadanja(igrac.nacinIspadanja)}</small>
+            {/if}
           </div>
           {#if !igrac.jeBot}
             <button type="button" class="prijavi-gumb" title="Prijavi igrača" aria-label={`Prijavi igrača ${igrac.nadimak}`} onclick={() => { prijavljeniIgrac = igrac; porukaPrijave = null; }}>

@@ -3,8 +3,10 @@ import { expect, test } from '@playwright/test';
 test('gost pokreće Zagrijavanje, odustaje i vidi kraj treninga bez napretka', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Igraj' }).click();
+  // PR14: prvo pravilnik, zatim Zagrijavanje.
+  await page.getByRole('button', { name: /KA-ZNA/ }).click();
   await page.getByRole('link', { name: /Zagrijavanje/ }).click();
-  await expect(page).toHaveURL(/\/zagrijavanje$/);
+  await expect(page).toHaveURL(/\/zagrijavanje\?pravila=ka_zna$/);
 
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });
   const sjedala = page.locator('.igraci-red > li');

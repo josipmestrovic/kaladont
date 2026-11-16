@@ -19,9 +19,17 @@ export async function stvoriIgrace(browser: Browser, broj: number): Promise<E2EI
   return dodajIgrace(browser, broj);
 }
 
-export async function udjiUJavniRed(igraci: readonly E2EIgrac[], mod: 'dva_igraca' | 'cetiri_igraca') {
+/** PR14: podržava Troboj i optional `pravila` (default KA-ZNA na serveru ako izostane). */
+export async function udjiUJavniRed(
+  igraci: readonly E2EIgrac[],
+  mod: 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca',
+  pravila?: 'klasicni' | 'ka_zna' | 'dokazi_nastavak',
+) {
+  const query = pravila
+    ? `/red?mod=${mod}&pravila=${pravila}`
+    : `/red?mod=${mod}`;
   await Promise.all(igraci.map(async (igrac) => {
-    await igrac.stranica.goto(`/red?mod=${mod}`);
+    await igrac.stranica.goto(query);
   }));
 }
 

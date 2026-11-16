@@ -1,6 +1,12 @@
 <script lang="ts">
   import type { MisijaDto } from 'zajednicko';
+  import { definicijaMisije } from 'zajednicko';
   import { Check, Play, RefreshCw } from 'lucide-svelte';
+  import {
+    putanjaJavnogReda,
+    putanjaZagrijavanja,
+    parsajPravilnikIzQuery,
+  } from '$lib/igraj-rute.js';
 
   let {
     misija,
@@ -35,11 +41,13 @@
   }
 
   function putanjaIgre(m: MisijaDto): string {
-    if (m.kontekst === 'trening') return '/zagrijavanje';
-    // HINT PR12: Play na Troboj misiji vodi u /red?mod=tri_igraca (kao D07→četiri, D09→dva).
-    if (m.mod === 'dva_igraca') return '/red?mod=dva_igraca';
-    if (m.mod === 'tri_igraca') return '/red?mod=tri_igraca';
-    if (m.mod === 'cetiri_igraca') return '/red?mod=cetiri_igraca';
+    // HINT PR14: proslijedi pravilnik iz definicije kad postoji (D22–D24 / W22–W24).
+    const definicija = definicijaMisije(m.predlozakId);
+    const pravila = parsajPravilnikIzQuery(definicija?.pravilnik ?? null);
+    if (m.kontekst === 'trening') return putanjaZagrijavanja(pravila);
+    if (m.mod === 'dva_igraca' || m.mod === 'tri_igraca' || m.mod === 'cetiri_igraca') {
+      return putanjaJavnogReda(m.mod, pravila);
+    }
     return '/?igraj=1';
   }
 

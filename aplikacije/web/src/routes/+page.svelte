@@ -8,6 +8,7 @@
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import Kaladont2d5d from '$lib/komponente/Kaladont2d5d.svelte';
   import KontrolePristupacnosti from '$lib/komponente/KontrolePristupacnosti.svelte';
+  import ModalIgraj from '$lib/komponente/ModalIgraj.svelte';
   import PopupNovihMisija from '$lib/komponente/PopupNovihMisija.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
@@ -16,20 +17,15 @@
     naslovnicaJsonLd,
   } from '$lib/seo.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
-  import { X } from 'lucide-svelte';
 
   const registriran = jeRegistriranKorisnik();
-  let otvoreniModal = $state<'igra' | null>(null);
+  let otvoreniModal = $state(false);
 
-  function otvoriModal(vrsta: 'igra') {
-    otvoreniModal = vrsta;
+  function otvoriModal() {
+    otvoreniModal = true;
     zabiljeziUmamiDogadjaj('igraj-klik');
     ucitajModalIgraAsete();
     zagrijGameplayZvukove();
-  }
-
-  function zatvoriNaEscape(dogadaj: KeyboardEvent) {
-    if (dogadaj.key === 'Escape') otvoreniModal = null;
   }
 
   async function odjaviSe() {
@@ -43,11 +39,10 @@
   }
 
   onMount(() => {
-    if ($page.url.searchParams.get('igraj') === '1') otvoriModal('igra');
+    // HINT PR14: ?igraj=1 otvara korak 1 (pravilnici), ne format.
+    if ($page.url.searchParams.get('igraj') === '1') otvoriModal();
   });
 </script>
-
-<svelte:window onkeydown={zatvoriNaEscape} />
 
 <SeoGlava
   title={NASLOVNICA_SEO_TITLE}
@@ -75,7 +70,7 @@
     <div class="desktop-navigacija-red">
       <Kaladont2d5d />
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
-      <button type="button" class="navigacijska-stavka primarna" onclick={() => otvoriModal('igra')}>
+      <button type="button" class="navigacijska-stavka primarna" onclick={() => otvoriModal()}>
         <img class="ikona-sucelja" src={urlAseta('/ikone/07-igraj.png')} alt="" aria-hidden="true" width="58" height="58" />
         <span>Igraj</span>
       </button>
@@ -137,41 +132,7 @@
   <PopupNovihMisija />
 {/if}
 
-  {#if otvoreniModal}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-podloga" role="presentation" onclick={() => (otvoreniModal = null)}>
-    <div
-      class="modal-sadrzaj"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-naslov"
-      tabindex="-1"
-      onclick={(dogadaj) => dogadaj.stopPropagation()}
-      onkeydown={(dogadaj) => dogadaj.stopPropagation()}
-    >
-      <button type="button" class="zatvori-modal" aria-label="Zatvori" onclick={() => (otvoreniModal = null)}>
-        <X size={22} aria-hidden="true" />
-      </button>
-
-      <p class="modal-nadnaslov">Odaberi stol</p>
-      <h2 id="modal-naslov">Kako želiš igrati?</h2>
-      <div class="modal-opcije">
-        <a href="/red?mod=dva_igraca" class="modal-opcija">
-          <img src="/ikone/17-soba-2-igraca.png" alt="" aria-hidden="true" /><span><strong>Dvoboj</strong><small>2 igrača</small></span>
-        </a>
-        <a href="/red?mod=cetiri_igraca" class="modal-opcija">
-          <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" /><span><strong>Četveroboj</strong><small>4 igrača</small></span>
-        </a>
-        <a href="/zagrijavanje" class="modal-opcija">
-          <img src="/ikone/67-zagrijavanje-bot.webp" alt="" aria-hidden="true" /><span><strong>Zagrijavanje</strong><small>Igraj dvoboj protiv računala.</small></span>
-        </a>
-        <a href="/soba/kreiraj" class="modal-opcija">
-          <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" /><span><strong>Privatna soba</strong><small>Prilagodi pravila i pozovi svoju ekipu.</small></span>
-        </a>
-      </div>
-    </div>
-  </div>
-{/if}
+<ModalIgraj otvoren={otvoreniModal} onZatvori={() => (otvoreniModal = false)} />
 
 <style>
   /* Fiksni font navigacije (20 mobitel / 24 desktop); vertikalni scroll na naslovnici je dopušten. */
@@ -613,83 +574,6 @@
     :global(html[data-font-disleksiju]) .landing-footer a {
       padding-block: 1px;
     }
-  }
-
-  .modal-podloga {
-    position: fixed;
-    z-index: 160;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 16px;
-    background: var(--boja-zastor);
-    backdrop-filter: blur(8px);
-  }
-
-  .modal-sadrzaj {
-    position: relative;
-    max-width: 480px;
-    width: 100%;
-    padding: 30px;
-    border: 1px solid var(--boja-obrub-jaci);
-    border-radius: 12px;
-    background: var(--boja-povrsina);
-    box-shadow: var(--sjena-modal);
-    text-align: center;
-  }
-
-  .zatvori-modal {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 38px;
-    height: 38px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--boja-tekst-sekundarni);
-    cursor: pointer;
-  }
-
-  .zatvori-modal:hover { background: var(--boja-obrub); color: var(--boja-tekst-osnovni); }
-
-  .modal-nadnaslov {
-    margin: 0 0 4px;
-    color: var(--boja-akcent-tekst);
-    font-size: var(--tekst-sitni);
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .modal-sadrzaj h2 { margin: 0 36px 22px; font-size: 31px; line-height: 1.1; }
-  .modal-opcije { display: grid; gap: 10px; }
-
-  .modal-opcija {
-    display: grid;
-    grid-template-columns: 56px 1fr;
-    align-items: center;
-    gap: 13px;
-    padding: 14px 16px;
-    border: 1px solid var(--boja-plocica-obrub);
-    border-radius: 8px;
-    background: var(--boja-plocica);
-    color: var(--boja-plocica-tekst);
-    text-align: left;
-    text-decoration: none;
-  }
-
-  .modal-opcija:hover { border-color: var(--boja-mint); }
-  .modal-opcija > img { width: 56px; height: 56px; object-fit: contain; }
-  .modal-opcija span { display: grid; gap: 2px; }
-  .modal-opcija strong { color: var(--boja-mint-tamni); font-family: var(--font-naslov); font-size: 19px; }
-  .modal-opcija small { color: #5c554a; font-size: var(--tekst-sitni); line-height: 1.35; }
-
-  @media (max-width: 999px) {
-    .modal-sadrzaj { padding: 26px 18px 20px; }
-    .modal-sadrzaj h2 { font-size: 27px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
