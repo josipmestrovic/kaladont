@@ -1,19 +1,24 @@
 /**
- * Trenutni Top 10 (D03). Nema backfilla: postojeći poredak se ne skenira pri uključivanju.
- * Nagrada nastaje tek uz sljedeću promjenu konkurencije. Pad s ljestvice ne briše dokaz.
+ * Trenutni Top 10 (D03).
+ *
+ * HINT PR11: snižavanje ulaznih pragova (5/10) odmah mijenja čitanje javnih ljestvica, ali
+ * Top10 dokazi se inače upisuju samo na sljedeću promjenu konkurencije. Jednokratni prolaz
+ * otvorenih tablica: `pnpm --filter posluzitelj prijelaz-ljestvice-pr11` (vidi odrzavanje.md).
+ * Ne izmišljati ulaske u zatvorenim razdobljima. Pad s ljestvice ne briše dokaz.
  *
  * Red zaključavanja:
  * 1. Transakcija koja mijenja poredak (javni završetak ili soft-delete) prvo odradi svoje
  *    retke, pa neposredno prije čitanja uzme pg_advisory_xact_lock moda.
- *    Fiksni red modova: cetiri_igraca (1), zatim dva_igraca (2). Jedan završetak zaključava
- *    samo svoj mod; brisanje zaključava oba. U toj transakciji se ne diraju tuđa dostignuća.
+ *    Fiksni red modova: cetiri_igraca (1), dva_igraca (2), tri_igraca (3). Jedan završetak
+ *    zaključava samo svoj mod; brisanje zaključava sva tri. U toj transakciji se ne diraju
+ *    tuđa dostignuća.
  * 2. Top 10 se računa istim SQL-om kao javna ljestvica, u toj transakciji, za dnevno/tjedno/
  *    mjesečno i obje metrike. Umeće se samo prvi dokaz po igraču, modu i kalendarskom početku.
  *    Prolazni ulazak ostaje zapisan iako sljedeća promjena igrača više ne vidi u Top 10.
  * 3. Nakon commita obrada nagrada uzima pg_advisory_xact_lock po igraču (klasa 872005) i
- *    tek onda FOR UPDATE na njegovim dokazima. Ne uzima lock moda, pa Dvoboj i Četveroboj
- *    ne mogu deadlockati preko tuđih dostignuća. Par „Na dvije fronte” vidi se pod tim
- *    igračevim lockom: drugi proces čeka i ne može oba promašiti već commitani dokaz.
+ *    tek onda FOR UPDATE na njegovim dokazima. Ne uzima lock moda, pa formati ne mogu
+ *    deadlockati preko tuđih dostignuća. Par „Na dvije fronte” (PR11 još samo 4p↔2p; PR13
+ *    širi na bilo koja dva formata) vidi se pod tim igračevim lockom.
  */
 import { and, asc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import {
@@ -35,7 +40,8 @@ import { dodijeliDoprinos, upisiObavijestDostignuca } from './dodjela.js';
 
 const KLASA_ZAKLJUCAVANJA_MODA = 872003;
 const KLASA_ZAKLJUCAVANJA_IGRACA = 872005;
-const REDOSLIJED_MODOVA = ['cetiri_igraca', 'dva_igraca'] as const;
+/** Stabilan red: postojeći 4p/2p lock ID-jevi ostaju 1/2; Troboj = 3. */
+export const REDOSLIJED_MODOVA_TOP10 = ['cetiri_igraca', 'dva_igraca', 'tri_igraca'] as const;
 const RAZDOBLJA_TOP10 = ['dnevno', 'tjedno', 'mjesecno'] as const;
 const METRIKE_TOP10 = ['prosjek_bodova', 'niz_pobjeda'] as const satisfies readonly MetrikaLjestvice[];
 
@@ -57,7 +63,9 @@ export interface ParametriTop10Snimke {
 }
 
 function kodModa(mod: ModPartije): number {
-  return mod === 'cetiri_igraca' ? 1 : 2;
+  if (mod === 'cetiri_igraca') return 1;
+  if (mod === 'dva_igraca') return 2;
+  return 3; // tri_igraca — nikad dijeliti lock s 2p
 }
 
 function kljucIgraca(igracId: string): number {
@@ -87,7 +95,7 @@ export async function zabiljeziTop10NakonPromjene(tx: MisijeTx, parametri: Param
   const obuhvati = obuhvatiRazdoblja(parametri.opazenoU, pocetak);
   const izvrsitelj = tx as unknown as IzvrsiteljPoretka;
 
-  for (const mod of REDOSLIJED_MODOVA) {
+  for (const mod of REDOSLIJED_MODOVA_TOP10) {
     if (!parametri.modovi.includes(mod)) continue;
     await zakljucajMod(tx, mod);
 

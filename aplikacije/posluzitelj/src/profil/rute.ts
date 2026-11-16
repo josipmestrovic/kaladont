@@ -848,64 +848,156 @@ export async function registrirajProfilRute(
     '/ljestvica',
     { preHandler: pokusajIdentifikaciju },
     async (zahtjev) => {
+      // PR11: legacy ukupni poredak — ulazni prag 5 (bio 10); limit i dalje 10|100.
+      // Troboj čita statistike_moda_igraca; 2p/4p ostaju na stupcima igraci.
+      const LEGACY_MINIMUM_LJESTVICE = 5;
       const rezultatLimita = ShemaLimit.safeParse(zahtjev.query);
       const limit = rezultatLimita.success ? (rezultatLimita.data.limit ?? 10) : 10;
-      const je1v1 = zahtjev.query.mod === 'dva_igraca' || zahtjev.query.mod === '1v1';
+      const modUpita = zahtjev.query.mod;
+      const je1v1 = modUpita === 'dva_igraca' || modUpita === '1v1';
+      const jeTroboj = modUpita === 'tri_igraca';
 
-      const colOdigrane = je1v1 ? igraci.odigrane1v1 : igraci.odigrane;
-      const colBodovi = je1v1 ? igraci.bodovi1v1 : igraci.bodoviUkupno;
+      type RedakLegacy = {
+        mjesto: number;
+        igracId: string;
+        jeJavan: boolean;
+        nadimak: string;
+        rang: string;
+        prosjekBodova: number;
+        odigrane: number;
+        postotakPobjeda: number;
+      };
 
-      const kandidati = await baza
-        .select()
-        .from(igraci)
-        .where(and(eq(igraci.upravljac, 'covjek'), gte(colOdigrane, 10), isNull(igraci.obrisanAt)))
-        .orderBy(desc(sql`${colBodovi}::float / ${colOdigrane}`))
-        .limit(limit);
+      let ljestvica: RedakLegacy[];
 
-      const ljestvica = kandidati.map((igrac, indeks) => {
-        const odig = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
-        const bod = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
-        const pobj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
-        const prosjek = prosjekBodova(bod, odig);
+      if (jeTroboj) {
+        const kandidati = await baza
+          .select({
+            id: igraci.id,
+            nadimak: igraci.nadimak,
+            vrsta: igraci.vrsta,
+            rangSumaJedinica: igraci.rangSumaJedinica,
+            rangBrojPartija: igraci.rangBrojPartija,
+            odigrane: statistikeModaIgraca.odigrane,
+            bodovi: statistikeModaIgraca.bodovi,
+            pobjede: statistikeModaIgraca.pobjede,
+          })
+          .from(statistikeModaIgraca)
+          .innerJoin(igraci, eq(igraci.id, statistikeModaIgraca.igracId))
+          .where(and(
+            eq(statistikeModaIgraca.mod, 'tri_igraca'),
+            eq(igraci.upravljac, 'covjek'),
+            gte(statistikeModaIgraca.odigrane, LEGACY_MINIMUM_LJESTVICE),
+            isNull(igraci.obrisanAt),
+          ))
+          .orderBy(desc(sql`${statistikeModaIgraca.bodovi}::float / ${statistikeModaIgraca.odigrane}`))
+          .limit(limit);
 
-        return {
+        ljestvica = kandidati.map((red, indeks) => ({
           mjesto: indeks + 1,
-          igracId: igrac.id,
-          jeJavan: igrac.vrsta !== 'gost',
-          nadimak: igrac.nadimak,
-          // PR09: naslovni rang je univerzalan; prosjekBodova ostaje formatna metrika ljestvice.
-          rang: izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija),
-          prosjekBodova: prosjek,
-          odigrane: odig,
-          postotakPobjeda: odig > 0 ? (pobj / odig) * 100 : 0,
-        };
-      });
+          igracId: red.id,
+          jeJavan: red.vrsta !== 'gost',
+          nadimak: red.nadimak,
+          rang: izracunajRangIzAgregata(red.rangSumaJedinica, red.rangBrojPartija),
+          prosjekBodova: prosjekBodova(red.bodovi, red.odigrane),
+          odigrane: red.odigrane,
+          postotakPobjeda: red.odigrane > 0 ? (red.pobjede / red.odigrane) * 100 : 0,
+        }));
+      } else {
+        const colOdigrane = je1v1 ? igraci.odigrane1v1 : igraci.odigrane;
+        const colBodovi = je1v1 ? igraci.bodovi1v1 : igraci.bodoviUkupno;
 
-      let mojeMjesto: (typeof ljestvica)[number] | null = null;
-      const igrac = (zahtjev as ZahtjevSIgracem).igrac;
-      if (igrac) {
-        const odigMoj = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
-        const bodMoj = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
-        const pobjMoj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
+        const kandidati = await baza
+          .select()
+          .from(igraci)
+          .where(and(eq(igraci.upravljac, 'covjek'), gte(colOdigrane, LEGACY_MINIMUM_LJESTVICE), isNull(igraci.obrisanAt)))
+          .orderBy(desc(sql`${colBodovi}::float / ${colOdigrane}`))
+          .limit(limit);
 
-        if (odigMoj >= 10) {
-          const prosjekMoj = prosjekBodova(bodMoj, odigMoj);
-          const [redakBoljih] = await baza
-            .select({ boljihOdMene: sql<number>`count(*)::int` })
-            .from(igraci)
-            .where(
-              sql`${igraci.upravljac} = 'covjek' and ${colOdigrane} >= 10 and ${colBodovi}::float / ${colOdigrane} > ${prosjekMoj}`,
-            );
-          mojeMjesto = {
-            mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
+        ljestvica = kandidati.map((igrac, indeks) => {
+          const odig = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
+          const bod = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
+          const pobj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
+          return {
+            mjesto: indeks + 1,
             igracId: igrac.id,
             jeJavan: igrac.vrsta !== 'gost',
             nadimak: igrac.nadimak,
+            // PR09: naslovni rang je univerzalan; prosjekBodova ostaje formatna metrika ljestvice.
             rang: izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija),
-            prosjekBodova: prosjekMoj,
-            odigrane: odigMoj,
-            postotakPobjeda: (pobjMoj / odigMoj) * 100,
+            prosjekBodova: prosjekBodova(bod, odig),
+            odigrane: odig,
+            postotakPobjeda: odig > 0 ? (pobj / odig) * 100 : 0,
           };
+        });
+      }
+
+      let mojeMjesto: RedakLegacy | null = null;
+      const igrac = (zahtjev as ZahtjevSIgracem).igrac;
+      if (igrac) {
+        if (jeTroboj) {
+          const [stat] = await baza
+            .select({
+              odigrane: statistikeModaIgraca.odigrane,
+              bodovi: statistikeModaIgraca.bodovi,
+              pobjede: statistikeModaIgraca.pobjede,
+            })
+            .from(statistikeModaIgraca)
+            .where(and(eq(statistikeModaIgraca.igracId, igrac.id), eq(statistikeModaIgraca.mod, 'tri_igraca')))
+            .limit(1);
+          const odigMoj = stat?.odigrane ?? 0;
+          if (odigMoj >= LEGACY_MINIMUM_LJESTVICE) {
+            const bodMoj = stat!.bodovi;
+            const pobjMoj = stat!.pobjede;
+            const prosjekMoj = prosjekBodova(bodMoj, odigMoj);
+            const [redakBoljih] = await baza
+              .select({ boljihOdMene: sql<number>`count(*)::int` })
+              .from(statistikeModaIgraca)
+              .innerJoin(igraci, eq(igraci.id, statistikeModaIgraca.igracId))
+              .where(and(
+                eq(statistikeModaIgraca.mod, 'tri_igraca'),
+                eq(igraci.upravljac, 'covjek'),
+                isNull(igraci.obrisanAt),
+                gte(statistikeModaIgraca.odigrane, LEGACY_MINIMUM_LJESTVICE),
+                sql`${statistikeModaIgraca.bodovi}::float / ${statistikeModaIgraca.odigrane} > ${prosjekMoj}`,
+              ));
+            mojeMjesto = {
+              mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
+              igracId: igrac.id,
+              jeJavan: igrac.vrsta !== 'gost',
+              nadimak: igrac.nadimak,
+              rang: izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija),
+              prosjekBodova: prosjekMoj,
+              odigrane: odigMoj,
+              postotakPobjeda: (pobjMoj / odigMoj) * 100,
+            };
+          }
+        } else {
+          const colOdigrane = je1v1 ? igraci.odigrane1v1 : igraci.odigrane;
+          const colBodovi = je1v1 ? igraci.bodovi1v1 : igraci.bodoviUkupno;
+          const odigMoj = je1v1 ? igrac.odigrane1v1 : igrac.odigrane;
+          const bodMoj = je1v1 ? igrac.bodovi1v1 : igrac.bodoviUkupno;
+          const pobjMoj = je1v1 ? igrac.pobjede1v1 : igrac.pobjede;
+
+          if (odigMoj >= LEGACY_MINIMUM_LJESTVICE) {
+            const prosjekMoj = prosjekBodova(bodMoj, odigMoj);
+            const [redakBoljih] = await baza
+              .select({ boljihOdMene: sql<number>`count(*)::int` })
+              .from(igraci)
+              .where(
+                sql`${igraci.upravljac} = 'covjek' and ${colOdigrane} >= ${LEGACY_MINIMUM_LJESTVICE} and ${colBodovi}::float / ${colOdigrane} > ${prosjekMoj}`,
+              );
+            mojeMjesto = {
+              mjesto: (redakBoljih?.boljihOdMene ?? 0) + 1,
+              igracId: igrac.id,
+              jeJavan: igrac.vrsta !== 'gost',
+              nadimak: igrac.nadimak,
+              rang: izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija),
+              prosjekBodova: prosjekMoj,
+              odigrane: odigMoj,
+              postotakPobjeda: (pobjMoj / odigMoj) * 100,
+            };
+          }
         }
       }
 

@@ -70,8 +70,9 @@ export interface OdgovorLjestvice {
   izracunatoU: string;
 }
 
+/** PR11: dnevno 5, sva dulja razdoblja 10. Top 10 redaka i rang/DNK prag 10 ostaju odvojene konstante. */
 export function minimumIgaraZaRazdoblje(razdoblje: RazdobljeLjestvice): number {
-  return razdoblje === 'dnevno' ? 10 : 20;
+  return razdoblje === 'dnevno' ? 5 : 10;
 }
 
 interface LokalniDatum {

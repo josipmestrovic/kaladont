@@ -176,13 +176,13 @@ describe('GET /ljestvica', () => {
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
     const { igracId, sesijskiToken } = (await registracija.json()) as { igracId: string; sesijskiToken: string };
-    // Formatni brojači kvalifikuju za listu; naslovni rang dolazi iz univerzalnog agregata.
+    // PR11 legacy min = 5; formatni brojači kvalifikuju za listu; naslovni rang = univerzalni agregat.
     // Učinak 178 × 10 partija × 2520 jedinica = prag Kaladonta.
     await baza
       .update(igraci)
       .set({
-        odigrane1v1: 10,
-        bodovi1v1: 10,
+        odigrane1v1: 5,
+        bodovi1v1: 5,
         rangBrojPartija: 10,
         rangSumaJedinica: 178 * 10 * 2520,
       })

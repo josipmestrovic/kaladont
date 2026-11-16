@@ -29,11 +29,13 @@ Jednokratna zamjena fonda ima CLI samo za održavanje: `pnpm --filter posluzitel
 
 **PR09 univerzalni rang:** nakon migracije `0065_univerzalni_rang` pokreni `pnpm --filter posluzitelj backfill-univerzalni-rang` (`--usporedi`, zatim `--primijeni=DA`; u produkciji i `--odrzavanje-produkcije=DA`). Detalji: [odrzavanje.md § PR09](../07-operacije/odrzavanje.md#pr09-univerzalni-rang-backfill).
 
+**PR11 ljestvice:** nakon deploya pokreni `pnpm --filter posluzitelj prijelaz-ljestvice-pr11` (`--usporedi`, zatim `--primijeni=DA`; u produkciji i `--odrzavanje-produkcije=DA`) za Top10 dokaze otvorenih tablica. Detalji: [odrzavanje.md § PR11](../07-operacije/odrzavanje.md#pr11-prijelaz-ljestvica-otvorene-tablice--top10).
+
 ## Vremenske ljestvice
 
-`GET /api/ljestvice?mod=cetiri_igraca|dva_igraca&metrika=prosjek_bodova|niz_pobjeda&razdoblje=dnevno|tjedno|mjesecno|godisnje|svih_vremena&prikaz=top|oko_mene` (svi parametri opcionalni; neispravna vrijednost vraća `400`). Identifikacija je opcionalna; „moja” pozicija dolazi isključivo iz sesije. Odgovor (tip `OdgovorLjestvice` u `zajednicko`) sadrži najviše 10 redaka s globalnim mjestima, vlastitu poziciju i statuse za svih pet razdoblja, `razdoblje.do` za odbrojavanje do resetiranja i `izracunatoU` (serverski sat). Zaključano svih vremena vraća prazne retke i `otkljucavaSe`. Odgovor ima `Cache-Control: private, no-store`; poslužitelj poredak drži u memoriji najviše 30 s i nikad preko kraja razdoblja.
+`GET /api/ljestvice?mod=cetiri_igraca|tri_igraca|dva_igraca&metrika=prosjek_bodova|niz_pobjeda&razdoblje=dnevno|tjedno|mjesecno|godisnje|svih_vremena&prikaz=top|oko_mene` (svi parametri opcionalni; neispravna vrijednost vraća `400`). Tri zasebne ljestvice po veličini stola; pravilnici se spajaju unutar formata. Ulaz: **5** dnevno, **10** svako dulje razdoblje. Identifikacija je opcionalna; „moja” pozicija dolazi isključivo iz sesije. Odgovor (tip `OdgovorLjestvice` u `zajednicko`) sadrži najviše 10 redaka s globalnim mjestima, vlastitu poziciju i statuse za svih pet razdoblja, `razdoblje.do` za odbrojavanje do resetiranja i `izracunatoU` (serverski sat). Zaključano svih vremena vraća prazne retke i `otkljucavaSe`. Odgovor ima `Cache-Control: private, no-store`; poslužitelj poredak drži u memoriji najviše 30 s i nikad preko kraja razdoblja.
 
-Stari `GET /api/ljestvica` ostaje privremeno radi kompatibilnosti.
+Stari `GET /api/ljestvica` ostaje privremeno radi kompatibilnosti (`mod=dva_igraca|1v1|tri_igraca` ili zadano Četveroboj; ulazni prag **5**; `limit` i dalje 10|100).
 
 ## Prijava riječi i igrača
 
