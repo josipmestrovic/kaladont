@@ -280,74 +280,59 @@ async function igraciSNeobradenim(partijaId: string | null, limit: number): Prom
  * HINT PR13: preispitaj parove iz već obrađenih Top10 dokaza.
  * Ne dira pojedinačne Top10 zvijezde — samo dodaje Na dvije fronte gdje ≥2 formata
  * već imaju dokaz, a pairing dokaz još ne postoji (npr. Troboj+4p iz PR11 ere).
+ *
+ * HINT Bugbot: kandidati se filtriraju NOT EXISTS prije limita (inače postojeći 4p↔2p
+ * parovi pojedu budget i Troboj parovi nikad ne dođu na red). Redoslijed: najnoviji prvi.
  */
 export async function preispitajParoveNaDvijeFronte(
   opcije: { limit?: number; igracId?: string } = {},
 ): Promise<Map<string, ObavijestOtkljucanogDostignuca[]>> {
   const limit = opcije.limit ?? 200;
-  const uvjeti: SQL[] = [];
-  if (opcije.igracId) uvjeti.push(eq(dokaziTop10Ulazaka.igracId, opcije.igracId));
+  const filterIgraca = opcije.igracId
+    ? sql`and d.igrac_id = ${opcije.igracId}`
+    : sql``;
 
-  // Učitaj Top10 dokaze (opcionalno filtrirane po igraču) i agregiraj u memoriji.
-  // HINT: bez igracId filtera ograniči na nedavne da ne učitamo cijelu povijest u jednom prolazu.
-  const upit = baza
-    .select({
-      igracId: dokaziTop10Ulazaka.igracId,
-      vrstaRazdoblja: dokaziTop10Ulazaka.vrstaRazdoblja,
-      kalendarskiPocetak: dokaziTop10Ulazaka.kalendarskiPocetak,
-      mod: dokaziTop10Ulazaka.mod,
-      opazenoU: dokaziTop10Ulazaka.opazenoU,
-    })
-    .from(dokaziTop10Ulazaka)
-    .orderBy(asc(dokaziTop10Ulazaka.igracId))
-    .limit(opcije.igracId ? 1000 : Math.max(limit * 10, 500));
-  const redovi = uvjeti.length > 0
-    ? await upit.where(and(...uvjeti))
-    : await upit;
-
-  type KljucPara = string;
-  const poKljucu = new Map<KljucPara, {
+  const kandidati = await baza.execute<{
     igracId: string;
     vrstaRazdoblja: string;
     kalendarskiPocetak: Date;
     opazenoU: Date;
-    modovi: Set<string>;
-  }>();
-
-  for (const red of redovi) {
-    const kljuc = `${red.igracId}|${red.vrstaRazdoblja}|${red.kalendarskiPocetak.toISOString()}`;
-    const postojeci = poKljucu.get(kljuc);
-    if (postojeci) {
-      postojeci.modovi.add(red.mod);
-      if (red.opazenoU > postojeci.opazenoU) postojeci.opazenoU = red.opazenoU;
-    } else {
-      poKljucu.set(kljuc, {
-        igracId: red.igracId,
-        vrstaRazdoblja: red.vrstaRazdoblja,
-        kalendarskiPocetak: red.kalendarskiPocetak,
-        opazenoU: red.opazenoU,
-        modovi: new Set([red.mod]),
-      });
-    }
-  }
-
-  const kandidati = [...poKljucu.values()]
-    .filter((k) => k.modovi.size >= 2)
-    .slice(0, limit);
+  }>(sql`
+    select d.igrac_id as "igracId",
+           d.vrsta_razdoblja as "vrstaRazdoblja",
+           d.kalendarski_pocetak as "kalendarskiPocetak",
+           max(d.opazeno_u) as "opazenoU"
+    from dokazi_top10_ulazaka d
+    where not exists (
+      select 1 from dokazi_dostignuca_na_dvije_fronte n
+      where n.igrac_id = d.igrac_id
+        and n.vrsta_razdoblja = d.vrsta_razdoblja
+        and n.kalendarski_pocetak = d.kalendarski_pocetak
+    )
+    ${filterIgraca}
+    group by d.igrac_id, d.vrsta_razdoblja, d.kalendarski_pocetak
+    having count(distinct d.mod) >= 2
+    order by max(d.opazeno_u) desc, d.igrac_id, d.vrsta_razdoblja
+    limit ${limit}
+  `);
 
   const poIgracu = new Map<string, ObavijestOtkljucanogDostignuca[]>();
-  for (const red of kandidati) {
+  for (const red of [...kandidati]) {
     const vrsta = red.vrstaRazdoblja as VrstaTop10;
     if (!DOSTIGNUCE_PO_VRSTI[vrsta]) continue;
+    // HINT: baza.execute vraća timestamp kao string — pretvori u Date prije Drizzle eq/insert.
+    const kalendarskiPocetak = new Date(red.kalendarskiPocetak);
+    const opazenoU = new Date(red.opazenoU);
     try {
       const obavijesti = await baza.transaction(async (tx) => {
         await zakljucajIgraca(tx, red.igracId);
+        // Double-check under lock.
         const [vec] = await tx.select({ igracId: dokaziDostignucaNaDvijeFronte.igracId })
           .from(dokaziDostignucaNaDvijeFronte)
           .where(and(
             eq(dokaziDostignucaNaDvijeFronte.igracId, red.igracId),
             eq(dokaziDostignucaNaDvijeFronte.vrstaRazdoblja, red.vrstaRazdoblja),
-            eq(dokaziDostignucaNaDvijeFronte.kalendarskiPocetak, red.kalendarskiPocetak),
+            eq(dokaziDostignucaNaDvijeFronte.kalendarskiPocetak, kalendarskiPocetak),
           ))
           .limit(1);
         if (vec) return [] as ObavijestOtkljucanogDostignuca[];
@@ -358,13 +343,13 @@ export async function preispitajParoveNaDvijeFronte(
           dokaz: {
             vrsta: 'na_dvije_fronte',
             vrstaRazdoblja: vrsta,
-            kalendarskiPocetak: red.kalendarskiPocetak,
+            kalendarskiPocetak,
           },
-          zavrsenoU: red.opazenoU,
+          zavrsenoU: opazenoU,
           izvor: 'top10_prijelaz_pr13',
           kontekst: {
             vrstaRazdoblja: vrsta,
-            kalendarskiPocetak: red.kalendarskiPocetak.toISOString(),
+            kalendarskiPocetak: kalendarskiPocetak.toISOString(),
             prijelaz: true,
           },
         });

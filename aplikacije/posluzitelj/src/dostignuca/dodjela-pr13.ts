@@ -3,18 +3,23 @@
  * HINT: trening/privatno ne zovu ove funkcije (caller: !samoStatistika + javni kontekst).
  * HINT: ne miješati `stara_skola` s katalogom `ka_zna` (žrtva) ni pravilnikom tipa.
  */
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import {
   ID_DOSTIGNUCA_IMAM_NASTAVAK,
   ID_DOSTIGNUCA_SALJI_DALJE,
   ID_DOSTIGNUCA_STARA_SKOLA,
   ID_DOSTIGNUCA_TRECA_SRECA,
   type ModPartije,
+  type ObavijestOtkljucanogDostignuca,
   type PravilnikPartije,
 } from 'zajednicko';
 import { ucinakPosebneRijeci } from '../baza/shema.js';
 import type { MisijeTx } from '../misije/tipovi.js';
-import { dodijeliDoprinos, type IshodDodjele } from './dodjela.js';
+import {
+  dodijeliDoprinos,
+  upisiObavijestDostignuca,
+  type IshodDodjele,
+} from './dodjela.js';
 
 function prazanIshod(): IshodDodjele {
   return { doprinosUmetnut: false, novaDostignuca: [], noveObavijesti: [] };
@@ -65,7 +70,7 @@ export function priznajImamNastavak(
 
 /**
  * Šalji dalje — čita ucinak_posebne_rijeci, ne kaladontSljedeciUzTriPlus (max 1/igra).
- * HINT: više događaja po igri; jedna obavijest na zadnjem doprinosu serije.
+ * HINT: više događaja po igri; jedna obavijest za najvišu novu razinu (ne zadnji red).
  * HINT: dokaz-kaladont ne ide ovim putem (obični Klasični efekt → vrsta_mete=sljedeci).
  */
 export async function priznajSaljiDalje(
@@ -90,15 +95,16 @@ export async function priznajSaljiDalje(
       eq(ucinakPosebneRijeci.uzrocnikId, ulaz.igracId),
       eq(ucinakPosebneRijeci.vrstaMete, 'sljedeci'),
       eq(ucinakPosebneRijeci.ucinak, 'eliminacija'),
-    ));
+    ))
+    .orderBy(asc(ucinakPosebneRijeci.redniBroj));
 
   const kandidati = redovi.filter((r) => r.brojAktivnihPrije >= 3);
   if (kandidati.length === 0) return prazanIshod();
 
+  // HINT Bugbot: razina često skoči na ranijem događaju (prag 1/3/10…), ne na zadnjem.
+  // Stoga sve doprinose s preskociObavijest, pa obavijesti za sve nove razine u seriji.
   const ishodi: IshodDodjele[] = [];
-  for (let i = 0; i < kandidati.length; i++) {
-    const red = kandidati[i]!;
-    const zadnji = i === kandidati.length - 1;
+  for (const red of kandidati) {
     ishodi.push(await dodijeliDoprinos(tx, {
       igracId: ulaz.igracId,
       dostignuceId: ID_DOSTIGNUCA_SALJI_DALJE,
@@ -106,10 +112,30 @@ export async function priznajSaljiDalje(
       zavrsenoU: ulaz.zavrsenoU,
       izvor: 'salji_dalje',
       kontekst: { partijaId: ulaz.partijaId, redniBroj: red.redniBroj },
-      preskociObavijest: !zadnji,
+      preskociObavijest: true,
     }));
   }
-  return spojiIshode(ishodi);
+
+  const spojeno = spojiIshode(ishodi);
+  if (spojeno.novaDostignuca.length === 0) return spojeno;
+
+  const noveObavijesti: ObavijestOtkljucanogDostignuca[] = [];
+  for (const nova of spojeno.novaDostignuca) {
+    const obavijest = await upisiObavijestDostignuca(tx, {
+      igracId: ulaz.igracId,
+      dostignuceId: ID_DOSTIGNUCA_SALJI_DALJE,
+      novaRazina: nova.novaRazina,
+      zavrsenoU: ulaz.zavrsenoU,
+      izvor: 'salji_dalje',
+      kontekst: { partijaId: ulaz.partijaId, grupirano: true },
+    });
+    if (obavijest) noveObavijesti.push(obavijest);
+  }
+  return {
+    doprinosUmetnut: spojeno.doprinosUmetnut,
+    novaDostignuca: spojeno.novaDostignuca,
+    noveObavijesti,
+  };
 }
 
 /**
