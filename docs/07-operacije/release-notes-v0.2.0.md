@@ -12,6 +12,8 @@ ne tvrdi da je paket već na produkciji.
 
 ## Što dolazi
 
+Javna lista na [/novosti#v0-2-0](https://kaladont.hr/novosti#v0-2-0):
+
 - **Troboj** (3 igrača) uz postojeći Dvoboj i Četveroboj.
 - Tri **pravilnika**: Klasični Kaladont, KA-ZNA, Dokaži nastavak — biraju se prije formata.
 - Jedan **univerzalni rang** i jedan **Kaladont DNK** za sve javne formate (kalibracija 10 ukupno).

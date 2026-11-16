@@ -27,6 +27,7 @@
 
   let korak = $state<'pravilnik' | 'format'>('pravilnik');
   let odabranaPravila = $state<PravilnikPartije | null>(null);
+  let podlogaEl = $state<HTMLDivElement | null>(null);
   let dijalogEl = $state<HTMLDivElement | null>(null);
   let prethodniFokus: HTMLElement | null = null;
 
@@ -39,6 +40,16 @@
       prethodniFokus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       queueMicrotask(() => dijalogEl?.focus());
     }
+  });
+
+  /** Overlay mora biti na document.body — inače overflow/flex roditelja na naslovnici lome fixed + zastor. */
+  $effect(() => {
+    const el = podlogaEl;
+    if (!el || typeof document === 'undefined') return;
+    document.body.appendChild(el);
+    return () => {
+      el.remove();
+    };
   });
 
   function zatvori() {
@@ -74,7 +85,7 @@
 
 {#if otvoren}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-podloga" role="presentation" onclick={zatvori}>
+  <div class="modal-podloga" bind:this={podlogaEl} role="presentation" onclick={zatvori}>
     <div
       bind:this={dijalogEl}
       class="modal-sadrzaj"

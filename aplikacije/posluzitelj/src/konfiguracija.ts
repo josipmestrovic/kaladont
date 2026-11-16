@@ -47,6 +47,7 @@ const shemaKonfiguracije = z.object({
   // ADR-017: zasebne zastavice; javni botovi su isključeni dok operater ne odluči drukčije.
   TRENING_OMOGUCEN: z.enum(['true', 'false']).default('true'),
   BOTOVI_DVOBOJ: z.enum(['true', 'false']).default('false'),
+  BOTOVI_TROBOJ: z.enum(['true', 'false']).default('false'),
   BOTOVI_CETVEROBOJ: z.enum(['true', 'false']).default('false'),
   MAKSIMALNO_AKTIVNIH_TRENINGA: z.coerce.number().int().positive().default(100),
   /** Čista vlastita imena/nazivi kao igrive riječi. Zadano isključeno na staging/produkciji. */
