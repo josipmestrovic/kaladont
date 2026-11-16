@@ -24,10 +24,13 @@ Puna checklista iz PR15 specifikacije (migracije, 9 javnih izbora → 8 redova, 
 
 | Stavka | Status |
 |---|---|
-| Lokalni lint / check / test / build / e2e | (ispuniti pri mergeu) |
-| Staging migracija + KA-ZNA povijest | (nakon deploya) |
-| Integracijski scenariji igre | (nakon deploya) |
-| `/novosti` 200 + sidro | (nakon deploya) |
+| Lokalni `web check` + `web build` | OK (0 errors) |
+| eslint (izmijenjeni `.ts`) | OK; puni `pnpm lint` pada na lokalnom `tmp-ci/` smeću izvan PR-a |
+| `pnpm test` lokalno | flaky/timeout na nekim poslužitelj testovima; CI je izvor istine |
+| Playwright lokalno | browser install/mreža; pokriti na CI (`naslovnica` uključuje PR15) |
+| Staging migracija + KA-ZNA povijest | (nakon mergea / deploya) |
+| Integracijski scenariji igre | (nakon mergea / deploya) |
+| `/novosti` 200 + sidro | (nakon mergea / deploya) |
 | Prod promocija | **nije u ovom koraku** — batch nakon staginga |
 
 ## Rollback
