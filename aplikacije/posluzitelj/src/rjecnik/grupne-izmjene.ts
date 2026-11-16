@@ -579,7 +579,7 @@ export async function potvrdiGrupnoUklanjanje(ulaz: {
     return { ok: false, status: 400, greska: 'Otisak pregleda nije ispravan.' };
   }
 
-  let sanducicIgraci: string[] = [];
+  const sanducicIgraci: string[] = [];
 
   const rezultat = await baza.transaction(async (tx) => {
     await zakljucajIzmjeneRjecnika(tx);
@@ -985,7 +985,7 @@ export async function potvrdiGrupnoDodavanje(
     return { ok: false, status: 400, greska: 'Otisak pregleda nije ispravan.' };
   }
 
-  let sanducicIgraci: string[] = [];
+  const sanducicIgraci: string[] = [];
 
   const rezultat = await baza.transaction(async (tx) => {
     await zakljucajIzmjeneRjecnika(tx);
@@ -1139,7 +1139,7 @@ export async function potvrdiGrupnoDodavanje(
 
     const promijenjene = sortirajJedinstvene([...dodane, ...reaktivirane, ...azurirane]);
     let prijavaIds: number[] = [];
-    let mailboxPrijavitelji: Array<{ prijavaId: number; igracId: string; rijec: string }> = [];
+    const mailboxPrijavitelji: Array<{ prijavaId: number; igracId: string; rijec: string }> = [];
     let prijaviteljiZaNagradu: Array<{ igracId: string; rijec: string }> = [];
     const obavijesti: ObavijestiGrupnePotvrde[] = [];
 

@@ -4,7 +4,6 @@
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   ID_DOSTIGNUCA_CINKAROS,
-  ID_DOSTIGNUCA_JEZICNI_DETEKTIV,
   type ObavijestOtkljucanogDostignuca,
 } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
@@ -30,7 +29,6 @@ import {
   stvoriPorukeOdbacenihPrijaveIgraca,
   stvoriPorukeOdbacenihPrijaveRijeci,
   stvoriPorukeUvazenePrijaveIgraca,
-  stvoriPorukeUvazenePrijaveRijeci,
 } from '../sanducic/okidaci.js';
 
 const RAZLOZI_PRIJAVE_IGRACA = ['pogrdan_nadimak', 'neprimjereno_ponasanje', 'drugo'] as const;
@@ -201,7 +199,17 @@ export async function potvrdiIspravakRjecnika(ulaz: {
     otisak = ulaz.grupno.otisak;
     kljucOperacije = ulaz.grupno.kljucOperacije;
     potvrdiPreklapanja = ulaz.grupno.potvrdiPreklapanja ?? false;
-    grupnoUlaz = ulaz.grupno;
+    const [prijavaZaGrupno] = await baza.select().from(prijave).where(eq(prijave.id, ulaz.prijavaId)).limit(1);
+    if (!prijavaZaGrupno) return { ok: false, status: 404, greska: 'Prijava nije pronađena.' };
+    const izvorna = normalizirajRijecRjecnika(prijavaZaGrupno.rijec);
+    grupnoUlaz = {
+      izvornaRijec: ulaz.grupno.izvornaRijec ?? prijavaZaGrupno.rijec,
+      vrsta: ulaz.grupno.vrsta ?? 'imenica',
+      lema: ulaz.grupno.lema ?? izvorna,
+      stupanj: ulaz.grupno.stupanj,
+      tierIzvora: ulaz.grupno.tierIzvora ?? tierIzFrekvencije(ulaz.frekvencija),
+      dodatniOblici: ulaz.grupno.dodatniOblici ?? [],
+    };
   }
 
   if (!otisak || !kljucOperacije) {

@@ -257,6 +257,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
           }
           return noviZapis;
         },
+      },
         () => nadopuniPotroseneGrupe(),
       );
       await registrirajRjecnikRute(apiApp, rjecnik);

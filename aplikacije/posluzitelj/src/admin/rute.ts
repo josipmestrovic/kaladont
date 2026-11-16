@@ -744,18 +744,22 @@ export async function registrirajAdminRute(
     }
     const pregledRez = await pregledGrupneIzmjene({ smjer: 'ukloni', rijec: jednostavno.data.rijec });
     if (!pregledRez.ok) return odgovor.code(pregledRez.status).send({ ok: false, greska: pregledRez.greska });
-    if (pregledRez.pregled.brojAktivnih > 1) {
+    const pregledUklanjanja = pregledRez.pregled;
+    if (pregledUklanjanja.smjer !== 'ukloni') {
+      return odgovor.code(500).send({ ok: false, greska: 'Neočekivani tip pregleda.' });
+    }
+    if (pregledUklanjanja.brojAktivnih > 1) {
       return odgovor.code(409).send({
         ok: false,
         greska: 'Potreban je pregled grupnog uklanjanja.',
         kod: 'zastarjeli_pregled',
-        pregled: pregledRez.pregled,
+        pregled: pregledUklanjanja,
       });
     }
     const rezultat = await potvrdiGrupnoUklanjanje({
       adminId: admin.id,
-      otisak: pregledRez.pregled.otisak,
-      kljucOperacije: `legacy-deaktiviraj-${pregledRez.pregled.otisak.slice(0, 24)}`,
+      otisak: pregledUklanjanja.otisak,
+      kljucOperacije: `legacy-deaktiviraj-${pregledUklanjanja.otisak.slice(0, 24)}`,
       rijec: jednostavno.data.rijec,
       razlog: jednostavno.data.razlog,
     });
