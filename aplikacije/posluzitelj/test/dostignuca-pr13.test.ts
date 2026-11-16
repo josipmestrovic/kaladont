@@ -41,11 +41,7 @@ import {
   priznajStaruSkolu,
   priznajTrecuSrecu,
 } from '../src/dostignuca/dodjela-pr13.js';
-import {
-  obradiNeobradeneTop10Dokaze,
-  preispitajParoveNaDvijeFronte,
-  zabiljeziTop10NakonPromjene,
-} from '../src/dostignuca/top10.js';
+import { preispitajParoveNaDvijeFronte } from '../src/dostignuca/top10.js';
 import { zakljuciPartijuUBazi, type ZapisStatistikeRijeci } from '../src/igra/upis-partije.js';
 
 const igraciZaBrisanje: string[] = [];
