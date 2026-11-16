@@ -6,12 +6,17 @@ Dopuna [pravila igre](pravila-igre.md) prema [ADR-017](../03-arhitektura/odluke/
 
 Vrijeme se računa na poslužitelju od `usaoU` **najstarijeg prisutnog čovjeka** u nepotpunoj grupi. Bot nikada nije vremensko polazište; dolazak novog čovjeka ne resetira čekanje ostalih.
 
-U redovnom radu prag Dvoboja izvlači se između 26 i 34 s, a pragovi Četveroboja između 17–23, 27–33 i 37–43 s. Odstupanja se izvlače jednom po epizodi čekanja, ne na svakom osvježavanju; tablica navodi njihove središnje vrijednosti. Kada red postane prazan ili grupa započne igru, sljedeća epizoda dobiva novi raspored.
+U redovnom radu prag Dvoboja izvlači se između 26 i 34 s, pragovi Troboja oko 20 i 30 s (s postojećim odstupanjem), a pragovi Četveroboja između 17–23, 27–33 i 37–43 s. Odstupanja se izvlače jednom po epizodi čekanja; tablica navodi središnje vrijednosti.
+
+<!-- HINT PR15: Troboj popuna 20/30 s; osam javnih redova (zajednički Dvoboj Klasični+KA-ZNA). -->
 
 | Situacija | Ponašanje |
 | --- | --- |
 | Dvoboj, jedan čovjek | Čeka do 30 s; na 30 s slobodan bot popunjava mjesto. |
 | Dvoboj, drugi čovjek stigne prije pokretanja | Igraju dva čovjeka; rezervirani bot se oslobađa. |
+| Troboj, 2 čovjeka | Jedan bot na ~20 s i početak. |
+| Troboj, 1 čovjek | Bot na ~20 s; drugi na ~30 s i početak. |
+| Troboj, 3 čovjeka | Početak odmah. |
 | Četveroboj, 3 čovjeka | Jedan bot na 20 s i početak. |
 | Četveroboj, 2 čovjeka | Bot na 20 s; drugi na 30 s i početak. |
 | Četveroboj, 1 čovjek | Botovi na 20 s, 30 s i 40 s; početak na 40 s. |
@@ -21,7 +26,7 @@ U redovnom radu prag Dvoboja izvlači se između 26 i 34 s, a pragovi Četverobo
 | Posljednji čovjek ode | Sve rezervacije grupe se oslobađaju. |
 | Nema slobodnog bota | Čeka se dalje; ponovno se razmatra kad se bot oslobodi. |
 
-Pragovi daju kumulativno najviše 1/2/3 bota u Četveroboju i 1 u Dvoboju, dodatno ograničeno slobodnim mjestima i fondom. Nova javna partija ne nastaje bez barem jednog čovjeka. Nakon pokretanja partije nema zamjene sudionika.
+Pragovi daju kumulativno najviše 1/2/3 bota u Četveroboju, 1/2 u Troboju i 1 u Dvoboju, uz fond. Nova javna partija ne nastaje bez barem jednog čovjeka. Nakon pokretanja partije nema zamjene sudionika.
 
 Rezervirani bot prikazuje se u čekaonici kao sudionik koji čeka od trenutka rezervacije. Pri početku partije čekaonica preuzima puna sjedala iz serverske poruke početka, tako da tijekom odbrojavanja prikazuje i konačne botove. Prikaz ne mijenja autoritativne rokove.
 
@@ -33,7 +38,7 @@ Tehnički oporavak dopušta najviše dva ponovna pokušaja nakon početnog poku�
 
 Samo u lokalnom razvojnom okruženju (`NODE_ENV=development`), radi bržeg testiranja javnog Dvoboja i Četveroboja, sva potrebna mjesta popunjavaju se botovima nakon 1 s čekanja, a javni botovi odigravaju nakon 2 s bez namjernog isteka. `BOTOVI_BRZI_RAZVOJ=false` vraća realni tempo i odstupanja popune. Popuna i dalje mora biti uključena za pojedini mod. Trening ostaje bez timera s odgovorom nakon 1–3 s. Staging i produkcija zadržavaju redovne pragove i tempo; `test` ne koristi slučajna odstupanja popune. Eksplicitni pragovi pojedinačnih testova imaju prednost.
 
-- Bot igra po **istim pravilima** kao čovjek: isti potez, timer, validacija, leksemske grupe, eliminacija i Kaladont-efekt. Potezi ljudi i botova prolaze istu obradu na poslužitelju.
+- Bot igra po **istim pravilima** kao čovjek: isti potez, timer, validacija, leksemske grupe, eliminacija, Kaladont-efekt i faza **dokaza** (Dokaži nastavak). Broj aktivnih utječe na rizik završetka „ka”. Potezi ljudi i botova prolaze istu obradu na poslužitelju.
 - Bot koristi **cijeli aktivni rječnik** dopušten pravilima partije. Nema legalne riječi koja je trajno nedostupna zbog položaja u popisu.
 - **Nenapadačka politika:** bot ne traži mrtve nastavke, ne gleda protivnikove mogućnosti i ne bira riječ prema broju protivnikovih nastavaka. Slučajan mrtvi nastavak smije se dogoditi. Pravilo je isto neovisno o tome je li sljedeći igrač čovjek ili bot.
 - **Izbor riječi (politika v3):** prvo se filtriraju „poznate” riječi (isključene su jako rijetke i one od 15+ grafema; duljine 10–14 imaju jači soft ponder). Među poznatim uobičajenim osnovnim oblicima zadano 90 % bira imenicu, a 10 % glagol ili pridjev. Oblik jednak lemi koristi se kao aproksimacija nominativa jednine / infinitiva / osnovnog pridjeva. Ako poželjnih nema, potez se broji kao težak (moguće „Ne znam”); bot ne pada na stručne/jako rijetke oblike. Unutar odabrane skupine svi kandidati imaju pozitivan ponder frekvencije i duljine. Sve izabrane riječi prolaze postojeću serversku validaciju i leksemske zabrane ponavljanja.
@@ -70,9 +75,9 @@ Postavke se učitavaju jednom pri pokretanju procesa. Ako trajni zapis još ne p
 
 ## Zagrijavanje
 
-- Dvoboj protiv jednog računalnog protivnika „Računalo” s jednim stalnim avatarom. Dostupno gostima i registriranima, uključujući nepotvrđen e-mail.
+- Trening odabranog pravilnika: **Klasični** = čovjek + 2 Računala; **KA-ZNA** i **Dokaži nastavak** = čovjek + 1 Računalo. Avatar „Računalo” je stalan. Dostupno gostima i registriranima.
 - Pokreće se odmah, bez javnog reda i bez trošenja javnog fonda botova. Igrač može imati samo jedan aktivni kontekst igranja (red, soba, partija ili trening).
-- Pravila valjanosti poteza i eliminacije identična su javnom Dvoboju, ali trening nema vremensko ograničenje poteza: nema automatskog ispadanja zbog čekanja ni prikaza timera. Računalo odigrava nakon 1–3 s; igrač može razmišljati bez roka.
+- Pravila valjanosti i eliminacije prate odabrani pravilnik; trening nema timer poteza. Računalo odigrava nakon 1–3 s.
 - Trening ne bilježi partiju, poteze ni natjecateljski napredak: nema bodova, XP-a, ranga, forme, nizova, kolekcije riječi ni općih dostignuća. Gostu i privremenom „Računalu” ne sprema se ništa.
 - Registrirani čovjek koji prirodno pobijedi dobiva napredak dostignuća **Zagrijan** na 1, 5, 20, 50 i 100 trening pobjeda. Ne dodjeljuje se pri izlasku, porazu, tehničkom prekidu ili neaktivnosti. Gosti nemaju dostignuće Zagrijan.
 - Neaktivni trening upozorava nakon 4 minute i tehnički se zatvara nakon 5 minuta bez ljudskog prihvaćenog poteza ili izričitog nastavka. Otkucaji veze i potezi Računala ne resetiraju neaktivnost. Zatvaranje nije pobjeda ni poraz.

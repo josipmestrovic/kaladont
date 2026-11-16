@@ -40,22 +40,23 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - H1 prikazuje „KALADONT online”; na desktopu su riječi u istom retku, a na mobitelu u dva retka. Oznaka **DEMO** i H1 dijele isti lijevi rub i poravnati su s lijevim rubom glavne navigacije. Oznaka verzije nije prikazana.
 - Animirane padajuće riječi u pozadini montiraju se samo na viewportu **širem od 1000 px**; na užim ekranima se ne pokreću. Uz `prefers-reduced-motion` animacija je isključena i na desktopu.
 - Uža glavna navigacija ima osnovne retke **Igraj**, **Pravila**, **Ljestvica** i **Moja statistika**. „Moja statistika” vodi na zadani statistički prikaz `/profil#statistika`. Sekundarne stavke imaju tamni standardni tekst i ikone, zelenu strelicu te tekst lijevo poravnat uz ikonu.
-- Glavna navigacija koristi vlastite SVG assete: `GiToothbrush` za Igraj, `GiSpellBook` za Pravila, `GiHoleLadder` za Ljestvicu, `GiGamepad` za Moju statistiku, `GiAutoRepair` za Postavke, `GiExitDoor` za Odjavu te `GiTwoShadows` za Prijavu i Registraciju. Modal igre koristi `GiLevelTwoAdvanced`, `GiLevelFourAdvanced` i `GiLockedDoor`.
+- Glavna navigacija koristi vlastite SVG assete: `GiToothbrush` za Igraj, `GiSpellBook` za Pravila, `GiHoleLadder` za Ljestvicu, `GiGamepad` za Moju statistiku, `GiAutoRepair` za Postavke, `GiExitDoor` za Odjavu te `GiTwoShadows` za Prijavu i Registraciju. Modal igre koristi ikone formata (uključujući Troboj) i privatne sobe.
 - Svi korisnici vide **Postavke** (`/postavke`, uz preusmjeravanje na `/profil?tab=postavke#postavke`); promjena teme dostupna je isključivo ondje. Registrirani korisnik dodatno vidi blago narančastu akciju **Odjavi se**. Gost vidi **Prijavi se** i **Registriraj se**. Editor avatara (`/profil/avatar`) dostupan je i gostima.
-- **Igraj** otvara modal sa slijedom: **Dvoboj** (`/red?mod=dva_igraca`, opis „2 igrača”), **Četveroboj** (`/red?mod=cetiri_igraca`, opis „4 igrača”), **Zagrijavanje** (`/zagrijavanje`, podnaslov „Igraj dvoboj protiv računala.”, ikona `19-vatra.png`) i **Privatna soba** (`/soba/kreiraj`). Modal zamućuje pozadinu.
+- <!-- HINT PR15: Igraj je dvokoračni — pravilnik pa format. -->
+- **Igraj** otvara modal u **dva koraka**: (1) pravilnik — Klasični Kaladont / KA-ZNA / Dokaži nastavak; (2) format — **Dvoboj**, **Troboj**, **Četveroboj**, zatim **Zagrijavanje** i **Privatna soba**. Javni ulazi nose `pravila` i `mod` u `/red`. Modal zamućuje pozadinu.
 - **Pravila** vode na `/pravila-kaladonta`, a **Ljestvice** na `/ljestvice`. Kratki SEO uvod ispod H1 vodi na hub pravila; na niskim ekranima ostaje u DOM-u (vizualno skriven) radi SEO-a. Vertikalni scroll na naslovnici je dopušten.
 - Tipografija na naslovnici: labele glavne navigacije **20px** (mobitel) / **24px** (desktop); prekidači **Font za disleksiju** i **Čitanje naglas** **16px** / **18px**. Ako labele prekidača ne stanu u jedan red, prelaze u drugi (bez truncatea).
-- Footer na dnu naslovnice sadrži izravne poveznice **O igri** (`/o-igri`), **Pomozi poboljšati igru** (`/povratne-informacije`), **Uvjeti** (`/uvjeti`) i **Privatnost** (`/privatnost`). CTA **pridruži zajednici** (forum, Umami `forum-klik-landing`) je u SEO uvodu ispod naslova, ne u footeru. Poveznice su vidljive gostima i prijavljenim korisnicima. Desktop ima navigaciju lijevo i „© 2026 Kaladont. Sva prava pridržana.” desno u istom retku; mobitel ima copyright odmah ispod navigacije.
+- Footer na dnu naslovnice sadrži **Novosti** (`/novosti`), **O igri** (`/o-igri`), **Pomozi poboljšati igru** (`/povratne-informacije`), **Uvjeti** (`/uvjeti`) i **Privatnost** (`/privatnost`). CTA **pridruži zajednici** (forum) je u SEO uvodu, ne u footeru. Desktop: navigacija lijevo, copyright desno; mobitel: copyright ispod navigacije.
 - Font za disleksiju i čitanje naglas nalaze se u **Postavkama** za goste i registrirane korisnike. Font mijenja tipografiju cijelog sučelja; čitanje naglas izgovara novu riječ na stolu Web Speech API-jem uz `hr-HR`. Postavke se spremaju lokalno u pregledniku. Uključeno čitanje naglas prikazuje globalnu obavijest koju korisnik može potvrditi.
 - Pravila (`/pravila-kaladonta/pristupacnost`) objašnjavaju govornu mogućnost i vode na upute za Android, iPhone/iPad, Windows, Mac i Linux. Ista tema opisuje disleksiju i moguću vrijednost jezične igre bez terapijskih tvrdnji.
 - Zaseban red poveznica Prijavi se / Registriraj se ispod navigacije ne prikazuje se; te su akcije dio jedinstvene navigacije gosta.
 
-## 2. Red čekanja (`/red?mod=cetiri_igraca|dva_igraca`)
+## 2. Red čekanja (`/red?mod=…&pravila=…`)
 
-- Ovisno o odabranom modu (4p ili 1v1), čekaonica prikazuje 4 ili 2 kružna mjesta.
-- Čim se skupe 4 (ili 2) igrača, pokreće se numerički countdown (6 s u stagingu/produkciji) i partija kreće.
-- Kad je popuna botovima uključena ([botovi.md](../02-pravila-igre/botovi.md)), rezervirani bot pojavljuje se na praznom mjestu kao sudionik koji čeka od trenutka rezervacije (Četveroboj: 20/30/40 s); u Dvoboju bot ulazi i partija kreće u istom trenutku (30 s). Prikaz ne nosi oznaku bota ni odbrojavanje do praga.
-- Gosti idu ravno u čekaonicu klikom na odabrani mod bez zapreka ili prompta za ime.
+- Čekaonica prikazuje 2, 3 ili 4 mjesta prema formatu (`dva_igraca` / `tri_igraca` / `cetiri_igraca`).
+- Čim se skupi pun stol, countdown (6 s u stagingu/produkciji) i partija kreće.
+- Popuna botovima: Četveroboj 20/30/40 s; Troboj ~20/30 s; Dvoboj ~30 s ([botovi.md](../02-pravila-igre/botovi.md)).
+- Gosti idu ravno u čekaonicu bez prompta za ime.
 
 ## 2d. Zagrijavanje (`/zagrijavanje`)
 
@@ -149,10 +150,11 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 - Stil igre prikazuje se odmah ispod XP-trake u bloku identiteta, na desktopu i mobitelu. Stil je „agresivan” iznad prosjeka 0,8 eliminacije po partiji, „uravnotežen” od 0,2 do uključivo 0,8, a „dobrica” ispod 0,2; bez partija je „neodređen”. Agresivan igrač traži priliku odigrati riječ koja će eliminirati sljedećeg igrača; uravnotežen nekad eliminira druge, ali mu to nije glavni prioritet; dobrica ne voli kad drugi ispadaju zbog njegove riječi. Stil „agresivan” je crven, „uravnotežen” neutralan, a „dobrica” zelen. Klik na podcrtani naziv stila ili gumb s upitnikom otvara objašnjenje iznad naziva; gumb X, klik izvan objašnjenja, pomicanje stranice ili Escape zatvaraju ga. **Prosječna ocjena igre** prikazuje se u statističkoj kartici „Ostalo” za oba načina.
 - Desno od avatara prikazuje se kompaktni izbor najviše šest istaknutih dostignuća, s njihovim ikonama i osvojenim zvjezdicama. Prikazuju se razine 2–5; prvo idu sva dostignuća s 4–5 zvjezdica, a zatim Iskusnjara razine 2–3 prije ostalih razina 2–3. Unutar skupine s jednakim brojem zvjezdica vrijedi prioritet: Iskusnjara, Glas zajednice, Kaladont!, Rijetkolovac, Dugometraš, Slijepa ulica, Lovac na glave, Završna riječ, KA-zna, Jezik u plamenu. Klik/dodir na ikonu prikazuje naziv, opis i napredak do sljedeće zvjezdice; Escape i klik izvan zatvaraju objašnjenje. Tooltip se otvara uz kliknutu ikonu i ostaje unutar ruba zaslona. Ispod 500 px ikone i zvjezdice smanjuju se za približno 20 %, razmak se smanjuje, a dostignuća ostaju u tri kolone i dva reda.
 - Gostu se prikazuju iste dostupne statistike, rekordi, dostignuća i kolekcija kao registriranom igraču; zaseban poziv na registraciju ostaje ispod zaglavlja. Gostu se ne prikazuje registracijski staž i javni profil gosta ne postoji. Na mobitelu istaknuta dostignuća ostaju uz avatar, a ime, XP i stil igre prikazuju se ispod gornjeg reda. Prosječna ocjena dostupna je u „Ostalo” statistike. Vlastiti profil ne ponavlja akcije Postavke i Odjavi se.
-- Vlastiti i javni profil koriste tabove **Četveroboj** i **Dvoboj** za statistiku. Sažetak svakog moda prikazuje `Odigrane`, `Pobjede` i `Porazi`; Aktivnost koristi ista imena modova. Tab **Aktivnost** i sadržaj povijesti partija vidljivi su isključivo administratoru na svim profilima; ostali korisnici, uključujući vlasnika vlastitog profila, nemaju prikaz ni API pristup. Modovi imaju odvojene rezultate, a broj sudionika je četiri odnosno dva.
-- Odjeljak „Riječi i streak” zajednički je za oba javna moda; promjena taba ne mijenja te brojke. Privatne sobe se ne računaju.
-- Registrirani igrači imaju javni read-only profil, primjerice `/profil/javni/:igracId`. Javni profil prikazuje nadimak, avatar, rang, rezultate, gamifikacijske statistike, najdužu i najrjeđu riječ, ali nikad email ili podatke za autentikaciju. Gosti nemaju javni profil.
-- Profil prikazuje mode-specific DNK naslove (`Kaladont DNK — Četveroboj` i `Kaladont DNK — Dvoboj`). U „Ostalo” Četveroboj prikazuje eliminacije po igri; oba moda prikazuju niz prihvaćenih riječi, prosjek prihvaćenog poteza, duge riječi po igri i rijetke riječi po igri.
+- Vlastiti profil prvo otvara karticu **Općenito** (jedan DNK radar, ukupne i po-format brojke), zatim **Statistika** s tabovima **Četveroboj / Troboj / Dvoboj**. Sažetak formata: `Odigrane`, `Pobjede`, `Porazi`. Tab **Aktivnost** / povijest partija samo administratoru.
+- Odjeljak „Riječi i streak” zajednički je za javne formate; privatne sobe se ne računaju.
+- Registrirani imaju javni profil `/profil/javni/:igracId` (bez emaila). Gosti nemaju javni profil.
+- <!-- HINT PR15: jedan DNK (PR10), ne zasebni naslovi po formatu. -->
+- Kaladont DNK je **jedan radar**; otključava se nakon 10 javnih ukupno. U „Ostalo” statistike ostaju po formatu.
   - `Otkriveno jako rijetkih riječi` — frekvencija `0`;
   - `Otkriveno srednje rijetkih riječi` — frekvencija `1–9`;
   - `Otkriveno rijetkih riječi` — frekvencija `10–99`;
@@ -173,10 +175,11 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 
 ## 8. Ljestvice (`/ljestvice?kategorija&mod&metrika&razdoblje&prikaz`)
 
-Jedna stranica s odabirima u URL-u (Natrag/Naprijed vraća odabir). Pravila poretka: [bodovanje-i-rangovi.md](../02-pravila-igre/bodovanje-i-rangovi.md#vremenske-ljestvice). Stara adresa `/ljestvica` preusmjerava ovamo. Zadani odabir: **Igrači → Četveroboj → Prosjek bodova → Tjedna → Top 10**.
-- Redoslijed od vrha: kategorija **Igrači | Najčešće riječi** (veći tabovi), način **Četveroboj | Dvoboj** (najjači naglasak), metrika (**Prosjek bodova | Niz pobjeda**; u Dvoboju Prosjek se prikazuje kao **Udio pobjeda** u postocima), pet razdoblja samo s nazivom, jedan statusni redak, tablica. Pri promjeni filtra odmah se prikaže učitavanje (stari rezultat ne ostaje pod novim odabirom).
-- Jedan redak iznad tablice za trenutačni odabir: npr. „Za ulazak treba 20 javnih igara. Reset u ponedjeljak u 00:00.” Osobni napredak samo za aktivni filter (npr. „Još 3 igre do poretka.” ili „Za prvi niz treba ti jedna pobjeda.”). Pravila izjednačenja otvaraju se na zahtjev. Godišnja piše „Novi poredak 1. siječnja.”; ostala razdoblja mogu pokazati „Resetira se za …”. Zaključano **Svih vremena** u prostoru rezultata: „Ljestvica svih vremena stiže {godina}.”
-- Tablica: Mjesto · Igrač · vrijednost metrike · Igre; najviše 10 redaka. Vlastiti redak (prema ID-u, ne nadimku) ima narančasti okvir i oznaku **Ovo si ti**. **Oko mene** (četiri iznad / pet ispod) samo kad je igrač rangiran **izvan Top 10**; u Top 10 i nerangiranima se odmah prikaže Top 10. Stari link s `prikaz=oko_mene` bez potrebe također pokazuje Top 10. Ispod tablice: proširiva **Pravila bodovanja** (ovise o Četveroboju/Dvoboju), zatim **Pravila izjednačenja**, zatim redak o pragu ulaska i resetu; ispod ostaje ~72 px praznog prostora.
+Jedna stranica s odabirima u URL-u. Pravila: [bodovanje-i-rangovi.md](../02-pravila-igre/bodovanje-i-rangovi.md#vremenske-ljestvice). Stara `/ljestvica` preusmjerava ovamo. Zadano: **Igrači → Četveroboj → Prosjek bodova → Tjedna → Top 10**.
+- Redoslijed: kategorija **Igrači | Najčešće riječi**, način **Četveroboj | Troboj | Dvoboj**, metrika (**Prosjek bodova | Niz pobjeda**; u Dvoboju Prosjek = **Udio pobjeda**), pet razdoblja, statusni redak, tablica.
+- <!-- HINT PR15: ulaz 5 dnevno / 10 dulje (PR11). -->
+- Statusni redak npr. „Za ulazak treba 5 (dnevno) ili 10 (dulje) javnih igara tog formata.” Osobni napredak samo za aktivni filter. Zaključano **Svih vremena**: „Ljestvica svih vremena stiže {godina}.”
+- Tablica: Mjesto · Igrač · metrika · Igre; Top 10; **Oko mene** izvan Top 10. Ispod: **Pravila bodovanja** (po formatu), **Pravila izjednačenja**, prag/reset.
 - Greška učitavanja prikazuje poruku i gumb „Pokušaj ponovno”, nikad „nije odigrano”.
 - Na mobitelu se razdoblja slažu u dva stupca, tablica u retke s `data-label` oznakama bez vodoravnog pomicanja.
 - Kategorija **Najčešće riječi**: Top 10 zadano najučestalijih ljudskih riječi iz **završenih javnih** partija (stvarna upotreba iz `potezi`, ne statička frekvencija iz uvoznog korpusa; privatne, poništene i botovi se ne broje; čovjek protiv bota broji se čovjeku). Stupci: riječ, broj ponavljanja; bez uvoda iznad tablice. Gumb **„Učitaj do 100"** s loading indikatorom; nema osobnih pozicija.
@@ -190,11 +193,11 @@ Jedna stranica s odabirima u URL-u (Natrag/Naprijed vraća odabir). Pravila pore
 
 ## 10. Statične stranice
 
-- `/pravila-kaladonta` i `/pravila-kaladonta/{tema}` (`kako-igrati` → kanonski root hub, te `nacini|bodovi|napredak|dnk|pristupacnost|pitanja`) — hub i teme s jedinstvenim title/H1 po temi, BreadcrumbList i FAQPage JSON-LD na pitanjima. Stari `?tema=` te `/pravila` i `/pomoc` preusmjeravaju 308 na path. Samo naslovnica (`/`) i hub (`/pravila-kaladonta`) imaju `index, follow`; teme pravila i ostale app rute (uključujući `/o-igri`) su `noindex, follow`. Sitemap sadrži samo ta dva URL-a.
-- Stranica **O igri** (`/o-igri`) prikazuje prijateljski overview igre, release/novosti te **atribuciju hrLexa** prema [izvor-i-licenca.md](../04-rjecnik/izvor-i-licenca.md#tekst-atribucije-za-stranicu-o-igri), CC BY-SA 4.0 za izvedeni rječnik, atribuciju Micaha Laniera i CC BY 4.0 za tuđe dijelove avatara, statistiku rječnika i kontakt. Uključuje CTA **Pridruži se zajednici** prema forumu (Umami event `forum-klik-o-igri`). Nije SEO target (`noindex`). Vlastite PNG ikone ne nose zastarjelu atribuciju zamijenjenog paketa. Lucide/Feather licencne obavijesti dostupne su na `/licence/lucide.txt`. Navod o pridržanim pravima izvornog koda i vlastitih ilustracija ne mijenja te licence. Stara adresa `/novosti` preusmjerava ovamo.
-- `/privatnost`, `/uvjeti` — pravni minimum (vidi [sigurnost-i-privatnost.md](../07-operacije/sigurnost-i-privatnost.md)).
-- `/zahvala` — javna zahvalna stranica nakon registracije s navigacijom prema glavnim akcijama i stranici `/o-igri`.
-- `/novosti` — preusmjerava na `/o-igri`.
+- `/pravila-kaladonta` i `/pravila-kaladonta/{tema}` — hub i teme; BreadcrumbList i FAQPage JSON-LD. Stari `?tema=`, `/pravila`, `/pomoc` → 308. Indeksabilni: `/`, `/pravila-kaladonta`, `/novosti`. `/o-igri` i teme pravila: `noindex, follow`. Sitemap: `/`, `/pravila-kaladonta`, `/novosti`.
+- **O igri** (`/o-igri`) — overview, licence/hrLex, statistika rječnika, CTA foruma; link na **Novosti**. Nije SEO target (`noindex`).
+- `/privatnost`, `/uvjeti` — pravni minimum.
+- `/zahvala` — nakon registracije.
+- **`/novosti`** — javni indeks objava (najnovija prva); prvo izdanje **Kaladont 0.2.0** sa sidrom `#v0-2-0`, datum 17. 11. 2026. Više nije redirect.
 
 ## Responzivnost
 

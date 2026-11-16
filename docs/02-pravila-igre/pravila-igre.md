@@ -2,14 +2,31 @@
 
 Ovaj dokument je autoritativan opis pravila. Sve druge datoteke, uključujući kod i UI tekstove, moraju biti usklađene s njim.
 
-## Postava i modovi
+## Postava, formati i pravilnici
 
-- **Četveroboj** igraju točno 4 igrača. Na početku svake partije sjedala se nepristrano nasumično promiješaju, a igra ide u krug prema tom fiksnom redoslijedu.
-- **Dvoboj** igraju točno 2 igrača. Početna sjedala i prvi igrač odabiru se nasumično; nakon svakog poteza na redu je protivnik.
-- Gosti i registrirani igrači igraju pod istim pravilima.
-- **Privatna soba** prima 2 do 8 igrača. Sjedala se nepristrano nasumično promiješaju na početku svake partije i zatim ostaju fiksna. Vlasnik može odabrati trajanje poteza (15, 30 ili 60 sekundi ili bez tajmera), dopuštene vrste riječi i želi li bodove za izazvane eliminacije. Imenice su uvijek dopuštene. Pravila nastavaka, grafema, ponavljanja i Kaladont-efekta ostaju ista.
-- Javni modovi koriste javni red čekanja, bodovanje, rangove i ljestvice. Privatna soba koristi samo svoju privremenu ljestvicu; njezin rezultat ne mijenja javne bodove ni rang.
-- U javnom redu ljudi imaju prednost; prazna mjesta nakon isteka pragova popunjavaju **botovi** koji igraju po istim pravilima, a ljudima vrijedi isti obračun kao i bez botova. **Zagrijavanje** je Dvoboj protiv računala u kojem se ništa ne bilježi. Detalji su u [botovi.md](botovi.md).
+<!-- HINT PR15: format stola ≠ pravilnik ≠ kontekst (javna/privatna/trening). -->
+
+Format javnog stola i pravilnik odvojene su osi. Pod „Igraj” igrač prvo bira pravilnik, zatim format.
+
+### Formati stola
+
+- **Četveroboj** — točno 4 igrača. Sjedala se nepristrano nasumično promiješaju; igra ide u krug.
+- **Troboj** — točno 3 igrača. Isto pravilo sjedala i kružnog reda. Prelazak na dva aktivna ne mijenja format ni bodovanje.
+- **Dvoboj** — točno 2 igrača. Početna sjedala i prvi igrač biraju se nasumično.
+- Gosti i registrirani igraju pod istim pravilima.
+- **Privatna soba** prima 2 do 8 igrača. Domaćin bira pravilnik, trajanje poteza (15/30/60 s ili bez tajmera), vrste riječi i bodove za eliminacije. Imenice su uvijek dopuštene.
+- Javni formati koriste javni red, bodovanje, jedan univerzalni rang i ljestvice po formatu. Privatna soba ima samo privremenu ljestvicu.
+- U javnom redu prazna mjesta nakon pragova popunjavaju **botovi**. **Zagrijavanje** igra odabrani pravilnik: Klasični ima čovjeka + 2 Računala; KA-ZNA i Dokaži nastavak čovjeka + 1 Računalo. Detalji: [botovi.md](botovi.md).
+
+### Pravilnici
+
+| Pravilnik | Posebna riječ na „ka” | „Ne znam” / istek | Mrtva slova |
+|---|---|---|---|
+| **Klasični Kaladont** | Ispada sljedeći aktivni iza autora posebne riječi | Redovna eliminacija igrača na potezu | Ispada sljedeći na redu |
+| **KA-ZNA** | Ispada autor riječi koja je ostavila „ka” (današnje ponašanje) | Redovna eliminacija | Ispada sljedeći na redu |
+| **Dokaži nastavak** | Kao KA-ZNA | Može otvoriti dokaz autoru prethodne riječi | Odmah ispada **autor** riječi; nema eliminacijskog boda |
+
+U spojenom javnom Dvoboju (Klasični + KA-ZNA) motor izvodi **KA-ZNA**; svaki igrač i dalje vidi vlastiti odabrani naziv. Stare partije i stari klijenti bez pravilnika = KA-ZNA.
 
 Redoslijed sjedala dodjeljuje se jednom na početku partije i određuje kružni red poteza; sjedalo 0 započinje prvi potez. Svaki igrač vidi isti red sjedala iz vlastite perspektive, zakrenut tako da je njegovo sjedalo prvo. Ta je zakrenuta projekcija samo prikaz: potez, timer i eliminacije i dalje se određuju prema identitetu koji pošalje poslužitelj. Eliminirani igrači ostaju na svojem mjestu do kraja partije.
 
@@ -18,8 +35,8 @@ Redoslijed sjedala dodjeljuje se jednom na početku partije i određuje kružni 
 1. Sustav bira početnu riječ; igrač je nikada ne bira sam. Prvo se pokušava odabrati riječ iz odobrenog skupa sigurnih riječi. Sigurnosni uvjet i rezervni odabir opisani su u odjeljku [Otvaranje runde](#otvaranje-runde).
 2. Igrač na potezu odgovara riječju koja počinje na zadnja dva grafema prethodne riječi. Javni potez traje 30 sekundi. Privatna soba može imati 15, 30 ili 60 sekundi ili biti bez tajmera.
 3. Nevaljan upis odbija se uz razlog. Igrač ne ispada odmah i može pokušati ponovno, ali njegov timer nastavlja teći.
-4. Nakon eliminacije ili Kaladont-efekta sustav bira novu početnu riječ, a red se nastavlja prema pravilima konkretnog moda.
-5. Partija završava kada ostane jedan igrač. U Dvoboju prvi koji ispadne odmah gubi.
+4. Nakon eliminacije ili Kaladont-efekta sustav bira novu početnu riječ (osim dokaznog prijelaza u Dokaži nastavak, gdje se ne bira nova riječ između odustajanja i dokaza).
+5. Partija završava kada ostane jedan igrač. U Dvoboju prva eliminacija završava partiju.
 
 ## Grafemi
 
@@ -75,39 +92,49 @@ Ako nijedan od 52 kandidata trenutačno ne zadovolji sva tri uvjeta, sustav kori
 
 Početna riječ troši svoje leksemske grupe kao i riječ igrača. Nakon objave na potez dolazi sljedeći aktivni igrač; njegov timer počinje tek tada. To vrijedi i kada se rundu otvara nakon eliminacije ili Kaladont-efekta.
 
-## Kaladont efekt
+## Kaladont efekt i dokaz
 
-„Kaladont” i „kalodont” imaju posebno pravilo kada se odigraju na `ka`:
+„Kaladont” i „kalodont” smiju se ponavljati. Posebno pravilo vrijedi samo kad se odigraju na traženi `ka`, a igrač je na potezu.
 
-1. Ne ispada sljedeći igrač, nego igrač čija je riječ otvorila nastavak `ka`.
-2. Bod za eliminaciju dobiva igrač koji je odigrao kaladont.
-3. Sustav zatim bira novu riječ za otvaranje runde.
+1. **KA-ZNA** i **Dokaži nastavak** (običan potez): ispada autor riječi koja je ostavila `ka`; uzročnik je igrač s posebnom riječju; nova sistemska riječ ide prvom aktivnom iza njega (kao danas).
+2. **Klasični Kaladont**: ispada prvi aktivni *iza* autora posebne riječi; uzročnik je i dalje onaj tko je rekao kaladont; nova riječ ide prvom aktivnom iza žrtve.
+3. Ako je `ka` otvorio sustav, nitko ne ispada i sustav odmah otvara novu rundu.
+4. U privatnoj sobi eliminacijski bod vrijedi samo ako ga je domaćin uključio.
 
-Ako je `ka` otvorio sustav, nema igrača koji bi ispao: nitko ne dobiva bod, a sustav odmah otvara novu rundu.
+### Dokaži nastavak — odgođena eliminacija
 
-„Kaladont” i „kalodont” mogu se ponoviti i daju posebnu nagradu XP-a u javnim partijama. Pravilo o tome tko ispada vrijedi neovisno o postavci eliminacijskih bodova privatne sobe; u privatnoj sobi bod se dodjeljuje samo ako je vlasnik uključio bodove za eliminacije.
+Kad Bruno na potezu kaže „Ne znam”, istekne ili napusti, a postoji igrivi nastavak na Aninu riječ, Ana dobiva **potez dokaza** (isti prefiks, novi rok). Dotad nema plasmana ni eliminacijskog boda.
+
+- Ana uspije (npr. „ćaća”) → **samo Bruno ispada**; Ana je uzročnik; nova **sistemska** riječ za prvog aktivnog iza Brune.
+- Ana ne uspije / „Ne znam” / istek → **samo Ana ispada**; Bruno ostaje; nitko ne dobiva eliminacijski bod; nova sistemska riječ za prvog aktivnog iza Ane.
+- Ako Ana odmah odigra riječ bez nastavka (npr. „cement”) → **odmah ispada samo Ana** (RS-31); Bruno ostaje.
+
+Rubni slučajevi: RS-31, RS-32 u [rubni-slucajevi.md](rubni-slucajevi.md).
 
 ## Ispadanje
 
 | Način | Opis | Bod napadaču? |
 |---|---|---|
-| **Ne znam** | Igrač predaje potez | Da |
-| **Istek vremena** | Timer istekne bez valjane riječi | Da |
-| **Mrtva slova** | Nema nijedne dostupne riječi na tražena dva grafema | Da |
-| **Prekid veze** | Igrač se ne vrati u 10 sekundi od prekida | Samo ako je bio na potezu |
-| **Kaladont** | Primjenjuje se posebno pravilo iznad | Da |
+| **Ne znam** | Predaja poteza; u Dokaži nastavak može otvoriti dokaz | Ovisi (dokaz: ne odmah) |
+| **Istek vremena** | Timer istekne bez valjane riječi | Ovisi (dokaz: ne odmah) |
+| **Mrtva slova** | Nema dostupne riječi; u Dokaži nastavak ispada autor | Da, osim mrtvih slova autora u dokazu |
+| **Prekid veze** | Igrač se ne vrati u 10 sekundi | Samo ako je bio na potezu |
+| **Kaladont** | Posebno pravilo po pravilniku | Da (kad postoji žrtva) |
+| **Neuspješan dokaz** | Autor ne dokaže nastavak | Ne |
 
-Ako rječnik nema riječ koja počinje traženim grafemima, sljedeći igrač ispada odmah, bez čekanja da istekne vrijeme. Igrač koji je otvorio taj par dobiva bod za eliminaciju u javnom Četveroboju, a moguću rupu u rječniku može prijaviti. Ako riječi postoje, ali su sve njihove leksemske grupe već potrošene, sljedeći igrač također odmah ispada; to je uobičajena taktička situacija i ne prijavljuje se kao rupa u rječniku.
+U Klasičnom i KA-ZNA, ako nema nastavka, sljedeći igrač ispada odmah. U Dokaži nastavak autor riječi bez nastavka ispada odmah (RS-31).
 
 Igrač se nakon prekida veze može vratiti u roku od 10 sekundi od trenutka kada igra utvrdi prekid, koristeći isti identitet. Vrijeme poteza nastavlja teći i tijekom prekida. Ako igrač nije bio na potezu, ispada bez boda za protivnika; ako je bio na potezu, bod može dobiti igrač koji mu je ostavio tražena slova. Namjerni izlazak iz partije odmah eliminira igrača i nema razdoblja za povratak.
 
-U Četveroboju prvi ispali zauzima četvrto mjesto, sljedeći treće, a zatim drugi; posljednji preostali igrač pobjeđuje. Eliminirani igrači ostaju promatrači do kraja partije. U Dvoboju prva eliminacija završava partiju.
+U Troboju i Četveroboju plasman prati redoslijed stvarnog ispadanja (prvi ispao = zadnje mjesto). Eliminirani ostaju promatrači. U Dvoboju prva eliminacija završava partiju.
 
 ## Bodovanje
 
-- **Četveroboj:** plasman donosi 0, 1, 2 ili 3 boda; svaka izazvana eliminacija donosi 1 bod; pobjednik dobiva dodatni bod. Maksimum je 7 bodova po partiji.
-- **Dvoboj:** pobjednik dobiva 1 bod, poraženi 0. Dvoboj ima zasebne statistike, rang, kalibraciju i ljestvicu od Četveroboja.
-- **Privatne sobe:** vlasnik bira dodjeljuju li se bodovi za izazvane eliminacije. Bodovi i pobjede zbrajaju se samo na privremenoj ljestvici aktivne sobe; privatni rezultat ne mijenja javne bodove, javni rang ni ljestvicu.
+- **Četveroboj:** plasman 3/2/1/0 + 1 pobjedniku + 1 po izazvanoj eliminaciji; maksimum **7**.
+- **Troboj:** plasman 2/1/0 + 1 pobjedniku + 1 po eliminaciji; maksimum **5**.
+- **Dvoboj:** pobjednik 1, poraženi 0.
+- Statistike, forma, niz i ljestvice su **po veličini stola**; pravilnici se spajaju unutar formata. **Rang i Kaladont DNK** su jedni za sve javne formate (kalibracija 10 ukupno).
+- **Privatne sobe:** domaćin bira bodove za eliminacije; rezultat ne mijenja javni rang ni ljestvice.
 
 Detaljna pravila bodova, XP-a, ocjene partije, rangova, niza pobjeda i dostignuća nalaze se na stranici [Bodovanje i rangovi](bodovanje-i-rangovi.md).
 

@@ -8,7 +8,8 @@ function urlZapisa(putanja: string): string {
 }
 
 export function GET() {
-  const putanje = ['/', '/pravila-kaladonta'];
+  // HINT PR15: /novosti je javna indeksabilna stranica izdanja (ne redirect).
+  const putanje = ['/', '/pravila-kaladonta', '/novosti'];
 
   const tijelo = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
