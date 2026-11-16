@@ -1781,12 +1781,13 @@
         </p>
       </div>
     {:else}
-      {#if stanje.ishodDokazaPoruka}
-        <p class="dokaz-ishod" role="status" aria-live="polite">{stanje.ishodDokazaPoruka}</p>
-      {/if}
       {#if stanje.statusSpremanja === 'spremanje_rezultata'}
         <div class="zavrsni-sazetak" aria-live="polite">
-          {#if stanje.eliminacije.at(-1)}<p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>{/if}
+          {#if stanje.ishodDokazaPoruka}
+            <p class="sustav-bira-obrazlozenje">{stanje.ishodDokazaPoruka}</p>
+          {:else if stanje.eliminacije.at(-1)}
+            <p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>
+          {/if}
           <p class="odbrojavanje-najava">Spremanje rezultata…</p>
         </div>
       {:else if stanje.sustavBiraRijec}

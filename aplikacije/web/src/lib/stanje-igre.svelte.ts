@@ -465,12 +465,16 @@ export function pokreniSlusateljeIgre(): void {
       stanje.zadnjaRijecIgracId = p.bodZa;
       stanje.zadnjaRijecVrsta = 'rijec';
     }
+    // HINT Bugbot: napuštanje čekača (prekid) dok traje dokaz → cekateljVecIspao, dokaz ostaje otvoren.
     if (bioDokaz && dokazSnimka) {
       const autor = nadimakIgraca(dokazSnimka.autorId);
       const cekatelj = nadimakIgraca(dokazSnimka.cekateljId);
-      if (p.igracId === dokazSnimka.cekateljId) {
-        // HINT: rod nepoznat — muški oblik kao u ostalim porukama igre.
+      if (p.igracId === dokazSnimka.cekateljId && p.razlog === 'prekid') {
+        stanje.dokaz = { ...dokazSnimka, cekateljVecIspao: true };
+      } else if (p.igracId === dokazSnimka.cekateljId) {
         zapisiIshodDokaza(`${autor} je dokazao nastavak. ${cekatelj} ispada.`);
+        stanje.dokaz = null;
+        stanje.faza = 'sustav_bira';
       } else if (p.igracId === dokazSnimka.autorId) {
         if (p.razlog.startsWith('mrtva_slova')) {
           const slova = (p.slova ?? dokazSnimka.trazenaSlova).toUpperCase();
@@ -478,22 +482,28 @@ export function pokreniSlusateljeIgre(): void {
         } else {
           zapisiIshodDokaza(`${autor} nije dokazao nastavak. ${autor} ispada.`);
         }
+        stanje.dokaz = null;
+        stanje.faza = 'sustav_bira';
       }
-      stanje.dokaz = null;
-      stanje.faza = 'sustav_bira';
+      // Treća osoba ispala tijekom dokaza: ne diraj snimku dokaza.
     }
-    // HINT PR14: ne sudi lokalno iz broja avatara — čekaj statusSpremanja / kraj sa servera.
-    // Optimistično samo ugasi aktivni unos; sustav_bira ostaje dok ne stigne runda-otvorena.
+    // HINT PR14/Bugbot: dok dokaz traje ne zaključuj partiju lokalno (čekač može biti već ispao).
+    const dokazJosTraje = stanje.faza === 'dokaz_nastavka' && stanje.dokaz !== null;
     const aktivni = stanje.sjedala.filter(
       (s) => !stanje.eliminacije.some((e) => e.igracId === s.igracId),
     ).length;
-    if (aktivni <= 1) {
+    if (!dokazJosTraje && aktivni <= 1) {
       if (stanje.statusSpremanja === 'nije_zavrsena') stanje.statusSpremanja = 'spremanje_rezultata';
       stanje.sustavBiraRijec = false;
       stanje.faza = 'zavrsena';
       stanje.naPotezuId = null;
       stanje.istekPotezaIso = null;
-    } else if (p.razlog !== 'prekid' && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena') {
+    } else if (
+      !dokazJosTraje &&
+      p.razlog !== 'prekid' &&
+      !stanje.kraj &&
+      stanje.statusSpremanja === 'nije_zavrsena'
+    ) {
       stanje.sustavBiraRijec = true;
       stanje.faza = 'sustav_bira';
       stanje.naPotezuId = null;

@@ -92,12 +92,11 @@
       {#if korak === 'pravilnik'}
         <p class="modal-nadnaslov">Odaberi pravilnik</p>
         <h2 id="modal-naslov">Kako želiš igrati?</h2>
-        <div class="modal-opcije" role="list">
+        <div class="modal-opcije">
           {#each REDOSLIJED_PRAVILNIKA as pravila (pravila)}
             <button
               type="button"
               class="modal-opcija"
-              role="listitem"
               onclick={() => odaberiPravilnik(pravila)}
             >
               <span class="modal-opcija-ikona" aria-hidden="true" data-pravila={pravila}></span>
@@ -111,12 +110,11 @@
       {:else if odabranaPravila}
         <p class="modal-nadnaslov">{TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv}</p>
         <h2 id="modal-naslov">Odaberi stol</h2>
-        <div class="modal-opcije" role="list">
+        <div class="modal-opcije">
           {#each FORMATI as mod (mod)}
             <a
               href={putanjaJavnogReda(mod, odabranaPravila)}
               class="modal-opcija"
-              role="listitem"
               data-mod={mod}
             >
               {#if mod === 'dva_igraca'}
@@ -136,7 +134,6 @@
           <a
             href={putanjaZagrijavanja(odabranaPravila)}
             class="modal-opcija"
-            role="listitem"
             data-izbor="zagrijavanje"
           >
             <img src="/ikone/67-zagrijavanje-bot.webp" alt="" aria-hidden="true" />
@@ -148,7 +145,6 @@
           <a
             href={putanjaPrivatneKreacije(odabranaPravila)}
             class="modal-opcija"
-            role="listitem"
             data-izbor="privatna"
           >
             <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" />

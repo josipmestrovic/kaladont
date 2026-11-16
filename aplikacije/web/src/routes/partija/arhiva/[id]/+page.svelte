@@ -34,9 +34,17 @@
     return new Date(datum).toLocaleString('hr-HR', { dateStyle: 'medium', timeStyle: 'short' });
   }
 
-  /** PR14: ljudski razlog ispadanja za arhivu. */
-  function tekstIspadanja(nacin: string | null): string {
+  /**
+   * PR14: ljudski razlog ispadanja.
+   * HINT Bugbot: motor ne piše dokaz_uspjeh/neuspjeh — žrtve dokaza ostaju ne_znam/istek;
+   * uz pravilnik dokazi_nastavak preimenuj u jasniji tekst.
+   */
+  function tekstIspadanja(nacin: string | null, pravila?: string): string {
     if (!nacin || nacin === 'pobjednik') return '';
+    if (pravila === 'dokazi_nastavak') {
+      if (nacin === 'ne_znam') return 'Dokaz / Ne znam';
+      if (nacin === 'istek') return 'Dokaz / istek vremena';
+    }
     const mapa: Record<string, string> = {
       kaladont: 'Kaladont',
       istek: 'Istek vremena',
@@ -45,8 +53,6 @@
       mrtva_slova_iskoristeno: 'Sve iskorišteno',
       prekid: 'Izgubljena veza',
       ne_znam: 'Ne znam',
-      dokaz_neuspjeh: 'Neuspješan dokaz',
-      dokaz_uspjeh: 'Dokazan nastavak (žrtva)',
     };
     return mapa[nacin] ?? nacin;
   }
@@ -124,8 +130,8 @@
               <small>Gost</small>
             {/if}
             <small>{igrac.bodovi} bodova · {igrac.eliminacije} eliminacija</small>
-            {#if tekstIspadanja(igrac.nacinIspadanja)}
-              <small class="razlog-ispadanja">Ispadanje: {tekstIspadanja(igrac.nacinIspadanja)}</small>
+            {#if tekstIspadanja(igrac.nacinIspadanja, arhiva.pravila)}
+              <small class="razlog-ispadanja">Ispadanje: {tekstIspadanja(igrac.nacinIspadanja, arhiva.pravila)}</small>
             {/if}
           </div>
           {#if !igrac.jeBot}

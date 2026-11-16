@@ -150,7 +150,10 @@ test('PR02-12/19: puni završni DTO u ciljanom DOM redoslijedu; pohvale nepromij
     await expect(stranica.getByText(/Odigrani oblik:/)).toBeVisible();
     await expect(stranica.getByText('Jako duga riječ')).toBeVisible();
     await expect(stranica.getByText('Jako rijetka riječ')).toBeVisible();
-    await expect(stranica.getByRole('link', { name: 'Igraj opet' })).toHaveAttribute('href', '/red?mod=dva_igraca');
+    await expect(stranica.getByRole('link', { name: 'Igraj opet' })).toHaveAttribute(
+      'href',
+      '/red?mod=dva_igraca&pravila=ka_zna',
+    );
   } finally {
     await zatvoriIgrace(igraci);
   }

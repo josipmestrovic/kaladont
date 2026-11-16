@@ -57,14 +57,20 @@ test('spojeni Dvoboj: Klasični i KA-ZNA dijele red, svaki vidi svoj pravilnik',
   }
 });
 
-test('Troboj: tri sjedala i oznaka pravilnika u čekaonici', async ({ browser }) => {
+test('Troboj: tri sjedala (lobby oznaka ili stol)', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
     await udjiUJavniRed(igraci, 'tri_igraca', 'dokazi_nastavak');
-    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Troboj', {
-      timeout: 20_000,
-    });
-    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Dokaži');
+    // Match može odmah u partiju — oznaka je na lobbyju; stol mora imati 3 sjedala.
+    await Promise.race([
+      igraci[0]!.stranica.getByTestId('red-oznaka-izbora').waitFor({ state: 'visible', timeout: 20_000 }),
+      igraci[0]!.stranica.waitForURL(/\/partija\/[0-9a-f-]+$/, { timeout: 30_000 }),
+    ]).catch(() => undefined);
+    const oznaka = igraci[0]!.stranica.getByTestId('red-oznaka-izbora');
+    if (await oznaka.isVisible().catch(() => false)) {
+      await expect(oznaka).toContainText('Troboj');
+      await expect(oznaka).toContainText('Dokaži');
+    }
     await cekajIstuPartiju(igraci);
     for (const { stranica } of igraci) {
       await expect(stranica.locator('.igraci-red > li')).toHaveCount(3);
