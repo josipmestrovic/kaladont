@@ -396,13 +396,15 @@ jobs:
         shell: bash
         run: rm -rf "$RUNNER_TEMP/ssh"
 
-  # Pokreće se samo kad je objava ujedno i izdanje (ADR-018). Nema produkcijskih tajni ni
-  # Environmenta; pisanje u repozitorij ograničeno je na ovaj job. Pad ovog joba ne vraća deploy:
-  # dovoljno je ponoviti samo njega („Re-run failed jobs”).
+  # Pokreće se samo kad je promocija uspjela i objava je ujedno izdanje (ADR-018).
+  # Custom if zamjenjuje default success(), pa eksplicitno tražimo result == success —
+  # inače bi job išao i nakon pala deploya/healtha ako je vrsta_objave već postavila izlaz.
+  # Nema produkcijskih tajni ni Environmenta; pisanje u repozitorij ograničeno je na ovaj job.
+  # Pad ovog joba ne vraća deploy: dovoljno je ponoviti samo njega („Re-run failed jobs”).
   izdanje:
     name: Objaviti CalVer oznaku i GitHub Release
     needs: promocija
-    if: ${{ needs.promocija.outputs.vrsta == 'izdanje' }}
+    if: ${{ needs.promocija.result == 'success' && needs.promocija.outputs.vrsta == 'izdanje' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write

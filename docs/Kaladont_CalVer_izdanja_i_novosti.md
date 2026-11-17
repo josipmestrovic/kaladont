@@ -390,7 +390,7 @@ Budući da je korak prije SSH pripreme, blokirana promocija ne dira produkciju i
   izdanje:
     name: Objaviti CalVer oznaku i GitHub Release
     needs: promocija
-    if: ${{ needs.promocija.outputs.vrsta == 'izdanje' }}
+    if: ${{ needs.promocija.result == 'success' && needs.promocija.outputs.vrsta == 'izdanje' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
