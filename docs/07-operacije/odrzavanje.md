@@ -112,5 +112,5 @@ pnpm --filter posluzitelj prijelaz-ljestvice-pr11 -- --primijeni=DA
 ```
 
 - Ne skenirati zatvorena razdoblja; ne izmišljati povijesne Top10 ulaske.
-- Dist-only container (isti obrazac kao PR09): `node /tmp/pokreni-prijelaz-ljestvice-pr11.mjs --usporedi` (skopiraj `tmp-ci/pokreni-prijelaz-ljestvice-pr11.mjs`).
+- Dist container: `node dist/cli/prijelaz-ljestvice-pr11.js --usporedi` (podržan `.js` ulaz). Za stare imageove s `.ts`-only checkom: `node /tmp/pokreni-prijelaz-ljestvice-pr11.mjs --usporedi` (skopiraj `tmp-ci/pokreni-prijelaz-ljestvice-pr11.mjs`).
 - HINT za produkcijski checklist 0.2.0: uz PR09 backfill (ako još nije) + ovaj PR11 prijelaz.
