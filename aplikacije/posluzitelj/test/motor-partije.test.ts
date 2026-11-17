@@ -1679,6 +1679,8 @@ describe('motor partije - Dokaži nastavak (PR05)', () => {
         cekateljId: string;
         turnToken: string;
         trazenaSlova: string;
+        razlogOtvaranja: string;
+        cekateljVecIspao: boolean;
       }>(
         igraciListe.map((ig) => ig.socket),
         'dokaz:zatrazen',
@@ -1701,6 +1703,8 @@ describe('motor partije - Dokaži nastavak (PR05)', () => {
       const dokaz = await dokazPromise;
       expect(dokaz.autorId).toBe(ana.token);
       expect(dokaz.cekateljId).toBe(bruno.token);
+      expect(dokaz.razlogOtvaranja).toBe('ne_znam');
+      expect(dokaz.cekateljVecIspao).toBe(false);
       expect(await ranaEliminacija).toBe('nije');
 
       const potroseneNakon = uzGrupe(potrosene, await grupeRijeci(anaRijec));
@@ -1719,6 +1723,62 @@ describe('motor partije - Dokaži nastavak (PR05)', () => {
       const novaRunda = await novaRundaPromise;
       const aktivni = new Set(pocetak.sjedala.map((s) => s.igracId).filter((id) => id !== bruno.token));
       expect(novaRunda.naPotezuId).toBe(sljedeciUKrugu(pocetak.sjedala, bruno.token, aktivni));
+    } finally {
+      odspojiIgrace(igraciListe);
+    }
+  });
+
+  it('Bruno Ne znam → Ana dokaže → Bruno ispada → Ana pobjeda', async () => {
+    const { igraciListe, pocetak, runda } = await pokreniDokazi(2);
+    try {
+      const potrosene = new Set(await grupeRijeci(runda.rijec));
+      const anaRijec = await pronadjiRijecNaPrefiks(runda.trazenaSlova, potrosene);
+      const ana = igraciListe.find((ig) => ig.token === runda.naPotezuId)!;
+      const prihvacenoPromise = cekajPrihvacenOdIgraca(ana.socket, ana.token);
+      ana.socket.emit('potez:rijec', { rijec: anaRijec, turnToken: runda.turnToken });
+      const prihvaceno = await prihvacenoPromise;
+      const bruno = igraciListe.find((ig) => ig.token === prihvaceno.sljedeciId)!;
+
+      const dokazPromise = cekajEventNaBiloKojem<{
+        autorId: string;
+        cekateljId: string;
+        turnToken: string;
+        trazenaSlova: string;
+        razlogOtvaranja: string;
+        cekateljVecIspao: boolean;
+      }>(
+        igraciListe.map((ig) => ig.socket),
+        'dokaz:zatrazen',
+        () => true,
+        8_000,
+        'PR05 2p dokaz zatražen',
+      );
+      bruno.socket.emit('potez:ne-znam', { turnToken: prihvaceno.turnToken });
+      const dokaz = await dokazPromise;
+      expect(dokaz.autorId).toBe(ana.token);
+      expect(dokaz.cekateljId).toBe(bruno.token);
+      expect(dokaz.razlogOtvaranja).toBe('ne_znam');
+      expect(dokaz.cekateljVecIspao).toBe(false);
+
+      const potroseneNakon = uzGrupe(potrosene, await grupeRijeci(anaRijec));
+      const dokazRijec = await pronadjiRijecNaPrefiks(dokaz.trazenaSlova, potroseneNakon);
+      const krajPromise = new Promise<KrajPartije>((resolve) => {
+        ana.socket.once('partija:kraj', resolve);
+      });
+      const elimBrunoPromise = cekajEventNaBiloKojem<Eliminacija>(
+        igraciListe.map((ig) => ig.socket),
+        'partija:eliminacija',
+        (e) => e.igracId === bruno.token,
+        10_000,
+        'PR05 2p Bruno nakon dokaza',
+      );
+      ana.socket.emit('potez:rijec', { rijec: dokazRijec, turnToken: dokaz.turnToken });
+      const elimBruno = await elimBrunoPromise;
+      expect(elimBruno.bodZa).toBe(ana.token);
+      const kraj = await krajPromise;
+      const anaPlasman = kraj.plasmani.find((p) => p.igracId === ana.token);
+      expect(anaPlasman?.plasman).toBe(1);
+      expect(pocetak.sjedala).toHaveLength(2);
     } finally {
       odspojiIgrace(igraciListe);
     }
