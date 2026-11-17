@@ -98,6 +98,59 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      - name: Najaviti vrstu sljedeće produkcijske promocije
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Informativno (ADR-018): kaže bi li promocija ovog digesta bila izdanje ili tiho ažuriranje.
+          # Korak nikad ne ruši staging deploy, pa svaka greška završava izlazom 0.
+          set +e
+          skripta=skripte/izdanja/odredi-izdanje.sh
+          oznake="$RUNNER_TEMP/oznake-izdanja.txt"
+          izlaz="$RUNNER_TEMP/najava-izdanja.txt"
+
+          if ! test -f "$skripta"; then
+            echo 'Skripta izdanja ne postoji na ovom commitu; najava se preskače.'
+            exit 0
+          fi
+          if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" \
+            --jq '.[].ref | ltrimstr("refs/tags/")' > "$oznake"; then
+            echo 'Dohvat Git oznaka nije uspio; najava se preskače.'
+            echo '- Najava vrste sljedeće promocije nije dostupna (dohvat Git oznaka nije uspio).' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if ! bash "$skripta" \
+            --izdanja aplikacije/web/src/lib/izdanja.json \
+            --oznake "$oznake" \
+            --samo-izvjestaj > "$izlaz"; then
+            echo 'Skripta izdanja nije uspjela; najava se preskače.'
+            echo '- Najava vrste sljedeće promocije nije dostupna (podaci izdanja nisu čitljivi).' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          cat "$izlaz"
+
+          vrsta=$(sed -n 's/^vrsta=//p' "$izlaz")
+          oznaka=$(sed -n 's/^oznaka=//p' "$izlaz")
+          nacrta=$(sed -n 's/^nacrta=//p' "$izlaz")
+          upozorenje=$(sed -n 's/^upozorenje=//p' "$izlaz")
+          {
+            echo '## Sljedeća produkcijska promocija ovog digesta'
+            if [ "$vrsta" = 'izdanje' ]; then
+              echo "- Sljedeća promocija: **IZDANJE ${oznaka}** (nastaju Git oznaka, GitHub Release i unos u Novostima)"
+            else
+              echo '- Sljedeća promocija: tiho ažuriranje (bez oznake i bez unosa u Novostima)'
+            fi
+            if [ -n "$upozorenje" ]; then
+              echo "- **Upozorenje:** promocija bi danas bila blokirana. ${upozorenje}"
+            fi
+            if [ "$vrsta" = 'tiho' ] && [ "${nacrta:-0}" -gt 0 ]; then
+              echo '- **Upozorenje:** postoji nacrt izdanja. Tiha promocija ga ne objavljuje u Novostima; ako slika već sadrži te promjene, izlaze bez najave.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
       - name: Pripremiti SSH vjerodajnice
         shell: bash
         env:
