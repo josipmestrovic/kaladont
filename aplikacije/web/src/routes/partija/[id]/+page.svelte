@@ -1888,7 +1888,7 @@
               </div>
             <div class="potez-gumbi">
               <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
-              {#if !jaDokazujem && (!stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
+              {#if jaDokazujem || (!stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
                 <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku || !vezaSpremna} onclick={posaljiNeZnam}>Ne znam</button>
               {/if}
             </div>
@@ -1922,7 +1922,7 @@
       <aside class="promatranje-traka" aria-live="polite">
         {#if stanje.obracunIskustva && !jeTrening}
           <p class="obracun-promatraca">Ukupno iskustva za ovu igru: <strong>{stanje.obracunIskustva.mojeIskustvo.osvojenoIskustvo} XP</strong>.</p>
-          <p>Za detaljni obračun pričekaj kraj igre. Ako odmah izađeš, sve će i dalje biti spremljeno.</p>
+          <p>Ako odmah izađeš, sve će i dalje biti spremljeno.</p>
         {/if}
         <div class="promatranje-akcije">
           <span>Promatraš igru.</span>
@@ -2795,7 +2795,7 @@
   .nadimak { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .promatranje-traka { flex-direction: column; align-items: stretch; }
   .promatranje-akcije { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .promatranje-traka p { margin: 0; font-size: 14px; }
+  .promatranje-traka p { margin: 0; font-size: var(--tekst-baza); }
   .rijec-kartica {
     min-height: 0;
     background: transparent;
@@ -2822,21 +2822,26 @@
     justify-content: space-between;
     gap: var(--razmak-12);
     margin: 16px 0 0;
-    padding: 10px 12px;
+    padding: 12px 14px;
     border: 1px solid var(--boja-obrub-jaci);
     border-radius: 8px;
     color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-mali);
+    font-size: var(--tekst-baza);
+  }
+  .promatranje-akcije span {
+    font-size: var(--tekst-baza);
   }
   .promatranje-traka button {
     flex-shrink: 0;
-    padding: 8px 12px;
+    padding: 10px 18px;
     border: 0;
-    border-radius: var(--radijus-pill);
+    border-radius: 8px;
     background: var(--boja-akcent);
     color: #1a1815;
     font: inherit;
+    font-size: var(--tekst-baza);
     font-weight: 700;
+    line-height: 1.2;
     cursor: pointer;
   }
   .promatranje-traka button:hover,
@@ -3281,17 +3286,19 @@
   }
   .dokaz-zona {
     margin: 0 0 12px;
-    padding: 12px 14px;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--boja-mint) 14%, var(--boja-povrsina));
-    border: 1px solid var(--boja-mint);
+    padding: 8px 0;
+    background: transparent;
+    border: 0;
+    text-align: center;
   }
   .dokaz-naslov {
-    margin: 0;
-    font-size: var(--tekst-mali);
-    font-weight: 700;
-    line-height: 1.35;
+    max-width: 620px;
+    margin: 0 auto;
+    font-size: calc(16px * 1.35);
+    font-weight: 600;
+    line-height: 1.2;
     color: var(--boja-tekst-osnovni);
+    text-align: center;
   }
   .dokaz-ishod {
     margin: 0 0 10px;
