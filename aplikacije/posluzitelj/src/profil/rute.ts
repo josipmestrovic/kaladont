@@ -1090,7 +1090,7 @@ export async function registrirajProfilRute(
 
   app.get<{ Params: { partijaId: string } }>('/partije/:partijaId/plasmani', async (zahtjev, odgovor) => {
     const [partija] = await baza
-      .select({ id: partije.id, mod: partije.mod, pocetak: partije.pocetak, kraj: partije.kraj })
+      .select({ id: partije.id, mod: partije.mod, pravila: partije.pravila, pocetak: partije.pocetak, kraj: partije.kraj })
       .from(partije)
       .where(and(
         eq(partije.id, zahtjev.params.partijaId),
@@ -1123,6 +1123,7 @@ export async function registrirajProfilRute(
       partija: {
         partijaId: partija.id,
         mod: partija.mod,
+        pravila: partija.pravila,
         pocetak: partija.pocetak.toISOString(),
         kraj: partija.kraj.toISOString(),
         plasmani: retci.map((redak) => ({ ...redak, plasman: redak.plasman ?? 0 })),

@@ -213,6 +213,13 @@ function primijeniFazuIzSnimke(p: Pick<StanjePartije, 'faza' | 'dokaz' | 'sustav
 function primijeniStanjePartije(p: StanjePartije): void {
   if (napustioPartiju) return;
   oznaciPartijuDostupnom();
+  // HINT PR14/Bugbot: uspješan dokaz kad je čekač već otišao dolazi samo kao
+  // partija:stanje (zakrpljeni bodZa), bez nove partija:eliminacija — banner ovdje.
+  const prethodniDokaz = stanje.dokaz;
+  const stariBodZaCekatelja =
+    prethodniDokaz?.cekateljVecIspao === true
+      ? (stanje.eliminacije.find((e) => e.igracId === prethodniDokaz.cekateljId)?.bodZa ?? null)
+      : undefined;
   stanje.partijaId = p.partijaId;
   stanje.pocetakPartijeIso = null;
   stanje.mojIgracId = p.mojIgracId;
@@ -242,6 +249,22 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.jePrivatna = Boolean(p.jePrivatna);
   stanje.kodSobe = p.kodSobe ?? null;
   stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
+
+  if (
+    prethodniDokaz?.cekateljVecIspao === true &&
+    stariBodZaCekatelja == null &&
+    !p.dokaz
+  ) {
+    const elim = p.eliminacije.find(
+      (e) => e.igracId === prethodniDokaz.cekateljId && e.bodZa === prethodniDokaz.autorId,
+    );
+    if (elim) {
+      zapisiIshodDokaza(`${nadimakIgraca(prethodniDokaz.autorId)} je dokazao nastavak.`);
+      if (elim.bodZa === stanje.mojIgracId && elim.iskustvo) {
+        prikaziStavkeIskustva([elim.iskustvo]);
+      }
+    }
+  }
 }
 
 function primijeniDokazZatrazen(p: DokazZatrazen): void {
@@ -352,10 +375,11 @@ export function pokreniSlusateljeIgre(): void {
   socket.on('partija:stanje', primijeniStanjePartije);
   socket.on('dokaz:zatrazen', primijeniDokazZatrazen);
 
-  // HINT PR14 e2e: Playwright može injektirati dokaz:zatrazen bez pravog server eventa.
+  // HINT PR14 e2e: Playwright može injektirati dokaz / stanje bez pravog server eventa.
   if (typeof window !== 'undefined') {
     const e2eEmit = (event: string, data: unknown) => {
       if (event === 'dokaz:zatrazen') primijeniDokazZatrazen(data as DokazZatrazen);
+      if (event === 'partija:stanje') primijeniStanjePartije(data as StanjePartije);
     };
     (window as unknown as { __KALADONT_E2E_EMIT__?: typeof e2eEmit }).__KALADONT_E2E_EMIT__ = e2eEmit;
     window.addEventListener('kaladont:dokaz-zatrazen', ((ev: CustomEvent<DokazZatrazen>) => {

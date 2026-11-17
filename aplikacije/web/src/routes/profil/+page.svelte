@@ -166,9 +166,10 @@
   }
 
   async function primijeniHashPogled() {
+    if (!profil) return;
     const izHasha = pogledIzHasha(window.location.hash);
-    if (!izHasha || !profil) return;
-    promijeniPogled(izHasha);
+    promijeniPogled(izHasha ?? 'opcenito');
+    if (!izHasha) return;
     await tick();
     document.getElementById(izHasha)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

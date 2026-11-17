@@ -194,7 +194,10 @@ async function glavno(): Promise<void> {
   }, null, 2));
 }
 
-const pokrenutIzravno = process.argv[1]?.replace(/\\/g, '/').endsWith('/cli/prijelaz-ljestvice-pr11.ts');
+const putanjaUlaza = process.argv[1]?.replace(/\\/g, '/') ?? '';
+const pokrenutIzravno =
+  putanjaUlaza.endsWith('/cli/prijelaz-ljestvice-pr11.ts')
+  || putanjaUlaza.endsWith('/cli/prijelaz-ljestvice-pr11.js');
 if (pokrenutIzravno) {
   glavno().catch((pogreska: unknown) => {
     console.error(pogreska instanceof Error ? pogreska.message : String(pogreska));

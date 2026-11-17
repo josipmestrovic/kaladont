@@ -55,41 +55,51 @@
   {:else if otkljucan}
     <p class="dnk-poruka">Ukupno odigrano: <strong>{odigrano}</strong></p>
   {:else}
-    <p class="dnk-poruka">Do otključavanja preostaje još <strong>{preostaloDoOtkljucavanja}</strong> javnih igara.</p>
+    <p class="dnk-poruka">DNK se tek treba otključati — odigraj još <strong>{preostaloDoOtkljucavanja}</strong> javnih igara (Dvoboj, Troboj i Četveroboj zajedno).</p>
   {/if}
 
-  <div class="dnk-promjena-sadrzaj">
-    <div class="graf-omotac">
-      <svg viewBox="0 0 240 240" role="img" aria-label="Novi Kaladont DNK profil">
-        {#each prstenovi as prsten}
-          <polygon points={tocke(poslije.map((os) => ({ ...os, vrijednost: prsten })))} class="dnk-prsten" />
-        {/each}
-        {#each poslije as os, indeks}
-          {@const kraj = koordinata(100, indeks)}
-          {@const oznaka = koordinata(113, indeks)}
-          <line x1={srediste} y1={srediste} x2={kraj.split(',')[0]} y2={kraj.split(',')[1]} class="dnk-os" />
-          <text x={oznaka.split(',')[0]} y={oznaka.split(',')[1]} class="dnk-oznaka" text-anchor="middle" dominant-baseline="middle">{os.naziv}</text>
-        {/each}
-        <polygon points={tocke(poslije)} class="dnk-podrucje" />
-      </svg>
-    </div>
+  {#if otkljucan}
+    <div class="dnk-promjena-sadrzaj">
+      <div class="graf-omotac">
+        <svg viewBox="0 0 240 240" role="img" aria-label="Novi Kaladont DNK profil">
+          {#each prstenovi as prsten}
+            <polygon points={tocke(poslije.map((os) => ({ ...os, vrijednost: prsten })))} class="dnk-prsten" />
+          {/each}
+          {#each poslije as os, indeks}
+            {@const kraj = koordinata(100, indeks)}
+            {@const oznaka = koordinata(113, indeks)}
+            <line x1={srediste} y1={srediste} x2={kraj.split(',')[0]} y2={kraj.split(',')[1]} class="dnk-os" />
+            <text x={oznaka.split(',')[0]} y={oznaka.split(',')[1]} class="dnk-oznaka" text-anchor="middle" dominant-baseline="middle">{os.naziv}</text>
+          {/each}
+          <polygon points={tocke(poslije)} class="dnk-podrucje" />
+        </svg>
+      </div>
 
-    <div class="dnk-promjene-lista">
-      {#each poslije as os}
-        {@const staraVrijednost = prijeZa(os)}
-        <div class="dnk-promjena-redak">
-          <strong>{os.naziv}</strong>
-          <span class:promijenjeno={promijeniloSe(os)}>
-            {#if promijeniloSe(os)}
-              <s>{staraVrijednost}</s>
-              <span class:pad={os.vrijednost > staraVrijednost} class="strelica" aria-label={os.vrijednost > staraVrijednost ? 'Povećanje' : 'Smanjenje'}>{os.vrijednost > staraVrijednost ? '↑' : '↓'}</span>
-            {/if}
-            <b>{os.vrijednost}</b>
-          </span>
-        </div>
-      {/each}
+      <div class="dnk-promjene-lista">
+        {#each poslije as os}
+          {@const staraVrijednost = prijeZa(os)}
+          <div class="dnk-promjena-redak">
+            <strong>{os.naziv}</strong>
+            <span class:promijenjeno={promijeniloSe(os)}>
+              {#if promijeniloSe(os)}
+                <s>{staraVrijednost}</s>
+                <span class:pad={os.vrijednost > staraVrijednost} class="strelica" aria-label={os.vrijednost > staraVrijednost ? 'Povećanje' : 'Smanjenje'}>{os.vrijednost > staraVrijednost ? '↑' : '↓'}</span>
+              {/if}
+              <b>{os.vrijednost}</b>
+            </span>
+          </div>
+        {/each}
+      </div>
     </div>
-  </div>
+  {:else}
+    <div class="dnk-zakljucano">
+      <div class="zakljucani-graf" aria-hidden="true">✦</div>
+      <div>
+        <strong>DNK se tek oblikuje</strong>
+        <p>Jedan dijeljeni Kaladont DNK za sve javne formate — otključava se nakon 10 partija ukupno.</p>
+      </div>
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -180,6 +190,41 @@
   .dnk-promjena-redak b { min-width: 22px; text-align: right; }
   .strelica { color: var(--boja-akcent); font-size: 1.15rem; font-weight: 800; line-height: 1; }
   .strelica.pad { color: var(--boja-tekst-sekundarni); }
+
+  .dnk-zakljucano {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 12px;
+    padding: 14px 12px;
+    border: 1px dashed var(--boja-obrub);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--boja-povrsina) 88%, var(--boja-akcent-tekst));
+  }
+
+  .zakljucani-graf {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--boja-akcent-tekst) 16%, transparent);
+    color: var(--boja-akcent-tekst);
+    font-size: 1.25rem;
+  }
+
+  .dnk-zakljucano strong {
+    display: block;
+    color: var(--boja-tekst-naslov);
+    font-size: var(--tekst-sitni);
+  }
+
+  .dnk-zakljucano p {
+    margin: 4px 0 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mikro);
+  }
 
   @media (max-width: 999px) {
     .dnk-promjena { padding: 14px; }
