@@ -1,46 +1,11 @@
 <script lang="ts">
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
-
-  /**
-   * HINT PR15: javna stranica Novosti (više nije 307 → /o-igri).
-   * Sidra #v0-2-0 / #v0-1-0 = javna izdanja; NE miješati s closed-alpha tagovima.
-   */
-  const objave = [
-    {
-      id: 'v0-2-0',
-      naslov: 'Kaladont 0.2.0',
-      datum: '17. 11. 2026.',
-      datetime: '2026-11-17',
-      stavke: [
-        'Troboj (3 igrača) uz postojeći Dvoboj i Četveroboj',
-        'Tri pravilnika — Klasični Kaladont, KA-ZNA, Dokaži nastavak — biraju se prije formata',
-        'Jedan univerzalni rang i jedan Kaladont DNK za sve javne formate',
-        'Ljestvice po formatu; ulaz 5 partija dnevno / 10 dulje razdoblje',
-        'Novi paket misija i dostignuća (Troboj, dokaz, Klasični, KA-ZNA)',
-      ],
-    },
-    {
-      id: 'v0-1-0',
-      naslov: 'Kaladont 0.1.0',
-      datum: '1. 10. 2026.',
-      datetime: '2026-10-01',
-      stavke: [
-        'Klasični Kaladont — igra na zadnja dva grafema, 30 s po potezu, hrLex rječnik',
-        'Javni formati Dvoboj i Četveroboj',
-        'Privatna soba (2–8 igrača) i Zagrijavanje protiv Računala',
-        'Računi, profil i javni profil',
-        'XP, razine, dnevne i tjedne misije te dostignuća',
-        'Javne ljestvice',
-        'Kolekcija riječi, editor avatara i sandučić obavijesti',
-        'Popuna javnog reda botovima',
-      ],
-    },
-  ] as const;
+  import { IZDANJA } from '$lib/izdanja.js';
 </script>
 
 <SeoGlava
   title="Novosti | Kaladont"
-  description="Novosti i bilješke izdanja Kaladonta — značajke po verziji, od prvog izdanja nadalje."
+  description="Novosti i bilješke izdanja Kaladonta — što je novo u svakom izdanju, od prvog nadalje."
   putanja="/novosti"
 />
 
@@ -52,14 +17,14 @@
   </header>
 
   <div class="popis">
-    {#each objave as objava}
-      <article class="objava" id={objava.id}>
+    {#each IZDANJA as izdanje (izdanje.id)}
+      <article class="objava" id={izdanje.sidro}>
         <header class="objava-zaglavlje">
-          <h2>{objava.naslov}</h2>
-          <time datetime={objava.datetime}>{objava.datum}</time>
+          <h2><time datetime={izdanje.objavljeno}>{izdanje.datumHr}</time></h2>
+          <p class="objava-naslov">{izdanje.naslov}</p>
         </header>
         <ul class="stavke">
-          {#each objava.stavke as stavka}
+          {#each izdanje.stavke as stavka}
             <li>{stavka}</li>
           {/each}
         </ul>
@@ -118,10 +83,6 @@
   }
 
   .objava-zaglavlje {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 8px 16px;
     margin-bottom: 12px;
   }
 
@@ -132,9 +93,9 @@
     font-size: 21px;
   }
 
-  .objava-zaglavlje time {
-    color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-sitni);
+  .objava-naslov {
+    margin: 4px 0 0;
+    font-weight: 700;
   }
 
   .stavke {

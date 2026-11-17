@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { nasloviNacrta, ocekivanaIzdanja } from './pomocnici/izdanja.js';
 
 const NASLOVNICA_TITLE = 'Kaladont Online - Multiplayer igra riječi';
 const NASLOVNICA_DESCRIPTION =
@@ -68,7 +69,8 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   // Avatar ovisi o gost-sesiji + /profil — duži timeout zbog CI opterećenja.
   await expect(header.locator('.avatar')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('link', { name: 'Obavijesti' })).toBeVisible();
-  await expect(page.getByText('v0.3.0-closed-alpha.1')).toHaveCount(0);
+  // Naslovnica ne prikazuje nikakvu oznaku verzije (SemVer, CalVer ni alpha).
+  await expect(page.locator('main.landing')).not.toContainText(/\d+\.\d+\.\d+|alpha/i);
   await expect(page.getByText('Hrvatska multiplayer igra riječi')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'KALADONT online' })).toBeVisible();
   await expect(page.locator('.ilustracija')).toHaveCount(0);
@@ -131,36 +133,179 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
 });
 
-test('PR15: /novosti je javna stranica izdanja 0.2.0 i 0.1.0', async ({ page, request }) => {
-  const odgovor = await request.get('/novosti');
+test('/novosti prikazuje objavljena izdanja po datumima, najnovije prvo', async ({ page, request }) => {
+  const izdanja = ocekivanaIzdanja();
+  expect(izdanja.length).toBeGreaterThan(0);
+
+  const odgovor = await request.get('/novosti', { maxRedirects: 0 });
   expect(odgovor.status()).toBe(200);
   const html = await odgovor.text();
-  expect(html).toContain('Kaladont 0.2.0');
-  expect(html).toContain('id="v0-2-0"');
-  expect(html).toContain('Kaladont 0.1.0');
-  expect(html).toContain('id="v0-1-0"');
-  expect(html).not.toContain('redirect');
+  for (const izdanje of izdanja) {
+    expect(html).toContain(`id="${izdanje.sidro}"`);
+    expect(html).toContain(`datetime="${izdanje.objavljeno}"`);
+  }
+  // Stara sidra i oznake 0.x više ne postoje; nacrti se ne prikazuju ni u SSR HTML-u.
+  expect(html).not.toContain('id="v0-');
+  expect(html).not.toContain('Kaladont 0.');
+  for (const naslovNacrta of nasloviNacrta()) {
+    expect(html).not.toContain(naslovNacrta);
+  }
 
   const mapa = await request.get('/sitemap.xml');
   expect(mapa.ok()).toBe(true);
   expect(await mapa.text()).toContain('/novosti');
 
-  await page.goto('/novosti#v0-2-0');
+  await page.goto('/novosti');
   await expect(page).toHaveTitle(/Novosti/);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
-  await expect(page.getByRole('heading', { name: 'Novosti' })).toBeVisible();
-  await expect(page.locator('#v0-2-0')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Kaladont 0.2.0' })).toBeVisible();
-  await expect(page.getByText('17. 11. 2026.')).toBeVisible();
-  await expect(page.locator('#v0-2-0 ul.stavke li').first()).toBeVisible();
-  await expect(page.locator('#v0-1-0')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Kaladont 0.1.0' })).toBeVisible();
-  await expect(page.getByText('1. 10. 2026.')).toBeVisible();
-  await expect(page.locator('#v0-1-0 ul.stavke li').first()).toContainText('Klasični Kaladont');
-  const redoslijed = await page.locator('article.objava').evaluateAll((el) => el.map((e) => e.id));
-  expect(redoslijed).toEqual(['v0-2-0', 'v0-1-0']);
+  await expect(page.getByRole('heading', { name: 'Novosti', exact: true })).toBeVisible();
+  // U javnom sučelju nema SemVer ni CalVer oznaka; hrvatski datum ima razmake pa ne odgovara uzorku.
+  await expect(page.locator('main.novosti')).not.toContainText(/\d+\.\d+\.\d+|alpha/i);
+
+  const zapisi = page.locator('article.objava');
+  const redoslijed = await zapisi.evaluateAll((elementi) => elementi.map((element) => element.id));
+  expect(redoslijed).toEqual(izdanja.map((izdanje) => izdanje.sidro));
+  for (const [indeks, izdanje] of izdanja.entries()) {
+    const zapis = zapisi.nth(indeks);
+    const vrijeme = zapis.locator('h2 time');
+    await expect(vrijeme).toHaveAttribute('datetime', izdanje.objavljeno);
+    await expect(vrijeme).toHaveText(izdanje.datumHr);
+    await expect(zapis.locator('.objava-naslov')).toHaveText(izdanje.naslov);
+    await expect(zapis.locator('ul.stavke li').first()).toBeVisible();
+  }
   await expect(page.getByRole('link', { name: 'O igri' }).first()).toHaveAttribute('href', '/o-igri');
 });
+
+test('naslovnica prikazuje zadnje ažuriranje iz istog izvora kao Novosti', async ({ page, request }) => {
+  const [najnovije] = ocekivanaIzdanja();
+  expect(najnovije).toBeDefined();
+
+  // Blok mora biti u SSR HTML-u: CI i produkcijski workflow provjeravaju ga bez preglednika.
+  const ssr = await (await request.get('/')).text();
+  expect(ssr).toContain(`href="/novosti#${najnovije.sidro}"`);
+  expect(ssr).toContain(`datetime="${najnovije.objavljeno}"`);
+
+  await page.goto('/');
+  const blok = page.locator('.zadnje-azuriranje');
+  await expect(blok).toHaveText(`Zadnje ažuriranje: ${najnovije.datumHr} · Vidi što je novo`);
+  await expect(blok.locator('.razdjelnik')).toHaveAttribute('aria-hidden', 'true');
+
+  const poveznice = blok.getByRole('link');
+  await expect(poveznice).toHaveCount(2);
+  // „Zadnje ažuriranje:” je običan tekst, izvan obiju poveznica.
+  await expect(poveznice.nth(0)).toHaveText(najnovije.datumHr);
+  await expect(poveznice.nth(1)).toHaveText('Vidi što je novo');
+  await expect(poveznice.nth(0)).toHaveAttribute('href', `/novosti#${najnovije.sidro}`);
+  await expect(poveznice.nth(0).locator('time')).toHaveAttribute('datetime', najnovije.objavljeno);
+  await expect(poveznice.nth(1)).toHaveAttribute('href', '/novosti');
+
+  // Klik na datum vodi na najnoviji zapis u Novostima, koji nosi isti datum.
+  await poveznice.nth(0).click();
+  await expect(page).toHaveURL(`/novosti#${najnovije.sidro}`);
+  const prviZapis = page.locator('article.objava').first();
+  await expect(prviZapis).toHaveAttribute('id', najnovije.sidro);
+  await expect(prviZapis).toBeInViewport();
+  await expect(prviZapis.locator('h2 time')).toHaveText(najnovije.datumHr);
+
+  await page.goto('/');
+  await page.locator('.zadnje-azuriranje').getByRole('link', { name: 'Vidi što je novo' }).click();
+  await expect(page).toHaveURL('/novosti');
+  await expect(page.getByRole('heading', { name: 'Novosti', exact: true })).toBeVisible();
+});
+
+type Okvir = { x: number; y: number; width: number; height: number };
+
+function preklapajuSe(a: Okvir, b: Okvir): boolean {
+  return a.x < b.x + b.width - 1 && b.x < a.x + a.width - 1 && a.y < b.y + b.height - 1 && b.y < a.y + a.height - 1;
+}
+
+// Tema ne mijenja raspored, pa se svijetla tema provjerava zajedno s fontom za disleksiju.
+for (const { sirina, visina } of [
+  { sirina: 320, visina: 568 },
+  { sirina: 380, visina: 760 },
+  { sirina: 390, visina: 844 },
+  { sirina: 1100, visina: 700 },
+  { sirina: 1440, visina: 900 },
+  { sirina: 1366, visina: 500 },
+]) {
+  for (const { svijetla, disleksija } of [
+    { svijetla: false, disleksija: false },
+    { svijetla: true, disleksija: true },
+  ]) {
+    const oznaka = `${svijetla ? 'svijetla' : 'tamna'}${disleksija ? ' + disleksija' : ''}`;
+    test(`zadnje ažuriranje ne remeti raspored ${sirina}×${visina} (${oznaka})`, async ({ page }) => {
+      await page.addInitScript(
+        ({ svijetlaTema, font }) => {
+          localStorage.setItem('kaladont_tema_v1', svijetlaTema ? 'svijetla' : 'tamna');
+          localStorage.setItem('kaladont_font_postavke_v1', String(font));
+        },
+        { svijetlaTema: svijetla, font: disleksija },
+      );
+      await page.setViewportSize({ width: sirina, height: visina });
+      await page.goto('/');
+
+      const blok = page.locator('.zadnje-azuriranje');
+      const footer = page.locator('.landing-footer');
+      await expect(blok).toBeVisible();
+      await expect(footer.locator('.copyright')).toBeVisible({ timeout: 20_000 });
+      if (svijetla) await expect(page.locator('html')).toHaveAttribute('data-tema', 'svijetla');
+      if (disleksija) await expect(page.locator('html')).toHaveAttribute('data-font-disleksiju', '');
+      for (const poveznica of await blok.getByRole('link').all()) {
+        await expect(poveznica).toBeVisible();
+      }
+      // Blok je brat footera, a ne njegov dio: postojeći testovi mjere raspored unutar footera.
+      await expect(footer.locator('.zadnje-azuriranje')).toHaveCount(0);
+      await page.evaluate(() => document.fonts.ready);
+
+      // Svi okviri mjere se u jednom pozivu, da pomak rasporeda između mjerenja ne da lažan rezultat.
+      const mjere = await page.evaluate(() => {
+        const okvir = (selektor: string) => {
+          const element = document.querySelector(selektor);
+          if (!element) return null;
+          const pravokutnik = element.getBoundingClientRect();
+          if (pravokutnik.width === 0 || pravokutnik.height === 0) return null;
+          return { x: pravokutnik.x, y: pravokutnik.y, width: pravokutnik.width, height: pravokutnik.height };
+        };
+        return {
+          blok: okvir('.zadnje-azuriranje'),
+          footer: okvir('.landing-footer'),
+          susjedi: {
+            navigacija: okvir('.glavna-navigacija'),
+            kontrolePristupacnosti: okvir('.kontrole-pristupacnosti-naslovnica'),
+            ilustracija: okvir('.scena-2d5d'),
+          },
+          sirinaSadrzaja: document.documentElement.scrollWidth,
+          sirinaProzora: document.documentElement.clientWidth,
+        };
+      });
+
+      expect(mjere.sirinaSadrzaja).toBeLessThanOrEqual(mjere.sirinaProzora);
+      expect(mjere.blok).not.toBeNull();
+      expect(mjere.footer).not.toBeNull();
+      expect(mjere.susjedi.navigacija).not.toBeNull();
+      const okvirBloka = mjere.blok!;
+      expect(okvirBloka.x).toBeGreaterThanOrEqual(0);
+      expect(okvirBloka.x + okvirBloka.width).toBeLessThanOrEqual(mjere.sirinaProzora + 1);
+      expect(okvirBloka.y + okvirBloka.height).toBeLessThanOrEqual(mjere.footer!.y + 1);
+      for (const [naziv, okvir] of Object.entries(mjere.susjedi)) {
+        if (okvir) expect(preklapajuSe(okvirBloka, okvir), `${naziv} se preklapa s blokom`).toBe(false);
+      }
+
+      if (sirina >= 1000) {
+        // Desktop je visinski ugođen bez viška prostora: blok ne smije povećati visinu naslovnice.
+        const visine = await page.evaluate(() => {
+          const element = document.querySelector<HTMLElement>('.zadnje-azuriranje')!;
+          const sBlokom = document.documentElement.scrollHeight;
+          element.style.display = 'none';
+          const bezBloka = document.documentElement.scrollHeight;
+          element.style.display = '';
+          return { sBlokom, bezBloka };
+        });
+        expect(visine.sBlokom).toBe(visine.bezBloka);
+      }
+    });
+  }
+}
 
 test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

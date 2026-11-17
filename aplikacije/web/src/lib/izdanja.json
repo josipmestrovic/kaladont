@@ -1,0 +1,27 @@
+[
+  {
+    "objavljeno": null,
+    "naslov": "Troboj i nova pravila igre",
+    "stavke": [
+      "Troboj (3 igrača) uz postojeći Dvoboj i Četveroboj",
+      "Tri pravilnika — Klasični Kaladont, KA-ZNA, Dokaži nastavak — biraju se prije formata",
+      "Jedan univerzalni rang i jedan Kaladont DNK za sve javne formate",
+      "Ljestvice po formatu; ulaz 5 partija dnevno / 10 dulje razdoblje",
+      "Novi paket misija i dostignuća (Troboj, dokaz, Klasični, KA-ZNA)"
+    ]
+  },
+  {
+    "objavljeno": "2026-11-14",
+    "naslov": "Prvo javno izdanje",
+    "stavke": [
+      "Klasični Kaladont — igra na zadnja dva grafema, 30 s po potezu, hrLex rječnik",
+      "Javni formati Dvoboj i Četveroboj",
+      "Privatna soba (2–8 igrača) i Zagrijavanje protiv Računala",
+      "Računi, profil i javni profil",
+      "XP, razine, dnevne i tjedne misije te dostignuća",
+      "Javne ljestvice",
+      "Kolekcija riječi, editor avatara i sandučić obavijesti",
+      "Popuna javnog reda botovima"
+    ]
+  }
+]
