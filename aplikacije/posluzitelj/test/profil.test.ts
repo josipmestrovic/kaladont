@@ -272,7 +272,7 @@ describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
     const privatnaPartijaId = randomUUID();
     const kraj = new Date();
     await baza.insert(partije).values([
-      { id: javnaPartijaId, mod: 'dva_igraca', status: 'zavrsena', pocetak: new Date(kraj.getTime() - 1_000), kraj, pobjednikId: igracId },
+      { id: javnaPartijaId, mod: 'dva_igraca', pravila: 'klasicni', status: 'zavrsena', pocetak: new Date(kraj.getTime() - 1_000), kraj, pobjednikId: igracId },
       { id: privatnaPartijaId, mod: 'cetiri_igraca', status: 'zavrsena', pocetak: new Date(kraj.getTime() - 2_000), kraj, pobjednikId: igracId },
     ]);
     await baza.insert(sudioniciPartije).values([
@@ -290,9 +290,53 @@ describe('GET /aktivnost/:igracId i /partije/:partijaId/plasmani', () => {
     expect(aktivnost.aktivnost.some((stavka) => stavka.partijaId === privatnaPartijaId)).toBe(false);
 
     const arhivaOdgovor = await fetch(`${adresa}/api/partije/${javnaPartijaId}/plasmani`);
-    const arhiva = (await arhivaOdgovor.json()) as { partija: { plasmani: { igracId: string; nadimak: string; plasman: number; bodovi: number }[] } };
+    const arhiva = (await arhivaOdgovor.json()) as { partija: { pravila: string; plasmani: { igracId: string; nadimak: string; plasman: number; bodovi: number }[] } };
     expect(arhivaOdgovor.status).toBe(200);
+    expect(arhiva.partija.pravila).toBe('klasicni');
     expect(arhiva.partija.plasmani).toEqual([{ igracId, nadimak: 'Povijesni Nadimak', plasman: 1, bodovi: 2, eliminacije: 0, nacinIspadanja: 'pobjednik', javniProfil: true, jeBot: false }]);
+  });
+
+  it('vraća pravila za sva tri pravilnika', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
+    });
+    const { igracId } = (await registracija.json()) as { igracId: string };
+    const kraj = new Date();
+    const pravilnici = ['klasicni', 'ka_zna', 'dokazi_nastavak'] as const;
+    const partijaIds = Object.fromEntries(pravilnici.map((p) => [p, randomUUID()])) as Record<(typeof pravilnici)[number], string>;
+
+    await baza.insert(partije).values(
+      pravilnici.map((pravila, i) => ({
+        id: partijaIds[pravila],
+        mod: 'dva_igraca' as const,
+        pravila,
+        status: 'zavrsena' as const,
+        pocetak: new Date(kraj.getTime() - (i + 1) * 1_000),
+        kraj,
+        pobjednikId: igracId,
+      })),
+    );
+    await baza.insert(sudioniciPartije).values(
+      pravilnici.map((pravila) => ({
+        partijaId: partijaIds[pravila],
+        igracId,
+        nadimak: 'Arhiva Pravilnik',
+        sjedalo: 0,
+        plasman: 1,
+        bodovi: 2,
+        eliminacije: 0,
+        nacinIspadanja: 'pobjednik' as const,
+      })),
+    );
+
+    for (const pravila of pravilnici) {
+      const odgovor = await fetch(`${adresa}/api/partije/${partijaIds[pravila]}/plasmani`);
+      const tijelo = (await odgovor.json()) as { partija: { pravila: string } };
+      expect(odgovor.status).toBe(200);
+      expect(tijelo.partija.pravila).toBe(pravila);
+    }
   });
 });
 

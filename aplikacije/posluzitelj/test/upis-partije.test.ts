@@ -761,6 +761,85 @@ describe('pouzdan upis poteza', () => {
   });
 });
 
+describe('DNK javnePartijeUkupno na ponovljenom obračunu (Problem C)', () => {
+  const igracId = randomUUID();
+  const partijeZaBrisanje: string[] = [];
+
+  afterEach(async () => {
+    for (const partijaId of partijeZaBrisanje.splice(0)) {
+      await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+      await baza.delete(rezultatiFormeIgraca).where(eq(rezultatiFormeIgraca.partijaId, partijaId));
+      await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+      await baza.delete(partije).where(eq(partije.id, partijaId));
+    }
+    await baza.delete(nizoviPobjedaIgraca).where(eq(nizoviPobjedaIgraca.igracId, igracId));
+    await baza.delete(statistikeModaIgraca).where(eq(statistikeModaIgraca.igracId, igracId));
+    await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igracId));
+    await baza.delete(igraci).where(eq(igraci.id, igracId));
+  });
+
+  it('na granici 10 partija retry vraća ukupni N2+N3+N4, ne formatni odigrane', async () => {
+    // Seed: 4 Dvoboja + 3 Troboja + 2 Četveroboja = 9; deseta je Četveroboj → ukupno 10.
+    await baza.insert(igraci).values({
+      id: igracId,
+      vrsta: 'registriran',
+      nadimak: 'DNK Retry',
+      odigrane1v1: 4,
+      odigrane: 2,
+      pobjede: 0,
+      pobjede1v1: 0,
+    });
+    await baza.insert(statistikeModaIgraca).values({
+      igracId,
+      mod: 'tri_igraca',
+      odigrane: 3,
+      pobjede: 0,
+      eliminacije: 0,
+      bodovi: 0,
+    });
+
+    const partijaId = randomUUID();
+    partijeZaBrisanje.push(partijaId);
+    await baza.insert(partije).values({ id: partijaId, mod: 'cetiri_igraca', status: 'u_tijeku' });
+    await baza.insert(sudioniciPartije).values({ partijaId, igracId, sjedalo: 0 });
+
+    const rezultati = [{
+      igracId,
+      plasman: 1 as const,
+      bodovi: 3,
+      eliminacije: 0,
+      iskustvo: 10,
+      nacinIspadanja: 'pobjednik' as const,
+    }];
+    const statistike = new Map([[igracId, praznaStatistika(igracId, 1)]]);
+
+    const prvi = await zakljuciPartijuUBazi(
+      partijaId,
+      igracId,
+      rezultati,
+      'cetiri_igraca',
+      statistike,
+    );
+    const agregatPrvi = prvi.get(igracId);
+    expect(agregatPrvi?.javnePartijeUkupno).toBe(10);
+    expect(agregatPrvi?.odigrane).toBe(3);
+    expect(agregatPrvi?.dnkPoslije.length).toBeGreaterThan(0);
+
+    const drugi = await zakljuciPartijuUBazi(
+      partijaId,
+      igracId,
+      rezultati,
+      'cetiri_igraca',
+      statistike,
+    );
+    const agregatRetry = drugi.get(igracId);
+    expect(agregatRetry?.javnePartijeUkupno).toBe(10);
+    expect(agregatRetry?.odigrane).toBe(3);
+    expect(agregatRetry?.dnkPoslije.length).toBeGreaterThan(0);
+    expect(agregatRetry?.dnkPoslije).toEqual(agregatRetry?.dnkPrije);
+  });
+});
+
 describe('upis Troboja (PR03)', () => {
   const ana = randomUUID();
   const bruno = randomUUID();

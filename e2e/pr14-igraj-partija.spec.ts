@@ -143,6 +143,126 @@ test('dokaz UI: autor vidi uputu, čekač vidi čekanje bez „Ispao”', async 
   }
 });
 
+test('dokaz UI: uspjeh nakon odlaska čekača pokazuje ishod, ne samo prekid', async ({ browser }) => {
+  const igraci = await stvoriIgrace(browser, 2);
+  try {
+    await udjiUJavniRed(igraci, 'dva_igraca', 'dokazi_nastavak');
+    await cekajIstuPartiju(igraci);
+
+    const autor = igraci[0]!;
+    const autorLi = autor.stranica.locator('.igraci-red > li:has(.oznaka-ti)');
+    const cekateljLi = autor.stranica.locator('.igraci-red > li:not(:has(.oznaka-ti))').first();
+    const autorId = await autorLi.getAttribute('data-igrac-id');
+    const cekateljId = await cekateljLi.getAttribute('data-igrac-id');
+    const autorNadimak = (await autorLi.locator('.nadimak').innerText()).trim();
+    const cekateljNadimak = (await cekateljLi.locator('.nadimak').innerText()).trim();
+    const partijaId = new URL(autor.stranica.url()).pathname.split('/').at(-1)!;
+    expect(autorId).toBeTruthy();
+    expect(cekateljId).toBeTruthy();
+
+    const dokazPayload = {
+      partijaId,
+      izazovId: `e2e-dokaz-odlazak-${Date.now()}`,
+      autorId: autorId!,
+      cekateljId: cekateljId!,
+      izvornaRijec: 'kuća',
+      trazenaSlova: 'ća',
+      razlogOtvaranja: 'prekid_na_potezu' as const,
+      cekateljVecIspao: true,
+      turnToken: 'e2e-token-odlazak',
+      istekPotezaIso: new Date(Date.now() + 60_000).toISOString(),
+      serverVrijemeIso: new Date().toISOString(),
+      naPotezuId: autorId!,
+    };
+
+    await autor.stranica.evaluate((p) => {
+      (window as unknown as { __KALADONT_E2E_EMIT__: (e: string, d: unknown) => void }).__KALADONT_E2E_EMIT__(
+        'dokaz:zatrazen',
+        p,
+      );
+    }, dokazPayload);
+    await expect(autor.stranica.getByTestId('dokaz-zona')).toBeVisible({ timeout: 10_000 });
+
+    const sjedala = [
+      {
+        igracId: autorId!,
+        nadimak: autorNadimak,
+        jeGost: true,
+        jeBot: false,
+        avatarId: 1,
+        avatarConfig: null,
+        avatarRevision: 0,
+        rang: null,
+        razina: 1,
+        trenutniNiz: 0,
+        razinaVatre: 0 as const,
+      },
+      {
+        igracId: cekateljId!,
+        nadimak: cekateljNadimak,
+        jeGost: true,
+        jeBot: false,
+        avatarId: 2,
+        avatarConfig: null,
+        avatarRevision: 0,
+        rang: null,
+        razina: 1,
+        trenutniNiz: 0,
+        razinaVatre: 0 as const,
+      },
+    ];
+
+    const stanjePayload = {
+      partijaId,
+      mojIgracId: autorId!,
+      sjedala,
+      turnToken: 'e2e-token-nakon',
+      naPotezuId: '',
+      trazenaSlova: null,
+      istekPotezaIso: new Date().toISOString(),
+      serverVrijemeIso: new Date().toISOString(),
+      runda: 2,
+      brojIskoristenih: 1,
+      eliminacije: [
+        {
+          igracId: cekateljId!,
+          plasman: 2,
+          razlog: 'prekid' as const,
+          bodZa: autorId!,
+          slova: null,
+          rijecUzrok: null,
+        },
+      ],
+      sustavBiraRijec: true,
+      istekIzboraIso: new Date(Date.now() + 5_000).toISOString(),
+      zadnjaRijec: 'ćaskanje',
+      zadnjaRijecIgracId: autorId!,
+      zadnjaRijecVrsta: 'rijec' as const,
+      zavrsena: false,
+      statusSpremanja: 'nije_zavrsena' as const,
+      faza: 'sustav_bira' as const,
+      dokaz: null,
+      pravila: 'dokazi_nastavak' as const,
+      mod: 'dva_igraca' as const,
+    };
+
+    await autor.stranica.evaluate((p) => {
+      (window as unknown as { __KALADONT_E2E_EMIT__: (e: string, d: unknown) => void }).__KALADONT_E2E_EMIT__(
+        'partija:stanje',
+        p,
+      );
+    }, stanjePayload);
+
+    await expect(autor.stranica.locator('.sustav-bira-obrazlozenje')).toContainText(
+      `${autorNadimak} je dokazao nastavak`,
+      { timeout: 10_000 },
+    );
+    await expect(autor.stranica.locator('.sustav-bira-obrazlozenje')).not.toContainText('izgubljena veza');
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
 test('klasični trening ima dva Računala (3 sjedala)', async ({ page }) => {
   await page.goto('/zagrijavanje?pravila=klasicni');
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });

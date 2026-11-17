@@ -147,7 +147,7 @@ jobs:
             status=$(curl --silent --show-error --output odgovor.json --write-out '%{http_code}' https://staging.kaladont.hr/zdravlje || true)
             odgovor=$(cat odgovor.json 2>/dev/null || true)
             echo "Pokušaj ${pokusaj}: HTTP ${status:-mrežna-greška}; ${odgovor:-bez tijela}"
-            if test "$status" = '200' && echo "$odgovor" | jq -e --arg digest "$EXPECTED_DIGEST" --arg verzija "$EXPECTED_VERSION" '.ok == true and .baza == "dostupna" and .digest == $digest and .verzija == $verzija' >/dev/null; then
+            if test "$status" = '200' && echo "$odgovor" | jq -e --arg digest "$EXPECTED_DIGEST" --arg verzija "$EXPECTED_VERSION" '.ok == true and .baza == "dostupna" and .digest == $digest and .verzija == $verzija and .botoviDvoboj == true and .botoviTroboj == true and .botoviCetveroboj == true' >/dev/null; then
               exit 0
             fi
             sleep 10

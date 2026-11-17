@@ -43,6 +43,18 @@ release_zapis_nove_verzije() {
   printf 'KALADONT_IMAGE=%s\nDIGEST=%s\nVERZIJA=%s' "$slika" "$digest" "$verzija"
 }
 
+# PR88: Troboj popuna traži BOTOVI_TROBOJ=true. Ako ključ nedostaje ili je ostao
+# false iz .env.primjer, staging bi inače javio botoviTroboj:false uz uključene
+# Dvoboj/Četveroboj. Compose default true nije dovoljan kad je vrijednost eksplicitna.
+osiguraj_botovi_troboj() {
+  local env_datoteka="$1"
+  if grep -q '^BOTOVI_TROBOJ=' "$env_datoteka"; then
+    sed -i 's/^BOTOVI_TROBOJ=.*/BOTOVI_TROBOJ=true/' "$env_datoteka"
+  else
+    printf 'BOTOVI_TROBOJ=true\n' >> "$env_datoteka"
+  fi
+}
+
 pripremi_kandidat_env() {
   local release_zapis="$1"
 
@@ -51,6 +63,7 @@ pripremi_kandidat_env() {
   if [ -n "$release_zapis" ]; then
     printf '%s\n' "$release_zapis" >> "$kandidat_env"
   fi
+  osiguraj_botovi_troboj "$kandidat_env"
   chmod 600 "$kandidat_env"
 }
 
@@ -158,6 +171,7 @@ elif [ "$rjecnik_kod" -ne 0 ]; then
 fi
 faza='rjecnik_spreman'
 zapisi_env "$novi_release_zapis"
+osiguraj_botovi_troboj .env
 env_stvarni_promijenjen='da'
 faza='env_azuriran'
 docker compose -f "$compose_datoteka" stop aplikacija

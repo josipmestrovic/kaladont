@@ -558,11 +558,28 @@ export async function zakljuciPartijuUBazi(
             iskustvoUkupno: igraci.iskustvoUkupno,
             upravljac: igraci.upravljac,
             vrstaIgraca: igraci.vrsta,
+            rangSumaJedinica: igraci.rangSumaJedinica,
+            rangBrojPartija: igraci.rangBrojPartija,
           })
           .from(igraci)
           .where(eq(igraci.id, r.igracId));
         if (stanjeIgraca) {
           const brojaci = await dohvatiBrojaceModa(tx, r.igracId, mod);
+          // PR10 / Problem C: retry mora vratiti N2+N3+N4 (ne formatni odigrane) za mojDnk.
+          let javnePartijeUkupno: number | undefined;
+          let dnkOsi: DnkOs[] = [];
+          const primaDnk = !samoStatistika
+            && (stanjeIgraca.vrstaIgraca === 'registriran' || stanjeIgraca.vrstaIgraca === 'admin')
+            && stanjeIgraca.upravljac === 'covjek';
+          if (primaDnk) {
+            const ucinak = izracunajUniverzalniUcinak(
+              Number(stanjeIgraca.rangSumaJedinica ?? 0),
+              stanjeIgraca.rangBrojPartija ?? 0,
+            );
+            const zajednicki = await dohvatiZajednickiDnkPodaci(tx, r.igracId, ucinak);
+            javnePartijeUkupno = zajednicki.n2 + zajednicki.n3 + zajednicki.n4;
+            dnkOsi = izracunajDnk(zajednicki);
+          }
           agregati.set(r.igracId, {
             bodoviUkupno: brojaci.bodovi,
             odigrane: brojaci.odigrane,
@@ -570,8 +587,9 @@ export async function zakljuciPartijuUBazi(
             iskustvoUkupno: stanjeIgraca.iskustvoUkupno,
             dovrseneIgre: 0,
             novaDostignuca: [],
-            dnkPrije: [],
-            dnkPoslije: [],
+            dnkPrije: dnkOsi,
+            dnkPoslije: dnkOsi,
+            javnePartijeUkupno,
             ocjenaIgre: null,
             bonusOcjenaIgre: 0,
             nizPrije: 0,
@@ -587,7 +605,7 @@ export async function zakljuciPartijuUBazi(
             botTip: null,
             iskustvoPrijePartije: stanjeIgraca.iskustvoUkupno,
           });
-          if (!samoStatistika && (stanjeIgraca.vrstaIgraca === 'registriran' || stanjeIgraca.vrstaIgraca === 'admin') && stanjeIgraca.upravljac === 'covjek') {
+          if (primaDnk) {
             const ishod = await dohvatiIshodMisija(tx, r.igracId, 'javna', partijaId);
             const agregat = agregati.get(r.igracId);
             if (ishod && agregat) {
