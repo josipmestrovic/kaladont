@@ -1,8 +1,8 @@
 # CI/CD (GitHub Actions)
 
-> **Status 2026-11-05: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Job `kod` na početku pokreće pinani **actionlint** nad `.github/workflows/` te `bash skripte/testovi/backup/pokreni.sh` (sintaksa + mock gate/restore/pg_dump). Ista aplikacijska slika nosi CLI za DB uloge, migracije, provjeru/uvoz hrLexa i first-admin. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Backup automatika je u `skripte/backup/` (systemd/`age`/Storage Box); gate `skripte/zahtijevaj-svjez-offserver-backup.sh` na VPS-u pokreće **novi** `--razlog=pre-migracija` dump i pada ako tooling nije instaliran ili dump nije potvrđen. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
+> **Status 2026-11-17: djelomično implementirano.** `.github/workflows/ci.yml` dijeli poslove (`putanje` → paralelni `kod` / `slika` → agregator **Lint, test, check i build**), uz docs-only path-filter, Playwright cache i least-privilege ovlasti. Job `kod` na početku pokreće pinani **actionlint** nad `.github/workflows/` te `bash skripte/testovi/backup/pokreni.sh` (sintaksa + mock gate/restore/pg_dump) i `bash skripte/testovi/izdanja/pokreni.sh` (odluka izdanje/tiho i bilješke Releasea). Ista aplikacijska slika nosi CLI za DB uloge, migracije, provjeru/uvoz hrLexa i first-admin. Main CI pushne candidate, smoke-testira digest, GHCR promovira isti manifest bez rebuilda (ili preskače ako kandidata nema), staging automatski objavljuje digest kad tag postoji, a produkcija se promovira ručnim `workflow_dispatch` uz staging gate i fail-closed backup gate. Isti produkcijski workflow razlikuje izdanje od tihog ažuriranja i za izdanje stvara CalVer oznaku i GitHub Release ([ADR-018](../03-arhitektura/odluke/018-calver-izdanja-i-tiha-azuriranja.md)). Backup automatika je u `skripte/backup/` (systemd/`age`/Storage Box); gate `skripte/zahtijevaj-svjez-offserver-backup.sh` na VPS-u pokreće **novi** `--razlog=pre-migracija` dump i pada ako tooling nije instaliran ili dump nije potvrđen. GitHub Environment `produkcija` i `PROD_*` tajne postavljaju se nakon VPS-a.
 
-Tok objave definiran je [ADR-om 014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md):
+Tok objave definiraju [ADR-014](../03-arhitektura/odluke/014-operativni-model-mvp-a.md) i [ADR-018](../03-arhitektura/odluke/018-calver-izdanja-i-tiha-azuriranja.md):
 
 ```mermaid
 flowchart LR
@@ -13,6 +13,7 @@ flowchart LR
     E --> F[Ručna provjera na stagingu]
     F --> G[Ručni produkcijski workflow]
     G --> H[Isti digest u produkciju]
+    H -->|samo izdanje| I[CalVer oznaka + GitHub Release]
 ```
 
 Razvojno računalo nema virtualizaciju pa se Docker slika ne može testirati lokalno — **CI je jedino mjesto koje dokazuje da slika radi** prije staginga. Zato smoke test nije opcionalan korak nego bloker objave (osim docs-only pusha).
@@ -20,7 +21,7 @@ Razvojno računalo nema virtualizaciju pa se Docker slika ne može testirati lok
 ## Pravila koja vrijede za sve workflowe
 
 - Sve third-party GitHub Actions reference pinaju se na puni commit SHA; komentar uz SHA navodi čitljivu verziju. Dependabot ih ažurira kroz Pull Request (PR).
-- Workflow zadano ima `contents: read`. Job `slika` dodatno ima `packages: write` (main candidate) i `security-events: write` (Trivy SARIF). Job `kod` i agregator ostaju na `contents: read`.
+- Workflow zadano ima `contents: read`. Job `slika` dodatno ima `packages: write` (main candidate) i `security-events: write` (Trivy SARIF). Job `kod` i agregator ostaju na `contents: read`. Jedini job s `contents: write` je `izdanje` u `promoviraj-produkciju.yml`, koji stvara Git oznaku i GitHub Release; nema Environment ni produkcijske tajne.
 - Aplikacijska slika gradi se samo za `linux/amd64`. ARM/multi-arch nije dio početne postave.
 - Staging i produkcija imaju zasebne GitHub Environmente i SSH ključeve. Produkcijski Environment nema required reviewer jer postoji jedan operater; ručni `workflow_dispatch` jest kontrolna točka.
 - `concurrency` dopušta najviše jedan aktivni deploy po okruženju. Novi staging deploy ne smije se utrkivati sa starim, a produkcijski deploy nikad ne prekida drugi produkcijski deploy.
@@ -80,8 +81,8 @@ flowchart TD
 | Job | Što radi | Ovlasti |
 | --- | --- | --- |
 | `putanje` | Izračun `docs_only` iz difa | `contents: read` |
-| `kod` | actionlint (workflow YAML), install, audit, Trivy secret, migracije, lint, Vitest, web check, build, Playwright cache + E2E (Chromium+WebKit) | `contents: read` |
-| `slika` | prod Compose config + sintetički validator konfiguracije, Docker build/candidate, Trivy image+SARIF, Caddy, compose smoke, HTTP E2E, image-smoke, load, simulacija | `contents: read` + `packages: write` + `security-events: write` |
+| `kod` | actionlint (workflow YAML), install, audit, Trivy secret, migracije, testovi backup skripti i skripti izdanja, lint, Vitest, web check, build, Playwright cache + E2E (Chromium+WebKit) | `contents: read` |
+| `slika` | prod Compose config + sintetički validator konfiguracije, Docker build/candidate, Trivy image+SARIF, Caddy, compose smoke, provjera izdanja u slici, HTTP E2E, image-smoke, load, simulacija | `contents: read` + `packages: write` + `security-events: write` |
 | agregator (**Lint, test, check i build**) | Zelen ako docs-only **ili** (`kod` i `slika` uspješni) | `contents: read` |
 
 `kod` i `slika` idu **paralelno** da lint/Vitest padne ranije, ne tek nakon Docker koraka. Playwright preglednici se predmemoriraju (`~/.cache/ms-playwright`, ključ na `pnpm-lock.yaml`).
@@ -100,11 +101,12 @@ Na `main` se slika gradi jednom. Taj lokalni image ili registry digest koristi s
 6. Pokretanje aplikacije kao ne-root korisnika u kontejneru.
 7. `GET /zdravlje` mora vratiti 200, dostupnu bazu, `brojRijeci > 0` i isti digest koji je candidate build proizveo.
 8. Prije builda: `docker compose -f docker-compose.prod.yml config` (sintetički env) i `provjera-produkcijske-konfiguracije.ts` (sintetički `NODE_ENV=production`).
-9. `pnpm test:e2e:http` provjerava same-origin HTTP rute i Socket.IO handshake protiv buildanog servera (izvještaj u `playwright-report-http/`).
-10. `pnpm test:e2e:image-smoke` u browseru odigra kratku stvarnu partiju protiv buildanog servera (izvještaj u `playwright-report-image/`); **ne** ulazi u desktop E2E na Viteu.
-11. Kratki `opterecenje --scenarij=igra` smoke zahtijeva prihvaćene poteze i završene partije; CI p95 pragovi su labavi (`5000` ms) da ne miješaju kapacitet s funkcionalnim padom. Stroži p95 ostaje za ručni/staging kapacitet.
-12. Skripta `simulacija` spaja četiri Socket.IO klijenta i odigra **cijelu partiju** protiv kontejnera.
-13. Gašenje stacka i volumena čak i kada prethodni korak padne.
+9. Provjera izdanja u slici: `skripte/izdanja/odredi-izdanje.sh` izračuna sidro i datum najnovijeg datiranog zapisa iz `izdanja.json`, a `/novosti` i naslovnica pokrenute slike moraju ih sadržavati. To je ugovor između weba (TypeScript) i skripti izdanja (bash/jq): istu provjeru produkcijski job `izdanje` radi prije stvaranja oznake, pa se neslaganje otkriva već u CI-ju.
+10. `pnpm test:e2e:http` provjerava same-origin HTTP rute i Socket.IO handshake protiv buildanog servera (izvještaj u `playwright-report-http/`).
+11. `pnpm test:e2e:image-smoke` u browseru odigra kratku stvarnu partiju protiv buildanog servera (izvještaj u `playwright-report-image/`); **ne** ulazi u desktop E2E na Viteu.
+12. Kratki `opterecenje --scenarij=igra` smoke zahtijeva prihvaćene poteze i završene partije; CI p95 pragovi su labavi (`5000` ms) da ne miješaju kapacitet s funkcionalnim padom. Stroži p95 ostaje za ručni/staging kapacitet.
+13. Skripta `simulacija` spaja četiri Socket.IO klijenta i odigra **cijelu partiju** protiv kontejnera.
+14. Gašenje stacka i volumena čak i kada prethodni korak padne.
 
 Padne li `kod` ili `slika`, agregator je crven i staging se ne dira. Dev E2E, HTTP i image-smoke artefakti imaju odvojene putanje da se ne pregaze.
 
@@ -116,7 +118,7 @@ Candidate tagovi su privremeni release artefakti. Treba ih zadržati dovoljno du
 
 Tag `latest` smije biti informativan, ali se nikad ne koristi za deploy, migraciju ni rollback. Jedina dopuštena referenca na serveru je `ghcr.io/<vlasnik>/kaladont@sha256:<digest>`.
 
-Operativna pravila za release identitet, status kandidata, staging closed test checklistu i evidenciju nalaze se u [release shemi](release-shema.md). Za prve zatvorene testove release se označava digestom i commit SHA-om; SemVer se ne uvodi dok ne postoji javni ritam izdanja.
+Operativna pravila za release identitet, status kandidata, staging closed test checklistu i evidenciju nalaze se u [release shemi](release-shema.md). Svaka objava identificira se digestom i commit SHA-om. CalVer oznaku `vYYYY.MM.DD` dobiva samo izdanje, tj. objava koja donosi novi datirani zapis u `aplikacije/web/src/lib/izdanja.json`; oznaka se ne koristi za deploy, migracije ni rollback.
 
 VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kratkotrajni `GITHUB_TOKEN` šalje se udaljenom `docker login --password-stdin` procesu preko zaštićene SSH veze i koristi s privremenim `DOCKER_CONFIG` direktorijem. Token se ne stavlja u argument naredbe ni log. Nakon `docker pull`/`compose pull` workflow izvršava `docker logout` i briše privremeni direktorij čak i kada deploy padne.
 
@@ -130,6 +132,7 @@ VPS ne čuva osobni access token ni trajnu GHCR prijavu. Tijekom deploy joba kra
 4. Workflow validira Compose, povlači novi digest, izvršava migracije, tek zatim mijenja release retke u stvarnom `.env`, zamjenjuje samo aplikacijski kontejner i čeka njegov health. Deploy skripta prije izmjene `.env` sprema release snapshot i na grešku ispisuje fazu pada, prethodni zapis, aktivnu sliku, je li stvarni `.env` promijenjen i kratku dijagnostiku bez tajni. Caddy ostaje dostupan na portovima 80/443, zatim validira i graceful reloada novu reverse-proxy konfiguraciju bez prekida slušanja.
 5. Ponavlja javni health do uspjeha; odgovor mora sadržavati očekivani digest i commit SHA.
 6. Zeleni staging deploy znači da je kandidat spreman za ručnu browser provjeru, ne za automatsku produkciju.
+7. Informativni korak **Najaviti vrstu sljedeće produkcijske promocije** pokreće `skripte/izdanja/odredi-izdanje.sh --samo-izvjestaj` i u sažetak runa upisuje bi li promocija ovog digesta bila izdanje ili tiho ažuriranje. Upozorava ako bi promocija danas bila blokirana ili ako postoji nacrt izdanja. Korak ima `continue-on-error` i nikad ne ruši deploy.
 
 Ako staging deploy padne prije završetka migracija, stvarni `.env` ostaje na prethodnom release zapisu; skripta ga može idempotentno potvrditi ili vratiti na isti prethodni zapis. Nakon što su migracije pokrenute nema automatskog rollbacka slike: workflow završava crveno s dijagnostikom, a operater ručno odlučuje je li povrat na prethodni digest siguran s obzirom na kompatibilnost sheme.
 
@@ -141,17 +144,28 @@ Actions ime: **Promoviraj produkciju**. Pokreće se isključivo ručno (`workflo
 
 1. Koristi Environment `produkcija`; nema required reviewer ni dodatnog approval koraka. (`PROD_HOST`, `PROD_SSH_KLJUC`, `PROD_SSH_KNOWN_HOSTS` — nakon VPS-a.)
 2. Iz OCI labele `org.opencontainers.image.revision` čita commit SHA; checkout i SCP koriste taj SHA (ne `main`), da rollback starog digesta vrati i tadašnje compose/Caddy. Zapisuje trenutni `DIGEST`/`VERZIJA` s VPS-a kao kandidat za rollback.
-3. **Backup gate:** na VPS-u pokreće `skripte/zahtijevaj-svjez-offserver-backup.sh`. Exit ≠ 0 = crveni job **prije** migracija. Skripta traži instalirani `/usr/local/lib/kaladont/kaladont-backup.sh` i `kaladont-backup.service`, zatim preko `sudo -n` pokreće **novi** dump s `--razlog=pre-migracija` (sinoćnji dnevni nije dovoljan) i čeka udaljenu SHA-256 potvrdu. Installer postavlja sudoers fragment za korisnika `deploy`.
-4. SCP: `docker-compose.prod.yml`, `Caddyfile`, `objava-produkcija.sh`, backup helper s commita slike.
-5. Kratkotrajni GHCR login na VPS-u (`GITHUB_TOKEN` + privremeni `DOCKER_CONFIG` + logout), zatim `objava-produkcija.sh` s istom faza-mašinom kao staging (kandidat `.env` → pull → migracije → stvarni `.env` → recreate → Caddy).
-6. Poll `https://kaladont.hr/zdravlje` (~30×): `ok`, `baza=dostupna`, očekivani `digest` i `verzija`.
-7. Step summary: prethodni i novi digest, commit, ishod. Na failure: artifact `.deploy-snapshot-*` bez tajni.
+3. **Vrsta objave i čuvar datuma:** `skripte/izdanja/odredi-izdanje.sh` čita `izdanja.json` s commita slike i postojeće Git oznake te odlučuje je li objava izdanje ili tiho ažuriranje ([release shema](release-shema.md#objava-i-izdanje)). Skripte se uzimaju s grane workflowa, da budu aktualne i pri rollbacku stare slike. Novo izdanje čiji datum nije današnji (Europe/Zagreb) ruši job **prije** SSH pripreme i backupa; produkcija ostaje netaknuta, a sažetak kaže što treba popraviti. Slika starija od sustava izdanja nema `izdanja.json` i uvijek je tiho ažuriranje.
+4. **Backup gate:** na VPS-u pokreće `skripte/zahtijevaj-svjez-offserver-backup.sh`. Exit ≠ 0 = crveni job **prije** migracija. Skripta traži instalirani `/usr/local/lib/kaladont/kaladont-backup.sh` i `kaladont-backup.service`, zatim preko `sudo -n` pokreće **novi** dump s `--razlog=pre-migracija` (sinoćnji dnevni nije dovoljan) i čeka udaljenu SHA-256 potvrdu. Installer postavlja sudoers fragment za korisnika `deploy`.
+5. SCP: `docker-compose.prod.yml`, `Caddyfile`, `objava-produkcija.sh`, backup helper s commita slike.
+6. Kratkotrajni GHCR login na VPS-u (`GITHUB_TOKEN` + privremeni `DOCKER_CONFIG` + logout), zatim `objava-produkcija.sh` s istom faza-mašinom kao staging (kandidat `.env` → pull → migracije → stvarni `.env` → recreate → Caddy).
+7. Poll `https://kaladont.hr/zdravlje` (~30×): `ok`, `baza=dostupna`, očekivani `digest` i `verzija`.
+8. Step summary: vrsta objave, prethodni i novi digest, commit, ishod. Na failure: artifact `.deploy-snapshot-*` bez tajni.
 
 `concurrency.group: produkcija-deploy`, `cancel-in-progress: false`. Nema automatskog rollbacka slike nakon migracija.
 
 Workflow ne provjerava postoje li aktivne partije i može ih prekinuti. Operater ga zato pokreće u doba slabog prometa. Ako se očekuje prekid dulji od 5 minuta, održavanje se najavljuje najmanje 24 sata unaprijed.
 
 Ako migracija, startup ili health check padnu, workflow završava crveno i u sažetku prikazuje prethodni digest te poveznicu na [ručni rollback](runbook-objava-i-rollback.md#rollback-vraćanje-prethodne-verzije). Operater prvo sprema dokaze, zatim ručno promovira prethodni digest istim workflowom; cilj povrata je 15 minuta.
+
+### Job `izdanje` — CalVer oznaka i GitHub Release
+
+Pokreće se samo kad je job `promocija` uspio i kad je objava izdanje. Jedini ima `contents: write`; nema Environment ni produkcijske tajne.
+
+1. Potvrdi da produkcija prikazuje izdanje: `https://kaladont.hr/novosti` sadrži sidro izdanja, a naslovnica poveznicu na njega (do 12 pokušaja).
+2. Ako GitHub Release s tom oznakom već postoji, završava bez izmjena. Ako postoji samo oznaka, mora pokazivati na promovirani commit.
+3. `skripte/izdanja/biljeske-izdanja.sh` iz `izdanja.json` složi bilješke, a `gh release create` stvori oznaku `vYYYY.MM.DD` na commitu promovirane slike i GitHub Release `Kaladont | D. M. YYYY.`.
+
+Pad ovog joba ne vraća deploy: produkcija je tada već ažurirana. Oporavak je **Re-run failed jobs**, koji ponavlja samo ovaj job; **Re-run all jobs** ponovio bi i deploy. Ugrađeni `GITHUB_TOKEN` ne može dobiti dozvolu za workflowe, pa GitHub odbija stvaranje oznake na commitu čije workflow datoteke ne postoje ni na jednoj grani (npr. kad su workflowi na `main` izmijenjeni nakon promoviranog commita). Tada sažetak joba ispisuje naredbu za ručno stvaranje oznake, nakon koje ponovljeni job sam stvara Release. Ostale slučajeve pokriva tablica [„Što ako”](runbook-objava-i-rollback.md#što-ako).
 
 ## Ručna provjera nakon workflowa
 
@@ -172,6 +186,7 @@ Aplikacijske tajne (baza, email, sesije, Storage Box i Healthchecks URL) žive u
 - Nema ručnog SSH deploya „na brzinu”; operater smije koristiti SSH za pregled i dokumentirane incidentne radnje, ne za zaobilaženje workflowa.
 - Produkcija nikad ne dobiva sliku koja nije prošla staging s istim digestom.
 - `latest`, branch tag i lokalni build nisu dopušteni produkcijski inputi.
+- CalVer oznake i GitHub Releaseove stvara job `izdanje`. Ručno se stvaraju samo u slučajevima koje opisuje [runbook](runbook-objava-i-rollback.md#što-ako), jer postojeća oznaka za čuvara datuma znači „već objavljeno”.
 - Tajne se ne ispisuju, ne spremaju u command history i ne šalju kao argument procesa.
 - Neuspjeli job mora očistiti privremeni Docker config i završiti crveno; ne smije prikriti djelomično izvršenu migraciju.
 - Workflow datoteke, Dockerfile, Compose, Caddy i migracije nemaju obvezan ljudski review dok postoji jedan operater. To je prihvaćen rizik, ublažen PR-om, obveznim CI-jem, stagingom i ručnom promocijom.

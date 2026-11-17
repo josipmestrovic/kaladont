@@ -1,5 +1,5 @@
 /**
- * Zajednički katalog formata stola i pravilnika (Kaladont 0.2.0).
+ * Zajednički katalog formata stola i pravilnika (paket Troboj).
  * Format, pravilnik i kontekst (javna/privatna/trening) tri su odvojene osi.
  */
 

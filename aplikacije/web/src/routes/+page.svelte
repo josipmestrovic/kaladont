@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik, prijediNaGostujucuSesiju } from '$lib/identitet.js';
+  import { NAJNOVIJE_IZDANJE, urlIzdanja } from '$lib/izdanja.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import { ucitajModalIgraAsete, urlAseta } from '$lib/asetovi-core.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
@@ -117,17 +118,31 @@
     </div>
   </section>
 
-  <footer class="landing-footer">
-    <nav aria-label="Dodatne poveznice">
-      <!-- HINT PR15: Novosti prije O igri; /novosti više nije 307 redirect. -->
-      <a href="/novosti">Novosti</a>
-      <a href="/o-igri">O igri</a>
-      <a href="/povratne-informacije">Pomozi poboljšati igru</a>
-      <a href="/uvjeti">Uvjeti</a>
-      <a href="/privatnost">Privatnost</a>
-    </nav>
-    <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
-  </footer>
+  <div class="landing-dno">
+    <!-- Datum i sidro dolaze iz istog izvora kao stranica Novosti (ADR-018); bez objavljenog izdanja blok se ne prikazuje. -->
+    {#if NAJNOVIJE_IZDANJE}
+      <p class="zadnje-azuriranje">
+        Zadnje ažuriranje:
+        <a href={urlIzdanja(NAJNOVIJE_IZDANJE)}
+          ><time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time></a
+        >
+        <span class="razdjelnik" aria-hidden="true">·</span>
+        <a class="sto-je-novo" href="/novosti">Vidi što je novo</a>
+      </p>
+    {/if}
+
+    <footer class="landing-footer">
+      <nav aria-label="Dodatne poveznice">
+        <!-- HINT PR15: Novosti prije O igri; /novosti više nije 307 redirect. -->
+        <a href="/novosti">Novosti</a>
+        <a href="/o-igri">O igri</a>
+        <a href="/povratne-informacije">Pomozi poboljšati igru</a>
+        <a href="/uvjeti">Uvjeti</a>
+        <a href="/privatnost">Privatnost</a>
+      </nav>
+      <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
+    </footer>
+  </div>
 </main>
 
 {#if registriran}
@@ -388,6 +403,37 @@
   .navigacijska-stavka.odjava-stavka::after { color: var(--boja-crvena); }
   .navigacijska-stavka.odjava-stavka:hover { border-color: var(--boja-crvena); }
 
+  /* Omotač drži blok „Zadnje ažuriranje” neposredno iznad footera, a footer ostaje nepromijenjen. */
+  .landing-dno {
+    position: relative;
+    z-index: 1;
+    width: min(100%, 980px);
+  }
+
+  .zadnje-azuriranje {
+    margin: 0 0 2px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+    line-height: 1.3;
+    text-align: left;
+  }
+
+  .zadnje-azuriranje a {
+    color: inherit;
+    font-weight: inherit;
+    text-decoration: underline;
+    white-space: nowrap;
+  }
+
+  .zadnje-azuriranje a:hover { color: var(--boja-akcent-tekst); }
+
+  /* Uz font za disleksiju tekst ne stane u jedan red: poveznica ide u vlastiti red, bez razdjelnika. */
+  :global(html[data-font-disleksiju]) .zadnje-azuriranje .razdjelnik { display: none; }
+  :global(html[data-font-disleksiju]) .zadnje-azuriranje .sto-je-novo {
+    display: block;
+    width: fit-content;
+  }
+
   .landing-footer {
     position: relative;
     z-index: 1;
@@ -426,6 +472,17 @@
 
   @media (min-width: 1000px) {
     .landing-footer a { padding-inline: 0; }
+
+    /* Na desktopu je naslovnica visinski ugođena bez viška prostora (osobito uz font za disleksiju).
+       Blok zato lebdi iznad footera u praznom lijevom stupcu, pored kontrola pristupačnosti
+       (480 px + razmak), i ne povećava visinu stranice. */
+    .zadnje-azuriranje {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      max-width: calc(100% - 480px - 32px);
+      margin: 0;
+    }
   }
 
   @media (max-width: 999px) {
@@ -467,6 +524,12 @@
     h1 { line-height: 0.95; }
     :global(html[data-font-disleksiju]) h1 { font-size: calc(var(--velicina-naslova) * 0.7); }
     :global(html[data-font-disleksiju]) .vrsta-igre { margin-top: clamp(4px, 1dvh, 8px); }
+    .zadnje-azuriranje {
+      font-size: clamp(12px, 2dvh, var(--tekst-sitni));
+      line-height: 1.2;
+      text-align: center;
+    }
+    .zadnje-azuriranje .sto-je-novo { margin-inline: auto; }
     .landing-footer { flex-direction: column; gap: 2px; }
     .landing-footer nav { justify-content: center; gap: 0 8px; }
     .copyright { font-size: 11px; line-height: 14px; }
@@ -501,6 +564,13 @@
     .kontrole-pristupacnosti-naslovnica :global(.kontrola-pristupacnosti) {
       gap: 4px;
       padding-inline: 4px;
+    }
+
+    /* Na uskim telefonima tekst ne stane u jedan red: poveznica ide u vlastiti red, bez razdjelnika. */
+    .zadnje-azuriranje .razdjelnik { display: none; }
+    .zadnje-azuriranje .sto-je-novo {
+      display: block;
+      width: fit-content;
     }
   }
 

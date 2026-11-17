@@ -180,6 +180,10 @@ jobs:
         shell: bash
         run: bash skripte/testovi/backup/pokreni.sh
 
+      - name: Provjeriti skripte izdanja
+        shell: bash
+        run: bash skripte/testovi/izdanja/pokreni.sh
+
       - name: Pokrenuti lint
         run: pnpm lint
 
@@ -446,6 +450,44 @@ jobs:
           docker compose -f docker-compose.ci.yml logs aplikacija
           echo 'CI image nije postao zdrav u zadanom roku.'
           exit 1
+
+      - name: Provjeriti da image prikazuje izdanje iz izdanja.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Ugovor skripti izdanja (bash/jq) i weba (TypeScript), ADR-018: ista provjera koju
+          # produkcijski job „izdanje” radi prije stvaranja oznake, pa se neslaganje otkriva već ovdje.
+          izlaz="$RUNNER_TEMP/izdanje-ugovor.txt"
+          poruke="$RUNNER_TEMP/izdanje-ugovor-poruke.txt"
+          # Ovdje trebaju samo sidro i datum; poruke čuvara datuma ispisuju se tek ako skripta padne.
+          if ! bash skripte/izdanja/odredi-izdanje.sh \
+            --izdanja aplikacije/web/src/lib/izdanja.json \
+            --samo-izvjestaj > "$izlaz" 2> "$poruke"; then
+            cat "$poruke"
+            echo 'Skripta izdanja nije uspjela nad izdanja.json.'
+            exit 1
+          fi
+          sidro=$(sed -n 's/^sidro=//p' "$izlaz")
+          datum=$(sed -n 's/^datum=//p' "$izlaz")
+          if [ -z "$sidro" ]; then
+            echo 'Nema datiranih izdanja; provjera se preskače.'
+            exit 0
+          fi
+
+          # Odgovor ide u datoteku pa u grep: curl | grep -q uz pipefail može lažno pasti.
+          curl --fail --silent --show-error --max-time 20 --output "$RUNNER_TEMP/novosti.html" http://127.0.0.1:3000/novosti
+          curl --fail --silent --show-error --max-time 20 --output "$RUNNER_TEMP/naslovnica.html" http://127.0.0.1:3000/
+
+          mora_sadrzavati() {
+            if ! grep -F -q -- "$2" "$1"; then
+              echo "Stranica $(basename "$1") ne sadrži očekivano: $2"
+              exit 1
+            fi
+          }
+          mora_sadrzavati "$RUNNER_TEMP/novosti.html" "id=\"${sidro}\""
+          mora_sadrzavati "$RUNNER_TEMP/novosti.html" "datetime=\"${datum}\""
+          mora_sadrzavati "$RUNNER_TEMP/naslovnica.html" "/novosti#${sidro}\""
+          echo "Image prikazuje izdanje ${sidro} (${datum}) na naslovnici i u Novostima."
 
       - name: Pokrenuti E2E nad izgrađenim same-origin serverom
         env:

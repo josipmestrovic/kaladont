@@ -23,6 +23,12 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     environment: produkcija
+    outputs:
+      verzija: ${{ steps.release.outputs.verzija }}
+      vrsta: ${{ steps.vrsta_objave.outputs.vrsta }}
+      oznaka: ${{ steps.vrsta_objave.outputs.oznaka }}
+      sidro: ${{ steps.vrsta_objave.outputs.sidro }}
+      naslov_releasea: ${{ steps.vrsta_objave.outputs.naslov_releasea }}
 
     steps:
       - name: Prijaviti se u GHCR
@@ -164,6 +170,68 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ steps.release.outputs.verzija }}
+
+      # Skripte dolaze s grane workflowa da budu aktualne i pri rollbacku stare slike;
+      # izdanja.json čita se s commita slike. Mora ići nakon gornjeg checkouta, koji čisti radnu mapu.
+      - name: Preuzeti skripte izdanja s grane workflowa
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: _workflow
+          sparse-checkout: skripte/izdanja
+          persist-credentials: false
+
+      - name: Odrediti vrstu objave i provjeriti datum izdanja
+        id: vrsta_objave
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Izdanje ili tiho ažuriranje (ADR-018). Korak je namjerno prije SSH pripreme:
+          # promocija novog izdanja s datumom koji nije današnji staje prije backupa i produkcije.
+          oznake="$RUNNER_TEMP/oznake-izdanja.txt"
+          izlaz="$RUNNER_TEMP/vrsta-objave.txt"
+          poruke="$RUNNER_TEMP/vrsta-objave-poruke.txt"
+
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" \
+            --jq '.[].ref | ltrimstr("refs/tags/")' > "$oznake"
+
+          kod=0
+          bash _workflow/skripte/izdanja/odredi-izdanje.sh \
+            --izdanja aplikacije/web/src/lib/izdanja.json \
+            --oznake "$oznake" > "$izlaz" 2> "$poruke" || kod=$?
+          cat "$poruke" >&2
+
+          if [ "$kod" -ne 0 ]; then
+            {
+              echo '### Promocija je zaustavljena prije izmjene produkcije'
+              echo
+              echo '```text'
+              cat "$poruke"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit "$kod"
+          fi
+
+          cat "$izlaz"
+          cat "$izlaz" >> "$GITHUB_OUTPUT"
+
+          vrsta=$(sed -n 's/^vrsta=//p' "$izlaz")
+          oznaka=$(sed -n 's/^oznaka=//p' "$izlaz")
+          nacrta=$(sed -n 's/^nacrta=//p' "$izlaz")
+          razlog=$(sed -n 's/^razlog=//p' "$izlaz")
+          {
+            if [ "$vrsta" = 'izdanje' ]; then
+              echo "- Vrsta objave: **IZDANJE ${oznaka}** (nakon provjere produkcije nastaju Git oznaka i GitHub Release)"
+            else
+              echo '- Vrsta objave: tiho ažuriranje (bez oznake i bez unosa u Novostima)'
+            fi
+            echo "- Razlog: ${razlog}"
+            if [ "$vrsta" = 'tiho' ] && [ "${nacrta:-0}" -gt 0 ]; then
+              echo '- **Upozorenje:** postoji nacrt izdanja. Ova objava ga ne objavljuje u Novostima; ako slika već sadrži te promjene, izlaze bez najave.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Pripremiti SSH vjerodajnice
         shell: bash
@@ -327,3 +395,129 @@ jobs:
         if: always()
         shell: bash
         run: rm -rf "$RUNNER_TEMP/ssh"
+
+  # Pokreće se samo kad je promocija uspjela i objava je ujedno izdanje (ADR-018).
+  # Custom if zamjenjuje default success(), pa eksplicitno tražimo result == success —
+  # inače bi job išao i nakon pala deploya/healtha ako je vrsta_objave već postavila izlaz.
+  # Nema produkcijskih tajni ni Environmenta; pisanje u repozitorij ograničeno je na ovaj job.
+  # Pad ovog joba ne vraća deploy: dovoljno je ponoviti samo njega („Re-run failed jobs”).
+  izdanje:
+    name: Objaviti CalVer oznaku i GitHub Release
+    needs: promocija
+    if: ${{ needs.promocija.result == 'success' && needs.promocija.outputs.vrsta == 'izdanje' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Preuzeti repozitorij na commit slike
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.promocija.outputs.verzija }}
+          persist-credentials: false
+
+      - name: Preuzeti skripte izdanja s grane workflowa
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: _workflow
+          sparse-checkout: skripte/izdanja
+          persist-credentials: false
+
+      - name: Potvrditi da produkcija prikazuje izdanje
+        shell: bash
+        env:
+          SIDRO: ${{ needs.promocija.outputs.sidro }}
+        run: |
+          set -euo pipefail
+          test -n "$SIDRO"
+          # Odgovor ide u datoteku pa u grep: curl | grep -q uz pipefail može lažno pasti.
+          for pokusaj in {1..12}; do
+            novosti=ne
+            naslovnica=ne
+            if curl --fail --silent --show-error --max-time 20 --output "$RUNNER_TEMP/novosti.html" https://kaladont.hr/novosti \
+              && grep -F -q -- "id=\"${SIDRO}\"" "$RUNNER_TEMP/novosti.html"; then
+              novosti=da
+            fi
+            if curl --fail --silent --show-error --max-time 20 --output "$RUNNER_TEMP/naslovnica.html" https://kaladont.hr/ \
+              && grep -F -q -- "/novosti#${SIDRO}\"" "$RUNNER_TEMP/naslovnica.html"; then
+              naslovnica=da
+            fi
+            echo "Pokušaj ${pokusaj}: novosti=${novosti} naslovnica=${naslovnica}"
+            if [ "$novosti" = 'da' ] && [ "$naslovnica" = 'da' ]; then
+              echo "- Produkcija prikazuje izdanje \`${SIDRO}\` na naslovnici i u Novostima" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Produkcija ne prikazuje izdanje ${SIDRO} na naslovnici i u Novostima."
+          exit 1
+
+      - name: Stvoriti Git oznaku i GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OZNAKA: ${{ needs.promocija.outputs.oznaka }}
+          NASLOV_RELEASEA: ${{ needs.promocija.outputs.naslov_releasea }}
+          VERZIJA: ${{ needs.promocija.outputs.verzija }}
+        run: |
+          set -euo pipefail
+          test -n "$NASLOV_RELEASEA"
+          if [[ ! "$OZNAKA" =~ ^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$ ]]; then
+            echo "Neočekivan oblik oznake izdanja: ${OZNAKA}"
+            exit 1
+          fi
+          if [[ ! "$VERZIJA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'Nedostaje puni commit SHA promovirane slike.'
+            exit 1
+          fi
+
+          if gh release view "$OZNAKA" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub Release ${OZNAKA} već postoji; ništa se ne mijenja."
+            echo "- GitHub Release \`${OZNAKA}\` već postoji; ništa nije mijenjano" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Oznaka bez Releasea (npr. stvorena ručno) mora pokazivati na promovirani commit.
+          broj_oznaka=$(gh api "/repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${OZNAKA}" \
+            --jq "map(select(.ref == \"refs/tags/${OZNAKA}\")) | length")
+          if [ "$broj_oznaka" -gt 0 ]; then
+            commit_oznake=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/refs/tags/${OZNAKA}" --jq '.sha')
+            if [ "$commit_oznake" != "$VERZIJA" ]; then
+              echo "Oznaka ${OZNAKA} već postoji, ali pokazuje na ${commit_oznake}, a ne na promovirani commit ${VERZIJA}."
+              exit 1
+            fi
+          fi
+
+          bash _workflow/skripte/izdanja/biljeske-izdanja.sh \
+            --izdanja aplikacije/web/src/lib/izdanja.json \
+            --oznaka "$OZNAKA" > "$RUNNER_TEMP/biljeske.md"
+
+          if ! gh release create "$OZNAKA" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$VERZIJA" \
+            --title "$NASLOV_RELEASEA" \
+            --notes-file "$RUNNER_TEMP/biljeske.md" \
+            --latest; then
+            # GITHUB_TOKEN ne može dobiti dozvolu za workflowe, pa GitHub odbija (403/404) oznaku na
+            # commitu čije workflow datoteke ne postoje na nekoj grani. Ručno stvorenu oznaku ovaj job prihvaća.
+            {
+              echo "### GitHub Release ${OZNAKA} nije stvoren"
+              echo
+              echo 'Produkcija je već uspješno objavljena; nedostaju samo Git oznaka i GitHub Release.'
+              echo
+              echo '1. Ponovi samo ovaj job: „Re-run failed jobs”. Ne koristi „Re-run all jobs”, jer ponavlja i deploy.'
+              echo '2. Ako opet padne, mogući je uzrok da su workflow datoteke na `main` izmijenjene nakon promoviranog commita: ugrađeni token tada ne smije stvoriti oznaku na njemu. Stvori oznaku ručno, pa ponovi korak 1:'
+              echo
+              echo '```bash'
+              echo 'gh auth refresh -h github.com -s workflow'
+              echo "gh api -X POST repos/${GITHUB_REPOSITORY}/git/refs -f ref=refs/tags/${OZNAKA} -f sha=${VERZIJA}"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          {
+            echo "- Git oznaka: \`${OZNAKA}\` na commitu \`${VERZIJA}\`"
+            echo "- GitHub Release: ${NASLOV_RELEASEA}"
+          } >> "$GITHUB_STEP_SUMMARY"

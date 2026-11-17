@@ -1,0 +1,4 @@
+# Skripte izdanja pokreću se i lokalno u Git Bashu (testovi, ručno stvaranje bilješki),
+# pa i na Windowsu uz core.autocrlf moraju zadržati LF završetke redaka.
+skripte/izdanja/** text eol=lf
+skripte/testovi/izdanja/** text eol=lf

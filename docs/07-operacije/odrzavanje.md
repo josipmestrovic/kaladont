@@ -53,7 +53,7 @@ Redovito, dosadno i kratko — tako se izbjegavaju noćna iznenađenja. Alarmi (
 
 ## Evidencija drillova, objava i većih zahvata
 
-Release identitet, statusi i obavezna polja definirani su u [release shemi](release-shema.md#predložak-zapisa-releasea). U evidenciju ulazi svaki staging closed test kandidat, produkcijska promocija, rollback, produkcijska probna partija, DB restore drill, potpuni recovery drill, rotacija ključeva, veća OS/PostgreSQL nadogradnja i incident.
+Release identitet, statusi i obavezna polja definirani su u [release shemi](release-shema.md#predložak-zapisa-releasea). U evidenciju ulazi svaki staging closed test kandidat, produkcijska promocija, rollback, produkcijska probna partija, DB restore drill, potpuni recovery drill, rotacija ključeva, veća OS/PostgreSQL nadogradnja i incident. Uz produkcijsku promociju koja je izdanje upisuje se i CalVer oznaka (npr. `v2026.11.23`); tiho ažuriranje nema oznaku.
 
 | UTC datum/vrijeme            | Vrsta                       | Digest / commit / kopija / partija                 | Trajanje | Rezultat i napomena                                 |
 | ---------------------------- | --------------------------- | -------------------------------------------------- | -------- | --------------------------------------------------- |
@@ -113,4 +113,4 @@ pnpm --filter posluzitelj prijelaz-ljestvice-pr11 -- --primijeni=DA
 
 - Ne skenirati zatvorena razdoblja; ne izmišljati povijesne Top10 ulaske.
 - Dist container: `node dist/cli/prijelaz-ljestvice-pr11.js --usporedi` (podržan `.js` ulaz). Za stare imageove s `.ts`-only checkom: `node /tmp/pokreni-prijelaz-ljestvice-pr11.mjs --usporedi` (skopiraj `tmp-ci/pokreni-prijelaz-ljestvice-pr11.mjs`).
-- HINT za produkcijski checklist 0.2.0: uz PR09 backfill (ako još nije) + ovaj PR11 prijelaz.
+- HINT za produkcijski checklist paketa Troboj: uz PR09 backfill (ako još nije) + ovaj PR11 prijelaz.

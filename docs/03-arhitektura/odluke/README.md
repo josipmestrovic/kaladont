@@ -40,3 +40,4 @@ ADR (engl. _Architecture Decision Record_) je kratak zapis jedne značajne odluk
 | [015](015-pojedinacne-sesije.md)               | Pojedinačne sesije                                          |
 | [016](016-gdpr-minimum-i-rucno-brisanje.md)    | GDPR minimum i ručno brisanje računa                        |
 | [017](017-botovi-i-zagrijavanje.md)            | Serverski botovi za popunu reda i trening „Zagrijavanje”    |
+| [018](018-calver-izdanja-i-tiha-azuriranja.md) | CalVer izdanja i tiha ažuriranja                            |
