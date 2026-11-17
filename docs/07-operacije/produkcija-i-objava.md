@@ -95,10 +95,12 @@ Detaljni koraci za početnika nalaze se u [Operacije for dummies](operacije-for-
 
 ## Objava nove verzije
 
-Identitet releasea, statusi, staging closed test checklist i evidencija opisani su u [release shemi](release-shema.md). Automatika i njezin ugovor opisani su u [CI/CD dokumentu](ci-cd.md); ljudski postupci su u [runbooku objave i rollbacka](runbook-objava-i-rollback.md). Trenutačni tok je: radna grana → Pull Request → zeleni CI → merge u `main` → GHCR objava → automatski staging deploy punim digestom → ručna staging provjera. Produkcijska promocija ostaje zaseban korak i nije potvrđena kao automatizirana.
+Identitet releasea, statusi, staging closed test checklist i evidencija opisani su u [release shemi](release-shema.md). Automatika i njezin ugovor opisani su u [CI/CD dokumentu](ci-cd.md); ljudski postupci su u [runbooku objave i rollbacka](runbook-objava-i-rollback.md). Trenutačni tok je: radna grana → Pull Request → zeleni CI → merge u `main` → GHCR objava → automatski staging deploy punim digestom → ručna staging provjera → ručna produkcijska promocija istog digesta.
+
+Nije svaka objava izdanje ([ADR-018](../03-arhitektura/odluke/018-calver-izdanja-i-tiha-azuriranja.md)). CalVer oznaku `vYYYY.MM.DD`, GitHub Release i unos u Novostima dobiva samo objava koja donosi novi datirani zapis u `aplikacije/web/src/lib/izdanja.json`. Sve ostalo su tiha ažuriranja, koja prolaze isti put bez oznake i bez unosa u Novostima.
 
 - Postoji jedan stvarni operater. Nema obveznog drugog reviewera ni dodatnog GitHub Environment approval koraka; ručno pokretanje produkcijskog workflowa kontrolna je točka.
-- Redovni deploy može prekinuti aktivne partije i ne blokira se automatski. Radi se u doba slabog prometa. Očekivani prekid dulji od 5 minuta najavljuje se najmanje 24 sata unaprijed na forumu i bannerom objavljenim prethodnim izdanjem.
+- Redovni deploy može prekinuti aktivne partije i ne blokira se automatski. Radi se u doba slabog prometa. Očekivani prekid dulji od 5 minuta najavljuje se najmanje 24 sata unaprijed na forumu i bannerom objavljenim prethodnom objavom.
 - Migracije se izvode prije zamjene kontejnera; moraju biti kompatibilne unatrag (stara verzija radi nad novom shemom barem jedan ciklus).
 - Prije svake produkcijske migracije mora uspjeti svježi šifrirani off-server backup.
 - Serveri, logovi i systemd timeri koriste UTC; najava korisnicima navodi lokalno vrijeme Europe/Zagreb.

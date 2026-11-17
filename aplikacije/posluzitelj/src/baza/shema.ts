@@ -29,7 +29,7 @@ export const upravljacIgraca = pgEnum('upravljac_igraca', ['covjek', 'bot']);
 export const tipPrezentacijeBota = pgEnum('tip_prezentacije_bota', ['imenovani', 'gost']);
 export const statusPartije = pgEnum('status_partije', ['u_tijeku', 'zavrsena', 'ponistena']);
 export const modPartije = pgEnum('mod_partije', ['cetiri_igraca', 'dva_igraca', 'tri_igraca']);
-/** Izvršeni / odabrani pravilnik partije (Kaladont 0.2.0). Default povijesti = ka_zna. */
+/** Izvršeni / odabrani pravilnik partije (paket Troboj). Default povijesti = ka_zna. */
 export const pravilnikPartije = pgEnum('pravilnik_partije', ['klasicni', 'ka_zna', 'dokazi_nastavak']);
 export const nacinIspadanja = pgEnum('nacin_ispadanja', [
   'ne_znam',

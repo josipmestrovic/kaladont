@@ -27,6 +27,7 @@ kaladont/
 │           ├── protokol.ts     # tipovi svih Socket.IO poruka
 │           └── poruke.ts       # svi UI/serverski tekstovi na hrvatskom (jedno mjesto)
 ├── skripte/
+│   ├── izdanja/                # izdanje ili tiho ažuriranje, bilješke GitHub Releasea (ADR-018)
 │   └── uvoz-rjecnika/          # hrLex → Postgres (podaci/ je u .gitignore)
 ├── docs/                       # ova dokumentacija
 ├── .github/

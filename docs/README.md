@@ -70,13 +70,7 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | [operacije-for-dummies.md](07-operacije/operacije-for-dummies.md)               | Linearni vodič od nule: preduvjeti, staging, produkcija, backup, održavanje i recovery |
 | [objava-staginga-za-pocetnike.md](07-operacije/objava-staginga-za-pocetnike.md) | Svakodnevna staging objava: provjera, direktni push, migracija, test i rollback         |
-| [release-shema.md](07-operacije/release-shema.md)                               | Identitet releasea, staging closed test checklist, promocija i rollback pravila        |
-| [release-notes-v0.2.0.md](07-operacije/release-notes-v0.2.0.md) | Javno izdanje 0.2.0 (Troboj, pravilnici; `/novosti#v0-2-0`) |
-| [release-notes-v0.1.0.md](07-operacije/release-notes-v0.1.0.md) | Prvo javno izdanje 0.1.0 (`/novosti#v0-1-0`) |
-| [release-notes-v0.5.0-closed-alpha.1.md](07-operacije/release-notes-v0.5.0-closed-alpha.1.md) | Novosti i provjere za peto zatvoreno alpha izdanje |
-| [release-notes-v0.4.0-closed-alpha.1.md](07-operacije/release-notes-v0.4.0-closed-alpha.1.md) | Novosti i provjere za četvrto zatvoreno alpha izdanje |
-| [release-notes-v0.3.0-closed-alpha.1.md](07-operacije/release-notes-v0.3.0-closed-alpha.1.md) | Novosti za treće zatvoreno alpha izdanje |
-| [release-notes-v0.2.0-closed-alpha.1.md](07-operacije/release-notes-v0.2.0-closed-alpha.1.md) | Povijesno zatvoreno alpha (≠ javno 0.2.0) |
+| [release-shema.md](07-operacije/release-shema.md)                               | Identitet releasea, objava i izdanje (CalVer), staging checklist, promocija i rollback |
 | [produkcija-i-objava.md](07-operacije/produkcija-i-objava.md)                   | Okruženja (staging/produkcija), Hetzner, Docker, Caddy, DNS                            |
 | [dimenzioniranje-posluzitelja.md](07-operacije/dimenzioniranje-posluzitelja.md) | Procjena resursa i veličine servera po ulozi                                           |
 | [ci-cd.md](07-operacije/ci-cd.md)                                               | GitHub Actions: CI, smoke test slike, staging, promocija digesta                       |
@@ -85,7 +79,7 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | [http-rute.md](03-arhitektura/http-rute.md)                                    | Razdvajanje poslovnog API-ja i URL-ova stranica                                        |
 | [vodic-postava-vps.md](07-operacije/vodic-postava-vps.md)                       | Početnički vodič: od praznog VPS-a do žive igre                                        |
 | [vodic-postava-discourse.md](07-operacije/vodic-postava-discourse.md)           | Postava foruma na zasebnom VPS-u                                                       |
-| [runbook-objava-i-rollback.md](07-operacije/runbook-objava-i-rollback.md)       | Postupak objave, promocije i vraćanja unatrag                                          |
+| [runbook-objava-i-rollback.md](07-operacije/runbook-objava-i-rollback.md)       | Postupak objave, izdanja, tihog ažuriranja i vraćanja unatrag                          |
 | [runbook-ssh-produkcija.md](07-operacije/runbook-ssh-produkcija.md)             | Svakodnevni SSH ulaz na produkcijski VPS (ključ, known_hosts, korisnik kaladont)      |
 | [runbook-umami.md](07-operacije/runbook-umami.md)                               | Početničko uključivanje Umamija na istom prod VPS-u (bez novog servera)                |
 | [runbook-backup-i-vracanje.md](07-operacije/runbook-backup-i-vracanje.md)       | Backup postupci i drill vraćanja                                                       |

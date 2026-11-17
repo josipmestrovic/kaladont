@@ -71,7 +71,7 @@ Stranica `/ljestvice` ima zasebne poretke za Četveroboj, Troboj i Dvoboj, po me
 
 Rang je **prikazni status** izračunat iz rezultata javnih partija. Ne utječe na prihvaćanje riječi, odabir protivnika ni ishod partije; može rasti ili padati s novim rezultatima.
 
-**Od 0.2.0 (PR09) postoji jedan univerzalni rang** za sve javne formate (Dvoboj, Troboj, Četveroboj) i sva tri pravilnika. Privatne, trening i poništene partije ne ulaze. Rang ne utječe na matchmaking.
+**Od paketa Troboj (PR09) postoji jedan univerzalni rang** za sve javne formate (Dvoboj, Troboj, Četveroboj) i sva tri pravilnika. Privatne, trening i poništene partije ne ulaze. Rang ne utječe na matchmaking.
 
 Dok igrač ne završi **10 javnih partija ukupno**, status je **Piskaralo**. Nakon desete partije rang odgovara **univerzalnom učinku**.
 

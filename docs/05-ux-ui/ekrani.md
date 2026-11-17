@@ -47,6 +47,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - **Pravila** vode na `/pravila-kaladonta`, a **Ljestvice** na `/ljestvice`. Kratki SEO uvod ispod H1 vodi na hub pravila; na niskim ekranima ostaje u DOM-u (vizualno skriven) radi SEO-a. Vertikalni scroll na naslovnici je dopušten.
 - Tipografija na naslovnici: labele glavne navigacije **20px** (mobitel) / **24px** (desktop); prekidači **Font za disleksiju** i **Čitanje naglas** **16px** / **18px**. Ako labele prekidača ne stanu u jedan red, prelaze u drugi (bez truncatea).
 - Footer na dnu naslovnice sadrži **Novosti** (`/novosti`), **O igri** (`/o-igri`), **Pomozi poboljšati igru** (`/povratne-informacije`), **Uvjeti** (`/uvjeti`) i **Privatnost** (`/privatnost`). CTA **pridruži zajednici** (forum) je u SEO uvodu, ne u footeru. Desktop: navigacija lijevo, copyright desno; mobitel: copyright ispod navigacije.
+- Neposredno iznad footera stoji redak **Zadnje ažuriranje: 23. 11. 2026. · Vidi što je novo**. Datum je datum najnovijeg objavljenog izdanja iz `aplikacije/web/src/lib/izdanja.json` ([ADR-018](../03-arhitektura/odluke/018-calver-izdanja-i-tiha-azuriranja.md)) i vodi na njegov zapis (`/novosti#izdanje-2026-11-23`); „Vidi što je novo” vodi na `/novosti`. Tiha ažuriranja ne mijenjaju datum. Redak ne prikazuje oznaku verzije ni commit, a bez objavljenog izdanja se ne prikazuje. Desktop: lijevo iznad navigacije footera, izvan toka stranice, pa ne povećava njezinu visinu; mobitel: centrirano iznad footera. Na zaslonima užim od 380 px i uz font za disleksiju „Vidi što je novo” prelazi u vlastiti redak, bez razdjelnika.
 - Font za disleksiju i čitanje naglas nalaze se u **Postavkama** za goste i registrirane korisnike. Font mijenja tipografiju cijelog sučelja; čitanje naglas izgovara novu riječ na stolu Web Speech API-jem uz `hr-HR`. Postavke se spremaju lokalno u pregledniku. Uključeno čitanje naglas prikazuje globalnu obavijest koju korisnik može potvrditi.
 - Pravila (`/pravila-kaladonta/pristupacnost`) objašnjavaju govornu mogućnost i vode na upute za Android, iPhone/iPad, Windows, Mac i Linux. Ista tema opisuje disleksiju i moguću vrijednost jezične igre bez terapijskih tvrdnji.
 - Zaseban red poveznica Prijavi se / Registriraj se ispod navigacije ne prikazuje se; te su akcije dio jedinstvene navigacije gosta.
@@ -197,7 +198,7 @@ Jedna stranica s odabirima u URL-u. Pravila: [bodovanje-i-rangovi.md](../02-prav
 - **O igri** (`/o-igri`) — overview, licence/hrLex, statistika rječnika, CTA foruma; link na **Novosti**. Nije SEO target (`noindex`).
 - `/privatnost`, `/uvjeti` — pravni minimum.
 - `/zahvala` — nakon registracije.
-- **`/novosti`** — javni indeks objava (najnovija prva); liste značajki po izdanju. **0.2.0** (`#v0-2-0`, 17. 11. 2026) i izvorno **0.1.0** (`#v0-1-0`, 1. 10. 2026). Više nije redirect.
+- **`/novosti`** — javni dnevnik izdanja, najnovije prvo; podaci dolaze iz `aplikacije/web/src/lib/izdanja.json`. Svaki zapis ima hrvatski datum kao naslov (`23. 11. 2026.`), kratak naslov izdanja i popis promjena. Sidro zapisa je `#izdanje-YYYY-MM-DD`, uz `-N` za N-ti nastavak istoga dana. Nacrti (`"objavljeno": null`) se ne prikazuju, a stranica ne prikazuje oznake verzija.
 
 ## Responzivnost
 

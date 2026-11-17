@@ -26,3 +26,11 @@ Sve odluke o pravilima, bodovanju, arhitekturi i UX-u zapisane su u `docs/` — 
 - PostgreSQL + Drizzle; nazivi tablica i stupaca na hrvatskom bez dijakritika (`rijeci.prva_dva`).
 - Popis riječi (derivat hrLexa, CC BY-SA 4.0) **ne commita se** u repozitorij.
 - Nove HTML tablice moraju imati semantička zaglavlja i mobilni prikaz bez vodoravnog pomicanja. Za presložene retke koristi hrvatski `data-label` na svakoj vrijednosnoj ćeliji prema obrascu u `docs/05-ux-ui/ekrani.md#html-tablice-na-mobitelu`; pregledne dvostupčane tablice mogu ostati vodoravne tek nakon provjere na uskom zaslonu.
+
+## Izdanja i Novosti
+
+- `aplikacije/web/src/lib/izdanja.json` jedini je izvor istine za stranicu Novosti, datum „Zadnje ažuriranje” na naslovnici te Git oznaku i GitHub Release (ADR-018, `docs/07-operacije/release-shema.md`).
+- Značajku koju igrači trebaju primijetiti dopiši kao stavku u nacrt (`"objavljeno": null`); ako nacrta nema, dodaj novi zapis na vrh. Popravke i sitnice ne upisuj: one izlaze kao tiho ažuriranje.
+- Datum u `objavljeno` upisuje se tek na dan produkcijske objave, zasebnim PR-om i na izričit zahtjev vlasnika. Ne upisuj ga samoinicijativno i ne mijenjaj datum već objavljenog izdanja.
+- Git oznake `vYYYY.MM.DD` i GitHub Releaseove stvara workflow „Promoviraj produkciju”. Ne stvaraj ih i ne briši ručno, osim po postupku iz `docs/07-operacije/runbook-objava-i-rollback.md`, i ne pokreći taj workflow bez izričitog zahtjeva.
+- Javno sučelje prikazuje samo hrvatski datum izdanja; bez oznaka verzija i commit SHA-a.
