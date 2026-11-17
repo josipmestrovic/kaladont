@@ -157,9 +157,9 @@ Izdanje je redovna produkcijska promocija s jednim korakom više na početku: up
 
 1. Dok se značajke razvijaju, zapis u `izdanja.json` je nacrt (`"objavljeno": null`). Naslov i stavke mogu se dopunjavati uz svaki PR.
 2. Paket provjeri na stagingu prije dana objave, da taj dan ne ode na otkrivanje grešaka.
-3. Na dan objave otvori PR koji `"objavljeno": null` mijenja u današnji datum i usklađuje stavke sa stvarnim sadržajem paketa. Taj PR ne mijenja nijedan test.
+3. Na dan objave otvori PR koji `"objavljeno": null` mijenja u današnji datum i usklađuje stavke sa stvarnim sadržajem paketa. Taj PR ne mijenja nijedan test. PR se smije spojiti i dan ranije, sa sutrašnjim datumom: čuvar tada blokira promociju do tog dana.
 4. Nakon spajanja pričekaj CI, GHCR promociju i staging. Digest s datumom je novi kandidat i prolazi staging checklistu iz ovog dokumenta kao svaki drugi. Sažetak runa **Objaviti staging** mora najaviti `IZDANJE vYYYY.MM.DD`; na stagingu provjeri i naslovnicu i `/novosti`.
-5. Istoga dana pokreni **Promoviraj produkciju** s digestom iz tog staging runa.
+5. Na dan upisan u `izdanja.json` pokreni **Promoviraj produkciju** s digestom iz tog staging runa.
 6. Nakon zelenog health checka job **Objaviti CalVer oznaku i GitHub Release** potvrdi da produkcija prikazuje izdanje, pa stvori oznaku na commitu promovirane slike i GitHub Release s bilješkama iz `izdanja.json`.
 7. Provjeri „Zadnje ažuriranje” na naslovnici, `/novosti` i stranicu Releases, pa objavu upiši u [evidenciju održavanja](odrzavanje.md#evidencija-drillova-objava-i-većih-zahvata) zajedno s oznakom izdanja.
 

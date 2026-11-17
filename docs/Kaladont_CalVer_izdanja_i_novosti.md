@@ -615,10 +615,10 @@ Izvodi vlasnik; agent priprema PR na zahtjev. Produkcijske korake paketa koji ni
 
 1. Paket je prošao staging checklistu iz release sheme.
 2. Usporedi stavke nacrta sa stvarnim završnim diffom i po potrebi ih ispravi.
-3. PR „Objaviti izdanje”: u `izdanja.json` zamijeni `"objavljeno": null` današnjim datumom. Ništa drugo.
+3. PR „Objaviti izdanje”: u `izdanja.json` zamijeni `"objavljeno": null` datumom objave. Ništa drugo. Datum je današnji; ako PR spajaš dan ranije, upiši sutrašnji (čuvar tada blokira promociju do tog dana).
 4. Nakon spajanja pričekaj CI, GHCR i staging. Sažetak staging runa mora reći „Sljedeća promocija: IZDANJE vYYYY.MM.DD”.
 5. Na stagingu provjeri naslovnicu i `/novosti`.
-6. Pokreni „Promoviraj produkciju” s digestom iz staging sažetka, **istoga dana**.
+6. Pokreni „Promoviraj produkciju” s digestom iz staging sažetka, **na dan upisan u `izdanja.json`**.
 7. Po završetku provjeri: job „Objaviti CalVer oznaku i GitHub Release” je zelen, novi Release postoji i pokazuje na promovirani commit, naslovnica i `/novosti` na produkciji prikazuju novo izdanje.
 8. Upiši objavu u evidenciju u `odrzavanje.md`, uključujući oznaku izdanja.
 

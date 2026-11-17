@@ -43,9 +43,9 @@ ssh kaladont@PROD_IP 'cd /opt/kaladont && docker compose -f docker-compose.prod.
 
 Izdanje je redovna objava koja igračima donosi novi datirani zapis u Novostima i novi datum „Zadnje ažuriranje” na naslovnici. Pravila su u [release shemi](release-shema.md#objava-i-izdanje); ovdje je samo ono što radiš drukčije.
 
-1. **Na dan objave** otvori PR koji u `aplikacije/web/src/lib/izdanja.json` nacrtu mijenja `"objavljeno": null` u današnji datum (npr. `"2026-11-23"`) i po potrebi usklađuje stavke sa stvarnim sadržajem. Datum mora biti dan stvarne promocije u zoni Europe/Zagreb.
+1. **Na dan objave** otvori PR koji u `aplikacije/web/src/lib/izdanja.json` nacrtu mijenja `"objavljeno": null` u današnji datum (npr. `"2026-11-23"`) i po potrebi usklađuje stavke sa stvarnim sadržajem. Datum mora biti dan stvarne promocije u zoni Europe/Zagreb. PR smiješ spojiti i dan ranije, sa sutrašnjim datumom: staging tada upozorava da bi promocija danas bila blokirana, a sutradan isti digest prolazi.
 2. Nakon spajanja prođi korake 1–7 redovne objave. Sažetak runa **Objaviti staging** mora najaviti `IZDANJE v2026.11.23`; na stagingu provjeri naslovnicu i `/novosti`.
-3. **Istoga dana** pokreni **Promoviraj produkciju**. Ako datum u slici nije današnji, workflow staje prije backupa i produkcije, a sažetak kaže što popraviti.
+3. **Na dan upisan u `izdanja.json`** pokreni **Promoviraj produkciju**. Ako datum u slici nije današnji, workflow staje prije backupa i produkcije, a sažetak kaže što popraviti.
 4. Nakon deploya pričekaj job **Objaviti CalVer oznaku i GitHub Release**. Zatim provjeri naslovnicu, `/novosti` i stranicu Releases na GitHubu.
 5. U evidenciju uz digest upiši i oznaku izdanja.
 
@@ -122,7 +122,7 @@ Potrebno je samo kad je izdanje već na produkciji, a oznaka nije nastala ili je
    gh api -X POST repos/josipmestrovic/kaladont/git/refs -f ref=refs/tags/v2026.11.23 -f sha=<puni-commit-sha>
    ```
 
-   Ako GitHub odbije zahtjev (HTTP 403 ili 404), tokenu nedostaje opseg `workflow`. Potreban je kad se workflow datoteke na tom commitu razlikuju od onih na granama. Dodaj ga naredbom `gh auth refresh -h github.com -s workflow` i ponovi.
+   Ako GitHub odbije zahtjev (HTTP 403 ili 404), tokenu vjerojatno nedostaje opseg `workflow`. Potreban je kad se workflow datoteke na tom commitu razlikuju od onih na granama. Dodaj ga naredbom `gh auth refresh -h github.com -s workflow` i ponovi.
 
 3. Stvori GitHub Release. Na runu promocije odaberi **Re-run failed jobs**: job sam stvara Release s bilješkama iz `izdanja.json`. Ako taj run više nije dostupan ili produkcija više ne prikazuje to izdanje kao najnovije, stvori ga ručno i tekst po potrebi dopuni na GitHubu:
 
