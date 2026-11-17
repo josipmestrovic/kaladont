@@ -45,11 +45,13 @@ export async function cekajIstuPartiju(igraci: readonly E2EIgrac[]): Promise<str
   return partijaIdovi[0]!;
 }
 
+const UNOS_POTEZA = /Dovrši riječ na|Dokaži nastavak/;
+
 export async function cekajIgracaNaPotezu(igraci: readonly E2EIgrac[]): Promise<E2EIgrac> {
   let igracNaPotezu: E2EIgrac | null = null;
   await expect.poll(async () => {
     for (const igrac of igraci) {
-      if (await igrac.stranica.getByRole('textbox', { name: /Dovrši riječ na/ }).isVisible()) {
+      if (await igrac.stranica.getByRole('textbox', { name: UNOS_POTEZA }).isVisible()) {
         igracNaPotezu = igrac;
         return true;
       }
@@ -57,6 +59,35 @@ export async function cekajIgracaNaPotezu(igraci: readonly E2EIgrac[]): Promise<
     return false;
   }, { timeout: 15_000 }).toBe(true);
   return igracNaPotezu!;
+}
+
+/** Upiše nastavak (bez prefiksa) i pošalje potez. */
+export async function odigrajRijec(stranica: Page, cijelaRijec: string): Promise<void> {
+  const unos = stranica.getByRole('textbox', { name: UNOS_POTEZA });
+  await expect(unos).toBeVisible({ timeout: 10_000 });
+  const oznaka = (await unos.getAttribute('aria-label')) ?? '';
+  const prefiksPoklapanje = oznaka.match(/(?:Dovrši riječ na|Dokaži nastavak na)\s+(.+)$/i);
+  const prefiks = (prefiksPoklapanje?.[1] ?? '').trim().toLocaleLowerCase('hr');
+  const normalizirana = cijelaRijec.trim().toLocaleLowerCase('hr');
+  if (!prefiks || !normalizirana.startsWith(prefiks)) {
+    throw new Error(`Riječ „${cijelaRijec}” ne odgovara prefiksu iz UI-ja („${prefiks}”).`);
+  }
+  const nastavak = normalizirana.slice(prefiks.length);
+  if (!nastavak) {
+    throw new Error(`Riječ „${cijelaRijec}” nema nastavak iza prefiksa „${prefiks}”.`);
+  }
+  await unos.fill(nastavak);
+  await expect(unos).toHaveValue(nastavak);
+  await stranica.getByRole('button', { name: 'Pošalji' }).click();
+  // Potez prihvaćen → forma nestaje (red prelazi).
+  await expect(unos).toBeHidden({ timeout: 15_000 });
+}
+
+export async function predajNeZnam(stranica: Page): Promise<void> {
+  await stranica.getByRole('button', { name: 'Ne znam' }).click();
+  const dijalog = stranica.getByRole('dialog', { name: 'Predati potez?' });
+  await expect(dijalog).toBeVisible();
+  await dijalog.getByRole('button', { name: 'Da' }).click();
 }
 
 export async function zatvoriIgrace(igraci: readonly E2EIgrac[]): Promise<void> {

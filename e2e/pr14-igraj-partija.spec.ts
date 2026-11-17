@@ -1,14 +1,19 @@
 /**
  * PR14 — prihvat: dvokoračni Igraj, spojeni Dvoboj, Troboj, dokaz UI, trening 2 bota, privatna.
  * HINT: dokaz UI se injektira preko window.__KALADONT_E2E_EMIT__ (vidi stanje-igre).
+ * HINT: „dokaz smoke” ide stvarnim putem (riječ → Ne znam → zona), bez injekcije.
  */
 import { expect, test, type Page } from '@playwright/test';
 import {
+  cekajIgracaNaPotezu,
   cekajIstuPartiju,
+  odigrajRijec,
+  predajNeZnam,
   stvoriIgrace,
   udjiUJavniRed,
   zatvoriIgrace,
 } from './pomocnici/igraci.js';
+import { pronadjiIgrivuRijec } from './pomocnici/rjecnik.js';
 
 async function otvoriIgrajKorak1(page: Page) {
   await page.goto('/');
@@ -288,6 +293,59 @@ test('privatna soba: gost vidi domaćinov pravilnik', async ({ browser }) => {
     await gost.goto(`/soba/${kodSobe}`);
     await expect(gost.getByText(/Pravilnik:/)).toBeVisible({ timeout: 15_000 });
     await expect(gost.getByText('Dokaži nastavak')).toBeVisible();
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
+test('dokaz smoke: Ne znam otvara zonu bez injekcije', async ({ browser }) => {
+  test.setTimeout(60_000);
+  const igraci = await stvoriIgrace(browser, 2);
+  try {
+    const vlasnik = igraci[0]!.stranica;
+    const gost = igraci[1]!.stranica;
+
+    await vlasnik.goto('/soba/kreiraj?pravila=dokazi_nastavak');
+    await vlasnik.getByRole('button', { name: 'Bez tajmera' }).click();
+    await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
+    await expect(vlasnik).toHaveURL(/\/soba\/[A-Z0-9]+$/);
+    const kodSobe = await vlasnik.locator('.oznaka-koda strong').innerText();
+
+    await gost.goto(`/soba/${kodSobe}`);
+    await expect(gost.getByText(/Prijavljeni igrači \(2 \/ 8\)/)).toBeVisible({ timeout: 15_000 });
+    await vlasnik.getByRole('button', { name: 'Započni igru' }).click();
+    await expect(vlasnik).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });
+    await expect(gost).toHaveURL(vlasnik.url());
+
+    const ana = await cekajIgracaNaPotezu(igraci);
+    const bruno = igraci.find((ig) => ig !== ana)!;
+    const unos = ana.stranica.getByRole('textbox', { name: /Dovrši riječ na|Dokaži nastavak/ });
+    const oznaka = (await unos.getAttribute('aria-label')) ?? '';
+    const prefiks = (oznaka.match(/(?:Dovrši riječ na|Dokaži nastavak na)\s+(.+)$/i)?.[1] ?? '')
+      .trim()
+      .toLocaleLowerCase('hr');
+    expect(prefiks.length).toBeGreaterThan(0);
+
+    // Desktop: sustavska riječ je u .kontekst-rijeci; oblak nije uvijek vidljiv.
+    const pocetnaLokator = ana.stranica.locator('.kontekst-rijeci .trenutna-rijec, .rijec-oblak').first();
+    await expect(pocetnaLokator).toBeVisible({ timeout: 10_000 });
+    const pocetnaRijec = (await pocetnaLokator.innerText()).replace(/\s+/g, '').toLocaleLowerCase('hr');
+    expect(pocetnaRijec.length).toBeGreaterThan(0);
+
+    const anaRijec = await pronadjiIgrivuRijec(prefiks, pocetnaRijec);
+    await odigrajRijec(ana.stranica, anaRijec);
+
+    await expect(bruno.stranica.getByRole('button', { name: 'Ne znam' })).toBeEnabled({
+      timeout: 15_000,
+    });
+    await predajNeZnam(bruno.stranica);
+
+    await expect(ana.stranica.getByTestId('dokaz-zona')).toContainText('Dokaži nastavak na svoju riječ', {
+      timeout: 15_000,
+    });
+    await expect(bruno.stranica.getByTestId('dokaz-zona')).toContainText('dokazuje nastavak');
+    await expect(bruno.stranica.getByTestId('dokaz-cekam')).toBeVisible();
+    await expect(bruno.stranica.getByText('Ispao si')).toHaveCount(0);
   } finally {
     await zatvoriIgrace(igraci);
   }
