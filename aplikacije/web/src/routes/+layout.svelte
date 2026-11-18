@@ -159,7 +159,8 @@
     <CitanjeNaglasObavijest />
   </div>
   {#if $page.url.pathname === '/' && sesijaSpreman && desktopPadajuceRijeci}<PadajuceRijeci />{/if}
-  {#if sesijaSpreman && !bezHeadera}
+  <!-- Naslovnica: Header (s h1) i u SSR-u prije gost-sesije, radi indeksabilnog naslova. -->
+  {#if !bezHeadera && (sesijaSpreman || $page.url.pathname === '/')}
     <Header {prethodnaPutanja} {mozeNaprijed} />
   {/if}
   <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">

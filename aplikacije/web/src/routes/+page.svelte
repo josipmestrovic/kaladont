@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
+  import { NAJNOVIJE_IZDANJE, urlIzdanja } from '$lib/izdanja.js';
   import { ucitajModalIgraAsete, urlAseta } from '$lib/asetovi-core.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import ModalIgraj from '$lib/komponente/ModalIgraj.svelte';
@@ -103,7 +103,9 @@
       {#if NAJNOVIJE_IZDANJE}
         <p class="zadnje-azuriranje">
           Zadnje ažuriranje:
-          <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
+          <a href={urlIzdanja(NAJNOVIJE_IZDANJE)}
+            ><time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time></a
+          >
           <span class="razdjelnik" aria-hidden="true">·</span>
           <a class="sto-je-novo" href="/novosti">Vidi što je novo</a>
         </p>
