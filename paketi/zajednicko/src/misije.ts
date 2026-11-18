@@ -355,7 +355,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   dnevna(
     'D24',
     'Po starom',
-    'Odigraj ukupno 4 prihvaćene riječi u javnim igrama KA-ZNA.',
+    'Odigraj ukupno 4 prihvaćene riječi u javnim igrama KA-zna.',
     'rijeci',
     4,
     'kolicina_rijeci',
@@ -421,7 +421,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   tjedna(
     'W24',
     'Stara škola pobjeđuje',
-    'Pobijedi u 5 javnih igara KA-ZNA.',
+    'Pobijedi u 5 javnih igara KA-zna.',
     'pobjede',
     5,
     'plasman',

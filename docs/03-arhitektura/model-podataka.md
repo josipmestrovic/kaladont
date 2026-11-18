@@ -159,7 +159,7 @@ Format stola (`mod`), pravilnik (`pravila`) i kontekst igre (`javna` / `privatna
 | id | uuid PK | |
 | mod | enum: `cetiri_igraca`, `dva_igraca`, `tri_igraca` | Format javnog stola (veličina) |
 | pravila | enum: `klasicni`, `ka_zna`, `dokazi_nastavak` | Izvršeni pravilnik; default i povijest = `ka_zna` |
-| spojeni_dvoboj | boolean | Zajednički javni Dvoboj (Klasični+KA-ZNA); povijest i do PR06 = `false` |
+| spojeni_dvoboj | boolean | Zajednički javni Dvoboj (Klasični+KA-zna); povijest i do PR06 = `false` |
 | pocetak | timestamptz | |
 | kraj | timestamptz, null | Stvarni trenutak kraja igre, zabilježen jednom u motoru; ponovljeni upis ga ne mijenja. Određuje razdoblje vremenskih ljestvica. |
 | status | enum: `u_tijeku`, `zavrsena`, `ponistena` | `ponistena` je rezerva za tehničke incidente |

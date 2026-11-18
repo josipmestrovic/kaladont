@@ -1,13 +1,13 @@
 <script lang="ts">
   import { bojaBordera, debljinaBorderaRanga, nazivAvatara, putanjaAvatara } from '$lib/avatari.js';
-  import { ZADANI_AVATAR_CONFIG, type AvatarConfigV1, type RazinaVatre } from 'zajednicko';
+  import { type AvatarConfigV1, type RazinaVatre } from 'zajednicko';
   import AvatarKonfiguracijaPreview from './AvatarKonfiguracijaPreview.svelte';
   import AvatarVatra from './AvatarVatra.svelte';
 
   interface Props {
     avatarId: number;
     rang?: string | null;
-    /** Gost bez spremljene konfiguracije prikazuje zadani avatar (bez „Gost” oznake). */
+    /** Gost prikazuje zeleni krug s bijelim „G”, bez konfiguracijskog avatara. */
     gost?: boolean;
     velicina?: number;
     prikaziRangBorder?: boolean;
@@ -21,11 +21,11 @@
   }
 
   const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null, razinaVatre = 0, nizPobjeda = 0, vanjskaSlika = null, opisSlike = null }: Props = $props();
-  const altTekst = $derived(opisSlike ?? nazivAvatara(avatarId));
+  const altTekst = $derived(opisSlike ?? (gost ? 'Gost' : nazivAvatara(avatarId)));
+  const gostFontSize = $derived(Math.max(10, Math.round(velicina * 0.42)));
 
-  const border = $derived(!prikaziRangBorder || vanjskaSlika ? null : bojaBordera(rang));
+  const border = $derived(!prikaziRangBorder || vanjskaSlika || gost ? null : bojaBordera(rang));
   const debljina = $derived(border ? debljinaBorderaRanga(velicina) : 0);
-  const konfiguracijaPrikaza = $derived(avatarConfig ?? (gost ? ZADANI_AVATAR_CONFIG : null));
 </script>
 
 <div
@@ -37,14 +37,16 @@
   style:--boja-rang={border ?? 'transparent'}
   style:--debljina-rang="{debljina}px"
 >
-    {#if !vanjskaSlika}
+    {#if !vanjskaSlika && !gost}
       <AvatarVatra razina={razinaVatre} niz={nizPobjeda} />
     {/if}
     <div class="avatar-sadrzaj">
       {#if vanjskaSlika}
         <img class="vanjska-slika" src={vanjskaSlika} alt={altTekst} />
-      {:else if konfiguracijaPrikaza}
-        <AvatarKonfiguracijaPreview konfiguracija={konfiguracijaPrikaza} velicina={velicina} />
+      {:else if gost}
+        <div class="gost-avatar" style:font-size="{gostFontSize}px" aria-label={altTekst}>G</div>
+      {:else if avatarConfig}
+        <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} />
       {:else}
         <img src={putanjaAvatara(avatarId)} alt={altTekst} />
       {/if}
@@ -93,5 +95,25 @@
     object-fit: contain;
     padding: 6%;
     box-sizing: border-box;
+  }
+
+  .gost-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--boja-povrsina-3);
+    color: #ffffff;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+    user-select: none;
+    line-height: 1;
+  }
+
+  :global(html[data-tema='svijetla']) .gost-avatar {
+    background: var(--boja-mint);
   }
 </style>

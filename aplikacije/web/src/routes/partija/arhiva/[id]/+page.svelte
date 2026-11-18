@@ -60,7 +60,7 @@
   function nazivPravilnikaArhive(pravila: string | undefined): string {
     if (pravila === 'klasicni') return 'Klasični Kaladont';
     if (pravila === 'dokazi_nastavak') return 'Dokaži nastavak';
-    return 'KA-ZNA';
+    return 'KA-zna';
   }
 
   async function posaljiPrijavu() {

@@ -477,8 +477,10 @@ export interface PayloadUdjiURed {
 }
 
 export interface PayloadTreningZapocni {
-  /** Izostanak = ka_zna. */
+  /** Izostanak = ka_zna (ili klasicni ako je brojRacunala ≥ 2). */
   pravila?: PravilnikPartije;
+  /** 1 = Dvoboj, 2 = Troboj, 3 = Četveroboj. Izostanak → iz pravilnika (klasični = 2, ostalo = 1). */
+  brojRacunala?: 1 | 2 | 3;
 }
 
 export type PotvrdaUlaskaURed = (stanje: StanjeReda | null) => void;

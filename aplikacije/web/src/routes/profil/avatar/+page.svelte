@@ -66,7 +66,7 @@
     <section class="gost-gate" aria-labelledby="avatar-gost-naslov">
       <h1 id="avatar-gost-naslov">Avatar za registrirane igrače</h1>
       <p>
-        Gosti koriste zadani avatar. Prijavi se ili otvori račun da urediš svoj izgled.
+        Promjena avatara dostupna je samo registriranim igračima. Prijavi se ili otvori račun da urediš svoj izgled.
       </p>
       <div class="gost-akcije">
         <a href="/prijava" class="gumb">Prijavi se</a>

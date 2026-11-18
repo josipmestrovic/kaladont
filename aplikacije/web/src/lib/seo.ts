@@ -118,7 +118,7 @@ export const FAQ_PITANJA: { pitanje: string; odgovor: string }[] = [
   {
     pitanje: 'Zašto sam odmah ispao?',
     odgovor:
-      '„Ne znam”, istek vremena, mrtva slova, posebna riječ na „ka” (u Klasičnom ispada sljedeći, u KA-ZNA autor „ka”), neuspješan dokaz u Dokaži nastavak, ili prekid veze dulji od 10 sekundi.',
+      '„Ne znam”, istek vremena, mrtva slova, posebna riječ na „ka” (u Klasičnom ispada sljedeći, u KA-zna autor „ka”), neuspješan dokaz u Dokaži nastavak, ili prekid veze dulji od 10 sekundi.',
   },
   {
     pitanje: 'Kako prijaviti riječ ili problem?',

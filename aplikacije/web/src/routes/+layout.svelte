@@ -63,7 +63,7 @@
     mozeNaprijed = indeksPovijesti < povijestAplikacije.length - 1;
   });
 
-  // Čekaonica i partija nemaju zajedničko zaglavlje. Naslovnica ima Header u načinu „samo desno”.
+  // Čekaonica i partija nemaju zajedničko zaglavlje. Naslovnica: logo lijevo + profil desno.
   const bezHeadera = $derived(
     $page.url.pathname === '/red' || $page.url.pathname.startsWith('/partija/'),
   );
@@ -181,7 +181,12 @@
     min-height: 100dvh;
   }
 
-  .aplikacija :global(.header),
+  /* Header iznad .stranica — inače profil-izbornik završi ispod sadržaja stranice. */
+  .aplikacija :global(.header) {
+    position: relative;
+    z-index: 10;
+  }
+
   .aplikacija .stranica {
     position: relative;
     z-index: 1;
@@ -190,7 +195,7 @@
   /* Naslovnički Header mora ostati absolute overlay (ne relative iz pravila iznad). */
   .aplikacija.landing-shell :global(.header.header--naslovnica) {
     position: absolute;
-    z-index: 5;
+    z-index: 10;
   }
 
   .aplikacija.landing-shell {

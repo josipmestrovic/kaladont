@@ -291,7 +291,7 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
     id: ID_DOSTIGNUCA_STARA_SKOLA,
     naziv: 'Stara škola',
     // HINT: odvojeno od dostignuća `ka_zna` (biti izbačen) i pravilnika `ka_zna`.
-    opis: 'Pobijedi javnu igru KA-ZNA u kojoj si osobno izbacio autora „ka”.',
+    opis: 'Pobijedi javnu igru KA-zna u kojoj si osobno izbacio autora „ka”.',
     kategorija: 'kaladont',
     pragovi: [1, 3, 10, 25, 50],
     vrijediUPrivatnoj: false,

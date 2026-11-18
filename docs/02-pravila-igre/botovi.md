@@ -8,7 +8,7 @@ Vrijeme se računa na poslužitelju od `usaoU` **najstarijeg prisutnog čovjeka*
 
 U redovnom radu prag Dvoboja izvlači se između 26 i 34 s, pragovi Troboja oko 20 i 30 s (s postojećim odstupanjem), a pragovi Četveroboja između 17–23, 27–33 i 37–43 s. Odstupanja se izvlače jednom po epizodi čekanja; tablica navodi središnje vrijednosti.
 
-<!-- HINT PR15: Troboj popuna 20/30 s; osam javnih redova (zajednički Dvoboj Klasični+KA-ZNA). -->
+<!-- HINT PR15: Troboj popuna 20/30 s; osam javnih redova (zajednički Dvoboj Klasični+KA-zna). -->
 
 | Situacija | Ponašanje |
 | --- | --- |
@@ -75,7 +75,7 @@ Postavke se učitavaju jednom pri pokretanju procesa. Ako trajni zapis još ne p
 
 ## Zagrijavanje
 
-- Trening odabranog pravilnika: **Klasični** = čovjek + 2 Računala; **KA-ZNA** i **Dokaži nastavak** = čovjek + 1 Računalo. Avatar „Računalo” je stalan. Dostupno gostima i registriranima.
+- Trening odabranog pravilnika: **Klasični** = čovjek + 2 Računala; **KA-zna** i **Dokaži nastavak** = čovjek + 1 Računalo. Avatar „Računalo” je stalan. Dostupno gostima i registriranima.
 - Pokreće se odmah, bez javnog reda i bez trošenja javnog fonda botova. Igrač može imati samo jedan aktivni kontekst igranja (red, soba, partija ili trening).
 - Pravila valjanosti i eliminacije prate odabrani pravilnik; trening nema timer poteza. Računalo odigrava nakon 1–3 s.
 - Trening ne bilježi partiju, poteze ni natjecateljski napredak: nema bodova, XP-a, ranga, forme, nizova, kolekcije riječi ni općih dostignuća. Gostu i privremenom „Računalu” ne sprema se ništa.

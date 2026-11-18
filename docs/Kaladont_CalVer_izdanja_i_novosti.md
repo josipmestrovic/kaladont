@@ -168,10 +168,10 @@ Polje zapisa, najnoviji prvi. Početni sadržaj:
     "naslov": "Troboj i nova pravila igre",
     "stavke": [
       "Troboj (3 igrača) uz postojeći Dvoboj i Četveroboj",
-      "Tri pravilnika — Klasični Kaladont, KA-ZNA, Dokaži nastavak — biraju se prije formata",
+      "Tri pravilnika — Klasični Kaladont, KA-zna, Dokaži nastavak — biraju se prije formata",
       "Jedan univerzalni rang i jedan Kaladont DNK za sve javne formate",
       "Ljestvice po formatu; ulaz 5 partija dnevno / 10 dulje razdoblje",
-      "Novi paket misija i dostignuća (Troboj, dokaz, Klasični, KA-ZNA)"
+      "Novi paket misija i dostignuća (Troboj, dokaz, Klasični, KA-zna)"
     ]
   },
   {

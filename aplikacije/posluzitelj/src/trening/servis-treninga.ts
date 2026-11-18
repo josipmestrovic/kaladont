@@ -1,6 +1,7 @@
 /**
  * Zagrijavanje (ADR-017 / PR08): trening protiv privremenih „Računala”, bez javnog reda, fonda i upisa.
- * Klasični = Troboj-trening (2 Računala); KA-ZNA / Dokaži nastavak = dvoboj (1 Računalo).
+ * UI bira 1–3 Računala; stari klijent i misije i dalje mogu slati samo `pravila`
+ * (klasični = 2 Računala, ostalo = 1).
  * Igrač smije imati samo jedan aktivni kontekst igranja; ulazak u trening napušta javni red.
  */
 import { randomUUID } from 'node:crypto';
@@ -24,13 +25,14 @@ import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenj
 export const NADIMAK_RACUNALA = 'Računalo';
 const PREFIKS_RACUNALA = 'racunalo-';
 
-/** PR08: klasični Zagrijavanje treba 2 bota da bi se vidjela eliminacija „sljedećeg”. */
+/** Stari ulaz po pravilniku: klasični Zagrijavanje treba 2 bota zbog eliminacije „sljedećeg”. */
 export function brojRacunalaZaTrening(pravila: PravilnikPartije): 1 | 2 {
   return pravila === 'klasicni' ? 2 : 1;
 }
 
 const ShemaTreningZapocni = z.object({
   pravila: z.enum(PRAVILNICI_PARTIJE).optional(),
+  brojRacunala: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
 }).strict().optional();
 
 export function jeRacunalo(igracId: string): boolean {
@@ -39,12 +41,12 @@ export function jeRacunalo(igracId: string): boolean {
 
 function izradiRacunalo(
   indeks: number,
-  ukupno: 1 | 2,
+  ukupno: 1 | 2 | 3,
   pravila: PravilnikPartije,
 ): StavkaReda {
-  // Jedan bot zadržava stari nadimak (e2e / ADR-017); dva bota se razlikuju brojem.
+  // Jedan bot zadržava stari nadimak (e2e / ADR-017); više botova se razlikuje brojem.
   const nadimak = ukupno === 1 ? NADIMAK_RACUNALA : `${NADIMAK_RACUNALA} ${indeks}`;
-  const avatarConfig: AvatarConfigV1 = indeks === 1 ? AVATAR_RACUNALA : AVATAR_RACUNALA_2;
+  const avatarConfig: AvatarConfigV1 = indeks === 2 ? AVATAR_RACUNALA_2 : AVATAR_RACUNALA;
   return {
     igracId: `${PREFIKS_RACUNALA}${randomUUID()}`,
     vrsta: 'gost',
@@ -117,8 +119,10 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
       }
       opcije.ukloniIzJavnogReda(socket.data.igracId);
 
-      const pravila = parse.data?.pravila ?? ZADANI_PRAVILNIK;
-      const brojRacunala = brojRacunalaZaTrening(pravila);
+      const brojRacunala = parse.data?.brojRacunala ?? brojRacunalaZaTrening(parse.data?.pravila ?? ZADANI_PRAVILNIK);
+      // Eksplicitna pravila imaju prednost; inače 1 Računalo → KA-zna, 2+ → Klasični.
+      const pravila =
+        parse.data?.pravila ?? (brojRacunala >= 2 ? 'klasicni' : ZADANI_PRAVILNIK);
 
       const covjek: StavkaReda = {
         igracId: socket.data.igracId,

@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
-  import { osvjeziGostSesijuNakon401 } from '$lib/identitet.js';
+  import { osvjeziGostSesijuNakon401, prijediNaGostujucuSesiju } from '$lib/identitet.js';
+  import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
   import { type AvatarConfigV1 } from 'zajednicko';
@@ -20,6 +21,8 @@
   let { prethodnaPutanja = null, mozeNaprijed = false } = $props<{ prethodnaPutanja?: string | null; mozeNaprijed?: boolean }>();
   let profil = $state<Profil | null>(null);
   let jeGost = $state(true);
+  let otvorenIzbornik = $state(false);
+  let omotIzbornika: HTMLDivElement | undefined = $state();
   let ucitavanjeProfila = false;
   let zakazanoUcitavanje = false;
   const jeNaslovna = $derived($page.url.pathname === '/');
@@ -32,6 +35,25 @@
 
   function idiNaprijed() {
     window.history.forward();
+  }
+
+  function zatvoriIzbornik() {
+    otvorenIzbornik = false;
+  }
+
+  function prebaciIzbornik() {
+    otvorenIzbornik = !otvorenIzbornik;
+  }
+
+  async function odjaviSe() {
+    if (!confirm('Jeste li sigurni da se želite odjaviti?')) return;
+    zatvoriIzbornik();
+    await api('/racuni/odjava', { method: 'POST' }).catch(() => {});
+    // Novi gost token prije socketa/profila — prazan Bearer ostavlja avatar/sandučic mrtvim.
+    await prijediNaGostujucuSesiju();
+    await osvjeziSocketIdentitet().catch(() => {});
+    window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
+    window.location.assign('/');
   }
 
   async function ucitajProfil(pokusaji = 3) {
@@ -78,21 +100,45 @@
       profil = profil ? { ...profil, avatarConfig: detalji.avatarConfig } : profil;
     };
     const azurirajIdentitet = () => void ucitajProfil();
+    const naKlikIzvana = (dogadaj: MouseEvent) => {
+      if (!otvorenIzbornik || !omotIzbornika) return;
+      if (omotIzbornika.contains(dogadaj.target as Node)) return;
+      zatvoriIzbornik();
+    };
+    const naTipku = (dogadaj: KeyboardEvent) => {
+      if (dogadaj.key === 'Escape' && otvorenIzbornik) zatvoriIzbornik();
+    };
+
     window.addEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
     window.addEventListener('kaladont:identitet-promijenjen', azurirajIdentitet);
+    document.addEventListener('click', naKlikIzvana);
+    document.addEventListener('keydown', naTipku);
 
     void ucitajProfil();
 
     return () => {
       window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
       window.removeEventListener('kaladont:identitet-promijenjen', azurirajIdentitet);
+      document.removeEventListener('click', naKlikIzvana);
+      document.removeEventListener('keydown', naTipku);
     };
+  });
+
+  // Navigacija zatvara meni (npr. klik na poveznicu unutar izbornika).
+  $effect(() => {
+    void $page.url.pathname;
+    zatvoriIzbornik();
   });
 </script>
 
 <header class="header" class:header--naslovnica={jeNaslovna}>
   <div class="header-sadrzaj">
-    {#if !jeNaslovna}
+    {#if jeNaslovna}
+      <h1 id="naslov-kaladont" class="logo-naslovnica">
+        <span class="ime-igre">KALADONT</span>
+        <span class="vrsta-igre">online</span>
+      </h1>
+    {:else}
       <div class="lijeve-akcije">
         <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
           <img class="header-ikona" src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
@@ -108,28 +154,55 @@
           </button>
         {/if}
       </div>
-    {:else}
-      <div class="lijeve-akcije lijeve-akcije--prazno" aria-hidden="true"></div>
     {/if}
 
     <div class="desno" aria-label={jeNaslovna ? 'Profil i obavijesti' : undefined}>
       {#if profil}
           <SanducicIkona velicina={44} />
-          <a
-            href="/profil"
-            class="profil-link"
-            aria-label={jeNaslovna ? `Profil: ${profil.nadimak}` : 'Moj profil'}
-          >
-            <span class="header-avatar">
-              <Avatar
-                avatarId={profil.avatarId}
-                avatarConfig={profil.avatarConfig}
-                rang={profil.rang === 'Piskaralo' ? null : profil.rang}
-                gost={jeGost}
-                velicina={44}
-              />
-            </span>
-          </a>
+          <div class="profil-omot" bind:this={omotIzbornika}>
+            <button
+              type="button"
+              class="profil-gumb"
+              aria-label={jeNaslovna ? `Izbornik profila: ${profil.nadimak}` : 'Izbornik profila'}
+              aria-haspopup="menu"
+              aria-expanded={otvorenIzbornik}
+              aria-controls="profil-izbornik"
+              onclick={prebaciIzbornik}
+            >
+              <span class="header-avatar">
+                <Avatar
+                  avatarId={profil.avatarId}
+                  avatarConfig={profil.avatarConfig}
+                  rang={profil.rang === 'Piskaralo' ? null : profil.rang}
+                  gost={jeGost}
+                  velicina={44}
+                />
+              </span>
+            </button>
+            {#if otvorenIzbornik}
+              <div
+                id="profil-izbornik"
+                class="profil-izbornik"
+                role="menu"
+                aria-label="Profil i račun"
+              >
+                <a href="/profil" class="profil-stavka" role="menuitem">Moj profil</a>
+                <a href="/misije" class="profil-stavka" role="menuitem">Misije</a>
+                <a href="/ljestvice" class="profil-stavka" role="menuitem">Ljestvice</a>
+                <a href="/pravila-kaladonta" class="profil-stavka" role="menuitem">Pravila</a>
+                <a href="/postavke" class="profil-stavka" role="menuitem">Postavke</a>
+                <div class="profil-razdjelnik" role="separator"></div>
+                {#if jeGost}
+                  <a href="/prijava" class="profil-stavka" role="menuitem">Prijavi se</a>
+                  <a href="/registracija" class="profil-stavka" role="menuitem">Registriraj se</a>
+                {:else}
+                  <button type="button" class="profil-stavka odjava" role="menuitem" onclick={odjaviSe}>
+                    Odjavi se
+                  </button>
+                {/if}
+              </div>
+            {/if}
+          </div>
       {/if}
     </div>
   </div>
@@ -169,8 +242,36 @@
     pointer-events: none;
   }
 
+  .header--naslovnica .logo-naslovnica,
   .header--naslovnica .desno {
     pointer-events: auto;
+  }
+
+  .logo-naslovnica {
+    margin: 0;
+    min-width: 0;
+    max-width: min(100%, calc(100vw - 140px));
+    color: var(--boja-tekst-osnovni);
+    font-family: var(--font-naslov);
+    font-size: clamp(22px, 4.2vw, 34px);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: 0.01em;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .logo-naslovnica .ime-igre,
+  .logo-naslovnica .vrsta-igre {
+    display: inline;
+  }
+
+  .logo-naslovnica .vrsta-igre {
+    margin-left: 0.2em;
+    font-size: 0.72em;
+    font-weight: 700;
   }
 
   .header-sadrzaj {
@@ -202,11 +303,6 @@
     align-items: center;
     gap: 8px;
     min-height: 44px;
-  }
-
-  .lijeve-akcije--prazno {
-    min-width: 0;
-    min-height: 0;
   }
 
   .header-akcija {
@@ -253,6 +349,10 @@
     text-decoration: none;
   }
 
+  .profil-omot {
+    position: relative;
+  }
+
   .header-avatar {
     display: inline-flex;
     flex-shrink: 0;
@@ -262,14 +362,71 @@
     margin: -4px;
   }
 
-  .profil-link {
+  .profil-gumb {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 44px;
     min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .profil-gumb:focus-visible {
+    outline: 3px solid var(--boja-fokus);
+    outline-offset: 2px;
+    border-radius: 50%;
+  }
+
+  .profil-izbornik {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    right: 0;
+    display: grid;
+    min-width: 200px;
+    gap: 2px;
+    padding: 8px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 8px;
+    background: var(--boja-povrsina);
+    box-shadow: var(--sjena-modal);
+  }
+
+  .profil-stavka {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    text-align: left;
     text-decoration: none;
     cursor: pointer;
+  }
+
+  .profil-stavka:hover,
+  .profil-stavka:focus-visible {
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    text-decoration: none;
+  }
+
+  .profil-stavka.odjava {
+    color: var(--boja-poraz-tekst);
+  }
+
+  .profil-razdjelnik {
+    height: 1px;
+    margin: 4px 2px;
+    background: var(--boja-obrub);
   }
 
   @media (max-width: 999px) {

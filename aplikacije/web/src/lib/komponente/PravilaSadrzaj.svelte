@@ -132,7 +132,7 @@
               </tr>
               <tr>
                 <th scope="row">„Ne znam”</th>
-                <td data-label="Što se događa">Predaja. U Klasičnom i KA-ZNA ispadaš. U Dokaži nastavak autor može dobiti potez dokaza.</td>
+                <td data-label="Što se događa">Predaja. U Klasičnom i KA-zna ispadaš. U Dokaži nastavak autor može dobiti potez dokaza.</td>
               </tr>
               <tr>
                 <th scope="row">Mrtva slova</th>
@@ -140,7 +140,7 @@
               </tr>
               <tr>
                 <th scope="row">Kaladont na „ka”</th>
-                <td data-label="Što se događa">Ovisi o pravilniku: Klasični — ispada sljedeći; KA-ZNA i Dokaži nastavak — ispada autor „ka”.</td>
+                <td data-label="Što se događa">Ovisi o pravilniku: Klasični — ispada sljedeći; KA-zna i Dokaži nastavak — ispada autor „ka”.</td>
               </tr>
               <tr>
                 <th scope="row">Dokaz (Dokaži nastavak)</th>
@@ -153,17 +153,17 @@
             </tbody>
           </table>
         </div>
-        <!-- HINT PR15: ne opisuj sva pravila kao KA-ZNA; tri pravilnika imaju različite žrtve. -->
+        <!-- HINT PR15: ne opisuj sva pravila kao KA-zna; tri pravilnika imaju različite žrtve. -->
         <aside class="napomena">
           <strong>Tri pravilnika.</strong> U <strong>Klasičnom</strong> „kaladont/kalodont” na „ka” izbacuje sljedećeg na redu.
-          U <strong>KA-ZNA</strong> izbacuje autora riječi na „ka”.
+          U <strong>KA-zna</strong> izbacuje autora riječi na „ka”.
           U <strong>Dokaži nastavak</strong> „Ne znam” često otvara dokaz autoru; mrtva slova odmah izbacuju autora, bez eliminacijskog boda protivniku.
         </aside>
       </section>
     </section>
   {:else if tema === 'nacini'}
     <section id="sadrzaj-pomoci" class="sadrzaj pregled-igre" aria-label="Kako sve možeš igrati?">
-      <p class="uvod">Pod „Igraj” prvo biraš pravilnik (Klasični Kaladont, KA-ZNA ili Dokaži nastavak), zatim format stola.</p>
+      <p class="uvod">Na naslovnici prvo biraš način (Ranked, Zagrijavanje ili Privatna soba), zatim pravilnik (Klasični Kaladont, KA-zna ili Dokaži nastavak) i format stola.</p>
       <div class="tablica-omotac">
         <table class="tablica-mobilni-retci tablica-s-oznakama">
           <thead>
@@ -201,7 +201,7 @@
             </tr>
             <tr>
               <th scope="row">Zagrijavanje</th>
-              <td data-label="Tko igra">Ti + 1 ili 2 Računala (Klasični: 2 bota; KA-ZNA i Dokaži nastavak: 1 bot)</td>
+              <td data-label="Tko igra">Ti + 1 ili 2 Računala (Klasični: 2 bota; KA-zna i Dokaži nastavak: 1 bot)</td>
               <td data-label="Bodovi i rang">Ne</td>
               <td data-label="Dostignuća">Djelomično</td>
             </tr>
@@ -415,7 +415,7 @@
             <tbody>
               <tr>
                 <th scope="row">Font za disleksiju</th>
-                <td data-label="Što radi u igri">OpenDyslexic ima teže dno slova, pa se b/d, p/q i u/n teže zamijene. Uključuje se na naslovnici ili u <a href="/postavke">Postavkama</a>.</td>
+                <td data-label="Što radi u igri">OpenDyslexic ima teže dno slova, pa se b/d, p/q i u/n teže zamijene. Uključuje se u <a href="/postavke">Postavkama</a>.</td>
               </tr>
               <tr>
                 <th scope="row">Obojena zadnja slova</th>
@@ -488,7 +488,7 @@
       <h3>Disleksija i čitanje</h3>
       <details>
         <summary>Kako olakšati čitanje kod disleksije?</summary>
-        <p>Uključi font za disleksiju i čitanje naglas na naslovnici ili u <a href="/postavke">Postavkama</a>. Za igru bez odbrojavanja otvori <a href="/zagrijavanje">Zagrijavanje</a> ili privatnu sobu bez tajmera.</p>
+        <p>Uključi font za disleksiju i čitanje naglas u <a href="/postavke">Postavkama</a>. Za igru bez odbrojavanja otvori <a href="/zagrijavanje">Zagrijavanje</a> ili privatnu sobu bez tajmera.</p>
       </details>
       <details>
         <summary>Zašto čitanje zvuči engleski ili čudno?</summary>
@@ -522,7 +522,7 @@
       </details>
       <details>
         <summary>Zašto sam odmah ispao?</summary>
-        <p>„Ne znam”, istek vremena, <PojamPomoc tekst="mrtva slova" opis={opisMrtvihSlova} id="mrtva-slova-faq" />, posebna riječ na „ka” (u Klasičnom ispada sljedeći, u KA-ZNA autor „ka”), neuspješan dokaz u Dokaži nastavak, ili prekid veze dulji od 10 sekundi.</p>
+        <p>„Ne znam”, istek vremena, <PojamPomoc tekst="mrtva slova" opis={opisMrtvihSlova} id="mrtva-slova-faq" />, posebna riječ na „ka” (u Klasičnom ispada sljedeći, u KA-zna autor „ka”), neuspješan dokaz u Dokaži nastavak, ili prekid veze dulji od 10 sekundi.</p>
       </details>
       <details>
         <summary>Kako prijaviti riječ ili problem?</summary>
