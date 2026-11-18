@@ -99,7 +99,7 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | Parametar                | Vrijednost                                                                |
 | ------------------------ | ------------------------------------------------------------------------- |
 | Igrača po partiji        | Dvoboj 2; Troboj 3; Četveroboj 4; privatna soba 2–8                      |
-| Pravilnici               | Klasični, KA-ZNA, Dokaži nastavak                                         |
+| Pravilnici               | Klasični, Dokaži nastavak, KA-zna                                         |
 | Vrijeme po potezu        | javni formati 30 s; privatna soba 15 / 30 / 60 s ili bez tajmera          |
 | Maksimum po igraču       | 7 (Četveroboj); 5 (Troboj); 1 (Dvoboj)                                    |
 | Ljestvice ulaz           | 5 dnevno / 10 dulje, po formatu                                           |

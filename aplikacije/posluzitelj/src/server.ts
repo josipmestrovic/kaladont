@@ -803,9 +803,11 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   const treningServis = registrirajTrening(io, {
     omogucen: () => postavkeBotova.treningOmogucen && upravitelj.mozePokrenutiPartiju(),
-    // PR08 — klasični Zagrijavanje je Troboj-trening (ne javni Troboj); ostalo ostaje Dvoboj.
+    // Zagrijavanje: mod iz broja sudionika (čovjek + 1–3 Računala).
     zapocniTrening: (sudionici, pravila) => {
-      const mod = pravila === 'klasicni' ? 'tri_igraca' as const : 'dva_igraca' as const;
+      const broj = sudionici.length;
+      const mod =
+        broj <= 2 ? ('dva_igraca' as const) : broj === 3 ? ('tri_igraca' as const) : ('cetiri_igraca' as const);
       return upravitelj.zapocniPartiju(sudionici, mod, { kontekst: 'trening', pravila });
     },
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,

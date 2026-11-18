@@ -139,25 +139,28 @@
     flex-direction: column;
     gap: 0.25rem;
     padding: 0.85rem 1rem;
-    border: 1px solid color-mix(in srgb, var(--boja-tekst, #1a1a1a) 12%, transparent);
+    border: 1px solid var(--boja-obrub);
     border-radius: 0.75rem;
-    background: color-mix(in srgb, var(--boja-pozadina, #fff) 92%, #f3f3f3);
+    background: var(--boja-povrsina);
+    color: var(--boja-tekst-osnovni);
   }
 
   .stat-broj {
     font-size: 1.35rem;
     font-weight: 700;
     line-height: 1.2;
+    color: var(--boja-tekst-osnovni);
   }
 
   .stat-naziv {
     font-size: 0.85rem;
-    opacity: 0.8;
+    color: var(--boja-tekst-sekundarni);
   }
 
   .ostalo-kartica h3 {
     margin: 0 0 0.75rem;
     font-size: 1.1rem;
+    color: var(--boja-tekst-naslov);
   }
 
   .ocjena-zvjezdice {

@@ -16,17 +16,17 @@ Format javnog stola i pravilnik odvojene su osi. Pod „Igraj” igrač prvo bir
 - Gosti i registrirani igraju pod istim pravilima.
 - **Privatna soba** prima 2 do 8 igrača. Domaćin bira pravilnik, trajanje poteza (15/30/60 s ili bez tajmera), vrste riječi i bodove za eliminacije. Imenice su uvijek dopuštene.
 - Javni formati koriste javni red, bodovanje, jedan univerzalni rang i ljestvice po formatu. Privatna soba ima samo privremenu ljestvicu.
-- U javnom redu prazna mjesta nakon pragova popunjavaju **botovi**. **Zagrijavanje** igra odabrani pravilnik: Klasični ima čovjeka + 2 Računala; KA-ZNA i Dokaži nastavak čovjeka + 1 Računalo. Detalji: [botovi.md](botovi.md).
+- U javnom redu prazna mjesta nakon pragova popunjavaju **botovi**. **Zagrijavanje** igra odabrani pravilnik: Klasični ima čovjeka + 2 Računala; KA-zna i Dokaži nastavak čovjeka + 1 Računalo. Detalji: [botovi.md](botovi.md).
 
 ### Pravilnici
 
 | Pravilnik | Posebna riječ na „ka” | „Ne znam” / istek | Mrtva slova |
 |---|---|---|---|
 | **Klasični Kaladont** | Ispada sljedeći aktivni iza autora posebne riječi | Redovna eliminacija igrača na potezu | Ispada sljedeći na redu |
-| **KA-ZNA** | Ispada autor riječi koja je ostavila „ka” (današnje ponašanje) | Redovna eliminacija | Ispada sljedeći na redu |
-| **Dokaži nastavak** | Kao KA-ZNA | Može otvoriti dokaz autoru prethodne riječi | Odmah ispada **autor** riječi; nema eliminacijskog boda |
+| **KA-zna** | Ispada autor riječi koja je ostavila „ka” (današnje ponašanje) | Redovna eliminacija | Ispada sljedeći na redu |
+| **Dokaži nastavak** | Kao KA-zna | Može otvoriti dokaz autoru prethodne riječi | Odmah ispada **autor** riječi; nema eliminacijskog boda |
 
-U spojenom javnom Dvoboju (Klasični + KA-ZNA) motor izvodi **KA-ZNA**; svaki igrač i dalje vidi vlastiti odabrani naziv. Stare partije i stari klijenti bez pravilnika = KA-ZNA.
+U spojenom javnom Dvoboju (Klasični + KA-zna) motor izvodi **KA-zna**; svaki igrač i dalje vidi vlastiti odabrani naziv. Stare partije i stari klijenti bez pravilnika = KA-zna.
 
 Redoslijed sjedala dodjeljuje se jednom na početku partije i određuje kružni red poteza; sjedalo 0 započinje prvi potez. Svaki igrač vidi isti red sjedala iz vlastite perspektive, zakrenut tako da je njegovo sjedalo prvo. Ta je zakrenuta projekcija samo prikaz: potez, timer i eliminacije i dalje se određuju prema identitetu koji pošalje poslužitelj. Eliminirani igrači ostaju na svojem mjestu do kraja partije.
 
@@ -96,7 +96,7 @@ Početna riječ troši svoje leksemske grupe kao i riječ igrača. Nakon objave 
 
 „Kaladont” i „kalodont” smiju se ponavljati. Posebno pravilo vrijedi samo kad se odigraju na traženi `ka`, a igrač je na potezu.
 
-1. **KA-ZNA** i **Dokaži nastavak** (običan potez): ispada autor riječi koja je ostavila `ka`; uzročnik je igrač s posebnom riječju; nova sistemska riječ ide prvom aktivnom iza njega (kao danas).
+1. **KA-zna** i **Dokaži nastavak** (običan potez): ispada autor riječi koja je ostavila `ka`; uzročnik je igrač s posebnom riječju; nova sistemska riječ ide prvom aktivnom iza njega (kao danas).
 2. **Klasični Kaladont**: ispada prvi aktivni *iza* autora posebne riječi; uzročnik je i dalje onaj tko je rekao kaladont; nova riječ ide prvom aktivnom iza žrtve.
 3. Ako je `ka` otvorio sustav, nitko ne ispada i sustav odmah otvara novu rundu.
 4. U privatnoj sobi eliminacijski bod vrijedi samo ako ga je domaćin uključio.
@@ -122,7 +122,7 @@ Rubni slučajevi: RS-31, RS-32 u [rubni-slucajevi.md](rubni-slucajevi.md).
 | **Kaladont** | Posebno pravilo po pravilniku | Da (kad postoji žrtva) |
 | **Neuspješan dokaz** | Autor ne dokaže nastavak | Ne |
 
-U Klasičnom i KA-ZNA, ako nema nastavka, sljedeći igrač ispada odmah. U Dokaži nastavak autor riječi bez nastavka ispada odmah (RS-31).
+U Klasičnom i KA-zna, ako nema nastavka, sljedeći igrač ispada odmah. U Dokaži nastavak autor riječi bez nastavka ispada odmah (RS-31).
 
 Igrač se nakon prekida veze može vratiti u roku od 10 sekundi od trenutka kada igra utvrdi prekid, koristeći isti identitet. Vrijeme poteza nastavlja teći i tijekom prekida. Ako igrač nije bio na potezu, ispada bez boda za protivnika; ako je bio na potezu, bod može dobiti igrač koji mu je ostavio tražena slova. Namjerni izlazak iz partije odmah eliminira igrača i nema razdoblja za povratak.
 

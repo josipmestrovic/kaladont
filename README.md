@@ -6,7 +6,7 @@ Hrvatska online višeigračka igra riječi: reci riječ koja počinje na posljed
 
 <!-- HINT PR15: prvo pravilnik, zatim format; Troboj + tri pravilnika. -->
 
-- **Pravilnici** — Klasični Kaladont, KA-ZNA, Dokaži nastavak (biraju se prije formata).
+- **Pravilnici** — Klasični Kaladont, Dokaži nastavak, KA-zna (biraju se prije formata).
 - **Dvoboj** — 2 igrača, 30 s po potezu.
 - **Troboj** — 3 igrača, 30 s po potezu.
 - **Četveroboj** — 4 igrača, 30 s po potezu, ispadanje do posljednjeg.

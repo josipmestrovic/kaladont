@@ -18,15 +18,26 @@
   const igra = dohvatiStanjeIgre();
   const savjeti = dohvatiSavjete('dva_igraca');
 
-  /** PR14: /zagrijavanje?pravila= — bez queryja stari default KA-ZNA. */
+  /** Glavni UI: ?botovi=1|2|3. Misije / stari linkovi: ?pravila=. */
+  const trazeniBotovi = $derived(((): 1 | 2 | 3 | null => {
+    const sirovo = $page.url.searchParams.get('botovi');
+    if (sirovo === '1' || sirovo === '2' || sirovo === '3') return Number(sirovo) as 1 | 2 | 3;
+    return null;
+  })());
   const trazenaPravila = $derived(((): PravilnikPartije | null => {
     const pravila = $page.url.searchParams.get('pravila');
     return jePoznatiPravilnik(pravila) ? pravila : null;
   })());
   const tekstPripreme = $derived(
-    trazenaPravila === 'klasicni'
-      ? 'Pripremamo igru s dva Računala…'
-      : 'Pripremamo dvoboj protiv Računala…',
+    trazeniBotovi === 1
+      ? 'Pripremamo dvoboj protiv Računala…'
+      : trazeniBotovi === 2
+        ? 'Pripremamo igru s dva Računala…'
+        : trazeniBotovi === 3
+          ? 'Pripremamo igru s tri Računala…'
+          : trazenaPravila === 'klasicni'
+            ? 'Pripremamo igru s dva Računala…'
+            : 'Pripremamo dvoboj protiv Računala…',
   );
 
   let poruka = $state<string | null>(null);
@@ -81,9 +92,15 @@
       }
       poruka = ishod.poruka;
     };
-    // Bez queryja: stari oblik (samo callback) → server default ka_zna.
-    if (trazenaPravila) socket.emit('trening:zapocni', { pravila: trazenaPravila }, potvrda);
-    else socket.emit('trening:zapocni', potvrda);
+    if (trazeniBotovi && trazenaPravila) {
+      socket.emit('trening:zapocni', { pravila: trazenaPravila, brojRacunala: trazeniBotovi }, potvrda);
+    } else if (trazeniBotovi) {
+      socket.emit('trening:zapocni', { brojRacunala: trazeniBotovi }, potvrda);
+    } else if (trazenaPravila) {
+      socket.emit('trening:zapocni', { pravila: trazenaPravila }, potvrda);
+    } else {
+      socket.emit('trening:zapocni', potvrda);
+    }
   }
 
   onMount(() => {

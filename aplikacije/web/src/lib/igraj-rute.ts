@@ -1,6 +1,6 @@
 /**
- * PR14 — URL-ovi i oznake za dvokoračni Igraj modal.
- * HINT: 9 UI izbora → 8 serverskih redova (Klasični+KA-ZNA Dvoboj dijele `2-zajednicki`).
+ * URL-ovi i oznake za Igraj (način na naslovnici → pravilnik → format ili Računala).
+ * HINT: Natjecateljski: 9 UI izbora → 8 serverskih redova (Klasični+KA-ZNA Dvoboj dijele `2-zajednicki`).
  * HINT: Troboj ikona dolazi naknadno — kartica je tekstualna („Troboj · 3 igrača”).
  */
 import type { ModPartije, PravilnikPartije } from 'zajednicko';
@@ -12,23 +12,24 @@ export const TEKSTOVI_PRAVILNIKA: Readonly<
 > = {
   klasicni: {
     naziv: 'Klasični Kaladont',
-    opis: 'Kad kažeš „kaladont”, ispada igrač koji je sljedeći na redu.',
+    opis: 'Ispada onaj igrač koji ne zna nastavak.',
   },
   ka_zna: {
-    naziv: 'KA-ZNA',
-    opis: 'Pazi kome ostavljaš „ka” jer ti se može vratiti i izbaciti te.',
+    naziv: 'KA-zna',
+    opis:
+      'Ispada igrač koji ne zna nastavak, osim u slučaju kaladonta - tada ispada onaj koji ga je omogućio!',
   },
   dokazi_nastavak: {
     naziv: 'Dokaži nastavak',
     opis:
-      'Protivnik je zapeo na tvojoj riječi? U tome slučaju moraš napisati nastavak na vlastitu riječ, inače ti ispadaš!',
+      'Ako protivnik zapne na tvojoj riječi, ti moraš napisati nastavak, inače ti ispadaš!',
   },
 };
 
 export const REDOSLIJED_PRAVILNIKA: readonly PravilnikPartije[] = [
   'klasicni',
-  'ka_zna',
   'dokazi_nastavak',
+  'ka_zna',
 ];
 
 export function nazivPravilnika(pravila: PravilnikPartije): string {
@@ -66,16 +67,19 @@ export function opisFormata(mod: ModPartije): string {
   }
 }
 
-/** Opis Zagrijavanja ovisi o odabranom pravilniku (klasični = 2 Računala). */
-export function opisZagrijavanja(pravila: PravilnikPartije): string {
-  if (pravila === 'klasicni') return 'Igraj s dva Računala.';
-  return 'Igraj dvoboj protiv Računala.';
-}
-
 export function putanjaJavnogReda(mod: ModPartije, pravila: PravilnikPartije): string {
   return `/red?mod=${encodeURIComponent(mod)}&pravila=${encodeURIComponent(pravila)}`;
 }
 
+/** Glavni UI Zagrijavanje — pravila + broj Računala (1–3). */
+export function putanjaZagrijavanjaBotova(
+  brojRacunala: 1 | 2 | 3,
+  pravila: PravilnikPartije,
+): string {
+  return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}&botovi=${brojRacunala}`;
+}
+
+/** Misije / Igraj opet — stari ulaz po pravilniku (klasični = 2 Računala). */
 export function putanjaZagrijavanja(pravila: PravilnikPartije): string {
   return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}`;
 }
@@ -84,20 +88,27 @@ export function putanjaPrivatneKreacije(pravila: PravilnikPartije): string {
   return `/soba/kreiraj?pravila=${encodeURIComponent(pravila)}`;
 }
 
+/** Trening: mod = broj sudionika (čovjek + Računala) → broj Računala 1–3. */
+export function brojRacunalaIzTreningModa(mod: ModPartije | null | undefined): 1 | 2 | 3 {
+  if (mod === 'dva_igraca') return 1;
+  if (mod === 'tri_igraca') return 2;
+  return 3;
+}
+
 /** Igraj opet / misije — zadrži mod+pravila; bez pravila → zadani KA-ZNA. */
 export function putanjaPonovneIgre(
   mod: ModPartije | null | undefined,
   pravila: PravilnikPartije | null | undefined,
   kontekst?: 'javna' | 'privatna' | 'trening' | null,
 ): string {
+  const p = jePoznatiPravilnik(pravila) ? pravila : ZADANI_PRAVILNIK;
   if (kontekst === 'trening') {
-    return putanjaZagrijavanja(jePoznatiPravilnik(pravila) ? pravila : ZADANI_PRAVILNIK);
+    return putanjaZagrijavanjaBotova(brojRacunalaIzTreningModa(mod), p);
   }
   if (kontekst === 'privatna') {
-    return putanjaPrivatneKreacije(jePoznatiPravilnik(pravila) ? pravila : ZADANI_PRAVILNIK);
+    return putanjaPrivatneKreacije(p);
   }
   const m = jePoznatiMod(mod) ? mod : 'cetiri_igraca';
-  const p = jePoznatiPravilnik(pravila) ? pravila : ZADANI_PRAVILNIK;
   return putanjaJavnogReda(m, p);
 }
 

@@ -2,25 +2,17 @@ import { IKONE_DOSTIGNUCA } from './ikone-dostignuca.js';
 
 const TIMEOUT_ASETA_MS = 8_000;
 
-/** Glavna navigacija na landingu — warm-up u pozadini. */
+/** Warm-up ikona navigacije na landingu (desktop). */
 export const KRITICNE_IKONE: readonly string[] = [
   '/ikone/07-igraj.png',
-  '/ikone/61-korisnicki-profil.webp',
-  '/ikone/62-misije.webp',
-  '/ikone/09-ljestvice.png',
-  '/ikone/08-pravila.png',
-  '/ikone/11-postavke.png',
-  '/ikone/12-odjavi-se.png',
-  '/ikone/13-prijavi-se.png',
-  '/ikone/14-registriraj-se.png',
+  '/ikone/67-zagrijavanje-bot.webp',
+  '/ikone/18-privatna-soba.png',
 ];
 
 /** Ikone u modalu „Igraj” — warm na klik, ne blocking. */
 export const MODAL_IGRA_IKONE: readonly string[] = [
   '/ikone/16-soba-4-igraca.png',
   '/ikone/17-soba-2-igraca.png',
-  '/ikone/18-privatna-soba.png',
-  '/ikone/67-zagrijavanje-bot.webp',
 ];
 
 /** Idle warm-up na landingu — ne blokira children(). */
@@ -31,10 +23,6 @@ export const POZADINSKE_SLIKE_LANDINGA: readonly string[] = [
   '/ikone/04-naslovna.png',
   '/ikone/05-naprijed.png',
   ...MODAL_IGRA_IKONE,
-  '/slike/demo-slika.webp',
-  '/slike/2-5-d-components/Tube-body.png',
-  '/slike/2-5-d-components/Cap.png',
-  '/slike/2-5-d-components/Speech-Bubble-kaladont.png',
 ];
 
 /** Profil / dostignuća — tek kad se ode na profil. */

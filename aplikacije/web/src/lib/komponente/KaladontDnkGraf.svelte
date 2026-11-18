@@ -251,7 +251,7 @@
   .dnk-pomoc {
     display: inline-block;
     margin-top: 12px;
-    color: var(--boja-pozadina-primarna);
+    color: var(--boja-isticanje-tekst);
     font-size: var(--tekst-sitni);
     font-weight: 700;
   }

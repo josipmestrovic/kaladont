@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * PR14 — dvokoračni Igraj: pravilnik → format/trening/privatna.
+   * Igraj: način dolazi s naslovnice → pravilnik → format (Ranked) ili broj Računala (Zagrijavanje).
    * HINT: Troboj bez ikone (tekst „Troboj · 3 igrača”) dok vlasnik ne dostavi asset.
    */
   import { onMount } from 'svelte';
@@ -11,27 +11,34 @@
     TEKSTOVI_PRAVILNIKA,
     nazivFormata,
     opisFormata,
-    opisZagrijavanja,
     putanjaJavnogReda,
-    putanjaPrivatneKreacije,
-    putanjaZagrijavanja,
+    putanjaZagrijavanjaBotova,
   } from '$lib/igraj-rute.js';
 
   let {
     otvoren = false,
+    nacin = 'natjecateljski',
     onZatvori,
   }: {
     otvoren?: boolean;
+    nacin?: 'natjecateljski' | 'laganini';
     onZatvori: () => void;
   } = $props();
 
-  let korak = $state<'pravilnik' | 'format'>('pravilnik');
+  let korak = $state<'pravilnik' | 'format' | 'botovi'>('pravilnik');
   let odabranaPravila = $state<PravilnikPartije | null>(null);
   let podlogaEl = $state<HTMLDivElement | null>(null);
   let dijalogEl = $state<HTMLDivElement | null>(null);
   let prethodniFokus: HTMLElement | null = null;
 
   const FORMATI: readonly ModPartije[] = ['dva_igraca', 'tri_igraca', 'cetiri_igraca'];
+  const OPCIJE_BOTOVA = [
+    { broj: 1 as const, naziv: 'Igraj 1 računalom' },
+    { broj: 2 as const, naziv: 'Igraj 2 računala' },
+    { broj: 3 as const, naziv: 'Igraj 3 računala' },
+  ];
+
+  const nazivNacina = $derived(nacin === 'laganini' ? 'Zagrijavanje' : 'Ranked');
 
   $effect(() => {
     if (otvoren) {
@@ -59,13 +66,15 @@
 
   function odaberiPravilnik(pravila: PravilnikPartije) {
     odabranaPravila = pravila;
-    korak = 'format';
+    korak = nacin === 'laganini' ? 'botovi' : 'format';
     queueMicrotask(() => dijalogEl?.focus());
   }
 
   function natrag() {
-    korak = 'pravilnik';
-    odabranaPravila = null;
+    if (korak === 'format' || korak === 'botovi') {
+      korak = 'pravilnik';
+      odabranaPravila = null;
+    }
     queueMicrotask(() => dijalogEl?.focus());
   }
 
@@ -91,7 +100,7 @@
       class="modal-sadrzaj"
       role="dialog"
       aria-modal="true"
-      aria-label="Igraj"
+      aria-label={nazivNacina}
       tabindex="-1"
       onclick={(dogadaj) => dogadaj.stopPropagation()}
       onkeydown={naTipku}
@@ -101,16 +110,15 @@
       </button>
 
       {#if korak === 'pravilnik'}
-        <p class="modal-nadnaslov">Odaberi pravilnik</p>
-        <h2 id="modal-naslov">Kako želiš igrati?</h2>
+        <p class="modal-nadnaslov">{nazivNacina}</p>
+        <h2 id="modal-naslov">Odaberi pravila po kojima želiš igrati</h2>
         <div class="modal-opcije">
           {#each REDOSLIJED_PRAVILNIKA as pravila (pravila)}
             <button
               type="button"
-              class="modal-opcija"
+              class="modal-opcija modal-opcija-tekst"
               onclick={() => odaberiPravilnik(pravila)}
             >
-              <span class="modal-opcija-ikona" aria-hidden="true" data-pravila={pravila}></span>
               <span>
                 <strong>{TEKSTOVI_PRAVILNIKA[pravila].naziv}</strong>
                 <small>{TEKSTOVI_PRAVILNIKA[pravila].opis}</small>
@@ -118,8 +126,8 @@
             </button>
           {/each}
         </div>
-      {:else if odabranaPravila}
-        <p class="modal-nadnaslov">{TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv}</p>
+      {:else if korak === 'format' && odabranaPravila}
+        <p class="modal-nadnaslov">Ranked · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv}</p>
         <h2 id="modal-naslov">Odaberi stol</h2>
         <div class="modal-opcije">
           {#each FORMATI as mod (mod)}
@@ -142,28 +150,22 @@
               </span>
             </a>
           {/each}
-          <a
-            href={putanjaZagrijavanja(odabranaPravila)}
-            class="modal-opcija"
-            data-izbor="zagrijavanje"
-          >
-            <img src="/ikone/67-zagrijavanje-bot.webp" alt="" aria-hidden="true" />
-            <span>
-              <strong>Zagrijavanje</strong>
-              <small>{opisZagrijavanja(odabranaPravila)}</small>
-            </span>
-          </a>
-          <a
-            href={putanjaPrivatneKreacije(odabranaPravila)}
-            class="modal-opcija"
-            data-izbor="privatna"
-          >
-            <img src="/ikone/18-privatna-soba.png" alt="" aria-hidden="true" />
-            <span>
-              <strong>Privatna soba</strong>
-              <small>Prilagodi pravila i pozovi svoju ekipu.</small>
-            </span>
-          </a>
+        </div>
+        <button type="button" class="natrag-modal" onclick={natrag}>Natrag</button>
+      {:else if korak === 'botovi' && odabranaPravila}
+        <p class="modal-nadnaslov">Zagrijavanje · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv}</p>
+        <h2 id="modal-naslov">Koliko Računala želiš?</h2>
+        <div class="modal-opcije">
+          {#each OPCIJE_BOTOVA as opcija (opcija.broj)}
+            <a
+              href={putanjaZagrijavanjaBotova(opcija.broj, odabranaPravila)}
+              class="modal-opcija modal-opcija-tekst"
+            >
+              <span>
+                <strong>{opcija.naziv}</strong>
+              </span>
+            </a>
+          {/each}
         </div>
         <button type="button" class="natrag-modal" onclick={natrag}>Natrag</button>
       {/if}
@@ -254,6 +256,10 @@
     width: 100%;
   }
 
+  .modal-opcija-tekst {
+    grid-template-columns: 1fr;
+  }
+
   .modal-opcija:hover {
     border-color: var(--boja-mint);
   }
@@ -274,18 +280,6 @@
     font-family: var(--font-naslov);
     font-size: 22px;
     font-weight: 800;
-  }
-
-  .modal-opcija-ikona[data-pravila='klasicni']::before {
-    content: 'K';
-  }
-  .modal-opcija-ikona[data-pravila='ka_zna']::before {
-    content: 'KA';
-    font-size: 16px;
-  }
-  .modal-opcija-ikona[data-pravila='dokazi_nastavak']::before {
-    content: 'DN';
-    font-size: 16px;
   }
 
   .modal-opcija span:not(.modal-opcija-ikona) {

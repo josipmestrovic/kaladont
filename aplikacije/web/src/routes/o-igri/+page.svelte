@@ -195,7 +195,7 @@
             </tr>
             <tr>
               <th scope="row">Kaladont na „ka”</th>
-              <td data-label="Što se događa">Klasični: ispada sljedeći. KA-ZNA: ispada autor „ka”.</td>
+              <td data-label="Što se događa">Klasični: ispada sljedeći. KA-zna: ispada autor „ka”.</td>
             </tr>
             <tr>
               <th scope="row">Dokaz</th>

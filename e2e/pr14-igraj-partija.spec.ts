@@ -15,19 +15,21 @@ import {
 } from './pomocnici/igraci.js';
 import { pronadjiIgrivuRijec } from './pomocnici/rjecnik.js';
 
-async function otvoriIgrajKorak1(page: Page) {
+async function otvoriRankedKorak1(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Igraj' }).click();
-  const dijalog = page.getByRole('dialog', { name: 'Igraj' });
-  await expect(dijalog.getByRole('heading', { name: 'Kako želiš igrati?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Ranked', exact: true }).click();
+  const dijalog = page.getByRole('dialog', { name: 'Ranked' });
+  await expect(
+    dijalog.getByRole('heading', { name: 'Odaberi pravila po kojima želiš igrati' }),
+  ).toBeVisible();
   return dijalog;
 }
 
 for (const sirina of [380, 1100] as const) {
   test(`Igraj koraci 1–2 čitljivi na ${sirina}px`, async ({ page }) => {
     await page.setViewportSize({ width: sirina, height: sirina < 1000 ? 720 : 900 });
-    const dijalog = await otvoriIgrajKorak1(page);
-    await expect(dijalog.getByText('Kad kažeš „kaladont”')).toBeVisible();
+    const dijalog = await otvoriRankedKorak1(page);
+    await expect(dijalog.getByText(/Ako protivnik zapne/)).toBeVisible();
     await dijalog.getByRole('button', { name: /Dokaži nastavak/ }).click();
     await expect(dijalog.getByRole('heading', { name: 'Odaberi stol' })).toBeVisible();
     await expect(dijalog.getByRole('link', { name: /Dvoboj/ })).toBeVisible();
@@ -36,7 +38,9 @@ for (const sirina of [380, 1100] as const) {
     const potvrdaNeZnamNijeTu = dijalog.getByRole('button', { name: 'Da' });
     await expect(potvrdaNeZnamNijeTu).toHaveCount(0);
     await dijalog.getByRole('button', { name: 'Natrag' }).click();
-    await expect(dijalog.getByRole('heading', { name: 'Kako želiš igrati?' })).toBeVisible();
+    await expect(
+      dijalog.getByRole('heading', { name: 'Odaberi pravila po kojima želiš igrati' }),
+    ).toBeVisible();
   });
 }
 
