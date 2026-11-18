@@ -56,9 +56,10 @@
         <button
           type="button"
           class="navigacijska-stavka primarna"
+          aria-label="Ranked"
           onclick={() => otvoriModal('natjecateljski')}
         >
-          <span class="stavka-tekst">
+          <span class="stavka-tekst" aria-hidden="true">
             <strong>Ranked</strong>
             <small>Igraj za rang i mjesto na ljestvici.</small>
           </span>
@@ -71,8 +72,13 @@
             height="72"
           />
         </button>
-        <button type="button" class="navigacijska-stavka" onclick={() => otvoriModal('laganini')}>
-          <span class="stavka-tekst">
+        <button
+          type="button"
+          class="navigacijska-stavka"
+          aria-label="Zagrijavanje"
+          onclick={() => otvoriModal('laganini')}
+        >
+          <span class="stavka-tekst" aria-hidden="true">
             <strong>Zagrijavanje</strong>
             <small>Igraj protiv računala.</small>
           </span>
@@ -85,8 +91,8 @@
             height="72"
           />
         </button>
-        <a href="/soba/kreiraj" class="navigacijska-stavka">
-          <span class="stavka-tekst">
+        <a href="/soba/kreiraj" class="navigacijska-stavka" aria-label="Privatna soba">
+          <span class="stavka-tekst" aria-hidden="true">
             <strong>Privatna soba</strong>
             <small>Pozovi prijatelje preko linka.</small>
           </span>
@@ -115,6 +121,9 @@
 
   <footer class="landing-footer">
     <nav aria-label="Dodatne poveznice">
+      <!-- HINT PR15: Novosti prije O igri; /novosti više nije 307 redirect. -->
+      <a href="/novosti">Novosti</a>
+      <a href="/o-igri">O igri</a>
       <a href="/povratne-informacije">Pomozi poboljšati igru</a>
       <a href="/uvjeti">Uvjeti</a>
       <a href="/privatnost">Privatnost</a>

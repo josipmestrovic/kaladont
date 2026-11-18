@@ -68,16 +68,25 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
     }, { timeout: 15_000 }).not.toBe(naslovPrije);
   }
   await expect(popupMisija).toHaveCount(0);
-  const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
-  const odjava = navigacija.getByRole('button', { name: 'Odjavi se' });
+  const profilGumb = page.getByRole('banner').getByRole('button', { name: /Izbornik profila/ });
+  await expect(profilGumb).toBeVisible({ timeout: 20_000 });
+  await profilGumb.click();
+  const izbornik = page.getByRole('menu', { name: 'Profil i račun' });
+  const odjava = izbornik.getByRole('menuitem', { name: 'Odjavi se' });
   await expect(odjava).toBeVisible();
   page.once('dialog', (dijalog) => dijalog.accept());
   await odjava.click();
-  await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toBeVisible({ timeout: 15_000 });
-  await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
+  await expect(profilGumb).toBeVisible({ timeout: 15_000 });
+  await profilGumb.click();
+  await expect(page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Prijavi se' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Odjavi se' })).toHaveCount(0);
   await page.reload();
-  await expect(navigacija.getByRole('link', { name: 'Prijavi se' })).toBeVisible();
-  await expect(navigacija.getByRole('button', { name: 'Odjavi se' })).toHaveCount(0);
+  await expect(profilGumb).toBeVisible({ timeout: 20_000 });
+  await profilGumb.click();
+  await expect(page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Prijavi se' })).toBeVisible();
+  await expect(page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Odjavi se' })).toHaveCount(0);
 });
 
 test('stranica privatnosti prikazuje GDPR kontakt i postupak brisanja', async ({ page }) => {
