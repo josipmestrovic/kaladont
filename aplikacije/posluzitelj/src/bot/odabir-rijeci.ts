@@ -165,9 +165,11 @@ export function odaberiPotez(
   // PR07: nedostajuća polja = KA-ZNA / 2 aktivna (kompatibilnost starih snimki i testova).
   const pravila = ulaz.pravila ?? 'ka_zna';
   const brojAktivnih = ulaz.brojAktivnih ?? 2;
-  const politika = politikaKa(pravila, brojAktivnih);
-  // ulaz.faza: dokaz_nastavka koristi isti repertoar; mrtav nastavak samo prirodno (jeNepoznataBotu).
-  void ulaz.faza;
+  const faza = ulaz.faza ?? 'obican_potez';
+  // bez_ka vrijedi samo na običnom potezu — u dokazu kaladont/ka-riječ su valjan dokaz (RS-34).
+  const politikaSirowa = politikaKa(pravila, brojAktivnih);
+  const politika: PolitikaKa =
+    politikaSirowa === 'bez_ka' && faza === 'dokaz_nastavka' ? 'oprezni' : politikaSirowa;
 
   // Primljeni KA.
   // agresivni: uvijek kaladont. oprezni: većinom kaladont / ponekad propust. bez_ka: nikad kaladont.
@@ -186,7 +188,7 @@ export function odaberiPotez(
   stanje.brojKandidata = poznati.length;
 
   if (poznati.length === 0) {
-    // Propust bez poznate riječi na „ka” → ipak kaladont (osim bez_ka = Dokaži).
+    // Propust bez poznate riječi na „ka” → ipak kaladont (osim bez_ka = Dokaži običan potez).
     if (propustKa && politika !== 'bez_ka') {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
@@ -214,13 +216,15 @@ export function odaberiPotez(
   }
 
   const radni = pozeljni.length ? pozeljni : poznati;
-  // agresivni: „ka” u poolu. oprezni: 1,5 % / prisilni. bez_ka: isključi „ka”; samo „ka” → odustani.
+  // agresivni: „ka” u poolu. oprezni: 1,5 % / prisilni. bez_ka: isključi „ka”; fallback na poznate bez „ka”.
   let odabranaSkupina: string[];
   let prisilniKa = false;
   if (politika === 'agresivni') {
     odabranaSkupina = [...radni];
   } else if (politika === 'bez_ka') {
-    const bezKa = radni.filter((rijec) => zadnjaDva(rijec) !== 'ka');
+    const bezKaRadni = radni.filter((rijec) => zadnjaDva(rijec) !== 'ka');
+    const bezKaPoznati = poznati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
+    const bezKa = bezKaRadni.length > 0 ? bezKaRadni : bezKaPoznati;
     if (bezKa.length === 0) return { vrsta: 'odustani', razlog: 'nema_rijeci' };
     odabranaSkupina = bezKa;
   } else {

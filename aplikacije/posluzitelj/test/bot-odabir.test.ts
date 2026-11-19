@@ -284,6 +284,33 @@ describe('odabir riječi bota', () => {
     expect(samoKa).toEqual({ vrsta: 'odustani', razlog: 'nema_rijeci' });
   });
 
+  it('Dokaži dokaz_nastavka: smije kaladont na „ka” (bez_ka samo na običnom potezu)', () => {
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ka',
+      kandidati: ['kava'],
+      ...laznaRijec({ kava: { frekvencija: 800, grupe: ['imenica:kava'] } }),
+      pravila: 'dokazi_nastavak',
+      faza: 'dokaz_nastavka',
+      brojAktivnih: 3,
+    }, stvoriStanjeBota(konfigBezPropusta, rng(1)), konfigBezPropusta, rng(1));
+    expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' });
+  });
+
+  it('Dokaži bez_ka: ako poželjni završavaju na „ka”, pada na poznate bez „ka”', () => {
+    const rijeci = laznaRijec({
+      maska: { frekvencija: 900, grupe: ['imenica:maska'] },
+      mastilo: { frekvencija: 20, grupe: ['imenica:mastilo'] },
+    });
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['maska', 'mastilo'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak',
+      brojAktivnih: 2,
+    }, stvoriStanjeBota(konfigBezPropusta, rng(3)), konfigBezPropusta, rng(3));
+    expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'mastilo', kategorija: 'srednja' });
+  });
+
   it('PR07 Klasični s 3 aktivna: riječ na „ka” ulazi u pool čak uz vjerojatnostOstavljanjaKa 0', () => {
     const rijeci = laznaRijec({
       masa: { frekvencija: 900, grupe: ['imenica:masa'] },
