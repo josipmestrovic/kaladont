@@ -2,22 +2,21 @@
  * Bot kontroler (ADR-017): sluša promjene poteza iz motora i za bota na potezu planira
  * točno jednu akciju po (partijaId, igracId, turnToken). Pri buđenju sve ponovno provjerava.
  *
- * PR05→PR07: snimka nosi faza/pravila/dokaz; novi token u dokaz_nastavka dopušta isti bot ponovno.
+ * PR01: fiksni tempo ~4 s (±jitter), obvezne reakcije u svim kontekstima, presentation RNG
+ * odvojen od odluke o riječi; bez namjernog izostanka.
  * PR07: odaberiPotez dobiva pravilnik + broj aktivnih; čekač dokaza ne dobiva reakciju ispadanja.
- * PR08: trening tempo (1–3 s) ostaje ovdje; broj Računala u Zagrijavanju nije u ovom PR-u.
  */
 import type { BrzaPoruka } from 'zajednicko';
 import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import type { KonfiguracijaBota } from './konfiguracija-bota.js';
-import { koeficijentTempaBota, odaberiPotez, stvoriStanjeBota, trajanjeRazmisljanjaMs, type OdlukaBota, type Rng, type StanjeBotaUPartiji } from './odabir-rijeci.js';
+import { odaberiPotez, stvoriStanjeBota, trajanjeRazmisljanjaMs, type OdlukaBota, type Rng, type StanjeBotaUPartiji } from './odabir-rijeci.js';
 import {
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
   odaberiReakcijuPriIspadanju,
   odgodaReakcijeMs,
 } from './reakcije.js';
-import { grafemi } from 'zajednicko';
 
 export type NaredbaBota =
   | { vrsta: 'rijec'; rijec: string; turnToken: string }
@@ -28,12 +27,14 @@ export interface OvisnostiBotKontrolera {
   izvrsiNaredbu: (partijaId: string, igracId: string, naredba: NaredbaBota) => RezultatNaredbe;
   posaljiReakciju?: (partijaId: string, igracId: string, poruka: BrzaPoruka) => boolean;
   konfiguracija: KonfiguracijaBota;
+  /** Decision RNG — samo odabir riječi / neznanje. */
   rng?: Rng;
+  /** Presentation RNG — tempo jitter, pool reakcija, odgoda reakcije. */
+  rngPrezentacije?: Rng;
   sada?: () => number;
   zakazi?: (posao: () => void, ms: number) => NodeJS.Timeout;
   otkazi?: (handle: NodeJS.Timeout) => void;
   zapisi?: (poruka: string, podaci: Record<string, unknown>) => void;
-  oznaciNamjerniIstek?: (partijaId: string, igracId: string, turnToken: string) => boolean;
   dohvatiPotez?: (partijaId: string) => DogadajPoteza | null;
   prekiniZbogGreske?: (partijaId: string, igracId: string, turnToken: string) => void;
   naAktivnost?: (igracId: string) => void;
@@ -46,10 +47,12 @@ export interface BrojaciBota {
   bezRijeci: number;
   zastarjelo: number;
   tehnickeGreske: number;
+  /** Zadržano radi health kompatibilnosti; namjerni istek više ne postoji. */
   namjernihCekanjaIsteka: number;
   dobrovoljniKa: number;
   prisilniKa: number;
   propustPrimljenogKa: number;
+  reakcijaPoslano: number;
 }
 
 interface PlaniranaAkcija {
@@ -60,26 +63,45 @@ interface PlaniranaAkcija {
   vrsta: 'rijec' | 'odustani' | 'oporavak';
 }
 
+type KategorijaReakcije = 'pozdrav' | 'sorry' | 'bravo';
+
 export class BotKontroler {
   private readonly stanjaPoPartiji = new Map<string, Map<string, StanjeBotaUPartiji>>();
   private readonly planirano = new Map<string, PlaniranaAkcija>();
-  private readonly namjerniIsteci = new Map<string, string>();
   private readonly aktualniPotezi = new Map<string, DogadajPoteza>();
   private readonly dovrseniTokeni = new Map<string, string>();
   private readonly greskePoBotu = new Map<string, { broj: number; posljednja: string; vrijemeMs: number }>();
   private readonly konfiguracijePartija = new Map<string, KonfiguracijaBota>();
   private readonly odluke = new Map<string, { turnToken: string; odluka: OdlukaBota; verzijaRjecnika: number }>();
   private readonly zakazaneReakcije = new Map<string, NodeJS.Timeout[]>();
+  private readonly poslaniPozdravi = new Map<string, Set<string>>();
+  private readonly poslaneEliminacijskeReakcije = new Set<string>();
+  /** Sljedeći trenutak (ms) kad igrač smije novu reakciju zbog RS-22 (2 s). */
+  private readonly sljedecaReakcijaMs = new Map<string, number>();
   private readonly rng: Rng;
+  private readonly rngPrezentacije: Rng;
   private readonly sada: () => number;
   private readonly zakazi: (posao: () => void, ms: number) => NodeJS.Timeout;
   private readonly otkazi: (handle: NodeJS.Timeout) => void;
   private readonly zapisi: (poruka: string, podaci: Record<string, unknown>) => void;
   private zaustavljen = false;
-  readonly brojaci: BrojaciBota = { planirano: 0, odigranihRijeci: 0, namjernihPropusta: 0, bezRijeci: 0, zastarjelo: 0, tehnickeGreske: 0, namjernihCekanjaIsteka: 0, dobrovoljniKa: 0, prisilniKa: 0, propustPrimljenogKa: 0 };
+  readonly brojaci: BrojaciBota = {
+    planirano: 0,
+    odigranihRijeci: 0,
+    namjernihPropusta: 0,
+    bezRijeci: 0,
+    zastarjelo: 0,
+    tehnickeGreske: 0,
+    namjernihCekanjaIsteka: 0,
+    dobrovoljniKa: 0,
+    prisilniKa: 0,
+    propustPrimljenogKa: 0,
+    reakcijaPoslano: 0,
+  };
 
   constructor(private readonly ovisnosti: OvisnostiBotKontrolera) {
     this.rng = ovisnosti.rng ?? Math.random;
+    this.rngPrezentacije = ovisnosti.rngPrezentacije ?? Math.random;
     this.sada = ovisnosti.sada ?? Date.now;
     this.zakazi = ovisnosti.zakazi ?? ((posao, ms) => setTimeout(posao, ms));
     this.otkazi = ovisnosti.otkazi ?? ((handle) => clearTimeout(handle));
@@ -99,26 +121,26 @@ export class BotKontroler {
     }
   }
 
-  /** Javna partija: svaki bot neovisno može pozdraviti nakon 2–5 s. */
+  /** Svaki bot pozdravi jednom na početku (javna, privatna, trening). */
   naPocetakPartije(partijaId: string, kontekst: DogadajPoteza['kontekst'], botIds: readonly string[]): void {
-    if (this.zaustavljen || kontekst !== 'javna' || !this.ovisnosti.posaljiReakciju || botIds.length === 0) return;
+    void kontekst;
+    if (this.zaustavljen || !this.ovisnosti.posaljiReakciju || botIds.length === 0) return;
     if (!this.konfiguracijePartija.has(partijaId)) {
       this.konfiguracijePartija.set(partijaId, structuredClone(this.ovisnosti.konfiguracija));
     }
-    const konfiguracija = this.konfiguracijePartija.get(partijaId)!;
     for (const igracId of botIds) {
-      const poruka = odaberiReakcijuNaPocetku(konfiguracija, this.rng);
-      if (poruka) this.zakaziReakciju(partijaId, igracId, poruka);
+      const poslani = this.poslaniPozdravi.get(partijaId) ?? new Set<string>();
+      if (poslani.has(igracId)) continue;
+      poslani.add(igracId);
+      this.poslaniPozdravi.set(partijaId, poslani);
+      const poruka = odaberiReakcijuNaPocetku(this.rngPrezentacije);
+      this.zakaziReakciju(partijaId, igracId, poruka);
     }
   }
 
   /**
-   * Javna partija: eliminator (sorry) i žrtva-bot (bravo/hvala, međusobno isključivo).
-   * PR07: ovaj hook zove se SAMO iz potvrđene eliminacije motora — to je signal da smije
-   * reakcija. Čekač dokaza prije potvrde nije na potezu (planiraj ga ne dira) i motor ga
-   * ne šalje ovamo dok dokaz traje. Bugbot: motor u zakljuciDokazUspjehom nullira dokaz
-   * pa tek onda zove eliminirajIgraca bez objave snimke — lokalna snimka može još držati
-   * zastarjeli dokaz; sinkroniziraj i dopusti reakciju žrtve.
+   * Eliminator (sorry-pool) i žrtva-bot (bravo-pool) kad postoji zaslužni protivnik.
+   * Samoeliminacija / prekid bez bodZa → tišina za žrtvu.
    */
   naEliminaciju(
     partijaId: string,
@@ -126,33 +148,43 @@ export class BotKontroler {
     zrtvaId: string,
     bodZaId: string | null,
     sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot' }[],
+    eliminacijaId: string,
   ): void {
-    if (this.zaustavljen || kontekst !== 'javna' || !this.ovisnosti.posaljiReakciju) return;
+    void kontekst;
+    if (this.zaustavljen || !this.ovisnosti.posaljiReakciju) return;
     if (!this.konfiguracijePartija.has(partijaId)) {
       this.konfiguracijePartija.set(partijaId, structuredClone(this.ovisnosti.konfiguracija));
     }
-    const konfiguracija = this.konfiguracijePartija.get(partijaId)!;
     const jeBot = (igracId: string | null) => Boolean(igracId && sudionici.some((s) => s.igracId === igracId && s.upravljac === 'bot'));
-    // PR07 Bugbot: očisti zastarjeli dokaz kad je žrtva bila čekač — potvrda je ovaj poziv.
     const snimka = this.aktualniPotezi.get(partijaId);
     if (snimka?.dokaz?.cekateljId === zrtvaId) {
       this.aktualniPotezi.set(partijaId, { ...snimka, dokaz: null });
     }
     if (jeBot(bodZaId) && bodZaId) {
-      const poruka = odaberiReakcijuPriEliminacijiProtivnika(konfiguracija, this.rng);
-      if (poruka) this.zakaziReakciju(partijaId, bodZaId, poruka);
+      this.zakaziEliminacijskuReakciju(partijaId, bodZaId, eliminacijaId, 'sorry', odaberiReakcijuPriEliminacijiProtivnika(this.rngPrezentacije));
     }
-    if (jeBot(zrtvaId)) {
-      const poruka = odaberiReakcijuPriIspadanju(konfiguracija, this.rng);
-      if (poruka) this.zakaziReakciju(partijaId, zrtvaId, poruka);
+    if (jeBot(zrtvaId) && bodZaId) {
+      this.zakaziEliminacijskuReakciju(partijaId, zrtvaId, eliminacijaId, 'bravo', odaberiReakcijuPriIspadanju(this.rngPrezentacije));
     }
+  }
+
+  private zakaziEliminacijskuReakciju(
+    partijaId: string,
+    igracId: string,
+    eliminacijaId: string,
+    kategorija: Exclude<KategorijaReakcije, 'pozdrav'>,
+    poruka: BrzaPoruka,
+  ): void {
+    const kljuc = `${partijaId}:${eliminacijaId}:${igracId}:${kategorija}`;
+    if (this.poslaneEliminacijskeReakcije.has(kljuc)) return;
+    this.poslaneEliminacijskeReakcije.add(kljuc);
+    this.zakaziReakciju(partijaId, igracId, poruka);
   }
 
   private planiraj(dogadaj: DogadajPoteza): void {
     const prethodniPlan = this.planirano.get(dogadaj.partijaId);
-    if (!dogadaj.zavrsena && !dogadaj.izborUToku && (prethodniPlan?.turnToken === dogadaj.turnToken || this.namjerniIsteci.get(dogadaj.partijaId) === dogadaj.turnToken || this.dovrseniTokeni.get(dogadaj.partijaId) === dogadaj.turnToken)) return;
+    if (!dogadaj.zavrsena && !dogadaj.izborUToku && (prethodniPlan?.turnToken === dogadaj.turnToken || this.dovrseniTokeni.get(dogadaj.partijaId) === dogadaj.turnToken)) return;
     this.otkaziPlan(dogadaj.partijaId);
-    this.namjerniIsteci.delete(dogadaj.partijaId);
     if (this.zaustavljen) return;
     if (dogadaj.zavrsena) {
       this.stanjaPoPartiji.delete(dogadaj.partijaId);
@@ -160,11 +192,11 @@ export class BotKontroler {
       this.dovrseniTokeni.delete(dogadaj.partijaId);
       this.konfiguracijePartija.delete(dogadaj.partijaId);
       this.odluke.delete(dogadaj.partijaId);
-      // Zakazane reakcije (2–5 s) smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
+      this.poslaniPozdravi.delete(dogadaj.partijaId);
+      this.ocistiEliminacijskeKljuceve(dogadaj.partijaId);
+      // Zakazane reakcije smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
       return;
     }
-    // PR07: bot-čekač nakon „Ne znam” nije naPotezuId — ne planiramo mu potez ni reakciju ispadanja.
-    // Dokazivač (autor) dobiva svjež turnToken u dokaz_nastavka i smije odigrati drugi potez.
     if (dogadaj.izborUToku || !dogadaj.naPotezuId || !dogadaj.trazenaSlova) return;
     const sudionik = dogadaj.sudionici.find((s) => s.igracId === dogadaj.naPotezuId);
     if (!sudionik || sudionik.upravljac !== 'bot' || !sudionik.aktivan) return;
@@ -175,25 +207,14 @@ export class BotKontroler {
       stanjeBota.brojPoteza += 1;
       stanjeBota.zadnjiToken = dogadaj.turnToken;
     }
-    if (dogadaj.kontekst === 'javna' && !stanjeBota.izostanakPotrosen && stanjeBota.ciljIzostanka === stanjeBota.brojPoteza && dogadaj.istekPotezaMs !== null && dogadaj.istekPotezaMs > this.sada() && this.ovisnosti.oznaciNamjerniIstek?.(dogadaj.partijaId, sudionik.igracId, dogadaj.turnToken)) {
-      stanjeBota.izostanakPotrosen = true;
-      this.namjerniIsteci.set(dogadaj.partijaId, dogadaj.turnToken);
-      this.brojaci.namjernihCekanjaIsteka += 1;
-      return;
-    }
 
     const odluka = this.odluci(dogadaj, stanjeBota);
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
-    const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rng, dogadaj.kontekst, {
+    const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rngPrezentacije, dogadaj.kontekst, {
       punoTrajanjeMs: dogadaj.trajanjePotezaMs,
       protekloMs: Math.max(0, this.sada() - dogadaj.pocetakPotezaMs),
-      koeficijentTempa: stanjeBota.koeficijentTempa,
-      brojKandidata: stanjeBota.brojKandidata,
-      // Brzi tempo samo kad stvarno igra kaladont na primljeni ka (ne pri propustu).
-      primljeniKa: odluka.vrsta === 'rijec' && odluka.rijec === 'kaladont' && dogadaj.trazenaSlova === 'ka',
-      ...(odluka.vrsta === 'rijec' ? { brojGrafema: grafemi(odluka.rijec).length, frekvencija: this.ovisnosti.rjecnik.frekvencijaZa(odluka.rijec) } : {}),
     });
-    // Bez roka (testni ONEMOGUCI_TIMER / privatno bez tajmera) ne čekaj udio od 30 s — inače CI testovi isteku.
+    // Bez roka (testni ONEMOGUCI_TIMER / privatno bez tajmera) ne čekaj puna 4 s — inače CI testovi isteku.
     const odgoda = rok === null && dogadaj.kontekst !== 'trening'
       ? Math.min(izracunataOdgoda, 200)
       : izracunataOdgoda;
@@ -225,11 +246,13 @@ export class BotKontroler {
     for (const partijaId of [...this.planirano.keys()]) this.otkaziPlan(partijaId);
     for (const partijaId of [...this.zakazaneReakcije.keys()]) this.otkaziReakcije(partijaId);
     this.stanjaPoPartiji.clear();
-    this.namjerniIsteci.clear();
     this.aktualniPotezi.clear();
     this.dovrseniTokeni.clear();
     this.konfiguracijePartija.clear();
     this.odluke.clear();
+    this.poslaniPozdravi.clear();
+    this.poslaneEliminacijskeReakcije.clear();
+    this.sljedecaReakcijaMs.clear();
   }
 
   brojPlaniranih(): number {
@@ -243,7 +266,7 @@ export class BotKontroler {
       return [{
         partijaId: dogadaj.partijaId,
         igracId: dogadaj.naPotezuId,
-        vrsta: this.namjerniIsteci.get(dogadaj.partijaId) === dogadaj.turnToken ? 'izostanak' : plan?.vrsta ?? null,
+        vrsta: plan?.vrsta ?? null,
         izvrsitiUMs: plan?.izvrsitiUMs ?? null,
         istekPotezaMs: dogadaj.istekPotezaMs,
         verzijaPolitike: this.konfiguracijePartija.get(dogadaj.partijaId)?.verzija ?? null,
@@ -266,7 +289,6 @@ export class BotKontroler {
       ista.verzijaRjecnika = verzijaRjecnika;
       return ista.odluka;
     }
-    // PR07: politika „ka” / dokaza iz snimke; tip sljedećeg (čovjek/bot) namjerno se ne prosljeđuje.
     const odluka = odaberiPotez({
       trazenaSlova: dogadaj.trazenaSlova!,
       kandidati,
@@ -322,7 +344,6 @@ export class BotKontroler {
       this.brojaci.zastarjelo += 1;
       return;
     }
-    // Riječ odbijena iako je bila igriva: rječnik se promijenio ili je indeks neusklađen. Tehnički kvar, ne „ljudski” propust.
     if (odluka.vrsta === 'rijec') odbijene.add(odluka.rijec);
     this.oporavi(dogadaj, igracId, pokusaj, odbijene, new Error(`Botova naredba odbijena: ${rezultat.kod}`));
   }
@@ -397,7 +418,6 @@ export class BotKontroler {
     let stanje = poIgracu.get(igracId);
     if (!stanje) {
       stanje = stvoriStanjeBota(this.konfiguracijePartija.get(partijaId) ?? this.ovisnosti.konfiguracija, this.rng);
-      stanje.koeficijentTempa = koeficijentTempaBota(igracId, this.konfiguracijePartija.get(partijaId) ?? this.ovisnosti.konfiguracija);
       poIgracu.set(igracId, stanje);
     }
     return stanje;
@@ -410,18 +430,53 @@ export class BotKontroler {
     this.planirano.delete(partijaId);
   }
 
+  private kljucReakcijeIgraca(partijaId: string, igracId: string): string {
+    return `${partijaId}:${igracId}`;
+  }
+
   private zakaziReakciju(partijaId: string, igracId: string, poruka: BrzaPoruka): void {
     if (!this.ovisnosti.posaljiReakciju) return;
-    const odgoda = odgodaReakcijeMs(this.rng);
-    const handle = this.zakazi(() => {
+    const konfiguracija = this.konfiguracijePartija.get(partijaId) ?? this.ovisnosti.konfiguracija;
+    const sada = this.sada();
+    const kljucIgraca = this.kljucReakcijeIgraca(partijaId, igracId);
+    const sljedeca = this.sljedecaReakcijaMs.get(kljucIgraca) ?? 0;
+    const bazaOdgode = odgodaReakcijeMs(this.rngPrezentacije, konfiguracija);
+    const cilj = Math.max(sada + bazaOdgode, sljedeca);
+    const odgoda = Math.max(0, cilj - sada);
+    // Rezerviraj slot unaprijed (+mala margina zbog setTimeout kašnjenja); nakon uspješnog emit-a usklađujemo.
+    this.sljedecaReakcijaMs.set(kljucIgraca, cilj + 2_050);
+
+    const ukloniHandle = (handle: NodeJS.Timeout) => {
       const red = this.zakazaneReakcije.get(partijaId);
-      if (red) {
-        const indeks = red.indexOf(handle);
-        if (indeks >= 0) red.splice(indeks, 1);
-        if (red.length === 0) this.zakazaneReakcije.delete(partijaId);
-      }
+      if (!red) return;
+      const indeks = red.indexOf(handle);
+      if (indeks >= 0) red.splice(indeks, 1);
+      if (red.length === 0) this.zakazaneReakcije.delete(partijaId);
+    };
+
+    const pokusajPoslati = (preostaliPokusaji: number) => {
       if (this.zaustavljen) return;
-      this.ovisnosti.posaljiReakciju?.(partijaId, igracId, poruka);
+      const uspjeh = this.ovisnosti.posaljiReakciju?.(partijaId, igracId, poruka);
+      if (uspjeh) {
+        this.brojaci.reakcijaPoslano += 1;
+        this.sljedecaReakcijaMs.set(kljucIgraca, this.sada() + 2_000);
+        return;
+      }
+      if (preostaliPokusaji <= 0) return;
+      // Motor je odbio zbog RS-22 — ponovi nakon punog cooldowna.
+      const retryHandle = this.zakazi(() => {
+        ukloniHandle(retryHandle);
+        pokusajPoslati(preostaliPokusaji - 1);
+      }, 2_000);
+      const red = this.zakazaneReakcije.get(partijaId) ?? [];
+      red.push(retryHandle);
+      this.zakazaneReakcije.set(partijaId, red);
+      this.sljedecaReakcijaMs.set(kljucIgraca, this.sada() + 4_050);
+    };
+
+    const handle = this.zakazi(() => {
+      ukloniHandle(handle);
+      pokusajPoslati(1);
     }, odgoda);
     const red = this.zakazaneReakcije.get(partijaId) ?? [];
     red.push(handle);
@@ -433,5 +488,15 @@ export class BotKontroler {
     if (!red) return;
     for (const handle of red) this.otkazi(handle);
     this.zakazaneReakcije.delete(partijaId);
+  }
+
+  private ocistiEliminacijskeKljuceve(partijaId: string): void {
+    const prefiks = `${partijaId}:`;
+    for (const kljuc of [...this.poslaneEliminacijskeReakcije]) {
+      if (kljuc.startsWith(prefiks)) this.poslaneEliminacijskeReakcije.delete(kljuc);
+    }
+    for (const kljuc of [...this.sljedecaReakcijaMs.keys()]) {
+      if (kljuc.startsWith(prefiks)) this.sljedecaReakcijaMs.delete(kljuc);
+    }
   }
 }

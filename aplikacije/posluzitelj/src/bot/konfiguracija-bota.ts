@@ -5,8 +5,8 @@
 import { z } from 'zod';
 import { PRAGOVI_POPUNE_MS } from '../red/raspored-popune.js';
 
-/** PR06: +tri_igraca pragovi i botoviTroboj. */
-export const VERZIJA_BOT_POLITIKE = 4;
+/** PR01: fiksni tempo 4 s (±jitter), obvezne reakcije, bez namjernog izostanka. */
+export const VERZIJA_BOT_POLITIKE = 5;
 
 export type KategorijaRijeci = 'uobicajena' | 'srednja' | 'rijetka';
 
@@ -15,30 +15,19 @@ export interface KonfiguracijaBota {
   /** Korpusna frekvencija: >= uobicajena je uobičajena, >= srednja je srednja, ostalo (uključujući 0) rijetko. */
   pragFrekvencije: { uobicajena: number; srednja: number };
   marginaRokaMs: number;
+  /** Ciljano trajanje razmišljanja od početka poteza (ms). */
+  trajanjePotezaBotaMs: number;
+  /** Simetrični jitter oko trajanjePotezaBotaMs (ms). */
+  jitterPotezaBotaMs: number;
+  /** Minimalna odgoda reakcije prije slanja (ms); plus nasumično 0–1000 ms. */
+  odgodaReakcijeMinMs: number;
   /** Vjerojatnost da bot ostavi riječ na „ka” kad takva postoji među poznatim kandidatima. */
   vjerojatnostOstavljanjaKa: number;
   /** Vjerojatnost da bot propusti tuđi „ka” i igra običnu riječ umjesto kaladonta. */
   vjerojatnostPropustaKa: number;
   vjerojatnostNeznanjaPoSudjelovanju: number;
-  vjerojatnostIzostankaPoSudjelovanju: number;
-  /** Po botu na početku javne partije: brza poruka `pozdrav` (Bok!). */
-  vjerojatnostReakcijePozdravNaPocetku: number;
-  /** Kad bot eliminira nekoga: brza poruka `sorry` (Nemoj zamjerit). */
-  vjerojatnostReakcijeSorryPriEliminaciji: number;
-  /** Kad bota eliminiraju: brza poruka `dobro-odigrano` (Bravo!); međusobno isključivo s hvala. */
-  vjerojatnostReakcijeBravoPriIspadanju: number;
-  /** Kad bota eliminiraju: brza poruka `najjaci` (Hvala); međusobno isključivo s bravo. */
-  vjerojatnostReakcijeHvalaPriIspadanju: number;
-  treningRazmisljanjeMinMs: number;
-  treningRazmisljanjeMaksMs: number;
-  brziRazvoj: boolean;
-  udioBrzih: number;
-  udioUobicajenih: number;
-  rasponBrzih: readonly [number, number];
-  rasponUobicajenih: readonly [number, number];
-  rasponSporih: readonly [number, number];
-  rasponPotezaIzostanka: readonly [number, number];
   rasponTeskogPotezaNeznanja: readonly [number, number];
+  brziRazvoj: boolean;
   odstupanjaPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
   pragoviPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
   treningOmogucen: boolean;
@@ -50,14 +39,6 @@ export interface KonfiguracijaBota {
   udioImenica: number;
   skalaLogFrekvencije: number;
   ponderDuljinePoGrafemu: number;
-  koeficijentTempaMin: number;
-  koeficijentTempaMaks: number;
-  korekcijaDuljinePoGrafemu: number;
-  maksimalnaKorekcijaDuljine: number;
-  korekcijaRijetkosti: number;
-  korekcijaTeskogPrefiksa: number;
-  minimalniUdioPoteza: number;
-  maksimalniUdioPoteza: number;
   maksimalnoAktivnihBotova: number;
   maksimalnoOporavakaBota: number;
   odmaciOporavkaBotaMs: readonly number[];
@@ -69,28 +50,43 @@ export interface KonfiguracijaBota {
   odmaciPonovnogPokretanjaRedaMs: readonly number[];
 }
 
+/** Stara polja v3/v4 koja se pri migraciji tiho odbacuju. */
+export const ZASTARJELA_POLJA_BOT_POLITIKE = [
+  'vjerojatnostIzostankaPoSudjelovanju',
+  'vjerojatnostReakcijePozdravNaPocetku',
+  'vjerojatnostReakcijeSorryPriEliminaciji',
+  'vjerojatnostReakcijeBravoPriIspadanju',
+  'vjerojatnostReakcijeHvalaPriIspadanju',
+  'treningRazmisljanjeMinMs',
+  'treningRazmisljanjeMaksMs',
+  'udioBrzih',
+  'udioUobicajenih',
+  'rasponBrzih',
+  'rasponUobicajenih',
+  'rasponSporih',
+  'rasponPotezaIzostanka',
+  'koeficijentTempaMin',
+  'koeficijentTempaMaks',
+  'korekcijaDuljinePoGrafemu',
+  'maksimalnaKorekcijaDuljine',
+  'korekcijaRijetkosti',
+  'korekcijaTeskogPrefiksa',
+  'minimalniUdioPoteza',
+  'maksimalniUdioPoteza',
+] as const;
+
 export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   verzija: VERZIJA_BOT_POLITIKE,
   pragFrekvencije: { uobicajena: 100, srednja: 10 },
   marginaRokaMs: 1_500,
+  trajanjePotezaBotaMs: 4_000,
+  jitterPotezaBotaMs: 300,
+  odgodaReakcijeMinMs: 2_000,
   vjerojatnostOstavljanjaKa: 0.015,
   vjerojatnostPropustaKa: 0.08,
   vjerojatnostNeznanjaPoSudjelovanju: 0.2,
-  vjerojatnostIzostankaPoSudjelovanju: 0.02,
-  vjerojatnostReakcijePozdravNaPocetku: 0.2,
-  vjerojatnostReakcijeSorryPriEliminaciji: 0.3,
-  vjerojatnostReakcijeBravoPriIspadanju: 0.1,
-  vjerojatnostReakcijeHvalaPriIspadanju: 0.05,
-  treningRazmisljanjeMinMs: 1_000,
-  treningRazmisljanjeMaksMs: 3_000,
-  brziRazvoj: false,
-  udioBrzih: 0.2,
-  udioUobicajenih: 0.65,
-  rasponBrzih: [0.08, 0.2],
-  rasponUobicajenih: [0.2, 0.55],
-  rasponSporih: [0.55, 0.85],
-  rasponPotezaIzostanka: [2, 12],
   rasponTeskogPotezaNeznanja: [1, 3],
+  brziRazvoj: false,
   odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [3_000, 3_000], cetiri_igraca: [3_000, 3_000, 3_000] },
   pragoviPopuneMs: structuredClone(PRAGOVI_POPUNE_MS),
   treningOmogucen: true,
@@ -102,14 +98,6 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   udioImenica: 0.9,
   skalaLogFrekvencije: 1,
   ponderDuljinePoGrafemu: 0.1,
-  koeficijentTempaMin: 0.9,
-  koeficijentTempaMaks: 1.1,
-  korekcijaDuljinePoGrafemu: 0.005,
-  maksimalnaKorekcijaDuljine: 0.05,
-  korekcijaRijetkosti: 0.03,
-  korekcijaTeskogPrefiksa: 0.015,
-  minimalniUdioPoteza: 0.08,
-  maksimalniUdioPoteza: 0.85,
   maksimalnoAktivnihBotova: 100,
   maksimalnoOporavakaBota: 2,
   odmaciOporavkaBotaMs: [100, 200],
@@ -122,10 +110,8 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
 };
 
 const Vjerojatnost = z.number().finite().min(0).max(1);
-const UdioPoteza = z.number().finite().min(0.01).max(0.99);
 const Vrijeme = z.number().int().min(0).max(300_000);
 const BrojPoteza = z.number().int().min(1).max(100);
-const Raspon = z.tuple([UdioPoteza, UdioPoteza]).refine(([od, doVrijednosti]) => od <= doVrijednosti, 'Početak raspona mora biti manji od kraja.');
 const RasponPoteza = z.tuple([BrojPoteza, BrojPoteza]).refine(([od, doVrijednosti]) => od <= doVrijednosti, 'Početak raspona mora biti manji od kraja.');
 const Pragovi = z.object({
   dva_igraca: z.tuple([Vrijeme]),
@@ -137,24 +123,14 @@ export const ShemaKonfiguracijeBota = z.object({
   verzija: z.literal(VERZIJA_BOT_POLITIKE),
   pragFrekvencije: z.object({ uobicajena: z.number().int().min(0).max(2_000_000_000), srednja: z.number().int().min(0).max(2_000_000_000) }).strict(),
   marginaRokaMs: z.number().int().min(150).max(1_500),
+  trajanjePotezaBotaMs: z.number().int().min(500).max(30_000),
+  jitterPotezaBotaMs: z.number().int().min(0).max(2_000),
+  odgodaReakcijeMinMs: z.number().int().min(0).max(10_000),
   vjerojatnostOstavljanjaKa: Vjerojatnost,
   vjerojatnostPropustaKa: Vjerojatnost.default(0.08),
   vjerojatnostNeznanjaPoSudjelovanju: Vjerojatnost,
-  vjerojatnostIzostankaPoSudjelovanju: Vjerojatnost,
-  vjerojatnostReakcijePozdravNaPocetku: Vjerojatnost,
-  vjerojatnostReakcijeSorryPriEliminaciji: Vjerojatnost,
-  vjerojatnostReakcijeBravoPriIspadanju: Vjerojatnost,
-  vjerojatnostReakcijeHvalaPriIspadanju: Vjerojatnost,
-  treningRazmisljanjeMinMs: z.number().int().min(100).max(30_000),
-  treningRazmisljanjeMaksMs: z.number().int().min(100).max(30_000),
-  brziRazvoj: z.boolean(),
-  udioBrzih: Vjerojatnost,
-  udioUobicajenih: Vjerojatnost,
-  rasponBrzih: Raspon,
-  rasponUobicajenih: Raspon,
-  rasponSporih: Raspon,
-  rasponPotezaIzostanka: RasponPoteza,
   rasponTeskogPotezaNeznanja: RasponPoteza,
+  brziRazvoj: z.boolean(),
   odstupanjaPopuneMs: Pragovi,
   pragoviPopuneMs: Pragovi,
   treningOmogucen: z.boolean(),
@@ -166,14 +142,6 @@ export const ShemaKonfiguracijeBota = z.object({
   udioImenica: Vjerojatnost,
   skalaLogFrekvencije: z.number().finite().min(0).max(10),
   ponderDuljinePoGrafemu: z.number().finite().min(0).max(2),
-  koeficijentTempaMin: z.number().finite().min(0.5).max(1.5),
-  koeficijentTempaMaks: z.number().finite().min(0.5).max(1.5),
-  korekcijaDuljinePoGrafemu: z.number().finite().min(0).max(0.02),
-  maksimalnaKorekcijaDuljine: z.number().finite().min(0).max(0.15),
-  korekcijaRijetkosti: z.number().finite().min(0).max(0.15),
-  korekcijaTeskogPrefiksa: z.number().finite().min(0).max(0.15),
-  minimalniUdioPoteza: UdioPoteza,
-  maksimalniUdioPoteza: UdioPoteza,
   maksimalnoAktivnihBotova: z.number().int().min(1).max(100),
   maksimalnoOporavakaBota: z.number().int().min(0).max(5),
   odmaciOporavkaBotaMs: z.array(z.number().int().min(10).max(5_000)).max(5),
@@ -185,17 +153,10 @@ export const ShemaKonfiguracijeBota = z.object({
   odmaciPonovnogPokretanjaRedaMs: z.array(z.number().int().min(100).max(60_000)).min(1).max(10),
 }).strict().superRefine((postavke, provjera) => {
   const pogreska = (polje: string, poruka: string) => provjera.addIssue({ code: z.ZodIssueCode.custom, path: [polje], message: poruka });
-  if (postavke.udioBrzih + postavke.udioUobicajenih > 1) pogreska('udioUobicajenih', 'Ukupan udio ne smije prelaziti 100 %.');
-  if (postavke.koeficijentTempaMin > postavke.koeficijentTempaMaks) pogreska('koeficijentTempaMaks', 'Gornja granica osobnog tempa mora biti veća ili jednaka donjoj.');
-  if (postavke.minimalniUdioPoteza > postavke.maksimalniUdioPoteza) pogreska('maksimalniUdioPoteza', 'Najveći udio mora biti veći ili jednak najmanjem.');
   if (postavke.odmaciOporavkaBotaMs.length < postavke.maksimalnoOporavakaBota) pogreska('odmaciOporavkaBotaMs', 'Za svaki oporavak mora postojati odmak.');
-  if (postavke.treningRazmisljanjeMinMs > postavke.treningRazmisljanjeMaksMs) pogreska('treningRazmisljanjeMaksMs', 'Najveće vrijeme ne smije biti manje od najmanjeg.');
   if (postavke.treningUpozorenjeNeaktivnostiMs >= postavke.treningZatvaranjeNeaktivnostiMs) pogreska('treningZatvaranjeNeaktivnostiMs', 'Zatvaranje mora biti nakon upozorenja.');
   if (postavke.pragFrekvencije.srednja > postavke.pragFrekvencije.uobicajena) pogreska('pragFrekvencije', 'Srednji prag ne smije prelaziti uobičajeni.');
-  if (postavke.vjerojatnostReakcijeBravoPriIspadanju + postavke.vjerojatnostReakcijeHvalaPriIspadanju > 1) {
-    pogreska('vjerojatnostReakcijeHvalaPriIspadanju', 'Ukupna vjerojatnost reakcija pri ispadanju ne smije prelaziti 100 %.');
-  }
-  if (postavke.rasponBrzih[1] > postavke.rasponUobicajenih[0] || postavke.rasponUobicajenih[1] > postavke.rasponSporih[0]) pogreska('rasponUobicajenih', 'Rasponi kategorija moraju biti poredani.');
+  if (postavke.jitterPotezaBotaMs > postavke.trajanjePotezaBotaMs) pogreska('jitterPotezaBotaMs', 'Jitter ne smije prelaziti trajanje poteza.');
   for (const mod of ['dva_igraca', 'tri_igraca', 'cetiri_igraca'] as const) {
     const pragovi = postavke.pragoviPopuneMs[mod];
     if (pragovi.some((prag, indeks) => prag < postavke.odstupanjaPopuneMs[mod][indeks]! || (indeks > 0 && prag < pragovi[indeks - 1]!))) pogreska('pragoviPopuneMs', 'Pragovi moraju biti poredani i barem jednaki odstupanju.');
@@ -219,6 +180,5 @@ export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): K
     vjerojatnostOstavljanjaKa: postotak(env.BOT_VJEROJATNOST_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa),
     vjerojatnostPropustaKa: postotak(env.BOT_VJEROJATNOST_PROPUSTA_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropustaKa),
     vjerojatnostNeznanjaPoSudjelovanju: postotak(env.BOT_NEZNANJE_PO_SUDJELOVANJU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostNeznanjaPoSudjelovanju),
-    vjerojatnostIzostankaPoSudjelovanju: lokalnoTestiranje ? 0 : postotak(env.BOT_IZOSTANAK_PO_SUDJELOVANJU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostIzostankaPoSudjelovanju),
   };
 }

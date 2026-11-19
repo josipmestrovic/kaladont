@@ -99,7 +99,7 @@ import { mapirajVrstuRacuna, zabiljeziKrajIgre, zabiljeziPocetakIgre } from '../
 const ShemaPotezRijec = z.object({ rijec: z.string().min(1).max(50), turnToken: z.string().min(1).max(64).optional() }).strict();
 const ShemaNeznam = z.object({ turnToken: z.string().min(1).max(64).optional() }).strict().optional();
 const ShemaTreningNastavi = z.object({}).strict();
-const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) }).strict();
+const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) }).strict(); // ljudski picker; botovi smiju i micro-flavour kodove
 
 const TRAJANJE_POTEZA_MS = konfiguracija.TRAJANJE_POTEZA_MS;
 const TRAJANJE_IZBORA_SUSTAVA_MS = 8_000;
@@ -152,15 +152,16 @@ export interface PostavkeMotoraPartije {
   naPrivatnaPartijaZavrsila?: (kodSobe: string, partijaId: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => void;
   /** Poziva se pri svakoj promjeni poteza, otvaranju runde i kraju; koristi ga bot kontroler. */
   naPromjenuPoteza?: (dogadaj: DogadajPoteza) => void;
-  /** Javni početak partije: bot kontroler može zakazati pozdrave. */
+  /** Početak partije: bot kontroler zakazuje obvezne pozdrave (svi konteksti). */
   naPocetakPartijeZaBotove?: (partijaId: string, kontekst: KontekstPartije, botIds: readonly string[]) => void;
-  /** Nakon eliminacije: bot kontroler može zakazati sorry / bravo / hvala. */
+  /** Nakon eliminacije: bot kontroler zakazuje sorry / bravo poolove. */
   naEliminacijuZaBotove?: (
     partijaId: string,
     kontekst: KontekstPartije,
     zrtvaId: string,
     bodZaId: string | null,
     sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot' }[],
+    eliminacijaId: string,
   ) => void;
   maksimalnoAktivnihTreninga?: number;
   dohvatiRokoveNeaktivnostiTreninga?: () => { upozorenjeMs: number; zatvaranjeMs: number };
@@ -2034,12 +2035,14 @@ export function stvoriUpraviteljPartija(
     stanje.eliminacije.push(poruka);
     upisiPotvrdjeniRaniPoraz(stanje, igracId, plasman, razlog);
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', poruka);
+    const eliminacijaId = `${stanje.partijaId}:${stanje.eliminacije.length}`;
     postavke.naEliminacijuZaBotove?.(
       stanje.partijaId,
       stanje.kontekst,
       igracId,
       napadac,
       stanje.sudionici.map((s) => ({ igracId: s.igracId, upravljac: s.upravljac })),
+      eliminacijaId,
     );
 
     if (stanje.politika.dajeNapredak && razlog !== 'prekid') {
@@ -3228,6 +3231,11 @@ export function stvoriUpraviteljPartija(
     for (const s of sudionici) {
       aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
     }
+    postavke.naPocetakPartijeZaBotove?.(
+      partijaId,
+      'privatna',
+      sudionici.filter((s) => s.upravljac === 'bot').map((s) => s.igracId),
+    );
     zabiljeziAnalitikuPocetka(stanje);
 
     void Promise.all([upisPocetkaPrivatnePartije, ucitajOtkljucaneGrupe(sudionici), ucitajGrupeZaDostignuca(sudionici)]).then(([, grupe, grupeDostignuca]) => {

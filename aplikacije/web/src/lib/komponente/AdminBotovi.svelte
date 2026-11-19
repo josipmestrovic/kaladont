@@ -8,24 +8,14 @@
     verzija: number;
     pragFrekvencije: { uobicajena: number; srednja: number };
     marginaRokaMs: number;
+    trajanjePotezaBotaMs: number;
+    jitterPotezaBotaMs: number;
+    odgodaReakcijeMinMs: number;
     vjerojatnostOstavljanjaKa: number;
     vjerojatnostPropustaKa: number;
     vjerojatnostNeznanjaPoSudjelovanju: number;
-    vjerojatnostIzostankaPoSudjelovanju: number;
-    vjerojatnostReakcijePozdravNaPocetku: number;
-    vjerojatnostReakcijeSorryPriEliminaciji: number;
-    vjerojatnostReakcijeBravoPriIspadanju: number;
-    vjerojatnostReakcijeHvalaPriIspadanju: number;
-    treningRazmisljanjeMinMs: number;
-    treningRazmisljanjeMaksMs: number;
-    brziRazvoj: boolean;
-    udioBrzih: number;
-    udioUobicajenih: number;
-    rasponBrzih: Raspon;
-    rasponUobicajenih: Raspon;
-    rasponSporih: Raspon;
-    rasponPotezaIzostanka: Raspon;
     rasponTeskogPotezaNeznanja: Raspon;
+    brziRazvoj: boolean;
     odstupanjaPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
     pragoviPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
     treningOmogucen: boolean;
@@ -37,14 +27,6 @@
     udioImenica: number;
     skalaLogFrekvencije: number;
     ponderDuljinePoGrafemu: number;
-    koeficijentTempaMin: number;
-    koeficijentTempaMaks: number;
-    korekcijaDuljinePoGrafemu: number;
-    maksimalnaKorekcijaDuljine: number;
-    korekcijaRijetkosti: number;
-    korekcijaTeskogPrefiksa: number;
-    minimalniUdioPoteza: number;
-    maksimalniUdioPoteza: number;
     maksimalnoAktivnihBotova: number;
     maksimalnoOporavakaBota: number;
     odmaciOporavkaBotaMs: number[];
@@ -221,29 +203,11 @@
           <label><input type="checkbox" bind:checked={nacrt.botoviCetveroboj} /> Botovi u Četveroboju</label>
           {#if zapis.brziRazvojDopusten}<label><input type="checkbox" bind:checked={nacrt.brziRazvoj} /> Brzi lokalni razvoj</label>{/if}
         </fieldset>
-        <fieldset><legend>Javni tempo</legend>
+        <fieldset><legend>Tempo i reakcije</legend>
+          <p class="napomena">Potez bota: {(nacrt.trajanjePotezaBotaMs / 1000).toLocaleString('hr-HR', { maximumFractionDigits: 1 })} s (±{(nacrt.jitterPotezaBotaMs / 1000).toLocaleString('hr-HR', { maximumFractionDigits: 1 })} s). Reakcije su obvezne (pool poruka) u javnim, privatnim i trening partijama. Namjerni izostanak je isključen.</p>
           <div class="polja">
-            <label>Brzi odgovori<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.udioBrzih} /><span>{postotak(nacrt.udioBrzih)}</span></label>
-            <label>Uobičajeni odgovori<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.udioUobicajenih} /><span>{postotak(nacrt.udioUobicajenih)}</span></label>
-            <label>Spori odgovori<input readonly value={postotak(Math.max(0, 1 - nacrt.udioBrzih - nacrt.udioUobicajenih))} /></label>
-            <label>Brzi raspon poteza<input type="number" min="0.08" max="0.85" step="0.01" bind:value={nacrt.rasponBrzih[0]} /><input aria-label="Brzi raspon do" type="number" min="0.08" max="0.85" step="0.01" bind:value={nacrt.rasponBrzih[1]} /></label>
-            <label>Uobičajeni raspon poteza<input type="number" min="0.08" max="0.85" step="0.01" bind:value={nacrt.rasponUobicajenih[0]} /><input aria-label="Uobičajeni raspon do" type="number" min="0.08" max="0.85" step="0.01" bind:value={nacrt.rasponUobicajenih[1]} /></label>
-            <label>Spori raspon poteza<input type="number" min="0.08" max="0.85" step="0.01" bind:value={nacrt.rasponSporih[0]} /><input aria-label="Spori raspon do" type="number" min="0.08" max="0.85" step="0.01" bind:value={nacrt.rasponSporih[1]} /></label>
-            <label>Trening odgovor min. (ms)<input type="number" min="100" max="30000" step="100" bind:value={nacrt.treningRazmisljanjeMinMs} /></label>
-            <label>Trening odgovor maks. (ms)<input type="number" min="100" max="30000" step="100" bind:value={nacrt.treningRazmisljanjeMaksMs} /></label>
             <label>Sigurnosna margina (ms)<input type="number" min="150" max="1500" step="50" bind:value={nacrt.marginaRokaMs} /></label>
-            <label>Osobni tempo od<input type="number" min="0.5" max="1.5" step="0.01" bind:value={nacrt.koeficijentTempaMin} /></label>
-            <label>Osobni tempo do<input type="number" min="0.5" max="1.5" step="0.01" bind:value={nacrt.koeficijentTempaMaks} /></label>
-            <label>Najmanji udio poteza<input type="number" min="0.01" max="0.99" step="0.01" bind:value={nacrt.minimalniUdioPoteza} /></label>
-            <label>Najveći udio poteza<input type="number" min="0.01" max="0.99" step="0.01" bind:value={nacrt.maksimalniUdioPoteza} /></label>
-          </div>
-        </fieldset>
-        <fieldset><legend>Brze poruke</legend>
-          <div class="polja">
-            <label>Pozdrav na početku<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostReakcijePozdravNaPocetku} /><span>{postotak(nacrt.vjerojatnostReakcijePozdravNaPocetku)}</span></label>
-            <label>„Nemoj zamjerit” pri eliminaciji<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostReakcijeSorryPriEliminaciji} /><span>{postotak(nacrt.vjerojatnostReakcijeSorryPriEliminaciji)}</span></label>
-            <label>„Bravo” pri ispadanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostReakcijeBravoPriIspadanju} /><span>{postotak(nacrt.vjerojatnostReakcijeBravoPriIspadanju)}</span></label>
-            <label>„Hvala” pri ispadanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostReakcijeHvalaPriIspadanju} /><span>{postotak(nacrt.vjerojatnostReakcijeHvalaPriIspadanju)}</span></label>
+            <label>Odgoda reakcije min. (ms)<input type="number" min="0" max="10000" step="100" bind:value={nacrt.odgodaReakcijeMinMs} /></label>
           </div>
         </fieldset>
         <fieldset><legend>Izbor riječi i prilike</legend>
@@ -253,16 +217,10 @@
             <label>Udio imenica<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.udioImenica} /><span>{postotak(nacrt.udioImenica)}</span></label>
             <label>Skala log frekvencije<input type="number" min="0" max="10" step="0.1" bind:value={nacrt.skalaLogFrekvencije} /></label>
             <label>Ponder duljine po slovu<input type="number" min="0" max="2" step="0.01" bind:value={nacrt.ponderDuljinePoGrafemu} /></label>
-            <label>Korekcija duljine po slovu<input type="number" min="0" max="0.02" step="0.001" bind:value={nacrt.korekcijaDuljinePoGrafemu} /></label>
-            <label>Najveća korekcija duljine<input type="number" min="0" max="0.15" step="0.01" bind:value={nacrt.maksimalnaKorekcijaDuljine} /></label>
-            <label>Korekcija rijetke riječi<input type="number" min="0" max="0.15" step="0.01" bind:value={nacrt.korekcijaRijetkosti} /></label>
-            <label>Korekcija teškog prefiksa<input type="number" min="0" max="0.15" step="0.005" bind:value={nacrt.korekcijaTeskogPrefiksa} /></label>
             <label>Dobrovoljni KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostOstavljanjaKa} /><span>{postotak(nacrt.vjerojatnostOstavljanjaKa)}</span></label>
             <label>Propust tuđeg KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostPropustaKa} /><span>{postotak(nacrt.vjerojatnostPropustaKa)}</span></label>
             <label>Prilika „Ne znam” po sudjelovanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostNeznanjaPoSudjelovanju} /><span>{postotak(nacrt.vjerojatnostNeznanjaPoSudjelovanju)}</span></label>
-            <label>Prilika izostanka po sudjelovanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostIzostankaPoSudjelovanju} /><span>{postotak(nacrt.vjerojatnostIzostankaPoSudjelovanju)}</span></label>
             <label>Teški potez za „Ne znam” od<input type="number" min="1" max="100" bind:value={nacrt.rasponTeskogPotezaNeznanja[0]} /><input aria-label="Teški potez za ne znam do" type="number" min="1" max="100" bind:value={nacrt.rasponTeskogPotezaNeznanja[1]} /></label>
-            <label>Vlastiti potez za izostanak od<input type="number" min="1" max="100" bind:value={nacrt.rasponPotezaIzostanka[0]} /><input aria-label="Vlastiti potez za izostanak do" type="number" min="1" max="100" bind:value={nacrt.rasponPotezaIzostanka[1]} /></label>
           </div>
         </fieldset>
         <fieldset><legend>Popuna javnog reda</legend>
@@ -362,6 +320,7 @@
   .diff code { white-space:pre-wrap; }
   .greska { color:#a03020; }
   .poruka { padding:10px 12px; background:#eef6f2; border-left:3px solid #24735e; }
+  .napomena { margin:0 0 12px; color:var(--boja-tekst-sporedni, #4a5560); font-size:0.95rem; line-height:1.4; }
   .fond { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin:16px 0; }
   .fond div { padding:10px 12px; background:#f5f6f5; border-radius:4px; }
   .fond dt { color:#666; font-size:12px; }
