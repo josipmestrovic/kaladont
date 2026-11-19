@@ -122,10 +122,11 @@ export class PredmemorijaLegalnosti {
 }
 
 /**
- * ReadonlySet pogled: bazne potrošene grupe snimke + dodatne grupe hipotetske riječi.
+ * Pogled na bazne potrošene grupe + dodatne grupe hipotetske riječi.
  * Izbjegava `new Set(iskoristene)` po kandidatu; `has` gleda oba izvora.
+ * Namjerno nije `implements ReadonlySet` (TS SetIterator vs IterableIterator).
  */
-export class SlozeneIskoristeneGrupe implements ReadonlySet<string> {
+export class SlozeneIskoristeneGrupe {
   constructor(
     private readonly baza: ReadonlySet<string>,
     private readonly dodatne: readonly string[],
@@ -143,27 +144,9 @@ export class SlozeneIskoristeneGrupe implements ReadonlySet<string> {
     return n;
   }
 
-  keys(): IterableIterator<string> {
-    return this[Symbol.iterator]();
-  }
-
-  values(): IterableIterator<string> {
-    return this[Symbol.iterator]();
-  }
-
-  *entries(): IterableIterator<[string, string]> {
-    for (const grupa of this) yield [grupa, grupa];
-  }
-
-  forEach(callbackfn: (value: string, value2: string, set: ReadonlySet<string>) => void, thisArg?: unknown): void {
-    for (const grupa of this) callbackfn.call(thisArg, grupa, grupa, this);
-  }
-
-  *[Symbol.iterator](): IterableIterator<string> {
-    yield* this.baza;
-    for (const grupa of this.dodatne) {
-      if (!this.baza.has(grupa)) yield grupa;
-    }
+  /** Za rječničke API-je koji očekuju ReadonlySet (koriste samo `has`). */
+  kaoReadonlySet(): ReadonlySet<string> {
+    return this as unknown as ReadonlySet<string>;
   }
 }
 
@@ -253,7 +236,7 @@ export function jeNepoznataBotu(rijec: string, frekvencija: number | null): bool
 
 function dodajGrupe(iskoristene: ReadonlySet<string>, grupe: readonly string[]): ReadonlySet<string> {
   if (grupe.length === 0) return iskoristene;
-  return new SlozeneIskoristeneGrupe(iskoristene, grupe);
+  return new SlozeneIskoristeneGrupe(iskoristene, grupe).kaoReadonlySet();
 }
 
 /** Zadrži samo odluku za aktualni token — ne akumuliraj povijest partije. */
