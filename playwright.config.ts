@@ -9,8 +9,19 @@ export default defineConfig({
   expect: { timeout: 5_000 },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
+  // CI shardovi: blob (spaja e2e-izvjestaj job). Lokalno: list.
+  // ONEMOGUCI_TIMER_POTEZA ostaje true u webServer envu — namjerno za glavni E2E.
   reporter: process.env.CI
-    ? [['dot'], ['html', { open: 'never', outputFolder: 'playwright-report-e2e' }]]
+    ? [
+        ['dot'],
+        [
+          'blob',
+          {
+            outputDir: 'blob-report',
+            fileName: `report-${process.env.E2E_SHARD ?? 'full'}.zip`,
+          },
+        ],
+      ]
     : 'list',
   outputDir: 'test-results/e2e',
   use: {
