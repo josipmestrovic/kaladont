@@ -13,6 +13,7 @@ import type { KonfiguracijaBota } from './konfiguracija-bota.js';
 import {
   jeNepoznataBotu,
   odaberiPotez,
+  odaberiPotezNastavivo,
   odgodaBezRokaMs,
   PredmemorijaLegalnosti,
   stvoriStanjeBota,
@@ -21,6 +22,7 @@ import {
   type Rng,
   type StanjeBotaUPartiji,
 } from './odabir-rijeci.js';
+import { CHECKPOINT_ZAPISA, predajSetImmediate } from './raspored-odziva.js';
 import {
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
@@ -46,6 +48,8 @@ export interface OvisnostiBotKontrolera {
   sada?: () => number;
   zakazi?: (posao: () => void, ms: number) => NodeJS.Timeout;
   otkazi?: (handle: NodeJS.Timeout) => void;
+  /** Predaja event loopa tijekom nastavivog odabira (testovi mogu ubrizgati brojač). */
+  predajKontrolu?: () => Promise<void>;
   zapisi?: (poruka: string, podaci: Record<string, unknown>) => void;
   dohvatiPotez?: (partijaId: string) => DogadajPoteza | null;
   prekiniZbogGreske?: (partijaId: string, igracId: string, turnToken: string) => void;
@@ -71,11 +75,18 @@ export interface BrojaciBota {
 }
 
 interface PlaniranaAkcija {
-  handle: NodeJS.Timeout;
+  handle: NodeJS.Timeout | null;
   igracId: string;
   turnToken: string;
   izvrsitiUMs: number;
-  vrsta: 'rijec' | 'odustani' | 'oporavak';
+  /** null dok odluka još nije izračunata. */
+  vrsta: 'rijec' | 'odustani' | 'oporavak' | null;
+  /** Generacija posla — stari async rezultat ne smije dira noviji plan. */
+  generacija: number;
+  odluka?: OdlukaBota;
+  odgodaIstekla?: boolean;
+  snimkaGrupa?: ReadonlySet<string>;
+  verzijaRjecnika?: number;
 }
 
 type KategorijaReakcije = 'pozdrav' | 'sorry' | 'bravo';
@@ -99,9 +110,11 @@ export class BotKontroler {
   private readonly sada: () => number;
   private readonly zakazi: (posao: () => void, ms: number) => NodeJS.Timeout;
   private readonly otkazi: (handle: NodeJS.Timeout) => void;
+  private readonly predajKontrolu: () => Promise<void>;
   private readonly zapisi: (poruka: string, podaci: Record<string, unknown>) => void;
   private readonly okruzenje: string;
   private zaustavljen = false;
+  private generacijaPosla = 0;
   readonly brojaci: BrojaciBota = {
     planirano: 0,
     odigranihRijeci: 0,
@@ -123,6 +136,7 @@ export class BotKontroler {
     this.sada = ovisnosti.sada ?? Date.now;
     this.zakazi = ovisnosti.zakazi ?? ((posao, ms) => setTimeout(posao, ms));
     this.otkazi = ovisnosti.otkazi ?? ((handle) => clearTimeout(handle));
+    this.predajKontrolu = ovisnosti.predajKontrolu ?? predajSetImmediate;
     this.zapisi = ovisnosti.zapisi ?? (() => undefined);
     this.okruzenje = ovisnosti.okruzenje ?? process.env.NODE_ENV ?? 'development';
   }
@@ -217,6 +231,8 @@ export class BotKontroler {
       // Zakazane reakcije smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
       return;
     }
+    // Novi token (i kad je na redu čovjek) oslobađa cache prethodnog poteza.
+    this.predmemorijaZa(dogadaj.partijaId).uskladiKontekst(dogadaj.turnToken, this.ovisnosti.rjecnik.verzijaRjecnika());
     if (dogadaj.izborUToku || !dogadaj.naPotezuId || !dogadaj.trazenaSlova) return;
     const sudionik = dogadaj.sudionici.find((s) => s.igracId === dogadaj.naPotezuId);
     if (!sudionik || sudionik.upravljac !== 'bot' || !sudionik.aktivan) return;
@@ -228,13 +244,12 @@ export class BotKontroler {
       stanjeBota.zadnjiToken = dogadaj.turnToken;
     }
 
-    const odluka = this.odluci(dogadaj, stanjeBota);
+    // Računanje tijekom prozora razmišljanja (ne sinkrono ovdje) — Socket.IO može flushati prije CPU-a.
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
     const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rngPrezentacije, dogadaj.kontekst, {
       punoTrajanjeMs: dogadaj.trajanjePotezaMs,
       protekloMs: Math.max(0, this.sada() - dogadaj.pocetakPotezaMs),
     });
-    // Bez roka: staging QA 3 s s ljudima / 0,2 s bez njih; CI i privatno bez tajmera ostaju brzi.
     const odgoda = rok === null
       ? odgodaBezRokaMs(izracunataOdgoda, {
         kontekst: dogadaj.kontekst,
@@ -242,27 +257,120 @@ export class BotKontroler {
         okruzenje: this.okruzenje,
       })
       : izracunataOdgoda;
-    const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const turnToken = dogadaj.turnToken;
+    const generacija = ++this.generacijaPosla;
+    const snimkaGrupa: ReadonlySet<string> = new Set(dogadaj.iskoristeneGrupe);
+    const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
+
     const handle = this.zakazi(() => {
       const plan = this.planirano.get(dogadaj.partijaId);
-      if (!plan || plan.turnToken !== turnToken || plan.igracId !== sudionik.igracId) {
+      if (!plan || plan.generacija !== generacija || plan.turnToken !== turnToken || plan.igracId !== sudionik.igracId) {
         this.brojaci.zastarjelo += 1;
         return;
       }
-      this.planirano.delete(dogadaj.partijaId);
+      plan.odgodaIstekla = true;
+      plan.handle = null;
       try {
-        const aktualni = this.aktualni(dogadaj, sudionik.igracId);
-        if (!aktualni) { this.brojaci.zastarjelo += 1; return; }
-        const svjezaOdluka = this.ovisnosti.rjecnik.verzijaRjecnika() === verzijaRjecnika ? odluka : this.odluci(aktualni, stanjeBota);
-        this.izvrsi(aktualni, sudionik.igracId, turnToken, svjezaOdluka, 0, new Set());
+        // Ako nastavivi izračun još nije gotov (kratka odgoda / testovi), sinkroni fallback.
+        if (!plan.odluka) {
+          const aktualni = this.aktualni(dogadaj, sudionik.igracId);
+          if (!aktualni) { this.brojaci.zastarjelo += 1; this.planirano.delete(dogadaj.partijaId); return; }
+          plan.odluka = this.odluci(aktualni, stanjeBota);
+          plan.vrsta = plan.odluka.vrsta;
+        }
+        this.pokusajIzvrsitiPlan(dogadaj.partijaId, dogadaj, sudionik.igracId, stanjeBota);
       } catch (greska) {
+        this.planirano.delete(dogadaj.partijaId);
         this.oporavi(dogadaj, sudionik.igracId, 0, new Set(), greska);
       }
     }, odgoda);
-    this.planirano.set(dogadaj.partijaId, { handle, igracId: sudionik.igracId, turnToken, izvrsitiUMs: this.sada() + odgoda, vrsta: odluka.vrsta });
+
+    this.planirano.set(dogadaj.partijaId, {
+      handle,
+      igracId: sudionik.igracId,
+      turnToken,
+      izvrsitiUMs: this.sada() + odgoda,
+      vrsta: null,
+      generacija,
+      snimkaGrupa,
+      verzijaRjecnika,
+      odgodaIstekla: false,
+    });
     this.ovisnosti.naAktivnost?.(sudionik.igracId);
     this.brojaci.planirano += 1;
+
+    // Odmah pokreni nastavivi izračun (overlap s odgodom razmišljanja).
+    void this.izracunajPlanNastavivo(dogadaj.partijaId, dogadaj, sudionik.igracId, stanjeBota, generacija, snimkaGrupa);
+  }
+
+  private jeAktualanPlan(partijaId: string, generacija: number, turnToken: string, igracId: string): boolean {
+    if (this.zaustavljen) return false;
+    const plan = this.planirano.get(partijaId);
+    return !!plan && plan.generacija === generacija && plan.turnToken === turnToken && plan.igracId === igracId;
+  }
+
+  private async izracunajPlanNastavivo(
+    partijaId: string,
+    dogadaj: DogadajPoteza,
+    igracId: string,
+    stanjeBota: StanjeBotaUPartiji,
+    generacija: number,
+    snimkaGrupa: ReadonlySet<string>,
+  ): Promise<void> {
+    const aktivan = () => this.jeAktualanPlan(partijaId, generacija, dogadaj.turnToken, igracId);
+    try {
+      const odluka = await this.odluciNastavivo(dogadaj, stanjeBota, snimkaGrupa, aktivan);
+      if (!odluka || !aktivan()) return;
+      const plan = this.planirano.get(partijaId);
+      if (!plan || plan.generacija !== generacija) return;
+      // Timer je možda već napravio sync fallback — ne prepisuj izvršeno.
+      if (!plan.odluka) {
+        plan.odluka = odluka;
+        plan.vrsta = odluka.vrsta;
+      }
+      this.pokusajIzvrsitiPlan(partijaId, dogadaj, igracId, stanjeBota);
+    } catch (greska) {
+      if (!aktivan()) return;
+      // Ako timer još nije pao, prepusti mu sync put; inače oporavak.
+      const plan = this.planirano.get(partijaId);
+      if (plan?.odgodaIstekla) {
+        this.planirano.delete(partijaId);
+        this.oporavi(dogadaj, igracId, 0, new Set(), greska);
+      }
+    }
+  }
+
+  private pokusajIzvrsitiPlan(
+    partijaId: string,
+    dogadaj: DogadajPoteza,
+    igracId: string,
+    stanjeBota: StanjeBotaUPartiji,
+  ): void {
+    const plan = this.planirano.get(partijaId);
+    if (!plan || !plan.odgodaIstekla || !plan.odluka) return;
+    const turnToken = plan.turnToken;
+    const odluka = plan.odluka;
+    const verzijaPriPlanu = plan.verzijaRjecnika;
+    this.planirano.delete(partijaId);
+    if (this.zaustavljen) {
+      this.brojaci.zastarjelo += 1;
+      return;
+    }
+    try {
+      const aktualni = this.aktualni(dogadaj, igracId);
+      if (!aktualni || aktualni.turnToken !== turnToken) {
+        this.brojaci.zastarjelo += 1;
+        return;
+      }
+      if (verzijaPriPlanu !== undefined && this.ovisnosti.rjecnik.verzijaRjecnika() !== verzijaPriPlanu) {
+        const svjeza = this.odluci(aktualni, stanjeBota);
+        this.izvrsi(aktualni, igracId, turnToken, svjeza, 0, new Set());
+        return;
+      }
+      this.izvrsi(aktualni, igracId, turnToken, odluka, 0, new Set());
+    } catch (greska) {
+      this.oporavi(dogadaj, igracId, 0, new Set(), greska);
+    }
   }
 
   zaustavi(): void {
@@ -312,51 +420,124 @@ export class BotKontroler {
     return predmemorija;
   }
 
-  private odluci(dogadaj: DogadajPoteza, stanjeBota: StanjeBotaUPartiji, odbijene: ReadonlySet<string> = new Set(), oporavak = false): OdlukaBota {
+  private zabiljeziOdluku(odluka: OdlukaBota, stanjeBota: StanjeBotaUPartiji, turnToken: string, verzijaRjecnika: number, partijaId: string): void {
+    if (odluka.vrsta === 'rijec' && odluka.propustKa) this.brojaci.propustPrimljenogKa += 1;
+    if (odluka.vrsta === 'rijec' && odluka.takticki) this.brojaci.taktickihPoteza += 1;
+    if (odluka.vrsta === 'rijec' && odluka.izborKa && stanjeBota.zadnjiTokenKa !== turnToken) {
+      stanjeBota.zadnjiTokenKa = turnToken;
+      if (odluka.izborKa === 'dobrovoljni') this.brojaci.dobrovoljniKa += 1;
+      else this.brojaci.prisilniKa += 1;
+    }
+    this.odluke.set(partijaId, { turnToken, odluka, verzijaRjecnika });
+  }
+
+  private odluci(dogadaj: DogadajPoteza, stanjeBota: StanjeBotaUPartiji, odbijene: ReadonlySet<string> = new Set(), oporavak = false, iskoristeneSnimka?: ReadonlySet<string>): OdlukaBota {
     const prethodna = this.odluke.get(dogadaj.partijaId);
     const ista = prethodna?.turnToken === dogadaj.turnToken ? prethodna : undefined;
     if (ista?.odluka.vrsta === 'odustani') return ista.odluka;
     const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
-    const kandidati = [...this.ovisnosti.rjecnik.igriviKandidati(dogadaj.trazenaSlova!, dogadaj.iskoristeneGrupe, dogadaj.dopusteneVrste)].filter((rijec) => !odbijene.has(rijec));
+    const iskoristene = iskoristeneSnimka ?? dogadaj.iskoristeneGrupe;
+    const kandidati = [...this.ovisnosti.rjecnik.igriviKandidati(dogadaj.trazenaSlova!, iskoristene, dogadaj.dopusteneVrste)].filter((rijec) => !odbijene.has(rijec));
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && (kandidati.includes(ista.odluka.rijec) || dogadaj.trazenaSlova === 'ka')) {
       ista.verzijaRjecnika = verzijaRjecnika;
       return ista.odluka;
     }
     const predmemorija = this.predmemorijaZa(dogadaj.partijaId);
-    predmemorija.uskladiVerziju(verzijaRjecnika);
-    const verzijaPotrosenih = `${dogadaj.iskoristeneGrupe.size}:${[...dogadaj.iskoristeneGrupe].slice(0, 32).sort().join(',')}`;
+    predmemorija.uskladiKontekst(dogadaj.turnToken, verzijaRjecnika);
+    const rjecnik = this.ovisnosti.rjecnik;
+    const dopusteneVrste = dogadaj.dopusteneVrste;
     const odluka = odaberiPotez({
       trazenaSlova: dogadaj.trazenaSlova!,
       kandidati,
-      frekvencijaZa: (rijec) => this.ovisnosti.rjecnik.frekvencijaZa(rijec),
-      grupeZa: (rijec) => this.ovisnosti.rjecnik.grupeZa(rijec),
+      frekvencijaZa: (rijec) => rjecnik.frekvencijaZa(rijec),
+      grupeZa: (rijec) => rjecnik.grupeZa(rijec),
       turnToken: dogadaj.turnToken,
       oporavak: oporavak || ista !== undefined,
       pravila: dogadaj.pravila ?? 'ka_zna',
       faza: dogadaj.faza ?? 'obican_potez',
       brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
-      iskoristeneGrupe: dogadaj.iskoristeneGrupe,
-      dopusteneVrste: dogadaj.dopusteneVrste,
-      imaSlobodnuRijecNa: (prefiks, iskoristene, dopusteneVrste) =>
-        this.ovisnosti.rjecnik.imaSlobodnuRijecNa(prefiks, iskoristene, dopusteneVrste),
-      poznatiKandidatiNa: (prefiks, iskoristene) => {
-        const frekvencijaZa = (rijec: string) => this.ovisnosti.rjecnik.frekvencijaZa(rijec);
-        return [...this.ovisnosti.rjecnik.igriviKandidati(prefiks, iskoristene, dogadaj.dopusteneVrste)]
-          .filter((rijec) => !jeNepoznataBotu(rijec, frekvencijaZa(rijec)));
-      },
+      iskoristeneGrupe: iskoristene,
+      dopusteneVrste,
+      imaSlobodnuRijecNa: (prefiks, potrosene, vrste) =>
+        rjecnik.imaSlobodnuRijecNa(prefiks, potrosene, vrste),
+      poznatiKandidatiNa: (prefiks, potrosene) => ({
+        *[Symbol.iterator](): Generator<string> {
+          for (const rijec of rjecnik.igriviKandidati(prefiks, potrosene, dopusteneVrste)) {
+            if (!jeNepoznataBotu(rijec, rjecnik.frekvencijaZa(rijec))) yield rijec;
+          }
+        },
+      }),
       predmemorija,
       verzijaRjecnika,
-      verzijaPotrosenih,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng);
-    if (odluka.vrsta === 'rijec' && odluka.propustKa) this.brojaci.propustPrimljenogKa += 1;
-    if (odluka.vrsta === 'rijec' && odluka.takticki) this.brojaci.taktickihPoteza += 1;
-    if (odluka.vrsta === 'rijec' && odluka.izborKa && stanjeBota.zadnjiTokenKa !== dogadaj.turnToken) {
-      stanjeBota.zadnjiTokenKa = dogadaj.turnToken;
-      if (odluka.izborKa === 'dobrovoljni') this.brojaci.dobrovoljniKa += 1;
-      else this.brojaci.prisilniKa += 1;
+    this.zabiljeziOdluku(odluka, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
+    return odluka;
+  }
+
+  private async odluciNastavivo(
+    dogadaj: DogadajPoteza,
+    stanjeBota: StanjeBotaUPartiji,
+    snimkaGrupa: ReadonlySet<string>,
+    aktivan: () => boolean,
+    odbijene: ReadonlySet<string> = new Set(),
+  ): Promise<OdlukaBota | null> {
+    if (!aktivan()) return null;
+    const prethodna = this.odluke.get(dogadaj.partijaId);
+    const ista = prethodna?.turnToken === dogadaj.turnToken ? prethodna : undefined;
+    if (ista?.odluka.vrsta === 'odustani') return ista.odluka;
+    const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
+    if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
+    const kandidati = [...this.ovisnosti.rjecnik.igriviKandidati(dogadaj.trazenaSlova!, snimkaGrupa, dogadaj.dopusteneVrste)].filter((rijec) => !odbijene.has(rijec));
+    if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && (kandidati.includes(ista.odluka.rijec) || dogadaj.trazenaSlova === 'ka')) {
+      ista.verzijaRjecnika = verzijaRjecnika;
+      return ista.odluka;
     }
-    this.odluke.set(dogadaj.partijaId, { turnToken: dogadaj.turnToken, odluka, verzijaRjecnika });
+    if (!aktivan()) return null;
+    const predmemorija = this.predmemorijaZa(dogadaj.partijaId);
+    predmemorija.uskladiKontekst(dogadaj.turnToken, verzijaRjecnika);
+    const rjecnik = this.ovisnosti.rjecnik;
+    const dopusteneVrste = dogadaj.dopusteneVrste;
+    const predaj = this.predajKontrolu;
+    const odluka = await odaberiPotezNastavivo({
+      trazenaSlova: dogadaj.trazenaSlova!,
+      kandidati,
+      frekvencijaZa: (rijec) => rjecnik.frekvencijaZa(rijec),
+      grupeZa: (rijec) => rjecnik.grupeZa(rijec),
+      turnToken: dogadaj.turnToken,
+      oporavak: ista !== undefined,
+      pravila: dogadaj.pravila ?? 'ka_zna',
+      faza: dogadaj.faza ?? 'obican_potez',
+      brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
+      iskoristeneGrupe: snimkaGrupa,
+      dopusteneVrste,
+      imaSlobodnuRijecNa: (prefiks, potrosene, vrste) =>
+        rjecnik.imaSlobodnuRijecNa(prefiks, potrosene, vrste),
+      poznatiKandidatiNa: (prefiks, potrosene) => ({
+        *[Symbol.iterator](): Generator<string> {
+          for (const rijec of rjecnik.igriviKandidati(prefiks, potrosene, dopusteneVrste)) {
+            if (!jeNepoznataBotu(rijec, rjecnik.frekvencijaZa(rijec))) yield rijec;
+          }
+        },
+      }),
+      poznatiKandidatiNaNastavivo: (prefiks, potrosene) => ({
+        async *[Symbol.asyncIterator](): AsyncGenerator<string> {
+          let n = 0;
+          for (const rijec of rjecnik.igriviKandidati(prefiks, potrosene, dopusteneVrste)) {
+            n += 1;
+            if (!jeNepoznataBotu(rijec, rjecnik.frekvencijaZa(rijec))) yield rijec;
+            if (n % CHECKPOINT_ZAPISA === 0) {
+              await predaj();
+              if (!aktivan()) return;
+            }
+          }
+        },
+      }),
+      predmemorija,
+      verzijaRjecnika,
+    }, stanjeBota, stanjeBota.konfiguracija, this.rng, predaj, aktivan);
+    if (!odluka || !aktivan()) return odluka;
+    this.zabiljeziOdluku(odluka, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
     return odluka;
   }
 
@@ -450,7 +631,15 @@ export class BotKontroler {
       const odmak = konfiguracija.odmaciOporavkaBotaMs[pokusaj] ?? konfiguracija.odmaciOporavkaBotaMs.at(-1) ?? 100;
       const odgoda = Math.min(odmak, preostalo - 150);
       const handle = this.zakazi(posao, odgoda);
-      this.planirano.set(dogadaj.partijaId, { handle, igracId, turnToken: dogadaj.turnToken, izvrsitiUMs: this.sada() + odgoda, vrsta: 'oporavak' });
+      this.planirano.set(dogadaj.partijaId, {
+        handle,
+        igracId,
+        turnToken: dogadaj.turnToken,
+        izvrsitiUMs: this.sada() + odgoda,
+        vrsta: 'oporavak',
+        generacija: ++this.generacijaPosla,
+        odgodaIstekla: true,
+      });
     } catch (greskaPlaniranja) {
       this.brojaci.tehnickeGreske += 1;
       this.zapisi('Nije moguće zakazati oporavak bota', { partijaId: dogadaj.partijaId, igracId, greska: greskaPlaniranja instanceof Error ? greskaPlaniranja.message : String(greskaPlaniranja) });
@@ -476,7 +665,7 @@ export class BotKontroler {
   private otkaziPlan(partijaId: string): void {
     const plan = this.planirano.get(partijaId);
     if (!plan) return;
-    this.otkazi(plan.handle);
+    if (plan.handle) this.otkazi(plan.handle);
     this.planirano.delete(partijaId);
   }
 
