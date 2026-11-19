@@ -51,13 +51,12 @@ for (const sirina of [380, 1100] as const) {
 test('spojeni Dvoboj: Klasični i KA-ZNA dijele isti stol', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 2);
   try {
-    // Prvo jedan igrač — potvrdi izbor prije matcha, bez utrke s navigacijom.
+    // Oba u lobbyju prije matcha — inače bot može popuniti mjesto prvog igrača.
     await igraci[0]!.stranica.goto('/red?mod=dva_igraca&pravila=klasicni');
-    const ishod0 = await cekajOznakuIliPartiju(igraci[0]!.stranica, /Klasični/i);
-    if (ishod0 === 'oznaka') {
-      await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Klasični');
-      await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Dvoboj');
-    }
+    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toBeVisible({ timeout: 15_000 });
+    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Klasični');
+    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Dvoboj');
+    await expect(igraci[0]!.stranica).not.toHaveURL(/\/partija\//);
 
     await igraci[1]!.stranica.goto('/red?mod=dva_igraca&pravila=ka_zna');
     const ishod1 = await cekajOznakuIliPartiju(igraci[1]!.stranica, /KA-zna/i);
@@ -325,20 +324,21 @@ async function pripremiDokazZonu(igraci: Awaited<ReturnType<typeof stvoriIgrace>
   // Bruno ne ispada na prvom „Ne znam” — čeka dokaz.
   await expect(bruno.stranica.locator('.igraci-red > li:has(.oznaka-ti)')).not.toHaveClass(/eliminiran/);
   await expect(bruno.stranica.getByText('Promatraš igru.')).toHaveCount(0);
-  return { ana, bruno, anaRijec };
+  return { ana, bruno, anaRijec, pocetnaRijec };
 }
 
 test('dokaz smoke: uspješan nastavak eliminira Bruna', async ({ browser }) => {
   test.setTimeout(90_000);
   const igraci = await stvoriIgrace(browser, 2);
   try {
-    const { ana, bruno, anaRijec } = await pripremiDokazZonu(igraci);
+    const { ana, bruno, anaRijec, pocetnaRijec } = await pripremiDokazZonu(igraci);
     const unos = ana.stranica.getByRole('textbox', { name: /Dokaži nastavak/ });
     await expect(unos).toBeVisible({ timeout: 10_000 });
     const oznaka = (await unos.getAttribute('aria-label')) ?? '';
     const prefiks = (oznaka.match(/Dokaži nastavak na\s+(.+)$/i)?.[1] ?? '').trim().toLocaleLowerCase('hr');
     expect(prefiks.length).toBeGreaterThan(0);
-    const dokazRijec = await pronadjiIgrivuRijec(prefiks, anaRijec);
+    // Isključi grupe sustavske + Anine riječi — inače RIJEC_ISKORISTENA.
+    const dokazRijec = await pronadjiIgrivuRijec(prefiks, pocetnaRijec, anaRijec);
     await odigrajRijec(ana.stranica, dokazRijec);
 
     await expect(bruno.stranica.locator('.igraci-red > li:has(.oznaka-ti)')).toHaveClass(/eliminiran/, {

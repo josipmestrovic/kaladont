@@ -45,27 +45,44 @@ async function grupeRijeci(sql: Sql, rijec: string): Promise<string[]> {
   return redovi[0]?.grupe ?? [];
 }
 
-/** Igračka riječ na prefiks s živim nastavkom (isti kriterij kao privatne-sobe PR08). */
-export async function pronadjiIgrivuRijec(prefiks: string, pocetnaRijec: string): Promise<string> {
+/**
+ * Igračka riječ na prefiks s živim nastavkom.
+ * `potroseneRijeci` — sve već odigrane (sustavska + igračke); grupe se unije.
+ */
+export async function pronadjiIgrivuRijec(
+  prefiks: string,
+  ...potroseneRijeci: string[]
+): Promise<string> {
+  if (potroseneRijeci.length === 0) {
+    throw new Error('pronadjiIgrivuRijec treba barem jednu potrošenu riječ za grupe.');
+  }
   const sql = postgres(BAZA_URL, { max: 1 });
   try {
+    const potrosene = [...new Set(potroseneRijeci)];
     const redovi = await sql<{ rijec: string }[]>`
-      select kandidat.rijec from rijeci kandidat
-      join rijeci pocetna on pocetna.rijec = ${pocetnaRijec}
+      with potroseno as (
+        select coalesce(array_agg(distinct g), '{}'::text[]) as grupe
+        from rijeci r
+        cross join lateral unnest(r.grupe) as g
+        where r.rijec = any(${potrosene})
+      )
+      select kandidat.rijec from rijeci kandidat, potroseno
       where kandidat.aktivna and kandidat.prva_dva = ${prefiks}
         and char_length(kandidat.rijec) > char_length(kandidat.prva_dva)
         and kandidat.zadnja_dva <> 'ka'
-        and not (kandidat.grupe && pocetna.grupe)
+        and not (kandidat.grupe && potroseno.grupe)
         and exists (
           select 1 from rijeci nastavak
           where nastavak.aktivna and nastavak.prva_dva = kandidat.zadnja_dva
-            and not (nastavak.grupe && (pocetna.grupe || kandidat.grupe))
+            and not (nastavak.grupe && (potroseno.grupe || kandidat.grupe))
         )
       order by kandidat.rijec limit 1
     `;
     const rijec = redovi[0]?.rijec;
     if (!rijec) {
-      throw new Error(`Nema igrive riječi na prefiks „${prefiks}” (početna: ${pocetnaRijec}).`);
+      throw new Error(
+        `Nema igrive riječi na prefiks „${prefiks}” (potrošeno: ${potrosene.join(', ')}).`,
+      );
     }
     return rijec;
   } finally {
@@ -108,12 +125,12 @@ export async function pronadjiLanacDoKa(
           }
         }
 
-        const rezultati = await kandidatiNaPrefiks(sql, cvor.prefiks, 300);
+        const rezultati = await kandidatiNaPrefiks(sql, cvor.prefiks, 400);
         const kandidati = rezultati.filter(
           (k) => jeIgriva(k, cvor.potrosene) && !cvor.put.includes(k.rijec),
         );
 
-        for (const kandidat of kandidati.slice(0, 15)) {
+        for (const kandidat of kandidati.slice(0, 40)) {
           const noviPrefiks = kandidat.zadnja_dva;
           if (posjeceniPrefiksi.has(noviPrefiks)) continue;
           if (!(await imaZivNastavak(sql, kandidat, cvor.potrosene))) continue;
