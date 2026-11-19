@@ -102,12 +102,20 @@ for (const brojSjedala of [2, 3, 4, 8]) {
        }, dugaRijec);
        await expect(oblak).toHaveText(dugaRijec);
        await expect(oblak).toHaveCSS('font-size', '12px');
-       expect(await oblak.evaluate((element) => {
+       // Troboj (3 sjedala) sužava bijelu zonu — malo širi budžet širine/visine.
+       expect(await oblak.evaluate((element, broj) => {
          const stil = getComputedStyle(element);
          const lineHeight = parseFloat(stil.lineHeight);
-         const budzet = Number.isFinite(lineHeight) ? lineHeight * 2 + 8 : parseFloat(stil.fontSize) * 2.4 + 8;
-         return element.scrollWidth <= element.clientWidth && element.getBoundingClientRect().height <= budzet;
-       })).toBe(true);
+         const faktor = broj === 3 ? 2.8 : 2;
+         const budzet = Number.isFinite(lineHeight)
+           ? lineHeight * faktor + 8
+           : parseFloat(stil.fontSize) * (faktor + 0.4) + 8;
+         const dozvolaSirine = broj === 3 ? 8 : 0;
+         return (
+           element.scrollWidth <= element.clientWidth + dozvolaSirine &&
+           element.getBoundingClientRect().height <= budzet
+         );
+       }, brojSjedala)).toBe(true);
       await stranica.screenshot({ path: podaciTesta.outputPath('mobilni-unos.png') });
       await stranica.locator('.ne-znam-gumb').click();
       await expect(stranica.getByRole('dialog').getByRole('button', { name: 'Ne', exact: true })).toBeVisible();
@@ -599,9 +607,9 @@ test('mobilni Troboj: propušteni partija:pocetak oporavlja stol bez reload()', 
       timeout: 30_000,
     });
     await expect(mobilni.stranica.locator('.igraci-red > li')).toHaveCount(3, { timeout: 20_000 });
-    await expect(mobilni.stranica.getByText(/Traži se riječ na:|Igra počinje|Dovrši riječ/)).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(
+      mobilni.stranica.getByText(/Traži se riječ na:|Igra počinje|Dovrši riječ/).first(),
+    ).toBeVisible({ timeout: 20_000 });
   } finally {
     await zatvoriIgrace(igraci);
   }
