@@ -22,7 +22,7 @@ export const TEKSTOVI_PRAVILNIKA: Readonly<
   dokazi_nastavak: {
     naziv: 'Dokaži nastavak',
     opis:
-      'Ako protivnik zapne na tvojoj riječi, ti moraš napisati nastavak, inače ti ispadaš!',
+      'Ako protivnik zapne na tvojoj riječi, ti moraš napisati nastavak, inače ti ispadaš! Slijepa ulica (npr. kaladont) odmah izbacuje tebe.',
   },
 };
 

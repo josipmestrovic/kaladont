@@ -24,7 +24,7 @@ Format javnog stola i pravilnik odvojene su osi. Pod „Igraj” igrač prvo bir
 |---|---|---|---|
 | **Klasični Kaladont** | Ispada sljedeći aktivni iza autora posebne riječi | Redovna eliminacija igrača na potezu | Ispada sljedeći na redu |
 | **KA-zna** | Ispada autor riječi koja je ostavila „ka” (današnje ponašanje) | Redovna eliminacija | Ispada sljedeći na redu |
-| **Dokaži nastavak** | Kao KA-zna | Može otvoriti dokaz autoru prethodne riječi | Odmah ispada **autor** riječi; nema eliminacijskog boda |
+| **Dokaži nastavak** | Kao mrtva slova: ispada **sayer** (nema nastavka na „nt”) | Može otvoriti dokaz autoru prethodne riječi | Odmah ispada **autor** riječi; nema eliminacijskog boda |
 
 U spojenom javnom Dvoboju (Klasični + KA-zna) motor izvodi **KA-zna**; svaki igrač i dalje vidi vlastiti odabrani naziv. Stare partije i stari klijenti bez pravilnika = KA-zna.
 
@@ -96,10 +96,11 @@ Početna riječ troši svoje leksemske grupe kao i riječ igrača. Nakon objave 
 
 „Kaladont” i „kalodont” smiju se ponavljati. Posebno pravilo vrijedi samo kad se odigraju na traženi `ka`, a igrač je na potezu.
 
-1. **KA-zna** i **Dokaži nastavak** (običan potez): ispada autor riječi koja je ostavila `ka`; uzročnik je igrač s posebnom riječju; nova sistemska riječ ide prvom aktivnom iza njega (kao danas).
+1. **KA-zna** (običan potez): ispada autor riječi koja je ostavila `ka`; uzročnik je igrač s posebnom riječju; nova sistemska riječ ide prvom aktivnom iza njega.
 2. **Klasični Kaladont**: ispada prvi aktivni *iza* autora posebne riječi; uzročnik je i dalje onaj tko je rekao kaladont; nova riječ ide prvom aktivnom iza žrtve.
-3. Ako je `ka` otvorio sustav, nitko ne ispada i sustav odmah otvara novu rundu.
-4. U privatnoj sobi eliminacijski bod vrijedi samo ako ga je domaćin uključio.
+3. **Dokaži nastavak** (običan potez): posebna riječ **nije** KA-zna efekt — ostavlja mrtav nastavak `nt`, pa odmah ispada **sayer** kao kod mrtvih slova (RS-31); bez eliminacijskog boda. Isto vrijedi i kad je `ka` otvorio sustav.
+4. **KA-zna / Klasični:** ako je `ka` otvorio sustav, nitko ne ispada i sustav odmah otvara novu rundu (RS-26).
+5. U privatnoj sobi eliminacijski bod vrijedi samo ako ga je domaćin uključio.
 
 ### Dokaži nastavak — odgođena eliminacija
 

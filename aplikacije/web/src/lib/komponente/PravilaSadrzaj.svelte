@@ -140,7 +140,7 @@
               </tr>
               <tr>
                 <th scope="row">Kaladont na „ka”</th>
-                <td data-label="Što se događa">Ovisi o pravilniku: Klasični — ispada sljedeći; KA-zna i Dokaži nastavak — ispada autor „ka”.</td>
+                <td data-label="Što se događa">Ovisi o pravilniku: Klasični — ispada sljedeći; KA-zna — ispada autor „ka”; Dokaži nastavak — sayer odmah ispada (mrtva slova na „nt”).</td>
               </tr>
               <tr>
                 <th scope="row">Dokaz (Dokaži nastavak)</th>
@@ -157,7 +157,7 @@
         <aside class="napomena">
           <strong>Tri pravilnika.</strong> U <strong>Klasičnom</strong> „kaladont/kalodont” na „ka” izbacuje sljedećeg na redu.
           U <strong>KA-zna</strong> izbacuje autora riječi na „ka”.
-          U <strong>Dokaži nastavak</strong> „Ne znam” često otvara dokaz autoru; mrtva slova odmah izbacuju autora, bez eliminacijskog boda protivniku.
+          U <strong>Dokaži nastavak</strong> „Ne znam” često otvara dokaz autoru; mrtva slova (uključujući „kaladont” na „nt”) odmah izbacuju autora, bez eliminacijskog boda protivniku.
         </aside>
       </section>
     </section>

@@ -606,7 +606,12 @@
 
   function sazetakEliminacije(eliminacija: Eliminacija): string {
     if (eliminacija.razlog === 'kaladont') {
-      return `Trenutna riječ: kaladont. Ispada igrač koji je omogućio Kaladont: ${imeIgraca(eliminacija.igracId)}.`;
+      const ime = imeIgraca(eliminacija.igracId);
+      // Klasični: žrtva je sljedeći, ne autor „ka”. KA-zna (i fallback): autor „ka”.
+      if (stanje.pravila === 'klasicni') {
+        return `Trenutna riječ: kaladont. ${ime} ispada jer je prethodni igrač rekao ‘kaladont’.`;
+      }
+      return `Trenutna riječ: kaladont. Ispada igrač koji je omogućio Kaladont: ${ime}.`;
     }
     if (eliminacija.razlog.startsWith('mrtva_slova')) {
       const rijec = eliminacija.rijecUzrok ?? prikazanaRijec?.rijec;

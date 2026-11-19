@@ -2481,7 +2481,8 @@ export function stvoriUpraviteljPartija(
     }
 
     if (stanje.politika.dajeNapredak) {
-      if (RIJECI_KALADONT.has(rijecNormalizirana)) {
+      // Dokaži + kaladont = mrtva slova (RS-31), ne posebni +100 XP.
+      if (RIJECI_KALADONT.has(rijecNormalizirana) && stanje.pravila !== 'dokazi_nastavak') {
         const stavka = { vrsta: 'kaladont' as const, naziv: 'Kaladont', kolicina: 1, poStavci: ISKUSTVO_KALADONT, iskustvo: ISKUSTVO_KALADONT };
         dodajStavkuIskustva(stanje, igracId, stavka);
         stavkePotezaIskustva.push(stavka);
@@ -2576,8 +2577,8 @@ export function stvoriUpraviteljPartija(
       return;
     }
 
-    // Kaladont/kalodont: meta po pravilniku (Klasični = sljedeći, KA-ZNA = autor).
-    if (RIJECI_KALADONT.has(rijecNormalizirana)) {
+    // Kaladont/kalodont: Klasični/KA-ZNA = posebni efekt. Dokaži = pad u mrtva slova (RS-31), ne RS-25.
+    if (RIJECI_KALADONT.has(rijecNormalizirana) && stanje.pravila !== 'dokazi_nastavak') {
       const brojAktivnihPrije = stanje.aktivni.size;
       zatvoriAnalitikaProzorDrugim(stanje);
       dodajNapredakDostignuca(stanje, igracId, { kaladontIzvedbe: 1 });
