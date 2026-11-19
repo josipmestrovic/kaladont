@@ -427,6 +427,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     prekiniZbogGreske: (partijaId, igracId, turnToken) => upravitelj.prekiniZbogGreskeBota(partijaId, igracId, turnToken),
     naAktivnost: (igracId) => fondBotova?.zabiljeziAktivnost(igracId),
     konfiguracija: postavkeBotova,
+    okruzenje: konfiguracija.NODE_ENV,
     zapisi: (poruka, podaci) => app.log.warn(podaci, poruka),
   });
   const aktivneVeze = {

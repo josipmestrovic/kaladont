@@ -335,7 +335,7 @@ export function stvoriUpraviteljPartija(
   postavke: PostavkeMotoraPartije = {},
 ) {
   const sat = postavke.sat ?? stvoriStvarniSat();
-  // SAMO za lokalno testiranje (docs/06-razvoj/postavljanje-okoline.md) - u produkciji mora biti iskljuceno/nepostavljeno
+  // Lokalno + staging QA (#100); produkcija odbija ONEMOGUCI_TIMER_POTEZA=true pri startu.
   const timerOnemogucen = postavke.timerOnemogucen ?? konfiguracija.ONEMOGUCI_TIMER_POTEZA === 'true';
   const trajanjePotezaMs = postavke.trajanjePotezaMs ?? TRAJANJE_POTEZA_MS;
   const tolerancijaPrekidaMs = postavke.tolerancijaPrekidaMs ?? konfiguracija.TOLERANCIJA_PREKIDA_MS;
@@ -894,6 +894,11 @@ export function stvoriUpraviteljPartija(
     return new Date(stanje.vrijemePocetkaPotezaMs + trajanjeMs).toISOString();
   }
 
+  /** 0 kad je timer isključen, inače sobno/trening trajanje (javno: undefined). */
+  function trajanjePotezaSekZaKlijenta(stanje: StanjeStola): number | undefined {
+    return timerOnemogucen ? 0 : stanje.trajanjePotezaSek;
+  }
+
   function posaljiStanje(socket: KaladontSocket): void {
     const partijaId = partijaPoIgracu.get(socket.data.igracId);
     const stanje = partijaId ? partije.get(partijaId) : undefined;
@@ -936,7 +941,8 @@ export function stvoriUpraviteljPartija(
       kontekst: stanje.kontekst,
       jePrivatna: stanje.jePrivatna,
       kodSobe: stanje.kodSobe,
-      trajanjePotezaSek: stanje.trajanjePotezaSek,
+      // Klijent: 0 = bez limitu (prazan istek je normalan, ne „prijelaz ubojite”).
+      trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
       dopusteneVrste: stanje.dopusteneVrste ? [...stanje.dopusteneVrste] : undefined,
       statusSpremanja: stanje.statusSpremanja,
       ...(stanje.treningNeaktivnost && stanje.kontekst === 'trening' ? { treningNeaktivnost: { ...stanje.treningNeaktivnost } } : {}),
@@ -1140,7 +1146,7 @@ export function stvoriUpraviteljPartija(
       spojeniDvoboj,
       kontekst,
       politika,
-      trajanjePotezaSek: kontekst === 'trening' ? 0 : undefined,
+      trajanjePotezaSek: timerOnemogucen || kontekst === 'trening' ? 0 : undefined,
       sudionici,
       aktivni: new Set(sudionici.map((s) => s.igracId)),
       eliminirani: [],
@@ -1303,6 +1309,7 @@ export function stvoriUpraviteljPartija(
         pravila: pravilaStola,
         spojeniDvoboj,
         kontekst,
+        trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
       };
       for (const s of sudionici) {
         aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
@@ -3175,7 +3182,7 @@ export function stvoriUpraviteljPartija(
       dokaz: null,
       jePrivatna: true,
       kodSobe,
-      trajanjePotezaSek: postavkeSobe.trajanjePotezaSek,
+      trajanjePotezaSek: timerOnemogucen ? 0 : postavkeSobe.trajanjePotezaSek,
       dopusteneVrste: new Set(postavkeSobe.dopusteneVrste),
       postavkePrivatneSobe: postavkeSobe,
     };
@@ -3222,6 +3229,7 @@ export function stvoriUpraviteljPartija(
       kontekst: 'privatna',
       jePrivatna: true,
       kodSobe,
+      trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
     };
 
     for (const s of sudionici) {

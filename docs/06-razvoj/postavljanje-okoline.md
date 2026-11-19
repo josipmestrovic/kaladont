@@ -63,7 +63,7 @@ stagingu i produkciji.
 | `UMAMI_URL` / `PUBLIC_UMAMI_URL` | Prazno u razvoju i na stagingu. U produkciji `https://analitika.kaladont.hr` nakon uključivanja ([runbook-umami.md](../07-operacije/runbook-umami.md)). Compose mapira `UMAMI_URL` → `PUBLIC_UMAMI_URL`. |
 | `UMAMI_WEBSITE_ID` / `PUBLIC_UMAMI_WEBSITE_ID` | Prazno = tracker se ne učitava. Vrijednost iz Umami dashboarda nakon bootstrapa. |
 | `UMAMI_BAZA_LOZINKA`, `UMAMI_APP_SECRET` | Samo produkcijski Compose za Umami servis; staging i lokalno ne trebaju. |
-| `ONEMOGUCI_TIMER_POTEZA`    | **Samo za lokalno testiranje** — vidi napomenu ispod. `false` ili izbrisano u produkciji.                                                                                                                     |
+| `ONEMOGUCI_TIMER_POTEZA`    | Lokalno i **staging QA** — vidi napomenu ispod. Staging Compose zadano `true`. U produkciji mora biti `false` ili izbrisano.                                                                                    |
 | `ODGODA_POCETKA_PARTIJE_MS` | Odgoda početka partije (odbrojavanje u čekaonici), zadano 6000 ms. Testovi postavljaju 0; ne mijenjati u produkciji. Neovisno o `ONEMOGUCI_TIMER_POTEZA` — odbrojavanje radi i s isključenim timerom poteza. Vrijedi za javni red, trening i privatne sobe. |
 | `TOLERANCIJA_PREKIDA_MS`    | Tolerancija mrežnog prekida tijekom aktivne partije. Zadano 10000 ms; staging i produkcija zahtijevaju točno tu vrijednost. Timer poteza ne pauzira se.                                                       |
 | `POSLUZUJ_WEB`              | `true` kada isti Fastify proces treba posluživati izgrađeni SvelteKit frontend; u lokalnom razvoju ostaje `false`.                                                                             |
@@ -82,10 +82,11 @@ zlouporabu Resend računa.
 
 ### Isključivanje timera poteza tijekom testiranja
 
-Pravilo od **30 sekundi po potezu** ([pravila-igre.md](../02-pravila-igre/pravila-igre.md)) je službeno pravilo igre i ne mijenja se. Radi udobnijeg ručnog testiranja (da se ne žuri dok se istražuje tijek partije), postavljanjem `ONEMOGUCI_TIMER_POTEZA=true` u `.env` poslužitelj prestaje automatski eliminirati igrača zbog isteka vremena — potez ostaje otvoren dok se ne pošalje riječ ili "Ne znam". Ovo je isključivo razvojna pogodnost:
+Pravilo od **30 sekundi po potezu** ([pravila-igre.md](../02-pravila-igre/pravila-igre.md)) je službeno pravilo igre i ne mijenja se. Radi udobnijeg ručnog testiranja (da se ne žuri dok se istražuje tijek partije), postavljanjem `ONEMOGUCI_TIMER_POTEZA=true` poslužitelj prestaje automatski eliminirati igrača zbog isteka vremena — potez ostaje otvoren dok se ne pošalje riječ ili "Ne znam".
 
-- **Mora biti `false` ili izbrisano prije bilo kakvog "produkcijskog" ponašanja** (uključujući demo/review okruženja koja trebaju vjerno oponašati produkciju).
-- Ne utječe na ostala pravila (RS-02/RS-03 mrtva slova i dalje eliminiraju odmah; RS-22/RS-23 rate limiti ostaju aktivni).
+- **Lokalno i staging** smiju imati `true` (staging Compose za QA #100). **Produkcija mora biti `false`** — startup odbija `true`.
+- Na stagingu botov potez bez roka traje ~3 s dok ima aktivnog čovjeka, ~0,2 s kad ostanu samo botovi. Pragovi ulaska botova u red ostaju normalni (20/30/40 s).
+- Ne utječe na ostala pravila (RS-02/RS-03 mrtva slova i dalje eliminiraju odmah; RS-22/RS-23 rate limiti ostaju aktivni; `TOLERANCIJA_PREKIDA_MS` ostaje 10 s).
 
 ## Testiranje četiri igrača lokalno
 

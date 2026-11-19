@@ -78,7 +78,7 @@ Ovo je najvažniji odjeljak. Kućica se označava tek kada postoji konkretan art
 - [ ] Produkcijski klijent koristi same-origin HTTP i Socket.IO, bez zapečenog `http://localhost:3000`.
 - [ ] Fastify ima ispravan `trustProxy` samo za Caddy, a CORS nije reflektirano otvoren svim originima.
 - [ ] Centralna konfiguracijska shema prekida startup ako nedostaje obvezna tajna ili se koristi razvojna zadana vrijednost.
-- [ ] Centralna runtime provjera prekida staging/produkcijski startup s non-zero izlazom kada je `ONEMOGUCI_TIMER_POTEZA=true`; CI ima negativni test koji to dokazuje.
+- [ ] Centralna runtime provjera prekida **produkcijski** startup s non-zero izlazom kada je `ONEMOGUCI_TIMER_POTEZA=true`; staging smije imati `true` za QA.
 - [ ] `/zdravlje` provjerava bazu i rječnik, vraća 503 kada nisu spremni te prikazuje aktivne partije, uptime i digest bez tajni.
 - [ ] Resend adapter stvarno šalje email; trenutačni log-only stub je uklonjen.
 - [ ] Staging email slanje radi prema testnoj adresi na više uređaja.
@@ -706,7 +706,7 @@ Ciljana konfiguracija mora obuhvatiti barem:
 - `STAGING_PRISTUP_SIFRA` (shared šifra za cookie gate na `/pristup`);
 - Storage Box podračun/ključ i javni `age` recipient;
 - zasebne Healthchecks ping URL-ove;
-- `ONEMOGUCI_TIMER_POTEZA` izostavljen ili strogo `false`.
+- `ONEMOGUCI_TIMER_POTEZA` izostavljen ili strogo `false` (produkcija; staging smije `true` za QA).
 
 Tajnu generiraj na VPS-u bez prikaza u dokumentu:
 

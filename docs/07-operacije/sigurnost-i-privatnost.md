@@ -140,7 +140,7 @@ Popis se održava ažurnim na `/privatnost` stranici; novi izvršitelj = izmjena
 Prije prvog staging/produkcijskog deploya moraju biti implementirani i testirani:
 
 - Fastify iza jedinog Caddy proxyja koristi točno konfiguriran `trustProxy`; same-origin klijent ne treba široki reflektirani CORS;
-- centralna konfiguracijska shema prekida startup ako nedostaje tajna, koristi se razvojna zadana vrijednost ili je uključen `ONEMOGUCI_TIMER_POTEZA`;
+- centralna konfiguracijska shema prekida startup ako nedostaje tajna, koristi se razvojna zadana vrijednost ili je u produkciji uključen `ONEMOGUCI_TIMER_POTEZA`;
 - Resend stvarno šalje, a SPF/DKIM provjera prolazi;
 - `/zdravlje` vraća 503 za nedostupnu bazu ili prazan rječnik i ne otkriva tajne/osobne podatke;
 - jednokratni admin CLI uklanja potrebu za ručnim produkcijskim SQL-om;

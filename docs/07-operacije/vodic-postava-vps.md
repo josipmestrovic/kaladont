@@ -127,7 +127,7 @@ sudo -u deploy touch /opt/kaladont/.env
 sudo chmod 600 /opt/kaladont/.env
 ```
 
-Konačan popis varijabli mora potjecati iz implementirane centralne konfiguracijske sheme. Najmanje obuhvaća internu `BAZA_URL`, jedinstvenu `SESIJA_TAJNA`, oznaku okruženja, digest/verziju, Resend konfiguraciju i na stagingu `STAGING_PRISTUP_SIFRA` (shared šifra za cookie gate). HTTP Basic Auth se ne koristi zbog Socket.IO promptova; gate je u aplikaciji (`/pristup`). `ONEMOGUCI_TIMER_POTEZA` ne postavlja se; aplikacija mora odbiti produkcijski/staging start ako je uključena.
+Konačan popis varijabli mora potjecati iz implementirane centralne konfiguracijske sheme. Najmanje obuhvaća internu `BAZA_URL`, jedinstvenu `SESIJA_TAJNA`, oznaku okruženja, digest/verziju, Resend konfiguraciju i na stagingu `STAGING_PRISTUP_SIFRA` (shared šifra za cookie gate). HTTP Basic Auth se ne koristi zbog Socket.IO promptova; gate je u aplikaciji (`/pristup`). Staging Compose smije imati `ONEMOGUCI_TIMER_POTEZA=true` za QA; produkcija mora biti `false` — startup odbija `true` samo u produkciji.
 
 PostgreSQL i Caddy navode se točnom verzijom i digestom, bez `latest`. Aplikacija se navodi isključivo punim GHCR digestom.
 

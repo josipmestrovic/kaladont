@@ -613,3 +613,30 @@ export function trajanjeRazmisljanjaMs(
   const gornja = Math.max(0, trajanjePotezaMs - margina);
   return Math.min(gornja, osnova);
 }
+
+/** Staging QA (#100): bot s ljudima ~3 s; bez aktivnih ljudi ~0,2 s. Pragove popune ne dira. */
+export const STAGING_BOT_POTEZ_S_LJUDIMA_MS = 3_000;
+/** Bez roka (CI / privatno / staging bot-only): brzi završetak. */
+export const BOT_POTEZ_BEZ_ROKA_MS = 200;
+
+/**
+ * Konačna odgoda kad partija nema rok poteza (`istekPotezaMs === null`).
+ * Staging: 3 s dok ima aktivnog čovjeka, inače 0,2 s. Ostalo: trening puni tempo, inače 0,2 s (CI).
+ */
+export function odgodaBezRokaMs(
+  izracunataOdgodaMs: number,
+  opcije: {
+    kontekst: 'javna' | 'privatna' | 'trening';
+    imaAktivnogCovjeka: boolean;
+    okruzenje: string;
+  },
+): number {
+  if (opcije.okruzenje === 'staging') {
+    return Math.min(
+      izracunataOdgodaMs,
+      opcije.imaAktivnogCovjeka ? STAGING_BOT_POTEZ_S_LJUDIMA_MS : BOT_POTEZ_BEZ_ROKA_MS,
+    );
+  }
+  if (opcije.kontekst === 'trening') return izracunataOdgodaMs;
+  return Math.min(izracunataOdgodaMs, BOT_POTEZ_BEZ_ROKA_MS);
+}

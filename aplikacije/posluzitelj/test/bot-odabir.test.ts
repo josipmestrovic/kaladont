@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DogadajPoteza, RezultatNaredbe } from '../src/igra/politika-ucinka.js';
 import { BotKontroler } from '../src/bot/kontroler.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
-import { Vrecica, klasificirajPoznatiSkup, odaberiPotez, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
+import { BOT_POTEZ_BEZ_ROKA_MS, STAGING_BOT_POTEZ_S_LJUDIMA_MS, Vrecica, klasificirajPoznatiSkup, odaberiPotez, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
 import { parsajSpremljenuKonfiguraciju } from '../src/bot/trajne-postavke.js';
 import { BROJ_GOSTIJU_FONDA_V4, BROJ_IMENOVANIH_FONDA_V4, CILJ_AKTIVNIH_FONDA_V4, NADIMCI_POCETNOG_FONDA_V4 } from '../src/bot/nadimci.js';
 import { stavkeZamjeneFondaBotova } from '../src/bot/servis-identiteta.js';
@@ -513,6 +513,14 @@ describe('odabir riječi bota', () => {
     expect(b).toBe(4_000);
   });
 
+  it('QA #100: bez roka na stagingu 3 s s ljudima, 0,2 s bez njih; CI ostaje brz', () => {
+    expect(odgodaBezRokaMs(4_000, { kontekst: 'javna', imaAktivnogCovjeka: true, okruzenje: 'staging' })).toBe(STAGING_BOT_POTEZ_S_LJUDIMA_MS);
+    expect(odgodaBezRokaMs(4_000, { kontekst: 'trening', imaAktivnogCovjeka: true, okruzenje: 'staging' })).toBe(STAGING_BOT_POTEZ_S_LJUDIMA_MS);
+    expect(odgodaBezRokaMs(4_000, { kontekst: 'javna', imaAktivnogCovjeka: false, okruzenje: 'staging' })).toBe(BOT_POTEZ_BEZ_ROKA_MS);
+    expect(odgodaBezRokaMs(4_000, { kontekst: 'javna', imaAktivnogCovjeka: true, okruzenje: 'test' })).toBe(BOT_POTEZ_BEZ_ROKA_MS);
+    expect(odgodaBezRokaMs(4_000, { kontekst: 'trening', imaAktivnogCovjeka: true, okruzenje: 'test' })).toBe(4_000);
+  });
+
   it('konfiguracija iz okoline mijenja samo valjane postotke', () => {
     const konfig = ucitajKonfiguracijuBota({
       BOT_NEZNANJE_U_MALOM_SKUPU: '0.5',
@@ -653,6 +661,29 @@ describe('bot kontroler', () => {
     kontroler.naPromjenuPoteza(dogadaj({ kontekst: 'trening' }));
     expect(timeri[0]!.ms).toBe(4_000);
     expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(0);
+  });
+
+  it('QA #100 staging: bez roka bot čeka 3 s s ljudima, 0,2 s kad ostanu samo botovi', () => {
+    const { kontroler: sLjudima, timeri: timeriLjudi } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigBezPropusta, { okruzenje: 'staging' });
+    sLjudima.naPromjenuPoteza(dogadaj({ istekPotezaMs: null }));
+    expect(timeriLjudi[0]!.ms).toBe(STAGING_BOT_POTEZ_S_LJUDIMA_MS);
+
+    const { kontroler: bezLjudi, timeri: timeriBotovi } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigBezPropusta, { okruzenje: 'staging' });
+    bezLjudi.naPromjenuPoteza(dogadaj({
+      istekPotezaMs: null,
+      sudionici: [
+        { igracId: 'covjek', upravljac: 'covjek', aktivan: false },
+        { igracId: 'bot', upravljac: 'bot', aktivan: true },
+        { igracId: 'bot2', upravljac: 'bot', aktivan: true },
+      ],
+    }));
+    expect(timeriBotovi[0]!.ms).toBe(BOT_POTEZ_BEZ_ROKA_MS);
+  });
+
+  it('bez roka izvan staginga ostaje 0,2 s (CI / privatno)', () => {
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigBezPropusta, { okruzenje: 'test' });
+    kontroler.naPromjenuPoteza(dogadaj({ istekPotezaMs: null }));
+    expect(timeri[0]!.ms).toBe(BOT_POTEZ_BEZ_ROKA_MS);
   });
 
   it('isti token se ne planira dvaput; novi token dobiva novi plan', () => {

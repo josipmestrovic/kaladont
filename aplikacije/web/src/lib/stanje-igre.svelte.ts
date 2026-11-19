@@ -370,6 +370,8 @@ export function pokreniSlusateljeIgre(): void {
     stanje.treningNeaktivnost = null;
     stanje.jePrivatna = Boolean(p.jePrivatna);
     stanje.kodSobe = p.kodSobe ?? null;
+    // Mora stići prije prvog potez:prihvacen — inače prazan istek izgleda kao ubojita riječ.
+    stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
   });
 
   socket.on('partija:stanje', primijeniStanjePartije);
