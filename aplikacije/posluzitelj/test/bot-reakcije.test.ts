@@ -117,7 +117,7 @@ describe('bot reakcije — kontroler', () => {
   it('cooldown pomiče drugu reakciju istog bota', () => {
     const poslano: { partijaId: string; igracId: string; poruka: string }[] = [];
     const zakazano: { ms: number; posao: () => void }[] = [];
-    let t = 0;
+    const t = 0;
     const kontroler = new BotKontroler({
       rjecnik: prazanRjecnik,
       izvrsiNaredbu: () => ({ ishod: 'ignoriran', razlog: 'nema_partije' }),

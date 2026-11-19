@@ -260,9 +260,10 @@ export function trajanjeRazmisljanjaMs(
   trajanjePotezaMs: number | null,
   konfig: KonfiguracijaBota,
   rng: Rng,
-  _kontekst: 'javna' | 'privatna' | 'trening' = 'javna',
+  kontekst: 'javna' | 'privatna' | 'trening' = 'javna',
   podaci?: { punoTrajanjeMs: number; protekloMs: number },
 ): number {
+  void kontekst;
   const punoTrajanje = podaci?.punoTrajanjeMs ?? trajanjePotezaMs ?? 30_000;
   const jitter = konfig.jitterPotezaBotaMs;
   const pomak = jitter <= 0 ? 0 : Math.floor(rng() * (2 * jitter + 1)) - jitter;

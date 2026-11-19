@@ -122,19 +122,19 @@ export class BotKontroler {
   }
 
   /** Svaki bot pozdravi jednom na početku (javna, privatna, trening). */
-  naPocetakPartije(partijaId: string, _kontekst: DogadajPoteza['kontekst'], botIds: readonly string[]): void {
+  naPocetakPartije(partijaId: string, kontekst: DogadajPoteza['kontekst'], botIds: readonly string[]): void {
+    void kontekst;
     if (this.zaustavljen || !this.ovisnosti.posaljiReakciju || botIds.length === 0) return;
     if (!this.konfiguracijePartija.has(partijaId)) {
       this.konfiguracijePartija.set(partijaId, structuredClone(this.ovisnosti.konfiguracija));
     }
     for (const igracId of botIds) {
-      const kljuc = `${partijaId}:${igracId}`;
       const poslani = this.poslaniPozdravi.get(partijaId) ?? new Set<string>();
       if (poslani.has(igracId)) continue;
       poslani.add(igracId);
       this.poslaniPozdravi.set(partijaId, poslani);
       const poruka = odaberiReakcijuNaPocetku(this.rngPrezentacije);
-      this.zakaziReakciju(partijaId, igracId, poruka, `pozdrav:${kljuc}`);
+      this.zakaziReakciju(partijaId, igracId, poruka);
     }
   }
 
@@ -144,12 +144,13 @@ export class BotKontroler {
    */
   naEliminaciju(
     partijaId: string,
-    _kontekst: DogadajPoteza['kontekst'],
+    kontekst: DogadajPoteza['kontekst'],
     zrtvaId: string,
     bodZaId: string | null,
     sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot' }[],
     eliminacijaId: string,
   ): void {
+    void kontekst;
     if (this.zaustavljen || !this.ovisnosti.posaljiReakciju) return;
     if (!this.konfiguracijePartija.has(partijaId)) {
       this.konfiguracijePartija.set(partijaId, structuredClone(this.ovisnosti.konfiguracija));
@@ -177,7 +178,7 @@ export class BotKontroler {
     const kljuc = `${partijaId}:${eliminacijaId}:${igracId}:${kategorija}`;
     if (this.poslaneEliminacijskeReakcije.has(kljuc)) return;
     this.poslaneEliminacijskeReakcije.add(kljuc);
-    this.zakaziReakciju(partijaId, igracId, poruka, kljuc);
+    this.zakaziReakciju(partijaId, igracId, poruka);
   }
 
   private planiraj(dogadaj: DogadajPoteza): void {
@@ -433,7 +434,7 @@ export class BotKontroler {
     return `${partijaId}:${igracId}`;
   }
 
-  private zakaziReakciju(partijaId: string, igracId: string, poruka: BrzaPoruka, _dedupKljuc: string): void {
+  private zakaziReakciju(partijaId: string, igracId: string, poruka: BrzaPoruka): void {
     if (!this.ovisnosti.posaljiReakciju) return;
     const konfiguracija = this.konfiguracijePartija.get(partijaId) ?? this.ovisnosti.konfiguracija;
     const sada = this.sada();
