@@ -22,7 +22,8 @@ WS_ENDPOINT="ws://127.0.0.1:${WS_PORT}/"
 STANJE_DIR="${RUNNER_TEMP:-/tmp}"
 STANJE_DATOTEKA="${STANJE_DIR}/kaladont-pw-browser-runtime.env"
 LOG_DATOTEKA="${STANJE_DIR}/kaladont-pw-browser-runtime.log"
-PULL_TIMEOUT_SEC="${PW_BROWSER_PULL_TIMEOUT_SEC:-240}"
+# Budžet mora stati u CI step timeout (8 min): 2×pull + sleep 10s + readiness + docker overhead.
+PULL_TIMEOUT_SEC="${PW_BROWSER_PULL_TIMEOUT_SEC:-150}"
 READINESS_TIMEOUT_SEC="${PW_BROWSER_READINESS_TIMEOUT_SEC:-60}"
 
 ime_kontejnera() {

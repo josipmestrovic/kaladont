@@ -197,7 +197,8 @@ jobs:
         run: pnpm build
 
       - name: Pokrenuti Playwright browser runtime
-        timeout-minutes: 5
+        # 8 min: stane 2×pull (150s) + retry pauza + readiness; inače GHA ubije korak prije logova.
+        timeout-minutes: 8
         run: bash skripte/ci/playwright-browser-runtime.sh start --webkit
 
       - name: Pokrenuti kritične Playwright E2E testove
@@ -461,7 +462,8 @@ jobs:
           echo "Image prikazuje izdanje ${sidro} (${datum}) na naslovnici i u Novostima."
 
       - name: Pokrenuti Playwright browser runtime
-        timeout-minutes: 5
+        # 8 min: stane 2×pull (150s) + retry pauza + readiness; inače GHA ubije korak prije logova.
+        timeout-minutes: 8
         run: bash skripte/ci/playwright-browser-runtime.sh start
 
       - name: Pokrenuti E2E nad izgrađenim same-origin serverom
