@@ -70,9 +70,6 @@ if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'producti
   if (konfiguracija.SESIJA_TAJNA === 'promijeni-me') {
     throw new Error('SESIJA_TAJNA mora biti promijenjena izvan razvoja i testiranja.');
   }
-  if (konfiguracija.ONEMOGUCI_TIMER_POTEZA === 'true') {
-    throw new Error('ONEMOGUCI_TIMER_POTEZA ne smije biti true izvan razvoja i testiranja.');
-  }
   if (konfiguracija.TOLERANCIJA_PREKIDA_MS !== 10_000) {
     throw new Error('TOLERANCIJA_PREKIDA_MS mora biti 10000 izvan razvoja i testiranja.');
   }
@@ -82,6 +79,11 @@ if (konfiguracija.NODE_ENV === 'staging' || konfiguracija.NODE_ENV === 'producti
   if (konfiguracija.JAVNA_ADRESA.startsWith('http://')) {
     throw new Error('JAVNA_ADRESA mora koristiti HTTPS izvan razvoja i testiranja.');
   }
+}
+
+// Staging smije isključiti timer poteza za QA (#100); produkcija nikad.
+if (konfiguracija.NODE_ENV === 'production' && konfiguracija.ONEMOGUCI_TIMER_POTEZA === 'true') {
+  throw new Error('ONEMOGUCI_TIMER_POTEZA ne smije biti true u produkciji.');
 }
 
 if (konfiguracija.NODE_ENV === 'production' && !process.env.LJESTVICE_POCETAK) {

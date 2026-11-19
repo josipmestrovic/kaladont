@@ -13,6 +13,7 @@ import type { KonfiguracijaBota } from './konfiguracija-bota.js';
 import {
   jeNepoznataBotu,
   odaberiPotez,
+  odgodaBezRokaMs,
   PredmemorijaLegalnosti,
   stvoriStanjeBota,
   trajanjeRazmisljanjaMs,
@@ -49,6 +50,8 @@ export interface OvisnostiBotKontrolera {
   dohvatiPotez?: (partijaId: string) => DogadajPoteza | null;
   prekiniZbogGreske?: (partijaId: string, igracId: string, turnToken: string) => void;
   naAktivnost?: (igracId: string) => void;
+  /** NODE_ENV; staging uključuje QA tempo bez roka (3 s / 0,2 s). */
+  okruzenje?: string;
 }
 
 export interface BrojaciBota {
@@ -97,6 +100,7 @@ export class BotKontroler {
   private readonly zakazi: (posao: () => void, ms: number) => NodeJS.Timeout;
   private readonly otkazi: (handle: NodeJS.Timeout) => void;
   private readonly zapisi: (poruka: string, podaci: Record<string, unknown>) => void;
+  private readonly okruzenje: string;
   private zaustavljen = false;
   readonly brojaci: BrojaciBota = {
     planirano: 0,
@@ -120,6 +124,7 @@ export class BotKontroler {
     this.zakazi = ovisnosti.zakazi ?? ((posao, ms) => setTimeout(posao, ms));
     this.otkazi = ovisnosti.otkazi ?? ((handle) => clearTimeout(handle));
     this.zapisi = ovisnosti.zapisi ?? (() => undefined);
+    this.okruzenje = ovisnosti.okruzenje ?? process.env.NODE_ENV ?? 'development';
   }
 
   naPromjenuPoteza(dogadaj: DogadajPoteza): void {
@@ -229,9 +234,13 @@ export class BotKontroler {
       punoTrajanjeMs: dogadaj.trajanjePotezaMs,
       protekloMs: Math.max(0, this.sada() - dogadaj.pocetakPotezaMs),
     });
-    // Bez roka (testni ONEMOGUCI_TIMER / privatno bez tajmera) ne čekaj puna 4 s — inače CI testovi isteku.
-    const odgoda = rok === null && dogadaj.kontekst !== 'trening'
-      ? Math.min(izracunataOdgoda, 200)
+    // Bez roka: staging QA 3 s s ljudima / 0,2 s bez njih; CI i privatno bez tajmera ostaju brzi.
+    const odgoda = rok === null
+      ? odgodaBezRokaMs(izracunataOdgoda, {
+        kontekst: dogadaj.kontekst,
+        imaAktivnogCovjeka: dogadaj.sudionici.some((s) => s.upravljac === 'covjek' && s.aktivan),
+        okruzenje: this.okruzenje,
+      })
       : izracunataOdgoda;
     const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const turnToken = dogadaj.turnToken;

@@ -335,7 +335,7 @@ export function stvoriUpraviteljPartija(
   postavke: PostavkeMotoraPartije = {},
 ) {
   const sat = postavke.sat ?? stvoriStvarniSat();
-  // SAMO za lokalno testiranje (docs/06-razvoj/postavljanje-okoline.md) - u produkciji mora biti iskljuceno/nepostavljeno
+  // Lokalno + staging QA (#100); produkcija odbija ONEMOGUCI_TIMER_POTEZA=true pri startu.
   const timerOnemogucen = postavke.timerOnemogucen ?? konfiguracija.ONEMOGUCI_TIMER_POTEZA === 'true';
   const trajanjePotezaMs = postavke.trajanjePotezaMs ?? TRAJANJE_POTEZA_MS;
   const tolerancijaPrekidaMs = postavke.tolerancijaPrekidaMs ?? konfiguracija.TOLERANCIJA_PREKIDA_MS;
@@ -936,7 +936,8 @@ export function stvoriUpraviteljPartija(
       kontekst: stanje.kontekst,
       jePrivatna: stanje.jePrivatna,
       kodSobe: stanje.kodSobe,
-      trajanjePotezaSek: stanje.trajanjePotezaSek,
+      // Klijent: 0 = bez limitu (prazan istek je normalan, ne „prijelaz ubojite”).
+      trajanjePotezaSek: timerOnemogucen ? 0 : stanje.trajanjePotezaSek,
       dopusteneVrste: stanje.dopusteneVrste ? [...stanje.dopusteneVrste] : undefined,
       statusSpremanja: stanje.statusSpremanja,
       ...(stanje.treningNeaktivnost && stanje.kontekst === 'trening' ? { treningNeaktivnost: { ...stanje.treningNeaktivnost } } : {}),
@@ -1140,7 +1141,7 @@ export function stvoriUpraviteljPartija(
       spojeniDvoboj,
       kontekst,
       politika,
-      trajanjePotezaSek: kontekst === 'trening' ? 0 : undefined,
+      trajanjePotezaSek: timerOnemogucen || kontekst === 'trening' ? 0 : undefined,
       sudionici,
       aktivni: new Set(sudionici.map((s) => s.igracId)),
       eliminirani: [],
