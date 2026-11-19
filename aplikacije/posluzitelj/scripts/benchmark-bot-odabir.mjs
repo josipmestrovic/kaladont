@@ -89,8 +89,6 @@ async function main() {
   let stvoriStanjeBota;
   let konfig;
   try {
-    const odabirUrl = pathToFileURL(resolve(root, 'src/bot/odabir-rijeci.ts')).href;
-    const konfigUrl = pathToFileURL(resolve(root, 'src/bot/konfiguracija-bota.ts')).href;
     // Node ne učitava .ts bez loadera — preferiraj dist ako postoji.
     const distOdabir = resolve(root, 'dist/bot/odabir-rijeci.js');
     const distKonfig = resolve(root, 'dist/bot/konfiguracija-bota.js');
