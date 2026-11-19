@@ -162,6 +162,8 @@ export interface PocetakPartije {
   kontekst?: KontekstPartije;
   jePrivatna?: boolean;
   kodSobe?: string;
+  /** 0 = bez limitu (ONEMOGUCI_TIMER / privatno / trening); izostanak = klijent drži null. */
+  trajanjePotezaSek?: number;
 }
 
 /**
