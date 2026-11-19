@@ -97,14 +97,14 @@ Riječ stigne u istom trenutku kad timer istekne.
 **RS-24 — Automatizirano igranje (bot igrača).**
 **Odluka za MVP:** bez aktivne detekcije; bilježi se `trajanje_ms` svakog poteza pa su sumnjivi obrasci (stalno < 500 ms) vidljivi u podacima za kasniju analizu.
 
-**RS-25 — Igrač izgovori "kaladont"/"kalodont".**
+**RS-25 — Igrač izgovori "kaladont"/"kalodont" (Klasični / KA-zna).**
 Riječ završava na mrtav par „nt" — po standardnom pravilu bi to eliminiralo sljedećeg igrača (RS-02 generalizacija).
-**Odluka:** posebno pravilo preuzima prednost — umjesto sljedećeg igrača ispada igrač koji je omogućio otvaranje na „ka“ (dohvaćen iz `napadacId` prije ažuriranja u `obradiPrihvacenPotez`), bod ide igraču koji je izgovorio riječ. Ove dvije riječi izuzete su od zabrane ponavljanja (mogu se odigrati više puta u partiji). Nakon eliminacije **sustav** (ne sayer) bira riječ za otvaranje nastavka runde (vidi RS-01), a red potom prelazi na sljedećeg aktivnog igrača nakon onoga tko je izgovorio Kaladont. Ako je eliminirani bio pretposljednji preostali, partija odmah završava.
-*Obrazloženje: tematska posebnost imena igre — vidi [pravila-igre.md](pravila-igre.md#posebno-pravilo-kaladont-i-kalodont).*
+**Odluka:** u **KA-zna** posebno pravilo preuzima prednost — umjesto sljedećeg igrača ispada igrač koji je omogućio otvaranje na „ka“ (dohvaćen iz `napadacId` prije ažuriranja u `obradiPrihvacenPotez`), bod ide igraču koji je izgovorio riječ. Ove dvije riječi izuzete su od zabrane ponavljanja (mogu se odigrati više puta u partiji). Nakon eliminacije **sustav** (ne sayer) bira riječ za otvaranje nastavka runde (vidi RS-01), a red potom prelazi na sljedećeg aktivnog igrača nakon onoga tko je izgovorio Kaladont. Ako je eliminirani bio pretposljednji preostali, partija odmah završava.
+*Obrazloženje: tematska posebnost imena igre — vidi [pravila-igre.md](pravila-igre.md#kaladont-efekt-i-dokaz). U Dokaži nastavak RS-25 ne vrijedi — vidi RS-31 / RS-34.*
 
-**RS-26 — "Kaladont"/"kalodont" omogućen sustavovom riječi (nitko nije kriv).**
+**RS-26 — "Kaladont"/"kalodont" omogućen sustavovom riječi (Klasični / KA-zna).**
 Sustav nasumično odabere riječ za otvaranje runde čija zadnja dva grafema ispadaju baš „ka", pa sljedeći igrač odgovori s „kaladont"/„kalodont".
-**Odluka:** ne primjenjuje se posebno pravilo (RS-25) jer ne postoji igrač koji je "omogućio ka" — sustavovu riječ nitko nije odigrao. Nitko ne ispada niti dobiva bod; sustav odmah ponovno bira novu riječ za otvaranje runde s istim igračem kao usidrenom točkom (sljedeći aktivni nakon njega dolazi na potez).
+**Odluka:** u Klasičnom i KA-zna ne primjenjuje se posebno pravilo (RS-25) jer ne postoji igrač koji je "omogućio ka" — sustavovu riječ nitko nije odigrao. Nitko ne ispada niti dobiva bod; sustav odmah ponovno bira novu riječ za otvaranje runde s istim igračem kao usidrenom točkom (sljedeći aktivni nakon njega dolazi na potez). U **Dokaži nastavak** sayer ipak pada mrtvim slovima (RS-34).
 *Obrazloženje: otkad riječ runde uvijek bira sustav (RS-01), ovaj rubni slučaj zamjenjuje stari "slobodna otvarajuća riječ" scenarij koji više nije moguć jer igrač ne bira riječi.*
 
 **RS-27 — Rječnik iscrpljen tijekom automatskog biranja riječi.**
@@ -131,13 +131,13 @@ Partija sadrži kanonski uređeni niz sjedala koji je poslužitelj nasumično do
 *Obrazloženje: promjena aktivnog igrača ne smije premještati sjedala ni avatare i otežavati praćenje poteza.*
 
 **RS-31 — Dokaži nastavak: mrtva slova eliminiraju autora (PR05).**
-U pravilniku `dokazi_nastavak` Ana odigra valjanu riječ (npr. „cement”) na čiji nastavak nema igrive riječi (rupa u bazi ili potrošene grupe).
+U pravilniku `dokazi_nastavak` Ana odigra valjanu riječ (npr. „cement”, „argument”, „akord”) na čiji nastavak nema igrive riječi (rupa u bazi ili potrošene grupe).
 **Odluka:** odmah ispada **Ana** (autor), bez eliminacijskog boda. Bruno ostaje. Nema faze dokaza. Nova sistemska riječ ide prvom aktivnom iza Ane. U Klasičnom i KA-zna i dalje vrijedi RS-02/RS-03 (žrtva = sljedeći).
 *Testovi:* `mrtva slova (cement): ispada autor…` u `motor-partije.test.ts`; `zrtvaMrtvihSlova` u `odluke-pravila.test.ts`.
 
 **RS-32 — Dokaži nastavak: odgođena eliminacija nakon „Ne znam”/isteka/napusti (PR05).**
 Bruno na potezu kaže „Ne znam”, istekne mu rok, ili napusti partiju, a postoji aktivan autor Anine riječi.
-**Odluka:** otvara se faza `dokaz_nastavka` (event `dokaz:zatrazen`). „Ne znam”/istek: Bruno **ostaje aktivan**, bez ranog poraza. Napusti/konačni prekid: Bruno je potvrđen (`prekid`), zatim Ana dokazuje za kredit. Uspjeh → Bruno ispada (ako već nije) s Aninim kreditom; uvijek nova **sistemska** riječ iza Brune. Neuspjeh → Ana ispada bez kredita. Posebna riječ na običnom potezu i dalje KA-zna; kao dokaz ne pokreće drugu žrtvu. Sustavska riječ + „Ne znam” = redovna eliminacija (nema autora).
+**Odluka:** otvara se faza `dokaz_nastavka` (event `dokaz:zatrazen`). „Ne znam”/istek: Bruno **ostaje aktivan**, bez ranog poraza. Napusti/konačni prekid: Bruno je potvrđen (`prekid`), zatim Ana dokazuje za kredit. Uspjeh → Bruno ispada (ako već nije) s Aninim kreditom; uvijek nova **sistemska** riječ iza Brune. Neuspjeh → Ana ispada bez kredita. Posebna riječ na običnom potezu **nije** KA-zna (vidi RS-34); kao dokaz ne pokreće drugu žrtvu. Sustavska riječ + „Ne znam” = redovna eliminacija (nema autora).
 *Testovi:* `Bruno Ne znam → dokaz…`, `Ana Ne znam → Ana ispada…`, `sistemska + Ne znam`, `Bruno izadji…` u `motor-partije.test.ts`.
 
 **RS-33 — Klasični Kaladont: posebna riječ pogađa sljedećeg (PR04).**
@@ -145,5 +145,10 @@ Ana → Bruno → Cvita. Ana ostavi „ka”, Bruno odigra `kaladont` ili `kalod
 **Odluka:** ispada **Cvita** (prvi aktivni iza Brune); Bruno je uzročnik; nova sistemska riječ ide prvom aktivnom iza Cvite. U KA-zna na istom lancu ispada Ana. Oba zapisa posebne riječi su izuzeta od zabrane ponavljanja.
 *Testovi:* klasični vs KA-zna žrtva u `motor-partije.test.ts` / `odluke-pravila.test.ts` (PR04).
 
-<!-- HINT PR15: RS-31/32/33 moraju ostati usklađeni s imenima testova na mainu. -->
+**RS-34 — Dokaži nastavak: „kaladont”/„kalodont” = mrtva slova sayera.**
+Ana ostavi „ka” (npr. „jabuka”), Bruno odigra `kaladont`/`kalodont` na običnom potezu u `dokazi_nastavak`.
+**Odluka:** nema KA-zna efekta (RS-25). Riječ ostavlja mrtav nastavak `nt` → odmah ispada **Bruno** (sayer) kao u RS-31: razlog `mrtva_slova_*`, bez eliminacijskog boda, bez `kaladontIzvedbe` / +100 XP / zapisa `ucinak_posebne_rijeci`. Isto ako je „ka” otvorio sustav (RS-26 se ne štedi sayera u ovom pravilniku). Kaladont kao **dokaz** i dalje uspješan dokaz bez ponovne posebne mete.
+*Testovi:* `jabuka → kaladont: sayer ispada mrtvim slovima…` u `motor-partije.test.ts`; `odrediMetuPosebneRijeci (Dokaži…)` u `odluke-pravila.test.ts`.
+
+<!-- HINT PR15: RS-31/32/33/34 moraju ostati usklađeni s imenima testova. -->
 

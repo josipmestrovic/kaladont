@@ -1561,11 +1561,9 @@ describe('motor partije - Klasični vs KA-ZNA (PR04)', () => {
     expect(kazna.zrtvaId).toBe(kazna.autorKa);
   });
 
-  it('kalodont i dokazi_nastavak (običan potez) rade KA-ZNA granom', async () => {
+  it('kalodont (KA-ZNA) i dalje pogađa autora „ka”', async () => {
     const kalodont = await odigrajKaladontNaTroje('ka_zna', 'kalodont');
     expect(kalodont.zrtvaId).toBe(kalodont.autorKa);
-    const dokazi = await odigrajKaladontNaTroje('dokazi_nastavak', 'kaladont');
-    expect(dokazi.zrtvaId).toBe(dokazi.autorKa);
   });
 });
 
@@ -1658,6 +1656,58 @@ describe('motor partije - Dokaži nastavak (PR05)', () => {
         }
       }
       expect(uspjelo, 'nije pronađena mrtva riječ za PR05 cement u 12 pokušaja').toBe(true);
+    } finally {
+      odspojiIgrace(igraciListe);
+    }
+  });
+
+  it('jabuka → kaladont: sayer ispada mrtvim slovima, bez kredita (ne KA-ZNA)', async () => {
+    const { igraciListe, pocetak, runda } = await pokreniDokazi(3);
+    try {
+      const lanac = await pronadjiLanacDoKa(runda.trazenaSlova, new Set(await grupeRijeci(runda.rijec)));
+      expect(lanac).not.toBeNull();
+
+      let naPotezu = igraciListe.find((ig) => ig.token === runda.naPotezuId)!;
+      let autorKa = naPotezu.token;
+      for (const rijec of lanac!) {
+        const prihvacenoPromise = cekajPrihvacenOdIgraca(naPotezu.socket, naPotezu.token);
+        naPotezu.socket.emit('potez:rijec', { rijec });
+        const prihvaceno = await Promise.race([
+          prihvacenoPromise,
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error(`Timeout čekajući potez:prihvacen (${rijec})`)), 8_000);
+          }),
+        ]);
+        autorKa = naPotezu.token;
+        naPotezu = igraciListe.find((ig) => ig.token === prihvaceno.sljedeciId)!;
+      }
+      const sayer = naPotezu;
+      expect(autorKa).not.toBe(sayer.token);
+
+      const eliminacijaPromise = cekajEventNaBiloKojem<Eliminacija>(
+        igraciListe.map((ig) => ig.socket),
+        'partija:eliminacija',
+        (e) => e.razlog.startsWith('mrtva_slova'),
+        10_000,
+        'PR05 kaladont = mrtva slova',
+      );
+      const novaRundaPromise = cekajSljedecuRundu(sayer.socket, runda.runda);
+      sayer.socket.emit('potez:rijec', { rijec: 'kaladont' });
+      const eliminacija = await eliminacijaPromise;
+      expect(eliminacija.igracId).toBe(sayer.token);
+      expect(eliminacija.bodZa).toBeNull();
+      expect(eliminacija.razlog).not.toBe('kaladont');
+      const novaRunda = await novaRundaPromise;
+      const aktivni = new Set(pocetak.sjedala.map((s) => s.igracId).filter((id) => id !== sayer.token));
+      expect(novaRunda.naPotezuId).toBe(sljedeciUKrugu(pocetak.sjedala, sayer.token, aktivni));
+      expect(aktivni.has(autorKa)).toBe(true);
+
+      await odgodi(200);
+      const ucinci = await baza
+        .select()
+        .from(ucinakPosebneRijeci)
+        .where(eq(ucinakPosebneRijeci.partijaId, pocetak.partijaId));
+      expect(ucinci).toHaveLength(0);
     } finally {
       odspojiIgrace(igraciListe);
     }

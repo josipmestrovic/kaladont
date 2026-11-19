@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DogadajPoteza, RezultatNaredbe } from '../src/igra/politika-ucinka.js';
 import { BotKontroler } from '../src/bot/kontroler.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
-import { Vrecica, koeficijentTempaBota, odaberiPotez, oprezKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
+import { Vrecica, koeficijentTempaBota, odaberiPotez, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
 import { BROJ_GOSTIJU_FONDA_V4, BROJ_IMENOVANIH_FONDA_V4, CILJ_AKTIVNIH_FONDA_V4, NADIMCI_POCETNOG_FONDA_V4 } from '../src/bot/nadimci.js';
 import { stavkeZamjeneFondaBotova } from '../src/bot/servis-identiteta.js';
 import { dopustenoBotova, pragoviPopuneZaOkruzenje } from '../src/red/raspored-popune.js';
@@ -224,12 +224,91 @@ describe('odabir riječi bota', () => {
 
   // --- PR07: pravilnik + broj aktivnih mijenjaju politiku „ka” ---
 
-  it('oprezKa: Klasični ≥3 bez opreza; inače duelistički oprez', () => {
+  it('politikaKa: agresivni / oprezni / bez_ka po pravilniku', () => {
+    expect(politikaKa('klasicni', 3)).toBe('agresivni');
+    expect(politikaKa('klasicni', 2)).toBe('oprezni');
+    expect(politikaKa('ka_zna', 5)).toBe('oprezni');
+    expect(politikaKa('dokazi_nastavak', 4)).toBe('bez_ka');
+    expect(politikaKa()).toBe('oprezni');
     expect(oprezKa('klasicni', 3)).toBe(false);
     expect(oprezKa('klasicni', 2)).toBe(true);
-    expect(oprezKa('ka_zna', 5)).toBe(true);
-    expect(oprezKa('dokazi_nastavak', 4)).toBe(true);
-    expect(oprezKa()).toBe(true);
+    expect(oprezKa('dokazi_nastavak', 4)).toBe(false);
+  });
+
+  it('Dokaži nastavak: nikad kaladont na primljeni „ka”; igra običnu ili odustaje', () => {
+    const rijeci = laznaRijec({ kava: { frekvencija: 800, grupe: ['imenica:kava'] }, kamen: { frekvencija: 500, grupe: ['imenica:kamen'] } });
+    const sPropustom: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostPropustaKa: 0 };
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ka',
+      kandidati: ['kava', 'kamen'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak',
+      brojAktivnih: 3,
+    }, stvoriStanjeBota(sPropustom, rng(1)), sPropustom, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', propustKa: true });
+    if (odluka.vrsta === 'rijec') {
+      expect(odluka.rijec).not.toBe('kaladont');
+      expect(['kava', 'kamen']).toContain(odluka.rijec);
+    }
+
+    const bezRijeci = odaberiPotez({
+      trazenaSlova: 'ka',
+      kandidati: [],
+      ...rijeci,
+      pravila: 'dokazi_nastavak',
+      brojAktivnih: 2,
+    }, stvoriStanjeBota(konfigBezPropusta, rng(2)), konfigBezPropusta, rng(2));
+    expect(bezRijeci).toEqual({ vrsta: 'odustani', razlog: 'nema_rijeci' });
+  });
+
+  it('Dokaži nastavak: nikad ne ostavlja riječ na „ka”', () => {
+    const r = rng(7);
+    const stanje = stvoriStanjeBota(konfigBezPropusta, r);
+    for (let i = 0; i < 50; i += 1) {
+      const odluka = odaberiPotez({
+        trazenaSlova: 'ma',
+        kandidati: ['masa', 'maska'],
+        ...rjecnik,
+        pravila: 'dokazi_nastavak',
+        brojAktivnih: 3,
+      }, stanje, konfigBezPropusta, r);
+      expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
+    }
+    const samoKa = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['maska'],
+      ...rjecnik,
+      pravila: 'dokazi_nastavak',
+      brojAktivnih: 2,
+    }, stanje, konfigBezPropusta, r);
+    expect(samoKa).toEqual({ vrsta: 'odustani', razlog: 'nema_rijeci' });
+  });
+
+  it('Dokaži dokaz_nastavka: smije kaladont na „ka” (bez_ka samo na običnom potezu)', () => {
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ka',
+      kandidati: ['kava'],
+      ...laznaRijec({ kava: { frekvencija: 800, grupe: ['imenica:kava'] } }),
+      pravila: 'dokazi_nastavak',
+      faza: 'dokaz_nastavka',
+      brojAktivnih: 3,
+    }, stvoriStanjeBota(konfigBezPropusta, rng(1)), konfigBezPropusta, rng(1));
+    expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' });
+  });
+
+  it('Dokaži bez_ka: ako poželjni završavaju na „ka”, pada na poznate bez „ka”', () => {
+    const rijeci = laznaRijec({
+      maska: { frekvencija: 900, grupe: ['imenica:maska'] },
+      mastilo: { frekvencija: 20, grupe: ['imenica:mastilo'] },
+    });
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['maska', 'mastilo'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak',
+      brojAktivnih: 2,
+    }, stvoriStanjeBota(konfigBezPropusta, rng(3)), konfigBezPropusta, rng(3));
+    expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'mastilo', kategorija: 'srednja' });
   });
 
   it('PR07 Klasični s 3 aktivna: riječ na „ka” ulazi u pool čak uz vjerojatnostOstavljanjaKa 0', () => {

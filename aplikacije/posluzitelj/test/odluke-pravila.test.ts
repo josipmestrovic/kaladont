@@ -88,7 +88,7 @@ describe('odluke-pravila', () => {
     ).toEqual({ zrtvaId: 'D', vrstaMete: 'sljedeci' });
   });
 
-  it('odrediMetuPosebneRijeci (Dokaži nastavak, običan potez) koristi KA-ZNA granu', () => {
+  it('odrediMetuPosebneRijeci (Dokaži nastavak) nema posebne mete — motor ide na mrtva slova', () => {
     expect(
       odrediMetuPosebneRijeci({
         pravilnik: 'dokazi_nastavak',
@@ -97,7 +97,7 @@ describe('odluke-pravila', () => {
         poredak,
         aktivni: new Set(poredak),
       }),
-    ).toEqual({ zrtvaId: 'A', vrstaMete: 'prethodni' });
+    ).toEqual({ zrtvaId: null, vrstaMete: null });
   });
 
   it('odlukaNakonEliminacije: jedan aktivni → zaključi; inače otvori rundu', () => {

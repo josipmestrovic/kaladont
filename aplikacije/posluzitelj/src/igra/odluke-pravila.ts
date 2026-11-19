@@ -50,7 +50,8 @@ export function sljedeciAktivniIza(
 /**
  * Meta posebne riječi (kaladont/kalodont) na OBIČNOM potezu.
  * Klasični → prvi aktivni iza sayera (i uz 2 aktivna = protivnik).
- * KA-ZNA i Dokaži nastavak (običan potez) → stvarni autor prethodne riječi.
+ * KA-ZNA → stvarni autor prethodne riječi.
+ * Dokaži nastavak → nema posebne mete (motor ide na mrtva slova / RS-31).
  *
  * // PR05: kaladont KAO DOKAZ nije ova funkcija — dokaz ne pokreće ponovnu KA-ZNA obradu.
  */
@@ -66,7 +67,12 @@ export function odrediMetuPosebneRijeci(ulaz: {
     return { zrtvaId, vrstaMete: zrtvaId ? 'sljedeci' : null };
   }
 
-  // ka_zna i dokazi_nastavak (običan potez): žrtva je stvarni autor.
+  // Dokaži: posebna riječ na običnom potezu nije KA-ZNA efekt — motor koristi mrtva slova.
+  if (ulaz.pravilnik === 'dokazi_nastavak') {
+    return { zrtvaId: null, vrstaMete: null };
+  }
+
+  // ka_zna: žrtva je stvarni autor prethodne riječi.
   const autor = ulaz.autorPrethodneRijeci;
   if (!autor) return { zrtvaId: null, vrstaMete: null };
   return { zrtvaId: autor, vrstaMete: 'prethodni' };

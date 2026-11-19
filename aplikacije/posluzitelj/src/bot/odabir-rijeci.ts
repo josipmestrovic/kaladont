@@ -86,13 +86,22 @@ export interface UlazOdabira {
 }
 
 /**
- * PR07: duelistički oprez = KA-ZNA ponašanje (8 % propust tuđeg „ka”, 1,5 % ostavljanje).
- * false samo u Klasičnom s ≥3 aktivna — tada „ka” ide u ponderirani skup, primljeni „ka” → uvijek kaladont.
- * Dokaži nastavak na običnom potezu zadržava oprez (posebna riječ = KA-ZNA učinak u motoru).
+ * Politika „ka” po pravilniku (teren za kasnije bot-tendencije).
+ * - agresivni: Klasični ≥3 — „ka” u poolu, primljeni „ka” → uvijek kaladont
+ * - oprezni: KA-ZNA / Klasični duel — 8 % propust, 1,5 % ostavljanje
+ * - bez_ka: Dokaži nastavak — nikad kaladont, nikad ostavljanje „ka”
  */
+export type PolitikaKa = 'agresivni' | 'oprezni' | 'bez_ka';
+
+export function politikaKa(pravila: PravilnikPartije = 'ka_zna', brojAktivnih = 2): PolitikaKa {
+  if (pravila === 'dokazi_nastavak') return 'bez_ka';
+  if (pravila === 'klasicni' && brojAktivnih >= 3) return 'agresivni';
+  return 'oprezni';
+}
+
+/** @deprecated Preferiraj `politikaKa`; true = oprezni (ne agresivni / ne bez_ka). */
 export function oprezKa(pravila: PravilnikPartije = 'ka_zna', brojAktivnih = 2): boolean {
-  if (pravila === 'klasicni') return brojAktivnih < 3;
-  return true;
+  return politikaKa(pravila, brojAktivnih) === 'oprezni';
 }
 
 export type OdlukaBota =
@@ -156,27 +165,31 @@ export function odaberiPotez(
   // PR07: nedostajuća polja = KA-ZNA / 2 aktivna (kompatibilnost starih snimki i testova).
   const pravila = ulaz.pravila ?? 'ka_zna';
   const brojAktivnih = ulaz.brojAktivnih ?? 2;
-  const sOprezom = oprezKa(pravila, brojAktivnih);
-  // ulaz.faza: dokaz_nastavka koristi isti repertoar; mrtav nastavak samo prirodno (jeNepoznataBotu).
-  void ulaz.faza;
+  const faza = ulaz.faza ?? 'obican_potez';
+  // bez_ka vrijedi samo na običnom potezu — u dokazu kaladont/ka-riječ su valjan dokaz (RS-34).
+  const politikaSirowa = politikaKa(pravila, brojAktivnih);
+  const politika: PolitikaKa =
+    politikaSirowa === 'bez_ka' && faza === 'dokaz_nastavka' ? 'oprezni' : politikaSirowa;
 
   // Primljeni KA.
-  // PR07 Klasični ≥3: uvijek kaladont (smije eliminirati sljedećeg). Bez propusta.
-  // Inače: većinom kaladont; ponekad propusti i igra običnu riječ na „ka”.
+  // agresivni: uvijek kaladont. oprezni: većinom kaladont / ponekad propust. bez_ka: nikad kaladont.
   if (ulaz.trazenaSlova === 'ka') {
-    if (!sOprezom || rng() >= konfig.vjerojatnostPropustaKa) {
+    if (politika === 'bez_ka') {
+      propustKa = true;
+    } else if (politika === 'agresivni' || rng() >= konfig.vjerojatnostPropustaKa) {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
+    } else {
+      propustKa = true;
     }
-    propustKa = true;
   }
 
   const poznati = sviKandidati.filter((rijec) => !jeNepoznataBotu(rijec, ulaz.frekvencijaZa(rijec)));
   stanje.brojKandidata = poznati.length;
 
   if (poznati.length === 0) {
-    // Propust bez poznate riječi na „ka” → ipak kaladont (kao čovjek koji se sjetio pravila).
-    if (propustKa) {
+    // Propust bez poznate riječi na „ka” → ipak kaladont (osim bez_ka = Dokaži običan potez).
+    if (propustKa && politika !== 'bez_ka') {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
     }
@@ -193,8 +206,8 @@ export function odaberiPotez(
 
   const pozeljni = poznati.filter((rijec) => kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig) === 'uobicajena' && osnovnaVrsta(rijec, ['imenica', 'glagol', 'pridjev']));
   if (!pozeljni.length) {
-    // Propust bez poželjne riječi na „ka” → ipak kaladont (kao empty-poznati).
-    if (propustKa) {
+    // Propust bez poželjne riječi na „ka” → ipak kaladont (osim bez_ka).
+    if (propustKa && politika !== 'bez_ka') {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
     }
@@ -203,12 +216,17 @@ export function odaberiPotez(
   }
 
   const radni = pozeljni.length ? pozeljni : poznati;
-  // PR07: bez opreza (Klasični ≥3) — „ka” u istom ponderiranom skupu; nema 1,5 % filtera.
-  // S oprezom — odvoji naKa i primijeni vjerojatnostOstavljanjaKa / prisilni put.
+  // agresivni: „ka” u poolu. oprezni: 1,5 % / prisilni. bez_ka: isključi „ka”; fallback na poznate bez „ka”.
   let odabranaSkupina: string[];
   let prisilniKa = false;
-  if (!sOprezom) {
+  if (politika === 'agresivni') {
     odabranaSkupina = [...radni];
+  } else if (politika === 'bez_ka') {
+    const bezKaRadni = radni.filter((rijec) => zadnjaDva(rijec) !== 'ka');
+    const bezKaPoznati = poznati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
+    const bezKa = bezKaRadni.length > 0 ? bezKaRadni : bezKaPoznati;
+    if (bezKa.length === 0) return { vrsta: 'odustani', razlog: 'nema_rijeci' };
+    odabranaSkupina = bezKa;
   } else {
     const kandidati: string[] = [];
     const naKa: string[] = [];
