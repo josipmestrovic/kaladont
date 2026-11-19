@@ -7,8 +7,12 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   cekajIgracaNaPotezu,
   cekajIstuPartiju,
+  cekajOznakuIliPartiju,
+  mojIgracId,
   odigrajRijec,
+  pokreniPrivatnuPartiju,
   predajNeZnam,
+  procitajPrefiksIPocetnu,
   stvoriIgrace,
   udjiUJavniRed,
   zatvoriIgrace,
@@ -47,21 +51,18 @@ for (const sirina of [380, 1100] as const) {
 test('spojeni Dvoboj: Klasični i KA-ZNA dijele isti stol', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 2);
   try {
+    // Prvo jedan igrač — potvrdi izbor prije matcha, bez utrke s navigacijom.
     await igraci[0]!.stranica.goto('/red?mod=dva_igraca&pravila=klasicni');
-    await igraci[1]!.stranica.goto('/red?mod=dva_igraca&pravila=ka_zna');
-
-    // Oznaka je samo na lobbyju; match često odmah ide u partiju.
-    await Promise.race([
-      igraci[0]!.stranica.getByTestId('red-oznaka-izbora').waitFor({ state: 'visible', timeout: 15_000 }),
-      igraci[0]!.stranica.waitForURL(/\/partija\/[0-9a-f-]+$/, { timeout: 30_000 }),
-    ]).catch(() => undefined);
-    const oznaka0 = igraci[0]!.stranica.getByTestId('red-oznaka-izbora');
-    const oznaka1 = igraci[1]!.stranica.getByTestId('red-oznaka-izbora');
-    if (await oznaka0.isVisible().catch(() => false)) {
-      await expect(oznaka0).toContainText('Klasični');
+    const ishod0 = await cekajOznakuIliPartiju(igraci[0]!.stranica, /Klasični/i);
+    if (ishod0 === 'oznaka') {
+      await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Klasični');
+      await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Dvoboj');
     }
-    if (await oznaka1.isVisible().catch(() => false)) {
-      await expect(oznaka1).toContainText('KA-ZNA');
+
+    await igraci[1]!.stranica.goto('/red?mod=dva_igraca&pravila=ka_zna');
+    const ishod1 = await cekajOznakuIliPartiju(igraci[1]!.stranica, /KA-zna/i);
+    if (ishod1 === 'oznaka') {
+      await expect(igraci[1]!.stranica.getByTestId('red-oznaka-izbora')).toContainText(/KA-zna/i);
     }
 
     await cekajIstuPartiju(igraci);
@@ -76,17 +77,18 @@ test('spojeni Dvoboj: Klasični i KA-ZNA dijele isti stol', async ({ browser }) 
 test('Troboj: tri sjedala (lobby oznaka ili stol)', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'tri_igraca', 'dokazi_nastavak');
-    // Match može odmah u partiju — oznaka je na lobbyju; stol mora imati 3 sjedala.
-    await Promise.race([
-      igraci[0]!.stranica.getByTestId('red-oznaka-izbora').waitFor({ state: 'visible', timeout: 20_000 }),
-      igraci[0]!.stranica.waitForURL(/\/partija\/[0-9a-f-]+$/, { timeout: 30_000 }),
-    ]).catch(() => undefined);
-    const oznaka = igraci[0]!.stranica.getByTestId('red-oznaka-izbora');
-    if (await oznaka.isVisible().catch(() => false)) {
+    await igraci[0]!.stranica.goto('/red?mod=tri_igraca&pravila=dokazi_nastavak');
+    const ishod = await cekajOznakuIliPartiju(igraci[0]!.stranica, /Troboj.*Dokaži|Dokaži.*Troboj/i);
+    if (ishod === 'oznaka') {
+      const oznaka = igraci[0]!.stranica.getByTestId('red-oznaka-izbora');
       await expect(oznaka).toContainText('Troboj');
       await expect(oznaka).toContainText('Dokaži');
     }
+
+    await Promise.all([
+      igraci[1]!.stranica.goto('/red?mod=tri_igraca&pravila=dokazi_nastavak'),
+      igraci[2]!.stranica.goto('/red?mod=tri_igraca&pravila=dokazi_nastavak'),
+    ]);
     await cekajIstuPartiju(igraci);
     for (const { stranica } of igraci) {
       await expect(stranica.locator('.igraci-red > li')).toHaveCount(3);
@@ -302,54 +304,82 @@ test('privatna soba: gost vidi domaćinov pravilnik', async ({ browser }) => {
   }
 });
 
-test('dokaz smoke: Ne znam otvara zonu bez injekcije', async ({ browser }) => {
-  test.setTimeout(60_000);
+async function pripremiDokazZonu(igraci: Awaited<ReturnType<typeof stvoriIgrace>>) {
+  await pokreniPrivatnuPartiju(igraci, 'dokazi_nastavak');
+  const ana = await cekajIgracaNaPotezu(igraci);
+  const bruno = igraci.find((ig) => ig !== ana)!;
+  const { prefiks, pocetnaRijec } = await procitajPrefiksIPocetnu(ana.stranica);
+  const anaRijec = await pronadjiIgrivuRijec(prefiks, pocetnaRijec);
+  await odigrajRijec(ana.stranica, anaRijec);
+
+  await expect(bruno.stranica.getByRole('button', { name: 'Ne znam' })).toBeEnabled({
+    timeout: 15_000,
+  });
+  await predajNeZnam(bruno.stranica);
+
+  await expect(ana.stranica.getByTestId('dokaz-zona')).toContainText('Dokaži nastavak na svoju riječ', {
+    timeout: 15_000,
+  });
+  await expect(bruno.stranica.getByTestId('dokaz-zona')).toContainText('dokazuje nastavak');
+  await expect(bruno.stranica.getByTestId('dokaz-cekam')).toBeVisible();
+  // Bruno ne ispada na prvom „Ne znam” — čeka dokaz.
+  await expect(bruno.stranica.locator('.igraci-red > li:has(.oznaka-ti)')).not.toHaveClass(/eliminiran/);
+  await expect(bruno.stranica.getByText('Promatraš igru.')).toHaveCount(0);
+  return { ana, bruno, anaRijec };
+}
+
+test('dokaz smoke: uspješan nastavak eliminira Bruna', async ({ browser }) => {
+  test.setTimeout(90_000);
   const igraci = await stvoriIgrace(browser, 2);
   try {
-    const vlasnik = igraci[0]!.stranica;
-    const gost = igraci[1]!.stranica;
-
-    await vlasnik.goto('/soba/kreiraj?pravila=dokazi_nastavak');
-    await vlasnik.getByRole('button', { name: 'Bez tajmera' }).click();
-    await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
-    await expect(vlasnik).toHaveURL(/\/soba\/[A-Z0-9]+$/);
-    const kodSobe = await vlasnik.locator('.oznaka-koda strong').innerText();
-
-    await gost.goto(`/soba/${kodSobe}`);
-    await expect(gost.getByText(/Prijavljeni igrači \(2 \/ 8\)/)).toBeVisible({ timeout: 15_000 });
-    await vlasnik.getByRole('button', { name: 'Započni igru' }).click();
-    await expect(vlasnik).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });
-    await expect(gost).toHaveURL(vlasnik.url());
-
-    const ana = await cekajIgracaNaPotezu(igraci);
-    const bruno = igraci.find((ig) => ig !== ana)!;
-    const unos = ana.stranica.getByRole('textbox', { name: /Dovrši riječ na|Dokaži nastavak/ });
+    const { ana, bruno, anaRijec } = await pripremiDokazZonu(igraci);
+    const unos = ana.stranica.getByRole('textbox', { name: /Dokaži nastavak/ });
+    await expect(unos).toBeVisible({ timeout: 10_000 });
     const oznaka = (await unos.getAttribute('aria-label')) ?? '';
-    const prefiks = (oznaka.match(/(?:Dovrši riječ na|Dokaži nastavak na)\s+(.+)$/i)?.[1] ?? '')
-      .trim()
-      .toLocaleLowerCase('hr');
+    const prefiks = (oznaka.match(/Dokaži nastavak na\s+(.+)$/i)?.[1] ?? '').trim().toLocaleLowerCase('hr');
     expect(prefiks.length).toBeGreaterThan(0);
+    const dokazRijec = await pronadjiIgrivuRijec(prefiks, anaRijec);
+    await odigrajRijec(ana.stranica, dokazRijec);
 
-    // Desktop: sustavska riječ je u .kontekst-rijeci; oblak nije uvijek vidljiv.
-    const pocetnaLokator = ana.stranica.locator('.kontekst-rijeci .trenutna-rijec, .rijec-oblak').first();
-    await expect(pocetnaLokator).toBeVisible({ timeout: 10_000 });
-    const pocetnaRijec = (await pocetnaLokator.innerText()).replace(/\s+/g, '').toLocaleLowerCase('hr');
-    expect(pocetnaRijec.length).toBeGreaterThan(0);
-
-    const anaRijec = await pronadjiIgrivuRijec(prefiks, pocetnaRijec);
-    await odigrajRijec(ana.stranica, anaRijec);
-
-    await expect(bruno.stranica.getByRole('button', { name: 'Ne znam' })).toBeEnabled({
+    await expect(bruno.stranica.locator('.igraci-red > li:has(.oznaka-ti)')).toHaveClass(/eliminiran/, {
       timeout: 15_000,
     });
-    await predajNeZnam(bruno.stranica);
+    await expect(ana.stranica.locator('.igraci-red > li:has(.oznaka-ti)')).not.toHaveClass(/eliminiran/);
+    // Dvoboj: nakon Bruna slijedi završni poredak (Ana pobjeđuje).
+    await expect(ana.stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(bruno.stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({
+      timeout: 20_000,
+    });
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
 
-    await expect(ana.stranica.getByTestId('dokaz-zona')).toContainText('Dokaži nastavak na svoju riječ', {
+test('dokaz smoke: predaja dokaza eliminira Anu, Bruno ostaje', async ({ browser }) => {
+  test.setTimeout(90_000);
+  const igraci = await stvoriIgrace(browser, 2);
+  try {
+    const { ana, bruno } = await pripremiDokazZonu(igraci);
+    const anaId = await mojIgracId(ana.stranica);
+    const brunoId = await mojIgracId(bruno.stranica);
+
+    await expect(ana.stranica.getByRole('button', { name: 'Ne znam' })).toBeEnabled({ timeout: 10_000 });
+    await predajNeZnam(ana.stranica);
+
+    await expect(ana.stranica.locator(`.igraci-red > li[data-igrac-id="${anaId}"]`)).toHaveClass(/eliminiran/, {
       timeout: 15_000,
     });
-    await expect(bruno.stranica.getByTestId('dokaz-zona')).toContainText('dokazuje nastavak');
-    await expect(bruno.stranica.getByTestId('dokaz-cekam')).toBeVisible();
-    await expect(bruno.stranica.getByText('Ispao si')).toHaveCount(0);
+    await expect(bruno.stranica.locator(`.igraci-red > li[data-igrac-id="${brunoId}"]`)).not.toHaveClass(
+      /eliminiran/,
+    );
+    await expect(bruno.stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(ana.stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({
+      timeout: 20_000,
+    });
   } finally {
     await zatvoriIgrace(igraci);
   }
