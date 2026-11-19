@@ -186,24 +186,26 @@ export function klasificirajPoznatiSkup(
   for (const rijec of kandidati) {
     if (jeNepoznataBotu(rijec, frekvencijaZa(rijec))) continue;
     poznateRijeci.push(rijec);
+    // Frekvenciju gledamo na svakom poznatom obliku — česta fleksija kasnije u grupi
+    // i dalje čini skup „dovoljnim”, ne samo prvi neovisni predstavnik.
+    if (jeCesta(rijec, frekvencijaZa, konfig)) imaCestu = true;
+
     const grupe = grupeZa(rijec);
     const nova = grupe.length === 0
       ? !pokriveneGrupe.has(`rijec:${rijec}`)
       : grupe.some((grupa) => !pokriveneGrupe.has(grupa));
-    if (!nova) continue;
-
-    brojNeovisnih += 1;
-    predstavnici.push(rijec);
-    if (grupe.length === 0) pokriveneGrupe.add(`rijec:${rijec}`);
-    else for (const grupa of grupe) pokriveneGrupe.add(grupa);
-
-    if (jeCesta(rijec, frekvencijaZa, konfig)) imaCestu = true;
+    if (nova) {
+      brojNeovisnih += 1;
+      predstavnici.push(rijec);
+      if (grupe.length === 0) pokriveneGrupe.add(`rijec:${rijec}`);
+      else for (const grupa of grupe) pokriveneGrupe.add(grupa);
+    }
 
     if (imaCestu || brojNeovisnih >= pragNeovisnih) {
       // Dovoljan skup: early-exit. Ostale poznate nisu potrebne za klasifikaciju.
       return {
         vrsta: 'dovoljan',
-        brojNeovisnih: Math.max(brojNeovisnih, imaCestu ? pragNeovisnih : brojNeovisnih),
+        brojNeovisnih,
         imaCestu,
         predstavnici,
         poznateRijeci,
@@ -298,6 +300,11 @@ function odlukaTaktikeZaToken(
   return vrijednost;
 }
 
+/**
+ * true = bot zna legalan nastavak;
+ * false = potvrđeno mrtvo (nema legalne riječi u cijelom rječniku);
+ * null = težak/nepoznat botu, ali nastavak može biti živ (smije odigrati).
+ */
 function imaPoznatiNastavak(
   rijec: string,
   ulaz: UlazOdabira,
@@ -307,25 +314,43 @@ function imaPoznatiNastavak(
   const nakon = dodajGrupe(iskoristene, grupe);
   const prefiks = zadnjaDva(rijec);
   const verzijaPotrosenih = ulaz.verzijaPotrosenih ?? `${iskoristene.size}`;
-  const kljuc = `${ulaz.verzijaRjecnika ?? 0}|${verzijaPotrosenih}|${ulaz.pravila ?? ''}|${ulaz.faza ?? ''}|${[...grupe].sort().join(',')}|${prefiks}|poznati`;
+  const bazaKljuca = `${ulaz.verzijaRjecnika ?? 0}|${verzijaPotrosenih}|${ulaz.pravila ?? ''}|${ulaz.faza ?? ''}|${[...grupe].sort().join(',')}|${prefiks}`;
 
-  const izracunaj = (): boolean => {
-    if (ulaz.poznatiKandidatiNa) {
-      for (const _ of ulaz.poznatiKandidatiNa(prefiks, nakon)) return true;
-      return false;
-    }
-    if (ulaz.imaSlobodnuRijecNa) {
-      return ulaz.imaSlobodnuRijecNa(prefiks, nakon, ulaz.dopusteneVrste);
-    }
+  if (ulaz.predmemorija) ulaz.predmemorija.uskladiVerziju(ulaz.verzijaRjecnika ?? 0);
+
+  const izracunajPoznato = (): boolean => {
+    if (!ulaz.poznatiKandidatiNa) return false;
+    for (const _ of ulaz.poznatiKandidatiNa(prefiks, nakon)) return true;
     return false;
   };
 
-  if (ulaz.predmemorija) {
-    ulaz.predmemorija.uskladiVerziju(ulaz.verzijaRjecnika ?? 0);
-    return ulaz.predmemorija.dohvatiIliIzracunaj(kljuc, izracunaj);
+  if (ulaz.poznatiKandidatiNa) {
+    const imaPoznato = ulaz.predmemorija
+      ? ulaz.predmemorija.dohvatiIliIzracunaj(`${bazaKljuca}|poznati`, izracunajPoznato)
+      : izracunajPoznato();
+    if (imaPoznato) return true;
+
+    // Prazan poznati repertoar ≠ potvrđena mrtva slova — provjeri cijeli rječnik.
+    if (ulaz.imaSlobodnuRijecNa) {
+      const imaLegalno = ulaz.predmemorija
+        ? ulaz.predmemorija.dohvatiIliIzracunaj(
+          `${bazaKljuca}|legalno`,
+          () => ulaz.imaSlobodnuRijecNa!(prefiks, nakon, ulaz.dopusteneVrste),
+        )
+        : ulaz.imaSlobodnuRijecNa(prefiks, nakon, ulaz.dopusteneVrste);
+      return imaLegalno ? null : false;
+    }
+    return null;
   }
-  if (!ulaz.poznatiKandidatiNa && !ulaz.imaSlobodnuRijecNa) return null;
-  return izracunaj();
+
+  if (!ulaz.imaSlobodnuRijecNa) return null;
+  const imaLegalno = ulaz.predmemorija
+    ? ulaz.predmemorija.dohvatiIliIzracunaj(
+      `${bazaKljuca}|legalno`,
+      () => ulaz.imaSlobodnuRijecNa!(prefiks, nakon, ulaz.dopusteneVrste),
+    )
+    : ulaz.imaSlobodnuRijecNa(prefiks, nakon, ulaz.dopusteneVrste);
+  return imaLegalno;
 }
 
 function brojCestihPoznatihNastavaka(
@@ -528,9 +553,10 @@ export function odaberiPotez(
   }
 
   // Sve poznate vode u potvrđenu samoeliminaciju u Dokaži → Ne znam (motor odlučuje o prethodnom autoru).
-  if (politikaSirowa === 'bez_ka' && faza === 'obican_potez') {
-    const imaIzbjegavanje = poznati.some((rijec) => imaPoznatiNastavak(rijec, ulaz, iskoristene) !== false);
-    if (!imaIzbjegavanje && ulaz.imaSlobodnuRijecNa) {
+  // Težak/nepoznat nastavak (null) nije potvrđeno mrtav — bot smije odigrati.
+  if (politikaSirowa === 'bez_ka' && faza === 'obican_potez' && poznati.length > 0) {
+    const sviPotvrdjenoMrtvi = poznati.every((rijec) => imaPoznatiNastavak(rijec, ulaz, iskoristene) === false);
+    if (sviPotvrdjenoMrtvi) {
       return { vrsta: 'odustani', razlog: 'nema_rijeci' };
     }
   }

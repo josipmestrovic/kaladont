@@ -137,6 +137,37 @@ describe('odabir riječi bota', () => {
     expect(klasifikacija.vrsta).toBe('mali');
   });
 
+  it('česta fleksija kasnije u istoj grupi čini skup dovoljnim', () => {
+    const rijeci = laznaRijec({
+      mase: { frekvencija: 40, grupe: ['imenica:masa'] },
+      masa: { frekvencija: 900, grupe: ['imenica:masa'] },
+    });
+    const klasifikacija = klasificirajPoznatiSkup(['mase', 'masa'], rijeci.frekvencijaZa, rijeci.grupeZa, konfigBezPropusta);
+    expect(klasifikacija.brojNeovisnih).toBe(1);
+    expect(klasifikacija.imaCestu).toBe(true);
+    expect(klasifikacija.vrsta).toBe('dovoljan');
+  });
+
+  it('Dokaži: težak ali živ nastavak ne predaje se kao nema_rijeci', () => {
+    const rijeci = laznaRijec({
+      javor: { frekvencija: 500, grupe: ['imenica:javor'] },
+    });
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ja',
+      kandidati: ['javor'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak',
+      faza: 'obican_potez',
+      brojAktivnih: 2,
+      iskoristeneGrupe: new Set(),
+      // Bot ne zna nastavak, ali rječnik ima legalnu riječ — smije odigrati.
+      poznatiKandidatiNa: () => [],
+      imaSlobodnuRijecNa: () => true,
+      turnToken: 't-tezak-ziv',
+    }, stvoriStanjeBota(konfigBezPropusta, rng(8)), konfigBezPropusta, rng(8));
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'javor' });
+  });
+
   it('duel oprez: preferira sigurnu riječ pred čestom na KA', () => {
     const rijeci = laznaRijec({
       magla: { frekvencija: 200, grupe: ['imenica:magla'] },
