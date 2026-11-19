@@ -41,7 +41,8 @@ describe('bot reakcije — kontroler', () => {
     grupeZa: () => [],
     verzijaRjecnika: () => 1,
     frekvencijaZa: () => null,
-  } as unknown as Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika'> & { frekvencijaZa(rijec: string): number | null };
+    imaSlobodnuRijecNa: () => false,
+  } as unknown as Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika' | 'imaSlobodnuRijecNa'> & { frekvencijaZa(rijec: string): number | null };
 
   function stvoriKontroler(opts: {
     poslano: { partijaId: string; igracId: string; poruka: string }[];

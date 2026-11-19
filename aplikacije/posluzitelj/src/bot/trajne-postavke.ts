@@ -10,8 +10,8 @@ import {
 } from './konfiguracija-bota.js';
 
 /**
- * Stare spremljene konfiguracije (v3/v4) moraju dobiti zadane vrijednosti v5
- * i odbaciti zastarjela polja tempa/izostanka/reakcija bez ručnog admin upisa.
+ * Stare spremljene konfiguracije (v3–v5) moraju dobiti zadane vrijednosti v6
+ * i odbaciti zastarjela polja (tempo/izostanak/reakcije/neznanje po sudjelovanju).
  * `zadano` treba biti env-učitan snapshot (BOTOVI_*), ne samo hardkodirani default —
  * inače nedostajući `botoviTroboj` uvijek padne na false i env se zanemari.
  */

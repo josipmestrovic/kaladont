@@ -5,8 +5,8 @@
 import { z } from 'zod';
 import { PRAGOVI_POPUNE_MS } from '../red/raspored-popune.js';
 
-/** PR01: fiksni tempo 4 s (±jitter), obvezne reakcije, bez namjernog izostanka. */
-export const VERZIJA_BOT_POLITIKE = 5;
+/** PR02: kontekstualno neznanje, ograničena taktika; fiksni tempo iz PR01. */
+export const VERZIJA_BOT_POLITIKE = 6;
 
 export type KategorijaRijeci = 'uobicajena' | 'srednja' | 'rijetka';
 
@@ -25,8 +25,14 @@ export interface KonfiguracijaBota {
   vjerojatnostOstavljanjaKa: number;
   /** Vjerojatnost da bot propusti tuđi „ka” i igra običnu riječ umjesto kaladonta. */
   vjerojatnostPropustaKa: number;
-  vjerojatnostNeznanjaPoSudjelovanju: number;
-  rasponTeskogPotezaNeznanja: readonly [number, number];
+  /** Vjerojatnost „Ne znam” kad je poznati skup mali (1–N opcija bez česte sigurne). */
+  vjerojatnostNeznanjaUMalomSkupu: number;
+  /** Gornja granica neovisnih opcija koja još čini „mali” skup. */
+  maksimalnoOpcijaMalogSkupa: number;
+  /** Udio poteza u kojima se ocjenjuje uzorak kandidata (1-ply taktika). */
+  vjerojatnostTaktickogPoteza: number;
+  /** Maksimalan broj ponderirano uzorkovanih kandidata u taktičkom potezu. */
+  maksimalnoTaktickihKandidata: number;
   brziRazvoj: boolean;
   odstupanjaPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
   pragoviPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
@@ -50,7 +56,7 @@ export interface KonfiguracijaBota {
   odmaciPonovnogPokretanjaRedaMs: readonly number[];
 }
 
-/** Stara polja v3/v4 koja se pri migraciji tiho odbacuju. */
+/** Stara polja v3–v5 koja se pri migraciji tiho odbacuju. */
 export const ZASTARJELA_POLJA_BOT_POLITIKE = [
   'vjerojatnostIzostankaPoSudjelovanju',
   'vjerojatnostReakcijePozdravNaPocetku',
@@ -73,6 +79,8 @@ export const ZASTARJELA_POLJA_BOT_POLITIKE = [
   'korekcijaTeskogPrefiksa',
   'minimalniUdioPoteza',
   'maksimalniUdioPoteza',
+  'vjerojatnostNeznanjaPoSudjelovanju',
+  'rasponTeskogPotezaNeznanja',
 ] as const;
 
 export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
@@ -84,8 +92,10 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   odgodaReakcijeMinMs: 2_000,
   vjerojatnostOstavljanjaKa: 0.015,
   vjerojatnostPropustaKa: 0.08,
-  vjerojatnostNeznanjaPoSudjelovanju: 0.2,
-  rasponTeskogPotezaNeznanja: [1, 3],
+  vjerojatnostNeznanjaUMalomSkupu: 0.1,
+  maksimalnoOpcijaMalogSkupa: 3,
+  vjerojatnostTaktickogPoteza: 0.25,
+  maksimalnoTaktickihKandidata: 12,
   brziRazvoj: false,
   odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [3_000, 3_000], cetiri_igraca: [3_000, 3_000, 3_000] },
   pragoviPopuneMs: structuredClone(PRAGOVI_POPUNE_MS),
@@ -111,8 +121,6 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
 
 const Vjerojatnost = z.number().finite().min(0).max(1);
 const Vrijeme = z.number().int().min(0).max(300_000);
-const BrojPoteza = z.number().int().min(1).max(100);
-const RasponPoteza = z.tuple([BrojPoteza, BrojPoteza]).refine(([od, doVrijednosti]) => od <= doVrijednosti, 'Početak raspona mora biti manji od kraja.');
 const Pragovi = z.object({
   dva_igraca: z.tuple([Vrijeme]),
   tri_igraca: z.tuple([Vrijeme, Vrijeme]),
@@ -128,8 +136,10 @@ export const ShemaKonfiguracijeBota = z.object({
   odgodaReakcijeMinMs: z.number().int().min(0).max(10_000),
   vjerojatnostOstavljanjaKa: Vjerojatnost,
   vjerojatnostPropustaKa: Vjerojatnost.default(0.08),
-  vjerojatnostNeznanjaPoSudjelovanju: Vjerojatnost,
-  rasponTeskogPotezaNeznanja: RasponPoteza,
+  vjerojatnostNeznanjaUMalomSkupu: Vjerojatnost,
+  maksimalnoOpcijaMalogSkupa: z.number().int().min(1).max(20),
+  vjerojatnostTaktickogPoteza: Vjerojatnost,
+  maksimalnoTaktickihKandidata: z.number().int().min(1).max(50),
   brziRazvoj: z.boolean(),
   odstupanjaPopuneMs: Pragovi,
   pragoviPopuneMs: Pragovi,
@@ -168,6 +178,11 @@ function postotak(vrijednost: string | undefined, zadano: number): number {
   return vrijednost !== undefined && Number.isFinite(broj) && broj >= 0 && broj <= 1 ? broj : zadano;
 }
 
+function cijeliBroj(vrijednost: string | undefined, zadano: number, min: number, max: number): number {
+  const broj = Number(vrijednost);
+  return vrijednost !== undefined && Number.isInteger(broj) && broj >= min && broj <= max ? broj : zadano;
+}
+
 export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): KonfiguracijaBota {
   const lokalnoTestiranje = env.NODE_ENV === 'development' && env.BOTOVI_BRZI_RAZVOJ !== 'false';
   return {
@@ -179,6 +194,9 @@ export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): K
     brziRazvoj: lokalnoTestiranje,
     vjerojatnostOstavljanjaKa: postotak(env.BOT_VJEROJATNOST_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa),
     vjerojatnostPropustaKa: postotak(env.BOT_VJEROJATNOST_PROPUSTA_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropustaKa),
-    vjerojatnostNeznanjaPoSudjelovanju: postotak(env.BOT_NEZNANJE_PO_SUDJELOVANJU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostNeznanjaPoSudjelovanju),
+    vjerojatnostNeznanjaUMalomSkupu: postotak(env.BOT_NEZNANJE_U_MALOM_SKUPU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostNeznanjaUMalomSkupu),
+    maksimalnoOpcijaMalogSkupa: cijeliBroj(env.BOT_MAKS_OPCIJA_MALOG_SKUPA, ZADANA_KONFIGURACIJA_BOTA.maksimalnoOpcijaMalogSkupa, 1, 20),
+    vjerojatnostTaktickogPoteza: postotak(env.BOT_VJEROJATNOST_TAKTICKOG_POTEZA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza),
+    maksimalnoTaktickihKandidata: cijeliBroj(env.BOT_MAKS_TAKTICKIH_KANDIDATA, ZADANA_KONFIGURACIJA_BOTA.maksimalnoTaktickihKandidata, 1, 50),
   };
 }

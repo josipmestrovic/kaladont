@@ -10,7 +10,16 @@ import type { BrzaPoruka } from 'zajednicko';
 import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import type { KonfiguracijaBota } from './konfiguracija-bota.js';
-import { odaberiPotez, stvoriStanjeBota, trajanjeRazmisljanjaMs, type OdlukaBota, type Rng, type StanjeBotaUPartiji } from './odabir-rijeci.js';
+import {
+  jeNepoznataBotu,
+  odaberiPotez,
+  PredmemorijaLegalnosti,
+  stvoriStanjeBota,
+  trajanjeRazmisljanjaMs,
+  type OdlukaBota,
+  type Rng,
+  type StanjeBotaUPartiji,
+} from './odabir-rijeci.js';
 import {
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
@@ -23,7 +32,9 @@ export type NaredbaBota =
   | { vrsta: 'odustani'; turnToken: string };
 
 export interface OvisnostiBotKontrolera {
-  rjecnik: Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika'> & { frekvencijaZa(rijec: string): number | null };
+  rjecnik: Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika' | 'imaSlobodnuRijecNa'> & {
+    frekvencijaZa(rijec: string): number | null;
+  };
   izvrsiNaredbu: (partijaId: string, igracId: string, naredba: NaredbaBota) => RezultatNaredbe;
   posaljiReakciju?: (partijaId: string, igracId: string, poruka: BrzaPoruka) => boolean;
   konfiguracija: KonfiguracijaBota;
@@ -53,6 +64,7 @@ export interface BrojaciBota {
   prisilniKa: number;
   propustPrimljenogKa: number;
   reakcijaPoslano: number;
+  taktickihPoteza: number;
 }
 
 interface PlaniranaAkcija {
@@ -73,6 +85,7 @@ export class BotKontroler {
   private readonly greskePoBotu = new Map<string, { broj: number; posljednja: string; vrijemeMs: number }>();
   private readonly konfiguracijePartija = new Map<string, KonfiguracijaBota>();
   private readonly odluke = new Map<string, { turnToken: string; odluka: OdlukaBota; verzijaRjecnika: number }>();
+  private readonly predmemorije = new Map<string, PredmemorijaLegalnosti>();
   private readonly zakazaneReakcije = new Map<string, NodeJS.Timeout[]>();
   private readonly poslaniPozdravi = new Map<string, Set<string>>();
   private readonly poslaneEliminacijskeReakcije = new Set<string>();
@@ -97,6 +110,7 @@ export class BotKontroler {
     prisilniKa: 0,
     propustPrimljenogKa: 0,
     reakcijaPoslano: 0,
+    taktickihPoteza: 0,
   };
 
   constructor(private readonly ovisnosti: OvisnostiBotKontrolera) {
@@ -192,6 +206,7 @@ export class BotKontroler {
       this.dovrseniTokeni.delete(dogadaj.partijaId);
       this.konfiguracijePartija.delete(dogadaj.partijaId);
       this.odluke.delete(dogadaj.partijaId);
+      this.predmemorije.delete(dogadaj.partijaId);
       this.poslaniPozdravi.delete(dogadaj.partijaId);
       this.ocistiEliminacijskeKljuceve(dogadaj.partijaId);
       // Zakazane reakcije smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
@@ -250,6 +265,7 @@ export class BotKontroler {
     this.dovrseniTokeni.clear();
     this.konfiguracijePartija.clear();
     this.odluke.clear();
+    this.predmemorije.clear();
     this.poslaniPozdravi.clear();
     this.poslaneEliminacijskeReakcije.clear();
     this.sljedecaReakcijaMs.clear();
@@ -278,6 +294,15 @@ export class BotKontroler {
     return new Map([...this.greskePoBotu].map(([igracId, greska]) => [igracId, { ...greska }]));
   }
 
+  private predmemorijaZa(partijaId: string): PredmemorijaLegalnosti {
+    let predmemorija = this.predmemorije.get(partijaId);
+    if (!predmemorija) {
+      predmemorija = new PredmemorijaLegalnosti();
+      this.predmemorije.set(partijaId, predmemorija);
+    }
+    return predmemorija;
+  }
+
   private odluci(dogadaj: DogadajPoteza, stanjeBota: StanjeBotaUPartiji, odbijene: ReadonlySet<string> = new Set(), oporavak = false): OdlukaBota {
     const prethodna = this.odluke.get(dogadaj.partijaId);
     const ista = prethodna?.turnToken === dogadaj.turnToken ? prethodna : undefined;
@@ -289,6 +314,9 @@ export class BotKontroler {
       ista.verzijaRjecnika = verzijaRjecnika;
       return ista.odluka;
     }
+    const predmemorija = this.predmemorijaZa(dogadaj.partijaId);
+    predmemorija.uskladiVerziju(verzijaRjecnika);
+    const verzijaPotrosenih = `${dogadaj.iskoristeneGrupe.size}:${[...dogadaj.iskoristeneGrupe].slice(0, 32).sort().join(',')}`;
     const odluka = odaberiPotez({
       trazenaSlova: dogadaj.trazenaSlova!,
       kandidati,
@@ -299,8 +327,21 @@ export class BotKontroler {
       pravila: dogadaj.pravila ?? 'ka_zna',
       faza: dogadaj.faza ?? 'obican_potez',
       brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
+      iskoristeneGrupe: dogadaj.iskoristeneGrupe,
+      dopusteneVrste: dogadaj.dopusteneVrste,
+      imaSlobodnuRijecNa: (prefiks, iskoristene, dopusteneVrste) =>
+        this.ovisnosti.rjecnik.imaSlobodnuRijecNa(prefiks, iskoristene, dopusteneVrste),
+      poznatiKandidatiNa: (prefiks, iskoristene) => {
+        const frekvencijaZa = (rijec: string) => this.ovisnosti.rjecnik.frekvencijaZa(rijec);
+        return [...this.ovisnosti.rjecnik.igriviKandidati(prefiks, iskoristene, dogadaj.dopusteneVrste)]
+          .filter((rijec) => !jeNepoznataBotu(rijec, frekvencijaZa(rijec)));
+      },
+      predmemorija,
+      verzijaRjecnika,
+      verzijaPotrosenih,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng);
     if (odluka.vrsta === 'rijec' && odluka.propustKa) this.brojaci.propustPrimljenogKa += 1;
+    if (odluka.vrsta === 'rijec' && odluka.takticki) this.brojaci.taktickihPoteza += 1;
     if (odluka.vrsta === 'rijec' && odluka.izborKa && stanjeBota.zadnjiTokenKa !== dogadaj.turnToken) {
       stanjeBota.zadnjiTokenKa = dogadaj.turnToken;
       if (odluka.izborKa === 'dobrovoljni') this.brojaci.dobrovoljniKa += 1;
