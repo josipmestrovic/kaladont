@@ -275,19 +275,23 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-e2e-blob-${{ github.run_id }}-${{ github.run_attempt }}-s${{ matrix.shard }}
+          # Bez run_attempt: rerun jednog sharda mora i dalje naći blobove zelenih shardova.
+          # overwrite: true dopušta zamjenu bloba istog sharda pri ponovnom pokretanju.
+          name: playwright-e2e-blob-${{ github.run_id }}-s${{ matrix.shard }}
           path: blob-report/
           if-no-files-found: ignore
           retention-days: 14
+          overwrite: true
 
       - name: Spremiti E2E dijagnostiku sharda
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-e2e-diag-${{ github.run_id }}-${{ github.run_attempt }}-s${{ matrix.shard }}
+          name: playwright-e2e-diag-${{ github.run_id }}-s${{ matrix.shard }}
           path: test-results/e2e/
           if-no-files-found: ignore
           retention-days: 14
+          overwrite: true
 
       - name: Ugasi Playwright browser runtime
         if: always()
@@ -323,7 +327,8 @@ jobs:
         id: blobovi
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          pattern: playwright-e2e-blob-${{ github.run_id }}-${{ github.run_attempt }}-s*
+          # Isti run_id za sve attemptove; overwrite na uploadu drži zadnji blob po shardu.
+          pattern: playwright-e2e-blob-${{ github.run_id }}-s*
           path: blob-reports
           merge-multiple: true
           # Ako nema artefakata (oba sharda pala prije uploada), korak pada → e2e-izvjestaj crven.
@@ -375,10 +380,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          name: playwright-e2e-${{ github.run_id }}
           path: playwright-report-e2e/
           if-no-files-found: ignore
           retention-days: 14
+          overwrite: true
 
   slika:
     name: Slika — build, sken, smoke
