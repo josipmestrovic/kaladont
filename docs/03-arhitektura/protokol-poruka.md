@@ -30,7 +30,8 @@ Poslužitelj razrješava identitet (ili stvara novog gosta) i veže socket uz `i
 | `soba:izbaci` | `{ igracId: string }` | Vlasnik izbacuje člana iz privatne čekaonice; izbačeni ostaje blokiran za taj kod sobe |
 
 ```ts
-type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci";
+type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci" | "cao" | "hej" | "oprosi" | "svaka-cast";
+// Ljudski `reakcija:posalji` prihvaća samo prve četiri; botovi smiju i micro-flavour kodove.
 // UI prikaz: 👋 Pozdrav! • 😅 Sorry! • 👏 Dobro odigrano! • 😎 Hvala
 ```
 

@@ -8,8 +8,7 @@
  */
 import { grafemi, PRAGOVI_DULJINE, zadnjaDva, type FazaPoteza, type PravilnikPartije } from 'zajednicko';
 import { promijesajNiz } from '../igra/raspored-sjedala.js';
-import { ZADANA_KONFIGURACIJA_BOTA, type KategorijaRijeci, type KonfiguracijaBota } from './konfiguracija-bota.js';
-import { createHash } from 'node:crypto';
+import { type KategorijaRijeci, type KonfiguracijaBota } from './konfiguracija-bota.js';
 
 /** Vraća broj u [0, 1). */
 export type Rng = () => number;
@@ -40,16 +39,13 @@ export class Vrecica<T> {
 
 export interface StanjeBotaUPartiji {
   vrecicaVrsta: Vrecica<'imenica' | 'ostalo'>;
-  ciljIzostanka: number | null;
   ciljNeznanja: number | null;
   brojPoteza: number;
   brojTeskihPoteza: number;
   zadnjiToken: string | null;
   zadnjiTezakToken: string | null;
-  izostanakPotrosen: boolean;
   neznanjePotroseno: boolean;
   konfiguracija: KonfiguracijaBota;
-  koeficijentTempa: number;
   brojKandidata: number;
   zadnjiTokenKa: string | null;
 }
@@ -58,16 +54,11 @@ export function stvoriStanjeBota(konfig: KonfiguracijaBota, rng: Rng): StanjeBot
   const cilj = (vjerojatnost: number, raspon: readonly [number, number]) => rng() < vjerojatnost ? raspon[0] + Math.min(raspon[1] - raspon[0], Math.floor(rng() * (raspon[1] - raspon[0] + 1))) : null;
   return {
     vrecicaVrsta: new Vrecica([{ vrijednost: 'imenica', udio: konfig.udioImenica * 100 }, { vrijednost: 'ostalo', udio: (1 - konfig.udioImenica) * 100 }], rng),
-    ciljIzostanka: cilj(konfig.brziRazvoj ? 0 : konfig.vjerojatnostIzostankaPoSudjelovanju, konfig.rasponPotezaIzostanka),
     ciljNeznanja: cilj(konfig.vjerojatnostNeznanjaPoSudjelovanju, konfig.rasponTeskogPotezaNeznanja),
     brojPoteza: 0, brojTeskihPoteza: 0, zadnjiToken: null, zadnjiTezakToken: null,
-    izostanakPotrosen: false, neznanjePotroseno: false,
-    konfiguracija: structuredClone(konfig), koeficijentTempa: 1, brojKandidata: 0, zadnjiTokenKa: null,
+    neznanjePotroseno: false,
+    konfiguracija: structuredClone(konfig), brojKandidata: 0, zadnjiTokenKa: null,
   };
-}
-
-export function koeficijentTempaBota(igracId: string, konfig: KonfiguracijaBota = ZADANA_KONFIGURACIJA_BOTA): number {
-  return konfig.koeficijentTempaMin + createHash('sha256').update(igracId).digest().readUInt16BE(0) / 65_535 * (konfig.koeficijentTempaMaks - konfig.koeficijentTempaMin);
 }
 
 export interface UlazOdabira {
@@ -261,27 +252,24 @@ export function odaberiPotez(
   };
 }
 
-/** Vrijeme razmišljanja unutar roka; bot nikad ne dobiva više od roka minus margina. */
+/**
+ * PR01: fiksni tempo od početka poteza (zadano 4000 ms) ± jitter, minus proteklo.
+ * Isti ugovor za javnu, privatnu i trening. Presentation RNG; ne ovisi o riječi/identitetu.
+ */
 export function trajanjeRazmisljanjaMs(
   trajanjePotezaMs: number | null,
   konfig: KonfiguracijaBota,
   rng: Rng,
-  kontekst: 'javna' | 'privatna' | 'trening' = 'javna',
-  podaci?: { punoTrajanjeMs: number; protekloMs: number; koeficijentTempa?: number; primljeniKa?: boolean; brojGrafema?: number; frekvencija?: number | null; brojKandidata?: number },
+  _kontekst: 'javna' | 'privatna' | 'trening' = 'javna',
+  podaci?: { punoTrajanjeMs: number; protekloMs: number },
 ): number {
-  const trajanje = podaci?.punoTrajanjeMs ?? trajanjePotezaMs ?? 30_000;
-  const kategorija = rng();
-  const raspon = podaci?.primljeniKa || kategorija < konfig.udioBrzih ? konfig.rasponBrzih : kategorija < konfig.udioBrzih + konfig.udioUobicajenih ? konfig.rasponUobicajenih : konfig.rasponSporih;
-  const duljina = 1 + Math.min(konfig.maksimalnaKorekcijaDuljine, Math.max(0, (podaci?.brojGrafema ?? 8) - 8) * konfig.korekcijaDuljinePoGrafemu);
-  const rijetkost = podaci?.frekvencija !== undefined && (podaci.frekvencija ?? 0) < konfig.pragFrekvencije.uobicajena ? 1 + konfig.korekcijaRijetkosti : 1;
-  const tezinaPrefiksa = 1 + Math.min(0.15, Math.max(0, 8 - (podaci?.brojKandidata ?? 8)) * konfig.korekcijaTeskogPrefiksa);
-  const udio = Math.min(konfig.maksimalniUdioPoteza, Math.max(konfig.minimalniUdioPoteza, (raspon[0] + rng() * (raspon[1] - raspon[0])) * (podaci?.koeficijentTempa ?? 1) * duljina * rijetkost * tezinaPrefiksa));
-  const cilj = kontekst === 'trening'
-    ? konfig.treningRazmisljanjeMinMs + rng() * (konfig.treningRazmisljanjeMaksMs - konfig.treningRazmisljanjeMinMs)
-    : konfig.brziRazvoj ? 2_000 : trajanje * udio;
+  const punoTrajanje = podaci?.punoTrajanjeMs ?? trajanjePotezaMs ?? 30_000;
+  const jitter = konfig.jitterPotezaBotaMs;
+  const pomak = jitter <= 0 ? 0 : Math.floor(rng() * (2 * jitter + 1)) - jitter;
+  const cilj = konfig.trajanjePotezaBotaMs + pomak;
   const osnova = Math.max(0, cilj - (podaci?.protekloMs ?? 0));
   if (trajanjePotezaMs === null) return osnova;
-  const margina = Math.min(konfig.marginaRokaMs, Math.max(150, trajanje * 0.05));
+  const margina = Math.min(konfig.marginaRokaMs, Math.max(150, punoTrajanje * 0.05));
   const gornja = Math.max(0, trajanjePotezaMs - margina);
   return Math.min(gornja, osnova);
 }

@@ -969,6 +969,10 @@
     sorry: '😅',
     'dobro-odigrano': '👏',
     najjaci: '😎',
+    cao: '👋',
+    hej: '👋',
+    oprosi: '😅',
+    'svaka-cast': '👏',
   };
   const REAKCIJE_EMOJI_PROSIRENE: Record<VrstaReakcije, string> = { ...REAKCIJE_EMOJI, tuzan: '😢' };
 
@@ -977,6 +981,10 @@
     sorry: 'Nemoj zamjerit',
     'dobro-odigrano': 'Bravo!',
     najjaci: 'Hvala',
+    cao: 'Ćao!',
+    hej: 'Hej!',
+    oprosi: 'Oprosti!',
+    'svaka-cast': 'Svaka čast!',
   };
   const REAKCIJE_TEKST_PROSIRENE: Record<VrstaReakcije, string> = { ...REAKCIJE_TEKST, tuzan: 'Ne znam' };
 

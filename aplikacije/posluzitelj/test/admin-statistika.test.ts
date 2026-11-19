@@ -78,7 +78,7 @@ describe('GET /admin/statistike/cekanje', () => {
     const prije = await odgovor.json() as ZapisPostavkiBotova;
     expect(prije.revizija).toBe(pocetnePostavke?.revizija ?? 0);
     const spremi = (konfiguracija = prije.konfiguracija, revizija = prije.revizija) => fetch(putanja, { method: 'PUT', headers, body: JSON.stringify({ revizija, konfiguracija }) });
-    expect((await spremi({ ...prije.konfiguracija, udioBrzih: 0.9, udioUobicajenih: 0.9 })).status).toBe(400);
+    expect((await spremi({ ...prije.konfiguracija, jitterPotezaBotaMs: 9_999 })).status).toBe(400);
     expect((await spremi({ ...prije.konfiguracija, brziRazvoj: true })).status).toBe(400);
     const odgovori = await Promise.all([
       spremi({ ...prije.konfiguracija, brziRazvoj: false, vjerojatnostOstavljanjaKa: 0.22 }),

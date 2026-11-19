@@ -423,7 +423,6 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     rjecnik,
     izvrsiNaredbu: (partijaId, igracId, naredba) => upravitelj.naredbaBota(partijaId, igracId, naredba),
     posaljiReakciju: (partijaId, igracId, poruka) => upravitelj.posaljiReakcijuSudionika(partijaId, igracId, poruka),
-    oznaciNamjerniIstek: (partijaId, igracId, turnToken) => upravitelj.oznaciNamjerniIstek(partijaId, igracId, turnToken),
     dohvatiPotez: (partijaId) => upravitelj.dohvatiPotez(partijaId),
     prekiniZbogGreske: (partijaId, igracId, turnToken) => upravitelj.prekiniZbogGreskeBota(partijaId, igracId, turnToken),
     naAktivnost: (igracId) => fondBotova?.zabiljeziAktivnost(igracId),
@@ -453,7 +452,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       zapisSocketHandlerGreske,
       naPromjenuPoteza: (dogadaj) => botKontroler.naPromjenuPoteza(dogadaj),
       naPocetakPartijeZaBotove: (partijaId, kontekst, botIds) => botKontroler.naPocetakPartije(partijaId, kontekst, botIds),
-      naEliminacijuZaBotove: (partijaId, kontekst, zrtvaId, bodZaId, sudionici) => botKontroler.naEliminaciju(partijaId, kontekst, zrtvaId, bodZaId, sudionici),
+      naEliminacijuZaBotove: (partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId) => botKontroler.naEliminaciju(partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId),
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
         naJavnaPartijaZavrsila(partijaId);

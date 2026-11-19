@@ -17,7 +17,20 @@ export interface PodaciVeze {
   token: string;
 }
 
-export type BrzaPoruka = 'pozdrav' | 'sorry' | 'dobro-odigrano' | 'najjaci';
+/** Brze poruke stolova. Ljudski picker šalje samo prve četiri; botovi smiju i micro-flavour kodove. */
+export type BrzaPoruka =
+  | 'pozdrav'
+  | 'sorry'
+  | 'dobro-odigrano'
+  | 'najjaci'
+  | 'cao'
+  | 'hej'
+  | 'oprosi'
+  | 'svaka-cast';
+
+/** Kodovi koje smije poslati ljudski `reakcija:posalji`. */
+export const LJUDSKE_BRZE_PORUKE = ['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci'] as const;
+export type LjudskaBrzaPoruka = (typeof LJUDSKE_BRZE_PORUKE)[number];
 
 export type KodRazlogaVeze = 'SESIJA_ISTEKLA' | 'NEVALJAN_TOKEN' | 'DRUGA_KARTICA' | 'SERVIS_NEDOSTUPAN';
 

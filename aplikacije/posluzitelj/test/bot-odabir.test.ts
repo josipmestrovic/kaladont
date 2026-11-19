@@ -2,32 +2,34 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DogadajPoteza, RezultatNaredbe } from '../src/igra/politika-ucinka.js';
 import { BotKontroler } from '../src/bot/kontroler.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
-import { Vrecica, koeficijentTempaBota, odaberiPotez, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
+import { Vrecica, odaberiPotez, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
+import { parsajSpremljenuKonfiguraciju } from '../src/bot/trajne-postavke.js';
 import { BROJ_GOSTIJU_FONDA_V4, BROJ_IMENOVANIH_FONDA_V4, CILJ_AKTIVNIH_FONDA_V4, NADIMCI_POCETNOG_FONDA_V4 } from '../src/bot/nadimci.js';
 import { stavkeZamjeneFondaBotova } from '../src/bot/servis-identiteta.js';
 import { dopustenoBotova, pragoviPopuneZaOkruzenje } from '../src/red/raspored-popune.js';
 import { jeValjanNadimak } from 'zajednicko';
 
 describe('lokalni tempo javnih botova', () => {
-  it('u development puni oba reda na 1 s i igra na 2 s, bez promjene treninga', () => {
+  it('u development ubrzava samo popunu; potez ostaje ~4 s', () => {
     const konfiguracija = ucitajKonfiguracijuBota({ NODE_ENV: 'development', BOT_VJEROJATNOST_ISTEKA: '1' });
     const pragovi = pragoviPopuneZaOkruzenje('development');
     for (const mod of ['dva_igraca', 'tri_igraca', 'cetiri_igraca'] as const) {
       expect(dopustenoBotova(0, 999, pragovi[mod])).toBe(0);
       expect(dopustenoBotova(0, 1_000, pragovi[mod])).toBe(mod === 'dva_igraca' ? 1 : mod === 'tri_igraca' ? 2 : 3);
     }
-    for (const nasumicno of [0, 0.5, 1]) {
-      expect(trajanjeRazmisljanjaMs(5_000, konfiguracija, () => nasumicno, 'javna')).toBe(2_000);
-      expect(trajanjeRazmisljanjaMs(null, konfiguracija, () => nasumicno, 'trening')).toBe(1_000 + 2_000 * nasumicno);
+    expect(konfiguracija.brziRazvoj).toBe(true);
+    expect(konfiguracija.trajanjePotezaBotaMs).toBe(4_000);
+    for (const kontekst of ['javna', 'trening'] as const) {
+      const ms = trajanjeRazmisljanjaMs(30_000, konfiguracija, () => 0.5, kontekst, { punoTrajanjeMs: 30_000, protekloMs: 0 });
+      expect(ms).toBeGreaterThanOrEqual(3_700);
+      expect(ms).toBeLessThanOrEqual(4_300);
     }
-    expect(konfiguracija.vjerojatnostIzostankaPoSudjelovanju).toBe(0);
   });
 
   it.each(['test', 'staging', 'production'])('ne ubrzava okruženje %s', (okruzenje) => {
     const konfiguracija = ucitajKonfiguracijuBota({ NODE_ENV: okruzenje });
     expect(konfiguracija.brziRazvoj).toBe(false);
-    expect(konfiguracija.rasponSporih).toEqual([0.55, 0.85]);
-    expect(konfiguracija.vjerojatnostIzostankaPoSudjelovanju).toBe(0.02);
+    expect(konfiguracija.trajanjePotezaBotaMs).toBe(4_000);
     expect(pragoviPopuneZaOkruzenje(okruzenje)).toEqual({
       dva_igraca: [30_000],
       tri_igraca: [20_000, 30_000],
@@ -60,7 +62,6 @@ const konfigBezPropusta: KonfiguracijaBota = {
   vjerojatnostOstavljanjaKa: 0,
   vjerojatnostPropustaKa: 0,
   vjerojatnostNeznanjaPoSudjelovanju: 0,
-  vjerojatnostIzostankaPoSudjelovanju: 0,
 };
 
 describe('vrećica', () => {
@@ -393,25 +394,26 @@ describe('odabir riječi bota', () => {
     expect(odaberiPotez({ trazenaSlova: 'ma', kandidati: ['masa', 'maska'], ...rjecnik }, stvoriStanjeBota(bezKA, rng(1)), bezKA, () => 0)).toMatchObject({ vrsta: 'rijec', rijec: 'masa' });
   });
 
-  it('vrijeme razmišljanja nikad ne prelazi rok minus marginu', () => {
+  it('vrijeme razmišljanja je ~4 s ±jitter i nikad ne prelazi rok minus marginu', () => {
     const r = rng(9);
     for (let i = 0; i < 100; i += 1) {
-      const ms = trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, r);
-      expect(ms).toBeLessThanOrEqual(28_500);
-      expect(ms).toBeGreaterThanOrEqual(800);
+      const ms = trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, r, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 0 });
+      expect(ms).toBeLessThanOrEqual(4_300);
+      expect(ms).toBeGreaterThanOrEqual(3_700);
     }
     expect(trajanjeRazmisljanjaMs(2_000, ZADANA_KONFIGURACIJA_BOTA, r)).toBeLessThanOrEqual(1_850);
-    expect(trajanjeRazmisljanjaMs(null, ZADANA_KONFIGURACIJA_BOTA, () => 0)).toBe(2_400);
-    expect(trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, () => 1)).toBe(25_500);
-    expect(trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, r, 'trening')).toBeGreaterThanOrEqual(1_000);
+    // rng=0 → jitter = -300
+    expect(trajanjeRazmisljanjaMs(null, ZADANA_KONFIGURACIJA_BOTA, () => 0)).toBe(3_700);
+    // rng ≈ 1 → gornji rub jittera
+    expect(trajanjeRazmisljanjaMs(null, ZADANA_KONFIGURACIJA_BOTA, () => 0.999)).toBe(4_300);
+    expect(trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, () => 0.5, 'trening', { punoTrajanjeMs: 30_000, protekloMs: 0 })).toBe(4_000);
   });
 
-  it('težina prefiksa s malim brojem kandidata blago usporava javni odgovor', () => {
-    const rngZaOba = () => 0.5;
-    const puno = trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, rngZaOba, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 0, brojKandidata: 8 });
-    const malo = trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, rngZaOba, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 0, brojKandidata: 1 });
-    expect(malo).toBeGreaterThan(puno);
-    expect(malo).toBeLessThanOrEqual(25_500);
+  it('identitet i duljina riječi ne mijenjaju fiksni tempo', () => {
+    const a = trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, () => 0.5, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 0 });
+    const b = trajanjeRazmisljanjaMs(30_000, ZADANA_KONFIGURACIJA_BOTA, () => 0.5, 'trening', { punoTrajanjeMs: 30_000, protekloMs: 0 });
+    expect(a).toBe(4_000);
+    expect(b).toBe(4_000);
   });
 
   it('konfiguracija iz okoline mijenja samo valjane postotke', () => {
@@ -419,7 +421,6 @@ describe('odabir riječi bota', () => {
     expect(konfig.vjerojatnostNeznanjaPoSudjelovanju).toBe(0.5);
     expect(konfig.vjerojatnostOstavljanjaKa).toBe(0.015);
     expect(konfig.vjerojatnostPropustaKa).toBe(0.08);
-    expect(konfig.vjerojatnostIzostankaPoSudjelovanju).toBe(0.02);
   });
 
   it('fond v4 ima 80 imenovanih i 20 gostiju', () => {
@@ -432,22 +433,42 @@ describe('odabir riječi bota', () => {
     expect(stavke.every((s) => s.kljucSeeda.startsWith('bot-v4-'))).toBe(true);
   });
 
-  it('tempo je proporcionalan punom potezu, a zakašnjeli događaj ne dobiva novi rok', () => {
-    const trideset = trajanjeRazmisljanjaMs(30_000, konfigBezPropusta, () => 0.5, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 0 });
-    const petnaest = trajanjeRazmisljanjaMs(15_000, konfigBezPropusta, () => 0.5, 'javna', { punoTrajanjeMs: 15_000, protekloMs: 0 });
-    expect(petnaest).toBe(trideset / 2);
-    expect(trajanjeRazmisljanjaMs(25_000, konfigBezPropusta, () => 0.5, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 5_000 })).toBe(trideset - 5_000);
+  it('zakašnjeli događaj oduzima proteklo vrijeme od fiksnog cilja', () => {
+    const puni = trajanjeRazmisljanjaMs(30_000, konfigBezPropusta, () => 0.5, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 0 });
+    expect(puni).toBe(4_000);
+    expect(trajanjeRazmisljanjaMs(25_000, konfigBezPropusta, () => 0.5, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 1_200 })).toBe(2_800);
     expect(trajanjeRazmisljanjaMs(10_000, konfigBezPropusta, () => 0.5, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 20_000 })).toBe(0);
-    expect(trajanjeRazmisljanjaMs(30_000, konfigBezPropusta, () => 0.9, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 0, primljeniKa: true })).toBeLessThanOrEqual(6_000);
-    expect(koeficijentTempaBota('bot-1')).toBe(koeficijentTempaBota('bot-1'));
-    expect(koeficijentTempaBota('bot-1')).toBeGreaterThanOrEqual(0.9);
-    expect(koeficijentTempaBota('bot-1')).toBeLessThanOrEqual(1.1);
+    // Kratki preostali rok ima prednost nad ciljem 4 s.
+    expect(trajanjeRazmisljanjaMs(2_000, konfigBezPropusta, () => 0.5, 'javna', { punoTrajanjeMs: 30_000, protekloMs: 0 })).toBeLessThanOrEqual(1_850);
   });
 
   it('stari env postotci ne dobivaju tiho novo značenje', () => {
     const konfiguracija = ucitajKonfiguracijuBota({ BOT_VJEROJATNOST_NE_ZNAM: '1', BOT_VJEROJATNOST_ISTEKA: '1' });
     expect(konfiguracija.vjerojatnostNeznanjaPoSudjelovanju).toBe(0.2);
-    expect(konfiguracija.vjerojatnostIzostankaPoSudjelovanju).toBe(0.02);
+  });
+
+  it('migracija v4→v5 odbacuje izostanak i daje fiksni tempo', () => {
+    const stara = {
+      ...ZADANA_KONFIGURACIJA_BOTA,
+      verzija: 4,
+      vjerojatnostIzostankaPoSudjelovanju: 1,
+      vjerojatnostReakcijePozdravNaPocetku: 0,
+      udioBrzih: 0.9,
+      rasponBrzih: [0.08, 0.2],
+      rasponUobicajenih: [0.2, 0.55],
+      rasponSporih: [0.55, 0.85],
+      koeficijentTempaMin: 0.5,
+      koeficijentTempaMaks: 1.5,
+      treningRazmisljanjeMinMs: 100,
+      treningRazmisljanjeMaksMs: 200,
+      botoviDvoboj: true,
+    };
+    const parsano = parsajSpremljenuKonfiguraciju(stara);
+    expect(parsano.verzija).toBe(5);
+    expect(parsano.trajanjePotezaBotaMs).toBe(4_000);
+    expect(parsano.jitterPotezaBotaMs).toBe(300);
+    expect(parsano.botoviDvoboj).toBe(true);
+    expect('vjerojatnostIzostankaPoSudjelovanju' in parsano).toBe(false);
   });
 });
 
@@ -458,13 +479,11 @@ describe('validacija admin postavki bota', () => {
   });
 
   it.each([
-    { udioBrzih: 0.6, udioUobicajenih: 0.6 },
     { vjerojatnostNeznanjaPoSudjelovanju: NaN },
     { vjerojatnostOstavljanjaKa: Infinity },
-    { treningRazmisljanjeMinMs: 4_000, treningRazmisljanjeMaksMs: 3_000 },
     { pragFrekvencije: { uobicajena: 10, srednja: 100 } },
-    { rasponPotezaIzostanka: [12, 2] },
-    { rasponBrzih: [0.08, 0.6] },
+    { jitterPotezaBotaMs: 5_000 },
+    { rasponTeskogPotezaNeznanja: [12, 2] },
     { pragoviPopuneMs: { dva_igraca: [3_000], tri_igraca: [20_000, 30_000], cetiri_igraca: [40_000, 30_000, 20_000] } },
     { odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [3_000], cetiri_igraca: [3_000, 3_000, 3_000] } },
   ])('odbija nevaljanu kombinaciju %j', (izmjena) => {
@@ -504,8 +523,8 @@ describe('bot kontroler', () => {
       },
       izvrsiNaredbu: izvrsi as never,
       konfiguracija,
-      oznaciNamjerniIstek: () => true,
       rng: rng(4),
+      rngPrezentacije: () => 0.5,
       sada: () => 0,
       zakazi: (posao, ms) => {
         timeri.push({ posao, ms });
@@ -523,37 +542,33 @@ describe('bot kontroler', () => {
     const { kontroler, timeri } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj());
     expect(timeri).toHaveLength(1);
-    expect(timeri[0]!.ms).toBeLessThanOrEqual(28_500);
+    expect(timeri[0]!.ms).toBe(4_000);
     timeri[0]!.posao();
     expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ vrsta: 'rijec', turnToken: 't1' }));
     expect(kontroler.brojaci.odigranihRijeci).toBe(1);
   });
 
-  it('trening planira 1–3 s i ne može namjerno čekati istek', () => {
-    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, { ...konfigBezPropusta, vjerojatnostIzostankaPoSudjelovanju: 1, rasponPotezaIzostanka: [1, 1] });
+  it('trening koristi isti ~4 s tempo i nikad ne čeka namjerni istek', () => {
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }));
     kontroler.naPromjenuPoteza(dogadaj({ kontekst: 'trening' }));
-    expect(timeri[0]!.ms).toBeGreaterThanOrEqual(1_000);
-    expect(timeri[0]!.ms).toBeLessThanOrEqual(3_000);
+    expect(timeri[0]!.ms).toBe(4_000);
     expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(0);
   });
 
-  it('javni namjerni istek ne igra potez i odluka vrijedi samo jednom za token', () => {
+  it('isti token se ne planira dvaput; novi token dobiva novi plan', () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri } = stvori(izvrsi, () => 1, { ...konfigBezPropusta, vjerojatnostIzostankaPoSudjelovanju: 1, rasponPotezaIzostanka: [1, 1] });
+    const { kontroler, timeri } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj());
     kontroler.naPromjenuPoteza(dogadaj());
-    expect(timeri).toHaveLength(0);
-    expect(izvrsi).not.toHaveBeenCalled();
-    expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(1);
-    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't2' }));
-    expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(1);
     expect(timeri).toHaveLength(1);
+    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't2' }));
+    expect(timeri).toHaveLength(2);
+    expect(timeri[1]!.ms).toBe(4_000);
   });
 
-  it('već propušten rok ne označava kao namjerni istek', () => {
-    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, { ...konfigBezPropusta, vjerojatnostIzostankaPoSudjelovanju: 1, rasponPotezaIzostanka: [1, 1] });
+  it('već propušten rok ne planira akciju', () => {
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }));
     kontroler.naPromjenuPoteza(dogadaj({ istekPotezaMs: -1 }));
-    expect(kontroler.brojaci.namjernihCekanjaIsteka).toBe(0);
     expect(timeri).toHaveLength(0);
   });
 
@@ -647,11 +662,12 @@ describe('bot kontroler', () => {
     const konfiguracija = structuredClone(konfigBezPropusta);
     const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfiguracija);
     kontroler.naPromjenuPoteza(dogadaj({ naPotezuId: 'covjek' }));
-    konfiguracija.brziRazvoj = true;
+    konfiguracija.trajanjePotezaBotaMs = 2_000;
+    konfiguracija.jitterPotezaBotaMs = 0;
     kontroler.naPromjenuPoteza(dogadaj());
-    expect(timeri[0]!.ms).not.toBe(2_000);
+    expect(timeri[0]!.ms).toBe(4_000); // snapshot još drži stare postavke
     kontroler.naPromjenuPoteza(dogadaj({ partijaId: 'p2' }));
-    expect(timeri[1]!.ms).toBe(2_000);
+    expect(timeri[1]!.ms).toBe(2_000); // nova partija uzima nove postavke
     kontroler.zaustavi();
   });
 
@@ -748,14 +764,10 @@ describe('bot kontroler', () => {
   it('PR07 naEliminaciju šalje reakciju žrtve i kad snimka još drži zastarjeli dokaz (Bugbot)', () => {
     // Motor nullira stanje.dokaz pa zove eliminirajIgraca bez objave — lokalna snimka zastarjela.
     const posaljiReakciju = vi.fn(() => true);
-    const konfigReakcija: KonfiguracijaBota = {
-      ...konfigBezPropusta,
-      vjerojatnostReakcijeBravoPriIspadanju: 1,
-      vjerojatnostReakcijeHvalaPriIspadanju: 0,
-    };
-    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigReakcija, {
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigBezPropusta, {
       posaljiReakciju,
       rng: () => 0,
+      rngPrezentacije: () => 0,
     });
     kontroler.naPromjenuPoteza(dogadaj({
       naPotezuId: 'covjek',
@@ -773,6 +785,7 @@ describe('bot kontroler', () => {
         { igracId: 'covjek', upravljac: 'covjek' },
         { igracId: 'bot', upravljac: 'bot' },
       ],
+      'p1:1',
     );
     const reakcije = timeri.filter((t) => t.ms >= 2_000);
     expect(reakcije.length).toBeGreaterThanOrEqual(1);
@@ -782,14 +795,10 @@ describe('bot kontroler', () => {
 
   it('PR07 naEliminaciju šalje reakciju žrtve kad dokaz nije u snimci', () => {
     const posaljiReakciju = vi.fn(() => true);
-    const konfigReakcija: KonfiguracijaBota = {
-      ...konfigBezPropusta,
-      vjerojatnostReakcijeBravoPriIspadanju: 1,
-      vjerojatnostReakcijeHvalaPriIspadanju: 0,
-    };
-    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigReakcija, {
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigBezPropusta, {
       posaljiReakciju,
       rng: () => 0,
+      rngPrezentacije: () => 0,
     });
     kontroler.naPromjenuPoteza(dogadaj({ naPotezuId: 'covjek', dokaz: null }));
     kontroler.naEliminaciju(
@@ -801,6 +810,7 @@ describe('bot kontroler', () => {
         { igracId: 'covjek', upravljac: 'covjek' },
         { igracId: 'bot', upravljac: 'bot' },
       ],
+      'p1:1',
     );
     const reakcije = timeri.filter((t) => t.ms >= 2_000);
     expect(reakcije.length).toBeGreaterThanOrEqual(1);

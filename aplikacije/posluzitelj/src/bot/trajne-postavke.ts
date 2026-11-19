@@ -1,11 +1,17 @@
 import { and, eq } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { izmjenePostavkiBotova, postavkeBotova } from '../baza/shema.js';
-import { ShemaKonfiguracijeBota, VERZIJA_BOT_POLITIKE, ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from './konfiguracija-bota.js';
+import {
+  ShemaKonfiguracijeBota,
+  VERZIJA_BOT_POLITIKE,
+  ZADANA_KONFIGURACIJA_BOTA,
+  ZASTARJELA_POLJA_BOT_POLITIKE,
+  type KonfiguracijaBota,
+} from './konfiguracija-bota.js';
 
 /**
- * Stare spremljene konfiguracije (verzija 3, bez tri_igraca / botoviTroboj) moraju
- * dobiti zadane vrijednosti i novu verziju politike bez ručnog admin upisa.
+ * Stare spremljene konfiguracije (v3/v4) moraju dobiti zadane vrijednosti v5
+ * i odbaciti zastarjela polja tempa/izostanka/reakcija bez ručnog admin upisa.
  * `zadano` treba biti env-učitan snapshot (BOTOVI_*), ne samo hardkodirani default —
  * inače nedostajući `botoviTroboj` uvijek padne na false i env se zanemari.
  */
@@ -13,7 +19,10 @@ export function parsajSpremljenuKonfiguraciju(
   sirovo: unknown,
   zadano: KonfiguracijaBota = ZADANA_KONFIGURACIJA_BOTA,
 ): KonfiguracijaBota {
-  const ulaz = sirovo && typeof sirovo === 'object' ? (sirovo as Record<string, unknown>) : {};
+  const ulaz = sirovo && typeof sirovo === 'object' ? { ...(sirovo as Record<string, unknown>) } : {};
+  for (const polje of ZASTARJELA_POLJA_BOT_POLITIKE) {
+    delete ulaz[polje];
+  }
   const pragoviUlaz = ulaz.pragoviPopuneMs && typeof ulaz.pragoviPopuneMs === 'object'
     ? (ulaz.pragoviPopuneMs as Record<string, unknown>)
     : {};
@@ -24,6 +33,9 @@ export function parsajSpremljenuKonfiguraciju(
     ...zadano,
     ...ulaz,
     verzija: VERZIJA_BOT_POLITIKE,
+    trajanjePotezaBotaMs: typeof ulaz.trajanjePotezaBotaMs === 'number' ? ulaz.trajanjePotezaBotaMs : zadano.trajanjePotezaBotaMs,
+    jitterPotezaBotaMs: typeof ulaz.jitterPotezaBotaMs === 'number' ? ulaz.jitterPotezaBotaMs : zadano.jitterPotezaBotaMs,
+    odgodaReakcijeMinMs: typeof ulaz.odgodaReakcijeMinMs === 'number' ? ulaz.odgodaReakcijeMinMs : zadano.odgodaReakcijeMinMs,
     pragoviPopuneMs: {
       ...zadano.pragoviPopuneMs,
       ...pragoviUlaz,
