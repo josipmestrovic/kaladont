@@ -786,27 +786,34 @@ describe('bot kontroler', () => {
     kontroler.zaustavi();
   });
 
-  it('planiraj ne računa odluku sinkrono (odgoda prije odluci)', () => {
-    let pozivaIgrive = 0;
+  it('planiraj ne izvršava naredbu sinkrono (odgoda prije izvrsi)', () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri } = stvori(izvrsi, () => 1, konfigBezPropusta, {
-      rjecnik: {
-        igriviKandidati: () => {
-          pozivaIgrive += 1;
-          return ['masa'];
-        },
-        frekvencijaZa: () => 500,
-        grupeZa: () => ['imenica:masa'],
-        verzijaRjecnika: () => 1,
-        imaSlobodnuRijecNa: () => true,
-      },
-    });
+    const { kontroler, timeri } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj());
-    expect(pozivaIgrive).toBe(0);
+    expect(izvrsi).not.toHaveBeenCalled();
     expect(kontroler.pregledPlanova()[0]?.vrsta).toBeNull();
     timeri[0]!.posao();
-    expect(pozivaIgrive).toBeGreaterThan(0);
     expect(izvrsi).toHaveBeenCalled();
+    kontroler.zaustavi();
+  });
+
+  it('novi token otkazuje zastarjeli nastavivi posao (generacija)', async () => {
+    let predaja = 0;
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri } = stvori(izvrsi, () => 1, konfigBezPropusta, {
+      predajKontrolu: async () => { predaja += 1; },
+    });
+    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't1' }));
+    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't2' }));
+    expect(timeri.length).toBeGreaterThanOrEqual(1);
+    // Stari callback ne smije igrati.
+    const stari = timeri[0]!;
+    stari.posao();
+    expect(izvrsi).not.toHaveBeenCalled();
+    const novi = timeri[timeri.length - 1]!;
+    novi.posao();
+    expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ turnToken: 't2' }));
+    void predaja;
     kontroler.zaustavi();
   });
 
