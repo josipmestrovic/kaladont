@@ -27,11 +27,17 @@ PULL_TIMEOUT_SEC="${PW_BROWSER_PULL_TIMEOUT_SEC:-150}"
 READINESS_TIMEOUT_SEC="${PW_BROWSER_READINESS_TIMEOUT_SEC:-60}"
 
 ime_kontejnera() {
-  local run_id job sanitarno
+  local run_id job shard sanitarno
   run_id="${GITHUB_RUN_ID:-local}"
   job="${GITHUB_JOB:-job}"
+  # Matrix E2E: GITHUB_JOB je isti ("e2e") na svim shardovima — dodaj E2E_SHARD.
+  shard="${E2E_SHARD:-}"
   sanitarno="$(printf '%s' "$job" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-')"
-  printf 'pw-browsers-%s-%s' "$run_id" "$sanitarno"
+  if [[ -n "$shard" ]]; then
+    printf 'pw-browsers-%s-%s-s%s' "$run_id" "$sanitarno" "$shard"
+  else
+    printf 'pw-browsers-%s-%s' "$run_id" "$sanitarno"
+  fi
 }
 
 zapisi_sazetak() {

@@ -1,8 +1,8 @@
 name: CI
 
-# PR: lint/test/e2e + lokalni image smoke, bez GHCR pusha.
+# PR: lint/test + izolirani E2E shardovi + lokalni image smoke, bez GHCR pusha.
 # main push: isti suite + candidate u GHCR; Objaviti Docker/staging pale se samo s main via workflow_run.
-# Docs-only putanje (docs/**, root *.md, .cursor/**, LICENSE) preskaču kod i sliku; agregator ostaje zelen.
+# Docs-only putanje (docs/**, root *.md, .cursor/**, LICENSE) preskaču kod, e2e i sliku; agregator ostaje zelen.
 on:
   push:
     branches:
@@ -77,7 +77,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   kod:
-    name: Kod — lint, test, E2E
+    name: Kod — lint, test, check, build
     needs: putanje
     if: ${{ needs.putanje.outputs.docs_only != 'true' }}
     runs-on: ubuntu-24.04
@@ -196,31 +196,189 @@ jobs:
       - name: Izgraditi workspace
         run: pnpm build
 
+  e2e:
+    name: E2E — shard ${{ matrix.shard }}/2
+    needs: putanje
+    if: ${{ needs.putanje.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kaladont
+          POSTGRES_PASSWORD: kaladont
+          POSTGRES_DB: kaladont_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kaladont -d kaladont_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      BAZA_URL: postgresql://kaladont:kaladont@localhost:5432/kaladont_ci
+      SESIJA_TAJNA: ci-test-secret
+      EMAIL_API_KLJUC: ''
+      DEV_MAIL: dev@example.com
+      UMAMI_URL: ''
+      UMAMI_WEBSITE_ID: ''
+      PUBLIC_UMAMI_URL: ''
+      PUBLIC_UMAMI_WEBSITE_ID: ''
+      ODGODA_POCETKA_PARTIJE_MS: '0'
+      ADMIN_TAJNI_KLJUC: ci-admin-secret
+      # Timer poteza: playwright.config.ts webServer forsira ONEMOGUCI_TIMER_POTEZA=true.
+      TOLERANCIJA_PREKIDA_MS: '10000'
+      E2E_SHARD: ${{ matrix.shard }}
+
+    steps:
+      - name: Preuzeti repozitorij
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Postaviti pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Postaviti Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalirati ovisnosti
+        run: pnpm install --frozen-lockfile
+
+      - name: Pripremiti bazu i zajednički paket za E2E
+        run: bash skripte/ci/e2e-priprema.sh
+
       - name: Pokrenuti Playwright browser runtime
         # 8 min: stane 2×pull (150s) + retry pauza + readiness; inače GHA ubije korak prije logova.
         timeout-minutes: 8
         run: bash skripte/ci/playwright-browser-runtime.sh start --webkit
 
-      - name: Pokrenuti kritične Playwright E2E testove
-        env:
-          ONEMOGUCI_TIMER_POTEZA: 'false'
-          TOLERANCIJA_PREKIDA_MS: '10000'
-        run: pnpm test:e2e
+      - name: Pokrenuti Playwright E2E shard
+        run: |
+          pnpm exec playwright test \
+            --config=playwright.config.ts \
+            --shard=${{ matrix.shard }}/2 \
+            --workers=1
 
-      - name: Spremiti Playwright E2E izvještaj
+      - name: Spremiti blob izvještaj sharda
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-e2e-${{ github.run_id }}
-          path: |
-            playwright-report-e2e/
-            test-results/e2e/
+          name: playwright-e2e-blob-${{ github.run_id }}-${{ github.run_attempt }}-s${{ matrix.shard }}
+          path: blob-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Spremiti E2E dijagnostiku sharda
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-e2e-diag-${{ github.run_id }}-${{ github.run_attempt }}-s${{ matrix.shard }}
+          path: test-results/e2e/
           if-no-files-found: ignore
           retention-days: 14
 
       - name: Ugasi Playwright browser runtime
         if: always()
         run: bash skripte/ci/playwright-browser-runtime.sh stop
+
+  e2e-izvjestaj:
+    name: E2E — spojeni izvještaj
+    needs: [putanje, e2e]
+    # Docs-only: ne spajati nepostojeće blobove (inače crveni docs PR).
+    if: ${{ always() && needs.putanje.result == 'success' && needs.putanje.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Preuzeti repozitorij
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Postaviti pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Postaviti Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalirati ovisnosti
+        run: pnpm install --frozen-lockfile
+
+      - name: Preuzeti blob izvještaje shardova
+        id: blobovi
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: playwright-e2e-blob-${{ github.run_id }}-${{ github.run_attempt }}-s*
+          path: blob-reports
+          merge-multiple: true
+          # Ako nema artefakata (oba sharda pala prije uploada), korak pada → e2e-izvjestaj crven.
+
+      - name: Spojiti blob izvještaje u HTML
+        shell: bash
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-e2e
+        run: |
+          set -euo pipefail
+          {
+            echo '## E2E spojeni izvještaj'
+            echo "- e2e matrix: \`${{ needs.e2e.result }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ ! -d blob-reports ]]; then
+            echo 'Direktorij blob-reports ne postoji — download artefakata nije uspio.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Nedostaju blob izvještaji E2E shardova.' >&2
+            exit 1
+          fi
+
+          mapfile -t zipovi < <(find blob-reports -type f -name '*.zip' | sort)
+          if [[ ${#zipovi[@]} -eq 0 ]]; then
+            echo 'Nema blob izvještaja — setup sharda vjerojatno nije stigao do uploada.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Nedostaju blob izvještaji E2E shardova.' >&2
+            find blob-reports -maxdepth 3 -type f >> "$GITHUB_STEP_SUMMARY" || true
+            exit 1
+          fi
+
+          printf '%s\n' "- Pronađeno blobova: \`${#zipovi[@]}\`" >> "$GITHUB_STEP_SUMMARY"
+          for z in "${zipovi[@]}"; do
+            printf '%s\n' "- \`$z\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          # Očekujemo oba sharda; nepotpun skup ostaje vidljiv u sažetku (agregator i dalje gleda e2e.result).
+          if [[ ${#zipovi[@]} -lt 2 ]]; then
+            echo "- Upozorenje: očekivana 2 bloba, pronađeno ${#zipovi[@]} (nepotpun suite izvještaj)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          pnpm exec playwright merge-reports --reporter html blob-reports
+          if [[ ! -f playwright-report-e2e/index.html ]]; then
+            echo 'HTML izvještaj nije nastao nakon merge-reports.' >&2
+            ls -la blob-reports playwright-report-e2e playwright-report 2>&1 || true
+            exit 1
+          fi
+          echo '- HTML: `playwright-report-e2e/`' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Spremiti spojeni E2E HTML izvještaj
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: playwright-report-e2e/
+          if-no-files-found: ignore
+          retention-days: 14
 
   slika:
     name: Slika — build, sken, smoke
@@ -565,7 +723,7 @@ jobs:
 
   agregator:
     name: Lint, test, check i build
-    needs: [putanje, kod, slika]
+    needs: [putanje, kod, e2e, e2e-izvjestaj, slika]
     if: always()
     runs-on: ubuntu-24.04
     permissions:
@@ -578,11 +736,15 @@ jobs:
           docs_only='${{ needs.putanje.outputs.docs_only }}'
           putanje='${{ needs.putanje.result }}'
           kod='${{ needs.kod.result }}'
+          e2e='${{ needs.e2e.result }}'
+          e2e_izvjestaj='${{ needs.e2e-izvjestaj.result }}'
           slika='${{ needs.slika.result }}'
           {
             echo '## CI agregator'
             echo "- putanje: \`$putanje\` (docs_only=\`$docs_only\`)"
             echo "- kod: \`$kod\`"
+            echo "- e2e: \`$e2e\`"
+            echo "- e2e-izvjestaj: \`$e2e_izvjestaj\`"
             echo "- slika: \`$slika\`"
           } >> "$GITHUB_STEP_SUMMARY"
           if [[ "$putanje" != "success" ]]; then
@@ -590,12 +752,13 @@ jobs:
             exit 1
           fi
           if [[ "$docs_only" == "true" ]]; then
-            echo "Docs-only promjene — kod i slika preskočeni; required check zelen."
+            echo "Docs-only promjene — kod, e2e i slika preskočeni; required check zelen."
             exit 0
           fi
-          if [[ "$kod" == "success" && "$slika" == "success" ]]; then
-            echo "Kod i slika su zeleni."
+          # failure / cancelled / neočekivani skipped = neuspjeh.
+          if [[ "$kod" == "success" && "$e2e" == "success" && "$e2e_izvjestaj" == "success" && "$slika" == "success" ]]; then
+            echo "Kod, E2E shardovi, izvještaj i slika su zeleni."
             exit 0
           fi
-          echo "CI nije prošao (kod=$kod, slika=$slika)."
+          echo "CI nije prošao (kod=$kod, e2e=$e2e, e2e-izvjestaj=$e2e_izvjestaj, slika=$slika)."
           exit 1
