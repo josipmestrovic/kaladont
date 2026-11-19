@@ -3231,6 +3231,11 @@ export function stvoriUpraviteljPartija(
     for (const s of sudionici) {
       aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
     }
+    postavke.naPocetakPartijeZaBotove?.(
+      partijaId,
+      'privatna',
+      sudionici.filter((s) => s.upravljac === 'bot').map((s) => s.igracId),
+    );
     zabiljeziAnalitikuPocetka(stanje);
 
     void Promise.all([upisPocetkaPrivatnePartije, ucitajOtkljucaneGrupe(sudionici), ucitajGrupeZaDostignuca(sudionici)]).then(([, grupe, grupeDostignuca]) => {

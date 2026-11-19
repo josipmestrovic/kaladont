@@ -443,18 +443,40 @@ export class BotKontroler {
     const bazaOdgode = odgodaReakcijeMs(this.rngPrezentacije, konfiguracija);
     const cilj = Math.max(sada + bazaOdgode, sljedeca);
     const odgoda = Math.max(0, cilj - sada);
-    // Rezerviraj cooldown slot unaprijed (RS-22: 2 s između emitiranih reakcija).
-    this.sljedecaReakcijaMs.set(kljucIgraca, cilj + 2_000);
-    const handle = this.zakazi(() => {
+    // Rezerviraj slot unaprijed (+mala margina zbog setTimeout kašnjenja); nakon uspješnog emit-a usklađujemo.
+    this.sljedecaReakcijaMs.set(kljucIgraca, cilj + 2_050);
+
+    const ukloniHandle = (handle: NodeJS.Timeout) => {
       const red = this.zakazaneReakcije.get(partijaId);
-      if (red) {
-        const indeks = red.indexOf(handle);
-        if (indeks >= 0) red.splice(indeks, 1);
-        if (red.length === 0) this.zakazaneReakcije.delete(partijaId);
-      }
+      if (!red) return;
+      const indeks = red.indexOf(handle);
+      if (indeks >= 0) red.splice(indeks, 1);
+      if (red.length === 0) this.zakazaneReakcije.delete(partijaId);
+    };
+
+    const pokusajPoslati = (preostaliPokusaji: number) => {
       if (this.zaustavljen) return;
       const uspjeh = this.ovisnosti.posaljiReakciju?.(partijaId, igracId, poruka);
-      if (uspjeh) this.brojaci.reakcijaPoslano += 1;
+      if (uspjeh) {
+        this.brojaci.reakcijaPoslano += 1;
+        this.sljedecaReakcijaMs.set(kljucIgraca, this.sada() + 2_000);
+        return;
+      }
+      if (preostaliPokusaji <= 0) return;
+      // Motor je odbio zbog RS-22 — ponovi nakon punog cooldowna.
+      const retryHandle = this.zakazi(() => {
+        ukloniHandle(retryHandle);
+        pokusajPoslati(preostaliPokusaji - 1);
+      }, 2_000);
+      const red = this.zakazaneReakcije.get(partijaId) ?? [];
+      red.push(retryHandle);
+      this.zakazaneReakcije.set(partijaId, red);
+      this.sljedecaReakcijaMs.set(kljucIgraca, this.sada() + 4_050);
+    };
+
+    const handle = this.zakazi(() => {
+      ukloniHandle(handle);
+      pokusajPoslati(1);
     }, odgoda);
     const red = this.zakazaneReakcije.get(partijaId) ?? [];
     red.push(handle);

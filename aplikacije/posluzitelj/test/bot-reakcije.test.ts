@@ -145,4 +145,37 @@ describe('bot reakcije — kontroler', () => {
     expect(zakazano).toHaveLength(2);
     expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(4_000);
   });
+
+  it('odbijena reakcija zbog cooldowna se jednom ponavlja', () => {
+    const poslano: { partijaId: string; igracId: string; poruka: string }[] = [];
+    const zakazano: { ms: number; posao: () => void }[] = [];
+    let pokusaji = 0;
+    const kontroler = new BotKontroler({
+      rjecnik: prazanRjecnik,
+      izvrsiNaredbu: () => ({ ishod: 'ignoriran', razlog: 'nema_partije' }),
+      posaljiReakciju: (partijaId, igracId, poruka) => {
+        pokusaji += 1;
+        if (pokusaji === 1) return false;
+        poslano.push({ partijaId, igracId, poruka });
+        return true;
+      },
+      konfiguracija: { ...ZADANA_KONFIGURACIJA_BOTA, odgodaReakcijeMinMs: 0 },
+      rng: () => 0,
+      rngPrezentacije: () => 0,
+      sada: () => 0,
+      zakazi: (posao, ms) => {
+        zakazano.push({ ms, posao });
+        return { ref: zakazano.length } as unknown as NodeJS.Timeout;
+      },
+      otkazi: vi.fn(),
+    });
+    kontroler.naPocetakPartije('p5', 'privatna', ['bot-a']);
+    expect(zakazano).toHaveLength(1);
+    zakazano[0]!.posao();
+    expect(poslano).toHaveLength(0);
+    expect(zakazano).toHaveLength(2);
+    expect(zakazano[1]!.ms).toBe(2_000);
+    zakazano[1]!.posao();
+    expect(poslano).toHaveLength(1);
+  });
 });
