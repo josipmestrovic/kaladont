@@ -75,7 +75,8 @@ interface PlaniranaAkcija {
   igracId: string;
   turnToken: string;
   izvrsitiUMs: number;
-  vrsta: 'rijec' | 'odustani' | 'oporavak';
+  /** null dok odluka još nije izračunata (odgađa se do isteka razmišljanja). */
+  vrsta: 'rijec' | 'odustani' | 'oporavak' | null;
 }
 
 type KategorijaReakcije = 'pozdrav' | 'sorry' | 'bravo';
@@ -217,6 +218,8 @@ export class BotKontroler {
       // Zakazane reakcije smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
       return;
     }
+    // Novi token (i kad je na redu čovjek) oslobađa cache prethodnog poteza.
+    this.predmemorijaZa(dogadaj.partijaId).uskladiKontekst(dogadaj.turnToken, this.ovisnosti.rjecnik.verzijaRjecnika());
     if (dogadaj.izborUToku || !dogadaj.naPotezuId || !dogadaj.trazenaSlova) return;
     const sudionik = dogadaj.sudionici.find((s) => s.igracId === dogadaj.naPotezuId);
     if (!sudionik || sudionik.upravljac !== 'bot' || !sudionik.aktivan) return;
@@ -228,7 +231,8 @@ export class BotKontroler {
       stanjeBota.zadnjiToken = dogadaj.turnToken;
     }
 
-    const odluka = this.odluci(dogadaj, stanjeBota);
+    // Odluku (odluci / 1-ply) NE računaj sinkrono ovdje: na velikom prefiksu blokira event loop
+    // pa Socket.IO ne flusha potez:prihvacen prije klijentskog 5s watchdoga (Zagrijavanje).
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
     const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rngPrezentacije, dogadaj.kontekst, {
       punoTrajanjeMs: dogadaj.trajanjePotezaMs,
@@ -242,7 +246,6 @@ export class BotKontroler {
         okruzenje: this.okruzenje,
       })
       : izracunataOdgoda;
-    const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const turnToken = dogadaj.turnToken;
     const handle = this.zakazi(() => {
       const plan = this.planirano.get(dogadaj.partijaId);
@@ -254,13 +257,13 @@ export class BotKontroler {
       try {
         const aktualni = this.aktualni(dogadaj, sudionik.igracId);
         if (!aktualni) { this.brojaci.zastarjelo += 1; return; }
-        const svjezaOdluka = this.ovisnosti.rjecnik.verzijaRjecnika() === verzijaRjecnika ? odluka : this.odluci(aktualni, stanjeBota);
-        this.izvrsi(aktualni, sudionik.igracId, turnToken, svjezaOdluka, 0, new Set());
+        const odluka = this.odluci(aktualni, stanjeBota);
+        this.izvrsi(aktualni, sudionik.igracId, turnToken, odluka, 0, new Set());
       } catch (greska) {
         this.oporavi(dogadaj, sudionik.igracId, 0, new Set(), greska);
       }
     }, odgoda);
-    this.planirano.set(dogadaj.partijaId, { handle, igracId: sudionik.igracId, turnToken, izvrsitiUMs: this.sada() + odgoda, vrsta: odluka.vrsta });
+    this.planirano.set(dogadaj.partijaId, { handle, igracId: sudionik.igracId, turnToken, izvrsitiUMs: this.sada() + odgoda, vrsta: null });
     this.ovisnosti.naAktivnost?.(sudionik.igracId);
     this.brojaci.planirano += 1;
   }
@@ -324,30 +327,33 @@ export class BotKontroler {
       return ista.odluka;
     }
     const predmemorija = this.predmemorijaZa(dogadaj.partijaId);
-    predmemorija.uskladiVerziju(verzijaRjecnika);
-    const verzijaPotrosenih = `${dogadaj.iskoristeneGrupe.size}:${[...dogadaj.iskoristeneGrupe].slice(0, 32).sort().join(',')}`;
+    predmemorija.uskladiKontekst(dogadaj.turnToken, verzijaRjecnika);
+    const rjecnik = this.ovisnosti.rjecnik;
+    const dopusteneVrste = dogadaj.dopusteneVrste;
     const odluka = odaberiPotez({
       trazenaSlova: dogadaj.trazenaSlova!,
       kandidati,
-      frekvencijaZa: (rijec) => this.ovisnosti.rjecnik.frekvencijaZa(rijec),
-      grupeZa: (rijec) => this.ovisnosti.rjecnik.grupeZa(rijec),
+      frekvencijaZa: (rijec) => rjecnik.frekvencijaZa(rijec),
+      grupeZa: (rijec) => rjecnik.grupeZa(rijec),
       turnToken: dogadaj.turnToken,
       oporavak: oporavak || ista !== undefined,
       pravila: dogadaj.pravila ?? 'ka_zna',
       faza: dogadaj.faza ?? 'obican_potez',
       brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
       iskoristeneGrupe: dogadaj.iskoristeneGrupe,
-      dopusteneVrste: dogadaj.dopusteneVrste,
-      imaSlobodnuRijecNa: (prefiks, iskoristene, dopusteneVrste) =>
-        this.ovisnosti.rjecnik.imaSlobodnuRijecNa(prefiks, iskoristene, dopusteneVrste),
-      poznatiKandidatiNa: (prefiks, iskoristene) => {
-        const frekvencijaZa = (rijec: string) => this.ovisnosti.rjecnik.frekvencijaZa(rijec);
-        return [...this.ovisnosti.rjecnik.igriviKandidati(prefiks, iskoristene, dogadaj.dopusteneVrste)]
-          .filter((rijec) => !jeNepoznataBotu(rijec, frekvencijaZa(rijec)));
-      },
+      dopusteneVrste,
+      imaSlobodnuRijecNa: (prefiks, iskoristene, vrste) =>
+        rjecnik.imaSlobodnuRijecNa(prefiks, iskoristene, vrste),
+      // Lijeni iterator — bez materijalizacije cijelog prefiksa prije prvog rezultata.
+      poznatiKandidatiNa: (prefiks, iskoristene) => ({
+        *[Symbol.iterator](): Generator<string> {
+          for (const rijec of rjecnik.igriviKandidati(prefiks, iskoristene, dopusteneVrste)) {
+            if (!jeNepoznataBotu(rijec, rjecnik.frekvencijaZa(rijec))) yield rijec;
+          }
+        },
+      }),
       predmemorija,
       verzijaRjecnika,
-      verzijaPotrosenih,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng);
     if (odluka.vrsta === 'rijec' && odluka.propustKa) this.brojaci.propustPrimljenogKa += 1;
     if (odluka.vrsta === 'rijec' && odluka.takticki) this.brojaci.taktickihPoteza += 1;

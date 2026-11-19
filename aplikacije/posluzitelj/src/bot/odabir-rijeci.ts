@@ -38,9 +38,15 @@ export interface StanjeBotaUPartiji {
   vrecicaVrsta: Vrecica<'imenica' | 'ostalo'>;
   brojPoteza: number;
   zadnjiToken: string | null;
-  /** Jednokratna odluka o probabilističkom neznanju po turnTokenu. */
+  /**
+   * Jednokratna odluka o probabilističkom neznanju po turnTokenu.
+   * Drži samo aktualni token (ne povijest partije).
+   */
   neznanjePoTokenu: Map<string, boolean>;
-  /** Jednokratna odluka je li potez taktički, po turnTokenu. */
+  /**
+   * Jednokratna odluka je li potez taktički, po turnTokenu.
+   * Drži samo aktualni token (ne povijest partije).
+   */
   taktikaPoTokenu: Map<string, boolean>;
   konfiguracija: KonfiguracijaBota;
   brojKandidata: number;
@@ -60,15 +66,33 @@ export function stvoriStanjeBota(konfig: KonfiguracijaBota, rng: Rng): StanjeBot
   };
 }
 
-/** Predmemorija 1-ply legalnosti u životnom vijeku partije. */
+/** Predmemorija 1-ply legalnosti za aktualni turnToken / verziju rječnika. */
 export class PredmemorijaLegalnosti {
+  static readonly LIMIT_ZAPISA = 4_096;
+
   private readonly zapis = new Map<string, boolean>();
   private verzijaRjecnika = -1;
+  private turnToken: string | null = null;
 
   ocisti(): void {
     this.zapis.clear();
+    this.turnToken = null;
   }
 
+  brojZapisa(): number {
+    return this.zapis.size;
+  }
+
+  /** Čisti cache kad se promijeni token ili verzija rječnika. */
+  uskladiKontekst(turnToken: string, verzija: number): void {
+    if (this.turnToken !== turnToken || this.verzijaRjecnika !== verzija) {
+      this.turnToken = turnToken;
+      this.verzijaRjecnika = verzija;
+      this.zapis.clear();
+    }
+  }
+
+  /** @deprecated Koristi uskladiKontekst(turnToken, verzija). */
   uskladiVerziju(verzija: number): void {
     if (this.verzijaRjecnika !== verzija) {
       this.verzijaRjecnika = verzija;
@@ -80,8 +104,57 @@ export class PredmemorijaLegalnosti {
     const postojece = this.zapis.get(kljuc);
     if (postojece !== undefined) return postojece;
     const vrijednost = izracunaj();
-    this.zapis.set(kljuc, vrijednost);
+    // Pun cache ne smije proizvesti lažni rezultat — samo preskoči upis.
+    if (this.zapis.size < PredmemorijaLegalnosti.LIMIT_ZAPISA) {
+      this.zapis.set(kljuc, vrijednost);
+    }
     return vrijednost;
+  }
+}
+
+/**
+ * ReadonlySet pogled: bazne potrošene grupe snimke + dodatne grupe hipotetske riječi.
+ * Izbjegava `new Set(iskoristene)` po kandidatu; `has` gleda oba izvora.
+ */
+export class SlozeneIskoristeneGrupe implements ReadonlySet<string> {
+  constructor(
+    private readonly baza: ReadonlySet<string>,
+    private readonly dodatne: readonly string[],
+  ) {}
+
+  has(grupa: string): boolean {
+    return this.baza.has(grupa) || this.dodatne.includes(grupa);
+  }
+
+  get size(): number {
+    let n = this.baza.size;
+    for (const grupa of this.dodatne) {
+      if (!this.baza.has(grupa)) n += 1;
+    }
+    return n;
+  }
+
+  keys(): IterableIterator<string> {
+    return this[Symbol.iterator]();
+  }
+
+  values(): IterableIterator<string> {
+    return this[Symbol.iterator]();
+  }
+
+  *entries(): IterableIterator<[string, string]> {
+    for (const grupa of this) yield [grupa, grupa];
+  }
+
+  forEach(callbackfn: (value: string, value2: string, set: ReadonlySet<string>) => void, thisArg?: unknown): void {
+    for (const grupa of this) callbackfn.call(thisArg, grupa, grupa, this);
+  }
+
+  *[Symbol.iterator](): IterableIterator<string> {
+    yield* this.baza;
+    for (const grupa of this.dodatne) {
+      if (!this.baza.has(grupa)) yield grupa;
+    }
   }
 }
 
@@ -104,7 +177,10 @@ export interface UlazOdabira {
   poznatiKandidatiNa?: (prefiks: string, iskoristeneGrupe: ReadonlySet<string>) => Iterable<string>;
   predmemorija?: PredmemorijaLegalnosti;
   verzijaRjecnika?: number;
-  /** Verzija potrošenih grupa (npr. size + hash) za cache ključ. */
+  /**
+   * @deprecated Cache više ne koristi globalni hash potrošenih grupa;
+   * predmemorija živi unutar snimke tokena, a ključ nosi hipotetske grupe kandidata.
+   */
   verzijaPotrosenih?: string;
 }
 
@@ -156,10 +232,15 @@ export function jeNepoznataBotu(rijec: string, frekvencija: number | null): bool
   return false;
 }
 
-function dodajGrupe(iskoristene: ReadonlySet<string>, grupe: readonly string[]): Set<string> {
-  const rezultat = new Set(iskoristene);
-  for (const grupa of grupe) rezultat.add(grupa);
-  return rezultat;
+function dodajGrupe(iskoristene: ReadonlySet<string>, grupe: readonly string[]): ReadonlySet<string> {
+  if (grupe.length === 0) return iskoristene;
+  return new SlozeneIskoristeneGrupe(iskoristene, grupe);
+}
+
+/** Zadrži samo odluku za aktualni token — ne akumuliraj povijest partije. */
+function zapisiOdlukuTokena(mapa: Map<string, boolean>, turnToken: string, vrijednost: boolean): void {
+  if (mapa.size !== 1 || !mapa.has(turnToken)) mapa.clear();
+  mapa.set(turnToken, vrijednost);
 }
 
 function jeCesta(rijec: string, frekvencijaZa: UlazOdabira['frekvencijaZa'], konfig: KonfiguracijaBota): boolean {
@@ -282,7 +363,7 @@ function odlukaNeznanjaZaToken(
   const postojece = stanje.neznanjePoTokenu.get(turnToken);
   if (postojece !== undefined) return postojece;
   const vrijednost = rng() < vjerojatnost;
-  stanje.neznanjePoTokenu.set(turnToken, vrijednost);
+  zapisiOdlukuTokena(stanje.neznanjePoTokenu, turnToken, vrijednost);
   return vrijednost;
 }
 
@@ -296,7 +377,7 @@ function odlukaTaktikeZaToken(
   const postojece = stanje.taktikaPoTokenu.get(turnToken);
   if (postojece !== undefined) return postojece;
   const vrijednost = rng() < vjerojatnost;
-  stanje.taktikaPoTokenu.set(turnToken, vrijednost);
+  zapisiOdlukuTokena(stanje.taktikaPoTokenu, turnToken, vrijednost);
   return vrijednost;
 }
 
@@ -305,6 +386,11 @@ function odlukaTaktikeZaToken(
  * false = potvrđeno mrtvo (nema legalne riječi u cijelom rječniku);
  * null = težak/nepoznat botu, ali nastavak može biti živ (smije odigrati).
  */
+function kljucNastavka(prefiks: string, grupe: readonly string[], pravila: string, faza: string): string {
+  // Kanonski sort + JSON — ne kolidira na zarezu u imenu grupe kao join(',').
+  return `${pravila}|${faza}|${prefiks}|${JSON.stringify([...grupe].sort())}`;
+}
+
 function imaPoznatiNastavak(
   rijec: string,
   ulaz: UlazOdabira,
@@ -313,10 +399,7 @@ function imaPoznatiNastavak(
   const grupe = ulaz.grupeZa(rijec);
   const nakon = dodajGrupe(iskoristene, grupe);
   const prefiks = zadnjaDva(rijec);
-  const verzijaPotrosenih = ulaz.verzijaPotrosenih ?? `${iskoristene.size}`;
-  const bazaKljuca = `${ulaz.verzijaRjecnika ?? 0}|${verzijaPotrosenih}|${ulaz.pravila ?? ''}|${ulaz.faza ?? ''}|${[...grupe].sort().join(',')}|${prefiks}`;
-
-  if (ulaz.predmemorija) ulaz.predmemorija.uskladiVerziju(ulaz.verzijaRjecnika ?? 0);
+  const bazaKljuca = kljucNastavka(prefiks, grupe, ulaz.pravila ?? '', ulaz.faza ?? '');
 
   const izracunajPoznato = (): boolean => {
     if (!ulaz.poznatiKandidatiNa) return false;
@@ -495,7 +578,19 @@ export function odaberiPotez(
   konfig: KonfiguracijaBota,
   rng: Rng,
 ): OdlukaBota {
-  const sviKandidati = [...ulaz.kandidati];
+  // Jedna materijalizacija radnog niza — bez drugog spreada ako je već niz.
+  const sviKandidati = Array.isArray(ulaz.kandidati)
+    ? (ulaz.kandidati as string[])
+    : [...ulaz.kandidati];
+  // Odbaci odluke starih tokena čim stigne novi (ne čekaj novo izvlačenje).
+  if (ulaz.turnToken) {
+    if (stanje.neznanjePoTokenu.size > 0 && !stanje.neznanjePoTokenu.has(ulaz.turnToken)) {
+      stanje.neznanjePoTokenu.clear();
+    }
+    if (stanje.taktikaPoTokenu.size > 0 && !stanje.taktikaPoTokenu.has(ulaz.turnToken)) {
+      stanje.taktikaPoTokenu.clear();
+    }
+  }
   let propustKa = false;
   const pravila = ulaz.pravila ?? 'ka_zna';
   const brojAktivnih = ulaz.brojAktivnih ?? 2;
