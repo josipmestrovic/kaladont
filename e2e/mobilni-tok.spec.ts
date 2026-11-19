@@ -1,7 +1,16 @@
 import { expect, test } from '@playwright/test';
-import { cekajIgracaNaPotezu, cekajIstuPartiju, dodajIgrace, udjiUJavniRed, zatvoriIgrace, type E2EIgrac } from './pomocnici/igraci.js';
+import {
+  cekajIgracaNaPotezu,
+  cekajIstuPartiju,
+  dodajIgrace,
+  pokreniPrivatnuPartiju,
+  udjiUJavniRed,
+  zatvoriIgrace,
+  type E2EIgrac,
+} from './pomocnici/igraci.js';
 
-for (const brojSjedala of [2, 4, 8]) {
+// Sintetički prikaz geometrije (injektirano stanje); stvarni Troboj tok je zaseban test.
+for (const brojSjedala of [2, 3, 4, 8]) {
   test(`mobilni unos prati tipkovnicu za ${brojSjedala} sjedala`, async ({ browser }, podaciTesta) => {
     test.setTimeout(60_000);
     const igraci = await dodajIgrace(browser, 2);
@@ -93,12 +102,20 @@ for (const brojSjedala of [2, 4, 8]) {
        }, dugaRijec);
        await expect(oblak).toHaveText(dugaRijec);
        await expect(oblak).toHaveCSS('font-size', '12px');
-       expect(await oblak.evaluate((element) => {
+       // Troboj (3 sjedala) sužava bijelu zonu — malo širi budžet širine/visine.
+       expect(await oblak.evaluate((element, broj) => {
          const stil = getComputedStyle(element);
          const lineHeight = parseFloat(stil.lineHeight);
-         const budzet = Number.isFinite(lineHeight) ? lineHeight * 2 + 8 : parseFloat(stil.fontSize) * 2.4 + 8;
-         return element.scrollWidth <= element.clientWidth && element.getBoundingClientRect().height <= budzet;
-       })).toBe(true);
+         const faktor = broj === 3 ? 2.8 : 2;
+         const budzet = Number.isFinite(lineHeight)
+           ? lineHeight * faktor + 8
+           : parseFloat(stil.fontSize) * (faktor + 0.4) + 8;
+         const dozvolaSirine = broj === 3 ? 8 : 0;
+         return (
+           element.scrollWidth <= element.clientWidth + dozvolaSirine &&
+           element.getBoundingClientRect().height <= budzet
+         );
+       }, brojSjedala)).toBe(true);
       await stranica.screenshot({ path: podaciTesta.outputPath('mobilni-unos.png') });
       await stranica.locator('.ne-znam-gumb').click();
       await expect(stranica.getByRole('dialog').getByRole('button', { name: 'Ne', exact: true })).toBeVisible();
@@ -509,6 +526,90 @@ test('mobilni prekid mreže zaključava potez i reconnect vraća stanje partije'
     await igrac.kontekst.setOffline(false);
     await expect(igrac.stranica.getByText('Veza je prekinuta.')).toBeHidden({ timeout: 15_000 });
     await expect(igrac.stranica.getByText(/Traži se riječ na:|Igra počinje/).first()).toBeVisible();
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
+test('mobilni Troboj: lobby → stol bez refresha (isti partijaId, 3 sjedala)', async ({
+  browser,
+  context,
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const igraci: E2EIgrac[] = [
+    { kontekst: context, stranica: page },
+    ...(await dodajIgrace(browser, 2)),
+  ];
+  try {
+    for (const igrac of igraci) {
+      await igrac.stranica.setViewportSize({ width: 390, height: 844 });
+    }
+    const partijaId = await pokreniPrivatnuPartiju(igraci, 'dokazi_nastavak');
+    for (const { stranica } of igraci) {
+      await expect(stranica).toHaveURL(new RegExp(`/partija/${partijaId}$`));
+      await expect(stranica.locator('.igraci-red > li')).toHaveCount(3);
+      await expect(stranica.locator('.igraci-red.troboj')).toHaveCount(1);
+    }
+    const naPotezu = await cekajIgracaNaPotezu(igraci);
+    const unos = naPotezu.stranica.getByRole('textbox', { name: /Dovrši riječ na|Dokaži nastavak/ });
+    await expect(unos).toBeVisible();
+    await unos.scrollIntoViewIfNeeded();
+    await unos.focus();
+    await expect(unos).toBeFocused();
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
+test('mobilni Troboj: propušteni partija:pocetak oporavlja stol bez reload()', async ({
+  browser,
+  context,
+  page,
+}) => {
+  test.setTimeout(90_000);
+  // Javni red sluša partija:stanje → goto; soba to nema. Hook samo suzbija početnu poruku.
+  const igraci: E2EIgrac[] = [
+    { kontekst: context, stranica: page },
+    ...(await dodajIgrace(browser, 2)),
+  ];
+  try {
+    for (const igrac of igraci) {
+      await igrac.stranica.setViewportSize({ width: 390, height: 844 });
+    }
+    const mobilni = igraci[0]!;
+    await mobilni.stranica.goto('/red?mod=tri_igraca&pravila=dokazi_nastavak');
+    await expect(mobilni.stranica.getByTestId('red-oznaka-izbora')).toBeVisible({ timeout: 20_000 });
+
+    await mobilni.stranica.evaluate(async () => {
+      const { dohvatiSocket } = await import('/src/lib/socket.ts');
+      dohvatiSocket().removeAllListeners('partija:pocetak');
+    });
+
+    await udjiUJavniRed(igraci.slice(1), 'tri_igraca', 'dokazi_nastavak');
+    await expect
+      .poll(async () => {
+        const urlovi = await Promise.all(igraci.slice(1).map((ig) => ig.stranica.url()));
+        return urlovi.every((u) => /\/partija\/[0-9a-f-]+$/.test(u));
+      }, { timeout: 45_000 })
+      .toBe(true);
+
+    const partijaId = new URL(igraci[1]!.stranica.url()).pathname.split('/').at(-1)!;
+    expect(mobilni.stranica.url()).not.toMatch(/\/partija\//);
+
+    // Stvarni server snapshot — test ne injektira prikaz ni ne zove reload().
+    await mobilni.stranica.evaluate(async () => {
+      const { dohvatiSocket } = await import('/src/lib/socket.ts');
+      dohvatiSocket().emit('partija:stanje');
+    });
+
+    await expect(mobilni.stranica).toHaveURL(new RegExp(`/partija/${partijaId}$`), {
+      timeout: 30_000,
+    });
+    await expect(mobilni.stranica.locator('.igraci-red > li')).toHaveCount(3, { timeout: 20_000 });
+    await expect(
+      mobilni.stranica.getByText(/Traži se riječ na:|Igra počinje|Dovrši riječ/).first(),
+    ).toBeVisible({ timeout: 20_000 });
   } finally {
     await zatvoriIgrace(igraci);
   }

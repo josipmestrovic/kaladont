@@ -74,16 +74,35 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   const izbornik = page.getByRole('menu', { name: 'Profil i račun' });
   const odjava = izbornik.getByRole('menuitem', { name: 'Odjavi se' });
   await expect(odjava).toBeVisible();
+
+  // Registriraj čekanje odjave prije klika; potvrdi stvarni API + opoziv tokena.
+  const odjavaOdgovor = page.waitForResponse(
+    (odgovor) => odgovor.url().includes('/racuni/odjava') && odgovor.request().method() === 'POST',
+    { timeout: 15_000 },
+  );
   page.once('dialog', (dijalog) => dijalog.accept());
   await odjava.click();
+  await odjavaOdgovor;
+  await expect
+    .poll(async () => page.evaluate(() => localStorage.getItem('kaladont_sesijski_token')), {
+      timeout: 15_000,
+    })
+    .toBeNull();
+
   await expect(profilGumb).toBeVisible({ timeout: 15_000 });
   await profilGumb.click();
   await expect(page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Prijavi se' })).toBeVisible({
     timeout: 15_000,
   });
   await expect(page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Odjavi se' })).toHaveCount(0);
+
   await page.reload();
   await expect(profilGumb).toBeVisible({ timeout: 20_000 });
+  await expect
+    .poll(async () => page.evaluate(() => localStorage.getItem('kaladont_sesijski_token')), {
+      timeout: 10_000,
+    })
+    .toBeNull();
   await profilGumb.click();
   await expect(page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Prijavi se' })).toBeVisible();
   await expect(page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Odjavi se' })).toHaveCount(0);

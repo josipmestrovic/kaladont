@@ -93,3 +93,96 @@ export async function predajNeZnam(stranica: Page): Promise<void> {
 export async function zatvoriIgrace(igraci: readonly E2EIgrac[]): Promise<void> {
   await Promise.all(igraci.map(({ kontekst }) => kontekst.close()));
 }
+
+export async function mojIgracId(stranica: Page): Promise<string> {
+  const id = await stranica.locator('.igraci-red > li:has(.oznaka-ti)').getAttribute('data-igrac-id');
+  if (!id) throw new Error('Nema data-igrac-id za lokalno sjedalo.');
+  return id;
+}
+
+/** Serverski redoslijed sjedala (ne lokalno rotiran prikaz). */
+export async function redoslijedSjedala(stranica: Page): Promise<string[]> {
+  return stranica.evaluate(async () => {
+    const putanja = '/src/lib/stanje-igre.svelte.ts';
+    const { dohvatiStanjeIgre } = await import(putanja);
+    return dohvatiStanjeIgre().sjedala.map((sjedalo: { igracId: string }) => sjedalo.igracId);
+  });
+}
+
+export async function procitajPrefiksIPocetnu(stranica: Page): Promise<{
+  prefiks: string;
+  pocetnaRijec: string;
+}> {
+  const unos = stranica.getByRole('textbox', { name: UNOS_POTEZA });
+  await expect(unos).toBeVisible({ timeout: 15_000 });
+  const oznaka = (await unos.getAttribute('aria-label')) ?? '';
+  const prefiks = (oznaka.match(/(?:Dovrši riječ na|Dokaži nastavak na)\s+(.+)$/i)?.[1] ?? '')
+    .trim()
+    .toLocaleLowerCase('hr');
+  expect(prefiks.length).toBeGreaterThan(0);
+  const pocetnaLokator = stranica.locator('.kontekst-rijeci .trenutna-rijec, .rijec-oblak').first();
+  await expect(pocetnaLokator).toBeVisible({ timeout: 10_000 });
+  const pocetnaRijec = (await pocetnaLokator.innerText()).replace(/\s+/g, '').toLocaleLowerCase('hr');
+  expect(pocetnaRijec.length).toBeGreaterThan(0);
+  return { prefiks, pocetnaRijec };
+}
+
+/** Privatna soba → partija; svi klijenti na isti partijaId. */
+export async function pokreniPrivatnuPartiju(
+  igraci: readonly E2EIgrac[],
+  pravila: 'klasicni' | 'ka_zna' | 'dokazi_nastavak',
+): Promise<string> {
+  if (igraci.length < 2) throw new Error('Privatna partija treba barem 2 igrača.');
+  const vlasnik = igraci[0]!.stranica;
+  await vlasnik.goto(`/soba/kreiraj?pravila=${pravila}`);
+  await expect(vlasnik.getByRole('radio', { name: new RegExp(pravila === 'ka_zna' ? 'KA-zna' : pravila === 'klasicni' ? 'Klasični' : 'Dokaži nastavak') })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await vlasnik.getByRole('button', { name: 'Bez tajmera' }).click();
+  await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
+  await expect(vlasnik).toHaveURL(/\/soba\/[A-Z0-9]+$/);
+  const kodSobe = await vlasnik.locator('.oznaka-koda strong').innerText();
+
+  for (const gost of igraci.slice(1)) {
+    await gost.stranica.goto(`/soba/${kodSobe}`);
+  }
+  await expect(vlasnik.getByText(new RegExp(`Prijavljeni igrači \\(${igraci.length} \\/ 8\\)`))).toBeVisible({
+    timeout: 15_000,
+  });
+  await vlasnik.getByRole('button', { name: 'Započni igru' }).click();
+  return cekajIstuPartiju(igraci);
+}
+
+/**
+ * Valjana stanja lobby oznake ili ulaska u partiju — ne proći samo zato što oznake nestane.
+ * Vrati 'oznaka' tek kad je tekst usklađen; 'partija' kad je URL gotov.
+ */
+export async function cekajOznakuIliPartiju(
+  stranica: Page,
+  ocekivaniTekst: RegExp,
+  timeoutMs = 30_000,
+): Promise<'oznaka' | 'partija'> {
+  let ishod: 'oznaka' | 'partija' | null = null;
+  await expect
+    .poll(
+      async () => {
+        if (/\/partija\/[0-9a-f-]+$/.test(stranica.url())) {
+          ishod = 'partija';
+          return 'partija';
+        }
+        const oznaka = stranica.getByTestId('red-oznaka-izbora');
+        if (await oznaka.isVisible().catch(() => false)) {
+          const tekst = (await oznaka.innerText().catch(() => '')) ?? '';
+          if (ocekivaniTekst.test(tekst)) {
+            ishod = 'oznaka';
+            return 'oznaka';
+          }
+        }
+        return 'ceka';
+      },
+      { timeout: timeoutMs },
+    )
+    .not.toBe('ceka');
+  return ishod!;
+}
