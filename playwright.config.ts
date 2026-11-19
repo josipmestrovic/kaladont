@@ -55,7 +55,8 @@ export default defineConfig({
         VERZIJA: 'e2e',
         DIGEST: 'e2e',
         BOT_IZOSTANAK_PO_SUDJELOVANJU: '0',
-        BOT_NEZNANJE_PO_SUDJELOVANJU: '0',
+        BOT_NEZNANJE_U_MALOM_SKUPU: '0',
+        BOT_VJEROJATNOST_TAKTICKOG_POTEZA: '0',
       },
     },
     {

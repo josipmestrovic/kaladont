@@ -3,7 +3,6 @@
   import { RefreshCw, RotateCcw, Save } from 'lucide-svelte';
   import { api } from '$lib/api.js';
 
-  type Raspon = [number, number];
   interface Postavke {
     verzija: number;
     pragFrekvencije: { uobicajena: number; srednja: number };
@@ -13,8 +12,10 @@
     odgodaReakcijeMinMs: number;
     vjerojatnostOstavljanjaKa: number;
     vjerojatnostPropustaKa: number;
-    vjerojatnostNeznanjaPoSudjelovanju: number;
-    rasponTeskogPotezaNeznanja: Raspon;
+    vjerojatnostNeznanjaUMalomSkupu: number;
+    maksimalnoOpcijaMalogSkupa: number;
+    vjerojatnostTaktickogPoteza: number;
+    maksimalnoTaktickihKandidata: number;
     brziRazvoj: boolean;
     odstupanjaPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
     pragoviPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
@@ -219,8 +220,10 @@
             <label>Ponder duljine po slovu<input type="number" min="0" max="2" step="0.01" bind:value={nacrt.ponderDuljinePoGrafemu} /></label>
             <label>Dobrovoljni KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostOstavljanjaKa} /><span>{postotak(nacrt.vjerojatnostOstavljanjaKa)}</span></label>
             <label>Propust tuđeg KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostPropustaKa} /><span>{postotak(nacrt.vjerojatnostPropustaKa)}</span></label>
-            <label>Prilika „Ne znam” po sudjelovanju<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostNeznanjaPoSudjelovanju} /><span>{postotak(nacrt.vjerojatnostNeznanjaPoSudjelovanju)}</span></label>
-            <label>Teški potez za „Ne znam” od<input type="number" min="1" max="100" bind:value={nacrt.rasponTeskogPotezaNeznanja[0]} /><input aria-label="Teški potez za ne znam do" type="number" min="1" max="100" bind:value={nacrt.rasponTeskogPotezaNeznanja[1]} /></label>
+            <label>„Ne znam” u malom skupu<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostNeznanjaUMalomSkupu} /><span>{postotak(nacrt.vjerojatnostNeznanjaUMalomSkupu)}</span></label>
+            <label>Maks. opcija malog skupa<input type="number" min="1" max="20" bind:value={nacrt.maksimalnoOpcijaMalogSkupa} /></label>
+            <label>Taktički potez<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostTaktickogPoteza} /><span>{postotak(nacrt.vjerojatnostTaktickogPoteza)}</span></label>
+            <label>Maks. taktičkih kandidata<input type="number" min="1" max="50" bind:value={nacrt.maksimalnoTaktickihKandidata} /></label>
           </div>
         </fieldset>
         <fieldset><legend>Popuna javnog reda</legend>
