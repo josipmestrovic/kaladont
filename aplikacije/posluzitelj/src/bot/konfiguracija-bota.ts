@@ -5,8 +5,8 @@
 import { z } from 'zod';
 import { PRAGOVI_POPUNE_MS } from '../red/raspored-popune.js';
 
-/** PR02: kontekstualno neznanje, ograničena taktika; fiksni tempo iz PR01. */
-export const VERZIJA_BOT_POLITIKE = 6;
+/** PR02 + v7: zajednički ograničeni repertoar i predvidljiv odabir. */
+export const VERZIJA_BOT_POLITIKE = 7;
 
 export type KategorijaRijeci = 'uobicajena' | 'srednja' | 'rijetka';
 
