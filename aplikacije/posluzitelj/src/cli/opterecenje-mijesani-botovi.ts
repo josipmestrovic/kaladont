@@ -42,7 +42,7 @@ export interface BotIgrac {
 interface MjerenaPartija {
   id: string;
   mod: ModPartije;
-  kontekst: 'javna' | 'privatna' | 'trening';
+  kontekst: 'javna' | 'privatna' | 'trening' | 'izazov';
   jePrivatna: boolean;
   kodSobe: string | null;
   vlasnikId: string | null;

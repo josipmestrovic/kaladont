@@ -1680,7 +1680,7 @@ export function stvoriUpraviteljPartija(
 
   async function obavijestiPrvuIgruSudionicima(
     stanje: StanjeStola,
-    kontekst: 'javna' | 'privatna' | 'trening',
+    kontekst: KontekstPartije,
   ): Promise<void> {
     try {
       await Promise.all(stanje.sudionici.map((sudionik) => mozdaObavijestiPrvuIgru({

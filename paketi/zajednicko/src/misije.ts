@@ -7,6 +7,7 @@ export type KontekstMisije = 'javna' | 'trening';
 /** HINT PR12: `tri_igraca` za Troboj; `oba` = sva tri javna formata (2/3/4) nakon otključavanja. */
 export type ModMisije = 'oba' | 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca';
 export type SlotMisije = 1 | 2 | 3;
+/** DB enum već ima `izazov` (PR01); TS matcher proširuje u PR04. */
 export type KontekstIzvoraMisije = 'javna' | 'trening';
 
 export type ObiteljMisije =

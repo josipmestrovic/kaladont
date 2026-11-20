@@ -64,7 +64,27 @@ export const vrstaPohvaleIgre = pgEnum('vrsta_pohvale_igre', ['najduzi_niz', 'na
 export const vrstaMisije = pgEnum('vrsta_misije', ['dnevna', 'tjedna']);
 export const statusDodjeleMisije = pgEnum('status_dodjele_misije', ['aktivna', 'dovrsena', 'zamijenjena', 'istekla']);
 export const statusDotokaDnevneMisije = pgEnum('status_dotoka_dnevne_misije', ['dodijeljeno', 'preskoceno']);
-export const kontekstIzvoraMisije = pgEnum('kontekst_izvora_misije', ['javna', 'trening']);
+export const kontekstIzvoraMisije = pgEnum('kontekst_izvora_misije', ['javna', 'trening', 'izazov']);
+export const statusPokusajaIzazova = pgEnum('status_pokusaja_izazova', [
+  'rezerviran',
+  'u_tijeku',
+  'uspjeh',
+  'neuspjeh',
+  'tehnicki_prekinuto',
+]);
+export const razlogNeuspjehaIzazova = pgEnum('razlog_neuspjeha_izazova', [
+  'cilj_neispunjen',
+  'eliminiran',
+  'nevaljana_rijec',
+  'odustao',
+  'prekid_veze',
+]);
+export const statusSpremanjaIzazova = pgEnum('status_spremanja_izazova', [
+  'nije_potrebno',
+  'spremanje_u_tijeku',
+  'spremljeno',
+]);
+export const vrstaRacunaIzazova = pgEnum('vrsta_racuna_izazova', ['gost', 'registriran']);
 
 export const igraci = pgTable('igraci', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -1000,7 +1020,7 @@ export const nizAktivnostiIgraca = pgTable('niz_aktivnosti_igraca', {
   check('chk_niz_aktivnosti_najbolji', sql`${tablica.najboljiNiz} >= ${tablica.trenutniNiz}`),
 ]);
 
-export const kontekstAnalitike = pgEnum('kontekst_analitike', ['javna', 'privatna', 'trening']);
+export const kontekstAnalitike = pgEnum('kontekst_analitike', ['javna', 'privatna', 'trening', 'izazov']);
 export const izvorPocetneAnalitike = pgEnum('izvor_pocetne_analitike', [
   'sigurni_skup',
   'rezervni_odabir',
@@ -1072,4 +1092,59 @@ export const analitikaSudjelovanja = pgTable('analitika_sudjelovanja', {
 }, (tablica) => [
   primaryKey({ columns: [tablica.igraId, tablica.igracId] }),
   index('idx_analitika_sudjelovanja_igrac').on(tablica.igracId),
+]);
+
+/** Pokušaj kampanjskog Izazova — serverski izvor istine za start/ishod. */
+export const pokusajiIzazova = pgTable('pokusaji_izazova', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  challengeId: text('challenge_id').notNull(),
+  requestId: text('request_id').notNull(),
+  definitionVersion: integer('definition_version').notNull(),
+  botProfileVersion: integer('bot_profile_version'),
+  dictionaryVersion: integer('dictionary_version'),
+  snapshot: jsonb('snapshot').notNull(),
+  partijaId: uuid('partija_id'),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  terminalAt: timestamp('terminal_at', { withTimezone: true }),
+  resultsVisibleAt: timestamp('results_visible_at', { withTimezone: true }),
+  status: statusPokusajaIzazova('status').notNull().default('rezerviran'),
+  reason: razlogNeuspjehaIzazova('reason'),
+  metrics: jsonb('metrics').notNull().default({}),
+  gameWon: boolean('game_won'),
+  seed: text('seed'),
+  settlementState: statusSpremanjaIzazova('settlement_state').notNull().default('nije_potrebno'),
+  accountTypeAtStart: vrstaRacunaIzazova('account_type_at_start').notNull(),
+}, (tablica) => [
+  uniqueIndex('uq_pokusaji_izazova_igrac_request').on(tablica.igracId, tablica.requestId),
+  uniqueIndex('uq_pokusaji_izazova_aktivan_igrac')
+    .on(tablica.igracId)
+    .where(sql`${tablica.status} in ('rezerviran', 'u_tijeku')`),
+  index('idx_pokusaji_izazova_challenge_verzija_start').on(
+    tablica.challengeId,
+    tablica.definitionVersion,
+    tablica.startedAt,
+  ),
+  index('idx_pokusaji_izazova_igrac_status').on(tablica.igracId, tablica.status),
+]);
+
+/** Prvi uspjeh po izazovu — jednokratna nagrada (reward_epoch). */
+export const zavrseciIzazova = pgTable('zavrseci_izazova', {
+  igracId: uuid('igrac_id').notNull().references(() => igraci.id, { onDelete: 'cascade' }),
+  challengeId: text('challenge_id').notNull(),
+  firstSuccessAttemptId: uuid('first_success_attempt_id').notNull().references(() => pokusajiIzazova.id, {
+    onDelete: 'restrict',
+  }),
+  vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull(),
+  nominalXp: integer('nominal_xp').notNull(),
+  awardedXp: integer('awarded_xp').notNull(),
+  rewardEpoch: integer('reward_epoch').notNull().default(1),
+}, (tablica) => [
+  primaryKey({ columns: [tablica.igracId, tablica.challengeId], name: 'zavrseci_izazova_pkey' }),
+  index('idx_zavrseci_izazova_vrijeme').on(tablica.vrijeme),
+  check(
+    'chk_zavrseci_izazova_xp',
+    sql`${tablica.nominalXp} >= 0 and ${tablica.awardedXp} >= 0 and ${tablica.awardedXp} <= ${tablica.nominalXp}`,
+  ),
+  check('chk_zavrseci_izazova_reward_epoch', sql`${tablica.rewardEpoch} >= 1`),
 ]);

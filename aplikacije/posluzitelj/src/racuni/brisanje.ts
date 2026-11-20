@@ -39,6 +39,8 @@ import {
   statistikeRijeciIgraca,
   treningRijeciIgraca,
   pobjedeTreninga,
+  pokusajiIzazova,
+  zavrseciIzazova,
   zamjeneMisija,
 } from '../baza/shema.js';
 
@@ -87,6 +89,9 @@ async function obrisiRacunUTransakciji(
   await transakcija.delete(stanjeMisijaIgraca).where(eq(stanjeMisijaIgraca.igracId, igrac.id));
   await transakcija.delete(aktivnostIgracaDani).where(eq(aktivnostIgracaDani.igracId, igrac.id));
   await transakcija.delete(nizAktivnostiIgraca).where(eq(nizAktivnostiIgraca.igracId, igrac.id));
+  // Soft-delete ne pokreće ON DELETE CASCADE — Izazov redove brišemo eksplicitno.
+  await transakcija.delete(zavrseciIzazova).where(eq(zavrseciIzazova.igracId, igrac.id));
+  await transakcija.delete(pokusajiIzazova).where(eq(pokusajiIzazova.igracId, igrac.id));
   await transakcija
     .update(igraci)
     .set({

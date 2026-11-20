@@ -1039,7 +1039,7 @@ export function trajanjeRazmisljanjaMs(
   trajanjePotezaMs: number | null,
   konfig: KonfiguracijaBota,
   rng: Rng,
-  kontekst: 'javna' | 'privatna' | 'trening' = 'javna',
+  kontekst: 'javna' | 'privatna' | 'trening' | 'izazov' = 'javna',
   podaci?: { punoTrajanjeMs: number; protekloMs: number },
 ): number {
   void kontekst;
@@ -1066,7 +1066,7 @@ export const BOT_POTEZ_BEZ_ROKA_MS = 200;
 export function odgodaBezRokaMs(
   izracunataOdgodaMs: number,
   opcije: {
-    kontekst: 'javna' | 'privatna' | 'trening';
+    kontekst: 'javna' | 'privatna' | 'trening' | 'izazov';
     imaAktivnogCovjeka: boolean;
     okruzenje: string;
   },
@@ -1077,6 +1077,6 @@ export function odgodaBezRokaMs(
       opcije.imaAktivnogCovjeka ? STAGING_BOT_POTEZ_S_LJUDIMA_MS : BOT_POTEZ_BEZ_ROKA_MS,
     );
   }
-  if (opcije.kontekst === 'trening') return izracunataOdgodaMs;
+  if (opcije.kontekst === 'trening' || opcije.kontekst === 'izazov') return izracunataOdgodaMs;
   return Math.min(izracunataOdgodaMs, BOT_POTEZ_BEZ_ROKA_MS);
 }

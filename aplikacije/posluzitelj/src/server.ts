@@ -50,6 +50,9 @@ import { ucitajKonfiguracijuBota } from './bot/konfiguracija-bota.js';
 import { pragoviPopuneZaOkruzenje } from './red/raspored-popune.js';
 import { FondBotova, ucitajIdentiteteBotova } from './bot/fond.js';
 import { registrirajTrening } from './trening/servis-treninga.js';
+import { registrirajIzazoviRute } from './izazovi/rute.js';
+import { registrirajIzazovSocket } from './izazovi/socket.js';
+import { ocistiStareGostIzazove } from './izazovi/pohrana.js';
 import { dohvatiIpKlijenta, jeDopustenaTestnaIp, OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
 import { obradiLeaseStaginga, type LeaseStaginga } from './sigurnost/staging-opterecenja.js';
 import type { ZapisSocketHandlerGreske } from './sigurnost/socket-handler.js';
@@ -222,6 +225,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       await registrirajProfilRute(apiApp, rjecnik);
       await registrirajLjestviceRute(apiApp);
       await registrirajMisijeRute(apiApp);
+      await registrirajIzazoviRute(apiApp);
       await registrirajDostignucaRute(apiApp);
       await registrirajSanducicRute(apiApp);
       await registrirajPrijaveRute(apiApp);
@@ -567,6 +571,16 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   }, 6 * 60 * 60 * 1000);
   cistacSanducica.unref();
 
+  void ocistiStareGostIzazove().then((broj) => {
+    if (broj.pokusaji > 0 || broj.zavrseci > 0) {
+      app.log.info(broj, 'Obrisani su stari gostujući podaci Izazova');
+    }
+  }).catch((greska) => app.log.error({ greska }, 'Čišćenje gostujućih Izazova nije uspjelo'));
+  const cistacGostIzazova = setInterval(() => {
+    void ocistiStareGostIzazove().catch((greska) => app.log.error({ greska }, 'Čišćenje gostujućih Izazova nije uspjelo'));
+  }, 24 * 60 * 60 * 1000);
+  cistacGostIzazova.unref();
+
   io.use(async (socket, next) => {
     const pocetakAutorizacije = performance.now();
     if (stagingPristup.aktivan) {
@@ -817,6 +831,16 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     zapisSocketHandlerGreske,
   });
 
+  const izazovServis = registrirajIzazovSocket(io, {
+    omogucen: () => konfiguracija.IZAZOV_OMOGUCEN === 'true' && upravitelj.mozePokrenutiPartiju(),
+    igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
+    igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
+    ukloniIzJavnogReda: redServis.ukloniIzReda,
+    provjeriDogadaj,
+    zapisSocketHandlerGreske,
+  });
+  void izazovServis;
+
   await ponistiPartijeUTijekuUBazi();
 
   dohvatiZivoStanjeBotova = () => ({
@@ -883,6 +907,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     if (zatvoreno) return;
     zatvoreno = true;
     clearInterval(cistacNepotvrdjenih);
+    clearInterval(cistacSanducica);
+    clearInterval(cistacGostIzazova);
     zatvoriNadzor();
     redServis.zaustaviPopunu();
     botKontroler.zaustavi();

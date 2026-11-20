@@ -65,7 +65,7 @@
 
   let od = $state('');
   let doDana = $state('');
-  let kontekst = $state<'' | 'javna' | 'privatna' | 'trening'>('');
+  let kontekst = $state<'' | 'javna' | 'privatna' | 'trening' | 'izazov'>('');
   let status = $state<StatusAnalitike | null>(null);
   let agregat = $state<AgregatPocetnih | null>(null);
   let dnevno = $state<Dnevno | null>(null);
@@ -198,6 +198,7 @@
       <option value="javna">Javna</option>
       <option value="privatna">Privatna</option>
       <option value="trening">Trening</option>
+      <option value="izazov">Izazov</option>
     </select>
   </label>
   <button type="submit">Osvježi</button>

@@ -99,7 +99,7 @@ export function brojRacunalaIzTreningModa(mod: ModPartije | null | undefined): 1
 export function putanjaPonovneIgre(
   mod: ModPartije | null | undefined,
   pravila: PravilnikPartije | null | undefined,
-  kontekst?: 'javna' | 'privatna' | 'trening' | null,
+  kontekst?: 'javna' | 'privatna' | 'trening' | 'izazov' | null,
 ): string {
   const p = jePoznatiPravilnik(pravila) ? pravila : ZADANI_PRAVILNIK;
   if (kontekst === 'trening') {
