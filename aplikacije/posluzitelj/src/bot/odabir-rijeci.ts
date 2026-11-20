@@ -696,8 +696,7 @@ export function odaberiPotez(
     if (!svjedok) {
       return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
     }
-    const saSvjedokom = poznati.filter((rijec) => imaPoznatiNastavak(rijec, ulaz, iskoristene) === true);
-    if (saSvjedokom.length) poznati = saSvjedokom;
+    poznati = [svjedok];
   }
 
   if (poznati.length > RADNI_UZORAK_PO_POTEZU) {
@@ -940,31 +939,30 @@ export async function odaberiPotezNastavivo(
     const radni = poznati.length > RADNI_UZORAK_PO_POTEZU
       ? uzorkujPonderirano(poznati, RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
       : poznati;
-    const provjeriListu = async (lista: readonly string[], limit: number): Promise<string | null | 'otkazano'> => {
+    const potvrdjeni: string[] = [];
+    const provjeriListu = async (lista: readonly string[], limit: number): Promise<'otkazano' | null> => {
       const uzorak = lista.length <= limit ? lista : uzorkujPonderirano([...lista], limit, ulaz.frekvencijaZa, rng, konfig);
       for (const kandidat of uzorak) {
         const nastavak = await imaPoznatiNastavakNastavivo(kandidat, ulaz, iskoristene, predaj, aktivan);
         if (nastavak === 'otkazano') return 'otkazano';
-        if (nastavak === true) return kandidat;
+        if (nastavak === true) {
+          potvrdjeni.push(kandidat);
+          return null;
+        }
       }
       return null;
     };
-    let svjedok = await provjeriListu(radni, DETALJNA_PROVJERA_PO_POTEZU);
-    if (svjedok === 'otkazano') return null;
-    if (!svjedok) {
-      svjedok = await provjeriListu(poznati.filter((rijec) => !radni.includes(rijec)), DOKAZ_DODATNA_PROVJERA);
-      if (svjedok === 'otkazano') return null;
+    let ishod = await provjeriListu(radni, DETALJNA_PROVJERA_PO_POTEZU);
+    if (ishod === 'otkazano') return null;
+    if (potvrdjeni.length === 0) {
+      ishod = await provjeriListu(poznati.filter((rijec) => !radni.includes(rijec)), DOKAZ_DODATNA_PROVJERA);
+      if (ishod === 'otkazano') return null;
     }
-    if (!svjedok) {
+    if (potvrdjeni.length === 0) {
       return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
     }
-    const saSvjedokom: string[] = [];
-    for (const rijec of poznati) {
-      const nastavak = await imaPoznatiNastavakNastavivo(rijec, ulaz, iskoristene, predaj, aktivan);
-      if (nastavak === 'otkazano') return null;
-      if (nastavak === true) saSvjedokom.push(rijec);
-    }
-    if (saSvjedokom.length) poznati = saSvjedokom;
+    // Samo potvrđeni kandidati (bez drugog punog prolaza).
+    poznati = potvrdjeni;
   }
 
   if (poznati.length > RADNI_UZORAK_PO_POTEZU) {

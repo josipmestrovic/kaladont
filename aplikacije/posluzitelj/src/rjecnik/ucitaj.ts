@@ -127,16 +127,41 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
   let ciljevi: CiljeviRijeci = { rijetke: { ukupno: 0, niska: 0, srednja: 0, jaka: 0 }, duge: { ukupno: 0, duga: 0, srednja: 0, jaka: 0 } };
   let verzija = 0;
   const upraviteljRepertoara = new UpraviteljRepertoara();
+  let rebuildRepertoaraZakazan = false;
+  let rebuildRepertoaraUTijeku = false;
 
-  function obnoviRepertoarBotova(): void {
-    upraviteljRepertoara.objavi(izgradiRepertoarBotova({
+  function izvorZaRepertoar(): Parameters<typeof izgradiRepertoarBotova>[0] {
+    return {
       prefiksi: () => poPrefiksu.keys(),
       rijeciNaPrefiksu: (prefiks) => poPrefiksu.get(prefiks) ?? [],
       frekvencijaZa,
       grupeZa,
       jeOsnovniOblik,
       jePostojecaRijec,
-    }, verzija));
+    };
+  }
+
+  /** Sinkroni rebuild (npr. nakon punog učitavanja). */
+  function obnoviRepertoarBotova(): void {
+    upraviteljRepertoara.objavi(izgradiRepertoarBotova(izvorZaRepertoar(), verzija));
+  }
+
+  /** Spoji više admin izmjena u jedan rebuild (setImmediate). */
+  function zakaziObnovuRepertoara(): void {
+    rebuildRepertoaraZakazan = true;
+    if (rebuildRepertoaraUTijeku) return;
+    rebuildRepertoaraUTijeku = true;
+    setImmediate(() => {
+      try {
+        while (rebuildRepertoaraZakazan) {
+          rebuildRepertoaraZakazan = false;
+          obnoviRepertoarBotova();
+        }
+      } finally {
+        rebuildRepertoaraUTijeku = false;
+        if (rebuildRepertoaraZakazan) zakaziObnovuRepertoara();
+      }
+    });
   }
 
   function kljucKolekcije(grupa: string): string {
@@ -568,16 +593,19 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
 
   function primijeniUklanjanja(rijeciUlaz: readonly string[]): void {
     let bilo = false;
+    const uklonjene = new Set<string>();
     for (const rijecUlaz of rijeciUlaz) {
       const rijec = rijecUlaz.normalize('NFC').trim().toLowerCase();
       if (!rijecGrupe.has(rijec)) continue;
       ukloniOblikIzMemorije(rijec);
+      uklonjene.add(rijec);
       bilo = true;
     }
     if (!bilo) return;
     osvjeziIzvedeneBrojace();
     verzija += 1;
-    obnoviRepertoarBotova();
+    upraviteljRepertoara.filtrirajUklonjene(uklonjene, verzija);
+    zakaziObnovuRepertoara();
   }
 
   function primijeniUbaci(zapis: {
@@ -623,7 +651,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
       .sort((a, b) => b.brojOblika - a.brojOblika);
     osvjeziIzvedeneBrojace();
     verzija += 1;
-    obnoviRepertoarBotova();
+    zakaziObnovuRepertoara();
   }
 
   await ucitaj();

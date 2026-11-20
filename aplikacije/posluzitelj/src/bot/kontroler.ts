@@ -325,6 +325,8 @@ export class BotKontroler {
     const id = this.raspored.prijavi(async () => {
       if (!aktivan()) return 'odustani';
       try {
+        // Verzija na početku izračuna — ne na kraju (inače refresh tijekom rada izgleda kao match).
+        const verzijaZaOdluku = this.ovisnosti.rjecnik.verzijaRjecnika();
         const odluka = await this.odluciNastavivo(dogadaj, stanjeBota, snimkaGrupa, aktivan);
         if (!aktivan()) return 'odustani';
         const plan = this.planirano.get(partijaId);
@@ -332,7 +334,7 @@ export class BotKontroler {
         if (odluka) {
           plan.odluka = odluka;
           plan.vrsta = odluka.vrsta;
-          plan.verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
+          plan.verzijaRjecnika = verzijaZaOdluku;
         }
         this.pokusajIzvrsitiPlan(partijaId, dogadaj, igracId, stanjeBota);
         return 'gotovo';
@@ -706,8 +708,11 @@ export class BotKontroler {
     const aktivan = () => this.jeAktualanPlan(partijaId, generacija, dogadaj.turnToken, igracId);
     try {
       const kandidati = this.kandidatiZaPotez(dogadaj.trazenaSlova!, dogadaj.iskoristeneGrupe, dogadaj.dopusteneVrste).filter((rijec) => !odbijene.has(rijec));
+      // Prazan repertoar nakon odbijenih = normalan odustanak, ne tehnička greška.
       if (kandidati.length === 0 && dogadaj.trazenaSlova?.toLowerCase() !== 'ka') {
-        throw new Error('Nema preostalih kandidata tijekom tehničkog oporavka');
+        if (!aktivan()) return;
+        this.izvrsi(dogadaj, igracId, dogadaj.turnToken, { vrsta: 'odustani', razlog: 'nema_rijeci' }, pokusaj, odbijene);
+        return;
       }
       const odluka = await this.odluciNastavivo(dogadaj, stanjeBota, dogadaj.iskoristeneGrupe, aktivan, odbijene);
       if (!odluka || !aktivan()) return;

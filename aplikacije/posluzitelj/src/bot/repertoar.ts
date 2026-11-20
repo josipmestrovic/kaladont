@@ -175,6 +175,20 @@ export class UpraviteljRepertoara {
   verzija(): number {
     return this.snimka.generacija;
   }
+
+  /** Odmah izbaci uklonjene/nelegalne riječi iz aktivne snimke (dok se rebuild još ne završi). */
+  filtrirajUklonjene(uklonjene: ReadonlySet<string>, novaGeneracija: number): void {
+    if (uklonjene.size === 0) return;
+    const poPrefiksu = new Map<string, StavkaPrefiksa>();
+    for (const [prefiks, stavka] of this.snimka.poPrefiksu) {
+      const glavni = stavka.glavni.filter((r) => !uklonjene.has(r));
+      const rezerva = stavka.rezerva.filter((r) => !uklonjene.has(r));
+      if (glavni.length > 0 || rezerva.length > 0) {
+        poPrefiksu.set(prefiks, { glavni, rezerva });
+      }
+    }
+    this.snimka = { generacija: novaGeneracija, poPrefiksu };
+  }
 }
 
 export function* kandidatiRepertoaraNaPrefiksu(

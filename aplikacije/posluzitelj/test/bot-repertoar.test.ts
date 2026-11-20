@@ -9,7 +9,7 @@ import {
 
 function fixture(rijeci: Record<string, { freq: number; grupe: string[]; osnovni?: boolean }>) {
   const poPrefiksu = new Map<string, string[]>();
-  for (const [rijec, meta] of Object.entries(rijeci)) {
+  for (const rijec of Object.keys(rijeci)) {
     const prefiks = rijec.slice(0, 2);
     const lista = poPrefiksu.get(prefiks) ?? [];
     lista.push(rijec);

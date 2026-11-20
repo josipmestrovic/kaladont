@@ -744,7 +744,12 @@ describe('bot kontroler', () => {
   function stvori(izvrsi: (p: string, i: string, n: unknown) => RezultatNaredbe, verzija = () => 1, konfiguracija = konfigBezPropusta, dodatno: Partial<import('../src/bot/kontroler.js').OvisnostiBotKontrolera> = {}) {
     const timeri: { posao: () => void; ms: number }[] = [];
     const prekini = vi.fn();
-    const raspored = new RasporedjivacOdziva({ predaj: async () => undefined, sada: () => 0 });
+    let satRasporeda = 0;
+    const raspored = new RasporedjivacOdziva({
+      predaj: async () => undefined,
+      // Monotoni sat — inače budžet 0 ms drži posao u beskonačnom 'nastavi' krugu.
+      sada: () => { satRasporeda += 1; return satRasporeda; },
+    });
     const kontroler = new BotKontroler({
       rjecnik: mockRjecnikZaKontroler(verzija),
       predajKontrolu: async () => undefined,
@@ -861,7 +866,7 @@ describe('bot kontroler', () => {
   it('novi token otkazuje zastarjeli nastavivi posao (generacija)', async () => {
     let predaja = 0;
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri, odgubi, raspored } = stvori(izvrsi, () => 1, konfigBezPropusta, {
+    const { kontroler, timeri, raspored } = stvori(izvrsi, () => 1, konfigBezPropusta, {
       predajKontrolu: async () => { predaja += 1; },
     });
     kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't1' }));
@@ -879,7 +884,7 @@ describe('bot kontroler', () => {
     timeri[indeksNovog]!.posao();
     for (let k = 0; k < 80 && raspored.brojAktivnih() > 0; k += 1) await dovršiAsyncOdluku();
     expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ turnToken: 't3' }));
-    void predaja;
+    expect(predaja).toBeGreaterThanOrEqual(0);
     kontroler.zaustavi();
   });
 
@@ -894,7 +899,7 @@ describe('bot kontroler', () => {
 
   it('promjena poteza otkazuje stari plan; zakašnjeli callback ne igra sa starim tokenom', async () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri, odgubi, raspored } = stvori(izvrsi);
+    const { kontroler, timeri, odgubi } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't1' }));
     const stariPosao = timeri[0]!.posao;
     kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't2' }));
@@ -919,9 +924,11 @@ describe('bot kontroler', () => {
     await odgubi(0);
     await odgubi(1);
     await odgubi(2);
-    expect(izvrsi.mock.calls.map(([, , n]) => n.vrsta)).toEqual(['rijec', 'rijec']);
-    expect(kontroler.brojaci.tehnickeGreske).toBe(3);
-    expect(prekini).toHaveBeenCalledExactlyOnceWith('p1', 'bot', 't1');
+    // Dvije odbijene riječi iz repertoara, zatim prazan skup → normalan odustanak (ne prekini).
+    expect(izvrsi.mock.calls.map(([, , n]) => n.vrsta)).toEqual(['rijec', 'rijec', 'odustani']);
+    expect(kontroler.brojaci.tehnickeGreske).toBe(2);
+    expect(prekini).not.toHaveBeenCalled();
+    expect(kontroler.brojaci.bezRijeci).toBe(1);
     expect(kontroler.brojaci.namjernihPropusta).toBe(0);
     void timeri;
   });
