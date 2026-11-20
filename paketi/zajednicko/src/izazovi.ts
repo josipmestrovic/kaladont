@@ -98,6 +98,21 @@ export interface CiljeviIzazova {
   uspjesanDokaz?: number;
 }
 
+/** Autoritativni napredak ciljeva u snimci / GET pokušaja (PR03). */
+export interface StavkaNapretkaCiljaIzazova {
+  required: number;
+  current: number;
+  met: boolean;
+}
+
+export interface GoalProgressIzazova {
+  bezPogreske: { required: boolean; met: boolean };
+  dugeRijeci: StavkaNapretkaCiljaIzazova;
+  rijetkeRijeci: StavkaNapretkaCiljaIzazova;
+  uspjesanDokaz: StavkaNapretkaCiljaIzazova;
+  sviCiljeviIspunjeni: boolean;
+}
+
 export interface DefinicijaIzazova {
   id: IdIzazova;
   redniBroj: number;

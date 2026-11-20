@@ -12,6 +12,7 @@ import {
   type PotvrdaIzazova,
 } from 'zajednicko';
 import {
+  dohvatiPokusajPoId,
   dohvatiPokusajPoRequestId,
   dohvatiZavrseneChallengeIds,
   oznaciTehnickiPrekinuto,
@@ -149,9 +150,15 @@ export async function rezervirajPokusajIzazova(ulaz: {
     };
   }
 
+  // Voditelj (PR03) CAS-a rezerviran → u_tijeku; osvježi redak za potvrdu.
+  const osvjezen = await dohvatiPokusajPoId(pokusaj.id);
   return {
     ok: true,
-    pokusaj,
+    pokusaj: osvjezen ?? {
+      ...pokusaj,
+      status: 'u_tijeku',
+      partijaId: motor.partijaId,
+    },
     pokrenut: true,
     partijaId: motor.partijaId,
   };
