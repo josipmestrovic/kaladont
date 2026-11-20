@@ -15,6 +15,7 @@ import {
   POCETNI_SEED_SIGURNIH_RIJECI,
 } from './pocetne-rijeci.js';
 import { ucitajSigurnePocetneRijeciIzBaze } from './sigurni-skup.js';
+import { izgradiRepertoarBotova, type SnimkaRepertoara, UpraviteljRepertoara } from '../bot/repertoar.js';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
 
@@ -41,6 +42,14 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   /** Broj oblika po kategoriji, sortirano silazno (GET /rjecnik/statistika, naslovnica). */
   brojPoKategoriji(): KategorijaRjecnika[];
   ciljeviRijeci(): CiljeviRijeci;
+  /** Je li riječ igriva uz dane potrošene grupe i filtre (bez skeniranja cijelog prefiksa). */
+  jeIgrivaRijec(
+    rijec: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): boolean;
   /** Igrive riječi na prefiks, bez kopiranja indeksa; redoslijed je redoslijed indeksa, ne rang. */
   igriviKandidati(
     dvaGrafema: string,
@@ -65,6 +74,12 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   primijeniUklanjanje(rijec: string): void;
   /** Skupno uklanjanje: jedna bump verzije rječnika. */
   primijeniUklanjanja(rijeciUlaz: readonly string[]): void;
+  /** Zajednički botov repertoar (256+256 po prefiksu). */
+  repertoarBotova(): SnimkaRepertoara;
+  verzijaRepertoara(): number;
+  /** Kljucevi početnih prefiksa u RAM mapi (za izgradnju repertoara). */
+  prefiksiRjecnika(): readonly string[];
+  rijeciNaPrefiksu(prefiks: string): readonly string[];
   /** Trenutni skup sigurnih početnih riječi (runtime). */
   popisSigurnihPocetnih(): readonly string[];
   jeUSigurnomSkupu(rijec: string): boolean;
@@ -111,6 +126,18 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
   let brojRijetkihPoTieru: readonly number[] = [0, 0, 0];
   let ciljevi: CiljeviRijeci = { rijetke: { ukupno: 0, niska: 0, srednja: 0, jaka: 0 }, duge: { ukupno: 0, duga: 0, srednja: 0, jaka: 0 } };
   let verzija = 0;
+  const upraviteljRepertoara = new UpraviteljRepertoara();
+
+  function obnoviRepertoarBotova(): void {
+    upraviteljRepertoara.objavi(izgradiRepertoarBotova({
+      prefiksi: () => poPrefiksu.keys(),
+      rijeciNaPrefiksu: (prefiks) => poPrefiksu.get(prefiks) ?? [],
+      frekvencijaZa,
+      grupeZa,
+      jeOsnovniOblik,
+      jePostojecaRijec,
+    }, verzija));
+  }
 
   function kljucKolekcije(grupa: string): string {
     return grupa.split(':').slice(0, 2).join(':');
@@ -384,6 +411,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     };
     osvjeziIzvedeneBrojace();
     verzija += 1;
+    obnoviRepertoarBotova();
   }
 
   function grupeZa(rijec: string): readonly string[] {
@@ -549,6 +577,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     if (!bilo) return;
     osvjeziIzvedeneBrojace();
     verzija += 1;
+    obnoviRepertoarBotova();
   }
 
   function primijeniUbaci(zapis: {
@@ -594,6 +623,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
       .sort((a, b) => b.brojOblika - a.brojOblika);
     osvjeziIzvedeneBrojace();
     verzija += 1;
+    obnoviRepertoarBotova();
   }
 
   await ucitaj();
@@ -615,6 +645,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     frekvencijaZa,
     vrsteZa,
     jeOsnovniOblik,
+    jeIgrivaRijec: jeIgriva,
     postojeRijeciNa,
     imaSlobodnuRijecNa,
     igriviKandidati,
@@ -663,6 +694,10 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
 
       return null;
     },
+    repertoarBotova: () => upraviteljRepertoara.dohvati(),
+    verzijaRepertoara: () => upraviteljRepertoara.verzija(),
+    prefiksiRjecnika: () => [...poPrefiksu.keys()],
+    rijeciNaPrefiksu: (prefiks: string) => poPrefiksu.get(prefiks) ?? [],
     ponovoUcitaj: ucitaj,
     primijeniUbaci,
     primijeniUklanjanje,
