@@ -252,7 +252,7 @@ describe('Zagrijavanje', () => {
     expect(await baza.select().from(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igracId))).toHaveLength(100);
   });
 
-  it('gost igra protiv Računala, dobiva kraj bez napretka i baza ostaje netaknuta', async () => {
+  it('gost igra protiv Iskusnog (zadani profil), dobiva kraj bez napretka i baza ostaje netaknuta', async () => {
     const prije = await snimkaNapretka();
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
@@ -260,7 +260,7 @@ describe('Zagrijavanje', () => {
       expect(pocetak.kontekst).toBe('trening');
       expect(pocetak.mod).toBe('dva_igraca');
       expect(pocetak.sjedala).toHaveLength(2);
-      expect(pocetak.sjedala.some((s) => s.nadimak === 'Računalo')).toBe(true);
+      expect(pocetak.sjedala.some((s) => s.nadimak === 'Iskusni')).toBe(true);
       expect(kraj.kontekst).toBe('trening');
       expect(kraj.mojeIskustvo).toBeNull();
       expect(kraj.novaDostignuca).toEqual([]);
@@ -275,7 +275,7 @@ describe('Zagrijavanje', () => {
     expect(await snimkaNapretka()).toEqual(prije);
   });
 
-  it('Računalo odigra legalnu riječ kad je na potezu i isti igrač može odmah u novi trening', async () => {
+  it('bot odigra legalnu riječ kad je na potezu i isti igrač može odmah u novi trening', async () => {
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
       const prvi = await odigrajTreningDoKraja(socket, true);
@@ -307,7 +307,7 @@ describe('Zagrijavanje', () => {
   });
 
   // PR08 — tri ulaza (klasični Troboj-trening / KA-ZNA / Dokaži) + izolacija javnih agregata.
-  it('PR08 klasični trening: tri_igraca, Računalo 1/2 i različiti avatari', async () => {
+  it('PR08 klasični trening: tri_igraca, Iskusni 1/2 i različiti avatari', async () => {
     const prije = await snimkaNapretka();
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
@@ -325,7 +325,7 @@ describe('Zagrijavanje', () => {
       expect(pocetak.sjedala).toHaveLength(3);
       const racunala = pocetak.sjedala.filter((s) => s.jeBot);
       expect(racunala).toHaveLength(2);
-      expect(racunala.map((s) => s.nadimak).sort()).toEqual(['Računalo 1', 'Računalo 2']);
+      expect(racunala.map((s) => s.nadimak).sort()).toEqual(['Iskusni 1', 'Iskusni 2']);
       const avatari = new Set(racunala.map((s) => JSON.stringify(s.avatarConfig)));
       expect(avatari.size).toBe(2);
       // #108: ispadanje jedinog čovjeka odmah završava Zagrijavanje (bez bot-vs-bot).
@@ -338,7 +338,7 @@ describe('Zagrijavanje', () => {
     expect(await snimkaNapretka()).toEqual(prije);
   });
 
-  it('PR08 ka_zna i dokazi_nastavak trening ostaju Dvoboj s jednim Računalom', async () => {
+  it('PR08 ka_zna i dokazi_nastavak trening ostaju Dvoboj s jednim Iskusnim', async () => {
     for (const pravila of ['ka_zna', 'dokazi_nastavak'] as const) {
       const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
       try {
@@ -347,12 +347,31 @@ describe('Zagrijavanje', () => {
         expect(pocetak.pravila).toBe(pravila);
         expect(pocetak.sjedala).toHaveLength(2);
         expect(pocetak.sjedala.filter((s) => s.jeBot)).toHaveLength(1);
-        expect(pocetak.sjedala.some((s) => s.nadimak === 'Računalo')).toBe(true);
+        expect(pocetak.sjedala.some((s) => s.nadimak === 'Iskusni')).toBe(true);
       } finally {
         socket.disconnect();
       }
     }
   }, 60_000);
+
+  it('PR02 eksplicitni profil Majstor i stari klijent bez profileId → Iskusni', async () => {
+    const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
+    try {
+      const pocetakPromise = cekaj<PocetakPartije>(socket, 'partija:pocetak');
+      const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => {
+        socket.emit('trening:zapocni', { pravila: 'ka_zna', brojRacunala: 1, profileId: 'majstor' }, resolve);
+      });
+      expect(potvrda.pokrenut).toBe(true);
+      const pocetak = await pocetakPromise;
+      expect(pocetak.sjedala.some((s) => s.nadimak === 'Majstor')).toBe(true);
+      const konfig = posluzitelj.dohvatiKonfiguracijuBotaPartije(pocetak.partijaId);
+      expect(konfig?.vjerojatnostTaktickogPoteza).toBe(0.5);
+      socket.emit('partija:izadji');
+      await cekaj(socket, 'partija:kraj', () => true, 10_000);
+    } finally {
+      socket.disconnect();
+    }
+  });
 
   it('PR08 stari ulaz bez payload-a ostaje ka_zna Dvoboj', async () => {
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);

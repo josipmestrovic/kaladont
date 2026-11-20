@@ -1,10 +1,11 @@
 <script lang="ts">
   /**
-   * Igraj: način dolazi s naslovnice → pravilnik → format (Ranked) ili broj Računala (Zagrijavanje).
+   * Igraj: način dolazi s naslovnice → pravilnik → format (Ranked) ili profil + broj botova (Zagrijavanje).
    * HINT: Troboj bez ikone (tekst „Troboj · 3 igrača”) dok vlasnik ne dostavi asset.
    */
   import { onMount } from 'svelte';
-  import type { ModPartije, PravilnikPartije } from 'zajednicko';
+  import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko';
+  import { NAZIVI_PROFILA_BOTA, PROFILI_BOTA_IZAZOVA, ZADANI_PROFIL_TRENINGA } from 'zajednicko';
   import { X } from 'lucide-svelte';
   import {
     REDOSLIJED_PRAVILNIKA,
@@ -25,17 +26,18 @@
     onZatvori: () => void;
   } = $props();
 
-  let korak = $state<'pravilnik' | 'format' | 'botovi'>('pravilnik');
+  let korak = $state<'pravilnik' | 'format' | 'profil' | 'botovi'>('pravilnik');
   let odabranaPravila = $state<PravilnikPartije | null>(null);
+  let odabraniProfil = $state<ProfilBotaIzazova>(ZADANI_PROFIL_TRENINGA);
   let podlogaEl = $state<HTMLDivElement | null>(null);
   let dijalogEl = $state<HTMLDivElement | null>(null);
   let prethodniFokus: HTMLElement | null = null;
 
   const FORMATI: readonly ModPartije[] = ['dva_igraca', 'tri_igraca', 'cetiri_igraca'];
   const OPCIJE_BOTOVA = [
-    { broj: 1 as const, naziv: 'Igraj 1 računalom' },
-    { broj: 2 as const, naziv: 'Igraj 2 računala' },
-    { broj: 3 as const, naziv: 'Igraj 3 računala' },
+    { broj: 1 as const, naziv: 'Igraj s 1 botom' },
+    { broj: 2 as const, naziv: 'Igraj s 2 bota' },
+    { broj: 3 as const, naziv: 'Igraj s 3 bota' },
   ];
 
   const nazivNacina = $derived(nacin === 'laganini' ? 'Zagrijavanje' : 'Ranked');
@@ -44,6 +46,7 @@
     if (otvoren) {
       korak = 'pravilnik';
       odabranaPravila = null;
+      odabraniProfil = ZADANI_PROFIL_TRENINGA;
       prethodniFokus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       queueMicrotask(() => dijalogEl?.focus());
     }
@@ -66,14 +69,25 @@
 
   function odaberiPravilnik(pravila: PravilnikPartije) {
     odabranaPravila = pravila;
-    korak = nacin === 'laganini' ? 'botovi' : 'format';
+    korak = nacin === 'laganini' ? 'profil' : 'format';
+    queueMicrotask(() => dijalogEl?.focus());
+  }
+
+  function odaberiProfil(profil: ProfilBotaIzazova) {
+    odabraniProfil = profil;
+    korak = 'botovi';
     queueMicrotask(() => dijalogEl?.focus());
   }
 
   function natrag() {
-    if (korak === 'format' || korak === 'botovi') {
+    if (korak === 'format') {
       korak = 'pravilnik';
       odabranaPravila = null;
+    } else if (korak === 'profil') {
+      korak = 'pravilnik';
+      odabranaPravila = null;
+    } else if (korak === 'botovi') {
+      korak = 'profil';
     }
     queueMicrotask(() => dijalogEl?.focus());
   }
@@ -152,13 +166,32 @@
           {/each}
         </div>
         <button type="button" class="natrag-modal" onclick={natrag}>Natrag</button>
-      {:else if korak === 'botovi' && odabranaPravila}
+      {:else if korak === 'profil' && odabranaPravila}
         <p class="modal-nadnaslov">Zagrijavanje · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv}</p>
-        <h2 id="modal-naslov">Koliko Računala želiš?</h2>
+        <h2 id="modal-naslov">Odaberi težinu bota</h2>
+        <div class="modal-opcije">
+          {#each PROFILI_BOTA_IZAZOVA as profil (profil)}
+            <button
+              type="button"
+              class="modal-opcija modal-opcija-tekst"
+              onclick={() => odaberiProfil(profil)}
+            >
+              <span>
+                <strong>{NAZIVI_PROFILA_BOTA[profil]}</strong>
+              </span>
+            </button>
+          {/each}
+        </div>
+        <button type="button" class="natrag-modal" onclick={natrag}>Natrag</button>
+      {:else if korak === 'botovi' && odabranaPravila}
+        <p class="modal-nadnaslov">
+          Zagrijavanje · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv} · {NAZIVI_PROFILA_BOTA[odabraniProfil]}
+        </p>
+        <h2 id="modal-naslov">Koliko botova želiš?</h2>
         <div class="modal-opcije">
           {#each OPCIJE_BOTOVA as opcija (opcija.broj)}
             <a
-              href={putanjaZagrijavanjaBotova(opcija.broj, odabranaPravila)}
+              href={putanjaZagrijavanjaBotova(opcija.broj, odabranaPravila, odabraniProfil)}
               class="modal-opcija modal-opcija-tekst"
             >
               <span>

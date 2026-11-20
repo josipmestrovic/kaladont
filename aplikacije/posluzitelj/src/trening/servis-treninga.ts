@@ -1,29 +1,39 @@
 /**
- * Zagrijavanje (ADR-017 / PR08): trening protiv privremenih „Računala”, bez javnog reda, fonda i upisa.
- * UI bira 1–3 Računala; stari klijent i misije i dalje mogu slati samo `pravila`
- * (klasični = 2 Računala, ostalo = 1).
+ * Zagrijavanje (ADR-017 / PR08 / PR02): trening protiv privremenih botova po profilu težine.
+ * UI bira 1–3 botova i profil; stari klijent bez profileId dobiva Iskusni.
  * Igrač smije imati samo jedan aktivni kontekst igranja; ulazak u trening napušta javni red.
  */
 import { randomUUID } from 'node:crypto';
 import {
   AVATAR_RACUNALA,
   AVATAR_RACUNALA_2,
+  jePoznatiProfilBota,
   PRAVILNICI_PARTIJE,
+  PROFILI_BOTA_IZAZOVA,
   ZADANI_PRAVILNIK,
+  ZADANI_PROFIL_TRENINGA,
   type AvatarConfigV1,
   type KodGreske,
   type PotvrdaTreninga,
   type PravilnikPartije,
+  type ProfilBotaIzazova,
 } from 'zajednicko';
 import { z } from 'zod';
+import type { KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
+import {
+  nadimakProfilaBota,
+  razrijesiProfilBotaIliZadani,
+} from '../bot/profili-bota.js';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
 import type { RezultatPokretanja } from '../igra/politika-ucinka.js';
 import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost/socket-handler.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 
-export const NADIMAK_RACUNALA = 'Računalo';
 const PREFIKS_RACUNALA = 'racunalo-';
+
+/** @deprecated Koristi nadimakProfilaBota; zadržano radi starih importa u testovima. */
+export const NADIMAK_RACUNALA = 'Računalo';
 
 /** Stari ulaz po pravilniku: klasični Zagrijavanje treba 2 bota zbog eliminacije „sljedećeg”. */
 export function brojRacunalaZaTrening(pravila: PravilnikPartije): 1 | 2 {
@@ -33,6 +43,7 @@ export function brojRacunalaZaTrening(pravila: PravilnikPartije): 1 | 2 {
 const ShemaTreningZapocni = z.object({
   pravila: z.enum(PRAVILNICI_PARTIJE).optional(),
   brojRacunala: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  profileId: z.enum(PROFILI_BOTA_IZAZOVA).optional(),
 }).strict().optional();
 
 export function jeRacunalo(igracId: string): boolean {
@@ -43,9 +54,9 @@ function izradiRacunalo(
   indeks: number,
   ukupno: 1 | 2 | 3,
   pravila: PravilnikPartije,
+  profileId: ProfilBotaIzazova,
 ): StavkaReda {
-  // Jedan bot zadržava stari nadimak (e2e / ADR-017); više botova se razlikuje brojem.
-  const nadimak = ukupno === 1 ? NADIMAK_RACUNALA : `${NADIMAK_RACUNALA} ${indeks}`;
+  const nadimak = nadimakProfilaBota(profileId, indeks, ukupno);
   const avatarConfig: AvatarConfigV1 = indeks === 2 ? AVATAR_RACUNALA_2 : AVATAR_RACUNALA;
   return {
     igracId: `${PREFIKS_RACUNALA}${randomUUID()}`,
@@ -66,7 +77,11 @@ function izradiRacunalo(
 
 export interface OpcijeServisaTreninga {
   omogucen: () => boolean;
-  zapocniTrening: (sudionici: StavkaReda[], pravila: PravilnikPartije) => Promise<RezultatPokretanja>;
+  zapocniTrening: (
+    sudionici: StavkaReda[],
+    pravila: PravilnikPartije,
+    botKonfiguracija: KonfiguracijaBota,
+  ) => Promise<RezultatPokretanja>;
   igracImaAktivnuPartiju: (igracId: string) => boolean;
   igracImaPrivatnuSobu: (igracId: string) => boolean;
   ukloniIzJavnogReda: (igracId: string) => void;
@@ -120,9 +135,13 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
       opcije.ukloniIzJavnogReda(socket.data.igracId);
 
       const brojRacunala = parse.data?.brojRacunala ?? brojRacunalaZaTrening(parse.data?.pravila ?? ZADANI_PRAVILNIK);
-      // Eksplicitna pravila imaju prednost; inače 1 Računalo → KA-zna, 2+ → Klasični.
+      // Eksplicitna pravila imaju prednost; inače 1 bot → KA-zna, 2+ → Klasični.
       const pravila =
         parse.data?.pravila ?? (brojRacunala >= 2 ? 'klasicni' : ZADANI_PRAVILNIK);
+      const profileId: ProfilBotaIzazova = jePoznatiProfilBota(parse.data?.profileId)
+        ? parse.data!.profileId!
+        : ZADANI_PROFIL_TRENINGA;
+      const { konfiguracija: botKonfiguracija } = razrijesiProfilBotaIliZadani(profileId);
 
       const covjek: StavkaReda = {
         igracId: socket.data.igracId,
@@ -146,13 +165,13 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
         usaoU: Date.now(),
         odabranaPravila: pravila,
       };
-      // Privremena Računala nemaju redak u bazi ni javni profil; ne zauzimaju fond.
+      // Privremeni botovi nemaju redak u bazi ni javni profil; ne zauzimaju fond.
       const racunala: StavkaReda[] = [];
       for (let i = 1; i <= brojRacunala; i += 1) {
-        racunala.push(izradiRacunalo(i, brojRacunala, pravila));
+        racunala.push(izradiRacunalo(i, brojRacunala, pravila, profileId));
       }
 
-      void opcije.zapocniTrening([covjek, ...racunala], pravila).then((rezultat) => {
+      void opcije.zapocniTrening([covjek, ...racunala], pravila, botKonfiguracija).then((rezultat) => {
         if (rezultat === 'pokrenuta') {
           brojaci.zapoceti += 1;
           potvrda?.({ pokrenut: true });

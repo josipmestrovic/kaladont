@@ -23,10 +23,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 
 function parseArgs(argv) {
-  const out = { prefiksi: ['ma', 'ra', 'na', 'po', 'pr'], ponavljanja: 3 };
+  const out = {
+    prefiksi: ['ma', 'ra', 'na', 'po', 'pr'],
+    ponavljanja: 3,
+    /** PR02: matrica profil × pravilnik (isti seeds / prefiksi). */
+    matrica: false,
+  };
   for (const a of argv) {
     if (a.startsWith('--prefiksi=')) out.prefiksi = a.slice(11).split(',').map((s) => s.trim()).filter(Boolean);
     if (a.startsWith('--ponavljanja=')) out.ponavljanja = Math.max(1, Number(a.slice(14)) || 3);
+    if (a === '--matrica') out.matrica = true;
   }
   return out;
 }
@@ -88,13 +94,18 @@ async function main() {
   let odaberiPotez;
   let stvoriStanjeBota;
   let konfig;
+  let razrijesiProfilBota;
   try {
     // Node ne učitava .ts bez loadera — preferiraj dist ako postoji.
     const distOdabir = resolve(root, 'dist/bot/odabir-rijeci.js');
     const distKonfig = resolve(root, 'dist/bot/konfiguracija-bota.js');
+    const distProfili = resolve(root, 'dist/bot/profili-bota.js');
     if (existsSync(distOdabir)) {
       ({ odaberiPotez, stvoriStanjeBota } = await import(pathToFileURL(distOdabir).href));
       ({ ZADANA_KONFIGURACIJA_BOTA: konfig } = await import(pathToFileURL(distKonfig).href));
+      if (existsSync(distProfili)) {
+        ({ razrijesiProfilBota } = await import(pathToFileURL(distProfili).href));
+      }
     } else {
       console.error('Nema dist/ — pokreni build poslužitelja ili koristi: pnpm exec tsx scripts/benchmark-bot-odabir.mjs');
       console.error('Ispisujem samo veličine prefiksa iz dataseta.');
@@ -110,62 +121,82 @@ async function main() {
     return;
   }
 
-  const konfigBota = {
-    ...konfig,
-    vjerojatnostPropustaKa: 0,
-    vjerojatnostOstavljanjaKa: 0,
-    vjerojatnostNeznanjaUMalomSkupu: 0,
-    vjerojatnostTaktickogPoteza: 0,
-  };
+  const profili = args.matrica && razrijesiProfilBota
+    ? ['pocetnik', 'iskusni', 'majstor', 'velemajstor']
+    : [null];
+  const pravilnici = args.matrica ? ['klasicni', 'ka_zna', 'dokazi_nastavak'] : ['ka_zna'];
 
   console.log(JSON.stringify({
     dataset: process.env.KALADONT_BENCH_RJECNIK ?? 'ugradjeni-fixture',
     zapisa: zapisi.length,
     prefiksi: args.prefiksi,
     ponavljanja: args.ponavljanja,
+    matrica: args.matrica,
+    profili: profili.map((p) => p ?? 'baseline-nulte-vjerojatnosti'),
+    pravilnici,
   }));
 
-  for (const pref of args.prefiksi) {
-    const kandidati = poPrefiksu.get(pref) ?? [];
-    const vremena = [];
-    let maxPregled = 0;
-    for (let p = 0; p < args.ponavljanja; p += 1) {
-      let pregledano = 0;
-      const t0 = performance.now();
-      const stanje = stvoriStanjeBota(konfigBota, () => 0.5);
-      odaberiPotez({
-        trazenaSlova: pref,
-        kandidati,
-        frekvencijaZa: (r) => meta.get(r)?.frekvencija ?? 0,
-        grupeZa: (r) => meta.get(r)?.grupe ?? [`imenica:${r}`],
-        pravila: 'ka_zna',
-        brojAktivnih: 2,
-        iskoristeneGrupe: new Set(),
-        imaSlobodnuRijecNa: () => true,
-        poznatiKandidatiNa: (prefiks) => ({
-          *[Symbol.iterator]() {
-            for (const rijec of poPrefiksu.get(prefiks) ?? []) {
-              pregledano += 1;
-              const f = meta.get(rijec)?.frekvencija ?? 0;
-              if (f > 0) yield rijec;
-            }
-          },
-        }),
-        turnToken: `bench-${pref}-${p}`,
-      }, stanje, konfigBota, () => 0.5);
-      const ms = performance.now() - t0;
-      vremena.push(ms);
-      maxPregled = Math.max(maxPregled, pregledano);
+  function napraviKonfig(profileId) {
+    if (profileId && razrijesiProfilBota) {
+      return razrijesiProfilBota(profileId, konfig).konfiguracija;
     }
-    vremena.sort((a, b) => a - b);
-    const med = vremena[Math.floor(vremena.length / 2)];
-    console.log(JSON.stringify({
-      prefiks: pref,
-      kandidata: kandidati.length,
-      medMs: Number(med.toFixed(2)),
-      maxMs: Number(vremena[vremena.length - 1].toFixed(2)),
-      maxPregledanihUPoznatima: maxPregled,
-    }));
+    return {
+      ...konfig,
+      vjerojatnostPropustaKa: 0,
+      vjerojatnostOstavljanjaKa: 0,
+      vjerojatnostNeznanjaUMalomSkupu: 0,
+      vjerojatnostTaktickogPoteza: 0,
+    };
+  }
+
+  for (const profileId of profili) {
+    for (const pravila of pravilnici) {
+      const konfigBota = napraviKonfig(profileId);
+      for (const pref of args.prefiksi) {
+        const kandidati = poPrefiksu.get(pref) ?? [];
+        const vremena = [];
+        let maxPregled = 0;
+        for (let p = 0; p < args.ponavljanja; p += 1) {
+          let pregledano = 0;
+          const t0 = performance.now();
+          const stanje = stvoriStanjeBota(konfigBota, () => 0.5);
+          odaberiPotez({
+            trazenaSlova: pref,
+            kandidati,
+            frekvencijaZa: (r) => meta.get(r)?.frekvencija ?? 0,
+            grupeZa: (r) => meta.get(r)?.grupe ?? [`imenica:${r}`],
+            pravila,
+            brojAktivnih: 2,
+            iskoristeneGrupe: new Set(),
+            imaSlobodnuRijecNa: () => true,
+            poznatiKandidatiNa: (prefiks) => ({
+              *[Symbol.iterator]() {
+                for (const rijec of poPrefiksu.get(prefiks) ?? []) {
+                  pregledano += 1;
+                  const f = meta.get(rijec)?.frekvencija ?? 0;
+                  if (f > 0) yield rijec;
+                }
+              },
+            }),
+            turnToken: `bench-${profileId ?? 'base'}-${pravila}-${pref}-${p}`,
+          }, stanje, konfigBota, () => 0.5);
+          const ms = performance.now() - t0;
+          vremena.push(ms);
+          maxPregled = Math.max(maxPregled, pregledano);
+        }
+        vremena.sort((a, b) => a - b);
+        const med = vremena[Math.floor(vremena.length / 2)];
+        console.log(JSON.stringify({
+          profileId: profileId ?? null,
+          pravila,
+          prefiks: pref,
+          kandidata: kandidati.length,
+          medMs: Number(med.toFixed(2)),
+          maxMs: Number(vremena[vremena.length - 1].toFixed(2)),
+          maxPregledanihUPoznatima: maxPregled,
+        }));
+      }
+    }
   }
 }
 

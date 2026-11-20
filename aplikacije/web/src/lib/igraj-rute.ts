@@ -1,10 +1,18 @@
 /**
- * URL-ovi i oznake za Igraj (način na naslovnici → pravilnik → format ili Računala).
+ * URL-ovi i oznake za Igraj (način na naslovnici → pravilnik → format ili botovi/profil).
  * HINT: Natjecateljski: 9 UI izbora → 8 serverskih redova (Klasični+KA-ZNA Dvoboj dijele `2-zajednicki`).
  * HINT: Troboj ikona dolazi naknadno — kartica je tekstualna („Troboj · 3 igrača”).
  */
-import type { ModPartije, PravilnikPartije } from 'zajednicko';
-import { jePoznatiMod, jePoznatiPravilnik, ZADANI_PRAVILNIK } from 'zajednicko';
+import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko';
+import {
+  jePoznatiMod,
+  jePoznatiPravilnik,
+  jePoznatiProfilBota,
+  NAZIVI_PROFILA_BOTA,
+  PROFILI_BOTA_IZAZOVA,
+  ZADANI_PRAVILNIK,
+  ZADANI_PROFIL_TRENINGA,
+} from 'zajednicko';
 
 /** Doslovni tekstovi kartica pravilnika (pregled + PR14). */
 export const TEKSTOVI_PRAVILNIKA: Readonly<
@@ -71,39 +79,59 @@ export function putanjaJavnogReda(mod: ModPartije, pravila: PravilnikPartije): s
   return `/red?mod=${encodeURIComponent(mod)}&pravila=${encodeURIComponent(pravila)}`;
 }
 
-/** Glavni UI Zagrijavanje — pravila + broj Računala (1–3). */
+/** Glavni UI Zagrijavanje — pravila + broj botova (1–3) + profil. */
 export function putanjaZagrijavanjaBotova(
   brojRacunala: 1 | 2 | 3,
   pravila: PravilnikPartije,
+  profileId: ProfilBotaIzazova = ZADANI_PROFIL_TRENINGA,
 ): string {
-  return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}&botovi=${brojRacunala}`;
+  return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}&botovi=${brojRacunala}&profil=${encodeURIComponent(profileId)}`;
 }
 
-/** Misije / Igraj opet — stari ulaz po pravilniku (klasični = 2 Računala). */
+/** Misije / Igraj opet — stari ulaz po pravilniku (klasični = 2 bota, zadani Iskusni). */
 export function putanjaZagrijavanja(pravila: PravilnikPartije): string {
   return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}`;
+}
+
+export function parsajProfilIzQuery(vrijednost: string | null | undefined): ProfilBotaIzazova {
+  return jePoznatiProfilBota(vrijednost) ? vrijednost : ZADANI_PROFIL_TRENINGA;
+}
+
+/** Iz nadimka „Majstor” / „Majstor 2” → profileId (Trening imena po težini). */
+export function profilIzNadimkaTreningBota(nadimak: string | null | undefined): ProfilBotaIzazova | null {
+  if (!nadimak) return null;
+  for (const id of PROFILI_BOTA_IZAZOVA) {
+    const naziv = NAZIVI_PROFILA_BOTA[id];
+    if (nadimak === naziv || nadimak.startsWith(`${naziv} `)) return id;
+  }
+  return null;
 }
 
 export function putanjaPrivatneKreacije(pravila: PravilnikPartije): string {
   return `/soba/kreiraj?pravila=${encodeURIComponent(pravila)}`;
 }
 
-/** Trening: mod = broj sudionika (čovjek + Računala) → broj Računala 1–3. */
+/** Trening: mod = broj sudionika (čovjek + botovi) → broj botova 1–3. */
 export function brojRacunalaIzTreningModa(mod: ModPartije | null | undefined): 1 | 2 | 3 {
   if (mod === 'dva_igraca') return 1;
   if (mod === 'tri_igraca') return 2;
   return 3;
 }
 
-/** Igraj opet / misije — zadrži mod+pravila; bez pravila → zadani KA-ZNA. */
+/** Igraj opet / misije — zadrži mod+pravila (+ profil u Treningu); bez pravila → zadani KA-ZNA. */
 export function putanjaPonovneIgre(
   mod: ModPartije | null | undefined,
   pravila: PravilnikPartije | null | undefined,
   kontekst?: 'javna' | 'privatna' | 'trening' | 'izazov' | null,
+  profileId?: ProfilBotaIzazova | null,
 ): string {
   const p = jePoznatiPravilnik(pravila) ? pravila : ZADANI_PRAVILNIK;
   if (kontekst === 'trening') {
-    return putanjaZagrijavanjaBotova(brojRacunalaIzTreningModa(mod), p);
+    return putanjaZagrijavanjaBotova(
+      brojRacunalaIzTreningModa(mod),
+      p,
+      jePoznatiProfilBota(profileId) ? profileId : ZADANI_PROFIL_TRENINGA,
+    );
   }
   if (kontekst === 'privatna') {
     return putanjaPrivatneKreacije(p);

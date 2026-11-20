@@ -5,11 +5,14 @@ import {
   ID_OVI_IZAZOVA,
   izgradiStavkuKataloga,
   izracunajZvjezdiceIzazivaca,
+  jePoznatiProfilBota,
   KATALOG_IZAZOVA,
+  nadimakProfilaBota,
   prethodniIzazovId,
   PRAG_DUGE_RIJECI_IZAZOVA,
   validirajKatalogIzazova,
   VERZIJA_DEFINICIJE_IZAZOVA,
+  ZADANI_PROFIL_TRENINGA,
 } from '../src/izazovi.js';
 
 describe('katalog izazova', () => {
@@ -58,5 +61,13 @@ describe('katalog izazova', () => {
     expect(izracunajZvjezdiceIzazivaca(new Set(['IZ01']))).toBe(1);
     expect(izracunajZvjezdiceIzazivaca(new Set(['IZ01', 'IZ02', 'IZ03', 'IZ04', 'IZ05', 'IZ06']))).toBe(2);
     expect(izracunajZvjezdiceIzazivaca(new Set(ID_OVI_IZAZOVA))).toBe(5);
+  });
+
+  it('PR02: zadani trening profil i nadimci', () => {
+    expect(ZADANI_PROFIL_TRENINGA).toBe('iskusni');
+    expect(jePoznatiProfilBota('majstor')).toBe(true);
+    expect(jePoznatiProfilBota('xyz')).toBe(false);
+    expect(nadimakProfilaBota('velemajstor', 1, 1)).toBe('Velemajstor');
+    expect(nadimakProfilaBota('velemajstor', 2, 3)).toBe('Velemajstor 2');
   });
 });

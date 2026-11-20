@@ -124,6 +124,8 @@ export interface Posluzitelj {
   zaustavi: () => Promise<void>;
   brojaciTreninga: import('./trening/servis-treninga.js').BrojaciTreninga;
   brojaciBota: import('./bot/kontroler.js').BrojaciBota;
+  /** PR02 test: per-partija snapshot bot politike. */
+  dohvatiKonfiguracijuBotaPartije: (partijaId: string) => import('./bot/konfiguracija-bota.js').KonfiguracijaBota | null;
   fondBotova: FondBotova;
   /** Direktni start javne partije (testovi / Troboj do PR06 reda). */
   zapocniJavnuPartiju: (
@@ -457,6 +459,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       zapisSocketHandlerGreske,
       naPromjenuPoteza: (dogadaj) => botKontroler.naPromjenuPoteza(dogadaj),
       naPocetakPartijeZaBotove: (partijaId, kontekst, botIds) => botKontroler.naPocetakPartije(partijaId, kontekst, botIds),
+      naKonfiguracijuBotovaPartije: (partijaId, konfiguracija) => botKontroler.postaviKonfiguracijuPartije(partijaId, konfiguracija),
       naEliminacijuZaBotove: (partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId) => botKontroler.naEliminaciju(partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId),
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
@@ -817,12 +820,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   const treningServis = registrirajTrening(io, {
     omogucen: () => postavkeBotova.treningOmogucen && upravitelj.mozePokrenutiPartiju(),
-    // Zagrijavanje: mod iz broja sudionika (čovjek + 1–3 Računala).
-    zapocniTrening: (sudionici, pravila) => {
+    // Zagrijavanje: mod iz broja sudionika (čovjek + 1–3 botova profila).
+    zapocniTrening: (sudionici, pravila, botKonfiguracija) => {
       const broj = sudionici.length;
       const mod =
         broj <= 2 ? ('dva_igraca' as const) : broj === 3 ? ('tri_igraca' as const) : ('cetiri_igraca' as const);
-      return upravitelj.zapocniPartiju(sudionici, mod, { kontekst: 'trening', pravila });
+      return upravitelj.zapocniPartiju(sudionici, mod, { kontekst: 'trening', pravila, botKonfiguracija });
     },
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
     igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
@@ -929,6 +932,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     zaustavi,
     brojaciTreninga: treningServis.brojaci,
     brojaciBota: botKontroler.brojaci,
+    dohvatiKonfiguracijuBotaPartije: (partijaId) => botKontroler.dohvatiKonfiguracijuPartije(partijaId),
     fondBotova,
     zapocniJavnuPartiju: (sudionici, mod, pravila) => upravitelj.zapocniPartiju(sudionici, mod, { pravila }),
   };
