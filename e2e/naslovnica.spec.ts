@@ -91,6 +91,10 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByRole('button', { name: 'Ranked', exact: true })).toBeVisible();
+  await expect(navigacija.getByRole('link', { name: 'Izazovi', exact: true })).toHaveAttribute(
+    'href',
+    '/izazovi',
+  );
   await expect(navigacija.getByRole('button', { name: 'Zagrijavanje', exact: true })).toBeVisible();
   await expect(navigacija.getByRole('link', { name: 'Privatna soba', exact: true })).toHaveAttribute(
     'href',
@@ -435,23 +439,27 @@ test('padajuće riječi montirane iznad 1000px i demontiraju se pri suženju', a
   await expect(page.locator('.pozadina-rijeci')).toHaveCount(0);
 });
 
-test('mobilna navigacija ima tri CTA stavke s razmakom', async ({ page }) => {
+test('mobilna navigacija ima četiri CTA stavke s razmakom', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await expect(page.locator('.landing-footer')).toBeVisible({ timeout: 20_000 });
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   const ranked = navigacija.getByRole('button', { name: 'Ranked', exact: true });
+  const izazovi = navigacija.getByRole('link', { name: 'Izazovi', exact: true });
   const zagrijavanje = navigacija.getByRole('button', { name: 'Zagrijavanje', exact: true });
   const privatna = navigacija.getByRole('link', { name: 'Privatna soba', exact: true });
 
   const rankedBox = await ranked.boundingBox();
+  const izazoviBox = await izazovi.boundingBox();
   const zagrijavanjeBox = await zagrijavanje.boundingBox();
   const privatnaBox = await privatna.boundingBox();
-  expect(rankedBox && zagrijavanjeBox && privatnaBox).toBeTruthy();
+  expect(rankedBox && izazoviBox && zagrijavanjeBox && privatnaBox).toBeTruthy();
 
-  const razmak1 = zagrijavanjeBox!.y - (rankedBox!.y + rankedBox!.height);
-  const razmak2 = privatnaBox!.y - (zagrijavanjeBox!.y + zagrijavanjeBox!.height);
+  const razmak1 = izazoviBox!.y - (rankedBox!.y + rankedBox!.height);
+  const razmak2 = zagrijavanjeBox!.y - (izazoviBox!.y + izazoviBox!.height);
+  const razmak3 = privatnaBox!.y - (zagrijavanjeBox!.y + zagrijavanjeBox!.height);
   expect(razmak1).toBeGreaterThanOrEqual(5);
   expect(razmak2).toBeGreaterThanOrEqual(5);
+  expect(razmak3).toBeGreaterThanOrEqual(5);
 });

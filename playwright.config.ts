@@ -68,6 +68,7 @@ export default defineConfig({
         BOT_IZOSTANAK_PO_SUDJELOVANJU: '0',
         BOT_NEZNANJE_U_MALOM_SKUPU: '0',
         BOT_VJEROJATNOST_TAKTICKOG_POTEZA: '0',
+        IZAZOV_OMOGUCEN: 'true',
       },
     },
     {

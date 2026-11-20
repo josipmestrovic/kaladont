@@ -72,6 +72,20 @@
             height="72"
           />
         </button>
+        <a href="/izazovi" class="navigacijska-stavka" aria-label="Izazovi" data-testid="naslovnica-izazovi">
+          <span class="stavka-tekst" aria-hidden="true">
+            <strong>Izazovi</strong>
+            <small>Kampanja protiv računala.</small>
+          </span>
+          <img
+            class="ikona-stavke"
+            src={urlAseta('/ikone/06-trofej.png')}
+            alt=""
+            aria-hidden="true"
+            width="72"
+            height="72"
+          />
+        </a>
         <button
           type="button"
           class="navigacijska-stavka"

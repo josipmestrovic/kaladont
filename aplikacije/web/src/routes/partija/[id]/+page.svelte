@@ -11,12 +11,15 @@
   import Konfeti from '$lib/komponente/Konfeti.svelte';
   import IskustvoPartije from '$lib/komponente/IskustvoPartije.svelte';
   import NapredakMisijaPartije from '$lib/komponente/NapredakMisijaPartije.svelte';
+  import NapredakCiljevaIzazova from '$lib/komponente/NapredakCiljevaIzazova.svelte';
+  import RezultatIzazova from '$lib/komponente/RezultatIzazova.svelte';
   import KaladontDnkPromjena from '$lib/komponente/KaladontDnkPromjena.svelte';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
   import Header from '$lib/komponente/Header.svelte';
   import PanelPrijavaRijeci from '$lib/komponente/PanelPrijavaRijeci.svelte';
   import PanelPrijavaIgraca from '$lib/komponente/PanelPrijavaIgraca.svelte';
   import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
+  import { procitajZadnjiChallengeId } from '$lib/izazovi-klijent.js';
   import {
     dohvatiBrojZaZavrsniSazetak,
     dohvatiStanjeSanducica,
@@ -97,6 +100,8 @@
   let prethodnaNagrada: NagradaZaRijec | null = null;
   let prethodnaPartijaObavijesti: string | null | undefined;
   const jeTrening = $derived(stanje.kontekst === 'trening' || stanje.kraj?.kontekst === 'trening');
+  const jeIzazov = $derived(stanje.kontekst === 'izazov' || stanje.kraj?.kontekst === 'izazov');
+  const izazovChallengeId = $derived(stanje.izazovChallengeId ?? procitajZadnjiChallengeId());
   /** Zadrži istu težinu pri „Igraj novi trening” (Bugbot PR02). */
   const treningProfileId = $derived((() => {
     const izPlasmana = (stanje.kraj?.plasmani ?? [])
@@ -873,7 +878,14 @@
 
     prikaziRezultate = false;
     rezervniRokRezultataMs ??= Date.now() + 8_000;
-    const rok = kraj.prikazRezultataOdIso ? Date.parse(kraj.prikazRezultataOdIso) : rezervniRokRezultataMs;
+    const izazovRok = stanje.izazovTerminal?.resultsVisibleAtIso
+      ? Date.parse(stanje.izazovTerminal.resultsVisibleAtIso)
+      : NaN;
+    const rok = Number.isFinite(izazovRok)
+      ? izazovRok
+      : kraj.prikazRezultataOdIso
+        ? Date.parse(kraj.prikazRezultataOdIso)
+        : rezervniRokRezultataMs;
 
     if (aplauzPobjedeZaPartijuId !== kraj.partijaId) {
       aplauzPobjedeZaPartijuId = kraj.partijaId;
@@ -1303,6 +1315,33 @@
 {/if}
 {#if stanje.kraj && prikaziRezultate}
   <div class="zavrsni-header"><Header /></div>
+  {#if jeIzazov}
+    {#if stanje.izazovTerminal?.status === 'uspjeh' || pobjednikPartije()?.igracId === stanje.mojIgracId}
+      <Konfeti intenzitet="veliki" />
+    {/if}
+    <RezultatIzazova
+      kraj={stanje.kraj}
+      challengeId={izazovChallengeId}
+      goalProgress={stanje.goalProgress}
+      terminalStatus={stanje.izazovTerminal?.status ?? null}
+      terminalReason={stanje.izazovTerminal?.reason ?? null}
+    />
+    <PanelPrijavaRijeci
+      partijaId={partijaId!}
+      potezi={lokalniPoteziZaPrijavu}
+      {odbijeneRijeci}
+      bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
+      bind:brojDodavanje={brojPrijavaDodavanje}
+      bind:limitDodavanjeDosegnut
+      ucitavanje={ucitavanjePotezaPrijava}
+      greska={greskaPotezaPrijava}
+      imaJos={imaJosPotezaPrijava}
+      naUcitajJos={() => void ucitajPotezeZaPrijavu(true)}
+      naOtvori={() => void ucitajPotezeZaPrijavu(false)}
+      otvorenoPocetno={true}
+    />
+    <div class="kraj-donje-praznine" aria-hidden="true"></div>
+  {:else}
   {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
     <Konfeti intenzitet="veliki" />
   {/if}
@@ -1584,8 +1623,16 @@
     <PanelPrijavaIgraca partijaId={partijaId!} igraci={igraciZaPrijavu} otvorenoPocetno={false} />
   {/if}
   <div class="kraj-donje-praznine" aria-hidden="true"></div>
+  {/if}
 {:else}
   <div class="aktivna-partija-sadrzaj">
+  {#if jeIzazov && !stanje.kraj}
+    <NapredakCiljevaIzazova
+      napredak={stanje.goalProgress}
+      pravila={stanje.pravila}
+      trajanjePotezaSek={stanje.trajanjePotezaSek}
+    />
+  {/if}
   {#if prikazanaSjedala.length > 0}
   <ul
     class="igraci-red"
