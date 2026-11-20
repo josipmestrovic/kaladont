@@ -65,7 +65,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      # Boot uključuje sinkroni rebuild botovog repertoara (~1,2 M riječi).
+      start_period: 120s
     networks:
       - javna
       - privatna
