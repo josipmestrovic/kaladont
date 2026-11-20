@@ -178,7 +178,7 @@ env_stvarni_promijenjen='da'
 faza='env_azuriran'
 docker compose -f "$compose_datoteka" stop aplikacija
 docker compose -f "$compose_datoteka" rm -f aplikacija
-docker compose -f "$compose_datoteka" up -d --wait --wait-timeout 180 --force-recreate aplikacija
+docker compose -f "$compose_datoteka" up -d --wait --wait-timeout 300 --force-recreate aplikacija
 faza='aplikacija_rekreirana'
 
 aktivna_slika=$(docker inspect kaladont-aplikacija-1 --format '{{.Config.Image}}')

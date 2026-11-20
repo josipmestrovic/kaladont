@@ -91,13 +91,14 @@ function odaberiZaPrefiks(
   const kandidati: KandidatGradnje[] = [];
   for (const rijec of rijeci) {
     if (!izvor.jePostojecaRijec(rijec)) continue;
-    if (jeNepoznataBotu(rijec, izvor.frekvencijaZa(rijec))) continue;
-    const frekvencija = izvor.frekvencijaZa(rijec) ?? 0;
+    const frekvencijaSirowa = izvor.frekvencijaZa(rijec);
+    if (jeNepoznataBotu(rijec, frekvencijaSirowa)) continue;
+    const frekvencija = frekvencijaSirowa ?? 0;
     kandidati.push({
       rijec,
       osnovni: izvor.jeOsnovniOblik(rijec),
       frekvencija,
-      kategorijaFrekvencije: kategorijaFrekvencije(izvor.frekvencijaZa(rijec)),
+      kategorijaFrekvencije: kategorijaFrekvencije(frekvencijaSirowa),
       zavrsetak: zadnjaDva(rijec),
       grupe: izvor.grupeZa(rijec),
       hash: stabilniHash(rijec),
@@ -111,37 +112,48 @@ function odaberiZaPrefiks(
 
   const glavni: string[] = [];
   const rezerva: string[] = [];
+  const odabrane = new Set<string>();
   const pokriveneGrupe = new Set<string>();
   const pokriveniZavrsetci = new Set<string>();
+
+  /** Monotoni pokazivač: jednom nevaljan kandidat više ne postaje alternativa (grupe/završeci samo rastu). */
+  let indeksAlternative = 0;
+
+  const naprijedDoAlternative = (): KandidatGradnje | undefined => {
+    while (indeksAlternative < kandidati.length) {
+      const druga = kandidati[indeksAlternative]!;
+      if (
+        !pokriveniZavrsetci.has(druga.zavrsetak)
+        && !odabrane.has(druga.rijec)
+        && !druga.grupe.some((g) => pokriveneGrupe.has(g))
+      ) {
+        return druga;
+      }
+      indeksAlternative += 1;
+    }
+    return undefined;
+  };
 
   const dodaj = (lista: string[], limit: number, preferirajRaznolikost: boolean) => {
     for (const k of kandidati) {
       if (lista.length >= limit) break;
-      if (glavni.includes(k.rijec) || rezerva.includes(k.rijec)) continue;
+      if (odabrane.has(k.rijec)) continue;
       const grupe = kljuceviGrupa(k.rijec, k.grupe);
-      if (grupe.length === 0) {
-        if (pokriveneGrupe.has(`rijec:${k.rijec}`)) continue;
-      } else if (grupe.some((g) => pokriveneGrupe.has(g))) {
-        continue;
-      }
+      if (grupe.some((g) => pokriveneGrupe.has(g))) continue;
       if (preferirajRaznolikost && pokriveniZavrsetci.has(k.zavrsetak) && lista.length < limit - 1) {
-        const alternativa = kandidati.find(
-          (druga) => !pokriveniZavrsetci.has(druga.zavrsetak)
-            && !glavni.includes(druga.rijec)
-            && !rezerva.includes(druga.rijec)
-            && !druga.grupe.some((g) => pokriveneGrupe.has(g)),
-        );
+        const alternativa = naprijedDoAlternative();
         if (alternativa && alternativa.rijec !== k.rijec) continue;
       }
       lista.push(k.rijec);
-      if (grupe.length === 0) pokriveneGrupe.add(`rijec:${k.rijec}`);
-      else for (const g of grupe) pokriveneGrupe.add(g);
+      odabrane.add(k.rijec);
+      for (const g of grupe) pokriveneGrupe.add(g);
       pokriveniZavrsetci.add(k.zavrsetak);
     }
   };
 
   dodaj(glavni, REPERTOAR_GLAVNI_PO_PREFIKSU, false);
   pokriveniZavrsetci.clear();
+  indeksAlternative = 0;
   dodaj(rezerva, REPERTOAR_REZERVA_PO_PREFIKSU, true);
 
   return { glavni, rezerva };

@@ -143,7 +143,13 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
 
   /** Sinkroni rebuild (npr. nakon punog učitavanja). */
   function obnoviRepertoarBotova(): void {
-    upraviteljRepertoara.objavi(izgradiRepertoarBotova(izvorZaRepertoar(), verzija));
+    const pocetak = performance.now();
+    const snimka = izgradiRepertoarBotova(izvorZaRepertoar(), verzija);
+    upraviteljRepertoara.objavi(snimka);
+    const ms = Math.round(performance.now() - pocetak);
+    console.info(
+      `Repertoar botova: ${snimka.poPrefiksu.size} prefiksa, generacija ${snimka.generacija}, ${ms} ms`,
+    );
   }
 
   /** Spoji više admin izmjena u jedan rebuild (setImmediate). */
