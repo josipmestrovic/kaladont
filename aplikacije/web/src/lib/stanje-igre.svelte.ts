@@ -294,6 +294,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
       const porukaIshoda = `${nadimakIgraca(prethodniDokaz.autorId)} je dokazao nastavak.`;
       stanje.dokaz = prethodniDokaz;
       stanje.faza = 'dokaz_nastavka';
+      stanje.sustavBiraRijec = false;
       zatvoriDokazNakonHold(() => {
         stanje.dokaz = null;
         zapisiIshodDokaza(porukaIshoda);
@@ -303,16 +304,20 @@ function primijeniStanjePartije(p: StanjePartije): void {
       }
     }
   } else if (prethodniDokaz && !p.dokaz && dokazPrikazanOdMs !== null && !p.zavrsena) {
-    // Brzi bot / reconnect: server već zatvorio dokaz — zadrži snimku, pa obavezno zakazati hold.
+    // Brzi bot / reconnect: zadrži snimku za hold. Ne poništavaj postojeći timer
+    // (eliminacija već zakazala zatvaranje s ishod porukom).
     stanje.dokaz = prethodniDokaz;
     stanje.faza = 'dokaz_nastavka';
-    const sljedecaFaza = p.sustavBiraRijec ? ('sustav_bira' as const) : ('obican_potez' as const);
-    const sustavBira = p.sustavBiraRijec;
-    zatvoriDokazNakonHold(() => {
-      stanje.dokaz = null;
-      stanje.faza = sljedecaFaza;
-      stanje.sustavBiraRijec = sustavBira;
-    });
+    stanje.sustavBiraRijec = false;
+    if (!timerZadrziDokaz) {
+      const sljedecaFaza = p.sustavBiraRijec ? ('sustav_bira' as const) : ('obican_potez' as const);
+      const sustavBira = p.sustavBiraRijec;
+      zatvoriDokazNakonHold(() => {
+        stanje.dokaz = null;
+        stanje.faza = sljedecaFaza;
+        stanje.sustavBiraRijec = sustavBira;
+      });
+    }
   }
 }
 
