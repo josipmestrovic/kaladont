@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { dohvatiStanjeVeze, type StanjeVeze } from '$lib/socket.js';
+  import { dohvatiStanjeVeze, otpustiBannerIstekaSesije, type StanjeVeze } from '$lib/socket.js';
   import { dohvatiStanjeIgre } from '$lib/stanje-igre.svelte.js';
 
   const stanjeVeze = dohvatiStanjeVeze();
@@ -13,6 +13,11 @@
   let obavijest: HTMLElement | undefined = $state();
   const trebaPrikazati = $derived(obavijestAktivna && !obavijestZatvorena);
 
+  function zatvoriObavijest(): void {
+    obavijestZatvorena = true;
+    if (stanjeVeze.stanje === 'sesija_istekla') otpustiBannerIstekaSesije();
+  }
+
   $effect(() => {
     if (!obavijestAktivna) obavijestZatvorena = false;
   });
@@ -20,7 +25,7 @@
   onMount(() => {
     function zatvoriKlikomIzvan(dogadaj: MouseEvent): void {
       if (!trebaPrikazati || !obavijest || !(dogadaj.target instanceof Node)) return;
-      if (!obavijest.contains(dogadaj.target)) obavijestZatvorena = true;
+      if (!obavijest.contains(dogadaj.target)) zatvoriObavijest();
     }
 
     document.addEventListener('click', zatvoriKlikomIzvan);
@@ -56,7 +61,7 @@
     stanjeVeze.partijaNedostupna
       ? 'Vjerojatno je došlo do ponovnog pokretanja poslužitelja.'
       : stanjeVeze.stanje === 'sesija_istekla'
-      ? 'Prijavi se ponovno kako bi nastavio/la.'
+      ? 'Možeš nastaviti kao gost; prijavi se ponovno za svoj račun.'
       : stanjeVeze.stanje === 'druga_kartica'
         ? 'Isti identitet otvoren je u drugoj kartici.'
         : stanjeVeze.stanje === 'ponovno_spajanje'
@@ -65,7 +70,7 @@
   );
 
   function prijaviSe(): void {
-    obavijestZatvorena = true;
+    zatvoriObavijest();
     void goto('/prijava');
   }
 </script>
@@ -76,7 +81,7 @@
       <strong>{naslov}</strong>
       <span>{opis}</span>
     </div>
-    <button type="button" class="zatvori" aria-label="Zatvori obavijest" onclick={() => (obavijestZatvorena = true)}>×</button>
+    <button type="button" class="zatvori" aria-label="Zatvori obavijest" onclick={zatvoriObavijest}>×</button>
     {#if stanjeVeze.partijaNedostupna}
       <button type="button" onclick={() => void goto('/')}>Na početnu</button>
     {:else if stanjeVeze.stanje === 'sesija_istekla'}

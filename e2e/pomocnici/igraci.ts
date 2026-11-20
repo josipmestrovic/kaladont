@@ -73,11 +73,14 @@ export async function odigrajRijec(stranica: Page, cijelaRijec: string): Promise
     throw new Error(`Riječ „${cijelaRijec}” ne odgovara prefiksu iz UI-ja („${prefiks}”).`);
   }
   const nastavak = normalizirana.slice(prefiks.length);
-  if (!nastavak) {
-    throw new Error(`Riječ „${cijelaRijec}” nema nastavak iza prefiksa „${prefiks}”.`);
+  // Prefiks-only riječ (RS-05/RS-06): prazan nastavak je valjan submit.
+  if (nastavak) {
+    await unos.fill(nastavak);
+    await expect(unos).toHaveValue(nastavak);
+  } else {
+    await unos.fill('');
+    await expect(unos).toHaveValue('');
   }
-  await unos.fill(nastavak);
-  await expect(unos).toHaveValue(nastavak);
   await stranica.getByRole('button', { name: 'Pošalji' }).click();
   // Potez prihvaćen → forma nestaje (red prelazi).
   await expect(unos).toBeHidden({ timeout: 15_000 });

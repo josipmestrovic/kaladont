@@ -43,7 +43,12 @@ export async function osvjeziGostSesijuNakon401(
   const emitirajIdentitet = opcije.emitirajIdentitet !== false;
   const prije = dohvatiAuthToken();
   zadnjiValjaniGostToken = null;
-  await inicijalizirajGostSesiju();
+  // Istekla/opozvana registrirana sesija blokira mintanje gosta dok sesijski token stoji.
+  if (typeof localStorage !== 'undefined' && localStorage.getItem(KLJUC_SESIJSKI_TOKEN)) {
+    await prijediNaGostujucuSesiju();
+  } else {
+    await inicijalizirajGostSesiju();
+  }
   const poslije = dohvatiAuthToken();
   if (!poslije || poslije === prije) return false;
   if (typeof window === 'undefined') return true;
