@@ -2169,6 +2169,7 @@ export function stvoriUpraviteljPartija(
         (id) => stanje.sudionici.find((s) => s.igracId === id)?.upravljac === 'covjek',
       );
       if (eliminiranJeCovjek && !imaAktivnogCovjeka) {
+        sabijPreostaleZaRaniStop(stanje);
         zakljuciPartiju(stanje);
         return;
       }
@@ -2929,6 +2930,24 @@ export function stvoriUpraviteljPartija(
   }
 
   /**
+   * Rani stop (trening/izazov): ostavi jednog aktivnog za zakljuciPartiju,
+   * ostale preostale stavi u eliminirani bez fiktivnog bot-vs-bot.
+   */
+  function sabijPreostaleZaRaniStop(stanje: StanjeStola): void {
+    const preostali = [...stanje.aktivni];
+    for (let i = 1; i < preostali.length; i += 1) {
+      const id = preostali[i]!;
+      stanje.aktivni.delete(id);
+      if (!stanje.eliminirani.includes(id)) stanje.eliminirani.push(id);
+    }
+    if (stanje.aktivni.size === 0) {
+      const bot = stanje.sudionici.find((s) => s.upravljac === 'bot');
+      if (bot) stanje.aktivni.add(bot.igracId);
+      else if (preostali[0]) stanje.aktivni.add(preostali[0]);
+    }
+  }
+
+  /**
    * PR03: rani terminal Izazova (bez-pogreške) — otkaži botove/timere, zatvori igru
    * bez igranja ostatka. Hint ide u settlement.
    */
@@ -2950,21 +2969,7 @@ export function stvoriUpraviteljPartija(
       stanje.aktivni.delete(covjekId);
       if (!stanje.eliminirani.includes(covjekId)) stanje.eliminirani.push(covjekId);
     }
-    // Ostavi jednog bota kao „pobjednika” strukture zakljuciPartiju; ostale makni bez poteza.
-    const preostali = [...stanje.aktivni];
-    for (let i = 1; i < preostali.length; i += 1) {
-      const id = preostali[i]!;
-      stanje.aktivni.delete(id);
-      if (!stanje.eliminirani.includes(id)) stanje.eliminirani.push(id);
-    }
-    if (stanje.aktivni.size === 0 && preostali[0]) {
-      stanje.aktivni.add(preostali[0]);
-    }
-    // Ako nema nikoga, dodaj fiktivnog — zakljuci očekuje ≥1; bolje spriječiti.
-    if (stanje.aktivni.size === 0) {
-      const bot = stanje.sudionici.find((s) => s.upravljac === 'bot');
-      if (bot) stanje.aktivni.add(bot.igracId);
-    }
+    sabijPreostaleZaRaniStop(stanje);
     zakljuciPartiju(stanje);
   }
 
@@ -3452,6 +3457,11 @@ export function stvoriUpraviteljPartija(
   return {
     zapocniPartiju,
     zapocniPrivatnuPartiju,
+    /** Tehnički prekid živog stola (npr. CAS Izazova nije uspio nakon starta). */
+    ponistiPartiju: (partijaId: string, poruka: string) => {
+      const stanje = partije.get(partijaId);
+      if (stanje) ponistiStol(stanje, poruka);
+    },
     registrirajHandlere,
     zaustavi,
     naredbaBota,

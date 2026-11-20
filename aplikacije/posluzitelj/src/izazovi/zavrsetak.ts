@@ -29,9 +29,9 @@ export interface UlazTerminalnogPokusaja {
 
 /** PR04: XP, Izazivač, misije, sandučić — no-op do settlement PR-a. */
 export async function nakonTerminalnogPokusaja(
-  _redak: RedakPokusajaIzazova,
+  redak: RedakPokusajaIzazova,
 ): Promise<void> {
-  /* stub PR04 */
+  void redak;
 }
 
 /**

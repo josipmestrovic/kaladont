@@ -32,7 +32,6 @@ import {
 } from './evaluacija.js';
 import {
   oznaciPokusajUTijeku,
-  type RedakPokusajaIzazova,
   type SnapshotPokusajaIzazova,
   dohvatiPokusajPoId,
 } from './pohrana.js';
@@ -48,7 +47,16 @@ export interface SesijaIzazova {
   ciljevi: CiljeviIzazova;
   cinjenice: CinjeniceIzazova;
   forsiranRazlog: RazlogNeuspjehaIzazova | null;
+  /** true tek nakon uspješnog CAS završetka (retry smije ponoviti dok je false). */
   zavrseno: boolean;
+  /** Deduplikacija paralelnih/retry poziva naKrajIgre. */
+  zavrsavanjePromise?: Promise<{
+    status: 'uspjeh' | 'neuspjeh' | 'tehnicki_prekinuto';
+    reason: RazlogNeuspjehaIzazova | null;
+    resultsVisibleAtIso: string | null;
+    gameWon: boolean | null;
+    goalProgress: GoalProgress;
+  } | null>;
 }
 
 export interface OvisnostiVoditeljaIzazova {
@@ -62,6 +70,8 @@ export interface OvisnostiVoditeljaIzazova {
       trajanjePotezaSek: number;
     },
   ) => Promise<{ ishod: RezultatPokretanja; partijaId: string | null }>;
+  /** Ako CAS u_tijeku ne uspije nakon starta motora — ukloni živi stol. */
+  ponistiPartiju: (partijaId: string, poruka: string) => void;
   dohvatiIgracaZaStol: (igracId: string) => {
     igracId: string;
     vrsta: 'gost' | 'registriran' | 'admin';
@@ -209,8 +219,15 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
       return { ok: false, razlog: ishod === 'pokrenuta' ? 'nema_partija_id' : ishod };
     }
 
-    const uTijeku = await oznaciPokusajUTijeku(ulaz.attemptId, partijaId);
+    let uTijeku;
+    try {
+      uTijeku = await oznaciPokusajUTijeku(ulaz.attemptId, partijaId);
+    } catch {
+      ovisnosti.ponistiPartiju(partijaId, 'Izazov nije moguće pokrenuti zbog greške pri spremanju.');
+      return { ok: false, razlog: 'cas_u_tijeku_greska' };
+    }
     if (!uTijeku) {
+      ovisnosti.ponistiPartiju(partijaId, 'Izazov nije moguće pokrenuti zbog greške pri spremanju.');
       return { ok: false, razlog: 'cas_u_tijeku_neuspjeh' };
     }
 
@@ -290,35 +307,48 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
     goalProgress: GoalProgress;
   } | null> {
     const sesija = sesijePoPartiji.get(ulaz.partijaId);
-    if (!sesija || sesija.zavrseno) return null;
-    sesija.zavrseno = true;
+    if (!sesija) return null;
+    if (sesija.zavrsavanjePromise) return sesija.zavrsavanjePromise;
+    if (sesija.zavrseno) return null;
+
     if (ulaz.terminalHint && !sesija.forsiranRazlog) {
       sesija.forsiranRazlog = ulaz.terminalHint;
     }
-    const covjekPobijedio = ulaz.pobjednikId === sesija.covjekId;
-    const odluka = odlukaNakonKrajaIgre({
-      ciljevi: sesija.ciljevi,
-      cinjenice: sesija.cinjenice,
-      covjekPobijedio,
-      forsiranRazlog: sesija.forsiranRazlog,
-    });
-    const redak = await zavrsiPokusajIzazova({
-      attemptId: sesija.attemptId,
-      status: odluka.status,
-      razlog: odluka.razlog,
-      metrics: odluka.metrics,
-      gameWon: odluka.gameWon,
-      partijaId: ulaz.partijaId,
-    });
-    sesijePoPartiji.delete(ulaz.partijaId);
-    sesijePoAttempt.delete(sesija.attemptId);
-    return {
-      status: (redak?.status as 'uspjeh' | 'neuspjeh' | 'tehnicki_prekinuto') ?? odluka.status,
-      reason: (redak?.reason as RazlogNeuspjehaIzazova | null) ?? odluka.razlog,
-      resultsVisibleAtIso: redak?.resultsVisibleAt?.toISOString() ?? null,
-      gameWon: redak?.gameWon ?? odluka.gameWon,
-      goalProgress: odluka.metrics.goalProgress,
-    };
+
+    sesija.zavrsavanjePromise = (async () => {
+      const covjekPobijedio = ulaz.pobjednikId === sesija.covjekId;
+      const odluka = odlukaNakonKrajaIgre({
+        ciljevi: sesija.ciljevi,
+        cinjenice: sesija.cinjenice,
+        covjekPobijedio,
+        forsiranRazlog: sesija.forsiranRazlog,
+      });
+      const redak = await zavrsiPokusajIzazova({
+        attemptId: sesija.attemptId,
+        status: odluka.status,
+        razlog: odluka.razlog,
+        metrics: odluka.metrics,
+        gameWon: odluka.gameWon,
+        partijaId: ulaz.partijaId,
+      });
+      if (!redak) {
+        // CAS nije prošao — ostavi sesiju za retry upisa motora.
+        sesija.zavrsavanjePromise = undefined;
+        return null;
+      }
+      sesija.zavrseno = true;
+      sesijePoPartiji.delete(ulaz.partijaId);
+      sesijePoAttempt.delete(sesija.attemptId);
+      return {
+        status: redak.status as 'uspjeh' | 'neuspjeh' | 'tehnicki_prekinuto',
+        reason: (redak.reason as RazlogNeuspjehaIzazova | null) ?? odluka.razlog,
+        resultsVisibleAtIso: redak.resultsVisibleAt?.toISOString() ?? null,
+        gameWon: redak.gameWon ?? odluka.gameWon,
+        goalProgress: odluka.metrics.goalProgress,
+      };
+    })();
+
+    return sesija.zavrsavanjePromise;
   }
 
   return {

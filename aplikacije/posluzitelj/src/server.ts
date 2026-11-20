@@ -480,8 +480,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
         naJavnaPartijaZavrsila(partijaId);
-        terminaliIzazovaPoPartiji.delete(partijaId);
-        goalProgressIzazovaCache.delete(partijaId);
+        // Ne briši goalProgress/terminal odmah — soba još živi (resultsVisibleAt / 15 s hold).
+        const timer = setTimeout(() => {
+          terminaliIzazovaPoPartiji.delete(partijaId);
+          goalProgressIzazovaCache.delete(partijaId);
+        }, 20_000);
+        timer.unref();
       },
       naPrivatnaPartijaZavrsila: (kodSobe, partijaId, pobjednikId, rezultati) => {
         sobaServis?.registrirajRezultatPartije(kodSobe, partijaId, pobjednikId, rezultati);
@@ -509,6 +513,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
   voditeljIzazova = stvoriVoditeljIzazova({
     zapocniPartiju: (sudionici, mod, opcije) => upravitelj.zapocniPartiju(sudionici, mod, opcije),
+    ponistiPartiju: (partijaId, poruka) => upravitelj.ponistiPartiju(partijaId, poruka),
     dohvatiIgracaZaStol: (igracId) => {
       const socket = aktivneVeze.dohvatiSocket(igracId);
       if (!socket) return null;
