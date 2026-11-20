@@ -72,11 +72,19 @@ export class RasporedjivacOdziva {
           } catch {
             ishod = 'odustani';
           }
-          if (ishod !== 'nastavi') {
-            this.red.splice(i, 1);
+          // Nakon awaita indeks može biti pomaknut (otkazi drugog/ovog posla).
+          const josIndex = this.red.findIndex((p) => p.id === posao.id);
+          if (josIndex < 0) {
+            // Već uklonjen tijekom koraka — ne spliceaj sljedeći posao.
             continue;
           }
-          i += 1;
+          if (ishod !== 'nastavi') {
+            this.red.splice(josIndex, 1);
+            i = josIndex;
+            continue;
+          }
+          i = josIndex + 1;
+          // Jedan korak po poslu pa predaja ako je budžet potrošen (ili sat ne napreduje).
           if (this.sada() - pocetak >= BUDZET_BLOKA_MS) break;
         }
         if (this.red.length > 0) await this.predaj();

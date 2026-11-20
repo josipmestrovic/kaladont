@@ -42,7 +42,9 @@ describe('bot reakcije — kontroler', () => {
     verzijaRjecnika: () => 1,
     frekvencijaZa: () => null,
     imaSlobodnuRijecNa: () => false,
-  } as unknown as Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika' | 'imaSlobodnuRijecNa'> & { frekvencijaZa(rijec: string): number | null };
+    jeIgrivaRijec: () => false,
+    repertoarBotova: () => ({ generacija: 1, poPrefiksu: new Map() }),
+  } as unknown as Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika' | 'imaSlobodnuRijecNa' | 'jeIgrivaRijec' | 'repertoarBotova'> & { frekvencijaZa(rijec: string): number | null };
 
   function stvoriKontroler(opts: {
     poslano: { partijaId: string; igracId: string; poruka: string }[];

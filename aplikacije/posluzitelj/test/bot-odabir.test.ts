@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DogadajPoteza, RezultatNaredbe } from '../src/igra/politika-ucinka.js';
 import { BotKontroler } from '../src/bot/kontroler.js';
+import { RasporedjivacOdziva } from '../src/bot/raspored-odziva.js';
+import { izgradiRepertoarBotova } from '../src/bot/repertoar.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
-import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, klasificirajPoznatiSkup, odaberiPotez, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
+import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, klasificirajPoznatiSkup, odaberiPotez, odaberiPotezNastavivo, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
 import { parsajSpremljenuKonfiguraciju } from '../src/bot/trajne-postavke.js';
 import { BROJ_GOSTIJU_FONDA_V4, BROJ_IMENOVANIH_FONDA_V4, CILJ_AKTIVNIH_FONDA_V4, NADIMCI_POCETNOG_FONDA_V4 } from '../src/bot/nadimci.js';
 import { stavkeZamjeneFondaBotova } from '../src/bot/servis-identiteta.js';
@@ -55,6 +57,20 @@ function laznaRijec(rijeci: Record<string, { frekvencija: number; grupe: string[
     frekvencijaZa: (rijec: string) => rijeci[rijec]?.frekvencija ?? null,
     grupeZa: (rijec: string) => rijeci[rijec]?.grupe ?? [],
   };
+}
+
+/** Poznati nastavci za Dokaži (običan potez) u jedinicnim testovima. */
+function poznatiZaDokazi(prefiks: string): string[] {
+  const tablica: Record<string, string[]> = {
+    sa: ['sat'],
+    lo: ['logika'],
+    va: ['vatra'],
+    en: ['enigma'],
+    st: ['stol'],
+    as: ['asfalt'],
+    ka: [],
+  };
+  return tablica[prefiks] ?? ['nastavak'];
 }
 
 const konfigBezPropusta: KonfiguracijaBota = {
@@ -148,7 +164,7 @@ describe('odabir riječi bota', () => {
     expect(klasifikacija.vrsta).toBe('dovoljan');
   });
 
-  it('Dokaži: težak ali živ nastavak ne predaje se kao nema_rijeci', () => {
+  it('Dokaži običan potez: bez svjedoka u budžetu predaje Ne znam', () => {
     const rijeci = laznaRijec({
       javor: { frekvencija: 500, grupe: ['imenica:javor'] },
     });
@@ -160,12 +176,15 @@ describe('odabir riječi bota', () => {
       faza: 'obican_potez',
       brojAktivnih: 2,
       iskoristeneGrupe: new Set(),
-      // Bot ne zna nastavak, ali rječnik ima legalnu riječ — smije odigrati.
       poznatiKandidatiNa: () => [],
       imaSlobodnuRijecNa: () => true,
       turnToken: 't-tezak-ziv',
     }, stvoriStanjeBota(konfigBezPropusta, rng(8)), konfigBezPropusta, rng(8));
-    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'javor' });
+    expect(odluka).toMatchObject({
+      vrsta: 'odustani',
+      razlog: 'nema_rijeci',
+      razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu',
+    });
   });
 
   it('duel oprez: preferira sigurnu riječ pred čestom na KA', () => {
@@ -409,6 +428,7 @@ describe('odabir riječi bota', () => {
       ...rijeci,
       pravila: 'dokazi_nastavak',
       brojAktivnih: 3,
+      poznatiKandidatiNa: poznatiZaDokazi,
     }, stvoriStanjeBota(sPropustom, rng(1)), sPropustom, () => 0);
     expect(odluka).toMatchObject({ vrsta: 'rijec', propustKa: true });
     if (odluka.vrsta === 'rijec') {
@@ -436,6 +456,7 @@ describe('odabir riječi bota', () => {
         ...rjecnik,
         pravila: 'dokazi_nastavak',
         brojAktivnih: 3,
+        poznatiKandidatiNa: poznatiZaDokazi,
       }, stanje, konfigBezPropusta, r);
       expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
     }
@@ -445,8 +466,13 @@ describe('odabir riječi bota', () => {
       ...rjecnik,
       pravila: 'dokazi_nastavak',
       brojAktivnih: 2,
+      poznatiKandidatiNa: poznatiZaDokazi,
     }, stanje, konfigBezPropusta, r);
-    expect(samoKa).toEqual({ vrsta: 'odustani', razlog: 'nema_rijeci' });
+    expect(samoKa).toEqual({
+      vrsta: 'odustani',
+      razlog: 'nema_rijeci',
+      razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu',
+    });
   });
 
   it('Dokaži dokaz_nastavka: smije kaladont na „ka” (bez_ka samo na običnom potezu)', () => {
@@ -472,8 +498,48 @@ describe('odabir riječi bota', () => {
       ...rijeci,
       pravila: 'dokazi_nastavak',
       brojAktivnih: 2,
+      poznatiKandidatiNa: poznatiZaDokazi,
     }, stvoriStanjeBota(konfigBezPropusta, rng(3)), konfigBezPropusta, rng(3));
     expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'mastilo', kategorija: 'srednja' });
+  });
+
+  it('Dokaži: potvrđeni „ka” svjedok ne baca Ne znam dok postoji potvrđen bez „ka”', async () => {
+    const rijeci = laznaRijec({
+      maska: { frekvencija: 950, grupe: ['imenica:maska'] },
+      masa: { frekvencija: 400, grupe: ['imenica:masa'] },
+    });
+    const poznatiSKa = (prefiks: string): string[] => {
+      if (prefiks === 'ka') return ['kava'];
+      if (prefiks === 'sa') return ['sat'];
+      return [];
+    };
+    const ulaz = {
+      trazenaSlova: 'ma',
+      kandidati: ['maska', 'masa'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak' as const,
+      faza: 'obican_potez' as const,
+      brojAktivnih: 2,
+      iskoristeneGrupe: new Set<string>(),
+      poznatiKandidatiNa: poznatiSKa,
+      poznatiKandidatiNaNastavivo: async function* (prefiks: string) {
+        for (const rijec of poznatiSKa(prefiks)) yield rijec;
+      },
+      imaSlobodnuRijecNa: () => true,
+      turnToken: 't-ka-prvi',
+    };
+    const sync = odaberiPotez(ulaz, stvoriStanjeBota(konfigBezPropusta, rng(1)), konfigBezPropusta, rng(1));
+    expect(sync).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
+
+    const asyncOdluka = await odaberiPotezNastavivo(
+      ulaz,
+      stvoriStanjeBota(konfigBezPropusta, rng(1)),
+      konfigBezPropusta,
+      rng(1),
+      async () => undefined,
+      () => true,
+    );
+    expect(asyncOdluka).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
   });
 
   it('PR07 Klasični s 3 aktivna: riječ na „ka” ulazi u pool čak uz vjerojatnostOstavljanjaKa 0', () => {
@@ -635,7 +701,7 @@ describe('odabir riječi bota', () => {
       botoviDvoboj: true,
     };
     const parsano = parsajSpremljenuKonfiguraciju(stara);
-    expect(parsano.verzija).toBe(6);
+    expect(parsano.verzija).toBe(7);
     expect(parsano.vjerojatnostNeznanjaUMalomSkupu).toBe(0.1);
     expect(parsano.vjerojatnostTaktickogPoteza).toBe(0.25);
     expect(parsano.maksimalnoTaktickihKandidata).toBe(12);
@@ -685,17 +751,48 @@ describe('bot kontroler', () => {
     };
   }
 
+  async function dovršiAsyncOdluku() {
+    for (let i = 0; i < 24; i += 1) {
+      await new Promise((r) => setImmediate(r));
+    }
+  }
+
+  function mockRjecnikZaKontroler(verzija = () => 1) {
+    const kandidati = ['masa', 'mast'];
+    const snimka = izgradiRepertoarBotova({
+      prefiksi: () => ['ma'].values(),
+      rijeciNaPrefiksu: () => kandidati,
+      frekvencijaZa: () => 500,
+      grupeZa: (r) => [`imenica:${r}`],
+      jeOsnovniOblik: () => true,
+      jePostojecaRijec: (r) => kandidati.includes(r),
+    }, verzija());
+    return {
+      igriviKandidati: function* () {
+        yield* kandidati;
+      },
+      frekvencijaZa: () => 500,
+      grupeZa: (r: string) => [`imenica:${r}`],
+      verzijaRjecnika: verzija,
+      imaSlobodnuRijecNa: () => true,
+      jeIgrivaRijec: (r: string) => kandidati.includes(r),
+      repertoarBotova: () => snimka,
+    };
+  }
+
   function stvori(izvrsi: (p: string, i: string, n: unknown) => RezultatNaredbe, verzija = () => 1, konfiguracija = konfigBezPropusta, dodatno: Partial<import('../src/bot/kontroler.js').OvisnostiBotKontrolera> = {}) {
     const timeri: { posao: () => void; ms: number }[] = [];
     const prekini = vi.fn();
+    let satRasporeda = 0;
+    const raspored = new RasporedjivacOdziva({
+      predaj: async () => undefined,
+      // Monotoni sat — inače budžet 0 ms drži posao u beskonačnom 'nastavi' krugu.
+      sada: () => { satRasporeda += 1; return satRasporeda; },
+    });
     const kontroler = new BotKontroler({
-      rjecnik: {
-        igriviKandidati: () => ['masa', 'mast'],
-        frekvencijaZa: () => 500,
-        grupeZa: (r) => [`imenica:${r}`],
-        verzijaRjecnika: verzija,
-        imaSlobodnuRijecNa: () => true,
-      },
+      rjecnik: mockRjecnikZaKontroler(verzija),
+      predajKontrolu: async () => undefined,
+      rasporedOdziva: raspored,
       izvrsiNaredbu: izvrsi as never,
       konfiguracija,
       rng: rng(4),
@@ -709,16 +806,24 @@ describe('bot kontroler', () => {
       prekiniZbogGreske: prekini,
       ...dodatno,
     });
-    return { kontroler, timeri, prekini };
+    async function odgubi(indeks = 0) {
+      timeri[indeks]?.posao();
+      for (let i = 0; i < 40 && raspored.brojAktivnih() > 0; i += 1) {
+        await dovršiAsyncOdluku();
+      }
+      await dovršiAsyncOdluku();
+    }
+    return { kontroler, timeri, prekini, odgubi, raspored };
   }
 
-  it('planira jednu akciju za bota na potezu i izvršava je s istim tokenom', () => {
+  it('planira jednu akciju za bota na potezu i izvršava je s istim tokenom', async () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
     const { kontroler, timeri } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj());
     expect(timeri).toHaveLength(1);
     expect(timeri[0]!.ms).toBe(4_000);
     timeri[0]!.posao();
+    await dovršiAsyncOdluku();
     expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ vrsta: 'rijec', turnToken: 't1' }));
     expect(kontroler.brojaci.odigranihRijeci).toBe(1);
   });
@@ -786,13 +891,13 @@ describe('bot kontroler', () => {
     kontroler.zaustavi();
   });
 
-  it('planiraj ne izvršava naredbu sinkrono (odgoda prije izvrsi)', () => {
+  it('planiraj ne izvršava naredbu sinkrono (odgoda prije izvrsi)', async () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri } = stvori(izvrsi);
+    const { kontroler, odgubi } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj());
     expect(izvrsi).not.toHaveBeenCalled();
     expect(kontroler.pregledPlanova()[0]?.vrsta).toBeNull();
-    timeri[0]!.posao();
+    await odgubi(0);
     expect(izvrsi).toHaveBeenCalled();
     kontroler.zaustavi();
   });
@@ -800,20 +905,25 @@ describe('bot kontroler', () => {
   it('novi token otkazuje zastarjeli nastavivi posao (generacija)', async () => {
     let predaja = 0;
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri } = stvori(izvrsi, () => 1, konfigBezPropusta, {
+    const { kontroler, timeri, raspored } = stvori(izvrsi, () => 1, konfigBezPropusta, {
       predajKontrolu: async () => { predaja += 1; },
     });
     kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't1' }));
+    const stariPosao = timeri[0]!.posao;
     kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't2' }));
-    expect(timeri.length).toBeGreaterThanOrEqual(1);
+    expect(timeri.length).toBeGreaterThanOrEqual(2);
     // Stari callback ne smije igrati.
-    const stari = timeri[0]!;
-    stari.posao();
+    stariPosao();
+    await dovršiAsyncOdluku();
     expect(izvrsi).not.toHaveBeenCalled();
-    const novi = timeri[timeri.length - 1]!;
-    novi.posao();
-    expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ turnToken: 't2' }));
-    void predaja;
+    expect(kontroler.brojaci.zastarjelo).toBeGreaterThanOrEqual(1);
+    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't3' }));
+    const indeksNovog = timeri.findLastIndex((t) => t.ms === 4_000);
+    expect(indeksNovog).toBeGreaterThanOrEqual(0);
+    timeri[indeksNovog]!.posao();
+    for (let k = 0; k < 80 && raspored.brojAktivnih() > 0; k += 1) await dovršiAsyncOdluku();
+    expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ turnToken: 't3' }));
+    expect(predaja).toBeGreaterThanOrEqual(0);
     kontroler.zaustavi();
   });
 
@@ -826,42 +936,52 @@ describe('bot kontroler', () => {
     expect(timeri).toHaveLength(0);
   });
 
-  it('promjena poteza otkazuje stari plan; zakašnjeli callback ne igra sa starim tokenom', () => {
+  it('promjena poteza otkazuje stari plan; zakašnjeli callback ne igra sa starim tokenom', async () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri } = stvori(izvrsi);
+    const { kontroler, timeri, odgubi } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't1' }));
     const stariPosao = timeri[0]!.posao;
     kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't2' }));
     stariPosao();
+    await dovršiAsyncOdluku();
     expect(izvrsi).not.toHaveBeenCalled();
-    timeri[1]!.posao();
+    expect(kontroler.brojaci.zastarjelo).toBeGreaterThanOrEqual(1);
+    kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't3' }));
+    const indeksNovog = timeri.findLastIndex((t) => t.ms === 4_000);
+    expect(indeksNovog).toBeGreaterThanOrEqual(0);
+    await odgubi(indeksNovog);
     expect(izvrsi).toHaveBeenCalledTimes(1);
-    expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ turnToken: 't2' }));
+    expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ turnToken: 't3' }));
   });
 
-  it('promjena rječnika tijekom čekanja ponovno bira riječ, a odbijena riječ se broji kao tehnička greška', () => {
+  it('promjena rječnika tijekom čekanja ponovno bira riječ, a odbijena riječ se broji kao tehnička greška', async () => {
     let verzija = 1;
     const izvrsi = vi.fn((_p: string, _i: string, n: { vrsta: string }) => (n.vrsta === 'rijec' ? { ishod: 'odbijen', kod: 'RIJEC_NE_POSTOJI', poruka: '' } : { ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri, prekini } = stvori(izvrsi, () => verzija);
+    const { kontroler, timeri, prekini, odgubi } = stvori(izvrsi, () => verzija);
     kontroler.naPromjenuPoteza(dogadaj());
     verzija = 2;
-    timeri[0]!.posao();
-    timeri[1]!.posao();
-    timeri[2]!.posao();
-    expect(izvrsi.mock.calls.map(([, , n]) => n.vrsta)).toEqual(['rijec', 'rijec']);
-    expect(kontroler.brojaci.tehnickeGreske).toBe(3);
-    expect(prekini).toHaveBeenCalledExactlyOnceWith('p1', 'bot', 't1');
+    await odgubi(0);
+    await odgubi(1);
+    await odgubi(2);
+    // Dvije odbijene riječi iz repertoara, zatim prazan skup → normalan odustanak (ne prekini).
+    expect(izvrsi.mock.calls.map(([, , n]) => n.vrsta)).toEqual(['rijec', 'rijec', 'odustani']);
+    expect(kontroler.brojaci.tehnickeGreske).toBe(2);
+    expect(prekini).not.toHaveBeenCalled();
+    expect(kontroler.brojaci.bezRijeci).toBe(1);
     expect(kontroler.brojaci.namjernihPropusta).toBe(0);
+    void timeri;
   });
 
-  it('jednokratna iznimka naredbe se oporavi i isti token ne izvršava ponovno', () => {
+  it('jednokratna iznimka naredbe se oporavi i isti token ne izvršava ponovno', async () => {
     const izvrsi = vi.fn().mockImplementationOnce(() => { throw new Error('Privremeni kvar'); }).mockReturnValue({ ishod: 'prihvacen' });
-    const { kontroler, timeri, prekini } = stvori(izvrsi);
+    const { kontroler, timeri, prekini, odgubi } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj());
-    timeri[0]!.posao();
+    await odgubi(0);
+    await dovršiAsyncOdluku();
     kontroler.naPromjenuPoteza(dogadaj());
-    expect(timeri).toHaveLength(2);
-    timeri[1]!.posao();
+    expect(timeri.length).toBeGreaterThanOrEqual(2);
+    await odgubi(1);
+    await dovršiAsyncOdluku();
     kontroler.naPromjenuPoteza(dogadaj());
     expect(izvrsi).toHaveBeenCalledTimes(2);
     expect(izvrsi.mock.calls[1]).toEqual(izvrsi.mock.calls[0]);
@@ -869,31 +989,38 @@ describe('bot kontroler', () => {
     expect(kontroler.brojaci.odigranihRijeci).toBe(1);
   });
 
-  it('promjena rječnika čuva već odabrano neznanje za isti token', () => {
+  it('promjena rječnika čuva već odabrano neznanje za isti token', async () => {
     let verzija = 1;
     let kandidati = ['masa'];
     let frekvencija = 1;
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri } = stvori(izvrsi, () => verzija, {
+    const bazni = mockRjecnikZaKontroler(() => verzija);
+    const { kontroler, odgubi } = stvori(izvrsi, () => verzija, {
       ...konfigBezPropusta, vjerojatnostNeznanjaUMalomSkupu: 1,
     }, {
       rjecnik: {
-        igriviKandidati: () => kandidati,
+        ...bazni,
         frekvencijaZa: () => frekvencija,
-        grupeZa: (rijec) => [`imenica:${rijec}`],
-        verzijaRjecnika: () => verzija,
-        imaSlobodnuRijecNa: () => true,
+        jeIgrivaRijec: (r: string) => kandidati.includes(r),
+        repertoarBotova: () => izgradiRepertoarBotova({
+          prefiksi: () => ['ma'].values(),
+          rijeciNaPrefiksu: () => kandidati,
+          frekvencijaZa: () => frekvencija,
+          grupeZa: (r) => [`imenica:${r}`],
+          jeOsnovniOblik: () => true,
+          jePostojecaRijec: (r) => kandidati.includes(r),
+        }, verzija),
       },
     });
     kontroler.naPromjenuPoteza(dogadaj());
     verzija = 2;
-    timeri[0]!.posao();
+    await odgubi(0);
     expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', { vrsta: 'odustani', turnToken: 't1' });
     expect(kontroler.brojaci.namjernihPropusta).toBe(1);
     kandidati = ['masa', 'mast', 'maslac', 'maska'];
     frekvencija = 500;
     kontroler.naPromjenuPoteza(dogadaj({ turnToken: 't2' }));
-    timeri[1]!.posao();
+    await odgubi(1);
     expect(izvrsi).toHaveBeenLastCalledWith('p1', 'bot', expect.objectContaining({ vrsta: 'rijec', turnToken: 't2' }));
     kontroler.zaustavi();
   });
@@ -911,36 +1038,34 @@ describe('bot kontroler', () => {
     kontroler.zaustavi();
   });
 
-  it('iznimka odabira ima dva oporavka i prekida trening bez lažne predaje', () => {
+  it('iznimka odabira ima dva oporavka i prekida trening bez lažne predaje', async () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri, prekini } = stvori(izvrsi, () => 1, konfigBezPropusta, {
+    const bazni = mockRjecnikZaKontroler();
+    const { kontroler, odgubi, prekini } = stvori(izvrsi, () => 1, konfigBezPropusta, {
       rjecnik: {
-        igriviKandidati: () => { throw new Error('Kvar odabira'); },
-        imaSlobodnuRijecNa: () => true,
-        frekvencijaZa: () => 500,
-        grupeZa: (rijec) => [`imenica:${rijec}`],
-        verzijaRjecnika: () => 1,
+        ...bazni,
+        repertoarBotova: () => { throw new Error('Kvar odabira'); },
       },
     });
     kontroler.naPromjenuPoteza(dogadaj({ kontekst: 'trening', istekPotezaMs: null }));
     // 0: odgođeni odluci, 1–2: oporavci (maks. 2) → prekid
-    timeri[0]!.posao();
-    timeri[1]!.posao();
-    timeri[2]!.posao();
+    await odgubi(0);
+    await odgubi(1);
+    await odgubi(2);
     expect(prekini).toHaveBeenCalledExactlyOnceWith('p1', 'bot', 't1');
     expect(kontroler.brojaci.tehnickeGreske).toBe(3);
     expect(izvrsi).not.toHaveBeenCalled();
   });
 
-  it('iznimka nakon promjene tokena ne ponavlja mogući već izvršeni potez', () => {
+  it('iznimka nakon promjene tokena ne ponavlja mogući već izvršeni potez', async () => {
     let aktualni = dogadaj();
     const izvrsi = vi.fn(() => {
       aktualni = dogadaj({ turnToken: 't2', naPotezuId: 'covjek' });
       throw new Error('Greška nakon promjene poteza');
     });
-    const { kontroler, timeri, prekini } = stvori(izvrsi, () => 1, konfigBezPropusta, { dohvatiPotez: () => aktualni });
+    const { kontroler, timeri, prekini, odgubi } = stvori(izvrsi, () => 1, konfigBezPropusta, { dohvatiPotez: () => aktualni });
     kontroler.naPromjenuPoteza(aktualni);
-    timeri[0]!.posao();
+    await odgubi(0);
     expect(timeri).toHaveLength(1);
     expect(prekini).not.toHaveBeenCalled();
     expect(izvrsi).toHaveBeenCalledTimes(1);
@@ -965,15 +1090,15 @@ describe('bot kontroler', () => {
     expect(kontroler.brojaci.planirano).toBe(1);
   });
 
-  it('PR07 novi token u dokaz_nastavka dopušta drugi plan istom botu', () => {
+  it('PR07 novi token u dokaz_nastavka dopušta drugi plan istom botu', async () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri } = stvori(izvrsi);
+    const { kontroler, timeri, odgubi } = stvori(izvrsi);
     kontroler.naPromjenuPoteza(dogadaj({
       turnToken: 't-obicni',
       faza: 'obican_potez',
       pravila: 'dokazi_nastavak',
     }));
-    timeri[0]!.posao();
+    await odgubi(0);
     expect(izvrsi).toHaveBeenCalledTimes(1);
     kontroler.naPromjenuPoteza(dogadaj({
       turnToken: 't-dokaz',
@@ -982,7 +1107,7 @@ describe('bot kontroler', () => {
       dokaz: { autorId: 'bot', cekateljId: 'covjek', cekateljVecIspao: false },
     }));
     expect(timeri).toHaveLength(2);
-    timeri[1]!.posao();
+    await odgubi(1);
     expect(izvrsi).toHaveBeenCalledTimes(2);
     expect(izvrsi).toHaveBeenLastCalledWith('p1', 'bot', expect.objectContaining({ turnToken: 't-dokaz' }));
   });
@@ -1061,15 +1186,26 @@ describe('bot kontroler', () => {
     expect(posaljiReakciju).toHaveBeenCalledWith('p1', 'bot', expect.any(String));
   });
 
-  it('PR07 Klasični Troboj: kontroler prosljeđuje broj aktivnih — na primljeni ka uvijek kaladont', () => {
+  it('PR07 Klasični Troboj: kontroler prosljeđuje broj aktivnih — na primljeni ka uvijek kaladont', async () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
-    const { kontroler, timeri } = stvori(izvrsi, () => 1, { ...konfigBezPropusta, vjerojatnostPropustaKa: 1 }, {
+    const kandidati = ['kava'];
+    const snimka = izgradiRepertoarBotova({
+      prefiksi: () => ['ka'].values(),
+      rijeciNaPrefiksu: () => kandidati,
+      frekvencijaZa: () => 500,
+      grupeZa: (r) => [`imenica:${r}`],
+      jeOsnovniOblik: () => true,
+      jePostojecaRijec: (r) => kandidati.includes(r),
+    }, 1);
+    const { kontroler, odgubi } = stvori(izvrsi, () => 1, { ...konfigBezPropusta, vjerojatnostPropustaKa: 1 }, {
       rjecnik: {
-        igriviKandidati: () => ['kava'],
+        igriviKandidati: function* () { yield* kandidati; },
         frekvencijaZa: () => 500,
         grupeZa: (r) => [`imenica:${r}`],
         verzijaRjecnika: () => 1,
         imaSlobodnuRijecNa: () => true,
+        jeIgrivaRijec: (r: string) => kandidati.includes(r),
+        repertoarBotova: () => snimka,
       },
     });
     kontroler.naPromjenuPoteza(dogadaj({
@@ -1082,7 +1218,7 @@ describe('bot kontroler', () => {
         { igracId: 'bot2', upravljac: 'bot', aktivan: true },
       ],
     }));
-    timeri[0]!.posao();
+    await odgubi(0);
     expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', { vrsta: 'rijec', rijec: 'kaladont', turnToken: 't1' });
   });
 });

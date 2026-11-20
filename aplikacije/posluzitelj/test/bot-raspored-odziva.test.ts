@@ -85,4 +85,36 @@ describe('raspored odziva', () => {
     await new Promise((r) => setImmediate(r));
     expect(raspored.brojAktivnih()).toBe(0);
   });
+
+  it('otkaz tijekom await koraka ne briše drugi posao', async () => {
+    let sat = 0;
+    const raspored = new RasporedjivacOdziva({
+      predaj: async () => undefined,
+      sada: () => { sat += 1; return sat; },
+    });
+    let odblokiraj!: () => void;
+    const blokada = new Promise<void>((resolve) => { odblokiraj = resolve; });
+    let bKoraka = 0;
+    let aPokrenut = false;
+    const idA = raspored.prijavi(async () => {
+      aPokrenut = true;
+      await blokada;
+      return 'gotovo';
+    });
+    raspored.prijavi(async () => {
+      bKoraka += 1;
+      return 'gotovo';
+    });
+    for (let i = 0; i < 20 && !aPokrenut; i += 1) {
+      await new Promise((r) => setImmediate(r));
+    }
+    expect(aPokrenut).toBe(true);
+    raspored.otkazi(idA);
+    odblokiraj();
+    for (let i = 0; i < 40 && raspored.brojAktivnih() > 0; i += 1) {
+      await new Promise((r) => setImmediate(r));
+    }
+    expect(bKoraka).toBe(1);
+    expect(raspored.brojAktivnih()).toBe(0);
+  });
 });

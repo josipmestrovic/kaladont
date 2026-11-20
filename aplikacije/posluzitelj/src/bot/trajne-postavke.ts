@@ -10,7 +10,7 @@ import {
 } from './konfiguracija-bota.js';
 
 /**
- * Stare spremljene konfiguracije (v3–v5) moraju dobiti zadane vrijednosti v6
+ * Stare spremljene konfiguracije (v3–v6) moraju dobiti zadane vrijednosti v7
  * i odbaciti zastarjela polja (tempo/izostanak/reakcije/neznanje po sudjelovanju).
  * `zadano` treba biti env-učitan snapshot (BOTOVI_*), ne samo hardkodirani default —
  * inače nedostajući `botoviTroboj` uvijek padne na false i env se zanemari.
@@ -47,6 +47,12 @@ export function parsajSpremljenuKonfiguraciju(
     botoviDvoboj: typeof ulaz.botoviDvoboj === 'boolean' ? ulaz.botoviDvoboj : zadano.botoviDvoboj,
     botoviTroboj: typeof ulaz.botoviTroboj === 'boolean' ? ulaz.botoviTroboj : zadano.botoviTroboj,
     botoviCetveroboj: typeof ulaz.botoviCetveroboj === 'boolean' ? ulaz.botoviCetveroboj : zadano.botoviCetveroboj,
+    maksimalnoTaktickihKandidata: Math.min(
+      typeof ulaz.maksimalnoTaktickihKandidata === 'number'
+        ? ulaz.maksimalnoTaktickihKandidata
+        : zadano.maksimalnoTaktickihKandidata,
+      12,
+    ),
   });
 }
 
