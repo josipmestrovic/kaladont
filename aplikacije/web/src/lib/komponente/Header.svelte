@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { api } from '$lib/api.js';
+  import { api, ApiGreska } from '$lib/api.js';
   import { osvjeziGostSesijuNakon401, prijediNaGostujucuSesiju } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import Avatar from './Avatar.svelte';
@@ -72,8 +72,9 @@
           profil = odgovor;
           jeGost = !odgovor.email;
           return;
-        } catch {
-          if (!oporavakOdrađen) {
+        } catch (greska) {
+          const je401 = greska instanceof ApiGreska && greska.status === 401;
+          if (!oporavakOdrađen && je401) {
             oporavakOdrađen = true;
             // Bez identitet eventa — inače bismo opet ušli u ovaj loader i mintali goste u petlji.
             await osvjeziGostSesijuNakon401({ emitirajIdentitet: false }).catch(() => {});

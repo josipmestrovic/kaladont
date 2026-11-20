@@ -59,10 +59,9 @@ test('spojeni Dvoboj: Klasični i KA-ZNA dijele isti stol', async ({ browser }) 
     await expect(igraci[0]!.stranica).not.toHaveURL(/\/partija\//);
 
     await igraci[1]!.stranica.goto('/red?mod=dva_igraca&pravila=ka_zna');
-    const ishod1 = await cekajOznakuIliPartiju(igraci[1]!.stranica, /KA-zna/i);
-    if (ishod1 === 'oznaka') {
-      await expect(igraci[1]!.stranica.getByTestId('red-oznaka-izbora')).toContainText(/KA-zna/i);
-    }
+    // cekajOznakuIliPartiju već potvrđuje KA-zna ili ulazak u partiju — bez ponovnog
+    // asserta na oznaku (race: match navigira prije follow-up expecta).
+    await cekajOznakuIliPartiju(igraci[1]!.stranica, /KA-zna/i);
 
     await cekajIstuPartiju(igraci);
     for (const { stranica } of igraci) {

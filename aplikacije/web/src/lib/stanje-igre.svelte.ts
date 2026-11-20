@@ -134,10 +134,38 @@ let odsviranPocetakZaPartijuId: string | null = null;
 let zadnjiDokazIzazovId: string | null = null;
 let brojOdbijenihNaPotezu = 0;
 let timerIshodDokaza: ReturnType<typeof setTimeout> | null = null;
+let timerZadrziDokaz: ReturnType<typeof setTimeout> | null = null;
+/** Klijentski hold: min. prikaz „dokazuje…” prije ishoda (brzi botovi). */
+let dokazPrikazanOdMs: number | null = null;
+const MIN_PRIKAZ_DOKAZA_MS = 2_500;
+const MIN_PRIKAZ_ISHODA_MS = 2_000;
 let timerStavkiIskustva: ReturnType<typeof setTimeout> | null = null;
 let timerNagradePoteza: ReturnType<typeof setTimeout> | null = null;
 let timerNovaDostignuca: ReturnType<typeof setTimeout> | null = null;
 let timerKonfetaIskustva: ReturnType<typeof setTimeout> | null = null;
+
+function ocistiDokazHold(): void {
+  if (timerZadrziDokaz) clearTimeout(timerZadrziDokaz);
+  timerZadrziDokaz = null;
+  dokazPrikazanOdMs = null;
+}
+
+/** Zadrži UI dokazivanja min. MIN_PRIKAZ_DOKAZA_MS, zatim izvrši zatvaranje + ishod. */
+function zatvoriDokazNakonHold(zatvori: () => void): void {
+  const otvorenMs = dokazPrikazanOdMs ?? Date.now();
+  const preostalo = Math.max(0, MIN_PRIKAZ_DOKAZA_MS - (Date.now() - otvorenMs));
+  if (timerZadrziDokaz) clearTimeout(timerZadrziDokaz);
+  if (preostalo === 0) {
+    dokazPrikazanOdMs = null;
+    zatvori();
+    return;
+  }
+  timerZadrziDokaz = setTimeout(() => {
+    timerZadrziDokaz = null;
+    dokazPrikazanOdMs = null;
+    zatvori();
+  }, preostalo);
+}
 
 function pokreniKonfete(intenzitet: 'mali' | 'srednji' | 'veliki', trajanjeMs = 3_200): void {
   stanje.intenzitetKonfetaIskustva = intenzitet;
@@ -206,8 +234,12 @@ function primijeniFazuIzSnimke(p: Pick<StanjePartije, 'faza' | 'dokaz' | 'sustav
   } else {
     stanje.faza = 'obican_potez';
   }
-  stanje.dokaz = p.dokaz ?? null;
-  if (p.dokaz?.izazovId) zadnjiDokazIzazovId = p.dokaz.izazovId;
+  const noviDokaz = p.dokaz ?? null;
+  if (noviDokaz?.izazovId && noviDokaz.izazovId !== zadnjiDokazIzazovId) {
+    dokazPrikazanOdMs = Date.now();
+  }
+  stanje.dokaz = noviDokaz;
+  if (noviDokaz?.izazovId) zadnjiDokazIzazovId = noviDokaz.izazovId;
 }
 
 function primijeniStanjePartije(p: StanjePartije): void {
@@ -259,10 +291,47 @@ function primijeniStanjePartije(p: StanjePartije): void {
       (e) => e.igracId === prethodniDokaz.cekateljId && e.bodZa === prethodniDokaz.autorId,
     );
     if (elim) {
-      zapisiIshodDokaza(`${nadimakIgraca(prethodniDokaz.autorId)} je dokazao nastavak.`);
+      // Kredit-snimka je PRIJE sustav-bira ili zakljuciPartiju (ako ≤1 aktivan).
+      const porukaIshoda = `${nadimakIgraca(prethodniDokaz.autorId)} je dokazao nastavak.`;
+      const aktivnih = p.sjedala.filter(
+        (s) => !p.eliminacije.some((e) => e.igracId === s.igracId),
+      ).length;
+      const zavrsavaSe = p.zavrsena || aktivnih <= 1;
+      stanje.dokaz = prethodniDokaz;
+      stanje.faza = 'dokaz_nastavka';
+      stanje.sustavBiraRijec = false;
+      zatvoriDokazNakonHold(() => {
+        stanje.dokaz = null;
+        if (zavrsavaSe) {
+          stanje.faza = 'zavrsena';
+          stanje.sustavBiraRijec = false;
+          if (stanje.statusSpremanja === 'nije_zavrsena') {
+            stanje.statusSpremanja = 'spremanje_rezultata';
+          }
+        } else {
+          stanje.faza = 'sustav_bira';
+          stanje.sustavBiraRijec = true;
+        }
+        zapisiIshodDokaza(porukaIshoda);
+      });
       if (elim.bodZa === stanje.mojIgracId && elim.iskustvo) {
         prikaziStavkeIskustva([elim.iskustvo]);
       }
+    }
+  } else if (prethodniDokaz && !p.dokaz && dokazPrikazanOdMs !== null && !p.zavrsena) {
+    // Brzi bot / reconnect: zadrži snimku za hold. Ne poništavaj postojeći timer
+    // (eliminacija već zakazala zatvaranje s ishod porukom).
+    stanje.dokaz = prethodniDokaz;
+    stanje.faza = 'dokaz_nastavka';
+    stanje.sustavBiraRijec = false;
+    if (!timerZadrziDokaz) {
+      const sljedecaFaza = p.sustavBiraRijec ? ('sustav_bira' as const) : ('obican_potez' as const);
+      const sustavBira = p.sustavBiraRijec;
+      zatvoriDokazNakonHold(() => {
+        stanje.dokaz = null;
+        stanje.faza = sljedecaFaza;
+        stanje.sustavBiraRijec = sustavBira;
+      });
     }
   }
 }
@@ -280,6 +349,8 @@ function primijeniDokazZatrazen(p: DokazZatrazen): void {
     return;
   }
   zadnjiDokazIzazovId = p.izazovId;
+  ocistiDokazHold();
+  dokazPrikazanOdMs = Date.now();
   stanje.faza = 'dokaz_nastavka';
   stanje.sustavBiraRijec = false;
   stanje.ishodDokazaPoruka = null;
@@ -311,7 +382,7 @@ function zapisiIshodDokaza(poruka: string): void {
   timerIshodDokaza = setTimeout(() => {
     stanje.ishodDokazaPoruka = null;
     timerIshodDokaza = null;
-  }, 4_500);
+  }, MIN_PRIKAZ_ISHODA_MS);
 }
 
 function nadimakIgraca(igracId: string | null | undefined): string {
@@ -363,6 +434,9 @@ export function pokreniSlusateljeIgre(): void {
     stanje.mod = p.mod ?? null;
     stanje.pravila = p.pravila ?? null;
     stanje.spojeniDvoboj = Boolean(p.spojeniDvoboj);
+    ocistiDokazHold();
+    if (timerIshodDokaza) clearTimeout(timerIshodDokaza);
+    timerIshodDokaza = null;
     stanje.faza = 'obican_potez';
     stanje.dokaz = null;
     stanje.ishodDokazaPoruka = null;
@@ -498,18 +572,23 @@ export function pokreniSlusateljeIgre(): void {
       if (p.igracId === dokazSnimka.cekateljId && p.razlog === 'prekid') {
         stanje.dokaz = { ...dokazSnimka, cekateljVecIspao: true };
       } else if (p.igracId === dokazSnimka.cekateljId) {
-        zapisiIshodDokaza(`${autor} je dokazao nastavak. ${cekatelj} ispada.`);
-        stanje.dokaz = null;
-        stanje.faza = 'sustav_bira';
+        const poruka = `${autor} je dokazao nastavak. ${cekatelj} ispada.`;
+        zatvoriDokazNakonHold(() => {
+          stanje.dokaz = null;
+          stanje.faza = 'sustav_bira';
+          stanje.sustavBiraRijec = true;
+          zapisiIshodDokaza(poruka);
+        });
       } else if (p.igracId === dokazSnimka.autorId) {
-        if (p.razlog.startsWith('mrtva_slova')) {
-          const slova = (p.slova ?? dokazSnimka.trazenaSlova).toUpperCase();
-          zapisiIshodDokaza(`Na ‘${slova}’ nema dostupnog nastavka. ${autor} ispada.`);
-        } else {
-          zapisiIshodDokaza(`${autor} nije dokazao nastavak. ${autor} ispada.`);
-        }
-        stanje.dokaz = null;
-        stanje.faza = 'sustav_bira';
+        const poruka = p.razlog.startsWith('mrtva_slova')
+          ? `Na ‘${(p.slova ?? dokazSnimka.trazenaSlova).toUpperCase()}’ nema dostupnog nastavka. ${autor} ispada.`
+          : `${autor} nije dokazao nastavak. ${autor} ispada.`;
+        zatvoriDokazNakonHold(() => {
+          stanje.dokaz = null;
+          stanje.faza = 'sustav_bira';
+          stanje.sustavBiraRijec = true;
+          zapisiIshodDokaza(poruka);
+        });
       }
       // Treća osoba ispala tijekom dokaza: ne diraj snimku dokaza.
     }
@@ -543,14 +622,25 @@ export function pokreniSlusateljeIgre(): void {
   socket.on('partija:sustav-bira-rijec', (p) => {
     if (napustioPartiju) return;
     stanje.zadnjaNagrada = null;
+    stanje.istekIzboraIso = p.istekIzboraIso;
+    if (dokazPrikazanOdMs !== null && stanje.dokaz) {
+      // Ne skidaj dokaz-zonu dok traje hold; faza/sustav se primijene nakon holda.
+      zatvoriDokazNakonHold(() => {
+        stanje.sustavBiraRijec = true;
+        stanje.faza = 'sustav_bira';
+        stanje.dokaz = null;
+      });
+      return;
+    }
+    ocistiDokazHold();
     stanje.sustavBiraRijec = true;
     stanje.faza = 'sustav_bira';
     stanje.dokaz = null;
-    stanje.istekIzboraIso = p.istekIzboraIso;
   });
 
   socket.on('partija:runda-otvorena', (p) => {
     if (napustioPartiju) return;
+    ocistiDokazHold();
     stanje.zadnjaNagrada = null;
     stanje.dokaz = null;
     stanje.faza = 'obican_potez';
@@ -585,6 +675,11 @@ export function pokreniSlusateljeIgre(): void {
     if (p.partijaId !== stanje.partijaId) return;
     // partija-kraj zvuk pušta se tek kad se prikažu konačni rezultati (partija/[id]/+page.svelte),
     // ne ovdje - inače se preklapa sa zvukom zadnje eliminacije.
+    ocistiDokazHold();
+    if (timerIshodDokaza) clearTimeout(timerIshodDokaza);
+    timerIshodDokaza = null;
+    stanje.dokaz = null;
+    stanje.ishodDokazaPoruka = null;
     stanje.kraj = p;
     stanje.treningNeaktivnost = null;
     stanje.ponistenaPoruka = null;
@@ -635,6 +730,9 @@ export function napustiLokalnuPartiju(): void {
   odsviranPocetakZaPartijuId = null;
   zaustaviSveZvukove();
   brojOdbijenihNaPotezu = 0;
+  ocistiDokazHold();
+  if (timerIshodDokaza) clearTimeout(timerIshodDokaza);
+  timerIshodDokaza = null;
   if (timerStavkiIskustva) clearTimeout(timerStavkiIskustva);
   if (timerNagradePoteza) clearTimeout(timerNagradePoteza);
   if (timerNovaDostignuca) clearTimeout(timerNovaDostignuca);

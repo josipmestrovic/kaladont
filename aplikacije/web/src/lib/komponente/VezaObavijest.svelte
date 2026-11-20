@@ -2,16 +2,26 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { dohvatiStanjeVeze, type StanjeVeze } from '$lib/socket.js';
+  import { dohvatiStanjeVeze, otpustiBannerIstekaSesije, type StanjeVeze } from '$lib/socket.js';
   import { dohvatiStanjeIgre } from '$lib/stanje-igre.svelte.js';
 
   const stanjeVeze = dohvatiStanjeVeze();
   const stanjeIgre = dohvatiStanjeIgre();
   const prikazivaStanja: StanjeVeze[] = ['prekid', 'ponovno_spajanje', 'sesija_istekla', 'druga_kartica'];
-  const obavijestAktivna = $derived(stanjeVeze.partijaNedostupna || prikazivaStanja.includes(stanjeVeze.stanje));
+  const prikaziIstekSesije = $derived(
+    stanjeVeze.obavijestIstekaSesije || stanjeVeze.stanje === 'sesija_istekla',
+  );
+  const obavijestAktivna = $derived(
+    stanjeVeze.partijaNedostupna || prikaziIstekSesije || prikazivaStanja.includes(stanjeVeze.stanje),
+  );
   let obavijestZatvorena = $state(false);
   let obavijest: HTMLElement | undefined = $state();
   const trebaPrikazati = $derived(obavijestAktivna && !obavijestZatvorena);
+
+  function zatvoriObavijest(): void {
+    obavijestZatvorena = true;
+    if (prikaziIstekSesije) otpustiBannerIstekaSesije();
+  }
 
   $effect(() => {
     if (!obavijestAktivna) obavijestZatvorena = false;
@@ -20,7 +30,7 @@
   onMount(() => {
     function zatvoriKlikomIzvan(dogadaj: MouseEvent): void {
       if (!trebaPrikazati || !obavijest || !(dogadaj.target instanceof Node)) return;
-      if (!obavijest.contains(dogadaj.target)) obavijestZatvorena = true;
+      if (!obavijest.contains(dogadaj.target)) zatvoriObavijest();
     }
 
     document.addEventListener('click', zatvoriKlikomIzvan);
@@ -43,7 +53,7 @@
   const naslov = $derived(
     stanjeVeze.partijaNedostupna
       ? 'Partija više nije dostupna.'
-      : stanjeVeze.stanje === 'sesija_istekla'
+      : prikaziIstekSesije
       ? 'Sesija je istekla.'
       : stanjeVeze.stanje === 'druga_kartica'
         ? 'Ova je kartica zatvorena.'
@@ -55,8 +65,8 @@
   const opis = $derived(
     stanjeVeze.partijaNedostupna
       ? 'Vjerojatno je došlo do ponovnog pokretanja poslužitelja.'
-      : stanjeVeze.stanje === 'sesija_istekla'
-      ? 'Prijavi se ponovno kako bi nastavio/la.'
+      : prikaziIstekSesije
+      ? 'Možeš nastaviti kao gost; prijavi se ponovno za svoj račun.'
       : stanjeVeze.stanje === 'druga_kartica'
         ? 'Isti identitet otvoren je u drugoj kartici.'
         : stanjeVeze.stanje === 'ponovno_spajanje'
@@ -65,21 +75,21 @@
   );
 
   function prijaviSe(): void {
-    obavijestZatvorena = true;
+    zatvoriObavijest();
     void goto('/prijava');
   }
 </script>
 
 {#if trebaPrikazati}
-  <aside bind:this={obavijest} class="veza-obavijest" class:kriticno={stanjeVeze.stanje === 'sesija_istekla' || stanjeVeze.stanje === 'druga_kartica'} role="status" aria-live="polite">
+  <aside bind:this={obavijest} class="veza-obavijest" class:kriticno={prikaziIstekSesije || stanjeVeze.stanje === 'druga_kartica'} role="status" aria-live="polite">
     <div>
       <strong>{naslov}</strong>
       <span>{opis}</span>
     </div>
-    <button type="button" class="zatvori" aria-label="Zatvori obavijest" onclick={() => (obavijestZatvorena = true)}>×</button>
+    <button type="button" class="zatvori" aria-label="Zatvori obavijest" onclick={zatvoriObavijest}>×</button>
     {#if stanjeVeze.partijaNedostupna}
       <button type="button" onclick={() => void goto('/')}>Na početnu</button>
-    {:else if stanjeVeze.stanje === 'sesija_istekla'}
+    {:else if prikaziIstekSesije}
       <button type="button" onclick={prijaviSe}>Prijavi se</button>
     {/if}
   </aside>

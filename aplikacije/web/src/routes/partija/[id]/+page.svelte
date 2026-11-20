@@ -161,7 +161,8 @@
 
   function posaljiPotez() {
     const rijec = `${prefiksRijeci}${unosNastavkaRijeci}`.normalize('NFC').toLocaleLowerCase('hr-HR').trim();
-    if (rijec.length <= prefiksRijeci.length || slanjeUTijeku) return;
+    // Prefiks-only (prazan nastavak) je valjana riječ od točno trazenaSlova — RS-05/RS-06.
+    if (!rijec || rijec.length < prefiksRijeci.length || slanjeUTijeku) return;
     aktivnaGrupaObavijestiId = null;
     obavijestiNapretkaNaCekanju = praznaSadrzajObavijesti();
     porukaPoteza = null;
@@ -594,7 +595,7 @@
 
   function statusEliminacije(eliminacija: Eliminacija): string {
     const oznake = {
-      kaladont: 'Ispao: Kaladont',
+      kaladont: stanje.pravila === 'klasicni' ? 'Ispao: nema nastavka' : 'Ispao: Kaladont',
       istek: 'Ispao: istek vremena',
       mrtva_slova_baza: 'Ispao: nema nastavka',
       mrtva_slova_iskoristeno: 'Ispao: sve iskorišteno',
@@ -607,9 +608,9 @@
   function sazetakEliminacije(eliminacija: Eliminacija): string {
     if (eliminacija.razlog === 'kaladont') {
       const ime = imeIgraca(eliminacija.igracId);
-      // Klasični: žrtva je sljedeći, ne autor „ka”. KA-zna (i fallback): autor „ka”.
+      // Klasični: žrtva je sljedeći; copy ističe „nema nastavak”, ne „zbog kaladonta”.
       if (stanje.pravila === 'klasicni') {
-        return `Trenutna riječ: kaladont. ${ime} ispada jer je prethodni igrač rekao ‘kaladont’.`;
+        return `${ime} je ispao jer nema nastavak.`;
       }
       return `Trenutna riječ: kaladont. Ispada igrač koji je omogućio Kaladont: ${ime}.`;
     }

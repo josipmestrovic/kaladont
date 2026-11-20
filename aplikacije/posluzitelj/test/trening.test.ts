@@ -308,7 +308,6 @@ describe('Zagrijavanje', () => {
 
   // PR08 — tri ulaza (klasični Troboj-trening / KA-ZNA / Dokaži) + izolacija javnih agregata.
   it('PR08 klasični trening: tri_igraca, Računalo 1/2 i različiti avatari', async () => {
-    // Ne čekamo kraj: nakon izlaska čovjeka dva bota mogu još dugo igrati (1–3 s/potez).
     const prije = await snimkaNapretka();
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
@@ -329,7 +328,10 @@ describe('Zagrijavanje', () => {
       expect(racunala.map((s) => s.nadimak).sort()).toEqual(['Računalo 1', 'Računalo 2']);
       const avatari = new Set(racunala.map((s) => JSON.stringify(s.avatarConfig)));
       expect(avatari.size).toBe(2);
+      // #108: ispadanje jedinog čovjeka odmah završava Zagrijavanje (bez bot-vs-bot).
+      const kraj = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 5_000);
       socket.emit('partija:izadji');
+      await kraj;
     } finally {
       socket.disconnect();
     }
@@ -365,7 +367,6 @@ describe('Zagrijavanje', () => {
   });
 
   it('PR08 izlazak čovjeka ne upisuje pobjedu treninga', async () => {
-    // Dvoboj: nakon izlaska ostaje 1 Računalo → partija:kraj odmah (u Troboju botovi bi nastavili bez kraj na socketu).
     const igracId = randomUUID();
     igraciZaBrisanje.push(igracId);
     await baza.insert(igraci).values({
@@ -393,6 +394,26 @@ describe('Zagrijavanje', () => {
       expect(poslije).toHaveLength(prije.length);
     } finally {
       socket.disconnect();
+    }
+  });
+
+  it('#108 Troboj/Četveroboj trening: izlazak čovjeka odmah šalje partija:kraj', async () => {
+    for (const brojRacunala of [2, 3] as const) {
+      const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
+      try {
+        const runda = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena');
+        const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => {
+          socket.emit('trening:zapocni', { pravila: 'klasicni', brojRacunala }, resolve);
+        });
+        expect(potvrda.pokrenut).toBe(true);
+        await runda;
+        const kraj = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 5_000);
+        socket.emit('partija:izadji');
+        const krajPoruka = await kraj;
+        expect(krajPoruka.plasmani.some((p) => p.jeBot !== true)).toBe(true);
+      } finally {
+        socket.disconnect();
+      }
     }
   });
 

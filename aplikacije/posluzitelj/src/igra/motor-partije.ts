@@ -2063,6 +2063,19 @@ export function stvoriUpraviteljPartija(
 
     if (opcije?.preskociNastavak) return;
 
+    // Zagrijavanje: čim ispadne jedini čovjek, ne čekaj bot-vs-bot do kraja.
+    if (stanje.kontekst === 'trening') {
+      const eliminiranJeCovjek =
+        stanje.sudionici.find((s) => s.igracId === igracId)?.upravljac === 'covjek';
+      const imaAktivnogCovjeka = [...stanje.aktivni].some(
+        (id) => stanje.sudionici.find((s) => s.igracId === id)?.upravljac === 'covjek',
+      );
+      if (eliminiranJeCovjek && !imaAktivnogCovjeka) {
+        zakljuciPartiju(stanje);
+        return;
+      }
+    }
+
     // Sigurno mjesto za završetak: nakon svih obveznih prijelaza ovog događaja.
     const odluka = odlukaNakonEliminacije({
       brojAktivnih: stanje.aktivni.size,

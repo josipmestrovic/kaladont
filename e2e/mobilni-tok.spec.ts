@@ -147,6 +147,60 @@ for (const brojSjedala of [2, 3, 4, 8]) {
   });
 }
 
+test('prazan nastavak šalje prefiks kao cijelu riječ (#111)', async ({ browser }) => {
+  test.setTimeout(60_000);
+  const igraci = await dodajIgrace(browser, 2);
+  const stranica = igraci[0]!.stranica;
+  try {
+    await udjiUJavniRed(igraci, 'dva_igraca');
+    await cekajIstuPartiju(igraci);
+    await stranica.evaluate(async () => {
+      const putanjaStanja = '/src/lib/stanje-igre.svelte.ts';
+      const putanjaSocketa = '/src/lib/socket.ts';
+      const { dohvatiStanjeIgre } = await import(putanjaStanja);
+      const { dohvatiSocket } = await import(putanjaSocketa);
+      const stanje = dohvatiStanjeIgre();
+      const sjedalo = stanje.sjedala.find((igrac: { igracId: string }) => igrac.igracId === stanje.mojIgracId);
+      dohvatiSocket().emitEvent(['partija:stanje', {
+        ...JSON.parse(JSON.stringify(stanje)),
+        sjedala: [
+          { ...sjedalo, igracId: stanje.mojIgracId, nadimak: 'Igrac0' },
+          { ...sjedalo, igracId: 'protivnik-1', nadimak: 'Igrac1' },
+        ],
+        naPotezuId: stanje.mojIgracId,
+        sustavBiraRijec: false,
+        zadnjaRijec: 'kuća',
+        zadnjaRijecIgracId: 'protivnik-1',
+        zadnjaRijecVrsta: 'rijec',
+        trazenaSlova: 'ča',
+        istekPotezaIso: '',
+        eliminacije: [],
+        statusSpremanja: 'nije_zavrsena',
+      }]);
+    });
+    const unos = stranica.getByRole('textbox', { name: 'Dovrši riječ na ČA' });
+    await expect(unos).toBeVisible();
+    await unos.fill('');
+    const poslano = await stranica.evaluate(async () => {
+      const putanja = '/src/lib/socket.ts';
+      const { dohvatiSocket } = await import(putanja);
+      const socket = dohvatiSocket();
+      const izvorno = socket.emit;
+      let potez: { rijec: string } | null = null;
+      socket.emit = (dogadaj: string, ...argumenti: unknown[]) => {
+        if (dogadaj === 'potez:rijec') { potez = argumenti[0] as { rijec: string }; return socket; }
+        return izvorno.call(socket, dogadaj, ...argumenti);
+      };
+      (document.querySelector('.zona-poteza') as HTMLFormElement).requestSubmit();
+      socket.emit = izvorno;
+      return potez;
+    });
+    expect(poslano).toMatchObject({ rijec: 'ča' });
+  } finally {
+    await zatvoriIgrace(igraci);
+  }
+});
+
 test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomicanja', async ({
   page,
 }) => {

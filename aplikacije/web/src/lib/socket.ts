@@ -1,7 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
 import type { DogadajiKlijentPoslužitelj, DogadajiPosluziteljKlijent } from 'zajednicko';
 import { ADRESA_POSLUZITELJA } from './konfiguracija.js';
-import { dohvatiAuthToken, osigurajAuthToken } from './identitet.js';
+import { dohvatiAuthToken, osigurajAuthToken, prijediNaGostujucuSesiju } from './identitet.js';
 export { dohvatiStanjeVeze } from './stanje-veze.svelte.js';
 export { oznaciPartijuDostupnom } from './stanje-veze.svelte.js';
 export type { StanjeSocketVeze, StanjeVeze } from './stanje-veze.svelte.js';
@@ -14,9 +14,36 @@ export type KaladontSocket = Socket<DogadajiPosluziteljKlijent, DogadajiKlijentP
 
 let socket: KaladontSocket | null = null;
 let slusateljiPostavljeni = false;
+let oporavakSesijeUTijeku = false;
 
 function kodIzGreske(greska: Error & { data?: { kod?: string } }): string | null {
   return greska.data?.kod ?? (greska.message.includes('sesija') || greska.message.includes('istekao') ? 'SESIJA_ISTEKLA' : null);
+}
+
+/** Istekla/nevaljana sesija → novi gost + socket; veza ide u spremno, banner je zaseban flag. */
+async function oporaviNakonIstekaSesije(
+  aktivniSocket: KaladontSocket,
+  kod: string,
+  poruka: string,
+): Promise<void> {
+  if (oporavakSesijeUTijeku) return;
+  oporavakSesijeUTijeku = true;
+  aktivniSocket.io.reconnection(false);
+  // Banner flag prije reconnecta — inače bi connect→spremno na trenutak maknuo obavijest.
+  stanjeVeze.obavijestIstekaSesije = true;
+  postaviStanjeVeze('sesija_istekla', kod, poruka);
+  try {
+    await prijediNaGostujucuSesiju();
+    await osvjeziSocketIdentitet();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
+    }
+  } catch {
+    // Oporavak nije uspio — ostavi sesija_istekla da korisnik ide na prijavu.
+    postaviStanjeVeze('sesija_istekla', kod, poruka);
+  } finally {
+    oporavakSesijeUTijeku = false;
+  }
 }
 
 function postaviSlusatelje(aktivniSocket: KaladontSocket): void {
@@ -30,8 +57,7 @@ function postaviSlusatelje(aktivniSocket: KaladontSocket): void {
   aktivniSocket.io.on('reconnect_error', (greska: Error) => {
     const kod = kodIzGreske(greska as Error & { data?: { kod?: string } });
     if (kod === 'SESIJA_ISTEKLA' || kod === 'NEVALJAN_TOKEN') {
-      aktivniSocket.io.reconnection(false);
-      postaviStanjeVeze('sesija_istekla', kod, greska.message);
+      void oporaviNakonIstekaSesije(aktivniSocket, kod, greska.message);
     } else {
       postaviStanjeVeze('ponovno_spajanje', kod, greska.message);
     }
@@ -46,7 +72,9 @@ function postaviSlusatelje(aktivniSocket: KaladontSocket): void {
       aktivniSocket.io.reconnection(false);
       postaviStanjeVeze('druga_kartica', p.kod, p.poruka);
     }
-    if (p.kod === 'SESIJA_ISTEKLA') postaviStanjeVeze('sesija_istekla', p.kod, p.poruka);
+    if (p.kod === 'SESIJA_ISTEKLA') {
+      void oporaviNakonIstekaSesije(aktivniSocket, p.kod, p.poruka);
+    }
   });
   aktivniSocket.on('disconnect', (razlog) => {
     if (razlog === 'io client disconnect') {
@@ -61,8 +89,7 @@ function postaviSlusatelje(aktivniSocket: KaladontSocket): void {
       aktivniSocket.io.reconnection(false);
       postaviStanjeVeze('druga_kartica', kod, greska.message);
     } else if (kod === 'SESIJA_ISTEKLA' || kod === 'NEVALJAN_TOKEN') {
-      aktivniSocket.io.reconnection(false);
-      postaviStanjeVeze('sesija_istekla', kod, greska.message);
+      void oporaviNakonIstekaSesije(aktivniSocket, kod, greska.message);
     } else postaviStanjeVeze('ponovno_spajanje', kod, greska.message);
   });
 }
@@ -110,5 +137,11 @@ export async function osvjeziSocketIdentitet(): Promise<void> {
 }
 
 export function oznaciNamjernoIskljucenje(): void {
+  stanjeVeze.obavijestIstekaSesije = false;
   postaviStanjeVeze('rucno_iskljuceno');
+}
+
+/** Korisnik zatvorio banner / otišao na prijavu. */
+export function otpustiBannerIstekaSesije(): void {
+  stanjeVeze.obavijestIstekaSesije = false;
 }
