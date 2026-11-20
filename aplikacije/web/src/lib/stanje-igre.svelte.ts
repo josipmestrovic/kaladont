@@ -63,6 +63,12 @@ interface StanjeIgre {
   jePrivatna: boolean;
   kodSobe: string | null;
   trajanjePotezaSek: number | null;
+  /** PR05: serverski napredak ciljeva (samo kontekst izazov). */
+  goalProgress: import('zajednicko').GoalProgressIzazova | null;
+  /** PR05: terminalni ishod pokušaja (reconnect / nakon kraja). */
+  izazovTerminal: NonNullable<import('zajednicko').StanjePartije['izazovTerminal']> | null;
+  /** Zadnji challengeId za CTA na rezultatu. */
+  izazovChallengeId: import('zajednicko').IdIzazova | null;
   zadnjaNagrada: NagradaZaRijec | null;
   oznakaPrihvacenogPoteza: number;
   trenutniStreak: number;
@@ -112,6 +118,9 @@ const stanje = $state<StanjeIgre>({
   jePrivatna: false,
   kodSobe: null,
   trajanjePotezaSek: null,
+  goalProgress: null,
+  izazovTerminal: null,
+  izazovChallengeId: null,
   zadnjaNagrada: null,
   oznakaPrihvacenogPoteza: 0,
   trenutniStreak: 0,
@@ -281,6 +290,13 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.jePrivatna = Boolean(p.jePrivatna);
   stanje.kodSobe = p.kodSobe ?? null;
   stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
+  if (stanje.kontekst === 'izazov') {
+    if (p.goalProgress !== undefined) stanje.goalProgress = p.goalProgress ?? null;
+    if (p.izazovTerminal !== undefined) stanje.izazovTerminal = p.izazovTerminal ?? null;
+  } else {
+    stanje.goalProgress = null;
+    stanje.izazovTerminal = null;
+  }
 
   if (
     prethodniDokaz?.cekateljVecIspao === true &&
@@ -446,16 +462,29 @@ export function pokreniSlusateljeIgre(): void {
     stanje.kodSobe = p.kodSobe ?? null;
     // Mora stići prije prvog potez:prihvacen — inače prazan istek izgleda kao ubojita riječ.
     stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
+    stanje.goalProgress = null;
+    stanje.izazovTerminal = null;
   });
 
   socket.on('partija:stanje', primijeniStanjePartije);
   socket.on('dokaz:zatrazen', primijeniDokazZatrazen);
 
-  // HINT PR14 e2e: Playwright može injektirati dokaz / stanje bez pravog server eventa.
+  // HINT PR14/PR05 e2e: Playwright može injektirati dokaz / stanje / kraj bez pravog server eventa.
   if (typeof window !== 'undefined') {
     const e2eEmit = (event: string, data: unknown) => {
       if (event === 'dokaz:zatrazen') primijeniDokazZatrazen(data as DokazZatrazen);
       if (event === 'partija:stanje') primijeniStanjePartije(data as StanjePartije);
+      if (event === 'partija:kraj') {
+        const p = data as import('zajednicko').KrajPartije;
+        stanje.partijaId = p.partijaId;
+        stanje.kraj = p;
+        stanje.kontekst = p.kontekst ?? stanje.kontekst;
+        stanje.statusSpremanja = 'rezultati_spremljeni';
+        stanje.rezultatiPrikazaniPartijaId = p.partijaId;
+        if (p.kontekst === 'izazov' && p.izazovSettlement) {
+          /* terminal može doći posebnim partija:stanje emitom */
+        }
+      }
     };
     (window as unknown as { __KALADONT_E2E_EMIT__?: typeof e2eEmit }).__KALADONT_E2E_EMIT__ = e2eEmit;
     window.addEventListener('kaladont:dokaz-zatrazen', ((ev: CustomEvent<DokazZatrazen>) => {
@@ -525,6 +554,8 @@ export function pokreniSlusateljeIgre(): void {
     if (mojPotez) {
       prikaziStavkeIskustva(p.iskustvo ?? []);
       prikaziKonfeteIskustva(p.iskustvo ?? []);
+      // Osvježi serverski goalProgress nakon vlastite riječi.
+      if (stanje.kontekst === 'izazov') socket.emit('partija:stanje');
     }
 
     // State se mora primijeniti prije zvuka: nepostojeći ili blokirani audio
@@ -543,6 +574,8 @@ export function pokreniSlusateljeIgre(): void {
 
   socket.on('potez:odbijen', (p) => {
     if (napustioPartiju) return;
+    // Odbijanje ide samo autoru poteza — osvježi bezPogreske / terminal hint.
+    if (stanje.kontekst === 'izazov') socket.emit('partija:stanje');
     pustiOdbijanje();
     stanje.trenutniStreak = 0;
     stanje.poruka = p.poruka;
@@ -685,6 +718,8 @@ export function pokreniSlusateljeIgre(): void {
     stanje.ponistenaPoruka = null;
     stanje.statusSpremanja = 'rezultati_spremljeni';
     stanje.pocetakPartijeIso = null;
+    // Dohvati izazovTerminal / konačni goalProgress za rezultatski ekran.
+    if (p.kontekst === 'izazov') socket.emit('partija:stanje');
   });
 
   socket.on('dostignuce:otkljucano', (p) => {
@@ -770,6 +805,8 @@ export function napustiLokalnuPartiju(): void {
   stanje.jePrivatna = false;
   stanje.kodSobe = null;
   stanje.trajanjePotezaSek = null;
+  stanje.goalProgress = null;
+  stanje.izazovTerminal = null;
   stanje.zadnjaNagrada = null;
   stanje.trenutniStreak = 0;
   stanje.stavkeIskustva = [];

@@ -5,6 +5,7 @@ const TIMEOUT_ASETA_MS = 8_000;
 /** Warm-up ikona navigacije na landingu (desktop). */
 export const KRITICNE_IKONE: readonly string[] = [
   '/ikone/07-igraj.png',
+  '/ikone/06-trofej.png',
   '/ikone/67-zagrijavanje-bot.webp',
   '/ikone/18-privatna-soba.png',
 ];
