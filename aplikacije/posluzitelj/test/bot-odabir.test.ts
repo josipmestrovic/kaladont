@@ -4,7 +4,7 @@ import { BotKontroler } from '../src/bot/kontroler.js';
 import { RasporedjivacOdziva } from '../src/bot/raspored-odziva.js';
 import { izgradiRepertoarBotova } from '../src/bot/repertoar.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
-import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, klasificirajPoznatiSkup, odaberiPotez, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
+import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, klasificirajPoznatiSkup, odaberiPotez, odaberiPotezNastavivo, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
 import { parsajSpremljenuKonfiguraciju } from '../src/bot/trajne-postavke.js';
 import { BROJ_GOSTIJU_FONDA_V4, BROJ_IMENOVANIH_FONDA_V4, CILJ_AKTIVNIH_FONDA_V4, NADIMCI_POCETNOG_FONDA_V4 } from '../src/bot/nadimci.js';
 import { stavkeZamjeneFondaBotova } from '../src/bot/servis-identiteta.js';
@@ -501,6 +501,45 @@ describe('odabir riječi bota', () => {
       poznatiKandidatiNa: poznatiZaDokazi,
     }, stvoriStanjeBota(konfigBezPropusta, rng(3)), konfigBezPropusta, rng(3));
     expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'mastilo', kategorija: 'srednja' });
+  });
+
+  it('Dokaži: potvrđeni „ka” svjedok ne baca Ne znam dok postoji potvrđen bez „ka”', async () => {
+    const rijeci = laznaRijec({
+      maska: { frekvencija: 950, grupe: ['imenica:maska'] },
+      masa: { frekvencija: 400, grupe: ['imenica:masa'] },
+    });
+    const poznatiSKa = (prefiks: string): string[] => {
+      if (prefiks === 'ka') return ['kava'];
+      if (prefiks === 'sa') return ['sat'];
+      return [];
+    };
+    const ulaz = {
+      trazenaSlova: 'ma',
+      kandidati: ['maska', 'masa'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak' as const,
+      faza: 'obican_potez' as const,
+      brojAktivnih: 2,
+      iskoristeneGrupe: new Set<string>(),
+      poznatiKandidatiNa: poznatiSKa,
+      poznatiKandidatiNaNastavivo: async function* (prefiks: string) {
+        for (const rijec of poznatiSKa(prefiks)) yield rijec;
+      },
+      imaSlobodnuRijecNa: () => true,
+      turnToken: 't-ka-prvi',
+    };
+    const sync = odaberiPotez(ulaz, stvoriStanjeBota(konfigBezPropusta, rng(1)), konfigBezPropusta, rng(1));
+    expect(sync).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
+
+    const asyncOdluka = await odaberiPotezNastavivo(
+      ulaz,
+      stvoriStanjeBota(konfigBezPropusta, rng(1)),
+      konfigBezPropusta,
+      rng(1),
+      async () => undefined,
+      () => true,
+    );
+    expect(asyncOdluka).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
   });
 
   it('PR07 Klasični s 3 aktivna: riječ na „ka” ulazi u pool čak uz vjerojatnostOstavljanjaKa 0', () => {

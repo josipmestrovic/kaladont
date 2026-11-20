@@ -571,25 +571,30 @@ function ocjeniTakticki(
   return najbolja;
 }
 
-function traziSvjedokaDokazi(
+/** Potvrđeni Dokaži kandidati u budžetu — bez „ka” (običan potez ih ionako ne smije igrati). */
+function traziPotvrdjeneDokazi(
   kandidati: readonly string[],
   ulaz: UlazOdabira,
   iskoristene: ReadonlySet<string>,
   konfig: KonfiguracijaBota,
   rng: Rng,
-): string | null {
-  const radni = kandidati.length > RADNI_UZORAK_PO_POTEZU
-    ? uzorkujPonderirano([...kandidati], RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
-    : [...kandidati];
-  const ostatak = kandidati.filter((rijec) => !radni.includes(rijec));
-  const provjeri = (lista: readonly string[], limit: number) => {
+): string[] {
+  const bezKa = kandidati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
+  if (!bezKa.length) return [];
+  const radni = bezKa.length > RADNI_UZORAK_PO_POTEZU
+    ? uzorkujPonderirano([...bezKa], RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
+    : [...bezKa];
+  const ostatak = bezKa.filter((rijec) => !radni.includes(rijec));
+  const potvrdjeni: string[] = [];
+  const provjeri = (lista: readonly string[], limit: number): void => {
     const uzorak = lista.length <= limit ? lista : uzorkujPonderirano([...lista], limit, ulaz.frekvencijaZa, rng, konfig);
     for (const rijec of uzorak) {
-      if (imaPoznatiNastavak(rijec, ulaz, iskoristene) === true) return rijec;
+      if (imaPoznatiNastavak(rijec, ulaz, iskoristene) === true) potvrdjeni.push(rijec);
     }
-    return null;
   };
-  return provjeri(radni, DETALJNA_PROVJERA_PO_POTEZU) ?? provjeri(ostatak, DOKAZ_DODATNA_PROVJERA);
+  provjeri(radni, DETALJNA_PROVJERA_PO_POTEZU);
+  if (potvrdjeni.length === 0) provjeri(ostatak, DOKAZ_DODATNA_PROVJERA);
+  return potvrdjeni;
 }
 
 function pripremiSkupinuZaIzbor(
@@ -692,11 +697,11 @@ export function odaberiPotez(
   }
 
   if (politikaSirowa === 'bez_ka' && faza === 'obican_potez' && poznati.length > 0) {
-    const svjedok = traziSvjedokaDokazi(poznati, ulaz, iskoristene, konfig, rng);
-    if (!svjedok) {
+    const potvrdjeni = traziPotvrdjeneDokazi(poznati, ulaz, iskoristene, konfig, rng);
+    if (!potvrdjeni.length) {
       return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
     }
-    poznati = [svjedok];
+    poznati = potvrdjeni;
   }
 
   if (poznati.length > RADNI_UZORAK_PO_POTEZU) {
@@ -936,32 +941,32 @@ export async function odaberiPotezNastavivo(
   }
 
   if (politikaSirowa === 'bez_ka' && faza === 'obican_potez' && poznati.length > 0) {
-    const radni = poznati.length > RADNI_UZORAK_PO_POTEZU
-      ? uzorkujPonderirano(poznati, RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
-      : poznati;
+    const bezKa = poznati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
+    if (!bezKa.length) {
+      return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
+    }
+    const radni = bezKa.length > RADNI_UZORAK_PO_POTEZU
+      ? uzorkujPonderirano(bezKa, RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
+      : bezKa;
     const potvrdjeni: string[] = [];
     const provjeriListu = async (lista: readonly string[], limit: number): Promise<'otkazano' | null> => {
       const uzorak = lista.length <= limit ? lista : uzorkujPonderirano([...lista], limit, ulaz.frekvencijaZa, rng, konfig);
       for (const kandidat of uzorak) {
         const nastavak = await imaPoznatiNastavakNastavivo(kandidat, ulaz, iskoristene, predaj, aktivan);
         if (nastavak === 'otkazano') return 'otkazano';
-        if (nastavak === true) {
-          potvrdjeni.push(kandidat);
-          return null;
-        }
+        if (nastavak === true) potvrdjeni.push(kandidat);
       }
       return null;
     };
     let ishod = await provjeriListu(radni, DETALJNA_PROVJERA_PO_POTEZU);
     if (ishod === 'otkazano') return null;
     if (potvrdjeni.length === 0) {
-      ishod = await provjeriListu(poznati.filter((rijec) => !radni.includes(rijec)), DOKAZ_DODATNA_PROVJERA);
+      ishod = await provjeriListu(bezKa.filter((rijec) => !radni.includes(rijec)), DOKAZ_DODATNA_PROVJERA);
       if (ishod === 'otkazano') return null;
     }
     if (potvrdjeni.length === 0) {
       return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
     }
-    // Samo potvrđeni kandidati (bez drugog punog prolaza).
     poznati = potvrdjeni;
   }
 
