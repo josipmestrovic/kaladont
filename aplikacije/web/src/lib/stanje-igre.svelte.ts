@@ -297,6 +297,8 @@ function primijeniStanjePartije(p: StanjePartije): void {
       stanje.sustavBiraRijec = false;
       zatvoriDokazNakonHold(() => {
         stanje.dokaz = null;
+        stanje.faza = 'sustav_bira';
+        stanje.sustavBiraRijec = true;
         zapisiIshodDokaza(porukaIshoda);
       });
       if (elim.bodZa === stanje.mojIgracId && elim.iskustvo) {
@@ -561,6 +563,7 @@ export function pokreniSlusateljeIgre(): void {
         zatvoriDokazNakonHold(() => {
           stanje.dokaz = null;
           stanje.faza = 'sustav_bira';
+          stanje.sustavBiraRijec = true;
           zapisiIshodDokaza(poruka);
         });
       } else if (p.igracId === dokazSnimka.autorId) {
@@ -570,6 +573,7 @@ export function pokreniSlusateljeIgre(): void {
         zatvoriDokazNakonHold(() => {
           stanje.dokaz = null;
           stanje.faza = 'sustav_bira';
+          stanje.sustavBiraRijec = true;
           zapisiIshodDokaza(poruka);
         });
       }
