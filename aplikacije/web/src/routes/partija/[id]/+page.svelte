@@ -27,7 +27,7 @@
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
-  import { putanjaPonovneIgre } from '$lib/igraj-rute.js';
+  import { profilIzNadimkaTreningBota, putanjaPonovneIgre } from '$lib/igraj-rute.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
@@ -97,6 +97,18 @@
   let prethodnaNagrada: NagradaZaRijec | null = null;
   let prethodnaPartijaObavijesti: string | null | undefined;
   const jeTrening = $derived(stanje.kontekst === 'trening' || stanje.kraj?.kontekst === 'trening');
+  /** Zadrži istu težinu pri „Igraj novi trening” (Bugbot PR02). */
+  const treningProfileId = $derived((() => {
+    const izPlasmana = (stanje.kraj?.plasmani ?? [])
+      .filter((p) => p.jeBot)
+      .map((p) => profilIzNadimkaTreningBota(p.nadimak))
+      .find((id) => id != null);
+    if (izPlasmana) return izPlasmana;
+    return stanje.sjedala
+      .filter((s) => s.jeBot)
+      .map((s) => profilIzNadimkaTreningBota(s.nadimak))
+      .find((id) => id != null) ?? null;
+  })());
   const IKONA_RACUNALA = '/ikone/67-zagrijavanje-bot.webp';
   function slikaSjedala(igracId: string, jeBot = false): string | null {
     if (igracId.startsWith('racunalo-')) return IKONA_RACUNALA;
@@ -1528,7 +1540,7 @@
   {#if jeTrening}
     <div class="kraj-akcije">
       <a
-        href={putanjaPonovneIgre(stanje.kraj.mod ?? stanje.mod, stanje.kraj.pravila ?? stanje.pravila, 'trening')}
+        href={putanjaPonovneIgre(stanje.kraj.mod ?? stanje.mod, stanje.kraj.pravila ?? stanje.pravila, 'trening', treningProfileId)}
         class="igraj-opet-gumb"
       >Igraj novi trening</a>
       <a href="/" class="sporedni-gumb">Povratak na odabir igre</a>
