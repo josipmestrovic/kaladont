@@ -114,7 +114,17 @@
           void goto(`/partija/${ishod.partijaId}`);
           return;
         }
-        // Rezerviran, čekamo partija:pocetak.
+        if (ishod.pokrenut === false) {
+          // Rezervacija bez pokretanja (npr. tehnicki_prekinuto) — ne čekaj partija:pocetak.
+          startUTijeku = false;
+          startPoruka =
+            ishod.status === 'tehnicki_prekinuto'
+              ? 'Izazov se nije mogao pokrenuti. Pokušaj ponovno.'
+              : 'Partija još nije krenula. Pokušaj ponovno ili osvježi mapu.';
+          void ucitaj();
+          return;
+        }
+        // pokrenut true bez partijaId — rijetko; čekamo partija:pocetak.
         return;
       }
       startUTijeku = false;

@@ -1325,6 +1325,7 @@
       goalProgress={stanje.goalProgress}
       terminalStatus={stanje.izazovTerminal?.status ?? null}
       terminalReason={stanje.izazovTerminal?.reason ?? null}
+      gameWon={stanje.izazovTerminal?.gameWon ?? null}
     />
     <PanelPrijavaRijeci
       partijaId={partijaId!}

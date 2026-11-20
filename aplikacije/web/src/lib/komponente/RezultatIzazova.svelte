@@ -16,17 +16,22 @@
     goalProgress = null,
     terminalStatus = null,
     terminalReason = null,
+    gameWon = null,
   }: {
     kraj: KrajPartije;
     challengeId?: IdIzazova | null;
     goalProgress?: GoalProgressIzazova | null;
     terminalStatus?: 'uspjeh' | 'neuspjeh' | 'tehnicki_prekinuto' | string | null;
     terminalReason?: string | null;
+    gameWon?: boolean | null;
   } = $props();
 
   const settlement = $derived(kraj.izazovSettlement ?? null);
   const uspjeh = $derived(terminalStatus === 'uspjeh');
   const pending = $derived(settlement?.settlementState === 'spremanje_u_tijeku');
+  const pobjedaPartije = $derived(
+    gameWon === true || uspjeh || terminalReason === 'cilj_neispunjen',
+  );
   const gameWonBezCilja = $derived(
     !uspjeh && terminalReason === 'cilj_neispunjen',
   );
@@ -75,7 +80,7 @@
 
   {#if goalProgress}
     <ul class="podciljevi" aria-label="Podciljevi">
-      <li class:met={false}>Pobjeda</li>
+      <li class:met={pobjedaPartije}>Pobjeda</li>
       {#if goalProgress.bezPogreske.required}
         <li class:met={goalProgress.bezPogreske.met}>Bez pogreške</li>
       {/if}

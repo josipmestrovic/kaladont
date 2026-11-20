@@ -407,12 +407,49 @@
     .landing-footer a { padding-inline: 0; }
   }
 
+  /* 4 CTA: kratki desktop viewport mora stati u 100dvh bez scrolla (E2E 1366×500). */
   @media (min-width: 1000px) and (max-height: 600px) {
     .landing {
-      --visina-stavke: clamp(48px, 6dvh, 64px);
-      --razmak-stavki: clamp(6px, 0.9dvh, 10px);
-      --landing-razmak: clamp(8px, 1.4dvh, 16px);
-      --font-stavke: clamp(26px, 3.6dvh, 34px);
+      --visina-stavke: clamp(40px, 7.2dvh, 52px);
+      --razmak-stavki: clamp(4px, 0.8dvh, 8px);
+      --landing-razmak: clamp(4px, 1dvh, 10px);
+      --landing-padding: clamp(4px, 1dvh, 10px);
+      --font-stavke: clamp(22px, 3.4dvh, 28px);
+      --font-opisa: clamp(13px, 2.2dvh, 16px);
+    }
+
+    .izbornik {
+      gap: clamp(8px, 1.4dvh, 14px);
+    }
+
+    .navigacijska-stavka {
+      padding-block: 6px;
+    }
+
+    .stavka-tekst small {
+      line-height: 1.15;
+    }
+  }
+
+  @media (min-width: 1000px) and (max-height: 520px) {
+    .landing {
+      --visina-stavke: clamp(36px, 6.8dvh, 44px);
+      --razmak-stavki: 4px;
+      --font-stavke: clamp(20px, 3.2dvh, 24px);
+      --font-opisa: clamp(12px, 2dvh, 14px);
+    }
+
+    .zadnje-azuriranje {
+      font-size: 11px;
+    }
+  }
+
+  @media (min-width: 1000px) and (max-height: 600px) {
+    :global(html[data-font-disleksiju]) .landing {
+      --visina-stavke: clamp(36px, 6.4dvh, 46px);
+      --razmak-stavki: 4px;
+      --font-stavke: clamp(18px, 3dvh, 24px);
+      --font-opisa: clamp(11px, 1.9dvh, 13px);
     }
   }
 
