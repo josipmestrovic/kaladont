@@ -92,9 +92,9 @@ describe('metrike misija', () => {
 });
 
 describe('PR12 — osam novih predložaka', () => {
-  it('pool ima 24 dnevne i 24 tjedne', () => {
-    expect(DEFINICIJE_MISIJA.filter((d) => d.vrsta === 'dnevna' && d.aktivna)).toHaveLength(24);
-    expect(DEFINICIJE_MISIJA.filter((d) => d.vrsta === 'tjedna' && d.aktivna)).toHaveLength(24);
+  it('pool ima 25 dnevnih i 25 tjednih (PR04 D25/W25)', () => {
+    expect(DEFINICIJE_MISIJA.filter((d) => d.vrsta === 'dnevna' && d.aktivna)).toHaveLength(25);
+    expect(DEFINICIJE_MISIJA.filter((d) => d.vrsta === 'tjedna' && d.aktivna)).toHaveLength(25);
   });
 
   it('copy nikad ne koristi riječ partija', () => {
@@ -427,5 +427,29 @@ describe('PR12 — osam novih predložaka', () => {
       }),
     });
     expect(r.noviNapredak).toBe(0);
+  });
+});
+
+describe('PR04 — Izazov misije', () => {
+  it('D25 broji izazov pokušaj; javna ne pomiče', () => {
+    const d = definicijaMisije('D25')!;
+    expect(d.kontekst).toBe('izazov');
+    expect(d.metrika).toBe('izazov_pokusaji');
+    const ok = primijeniMetrikuNaDodjelu({
+      predlozakId: 'D25',
+      snapshot: snapshotIzDefinicije(d),
+      napredak: 0,
+      podstanje: {},
+      metrike: bazaMetrike({ kontekst: 'izazov', mod: 'dva_igraca', prihvaceneRijeci: 1 }),
+    });
+    expect(ok.noviNapredak).toBe(1);
+    const skip = primijeniMetrikuNaDodjelu({
+      predlozakId: 'D25',
+      snapshot: snapshotIzDefinicije(d),
+      napredak: 0,
+      podstanje: {},
+      metrike: bazaMetrike({ kontekst: 'javna', prihvaceneRijeci: 3 }),
+    });
+    expect(skip.noviNapredak).toBe(0);
   });
 });
