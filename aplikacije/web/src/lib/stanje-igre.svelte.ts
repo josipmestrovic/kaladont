@@ -291,15 +291,27 @@ function primijeniStanjePartije(p: StanjePartije): void {
       (e) => e.igracId === prethodniDokaz.cekateljId && e.bodZa === prethodniDokaz.autorId,
     );
     if (elim) {
-      // Kredit-snimka stiže PRIJE zapocniIzborRijeciSustava — forsira sustav_bira.
+      // Kredit-snimka je PRIJE sustav-bira ili zakljuciPartiju (ako ≤1 aktivan).
       const porukaIshoda = `${nadimakIgraca(prethodniDokaz.autorId)} je dokazao nastavak.`;
+      const aktivnih = p.sjedala.filter(
+        (s) => !p.eliminacije.some((e) => e.igracId === s.igracId),
+      ).length;
+      const zavrsavaSe = p.zavrsena || aktivnih <= 1;
       stanje.dokaz = prethodniDokaz;
       stanje.faza = 'dokaz_nastavka';
       stanje.sustavBiraRijec = false;
       zatvoriDokazNakonHold(() => {
         stanje.dokaz = null;
-        stanje.faza = 'sustav_bira';
-        stanje.sustavBiraRijec = true;
+        if (zavrsavaSe) {
+          stanje.faza = 'zavrsena';
+          stanje.sustavBiraRijec = false;
+          if (stanje.statusSpremanja === 'nije_zavrsena') {
+            stanje.statusSpremanja = 'spremanje_rezultata';
+          }
+        } else {
+          stanje.faza = 'sustav_bira';
+          stanje.sustavBiraRijec = true;
+        }
         zapisiIshodDokaza(porukaIshoda);
       });
       if (elim.bodZa === stanje.mojIgracId && elim.iskustvo) {
