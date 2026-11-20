@@ -818,7 +818,7 @@ export async function registrirajAdminRute(
   const ShemaFilteraAnalitike = z.object({
     od: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     do: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    kontekst: z.enum(['javna', 'privatna', 'trening']).optional(),
+    kontekst: z.enum(['javna', 'privatna', 'trening', 'izazov']).optional(),
     stranica: z.coerce.number().int().min(1).max(1000).optional(),
   });
 

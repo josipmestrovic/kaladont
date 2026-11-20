@@ -134,6 +134,34 @@ describe('Izazov PR01 — servis rezervacije', () => {
     if (!drugi.ok) expect(drugi.kod).toBe('IZAZOV_AKTIVAN');
   });
 
+  it('bacanje u pokreniPartiju označava tehnicki_prekinuto i otključava igrača', async () => {
+    const gost = await noviGost();
+    const pad = await rezervirajPokusajIzazova({
+      igracId: gost.igracId,
+      vrsta: 'gost',
+      challengeId: 'IZ01',
+      requestId: randomUUID(),
+      omogucen: true,
+      pokreniPartiju: async () => {
+        throw new Error('simulirani pad motora');
+      },
+    });
+    expect(pad.ok).toBe(true);
+    if (!pad.ok) return;
+    expect(pad.pokrenut).toBe(false);
+    expect(pad.pokusaj.status).toBe('tehnicki_prekinuto');
+
+    const ponovni = await rezervirajPokusajIzazova({
+      igracId: gost.igracId,
+      vrsta: 'gost',
+      challengeId: 'IZ01',
+      requestId: randomUUID(),
+      omogucen: true,
+    });
+    expect(ponovni.ok).toBe(true);
+    if (ponovni.ok) expect(ponovni.pokusaj.status).toBe('tehnicki_prekinuto');
+  });
+
   it('klijentski XP/profil u payloadu nije dio ugovora — server koristi katalog', async () => {
     const gost = await noviGost();
     const rezultat = await rezervirajPokusajIzazova({

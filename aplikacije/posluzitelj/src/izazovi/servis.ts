@@ -121,11 +121,23 @@ export async function rezervirajPokusajIzazova(ulaz: {
   }
 
   const pokreni = ulaz.pokreniPartiju ?? stubPokreniPartijuIzazova;
-  const motor = await pokreni({
-    attemptId: pokusaj.id,
-    igracId: ulaz.igracId,
-    challengeId: definicija.id,
-  });
+  let motor: Awaited<ReturnType<PokreniPartijuIzazova>>;
+  try {
+    motor = await pokreni({
+      attemptId: pokusaj.id,
+      igracId: ulaz.igracId,
+      challengeId: definicija.id,
+    });
+  } catch {
+    // Rezervacija mora izaći iz aktivnog statusa — inače unique index zaključa igrača.
+    const terminalni = await oznaciTehnickiPrekinuto(pokusaj.id);
+    return {
+      ok: true,
+      pokusaj: terminalni ?? { ...pokusaj, status: 'tehnicki_prekinuto' },
+      pokrenut: false,
+      partijaId: null,
+    };
+  }
 
   if (!motor.ok) {
     const terminalni = await oznaciTehnickiPrekinuto(pokusaj.id);
