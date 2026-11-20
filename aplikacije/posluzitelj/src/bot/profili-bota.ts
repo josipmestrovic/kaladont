@@ -1,0 +1,89 @@
+/**
+ * Verzionirani profili botova za Trening i Izazov (PR02).
+ * Javna/privatna i dalje koriste globalni admin/env resolver — ovi profili ih ne diraju.
+ */
+import {
+  jePoznatiProfilBota,
+  nadimakProfilaBota,
+  ZADANI_PROFIL_TRENINGA,
+  type ProfilBotaIzazova,
+} from 'zajednicko';
+import {
+  ZADANA_KONFIGURACIJA_BOTA,
+  type KonfiguracijaBota,
+} from './konfiguracija-bota.js';
+
+export { nadimakProfilaBota, ZADANI_PROFIL_TRENINGA };
+
+/** Verzija seta profilnih poluga; odvojena od VERZIJA_BOT_POLITIKE. */
+export const VERZIJA_PROFILA_BOTA = 1;
+
+/** Četiri vjerojatnosne poluge iz speka 08 (pilot, ne izmjeren balans). */
+export interface PolugeProfilaBota {
+  vjerojatnostTaktickogPoteza: number;
+  vjerojatnostNeznanjaUMalomSkupu: number;
+  vjerojatnostPropustaKa: number;
+  vjerojatnostOstavljanjaKa: number;
+}
+
+export const POLUGE_PROFILA_BOTA: Readonly<Record<ProfilBotaIzazova, PolugeProfilaBota>> = {
+  pocetnik: {
+    vjerojatnostTaktickogPoteza: 0.1,
+    vjerojatnostNeznanjaUMalomSkupu: 0.25,
+    vjerojatnostPropustaKa: 0.2,
+    vjerojatnostOstavljanjaKa: 0.04,
+  },
+  iskusni: {
+    vjerojatnostTaktickogPoteza: 0.25,
+    vjerojatnostNeznanjaUMalomSkupu: 0.1,
+    vjerojatnostPropustaKa: 0.08,
+    vjerojatnostOstavljanjaKa: 0.015,
+  },
+  majstor: {
+    vjerojatnostTaktickogPoteza: 0.5,
+    vjerojatnostNeznanjaUMalomSkupu: 0.05,
+    vjerojatnostPropustaKa: 0.04,
+    vjerojatnostOstavljanjaKa: 0.008,
+  },
+  velemajstor: {
+    vjerojatnostTaktickogPoteza: 0.75,
+    vjerojatnostNeznanjaUMalomSkupu: 0.02,
+    vjerojatnostPropustaKa: 0.02,
+    vjerojatnostOstavljanjaKa: 0.003,
+  },
+};
+
+export interface RazrijesenaKonfiguracijaBota {
+  konfiguracija: KonfiguracijaBota;
+  profileId: ProfilBotaIzazova;
+  botProfileVersion: number;
+}
+
+export function razrijesiProfilBota(
+  profileId: ProfilBotaIzazova,
+  baza: KonfiguracijaBota = ZADANA_KONFIGURACIJA_BOTA,
+): RazrijesenaKonfiguracijaBota {
+  if (!jePoznatiProfilBota(profileId)) {
+    throw new Error(`Nepoznat profil bota: ${String(profileId)}`);
+  }
+  const poluge = POLUGE_PROFILA_BOTA[profileId];
+  const konfiguracija = structuredClone(baza);
+  konfiguracija.vjerojatnostTaktickogPoteza = poluge.vjerojatnostTaktickogPoteza;
+  konfiguracija.vjerojatnostNeznanjaUMalomSkupu = poluge.vjerojatnostNeznanjaUMalomSkupu;
+  konfiguracija.vjerojatnostPropustaKa = poluge.vjerojatnostPropustaKa;
+  konfiguracija.vjerojatnostOstavljanjaKa = poluge.vjerojatnostOstavljanjaKa;
+  return {
+    konfiguracija,
+    profileId,
+    botProfileVersion: VERZIJA_PROFILA_BOTA,
+  };
+}
+
+/** Stari klijent / izostanak → Iskusni. */
+export function razrijesiProfilBotaIliZadani(
+  profileId: ProfilBotaIzazova | undefined | null,
+  baza: KonfiguracijaBota = ZADANA_KONFIGURACIJA_BOTA,
+): RazrijesenaKonfiguracijaBota {
+  const id = jePoznatiProfilBota(profileId) ? profileId : ZADANI_PROFIL_TRENINGA;
+  return razrijesiProfilBota(id, baza);
+}

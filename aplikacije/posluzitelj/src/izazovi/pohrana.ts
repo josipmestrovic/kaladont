@@ -16,6 +16,7 @@ import {
   type StatusPokusajaIzazova,
   type TrajanjePotezaIzazovaMs,
 } from 'zajednicko';
+import { VERZIJA_PROFILA_BOTA } from '../bot/profili-bota.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, pokusajiIzazova, zavrseciIzazova } from '../baza/shema.js';
 
@@ -28,6 +29,7 @@ export interface SnapshotPokusajaIzazova {
   mod: DefinicijaIzazova['mod'];
   pravila: DefinicijaIzazova['pravila'];
   profileId: ProfilBotaIzazova;
+  botProfileVersion: number;
   turnDurationMs: TrajanjePotezaIzazovaMs;
   brojIgraca: 2 | 3 | 4;
   ciljevi: CiljeviIzazova;
@@ -137,6 +139,7 @@ export function napraviSnapshot(definicija: DefinicijaIzazova): SnapshotPokusaja
     mod: definicija.mod,
     pravila: definicija.pravila,
     profileId: definicija.profileId,
+    botProfileVersion: VERZIJA_PROFILA_BOTA,
     turnDurationMs: definicija.turnDurationMs,
     brojIgraca: definicija.brojIgraca,
     ciljevi: { ...definicija.ciljevi },
@@ -159,6 +162,7 @@ export async function umetniRezerviraniPokusaj(ulaz: {
       challengeId: ulaz.definicija.id,
       requestId: ulaz.requestId,
       definitionVersion: VERZIJA_DEFINICIJE_IZAZOVA,
+      botProfileVersion: snapshot.botProfileVersion,
       snapshot,
       status: 'rezerviran',
       settlementState: 'nije_potrebno',

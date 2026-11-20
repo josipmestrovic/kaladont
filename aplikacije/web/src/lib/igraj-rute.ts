@@ -1,10 +1,16 @@
 /**
- * URL-ovi i oznake za Igraj (način na naslovnici → pravilnik → format ili Računala).
+ * URL-ovi i oznake za Igraj (način na naslovnici → pravilnik → format ili botovi/profil).
  * HINT: Natjecateljski: 9 UI izbora → 8 serverskih redova (Klasični+KA-ZNA Dvoboj dijele `2-zajednicki`).
  * HINT: Troboj ikona dolazi naknadno — kartica je tekstualna („Troboj · 3 igrača”).
  */
-import type { ModPartije, PravilnikPartije } from 'zajednicko';
-import { jePoznatiMod, jePoznatiPravilnik, ZADANI_PRAVILNIK } from 'zajednicko';
+import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko';
+import {
+  jePoznatiMod,
+  jePoznatiPravilnik,
+  jePoznatiProfilBota,
+  ZADANI_PRAVILNIK,
+  ZADANI_PROFIL_TRENINGA,
+} from 'zajednicko';
 
 /** Doslovni tekstovi kartica pravilnika (pregled + PR14). */
 export const TEKSTOVI_PRAVILNIKA: Readonly<
@@ -71,17 +77,22 @@ export function putanjaJavnogReda(mod: ModPartije, pravila: PravilnikPartije): s
   return `/red?mod=${encodeURIComponent(mod)}&pravila=${encodeURIComponent(pravila)}`;
 }
 
-/** Glavni UI Zagrijavanje — pravila + broj Računala (1–3). */
+/** Glavni UI Zagrijavanje — pravila + broj botova (1–3) + profil. */
 export function putanjaZagrijavanjaBotova(
   brojRacunala: 1 | 2 | 3,
   pravila: PravilnikPartije,
+  profileId: ProfilBotaIzazova = ZADANI_PROFIL_TRENINGA,
 ): string {
-  return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}&botovi=${brojRacunala}`;
+  return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}&botovi=${brojRacunala}&profil=${encodeURIComponent(profileId)}`;
 }
 
-/** Misije / Igraj opet — stari ulaz po pravilniku (klasični = 2 Računala). */
+/** Misije / Igraj opet — stari ulaz po pravilniku (klasični = 2 bota, zadani Iskusni). */
 export function putanjaZagrijavanja(pravila: PravilnikPartije): string {
   return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}`;
+}
+
+export function parsajProfilIzQuery(vrijednost: string | null | undefined): ProfilBotaIzazova {
+  return jePoznatiProfilBota(vrijednost) ? vrijednost : ZADANI_PROFIL_TRENINGA;
 }
 
 export function putanjaPrivatneKreacije(pravila: PravilnikPartije): string {

@@ -502,6 +502,8 @@ export interface PayloadTreningZapocni {
   pravila?: PravilnikPartije;
   /** 1 = Dvoboj, 2 = Troboj, 3 = Četveroboj. Izostanak → iz pravilnika (klasični = 2, ostalo = 1). */
   brojRacunala?: 1 | 2 | 3;
+  /** PR02: Početnik/Iskusni/Majstor/Velemajstor. Izostanak = Iskusni (stari klijent). */
+  profileId?: import('./izazovi.js').ProfilBotaIzazova;
 }
 
 export type PotvrdaUlaskaURed = (stanje: StanjeReda | null) => void;

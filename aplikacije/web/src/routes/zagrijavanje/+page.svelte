@@ -8,17 +8,20 @@
   import { aktivirajAudio, pustiAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import {
     jePoznatiPravilnik,
+    NAZIVI_PROFILA_BOTA,
     type PocetakPartije,
     type PotvrdaTreninga,
     type PravilnikPartije,
+    type ProfilBotaIzazova,
     type RundaOtvorena,
     type StanjePartije,
   } from 'zajednicko';
+  import { parsajProfilIzQuery } from '$lib/igraj-rute.js';
 
   const igra = dohvatiStanjeIgre();
   const savjeti = dohvatiSavjete('dva_igraca');
 
-  /** Glavni UI: ?botovi=1|2|3. Misije / stari linkovi: ?pravila=. */
+  /** Glavni UI: ?botovi=1|2|3&profil=. Misije / stari linkovi: ?pravila=. */
   const trazeniBotovi = $derived(((): 1 | 2 | 3 | null => {
     const sirovo = $page.url.searchParams.get('botovi');
     if (sirovo === '1' || sirovo === '2' || sirovo === '3') return Number(sirovo) as 1 | 2 | 3;
@@ -28,16 +31,18 @@
     const pravila = $page.url.searchParams.get('pravila');
     return jePoznatiPravilnik(pravila) ? pravila : null;
   })());
+  const trazeniProfil = $derived(parsajProfilIzQuery($page.url.searchParams.get('profil')));
+  const nazivProfila = $derived(NAZIVI_PROFILA_BOTA[trazeniProfil]);
   const tekstPripreme = $derived(
     trazeniBotovi === 1
-      ? 'Pripremamo dvoboj protiv Računala…'
+      ? `Pripremamo dvoboj · ${nazivProfila}…`
       : trazeniBotovi === 2
-        ? 'Pripremamo igru s dva Računala…'
+        ? `Pripremamo igru s 2 bota · ${nazivProfila}…`
         : trazeniBotovi === 3
-          ? 'Pripremamo igru s tri Računala…'
+          ? `Pripremamo igru s 3 bota · ${nazivProfila}…`
           : trazenaPravila === 'klasicni'
-            ? 'Pripremamo igru s dva Računala…'
-            : 'Pripremamo dvoboj protiv Računala…',
+            ? `Pripremamo igru s 2 bota · ${nazivProfila}…`
+            : `Pripremamo dvoboj · ${nazivProfila}…`,
   );
 
   let poruka = $state<string | null>(null);
@@ -92,13 +97,15 @@
       }
       poruka = ishod.poruka;
     };
+    const profileId: ProfilBotaIzazova = trazeniProfil;
     if (trazeniBotovi && trazenaPravila) {
-      socket.emit('trening:zapocni', { pravila: trazenaPravila, brojRacunala: trazeniBotovi }, potvrda);
+      socket.emit('trening:zapocni', { pravila: trazenaPravila, brojRacunala: trazeniBotovi, profileId }, potvrda);
     } else if (trazeniBotovi) {
-      socket.emit('trening:zapocni', { brojRacunala: trazeniBotovi }, potvrda);
+      socket.emit('trening:zapocni', { brojRacunala: trazeniBotovi, profileId }, potvrda);
     } else if (trazenaPravila) {
-      socket.emit('trening:zapocni', { pravila: trazenaPravila }, potvrda);
+      socket.emit('trening:zapocni', { pravila: trazenaPravila, profileId }, potvrda);
     } else {
+      // Stari klijent / prazan URL — server defaulta na Iskusni.
       socket.emit('trening:zapocni', potvrda);
     }
   }

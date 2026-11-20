@@ -173,9 +173,11 @@ describe('Izazov PR01 — servis rezervacije', () => {
     });
     expect(rezultat.ok).toBe(true);
     if (!rezultat.ok) return;
-    const snapshot = rezultat.pokusaj.snapshot as { xp: number; profileId: string };
+    const snapshot = rezultat.pokusaj.snapshot as { xp: number; profileId: string; botProfileVersion: number };
     expect(snapshot.xp).toBe(definicijaIzazova('IZ01').xp);
     expect(snapshot.profileId).toBe('pocetnik');
+    expect(snapshot.botProfileVersion).toBe(1);
+    expect(rezultat.pokusaj.botProfileVersion).toBe(1);
   });
 
   it('gost vidi puni katalog; IZ24 zaključan', async () => {

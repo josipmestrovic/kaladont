@@ -154,6 +154,8 @@ export interface PostavkeMotoraPartije {
   naPromjenuPoteza?: (dogadaj: DogadajPoteza) => void;
   /** Početak partije: bot kontroler zakazuje obvezne pozdrave (svi konteksti). */
   naPocetakPartijeZaBotove?: (partijaId: string, kontekst: KontekstPartije, botIds: readonly string[]) => void;
+  /** Trening/Izazov: eksplicitni snapshot bot politike prije prvog poteza. */
+  naKonfiguracijuBotovaPartije?: (partijaId: string, konfiguracija: import('../bot/konfiguracija-bota.js').KonfiguracijaBota) => void;
   /** Nakon eliminacije: bot kontroler zakazuje sorry / bravo poolove. */
   naEliminacijuZaBotove?: (
     partijaId: string,
@@ -1091,6 +1093,8 @@ export function stvoriUpraviteljPartija(
       pravila?: PravilnikPartije;
       /** Kanonski ka_zna u spojenom Dvoboju; UI odabir ostaje na sudioniku (odabranaPravila). */
       spojeniDvoboj?: boolean;
+      /** PR02: per-partija bot snapshot (Trening/Izazov); javna bez ovoga koristi globalni resolver. */
+      botKonfiguracija?: import('../bot/konfiguracija-bota.js').KonfiguracijaBota;
     } = {},
   ): Promise<RezultatPokretanja> {
     const kontekst = opcije.kontekst ?? 'javna';
@@ -1210,6 +1214,9 @@ export function stvoriUpraviteljPartija(
     };
 
     partije.set(partijaId, stanje);
+    if (opcije.botKonfiguracija) {
+      postavke.naKonfiguracijuBotovaPartije?.(partijaId, opcije.botKonfiguracija);
+    }
     if (kontekst === 'trening') zakaziNeaktivnostTreninga(stanje);
     for (const s of sudionici) partijaPoIgracu.set(s.igracId, partijaId);
 

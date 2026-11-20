@@ -15,6 +15,31 @@ export const PRAG_DUGE_RIJECI_IZAZOVA = PRAGOVI_DULJINE.duga;
 export const PROFILI_BOTA_IZAZOVA = ['pocetnik', 'iskusni', 'majstor', 'velemajstor'] as const;
 export type ProfilBotaIzazova = (typeof PROFILI_BOTA_IZAZOVA)[number];
 
+/** Zadani profil Treninga / stari klijent bez profileId (= trenutna ZADANA politika). */
+export const ZADANI_PROFIL_TRENINGA: ProfilBotaIzazova = 'iskusni';
+
+/** Prikazna imena (Trening + Izazov); ne javni rang. */
+export const NAZIVI_PROFILA_BOTA: Readonly<Record<ProfilBotaIzazova, string>> = {
+  pocetnik: 'Početnik',
+  iskusni: 'Iskusni',
+  majstor: 'Majstor',
+  velemajstor: 'Velemajstor',
+};
+
+export function jePoznatiProfilBota(vrijednost: unknown): vrijednost is ProfilBotaIzazova {
+  return typeof vrijednost === 'string' && (PROFILI_BOTA_IZAZOVA as readonly string[]).includes(vrijednost);
+}
+
+/** Jedan bot: „Majstor”; više: „Majstor 1”, „Majstor 2”, … */
+export function nadimakProfilaBota(
+  profileId: ProfilBotaIzazova,
+  indeks: number,
+  ukupno: number,
+): string {
+  const baza = NAZIVI_PROFILA_BOTA[profileId];
+  return ukupno <= 1 ? baza : `${baza} ${indeks}`;
+}
+
 export const TRAJANJA_POTEZA_IZAZOVA_MS = [15_000, 30_000] as const;
 export type TrajanjePotezaIzazovaMs = (typeof TRAJANJA_POTEZA_IZAZOVA_MS)[number];
 

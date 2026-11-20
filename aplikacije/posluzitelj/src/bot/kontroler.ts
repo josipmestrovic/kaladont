@@ -150,13 +150,33 @@ export class BotKontroler {
     this.okruzenje = ovisnosti.okruzenje ?? process.env.NODE_ENV ?? 'development';
   }
 
+  /**
+   * Eksplicitni snapshot za Trening/Izazov — mora biti prije prvog događaja poteza.
+   * Javna/privatna bez ovoga i dalje kloniraju globalni ovisnosti.konfiguracija.
+   */
+  postaviKonfiguracijuPartije(partijaId: string, konfiguracija: KonfiguracijaBota): void {
+    this.konfiguracijePartija.set(partijaId, structuredClone(konfiguracija));
+  }
+
+  /** Test / dijagnostika: aktivni snapshot ili null. */
+  dohvatiKonfiguracijuPartije(partijaId: string): KonfiguracijaBota | null {
+    const snimka = this.konfiguracijePartija.get(partijaId);
+    return snimka ? structuredClone(snimka) : null;
+  }
+
+  private osigurajKonfiguracijuPartije(partijaId: string): KonfiguracijaBota {
+    const postoji = this.konfiguracijePartija.get(partijaId);
+    if (postoji) return postoji;
+    const snimka = structuredClone(this.ovisnosti.konfiguracija);
+    this.konfiguracijePartija.set(partijaId, snimka);
+    return snimka;
+  }
+
   naPromjenuPoteza(dogadaj: DogadajPoteza): void {
     if (this.zaustavljen) return;
     this.aktualniPotezi.set(dogadaj.partijaId, dogadaj);
     try {
-      if (!dogadaj.zavrsena && !this.konfiguracijePartija.has(dogadaj.partijaId)) {
-        this.konfiguracijePartija.set(dogadaj.partijaId, structuredClone(this.ovisnosti.konfiguracija));
-      }
+      if (!dogadaj.zavrsena) this.osigurajKonfiguracijuPartije(dogadaj.partijaId);
       this.planiraj(dogadaj);
     } catch (greska) {
       this.oporavi(dogadaj, dogadaj.naPotezuId, 0, new Set(), greska);
@@ -167,9 +187,7 @@ export class BotKontroler {
   naPocetakPartije(partijaId: string, kontekst: DogadajPoteza['kontekst'], botIds: readonly string[]): void {
     void kontekst;
     if (this.zaustavljen || !this.ovisnosti.posaljiReakciju || botIds.length === 0) return;
-    if (!this.konfiguracijePartija.has(partijaId)) {
-      this.konfiguracijePartija.set(partijaId, structuredClone(this.ovisnosti.konfiguracija));
-    }
+    this.osigurajKonfiguracijuPartije(partijaId);
     for (const igracId of botIds) {
       const poslani = this.poslaniPozdravi.get(partijaId) ?? new Set<string>();
       if (poslani.has(igracId)) continue;
@@ -194,9 +212,7 @@ export class BotKontroler {
   ): void {
     void kontekst;
     if (this.zaustavljen || !this.ovisnosti.posaljiReakciju) return;
-    if (!this.konfiguracijePartija.has(partijaId)) {
-      this.konfiguracijePartija.set(partijaId, structuredClone(this.ovisnosti.konfiguracija));
-    }
+    this.osigurajKonfiguracijuPartije(partijaId);
     const jeBot = (igracId: string | null) => Boolean(igracId && sudionici.some((s) => s.igracId === igracId && s.upravljac === 'bot'));
     const snimka = this.aktualniPotezi.get(partijaId);
     if (snimka?.dokaz?.cekateljId === zrtvaId) {
