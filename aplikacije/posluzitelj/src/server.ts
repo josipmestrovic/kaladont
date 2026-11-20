@@ -9,7 +9,15 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIoServer, type Socket } from 'socket.io';
-import { validirajAvatarConfig, type AvatarConfigV1, type DogadajiKlijentPoslužitelj, type DogadajiPosluziteljKlijent, type KodRazlogaVeze } from 'zajednicko';
+import {
+  validirajAvatarConfig,
+  type AvatarConfigV1,
+  type DogadajiKlijentPoslužitelj,
+  type DogadajiPosluziteljKlijent,
+  type GoalProgressIzazova,
+  type KodRazlogaVeze,
+  type StanjePartije,
+} from 'zajednicko';
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
@@ -52,7 +60,8 @@ import { FondBotova, ucitajIdentiteteBotova } from './bot/fond.js';
 import { registrirajTrening } from './trening/servis-treninga.js';
 import { registrirajIzazoviRute } from './izazovi/rute.js';
 import { registrirajIzazovSocket } from './izazovi/socket.js';
-import { ocistiStareGostIzazove } from './izazovi/pohrana.js';
+import { ocistiStareGostIzazove, oznaciNedovrsenePokusajeTehnickimPrekidom } from './izazovi/pohrana.js';
+import { stvoriVoditeljIzazova } from './izazovi/voditelj.js';
 import { dohvatiIpKlijenta, jeDopustenaTestnaIp, OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
 import { obradiLeaseStaginga, type LeaseStaginga } from './sigurnost/staging-opterecenja.js';
 import type { ZapisSocketHandlerGreske } from './sigurnost/socket-handler.js';
@@ -133,6 +142,8 @@ export interface Posluzitelj {
     mod: import('zajednicko').ModPartije,
     pravila?: import('zajednicko').PravilnikPartije,
   ) => Promise<import('./igra/politika-ucinka.js').RezultatPokretanja>;
+  /** PR03 test: voditelj Izazova. */
+  voditeljIzazova?: ReturnType<typeof stvoriVoditeljIzazova>;
 }
 
 export interface OpcijePosluzitelja {
@@ -445,6 +456,11 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   };
   postaviVezeZaObavijestiDostignuca(aktivneVeze);
   postaviVezeZaSanducic(aktivneVeze);
+  type VoditeljIzazova = ReturnType<typeof stvoriVoditeljIzazova>;
+  let voditeljIzazova: VoditeljIzazova | null = null;
+  const terminaliIzazovaPoPartiji = new Map<string, NonNullable<StanjePartije['izazovTerminal']>>();
+  const goalProgressIzazovaCache = new Map<string, GoalProgressIzazova>();
+
   const upravitelj = stvoriUpraviteljPartija(
     io,
     rjecnik,
@@ -464,12 +480,62 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
         naJavnaPartijaZavrsila(partijaId);
+        // Ne briši goalProgress/terminal odmah — soba još živi (resultsVisibleAt / 15 s hold).
+        const timer = setTimeout(() => {
+          terminaliIzazovaPoPartiji.delete(partijaId);
+          goalProgressIzazovaCache.delete(partijaId);
+        }, 20_000);
+        timer.unref();
       },
       naPrivatnaPartijaZavrsila: (kodSobe, partijaId, pobjednikId, rezultati) => {
         sobaServis?.registrirajRezultatPartije(kodSobe, partijaId, pobjednikId, rezultati);
       },
+      naIzazovOdbijenPotez: (ulaz) => voditeljIzazova?.naOdbijenPotez(ulaz) ?? { zaustavi: false },
+      naIzazovPrihvacenPotez: (ulaz) => { voditeljIzazova?.naPrihvacenPotez(ulaz); },
+      naIzazovKraj: async (ulaz) => {
+        const terminal = await voditeljIzazova?.naKrajIgre(ulaz);
+        if (!terminal) return;
+        goalProgressIzazovaCache.set(ulaz.partijaId, terminal.goalProgress);
+        terminaliIzazovaPoPartiji.set(ulaz.partijaId, {
+          status: terminal.status,
+          reason: terminal.reason,
+          resultsVisibleAtIso: terminal.resultsVisibleAtIso,
+          gameWon: terminal.gameWon,
+        });
+      },
+      dohvatiGoalProgressIzazova: (partijaId) =>
+        voditeljIzazova?.goalProgressZaPartiju(partijaId)
+        ?? goalProgressIzazovaCache.get(partijaId)
+        ?? null,
+      dohvatiTerminalIzazova: (partijaId) => terminaliIzazovaPoPartiji.get(partijaId) ?? null,
     },
   );
+
+  voditeljIzazova = stvoriVoditeljIzazova({
+    zapocniPartiju: (sudionici, mod, opcije) => upravitelj.zapocniPartiju(sudionici, mod, opcije),
+    ponistiPartiju: (partijaId, poruka) => upravitelj.ponistiPartiju(partijaId, poruka),
+    dohvatiIgracaZaStol: (igracId) => {
+      const socket = aktivneVeze.dohvatiSocket(igracId);
+      if (!socket) return null;
+      return {
+        igracId: socket.data.igracId,
+        vrsta: socket.data.vrsta,
+        nadimak: socket.data.nadimak,
+        avatarId: socket.data.avatarId,
+        avatarConfig: socket.data.avatarConfig,
+        avatarRevision: socket.data.avatarRevision,
+        odigrane: socket.data.odigrane,
+        pobjede: socket.data.pobjede,
+        bodoviUkupno: socket.data.bodoviUkupno,
+        odigrane1v1: socket.data.odigrane1v1,
+        pobjede1v1: socket.data.pobjede1v1,
+        bodovi1v1: socket.data.bodovi1v1,
+        rangBrojPartija: socket.data.rangBrojPartija,
+        rangSumaJedinica: socket.data.rangSumaJedinica,
+        iskustvoUkupno: socket.data.iskustvoUkupno,
+      };
+    },
+  });
   nadopuniPotroseneGrupe = () => upravitelj.nadopuniPotroseneGrupe(rjecnik);
 
   app.get('/zdravlje', async (_zahtjev, odgovor) => {
@@ -692,12 +758,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     io,
     async (stol, mod, meta) => {
       // Kanonska pravila iz ključa reda (spojeni Dvoboj → ka_zna); odabranaPravila ostaje na sudioniku.
-      const rezultat = await upravitelj.zapocniPartiju(stol, mod, {
+      const { ishod } = await upravitelj.zapocniPartiju(stol, mod, {
         pravila: meta.pravila,
         spojeniDvoboj: meta.spojeniDvoboj,
       });
-      if (rezultat === 'pokrenuta') void osvjeziProsjekCekanja();
-      return rezultat;
+      if (ishod === 'pokrenuta') void osvjeziProsjekCekanja();
+      return ishod;
     },
     upravitelj.imaAktivnuPartiju,
     (igracId) => igracImaPrivatnuSobu(igracId),
@@ -821,11 +887,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const treningServis = registrirajTrening(io, {
     omogucen: () => postavkeBotova.treningOmogucen && upravitelj.mozePokrenutiPartiju(),
     // Zagrijavanje: mod iz broja sudionika (čovjek + 1–3 botova profila).
-    zapocniTrening: (sudionici, pravila, botKonfiguracija) => {
+    zapocniTrening: async (sudionici, pravila, botKonfiguracija) => {
       const broj = sudionici.length;
       const mod =
         broj <= 2 ? ('dva_igraca' as const) : broj === 3 ? ('tri_igraca' as const) : ('cetiri_igraca' as const);
-      return upravitelj.zapocniPartiju(sudionici, mod, { kontekst: 'trening', pravila, botKonfiguracija });
+      const { ishod } = await upravitelj.zapocniPartiju(sudionici, mod, { kontekst: 'trening', pravila, botKonfiguracija });
+      return ishod;
     },
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
     igracImaPrivatnuSobu: sobaServis.imaPrivatnuSobu,
@@ -841,10 +908,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     ukloniIzJavnogReda: redServis.ukloniIzReda,
     provjeriDogadaj,
     zapisSocketHandlerGreske,
+    pokreniPartiju: (ulaz) => voditeljIzazova!.pokreniPartiju(ulaz),
   });
   void izazovServis;
 
   await ponistiPartijeUTijekuUBazi();
+  await oznaciNedovrsenePokusajeTehnickimPrekidom();
 
   dohvatiZivoStanjeBotova = () => ({
     fond: fondBotova.stanje(),
@@ -934,6 +1003,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     brojaciBota: botKontroler.brojaci,
     dohvatiKonfiguracijuBotaPartije: (partijaId) => botKontroler.dohvatiKonfiguracijuPartije(partijaId),
     fondBotova,
-    zapocniJavnuPartiju: (sudionici, mod, pravila) => upravitelj.zapocniPartiju(sudionici, mod, { pravila }),
+    zapocniJavnuPartiju: async (sudionici, mod, pravila) => {
+      const { ishod } = await upravitelj.zapocniPartiju(sudionici, mod, { pravila });
+      return ishod;
+    },
+    voditeljIzazova: voditeljIzazova ?? undefined,
   };
 }

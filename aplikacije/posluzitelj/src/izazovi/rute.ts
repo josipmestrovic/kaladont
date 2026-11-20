@@ -30,6 +30,13 @@ export async function registrirajIzazoviRute(app: FastifyInstance): Promise<void
     if (pokusaj.igracId !== igrac.id && !jeAdmin) {
       return odgovor.code(403).send({ ok: false, kod: 'ZABRANJENO', greska: 'Nemate pristup ovom pokušaju.' });
     }
+    const metrics = (pokusaj.metrics ?? {}) as {
+      goalProgress?: unknown;
+      dugeRijeci?: number;
+      rijetkeRijeci?: number;
+      uspjesniDokazi?: number;
+      imaPravuPogresku?: boolean;
+    };
     return {
       ok: true,
       pokusaj: {
@@ -43,6 +50,7 @@ export async function registrirajIzazoviRute(app: FastifyInstance): Promise<void
         resultsVisibleAt: pokusaj.resultsVisibleAt?.toISOString() ?? null,
         gameWon: pokusaj.gameWon,
         metrics: pokusaj.metrics,
+        goalProgress: metrics.goalProgress ?? null,
         snapshot: pokusaj.snapshot,
         settlementState: pokusaj.settlementState,
         accountTypeAtStart: pokusaj.accountTypeAtStart,

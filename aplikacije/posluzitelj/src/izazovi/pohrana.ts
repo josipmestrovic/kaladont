@@ -175,6 +175,25 @@ export async function umetniRezerviraniPokusaj(ulaz: {
   return redak;
 }
 
+/** CAS: rezerviran → u_tijeku + partijaId (nakon uspješnog starta motora). */
+export async function oznaciPokusajUTijeku(
+  attemptId: string,
+  partijaId: string,
+): Promise<RedakPokusajaIzazova | null> {
+  const [redak] = await baza
+    .update(pokusajiIzazova)
+    .set({
+      status: 'u_tijeku',
+      partijaId,
+    })
+    .where(and(
+      eq(pokusajiIzazova.id, attemptId),
+      eq(pokusajiIzazova.status, 'rezerviran'),
+    ))
+    .returning();
+  return redak ?? null;
+}
+
 /** Označi pokušaj tehničkim prekidom (npr. stub motora u PR01). */
 export async function oznaciTehnickiPrekinuto(attemptId: string): Promise<RedakPokusajaIzazova | null> {
   const sada = new Date();
@@ -192,6 +211,25 @@ export async function oznaciTehnickiPrekinuto(attemptId: string): Promise<RedakP
     ))
     .returning();
   return redak ?? null;
+}
+
+/**
+ * Boot recovery: nedovršeni rezerviran/u_tijeku → tehnicki_prekinuto
+ * (uz postojeći ponistiPartijeUTijekuUBazi za partije).
+ */
+export async function oznaciNedovrsenePokusajeTehnickimPrekidom(): Promise<number> {
+  const sada = new Date();
+  const redovi = await baza
+    .update(pokusajiIzazova)
+    .set({
+      status: 'tehnicki_prekinuto',
+      terminalAt: sada,
+      resultsVisibleAt: sada,
+      settlementState: 'nije_potrebno',
+    })
+    .where(inArray(pokusajiIzazova.status, ['rezerviran', 'u_tijeku']))
+    .returning({ id: pokusajiIzazova.id });
+  return redovi.length;
 }
 
 /**

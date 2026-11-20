@@ -231,6 +231,15 @@ export interface StanjePartije {
   faza?: FazaPoteza;
   /** PR05: popunjeno samo dok traje dokaz_nastavka. */
   dokaz?: SnimkaDokaza | null;
+  /** PR03: napredak ciljeva kampanjskog Izazova (samo kontekst izazov). */
+  goalProgress?: import('./izazovi.js').GoalProgressIzazova | null;
+  /** PR03: terminalni ishod pokušaja ako je već CAS-an (reconnect / refresh). */
+  izazovTerminal?: {
+    status: import('./izazovi.js').StatusPokusajaIzazova;
+    reason: import('./izazovi.js').RazlogNeuspjehaIzazova | null;
+    resultsVisibleAtIso: string | null;
+    gameWon: boolean | null;
+  } | null;
 }
 
 /**
