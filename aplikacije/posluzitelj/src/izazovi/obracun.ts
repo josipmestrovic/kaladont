@@ -191,7 +191,7 @@ export async function obracunajSettlementIzazova(
     const jeRegistriran = igrac.vrsta === 'registriran' || igrac.vrsta === 'admin';
     let firstCompletion = false;
     let challengeXp: ChallengeXpSettlement = { nominal: 0, awarded: 0 };
-    let iskustvoPrije = igrac.iskustvoUkupno;
+    const iskustvoPrije = igrac.iskustvoUkupno;
     let iskustvoNakonKampanje = igrac.iskustvoUkupno;
     const novaDostignuca: SettlementIzazova['novaDostignuca'] = [];
     let izazivacNovaRazina = 0;

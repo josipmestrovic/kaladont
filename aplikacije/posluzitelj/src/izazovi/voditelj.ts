@@ -314,38 +314,45 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
     }
 
     sesija.zavrsavanjePromise = (async () => {
-      const covjekPobijedio = ulaz.pobjednikId === sesija.covjekId;
-      const odluka = odlukaNakonKrajaIgre({
-        ciljevi: sesija.ciljevi,
-        cinjenice: sesija.cinjenice,
-        covjekPobijedio,
-        forsiranRazlog: sesija.forsiranRazlog,
-      });
-      const ishod = await zavrsiPokusajIzazova({
-        attemptId: sesija.attemptId,
-        status: odluka.status,
-        razlog: odluka.razlog,
-        metrics: odluka.metrics,
-        gameWon: odluka.gameWon,
-        partijaId: ulaz.partijaId,
-      });
-      if (!ishod) {
-        // CAS nije prošao — ostavi sesiju za retry upisa motora.
+      try {
+        const covjekPobijedio = ulaz.pobjednikId === sesija.covjekId;
+        const odluka = odlukaNakonKrajaIgre({
+          ciljevi: sesija.ciljevi,
+          cinjenice: sesija.cinjenice,
+          covjekPobijedio,
+          forsiranRazlog: sesija.forsiranRazlog,
+        });
+        const ishod = await zavrsiPokusajIzazova({
+          attemptId: sesija.attemptId,
+          status: odluka.status,
+          razlog: odluka.razlog,
+          metrics: odluka.metrics,
+          gameWon: odluka.gameWon,
+          partijaId: ulaz.partijaId,
+        });
+        if (!ishod) {
+          // CAS nije prošao — ostavi sesiju za retry upisa motora.
+          sesija.zavrsavanjePromise = undefined;
+          return null;
+        }
+        const { redak, settlement } = ishod;
+        sesija.zavrseno = true;
+        sesijePoPartiji.delete(ulaz.partijaId);
+        sesijePoAttempt.delete(sesija.attemptId);
+        return {
+          status: redak.status as 'uspjeh' | 'neuspjeh' | 'tehnicki_prekinuto',
+          reason: (redak.reason as RazlogNeuspjehaIzazova | null) ?? odluka.razlog,
+          resultsVisibleAtIso: redak.resultsVisibleAt?.toISOString() ?? null,
+          gameWon: redak.gameWon ?? odluka.gameWon,
+          goalProgress: odluka.metrics.goalProgress,
+          settlement,
+        };
+      } catch (greska) {
+        // Settlement TX / CAS pomoćni put: očisti promise da motor retry može ponoviti
+        // zavrsiPokusaj (terminal + spremanje_u_tijeku → ponovni obračun).
         sesija.zavrsavanjePromise = undefined;
-        return null;
+        throw greska;
       }
-      const { redak, settlement } = ishod;
-      sesija.zavrseno = true;
-      sesijePoPartiji.delete(ulaz.partijaId);
-      sesijePoAttempt.delete(sesija.attemptId);
-      return {
-        status: redak.status as 'uspjeh' | 'neuspjeh' | 'tehnicki_prekinuto',
-        reason: (redak.reason as RazlogNeuspjehaIzazova | null) ?? odluka.razlog,
-        resultsVisibleAtIso: redak.resultsVisibleAt?.toISOString() ?? null,
-        gameWon: redak.gameWon ?? odluka.gameWon,
-        goalProgress: odluka.metrics.goalProgress,
-        settlement,
-      };
     })();
 
     return sesija.zavrsavanjePromise;
