@@ -30,6 +30,8 @@ export interface CinjeniceIzazova {
   dugeRijeci: number;
   rijetkeRijeci: number;
   uspjesniDokazi: number;
+  /** Prihvaćene ljudske riječi (PR04 misije). */
+  prihvaceneRijeci: number;
 }
 
 export function prazneCinjenice(): CinjeniceIzazova {
@@ -38,6 +40,7 @@ export function prazneCinjenice(): CinjeniceIzazova {
     dugeRijeci: 0,
     rijetkeRijeci: 0,
     uspjesniDokazi: 0,
+    prihvaceneRijeci: 0,
   };
 }
 
@@ -50,6 +53,7 @@ export interface MetrikePokusajaIzazova {
   rijetkeRijeci: number;
   uspjesniDokazi: number;
   imaPravuPogresku: boolean;
+  prihvaceneRijeci: number;
   goalProgress: GoalProgress;
 }
 
@@ -76,6 +80,7 @@ export function azurirajCinjenicePrihvacenomRijeci(
   },
 ): CinjeniceIzazova {
   const iduce: CinjeniceIzazova = { ...cinjenice };
+  iduce.prihvaceneRijeci += 1;
   if (jeDugaRijecZaIzazov(ulaz.brojGrafema)) iduce.dugeRijeci += 1;
   if (jeRijetkaRijecZaIzazov(ulaz.frekvencija, ulaz.brojGrafema)) iduce.rijetkeRijeci += 1;
   if (ulaz.uspjesanDokaz) iduce.uspjesniDokazi += 1;
@@ -131,6 +136,7 @@ export function metrikeIzCinjenica(
     rijetkeRijeci: cinjenice.rijetkeRijeci,
     uspjesniDokazi: cinjenice.uspjesniDokazi,
     imaPravuPogresku: cinjenice.imaPravuPogresku,
+    prihvaceneRijeci: cinjenice.prihvaceneRijeci,
     goalProgress: evaluirajNapredak(ciljevi, cinjenice),
   };
 }

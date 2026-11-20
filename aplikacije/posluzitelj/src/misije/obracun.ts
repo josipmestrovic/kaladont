@@ -41,7 +41,7 @@ function opisNapretka(naziv: string, prije: number, poslije: number, cilj: numbe
 async function ucitajIliNullIshod(
   tx: MisijeTx,
   igracId: string,
-  kontekst: 'javna' | 'trening',
+  kontekst: 'javna' | 'trening' | 'izazov',
   izvorId: string,
 ): Promise<IshodMisijaPayload | null> {
   const [red] = await tx.select().from(ishodiMisijaIgara).where(and(
@@ -274,7 +274,11 @@ export async function obracunajMisijeZaIgraca(
         staraRazina: prijeZv,
         novaRazina: poslijeZv,
         tx,
-        izvorTip: metrike.kontekst === 'trening' ? 'trening' : 'partija',
+        izvorTip: metrike.kontekst === 'trening'
+          ? 'trening'
+          : metrike.kontekst === 'izazov'
+            ? 'izazov'
+            : 'partija',
         izvorId: metrike.izvorId,
       });
       novaDostignuca.push({
@@ -322,7 +326,7 @@ export async function obracunajMisijeZaIgraca(
 export async function dohvatiIshodMisija(
   tx: MisijeTx,
   igracId: string,
-  kontekst: 'javna' | 'trening',
+  kontekst: 'javna' | 'trening' | 'izazov',
   izvorId: string,
 ): Promise<IshodMisijaPayload | null> {
   return ucitajIliNullIshod(tx, igracId, kontekst, izvorId);

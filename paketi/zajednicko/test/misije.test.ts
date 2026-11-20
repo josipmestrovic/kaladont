@@ -10,15 +10,15 @@ import {
 } from '../src/misije.js';
 
 describe('katalog misija', () => {
-  it('ima točno 24 dnevnih i 24 tjednih aktivnih predložaka (PR12)', () => {
-    expect(DEFINICIJE_MISIJA).toHaveLength(48);
-    expect(definicijeMisijaPoVrsti('dnevna')).toHaveLength(24);
-    expect(definicijeMisijaPoVrsti('tjedna')).toHaveLength(24);
+  it('ima točno 25 dnevnih i 25 tjednih aktivnih predložaka (PR04 Izazov)', () => {
+    expect(DEFINICIJE_MISIJA).toHaveLength(50);
+    expect(definicijeMisijaPoVrsti('dnevna')).toHaveLength(25);
+    expect(definicijeMisijaPoVrsti('tjedna')).toHaveLength(25);
   });
 
   it('ima jedinstvene ID-ove i pozitivne ciljeve', () => {
     const idovi = DEFINICIJE_MISIJA.map((d) => d.predlozakId);
-    expect(new Set(idovi).size).toBe(48);
+    expect(new Set(idovi).size).toBe(50);
     for (const d of DEFINICIJE_MISIJA) {
       expect(d.cilj).toBeGreaterThan(0);
       expect(d.verzijaDefinicije).toBe(1);
@@ -40,6 +40,11 @@ describe('katalog misija', () => {
     expect(definicijaMisije('W09')?.cilj).toBe(20);
     expect(definicijaMisije('W10')?.cilj).toBe(3);
     expect(definicijaMisije('W10')?.kontekst).toBe('trening');
+    expect(definicijaMisije('D25')?.kontekst).toBe('izazov');
+    expect(definicijaMisije('D25')?.metrika).toBe('izazov_pokusaji');
+    expect(definicijaMisije('D25')?.cilj).toBe(3);
+    expect(definicijaMisije('W25')?.kontekst).toBe('izazov');
+    expect(definicijaMisije('W25')?.cilj).toBe(10);
   });
 
   it('označava top-2 i pristupačne tjedne', () => {

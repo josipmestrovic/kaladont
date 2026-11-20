@@ -61,7 +61,8 @@ import { registrirajTrening } from './trening/servis-treninga.js';
 import { registrirajIzazoviRute } from './izazovi/rute.js';
 import { registrirajIzazovSocket } from './izazovi/socket.js';
 import { ocistiStareGostIzazove, oznaciNedovrsenePokusajeTehnickimPrekidom } from './izazovi/pohrana.js';
-import { stvoriVoditeljIzazova } from './izazovi/voditelj.js';
+import { stvoriVoditeljIzazova, type IshodKrajaIzazova } from './izazovi/voditelj.js';
+import type { SettlementIzazova } from './izazovi/obracun.js';
 import { dohvatiIpKlijenta, jeDopustenaTestnaIp, OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
 import { obradiLeaseStaginga, type LeaseStaginga } from './sigurnost/staging-opterecenja.js';
 import type { ZapisSocketHandlerGreske } from './sigurnost/socket-handler.js';
@@ -493,7 +494,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       naIzazovOdbijenPotez: (ulaz) => voditeljIzazova?.naOdbijenPotez(ulaz) ?? { zaustavi: false },
       naIzazovPrihvacenPotez: (ulaz) => { voditeljIzazova?.naPrihvacenPotez(ulaz); },
       naIzazovKraj: async (ulaz) => {
-        const terminal = await voditeljIzazova?.naKrajIgre(ulaz);
+        const terminal = await voditeljIzazova?.naKrajIgre(ulaz) as IshodKrajaIzazova | null | undefined;
         if (!terminal) return;
         goalProgressIzazovaCache.set(ulaz.partijaId, terminal.goalProgress);
         terminaliIzazovaPoPartiji.set(ulaz.partijaId, {
@@ -502,6 +503,8 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
           resultsVisibleAtIso: terminal.resultsVisibleAtIso,
           gameWon: terminal.gameWon,
         });
+        const settlement: SettlementIzazova = terminal.settlement;
+        return { settlement };
       },
       dohvatiGoalProgressIzazova: (partijaId) =>
         voditeljIzazova?.goalProgressZaPartiju(partijaId)

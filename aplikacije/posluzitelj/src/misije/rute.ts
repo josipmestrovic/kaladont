@@ -15,7 +15,7 @@ const ShemaZamjene = z.object({
 }).strict();
 
 const ShemaIshodaParams = z.object({
-  kontekst: z.enum(['javna', 'trening']),
+  kontekst: z.enum(['javna', 'trening', 'izazov']),
   izvorId: z.string().uuid(),
 });
 

@@ -410,6 +410,8 @@ export interface KrajPartije {
   kontekst?: KontekstPartije;
   jePrivatna?: boolean;
   kodSobe?: string;
+  /** PR04: rezultat settlementa Izazova (nakon commit-a). */
+  izazovSettlement?: import('./izazovi.js').SettlementIzazovaDto;
 }
 
 export interface NovoDostignuceTijekomPartije {

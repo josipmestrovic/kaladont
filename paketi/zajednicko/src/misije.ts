@@ -3,12 +3,12 @@ import type { ModPartije, PravilnikPartije } from './katalog-partije.js';
 
 export type VrstaMisije = 'dnevna' | 'tjedna';
 export type StatusDodjeleMisije = 'aktivna' | 'dovrsena' | 'zamijenjena' | 'istekla';
-export type KontekstMisije = 'javna' | 'trening';
+export type KontekstMisije = 'javna' | 'trening' | 'izazov';
 /** HINT PR12: `tri_igraca` za Troboj; `oba` = sva tri javna formata (2/3/4) nakon otključavanja. */
 export type ModMisije = 'oba' | 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca';
 export type SlotMisije = 1 | 2 | 3;
-/** DB enum već ima `izazov` (PR01); TS matcher proširuje u PR04. */
-export type KontekstIzvoraMisije = 'javna' | 'trening';
+/** DB enum već ima `izazov` (PR01); TS matcher PR04. */
+export type KontekstIzvoraMisije = 'javna' | 'trening' | 'izazov';
 
 export type ObiteljMisije =
   | 'aktivnost'
@@ -23,7 +23,8 @@ export type ObiteljMisije =
   | 'taktika'
   | 'spoj_rijeci'
   | 'raznolikost'
-  | 'razliciti_dani';
+  | 'razliciti_dani'
+  | 'izazov';
 
 export type MetrikaMisije =
   | 'partije'
@@ -47,7 +48,9 @@ export type MetrikaMisije =
   /** PR12 W22: +1 po javnoj igri s barem jednim uspješnim dokazom (max 1 doprinos / igra). */
   | 'partije_s_dokazom'
   /** PR12 W23: +1 po igri s barem jednim kaladontom na sljedećeg uz ≥3 aktivna prije poteza. */
-  | 'kaladont_sljedeci';
+  | 'kaladont_sljedeci'
+  /** PR04: +1 po kvalificiranom pokušaju Izazova (uspjeh ili igrački neuspjeh uz ≥1 riječ). */
+  | 'izazov_pokusaji';
 
 export interface PodciljDefinicijeMisije {
   kljuc: string;
@@ -427,6 +430,26 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
     5,
     'plasman',
     { pravilnik: 'ka_zna' },
+  ),
+
+  // --- PR04: Izazov pool (nisu obvezna dodatna dodjela; ulaze u postojeći pool). ---
+  dnevna(
+    'D25',
+    'Tri izazova',
+    'Završi 3 pokušaja Izazova (uspjeh ili igrački neuspjeh uz barem jednu riječ).',
+    'izazov_pokusaji',
+    3,
+    'izazov',
+    { kontekst: 'izazov', mod: 'oba' },
+  ),
+  tjedna(
+    'W25',
+    'Deset izazova',
+    'Završi 10 pokušaja Izazova (uspjeh ili igrački neuspjeh uz barem jednu riječ).',
+    'izazov_pokusaji',
+    10,
+    'izazov',
+    { kontekst: 'izazov', mod: 'oba' },
   ),
 ] as const;
 

@@ -126,12 +126,20 @@ describe('Izazov PR03 — CAS završetak', () => {
       attemptId: pokusaj.id,
       status: 'neuspjeh',
       razlog: 'eliminiran',
-      metrics: { dugeRijeci: 0, rijetkeRijeci: 0, uspjesniDokazi: 0, imaPravuPogresku: false, goalProgress: evaluirajNapredak({}, prazneCinjenice()) },
+      metrics: {
+        dugeRijeci: 0,
+        rijetkeRijeci: 0,
+        uspjesniDokazi: 0,
+        imaPravuPogresku: false,
+        prihvaceneRijeci: 0,
+        goalProgress: evaluirajNapredak({}, prazneCinjenice()),
+      },
       gameWon: false,
       terminalAt,
     });
-    expect(prvi?.status).toBe('neuspjeh');
-    expect(prvi?.resultsVisibleAt?.getTime()).toBe(terminalAt.getTime() + ODGODA_REZULTATA_IZAZOVA_MS);
+    expect(prvi?.redak.status).toBe('neuspjeh');
+    expect(prvi?.redak.resultsVisibleAt?.getTime()).toBe(terminalAt.getTime() + ODGODA_REZULTATA_IZAZOVA_MS);
+    expect(prvi?.settlement.settlementState).toBe('spremljeno');
 
     const drugi = await zavrsiPokusajIzazova({
       attemptId: pokusaj.id,
@@ -140,8 +148,8 @@ describe('Izazov PR03 — CAS završetak', () => {
       gameWon: true,
       terminalAt: new Date(),
     });
-    expect(drugi?.status).toBe('neuspjeh');
-    expect(drugi?.id).toBe(prvi?.id);
+    expect(drugi?.redak.status).toBe('neuspjeh');
+    expect(drugi?.redak.id).toBe(prvi?.redak.id);
   });
 });
 

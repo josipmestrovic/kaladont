@@ -19,6 +19,7 @@ export function smijePrimitiMisijskiNapredak(metrike: MetrikeMisijaIgre): boolea
  */
 export function misijaOdgovaraKontekstu(snapshot: SnapshotMisije, metrike: MetrikeMisijaIgre): boolean {
   if (snapshot.kontekst === 'trening') return metrike.kontekst === 'trening';
+  if (snapshot.kontekst === 'izazov') return metrike.kontekst === 'izazov';
   if (metrike.kontekst !== 'javna') return false;
 
   const modovi = snapshot.modovi;
@@ -184,6 +185,11 @@ export function primijeniMetrikuNaDodjelu(ulaz: {
         napredak = Math.min(cilj, napredak + 1);
         delta.delta = 1;
       }
+      break;
+    // PR04: +1 po kvalificiranom pokušaju Izazova (dedup preko izvorId=attemptId).
+    case 'izazov_pokusaji':
+      napredak = Math.min(cilj, napredak + 1);
+      delta.delta = 1;
       break;
     default:
       break;

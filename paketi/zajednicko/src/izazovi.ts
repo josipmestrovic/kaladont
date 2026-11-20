@@ -248,6 +248,16 @@ export interface NapredakIzazovaDto {
   izazivacZvjezdice: 0 | 1 | 2 | 3 | 4 | 5;
 }
 
+/** Settlement payload na GET pokušaja / partija:kraj (PR04; UI mapa u PR05). */
+export interface SettlementIzazovaDto {
+  firstCompletion: boolean;
+  challengeXp: { nominal: number; awarded: number };
+  missionXp: { nominal: number; awarded: number };
+  izazivac: { zvjezdice: number; novaRazina: number };
+  settlementState: StatusSpremanjaIzazova;
+  novaDostignuca: { id: string; novaRazina: number; maksimalnaRazina: number }[];
+}
+
 export interface OdgovorKatalogaIzazova {
   ok: true;
   omogucen: boolean;
