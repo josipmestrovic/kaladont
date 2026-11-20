@@ -27,6 +27,7 @@ describe('HTTP API namespace', () => {
       { method: 'POST', url: '/api/racuni/zaboravljena-lozinka' },
       { method: 'POST', url: '/api/racuni/resetiraj-lozinku' },
       { method: 'GET', url: '/api/dostignuca' },
+      { method: 'GET', url: '/api/izazovi' },
       { method: 'GET', url: '/api/profil' },
       { method: 'GET', url: `/api/profil/javni/${randomUUID()}` },
       { method: 'PUT', url: '/api/profil/avatar' },

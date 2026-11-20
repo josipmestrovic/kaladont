@@ -46,6 +46,8 @@ const shemaKonfiguracije = z.object({
   LJESTVICE_POCETAK: z.string().datetime({ offset: true }).default('2026-01-01T00:00:00+01:00'),
   // ADR-017: zasebne zastavice; javni botovi su isključeni dok operater ne odluči drukčije.
   TRENING_OMOGUCEN: z.enum(['true', 'false']).default('true'),
+  /** Kampanjski Izazov; default off do release gatea PR07. */
+  IZAZOV_OMOGUCEN: z.enum(['true', 'false']).default('false'),
   BOTOVI_DVOBOJ: z.enum(['true', 'false']).default('false'),
   BOTOVI_TROBOJ: z.enum(['true', 'false']).default('false'),
   BOTOVI_CETVEROBOJ: z.enum(['true', 'false']).default('false'),

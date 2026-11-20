@@ -132,8 +132,11 @@ export interface PayloadIzbaciIzSobe {
   igracId: string;
 }
 
-/** Javna partija (bodovi, rang, XP), privatna soba ili trening u kojem se ništa ne bilježi. */
-export type KontekstPartije = 'javna' | 'privatna' | 'trening';
+/**
+ * Javna partija (bodovi, rang, XP), privatna soba, trening ili kampanjski Izazov.
+ * Kampanjski challengeId ≠ dokaz `izazovId`.
+ */
+export type KontekstPartije = 'javna' | 'privatna' | 'trening' | 'izazov';
 
 export interface PocetakPartije {
   partijaId: string;
@@ -470,7 +473,10 @@ export type KodGreske =
   | 'PREVISE_SOBA'
   | 'PREVISE_PARTIJA'
   | 'UPIS_PARTIJE_NEUSPJEO'
-  | 'TRENING_NEDOSTUPAN';
+  | 'TRENING_NEDOSTUPAN'
+  | 'IZAZOV_NEDOSTUPAN'
+  | 'IZAZOV_ZAKLJUCAN'
+  | 'IZAZOV_AKTIVAN';
 
 export interface PayloadGreska {
   kod: KodGreske;
@@ -503,12 +509,32 @@ export type PotvrdaUlaskaURed = (stanje: StanjeReda | null) => void;
 /** Potvrda pokretanja treninga: partija kreće kroz redovne `partija:*` događaje. */
 export type PotvrdaTreninga = (ishod: { pokrenut: true } | { pokrenut: false; kod: KodGreske; poruka: string }) => void;
 
+/** Start kampanjskog Izazova; challengeId ≠ dokaz izazovId. */
+export interface PayloadIzazovZapocni {
+  challengeId: import('./izazovi.js').IdIzazova;
+  requestId: string;
+}
+
+export type PotvrdaIzazova = (ishod:
+  | {
+    rezerviran: true;
+    attemptId: string;
+    challengeId: import('./izazovi.js').IdIzazova;
+    /** true kad je motor stvarno pokrenuo partiju (PR03+). */
+    pokrenut: boolean;
+    partijaId: string | null;
+    status: import('./izazovi.js').StatusPokusajaIzazova;
+  }
+  | { rezerviran: false; kod: KodGreske; poruka: string }
+) => void;
+
 /** Mapa svih događaja klijent -> poslužitelj, za tipiziranu upotrebu Socket.IO. */
 export interface DogadajiKlijentPoslužitelj {
   'red:udji': (payload: PayloadUdjiURed | undefined, potvrda?: PotvrdaUlaskaURed) => void;
   /** Stari klijent šalje samo callback; novi može poslati `{ pravila }` pa callback. */
   'trening:zapocni': (payloadIliPotvrda?: PayloadTreningZapocni | PotvrdaTreninga, potvrda?: PotvrdaTreninga) => void;
   'trening:nastavi': (payload: Record<string, never>) => void;
+  'izazov:zapocni': (payload: PayloadIzazovZapocni, potvrda?: PotvrdaIzazova) => void;
   'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;

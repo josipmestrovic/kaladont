@@ -18,7 +18,7 @@ export type StatusOtvaranjaAnalitike =
   | 'rani_incident'
   | 'zatvoren_drugim'
   | 'nepotpuno';
-export type KontekstOtvaranjaAnalitike = 'javna' | 'privatna' | 'trening';
+export type KontekstOtvaranjaAnalitike = 'javna' | 'privatna' | 'trening' | 'izazov';
 export type UpravljacOtvaranjaAnalitike = 'covjek' | 'bot';
 
 export interface ZapisOtvaranjaAnalitike {

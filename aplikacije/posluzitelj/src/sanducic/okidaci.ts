@@ -71,7 +71,7 @@ export async function mozdaObavijestiPrvuIgru(ulaz: {
   jeGost: boolean;
   jeBot: boolean;
   izvorId: string;
-  kontekst: 'javna' | 'privatna' | 'trening';
+  kontekst: 'javna' | 'privatna' | 'trening' | 'izazov';
   mod?: string | null;
 }): Promise<void> {
   if (ulaz.jeBot) return;
@@ -501,7 +501,7 @@ async function dohvatiSnapshotGostSazetka(
 export async function obradiDovrsenuIgruSanducic(ulaz: {
   igracId: string;
   jeBot: boolean;
-  izvorTip: 'javna' | 'privatna' | 'trening';
+  izvorTip: 'javna' | 'privatna' | 'trening' | 'izazov';
   izvorId: string;
   mod?: string | null;
   /** Ako je brojač već povećan u istoj transakciji (javna partija). */
