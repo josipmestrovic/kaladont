@@ -292,13 +292,15 @@ function primijeniStanjePartije(p: StanjePartije): void {
     );
     if (elim) {
       const porukaIshoda = `${nadimakIgraca(prethodniDokaz.autorId)} je dokazao nastavak.`;
+      const sljedecaFaza = p.sustavBiraRijec ? ('sustav_bira' as const) : ('obican_potez' as const);
+      const sustavBira = p.sustavBiraRijec;
       stanje.dokaz = prethodniDokaz;
       stanje.faza = 'dokaz_nastavka';
       stanje.sustavBiraRijec = false;
       zatvoriDokazNakonHold(() => {
         stanje.dokaz = null;
-        stanje.faza = 'sustav_bira';
-        stanje.sustavBiraRijec = true;
+        stanje.faza = sljedecaFaza;
+        stanje.sustavBiraRijec = sustavBira;
         zapisiIshodDokaza(porukaIshoda);
       });
       if (elim.bodZa === stanje.mojIgracId && elim.iskustvo) {
