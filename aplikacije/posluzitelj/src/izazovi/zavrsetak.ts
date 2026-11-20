@@ -1,11 +1,12 @@
 /**
  * Terminalni CAS završetak pokušaja Izazova (PR03).
- * Nagrade / zavrseci / XP — stub hook za PR04.
+ * Nagrade / zavrseci / XP — PR04 settlement hook.
  */
 import { and, eq, inArray } from 'drizzle-orm';
 import type { RazlogNeuspjehaIzazova, StatusPokusajaIzazova } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { pokusajiIzazova } from '../baza/shema.js';
+import { obracunajSettlementIzazova, type SettlementIzazova } from './obracun.js';
 import type { MetrikePokusajaIzazova } from './evaluacija.js';
 import type { RedakPokusajaIzazova } from './pohrana.js';
 
@@ -27,11 +28,16 @@ export interface UlazTerminalnogPokusaja {
   partijaId?: string | null;
 }
 
-/** PR04: XP, Izazivač, misije, sandučić — no-op do settlement PR-a. */
+export interface TerminalniIshodIzazova {
+  redak: RedakPokusajaIzazova;
+  settlement: SettlementIzazova;
+}
+
+/** PR04: XP, Izazivač, misije, sandučić. */
 export async function nakonTerminalnogPokusaja(
   redak: RedakPokusajaIzazova,
-): Promise<void> {
-  void redak;
+): Promise<SettlementIzazova> {
+  return obracunajSettlementIzazova(redak);
 }
 
 /**
@@ -40,9 +46,10 @@ export async function nakonTerminalnogPokusaja(
  */
 export async function zavrsiPokusajIzazova(
   ulaz: UlazTerminalnogPokusaja,
-): Promise<RedakPokusajaIzazova | null> {
+): Promise<TerminalniIshodIzazova | null> {
   const terminalAt = ulaz.terminalAt ?? new Date();
   const resultsVisibleAt = new Date(terminalAt.getTime() + ODGODA_REZULTATA_IZAZOVA_MS);
+  const trebaSettlement = ulaz.status === 'uspjeh' || ulaz.status === 'neuspjeh';
 
   const [azuriran] = await baza
     .update(pokusajiIzazova)
@@ -54,7 +61,7 @@ export async function zavrsiPokusajIzazova(
       terminalAt,
       resultsVisibleAt,
       ...(ulaz.partijaId !== undefined ? { partijaId: ulaz.partijaId } : {}),
-      settlementState: 'nije_potrebno',
+      settlementState: trebaSettlement ? 'spremanje_u_tijeku' : 'nije_potrebno',
     })
     .where(and(
       eq(pokusajiIzazova.id, ulaz.attemptId),
@@ -63,8 +70,13 @@ export async function zavrsiPokusajIzazova(
     .returning();
 
   if (azuriran) {
-    await nakonTerminalnogPokusaja(azuriran);
-    return azuriran;
+    const settlement = await nakonTerminalnogPokusaja(azuriran);
+    const [svjez] = await baza
+      .select()
+      .from(pokusajiIzazova)
+      .where(eq(pokusajiIzazova.id, azuriran.id))
+      .limit(1);
+    return { redak: svjez ?? azuriran, settlement };
   }
 
   const [postojeci] = await baza
@@ -78,7 +90,21 @@ export async function zavrsiPokusajIzazova(
       || postojeci.status === 'neuspjeh'
       || postojeci.status === 'tehnicki_prekinuto')
   ) {
-    return postojeci;
+    // Retry settlement ako je CAS prošao ali TX nije završio.
+    if (
+      (postojeci.status === 'uspjeh' || postojeci.status === 'neuspjeh')
+      && postojeci.settlementState !== 'spremljeno'
+    ) {
+      const settlement = await nakonTerminalnogPokusaja(postojeci);
+      const [svjez] = await baza
+        .select()
+        .from(pokusajiIzazova)
+        .where(eq(pokusajiIzazova.id, postojeci.id))
+        .limit(1);
+      return { redak: svjez ?? postojeci, settlement };
+    }
+    const settlement = await nakonTerminalnogPokusaja(postojeci);
+    return { redak: postojeci, settlement };
   }
   return null;
 }

@@ -36,7 +36,16 @@ export async function registrirajIzazoviRute(app: FastifyInstance): Promise<void
       rijetkeRijeci?: number;
       uspjesniDokazi?: number;
       imaPravuPogresku?: boolean;
+      prihvaceneRijeci?: number;
+      settlement?: {
+        firstCompletion?: boolean;
+        challengeXp?: { nominal: number; awarded: number };
+        missionXp?: { nominal: number; awarded: number };
+        izazivac?: { zvjezdice: number; novaRazina: number };
+        novaDostignuca?: { id: string; novaRazina: number; maksimalnaRazina: number }[];
+      };
     };
+    const s = metrics.settlement;
     return {
       ok: true,
       pokusaj: {
@@ -55,6 +64,10 @@ export async function registrirajIzazoviRute(app: FastifyInstance): Promise<void
         settlementState: pokusaj.settlementState,
         accountTypeAtStart: pokusaj.accountTypeAtStart,
         definitionVersion: pokusaj.definitionVersion,
+        firstCompletion: s?.firstCompletion ?? false,
+        challengeXp: s?.challengeXp ?? { nominal: 0, awarded: 0 },
+        missionXp: s?.missionXp ?? { nominal: 0, awarded: 0 },
+        izazivac: s?.izazivac ?? { zvjezdice: 0, novaRazina: 0 },
       },
     };
   });

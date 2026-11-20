@@ -50,9 +50,12 @@ export type BrojacDostignuca =
   /** HINT PR13: kaladont → sljedeći uz ≥3 aktivna u Klasičnom; više događaja / igra OK. */
   | 'kaladontSljedeci'
   /** HINT PR13: pobjede KA-ZNA u kojima je igrač izbacio autora „ka”; 1 / igra. */
-  | 'staraSkolaPobjede';
+  | 'staraSkolaPobjede'
+  /** PR04: zvjezdice Izazivača (0–5) iz milestone skupova završenih izazova; samo servis. */
+  | 'izazivacZvjezdice';
 
 export const ID_DOSTIGNUCA_STALNO_SI_TU = 'stalno_si_tu';
+export const ID_DOSTIGNUCA_IZAZIVAC = 'izazivac';
 export const ID_DOSTIGNUCA_COVJEK_NA_MISIJI = 'covjek_na_misiji';
 export const ID_DOSTIGNUCA_PRIVATNIK = 'privatnik';
 export const ID_DOSTIGNUCA_TJEDAN_POD_KONTROLOM = 'tjedan_pod_kontrolom';
@@ -92,6 +95,7 @@ export const BROJACI_VAN_PARTIJSKE_DELTA: ReadonlySet<BrojacDostignuca> = new Se
   'igreSDokazom',
   'kaladontSljedeci',
   'staraSkolaPobjede',
+  'izazivacZvjezdice',
 ]);
 
 export interface DefinicijaDostignuca {
@@ -297,6 +301,15 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
     vrijediUPrivatnoj: false,
     brojac: 'staraSkolaPobjede',
   },
+  {
+    id: ID_DOSTIGNUCA_IZAZIVAC,
+    naziv: 'Izazivač',
+    opis: 'Dovršavaj razine Izazova — zvjezdice prate milestone skupove.',
+    kategorija: 'igra',
+    pragovi: [1, 2, 3, 4, 5],
+    vrijediUPrivatnoj: false,
+    brojac: 'izazivacZvjezdice',
+  },
 ] as const;
 
 export const UKUPNO_ZVJEZDICA_DOSTIGNUCA = DEFINICIJE_DOSTIGNUCA.reduce((zbroj, definicija) => zbroj + definicija.pragovi.length, 0);
@@ -337,6 +350,7 @@ const PRIORITETI_ISTAKNUTIH_DOSTIGNUCA = [
   ID_DOSTIGNUCA_IMAM_NASTAVAK,
   ID_DOSTIGNUCA_SALJI_DALJE,
   ID_DOSTIGNUCA_STARA_SKOLA,
+  ID_DOSTIGNUCA_IZAZIVAC,
 ] as const;
 
 export function odaberiIstaknutaDostignuca<T extends { id: string; razina: number }>(

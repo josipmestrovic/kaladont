@@ -306,6 +306,8 @@ export const napredakDostignucaIgraca = pgTable('napredak_dostignuca_igraca', {
   kaladontSljedeci: integer('kaladont_sljedeci').notNull().default(0),
   /** HINT PR13: KA-ZNA pobjede s eliminacijom autora (Stara škola). */
   staraSkolaPobjede: integer('stara_skola_pobjede').notNull().default(0),
+  /** PR04: zvjezdice Izazivača (0–5) iz milestone skupova. */
+  izazivacZvjezdice: integer('izazivac_zvjezdice').notNull().default(0),
   anketaIspunjena: boolean('anketa_ispunjena').notNull().default(false),
   azurirano: timestamp('azurirano', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [primaryKey({ columns: [tablica.igracId] })]);

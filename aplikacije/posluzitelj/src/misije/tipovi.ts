@@ -25,7 +25,7 @@ export type SnapshotMisije = {
   xp: number;
   obitelj: string;
   zahtjevnija: boolean;
-  kontekst: 'javna' | 'trening';
+  kontekst: 'javna' | 'trening' | 'izazov';
   /** HINT PR12: uključuje tri_igraca; stari snapshoti mogu imati samo oba|dva|cetiri. */
   mod: 'oba' | 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca';
   /**

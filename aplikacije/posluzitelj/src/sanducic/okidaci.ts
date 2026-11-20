@@ -84,7 +84,11 @@ export async function mozdaObavijestiPrvuIgru(ulaz: {
       tip: TIP_SANDUCIC_PRVA_IGRA,
       deduplikacijskiKljuc: 'prva_igra',
       podaci: { gost: ulaz.jeGost, kontekst: ulaz.kontekst },
-      izvorTip: ulaz.kontekst === 'trening' ? 'trening' : 'partija',
+      izvorTip: ulaz.kontekst === 'trening'
+        ? 'trening'
+        : ulaz.kontekst === 'izazov'
+          ? 'izazov'
+          : 'partija',
       izvorId: ulaz.izvorId,
       mod: ulaz.mod ?? null,
     }, { tx, emitiraj: false });

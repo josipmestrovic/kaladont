@@ -187,7 +187,9 @@ export interface PostavkeMotoraPartije {
     partijaId: string;
     pobjednikId: string | null;
     terminalHint?: 'nevaljana_rijec' | 'odustao' | 'prekid_veze' | null;
-  }) => void | Promise<void>;
+  }) => void | Promise<{
+    settlement?: import('../izazovi/obracun.js').SettlementIzazova;
+  } | void>;
   /** Snimka goalProgress za partija:stanje (voditelj). */
   dohvatiGoalProgressIzazova?: (partijaId: string) => import('zajednicko').GoalProgressIzazova | null;
   /** Opcionalni terminalni podaci za reconnect nakon CAS-a. */
@@ -1477,13 +1479,15 @@ export function stvoriUpraviteljPartija(
       pokreniSpremanjeRezultata(
         stanje,
         async () => {
-          await postavke.naIzazovKraj?.({
+          const krajIshod = await postavke.naIzazovKraj?.({
             partijaId: stanje.partijaId,
             pobjednikId,
             terminalHint,
           });
+          const settlement = krajIshod && typeof krajIshod === 'object' ? krajIshod.settlement : undefined;
           await obavijestiPrvuIgruSudionicima(stanje, 'izazov');
           for (const p of plasmani) {
+            const covjek = stanje.sudionici.find((s) => s.igracId === p.igracId)?.upravljac === 'covjek';
             const poruka: KrajPartije = {
               partijaId: stanje.partijaId,
               prikazRezultataOdIso,
@@ -1493,11 +1497,26 @@ export function stvoriUpraviteljPartija(
               mojeIskustvo: null,
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,
-              novaDostignuca: [],
+              novaDostignuca: covjek && settlement ? settlement.novaDostignuca : [],
+              promjeneMisija: covjek ? settlement?.ishodMisija?.promjeneMisija : undefined,
+              ukupnoIskustvo: covjek ? settlement?.ishodMisija?.ukupnoIskustvo : undefined,
+              misijeStanjeVerzija: covjek ? settlement?.ishodMisija?.misijeStanjeVerzija : undefined,
               mod: stanje.mod,
               pravila: stanje.pravila,
               spojeniDvoboj: stanje.spojeniDvoboj,
               kontekst: 'izazov',
+              ...(covjek && settlement
+                ? {
+                  izazovSettlement: {
+                    firstCompletion: settlement.firstCompletion,
+                    challengeXp: settlement.challengeXp,
+                    missionXp: settlement.missionXp,
+                    izazivac: settlement.izazivac,
+                    settlementState: settlement.settlementState,
+                    novaDostignuca: settlement.novaDostignuca,
+                  },
+                }
+                : {}),
             };
             stanje.rezultatiKraja.set(p.igracId, poruka);
             const trenutnaPartija = partijaPoIgracu.get(p.igracId);
