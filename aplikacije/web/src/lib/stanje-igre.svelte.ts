@@ -58,7 +58,7 @@ interface StanjeIgre {
   dokaz: SnimkaDokaza | null;
   /** Kratka banner poruka nakon ishoda dokaza (uspjeh/neuspjeh). */
   ishodDokazaPoruka: string | null;
-  kontekst: 'javna' | 'privatna' | 'trening' | null;
+  kontekst: 'javna' | 'privatna' | 'trening' | 'izazov' | null;
   treningNeaktivnost: Omit<TreningNeaktivnost, 'partijaId'> | null;
   jePrivatna: boolean;
   kodSobe: string | null;
