@@ -15,14 +15,12 @@ export type KaladontSocket = Socket<DogadajiPosluziteljKlijent, DogadajiKlijentP
 let socket: KaladontSocket | null = null;
 let slusateljiPostavljeni = false;
 let oporavakSesijeUTijeku = false;
-/** Nakon oporavka u gosta zadrži banner „Sesija je istekla” usprkos connect → spremno. */
-let zadrziBannerIsteka = false;
 
 function kodIzGreske(greska: Error & { data?: { kod?: string } }): string | null {
   return greska.data?.kod ?? (greska.message.includes('sesija') || greska.message.includes('istekao') ? 'SESIJA_ISTEKLA' : null);
 }
 
-/** Istekla/nevaljana sesija → novi gost + socket, da avatar/mailbox/Zagrijavanje rade. */
+/** Istekla/nevaljana sesija → novi gost + socket; veza ide u spremno, banner je zaseban flag. */
 async function oporaviNakonIstekaSesije(
   aktivniSocket: KaladontSocket,
   kod: string,
@@ -31,7 +29,8 @@ async function oporaviNakonIstekaSesije(
   if (oporavakSesijeUTijeku) return;
   oporavakSesijeUTijeku = true;
   aktivniSocket.io.reconnection(false);
-  zadrziBannerIsteka = true;
+  // Banner flag prije reconnecta — inače bi connect→spremno na trenutak maknuo obavijest.
+  stanjeVeze.obavijestIstekaSesije = true;
   postaviStanjeVeze('sesija_istekla', kod, poruka);
   try {
     await prijediNaGostujucuSesiju();
@@ -40,9 +39,9 @@ async function oporaviNakonIstekaSesije(
       window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
     }
   } catch {
-    // Banner ostaje; korisnik može otići na prijavu.
-  } finally {
+    // Oporavak nije uspio — ostavi sesija_istekla da korisnik ide na prijavu.
     postaviStanjeVeze('sesija_istekla', kod, poruka);
+  } finally {
     oporavakSesijeUTijeku = false;
   }
 }
@@ -54,10 +53,7 @@ function postaviSlusatelje(aktivniSocket: KaladontSocket): void {
     stanjeVeze.brojPokusaja += 1;
     postaviStanjeVeze('ponovno_spajanje');
   });
-  aktivniSocket.io.on('reconnect', () => {
-    if (zadrziBannerIsteka) return;
-    postaviStanjeVeze('spremno');
-  });
+  aktivniSocket.io.on('reconnect', () => postaviStanjeVeze('spremno'));
   aktivniSocket.io.on('reconnect_error', (greska: Error) => {
     const kod = kodIzGreske(greska as Error & { data?: { kod?: string } });
     if (kod === 'SESIJA_ISTEKLA' || kod === 'NEVALJAN_TOKEN') {
@@ -69,7 +65,6 @@ function postaviSlusatelje(aktivniSocket: KaladontSocket): void {
   aktivniSocket.io.on('reconnect_failed', () => postaviStanjeVeze('prekid', 'RECONNECT_NEUSPJEO'));
   aktivniSocket.on('connect', () => {
     stanjeVeze.brojPokusaja = 0;
-    if (zadrziBannerIsteka) return;
     postaviStanjeVeze('spremno');
   });
   aktivniSocket.on('veza:zatvorena', (p) => {
@@ -142,14 +137,11 @@ export async function osvjeziSocketIdentitet(): Promise<void> {
 }
 
 export function oznaciNamjernoIskljucenje(): void {
-  zadrziBannerIsteka = false;
+  stanjeVeze.obavijestIstekaSesije = false;
   postaviStanjeVeze('rucno_iskljuceno');
 }
 
-/** Korisnik zatvorio banner / otišao na prijavu — više ne forsiraj sesija_istekla. */
+/** Korisnik zatvorio banner / otišao na prijavu. */
 export function otpustiBannerIstekaSesije(): void {
-  zadrziBannerIsteka = false;
-  if (stanjeVeze.stanje === 'sesija_istekla' && socket?.connected) {
-    postaviStanjeVeze('spremno');
-  }
+  stanjeVeze.obavijestIstekaSesije = false;
 }

@@ -7,6 +7,8 @@ export interface StanjeSocketVeze {
   brojPokusaja: number;
   zadnjaPromjenaMs: number;
   partijaNedostupna: boolean;
+  /** Banner „Sesija je istekla” nakon oporavka u gosta — odvojeno od stanja veze (spremno). */
+  obavijestIstekaSesije: boolean;
 }
 
 export const stanjeVeze = $state<StanjeSocketVeze>({
@@ -16,6 +18,7 @@ export const stanjeVeze = $state<StanjeSocketVeze>({
   brojPokusaja: 0,
   zadnjaPromjenaMs: Date.now(),
   partijaNedostupna: false,
+  obavijestIstekaSesije: false,
 });
 
 export function postaviStanjeVeze(stanje: StanjeVeze, kod: string | null = null, poruka: string | null = null): void {

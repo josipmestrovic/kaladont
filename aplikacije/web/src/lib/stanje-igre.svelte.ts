@@ -303,9 +303,16 @@ function primijeniStanjePartije(p: StanjePartije): void {
       }
     }
   } else if (prethodniDokaz && !p.dokaz && dokazPrikazanOdMs !== null && !p.zavrsena) {
-    // Brzi bot: server već zatvorio dokaz — zadrži snimku dok ne istekne min. prikaz.
+    // Brzi bot / reconnect: server već zatvorio dokaz — zadrži snimku, pa obavezno zakazati hold.
     stanje.dokaz = prethodniDokaz;
     stanje.faza = 'dokaz_nastavka';
+    const sljedecaFaza = p.sustavBiraRijec ? ('sustav_bira' as const) : ('obican_potez' as const);
+    const sustavBira = p.sustavBiraRijec;
+    zatvoriDokazNakonHold(() => {
+      stanje.dokaz = null;
+      stanje.faza = sljedecaFaza;
+      stanje.sustavBiraRijec = sustavBira;
+    });
   }
 }
 
