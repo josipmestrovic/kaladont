@@ -46,6 +46,8 @@ services:
       ODGODA_POCETKA_PARTIJE_MS: "6000"
       TOLERANCIJA_PREKIDA_MS: "10000"
       TRENING_OMOGUCEN: ${TRENING_OMOGUCEN:-true}
+      # Produkcija: Izazov ostaje off do release gatea nakon lvl redesigna (PR07 staging-only).
+      IZAZOV_OMOGUCEN: ${IZAZOV_OMOGUCEN:-false}
       BOTOVI_DVOBOJ: ${BOTOVI_DVOBOJ:-false}
       BOTOVI_TROBOJ: ${BOTOVI_TROBOJ:-false}
       BOTOVI_CETVEROBOJ: ${BOTOVI_CETVEROBOJ:-false}

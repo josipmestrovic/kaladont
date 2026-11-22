@@ -16,5 +16,5 @@ Terminalni `pokusaji_izazova` stariji od **90 dana** (`terminal_at`) brišu se d
 
 ## Granice
 
-- Feature flag Izazova ostaje off dok se ne otvori release gate (PR07).
+- Staging: flag on (PR07). Produkcija ostaje off do releasea nakon redesigna razina — vidi [izazov-staging-rollout.md](../07-operacije/izazov-staging-rollout.md).
 - CSV i API ne sadrže email, IP ni nadimak — samo id-eve izazova/verzija i brojeve.

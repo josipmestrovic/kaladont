@@ -80,6 +80,7 @@ Za prvu postavu kreni od **Operacije for dummies**. Ostali dokumenti u ovoj cjel
 | [vodic-postava-vps.md](07-operacije/vodic-postava-vps.md)                       | Početnički vodič: od praznog VPS-a do žive igre                                        |
 | [vodic-postava-discourse.md](07-operacije/vodic-postava-discourse.md)           | Postava foruma na zasebnom VPS-u                                                       |
 | [runbook-objava-i-rollback.md](07-operacije/runbook-objava-i-rollback.md)       | Postupak objave, izdanja, tihog ažuriranja i vraćanja unatrag                          |
+| [izazov-staging-rollout.md](07-operacije/izazov-staging-rollout.md)             | Izazov: staging flag on, smoke checklist, rollback (produkcija off do lvl redesigna)   |
 | [runbook-ssh-produkcija.md](07-operacije/runbook-ssh-produkcija.md)             | Svakodnevni SSH ulaz na produkcijski VPS (ključ, known_hosts, korisnik kaladont)      |
 | [runbook-umami.md](07-operacije/runbook-umami.md)                               | Početničko uključivanje Umamija na istom prod VPS-u (bez novog servera)                |
 | [runbook-backup-i-vracanje.md](07-operacije/runbook-backup-i-vracanje.md)       | Backup postupci i drill vraćanja                                                       |
