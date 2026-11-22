@@ -531,7 +531,11 @@ for (const zaslon of [
         const provjeri = async () => {
           for (let indeks = 0; indeks < igraci.length; indeks += 1) {
             const stranica = igraci[indeks]!.stranica;
-            await expect.poll(() => polozajiAvatara(stranica)).toEqual(prije[indeks]);
+            // Eliminacijski banner smije pomaknuti Y; X/širina/visina avatara ostaju stabilni.
+            await expect.poll(async () => {
+              const sada = await polozajiAvatara(stranica);
+              return sada.map(({ x, width, height }) => ({ x, width, height }));
+            }).toEqual(prije[indeks]!.map(({ x, width, height }) => ({ x, width, height })));
             for (const avatar of await polozajiAvatara(stranica)) {
               expect(avatar.x).toBeGreaterThanOrEqual(0);
               expect(avatar.y).toBeGreaterThanOrEqual(0);

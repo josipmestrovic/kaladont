@@ -102,8 +102,7 @@ test('PR10: Općenito je default s jednim radarom; #statistika otvara Statistiku
 
     await page.goto('/profil#statistika');
     await expect(page.locator('#statistika')).toBeVisible();
-    await expect(page.getByLabel('Format igre')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Troboj' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Brza igra \(Troboj\)/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Općenito', level: 2 })).toHaveCount(0);
 
     await page.goto('/profil');

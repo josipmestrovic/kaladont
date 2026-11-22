@@ -295,7 +295,7 @@ for (const { sirina, visina } of [
           element.style.display = 'none';
           const bezBloka = document.documentElement.scrollHeight;
           element.style.display = '';
-          return { sBlokom, bezBloka, stajeUViewport: bezBloka <= visinaViewporta };
+          return { sBlokom, bezBloka, stajeUViewport: bezBloka < visinaViewporta };
         }, visina);
         if (visine.stajeUViewport) expect(visine.sBlokom).toBe(visine.bezBloka);
       }

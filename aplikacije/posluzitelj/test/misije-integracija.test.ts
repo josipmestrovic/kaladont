@@ -457,28 +457,36 @@ describe('misije API i stanje', () => {
         eq(dodjeleMisija.status, 'aktivna'),
       ));
       expect(tjedne.length).toBeGreaterThan(0);
+      const aktivnaPartija = (predlozakId: string) => {
+        const d = DEFINICIJE_MISIJA.find((x) => x.predlozakId === predlozakId);
+        return d?.vrsta === 'tjedna' && d.aktivna && d.metrika === 'partije' ? d : undefined;
+      };
+      // Preferiraj već dodijeljenu aktivnu partije-misiju (uq po predlošku u ciklusu).
+      const postojeca = tjedne.find((t) => aktivnaPartija(t.predlozakId));
       const zauzeti = new Set(tjedne.map((t) => t.predlozakId));
-      const tjedna = tjedne[0]!;
+      const ciljna = postojeca
+        ? aktivnaPartija(postojeca.predlozakId)!
+        : DEFINICIJE_MISIJA.find((d) =>
+          d.vrsta === 'tjedna' && d.aktivna && d.metrika === 'partije' && !zauzeti.has(d.predlozakId),
+        );
+      expect(ciljna).toBeDefined();
+      const tjedna = postojeca ?? tjedne[0]!;
       tjednaId = tjedna.id;
-      // Biraj predložak koji još nije u paketu (manji aktivni pool nakon Brze igre).
-      const ciljna = DEFINICIJE_MISIJA.find((d) =>
-        d.vrsta === 'tjedna' && d.aktivna && d.metrika === 'partije' && !zauzeti.has(d.predlozakId),
-      ) ?? DEFINICIJE_MISIJA.find((d) => d.predlozakId === tjedna.predlozakId)!;
       await tx.update(dodjeleMisija).set({
-        predlozakId: ciljna.predlozakId,
-        cilj: ciljna.cilj,
+        predlozakId: ciljna!.predlozakId,
+        cilj: ciljna!.cilj,
         napredak: 0,
         snapshot: {
-          predlozakId: ciljna.predlozakId,
+          predlozakId: ciljna!.predlozakId,
           verzijaDefinicije: 1,
-          naziv: ciljna.naziv,
-          opis: ciljna.opis,
-          metrika: ciljna.metrika,
-          cilj: ciljna.cilj,
+          naziv: ciljna!.naziv,
+          opis: ciljna!.opis,
+          metrika: ciljna!.metrika,
+          cilj: ciljna!.cilj,
           pragMetrike: null,
           podciljevi: null,
-          xp: ciljna.xp,
-          obitelj: ciljna.obitelj,
+          xp: ciljna!.xp,
+          obitelj: ciljna!.obitelj,
           zahtjevnija: false,
           kontekst: 'javna',
           mod: 'oba',
@@ -496,7 +504,7 @@ describe('misije API i stanje', () => {
     const metrike = {
       izvorId: randomUUID(),
       kontekst: 'javna' as const,
-      mod: 'dva_igraca' as const,
+      mod: 'tri_igraca' as const,
       igracId,
       zavrsenoU: nedjelja,
       plasman: 2,

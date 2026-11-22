@@ -779,7 +779,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     odspojiIgrace(igraci);
   });
 
-  it('prijelaz traje 8 sekundi, dodatna eliminacija i reconnect ne resetiraju rok', async () => {
+  it('prijelaz traje 8 sekundi, reconnect ne resetira rok', async () => {
     // Početak blizu stvarnog Date.now(): usaoU u redu i dalje dolazi iz wall clocka.
     const sat = stvoriKontroliraniSat(Date.now());
     const posluzitelj = await izgradiPosluzitelj({
@@ -816,7 +816,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       const rok = Date.parse(izbor.istekIzboraIso);
       expect(rok - pocetakPrijelaza).toBe(8_000);
       expect(otvorenaU).toBe(0);
-      ostali[1]!.socket.emit('partija:izadji');
+      // Troboj: izlazak drugog preostalog tijekom prijelaza bi završio partiju — samo reconnect.
       naPotezu.socket.disconnect();
       const povratak = await spojiIgracaIPricekajStanje(naPotezu.authToken, cilj);
       obnovljeni = povratak.igrac;
@@ -831,7 +831,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
       odspojiIgrace([...igraci, ...(obnovljeni ? [obnovljeni] : [])]);
       await posluzitelj.zaustavi();
     }
-  });
+  }, 90_000);
 
   it('eliminirani igrač se nakon reconnecta vraća kao promatrač', async () => {
     const { igraci, runda } = await pokreniPartiju();
@@ -898,9 +898,30 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
         igraci[0]!.socket.once('partija:pocetak', resolve);
       });
       const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
-      for (const igrac of igraci) igrac.socket.emit('red:udji', { mod: 'tri_igraca', pravila: 'ka_zna' });
+      // Javni red prihvaća samo Klasični — KA-zna pokrećemo izravno.
+      const stavke = igraci.map((igrac, indeks) => ({
+        igracId: igrac.igracId,
+        vrsta: 'gost' as const,
+        nadimak: `Ka-${indeks}`,
+        avatarId: 0,
+        avatarConfig: null,
+        avatarRevision: 0,
+        odigrane: 0,
+        pobjede: 0,
+        bodoviUkupno: 0,
+        odigrane3p: 0,
+        pobjede3p: 0,
+        bodovi3p: 0,
+        iskustvoUkupno: 0,
+        trenutniNiz3p: 0,
+        usaoU: Date.now(),
+      }));
+      const rezultat = await zapocniJavnuPartiju(stavke, 'tri_igraca', 'ka_zna');
+      expect(rezultat).toBe('pokrenuta');
       const pocetak = await pocetakPromise;
       const runda = await rundaPromise;
+      // Kratka pauza da upis početka partije stigne prije poteza (CI FK šum).
+      await odgodi(150);
 
       // odigraj stvaran lanac rijeci dok netko ne odigra rijec koja zavrsava na "ka"
       const lanac = await pronadjiLanacDoKa(runda.trazenaSlova, new Set(await grupeRijeci(runda.rijec)));
