@@ -230,6 +230,8 @@ type OpcijeDefinicijeMisije = {
   pravilnik?: PravilnikPartije;
   pragMetrike?: number;
   podciljevi?: readonly PodciljDefinicijeMisije[];
+  /** Soft-delete iz poola novih dodjela; zadano true. */
+  aktivna?: boolean;
 };
 
 function dnevna(
@@ -258,7 +260,7 @@ function dnevna(
     mod: opts.mod ?? 'oba',
     modovi: opts.modovi,
     pravilnik: opts.pravilnik,
-    aktivna: true,
+    aktivna: opts.aktivna ?? true,
   };
 }
 
@@ -288,7 +290,7 @@ function tjedna(
     mod: opts.mod ?? 'oba',
     modovi: opts.modovi,
     pravilnik: opts.pravilnik,
-    aktivna: true,
+    aktivna: opts.aktivna ?? true,
   };
 }
 
@@ -299,12 +301,13 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   dnevna('D04', 'Pet u jednoj', 'U jednoj igri odigraj 5 prihvaćenih riječi.', 'rijeci_u_partiji_max', 5, 'ucinak_partije'),
   dnevna('D05', 'Duge riječi', 'Odigraj 2 riječi s najmanje 10 slova.', 'duge', 2, 'duljina'),
   dnevna('D06', 'Rijetko otkriće', 'Odigraj 1 riječ bilo kojeg postojećeg tiera rijetkosti.', 'rijetke', 1, 'rijetkost'),
-  dnevna('D07', 'Za stolom četvorice', 'Završi 1 Četveroboj.', 'partije', 1, 'aktivnost', { mod: 'cetiri_igraca' }),
-  dnevna('D08', 'Pobjednik Četveroboja', 'Pobijedi u 1 javnom Četveroboju.', 'pobjede', 1, 'plasman', { mod: 'cetiri_igraca' }),
-  dnevna('D09', 'Tri dvobojske pobjede', 'Pobijedi u 3 javna Dvoboja.', 'pobjede', 3, 'plasman', { mod: 'dva_igraca' }),
+  dnevna('D07', 'Za stolom četvorice', 'Završi 1 Četveroboj.', 'partije', 1, 'aktivnost', { mod: 'cetiri_igraca', aktivna: false }),
+  dnevna('D08', 'Pobjednik Četveroboja', 'Pobijedi u 1 javnom Četveroboju.', 'pobjede', 1, 'plasman', { mod: 'cetiri_igraca', aktivna: false }),
+  dnevna('D09', 'Tri dvobojske pobjede', 'Pobijedi u 3 javna Dvoboja.', 'pobjede', 3, 'plasman', { mod: 'dva_igraca', aktivna: false }),
   dnevna('D10', 'Pobjeda za zagrijavanje', 'Završi i pobijedi u 1 treningu.', 'trening_pobjede', 1, 'trening', { kontekst: 'trening', mod: 'dva_igraca' }),
-  dnevna('D11', 'Dvobojski ritam', 'Završi 3 Dvoboja.', 'partije', 3, 'aktivnost', { mod: 'dva_igraca' }),
+  dnevna('D11', 'Dvobojski ritam', 'Završi 3 Dvoboja.', 'partije', 3, 'aktivnost', { mod: 'dva_igraca', aktivna: false }),
   dnevna('D12', 'Oba lica Kaladonta', 'Završi 1 Dvoboj i 1 Četveroboj.', 'oba_moda', 2, 'oba_moda', {
+    aktivna: false,
     podciljevi: [
       { kljuc: 'dva_igraca', naziv: 'Dvoboji', cilj: 1 },
       { kljuc: 'cetiri_igraca', naziv: 'Četveroboji', cilj: 1 },
@@ -316,7 +319,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   dnevna('D16', 'Skriveno blago', 'Odigraj 1 riječ označenu kao „jako rijetka”.', 'jako_rijetke', 1, 'rijetkost', { zahtjevnija: true }),
   dnevna('D17', 'Dvostruki pogodak', 'Odigraj 1 riječ koja je istodobno duga (≥10 slova) i rijetka (bilo koji tier).', 'duge_i_rijetke', 1, 'spoj_rijeci', { zahtjevnija: true }),
   dnevna('D18', 'Pet početaka', 'Odigraj riječi s 5 različitih početaka od dva hrvatska slova.', 'razliciti_poceci', 5, 'raznolikost'),
-  dnevna('D19', 'Među najboljima', 'Završi 1 Četveroboj na 1. ili 2. mjestu.', 'pobjede', 1, 'plasman', { mod: 'cetiri_igraca' }),
+  dnevna('D19', 'Među najboljima', 'Završi 1 Četveroboj na 1. ili 2. mjestu.', 'pobjede', 1, 'plasman', { mod: 'cetiri_igraca', aktivna: false }),
   dnevna('D20', 'Dvije dobre igre', 'U 2 različite igre odigraj barem 3 prihvaćene riječi po igri.', 'partije_s_rijecima', 2, 'ucinak_partije', { pragMetrike: 3 }),
 
   // --- PR12: četiri nova dnevna (pool 20→24). Copy: „igra”, nikad „partija”. ---
@@ -339,7 +342,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
     'rijeci_u_partiji_max',
     3,
     'ucinak_partije',
-    { pravilnik: 'dokazi_nastavak' },
+    { pravilnik: 'dokazi_nastavak', aktivna: false },
   ),
   // HINT D23: početni format 3 ili 4 + Klasični; Dvoboj ne broji.
   dnevna(
@@ -363,7 +366,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
     'rijeci',
     4,
     'kolicina_rijeci',
-    { pravilnik: 'ka_zna' },
+    { pravilnik: 'ka_zna', aktivna: false },
   ),
 
   tjedna('W01', 'Redoviti igrač', 'Završi 15 javnih igara.', 'partije', 15, 'aktivnost'),
@@ -373,19 +376,20 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   tjedna('W05', 'Lovac na rijetke', 'Odigraj 10 rijetkih riječi, bilo kojeg postojećeg tiera.', 'rijetke', 10, 'rijetkost'),
   tjedna('W06', 'Tri dana igre', 'Završi barem 1 javnu igru u 3 različita dana ovog tjedna.', 'dani', 3, 'razliciti_dani'),
   tjedna('W07', 'Osam dobrih igara', 'U 8 različitih igara odigraj barem 5 prihvaćenih riječi po igri.', 'partije_s_rijecima', 8, 'ucinak_partije', { pragMetrike: 5 }),
-  tjedna('W08', 'Pet četverobojnih pobjeda', 'Pobijedi u 5 Četveroboja.', 'pobjede', 5, 'plasman', { zahtjevnija: true, mod: 'cetiri_igraca' }),
-  tjedna('W09', 'Dvobojski pobjednik', 'Pobijedi u 20 javnih Dvoboja.', 'pobjede', 20, 'plasman', { zahtjevnija: true, mod: 'dva_igraca' }),
+  tjedna('W08', 'Pet četverobojnih pobjeda', 'Pobijedi u 5 Četveroboja.', 'pobjede', 5, 'plasman', { zahtjevnija: true, mod: 'cetiri_igraca', aktivna: false }),
+  tjedna('W09', 'Dvobojski pobjednik', 'Pobijedi u 20 javnih Dvoboja.', 'pobjede', 20, 'plasman', { zahtjevnija: true, mod: 'dva_igraca', aktivna: false }),
   tjedna('W10', 'Trening tjedan', 'Završi i pobijedi u 3 različita treninga.', 'trening_pobjede', 3, 'trening', { kontekst: 'trening', mod: 'dva_igraca' }),
-  tjedna('W11', 'Četverobojni tjedan', 'Završi 10 Četveroboja.', 'partije', 10, 'aktivnost', { mod: 'cetiri_igraca' }),
-  tjedna('W12', 'Dvobojski maraton', 'Završi 25 Dvoboja.', 'partije', 25, 'aktivnost', { mod: 'dva_igraca' }),
+  tjedna('W11', 'Četverobojni tjedan', 'Završi 10 Četveroboja.', 'partije', 10, 'aktivnost', { mod: 'cetiri_igraca', aktivna: false }),
+  tjedna('W12', 'Dvobojski maraton', 'Završi 25 Dvoboja.', 'partije', 25, 'aktivnost', { mod: 'dva_igraca', aktivna: false }),
   tjedna('W13', 'Taktičar', 'Izazov 10 eliminacija.', 'eliminacije', 10, 'taktika'),
   tjedna('W14', 'Kaladont majstor', 'Izvedi 5 uspješnih Kaladonta.', 'kaladont', 5, 'taktika', { zahtjevnija: true }),
   tjedna('W15', 'Velike riječi', 'Odigraj 5 riječi s najmanje 15 slova.', 'jako_duge', 5, 'duljina', { zahtjevnija: true }),
   tjedna('W16', 'Rijetka zbirka', 'Odigraj 5 riječi označenih kao „jako rijetke”.', 'jako_rijetke', 5, 'rijetkost', { zahtjevnija: true }),
   tjedna('W17', 'Dugi i rijetki', 'Odigraj 5 riječi koje su svaka istodobno duge (≥10 slova) i rijetke.', 'duge_i_rijetke', 5, 'spoj_rijeci', { zahtjevnija: true }),
   tjedna('W18', 'Dvadeset početaka', 'Odigraj riječi s 20 različitih početaka od dva hrvatska slova.', 'razliciti_poceci', 20, 'raznolikost'),
-  tjedna('W19', 'Stalno pri vrhu', 'Završi 10 Četveroboja na 1. ili 2. mjestu.', 'pobjede', 10, 'plasman', { mod: 'cetiri_igraca' }),
+  tjedna('W19', 'Stalno pri vrhu', 'Završi 10 Četveroboja na 1. ili 2. mjestu.', 'pobjede', 10, 'plasman', { mod: 'cetiri_igraca', aktivna: false }),
   tjedna('W20', 'Svestrani igrač', 'Završi 5 Dvoboja i 5 Četveroboja.', 'oba_moda', 10, 'oba_moda', {
+    aktivna: false,
     podciljevi: [
       { kljuc: 'dva_igraca', naziv: 'Dvoboji', cilj: 5 },
       { kljuc: 'cetiri_igraca', naziv: 'Četveroboji', cilj: 5 },
@@ -410,7 +414,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
     'partije_s_dokazom',
     2,
     'taktika',
-    { zahtjevnija: true },
+    { zahtjevnija: true, aktivna: false },
   ),
   // HINT W23: ≥3 aktivna neposredno prije poteza; stvarna sljedeća žrtva; max 1 / igra.
   tjedna(
@@ -429,7 +433,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
     'pobjede',
     5,
     'plasman',
-    { pravilnik: 'ka_zna' },
+    { pravilnik: 'ka_zna', aktivna: false },
   ),
 
   // --- PR04: Izazov pool (nisu obvezna dodatna dodjela; ulaze u postojeći pool). ---

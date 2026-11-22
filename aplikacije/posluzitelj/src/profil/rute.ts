@@ -13,6 +13,7 @@ import {
   izracunajUniverzalniUcinak,
   izracunajRazinuDostignuca,
   jeDostignuceNovo,
+  jeDostignuceVidljivo,
   jePrihvacenaAktualnaVerzijaUvjeta,
   kolekcijskiKljucGrupe,
   kolekcionarskaRazina,
@@ -524,7 +525,8 @@ async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number
   const brojac = napredak[0];
   const razinaIskustva = stanjeIskustva(iskustvoUkupno).razina;
   const razine = new Map(otkljucana.map((redak) => [redak.dostignuceId, redak.razina]));
-  const dostignuca = DEFINICIJE_DOSTIGNUCA.map((definicija) => {
+  const vidljiveDefinicije = DEFINICIJE_DOSTIGNUCA.filter((d) => jeDostignuceVidljivo(d.id));
+  const dostignuca = vidljiveDefinicije.map((definicija) => {
     const vrijednost = definicija.brojac === 'razina'
       ? razinaIskustva
       : definicija.brojac === 'najboljiNizAktivnosti'
@@ -550,7 +552,7 @@ async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number
   return {
     ukupnoZvjezdica: dostignuca.reduce((zbroj, dostignuce) => zbroj + dostignuce.razina, 0),
     ukupnoOtkljucanih: dostignuca.filter((dostignuce) => dostignuce.razina > 0).length,
-    maksimalnoZvjezdica: DEFINICIJE_DOSTIGNUCA.reduce(
+    maksimalnoZvjezdica: vidljiveDefinicije.reduce(
       (zbroj, definicija) => zbroj + definicija.pragovi.length,
       0,
     ),

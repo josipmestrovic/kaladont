@@ -43,3 +43,27 @@ export function kanonskiModLjestvice(mod: unknown): 'tri_igraca' {
   void mod;
   return 'tri_igraca';
 }
+
+/**
+ * Dostignuća koja nisu ostvariva kroz jedini javni red (Brza igra).
+ * Katalog i DB zapisi ostaju; UI i nove dodjele ih skrivaju.
+ * `ka_zna` (žrtva Kaladonta) NIJE ovdje — ostaje ostvarivo u Klasičnom Troboju.
+ */
+export const NEDOSTIZNA_DOSTIGNUCA = [
+  'dvostruka_kruna',
+  'na_dvije_fronte',
+  'imam_nastavak',
+  'stara_skola',
+] as const;
+
+const NEDOSTIZNA_DOSTIGNUCA_SET = new Set<string>(NEDOSTIZNA_DOSTIGNUCA);
+
+/** Definicija ostaje poznata; nije vidljiva u korisničkom UI-ju. */
+export function jeDostignuceVidljivo(id: string): boolean {
+  return !NEDOSTIZNA_DOSTIGNUCA_SET.has(id);
+}
+
+/** Nove dodjele/popupovi samo za ostvariva. */
+export function jeDostignuceOstvarivo(id: string): boolean {
+  return jeDostignuceVidljivo(id);
+}

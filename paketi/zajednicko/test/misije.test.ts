@@ -10,10 +10,15 @@ import {
 } from '../src/misije.js';
 
 describe('katalog misija', () => {
-  it('ima točno 25 dnevnih i 25 tjednih aktivnih predložaka (PR04 Izazov)', () => {
+  it('katalog ima 50 predložaka; aktivni pool je manji nakon Brze igre', () => {
     expect(DEFINICIJE_MISIJA).toHaveLength(50);
-    expect(definicijeMisijaPoVrsti('dnevna')).toHaveLength(25);
-    expect(definicijeMisijaPoVrsti('tjedna')).toHaveLength(25);
+    // 8 dnevnih + 8 tjednih deaktivirano (D07/08/09/11/12/19/22/24, W08/09/11/12/19/20/22/24).
+    expect(definicijeMisijaPoVrsti('dnevna')).toHaveLength(17);
+    expect(definicijeMisijaPoVrsti('tjedna')).toHaveLength(17);
+    expect(definicijaMisije('D07')?.aktivna).toBe(false);
+    expect(definicijaMisije('W22')?.aktivna).toBe(false);
+    expect(definicijaMisije('D21')?.aktivna).toBe(true);
+    expect(definicijaMisije('D25')?.aktivna).toBe(true);
   });
 
   it('ima jedinstvene ID-ove i pozitivne ciljeve', () => {
@@ -22,7 +27,6 @@ describe('katalog misija', () => {
     for (const d of DEFINICIJE_MISIJA) {
       expect(d.cilj).toBeGreaterThan(0);
       expect(d.verzijaDefinicije).toBe(1);
-      expect(d.aktivna).toBe(true);
     }
   });
 

@@ -451,29 +451,34 @@ describe('misije API i stanje', () => {
     let tjednaId = '';
     await baza.transaction(async (tx) => {
       await osigurajStanjeMisija(tx, igracId, { sada: () => utorak, rng: fiksniRng() });
-      const [tjedna] = await tx.select().from(dodjeleMisija).where(and(
+      const tjedne = await tx.select().from(dodjeleMisija).where(and(
         eq(dodjeleMisija.igracId, igracId),
         eq(dodjeleMisija.vrsta, 'tjedna'),
         eq(dodjeleMisija.status, 'aktivna'),
       ));
-      expect(tjedna).toBeTruthy();
-      tjednaId = tjedna!.id;
-      const w01 = DEFINICIJE_MISIJA.find((d) => d.predlozakId === 'W01')!;
+      expect(tjedne.length).toBeGreaterThan(0);
+      const zauzeti = new Set(tjedne.map((t) => t.predlozakId));
+      const tjedna = tjedne[0]!;
+      tjednaId = tjedna.id;
+      // Biraj predložak koji još nije u paketu (manji aktivni pool nakon Brze igre).
+      const ciljna = DEFINICIJE_MISIJA.find((d) =>
+        d.vrsta === 'tjedna' && d.aktivna && d.metrika === 'partije' && !zauzeti.has(d.predlozakId),
+      ) ?? DEFINICIJE_MISIJA.find((d) => d.predlozakId === tjedna.predlozakId)!;
       await tx.update(dodjeleMisija).set({
-        predlozakId: w01.predlozakId,
-        cilj: w01.cilj,
+        predlozakId: ciljna.predlozakId,
+        cilj: ciljna.cilj,
         napredak: 0,
         snapshot: {
-          predlozakId: w01.predlozakId,
+          predlozakId: ciljna.predlozakId,
           verzijaDefinicije: 1,
-          naziv: w01.naziv,
-          opis: w01.opis,
-          metrika: w01.metrika,
-          cilj: w01.cilj,
+          naziv: ciljna.naziv,
+          opis: ciljna.opis,
+          metrika: ciljna.metrika,
+          cilj: ciljna.cilj,
           pragMetrike: null,
           podciljevi: null,
-          xp: w01.xp,
-          obitelj: w01.obitelj,
+          xp: ciljna.xp,
+          obitelj: ciljna.obitelj,
           zahtjevnija: false,
           kontekst: 'javna',
           mod: 'oba',
@@ -523,7 +528,7 @@ describe('misije API i stanje', () => {
     expect(['istekla', 'dovrsena']).toContain(nakon!.status);
   });
 
-  it('PR12: paralelna D22+W22 i retry istog izvora bez dvostruke nagrade', async () => {
+  it('Brza igra: deaktivirane D22/W22 ne napreduju u obračunu', async () => {
     const { igracId } = await registriraj();
     const sada = new Date('2026-11-04T12:00:00+01:00');
     let d22Id = '';
@@ -620,13 +625,21 @@ describe('misije API i stanje', () => {
     const prvi = await baza.transaction((tx) =>
       obracunajMisijeZaIgraca(tx, metrike, 100, 50, { sada: () => sada, rng: fiksniRng() }),
     );
-    expect(prvi.promjeneMisija.some((p) => p.predlozakId === 'D22' && p.poslije === 3)).toBe(true);
-    expect(prvi.promjeneMisija.some((p) => p.predlozakId === 'W22' && p.poslije === 1)).toBe(true);
+    expect(prvi.promjeneMisija.some((p) => p.predlozakId === 'D22')).toBe(false);
+    expect(prvi.promjeneMisija.some((p) => p.predlozakId === 'W22')).toBe(false);
+  });
 
-    const drugi = await baza.transaction((tx) =>
-      obracunajMisijeZaIgraca(tx, metrike, 100, 50, { sada: () => sada, rng: fiksniRng() }),
-    );
-    expect(drugi.promjeneMisija).toEqual(prvi.promjeneMisija);
+  it('sistemska zamjena deaktivirane aktivne misije ne troši ručnu kvotu', async () => {
+    const { igracId } = await registriraj();
+    await baza.transaction(async (tx) => {
+      const stanje = await izgradiStanjeMisijaDto(tx, igracId);
+      const dnevna = stanje.dnevne.aktivne[0]!;
+      await tx.update(dodjeleMisija).set({ predlozakId: 'D07' }).where(eq(dodjeleMisija.id, dnevna.dodjelaId));
+      const poslije = await izgradiStanjeMisijaDto(tx, igracId);
+      expect(poslije.dnevne.aktivne.every((m) => m.predlozakId !== 'D07')).toBe(true);
+      expect(poslije.dnevne.aktivne).toHaveLength(stanje.dnevne.aktivne.length);
+      expect(poslije.zamjene.dnevna.preostalo).toBe(1);
+    });
   });
 
   it('soft-delete: neaktivna definicija se ne bira za nove dodjele', async () => {

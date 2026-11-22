@@ -3,6 +3,8 @@ import {
   AKTIVNI_JAVNI_REDOVI,
   BRZA_IGRA,
   jeAktivanJavniKljuc,
+  jeDostignuceOstvarivo,
+  jeDostignuceVidljivo,
   jeJavnaKombinacijaAktivna,
   kanonskiModLjestvice,
   KLJUCEVI_JAVNOG_REDA,
@@ -45,5 +47,14 @@ describe('dostupnost-igranja', () => {
     expect(kanonskiModLjestvice('cetiri_igraca')).toBe('tri_igraca');
     expect(kanonskiModLjestvice('tri_igraca')).toBe('tri_igraca');
     expect(kanonskiModLjestvice(undefined)).toBe('tri_igraca');
+  });
+
+  it('skriva nedostižna dostignuća, ali ne ka_zna (žrtva)', () => {
+    expect(jeDostignuceVidljivo('dvostruka_kruna')).toBe(false);
+    expect(jeDostignuceVidljivo('na_dvije_fronte')).toBe(false);
+    expect(jeDostignuceVidljivo('imam_nastavak')).toBe(false);
+    expect(jeDostignuceVidljivo('stara_skola')).toBe(false);
+    expect(jeDostignuceVidljivo('ka_zna')).toBe(true);
+    expect(jeDostignuceOstvarivo('salji_dalje')).toBe(true);
   });
 });
