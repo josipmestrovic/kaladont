@@ -196,10 +196,11 @@ describe('red čekanja', () => {
       await stanjePromise;
     }
 
+    // Listener prije zamjenske veze — server emitira red:stanje dok gasi staru sesiju.
+    const stanjeNakonPrekida = new Promise<StanjeReda>((resolve) => veze[0]!.once('red:stanje', resolve));
     const odjavaStare = new Promise<void>((resolve) => veze[1]!.once('disconnect', () => resolve()));
     const zamjenskaVeza = await spojiSe(gosti[1]!.token);
     await odjavaStare;
-    const stanjeNakonPrekida = new Promise<StanjeReda>((resolve) => veze[0]!.once('red:stanje', resolve));
     const bezOdspojenog = await stanjeNakonPrekida;
     expect(bezOdspojenog.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([gosti[0]!.igracId]);
 
