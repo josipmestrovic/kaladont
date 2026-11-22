@@ -42,8 +42,8 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Uža glavna navigacija ima osnovne retke **Igraj**, **Pravila**, **Ljestvica** i **Moja statistika**. „Moja statistika” vodi na zadani statistički prikaz `/profil#statistika`. Sekundarne stavke imaju tamni standardni tekst i ikone, zelenu strelicu te tekst lijevo poravnat uz ikonu.
 - Glavna navigacija koristi vlastite SVG assete: `GiToothbrush` za Igraj, `GiSpellBook` za Pravila, `GiHoleLadder` za Ljestvicu, `GiGamepad` za Moju statistiku, `GiAutoRepair` za Postavke, `GiExitDoor` za Odjavu te `GiTwoShadows` za Prijavu i Registraciju. Modal igre koristi ikone formata (uključujući Troboj) i privatne sobe.
 - Svi korisnici vide **Postavke** (`/postavke`, uz preusmjeravanje na `/profil?tab=postavke#postavke`); promjena teme dostupna je isključivo ondje. Registrirani korisnik dodatno vidi blago narančastu akciju **Odjavi se**. Gost vidi **Prijavi se** i **Registriraj se**. Editor avatara (`/profil/avatar`) dostupan je i gostima.
-- <!-- HINT PR15: Igraj je dvokoračni — pravilnik pa format. -->
-- **Igraj** otvara modal u **dva koraka**: (1) pravila — Klasični Kaladont / Dokaži nastavak / KA-zna; (2) format — **Dvoboj**, **Troboj**, **Četveroboj**. Redoslijed glavne navigacije: **Igraj**, **Zagrijavanje**, **Privatna soba**. Zagrijavanje otvara modal u dva koraka: pravila, zatim 1 / 2 / 3 Računala. Javni ulazi nose `pravila` i `mod` u `/red`. Modal zamućuje pozadinu.
+- <!-- HINT: Brza igra = instant ulaz u Troboj+Klasični; Trening zadržava modal. -->
+- Glavna navigacija: **Brza igra**, **Izazovi**, **Trening**, **Privatna soba**. **Brza igra** ide izravno na `/red?mod=tri_igraca&pravila=klasicni` (bez modala). **Trening** otvara modal: pravilnik → težina → broj botova (URL `/zagrijavanje` ostaje). Ostali javni redovi nisu dostupni u UI-ju.
 - **Pravila** vode na `/pravila-kaladonta`, a **Ljestvice** na `/ljestvice`. Kratki SEO uvod ispod H1 vodi na hub pravila; na niskim ekranima ostaje u DOM-u (vizualno skriven) radi SEO-a. Vertikalni scroll na naslovnici je dopušten.
 - Tipografija na naslovnici: labele glavne navigacije **20px** (mobitel) / **24px** (desktop); prekidači **Font za disleksiju** i **Čitanje naglas** **16px** / **18px**. Ako labele prekidača ne stanu u jedan red, prelaze u drugi (bez truncatea).
 - Footer na dnu naslovnice sadrži **Novosti** (`/novosti`), **O igri** (`/o-igri`), **Pomozi poboljšati igru** (`/povratne-informacije`), **Uvjeti** (`/uvjeti`) i **Privatnost** (`/privatnost`). CTA **pridruži zajednici** (forum) je u SEO uvodu, ne u footeru. Desktop: navigacija lijevo, copyright desno; mobitel: copyright ispod navigacije.
@@ -52,14 +52,14 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Pravila (`/pravila-kaladonta/pristupacnost`) objašnjavaju govornu mogućnost i vode na upute za Android, iPhone/iPad, Windows, Mac i Linux. Ista tema opisuje disleksiju i moguću vrijednost jezične igre bez terapijskih tvrdnji.
 - Zaseban red poveznica Prijavi se / Registriraj se ispod navigacije ne prikazuje se; te su akcije dio jedinstvene navigacije gosta.
 
-## 2. Red čekanja (`/red?mod=…&pravila=…`)
+## 2. Red čekanja (`/red?mod=tri_igraca&pravila=klasicni`)
 
-- Čekaonica prikazuje 2, 3 ili 4 mjesta prema formatu (`dva_igraca` / `tri_igraca` / `cetiri_igraca`).
+- Javna čekaonica je **Brza igra · Troboj · Klasična pravila** (3 mjesta). Stari `/red` linkovi preusmjeravaju na kanonski ulaz.
 - Čim se skupi pun stol, countdown (6 s u stagingu/produkciji) i partija kreće.
-- Popuna botovima: Četveroboj 20/30/40 s; Troboj ~20/30 s; Dvoboj ~30 s ([botovi.md](../02-pravila-igre/botovi.md)).
+- Popuna botovima za Troboj: fiksno **10 s / 20 s** bez jittera ([botovi.md](../02-pravila-igre/botovi.md)). Timer poteza ostaje **30 s**.
 - Gosti idu ravno u čekaonicu bez prompta za ime.
 
-## 2d. Zagrijavanje (`/zagrijavanje`)
+## 2d. Trening (`/zagrijavanje`)
 
 - Stranica odmah šalje `trening:zapocni`, prikazuje „Pripremamo dvoboj protiv računala…”, napomenu da se ništa ne bilježi i gumb **Odustani**. Nakon `partija:pocetak` odbrojava kao čekaonica i vodi na `/partija/:id`.
 - Greška (zauzet poslužitelj, isključen trening, aktivna partija ili soba) prikazuje poruku i **Pokušaj ponovno**; igrač koji već ima partiju preusmjerava se na nju.

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { nasloviNacrta, ocekivanaIzdanja } from './pomocnici/izdanja.js';
-import { otvoriProfilIzbornik, otvoriRankedKorak1 } from './pomocnici/naslovnica.js';
+import { otvoriProfilIzbornik } from './pomocnici/naslovnica.js';
 
 const NASLOVNICA_TITLE = 'Kaladont Online - Multiplayer igra riječi';
 const NASLOVNICA_DESCRIPTION =
@@ -90,12 +90,12 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(footerLinkovi.nth(1)).toHaveAttribute('href', '/o-igri');
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
-  await expect(navigacija.getByRole('button', { name: 'Ranked', exact: true })).toBeVisible();
+  await expect(navigacija.getByRole('button', { name: 'Brza igra', exact: true })).toBeVisible();
   await expect(navigacija.getByRole('link', { name: 'Izazovi', exact: true })).toHaveAttribute(
     'href',
     '/izazovi',
   );
-  await expect(navigacija.getByRole('button', { name: 'Zagrijavanje', exact: true })).toBeVisible();
+  await expect(navigacija.getByRole('button', { name: 'Trening', exact: true })).toBeVisible();
   await expect(navigacija.getByRole('link', { name: 'Privatna soba', exact: true })).toHaveAttribute(
     'href',
     '/soba/kreiraj',
@@ -118,28 +118,10 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(izbornik.getByRole('menuitem', { name: 'Odjavi se' })).toHaveCount(0);
   await page.keyboard.press('Escape');
 
-  const dijalog = await otvoriRankedKorak1(page);
-  const podloga = page.locator('.modal-podloga');
-  await expect(podloga).toHaveCSS('position', 'fixed');
-  const okvir = await podloga.boundingBox();
-  expect(okvir).toBeTruthy();
-  expect(okvir!.width).toBeGreaterThanOrEqual(page.viewportSize()!.width - 2);
-  expect(okvir!.height).toBeGreaterThanOrEqual(page.viewportSize()!.height - 2);
-  await expect(dijalog.getByRole('button', { name: /Klasični Kaladont/ })).toBeVisible();
-  await expect(dijalog.getByRole('button', { name: /KA-zna/ })).toBeVisible();
-  await expect(dijalog.getByRole('button', { name: /Dokaži nastavak/ })).toBeVisible();
-
-  await dijalog.getByRole('button', { name: /KA-zna/ }).click();
-  await expect(dijalog.getByRole('heading', { name: 'Odaberi stol' })).toBeVisible();
-  const opcije = dijalog.getByRole('link');
-  await expect(opcije).toHaveCount(3);
-  await expect(opcije.nth(0)).toHaveAttribute('href', '/red?mod=dva_igraca&pravila=ka_zna');
-  await expect(opcije.nth(1)).toHaveAttribute('href', '/red?mod=tri_igraca&pravila=ka_zna');
-  await expect(opcije.nth(2)).toHaveAttribute('href', '/red?mod=cetiri_igraca&pravila=ka_zna');
-  await expect(dijalog.getByText('Troboj · 3 igrača')).toBeVisible();
-
-  await page.keyboard.press('Escape');
-  await expect(dijalog).toBeHidden();
+  await navigacija.getByRole('button', { name: 'Brza igra', exact: true }).click();
+  await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
+  await expect(page.getByTestId('red-oznaka-izbora')).toHaveText('Brza igra · Troboj · Klasična pravila');
+  await page.goto('/');
 
   await oIgri.click();
   await expect(page).toHaveURL('/o-igri');
@@ -445,20 +427,20 @@ test('mobilna navigacija ima četiri CTA stavke s razmakom', async ({ page }) =>
   await expect(page.locator('.landing-footer')).toBeVisible({ timeout: 20_000 });
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
-  const ranked = navigacija.getByRole('button', { name: 'Ranked', exact: true });
+  const brza = navigacija.getByRole('button', { name: 'Brza igra', exact: true });
   const izazovi = navigacija.getByRole('link', { name: 'Izazovi', exact: true });
-  const zagrijavanje = navigacija.getByRole('button', { name: 'Zagrijavanje', exact: true });
+  const trening = navigacija.getByRole('button', { name: 'Trening', exact: true });
   const privatna = navigacija.getByRole('link', { name: 'Privatna soba', exact: true });
 
-  const rankedBox = await ranked.boundingBox();
+  const brzaBox = await brza.boundingBox();
   const izazoviBox = await izazovi.boundingBox();
-  const zagrijavanjeBox = await zagrijavanje.boundingBox();
+  const treningBox = await trening.boundingBox();
   const privatnaBox = await privatna.boundingBox();
-  expect(rankedBox && izazoviBox && zagrijavanjeBox && privatnaBox).toBeTruthy();
+  expect(brzaBox && izazoviBox && treningBox && privatnaBox).toBeTruthy();
 
-  const razmak1 = izazoviBox!.y - (rankedBox!.y + rankedBox!.height);
-  const razmak2 = zagrijavanjeBox!.y - (izazoviBox!.y + izazoviBox!.height);
-  const razmak3 = privatnaBox!.y - (zagrijavanjeBox!.y + zagrijavanjeBox!.height);
+  const razmak1 = izazoviBox!.y - (brzaBox!.y + brzaBox!.height);
+  const razmak2 = treningBox!.y - (izazoviBox!.y + izazoviBox!.height);
+  const razmak3 = privatnaBox!.y - (treningBox!.y + treningBox!.height);
   expect(razmak1).toBeGreaterThanOrEqual(5);
   expect(razmak2).toBeGreaterThanOrEqual(5);
   expect(razmak3).toBeGreaterThanOrEqual(5);

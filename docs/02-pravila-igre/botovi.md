@@ -6,16 +6,16 @@ Dopuna [pravila igre](pravila-igre.md) prema [ADR-017](../03-arhitektura/odluke/
 
 Vrijeme se računa na poslužitelju od `usaoU` **najstarijeg prisutnog čovjeka** u nepotpunoj grupi. Bot nikada nije vremensko polazište; dolazak novog čovjeka ne resetira čekanje ostalih.
 
-U redovnom radu prag Dvoboja izvlači se između 26 i 34 s, pragovi Troboja oko 20 i 30 s (s postojećim odstupanjem), a pragovi Četveroboja između 17–23, 27–33 i 37–43 s. Odstupanja se izvlače jednom po epizodi čekanja; tablica navodi središnje vrijednosti.
+U redovnom radu jedini aktivan javni red je **Brza igra** (Troboj + Klasični): pragovi **10 s / 20 s** bez jittera. Ostali formati ostaju u katalogu za Trening/privatno i kasnije uključivanje; njihovi pragovi (Dvoboj ~30 s, Četveroboj 20/30/40 s s odstupanjem) vrijede tek ako se ponovno aktiviraju.
 
-<!-- HINT PR15: Troboj popuna 20/30 s; osam javnih redova (zajednički Dvoboj Klasični+KA-zna). -->
+<!-- HINT: Brza igra = 10/20 s Troboj; katalog 8 redova ostaje. -->
 
 | Situacija | Ponašanje |
 | --- | --- |
 | Dvoboj, jedan čovjek | Čeka do 30 s; na 30 s slobodan bot popunjava mjesto. |
 | Dvoboj, drugi čovjek stigne prije pokretanja | Igraju dva čovjeka; rezervirani bot se oslobađa. |
-| Troboj, 2 čovjeka | Jedan bot na ~20 s i početak. |
-| Troboj, 1 čovjek | Bot na ~20 s; drugi na ~30 s i početak. |
+| Troboj, 2 čovjeka | Jedan bot na 10 s i početak. |
+| Troboj, 1 čovjek | Bot na 10 s; drugi na 20 s i početak. |
 | Troboj, 3 čovjeka | Početak odmah. |
 | Četveroboj, 3 čovjeka | Jedan bot na 20 s i početak. |
 | Četveroboj, 2 čovjeka | Bot na 20 s; drugi na 30 s i početak. |

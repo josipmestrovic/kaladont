@@ -16,9 +16,7 @@
   import { apiUrl } from '$lib/api-url.js';
   import { dohvatiAuthToken } from '$lib/identitet.js';
 
-  type ModPartije = import('zajednicko').ModPartije;
-  /** PR11: tri ljestvice po veličini stola (Četveroboj / Troboj / Dvoboj). */
-  type Mod = 'cetiri_igraca' | 'tri_igraca' | 'dva_igraca';
+  type Mod = 'tri_igraca';
   type Kategorija = 'igraci' | 'rijeci';
 
   interface StavkaRijeci {
@@ -27,13 +25,9 @@
     brojUpotreba: number;
   }
 
-  /** Copy po PR03/pregledu — stil kao postojeći Četveroboj/Dvoboj tekstovi. */
   const PRAVILA_BODOVANJA: Record<Mod, string> = {
-    cetiri_igraca:
-      'Plasman: 1. mjesto 3 boda, 2. mjesto 2, 3. mjesto 1, 4. mjesto 0. Uz to +1 za pobjedu i +1 po eliminaciji (najviše 3). Maksimum je 7 bodova po igri.',
     tri_igraca:
       'Plasman: 1. mjesto 2 boda, 2. mjesto 1, 3. mjesto 0. Uz to +1 za pobjedu i +1 po eliminaciji. Maksimum je 5 bodova po igri.',
-    dva_igraca: 'Pobjednik dobiva 1 bod, poraženi 0. Eliminacije ne dodaju bodove.',
   };
 
   const NAZIVI_RAZDOBLJA: Record<RazdobljeLjestvice, string> = {
@@ -60,13 +54,7 @@
 
   const url = $derived($page.url);
   const kategorija = $derived<Kategorija>(url.searchParams.get('kategorija') === 'rijeci' ? 'rijeci' : 'igraci');
-  const mod = $derived<Mod>(
-    url.searchParams.get('mod') === 'dva_igraca'
-      ? 'dva_igraca'
-      : url.searchParams.get('mod') === 'tri_igraca'
-        ? 'tri_igraca'
-        : 'cetiri_igraca',
-  );
+  const mod = $derived<Mod>('tri_igraca');
   const metrika = $derived<MetrikaLjestvice>(
     (METRIKE_LJESTVICA as readonly string[]).includes(url.searchParams.get('metrika') ?? '')
       ? (url.searchParams.get('metrika') as MetrikaLjestvice)
@@ -111,9 +99,9 @@
   // Stari ?prikaz=oko_mene bez potrebe prikazuje Top 10; normalizirani prikaz ide u API.
   const prikaz = $derived<PrikazLjestvice>(prikazUrl === 'oko_mene' && mozeOkoMene ? 'oko_mene' : 'top');
 
-  function nazivMetrike(me: MetrikaLjestvice, m: ModPartije = mod): string {
+  function nazivMetrike(me: MetrikaLjestvice): string {
     if (me === 'niz_pobjeda') return 'Niz pobjeda';
-    return m === 'dva_igraca' ? 'Udio pobjeda' : 'Prosjek bodova';
+    return 'Prosjek bodova';
   }
 
   function promijeni(izmjene: Record<string, string>) {
@@ -176,6 +164,12 @@
   });
 
   onMount(() => {
+    const stariMod = url.searchParams.get('mod');
+    if (stariMod && stariMod !== 'tri_igraca') {
+      const novi = new URL(url);
+      novi.searchParams.set('mod', 'tri_igraca');
+      void goto(`${novi.pathname}${novi.search}`, { replaceState: true, noScroll: true });
+    }
     const tik = setInterval(() => {
       sadaMs = Date.now();
     }, 1000);
@@ -255,11 +249,7 @@
 </div>
 
 {#if kategorija === 'igraci'}
-  <div class="modovi" role="group" aria-label="Način igre">
-    <button type="button" class="mod-gumb" aria-pressed={mod === 'cetiri_igraca'} class:aktivan={mod === 'cetiri_igraca'} onclick={() => promijeni({ mod: 'cetiri_igraca' })}>Četveroboj</button>
-    <button type="button" class="mod-gumb" aria-pressed={mod === 'tri_igraca'} class:aktivan={mod === 'tri_igraca'} onclick={() => promijeni({ mod: 'tri_igraca' })}>Troboj</button>
-    <button type="button" class="mod-gumb" aria-pressed={mod === 'dva_igraca'} class:aktivan={mod === 'dva_igraca'} onclick={() => promijeni({ mod: 'dva_igraca' })}>Dvoboj</button>
-  </div>
+  <p class="mod-oznaka" data-testid="ljestvice-mod">Brza igra · Troboj</p>
 
   <div class="metrike" role="group" aria-label="Ljestvica">
     {#each METRIKE_LJESTVICA as m (m)}
@@ -411,6 +401,13 @@
     color: var(--boja-isticanje-tekst);
     font-weight: 700;
     border-bottom-color: var(--boja-isticanje-slova);
+  }
+
+  .mod-oznaka {
+    margin: 0 0 8px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mali);
+    font-weight: 600;
   }
 
   .modovi {

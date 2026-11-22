@@ -11,7 +11,6 @@
   import StilIgrePojasnjenje from '$lib/komponente/StilIgrePojasnjenje.svelte';
   import KolekcijaRijeci from '$lib/komponente/KolekcijaRijeci.svelte';
   import OpcenitoProfil from '$lib/komponente/OpcenitoProfil.svelte';
-  import Podizbornik from '$lib/komponente/Podizbornik.svelte';
   import { ucitajAseteProfila } from '$lib/asetovi-core.js';
   import { PRAGOVI_DULJINE, type AvatarConfigV1, type BrojacDostignuca, type DnkProfil, type ModPartije } from 'zajednicko';
 
@@ -99,7 +98,7 @@
   }
 
   type PogledProfila = 'opcenito' | 'statistika' | 'dostignuca' | 'rijeci' | 'povijest';
-  type TabFormata = '1v1' | '3p' | '4p';
+  type TabFormata = '3p';
 
   interface Dostignuce {
     id: string;
@@ -117,7 +116,7 @@
 
   let profil = $state<Profil | null>(null);
   let greska = $state<string | null>(null);
-  let aktivniTab = $state<TabFormata>('1v1');
+  let aktivniTab = $state<TabFormata>('3p');
   let otvoreniPopup = $state<'duge' | 'rijetke' | null>(null);
   let rijeciPoKategoriji = $state<Record<string, string[]>>({});
   let ucitavanjeRijeci = $state(false);
@@ -126,29 +125,16 @@
   let velicinaAvatara = $state(198);
   const prikazujePostavke = $derived($page.url.searchParams.get('tab') === 'postavke');
 
-  function formaZaTab(tab: TabFormata): FormaProfil | null {
+  function formaZaTab(_tab: TabFormata): FormaProfil | null {
     if (!profil) return null;
-    if (profil.formati) {
-      const kljuc: ModPartije = tab === '1v1' ? 'dva_igraca' : tab === '3p' ? 'tri_igraca' : 'cetiri_igraca';
-      return profil.formati[kljuc]?.forma ?? null;
-    }
-    if (tab === '1v1') return profil.forma.dvaIgraca;
-    if (tab === '4p') return profil.forma.cetiriIgraca;
+    if (profil.formati) return profil.formati.tri_igraca?.forma ?? null;
     return profil.forma.triIgraca ?? null;
   }
 
-  /** Na Općenito: najjači trenutniNiz (izjednačeno 4p→3p→2p); na Statistici: aktivniTab. */
+  /** Na Općenito i Statistici: Troboj (Brza igra) forma. */
   const headerForma = $derived.by(() => {
     if (!profil) return null;
-    if (aktivniPogled === 'statistika') return formaZaTab(aktivniTab);
-    const kandidati: FormaProfil[] = [];
-    for (const tab of ['4p', '3p', '1v1'] as const) {
-      const forma = formaZaTab(tab);
-      if (forma) kandidati.push(forma);
-    }
-    if (kandidati.length === 0) return null;
-    return kandidati.reduce((najbolji, trenutni) =>
-      trenutni.trenutniNiz > najbolji.trenutniNiz ? trenutni : najbolji);
+    return formaZaTab(aktivniTab);
   });
 
   function promijeniPogled(pogled: PogledProfila) {
@@ -303,31 +289,20 @@
         dnk={profil.dnk}
         odigraneJavne={profil.odigraneJavne ?? (profil.odigrane + profil.odigrane1v1)}
         pobjedeJavne={profil.pobjedeJavne ?? (profil.pobjede + profil.pobjede1v1)}
-        odigrane2p={profil.formati?.dva_igraca.odigrane ?? profil.odigrane1v1}
-        odigrane3p={profil.formati?.tri_igraca.odigrane ?? 0}
-        odigrane4p={profil.formati?.cetiri_igraca.odigrane ?? profil.odigrane}
+        odigraneBrzaIgra={profil.formati?.tri_igraca.odigrane ?? 0}
         prosjecnaOcjenaIgre={profil.prosjecnaOcjenaIgre}
         naslovDnk="Tvoj Kaladont DNK"
       />
     {/if}
 
     {#if aktivniPogled === 'statistika'}
-      <Podizbornik
-        stavke={[
-          { kljuc: '1v1', naziv: 'Dvoboj' },
-          { kljuc: '3p', naziv: 'Troboj' },
-          { kljuc: '4p', naziv: 'Četveroboj' },
-        ]}
-        aktivna={aktivniTab}
-        ariaLabel="Format igre"
-        promijeni={(kljuc) => (aktivniTab = kljuc as TabFormata)}
-      />
-      {@const formatKljuc: ModPartije = aktivniTab === '1v1' ? 'dva_igraca' : aktivniTab === '3p' ? 'tri_igraca' : 'cetiri_igraca'}
+      {@const formatKljuc: ModPartije = 'tri_igraca'}
       {@const formatStat = profil.formati?.[formatKljuc]}
-      {@const odigraneFmt = formatStat?.odigrane ?? (aktivniTab === '1v1' ? profil.odigrane1v1 : aktivniTab === '4p' ? profil.odigrane : 0)}
-      {@const pobjedeFmt = formatStat?.pobjede ?? (aktivniTab === '1v1' ? profil.pobjede1v1 : aktivniTab === '4p' ? profil.pobjede : 0)}
+      {@const odigraneFmt = formatStat?.odigrane ?? 0}
+      {@const pobjedeFmt = formatStat?.pobjede ?? 0}
       {@const formaFmt = formaZaTab(aktivniTab)}
       <section id="statistika" class="statistika-sekcija">
+        <h2>Rezultati — Brza igra (Troboj)</h2>
         <div class="mrezica-kartica">
           <div class="stat-kartica">
             <span class="stat-broj">{odigraneFmt}</span>
