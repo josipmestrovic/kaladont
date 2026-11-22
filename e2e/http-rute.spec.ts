@@ -80,10 +80,10 @@ test('nepoznata API ruta vraća JSON 404, a reset stranica ostaje HTML', async (
 });
 
 test('same-origin Socket.IO handshake radi u buildanom serveru', async ({ page }) => {
-  await page.goto('/red?mod=dva_igraca');
-  await expect(page).toHaveURL(/\/red\?mod=dva_igraca$/);
+  await page.goto('/red?mod=tri_igraca&pravila=klasicni');
+  await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni$/);
   await expect(page.locator('ul.mjesta > li.moje-sjedalo .oznaka-ti')).toBeVisible();
   await expect(page.locator('ul.mjesta > li.zauzeto')).toHaveCount(1);
-  await expect(page.getByRole('heading', { name: /Čekamo još 1/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Čekamo još 2/ })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });

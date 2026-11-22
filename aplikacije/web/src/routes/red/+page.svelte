@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { dohvatiSocket } from '$lib/socket.js';
   import Zanimljivosti from '$lib/komponente/Zanimljivosti.svelte';
@@ -10,18 +9,13 @@
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
   import type { ModPartije, PayloadGreska, PocetakPartije, PravilnikPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
-  import {
-    BRZA_IGRA,
-    javnaSjedalaZaMod,
-    jeJavnaKombinacijaAktivna,
-    jePoznatiPravilnik,
-    ZADANI_PRAVILNIK,
-  } from 'zajednicko';
+  import { BRZA_IGRA, javnaSjedalaZaMod } from 'zajednicko';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
 
+  let { data } = $props();
   const igra = dohvatiStanjeIgre();
 
-  /** Stari /red linkovi → kanonska Brza igra; ne šalji nedopušten ulaz serveru. */
+  /** Javni lobby je uvijek Brza igra (kanonski URL dolazi iz +page.ts). */
   const trazeneMod = $derived(BRZA_IGRA.mod satisfies ModPartije);
   const trazenaPravila = $derived(BRZA_IGRA.pravila satisfies PravilnikPartije);
   const ukupnoMjesta = $derived(javnaSjedalaZaMod(trazeneMod));
@@ -76,26 +70,8 @@
   }
 
   onMount(() => {
-    const queryMod = $page.url.searchParams.get('mod');
-    const queryPravila = $page.url.searchParams.get('pravila');
-    const legacyParam = $page.url.searchParams.get('obavijest') === 'legacy';
-    if (legacyParam) {
+    if (data.obavijestLegacy) {
       obavijestLegacy = 'Ovaj način više nije dostupan kao javna igra. Premješteni ste u Brzu igru.';
-    }
-    const trazeniModQuery: ModPartije =
-      queryMod === 'dva_igraca' ? 'dva_igraca'
-        : queryMod === 'tri_igraca' ? 'tri_igraca'
-          : queryMod === 'cetiri_igraca' ? 'cetiri_igraca'
-            : BRZA_IGRA.mod;
-    const trazenaPravilaQuery: PravilnikPartije = jePoznatiPravilnik(queryPravila)
-      ? queryPravila
-      : (queryPravila == null && queryMod == null ? BRZA_IGRA.pravila : ZADANI_PRAVILNIK);
-    const kanonski =
-      queryMod === BRZA_IGRA.mod && queryPravila === BRZA_IGRA.pravila;
-    if (!kanonski) {
-      const putanja = `${putanjaBrzeIgre()}${jeJavnaKombinacijaAktivna(trazeniModQuery, trazenaPravilaQuery) ? '' : '&obavijest=legacy'}`;
-      void goto(putanja, { replaceState: true });
-      return;
     }
 
     zagrijGameplayZvukove();

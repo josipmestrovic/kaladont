@@ -10,7 +10,7 @@ import {
 for (const sirina of [320, 390, 1440]) {
   test(`zanimljivosti se listaju bez pomicanja čekaonice ${sirina}px`, async ({ page }, podaciTesta) => {
     await page.setViewportSize({ width: sirina, height: 900 });
-    await page.goto('/red?mod=dva_igraca');
+    await page.goto('/red?mod=tri_igraca&pravila=klasicni');
     const zanimljivosti = page.getByRole('region', { name: 'Zanimljivosti o hrvatskom jeziku' });
     await expect(zanimljivosti.getByRole('heading', { name: 'Zanimljivosti', exact: true })).toBeVisible();
     await expect(zanimljivosti.locator('article')).toHaveCount(5);
@@ -37,7 +37,7 @@ for (const sirina of [320, 390, 1440]) {
 }
 
 test('PR02-12/19: puni završni DTO u ciljanom DOM redoslijedu; pohvale nepromijenjene', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 2);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
     await udjiUJavniRed(igraci, 'dva_igraca');
     const partijaId = await cekajIstuPartiju(igraci);
@@ -152,7 +152,7 @@ test('PR02-12/19: puni završni DTO u ciljanom DOM redoslijedu; pohvale nepromij
     await expect(stranica.getByText('Jako rijetka riječ')).toBeVisible();
     await expect(stranica.getByRole('link', { name: 'Igraj opet' })).toHaveAttribute(
       'href',
-      '/red?mod=dva_igraca&pravila=ka_zna',
+      '/red?mod=tri_igraca&pravila=klasicni',
     );
   } finally {
     await zatvoriIgrace(igraci);
@@ -160,7 +160,7 @@ test('PR02-12/19: puni završni DTO u ciljanom DOM redoslijedu; pohvale nepromij
 });
 
 test('PR02-13: minimalni završni DTO skriva opcionalne blokove; akcije i prijave ostaju', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 2);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
     await udjiUJavniRed(igraci, 'dva_igraca');
     const partijaId = await cekajIstuPartiju(igraci);
@@ -205,7 +205,7 @@ test('PR02-13: minimalni završni DTO skriva opcionalne blokove; akcije i prijav
 });
 
 test('P01-15/16: pohvale igre vidljive na završnom ekranu; prijave ostaju na dnu', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 2);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
     await udjiUJavniRed(igraci, 'dva_igraca');
     const partijaId = await cekajIstuPartiju(igraci);
@@ -259,7 +259,7 @@ test('P01-15/16: pohvale igre vidljive na završnom ekranu; prijave ostaju na dn
 });
 
 test('P01-regresija: kasni kraj s obje pohvale otvara Završni poredak', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 2);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
     await udjiUJavniRed(igraci, 'dva_igraca');
     const partijaId = await cekajIstuPartiju(igraci);
@@ -326,12 +326,12 @@ test('P01-regresija: kasni kraj s obje pohvale otvara Završni poredak', async (
 
 for (const svijetla of [false, true]) {
   test(`završni rezultati imaju čitljiv kontrast ${svijetla ? 'svijetla' : 'tamna'}`, async ({ browser }, podaciTesta) => {
-    const igraci = await stvoriIgrace(browser, 2);
+    const igraci = await stvoriIgrace(browser, 3);
     try {
       await udjiUJavniRed(igraci, 'dva_igraca');
       const partijaId = await cekajIstuPartiju(igraci);
       const stranica = igraci[0]!.stranica;
-      await expect(stranica.locator('.igraci-red > li')).toHaveCount(2);
+      await expect(stranica.locator('.igraci-red > li')).toHaveCount(3);
       await expect.poll(() => stranica.evaluate(async () => {
         const putanja = '/src/lib/stanje-igre.svelte.ts';
         const { dohvatiStanjeIgre } = await import(putanja);
@@ -404,79 +404,77 @@ for (const svijetla of [false, true]) {
   });
 }
 
-for (const mod of ['dva_igraca', 'cetiri_igraca'] as const) {
-  test(`odbrojavanje zadržava lobby red i ne prikazuje shuffle u modu ${mod}`, async ({ page }) => {
-    await page.goto(`/red?mod=${mod}`);
-    await expect(page.locator('.mjesta li.moje-sjedalo')).toHaveCount(1);
-    await page.evaluate(async (nacin) => {
-      const putanjaModula = '/src/lib/socket.ts';
-      const modul = await import(putanjaModula);
-      const socket = modul.dohvatiSocket();
-      const stanje = await new Promise<{ mojIgracId: string }>((resolve) => {
-        socket.once('red:stanje', resolve);
-        socket.emit('red:stanje', { mod: nacin });
-      });
-      const brojMjesta = nacin === 'dva_igraca' ? 2 : 4;
-      const lobbyMjesta = Array.from({ length: brojMjesta }, (_, indeks) => ({
-        igracId: indeks === 0 ? stanje.mojIgracId : `lobby-bot-${indeks}`,
-        nadimak: indeks === 0 ? 'Igrac' : `LobbyBot${indeks}`,
-        jeGost: indeks === 0,
-        avatarId: 0,
-        avatarConfig: null,
-        avatarRevision: 0,
-        rang: null,
-        razina: 1,
-        odigrane: 0,
-        prosjekBodova: 0,
-        postotakPobjeda: 0,
-        trenutniNiz: 0,
-        razinaVatre: 0 as const,
-      }));
-      socket.emitEvent([
-        'red:stanje',
-        {
-          mojIgracId: stanje.mojIgracId,
-          mod: nacin,
-          prosjekCekanjaSek: 12,
-          mjesta: lobbyMjesta,
-        },
-      ]);
-      const shuffledSjedala = [...lobbyMjesta].reverse().map((mjesto, indeks) => ({
-        igracId: mjesto.igracId,
-        nadimak: indeks === brojMjesta - 1 ? 'Igrac' : `ShuffleBot${indeks + 1}`,
-        jeGost: mjesto.jeGost,
-        avatarId: mjesto.avatarId,
-        avatarConfig: mjesto.avatarConfig,
-        avatarRevision: mjesto.avatarRevision,
-        rang: mjesto.rang,
-        razina: mjesto.razina,
-        trenutniNiz: mjesto.trenutniNiz,
-        razinaVatre: mjesto.razinaVatre,
-      }));
-      socket.emitEvent([
-        'partija:pocetak',
-        {
-          partijaId: 'test-odbrojavanje',
-          mojIgracId: stanje.mojIgracId,
-          mod: nacin,
-          kontekst: 'javna',
-          pocetakIso: new Date(Date.now() + 60_000).toISOString(),
-          sjedala: shuffledSjedala,
-        },
-      ]);
-    }, mod);
-    await expect(page.getByRole('heading', { name: /Svi igrači su tu/ })).toBeVisible();
-    await expect(page.locator('.mjesta li.zauzeto')).toHaveCount(mod === 'dva_igraca' ? 2 : 4);
-    await expect(page.getByText('Prazno mjesto', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('LobbyBot1', { exact: true })).toBeVisible();
-    await expect(page.getByText('ShuffleBot1', { exact: true })).toHaveCount(0);
-    const nadimci = await page.locator('.mjesta li.zauzeto strong').evaluateAll((elementi) =>
-      elementi.map((el) => el.childNodes[0]?.textContent?.trim() ?? ''),
-    );
-    const ocekivano = mod === 'dva_igraca' ? ['Igrac', 'LobbyBot1'] : ['Igrac', 'LobbyBot1', 'LobbyBot2', 'LobbyBot3'];
-    expect(nadimci).toEqual(ocekivano);
-  });
-}
+test('odbrojavanje zadržava lobby red i ne prikazuje shuffle u Brzoj igri', async ({ page }) => {
+  const mod = 'tri_igraca' as const;
+  await page.goto('/red?mod=tri_igraca&pravila=klasicni');
+  await expect(page.locator('.mjesta li.moje-sjedalo')).toHaveCount(1);
+  await page.evaluate(async (nacin) => {
+    const putanjaModula = '/src/lib/socket.ts';
+    const modul = await import(putanjaModula);
+    const socket = modul.dohvatiSocket();
+    const stanje = await new Promise<{ mojIgracId: string }>((resolve) => {
+      socket.once('red:stanje', resolve);
+      socket.emit('red:stanje', { mod: nacin });
+    });
+    const brojMjesta = 3;
+    const lobbyMjesta = Array.from({ length: brojMjesta }, (_, indeks) => ({
+      igracId: indeks === 0 ? stanje.mojIgracId : `lobby-bot-${indeks}`,
+      nadimak: indeks === 0 ? 'Igrac' : `LobbyBot${indeks}`,
+      jeGost: indeks === 0,
+      avatarId: 0,
+      avatarConfig: null,
+      avatarRevision: 0,
+      rang: null,
+      razina: 1,
+      odigrane: 0,
+      prosjekBodova: 0,
+      postotakPobjeda: 0,
+      trenutniNiz: 0,
+      razinaVatre: 0 as const,
+    }));
+    socket.emitEvent([
+      'red:stanje',
+      {
+        mojIgracId: stanje.mojIgracId,
+        mod: nacin,
+        prosjekCekanjaSek: 12,
+        mjesta: lobbyMjesta,
+      },
+    ]);
+    const shuffledSjedala = [...lobbyMjesta].reverse().map((mjesto, indeks) => ({
+      igracId: mjesto.igracId,
+      nadimak: indeks === brojMjesta - 1 ? 'Igrac' : `ShuffleBot${indeks + 1}`,
+      jeGost: mjesto.jeGost,
+      avatarId: mjesto.avatarId,
+      avatarConfig: mjesto.avatarConfig,
+      avatarRevision: mjesto.avatarRevision,
+      rang: mjesto.rang,
+      razina: mjesto.razina,
+      trenutniNiz: mjesto.trenutniNiz,
+      razinaVatre: mjesto.razinaVatre,
+    }));
+    socket.emitEvent([
+      'partija:pocetak',
+      {
+        partijaId: 'test-odbrojavanje',
+        mojIgracId: stanje.mojIgracId,
+        mod: nacin,
+        kontekst: 'javna',
+        pocetakIso: new Date(Date.now() + 60_000).toISOString(),
+        sjedala: shuffledSjedala,
+      },
+    ]);
+  }, mod);
+  await expect(page.getByRole('heading', { name: /Svi igrači su tu/ })).toBeVisible();
+  await expect(page.locator('.mjesta li.zauzeto')).toHaveCount(3);
+  await expect(page.getByText('Prazno mjesto', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('LobbyBot1', { exact: true })).toBeVisible();
+  await expect(page.getByText('ShuffleBot1', { exact: true })).toHaveCount(0);
+  const nadimci = await page.locator('.mjesta li.zauzeto strong').evaluateAll((elementi) =>
+    elementi.map((el) => el.childNodes[0]?.textContent?.trim() ?? ''),
+  );
+  expect(nadimci).toEqual(['Igrac', 'LobbyBot1', 'LobbyBot2']);
+});
 
 async function polozajiAvatara(stranica: Page) {
   return stranica.locator('.igraci-red .avatar-omot').evaluateAll((avatari) => avatari.map((avatar) => {
@@ -497,13 +495,12 @@ for (const zaslon of [
   { width: 1440, height: 900 }, { width: 390, height: 844 },
   { width: 320, height: 568 }, { width: 844, height: 390 },
 ]) {
-  for (const mod of ['dva_igraca', 'cetiri_igraca'] as const) {
-    test(`stabilni avatari kroz prijelaze ${mod} ${zaslon.width}x${zaslon.height}`, async ({ browser }, podaciTesta) => {
+  test(`stabilni avatari kroz prijelaze Brza igra ${zaslon.width}x${zaslon.height}`, async ({ browser }, podaciTesta) => {
       test.setTimeout(90_000);
-      const igraci = await stvoriIgrace(browser, mod === 'dva_igraca' ? 2 : 4);
+      const igraci = await stvoriIgrace(browser, 3);
       try {
         for (const { stranica } of igraci) await stranica.setViewportSize(zaslon);
-        await udjiUJavniRed(igraci, mod);
+        await udjiUJavniRed(igraci);
         const partijaId = await cekajIstuPartiju(igraci);
         const stanja: StanjePartije[] = [];
         for (const { stranica } of igraci) {
@@ -636,24 +633,13 @@ for (const zaslon of [
       } finally {
         await zatvoriIgrace(igraci);
       }
-    });
-  }
+  });
 }
 
-test('četiri igrača ulaze u javni red i dobivaju isti stol', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 4);
+test('tri igrača ulaze u javni red i dobivaju isti stol', async ({ browser }) => {
+  const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'cetiri_igraca');
-    await cekajIstuPartiju(igraci);
-  } finally {
-    await zatvoriIgrace(igraci);
-  }
-});
-
-test('dva igrača ulaze u javni red i dobivaju isti stol', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 2);
-  try {
-    await udjiUJavniRed(igraci, 'dva_igraca');
+    await udjiUJavniRed(igraci);
     await cekajIstuPartiju(igraci);
   } finally {
     await zatvoriIgrace(igraci);
@@ -663,14 +649,14 @@ test('dva igrača ulaze u javni red i dobivaju isti stol', async ({ browser }) =
 test('svaki igrač vidi sebe prvog, a sjedala se ne mijenjaju nakon eliminacije', async ({
   browser,
 }) => {
-  const igraci = await stvoriIgrace(browser, 4);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'cetiri_igraca');
+    await udjiUJavniRed(igraci);
     await cekajIstuPartiju(igraci);
 
     for (const { stranica } of igraci) {
       const sjedala = stranica.locator('.igraci-red > li');
-      await expect(sjedala).toHaveCount(4);
+      await expect(sjedala).toHaveCount(3);
       const mojRed = stranica.locator('.igraci-red > li:has(.oznaka-ti)');
       await expect(mojRed).toHaveAttribute(
         'data-igrac-id',
@@ -723,7 +709,7 @@ test('svaki igrač vidi sebe prvog, a sjedala se ne mijenjaju nakon eliminacije'
 });
 
 test('dijalog Ne znam nestaje nakon eliminacije i prikazuje promatranje', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 4);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
     await udjiUJavniRed(igraci, 'cetiri_igraca');
     const partijaId = await cekajIstuPartiju(igraci);
@@ -786,7 +772,7 @@ test('dijalog Ne znam nestaje nakon eliminacije i prikazuje promatranje', async 
 });
 
 test('eliminator nakon kaladonta ostaje interaktivan i dobiva formu u novoj rundi', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 4);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
     await udjiUJavniRed(igraci, 'cetiri_igraca');
     await cekajIstuPartiju(igraci);
@@ -889,7 +875,7 @@ test('eliminator nakon kaladonta ostaje interaktivan i dobiva formu u novoj rund
 });
 
 test('eliminator nakon zadnje eliminacije vidi spremanje a ne zamrznuti stol', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 4);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
     await udjiUJavniRed(igraci, 'cetiri_igraca');
     await cekajIstuPartiju(igraci);

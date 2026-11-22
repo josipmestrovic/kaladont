@@ -19,25 +19,31 @@ export async function stvoriIgrace(browser: Browser, broj: number): Promise<E2EI
   return dodajIgrace(browser, broj);
 }
 
-/** PR14: podržava Troboj i optional `pravila` (default KA-ZNA na serveru ako izostane). */
+/** Javni red je samo Brza igra (Troboj · Klasični); stari mod/pravila argumenti se ignoriraju. */
 export async function udjiUJavniRed(
   igraci: readonly E2EIgrac[],
-  mod: 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca',
-  pravila?: 'klasicni' | 'ka_zna' | 'dokazi_nastavak',
+  _mod?: 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca',
+  _pravila?: 'klasicni' | 'ka_zna' | 'dokazi_nastavak',
 ) {
-  const query = pravila
-    ? `/red?mod=${mod}&pravila=${pravila}`
-    : `/red?mod=${mod}`;
-  await Promise.all(igraci.map(async (igrac) => {
+  if (igraci.length < 1 || igraci.length > 3) {
+    throw new Error(`Brza igra (Troboj) prima 1–3 igrača u javni red, dobiveno ${igraci.length}.`);
+  }
+  const query = '/red?mod=tri_igraca&pravila=klasicni';
+  // Ulaz jedan-po-jedan + potvrda sjedala: paralelni goto često ostavi stol na 1–2
+  // i cekajIstuPartiju onda visi desetke sekundi (bez bot-filla u E2E).
+  for (const igrac of igraci) {
     await igrac.stranica.goto(query);
-  }));
+    await expect(igrac.stranica.locator('ul.mjesta > li.moje-sjedalo')).toBeVisible({
+      timeout: 10_000,
+    });
+  }
 }
 
 export async function cekajIstuPartiju(igraci: readonly E2EIgrac[]): Promise<string> {
   const partijaIdovi = await Promise.all(
     igraci.map(async ({ stranica }) => {
-      // CI matchmaking + bot fill često treba više od zadanog Playwright 5s.
-      await expect(stranica).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 30_000 });
+      // Troboj s 3 čovjeka mora odmah krenuti; 15s je dovoljno bez bot-fill čekanja.
+      await expect(stranica).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 15_000 });
       return new URL(stranica.url()).pathname.split('/').at(-1)!;
     }),
   );

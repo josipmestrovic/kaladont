@@ -48,24 +48,22 @@ for (const sirina of [380, 1100] as const) {
   });
 }
 
-test('spojeni Dvoboj: Klasični i KA-ZNA dijele isti stol', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 2);
+test('stari javni URL ide u Brzu igru i tri igrača dijele stol', async ({ browser }) => {
+  const igraci = await stvoriIgrace(browser, 3);
   try {
-    // Oba u lobbyju prije matcha — inače bot može popuniti mjesto prvog igrača.
     await igraci[0]!.stranica.goto('/red?mod=dva_igraca&pravila=klasicni');
-    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toBeVisible({ timeout: 15_000 });
-    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Klasični');
-    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Dvoboj');
+    await expect(igraci[0]!.stranica).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
+    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Brza igra');
+    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Troboj');
     await expect(igraci[0]!.stranica).not.toHaveURL(/\/partija\//);
 
-    await igraci[1]!.stranica.goto('/red?mod=dva_igraca&pravila=ka_zna');
-    // cekajOznakuIliPartiju već potvrđuje KA-zna ili ulazak u partiju — bez ponovnog
-    // asserta na oznaku (race: match navigira prije follow-up expecta).
-    await cekajOznakuIliPartiju(igraci[1]!.stranica, /KA-zna/i);
-
+    await Promise.all([
+      igraci[1]!.stranica.goto('/red?mod=tri_igraca&pravila=klasicni'),
+      igraci[2]!.stranica.goto('/red?mod=dva_igraca&pravila=ka_zna'),
+    ]);
     await cekajIstuPartiju(igraci);
     for (const { stranica } of igraci) {
-      await expect(stranica.locator('.igraci-red > li')).toHaveCount(2);
+      await expect(stranica.locator('.igraci-red > li')).toHaveCount(3);
     }
   } finally {
     await zatvoriIgrace(igraci);
@@ -75,17 +73,17 @@ test('spojeni Dvoboj: Klasični i KA-ZNA dijele isti stol', async ({ browser }) 
 test('Troboj: tri sjedala (lobby oznaka ili stol)', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await igraci[0]!.stranica.goto('/red?mod=tri_igraca&pravila=dokazi_nastavak');
-    const ishod = await cekajOznakuIliPartiju(igraci[0]!.stranica, /Troboj.*Dokaži|Dokaži.*Troboj/i);
+    await igraci[0]!.stranica.goto('/red?mod=tri_igraca&pravila=klasicni');
+    const ishod = await cekajOznakuIliPartiju(igraci[0]!.stranica, /Brza igra.*Troboj|Troboj.*Klasičn/i);
     if (ishod === 'oznaka') {
       const oznaka = igraci[0]!.stranica.getByTestId('red-oznaka-izbora');
       await expect(oznaka).toContainText('Troboj');
-      await expect(oznaka).toContainText('Dokaži');
+      await expect(oznaka).toContainText('Brza igra');
     }
 
     await Promise.all([
-      igraci[1]!.stranica.goto('/red?mod=tri_igraca&pravila=dokazi_nastavak'),
-      igraci[2]!.stranica.goto('/red?mod=tri_igraca&pravila=dokazi_nastavak'),
+      igraci[1]!.stranica.goto('/red?mod=tri_igraca&pravila=klasicni'),
+      igraci[2]!.stranica.goto('/red?mod=tri_igraca&pravila=klasicni'),
     ]);
     await cekajIstuPartiju(igraci);
     for (const { stranica } of igraci) {
@@ -98,9 +96,9 @@ test('Troboj: tri sjedala (lobby oznaka ili stol)', async ({ browser }) => {
 });
 
 test('dokaz UI: autor vidi uputu, čekač vidi čekanje bez „Ispao”', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 2);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'dva_igraca', 'dokazi_nastavak');
+    await udjiUJavniRed(igraci);
     await cekajIstuPartiju(igraci);
 
     const autor = igraci[0]!;
@@ -153,9 +151,9 @@ test('dokaz UI: autor vidi uputu, čekač vidi čekanje bez „Ispao”', async 
 });
 
 test('dokaz UI: uspjeh nakon odlaska čekača pokazuje ishod, ne samo prekid', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 2);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'dva_igraca', 'dokazi_nastavak');
+    await udjiUJavniRed(igraci);
     await cekajIstuPartiju(igraci);
 
     const autor = igraci[0]!;

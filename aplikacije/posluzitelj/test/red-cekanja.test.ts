@@ -116,8 +116,8 @@ describe('red čekanja', () => {
     }
   });
 
-  it('sastavlja stol od 4 igrača i svima šalje partija:pocetak s istim partijaId', async () => {
-    const klijenti = await Promise.all([spojiSe(), spojiSe(), spojiSe(), spojiSe()]);
+  it('sastavlja stol od 3 igrača i svima šalje partija:pocetak s istim partijaId', async () => {
+    const klijenti = await Promise.all([spojiSe(), spojiSe(), spojiSe()]);
 
     const pocetciPromise = Promise.all(
       klijenti.map(
@@ -135,7 +135,7 @@ describe('red čekanja', () => {
     const pocetci = await pocetciPromise;
     const partijaIdovi = new Set(pocetci.map((p) => p.partijaId));
     expect(partijaIdovi.size).toBe(1);
-    expect(pocetci[0]!.sjedala).toHaveLength(4);
+    expect(pocetci[0]!.sjedala).toHaveLength(3);
 
     for (const klijent of klijenti) klijent.disconnect();
   });
@@ -156,7 +156,7 @@ describe('red čekanja', () => {
     await cekajPocetak;
 
     const stanjaCetvrtog: StanjeReda[] = [];
-    klijenti[4]!.on('red:stanje', (stanje: StanjeReda) => stanjaCetvrtog.push(stanje));
+    klijenti[3]!.on('red:stanje', (stanje: StanjeReda) => stanjaCetvrtog.push(stanje));
 
     klijenti[3]!.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -229,7 +229,7 @@ describe('red čekanja', () => {
 
     const povratnaVeza = await spojiSe(gosti[1]!.token);
     const stanjeNakonPovratka = new Promise<StanjeReda>((resolve) => povratnaVeza.once('red:stanje', resolve));
-    povratnaveza.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
+    povratnaVeza.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     const stanje = await stanjeNakonPovratka;
     expect(stanje.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
       gosti[0]!.igracId,

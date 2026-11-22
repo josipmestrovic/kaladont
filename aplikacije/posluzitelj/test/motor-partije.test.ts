@@ -1320,17 +1320,9 @@ describe('motor partije - otvarač runde nakon eliminacije', () => {
 
 describe('motor partije - PR02 kolekcija oznake na kraju', () => {
   it('PR02-08/09: završni snapshot nosi oznake uz novootključane riječi i reconnect ih ne mijenja', async () => {
-    const igraci = await Promise.all([spojiIgraca(), spojiIgraca()]);
-    const pocetakPromise = new Promise<PocetakPartije>((resolve) => {
-      igraci[0]!.socket.on('partija:pocetak', resolve);
-    });
-    const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
-    for (const igrac of igraci) igrac.socket.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
-    const pocetak = await pocetakPromise;
-    const runda = await rundaPromise;
+    const { igraci, pocetak, runda } = await pokreniPartiju();
 
     const otvarac = igraci.find((ig) => ig.token === runda.naPotezuId)!;
-    const protivnik = igraci.find((ig) => ig !== otvarac)!;
     const potrosene = new Set(await grupeRijeci(runda.rijec));
     const rijecZaIgru = await pronadjiRijecNaPrefiks(runda.trazenaSlova, potrosene);
 
@@ -1341,13 +1333,31 @@ describe('motor partije - PR02 kolekcija oznake na kraju', () => {
     });
     otvarac.socket.emit('potez:rijec', { rijec: rijecZaIgru, turnToken: runda.turnToken });
     const prihvaceno = await prihvacenoPromise;
-    expect(prihvaceno.sljedeciId).toBe(protivnik.token);
+    expect(igraci.some((ig) => ig.token === prihvaceno.sljedeciId && ig !== otvarac)).toBe(true);
 
     const krajPromise = new Promise<KrajPartije>((resolve) => {
       otvarac.socket.once('partija:kraj', resolve);
     });
-    protivnik.socket.emit('potez:ne-znam');
-    const kraj = await krajPromise;
+    let naPotezuId = prihvaceno.sljedeciId;
+    let trenutnaRunda = runda.runda;
+    let kraj: KrajPartije | undefined;
+    for (let i = 0; i < igraci.length; i += 1) {
+      const naPotezu = igraci.find((ig) => ig.token === naPotezuId);
+      if (!naPotezu) break;
+      const sljedecaRunda = cekajSljedecuRundu(otvarac.socket, trenutnaRunda);
+      naPotezu.socket.emit('potez:ne-znam');
+      const ishod = await Promise.race([
+        krajPromise.then((vrijednost) => ({ vrsta: 'kraj' as const, vrijednost })),
+        sljedecaRunda.then((nova) => ({ vrsta: 'runda' as const, vrijednost: nova })),
+      ]);
+      if (ishod.vrsta === 'kraj') {
+        kraj = ishod.vrijednost;
+        break;
+      }
+      trenutnaRunda = ishod.vrijednost.runda;
+      naPotezuId = ishod.vrijednost.naPotezuId;
+    }
+    if (!kraj) kraj = await krajPromise;
 
     expect(kraj.kolekcija).toBeDefined();
     expect(kraj.kolekcija!.dodaneKategorije.length).toBeGreaterThan(0);

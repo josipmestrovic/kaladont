@@ -2,9 +2,9 @@ import { expect, test } from '@playwright/test';
 import { cekajIstuPartiju, stvoriIgrace, udjiUJavniRed, zatvoriIgrace } from './pomocnici/igraci.js';
 
 test('reload u aktivnoj partiji vraća isti stol i stanje igre', async ({ browser }) => {
-  const igraci = await stvoriIgrace(browser, 4);
+  const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'cetiri_igraca');
+    await udjiUJavniRed(igraci);
     const partijaId = await cekajIstuPartiju(igraci);
     const igrac = igraci[0]!.stranica;
 

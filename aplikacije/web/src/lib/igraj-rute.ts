@@ -6,7 +6,6 @@ import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko
 import {
   BRZA_IGRA,
   jeJavnaKombinacijaAktivna,
-  jePoznatiMod,
   jePoznatiPravilnik,
   jePoznatiProfilBota,
   NAZIVI_PROFILA_BOTA,
