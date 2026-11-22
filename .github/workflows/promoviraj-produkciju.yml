@@ -431,6 +431,9 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$SIDRO"
+          # sidro: izdanje-YYYY-MM-DD ili izdanje-YYYY-MM-DD-N — na naslovnici je samo datetime, ne hash sidra.
+          DATUM=$(printf '%s\n' "$SIDRO" | sed -n 's/^izdanje-\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\).*/\1/p')
+          test -n "$DATUM"
           # Odgovor ide u datoteku pa u grep: curl | grep -q uz pipefail može lažno pasti.
           for pokusaj in {1..12}; do
             novosti=ne
@@ -440,7 +443,8 @@ jobs:
               novosti=da
             fi
             if curl --fail --silent --show-error --max-time 20 --output "$RUNNER_TEMP/naslovnica.html" https://kaladont.hr/ \
-              && grep -F -q -- "/novosti#${SIDRO}\"" "$RUNNER_TEMP/naslovnica.html"; then
+              && grep -F -q -- "datetime=\"${DATUM}\"" "$RUNNER_TEMP/naslovnica.html" \
+              && grep -F -q -- "Vidi što je novo" "$RUNNER_TEMP/naslovnica.html"; then
               naslovnica=da
             fi
             echo "Pokušaj ${pokusaj}: novosti=${novosti} naslovnica=${naslovnica}"

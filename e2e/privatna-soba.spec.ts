@@ -9,17 +9,14 @@ test('dva igrača stvaraju privatnu sobu i pokreću partiju', async ({ browser }
 
     await vlasnik.goto('/soba/kreiraj');
     await expect(vlasnik.getByRole('heading', { name: 'Nova privatna soba' })).toBeVisible();
-    await expect(vlasnik.getByRole('heading', { name: 'Dopuštene vrste riječi' })).toBeVisible();
+    await expect(vlasnik.getByRole('heading', { name: 'Vrste riječi' })).toBeVisible();
 
     const imenice = vlasnik.getByRole('checkbox', { name: 'Imenice' });
     await expect(imenice).toBeChecked();
     await expect(imenice).toBeDisabled();
 
-    await vlasnik.getByRole('button', { name: 'skupa sigurnih riječi' }).click();
-    await expect(vlasnik.getByRole('tooltip')).toContainText(
-      'Zbirka riječi koja uvijek ima nastavak te njihov nastavak isto ima nastavak.',
-    );
-    await vlasnik.keyboard.press('Escape');
+    await expect(vlasnik.getByText(/Imenice su uvijek uključene/)).toBeVisible();
+    await expect(vlasnik.getByRole('heading', { name: 'Sažetak sobe' })).toBeVisible();
 
     await vlasnik.getByRole('checkbox', { name: 'Glagoli' }).uncheck();
     await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();

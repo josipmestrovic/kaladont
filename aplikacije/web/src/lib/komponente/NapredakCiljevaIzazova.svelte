@@ -14,7 +14,7 @@
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
 
   const OPIS_DOKAZI_NASTAVAK =
-    'Ako sljedeći igrač ne zna nastavak ili mu istekne vrijeme, autor prethodne riječi mora dokazati da nastavak postoji tako da ga odigra. Uspije li, ispada igrač koji nije znao nastavak. Ne uspije li, ispada autor prethodne riječi.';
+    'Ako sljedeći igrač ne zna nastavak, autor prethodne riječi mora dokazati da nastavak postoji tako da ga odigra. Uspije li, ispada igrač koji nije znao nastavak. Ne uspije li, ispada autor prethodne riječi.';
 
   let {
     napredak,

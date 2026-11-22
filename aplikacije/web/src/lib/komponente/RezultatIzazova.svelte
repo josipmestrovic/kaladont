@@ -52,7 +52,7 @@
         ? 'Izazov uspješan!'
         : gameWonBezCilja
           ? 'Pobjeda bez cilja'
-          : 'Izazov nije uspio',
+          : 'Izgubio si izazov',
   );
 
   function prikaziXp(dio: SettlementIzazovaDto['challengeXp'] | null | undefined): string {
@@ -84,7 +84,17 @@
     <ul class="podciljevi" aria-label="Podciljevi">
       <li class:met={pobjedaPartije}>Pobjeda</li>
       {#if goalProgress.bezPogreske.required}
-        <li class:met={goalProgress.bezPogreske.met}>Bez pogreške</li>
+        <li
+          class:met={goalProgress.bezPogreske.met}
+          class:prekseno={!goalProgress.bezPogreske.met}
+          data-testid="izazov-rezultat-bez-pogreske"
+        >
+          {#if goalProgress.bezPogreske.met}
+            Bez pogreške
+          {:else}
+            Bez pogreške — pogriješio si
+          {/if}
+        </li>
       {/if}
       {#if goalProgress.dugeRijeci.required > 0}
         <li class:met={goalProgress.dugeRijeci.met}>
@@ -162,13 +172,22 @@
   {/if}
 
   <div class="akcije">
-    <a class="primarni" href={mapaHref} data-testid="izazov-odaberi"
-      >Odaberi izazov</a
-    >
-    {#if challengeId}
-      <a class="sporedni" href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`} data-testid="izazov-ponovo"
-        >Pokušaj ponovno</a
+    {#if challengeId && !uspjeh}
+      <a
+        class="primarni"
+        href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`}
+        data-testid="izazov-ponovo">Pokušaj ponovno</a
       >
+      <a class="sporedni" href={mapaHref} data-testid="izazov-odaberi">Odaberi izazov</a>
+    {:else}
+      <a class="primarni" href={mapaHref} data-testid="izazov-odaberi">Odaberi izazov</a>
+      {#if challengeId}
+        <a
+          class="sporedni"
+          href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`}
+          data-testid="izazov-ponovo">Pokušaj ponovno</a
+        >
+      {/if}
     {/if}
   </div>
 
@@ -220,6 +239,11 @@
   .podciljevi li.met {
     border-color: var(--boja-isticanje-tekst);
     color: var(--boja-isticanje-tekst);
+    font-weight: 700;
+  }
+  .podciljevi li.prekseno {
+    border-color: var(--boja-opasnost, #b00020);
+    color: var(--boja-opasnost, #b00020);
     font-weight: 700;
   }
   .pending {

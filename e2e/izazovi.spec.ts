@@ -21,16 +21,9 @@ test('naslovnica vodi na mapu; level tabovi i zaključani finale', async ({ page
   await expect(dv05).toHaveAttribute('data-status', 'zakljucan');
 
   await dv05.click();
-  const detalj = page.getByTestId('izazov-detalj');
-  await expect(detalj).toBeVisible();
-  await expect(detalj.getByRole('heading', { name: 'Završni izazov' })).toBeVisible();
-  await expect(page.getByTestId('izazov-start')).toBeDisabled();
-  await detalj.getByRole('button', { name: 'Zatvori' }).click();
-  await expect(detalj).toHaveCount(0);
-
-  await dv01.click();
-  await expect(page.getByTestId('izazov-detalj')).toBeVisible();
-  await expect(page.getByTestId('izazov-start')).toBeEnabled();
+  await expect(page.getByTestId('izazov-detalj')).toHaveCount(0);
+  await expect(page.getByTestId('izazov-start-poruka')).toBeVisible();
+  await expect(page.getByTestId('izazov-start-poruka')).toContainText(/Otključava|Završi/);
 });
 
 test('zaključani ?level= fallback + obavijest', async ({ page }) => {
@@ -43,7 +36,6 @@ test('zaključani ?level= fallback + obavijest', async ({ page }) => {
 test('gost pokreće IZ-L1-DV-01, odustaje i vidi rezultat bez rang/DNK', async ({ page }) => {
   await otvoriMapu(page);
   await page.getByTestId('izazov-kartica-IZ-L1-DV-01').click();
-  await page.getByTestId('izazov-start').click();
 
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 25_000 });
   await expect(page.getByTestId('izazov-ciljevi')).toBeVisible({ timeout: 15_000 });
@@ -58,7 +50,7 @@ test('gost pokreće IZ-L1-DV-01, odustaje i vidi rezultat bez rang/DNK', async (
   await potvrda.getByRole('button', { name: 'Da' }).click();
 
   await expect(page.getByTestId('rezultat-izazova')).toBeVisible({ timeout: 25_000 });
-  await expect(page.getByRole('heading', { name: /Izazov nije uspio|Tehnički prekid/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Izgubio si izazov|Izazov nije uspio|Tehnički prekid/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Završni poredak' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Forma' })).toHaveCount(0);
   await expect(page.getByTestId('izazov-gost-cta')).toContainText('postojeći');

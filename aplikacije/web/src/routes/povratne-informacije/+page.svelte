@@ -66,15 +66,15 @@
 </script>
 
 <svelte:head>
-  <title>Pomozi poboljšati igru | Kaladont</title>
+  <title>Povratne informacije | Kaladont</title>
   <meta name="description" content="Pošalji povratnu informaciju i pomozi u poboljšanju Kaladonta." />
 </svelte:head>
 
 <main class="povratne-informacije">
   <header>
-    <p class="nadnaslov">Glas zajednice</p>
-    <h1>Pomozi poboljšati igru</h1>
-    <p>Opiši što ti se sviđa, što te koči ili što bi promijenio.</p>
+    <p class="nadnaslov">Pomozi poboljšati igru</p>
+    <h1>Povratne informacije</h1>
+    <p>Opiši što ti se sviđa, što ne ili što bi promijenio.</p>
   </header>
 
   <form onsubmit={posalji}>

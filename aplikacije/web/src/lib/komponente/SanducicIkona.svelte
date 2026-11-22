@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Bell } from 'lucide-svelte';
   import { dohvatiStanjeSanducica } from '$lib/stanje-sanducica.svelte.js';
 
   let { velicina = 44 }: { velicina?: number } = $props();
@@ -10,17 +11,11 @@
       ? `Obavijesti, ${stanje.brojNeprocitanih} nepročitane`
       : 'Obavijesti',
   );
+  const ikonaVelicina = $derived(Math.round(velicina * 0.72));
 </script>
 
 <a href="/obavijesti" class="sanducic-ikona" aria-label={aria} style={`--sanducic-velicina: ${velicina}px`}>
-  <img
-    class="ikona"
-    src="/ikone/81-mailbox.webp"
-    alt=""
-    aria-hidden="true"
-    width={velicina}
-    height={velicina}
-  />
+  <Bell class="ikona" size={ikonaVelicina} strokeWidth={2.2} aria-hidden="true" />
   {#if imaNeprocitanih}
     <span class="tockica" aria-hidden="true"></span>
   {/if}
@@ -36,15 +31,18 @@
     height: var(--sanducic-velicina, 44px);
     min-width: 44px;
     min-height: 44px;
+    color: var(--boja-tekst-osnovni);
     text-decoration: none;
     flex-shrink: 0;
   }
 
+  .sanducic-ikona:hover {
+    color: var(--boja-akcent-tekst);
+  }
+
   .ikona {
-    width: var(--sanducic-velicina, 44px);
-    height: var(--sanducic-velicina, 44px);
-    object-fit: contain;
     display: block;
+    flex-shrink: 0;
   }
 
   .tockica {
