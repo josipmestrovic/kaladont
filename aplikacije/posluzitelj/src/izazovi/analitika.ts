@@ -214,7 +214,31 @@ function prazanRedak(
   };
 }
 
-function agregirajSirove(pokusaji: SiroviPokusaj[], turnDurationFilter?: number): RedakIzazovAnalitike[] {
+function kljucVerzijeIgraca(igracId: string, challengeId: string, definitionVersion: number): string {
+  return `${igracId}\0${challengeId}\0${definitionVersion}`;
+}
+
+/** Prvi netehnički i redoslijed do uspjeha po (igrac, challenge, definitionVersion). */
+function mapaPovijestiVerzije(povijest: SiroviPokusaj[]): Map<string, SiroviPokusaj[]> {
+  const mapa = new Map<string, SiroviPokusaj[]>();
+  for (const p of povijest) {
+    if (p.status !== 'uspjeh' && p.status !== 'neuspjeh') continue;
+    const k = kljucVerzijeIgraca(p.igracId, p.challengeId, p.definitionVersion);
+    const lista = mapa.get(k) ?? [];
+    lista.push(p);
+    mapa.set(k, lista);
+  }
+  for (const lista of mapa.values()) {
+    lista.sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
+  }
+  return mapa;
+}
+
+function agregirajSirove(
+  pokusaji: SiroviPokusaj[],
+  povijestPoVerziji: Map<string, SiroviPokusaj[]>,
+  turnDurationFilter?: number,
+): RedakIzazovAnalitike[] {
   type Akum = {
     meta: {
       challengeId: string;
@@ -258,14 +282,9 @@ function agregirajSirove(pokusaji: SiroviPokusaj[], turnDurationFilter?: number)
     const uniqueStarted = new Set<string>();
     const uniqueSuccess = new Set<string>();
     const trajanja: number[] = [];
+    const igraciNetehnickiURedu = new Set<string>();
 
-    // First-try unutar (igrac, challenge, definitionVersion) — svi pokušaji grupe dijele challenge+verziju.
-    const poIgracu = new Map<string, SiroviPokusaj[]>();
     for (const p of g.pokusaji) {
-      const lista = poIgracu.get(p.igracId) ?? [];
-      lista.push(p);
-      poIgracu.set(p.igracId, lista);
-
       const pokrenut = p.partijaId !== null;
       if (pokrenut) {
         red.started += 1;
@@ -286,6 +305,7 @@ function agregirajSirove(pokusaji: SiroviPokusaj[], turnDurationFilter?: number)
         if (p.reason) red.reasons[p.reason] = (red.reasons[p.reason] ?? 0) + 1;
       }
       if (p.status === 'uspjeh' || p.status === 'neuspjeh') {
+        igraciNetehnickiURedu.add(p.igracId);
         red.igrackiZavrseni += 1;
         if (p.gameWon === true) red.gameWon += 1;
         if (p.terminalAt && p.startedAt) {
@@ -305,16 +325,17 @@ function agregirajSirove(pokusaji: SiroviPokusaj[], turnDurationFilter?: number)
     red.uniqueSuccessWilson = wilsonInterval95(red.uniqueSuccess, red.uniqueStarted);
     red.maliUzorak = red.uniqueStarted < PRAG_MALI_UZORAK_IZAZOVA;
 
+    // First-try / attempts-to-success: prvi netehnički po (igrac, challenge, definitionVersion),
+    // izvan bot/timer podgrupe i bez ograničenja od/do (povijest verzije).
     const attemptsToSuccess: number[] = [];
-    for (const [, lista] of poIgracu) {
-      const netehnički = [...lista]
-        .filter((p) => p.status === 'uspjeh' || p.status === 'neuspjeh')
-        .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
-      if (netehnički.length === 0) continue;
+    for (const igracId of igraciNetehnickiURedu) {
+      const povijest = povijestPoVerziji.get(
+        kljucVerzijeIgraca(igracId, g.meta.challengeId, g.meta.definitionVersion),
+      );
+      if (!povijest || povijest.length === 0) continue;
       red.firstTryPlayers += 1;
-      const prvi = netehnički[0]!;
-      if (prvi.status === 'uspjeh') red.firstTrySuccess += 1;
-      const idxUspjeh = netehnički.findIndex((p) => p.status === 'uspjeh');
+      if (povijest[0]!.status === 'uspjeh') red.firstTrySuccess += 1;
+      const idxUspjeh = povijest.findIndex((p) => p.status === 'uspjeh');
       if (idxUspjeh >= 0) attemptsToSuccess.push(idxUspjeh + 1);
     }
     red.firstTryRate = omjerPostotak(red.firstTrySuccess, red.firstTryPlayers);
@@ -333,6 +354,49 @@ function agregirajSirove(pokusaji: SiroviPokusaj[], turnDurationFilter?: number)
     return (a.botProfileVersion ?? 0) - (b.botProfileVersion ?? 0);
   });
   return redovi;
+}
+
+async function dohvatiPovijestNetehnickihZaKohortu(sirovi: SiroviPokusaj[]): Promise<Map<string, SiroviPokusaj[]>> {
+  const igracIds = new Set<string>();
+  const challengeIds = new Set<string>();
+  const verzije = new Set<number>();
+  for (const p of sirovi) {
+    if (p.status !== 'uspjeh' && p.status !== 'neuspjeh') continue;
+    igracIds.add(p.igracId);
+    challengeIds.add(p.challengeId);
+    verzije.add(p.definitionVersion);
+  }
+  if (igracIds.size === 0) return new Map();
+
+  const redoviDb = await baza
+    .select({
+      id: pokusajiIzazova.id,
+      igracId: pokusajiIzazova.igracId,
+      challengeId: pokusajiIzazova.challengeId,
+      definitionVersion: pokusajiIzazova.definitionVersion,
+      botProfileVersion: pokusajiIzazova.botProfileVersion,
+      snapshot: pokusajiIzazova.snapshot,
+      partijaId: pokusajiIzazova.partijaId,
+      startedAt: pokusajiIzazova.startedAt,
+      terminalAt: pokusajiIzazova.terminalAt,
+      status: pokusajiIzazova.status,
+      reason: pokusajiIzazova.reason,
+      gameWon: pokusajiIzazova.gameWon,
+      accountTypeAtStart: pokusajiIzazova.accountTypeAtStart,
+    })
+    .from(pokusajiIzazova)
+    .where(and(
+      inArray(pokusajiIzazova.igracId, [...igracIds]),
+      inArray(pokusajiIzazova.challengeId, [...challengeIds]),
+      inArray(pokusajiIzazova.definitionVersion, [...verzije]),
+      inArray(pokusajiIzazova.status, ['uspjeh', 'neuspjeh']),
+    ));
+
+  return mapaPovijestiVerzije(redoviDb.map((r) => ({
+    ...r,
+    botProfileVersion: r.botProfileVersion ?? null,
+    accountTypeAtStart: r.accountTypeAtStart as VrstaRacunaIzazovAnalitike,
+  })));
 }
 
 export async function agregirajIzazove(filter: FilterIzazovAnalitike): Promise<OdgovorIzazovAnalitike> {
@@ -364,7 +428,8 @@ export async function agregirajIzazove(filter: FilterIzazovAnalitike): Promise<O
     accountTypeAtStart: r.accountTypeAtStart as VrstaRacunaIzazovAnalitike,
   }));
 
-  const redovi = agregirajSirove(sirovi, filter.turnDurationMs);
+  const povijestPoVerziji = await dohvatiPovijestNetehnickihZaKohortu(sirovi);
+  const redovi = agregirajSirove(sirovi, povijestPoVerziji, filter.turnDurationMs);
 
   let started = 0;
   let aktivni = 0;

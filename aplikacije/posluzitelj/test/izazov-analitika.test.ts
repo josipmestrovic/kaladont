@@ -338,6 +338,45 @@ describe('Agregacija Izazova — fixture A/B', () => {
     expect(b.ukupno.uspjesi).toBe(a.ukupno.uspjesi);
     expect(b.redovi.length).toBe(a.redovi.length);
   });
+
+  it('first-try gleda prvi netehnički u verziji, ne bot/timer podgrupu ni samo od/do', async () => {
+    const igrac = await noviIgrac('gost');
+    const dan = danasZagrebIso();
+    const prijeProzora = new Date(Date.now() - 10 * 86_400_000);
+
+    await umetniPokusaj({
+      igracId: igrac,
+      challengeId: 'IZ06',
+      definitionVersion: 1,
+      botProfileVersion: BOT_VERZIJA_TEST,
+      status: 'neuspjeh',
+      reason: 'eliminiran',
+      startedAt: prijeProzora,
+      terminalAt: new Date(prijeProzora.getTime() + 30_000),
+    });
+    await umetniPokusaj({
+      igracId: igrac,
+      challengeId: 'IZ06',
+      definitionVersion: 1,
+      botProfileVersion: BOT_VERZIJA_TEST + 1,
+      status: 'uspjeh',
+      gameWon: true,
+      startedAt: new Date(),
+    });
+
+    const agregat = await agregirajIzazove({
+      odDan: dan,
+      doDan: dan,
+      challengeId: 'IZ06',
+      botProfileVersion: BOT_VERZIJA_TEST + 1,
+    });
+    const red = agregat.redovi.find((r) => r.challengeId === 'IZ06');
+    expect(red).toBeTruthy();
+    expect(red!.uspjesi).toBe(1);
+    expect(red!.firstTryPlayers).toBe(1);
+    expect(red!.firstTrySuccess).toBe(0);
+    expect(red!.attemptsToFirstSuccessMedian).toBe(2);
+  });
 });
 
 describe('Admin rute Izazov analitike', () => {
