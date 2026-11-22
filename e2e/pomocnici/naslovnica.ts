@@ -10,10 +10,10 @@ export async function otvoriProfilIzbornik(page: Page): Promise<Locator> {
   return izbornik;
 }
 
-/** Brza igra: jedan klik → kanonski red. */
+/** Igraj (Brza igra): jedan klik → kanonski red. */
 export async function idiUBrzuIgru(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Brza igra', exact: true }).click();
+  await page.getByRole('button', { name: 'Igraj', exact: true }).click();
   await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
 }
 

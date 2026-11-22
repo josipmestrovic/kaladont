@@ -3,8 +3,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { NAJNOVIJE_IZDANJE, urlIzdanja } from '$lib/izdanja.js';
-  import { ucitajModalIgraAsete, urlAseta } from '$lib/asetovi-core.js';
+  import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
+  import { ucitajModalIgraAsete } from '$lib/asetovi-core.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
   import ModalIgraj from '$lib/komponente/ModalIgraj.svelte';
@@ -47,52 +47,41 @@
 />
 
 <main class="landing">
+  <div class="landing-prostor landing-prostor--gore" aria-hidden="true"></div>
   <section class="izbornik" aria-labelledby="naslov-kaladont">
-    <p class="seo-uvod">
-      Hrvatska online igra riječi: reci riječ na zadnja dva slova prethodne i ostani zadnji za stolom.
-      <a href="/pravila-kaladonta">Pročitaj pravila</a>
-      ili se
-      <a href="https://forum.kaladont.hr" rel="noopener noreferrer" data-umami-event="forum-klik-landing"
-        >pridruži zajednici</a
-      >.
-    </p>
-
     <div class="navigacijski-blok">
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
         <button
           type="button"
           class="navigacijska-stavka primarna"
-          aria-label="Brza igra"
+          aria-label="Igraj"
           data-testid="naslovnica-brza-igra"
           onclick={idiUBrzuIgru}
         >
-          <span class="stavka-tekst" aria-hidden="true">
-            <strong>Brza igra</strong>
-            <small>Igraj brzu igru u troje. Ako trenutno nema igrača, spojit ćemo te s botovima.</small>
+          <span class="stavka-sadrzaj" aria-hidden="true">
+            <span class="stavka-tekst">
+              <strong>Igraj</strong>
+              <small>Klasična online igra u 3 igrača.</small>
+            </span>
           </span>
-          <img
-            class="ikona-stavke"
-            src={urlAseta('/ikone/07-igraj.png')}
-            alt=""
-            aria-hidden="true"
-            width="72"
-            height="72"
-          />
+          <span class="cta" aria-hidden="true">
+            <svg class="cta-play" viewBox="0 0 12 14" width="16" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M1 1.2v11.6L11 7 1 1.2Z" />
+            </svg>
+            Igraj odmah
+          </span>
         </button>
+
         <a href="/izazovi" class="navigacijska-stavka" aria-label="Izazovi" data-testid="naslovnica-izazovi">
-          <span class="stavka-tekst" aria-hidden="true">
-            <strong>Izazovi</strong>
-            <small>Okušaj se u sve težim izazovima i pokaži imaš li znanje za pobjedu nad računalom.</small>
+          <span class="stavka-sadrzaj" aria-hidden="true">
+            <span class="stavka-tekst">
+              <strong>Izazovi</strong>
+              <small>Svladavaj sve teže izazove.</small>
+            </span>
           </span>
-          <img
-            class="ikona-stavke"
-            src={urlAseta('/ikone/06-trofej.png')}
-            alt=""
-            aria-hidden="true"
-            width="72"
-            height="72"
-          />
+          <span class="strelica" aria-hidden="true">›</span>
         </a>
+
         <button
           type="button"
           class="navigacijska-stavka"
@@ -100,53 +89,54 @@
           data-testid="naslovnica-trening"
           onclick={otvoriTrening}
         >
-          <span class="stavka-tekst" aria-hidden="true">
-            <strong>Trening</strong>
-            <small>Vježbaj protiv računala, odaberi težinu i pravila te izbrusi svoju igru bez pritiska.</small>
+          <span class="stavka-sadrzaj" aria-hidden="true">
+            <span class="stavka-tekst">
+              <strong>Trening</strong>
+              <small>Vježbaj protiv računala.</small>
+            </span>
           </span>
-          <img
-            class="ikona-stavke"
-            src={urlAseta('/ikone/67-zagrijavanje-bot.webp')}
-            alt=""
-            aria-hidden="true"
-            width="72"
-            height="72"
-          />
+          <span class="strelica" aria-hidden="true">›</span>
         </button>
-        <a href="/soba/kreiraj" class="navigacijska-stavka" aria-label="Privatna soba">
-          <span class="stavka-tekst" aria-hidden="true">
-            <strong>Privatna soba</strong>
-            <small>Okupi svoju ekipu, podijeli poveznicu i zaigrajte zajedno po pravilima koja odaberete.</small>
+
+        <a href="/soba/kreiraj" class="navigacijska-stavka privatna" aria-label="Privatna soba">
+          <span class="stavka-sadrzaj" aria-hidden="true">
+            <span class="stavka-tekst">
+              <strong>Privatna soba</strong>
+              <small>Pozovi ekipu i igrajte zajedno.</small>
+            </span>
           </span>
-          <img
-            class="ikona-stavke"
-            src={urlAseta('/ikone/18-privatna-soba.png')}
-            alt=""
-            aria-hidden="true"
-            width="72"
-            height="72"
-          />
+          <span class="strelica" aria-hidden="true">›</span>
         </a>
+
+        <div
+          class="navigacijska-stavka turniri uskoro"
+          aria-label="Turniri, izlazi uskoro"
+          data-testid="naslovnica-turniri"
+        >
+          <span class="stavka-sadrzaj" aria-hidden="true">
+            <span class="stavka-tekst">
+              <strong>Turniri</strong>
+              <small>Izlazi uskoro</small>
+            </span>
+          </span>
+          <span class="oznaka-uskoro" aria-hidden="true">Uskoro</span>
+        </div>
       </nav>
       {#if NAJNOVIJE_IZDANJE}
         <p class="zadnje-azuriranje">
           Zadnje ažuriranje:
-          <a href={urlIzdanja(NAJNOVIJE_IZDANJE)}
-            ><time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time></a
-          >
+          <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
           <span class="razdjelnik" aria-hidden="true">·</span>
           <a class="sto-je-novo" href="/novosti">Vidi što je novo</a>
         </p>
       {/if}
     </div>
   </section>
+  <div class="landing-prostor landing-prostor--dolje" aria-hidden="true"></div>
 
   <footer class="landing-footer">
     <nav aria-label="Dodatne poveznice">
-      <!-- HINT PR15: Novosti prije O igri; /novosti više nije 307 redirect. -->
-      <a href="/novosti">Novosti</a>
-      <a href="/o-igri">O igri</a>
-      <a href="/povratne-informacije">Pomozi poboljšati igru</a>
+      <a href="/povratne-informacije">Povratne informacije</a>
       <a href="/uvjeti">Uvjeti</a>
       <a href="/privatnost">Privatnost</a>
     </nav>
@@ -164,11 +154,12 @@
   /* Centriran landing; naslov (h1) je u Headeru kao logo. */
   .landing {
     --landing-padding: clamp(8px, 2.2dvh, 32px);
-    --landing-razmak: clamp(10px, 2.4dvh, 32px);
-    --visina-stavke: clamp(64px, 8dvh, 88px);
-    --razmak-stavki: clamp(10px, 1.4dvh, 14px);
-    --font-stavke: clamp(29px, 3.8dvh, 38px);
-    --font-opisa: clamp(18px, 2.4dvh, 22px);
+    --razmak-stavki: 16px;
+    --font-stavke: clamp(26px, 3.2dvh, 30px);
+    --font-opisa: clamp(17px, 2.1dvh, 18px);
+    --padding-stavke: clamp(24px, 2.8dvh, 28px);
+    --razmak-naslov-opis: 9px;
+    --radijus-stavke: 20px;
 
     position: relative;
     isolation: isolate;
@@ -177,56 +168,42 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--landing-razmak);
     min-height: 100vh;
     min-height: 100dvh;
     padding-block: var(--landing-padding);
     padding-inline: 16px;
   }
 
+  /*
+   * Jednaki vizualni razmaci: header ↔ izbornik ↔ footer.
+   * Gornji prostor dobiva padding kao kompenzaciju za absolute header,
+   * pa flex:1 na oba daje isti „prazan” razmak oko izbornika.
+   */
+  .landing-prostor {
+    flex: 1 1 0;
+    min-height: 8px;
+    width: 100%;
+    pointer-events: none;
+  }
+
+  .landing-prostor--gore {
+    box-sizing: content-box;
+    padding-top: 56px;
+  }
+
   .izbornik {
     position: relative;
     z-index: 1;
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
-    gap: clamp(18px, 3dvh, 36px);
+    gap: clamp(12px, 1.8dvh, 18px);
     width: min(100%, 560px);
     min-width: 0;
     max-width: 100%;
     text-align: center;
-  }
-
-  .seo-uvod {
-    max-width: 34rem;
-    margin: 0 auto;
-    color: var(--boja-tekst-sekundarni);
-    font-size: clamp(12px, 1.6dvh, 15px);
-    font-weight: 600;
-    line-height: 1.3;
-  }
-
-  .seo-uvod a {
-    color: var(--boja-pozadina-primarna);
-    font-weight: 700;
-  }
-
-  /* Na niskim / srednjim ekranima ostaje u DOM-u za SEO, bez dodatnog scrolla. */
-  @media (max-height: 950px) {
-    .seo-uvod {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      margin: -1px;
-      padding: 0;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
   }
 
   .navigacijski-blok {
@@ -247,18 +224,17 @@
   }
 
   .navigacijska-stavka {
+    position: relative;
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    min-height: var(--visina-stavke);
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-items: start;
     gap: 12px;
-    padding: 12px 18px;
+    padding: var(--padding-stavke);
     border: 1px solid var(--boja-plocica-obrub);
-    border-radius: 8px;
+    border-radius: var(--radijus-stavke);
     background: var(--boja-plocica);
     box-shadow: var(--sjena-suptilna);
     color: var(--boja-plocica-tekst);
@@ -268,11 +244,17 @@
     transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
   }
 
-  .stavka-tekst {
+  .stavka-sadrzaj {
     display: grid;
-    gap: 2px;
+    gap: var(--razmak-naslov-opis);
     min-width: 0;
     text-align: left;
+  }
+
+  .stavka-tekst {
+    display: grid;
+    gap: var(--razmak-naslov-opis);
+    min-width: 0;
   }
 
   .stavka-tekst strong {
@@ -284,37 +266,119 @@
 
   .stavka-tekst small {
     color: #5c554a;
+    font-family: var(--font-tijelo);
     font-size: var(--font-opisa);
+    font-weight: 500;
+    line-height: 1.35;
+  }
+
+  .cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 4px;
+    padding: 10px 18px;
+    border-radius: var(--radijus-pill);
+    background: var(--boja-mint);
+    color: #fff;
+    font-family: var(--font-naslov);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .cta-play {
+    flex-shrink: 0;
+  }
+
+  .strelica {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: color-mix(in srgb, #1a1815 8%, transparent);
+    color: color-mix(in srgb, #1a1815 45%, transparent);
+    font-size: 18px;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 1;
+    pointer-events: none;
   }
 
-  /* Ikone samo desktop — visina ≈ naslov + opis. */
-  .ikona-stavke {
-    display: none;
+  .navigacijska-stavka.uskoro {
+    cursor: not-allowed;
+    opacity: 0.78;
   }
 
-  @media (min-width: 1000px) {
-    .navigacijska-stavka {
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
+  .navigacijska-stavka.uskoro:hover,
+  .navigacijska-stavka.uskoro:focus-visible {
+    transform: none;
+    border-color: var(--boja-plocica-obrub);
+    box-shadow: var(--sjena-suptilna);
+  }
 
-    .ikona-stavke {
-      display: block;
-      width: auto;
-      height: calc(var(--font-stavke) * 1.15 + 2px + var(--font-opisa) * 1.3);
-      max-height: 100%;
-      object-fit: contain;
-      flex-shrink: 0;
-    }
+  .oznaka-uskoro {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: var(--radijus-pill);
+    background: color-mix(in srgb, #1a1815 8%, transparent);
+    color: color-mix(in srgb, #1a1815 55%, transparent);
+    font-family: var(--font-tijelo);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  .navigacijska-stavka.primarna {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 16px;
+    border-color: transparent;
+    background: var(--boja-zuta-krema);
+    color: #1a1815;
+  }
+
+  .navigacijska-stavka.primarna .stavka-sadrzaj {
+    gap: 10px;
   }
 
   .navigacijska-stavka.primarna .stavka-tekst small {
     color: color-mix(in srgb, #1a1815 72%, transparent);
+    font-weight: 500;
   }
 
-  :global(html[data-tema='svijetla']) .navigacijska-stavka.primarna .stavka-tekst small {
-    color: color-mix(in srgb, white 82%, transparent);
+  .navigacijska-stavka.primarna .cta {
+    margin-top: 0;
+  }
+
+  @media (min-width: 1000px) {
+    .navigacijska-stavka.primarna {
+      grid-template-columns: minmax(0, 1fr) minmax(200px, 38%);
+      align-items: stretch;
+      gap: 24px;
+    }
+
+    .navigacijska-stavka.primarna .cta {
+      align-self: center;
+      width: 100%;
+      min-height: 48px;
+      margin-top: 0;
+      padding: 12px 20px;
+      border-radius: 14px;
+      font-size: 17px;
+    }
   }
 
   .navigacijska-stavka:hover {
@@ -323,16 +387,8 @@
     box-shadow: var(--sjena-modal);
   }
 
-  .navigacijska-stavka.primarna {
-    border-color: var(--boja-zuta-krema);
-    background: var(--boja-zuta-krema);
-    color: #1a1815;
-  }
-
-  :global(html[data-tema='svijetla']) .navigacijska-stavka.primarna {
-    border-color: var(--boja-mint);
-    background: var(--boja-mint);
-    color: white;
+  .navigacijska-stavka.primarna:hover {
+    border-color: transparent;
   }
 
   .zadnje-azuriranje {
@@ -407,9 +463,34 @@
 
   @media (min-width: 1000px) {
     .landing {
-      gap: 0;
       --landing-padding: clamp(8px, 1.8dvh, 24px);
-      --font-stavke: clamp(31px, 4.1dvh, 41px);
+      --font-stavke: clamp(26px, 2.8dvh, 30px);
+      --font-opisa: 18px;
+      --padding-stavke: 28px;
+      --visina-stavke: 120px;
+    }
+
+    .landing-prostor--gore {
+      padding-top: 80px;
+    }
+
+    .izbornik {
+      width: min(100%, 820px);
+    }
+
+    .glavna-navigacija {
+      grid-template-columns: 1fr 1fr;
+      grid-auto-rows: var(--visina-stavke);
+    }
+
+    .navigacijska-stavka {
+      min-height: var(--visina-stavke);
+      height: 100%;
+      box-sizing: border-box;
+    }
+
+    .navigacijska-stavka.primarna {
+      grid-column: 1 / -1;
     }
 
     .landing-footer a { padding-inline: 0; }
@@ -418,62 +499,85 @@
   /* 4 CTA: kratki desktop viewport mora stati u 100dvh bez scrolla (E2E 1366×500). */
   @media (min-width: 1000px) and (max-height: 600px) {
     .landing {
-      --visina-stavke: clamp(40px, 7.2dvh, 52px);
-      --razmak-stavki: clamp(4px, 0.8dvh, 8px);
-      --landing-razmak: clamp(4px, 1dvh, 10px);
+      --razmak-stavki: 10px;
       --landing-padding: clamp(4px, 1dvh, 10px);
-      --font-stavke: clamp(22px, 3.4dvh, 28px);
-      --font-opisa: clamp(13px, 2.2dvh, 16px);
+      --font-stavke: clamp(22px, 3.2dvh, 26px);
+      --font-opisa: clamp(14px, 2dvh, 16px);
+      --padding-stavke: clamp(14px, 2.4dvh, 20px);
+      --razmak-naslov-opis: 6px;
+      --visina-stavke: 88px;
+    }
+
+    .landing-prostor {
+      min-height: 4px;
+    }
+
+    .landing-prostor--gore {
+      padding-top: 40px;
     }
 
     .izbornik {
       gap: clamp(8px, 1.4dvh, 14px);
     }
 
-    .navigacijska-stavka {
-      padding-block: 6px;
+    .cta {
+      margin-top: 0;
+      padding: 7px 14px;
+      font-size: 14px;
     }
 
     .stavka-tekst small {
-      line-height: 1.15;
+      line-height: 1.2;
     }
   }
 
   @media (min-width: 1000px) and (max-height: 520px) {
     .landing {
-      --visina-stavke: clamp(36px, 6.8dvh, 44px);
-      --razmak-stavki: 4px;
-      --font-stavke: clamp(20px, 3.2dvh, 24px);
-      --font-opisa: clamp(12px, 2dvh, 14px);
+      --razmak-stavki: 8px;
+      --font-stavke: clamp(20px, 3dvh, 24px);
+      --font-opisa: clamp(13px, 1.9dvh, 15px);
+      --padding-stavke: 12px 16px;
+      --visina-stavke: 72px;
     }
 
     .zadnje-azuriranje {
       font-size: 11px;
     }
+
+    .cta {
+      display: none;
+    }
   }
 
   @media (min-width: 1000px) and (max-height: 600px) {
     :global(html[data-font-disleksiju]) .landing {
-      --visina-stavke: clamp(36px, 6.4dvh, 46px);
-      --razmak-stavki: 4px;
-      --font-stavke: clamp(18px, 3dvh, 24px);
-      --font-opisa: clamp(11px, 1.9dvh, 13px);
+      --razmak-stavki: 8px;
+      --font-stavke: clamp(18px, 2.8dvh, 24px);
+      --font-opisa: clamp(12px, 1.8dvh, 14px);
+      --padding-stavke: 12px 16px;
     }
   }
 
   @media (max-width: 999px) {
     .landing {
       --landing-padding: clamp(6px, 1.2dvh, 12px);
-      --landing-razmak: clamp(8px, 2dvh, 20px);
-      --visina-stavke: clamp(56px, 7dvh, 72px);
-      --razmak-stavki: clamp(8px, 1.2dvh, 12px);
-      --font-stavke: clamp(24px, 3.4dvh, 31px);
+      --font-stavke: clamp(22px, 3dvh, 24px);
+      --visina-sporedne: 92px;
       padding-inline: 12px;
+    }
+
+    .landing-prostor--gore {
+      padding-top: 60px;
     }
 
     .izbornik {
       width: min(100%, 440px);
-      gap: clamp(16px, 2.4dvh, 28px);
+      gap: clamp(12px, 1.6dvh, 16px);
+    }
+
+    .navigacijska-stavka:not(.primarna) {
+      min-height: var(--visina-sporedne);
+      box-sizing: border-box;
     }
 
     .landing-footer { flex-direction: column; gap: 2px; }
@@ -489,19 +593,12 @@
     }
   }
 
-  @media (max-width: 429px) {
-    .landing {
-      --font-stavke: clamp(22px, 3.1dvh, 26px);
-    }
-
-    .navigacijska-stavka {
-      padding-inline: 12px;
-    }
-  }
-
   @media (max-width: 379px) {
-    .navigacijska-stavka {
-      padding-inline: 10px;
+    .landing {
+      --font-stavke: 24px;
+      --font-opisa: clamp(14px, 3.6vw, 16px);
+      --padding-stavke: 20px;
+      --visina-sporedne: 88px;
     }
 
     .zadnje-azuriranje .razdjelnik { display: none; }
@@ -513,41 +610,58 @@
 
   @media (max-width: 999px) and (max-height: 700px) {
     .landing {
-      --landing-razmak: 6px;
-      --razmak-stavki: clamp(6px, 1dvh, 10px);
-      --visina-stavke: clamp(48px, 6dvh, 60px);
-      --font-stavke: clamp(22px, 3dvh, 26px);
+      --razmak-stavki: 12px;
+      --font-stavke: clamp(20px, 2.8dvh, 22px);
+      --font-opisa: 16px;
+      --padding-stavke: 18px 20px;
+      --visina-sporedne: 84px;
       --landing-padding: 4px;
     }
 
+    /* Ispod 380px naslov kartice ostaje 24px. */
+    @media (max-width: 379px) {
+      .landing {
+        --font-stavke: 24px;
+      }
+    }
+
+    .landing-prostor--gore {
+      padding-top: 52px;
+    }
+
     .izbornik {
-      gap: 12px;
+      gap: 10px;
+    }
+
+    .cta {
+      padding: 8px 14px;
+      font-size: 15px;
     }
   }
 
   @media (max-width: 999px) {
     :global(html[data-font-disleksiju]) .landing {
-      --visina-stavke: clamp(44px, 5.6dvh, 58px);
-      --razmak-stavki: clamp(6px, 1dvh, 10px);
-      --landing-razmak: clamp(6px, 1.4dvh, 14px);
-      --font-stavke: clamp(19px, 2.9dvh, 24px);
+      --razmak-stavki: 12px;
+      --font-stavke: clamp(20px, 2.7dvh, 22px);
+      --font-opisa: 16px;
+    }
+
+    @media (max-width: 379px) {
+      :global(html[data-font-disleksiju]) .landing {
+        --font-stavke: 24px;
+      }
     }
   }
 
   @media (max-width: 999px) and (max-height: 700px) {
     :global(html[data-font-disleksiju]) .landing {
-      --visina-stavke: clamp(40px, 5dvh, 52px);
-      --razmak-stavki: clamp(4px, 0.8dvh, 8px);
+      --razmak-stavki: 10px;
       --landing-padding: 2px;
-      --landing-razmak: 4px;
+      --padding-stavke: 14px 16px;
     }
-  }
 
-  /* Samo navigacija: ispod 410px ~15% manji naslov i opis. */
-  @media (max-width: 409px) {
-    .landing {
-      --font-stavke: clamp(19px, 2.6dvh, 22px);
-      --font-opisa: clamp(15px, 2dvh, 19px);
+    :global(html[data-font-disleksiju]) .landing-prostor--gore {
+      padding-top: 48px;
     }
   }
 
