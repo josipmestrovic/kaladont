@@ -63,12 +63,73 @@
     napomena: string;
   }
 
+  interface WilsonInterval {
+    low: number;
+    high: number;
+  }
+
+  interface RedakIzazova {
+    challengeId: string;
+    definitionVersion: number;
+    botProfileVersion: number | null;
+    turnDurationMs: number | null;
+    started: number;
+    aktivni: number;
+    tehnicki: number;
+    uspjesi: number;
+    neuspjesi: number;
+    igrackiZavrseni: number;
+    attemptSuccessBrojnik: number;
+    attemptSuccessNazivnik: number;
+    attemptSuccessRate: number | null;
+    gameWon: number;
+    gameWonRate: number | null;
+    uniqueStarted: number;
+    uniqueSuccess: number;
+    uniqueSuccessRate: number | null;
+    uniqueSuccessWilson: WilsonInterval | null;
+    maliUzorak: boolean;
+    firstTrySuccess: number;
+    firstTryPlayers: number;
+    firstTryRate: number | null;
+    attemptsToFirstSuccessMedian: number | null;
+    trajanjeMedianMs: number | null;
+    trajanjeP90Ms: number | null;
+    reasons: Record<string, number>;
+    startedGost: number;
+    startedRegistriran: number;
+    uspjesiGost: number;
+    uspjesiRegistriran: number;
+  }
+
+  interface AgregatIzazova {
+    od: string;
+    do: string;
+    vremenskaZona: string;
+    ukupno: {
+      started: number;
+      aktivni: number;
+      tehnicki: number;
+      uspjesi: number;
+      neuspjesi: number;
+      uniqueStarted: number;
+      uniqueSuccess: number;
+      uniqueSuccessRate: number | null;
+      uniqueSuccessWilson: WilsonInterval | null;
+      maliUzorak: boolean;
+    };
+    redovi: RedakIzazova[];
+  }
+
   let od = $state('');
   let doDana = $state('');
   let kontekst = $state<'' | 'javna' | 'privatna' | 'trening' | 'izazov'>('');
+  let izazovChallengeId = $state('');
+  let izazovAccountType = $state<'' | 'gost' | 'registriran'>('');
   let status = $state<StatusAnalitike | null>(null);
   let agregat = $state<AgregatPocetnih | null>(null);
   let dnevno = $state<Dnevno | null>(null);
+  let izazovi = $state<AgregatIzazova | null>(null);
   let incidenti = $state<IncidentRedak[]>([]);
   let ukupnoIncidenata = $state(0);
   let stranica = $state(1);
@@ -117,17 +178,63 @@
     return params.toString();
   }
 
+  function queryIzazovi(): string {
+    const params = new URLSearchParams();
+    if (od) params.set('od', od);
+    if (doDana) params.set('do', doDana);
+    if (izazovChallengeId) params.set('challengeId', izazovChallengeId);
+    if (izazovAccountType) params.set('accountTypeAtStart', izazovAccountType);
+    return params.toString();
+  }
+
+  function formatMs(ms: number | null): string {
+    if (ms === null) return '—';
+    if (ms < 1000) return `${Math.round(ms)} ms`;
+    return `${(ms / 1000).toFixed(1)} s`;
+  }
+
+  function wilsonTekst(w: WilsonInterval | null): string {
+    if (!w) return '—';
+    return `${w.low.toFixed(1)}–${w.high.toFixed(1)} %`;
+  }
+
+  async function preuzmiCsv() {
+    greska = null;
+    try {
+      const { apiUrl } = await import('$lib/api-url.js');
+      const { osigurajAuthToken } = await import('$lib/identitet.js');
+      const token = await osigurajAuthToken();
+      const odgovor = await fetch(apiUrl(`/admin/analitika/izazovi.csv?${queryIzazovi()}`), {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!odgovor.ok) {
+        throw new Error(`CSV nije dostupan (${odgovor.status})`);
+      }
+      const blob = await odgovor.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `izazovi-${od || 'od'}_${doDana || 'do'}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      greska = e instanceof Error ? e.message : 'CSV preuzimanje nije uspjelo.';
+    }
+  }
+
   async function ucitaj() {
     greska = null;
     const q = query();
+    const qIz = queryIzazovi();
     const rezultati = await Promise.allSettled([
       api<AgregatPocetnih & { ok: boolean }>(`/admin/analitika/pocetne-rijeci?${q}`),
       api<{ ok: boolean; ukupno: number; incidenti: IncidentRedak[] }>(`/admin/analitika/incidenti?${q}`),
       api<Dnevno & { ok: boolean; od: string; do: string }>(`/admin/analitika/dnevno?${q}`),
       api<StatusAnalitike & { ok: boolean }>('/admin/analitika/status'),
+      api<AgregatIzazova & { ok: boolean }>(`/admin/analitika/izazovi?${qIz}`),
     ]);
     const greske: string[] = [];
-    const [a, i, d, s] = rezultati;
+    const [a, i, d, s, iz] = rezultati;
     if (a.status === 'fulfilled') {
       agregat = a.value;
       if (!od) od = a.value.od;
@@ -145,6 +252,8 @@
     else greske.push(d.reason instanceof Error ? d.reason.message : 'Dnevno igranje nije dostupno.');
     if (s.status === 'fulfilled') status = s.value;
     else greske.push(s.reason instanceof Error ? s.reason.message : 'Status nije dostupan.');
+    if (iz.status === 'fulfilled') izazovi = iz.value;
+    else greske.push(iz.reason instanceof Error ? iz.reason.message : 'Izazovi analitika nije dostupna.');
     greska = greske.length > 0 ? greske.join(' ') : null;
   }
 
@@ -201,8 +310,103 @@
       <option value="izazov">Izazov</option>
     </select>
   </label>
+  <label>Izazov
+    <input type="text" bind:value={izazovChallengeId} placeholder="npr. IZ01" maxlength="4" />
+  </label>
+  <label>Račun (Izazov)
+    <select bind:value={izazovAccountType}>
+      <option value="">Svi</option>
+      <option value="gost">Gost</option>
+      <option value="registriran">Registriran</option>
+    </select>
+  </label>
   <button type="submit">Osvježi</button>
 </form>
+
+{#if izazovi}
+  <section aria-labelledby="izazovi-naslov">
+    <h2 id="izazovi-naslov">Izazovi</h2>
+    <p class="meta">
+      Zona: {izazovi.vremenskaZona} · {izazovi.od} – {izazovi.do}
+      · kohorta po startedAt · verzije odvojene
+      {#if izazovi.ukupno.maliUzorak}
+        · <strong>mali uzorak</strong> (&lt;30 unique igrača)
+      {/if}
+    </p>
+    <dl class="kartice">
+      <div><dt>Pokrenuti</dt><dd>{izazovi.ukupno.started}</dd></div>
+      <div><dt>Aktivni</dt><dd>{izazovi.ukupno.aktivni}</dd></div>
+      <div><dt>Tehnički</dt><dd>{izazovi.ukupno.tehnicki}</dd></div>
+      <div><dt>Uspjesi / neuspjesi</dt><dd>{izazovi.ukupno.uspjesi} / {izazovi.ukupno.neuspjesi}</dd></div>
+      <div>
+        <dt>Unique uspjeh</dt>
+        <dd>
+          {izazovi.ukupno.uniqueSuccess} / {izazovi.ukupno.uniqueStarted}
+          ({postotak(izazovi.ukupno.uniqueSuccessRate)})
+        </dd>
+      </div>
+      <div><dt>Wilson 95%</dt><dd>{wilsonTekst(izazovi.ukupno.uniqueSuccessWilson)}</dd></div>
+    </dl>
+    <p class="meta">
+      <button type="button" onclick={() => void preuzmiCsv()}>Preuzmi CSV</button>
+      (bez osobnih podataka)
+    </p>
+    {#if izazovi.redovi.length === 0}
+      <p>Nema pokušaja Izazova u odabranom razdoblju.</p>
+    {:else}
+      <table>
+        <thead>
+          <tr>
+            <th>Izazov</th>
+            <th>Verzija</th>
+            <th>Timer</th>
+            <th>Started</th>
+            <th>Uspjeh pokušaja</th>
+            <th>gameWon</th>
+            <th>Unique</th>
+            <th>First-try</th>
+            <th>Do 1. uspjeha</th>
+            <th>Trajanje med/p90</th>
+            <th>Razlozi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each izazovi.redovi as red (`${red.challengeId}-${red.definitionVersion}-${red.botProfileVersion}-${red.turnDurationMs}`)}
+            <tr>
+              <td>
+                {red.challengeId}
+                {#if red.maliUzorak}<span class="meta"> · mali</span>{/if}
+              </td>
+              <td>d{red.definitionVersion}{#if red.botProfileVersion != null}/b{red.botProfileVersion}{/if}</td>
+              <td>{red.turnDurationMs != null ? `${red.turnDurationMs / 1000}s` : '—'}</td>
+              <td>{red.started} <span class="meta">(akt {red.aktivni}, teh {red.tehnicki})</span></td>
+              <td>
+                {red.attemptSuccessBrojnik}/{red.attemptSuccessNazivnik}
+                ({postotak(red.attemptSuccessRate)})
+              </td>
+              <td>{red.gameWon}/{red.igrackiZavrseni} ({postotak(red.gameWonRate)})</td>
+              <td>
+                {red.uniqueSuccess}/{red.uniqueStarted} ({postotak(red.uniqueSuccessRate)})
+                <span class="meta">W {wilsonTekst(red.uniqueSuccessWilson)}</span>
+              </td>
+              <td>{red.firstTrySuccess}/{red.firstTryPlayers} ({postotak(red.firstTryRate)})</td>
+              <td>{red.attemptsToFirstSuccessMedian ?? '—'}</td>
+              <td>{formatMs(red.trajanjeMedianMs)} / {formatMs(red.trajanjeP90Ms)}</td>
+              <td class="meta">
+                {#each Object.entries(red.reasons) as [razlog, broj]}
+                  {razlog}:{broj}
+                  {' '}
+                {:else}
+                  —
+                {/each}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  </section>
+{/if}
 
 {#if dnevno}
   <section aria-labelledby="dnevno-naslov">

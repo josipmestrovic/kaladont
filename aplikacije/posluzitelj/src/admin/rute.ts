@@ -60,6 +60,12 @@ import {
 } from '../analitika/otvaranja.js';
 import { agregirajDnevneIgre } from '../analitika/igre.js';
 import { dohvatiStatusAnalitike } from '../analitika/status.js';
+import {
+  agregirajIzazove,
+  izazoviAgregatUCsv,
+  type VrstaRacunaIzazovAnalitike,
+} from '../izazovi/analitika.js';
+import { ID_OVI_IZAZOVA } from 'zajednicko';
 
 /** Živi brojači iz memorije procesa; nisu trajni i vrijede od zadnjeg pokretanja. */
 export interface ZivoStanjeBotova {
@@ -912,5 +918,84 @@ export async function registrirajAdminRute(
     odgovor.header('Cache-Control', 'no-store');
     const status = await dohvatiStatusAnalitike();
     return { ok: true, ...status };
+  });
+
+  const ShemaFilteraIzazova = z.object({
+    od: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    do: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    challengeId: z.enum(ID_OVI_IZAZOVA).optional(),
+    definitionVersion: z.coerce.number().int().min(1).max(10_000).optional(),
+    accountTypeAtStart: z.enum(['gost', 'registriran']).optional(),
+    botProfileVersion: z.coerce.number().int().min(0).max(10_000).optional(),
+    turnDurationMs: z.coerce.number().int().positive().optional(),
+  });
+
+  function parsirajFilterIzazova(query: unknown):
+    | {
+      ok: true;
+      od: string;
+      do: string;
+      challengeId?: string;
+      definitionVersion?: number;
+      accountTypeAtStart?: VrstaRacunaIzazovAnalitike;
+      botProfileVersion?: number;
+      turnDurationMs?: number;
+    }
+    | { ok: false; greska: string } {
+    const parsed = ShemaFilteraIzazova.safeParse(query);
+    if (!parsed.success) return { ok: false, greska: 'Neispravni filteri Izazova.' };
+    const bazni = parsirajFilterAnalitike({
+      od: parsed.data.od,
+      do: parsed.data.do,
+    });
+    if (!bazni.ok) return bazni;
+    return {
+      ok: true,
+      od: bazni.od,
+      do: bazni.do,
+      challengeId: parsed.data.challengeId,
+      definitionVersion: parsed.data.definitionVersion,
+      accountTypeAtStart: parsed.data.accountTypeAtStart,
+      botProfileVersion: parsed.data.botProfileVersion,
+      turnDurationMs: parsed.data.turnDurationMs,
+    };
+  }
+
+  app.get('/admin/analitika/izazovi', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const filter = parsirajFilterIzazova(zahtjev.query);
+    if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
+    const agregat = await agregirajIzazove({
+      odDan: filter.od,
+      doDan: filter.do,
+      challengeId: filter.challengeId,
+      definitionVersion: filter.definitionVersion,
+      accountTypeAtStart: filter.accountTypeAtStart,
+      botProfileVersion: filter.botProfileVersion,
+      turnDurationMs: filter.turnDurationMs,
+    });
+    return { ok: true, ...agregat };
+  });
+
+  app.get('/admin/analitika/izazovi.csv', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const filter = parsirajFilterIzazova(zahtjev.query);
+    if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
+    const agregat = await agregirajIzazove({
+      odDan: filter.od,
+      doDan: filter.do,
+      challengeId: filter.challengeId,
+      definitionVersion: filter.definitionVersion,
+      accountTypeAtStart: filter.accountTypeAtStart,
+      botProfileVersion: filter.botProfileVersion,
+      turnDurationMs: filter.turnDurationMs,
+    });
+    const csv = izazoviAgregatUCsv(agregat);
+    odgovor.header('Content-Type', 'text/csv; charset=utf-8');
+    odgovor.header(
+      'Content-Disposition',
+      `attachment; filename="izazovi-${filter.od}_${filter.do}.csv"`,
+    );
+    return odgovor.send(csv);
   });
 }
