@@ -53,6 +53,8 @@ services:
       SOCKET_MAKSIMALNO_AKTIVNIH_PARTIJA: ${STAGING_TEST_MAKSIMALNO_PARTIJA:-500}
       SOCKET_DOGADAJI_PO_PROZORU: ${STAGING_TEST_DOGADAJI_PO_PROZORU:-30}
       TRENING_OMOGUCEN: ${TRENING_OMOGUCEN:-true}
+      # Staging: Izazov uključen za QA (PR07). Produkcija ostaje default false.
+      IZAZOV_OMOGUCEN: ${IZAZOV_OMOGUCEN:-true}
       # Staging: javna popuna uključena (fond + /zdravlje). Produkcija ostaje opt-in (false).
       BOTOVI_DVOBOJ: ${BOTOVI_DVOBOJ:-true}
       BOTOVI_TROBOJ: ${BOTOVI_TROBOJ:-true}
