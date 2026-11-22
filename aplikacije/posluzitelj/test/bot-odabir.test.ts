@@ -233,6 +233,95 @@ describe('odabir riječi bota', () => {
     expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'jaje' });
   });
 
+  it('Dokaži: faktor propusta 1 i n=1 → Ne znam unatoč živom nastavku', () => {
+    const rijeci = laznaRijec({
+      jaje: { frekvencija: 400, grupe: ['imenica:jaje'] },
+      jelen: { frekvencija: 200, grupe: ['imenica:jelen'] },
+    });
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      dokaziFaktorPropusaPotvrde: 1,
+      dokaziBudzetDetaljneProvjere: 4,
+      dokaziBudzetDodatneProvjere: 4,
+      vjerojatnostDokaziPreskokaPotvrde: 0,
+    };
+    const stanje = stvoriStanjeBota(konfig, rng(3));
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ja',
+      kandidati: ['jaje'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak',
+      faza: 'obican_potez',
+      brojAktivnih: 2,
+      iskoristeneGrupe: new Set(),
+      imaSlobodnuRijecNa: () => true,
+      poznatiKandidatiNa: (prefiks) => (prefiks === 'je' ? ['jelen'] : []),
+      turnToken: 't-propust',
+    }, stanje, konfig, () => 0);
+    expect(odluka).toMatchObject({
+      vrsta: 'odustani',
+      razlog: 'nema_rijeci',
+      razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu',
+    });
+    expect(stanje.dokaziPropustPoKljucu.get('t-propust|jaje')).toBe(true);
+  });
+
+  it('Dokaži: preskok potvrde = 1 → igra bez potvrđenog nastavka', () => {
+    const rijeci = laznaRijec({
+      javor: { frekvencija: 500, grupe: ['imenica:javor'] },
+    });
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostDokaziPreskokaPotvrde: 1,
+      dokaziFaktorPropusaPotvrde: 1,
+    };
+    const stanje = stvoriStanjeBota(konfig, rng(4));
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ja',
+      kandidati: ['javor'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak',
+      faza: 'obican_potez',
+      brojAktivnih: 2,
+      iskoristeneGrupe: new Set(),
+      poznatiKandidatiNa: () => [],
+      imaSlobodnuRijecNa: () => true,
+      turnToken: 't-preskok',
+    }, stanje, konfig, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'javor' });
+    expect(stanje.dokaziPreskokPoTokenu.get('t-preskok')).toBe(true);
+  });
+
+  it('Dokaži: propust i preskok ostaju stabilni pri oporavku istog tokena', () => {
+    const rijeci = laznaRijec({
+      jaje: { frekvencija: 400, grupe: ['imenica:jaje'] },
+      jelen: { frekvencija: 200, grupe: ['imenica:jelen'] },
+    });
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      dokaziFaktorPropusaPotvrde: 1,
+      vjerojatnostDokaziPreskokaPotvrde: 0,
+    };
+    const stanje = stvoriStanjeBota(konfig, rng(7));
+    const ulaz = {
+      trazenaSlova: 'ja',
+      kandidati: ['jaje'],
+      ...rijeci,
+      pravila: 'dokazi_nastavak' as const,
+      faza: 'obican_potez' as const,
+      brojAktivnih: 2,
+      iskoristeneGrupe: new Set<string>(),
+      imaSlobodnuRijecNa: () => true,
+      poznatiKandidatiNa: (prefiks: string) => (prefiks === 'je' ? ['jelen'] : []),
+      turnToken: 't-oporavak-dokazi',
+    };
+    const prvi = odaberiPotez(ulaz, stanje, konfig, () => 0);
+    expect(prvi.vrsta).toBe('odustani');
+    const drugi = odaberiPotez({ ...ulaz, oporavak: true }, stanje, konfig, () => 0.99);
+    expect(drugi).toEqual(prvi);
+    expect(stanje.dokaziPropustPoKljucu.get('t-oporavak-dokazi|jaje')).toBe(true);
+  });
+
   it('među čestim osnovnim oblicima bira 90 imenica i 10 glagola/pridjeva u ciklusu', () => {
     const rijeci = laznaRijec({
       masa: { frekvencija: 900, grupe: ['imenica:masa'] },
@@ -383,6 +472,8 @@ describe('odabir riječi bota', () => {
     }, stanje, konfig, () => 0);
     expect([...stanje.taktikaPoTokenu.keys()]).toEqual(['t-b']);
     expect(stanje.neznanjePoTokenu.has('t-a')).toBe(false);
+    expect(stanje.dokaziPreskokPoTokenu.has('t-a')).toBe(false);
+    expect(stanje.dokaziPropustPoKljucu.size).toBe(0);
   });
 
   it('riječ na „ka” izbjegava kad postoji druga, ali je odigra ako je jedina', () => {

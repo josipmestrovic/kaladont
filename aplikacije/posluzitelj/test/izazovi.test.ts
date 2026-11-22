@@ -15,6 +15,7 @@ import {
 } from '../src/izazovi/pohrana.js';
 import { rezervirajPokusajIzazova, stubPokreniPartijuIzazova } from '../src/izazovi/servis.js';
 import { definicijaIzazova } from 'zajednicko';
+import { VERZIJA_PROFILA_BOTA } from '../src/bot/profili-bota.js';
 
 let posluzitelj: Posluzitelj;
 let adresa: string;
@@ -176,8 +177,8 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const snapshot = rezultat.pokusaj.snapshot as { xp: number; profileId: string; botProfileVersion: number };
     expect(snapshot.xp).toBe(definicijaIzazova('IZ-L1-DV-01').xp);
     expect(snapshot.profileId).toBe('pocetnik');
-    expect(snapshot.botProfileVersion).toBe(1);
-    expect(rezultat.pokusaj.botProfileVersion).toBe(1);
+    expect(snapshot.botProfileVersion).toBe(VERZIJA_PROFILA_BOTA);
+    expect(rezultat.pokusaj.botProfileVersion).toBe(VERZIJA_PROFILA_BOTA);
   });
 
   it('gost vidi puni katalog; finale L4 i L1 zaključani', async () => {
