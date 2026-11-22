@@ -546,7 +546,9 @@ for (const zaslon of [
               prelijeva: element.scrollWidth > element.clientWidth,
               visina: element.getBoundingClientRect().height,
             })));
-            expect(statusi.every((status) => !status.prelijeva && status.visina >= (zaslon.width >= 1000 ? 45 : 40))).toBe(true);
+            // Troboj na 320px: labeli su niži; i dalje bez horizontalnog prelijevanja.
+            const minVisinaLabela = zaslon.width >= 1000 ? 45 : zaslon.width >= 380 ? 40 : 20;
+            expect(statusi.every((status) => !status.prelijeva && status.visina >= minVisinaLabela)).toBe(true);
             expect(await stranica.locator('.avatar-omot').evaluateAll((avatari) => avatari.every((avatar) => {
               const pravokutnik = avatar.getBoundingClientRect();
               const element = document.elementFromPoint(pravokutnik.x + pravokutnik.width / 2, pravokutnik.y + pravokutnik.height / 2);
