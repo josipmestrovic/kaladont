@@ -1,13 +1,17 @@
 /** Tipizirani HTTP klijent za katalog i pokušaje Izazova. */
 import type {
+  AgregatLevelaIzazovaDto,
   IdIzazova,
+  LevelIzazova,
   OdgovorKatalogaIzazova,
+  RazlogZakljucavanja,
   SettlementIzazovaDto,
   StatusPokusajaIzazova,
   StatusSpremanjaIzazova,
   GoalProgressIzazova,
   RazlogNeuspjehaIzazova,
 } from 'zajednicko';
+import { NAZIVI_LEVELA_IZAZOVA, jeIdIzazova } from 'zajednicko';
 import { ApiGreska, api } from './api.js';
 
 export { ApiGreska };
@@ -62,7 +66,7 @@ export function spremiZadnjiChallengeId(id: IdIzazova): void {
 export function procitajZadnjiChallengeId(): IdIzazova | null {
   try {
     const v = sessionStorage.getItem(KLJUC_ZADNJEG_IZAZOVA);
-    return v && /^IZ\d{2}$/.test(v) ? (v as IdIzazova) : null;
+    return v && jeIdIzazova(v) ? v : null;
   } catch {
     return null;
   }
@@ -73,7 +77,7 @@ export function porukaZaKodIzazova(kod: string | null | undefined, fallback: str
     case 'IZAZOV_NEDOSTUPAN':
       return 'Izazovi trenutačno nisu dostupni.';
     case 'IZAZOV_ZAKLJUCAN':
-      return 'Najprije dovrši prethodni izazov.';
+      return 'Najprije otključaj ovaj izazov.';
     case 'IZAZOV_AKTIVAN':
       return 'Već imaš aktivan pokušaj. Nastavi ga ili pričekaj završetak.';
     case 'VEC_U_PARTIJI':
@@ -102,7 +106,29 @@ export function tekstRazlogaNeuspjeha(razlog: RazlogNeuspjehaIzazova | null | un
   }
 }
 
-export function nazivEtape(redniBroj: number): string {
-  const etapa = Math.ceil(redniBroj / 3);
-  return `Etapa ${etapa}`;
+export function tekstRazlogaZakljucavanja(razlog: RazlogZakljucavanja | null | undefined): string {
+  if (!razlog) return 'Zaključano.';
+  if (razlog.vrsta === 'prethodni_level') {
+    return `Zaključano — najprije dovrši level ${razlog.level} (${NAZIVI_LEVELA_IZAZOVA[razlog.level]}).`;
+  }
+  return 'Zaključano — najprije dovrši varijante 1–4 ovog formata.';
+}
+
+/** Najviši otključani nezavršen level; inače najviši otključani; fallback 1. */
+export function zadaniLevelIzazova(leveli: readonly AgregatLevelaIzazovaDto[]): LevelIzazova {
+  let najvisiOtkljucan: LevelIzazova = 1;
+  let najvisiNezavrsen: LevelIzazova | null = null;
+  for (const L of leveli) {
+    if (L.status === 'zakljucan') break;
+    najvisiOtkljucan = L.level;
+    if (L.zavrseno < L.ukupno) najvisiNezavrsen = L.level;
+  }
+  return najvisiNezavrsen ?? najvisiOtkljucan;
+}
+
+export function parsirajLevelIzUrl(sirovo: string | null): LevelIzazova | null {
+  if (sirovo === '1' || sirovo === '2' || sirovo === '3' || sirovo === '4') {
+    return Number(sirovo) as LevelIzazova;
+  }
+  return null;
 }
