@@ -33,17 +33,22 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chrome',
-      testIgnore: ['mobilni-tok.spec.ts', 'http-rute.spec.ts', 'image-smoke.spec.ts'],
+      testIgnore: [
+        'mobilni-tok.spec.ts',
+        'izazovi-mobilni.spec.ts',
+        'http-rute.spec.ts',
+        'image-smoke.spec.ts',
+      ],
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'android-chrome',
-      testMatch: ['mobilni-tok.spec.ts'],
+      testMatch: ['mobilni-tok.spec.ts', 'izazovi-mobilni.spec.ts'],
       use: { ...devices['Pixel 7'] },
     },
     {
       name: 'iphone-webkit',
-      testMatch: ['mobilni-tok.spec.ts'],
+      testMatch: ['mobilni-tok.spec.ts', 'izazovi-mobilni.spec.ts'],
       use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },
   ],

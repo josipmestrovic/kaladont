@@ -58,7 +58,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const rezultat = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId: randomUUID(),
       omogucen: false,
     });
@@ -66,12 +66,12 @@ describe('Izazov PR01 — servis rezervacije', () => {
     if (!rezultat.ok) expect(rezultat.kod).toBe('IZAZOV_NEDOSTUPAN');
   });
 
-  it('zaključana razina odbijena; IZ01 dostupan', async () => {
+  it('zaključana razina odbijena; IZ-L1-DV-01 dostupan', async () => {
     const gost = await noviGost();
     const zakljucan = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ24',
+      challengeId: 'IZ-L4-CE-05',
       requestId: randomUUID(),
       omogucen: true,
     });
@@ -81,7 +81,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const ok = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId: randomUUID(),
       omogucen: true,
     });
@@ -99,7 +99,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const prvi = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId,
       omogucen: true,
       pokreniPartiju: async () => ({ ok: true, partijaId: randomUUID() }),
@@ -116,7 +116,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const ponovno = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId,
       omogucen: true,
     });
@@ -126,7 +126,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const drugi = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId: randomUUID(),
       omogucen: true,
     });
@@ -139,7 +139,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const pad = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId: randomUUID(),
       omogucen: true,
       pokreniPartiju: async () => {
@@ -154,7 +154,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const ponovni = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId: randomUUID(),
       omogucen: true,
     });
@@ -167,27 +167,30 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const rezultat = await rezervirajPokusajIzazova({
       igracId: gost.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId: randomUUID(),
       omogucen: true,
     });
     expect(rezultat.ok).toBe(true);
     if (!rezultat.ok) return;
     const snapshot = rezultat.pokusaj.snapshot as { xp: number; profileId: string; botProfileVersion: number };
-    expect(snapshot.xp).toBe(definicijaIzazova('IZ01').xp);
+    expect(snapshot.xp).toBe(definicijaIzazova('IZ-L1-DV-01').xp);
     expect(snapshot.profileId).toBe('pocetnik');
     expect(snapshot.botProfileVersion).toBe(1);
     expect(rezultat.pokusaj.botProfileVersion).toBe(1);
   });
 
-  it('gost vidi puni katalog; IZ24 zaključan', async () => {
+  it('gost vidi puni katalog; finale L4 i L1 zaključani', async () => {
     const gost = await noviGost();
     const odgovor = await izgradiOdgovorKataloga(gost.igracId, true);
-    expect(odgovor.katalog).toHaveLength(24);
-    const iz24 = odgovor.katalog.find((s) => s.id === 'IZ24');
-    expect(iz24?.status).toBe('zakljucan');
-    expect(iz24?.blockingChallengeId).toBe('IZ23');
-    expect(iz24?.naziv).toBe('Završni ispit');
+    expect(odgovor.katalog).toHaveLength(60);
+    const finaleL4 = odgovor.katalog.find((s) => s.id === 'IZ-L4-CE-05');
+    expect(finaleL4?.status).toBe('zakljucan');
+    expect(finaleL4?.razlogZakljucavanja?.vrsta).toBe('prethodni_level');
+    expect(finaleL4?.naziv).toBe('Završni izazov');
+    const finaleL1 = odgovor.katalog.find((s) => s.id === 'IZ-L1-DV-05');
+    expect(finaleL1?.status).toBe('zakljucan');
+    expect(finaleL1?.razlogZakljucavanja?.vrsta).toBe('prethodni_izazovi_formata');
   });
 
   it('registracija istog ID-a čuva završetke', async () => {
@@ -195,7 +198,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const pokusaj = await umetniRezerviraniPokusaj({
       igracId: gost.igracId,
       requestId: randomUUID(),
-      definicija: definicijaIzazova('IZ01'),
+      definicija: definicijaIzazova('IZ-L1-DV-01'),
       accountTypeAtStart: 'gost',
       seed: 'test',
     });
@@ -206,7 +209,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     }).where(eq(pokusajiIzazova.id, pokusaj.id));
     await baza.insert(zavrseciIzazova).values({
       igracId: gost.igracId,
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       firstSuccessAttemptId: pokusaj.id,
       vrijeme: new Date(),
       nominalXp: 100,
@@ -222,11 +225,11 @@ describe('Izazov PR01 — servis rezervacije', () => {
     }).where(eq(igraci.id, gost.igracId));
 
     const katalog = await izgradiOdgovorKataloga(gost.igracId, true);
-    expect(katalog.napredak.zavrseniChallengeIds).toContain('IZ01');
-    const stavka = katalog.katalog.find((s) => s.id === 'IZ01');
+    expect(katalog.napredak.zavrseniChallengeIds).toContain('IZ-L1-DV-01');
+    const stavka = katalog.katalog.find((s) => s.id === 'IZ-L1-DV-01');
     expect(stavka?.status).toBe('zavrsen');
     expect(stavka?.xpOsvojen).toBe(true);
-    expect(katalog.katalog.find((s) => s.id === 'IZ02')?.status).toBe('dostupan');
+    expect(katalog.katalog.find((s) => s.id === 'IZ-L1-TR-01')?.status).toBe('dostupan');
   });
 
   it('tuđi attempt nije dostupan vlasniku drugog računa', async () => {
@@ -235,7 +238,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const rezervacija = await rezervirajPokusajIzazova({
       igracId: a.igracId,
       vrsta: 'gost',
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       requestId: randomUUID(),
       omogucen: true,
     });
@@ -267,7 +270,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     expect(odgovor.statusCode).toBe(200);
     const tijelo = odgovor.json<OdgovorKatalogaIzazova>();
     expect(tijelo.ok).toBe(true);
-    expect(tijelo.katalog).toHaveLength(24);
+    expect(tijelo.katalog).toHaveLength(60);
     // Default env flag je false
     expect(tijelo.omogucen).toBe(false);
   });
@@ -276,7 +279,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const gost = await noviGost();
     const socket = await spoji(gost.token);
     const ishod = await new Promise<Parameters<PotvrdaIzazova>[0]>((resolve) => {
-      socket.emit('izazov:zapocni', { challengeId: 'IZ01', requestId: randomUUID() }, resolve);
+      socket.emit('izazov:zapocni', { challengeId: 'IZ-L1-DV-01', requestId: randomUUID() }, resolve);
     });
     socket.close();
     expect(ishod.rezerviran).toBe(false);
@@ -287,7 +290,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const rezultat = await stubPokreniPartijuIzazova({
       attemptId: randomUUID(),
       igracId: randomUUID(),
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
     });
     expect(rezultat.ok).toBe(false);
   });
@@ -297,7 +300,7 @@ describe('Izazov PR01 — servis rezervacije', () => {
     const pokusaj = await umetniRezerviraniPokusaj({
       igracId: gost.igracId,
       requestId: randomUUID(),
-      definicija: definicijaIzazova('IZ01'),
+      definicija: definicijaIzazova('IZ-L1-DV-01'),
       accountTypeAtStart: 'gost',
       seed: 'cleanup',
     });

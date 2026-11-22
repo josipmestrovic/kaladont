@@ -30,7 +30,7 @@
   const tvojPotezSek = $derived(
     meta ? Math.round(meta.humanTurnDurationMs / 1000) : null,
   );
-  const prikaziDokazPomoc = $derived(efektivnaPravila === 'dokazi');
+  const prikaziDokazPomoc = $derived(efektivnaPravila === 'dokazi_nastavak');
 </script>
 
 {#if napredak || meta}

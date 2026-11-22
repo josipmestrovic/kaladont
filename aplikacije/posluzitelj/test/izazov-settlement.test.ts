@@ -67,7 +67,7 @@ async function noviIgrac(opcije: {
   return id;
 }
 
-async function pripremiPokusaj(igracId: string, challengeId: 'IZ01' | 'IZ02' = 'IZ01') {
+async function pripremiPokusaj(igracId: string, challengeId: 'IZ-L1-DV-01' | 'IZ-L1-TR-01' = 'IZ-L1-DV-01') {
   const pokusaj = await umetniRezerviraniPokusaj({
     igracId,
     requestId: randomUUID(),
@@ -127,9 +127,11 @@ describe('Izazov PR04 — kvalifikacija misija', () => {
 });
 
 describe('Izazov PR04 — settlement XP i Izazivač', () => {
+  const XP_DV01 = definicijaIzazova('IZ-L1-DV-01').xp;
+
   it('prvi uspjeh daje kampanjski XP i Izazivač ★; retry ne duplira', async () => {
     const igracId = await noviIgrac({ vrsta: 'gost' });
-    const pokusaj = await pripremiPokusaj(igracId, 'IZ01');
+    const pokusaj = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     const prvi = await zavrsiPokusajIzazova({
       attemptId: pokusaj.id,
       status: 'uspjeh',
@@ -137,7 +139,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
       gameWon: true,
     });
     expect(prvi?.settlement.firstCompletion).toBe(true);
-    expect(prvi?.settlement.challengeXp).toEqual({ nominal: 100, awarded: 100 });
+    expect(prvi?.settlement.challengeXp).toEqual({ nominal: XP_DV01, awarded: XP_DV01 });
     expect(prvi?.settlement.izazivac.zvjezdice).toBe(1);
     expect(prvi?.settlement.izazivac.novaRazina).toBe(1);
     expect(prvi?.settlement.settlementState).toBe('spremljeno');
@@ -147,7 +149,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
       rangSumaJedinica: igraci.rangSumaJedinica,
       rangBrojPartija: igraci.rangBrojPartija,
     }).from(igraci).where(eq(igraci.id, igracId));
-    expect(igrac?.iskustvoUkupno).toBe(100);
+    expect(igrac?.iskustvoUkupno).toBe(XP_DV01);
     expect(igrac?.rangSumaJedinica).toBe(0);
     expect(igrac?.rangBrojPartija).toBe(0);
 
@@ -164,10 +166,10 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
       gameWon: true,
     });
     expect(drugi?.settlement.firstCompletion).toBe(true);
-    expect(drugi?.settlement.challengeXp.awarded).toBe(100);
+    expect(drugi?.settlement.challengeXp.awarded).toBe(XP_DV01);
 
     const [ponovo] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
-    expect(ponovo?.iskustvoUkupno).toBe(100);
+    expect(ponovo?.iskustvoUkupno).toBe(XP_DV01);
 
     const zavrseci = await baza.select().from(zavrseciIzazova).where(eq(zavrseciIzazova.igracId, igracId));
     expect(zavrseci).toHaveLength(1);
@@ -175,7 +177,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
 
   it('paralelni uspjesi iste razine → jedna nagrada', async () => {
     const igracId = await noviIgrac({ vrsta: 'gost' });
-    const a = await pripremiPokusaj(igracId, 'IZ01');
+    const a = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     // Drugi aktivni pokušaj nije moguć u DB — simuliraj dva terminalna reda ručno nije;
     // umjesto toga dva paralelna zavrsi na istom attemptu (CAS + settlement race).
     const [r1, r2] = await Promise.all([
@@ -196,12 +198,12 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
     const zavrseci = await baza.select().from(zavrseciIzazova).where(eq(zavrseciIzazova.igracId, igracId));
     expect(zavrseci).toHaveLength(1);
     const [igrac] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
-    expect(igrac?.iskustvoUkupno).toBe(100);
+    expect(igrac?.iskustvoUkupno).toBe(XP_DV01);
   });
 
   it('dva uspjeha iste razine na različitim attemptima → jedna nagrada', async () => {
     const igracId = await noviIgrac({ vrsta: 'gost' });
-    const prvi = await pripremiPokusaj(igracId, 'IZ01');
+    const prvi = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     await zavrsiPokusajIzazova({
       attemptId: prvi.id,
       status: 'uspjeh',
@@ -212,7 +214,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
     const drugi = await umetniRezerviraniPokusaj({
       igracId,
       requestId: randomUUID(),
-      definicija: definicijaIzazova('IZ01'),
+      definicija: definicijaIzazova('IZ-L1-DV-01'),
       accountTypeAtStart: 'gost',
       seed: 'pr04-b',
     });
@@ -226,12 +228,12 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
     expect(ishod?.settlement.firstCompletion).toBe(false);
     expect(ishod?.settlement.challengeXp.awarded).toBe(0);
     const [igrac] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
-    expect(igrac?.iskustvoUkupno).toBe(100);
+    expect(igrac?.iskustvoUkupno).toBe(XP_DV01);
   });
 
   it('nova definitionVersion ne resetira nagradu', async () => {
     const igracId = await noviIgrac({ vrsta: 'gost' });
-    const prvi = await pripremiPokusaj(igracId, 'IZ01');
+    const prvi = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     await zavrsiPokusajIzazova({
       attemptId: prvi.id,
       status: 'uspjeh',
@@ -242,7 +244,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
     const drugi = await umetniRezerviraniPokusaj({
       igracId,
       requestId: randomUUID(),
-      definicija: { ...definicijaIzazova('IZ01') },
+      definicija: { ...definicijaIzazova('IZ-L1-DV-01') },
       accountTypeAtStart: 'gost',
       seed: 'pr04-v2',
     });
@@ -267,14 +269,14 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
       vrsta: 'gost',
       iskustvoUkupno: MAKSIMALNO_ISKUSTVO - 40,
     });
-    const pokusaj = await pripremiPokusaj(igracId, 'IZ01');
+    const pokusaj = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     const ishod = await zavrsiPokusajIzazova({
       attemptId: pokusaj.id,
       status: 'uspjeh',
       metrics: metrikeUspjeh(1),
       gameWon: true,
     });
-    expect(ishod?.settlement.challengeXp).toEqual({ nominal: 100, awarded: 40 });
+    expect(ishod?.settlement.challengeXp).toEqual({ nominal: XP_DV01, awarded: 40 });
     const [igrac] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
     expect(igrac?.iskustvoUkupno).toBe(MAKSIMALNO_ISKUSTVO);
     expect(stanjeIskustva(igrac!.iskustvoUkupno).razina).toBe(100);
@@ -286,7 +288,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
     await baza.transaction((tx) => osigurajStanjeMisija(tx, igracId, { sada: () => sada, rng: () => 0.42 }));
     await forsiraD25(igracId);
 
-    const pokusaj = await pripremiPokusaj(igracId, 'IZ01');
+    const pokusaj = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     const ishod = await zavrsiPokusajIzazova({
       attemptId: pokusaj.id,
       status: 'neuspjeh',
@@ -314,7 +316,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
     await baza.transaction((tx) => osigurajStanjeMisija(tx, igracId, { sada: () => sada, rng: () => 0.42 }));
     await forsiraD25(igracId);
 
-    const bezRijeci = await pripremiPokusaj(igracId, 'IZ01');
+    const bezRijeci = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     const a = await zavrsiPokusajIzazova({
       attemptId: bezRijeci.id,
       status: 'neuspjeh',
@@ -328,7 +330,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
     const odustao = await umetniRezerviraniPokusaj({
       igracId,
       requestId: randomUUID(),
-      definicija: definicijaIzazova('IZ01'),
+      definicija: definicijaIzazova('IZ-L1-DV-01'),
       accountTypeAtStart: 'gost',
       seed: 'odustao',
     });
@@ -345,7 +347,7 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
 
   it('gost→registracija ne duplira XP', async () => {
     const igracId = await noviIgrac({ vrsta: 'gost' });
-    const pokusaj = await pripremiPokusaj(igracId, 'IZ01');
+    const pokusaj = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     await zavrsiPokusajIzazova({
       attemptId: pokusaj.id,
       status: 'uspjeh',
@@ -362,14 +364,14 @@ describe('Izazov PR04 — settlement XP i Izazivač', () => {
     const ponovo = await obracunajSettlementIzazova(
       (await baza.select().from(pokusajiIzazova).where(eq(pokusajiIzazova.id, pokusaj.id)))[0]!,
     );
-    expect(ponovo.challengeXp.awarded).toBe(100);
+    expect(ponovo.challengeXp.awarded).toBe(XP_DV01);
     const [igrac] = await baza.select({ iskustvoUkupno: igraci.iskustvoUkupno }).from(igraci).where(eq(igraci.id, igracId));
-    expect(igrac?.iskustvoUkupno).toBe(100);
+    expect(igrac?.iskustvoUkupno).toBe(XP_DV01);
   });
 
   it('tehnicki_prekinuto ne dira XP ni settlement', async () => {
     const igracId = await noviIgrac({ vrsta: 'gost' });
-    const pokusaj = await pripremiPokusaj(igracId, 'IZ01');
+    const pokusaj = await pripremiPokusaj(igracId, 'IZ-L1-DV-01');
     const ishod = await zavrsiPokusajIzazova({
       attemptId: pokusaj.id,
       status: 'tehnicki_prekinuto',
