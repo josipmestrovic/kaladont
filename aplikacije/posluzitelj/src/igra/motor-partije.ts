@@ -258,6 +258,10 @@ interface StanjeStola {
    * Settlement ga čita pri zaključivanju.
    */
   izazovTerminalHint?: 'nevaljana_rijec' | 'odustao' | 'prekid_veze' | null;
+  /** PR redesign: odvojeni rok čovjek/bot; samo kontekst izazov. */
+  izazovTimerPolitika?: { covjekMs: number; botMs: number };
+  /** Autoritativni metadata kampanje (refresh/reconnect). */
+  izazovMeta?: import('zajednicko').IzazovPartijaMeta;
   sudionici: SudionikPartije[]; // svi 4 ili 2, fiksni redoslijed po sjedalu
   aktivni: Set<string>;
   eliminirani: string[]; // redoslijed ispadanja - prvi ispali je na indeksu 0
@@ -408,7 +412,18 @@ export function stvoriUpraviteljPartija(
     return timerOnemogucen;
   }
 
-  function trajanjePotezaMsZaStol(stanje: StanjeStola): number {
+  function aktivanIgracZaTimer(stanje: StanjeStola): string {
+    return stanje.dokaz?.autorId ?? stanje.naPotezuId;
+  }
+
+  /** Efektivni rok aktivnog sudionika; za Izazov čovjek/bot mogu biti različiti. */
+  function trajanjePotezaMsZaStol(stanje: StanjeStola, igracId?: string): number {
+    if (stanje.kontekst === 'izazov' && stanje.izazovTimerPolitika) {
+      const id = igracId ?? aktivanIgracZaTimer(stanje);
+      const sud = stanje.sudionici.find((s) => s.igracId === id);
+      if (sud?.upravljac === 'bot') return stanje.izazovTimerPolitika.botMs;
+      return stanje.izazovTimerPolitika.covjekMs;
+    }
     return stanje.trajanjePotezaSek !== undefined
       ? stanje.trajanjePotezaSek * 1000
       : trajanjePotezaMs;
@@ -931,9 +946,11 @@ export function stvoriUpraviteljPartija(
     return new Date(stanje.vrijemePocetkaPotezaMs + trajanjeMs).toISOString();
   }
 
-  /** 0 kad je timer isključen, inače sobno/trening/izazov trajanje (javno: undefined). */
+  /** 0 kad je timer isključen; za Izazov = efektivni rok aktivnog sudionika. */
   function trajanjePotezaSekZaKlijenta(stanje: StanjeStola): number | undefined {
-    if (stanje.kontekst === 'izazov') return stanje.trajanjePotezaSek;
+    if (stanje.kontekst === 'izazov') {
+      return Math.round(trajanjePotezaMsZaStol(stanje) / 1000);
+    }
     return timerOnemogucen ? 0 : stanje.trajanjePotezaSek;
   }
 
@@ -991,6 +1008,7 @@ export function stvoriUpraviteljPartija(
         ? {
           goalProgress: postavke.dohvatiGoalProgressIzazova?.(stanje.partijaId) ?? null,
           izazovTerminal: postavke.dohvatiTerminalIzazova?.(stanje.partijaId) ?? null,
+          ...(stanje.izazovMeta ? { izazov: stanje.izazovMeta } : {}),
         }
         : {}),
     };
@@ -1139,6 +1157,9 @@ export function stvoriUpraviteljPartija(
       botKonfiguracija?: import('../bot/konfiguracija-bota.js').KonfiguracijaBota;
       /** PR03: per-stol timer (15/30) za Izazov; trening i dalje forsira 0. */
       trajanjePotezaSek?: number;
+      /** Redizajn: odvojeni rok čovjek/bot. */
+      izazovTimerPolitika?: { covjekMs: number; botMs: number };
+      izazovMeta?: import('zajednicko').IzazovPartijaMeta;
     } = {},
   ): Promise<{ ishod: RezultatPokretanja; partijaId: string | null }> {
     const kontekst = opcije.kontekst ?? 'javna';
@@ -1197,8 +1218,13 @@ export function stvoriUpraviteljPartija(
       kontekst,
       politika,
       izazovTerminalHint: null,
+      izazovTimerPolitika: kontekst === 'izazov' ? opcije.izazovTimerPolitika : undefined,
+      izazovMeta: kontekst === 'izazov' ? opcije.izazovMeta : undefined,
       trajanjePotezaSek: kontekst === 'izazov'
-        ? (opcije.trajanjePotezaSek ?? 30)
+        ? (opcije.trajanjePotezaSek
+          ?? (opcije.izazovTimerPolitika
+            ? Math.round(opcije.izazovTimerPolitika.covjekMs / 1000)
+            : 30))
         : (timerOnemogucen || kontekst === 'trening' ? 0 : undefined),
       sudionici,
       aktivni: new Set(sudionici.map((s) => s.igracId)),
@@ -1368,6 +1394,7 @@ export function stvoriUpraviteljPartija(
         spojeniDvoboj,
         kontekst,
         trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
+        ...(stanje.izazovMeta ? { izazov: stanje.izazovMeta } : {}),
       };
       for (const s of sudionici) {
         aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
@@ -2053,6 +2080,7 @@ export function stvoriUpraviteljPartija(
       istekPotezaIso: istekPotezaIso(stanje),
       serverVrijemeIso: new Date(sat.sada()).toISOString(),
       runda: stanje.runda,
+      trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
     };
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:runda-otvorena', poruka);
     objaviPromjenuPoteza(stanje);
@@ -2299,6 +2327,7 @@ export function stvoriUpraviteljPartija(
       istekPotezaIso: snimka.istekPotezaIso,
       serverVrijemeIso: new Date(sat.sada()).toISOString(),
       naPotezuId: autorId,
+      trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
     };
     // Odvojeno od partija:eliminacija — Bruno na Ne znam još nije ispao.
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('dokaz:zatrazen', poruka);
@@ -2828,6 +2857,7 @@ export function stvoriUpraviteljPartija(
       streak: trenutniStreak,
       nagrada,
       iskustvo: stavkePotezaIskustva,
+      trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
     };
     emitirajPrihvacenPotezSvima(stanje, poruka, izvorniSocket);
     if (!stanje.prekidiUTijeku.has(sljedeci)) posaljiStanjeSvima(stanje);

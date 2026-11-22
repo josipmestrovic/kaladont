@@ -1,111 +1,134 @@
 <script lang="ts">
-  import type { GoalProgressIzazova, PravilnikPartije } from 'zajednicko';
+  import type {
+    GoalProgressIzazova,
+    IzazovPartijaMeta,
+    PravilnikPartije,
+  } from 'zajednicko';
+  import {
+    NAZIVI_FORMATA_IZAZOVA,
+    NAZIVI_LEVELA_IZAZOVA,
+    NAZIVI_PROFILA_BOTA,
+    NAZIVI_VARIJANTI_IZAZOVA,
+  } from 'zajednicko';
   import { nazivPravilnika } from '$lib/igraj-rute.js';
+  import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
+
+  const OPIS_DOKAZI_NASTAVAK =
+    'Ako sljedeći igrač ne zna nastavak ili mu istekne vrijeme, autor prethodne riječi mora dokazati da nastavak postoji tako da ga odigra. Uspije li, ispada igrač koji nije znao nastavak. Ne uspije li, ispada autor prethodne riječi.';
 
   let {
     napredak,
+    meta = null,
     pravila = null,
-    trajanjePotezaSek = null,
   }: {
     napredak: GoalProgressIzazova | null;
+    meta?: IzazovPartijaMeta | null;
     pravila?: PravilnikPartije | null;
-    trajanjePotezaSek?: number | null;
   } = $props();
 
-  const stavke = $derived((() => {
-    if (!napredak) return [] as { id: string; tekst: string; met: boolean }[];
-    const lista: { id: string; tekst: string; met: boolean }[] = [
-      { id: 'pobjeda', tekst: 'Pobijedi', met: false },
-    ];
-    if (napredak.bezPogreske.required) {
-      lista.push({
-        id: 'bez',
-        tekst: 'Bez pogreške',
-        met: napredak.bezPogreske.met,
-      });
-    }
-    if (napredak.dugeRijeci.required > 0) {
-      lista.push({
-        id: 'duge',
-        tekst: `Duge riječi ${napredak.dugeRijeci.current}/${napredak.dugeRijeci.required}`,
-        met: napredak.dugeRijeci.met,
-      });
-    }
-    if (napredak.rijetkeRijeci.required > 0) {
-      lista.push({
-        id: 'rijetke',
-        tekst: `Rijetke riječi ${napredak.rijetkeRijeci.current}/${napredak.rijetkeRijeci.required}`,
-        met: napredak.rijetkeRijeci.met,
-      });
-    }
-    if (napredak.uspjesanDokaz.required > 0) {
-      lista.push({
-        id: 'dokaz',
-        tekst: `Uspješan dokaz ${napredak.uspjesanDokaz.current}/${napredak.uspjesanDokaz.required}`,
-        met: napredak.uspjesanDokaz.met,
-      });
-    }
-    return lista;
-  })());
+  const efektivnaPravila = $derived(pravila ?? null);
+  const tvojPotezSek = $derived(
+    meta ? Math.round(meta.humanTurnDurationMs / 1000) : null,
+  );
+  const prikaziDokazPomoc = $derived(efektivnaPravila === 'dokazi_nastavak');
 </script>
 
-{#if napredak}
-  <aside class="ciljevi-izazova" aria-label="Ciljevi izazova" data-testid="izazov-ciljevi">
-    <div class="meta">
-      {#if pravila}
-        <span>{nazivPravilnika(pravila)}</span>
+{#if napredak || meta}
+  <aside class="ciljevi-izazova" aria-label="Uvjeti izazova" data-testid="izazov-ciljevi">
+    {#if meta}
+      <p class="naslov-reda" data-testid="izazov-uvjeti-naslov">
+        Level {meta.level} · {NAZIVI_FORMATA_IZAZOVA[meta.format]} · {NAZIVI_VARIJANTI_IZAZOVA[meta.varijanta]}
+      </p>
+      <p class="meta-reda">
+        <span>Botovi: {NAZIVI_PROFILA_BOTA[meta.profileId]}</span>
+        {#if efektivnaPravila}
+          <span class="pravila">
+            Pravila: {nazivPravilnika(efektivnaPravila)}
+            {#if prikaziDokazPomoc}
+              <PojamPomoc
+                id="izazov-dokazi-pomoc"
+                opis={OPIS_DOKAZI_NASTAVAK}
+                ariaLabel="Što znači Dokaži nastavak?"
+                pozicioniranje="uz-okidac"
+              />
+            {/if}
+          </span>
+        {/if}
+      </p>
+    {:else if efektivnaPravila}
+      <p class="meta-reda">
+        <span>{nazivPravilnika(efektivnaPravila)}</span>
+      </p>
+    {/if}
+
+    <p class="uvjeti-reda">
+      {#if tvojPotezSek != null && tvojPotezSek > 0}
+        <strong>Tvoj potez: {tvojPotezSek} s</strong>
       {/if}
-      {#if trajanjePotezaSek != null && trajanjePotezaSek > 0}
-        <span>{trajanjePotezaSek} s</span>
+      {#if napredak?.bezPogreske.required}
+        <span data-testid="izazov-uvjet-bez-pogreske">
+          {#if napredak.bezPogreske.met}
+            Bez pogrešne riječi — zasad ispunjeno
+          {:else}
+            Bez pogrešne riječi
+          {/if}
+        </span>
+      {:else}
+        <span>Pobijedi</span>
       {/if}
-    </div>
-    <ul>
-      {#each stavke as stavka (stavka.id)}
-        <li class:met={stavka.met} class:cekaj={stavka.id === 'pobjeda'}>
-          <span class="oznaka" aria-hidden="true">{stavka.met ? '✓' : stavka.id === 'pobjeda' ? '○' : '○'}</span>
-          <span>{stavka.tekst}</span>
-        </li>
-      {/each}
-    </ul>
+    </p>
+
+    {#if napredak}
+      <p class="napomena">
+        {#if napredak.bezPogreske.required}
+          Za prolaz moraš pobijediti. Prva pogrešna riječ završava izazov.
+        {:else}
+          Za prolaz moraš pobijediti.
+        {/if}
+      </p>
+    {/if}
+
+    {#if meta && !napredak}
+      <p class="napomena">Level {NAZIVI_LEVELA_IZAZOVA[meta.level]}</p>
+    {/if}
   </aside>
 {/if}
 
 <style>
   .ciljevi-izazova {
     margin: 0 0 10px;
-    padding: 8px 10px;
+    padding: 10px 12px;
     border: 1px solid var(--boja-obrub);
     border-radius: 8px;
     background: var(--boja-povrsina-2);
     font-size: var(--tekst-mali);
   }
-  .meta {
+  .naslov-reda {
+    margin: 0 0 4px;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+  .meta-reda,
+  .uvjeti-reda {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 12px;
-    margin-bottom: 6px;
+    align-items: center;
+    gap: 6px 12px;
+    margin: 0 0 4px;
     color: var(--boja-tekst-sekundarni);
     font-weight: 600;
   }
-  ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 14px;
-  }
-  li {
+  .pravila {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+  }
+  .uvjeti-reda strong {
+    color: var(--boja-tekst-osnovni);
+  }
+  .napomena {
+    margin: 4px 0 0;
     color: var(--boja-tekst-sekundarni);
-  }
-  li.met {
-    color: var(--boja-isticanje-tekst);
-    font-weight: 700;
-  }
-  .oznaka {
-    font-weight: 700;
+    font-weight: 500;
   }
 </style>

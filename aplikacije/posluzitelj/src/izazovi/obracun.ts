@@ -7,11 +7,10 @@ import {
   ID_DOSTIGNUCA_IZAZIVAC,
   MAKSIMALNO_ISKUSTVO,
   ZADANI_PRAVILNIK,
-  definicijaIzazova,
   izracunajRazinuDostignuca,
   izracunajZvjezdiceIzazivaca,
+  pokusajDefinicijuIzazova,
   stanjeIskustva,
-  type IdIzazova,
   type MetrikeMisijaIgre,
   type ModPartije,
   type ObavijestOtkljucanogDostignuca,
@@ -154,8 +153,11 @@ export async function obracunajSettlementIzazova(
   }
 
   const snapshot = snapshotIzRetka(redak);
-  const definicija = definicijaIzazova(redak.challengeId as IdIzazova);
-  const nominalXp = definicija?.xp ?? snapshot.xp ?? 0;
+  const definicija = pokusajDefinicijuIzazova(redak.challengeId);
+  const nominalXp =
+    (typeof snapshot.xp === 'number' && Number.isFinite(snapshot.xp) ? snapshot.xp : null)
+    ?? definicija?.xp
+    ?? 0;
   const terminalAt = redak.terminalAt ?? new Date();
   const prihvaceneRijeci = citajPrihvaceneRijeci(metrics);
 

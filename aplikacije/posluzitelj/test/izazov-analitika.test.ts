@@ -82,7 +82,7 @@ async function umetniPokusaj(ulaz: {
   partijaId?: string | null;
   turnDurationMs?: number;
 }): Promise<string> {
-  const challengeId = ulaz.challengeId ?? 'IZ01';
+  const challengeId = ulaz.challengeId ?? 'IZ-L1-DV-01';
   const def = definicijaIzazova(challengeId);
   const snapshot = {
     ...napraviSnapshot(def),
@@ -180,7 +180,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const agregat = await agregirajIzazove({
       odDan: dan,
       doDan: dan,
-      challengeId: 'IZ01',
+      challengeId: 'IZ-L1-DV-01',
       definitionVersion: VERZIJA_DEFINICIJE_IZAZOVA,
       ...filterTest(),
     });
@@ -193,7 +193,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     expect(agregat.ukupno.uniqueSuccessRate).toBeCloseTo(50, 5);
 
     const red = agregat.redovi.find(
-      (r) => r.challengeId === 'IZ01' && r.definitionVersion === VERZIJA_DEFINICIJE_IZAZOVA,
+      (r) => r.challengeId === 'IZ-L1-DV-01' && r.definitionVersion === VERZIJA_DEFINICIJE_IZAZOVA,
     );
     expect(red).toBeTruthy();
     expect(red!.attemptSuccessBrojnik).toBe(1);
@@ -210,7 +210,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     expect(csv).toContain('challengeId');
     expect(csv).toContain('attemptSuccessRate');
     expect(csv).not.toMatch(/@example\.com/);
-    expect(csv).toContain('IZ01');
+    expect(csv).toContain('IZ-L1-DV-01');
   });
 
   it('aktivni i tehnički ne ulaze u attempt success nazivnik', async () => {
@@ -220,7 +220,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
 
     await umetniPokusaj({
       igracId: igrac,
-      challengeId: 'IZ02',
+      challengeId: 'IZ-L1-TR-01',
       status: 'uspjeh',
       gameWon: true,
       startedAt: new Date(t),
@@ -229,7 +229,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const aktivan = await noviIgrac('gost');
     await umetniPokusaj({
       igracId: aktivan,
-      challengeId: 'IZ02',
+      challengeId: 'IZ-L1-TR-01',
       status: 'u_tijeku',
       startedAt: new Date(t + 1),
       terminalAt: null,
@@ -237,7 +237,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const teh = await noviIgrac('gost');
     await umetniPokusaj({
       igracId: teh,
-      challengeId: 'IZ02',
+      challengeId: 'IZ-L1-TR-01',
       status: 'tehnicki_prekinuto',
       startedAt: new Date(t + 2),
     });
@@ -245,10 +245,10 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const agregat = await agregirajIzazove({
       odDan: dan,
       doDan: dan,
-      challengeId: 'IZ02',
+      challengeId: 'IZ-L1-TR-01',
       ...filterTest(),
     });
-    const red = agregat.redovi.find((r) => r.challengeId === 'IZ02');
+    const red = agregat.redovi.find((r) => r.challengeId === 'IZ-L1-TR-01');
     expect(red).toBeTruthy();
     expect(red!.aktivni).toBe(1);
     expect(red!.tehnicki).toBe(1);
@@ -264,7 +264,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const t = Date.now();
     await umetniPokusaj({
       igracId,
-      challengeId: 'IZ03',
+      challengeId: 'IZ-L1-CE-01',
       status: 'neuspjeh',
       reason: 'eliminiran',
       accountTypeAtStart: 'gost',
@@ -273,7 +273,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     await baza.update(igraci).set({ vrsta: 'registriran' }).where(eq(igraci.id, igracId));
     await umetniPokusaj({
       igracId,
-      challengeId: 'IZ03',
+      challengeId: 'IZ-L1-CE-01',
       status: 'uspjeh',
       gameWon: true,
       accountTypeAtStart: 'registriran',
@@ -283,10 +283,10 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const agregat = await agregirajIzazove({
       odDan: dan,
       doDan: dan,
-      challengeId: 'IZ03',
+      challengeId: 'IZ-L1-CE-01',
       ...filterTest(),
     });
-    const red = agregat.redovi.find((r) => r.challengeId === 'IZ03');
+    const red = agregat.redovi.find((r) => r.challengeId === 'IZ-L1-CE-01');
     expect(red!.uniqueStarted).toBe(1);
     expect(red!.uniqueSuccess).toBe(1);
     expect(red!.startedGost).toBe(1);
@@ -299,7 +299,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const t = Date.now();
     await umetniPokusaj({
       igracId: igrac,
-      challengeId: 'IZ04',
+      challengeId: 'IZ-L1-DV-03',
       definitionVersion: 1,
       status: 'uspjeh',
       gameWon: true,
@@ -309,7 +309,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const igrac2 = await noviIgrac('gost');
     await umetniPokusaj({
       igracId: igrac2,
-      challengeId: 'IZ04',
+      challengeId: 'IZ-L1-DV-03',
       definitionVersion: 2,
       status: 'neuspjeh',
       reason: 'eliminiran',
@@ -319,7 +319,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const agregat = await agregirajIzazove({
       odDan: dan,
       doDan: dan,
-      challengeId: 'IZ04',
+      challengeId: 'IZ-L1-DV-03',
       ...filterTest(),
     });
     const v1 = agregat.redovi.find((r) => r.definitionVersion === 1);
@@ -332,8 +332,8 @@ describe('Agregacija Izazova — fixture A/B', () => {
 
   it('ponovna agregacija (idempotentni read) ne mijenja brojače', async () => {
     const dan = danasZagrebIso();
-    const a = await agregirajIzazove({ odDan: dan, doDan: dan, challengeId: 'IZ01', ...filterTest() });
-    const b = await agregirajIzazove({ odDan: dan, doDan: dan, challengeId: 'IZ01', ...filterTest() });
+    const a = await agregirajIzazove({ odDan: dan, doDan: dan, challengeId: 'IZ-L1-DV-01', ...filterTest() });
+    const b = await agregirajIzazove({ odDan: dan, doDan: dan, challengeId: 'IZ-L1-DV-01', ...filterTest() });
     expect(b.ukupno.started).toBe(a.ukupno.started);
     expect(b.ukupno.uspjesi).toBe(a.ukupno.uspjesi);
     expect(b.redovi.length).toBe(a.redovi.length);
@@ -346,7 +346,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
 
     await umetniPokusaj({
       igracId: igrac,
-      challengeId: 'IZ06',
+      challengeId: 'IZ-L1-TR-02',
       definitionVersion: 1,
       botProfileVersion: BOT_VERZIJA_TEST,
       status: 'neuspjeh',
@@ -356,7 +356,7 @@ describe('Agregacija Izazova — fixture A/B', () => {
     });
     await umetniPokusaj({
       igracId: igrac,
-      challengeId: 'IZ06',
+      challengeId: 'IZ-L1-TR-02',
       definitionVersion: 1,
       botProfileVersion: BOT_VERZIJA_TEST + 1,
       status: 'uspjeh',
@@ -367,10 +367,10 @@ describe('Agregacija Izazova — fixture A/B', () => {
     const agregat = await agregirajIzazove({
       odDan: dan,
       doDan: dan,
-      challengeId: 'IZ06',
+      challengeId: 'IZ-L1-TR-02',
       botProfileVersion: BOT_VERZIJA_TEST + 1,
     });
-    const red = agregat.redovi.find((r) => r.challengeId === 'IZ06');
+    const red = agregat.redovi.find((r) => r.challengeId === 'IZ-L1-TR-02');
     expect(red).toBeTruthy();
     expect(red!.uspjesi).toBe(1);
     expect(red!.firstTryPlayers).toBe(1);
@@ -464,7 +464,7 @@ describe('Retencija pokušaja Izazova', () => {
 
     const zaBrisanje = await umetniPokusaj({
       igracId: igrac,
-      challengeId: 'IZ05',
+      challengeId: 'IZ-L1-DV-04',
       status: 'neuspjeh',
       reason: 'eliminiran',
       startedAt: staro,
@@ -472,7 +472,7 @@ describe('Retencija pokušaja Izazova', () => {
     });
     const zasticen = await umetniPokusaj({
       igracId: igrac,
-      challengeId: 'IZ05',
+      challengeId: 'IZ-L1-DV-04',
       status: 'uspjeh',
       gameWon: true,
       startedAt: new Date(staro.getTime() + 1_000),
@@ -480,7 +480,7 @@ describe('Retencija pokušaja Izazova', () => {
     });
     await baza.insert(zavrseciIzazova).values({
       igracId: igrac,
-      challengeId: 'IZ05',
+      challengeId: 'IZ-L1-DV-04',
       firstSuccessAttemptId: zasticen,
       vrijeme: new Date(staro.getTime() + 2_000),
       nominalXp: 100,

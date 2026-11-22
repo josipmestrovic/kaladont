@@ -167,6 +167,8 @@ export interface PocetakPartije {
   kodSobe?: string;
   /** 0 = bez limitu (ONEMOGUCI_TIMER / privatno / trening); izostanak = klijent drži null. */
   trajanjePotezaSek?: number;
+  /** Kampanjski Izazov — autoritativni kontekst (refresh/reconnect). */
+  izazov?: import('./izazovi.js').IzazovPartijaMeta;
 }
 
 /**
@@ -240,6 +242,8 @@ export interface StanjePartije {
     resultsVisibleAtIso: string | null;
     gameWon: boolean | null;
   } | null;
+  /** Kampanjski Izazov metadata. */
+  izazov?: import('./izazovi.js').IzazovPartijaMeta;
 }
 
 /**
@@ -260,6 +264,8 @@ export interface DokazZatrazen {
   istekPotezaIso: string;
   serverVrijemeIso: string;
   naPotezuId: string;
+  /** Efektivni rok aktivnog (dokaznog) sudionika. */
+  trajanjePotezaSek?: number;
 }
 
 export interface TreningNeaktivnost {
@@ -282,6 +288,8 @@ export interface PrihvacenPotez {
   nagrada: NagradaZaRijec | null;
   /** Autoritativne XP stavke koje je autor poteza upravo ostvario; nema konačnog obračuna. */
   iskustvo?: StavkaIskustva[];
+  /** Efektivni rok sljedećeg igrača (posebno relevantno za Izazov 15/30). */
+  trajanjePotezaSek?: number;
 }
 
 export interface OtkljucavanjeRijeci {
@@ -463,6 +471,8 @@ export interface RundaOtvorena {
   istekPotezaIso: string;
   serverVrijemeIso: string;
   runda: number;
+  /** Efektivni rok igrača na potezu. */
+  trajanjePotezaSek?: number;
 }
 
 export type KodGreske =

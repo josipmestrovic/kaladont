@@ -82,12 +82,12 @@ describe('Izazov PR03 — evaluacija (čista)', () => {
 
   it('parametrizirano: pravilnici × formati × timer iz kataloga', () => {
     const uzorci = [
-      definicijaIzazova('IZ01'),
-      definicijaIzazova('IZ04'),
-      definicijaIzazova('IZ09'),
-      definicijaIzazova('IZ12'),
-      definicijaIzazova('IZ22'),
-      definicijaIzazova('IZ24'),
+      definicijaIzazova('IZ-L1-DV-01'),
+      definicijaIzazova('IZ-L1-DV-03'),
+      definicijaIzazova('IZ-L1-TR-02'),
+      definicijaIzazova('IZ-L1-CE-03'),
+      definicijaIzazova('IZ-L1-DV-04'),
+      definicijaIzazova('IZ-L4-CE-05'),
     ] as const;
     for (const d of uzorci) {
       expect([2, 3, 4]).toContain(d.brojIgraca);
@@ -115,7 +115,7 @@ describe('Izazov PR03 — CAS završetak', () => {
     const pokusaj = await umetniRezerviraniPokusaj({
       igracId: gost.igracId,
       requestId: randomUUID(),
-      definicija: definicijaIzazova('IZ01'),
+      definicija: definicijaIzazova('IZ-L1-DV-01'),
       accountTypeAtStart: 'gost',
       seed: 'cas',
     });
@@ -206,7 +206,7 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
     });
   }
 
-  async function pokreniIzazov(challengeId: 'IZ01' | 'IZ04' | 'IZ09' = 'IZ01'): Promise<{
+  async function pokreniIzazov(challengeId: 'IZ-L1-DV-01' | 'IZ-L1-DV-03' | 'IZ-L1-TR-02' = 'IZ-L1-DV-01'): Promise<{
     socket: ClientSocket;
     igracId: string;
     attemptId: string;
@@ -249,10 +249,12 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   }
 
   it('start: kontekst izazov, timer 30s unatoč timerOnemogucen, status u_tijeku', async () => {
-    const { socket, attemptId, pocetak, runda } = await pokreniIzazov('IZ01');
+    const { socket, attemptId, pocetak, runda } = await pokreniIzazov('IZ-L1-DV-01');
     try {
       expect(pocetak.kontekst).toBe('izazov');
       expect(pocetak.trajanjePotezaSek).toBe(30);
+      expect(pocetak.izazov?.humanTurnDurationMs).toBe(30_000);
+      expect(pocetak.izazov?.botTurnDurationMs).toBe(30_000);
       expect(runda.istekPotezaIso).not.toBe('');
       const rokMs = new Date(runda.istekPotezaIso).getTime() - sat.sada();
       expect(rokMs).toBeGreaterThanOrEqual(29_000);
@@ -267,23 +269,45 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
       const stanje = await stanjePromise;
       expect(stanje.goalProgress).toBeTruthy();
       expect(stanje.trajanjePotezaSek).toBe(30);
+      expect(stanje.izazov?.challengeId).toBe('IZ-L1-DV-01');
     } finally {
       socket.disconnect();
     }
   });
 
-  it('fake clock: rok ≈ 15 s; 14999 ms OK; deadline eliminira čovjeka na potezu', async () => {
-    const { socket, igracId, runda } = await pokreniIzazov('IZ09');
+  it('brzi: ljudski rok 15s u meta; bot rok 30s', async () => {
+    const { socket, pocetak, runda, igracId } = await pokreniIzazov('IZ-L1-TR-02');
+    try {
+      expect(pocetak.izazov?.humanTurnDurationMs).toBe(15_000);
+      expect(pocetak.izazov?.botTurnDurationMs).toBe(30_000);
+      if (runda.naPotezuId === igracId) {
+        expect(runda.trajanjePotezaSek).toBe(15);
+        const rokMs = new Date(runda.istekPotezaIso).getTime() - sat.sada();
+        expect(rokMs).toBeGreaterThanOrEqual(14_900);
+        expect(rokMs).toBeLessThanOrEqual(15_000);
+      } else {
+        expect(runda.trajanjePotezaSek).toBe(30);
+      }
+    } finally {
+      socket.disconnect();
+    }
+  });
+
+  it('fake clock: ljudski rok ≈ 15 s; deadline eliminira čovjeka na potezu', async () => {
+    const { socket, igracId, runda } = await pokreniIzazov('IZ-L1-TR-02');
     try {
       expect(runda.istekPotezaIso).not.toBe('');
       const preostalo = new Date(runda.istekPotezaIso).getTime() - sat.sada();
-      expect(preostalo).toBeGreaterThanOrEqual(14_900);
-      expect(preostalo).toBeLessThanOrEqual(15_000);
-
       if (runda.naPotezuId !== igracId) {
-        // Bot na potezu — stolni timer i dalje autoritativan (već provjereno).
+        // Bot na potezu — efektivni rok 30 s (per-seat politika).
+        expect(preostalo).toBeGreaterThanOrEqual(29_000);
+        expect(preostalo).toBeLessThanOrEqual(30_000);
+        expect(runda.trajanjePotezaSek).toBe(30);
         return;
       }
+
+      expect(preostalo).toBeGreaterThanOrEqual(14_900);
+      expect(preostalo).toBeLessThanOrEqual(15_000);
 
       const elimPromise = cekaj<{ igracId: string; razlog: string }>(
         socket,
@@ -312,7 +336,7 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   });
 
   it('bez-pogreške: prava pogreška odmah terminalira pokušaj', async () => {
-    const { socket, igracId, attemptId, runda } = await pokreniIzazov('IZ04');
+    const { socket, igracId, attemptId, runda } = await pokreniIzazov('IZ-L1-DV-03');
     try {
       if (runda.naPotezuId !== igracId) {
         // Raspored bez našeg poteza — potvrdi da je igra živa; evaluator je pokriven unit testom.
@@ -337,7 +361,7 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   });
 
   it('rani stop: čovjek napušta → kraj igre bez bot-vs-bot; CAS odustao', async () => {
-    const { socket, igracId, attemptId } = await pokreniIzazov('IZ01');
+    const { socket, igracId, attemptId } = await pokreniIzazov('IZ-L1-DV-01');
     try {
       const krajPromise = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 20_000);
       socket.emit('partija:izadji');
@@ -359,7 +383,7 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   });
 
   it('rani stop: ne-znam na potezu → eliminiran', async () => {
-    const { socket, igracId, attemptId, runda } = await pokreniIzazov('IZ01');
+    const { socket, igracId, attemptId, runda } = await pokreniIzazov('IZ-L1-DV-01');
     try {
       if (runda.naPotezuId !== igracId) {
         expect((await dohvatiPokusajPoId(attemptId))?.status).toBe('u_tijeku');
@@ -406,13 +430,13 @@ describe('Izazov PR03 — parametrizirani start (uzorak pravilnika/formata)', ()
     }
   });
 
-  const uzorak: { id: 'IZ01' | 'IZ02' | 'IZ03' | 'IZ07' | 'IZ09' | 'IZ22'; pravila: PravilnikPartije; broj: 2 | 3 | 4; sek: 15 | 30 }[] = [
-    { id: 'IZ01', pravila: 'klasicni', broj: 2, sek: 30 },
-    { id: 'IZ02', pravila: 'klasicni', broj: 3, sek: 30 },
-    { id: 'IZ03', pravila: 'klasicni', broj: 4, sek: 30 },
-    { id: 'IZ07', pravila: 'ka_zna', broj: 3, sek: 30 },
-    { id: 'IZ09', pravila: 'ka_zna', broj: 3, sek: 15 },
-    { id: 'IZ22', pravila: 'dokazi_nastavak', broj: 2, sek: 30 },
+  const uzorak: { id: 'IZ-L1-DV-01' | 'IZ-L1-TR-01' | 'IZ-L1-CE-01' | 'IZ-L1-TR-04' | 'IZ-L1-TR-02' | 'IZ-L1-DV-04'; pravila: PravilnikPartije; broj: 2 | 3 | 4; sek: 15 | 30 }[] = [
+    { id: 'IZ-L1-DV-01', pravila: 'klasicni', broj: 2, sek: 30 },
+    { id: 'IZ-L1-TR-01', pravila: 'klasicni', broj: 3, sek: 30 },
+    { id: 'IZ-L1-CE-01', pravila: 'klasicni', broj: 4, sek: 30 },
+    { id: 'IZ-L1-TR-04', pravila: 'dokazi_nastavak', broj: 3, sek: 30 },
+    { id: 'IZ-L1-TR-02', pravila: 'klasicni', broj: 3, sek: 15 },
+    { id: 'IZ-L1-DV-04', pravila: 'dokazi_nastavak', broj: 2, sek: 30 },
   ];
 
   it.each(uzorak)('$id: $pravila / $broj igrača / $sek s', async ({ id, pravila, broj, sek }) => {
@@ -454,7 +478,10 @@ describe('Izazov PR03 — parametrizirani start (uzorak pravilnika/formata)', ()
       const pocetak = await pocetakPromise;
       expect(pocetak.pravila).toBe(pravila);
       expect(pocetak.sjedala).toHaveLength(broj);
-      expect(pocetak.trajanjePotezaSek).toBe(sek);
+      expect(pocetak.izazov?.humanTurnDurationMs).toBe(sek * 1000);
+      expect(pocetak.izazov?.botTurnDurationMs).toBe(30_000);
+      // Živi trajanjePotezaSek = rok aktivnog sjedala (čovjek sek ili bot 30).
+      expect([sek, 30]).toContain(pocetak.trajanjePotezaSek);
       expect(pocetak.sjedala.filter((s) => s.jeBot)).toHaveLength(broj - 1);
     } finally {
       socket.disconnect();

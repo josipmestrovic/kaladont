@@ -5,40 +5,51 @@ async function otvoriMapu(page: Page) {
   await expect(page.getByRole('heading', { name: 'Izazovi' })).toBeVisible({ timeout: 20_000 });
 }
 
-test('naslovnica vodi na mapu; kartice i zaključani detalj', async ({ page }) => {
+test('naslovnica vodi na mapu; level tabovi i zaključani finale', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('naslovnica-izazovi').click();
-  await expect(page).toHaveURL(/\/izazovi$/);
+  await expect(page).toHaveURL(/\/izazovi/);
   await expect(page.getByRole('heading', { name: 'Izazovi' })).toBeVisible();
 
-  const iz01 = page.getByTestId('izazov-kartica-IZ01');
-  const iz02 = page.getByTestId('izazov-kartica-IZ02');
-  await expect(iz01).toBeVisible({ timeout: 20_000 });
-  await expect(iz01).toHaveAttribute('data-status', 'dostupan');
-  await expect(iz02).toHaveAttribute('data-status', 'zakljucan');
+  await expect(page.getByTestId('izazov-level-tabovi')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('izazov-level-1')).toHaveAttribute('aria-pressed', 'true');
 
-  await iz02.click();
+  const dv01 = page.getByTestId('izazov-kartica-IZ-L1-DV-01');
+  const dv05 = page.getByTestId('izazov-kartica-IZ-L1-DV-05');
+  await expect(dv01).toBeVisible();
+  await expect(dv01).toHaveAttribute('data-status', 'dostupan');
+  await expect(dv05).toHaveAttribute('data-status', 'zakljucan');
+
+  await dv05.click();
   const detalj = page.getByTestId('izazov-detalj');
   await expect(detalj).toBeVisible();
-  await expect(detalj.getByRole('heading', { name: 'Treće mjesto nije cilj' })).toBeVisible();
+  await expect(detalj.getByRole('heading', { name: 'Završni izazov' })).toBeVisible();
   await expect(page.getByTestId('izazov-start')).toBeDisabled();
   await detalj.getByRole('button', { name: 'Zatvori' }).click();
   await expect(detalj).toHaveCount(0);
 
-  await iz01.click();
+  await dv01.click();
   await expect(page.getByTestId('izazov-detalj')).toBeVisible();
   await expect(page.getByTestId('izazov-start')).toBeEnabled();
 });
 
-test('gost pokreće IZ01, odustaje i vidi rezultat bez rang/DNK', async ({ page }) => {
+test('zaključani ?level= fallback + obavijest', async ({ page }) => {
+  await page.goto('/izazovi?level=4');
+  await expect(page.getByTestId('izazov-level-obavijest')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('izazov-level-1')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page).toHaveURL(/level=1/);
+});
+
+test('gost pokreće IZ-L1-DV-01, odustaje i vidi rezultat bez rang/DNK', async ({ page }) => {
   await otvoriMapu(page);
-  await page.getByTestId('izazov-kartica-IZ01').click();
+  await page.getByTestId('izazov-kartica-IZ-L1-DV-01').click();
   await page.getByTestId('izazov-start').click();
 
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 25_000 });
   await expect(page.getByTestId('izazov-ciljevi')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Pobijedi')).toBeVisible();
-  await expect(page.getByText('Početnik')).toBeVisible();
+  await expect(page.getByTestId('izazov-uvjeti-naslov')).toContainText('Level 1');
+  await expect(page.getByText('Tvoj potez: 30 s')).toBeVisible();
+  await expect(page.getByTestId('izazov-ciljevi')).toContainText('Botovi: Početnik');
 
   await expect(page.getByRole('button', { name: 'Ne znam' })).toBeEnabled({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Ne znam' }).click();
@@ -51,8 +62,8 @@ test('gost pokreće IZ01, odustaje i vidi rezultat bez rang/DNK', async ({ page 
   await expect(page.getByRole('heading', { name: 'Završni poredak' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Forma' })).toHaveCount(0);
   await expect(page.getByTestId('izazov-gost-cta')).toContainText('postojeći');
-  await expect(page.getByTestId('izazov-svi')).toHaveAttribute('href', '/izazovi');
-  await expect(page.getByTestId('izazov-ponovo')).toHaveAttribute('href', /zapocni=IZ01/);
+  await expect(page.getByTestId('izazov-odaberi')).toHaveAttribute('href', /\/izazovi\?level=1/);
+  await expect(page.getByTestId('izazov-ponovo')).toHaveAttribute('href', /zapocni=IZ-L1-DV-01/);
 });
 
 test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page }) => {
@@ -62,7 +73,7 @@ test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page
   await page.goto('/');
   await expect(page.getByTestId('naslovnica-izazovi')).toBeVisible({ timeout: 20_000 });
   await page.evaluate(() => {
-    sessionStorage.setItem('kaladont:izazov:zadnjiChallengeId', 'IZ01');
+    sessionStorage.setItem('kaladont:izazov:zadnjiChallengeId', 'IZ-L1-DV-01');
   });
   await page.goto(`/partija/${partijaId}`);
 
@@ -73,7 +84,17 @@ test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page
       stanje.partijaId = partijaId;
       stanje.mojIgracId = mojId;
       stanje.kontekst = 'izazov';
-      stanje.izazovChallengeId = 'IZ01';
+      stanje.izazovChallengeId = 'IZ-L1-DV-01';
+      stanje.izazovMeta = {
+        challengeId: 'IZ-L1-DV-01',
+        level: 1,
+        format: 'DV',
+        varijanta: 'obicni',
+        naziv: 'Obični',
+        profileId: 'pocetnik',
+        humanTurnDurationMs: 30_000,
+        botTurnDurationMs: 30_000,
+      };
       stanje.sjedala = [
         {
           igracId: mojId,
@@ -163,23 +184,26 @@ test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page
   await expect(page.getByTestId('rezultat-izazova')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('heading', { name: 'Izazov uspješan!' })).toBeVisible();
   await expect(page.getByTestId('izazov-challenge-xp')).toContainText('100');
-  await expect(page.getByTestId('izazov-sljedeci')).toHaveAttribute('href', /zapocni=IZ02/);
+  await expect(page.getByTestId('izazov-odaberi')).toHaveAttribute('href', '/izazovi?level=1');
   await expect(page.getByTestId('izazov-gost-cta')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Završni poredak' })).toHaveCount(0);
 });
 
-test('mapa na 380px bez horizontalnog scrolla', async ({ page }) => {
+test('mapa na 380px bez horizontalnog scrolla; tabovi wrap', async ({ page }) => {
   await page.setViewportSize({ width: 380, height: 700 });
   await otvoriMapu(page);
-  await expect(page.getByTestId('izazov-kartica-IZ01')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('izazov-kartica-IZ-L1-DV-01')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('izazov-level-4')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
     true,
   );
 });
 
-test('desktop 1100px mapa ostaje pregledna', async ({ page }) => {
+test('desktop 1100px prikazuje tri formata L1', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
   await otvoriMapu(page);
-  await expect(page.getByTestId('izazov-kartica-IZ24')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole('heading', { name: 'Etapa 8' })).toBeVisible();
+  await expect(page.getByTestId('izazov-format-DV')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('izazov-format-TR')).toBeVisible();
+  await expect(page.getByTestId('izazov-format-CE')).toBeVisible();
+  await expect(page.getByTestId('izazov-kartica-IZ-L1-CE-04')).toBeVisible();
 });

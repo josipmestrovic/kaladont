@@ -3,9 +3,10 @@
     GoalProgressIzazova,
     IdIzazova,
     KrajPartije,
+    LevelIzazova,
     SettlementIzazovaDto,
   } from 'zajednicko';
-  import { ID_OVI_IZAZOVA } from 'zajednicko';
+  import { jeIdIzazova, pokusajDefinicijuIzazova } from 'zajednicko';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { tekstRazlogaNeuspjeha } from '$lib/izazovi-klijent.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
@@ -36,12 +37,13 @@
     !uspjeh && terminalReason === 'cilj_neispunjen',
   );
 
-  const sljedeciId = $derived(((): IdIzazova | null => {
-    if (!challengeId || !uspjeh) return null;
-    const idx = ID_OVI_IZAZOVA.indexOf(challengeId);
-    if (idx < 0 || idx >= ID_OVI_IZAZOVA.length - 1) return null;
-    return ID_OVI_IZAZOVA[idx + 1]!;
+  const levelOdigranog = $derived(((): LevelIzazova => {
+    if (challengeId && jeIdIzazova(challengeId)) {
+      return pokusajDefinicijuIzazova(challengeId)?.level ?? 1;
+    }
+    return 1;
   })());
+  const mapaHref = $derived(`/izazovi?level=${levelOdigranog}`);
 
   const naslov = $derived(
     terminalStatus === 'tehnicki_prekinuto'
@@ -160,16 +162,14 @@
   {/if}
 
   <div class="akcije">
-    {#if uspjeh && sljedeciId && !pending}
-      <a class="primarni" href={`/izazovi?zapocni=${sljedeciId}`} data-testid="izazov-sljedeci"
-        >Sljedeći izazov</a
-      >
-    {:else if challengeId}
-      <a class="primarni" href={`/izazovi?zapocni=${challengeId}`} data-testid="izazov-ponovo"
+    <a class="primarni" href={mapaHref} data-testid="izazov-odaberi"
+      >Odaberi izazov</a
+    >
+    {#if challengeId}
+      <a class="sporedni" href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`} data-testid="izazov-ponovo"
         >Pokušaj ponovno</a
       >
     {/if}
-    <a class="sporedni" href="/izazovi" data-testid="izazov-svi">Svi izazovi</a>
   </div>
 
   {#if !jeRegistriranKorisnik()}

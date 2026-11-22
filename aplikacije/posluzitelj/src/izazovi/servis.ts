@@ -5,8 +5,9 @@
 import { randomBytes } from 'node:crypto';
 import {
   definicijaIzazova,
+  dostupnostIzazova,
   jeIdIzazova,
-  prethodniIzazovId,
+  NAZIVI_LEVELA_IZAZOVA,
   type IdIzazova,
   type KodGreske,
   type PotvrdaIzazova,
@@ -81,13 +82,14 @@ export async function rezervirajPokusajIzazova(ulaz: {
 
   const definicija = definicijaIzazova(ulaz.challengeId);
   const zavrseni = await dohvatiZavrseneChallengeIds(ulaz.igracId);
-  const prethodni = prethodniIzazovId(definicija.id);
-  if (prethodni !== null && !zavrseni.has(prethodni)) {
-    return {
-      ok: false,
-      kod: 'IZAZOV_ZAKLJUCAN',
-      poruka: `Najprije dovrši izazov ${prethodni}.`,
-    };
+  const { status, razlog } = dostupnostIzazova(definicija, zavrseni);
+  if (status === 'zakljucan') {
+    const poruka = razlog?.vrsta === 'prethodni_level'
+      ? `Najprije dovrši level ${razlog.level} (${NAZIVI_LEVELA_IZAZOVA[razlog.level]}).`
+      : razlog?.vrsta === 'prethodni_izazovi_formata'
+        ? `Najprije dovrši prethodna 4 izazova ovog formata (${4 - razlog.nedostaje.length}/4).`
+        : 'Izazov je zaključan.';
+    return { ok: false, kod: 'IZAZOV_ZAKLJUCAN', poruka };
   }
 
   const accountTypeAtStart = ulaz.vrsta === 'gost' ? 'gost' as const : 'registriran' as const;

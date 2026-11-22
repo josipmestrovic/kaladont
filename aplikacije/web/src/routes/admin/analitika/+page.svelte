@@ -311,7 +311,7 @@
     </select>
   </label>
   <label>Izazov
-    <input type="text" bind:value={izazovChallengeId} placeholder="npr. IZ01" maxlength="4" />
+    <input type="text" bind:value={izazovChallengeId} placeholder="npr. IZ-L1-DV-01" maxlength="32" />
   </label>
   <label>Račun (Izazov)
     <select bind:value={izazovAccountType}>

@@ -69,6 +69,8 @@ interface StanjeIgre {
   izazovTerminal: NonNullable<import('zajednicko').StanjePartije['izazovTerminal']> | null;
   /** Zadnji challengeId za CTA na rezultatu. */
   izazovChallengeId: import('zajednicko').IdIzazova | null;
+  /** Autoritativni metadata kampanje (panel uvjeta). */
+  izazovMeta: import('zajednicko').IzazovPartijaMeta | null;
   zadnjaNagrada: NagradaZaRijec | null;
   oznakaPrihvacenogPoteza: number;
   trenutniStreak: number;
@@ -121,6 +123,7 @@ const stanje = $state<StanjeIgre>({
   goalProgress: null,
   izazovTerminal: null,
   izazovChallengeId: null,
+  izazovMeta: null,
   zadnjaNagrada: null,
   oznakaPrihvacenogPoteza: 0,
   trenutniStreak: 0,
@@ -293,9 +296,14 @@ function primijeniStanjePartije(p: StanjePartije): void {
   if (stanje.kontekst === 'izazov') {
     if (p.goalProgress !== undefined) stanje.goalProgress = p.goalProgress ?? null;
     if (p.izazovTerminal !== undefined) stanje.izazovTerminal = p.izazovTerminal ?? null;
+    if (p.izazov) {
+      stanje.izazovMeta = p.izazov;
+      stanje.izazovChallengeId = p.izazov.challengeId;
+    }
   } else {
     stanje.goalProgress = null;
     stanje.izazovTerminal = null;
+    stanje.izazovMeta = null;
   }
 
   if (
@@ -357,12 +365,13 @@ function primijeniDokazZatrazen(p: DokazZatrazen): void {
   if (p.partijaId !== stanje.partijaId) return;
   // HINT: reconnect može ponoviti isti izazov — bez dvostrukog SFX/poruke.
   if (zadnjiDokazIzazovId === p.izazovId && stanje.faza === 'dokaz_nastavka') {
-    stanje.turnToken = p.turnToken;
-    stanje.naPotezuId = p.naPotezuId;
-    stanje.istekPotezaIso = p.istekPotezaIso;
-    stanje.serverVrijemeIso = p.serverVrijemeIso;
-    stanje.trazenaSlova = p.trazenaSlova;
-    return;
+  stanje.turnToken = p.turnToken;
+  stanje.naPotezuId = p.naPotezuId;
+  stanje.istekPotezaIso = p.istekPotezaIso;
+  stanje.serverVrijemeIso = p.serverVrijemeIso;
+  stanje.trazenaSlova = p.trazenaSlova;
+  if (p.trajanjePotezaSek !== undefined) stanje.trajanjePotezaSek = p.trajanjePotezaSek;
+  return;
   }
   zadnjiDokazIzazovId = p.izazovId;
   ocistiDokazHold();
@@ -386,6 +395,7 @@ function primijeniDokazZatrazen(p: DokazZatrazen): void {
   stanje.istekPotezaIso = p.istekPotezaIso;
   stanje.serverVrijemeIso = p.serverVrijemeIso;
   stanje.trazenaSlova = p.trazenaSlova;
+  if (p.trajanjePotezaSek !== undefined) stanje.trajanjePotezaSek = p.trajanjePotezaSek;
   if (p.naPotezuId === stanje.mojIgracId) {
     brojOdbijenihNaPotezu = 0;
     pustiAudio('tvoj-red');
@@ -464,6 +474,12 @@ export function pokreniSlusateljeIgre(): void {
     stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
     stanje.goalProgress = null;
     stanje.izazovTerminal = null;
+    if (p.izazov) {
+      stanje.izazovMeta = p.izazov;
+      stanje.izazovChallengeId = p.izazov.challengeId;
+    } else if (stanje.kontekst !== 'izazov') {
+      stanje.izazovMeta = null;
+    }
   });
 
   socket.on('partija:stanje', primijeniStanjePartije);
@@ -545,6 +561,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.trazenaSlova = p.trazenaSlova;
     stanje.serverVrijemeIso = p.serverVrijemeIso;
     stanje.brojIskoristenih = p.brojIskoristenih;
+    if (p.trajanjePotezaSek !== undefined) stanje.trajanjePotezaSek = p.trajanjePotezaSek;
     if (p.igracId === stanje.mojIgracId) stanje.trenutniStreak = p.streak;
     stanje.poruka = null;
     stanje.zadnjaRijec = p.rijec;
@@ -699,6 +716,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.istekPotezaIso = p.istekPotezaIso;
     stanje.serverVrijemeIso = p.serverVrijemeIso;
     stanje.runda = p.runda;
+    if (p.trajanjePotezaSek !== undefined) stanje.trajanjePotezaSek = p.trajanjePotezaSek;
     stanje.zadnjaRijec = p.rijec;
     stanje.zadnjaRijecIgracId = null;
     stanje.zadnjaRijecVrsta = 'sustav_rijec';
@@ -805,6 +823,7 @@ export function napustiLokalnuPartiju(): void {
   stanje.jePrivatna = false;
   stanje.kodSobe = null;
   stanje.trajanjePotezaSek = null;
+  stanje.izazovMeta = null;
   stanje.goalProgress = null;
   stanje.izazovTerminal = null;
   stanje.zadnjaNagrada = null;

@@ -72,6 +72,8 @@ export interface OvisnostiVoditeljaIzazova {
       pravila: SnapshotPokusajaIzazova['pravila'];
       botKonfiguracija: KonfiguracijaBota;
       trajanjePotezaSek: number;
+      izazovTimerPolitika?: { covjekMs: number; botMs: number };
+      izazovMeta?: import('zajednicko').IzazovPartijaMeta;
     },
   ) => Promise<{ ishod: RezultatPokretanja; partijaId: string | null }>;
   /** Ako CAS u_tijeku ne uspije nakon starta motora — ukloni živi stol. */
@@ -173,7 +175,9 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
     const profileId = snapshot.profileId ?? definicija.profileId;
     const { konfiguracija: botKonfiguracija } = razrijesiProfilBotaIliZadani(profileId);
     const brojBotova = (snapshot.brojIgraca - 1) as 1 | 2 | 3;
-    const trajanjePotezaSek = Math.round(snapshot.turnDurationMs / 1000);
+    const covjekMs = snapshot.turnDurationMs;
+    const botMs = snapshot.botTurnDurationMs ?? 30_000;
+    const trajanjePotezaSek = Math.round(covjekMs / 1000);
 
     const igrac = ovisnosti.dohvatiIgracaZaStol(ulaz.igracId);
     if (!igrac) {
@@ -216,6 +220,17 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
         pravila: snapshot.pravila,
         botKonfiguracija,
         trajanjePotezaSek,
+        izazovTimerPolitika: { covjekMs, botMs },
+        izazovMeta: {
+          challengeId: snapshot.challengeId,
+          level: snapshot.level ?? 1,
+          format: snapshot.format ?? 'DV',
+          varijanta: snapshot.varijanta ?? 'obicni',
+          naziv: snapshot.naziv,
+          profileId: profileId,
+          humanTurnDurationMs: covjekMs,
+          botTurnDurationMs: botMs,
+        },
       },
     );
 

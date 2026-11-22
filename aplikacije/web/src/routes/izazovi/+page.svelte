@@ -3,7 +3,10 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import type {
+    AgregatLevelaIzazovaDto,
+    FormatIzazova,
     IdIzazova,
+    LevelIzazova,
     OdgovorKatalogaIzazova,
     PocetakPartije,
     PotvrdaIzazova,
@@ -11,17 +14,25 @@
     StanjePartije,
     StavkaKatalogaIzazovaDto,
   } from 'zajednicko';
-  import { NAZIVI_PROFILA_BOTA } from 'zajednicko';
+  import {
+    FORMATI_IZAZOVA,
+    NAZIVI_FORMATA_IZAZOVA,
+    NAZIVI_LEVELA_IZAZOVA,
+    NAZIVI_PROFILA_BOTA,
+    NAZIVI_VARIJANTI_IZAZOVA,
+  } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import {
     ApiGreska,
     dohvatiKatalogIzazova,
-    nazivEtape,
     noviRequestIdIzazova,
+    parsirajLevelIzUrl,
     porukaZaKodIzazova,
     spremiZadnjiChallengeId,
+    tekstRazlogaZakljucavanja,
+    zadaniLevelIzazova,
   } from '$lib/izazovi-klijent.js';
   import { nazivFormata, nazivPravilnika } from '$lib/igraj-rute.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
@@ -32,32 +43,42 @@
   let ucitava = $state(true);
   let greska = $state<string | null>(null);
   let odabrani = $state<StavkaKatalogaIzazovaDto | null>(null);
+  let odabraniLevel = $state<LevelIzazova>(1);
+  let levelObavijest = $state<string | null>(null);
   let startUTijeku = $state(false);
   let startPoruka = $state<string | null>(null);
   let timeoutPotvrde: ReturnType<typeof setTimeout> | null = null;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const etape = $derived(((): { naziv: string; kartice: StavkaKatalogaIzazovaDto[] }[] => {
-    const katalog = odgovor?.katalog ?? [];
-    const grupe: { naziv: string; kartice: StavkaKatalogaIzazovaDto[] }[] = [];
-    for (let i = 0; i < katalog.length; i += 3) {
-      const kartice = katalog.slice(i, i + 3);
-      const prva = kartice[0];
-      if (!prva) continue;
-      grupe.push({ naziv: nazivEtape(prva.redniBroj), kartice });
-    }
-    return grupe;
-  })());
-
   const aktivni = $derived(odgovor?.napredak.aktivniPokusaj ?? null);
   const zvjezdice = $derived(odgovor?.napredak.izazivacZvjezdice ?? 0);
   const omogucen = $derived(odgovor?.omogucen === true);
+  const leveli = $derived(odgovor?.napredak.leveli ?? []);
+  const aktivniAgregat = $derived(leveli.find((L) => L.level === odabraniLevel) ?? null);
+
+  const karticePoFormatu = $derived(((): { format: FormatIzazova; naziv: string; zavrseno: number; kartice: StavkaKatalogaIzazovaDto[] }[] => {
+    const katalog = odgovor?.katalog ?? [];
+    const agregati = aktivniAgregat?.formati ?? [];
+    return FORMATI_IZAZOVA.map((format) => {
+      const agregat = agregati.find((f) => f.format === format);
+      const kartice = katalog
+        .filter((s) => s.level === odabraniLevel && s.format === format)
+        .sort((a, b) => a.redoslijedUFormatu - b.redoslijedUFormatu);
+      return {
+        format,
+        naziv: agregat?.naziv ?? NAZIVI_FORMATA_IZAZOVA[format],
+        zavrseno: agregat?.zavrseno ?? 0,
+        kartice,
+      };
+    });
+  })());
 
   async function ucitaj() {
     ucitava = true;
     greska = null;
     try {
       odgovor = await dohvatiKatalogIzazova();
+      primijeniLevelIzUrl(odgovor.napredak.leveli);
     } catch (e) {
       greska =
         e instanceof ApiGreska
@@ -67,6 +88,52 @@
     } finally {
       ucitava = false;
     }
+  }
+
+  function levelJeOtkljucan(level: LevelIzazova, lista: AgregatLevelaIzazovaDto[]): boolean {
+    return lista.find((L) => L.level === level)?.status !== 'zakljucan';
+  }
+
+  function primijeniLevelIzUrl(lista: AgregatLevelaIzazovaDto[]) {
+    const zatrazeni = parsirajLevelIzUrl($page.url.searchParams.get('level'));
+    const zadani = zadaniLevelIzazova(lista);
+    if (zatrazeni && levelJeOtkljucan(zatrazeni, lista)) {
+      odabraniLevel = zatrazeni;
+      levelObavijest = null;
+      sinkronizirajUrl(zatrazeni, false);
+      return;
+    }
+    if (zatrazeni && !levelJeOtkljucan(zatrazeni, lista)) {
+      odabraniLevel = zadani;
+      levelObavijest = `Level ${zatrazeni} još nije otključan — prikazujem ${NAZIVI_LEVELA_IZAZOVA[zadani]}.`;
+      sinkronizirajUrl(zadani, true);
+      return;
+    }
+    odabraniLevel = zadani;
+    levelObavijest = null;
+    sinkronizirajUrl(zadani, true);
+  }
+
+  function sinkronizirajUrl(level: LevelIzazova, replace: boolean) {
+    const url = new URL($page.url);
+    if (url.searchParams.get('level') === String(level)) return;
+    url.searchParams.set('level', String(level));
+    void goto(`${url.pathname}?${url.searchParams.toString()}`, {
+      replaceState: replace,
+      keepFocus: true,
+      noScroll: true,
+    });
+  }
+
+  function odaberiLevel(level: LevelIzazova) {
+    if (!odgovor) return;
+    if (!levelJeOtkljucan(level, odgovor.napredak.leveli)) {
+      levelObavijest = `Level ${level} (${NAZIVI_LEVELA_IZAZOVA[level]}) još nije otključan.`;
+      return;
+    }
+    odabraniLevel = level;
+    levelObavijest = null;
+    sinkronizirajUrl(level, false);
   }
 
   function otvoriDetalj(stavka: StavkaKatalogaIzazovaDto) {
@@ -80,12 +147,12 @@
     startPoruka = null;
   }
 
-  function tekstTrajanja(ms: number): string {
-    return `${Math.round(ms / 1000)} s po potezu`;
+  function tekstTrajanjaCovjek(ms: number): string {
+    return `${Math.round(ms / 1000)} s (tvoj potez)`;
   }
 
   function statusOznaka(status: StavkaKatalogaIzazovaDto['status']): string {
-    if (status === 'zavrsen') return 'Završen';
+    if (status === 'zavrsen') return 'Odrađeno';
     if (status === 'dostupan') return 'Dostupan';
     return 'Zaključan';
   }
@@ -115,7 +182,6 @@
           return;
         }
         if (ishod.pokrenut === false) {
-          // Rezervacija bez pokretanja (npr. tehnicki_prekinuto) — ne čekaj partija:pocetak.
           startUTijeku = false;
           startPoruka =
             ishod.status === 'tehnicki_prekinuto'
@@ -124,7 +190,6 @@
           void ucitaj();
           return;
         }
-        // pokrenut true bez partijaId — rijetko; čekamo partija:pocetak.
         return;
       }
       startUTijeku = false;
@@ -155,7 +220,13 @@
       const zatrazeni = $page.url.searchParams.get('zapocni');
       if (zatrazeni && odgovor) {
         const stavka = odgovor.katalog.find((s) => s.id === zatrazeni);
-        if (stavka) otvoriDetalj(stavka);
+        if (stavka) {
+          if (levelJeOtkljucan(stavka.level, odgovor.napredak.leveli)) {
+            odabraniLevel = stavka.level;
+            sinkronizirajUrl(stavka.level, true);
+          }
+          otvoriDetalj(stavka);
+        }
       }
     });
 
@@ -181,7 +252,6 @@
     socket.on('partija:stanje', naStanje);
     socket.on('partija:runda-otvorena', naRundu);
 
-    // Ako je aktivan pokušaj bez partijaId (rezerviran), periodički osvježi.
     pollTimer = setInterval(() => {
       if (aktivni && !aktivni.partijaId) void ucitaj();
     }, 4_000);
@@ -206,7 +276,7 @@
 <main class="izazovi-stranica">
   <header class="naslov">
     <h1>Izazovi</h1>
-    <p>24 razine protiv računala. Pobjeda + ciljevi = napredak.</p>
+    <p>Četiri levela, tri formata, pet varijanti — pobjeda (i bez pogreške gdje treba) = napredak.</p>
     <div class="izazivac" aria-label={`Izazivač: ${zvjezdice} od 5 zvjezdica`}>
       <span class="izazivac-naziv">Izazivač</span>
       <span class="zvjezdice">
@@ -256,11 +326,42 @@
     <p class="greska" role="alert">{greska}</p>
     <button type="button" class="primarni-gumb" onclick={() => ucitaj()}>Pokušaj ponovno</button>
   {:else if odgovor}
-    {#each etape as etapa (etapa.naziv)}
-      <section class="etapa" aria-labelledby={`etapa-${etapa.naziv}`}>
-        <h2 id={`etapa-${etapa.naziv}`}>{etapa.naziv}</h2>
+    <nav class="pogled-tabovi" aria-label="Leveli izazova" data-testid="izazov-level-tabovi">
+      {#each leveli as L (L.level)}
+        <button
+          type="button"
+          class:aktivan={L.level === odabraniLevel}
+          class:zakljucan={L.status === 'zakljucan'}
+          data-testid={`izazov-level-${L.level}`}
+          aria-pressed={L.level === odabraniLevel}
+          aria-disabled={L.status === 'zakljucan'}
+          onclick={() => odaberiLevel(L.level)}
+        >
+          {L.naziv}
+          <span class="tab-meta">{L.zavrseno}/{L.ukupno}</span>
+        </button>
+      {/each}
+    </nav>
+
+    {#if levelObavijest}
+      <p class="banner-info" role="status" data-testid="izazov-level-obavijest">{levelObavijest}</p>
+    {/if}
+
+    {#if aktivniAgregat}
+      <p class="level-sažetak" data-testid="izazov-level-sazetak">
+        {aktivniAgregat.naziv} · {aktivniAgregat.zavrseno}/{aktivniAgregat.ukupno} · bot
+        {NAZIVI_PROFILA_BOTA[aktivniAgregat.profileId]}
+      </p>
+    {/if}
+
+    {#each karticePoFormatu as sekcija (sekcija.format)}
+      <section class="format-sekcija" aria-labelledby={`format-${sekcija.format}`} data-testid={`izazov-format-${sekcija.format}`}>
+        <h2 id={`format-${sekcija.format}`}>
+          {sekcija.naziv}
+          <span class="format-meta">{sekcija.zavrseno}/5</span>
+        </h2>
         <div class="mreza">
-          {#each etapa.kartice as kartica (kartica.id)}
+          {#each sekcija.kartice as kartica (kartica.id)}
             <button
               type="button"
               class="kartica"
@@ -272,7 +373,12 @@
               aria-label={`${kartica.id} ${kartica.naziv}, ${statusOznaka(kartica.status)}`}
               onclick={() => otvoriDetalj(kartica)}
             >
-              <span class="kartica-id">{kartica.id}</span>
+              <span class="kartica-glava">
+                <span class="kartica-id">{kartica.redoslijedUFormatu}. {NAZIVI_VARIJANTI_IZAZOVA[kartica.varijanta]}</span>
+                {#if kartica.status === 'zavrsen'}
+                  <span class="kvacica" aria-hidden="true">✓</span>
+                {/if}
+              </span>
               <strong class="kartica-naziv">{kartica.naziv}</strong>
               <span class="kartica-meta">{statusOznaka(kartica.status)} · {kartica.xp} XP</span>
             </button>
@@ -302,10 +408,12 @@
       </header>
       <p class="detalj-cilj">{odabrani.opisCilja}</p>
       <ul class="detalj-lista">
+        <li><span>Level</span><strong>{NAZIVI_LEVELA_IZAZOVA[odabrani.level]}</strong></li>
         <li><span>Pravilnik</span><strong>{nazivPravilnika(odabrani.pravila)}</strong></li>
         <li><span>Format</span><strong>{nazivFormata(odabrani.mod)}</strong></li>
         <li><span>Bot</span><strong>{NAZIVI_PROFILA_BOTA[odabrani.effectiveProfileId]}</strong></li>
-        <li><span>Vrijeme</span><strong>{tekstTrajanja(odabrani.turnDurationMs)}</strong></li>
+        <li><span>Tvoj potez</span><strong>{tekstTrajanjaCovjek(odabrani.turnDurationMs)}</strong></li>
+        <li><span>Bot potez</span><strong>{Math.round(odabrani.botTurnDurationMs / 1000)} s</strong></li>
         <li>
           <span>XP</span>
           <strong>
@@ -316,7 +424,7 @@
       </ul>
       {#if odabrani.status === 'zakljucan'}
         <p class="detalj-lock" role="status">
-          Zaključano — najprije dovrši {odabrani.blockingChallengeId ?? 'prethodni izazov'}.
+          {tekstRazlogaZakljucavanja(odabrani.razlogZakljucavanja)}
         </p>
       {/if}
       {#if startPoruka}
@@ -405,22 +513,75 @@
     font-size: var(--tekst-mali);
     color: var(--boja-tekst-sekundarni);
   }
-  .etapa {
-    margin-top: 28px;
+  .pogled-tabovi {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 20px 0 8px;
   }
-  .etapa h2 {
+  .pogled-tabovi button {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
+    padding: 9px 14px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: var(--radijus-pill);
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  @media (min-width: 560px) {
+    .pogled-tabovi button {
+      flex: 1 1 0;
+    }
+  }
+  .pogled-tabovi button.aktivan {
+    border-color: var(--boja-cta-pozadina);
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
+  }
+  .pogled-tabovi button.zakljucan {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .tab-meta {
+    font-weight: 600;
+    opacity: 0.85;
+  }
+  .level-sažetak {
+    margin: 0 0 16px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mali);
+  }
+  .format-sekcija {
+    margin-top: 22px;
+  }
+  .format-sekcija h2 {
     margin: 0 0 12px;
     font-size: var(--tekst-baza);
     color: var(--boja-tekst-sekundarni);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .format-meta {
+    font-weight: 600;
+    font-size: var(--tekst-mali);
   }
   .mreza {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
-  @media (max-width: 520px) {
+  @media (min-width: 560px) {
     .mreza {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
   .kartica {
@@ -446,15 +607,27 @@
     opacity: 0.72;
   }
   .kartica.zavrsen {
-    border-color: var(--boja-isticanje-tekst);
+    border-color: #e67e22;
+    box-shadow: inset 0 0 0 1px #e67e22;
   }
   .kartica.dostupan {
     box-shadow: inset 0 0 0 1px var(--boja-isticanje-tekst);
+  }
+  .kartica-glava {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
   }
   .kartica-id {
     font-size: var(--tekst-mali);
     font-weight: 700;
     color: var(--boja-tekst-sekundarni);
+  }
+  .kvacica {
+    color: #e67e22;
+    font-weight: 800;
   }
   .kartica-naziv {
     font-size: var(--tekst-baza);
