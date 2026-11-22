@@ -3,7 +3,7 @@
   import { definicijaMisije } from 'zajednicko';
   import { Check, Play, RefreshCw } from 'lucide-svelte';
   import {
-    putanjaJavnogReda,
+    putanjaBrzeIgre,
     putanjaZagrijavanja,
     parsajPravilnikIzQuery,
   } from '$lib/igraj-rute.js';
@@ -32,23 +32,21 @@
   }
 
   function oznakaKonteksta(m: MisijaDto): string {
-    if (m.kontekst === 'trening') return 'Zagrijavanje';
-    // HINT PR12: D21/W21 koriste mod=tri_igraca — badge mora reći Troboj (ne generička „Javna igra”).
+    if (m.kontekst === 'trening') return 'Trening';
+    if (m.kontekst === 'izazov') return 'Izazovi';
+    // HINT: javne misije vode u Brzu igru (Troboj); badge ostaje po formatu misije.
+    if (m.mod === 'tri_igraca') return 'Brza igra';
     if (m.mod === 'dva_igraca') return 'Dvoboj';
-    if (m.mod === 'tri_igraca') return 'Troboj';
     if (m.mod === 'cetiri_igraca') return 'Četveroboj';
-    return 'Javna igra';
+    return 'Brza igra';
   }
 
   function putanjaIgre(m: MisijaDto): string {
-    // HINT PR14: proslijedi pravilnik iz definicije kad postoji (D22–D24 / W22–W24).
     const definicija = definicijaMisije(m.predlozakId);
     const pravila = parsajPravilnikIzQuery(definicija?.pravilnik ?? null);
     if (m.kontekst === 'trening') return putanjaZagrijavanja(pravila);
-    if (m.mod === 'dva_igraca' || m.mod === 'tri_igraca' || m.mod === 'cetiri_igraca') {
-      return putanjaJavnogReda(m.mod, pravila);
-    }
-    return '/?igraj=1';
+    if (m.kontekst === 'izazov') return '/izazovi';
+    return putanjaBrzeIgre();
   }
 
   function tekstNapretka(m: MisijaDto): string {

@@ -56,16 +56,16 @@ describe('red čekanja', () => {
     const igrac = await spojiSe();
     try {
       const greskaPromise = new Promise<{ kod: string }>((resolve) => igrac.once('greska', resolve));
-      igrac.emit('red:udji', { mod: 'dva_igraca' }, { nijeFunkcija: true });
+      igrac.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' }, { nijeFunkcija: true });
       expect(await greskaPromise).toMatchObject({ kod: 'NEVALJAN_PAYLOAD' });
       expect(igrac.connected).toBe(true);
 
       const stanjePrijeUlaska = new Promise<StanjeReda>((resolve) => igrac.once('red:stanje', resolve));
-      igrac.emit('red:stanje', { mod: 'dva_igraca' });
+      igrac.emit('red:stanje', { mod: 'tri_igraca', pravila: 'klasicni' });
       expect((await stanjePrijeUlaska).mjesta.filter(Boolean)).toHaveLength(0);
 
       const stanjeNakonUlaska = new Promise<StanjeReda>((resolve) => igrac.once('red:stanje', resolve));
-      igrac.emit('red:udji');
+      igrac.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
       expect((await stanjeNakonUlaska).mjesta.filter(Boolean)).toHaveLength(1);
     } finally {
       igrac.disconnect();
@@ -102,7 +102,7 @@ describe('red čekanja', () => {
 
     try {
       const stanjePromise = new Promise<StanjeReda>((resolve) => uRedu.once('red:stanje', resolve));
-      uRedu.emit('red:udji');
+      uRedu.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
       await stanjePromise;
 
       const stvorena = new Promise<{ kod: string }>((resolve) => vlasnik.once('soba:stvorena', resolve));
@@ -129,7 +129,7 @@ describe('red čekanja', () => {
     );
 
     for (const klijent of klijenti) {
-      klijent.emit('red:udji');
+      klijent.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     }
 
     const pocetci = await pocetciPromise;
@@ -140,29 +140,29 @@ describe('red čekanja', () => {
     for (const klijent of klijenti) klijent.disconnect();
   });
 
-  it('RS-17: peti igrač ostaje u redu za sljedeći stol', async () => {
-    const klijenti = await Promise.all([spojiSe(), spojiSe(), spojiSe(), spojiSe(), spojiSe()]);
+  it('RS-17: četvrti igrač ostaje u redu za sljedeći stol', async () => {
+    const klijenti = await Promise.all([spojiSe(), spojiSe(), spojiSe(), spojiSe()]);
 
     const cekajPocetak = new Promise<void>((resolve) => {
       klijenti[0]!.on('partija:pocetak', () => resolve());
     });
 
     // ulazak jedan po jedan uz cekanje potvrde (red:stanje) - osigurava deterministican redoslijed u redu
-    for (const klijent of klijenti.slice(0, 4)) {
+    for (const klijent of klijenti.slice(0, 3)) {
       const potvrda = new Promise<void>((resolve) => klijent.once('red:stanje', () => resolve()));
-      klijent.emit('red:udji');
+      klijent.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
       await potvrda;
     }
     await cekajPocetak;
 
-    const stanjaPetog: StanjeReda[] = [];
-    klijenti[4]!.on('red:stanje', (stanje: StanjeReda) => stanjaPetog.push(stanje));
+    const stanjaCetvrtog: StanjeReda[] = [];
+    klijenti[4]!.on('red:stanje', (stanje: StanjeReda) => stanjaCetvrtog.push(stanje));
 
-    klijenti[4]!.emit('red:udji');
+    klijenti[3]!.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // peti igrač i dalje čeka - vidio je barem jedno stanje s barem 1 zauzetim mjestom (samog sebe)
-    expect(stanjaPetog.length).toBeGreaterThan(0);
+    // četvrti igrač i dalje čeka - vidio je barem jedno stanje s barem 1 zauzetim mjestom (samog sebe)
+    expect(stanjaCetvrtog.length).toBeGreaterThan(0);
 
     for (const klijent of klijenti) klijent.disconnect();
   });
@@ -176,7 +176,7 @@ describe('red čekanja', () => {
     });
 
     const stanjePromise = new Promise<StanjeReda>((resolve) => uRedu.once('red:stanje', resolve));
-    uRedu.emit('red:udji');
+    uRedu.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     const stanje = await stanjePromise;
     await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -191,7 +191,7 @@ describe('red čekanja', () => {
     const veze = gosti.map((gost) => gost.socket);
     for (const veza of veze) {
       const stanjePromise = new Promise<StanjeReda>((resolve) => veza.once('red:stanje', resolve));
-      veza.emit('red:udji');
+      veza.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
       await stanjePromise;
     }
 
@@ -199,7 +199,7 @@ describe('red čekanja', () => {
     const zamjenskaVeza = await spojiSe(gosti[1]!.token);
     await odjavaStare;
     const stanjePromise = new Promise<StanjeReda>((resolve) => zamjenskaVeza.once('red:stanje', resolve));
-    zamjenskaVeza.emit('red:udji');
+    zamjenskaveza.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     const stanje = await stanjePromise;
 
     expect(stanje.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
@@ -215,7 +215,7 @@ describe('red čekanja', () => {
     const veze = gosti.map((gost) => gost.socket);
     for (const veza of veze) {
       const stanjePromise = new Promise<StanjeReda>((resolve) => veza.once('red:stanje', resolve));
-      veza.emit('red:udji');
+      veza.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
       await stanjePromise;
     }
 
@@ -229,7 +229,7 @@ describe('red čekanja', () => {
 
     const povratnaVeza = await spojiSe(gosti[1]!.token);
     const stanjeNakonPovratka = new Promise<StanjeReda>((resolve) => povratnaVeza.once('red:stanje', resolve));
-    povratnaVeza.emit('red:udji');
+    povratnaveza.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     const stanje = await stanjeNakonPovratka;
     expect(stanje.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
       gosti[0]!.igracId,
@@ -241,29 +241,27 @@ describe('red čekanja', () => {
   });
 
   it('igrač iz aktivne partije ne može ponovno popuniti drugi stol', async () => {
-    const aktivniGosti = await stvoriGoste(4);
+    const aktivniGosti = await stvoriGoste(3);
     const aktivniIgraci = aktivniGosti.map((gost) => gost.socket);
     const pocetakAktivne = new Promise<PocetakPartije>((resolve) => {
       aktivniIgraci[0]!.once('partija:pocetak', resolve);
     });
-    for (const igrac of aktivniIgraci) igrac.emit('red:udji');
+    for (const igrac of aktivniIgraci) igrac.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     await pocetakAktivne;
 
     const greskaPrivatneSobe = new Promise<{ kod: string }>((resolve) => aktivniIgraci[0]!.once('greska', resolve));
     aktivniIgraci[0]!.emit('soba:stvori', {});
     expect((await greskaPrivatneSobe).kod).toBe('VEC_U_PARTIJI');
 
-    const noviGosti = await stvoriGoste(4);
+    const noviGosti = await stvoriGoste(3);
     const noviIgraci = noviGosti.map((gost) => gost.socket);
-    for (const igrac of noviIgraci.slice(0, 3)) igrac.emit('red:udji');
-    aktivniIgraci[0]!.emit('red:udji');
-
     const pocetciNovih = Promise.all(
       noviIgraci.map(
         (igrac) => new Promise<PocetakPartije>((resolve) => igrac.once('partija:pocetak', resolve)),
       ),
     );
-    noviIgraci[3]!.emit('red:udji');
+    for (const igrac of noviIgraci) igrac.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
+    aktivniIgraci[0]!.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     const pocetci = await pocetciNovih;
 
     for (const pocetak of pocetci) {
@@ -277,14 +275,14 @@ describe('red čekanja', () => {
     }
   });
 
-  it('stari ulaz bez pravila dobiva ka_zna; Troboj ulazi; nevažeći pravilnik se odbija', async () => {
+  it('prazan ulaz i Brza igra; nevažeći pravilnik se odbija; stari javni red se odbija', async () => {
     const igrac = await spojiSe();
     try {
       const stanje = await new Promise<StanjeReda>((resolve) => {
-        igrac.emit('red:udji', { mod: 'dva_igraca' }, resolve);
+        igrac.emit('red:udji', {}, resolve);
       });
-      expect(stanje.mod).toBe('dva_igraca');
-      expect(stanje.pravila).toBe('ka_zna');
+      expect(stanje.mod).toBe('tri_igraca');
+      expect(stanje.pravila).toBe('klasicni');
       igrac.emit('red:izadji');
 
       const potvrdaTroboj = await new Promise<StanjeReda | null>((resolve) => {
@@ -296,14 +294,15 @@ describe('red čekanja', () => {
       igrac.emit('red:izadji');
 
       const greskaPravila = new Promise<{ kod: string }>((resolve) => igrac.once('greska', resolve));
-      igrac.emit('red:udji', { mod: 'dva_igraca', pravila: 'nepoznato' });
+      igrac.emit('red:udji', { mod: 'tri_igraca', pravila: 'nepoznato' });
       expect(await greskaPravila).toMatchObject({ kod: 'NEVALJAN_PAYLOAD' });
 
-      const sKlasicnim = await new Promise<StanjeReda>((resolve) => {
+      const greskaStarog = new Promise<{ kod: string }>((resolve) => igrac.once('greska', resolve));
+      const potvrdaStarog = await new Promise<StanjeReda | null>((resolve) => {
         igrac.emit('red:udji', { mod: 'dva_igraca', pravila: 'klasicni' }, resolve);
       });
-      expect(sKlasicnim.pravila).toBe('klasicni');
-      expect(sKlasicnim.mjesta.find((m) => m)?.odabranaPravila).toBe('klasicni');
+      expect(potvrdaStarog).toBeNull();
+      expect((await greskaStarog).kod).toBe('JAVNI_RED_NEDOSTUPAN');
     } finally {
       igrac.disconnect();
     }

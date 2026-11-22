@@ -131,10 +131,10 @@ async function cekajZavrsenuPartiju(partijaId: string, timeoutMs = 2_000): Promi
 async function pokreniPartiju(
   ciljnaAdresa = adresa,
 ): Promise<{ igraci: Igrac[]; pocetak: PocetakPartije; runda: RundaOtvorena }> {
-  const igraci = await Promise.all(Array.from({ length: 4 }, () => spojiIgraca(`gost.${randomUUID().replaceAll('-', '')}`, ciljnaAdresa)));
+  const igraci = await Promise.all(Array.from({ length: 3 }, () => spojiIgraca(`gost.${randomUUID().replaceAll('-', '')}`, ciljnaAdresa)));
   const pocetakPromise = new Promise<PocetakPartije>((resolve) => igraci[0]!.socket.once('partija:pocetak', resolve));
   const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
-  for (const igrac of igraci) igrac.socket.emit('red:udji');
+  for (const igrac of igraci) igrac.socket.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
   const [pocetak, runda] = await Promise.all([pocetakPromise, rundaPromise]);
   return { igraci, pocetak, runda };
 }
@@ -1325,7 +1325,7 @@ describe('motor partije - PR02 kolekcija oznake na kraju', () => {
       igraci[0]!.socket.on('partija:pocetak', resolve);
     });
     const rundaPromise = cekajRunduOtvorenu(igraci[0]!.socket);
-    for (const igrac of igraci) igrac.socket.emit('red:udji', { mod: 'dva_igraca' });
+    for (const igrac of igraci) igrac.socket.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     const pocetak = await pocetakPromise;
     const runda = await rundaPromise;
 

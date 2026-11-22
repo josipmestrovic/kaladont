@@ -97,7 +97,7 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   vjerojatnostTaktickogPoteza: 0.25,
   maksimalnoTaktickihKandidata: 12,
   brziRazvoj: false,
-  odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [3_000, 3_000], cetiri_igraca: [3_000, 3_000, 3_000] },
+  odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [0, 0], cetiri_igraca: [3_000, 3_000, 3_000] },
   pragoviPopuneMs: structuredClone(PRAGOVI_POPUNE_MS),
   treningOmogucen: true,
   botoviDvoboj: false,

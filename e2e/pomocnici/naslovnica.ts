@@ -10,22 +10,24 @@ export async function otvoriProfilIzbornik(page: Page): Promise<Locator> {
   return izbornik;
 }
 
-/** Ranked modal: pravilnik → format. */
-export async function otvoriRankedKorak1(page: Page) {
+/** Brza igra: jedan klik → kanonski red. */
+export async function idiUBrzuIgru(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Ranked', exact: true }).click();
-  const dijalog = page.getByRole('dialog', { name: 'Ranked' });
-  await expect(
-    dijalog.getByRole('heading', { name: 'Odaberi pravila po kojima želiš igrati' }),
-  ).toBeVisible();
-  return dijalog;
+  await page.getByRole('button', { name: 'Brza igra', exact: true }).click();
+  await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
 }
 
-/** Zagrijavanje modal: pravilnik → broj Računala. */
+/** @deprecated Koristi idiUBrzuIgru — Ranked modal više ne postoji. */
+export async function otvoriRankedKorak1(page: Page) {
+  await idiUBrzuIgru(page);
+  return page.getByRole('main');
+}
+
+/** Trening modal: pravilnik → profil → botovi. */
 export async function otvoriZagrijavanjeKorak1(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Zagrijavanje', exact: true }).click();
-  const dijalog = page.getByRole('dialog', { name: 'Zagrijavanje' });
+  await page.getByRole('button', { name: 'Trening', exact: true }).click();
+  const dijalog = page.getByRole('dialog', { name: 'Trening' });
   await expect(
     dijalog.getByRole('heading', { name: 'Odaberi pravila po kojima želiš igrati' }),
   ).toBeVisible();

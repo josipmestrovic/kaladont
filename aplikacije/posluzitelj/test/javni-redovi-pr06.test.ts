@@ -1,12 +1,13 @@
 /**
- * PR06: javni redovi (9→8), spojeni Dvoboj, Troboj pragovi, idempotencija ulaska.
+ * Javni redovi: Brza igra (3-klasicni) aktivna; ostali ključevi kataloga odbijeni.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID, createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import type { PocetakPartije, StanjeReda } from 'zajednicko';
+import type { PayloadGreska, PocetakPartije, StanjeReda } from 'zajednicko';
+import { BRZA_IGRA, KLJUCEVI_JAVNOG_REDA } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { partije, sesije, sudioniciPartije } from '../src/baza/shema.js';
@@ -46,118 +47,97 @@ function spojiSe(token = `gost.${randomUUID().replaceAll('-', '')}`): Promise<Cl
   });
 }
 
-describe('PR06 javni redovi', () => {
-  it('Klasični + KA-ZNA Dvoboj dijele red i pokreću spojeni stol bez bota', async () => {
-    const tokenA = `gost.${randomUUID().replaceAll('-', '')}`;
-    const tokenB = `gost.${randomUUID().replaceAll('-', '')}`;
-    const a = await spojiSe(tokenA);
-    const b = await spojiSe(tokenB);
-    const idA = await igracIdZaToken(tokenA);
-    const idB = await igracIdZaToken(tokenB);
+const ULZAZ_BRZA = { mod: BRZA_IGRA.mod, pravila: BRZA_IGRA.pravila } as const;
+
+describe('javni redovi — Brza igra', () => {
+  it('katalog i dalje ima 8 ključeva; samo Brza igra je aktivna', () => {
+    expect(KLJUCEVI_JAVNOG_REDA).toHaveLength(8);
+    expect(BRZA_IGRA.kljucReda).toBe('3-klasicni');
+  });
+
+  it('tri čovjeka u Brzoj igri pokreću Troboj bez bota', async () => {
+    const tokeni = Array.from({ length: 3 }, () => `gost.${randomUUID().replaceAll('-', '')}`);
+    const socke = await Promise.all(tokeni.map((t) => spojiSe(t)));
+    const idovi = await Promise.all(tokeni.map((t) => igracIdZaToken(t)));
     try {
-      const pocetakA = new Promise<PocetakPartije>((resolve) => a.once('partija:pocetak', resolve));
-      const pocetakB = new Promise<PocetakPartije>((resolve) => b.once('partija:pocetak', resolve));
-
-      await new Promise<StanjeReda>((resolve) => a.emit('red:udji', { mod: 'dva_igraca', pravila: 'klasicni' }, resolve));
-      await new Promise<StanjeReda>((resolve) => b.emit('red:udji', { mod: 'dva_igraca', pravila: 'ka_zna' }, resolve));
-
-      const [pa, pb] = await Promise.all([pocetakA, pocetakB]);
-      expect(pa.partijaId).toBe(pb.partijaId);
-      expect(pa.mod).toBe('dva_igraca');
-      expect(pa.pravila).toBe('ka_zna');
-      expect(pa.spojeniDvoboj).toBe(true);
+      const pocetci = socke.map((s) => new Promise<PocetakPartije>((resolve) => s.once('partija:pocetak', resolve)));
+      for (const s of socke) {
+        await new Promise<StanjeReda | null>((resolve) => s.emit('red:udji', ULZAZ_BRZA, resolve));
+      }
+      const [pa] = await Promise.all(pocetci);
+      expect(pa.mod).toBe('tri_igraca');
+      expect(pa.pravila).toBe('klasicni');
       expect(pa.sjedala.every((s) => !s.jeBot)).toBe(true);
-
-      const odabiri = new Map(pa.sjedala.map((s) => [s.igracId, s.odabranaPravila]));
-      expect(odabiri.get(idA)).toBe('klasicni');
-      expect(odabiri.get(idB)).toBe('ka_zna');
+      expect(pa.sjedala).toHaveLength(3);
+      expect(new Set(pa.sjedala.map((s) => s.igracId))).toEqual(new Set(idovi));
 
       const [partija] = await baza.select({
         pravila: partije.pravila,
-        spojeniDvoboj: partije.spojeniDvoboj,
+        mod: partije.mod,
       }).from(partije).where(eq(partije.id, pa.partijaId));
-      expect(partija).toEqual({ pravila: 'ka_zna', spojeniDvoboj: true });
+      expect(partija).toEqual({ pravila: 'klasicni', mod: 'tri_igraca' });
 
-      const sudionici = await baza.select({
-        igracId: sudioniciPartije.igracId,
-        odabranaPravila: sudioniciPartije.odabranaPravila,
-      }).from(sudioniciPartije).where(eq(sudioniciPartije.partijaId, pa.partijaId));
-      expect(sudionici).toHaveLength(2);
-      expect(new Map(sudionici.map((s) => [s.igracId, s.odabranaPravila])).get(idA)).toBe('klasicni');
+      const sudionici = await baza.select({ igracId: sudioniciPartije.igracId })
+        .from(sudioniciPartije).where(eq(sudioniciPartije.partijaId, pa.partijaId));
+      expect(sudionici).toHaveLength(3);
     } finally {
-      a.emit('partija:izadji');
-      b.emit('partija:izadji');
-      a.disconnect();
-      b.disconnect();
+      for (const s of socke) {
+        s.emit('partija:izadji');
+        s.disconnect();
+      }
     }
   });
 
-  it('različiti Troboj pravilnici ne dijele red', async () => {
-    const a = await spojiSe();
-    const b = await spojiSe();
+  it('nedostupan javni red:udji i red:stanje se odbijaju bez premještanja', async () => {
+    const socket = await spojiSe();
     try {
-      const sa = await new Promise<StanjeReda>((resolve) => {
-        a.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' }, resolve);
+      const greskaUdji = new Promise<PayloadGreska>((resolve) => socket.once('greska', resolve));
+      const potvrda = await new Promise<StanjeReda | null>((resolve) => {
+        socket.emit('red:udji', { mod: 'dva_igraca', pravila: 'klasicni' }, resolve);
       });
-      const sb = await new Promise<StanjeReda>((resolve) => {
-        b.emit('red:udji', { mod: 'tri_igraca', pravila: 'ka_zna' }, resolve);
+      expect(potvrda).toBeNull();
+      const g = await greskaUdji;
+      expect(g.kod).toBe('JAVNI_RED_NEDOSTUPAN');
+
+      const greskaStanje = new Promise<PayloadGreska>((resolve) => socket.once('greska', resolve));
+      socket.emit('red:stanje', { mod: 'cetiri_igraca', pravila: 'ka_zna' });
+      expect((await greskaStanje).kod).toBe('JAVNI_RED_NEDOSTUPAN');
+
+      const greskaTrobojKaZna = new Promise<PayloadGreska>((resolve) => socket.once('greska', resolve));
+      const potvrdaKa = await new Promise<StanjeReda | null>((resolve) => {
+        socket.emit('red:udji', { mod: 'tri_igraca', pravila: 'ka_zna' }, resolve);
       });
-      expect(sa.mjesta.filter(Boolean)).toHaveLength(1);
-      expect(sb.mjesta.filter(Boolean)).toHaveLength(1);
-      expect(sa.mjesta.find((m) => m)?.igracId).not.toBe(sb.mjesta.find((m) => m)?.igracId);
+      expect(potvrdaKa).toBeNull();
+      expect((await greskaTrobojKaZna).kod).toBe('JAVNI_RED_NEDOSTUPAN');
     } finally {
-      a.emit('red:izadji');
-      b.emit('red:izadji');
-      a.disconnect();
-      b.disconnect();
+      socket.disconnect();
     }
   });
 
-  it('identičan red:udji je no-op; promjena pravilnika u 2-zajednicki je novi ulazak', async () => {
+  it('identičan red:udji u Brzoj igri je no-op', async () => {
     const igrac = await spojiSe();
     try {
       const prvo = await new Promise<StanjeReda>((resolve) => {
-        igrac.emit('red:udji', { mod: 'dva_igraca', pravila: 'klasicni' }, resolve);
+        igrac.emit('red:udji', ULZAZ_BRZA, resolve);
       });
-      const usaoUPrije = prvo.mjesta.find((m) => m)?.igracId;
-      expect(usaoUPrije).toBeTruthy();
+      expect(prvo.mjesta.filter(Boolean)).toHaveLength(1);
+      expect(prvo.pravila).toBe('klasicni');
+      expect(prvo.mod).toBe('tri_igraca');
 
       const drugo = await new Promise<StanjeReda>((resolve) => {
-        igrac.emit('red:udji', { mod: 'dva_igraca', pravila: 'klasicni' }, resolve);
+        igrac.emit('red:udji', ULZAZ_BRZA, resolve);
       });
       expect(drugo.mjesta.filter(Boolean)).toHaveLength(1);
       expect(drugo.pravila).toBe('klasicni');
-
-      const trece = await new Promise<StanjeReda>((resolve) => {
-        igrac.emit('red:udji', { mod: 'dva_igraca', pravila: 'ka_zna' }, resolve);
-      });
-      expect(trece.pravila).toBe('ka_zna');
-      expect(trece.mjesta.find((m) => m)?.odabranaPravila).toBe('ka_zna');
-      expect(trece.mjesta.filter(Boolean)).toHaveLength(1);
     } finally {
       igrac.emit('red:izadji');
       igrac.disconnect();
     }
   });
 
-  it('Dokaz Dvoboj ima zaseban red od spojenog', async () => {
-    const a = await spojiSe();
-    const b = await spojiSe();
-    try {
-      await new Promise<StanjeReda>((resolve) => {
-        a.emit('red:udji', { mod: 'dva_igraca', pravila: 'klasicni' }, resolve);
-      });
-      const sb = await new Promise<StanjeReda>((resolve) => {
-        b.emit('red:udji', { mod: 'dva_igraca', pravila: 'dokazi_nastavak' }, resolve);
-      });
-      expect(sb.mjesta.filter(Boolean)).toHaveLength(1);
-      expect(sb.pravila).toBe('dokazi_nastavak');
-    } finally {
-      a.emit('red:izadji');
-      b.emit('red:izadji');
-      a.disconnect();
-      b.disconnect();
-    }
+  it('zadani Troboj pragovi su 10/20 s bez jittera', () => {
+    expect(ZADANA_KONFIGURACIJA_BOTA.pragoviPopuneMs.tri_igraca).toEqual([10_000, 20_000]);
+    expect(ZADANA_KONFIGURACIJA_BOTA.odstupanjaPopuneMs.tri_igraca).toEqual([0, 0]);
   });
 
   it('stara bot konfiguracija bez tri_igraca se uspješno parsira', () => {
@@ -170,7 +150,7 @@ describe('PR06 javni redovi', () => {
     };
     const parsano = parsajSpremljenuKonfiguraciju(stara);
     expect(parsano.verzija).toBe(VERZIJA_BOT_POLITIKE);
-    expect(parsano.pragoviPopuneMs.tri_igraca).toEqual([20_000, 30_000]);
+    expect(parsano.pragoviPopuneMs.tri_igraca).toEqual([10_000, 20_000]);
     expect(parsano.botoviTroboj).toBe(false);
   });
 

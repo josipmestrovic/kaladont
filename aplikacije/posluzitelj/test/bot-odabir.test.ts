@@ -34,7 +34,7 @@ describe('lokalni tempo javnih botova', () => {
     expect(konfiguracija.trajanjePotezaBotaMs).toBe(4_000);
     expect(pragoviPopuneZaOkruzenje(okruzenje)).toEqual({
       dva_igraca: [30_000],
-      tri_igraca: [20_000, 30_000],
+      tri_igraca: [10_000, 20_000],
       cetiri_igraca: [20_000, 30_000, 40_000],
     });
   });
@@ -724,8 +724,8 @@ describe('validacija admin postavki bota', () => {
     { jitterPotezaBotaMs: 5_000 },
     { maksimalnoOpcijaMalogSkupa: 0 },
     { maksimalnoTaktickihKandidata: 0 },
-    { pragoviPopuneMs: { dva_igraca: [3_000], tri_igraca: [20_000, 30_000], cetiri_igraca: [40_000, 30_000, 20_000] } },
-    { odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [3_000], cetiri_igraca: [3_000, 3_000, 3_000] } },
+    { pragoviPopuneMs: { dva_igraca: [3_000], tri_igraca: [10_000, 20_000], cetiri_igraca: [40_000, 30_000, 20_000] } },
+    { odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [0], cetiri_igraca: [3_000, 3_000, 3_000] } },
   ])('odbija nevaljanu kombinaciju %j', (izmjena) => {
     expect(ShemaKonfiguracijeBota.safeParse({ ...ZADANA_KONFIGURACIJA_BOTA, ...izmjena }).success).toBe(false);
   });

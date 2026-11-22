@@ -1,6 +1,7 @@
 export * from './grafemi.js';
 export * from './pravila.js';
 export * from './katalog-partije.js';
+export * from './dostupnost-igranja.js';
 export * from './bodovanje.js';
 export * from './protokol.js';
 export * from './poruke.js';

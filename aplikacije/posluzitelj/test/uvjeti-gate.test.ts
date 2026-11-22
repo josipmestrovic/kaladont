@@ -53,7 +53,7 @@ describe('Uvjeti samo na registraciji', () => {
           clearTimeout(timeout);
           reject(new Error(`Neočekivana greška: ${JSON.stringify(poruka)}`));
         });
-        socket.emit('red:udji', { mod: 'dva_igraca' });
+        socket.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
       });
       expect(stanje.mjesta.filter(Boolean).length).toBeGreaterThanOrEqual(1);
     } finally {

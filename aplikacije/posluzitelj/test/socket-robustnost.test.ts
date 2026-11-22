@@ -259,7 +259,7 @@ describe('Socket.IO robusnost', () => {
       const igracIdPrvog = await igracIdZaToken(tokenPrvog);
       let brojPozivaAcka = 0;
       const ack = new Promise<unknown>((resolve) => {
-        prvi!.emit('red:udji', { mod: 'dva_igraca' }, (stanje: unknown) => {
+        prvi!.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' }, (stanje: unknown) => {
           brojPozivaAcka += 1;
           resolve(stanje);
         });
@@ -268,7 +268,7 @@ describe('Socket.IO robusnost', () => {
       expect(brojPozivaAcka).toBe(1);
 
       const nevaljanAck = cekajSocketDogadaj<{ kod: string }>(prvi, 'greska');
-      prvi.emit('red:udji', { mod: 'dva_igraca' }, { nijeFunkcija: true });
+      prvi.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' }, { nijeFunkcija: true });
       expect(await nevaljanAck).toMatchObject({ kod: 'NEVALJAN_PAYLOAD' });
       expect(proces.exitCode).toBeNull();
 
@@ -282,7 +282,7 @@ describe('Socket.IO robusnost', () => {
       const pocetakDrugog = cekajSocketDogadaj<{ partijaId: string }>(drugi, 'partija:pocetak');
       const rundaPrvog = cekajSocketDogadaj<RundaOtvorena>(prvi, 'partija:runda-otvorena');
       const rundaDrugog = cekajSocketDogadaj<RundaOtvorena>(drugi, 'partija:runda-otvorena');
-      drugi.emit('red:udji', { mod: 'dva_igraca' });
+      drugi.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
 
       const [, , prvaRunda] = await Promise.all([pocetakPrvog, pocetakDrugog, rundaPrvog]);
       const drugaRunda = await rundaDrugog;
