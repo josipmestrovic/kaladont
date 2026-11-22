@@ -39,7 +39,7 @@ for (const sirina of [320, 390, 1440]) {
 test('PR02-12/19: puni završni DTO u ciljanom DOM redoslijedu; pohvale nepromijenjene', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'dva_igraca');
+    await udjiUJavniRed(igraci);
     const partijaId = await cekajIstuPartiju(igraci);
     const stranica = igraci[0]!.stranica;
     await stranica.setViewportSize({ width: 390, height: 844 });
@@ -162,7 +162,7 @@ test('PR02-12/19: puni završni DTO u ciljanom DOM redoslijedu; pohvale nepromij
 test('PR02-13: minimalni završni DTO skriva opcionalne blokove; akcije i prijave ostaju', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'dva_igraca');
+    await udjiUJavniRed(igraci);
     const partijaId = await cekajIstuPartiju(igraci);
     const stranica = igraci[0]!.stranica;
     await expect.poll(() => stranica.evaluate(async () => {
@@ -207,7 +207,7 @@ test('PR02-13: minimalni završni DTO skriva opcionalne blokove; akcije i prijav
 test('P01-15/16: pohvale igre vidljive na završnom ekranu; prijave ostaju na dnu', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'dva_igraca');
+    await udjiUJavniRed(igraci);
     const partijaId = await cekajIstuPartiju(igraci);
     const stranica = igraci[0]!.stranica;
     await stranica.setViewportSize({ width: 390, height: 844 });
@@ -261,7 +261,7 @@ test('P01-15/16: pohvale igre vidljive na završnom ekranu; prijave ostaju na dn
 test('P01-regresija: kasni kraj s obje pohvale otvara Završni poredak', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'dva_igraca');
+    await udjiUJavniRed(igraci);
     const partijaId = await cekajIstuPartiju(igraci);
     const stranica = igraci[0]!.stranica;
     await expect.poll(() => stranica.evaluate(async () => {
@@ -328,7 +328,7 @@ for (const svijetla of [false, true]) {
   test(`završni rezultati imaju čitljiv kontrast ${svijetla ? 'svijetla' : 'tamna'}`, async ({ browser }, podaciTesta) => {
     const igraci = await stvoriIgrace(browser, 3);
     try {
-      await udjiUJavniRed(igraci, 'dva_igraca');
+      await udjiUJavniRed(igraci);
       const partijaId = await cekajIstuPartiju(igraci);
       const stranica = igraci[0]!.stranica;
       await expect(stranica.locator('.igraci-red > li')).toHaveCount(3);
@@ -711,7 +711,7 @@ test('svaki igrač vidi sebe prvog, a sjedala se ne mijenjaju nakon eliminacije'
 test('dijalog Ne znam nestaje nakon eliminacije i prikazuje promatranje', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'cetiri_igraca');
+    await udjiUJavniRed(igraci);
     const partijaId = await cekajIstuPartiju(igraci);
 
     let indeksNaPotezu = -1;
@@ -774,7 +774,7 @@ test('dijalog Ne znam nestaje nakon eliminacije i prikazuje promatranje', async 
 test('eliminator nakon kaladonta ostaje interaktivan i dobiva formu u novoj rundi', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'cetiri_igraca');
+    await udjiUJavniRed(igraci);
     await cekajIstuPartiju(igraci);
 
     let indeksNaPotezu = -1;
@@ -877,7 +877,7 @@ test('eliminator nakon kaladonta ostaje interaktivan i dobiva formu u novoj rund
 test('eliminator nakon zadnje eliminacije vidi spremanje a ne zamrznuti stol', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
-    await udjiUJavniRed(igraci, 'cetiri_igraca');
+    await udjiUJavniRed(igraci);
     await cekajIstuPartiju(igraci);
 
     let indeksNaPotezu = -1;

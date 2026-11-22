@@ -19,12 +19,8 @@ export async function stvoriIgrace(browser: Browser, broj: number): Promise<E2EI
   return dodajIgrace(browser, broj);
 }
 
-/** Javni red je samo Brza igra (Troboj · Klasični); stari mod/pravila argumenti se ignoriraju. */
-export async function udjiUJavniRed(
-  igraci: readonly E2EIgrac[],
-  _mod?: 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca',
-  _pravila?: 'klasicni' | 'ka_zna' | 'dokazi_nastavak',
-) {
+/** Javni red je samo Brza igra (Troboj · Klasični). */
+export async function udjiUJavniRed(igraci: readonly E2EIgrac[]) {
   if (igraci.length < 1 || igraci.length > 3) {
     throw new Error(`Brza igra (Troboj) prima 1–3 igrača u javni red, dobiveno ${igraci.length}.`);
   }
