@@ -241,11 +241,19 @@
 
   .header--naslovnica .header-sadrzaj {
     pointer-events: none;
+    /* Veliki H1 ne smije vertikalno centrirati avatar — inače skače na /profil. */
+    align-items: flex-start;
   }
 
   .header--naslovnica .logo-naslovnica,
   .header--naslovnica .desno {
     pointer-events: auto;
+  }
+
+  .header--naslovnica .desno {
+    /* Usklađeno s 44px akcijama na ostalim stranicama (avatar 50px + 4px padding). */
+    min-height: 44px;
+    padding-top: 0;
   }
 
   .logo-naslovnica {

@@ -334,6 +334,12 @@
     <p class="podnaslov">Pobijedi izazove i otključaj nove razine.</p>
   </header>
 
+  {#if odgovor && !omogucen}
+    <p class="banner-info" role="status" data-testid="izazov-u-pripremi">
+      Izazovi su u pripremi — možeš pregledati karte, ali start još nije otvoren.
+    </p>
+  {/if}
+
   {#if aktivni}
     <div class="banner-aktivni" role="status" data-testid="izazov-aktivni">
       <p>

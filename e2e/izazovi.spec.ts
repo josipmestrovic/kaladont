@@ -20,10 +20,11 @@ test('naslovnica vodi na mapu; level tabovi i zaključani finale', async ({ page
   await expect(dv01).toHaveAttribute('data-status', 'dostupan');
   await expect(dv05).toHaveAttribute('data-status', 'zakljucan');
 
-  await dv05.click();
+  // Klik na broj kartice — izbjegava PojamPomoc gumbe koji stopPropagation.
+  await dv05.locator('.kartica-broj').click();
   await expect(page.getByTestId('izazov-detalj')).toHaveCount(0);
   await expect(page.getByTestId('izazov-start-poruka')).toBeVisible();
-  await expect(page.getByTestId('izazov-start-poruka')).toContainText(/Otključava|Završi/);
+  await expect(page.getByTestId('izazov-start-poruka')).toContainText(/Otključava|dovrši/i);
 });
 
 test('zaključani ?level= fallback + obavijest', async ({ page }) => {

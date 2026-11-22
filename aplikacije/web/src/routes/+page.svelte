@@ -110,10 +110,11 @@
 
         <div
           class="navigacijska-stavka turniri uskoro"
+          role="status"
           aria-label="Turniri, izlazi uskoro"
           data-testid="naslovnica-turniri"
         >
-          <span class="stavka-sadrzaj" aria-hidden="true">
+          <span class="stavka-sadrzaj">
             <span class="stavka-tekst">
               <strong>Turniri</strong>
               <small>Izlazi uskoro</small>
@@ -136,6 +137,7 @@
 
   <footer class="landing-footer">
     <nav aria-label="Dodatne poveznice">
+      <a href="/pravila-kaladonta">Pravila</a>
       <a href="/povratne-informacije">Povratne informacije</a>
       <a href="/uvjeti">Uvjeti</a>
       <a href="/privatnost">Privatnost</a>
@@ -513,7 +515,8 @@
     }
 
     .landing-prostor--gore {
-      padding-top: 40px;
+      /* Overlay H1 je 60px — spacer mora biti ≥ logo da CTA ne završi ispod. */
+      padding-top: 72px;
     }
 
     .izbornik {

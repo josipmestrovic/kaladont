@@ -81,11 +81,13 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   const footer = page.locator('.landing-footer');
   const footerLinkovi = footer.locator('nav a');
-  await expect(footerLinkovi).toHaveCount(3);
-  await expect(footerLinkovi.nth(0)).toHaveAttribute('href', '/povratne-informacije');
-  await expect(footerLinkovi.nth(0)).toHaveText('Povratne informacije');
-  await expect(footerLinkovi.nth(1)).toHaveAttribute('href', '/uvjeti');
-  await expect(footerLinkovi.nth(2)).toHaveAttribute('href', '/privatnost');
+  await expect(footerLinkovi).toHaveCount(4);
+  await expect(footerLinkovi.nth(0)).toHaveAttribute('href', '/pravila-kaladonta');
+  await expect(footerLinkovi.nth(0)).toHaveText('Pravila');
+  await expect(footerLinkovi.nth(1)).toHaveAttribute('href', '/povratne-informacije');
+  await expect(footerLinkovi.nth(1)).toHaveText('Povratne informacije');
+  await expect(footerLinkovi.nth(2)).toHaveAttribute('href', '/uvjeti');
+  await expect(footerLinkovi.nth(3)).toHaveAttribute('href', '/privatnost');
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByRole('button', { name: 'Igraj', exact: true })).toBeVisible();

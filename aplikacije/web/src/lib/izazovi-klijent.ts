@@ -132,8 +132,8 @@ export function tekstRazlogaZakljucavanja(razlog: RazlogZakljucavanja | null | u
     return `Otključava se nakon levela ${razlog.level} (${NAZIVI_LEVELA_IZAZOVA[razlog.level]}).`;
   }
   const zavrseno = 4 - razlog.nedostaje.length;
-  if (zavrseno <= 0) return 'Otključava se nakon prva 4 izazova.';
-  return `Završi ${zavrseno}/4 prethodna izazova za otključavanje.`;
+  if (zavrseno <= 0) return 'Otključava se nakon prva 4 izazova ovog formata.';
+  return `Najprije dovrši prethodna 4 izazova ovog formata (${zavrseno}/4).`;
 }
 
 /** Najviši otključani nezavršen level; inače najviši otključani; fallback 1. */
