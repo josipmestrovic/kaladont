@@ -3,18 +3,23 @@
  */
 import { and, eq, inArray, lt } from 'drizzle-orm';
 import {
+  izgradiAgregateLevela,
   izgradiStavkuKataloga,
   izracunajZvjezdiceIzazivaca,
+  jeIdIzazova,
   KATALOG_IZAZOVA,
   VERZIJA_DEFINICIJE_IZAZOVA,
   type CiljeviIzazova,
   type DefinicijaIzazova,
+  type FormatIzazova,
   type IdIzazova,
+  type LevelIzazova,
   type NapredakIzazovaDto,
   type OdgovorKatalogaIzazova,
   type ProfilBotaIzazova,
   type StatusPokusajaIzazova,
   type TrajanjePotezaIzazovaMs,
+  type VarijantaIzazova,
 } from 'zajednicko';
 import { VERZIJA_PROFILA_BOTA } from '../bot/profili-bota.js';
 import { baza } from '../baza/klijent.js';
@@ -26,11 +31,17 @@ export interface SnapshotPokusajaIzazova {
   challengeId: IdIzazova;
   definitionVersion: number;
   naziv: string;
+  level: LevelIzazova;
+  format: FormatIzazova;
+  varijanta: VarijantaIzazova;
   mod: DefinicijaIzazova['mod'];
   pravila: DefinicijaIzazova['pravila'];
   profileId: ProfilBotaIzazova;
   botProfileVersion: number;
+  /** Rok čovjeka. */
   turnDurationMs: TrajanjePotezaIzazovaMs;
+  /** Rok bota (obično 30_000). */
+  botTurnDurationMs: TrajanjePotezaIzazovaMs;
   brojIgraca: 2 | 3 | 4;
   ciljevi: CiljeviIzazova;
   xp: number;
@@ -107,19 +118,19 @@ export async function izgradiOdgovorKataloga(
     izgradiStavkuKataloga(d, { zavrseni, awardedXpPoId: awardedXp }),
   );
 
+  const zavrseniAktivni = [...zavrseni].filter((id): id is IdIzazova => jeIdIzazova(id));
   const napredak: NapredakIzazovaDto = {
-    zavrseniChallengeIds: [...zavrseni].filter((id): id is IdIzazova =>
-      KATALOG_IZAZOVA.some((d) => d.id === id),
-    ),
-    aktivniPokusaj: aktivni
+    zavrseniChallengeIds: zavrseniAktivni,
+    aktivniPokusaj: aktivni && jeIdIzazova(aktivni.challengeId)
       ? {
         attemptId: aktivni.id,
-        challengeId: aktivni.challengeId as IdIzazova,
+        challengeId: aktivni.challengeId,
         status: aktivni.status as StatusPokusajaIzazova,
         partijaId: aktivni.partijaId,
       }
       : null,
     izazivacZvjezdice: izracunajZvjezdiceIzazivaca(zavrseni),
+    leveli: izgradiAgregateLevela(zavrseni),
   };
 
   return {
@@ -136,11 +147,15 @@ export function napraviSnapshot(definicija: DefinicijaIzazova): SnapshotPokusaja
     challengeId: definicija.id,
     definitionVersion: VERZIJA_DEFINICIJE_IZAZOVA,
     naziv: definicija.naziv,
+    level: definicija.level,
+    format: definicija.format,
+    varijanta: definicija.varijanta,
     mod: definicija.mod,
     pravila: definicija.pravila,
     profileId: definicija.profileId,
     botProfileVersion: VERZIJA_PROFILA_BOTA,
     turnDurationMs: definicija.turnDurationMs,
+    botTurnDurationMs: definicija.botTurnDurationMs,
     brojIgraca: definicija.brojIgraca,
     ciljevi: { ...definicija.ciljevi },
     xp: definicija.xp,
