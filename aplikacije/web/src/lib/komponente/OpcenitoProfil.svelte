@@ -18,9 +18,8 @@
     dnk: DnkProfil & { metrike: DnkMetrike };
     odigraneJavne: number;
     pobjedeJavne: number;
-    odigrane2p: number;
-    odigrane3p: number;
-    odigrane4p: number;
+    /** Broj Brzih igara (Troboj); zasebno od ukupnog javnog broja. */
+    odigraneBrzaIgra: number;
     prosjecnaOcjenaIgre: number | null;
     /** „Tvoj Kaladont DNK” na vlastitom, „Kaladont DNK” na javnom. */
     naslovDnk?: string;
@@ -30,9 +29,7 @@
     dnk,
     odigraneJavne,
     pobjedeJavne,
-    odigrane2p,
-    odigrane3p,
-    odigrane4p,
+    odigraneBrzaIgra,
     prosjecnaOcjenaIgre,
     naslovDnk = 'Kaladont DNK',
   }: Props = $props();
@@ -52,8 +49,8 @@
       <span class="stat-naziv">Odigrane javne igre</span>
     </div>
     <div class="stat-kartica">
-      <span class="stat-broj">{odigrane2p} / {odigrane3p} / {odigrane4p}</span>
-      <span class="stat-naziv">Dvoboj / Troboj / Četveroboj</span>
+      <span class="stat-broj">{odigraneBrzaIgra}</span>
+      <span class="stat-naziv">Brza igra (Troboj)</span>
     </div>
     <div class="stat-kartica">
       <span class="stat-broj">{pobjedeJavne}</span>

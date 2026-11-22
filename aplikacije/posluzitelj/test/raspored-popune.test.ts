@@ -24,7 +24,7 @@ describe('povrat namjere reda nakon neuspjelog početka', () => {
     });
     const servis = registrirajRedCekanja(io as unknown as KaladontIo, (stol) => {
       pocetci.push(stol);
-      for (const socket of io.sockets.sockets.values()) socket.leave('red-cekanja-2-zajednicki');
+      for (const socket of io.sockets.sockets.values()) socket.leave('red-cekanja-3-klasicni');
       oznaciPocetak();
       return new Promise<RezultatPokretanja>((resolve) => { dovrsiPokusaj = resolve; });
     }, () => false, () => false, () => true, async () => null, () => true, () => undefined);
@@ -32,11 +32,11 @@ describe('povrat namjere reda nakon neuspjelog početka', () => {
       await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
       const podaci = http.address();
       const adresa = `http://127.0.0.1:${typeof podaci === 'object' && podaci ? podaci.port : 0}`;
-      for (let indeks = 0; indeks < 2; indeks += 1) {
+      for (let indeks = 0; indeks < 3; indeks += 1) {
         const socket = spojiSocket(adresa, { forceNew: true });
         await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); });
         klijenti.push(socket);
-        await new Promise<StanjeReda>((resolve) => socket.emit('red:udji', { mod: 'dva_igraca' }, resolve));
+        await new Promise<StanjeReda>((resolve) => socket.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' }, resolve));
       }
       await zapoceo;
       const prvi = klijenti[0]!;
@@ -48,7 +48,7 @@ describe('povrat namjere reda nakon neuspjelog početka', () => {
       }
       const drugiStanje = new Promise<StanjeReda>((resolve) => {
         const slusaj = (stanje: StanjeReda) => {
-          if (stanje.mjesta.filter(Boolean).length !== (izlazi ? 1 : 2)) return;
+          if (stanje.mjesta.filter(Boolean).length !== (izlazi ? 2 : 3)) return;
           klijenti[1]!.off('red:stanje', slusaj);
           resolve(stanje);
         };
@@ -56,8 +56,8 @@ describe('povrat namjere reda nakon neuspjelog početka', () => {
       });
       dovrsiPokusaj('greska');
       const stanje = await (izlazi ? drugiStanje : stanjeNakon);
-      expect(stanje.mjesta.filter(Boolean)).toHaveLength(izlazi ? 1 : 2);
-      expect(io.sockets.sockets.get(prvi.id!)?.rooms.has('red-cekanja-2-zajednicki')).toBe(!izlazi);
+      expect(stanje.mjesta.filter(Boolean)).toHaveLength(izlazi ? 2 : 3);
+      expect(io.sockets.sockets.get(prvi.id!)?.rooms.has('red-cekanja-3-klasicni')).toBe(!izlazi);
       if (!izlazi) {
         const ponovniPocetak = new Promise<void>((resolve) => { oznaciPocetak = resolve; });
         await ponovniPocetak;
@@ -207,19 +207,20 @@ describe('pragovi popune', () => {
     expect(dopustenoBotova(0, 29_999, PRAGOVI_POPUNE_MS.dva_igraca)).toBe(0);
     expect(dopustenoBotova(0, 30_000, PRAGOVI_POPUNE_MS.dva_igraca)).toBe(1);
     const troboj = PRAGOVI_POPUNE_MS.tri_igraca;
-    expect(dopustenoBotova(0, 19_999, troboj)).toBe(0);
-    expect(dopustenoBotova(0, 20_000, troboj)).toBe(1);
-    expect(dopustenoBotova(0, 29_999, troboj)).toBe(1);
-    expect(dopustenoBotova(0, 30_000, troboj)).toBe(2);
+    expect(troboj).toEqual([10_000, 20_000]);
+    expect(dopustenoBotova(0, 9_999, troboj)).toBe(0);
+    expect(dopustenoBotova(0, 10_000, troboj)).toBe(1);
+    expect(dopustenoBotova(0, 19_999, troboj)).toBe(1);
+    expect(dopustenoBotova(0, 20_000, troboj)).toBe(2);
   });
 });
 
 describe('popuna reda', () => {
-  it('troboj: jedan čovjek dobiva botove točno na 20/30 s', async () => {
+  it('troboj: jedan čovjek dobiva botove točno na 10/20 s', async () => {
     const o = okolina('tri_igraca');
     o.red.udji(covjek('h1', o.sada));
     o.popuna.osvjezi();
-    await o.tik(19_999);
+    await o.tik(9_999);
     expect(o.popuna.rezerviraniBotovi()).toHaveLength(0);
     await o.tik(1);
     expect(o.popuna.rezerviraniBotovi()).toHaveLength(1);

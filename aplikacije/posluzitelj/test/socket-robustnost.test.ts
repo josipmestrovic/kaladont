@@ -251,15 +251,17 @@ describe('Socket.IO robusnost', () => {
     const { proces, adresa: adresaChilda } = await pokreniChildPosluzitelj();
     const tokenPrvog = `gost.${randomUUID().replaceAll('-', '')}`;
     const tokenDrugog = `gost.${randomUUID().replaceAll('-', '')}`;
+    const tokenTreceg = `gost.${randomUUID().replaceAll('-', '')}`;
     let prvi: ClientSocket | undefined;
     let drugi: ClientSocket | undefined;
+    let treci: ClientSocket | undefined;
 
     try {
       prvi = await spojiNa(adresaChilda, tokenPrvog);
       const igracIdPrvog = await igracIdZaToken(tokenPrvog);
       let brojPozivaAcka = 0;
       const ack = new Promise<unknown>((resolve) => {
-        prvi!.emit('red:udji', { mod: 'dva_igraca' }, (stanje: unknown) => {
+        prvi!.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' }, (stanje: unknown) => {
           brojPozivaAcka += 1;
           resolve(stanje);
         });
@@ -268,7 +270,7 @@ describe('Socket.IO robusnost', () => {
       expect(brojPozivaAcka).toBe(1);
 
       const nevaljanAck = cekajSocketDogadaj<{ kod: string }>(prvi, 'greska');
-      prvi.emit('red:udji', { mod: 'dva_igraca' }, { nijeFunkcija: true });
+      prvi.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' }, { nijeFunkcija: true });
       expect(await nevaljanAck).toMatchObject({ kod: 'NEVALJAN_PAYLOAD' });
       expect(proces.exitCode).toBeNull();
 
@@ -277,44 +279,64 @@ describe('Socket.IO robusnost', () => {
       expect((await zdravlje.json()).ok).toBe(true);
 
       drugi = await spojiNa(adresaChilda, tokenDrugog);
+      treci = await spojiNa(adresaChilda, tokenTreceg);
       const igracIdDrugog = await igracIdZaToken(tokenDrugog);
+      const igracIdTreceg = await igracIdZaToken(tokenTreceg);
+      const idZaSocket = new Map<string, ClientSocket>([
+        [igracIdPrvog, prvi],
+        [igracIdDrugog, drugi],
+        [igracIdTreceg, treci],
+      ]);
       const pocetakPrvog = cekajSocketDogadaj<{ partijaId: string }>(prvi, 'partija:pocetak');
       const pocetakDrugog = cekajSocketDogadaj<{ partijaId: string }>(drugi, 'partija:pocetak');
+      const pocetakTreceg = cekajSocketDogadaj<{ partijaId: string }>(treci, 'partija:pocetak');
       const rundaPrvog = cekajSocketDogadaj<RundaOtvorena>(prvi, 'partija:runda-otvorena');
-      const rundaDrugog = cekajSocketDogadaj<RundaOtvorena>(drugi, 'partija:runda-otvorena');
-      drugi.emit('red:udji', { mod: 'dva_igraca' });
+      drugi.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
+      treci.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
 
-      const [, , prvaRunda] = await Promise.all([pocetakPrvog, pocetakDrugog, rundaPrvog]);
-      const drugaRunda = await rundaDrugog;
+      const [, , , prvaRunda] = await Promise.all([pocetakPrvog, pocetakDrugog, pocetakTreceg, rundaPrvog]);
       expect(proces.exitCode).toBeNull();
-      expect(prvaRunda.rijec).toBe(drugaRunda.rijec);
 
-      const aktivni = prvaRunda.naPotezuId === igracIdPrvog ? prvi : drugi;
-      const aktivniIgracId = aktivni === prvi ? igracIdPrvog : igracIdDrugog;
+      const aktivniIgracId = prvaRunda.naPotezuId;
+      const aktivni = idZaSocket.get(aktivniIgracId);
+      expect(aktivni).toBeDefined();
       const rijec = await pronadjiIgrivuRijec(prvaRunda.trazenaSlova, prvaRunda.rijec);
-      const prihvacen = new Promise<{ igracId: string; rijec: string }>((resolve) => {
-        const handler = (payload: { igracId: string; rijec: string }) => {
+      const prihvacen = new Promise<{ igracId: string; rijec: string; sljedeciId: string }>((resolve) => {
+        const handler = (payload: { igracId: string; rijec: string; sljedeciId: string }) => {
           if (payload.igracId !== aktivniIgracId) return;
-          aktivni.off('potez:prihvacen', handler);
+          aktivni!.off('potez:prihvacen', handler);
           resolve(payload);
         };
-        aktivni.on('potez:prihvacen', handler);
+        aktivni!.on('potez:prihvacen', handler);
       });
-      aktivni.emit('potez:rijec', { rijec, turnToken: prvaRunda.turnToken });
-      expect(await prihvacen).toMatchObject({ igracId: aktivniIgracId, rijec });
+      aktivni!.emit('potez:rijec', { rijec, turnToken: prvaRunda.turnToken });
+      const prihvaceniPotez = await prihvacen;
+      expect(prihvaceniPotez).toMatchObject({ igracId: aktivniIgracId, rijec });
 
       const stanjePrvog = cekajSocketDogadaj<{ naPotezuId: string }>(prvi, 'partija:stanje');
       const stanjeDrugog = cekajSocketDogadaj<{ naPotezuId: string }>(drugi, 'partija:stanje');
       prvi.emit('partija:stanje');
       drugi.emit('partija:stanje');
       const [novoStanjePrvog, novoStanjeDrugog] = await Promise.all([stanjePrvog, stanjeDrugog]);
-      const igracNaPotezu = novoStanjePrvog.naPotezuId === igracIdPrvog ? prvi : drugi;
       expect(novoStanjePrvog.naPotezuId).toBe(novoStanjeDrugog.naPotezuId);
+      expect(novoStanjePrvog.naPotezuId).toBe(prihvaceniPotez.sljedeciId);
 
       const krajPrvog = cekajSocketDogadaj(prvi, 'partija:kraj');
       const krajDrugog = cekajSocketDogadaj(drugi, 'partija:kraj');
-      igracNaPotezu.emit('potez:ne-znam');
-      await Promise.all([krajPrvog, krajDrugog]);
+      const krajTreceg = cekajSocketDogadaj(treci, 'partija:kraj');
+      let naPotezuId = prihvaceniPotez.sljedeciId;
+      for (let i = 0; i < 3; i += 1) {
+        const naPotezu = idZaSocket.get(naPotezuId);
+        if (!naPotezu) break;
+        const sljedeci = cekajSocketDogadaj<{ naPotezuId: string; runda: number }>(prvi, 'partija:runda-otvorena');
+        naPotezu.emit('potez:ne-znam');
+        const ishod = await Promise.race([
+          Promise.all([krajPrvog, krajDrugog, krajTreceg]).then(() => ({ vrsta: 'kraj' as const })),
+          sljedeci.then((nova) => ({ vrsta: 'runda' as const, naPotezuId: nova.naPotezuId })),
+        ]);
+        if (ishod.vrsta === 'kraj') break;
+        naPotezuId = ishod.naPotezuId;
+      }
 
       const zdravljeNakonPoteza = await fetch(`${adresaChilda}/zdravlje`, { headers: { connection: 'close' } });
       expect(zdravljeNakonPoteza.status).toBe(200);
@@ -322,6 +344,7 @@ describe('Socket.IO robusnost', () => {
     } finally {
       prvi?.disconnect();
       drugi?.disconnect();
+      treci?.disconnect();
       await zaustaviChild(proces);
     }
   }, 180_000);

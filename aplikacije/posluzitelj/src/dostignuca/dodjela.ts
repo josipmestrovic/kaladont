@@ -5,6 +5,7 @@ import {
   ID_DOSTIGNUCA_TJEDAN_POD_KONTROLOM,
   dohvatiDefinicijuDostignuca,
   izracunajRazinuDostignuca,
+  jeDostignuceOstvarivo,
   type NovoDostignuce,
   type ObavijestOtkljucanogDostignuca,
 } from 'zajednicko';
@@ -238,6 +239,9 @@ async function uvecajBrojac(tx: MisijeTx, igracId: string, brojac: ServisniBroja
  * Ponovljeni dokaz je no-op (ON CONFLICT DO NOTHING).
  */
 export async function dodijeliDoprinos(tx: MisijeTx, parametri: ParametriDodjele): Promise<IshodDodjele> {
+  // Deaktivirana dostignuća: ne umeći nove dokaze ni popupove (povijesni zapisi ostaju).
+  if (!jeDostignuceOstvarivo(parametri.dostignuceId)) return prazanIshod();
+
   const umetnuto = await umetniDokaz(tx, parametri);
   if (umetnuto.length === 0) return prazanIshod();
 

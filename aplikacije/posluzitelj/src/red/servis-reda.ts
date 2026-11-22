@@ -8,8 +8,10 @@
  */
 import type { KljucJavnogReda, ModPartije, PravilnikPartije, StanjeReda } from 'zajednicko';
 import {
+  BRZA_IGRA,
   izracunajRangIzAgregata,
   javnaSjedalaZaMod,
+  jeJavnaKombinacijaAktivna,
   kanonskaPravilaZaKljuc,
   KLJUCEVI_JAVNOG_REDA,
   kljucJavnogReda,
@@ -19,6 +21,7 @@ import {
   stanjeIskustva,
   ZADANI_PRAVILNIK,
 } from 'zajednicko';
+
 import { z } from 'zod';
 import type { KaladontIo } from '../server.js';
 import { RedCekanja, prvihN, type StavkaReda } from './red-cekanja.js';
@@ -34,6 +37,9 @@ const ShemaPayloadReda = z.object({
   pravila: z.enum(PRAVILNICI_PARTIJE).optional(),
 }).strict().optional();
 const PORUKA_NEVALJANOG_PAYLOADA = 'Poslana poruka nije ispravna.';
+const PORUKA_JAVNI_RED_NEDOSTUPAN =
+  'Ovaj javni red trenutačno nije dostupan. Otvori Brzu igru (Troboj · Klasična pravila).';
+
 
 function sobaZaKljuc(kljuc: KljucJavnogReda): string {
   return `red-cekanja-${kljuc}`;
@@ -42,11 +48,22 @@ function sobaZaKljuc(kljuc: KljucJavnogReda): string {
 function razrijesiUlazReda(payload: { mod?: string; pravila?: PravilnikPartije } | undefined):
   | { ok: true; mod: ModPartije; pravila: PravilnikPartije; kljuc: KljucJavnogReda }
   | { ok: false } {
+  // Prazan ulaz → kanonska Brza igra. Eksplicitni stari mod/pravilnik ostaje i prolazi kroz allow-list.
+  if (!payload?.mod && !payload?.pravila) {
+    return {
+      ok: true,
+      mod: BRZA_IGRA.mod,
+      pravila: BRZA_IGRA.pravila,
+      kljuc: BRZA_IGRA.kljucReda,
+    };
+  }
   const mod: ModPartije =
     payload?.mod === 'dva_igraca' ? 'dva_igraca'
       : payload?.mod === 'tri_igraca' ? 'tri_igraca'
-        : 'cetiri_igraca';
-  const pravila = payload?.pravila ?? ZADANI_PRAVILNIK;
+        : payload?.mod === 'cetiri_igraca' ? 'cetiri_igraca'
+          : BRZA_IGRA.mod;
+  const pravila = payload?.pravila
+    ?? (mod === BRZA_IGRA.mod ? BRZA_IGRA.pravila : ZADANI_PRAVILNIK);
   return { ok: true, mod, pravila, kljuc: kljucJavnogReda(mod, pravila) };
 }
 
@@ -298,6 +315,10 @@ export function registrirajRedCekanja(
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: PORUKA_NEVALJANOG_PAYLOADA });
         return;
       }
+      if (!jeJavnaKombinacijaAktivna(ulaz.mod, ulaz.pravila)) {
+        socket.emit('greska', { kod: 'JAVNI_RED_NEDOSTUPAN', poruka: PORUKA_JAVNI_RED_NEDOSTUPAN });
+        return;
+      }
       socket.emit('red:stanje', izracunajStanje(socket.data.igracId, ulaz.kljuc, ulaz.pravila));
     }));
 
@@ -324,6 +345,11 @@ export function registrirajRedCekanja(
       const ulaz = razrijesiUlazReda(rezultat.data);
       if (!ulaz.ok) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: PORUKA_NEVALJANOG_PAYLOADA });
+        potvrda?.(null);
+        return;
+      }
+      if (!jeJavnaKombinacijaAktivna(ulaz.mod, ulaz.pravila)) {
+        socket.emit('greska', { kod: 'JAVNI_RED_NEDOSTUPAN', poruka: PORUKA_JAVNI_RED_NEDOSTUPAN });
         potvrda?.(null);
         return;
       }

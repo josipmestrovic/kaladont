@@ -19,25 +19,36 @@ export async function stvoriIgrace(browser: Browser, broj: number): Promise<E2EI
   return dodajIgrace(browser, broj);
 }
 
-/** PR14: podržava Troboj i optional `pravila` (default KA-ZNA na serveru ako izostane). */
-export async function udjiUJavniRed(
-  igraci: readonly E2EIgrac[],
-  mod: 'dva_igraca' | 'tri_igraca' | 'cetiri_igraca',
-  pravila?: 'klasicni' | 'ka_zna' | 'dokazi_nastavak',
-) {
-  const query = pravila
-    ? `/red?mod=${mod}&pravila=${pravila}`
-    : `/red?mod=${mod}`;
-  await Promise.all(igraci.map(async (igrac) => {
+/** Javni red je samo Brza igra (Troboj · Klasični). */
+export async function udjiUJavniRed(igraci: readonly E2EIgrac[]) {
+  if (igraci.length < 1 || igraci.length > 3) {
+    throw new Error(`Brza igra (Troboj) prima 1–3 igrača u javni red, dobiveno ${igraci.length}.`);
+  }
+  const query = '/red?mod=tri_igraca&pravila=klasicni';
+  // Ulaz jedan-po-jedan: paralelni goto ostavlja stol na 1–2. Treći igrač može odmah
+  // otići u /partija — zato prihvaćamo lobby ILI partiju, ne samo sjedalo.
+  for (const igrac of igraci) {
     await igrac.stranica.goto(query);
-  }));
+    await expect
+      .poll(
+        async () => {
+          if (/\/partija\/[0-9a-f-]+$/.test(igrac.stranica.url())) return 'partija';
+          if (await igrac.stranica.locator('ul.mjesta > li.moje-sjedalo').isVisible().catch(() => false)) {
+            return 'lobby';
+          }
+          return 'ceka';
+        },
+        { timeout: 10_000 },
+      )
+      .not.toBe('ceka');
+  }
 }
 
 export async function cekajIstuPartiju(igraci: readonly E2EIgrac[]): Promise<string> {
   const partijaIdovi = await Promise.all(
     igraci.map(async ({ stranica }) => {
-      // CI matchmaking + bot fill često treba više od zadanog Playwright 5s.
-      await expect(stranica).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 30_000 });
+      // Troboj s 3 čovjeka mora odmah krenuti; 15s je dovoljno bez bot-fill čekanja.
+      await expect(stranica).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 15_000 });
       return new URL(stranica.url()).pathname.split('/').at(-1)!;
     }),
   );

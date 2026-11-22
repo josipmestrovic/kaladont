@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { dohvatiSocket } from '$lib/socket.js';
   import Zanimljivosti from '$lib/komponente/Zanimljivosti.svelte';
@@ -10,31 +9,25 @@
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
   import type { ModPartije, PayloadGreska, PocetakPartije, PravilnikPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
-  import { javnaSjedalaZaMod, jePoznatiPravilnik, ZADANI_PRAVILNIK } from 'zajednicko';
-  import { nazivFormata, nazivPravilnika } from '$lib/igraj-rute.js';
+  import { BRZA_IGRA, javnaSjedalaZaMod } from 'zajednicko';
+  import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
 
+  let { data } = $props();
   const igra = dohvatiStanjeIgre();
 
-  /** PR14: /red?mod=&pravila= — stare adrese bez pravila → KA-ZNA. */
-  const trazeneMod = $derived(((): ModPartije => {
-    const mod = $page.url.searchParams.get('mod');
-    if (mod === 'dva_igraca') return 'dva_igraca';
-    if (mod === 'tri_igraca') return 'tri_igraca';
-    return 'cetiri_igraca';
-  })());
-  const trazenaPravila = $derived(((): PravilnikPartije => {
-    const pravila = $page.url.searchParams.get('pravila');
-    return jePoznatiPravilnik(pravila) ? pravila : ZADANI_PRAVILNIK;
-  })());
+  /** Javni lobby je uvijek Brza igra (kanonski URL dolazi iz +page.ts). */
+  const trazeneMod = $derived(BRZA_IGRA.mod satisfies ModPartije);
+  const trazenaPravila = $derived(BRZA_IGRA.pravila satisfies PravilnikPartije);
   const ukupnoMjesta = $derived(javnaSjedalaZaMod(trazeneMod));
 
   let stanje = $state<StanjeReda>({
     mojIgracId: '',
-    mod: 'cetiri_igraca',
-    mjesta: [null, null, null, null],
+    mod: BRZA_IGRA.mod,
+    mjesta: [null, null, null],
     prosjekCekanjaSek: 0,
   });
   let poruka = $state<string | null>(null);
+  let obavijestLegacy = $state<string | null>(null);
   let countdown = $state<number | null>(null);
   let stanjeUcitano = $state(false);
   let odbrojavanjePartije: ReturnType<typeof setInterval> | null = null;
@@ -45,16 +38,8 @@
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
   const preostaloIgraca = $derived(Math.max(0, ukupnoMjesta - brojIgraca));
   const stanjeUskladjeno = $derived(stanje.mod === trazeneMod);
-  // HINT PR14: u spojenom Dvoboju svaki vidi svoj odabir kartice, ne stolov kanonski pravilnik.
-  const prikazPravilnika = $derived(((): PravilnikPartije => {
-    const moje = stanje.mjesta.find((m) => m?.igracId === stanje.mojIgracId);
-    if (moje?.odabranaPravila && jePoznatiPravilnik(moje.odabranaPravila)) return moje.odabranaPravila;
-    if (stanje.pravila && jePoznatiPravilnik(stanje.pravila)) return stanje.pravila;
-    return trazenaPravila;
-  })());
-  const naslovLobbyja = $derived(
-    `${nazivPravilnika(prikazPravilnika)} · ${nazivFormata(trazeneMod)}`,
-  );
+  const naslovLobbyja = 'Brza igra · Troboj · Klasična pravila';
+  const objasnjenjeLobbyja = 'Igra utječe na rang i mjesto na ljestvici.';
 
   function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {
     if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
@@ -85,6 +70,10 @@
   }
 
   onMount(() => {
+    if (data.obavijestLegacy) {
+      obavijestLegacy = 'Ovaj način više nije dostupan kao javna igra. Premješteni ste u Brzu igru.';
+    }
+
     zagrijGameplayZvukove();
     pokreniSlusateljeIgre();
     const socket = dohvatiSocket();
@@ -113,6 +102,15 @@
         cekanjeStanjaTimeout = null;
         ulazakPoslan = false;
         void goto('/potvrdi-email');
+        return;
+      }
+      if (greska.kod === 'JAVNI_RED_NEDOSTUPAN') {
+        if (cekanjeStanjaTimeout) clearTimeout(cekanjeStanjaTimeout);
+        cekanjeStanjaTimeout = null;
+        ulazakPoslan = false;
+        poruka = greska.poruka;
+        stanjeUcitano = true;
+        void goto(putanjaBrzeIgre());
         return;
       }
       poruka = greska.poruka;
@@ -210,10 +208,15 @@
 {#if countdown !== null}
   <h1 aria-live="polite">Svi igrači su tu! Igra kreće za {countdown}…</h1>
 {:else}
-  <h1>Čekamo još {preostaloIgraca} {preostaloIgraca === 1 ? (trazeneMod === 'dva_igraca' ? 'igrača' : 'igrač') : 'igrača'}...</h1>
+  <h1>Čekamo još {preostaloIgraca} {preostaloIgraca === 1 ? 'igrač' : 'igrača'}...</h1>
 {/if}
 
 <p class="oznaka-izbora" data-testid="red-oznaka-izbora">{naslovLobbyja}</p>
+<p class="objasnjenje-reda">{objasnjenjeLobbyja}</p>
+
+{#if obavijestLegacy}
+  <p role="status">{obavijestLegacy}</p>
+{/if}
 
 {#if poruka}
   <p role="alert">{poruka}</p>
@@ -243,6 +246,7 @@
         <div class="podaci">
           <strong>
             {mjesto.nadimak}
+            {#if mjesto.jeBot}<span class="oznaka-bot">BOT</span>{/if}
             {#if mjesto.igracId === stanje.mojIgracId}<span class="oznaka-ti">TI</span>{/if}
           </strong>
           {#if !mjesto.jeBot}
@@ -293,7 +297,8 @@
     background: var(--boja-povrsina-2);
   }
 
-  .oznaka-ti {
+  .oznaka-ti,
+  .oznaka-bot {
     display: inline-block;
     margin-left: 6px;
     padding: 2px 6px;
@@ -304,6 +309,17 @@
     line-height: 1;
     letter-spacing: 0.04em;
     vertical-align: middle;
+  }
+
+  .oznaka-bot {
+    background: var(--boja-tekst-sekundarni);
+    color: var(--boja-povrsina);
+  }
+
+  .objasnjenje-reda {
+    margin: 0 0 8px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mali);
   }
 
   .mjesta li.prazno-mjesto {

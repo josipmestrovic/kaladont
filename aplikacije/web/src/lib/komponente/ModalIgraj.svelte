@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * Igraj: način dolazi s naslovnice → pravilnik → format (Ranked) ili profil + broj botova (Zagrijavanje).
-   * HINT: Troboj bez ikone (tekst „Troboj · 3 igrača”) dok vlasnik ne dostavi asset.
+   * Trening modal: pravilnik → profil → broj botova.
+   * Ranked / Brza igra više ne koriste ovaj modal (izravni ulaz u red).
    */
   import { onMount } from 'svelte';
   import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko';
@@ -40,7 +40,7 @@
     { broj: 3 as const, naziv: 'Igraj s 3 bota' },
   ];
 
-  const nazivNacina = $derived(nacin === 'laganini' ? 'Zagrijavanje' : 'Ranked');
+  const nazivNacina = $derived(nacin === 'laganini' ? 'Trening' : 'Brza igra');
 
   $effect(() => {
     if (otvoren) {
@@ -167,7 +167,7 @@
         </div>
         <button type="button" class="natrag-modal" onclick={natrag}>Natrag</button>
       {:else if korak === 'profil' && odabranaPravila}
-        <p class="modal-nadnaslov">Zagrijavanje · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv}</p>
+        <p class="modal-nadnaslov">Trening · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv}</p>
         <h2 id="modal-naslov">Odaberi težinu bota</h2>
         <div class="modal-opcije">
           {#each PROFILI_BOTA_IZAZOVA as profil (profil)}
@@ -185,7 +185,7 @@
         <button type="button" class="natrag-modal" onclick={natrag}>Natrag</button>
       {:else if korak === 'botovi' && odabranaPravila}
         <p class="modal-nadnaslov">
-          Zagrijavanje · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv} · {NAZIVI_PROFILA_BOTA[odabraniProfil]}
+          Trening · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv} · {NAZIVI_PROFILA_BOTA[odabraniProfil]}
         </p>
         <h2 id="modal-naslov">Koliko botova želiš?</h2>
         <div class="modal-opcije">

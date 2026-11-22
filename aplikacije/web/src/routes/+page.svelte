@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { NAJNOVIJE_IZDANJE, urlIzdanja } from '$lib/izdanja.js';
   import { ucitajModalIgraAsete, urlAseta } from '$lib/asetovi-core.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
+  import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
   import ModalIgraj from '$lib/komponente/ModalIgraj.svelte';
   import PopupNovihMisija from '$lib/komponente/PopupNovihMisija.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
@@ -17,10 +19,14 @@
 
   const registriran = jeRegistriranKorisnik();
   let otvoreniModal = $state(false);
-  let nacinModala = $state<'natjecateljski' | 'laganini'>('natjecateljski');
 
-  function otvoriModal(nacin: 'natjecateljski' | 'laganini' = 'natjecateljski') {
-    nacinModala = nacin;
+  function idiUBrzuIgru() {
+    zabiljeziUmamiDogadjaj('igraj-klik');
+    zagrijGameplayZvukove();
+    void goto(putanjaBrzeIgre());
+  }
+
+  function otvoriTrening() {
     otvoreniModal = true;
     zabiljeziUmamiDogadjaj('igraj-klik');
     ucitajModalIgraAsete();
@@ -28,8 +34,8 @@
   }
 
   onMount(() => {
-    // HINT: ?igraj=1 otvara modal na pravilnicima (zadano Ranked).
-    if ($page.url.searchParams.get('igraj') === '1') otvoriModal('natjecateljski');
+    // ?igraj=1 → izravno Brza igra (bez modala).
+    if ($page.url.searchParams.get('igraj') === '1') idiUBrzuIgru();
   });
 </script>
 
@@ -56,12 +62,13 @@
         <button
           type="button"
           class="navigacijska-stavka primarna"
-          aria-label="Ranked"
-          onclick={() => otvoriModal('natjecateljski')}
+          aria-label="Brza igra"
+          data-testid="naslovnica-brza-igra"
+          onclick={idiUBrzuIgru}
         >
           <span class="stavka-tekst" aria-hidden="true">
-            <strong>Ranked</strong>
-            <small>Igraj za rang i mjesto na ljestvici.</small>
+            <strong>Brza igra</strong>
+            <small>Igraj brzu igru u troje. Ako trenutno nema igrača, spojit ćemo te s botovima.</small>
           </span>
           <img
             class="ikona-stavke"
@@ -75,7 +82,7 @@
         <a href="/izazovi" class="navigacijska-stavka" aria-label="Izazovi" data-testid="naslovnica-izazovi">
           <span class="stavka-tekst" aria-hidden="true">
             <strong>Izazovi</strong>
-            <small>Kampanja protiv računala.</small>
+            <small>Okušaj se u sve težim izazovima i pokaži imaš li znanje za pobjedu nad računalom.</small>
           </span>
           <img
             class="ikona-stavke"
@@ -89,12 +96,13 @@
         <button
           type="button"
           class="navigacijska-stavka"
-          aria-label="Zagrijavanje"
-          onclick={() => otvoriModal('laganini')}
+          aria-label="Trening"
+          data-testid="naslovnica-trening"
+          onclick={otvoriTrening}
         >
           <span class="stavka-tekst" aria-hidden="true">
-            <strong>Zagrijavanje</strong>
-            <small>Igraj protiv računala.</small>
+            <strong>Trening</strong>
+            <small>Vježbaj protiv računala, odaberi težinu i pravila te izbrusi svoju igru bez pritiska.</small>
           </span>
           <img
             class="ikona-stavke"
@@ -108,7 +116,7 @@
         <a href="/soba/kreiraj" class="navigacijska-stavka" aria-label="Privatna soba">
           <span class="stavka-tekst" aria-hidden="true">
             <strong>Privatna soba</strong>
-            <small>Pozovi prijatelje preko linka.</small>
+            <small>Okupi svoju ekipu, podijeli poveznicu i zaigrajte zajedno po pravilima koja odaberete.</small>
           </span>
           <img
             class="ikona-stavke"
@@ -150,7 +158,7 @@
   <PopupNovihMisija />
 {/if}
 
-<ModalIgraj otvoren={otvoreniModal} nacin={nacinModala} onZatvori={() => (otvoreniModal = false)} />
+<ModalIgraj otvoren={otvoreniModal} nacin="laganini" onZatvori={() => (otvoreniModal = false)} />
 
 <style>
   /* Centriran landing; naslov (h1) je u Headeru kao logo. */

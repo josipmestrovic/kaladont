@@ -5,11 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import {
-  ID_DOSTIGNUCA_DVOSTRUKA_KRUNA,
-  ID_DOSTIGNUCA_IMAM_NASTAVAK,
   ID_DOSTIGNUCA_NA_DVIJE_FRONTE,
   ID_DOSTIGNUCA_SALJI_DALJE,
-  ID_DOSTIGNUCA_STARA_SKOLA,
   ID_DOSTIGNUCA_TRECA_SRECA,
 } from 'zajednicko';
 import { baza } from '../src/baza/klijent.js';
@@ -170,9 +167,8 @@ describe('dostignuća PR13', () => {
 
     const prvi = await baza.transaction((tx) =>
       priznajImamNastavak(tx, { igracId, partijaId, uspjesniDokazi: 2, zavrsenoU }));
-    expect(prvi.novaDostignuca).toEqual([
-      { id: ID_DOSTIGNUCA_IMAM_NASTAVAK, novaRazina: 1, maksimalnaRazina: 5 },
-    ]);
+    expect(prvi.doprinosUmetnut).toBe(false);
+    expect(prvi.novaDostignuca).toEqual([]);
 
     const retry = await baza.transaction((tx) =>
       priznajImamNastavak(tx, { igracId, partijaId, uspjesniDokazi: 5, zavrsenoU }));
@@ -185,7 +181,7 @@ describe('dostignuća PR13', () => {
 
     const [napredak] = await baza.select({ n: napredakDostignucaIgraca.igreSDokazom })
       .from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracId));
-    expect(napredak?.n).toBe(1);
+    expect(napredak?.n ?? 0).toBe(0);
   });
 
   // --- Šalji dalje ---
@@ -281,7 +277,8 @@ describe('dostignuća PR13', () => {
       spojeniDvoboj: true,
       zavrsenoU,
     }));
-    expect(plus.novaDostignuca[0]?.id).toBe(ID_DOSTIGNUCA_STARA_SKOLA);
+    expect(plus.doprinosUmetnut).toBe(false);
+    expect(plus.novaDostignuca).toEqual([]);
 
     const klasicnaKartica = await novaPartija('dva_igraca', 'ka_zna', true);
     await baza.insert(ucinakPosebneRijeci).values({
@@ -316,7 +313,8 @@ describe('dostignuća PR13', () => {
 
     const sDvobojem = await baza.transaction((tx) =>
       priznajDnevnuPobjeduModa(tx, { igracId, mod: 'dva_igraca', zavrsenoU: dan }));
-    expect(sDvobojem.novaDostignuca[0]?.id).toBe(ID_DOSTIGNUCA_DVOSTRUKA_KRUNA);
+    expect(sDvobojem.doprinosUmetnut).toBe(false);
+    expect(sDvobojem.novaDostignuca).toEqual([]);
 
     const cetvrti = await baza.transaction((tx) =>
       priznajDnevnuPobjeduModa(tx, { igracId, mod: 'cetiri_igraca', zavrsenoU: dan }));
@@ -324,7 +322,7 @@ describe('dostignuća PR13', () => {
 
     const [napredak] = await baza.select({ n: napredakDostignucaIgraca.dvostrukeKrune })
       .from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracId));
-    expect(napredak?.n).toBe(1);
+    expect(napredak?.n ?? 0).toBe(0);
   });
 
   it('Dvostruka kruna: ponoć Zagreb razdvaja dane', async () => {
@@ -345,11 +343,11 @@ describe('dostignuća PR13', () => {
     expect(dan2.doprinosUmetnut).toBe(false);
     const dan2komplet = await baza.transaction((tx) =>
       priznajDnevnuPobjeduModa(tx, { igracId, mod: 'cetiri_igraca', zavrsenoU: poslije }));
-    expect(dan2komplet.doprinosUmetnut).toBe(true);
+    expect(dan2komplet.doprinosUmetnut).toBe(false);
 
     const [napredak] = await baza.select({ n: napredakDostignucaIgraca.dvostrukeKrune })
       .from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracId));
-    expect(napredak?.n).toBe(2);
+    expect(napredak?.n ?? 0).toBe(0);
   });
 
   // --- Na dvije fronte preispitivanje ---
@@ -385,11 +383,11 @@ describe('dostignuća PR13', () => {
     ]);
 
     const rezultat = await preispitajParoveNaDvijeFronte({ limit: 50, igracId });
-    expect(rezultat.has(igracId)).toBe(true);
+    expect(rezultat.has(igracId)).toBe(false);
 
     const [napredak] = await baza.select({ n: napredakDostignucaIgraca.naDvijeFronte })
       .from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracId));
-    expect(napredak?.n).toBe(1);
+    expect(napredak?.n ?? 0).toBe(0);
 
     // Idempotentno
     const ponovo = await preispitajParoveNaDvijeFronte({ limit: 50, igracId });

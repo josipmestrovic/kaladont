@@ -10,6 +10,7 @@ import {
 } from '../baza/shema.js';
 import { dnevneGranice, sljedecaPonocNakon, tjedneGranice, lokalniDatumIso } from './kalendar.js';
 import { izracunajNovosti, osigurajStanjeMisija } from './stanje.js';
+import { sistemskiZamijeniNeostvariveMisije } from './sistemska-zamjena.js';
 import type { MisijeSatRng, MisijeTx, PodstanjeMisije, SnapshotMisije } from './tipovi.js';
 import { zadaniSatRng } from './tipovi.js';
 
@@ -76,6 +77,7 @@ export async function izgradiStanjeMisijaDto(
 ): Promise<StanjeMisijaDto> {
   const sada = satRng.sada();
   await osigurajStanjeMisija(tx, igracId, satRng);
+  await sistemskiZamijeniNeostvariveMisije(tx, igracId, satRng);
   const [stanje] = await tx.select().from(stanjeMisijaIgraca).where(eq(stanjeMisijaIgraca.igracId, igracId));
   if (!stanje) throw new Error('Stanje misija nedostaje.');
 

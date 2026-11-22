@@ -1,11 +1,11 @@
 /**
- * URL-ovi i oznake za Igraj (način na naslovnici → pravilnik → format ili botovi/profil).
- * HINT: Natjecateljski: 9 UI izbora → 8 serverskih redova (Klasični+KA-ZNA Dvoboj dijele `2-zajednicki`).
- * HINT: Troboj ikona dolazi naknadno — kartica je tekstualna („Troboj · 3 igrača”).
+ * URL-ovi i oznake za Igraj (Brza igra / Trening / privatna).
+ * Javni ulaz: samo Brza igra (Troboj · Klasični). Trening zadržava pravilnik + botove.
  */
 import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko';
 import {
-  jePoznatiMod,
+  BRZA_IGRA,
+  jeJavnaKombinacijaAktivna,
   jePoznatiPravilnik,
   jePoznatiProfilBota,
   NAZIVI_PROFILA_BOTA,
@@ -13,6 +13,7 @@ import {
   ZADANI_PRAVILNIK,
   ZADANI_PROFIL_TRENINGA,
 } from 'zajednicko';
+
 
 /** Doslovni tekstovi kartica pravilnika (pregled + PR14). */
 export const TEKSTOVI_PRAVILNIKA: Readonly<
@@ -76,10 +77,15 @@ export function opisFormata(mod: ModPartije): string {
 }
 
 export function putanjaJavnogReda(mod: ModPartije, pravila: PravilnikPartije): string {
+  if (!jeJavnaKombinacijaAktivna(mod, pravila)) return BRZA_IGRA.putanja;
   return `/red?mod=${encodeURIComponent(mod)}&pravila=${encodeURIComponent(pravila)}`;
 }
 
-/** Glavni UI Zagrijavanje — pravila + broj botova (1–3) + profil. */
+export function putanjaBrzeIgre(): string {
+  return BRZA_IGRA.putanja;
+}
+
+/** Glavni UI Trening — pravila + broj botova (1–3) + profil. */
 export function putanjaZagrijavanjaBotova(
   brojRacunala: 1 | 2 | 3,
   pravila: PravilnikPartije,
@@ -118,7 +124,7 @@ export function brojRacunalaIzTreningModa(mod: ModPartije | null | undefined): 1
   return 3;
 }
 
-/** Igraj opet / misije — zadrži mod+pravila (+ profil u Treningu); bez pravila → zadani KA-ZNA. */
+/** Igraj opet / misije — javno uvijek Brza igra; Trening/privatna zadržavaju kontekst. */
 export function putanjaPonovneIgre(
   mod: ModPartije | null | undefined,
   pravila: PravilnikPartije | null | undefined,
@@ -136,8 +142,7 @@ export function putanjaPonovneIgre(
   if (kontekst === 'privatna') {
     return putanjaPrivatneKreacije(p);
   }
-  const m = jePoznatiMod(mod) ? mod : 'cetiri_igraca';
-  return putanjaJavnogReda(m, p);
+  return putanjaBrzeIgre();
 }
 
 export function parsajPravilnikIzQuery(vrijednost: string | null | undefined): PravilnikPartije {

@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import {
   ID_DOSTIGNUCA_CISTA_PETICA,
-  ID_DOSTIGNUCA_DVOSTRUKA_KRUNA,
   ID_DOSTIGNUCA_RIJETKA_GRDOSIJA,
   ID_DOSTIGNUCA_SVE_POHVALE,
 } from 'zajednicko';
@@ -115,9 +114,8 @@ describe('dostignuća D02', () => {
 
     const oba = await baza.transaction((tx) =>
       priznajDnevnuPobjeduModa(tx, { igracId, mod: 'cetiri_igraca', zavrsenoU }));
-    expect(oba.novaDostignuca).toEqual([
-      { id: ID_DOSTIGNUCA_DVOSTRUKA_KRUNA, novaRazina: 1, maksimalnaRazina: 5 },
-    ]);
+    expect(oba.doprinosUmetnut).toBe(false);
+    expect(oba.novaDostignuca).toEqual([]);
 
     const ponovo = await baza.transaction((tx) =>
       priznajDnevnuPobjeduModa(tx, { igracId, mod: 'dva_igraca', zavrsenoU }));
@@ -125,7 +123,7 @@ describe('dostignuća D02', () => {
 
     const [napredak] = await baza.select({ dvostrukeKrune: napredakDostignucaIgraca.dvostrukeKrune })
       .from(napredakDostignucaIgraca).where(eq(napredakDostignucaIgraca.igracId, igracId));
-    expect(napredak?.dvostrukeKrune).toBe(1);
+    expect(napredak?.dvostrukeKrune ?? 0).toBe(0);
   });
 
   it('čista petica kroz zaključak: 5 riječi i 0 pogrešaka; pogreška ili retry ne daju duplo', async () => {

@@ -13,7 +13,7 @@ import {
 for (const brojSjedala of [2, 3, 4, 8]) {
   test(`mobilni unos prati tipkovnicu za ${brojSjedala} sjedala`, async ({ browser }, podaciTesta) => {
     test.setTimeout(60_000);
-    const igraci = await dodajIgrace(browser, 2);
+    const igraci = await dodajIgrace(browser, 3);
     const stranica = igraci[0]!.stranica;
     try {
       await stranica.setViewportSize({ width: 390, height: 844 });
@@ -23,7 +23,7 @@ for (const brojSjedala of [2, 3, 4, 8]) {
         });
         Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true });
       });
-      await udjiUJavniRed(igraci, 'dva_igraca');
+      await udjiUJavniRed(igraci);
       await cekajIstuPartiju(igraci);
       await stranica.evaluate(async (broj) => {
         const putanjaStanja = '/src/lib/stanje-igre.svelte.ts';
@@ -149,10 +149,10 @@ for (const brojSjedala of [2, 3, 4, 8]) {
 
 test('prazan nastavak šalje prefiks kao cijelu riječ (#111)', async ({ browser }) => {
   test.setTimeout(60_000);
-  const igraci = await dodajIgrace(browser, 2);
+  const igraci = await dodajIgrace(browser, 3);
   const stranica = igraci[0]!.stranica;
   try {
-    await udjiUJavniRed(igraci, 'dva_igraca');
+    await udjiUJavniRed(igraci);
     await cekajIstuPartiju(igraci);
     await stranica.evaluate(async () => {
       const putanjaStanja = '/src/lib/stanje-igre.svelte.ts';
@@ -632,7 +632,7 @@ test('mobilni Troboj: propušteni partija:pocetak oporavlja stol bez reload()', 
       await igrac.stranica.setViewportSize({ width: 390, height: 844 });
     }
     const mobilni = igraci[0]!;
-    await mobilni.stranica.goto('/red?mod=tri_igraca&pravila=dokazi_nastavak');
+    await mobilni.stranica.goto('/red?mod=tri_igraca&pravila=klasicni');
     await expect(mobilni.stranica.getByTestId('red-oznaka-izbora')).toBeVisible({ timeout: 20_000 });
 
     await mobilni.stranica.evaluate(async () => {
@@ -640,7 +640,7 @@ test('mobilni Troboj: propušteni partija:pocetak oporavlja stol bez reload()', 
       dohvatiSocket().removeAllListeners('partija:pocetak');
     });
 
-    await udjiUJavniRed(igraci.slice(1), 'tri_igraca', 'dokazi_nastavak');
+    await udjiUJavniRed(igraci.slice(1));
     await expect
       .poll(async () => {
         const urlovi = await Promise.all(igraci.slice(1).map((ig) => ig.stranica.url()));

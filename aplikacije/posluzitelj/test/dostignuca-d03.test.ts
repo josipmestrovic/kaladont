@@ -264,7 +264,7 @@ describe('dostignuća D03 Top 10', () => {
     expect((await brojac(igracId)).tjedneElite).toBe(0);
   });
 
-  it('PR13: Troboj Top10 dokaz; ponovljeni snimak ne duplicira; Troboj+Četveroboj daje Na dvije fronte', async () => {
+  it('PR13: Troboj Top10 dokaz; ponovljeni snimak ne duplicira; Na dvije fronte ostaje skriveno', async () => {
     const igracId = await noviIgrac('TrobojTop');
     await igre(igracId, 5, 4, 'tri_igraca', DAN, 1);
     await snimi('tri_igraca', DAN);
@@ -274,14 +274,14 @@ describe('dostignuća D03 Top 10', () => {
     await snimi('tri_igraca', DAN);
     expect(await brojUlazaka(igracId, 'tri_igraca')).toBe(1);
     expect((await brojac(igracId)).dnevneDesetke).toBe(1);
-    // HINT PR13: bilo koja dva formata — Troboj+Četveroboj sada daje par.
+    // Brza igra: Na dvije fronte je deaktivirano — drugi format ne diže brojač.
     await igre(igracId, 5, 4, 'cetiri_igraca', DAN, 1);
     await snimi('cetiri_igraca', DAN);
     expect(await brojUlazaka(igracId, 'cetiri_igraca')).toBe(1);
-    expect((await brojac(igracId)).naDvijeFronte).toBe(1);
+    expect((await brojac(igracId)).naDvijeFronte).toBe(0);
   });
 
-  it('oba moda istog dana daju Na dvije fronte jednom, a 20 igara diže tri razdoblja u jednu obavijest', async () => {
+  it('Top10 razdoblja i dalje rastu; Na dvije fronte ostaje 0 nakon drugog formata', async () => {
     const igracId = await noviIgrac('Fronte');
     await igre(igracId, 20, 8, 'cetiri_igraca', DAN, 1);
     await snimi('cetiri_igraca', DAN);
@@ -292,20 +292,20 @@ describe('dostignuća D03 Top 10', () => {
     await igre(igracId, 20, 8, 'dva_igraca', DAN, 1);
     await snimi('dva_igraca', DAN);
     stanje = await brojac(igracId);
-    expect(stanje).toMatchObject({ dnevneDesetke: 1, tjedneElite: 1, mjesecneElite: 1, naDvijeFronte: 3 });
+    expect(stanje).toMatchObject({ dnevneDesetke: 1, tjedneElite: 1, mjesecneElite: 1, naDvijeFronte: 0 });
 
     const obavijesti = await baza.select().from(obavijestiIgraca).where(and(
       eq(obavijestiIgraca.igracId, igracId),
       eq(obavijestiIgraca.dostignuceId, ID_DOSTIGNUCA_NA_DVIJE_FRONTE),
     ));
-    expect(obavijesti.map((red) => red.novaRazina)).toEqual([3]);
+    expect(obavijesti).toHaveLength(0);
 
     const razine = await baza.select({ id: dostignucaIgraca.dostignuceId, razina: dostignucaIgraca.razina })
       .from(dostignucaIgraca).where(eq(dostignucaIgraca.igracId, igracId));
     expect(razine.find((red) => red.id === ID_DOSTIGNUCA_DNEVNA_DESETKA)?.razina).toBe(1);
     expect(razine.find((red) => red.id === ID_DOSTIGNUCA_TJEDNA_ELITA)?.razina).toBe(1);
     expect(razine.find((red) => red.id === ID_DOSTIGNUCA_MJESECNA_ELITA)?.razina).toBe(1);
-    expect(razine.find((red) => red.id === ID_DOSTIGNUCA_NA_DVIJE_FRONTE)?.razina).toBe(3);
+    expect(razine.find((red) => red.id === ID_DOSTIGNUCA_NA_DVIJE_FRONTE)).toBeUndefined();
   });
 
   it('sljedeći dan daje novi doprinos, a zakašnjela obrada čuva ključ dokaza', async () => {

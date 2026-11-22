@@ -98,12 +98,11 @@ test('PR10: Općenito je default s jednim radarom; #statistika otvara Statistiku
     await expect(page.getByRole('heading', { name: 'Tvoj Kaladont DNK', level: 3 })).toBeVisible();
     await expect(page.locator('.dnk-kartica')).toHaveCount(1);
     await expect(page.getByText('Odigrane javne igre')).toBeVisible();
-    await expect(page.getByText('Dvoboj / Troboj / Četveroboj')).toBeVisible();
+    await expect(page.getByText('Brza igra (Troboj)')).toBeVisible();
 
     await page.goto('/profil#statistika');
     await expect(page.locator('#statistika')).toBeVisible();
-    await expect(page.getByLabel('Format igre')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Troboj' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Brza igra \(Troboj\)/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Općenito', level: 2 })).toHaveCount(0);
 
     await page.goto('/profil');

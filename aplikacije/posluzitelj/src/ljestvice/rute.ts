@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
+  kanonskiModLjestvice,
   METRIKE_LJESTVICA,
   minimumIgaraZaRazdoblje,
   PRIKAZI_LJESTVICA,
@@ -17,8 +18,8 @@ import { pokusajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentika
 import { dohvatiPoredak, obuhvatiRazdoblja, pozicijaIgraca, type Poredak } from './servis.js';
 
 const ShemaUpitaLjestvice = z.object({
-  // PR11: tri javne ljestvice po veličini stola (2/3/4); pravilnici se spajaju unutar formata.
-  mod: z.enum(['cetiri_igraca', 'dva_igraca', 'tri_igraca']).default('cetiri_igraca'),
+  // Stari mod parametri (2p/4p) se kanonski normaliziraju na Troboj — bez tihog miješanja metrika.
+  mod: z.enum(['cetiri_igraca', 'dva_igraca', 'tri_igraca']).default('tri_igraca'),
   metrika: z.enum(METRIKE_LJESTVICA).default('prosjek_bodova'),
   razdoblje: z.enum(RAZDOBLJA_LJESTVICA).default('dnevno'),
   prikaz: z.enum(PRIKAZI_LJESTVICA).default('top'),
@@ -30,7 +31,10 @@ export async function registrirajLjestviceRute(app: FastifyInstance): Promise<vo
     if (!upit.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni parametri ljestvice.' });
     }
-    const { mod, metrika, razdoblje, prikaz } = upit.data;
+    const metrika = upit.data.metrika;
+    const razdoblje = upit.data.razdoblje;
+    const prikaz = upit.data.prikaz;
+    const mod = kanonskiModLjestvice(upit.data.mod);
     const mojId = (zahtjev as ZahtjevSIgracem).igrac?.id ?? null;
     const sada = new Date();
     const obuhvati = obuhvatiRazdoblja(sada, new Date(konfiguracija.LJESTVICE_POCETAK));

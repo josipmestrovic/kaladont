@@ -642,7 +642,7 @@ describe('privatne sobe', () => {
     }
   }, 30_000);
 
-  it('bot manager odigra Dvoboj, javni Četveroboj, privatni Četveroboj i trening protiv Računala', async () => {
+  it('bot manager odigra privatni Četveroboj i trening protiv Računala (javni red = Brza igra)', async () => {
     const grupePoRijeci = new Map<string, string[]>();
     const rjecnikTesta: SnimkaRjecnika = {
       brojRijeci: 1,
@@ -674,15 +674,19 @@ describe('privatne sobe', () => {
     }, rjecnikTesta, (razlog) => { razlogPrekida = razlog; prekid.abort(); });
 
     try {
+      // Javni Dvoboj/Četveroboj više nisu dostupni (Brza igra = samo Troboj).
       await Promise.all([
-        simulator.pokreniGrupu(izradiGrupuBotova('dvoboj'), prekid.signal),
-        simulator.pokreniGrupu(izradiGrupuBotova('javni_cetveroboj'), prekid.signal),
         simulator.pokreniGrupu(izradiGrupuBotova('privatni_cetveroboj'), prekid.signal),
         simulator.pokreniGrupu(izradiGrupuBotova('trening'), prekid.signal),
       ]);
 
       const rok = Date.now() + 30_000;
-      while (!Object.values(simulator.sazetak().zavrsenePoVrsti).every((broj) => broj >= 2) && Date.now() < rok && !prekid.signal.aborted) {
+      while (
+        (simulator.sazetak().zavrsenePoVrsti.privatni_cetveroboj < 2
+          || (simulator.sazetak().zavrsenePoVrsti.trening ?? 0) < 2)
+        && Date.now() < rok
+        && !prekid.signal.aborted
+      ) {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
@@ -690,8 +694,9 @@ describe('privatne sobe', () => {
       await simulator.dovrsiPartije(5_000, prekid.signal);
       expect(simulator.uzorak().aktivnePartije).toBe(0);
       const sazetak = simulator.sazetak();
-      expect(sazetak.zavrsenePartije).toBeGreaterThanOrEqual(4);
-      expect(Object.values(sazetak.zavrsenePoVrsti).every((broj) => broj >= 2)).toBe(true);
+      expect(sazetak.zavrsenePartije).toBeGreaterThanOrEqual(2);
+      expect(sazetak.zavrsenePoVrsti.privatni_cetveroboj).toBeGreaterThanOrEqual(2);
+      expect(sazetak.zavrsenePoVrsti.trening ?? 0).toBeGreaterThanOrEqual(2);
       expect(sazetak.partijeBezSpremanja).toBe(0);
       expect(sazetak.brojPoteza).toBeGreaterThan(0);
       expect(sazetak.odbijeniTreninzi).toBe(0);

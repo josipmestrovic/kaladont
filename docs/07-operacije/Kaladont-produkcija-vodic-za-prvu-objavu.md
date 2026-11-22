@@ -363,7 +363,7 @@ U `nano` spremi s `Ctrl+O`, Enter, zatvori s `Ctrl+X`. Stvarne vrijednosti unosi
 | `LJESTVICE_POCETAK` | Odaberi stvarni početak javnog praćenja ljestvica u ISO 8601 s pomakom, primjer oblika `2026-11-15T10:00:00+01:00`. Primjer nije odabrani datum lansiranja. |
 | `KALADONT_IMAGE`, `VERZIJA`, `DIGEST` | Iz provjerenog releasea: `ghcr.io/josipmestrovic/kaladont@sha256:…`, puni commit SHA, puni `sha256:…`. Novi workflow treba ažurirati ova tri polja zajedno. |
 | `NADZOR_EMAIL_OMOGUCEN` | Za launch `true`; pošalji probnu obavijest iz admina i provjeri stvarni inbox. |
-| `BOTOVI_DVOBOJ`, `BOTOVI_TROBOJ`, `BOTOVI_CETVEROBOJ`, `TRENING_OMOGUCEN` | Eksplicitno odaberi ponašanje za release. Compose zadano uključuje trening i isključuje javne botove (`false`). Za popunu sva tri moda postavi i `BOTOVI_TROBOJ=true` (ne samo Dvoboj/Četveroboj). Staging Compose zadano drži sve tri na `true`. Provjeri trajne postavke, fond botova i jednu stvarnu igru s jednim čovjekom. |
+| `BOTOVI_DVOBOJ`, `BOTOVI_TROBOJ`, `BOTOVI_CETVEROBOJ`, `TRENING_OMOGUCEN` | Za **Brzu igru** obavezno `BOTOVI_TROBOJ=true` i efektivni pragovi Troboja `[10000,20000]` uz odstupanja `[0,0]` (provjeri trajne adminske postavke — TS default nije dokaz produkcije). Ostali javni bot-flagovi mogu ostati `false`. Compose zadano isključuje javne botove; staging često drži Troboj uključen. Provjeri fond (≥2 aktivna bota po stolu) i jednu stvarnu igru s jednim čovjekom. |
 | Vrijednosti koje Compose određuje | `NODE_ENV=production`, interna adresa baze, port 3000, isključenje razvojnog preskakanja timera i tolerancija prekida. Produkcija ima svoju `kaladont_prod` i trajan volume. Umami može pričekati. |
 
 

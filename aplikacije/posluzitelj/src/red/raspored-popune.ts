@@ -7,10 +7,10 @@ import type { RezultatPokretanja } from '../igra/politika-ucinka.js';
 import type { FondBotova, Rezervacija } from '../bot/fond.js';
 import type { RedCekanja, StavkaReda } from './red-cekanja.js';
 
-/** Pragovi po veličini stola (ne po ključu reda). Troboj: 20/30 s — prva dva četverobojska. */
+/** Pragovi po veličini stola (ne po ključu reda). Brza igra (Troboj): fiksno 10/20 s. */
 export const PRAGOVI_POPUNE_MS: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]> = {
   dva_igraca: [30_000],
-  tri_igraca: [20_000, 30_000],
+  tri_igraca: [10_000, 20_000],
   cetiri_igraca: [20_000, 30_000, 40_000],
 };
 

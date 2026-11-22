@@ -2,6 +2,7 @@ import { and, asc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   DEFINICIJE_DOSTIGNUCA,
   MAKSIMALNO_ISKUSTVO,
+  definicijaMisije,
   type MetrikeMisijaIgre,
   type ObavijestOtkljucanogDostignuca,
   type PromjenaMisije,
@@ -127,6 +128,9 @@ export async function obracunajMisijeZaIgraca(
 
   for (const dodjela of kandidati) {
     if (dodjela.dostupnaOd.getTime() > metrike.zavrsenoU.getTime()) continue;
+    // Deaktivirani predlošci više ne napreduju (čekaju sistemsku zamjenu).
+    const defPredloska = definicijaMisije(dodjela.predlozakId);
+    if (defPredloska && defPredloska.aktivna === false) continue;
 
     const [doprinos] = await tx.insert(doprinosiMisijama).values({
       dodjelaId: dodjela.id,

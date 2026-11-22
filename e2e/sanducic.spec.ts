@@ -58,7 +58,7 @@ test('toast se potisne u redu bez gubitka badgea', async ({ page }) => {
   await seedPoruku(page, token, `Potiskivanje ${Date.now()}`);
 
   await expect(page.locator('.sanducic-toast')).toBeVisible({ timeout: 15_000 });
-  await page.goto('/red?mod=dva_igraca');
+  await page.goto('/red?mod=tri_igraca&pravila=klasicni');
   await expect(page.locator('.sanducic-toast')).toHaveCount(0);
 
   await page.goto('/');
