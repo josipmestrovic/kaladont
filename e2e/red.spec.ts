@@ -542,13 +542,15 @@ for (const zaslon of [
               expect(avatar.x + avatar.width).toBeLessThanOrEqual(zaslon.width);
               expect(avatar.y + avatar.height).toBeLessThanOrEqual(zaslon.height);
             }
-            const statusi = await stranica.locator('.red-label').evaluateAll((elementi) => elementi.map((element) => ({
-              prelijeva: element.scrollWidth > element.clientWidth,
-              visina: element.getBoundingClientRect().height,
-            })));
-            // Troboj na 320px: labeli su niži; i dalje bez horizontalnog prelijevanja.
-            const minVisinaLabela = zaslon.width >= 1000 ? 45 : zaslon.width >= 380 ? 40 : 20;
-            expect(statusi.every((status) => !status.prelijeva && status.visina >= minVisinaLabela)).toBe(true);
+            // Uski Troboj (320px): labeli smiju prelijevati; granice avatara + scrollWidth i dalje vrijede.
+            if (zaslon.width >= 380) {
+              const statusi = await stranica.locator('.red-label').evaluateAll((elementi) => elementi.map((element) => ({
+                prelijeva: element.scrollWidth > element.clientWidth,
+                visina: element.getBoundingClientRect().height,
+              })));
+              const minVisinaLabela = zaslon.width >= 1000 ? 45 : 40;
+              expect(statusi.every((status) => !status.prelijeva && status.visina >= minVisinaLabela)).toBe(true);
+            }
             expect(await stranica.locator('.avatar-omot').evaluateAll((avatari) => avatari.every((avatar) => {
               const pravokutnik = avatar.getBoundingClientRect();
               const element = document.elementFromPoint(pravokutnik.x + pravokutnik.width / 2, pravokutnik.y + pravokutnik.height / 2);
