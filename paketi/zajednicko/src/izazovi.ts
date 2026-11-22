@@ -451,6 +451,18 @@ export interface NapredakIzazovaDto {
   leveli: AgregatLevelaIzazovaDto[];
 }
 
+/** Metadata kampanje na partija:pocetak / partija:stanje (autoritativno). */
+export interface IzazovPartijaMeta {
+  challengeId: IdIzazova;
+  level: LevelIzazova;
+  format: FormatIzazova;
+  varijanta: VarijantaIzazova;
+  naziv: string;
+  profileId: ProfilBotaIzazova;
+  humanTurnDurationMs: number;
+  botTurnDurationMs: number;
+}
+
 /** Settlement payload na GET pokušaja / partija:kraj. */
 export interface SettlementIzazovaDto {
   firstCompletion: boolean;
