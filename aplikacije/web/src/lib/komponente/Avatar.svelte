@@ -7,7 +7,7 @@
   interface Props {
     avatarId: number;
     rang?: string | null;
-    /** Gost prikazuje zeleni krug s bijelim „G”, bez konfiguracijskog avatara. */
+    /** Gost prikazuje zeleni krug s bijelim „Gost”, bez konfiguracijskog avatara. */
     gost?: boolean;
     velicina?: number;
     prikaziRangBorder?: boolean;
@@ -22,7 +22,7 @@
 
   const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null, razinaVatre = 0, nizPobjeda = 0, vanjskaSlika = null, opisSlike = null }: Props = $props();
   const altTekst = $derived(opisSlike ?? (gost ? 'Gost' : nazivAvatara(avatarId)));
-  const gostFontSize = $derived(Math.max(10, Math.round(velicina * 0.42)));
+  const gostFontSize = $derived(Math.max(9, Math.round(velicina * 0.26)));
 
   const border = $derived(!prikaziRangBorder || vanjskaSlika || gost ? null : bojaBordera(rang));
   const debljina = $derived(border ? debljinaBorderaRanga(velicina) : 0);
@@ -44,7 +44,7 @@
       {#if vanjskaSlika}
         <img class="vanjska-slika" src={vanjskaSlika} alt={altTekst} />
       {:else if gost}
-        <div class="gost-avatar" style:font-size="{gostFontSize}px" aria-label={altTekst}>G</div>
+        <div class="gost-avatar" style:font-size="{gostFontSize}px" aria-label={altTekst}>Gost</div>
       {:else if avatarConfig}
         <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} />
       {:else}
@@ -103,12 +103,12 @@
     border-radius: 50%;
     background: var(--boja-povrsina-3);
     color: #ffffff;
+    font-family: var(--font-tijelo);
     font-weight: 700;
     display: flex;
     align-items: center;
     justify-content: center;
-    text-transform: uppercase;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.01em;
     user-select: none;
     line-height: 1;
   }

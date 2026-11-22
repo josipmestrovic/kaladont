@@ -18,8 +18,6 @@
     FORMATI_IZAZOVA,
     NAZIVI_FORMATA_IZAZOVA,
     NAZIVI_LEVELA_IZAZOVA,
-    NAZIVI_PROFILA_BOTA,
-    NAZIVI_VARIJANTI_IZAZOVA,
   } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
@@ -34,15 +32,34 @@
     tekstRazlogaZakljucavanja,
     zadaniLevelIzazova,
   } from '$lib/izazovi-klijent.js';
-  import { nazivFormata, nazivPravilnika } from '$lib/igraj-rute.js';
-  import { jeRegistriranKorisnik } from '$lib/identitet.js';
+  import { nazivPravilnika } from '$lib/igraj-rute.js';
+  import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
+
+  const UKUPNO_IZAZOVA = 60;
+
+  type UvjetKartice = {
+    kljuc: 'dokazi_nastavak' | 'ka_zna' | 'bez_pogreske' | '15s';
+    naziv: string;
+    opis: string;
+  };
+
+  /** Opisi posebnih uvjeta na karticama (igra protiv botova — bez isteka vremena u dokazu). */
+  const OPISI_UVJETA = {
+    dokazi_nastavak:
+      'Ako sljedeći igrač ne zna nastavak, autor prethodne riječi mora dokazati da nastavak postoji tako da ga odigra. Uspije li, ispada igrač koji nije znao nastavak. Ne uspije li, ispada autor prethodne riječi.',
+    ka_zna:
+      'Ispada igrač koji ne zna nastavak, osim u slučaju kaladonta — tada ispada onaj koji ga je omogućio.',
+    bez_pogreske:
+      'Ne smiješ pogriješiti nijednu riječ. Prva pogrešna riječ završava izazov — moraš pobijediti bez greške.',
+    '15s':
+      'Na svom potezu imaš samo 15 sekundi za odgovor umjesto uobičajenih 30.',
+  } as const satisfies Record<UvjetKartice['kljuc'], string>;
 
   const igra = dohvatiStanjeIgre();
 
   let odgovor = $state<OdgovorKatalogaIzazova | null>(null);
   let ucitava = $state(true);
   let greska = $state<string | null>(null);
-  let odabrani = $state<StavkaKatalogaIzazovaDto | null>(null);
   let odabraniLevel = $state<LevelIzazova>(1);
   let levelObavijest = $state<string | null>(null);
   let startUTijeku = $state(false);
@@ -51,12 +68,18 @@
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   const aktivni = $derived(odgovor?.napredak.aktivniPokusaj ?? null);
-  const zvjezdice = $derived(odgovor?.napredak.izazivacZvjezdice ?? 0);
   const omogucen = $derived(odgovor?.omogucen === true);
   const leveli = $derived(odgovor?.napredak.leveli ?? []);
   const aktivniAgregat = $derived(leveli.find((L) => L.level === odabraniLevel) ?? null);
+  const ukupnoZavrseno = $derived(odgovor?.napredak.zavrseniChallengeIds.length ?? 0);
+  const ukupnoPostotak = $derived(Math.round((ukupnoZavrseno / UKUPNO_IZAZOVA) * 100));
 
-  const karticePoFormatu = $derived(((): { format: FormatIzazova; naziv: string; zavrseno: number; kartice: StavkaKatalogaIzazovaDto[] }[] => {
+  const karticePoFormatu = $derived(((): {
+    format: FormatIzazova;
+    naziv: string;
+    zavrseno: number;
+    kartice: StavkaKatalogaIzazovaDto[];
+  }[] => {
     const katalog = odgovor?.katalog ?? [];
     const agregati = aktivniAgregat?.formati ?? [];
     return FORMATI_IZAZOVA.map((format) => {
@@ -127,34 +150,58 @@
 
   function odaberiLevel(level: LevelIzazova) {
     if (!odgovor) return;
-    if (!levelJeOtkljucan(level, odgovor.napredak.leveli)) {
-      levelObavijest = `Level ${level} (${NAZIVI_LEVELA_IZAZOVA[level]}) još nije otključan.`;
-      return;
-    }
+    if (!levelJeOtkljucan(level, odgovor.napredak.leveli)) return;
     odabraniLevel = level;
     levelObavijest = null;
     sinkronizirajUrl(level, false);
   }
 
-  function otvoriDetalj(stavka: StavkaKatalogaIzazovaDto) {
-    odabrani = stavka;
-    startPoruka = null;
-  }
-
-  function zatvoriDetalj() {
-    if (startUTijeku) return;
-    odabrani = null;
-    startPoruka = null;
-  }
-
-  function tekstTrajanjaCovjek(ms: number): string {
-    return `${Math.round(ms / 1000)} s (tvoj potez)`;
-  }
-
   function statusOznaka(status: StavkaKatalogaIzazovaDto['status']): string {
-    if (status === 'zavrsen') return 'Odrađeno';
+    if (status === 'zavrsen') return 'Završeno';
     if (status === 'dostupan') return 'Dostupan';
     return 'Zaključan';
+  }
+
+  /** Posebni uvjeti kartice — redom: pravilnik, bez pogreške, 15 s. */
+  function posebniUvjeti(kartica: StavkaKatalogaIzazovaDto): UvjetKartice[] {
+    const uvjeti: UvjetKartice[] = [];
+    if (kartica.pravila === 'dokazi_nastavak') {
+      uvjeti.push({
+        kljuc: 'dokazi_nastavak',
+        naziv: nazivPravilnika('dokazi_nastavak'),
+        opis: OPISI_UVJETA.dokazi_nastavak,
+      });
+    } else if (kartica.pravila === 'ka_zna') {
+      uvjeti.push({
+        kljuc: 'ka_zna',
+        naziv: nazivPravilnika('ka_zna'),
+        opis: OPISI_UVJETA.ka_zna,
+      });
+    }
+    if (kartica.ciljevi.bezPogreske) {
+      uvjeti.push({
+        kljuc: 'bez_pogreske',
+        naziv: 'Bez pogreške',
+        opis: OPISI_UVJETA.bez_pogreske,
+      });
+    }
+    if (kartica.turnDurationMs <= 15_000) {
+      uvjeti.push({
+        kljuc: '15s',
+        naziv: '15 s',
+        opis: OPISI_UVJETA['15s'],
+      });
+    }
+    return uvjeti;
+  }
+
+  function klikNaKarticu(kartica: StavkaKatalogaIzazovaDto) {
+    if (startUTijeku) return;
+    if (kartica.status === 'zakljucan') {
+      startPoruka = tekstRazlogaZakljucavanja(kartica.razlogZakljucavanja);
+      return;
+    }
+    zapocni(kartica.id);
   }
 
   function zapocni(challengeId: IdIzazova) {
@@ -202,6 +249,14 @@
     socket.emit('izazov:zapocni', { challengeId, requestId: noviRequestIdIzazova() }, potvrda);
   }
 
+  function tipkaNaKartici(dogadaj: KeyboardEvent, kartica: StavkaKatalogaIzazovaDto) {
+    if (dogadaj.key !== 'Enter' && dogadaj.key !== ' ') return;
+    // Tooltip gumbi unutar kartice imaju vlastiti Enter — ne pokreći izazov.
+    if (dogadaj.target !== dogadaj.currentTarget) return;
+    dogadaj.preventDefault();
+    klikNaKarticu(kartica);
+  }
+
   function nastaviAktivni() {
     if (!aktivni?.partijaId) {
       void ucitaj();
@@ -225,7 +280,7 @@
             odabraniLevel = stavka.level;
             sinkronizirajUrl(stavka.level, true);
           }
-          otvoriDetalj(stavka);
+          klikNaKarticu(stavka);
         }
       }
     });
@@ -276,25 +331,11 @@
 <main class="izazovi-stranica">
   <header class="naslov">
     <h1>Izazovi</h1>
-    <p>Četiri levela, tri formata, pet varijanti — pobjeda (i bez pogreške gdje treba) = napredak.</p>
-    <div class="izazivac" aria-label={`Izazivač: ${zvjezdice} od 5 zvjezdica`}>
-      <span class="izazivac-naziv">Izazivač</span>
-      <span class="zvjezdice">
-        {#each Array.from({ length: 5 }, (_, i) => i < zvjezdice) as puna}
-          <img
-            src={puna ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'}
-            alt=""
-            aria-hidden="true"
-            width="22"
-            height="22"
-          />
-        {/each}
-      </span>
-    </div>
+    <p class="podnaslov">Pobijedi izazove i otključaj nove razine.</p>
   </header>
 
-  {#if !omogucen && odgovor}
-    <p class="banner-info" role="status" data-testid="izazov-nedostupan">
+  {#if odgovor && !omogucen}
+    <p class="banner-info" role="status" data-testid="izazov-u-pripremi">
       Izazovi su u pripremi — možeš pregledati karte, ali start još nije otvoren.
     </p>
   {/if}
@@ -313,11 +354,8 @@
     </div>
   {/if}
 
-  {#if !jeRegistriranKorisnik()}
-    <p class="gost-napomena">
-      Gost može igrati Izazove. Prijava na <strong>postojeći</strong> račun ne spaja gost progres —
-      registracija novog računa zadržava napredak s ovog uređaja.
-    </p>
+  {#if startPoruka}
+    <p class="banner-info" role="status" data-testid="izazov-start-poruka">{startPoruka}</p>
   {/if}
 
   {#if ucitava && !odgovor}
@@ -326,6 +364,25 @@
     <p class="greska" role="alert">{greska}</p>
     <button type="button" class="primarni-gumb" onclick={() => ucitaj()}>Pokušaj ponovno</button>
   {:else if odgovor}
+    <section class="meta-blok" aria-label="Napredak izazova" data-testid="izazov-meta">
+      <div class="meta-napredak">
+        <p class="meta-napredak-naslov">Napredak</p>
+        <p class="meta-napredak-broj" data-testid="izazov-ukupni-napredak">
+          {ukupnoZavrseno} / {UKUPNO_IZAZOVA} izazova završeno
+        </p>
+        <div
+          class="meta-traka"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={UKUPNO_IZAZOVA}
+          aria-valuenow={ukupnoZavrseno}
+          aria-label="Ukupni napredak izazova"
+        >
+          <span class="meta-traka-ispuna" style={`width: ${ukupnoPostotak}%`}></span>
+        </div>
+      </div>
+    </section>
+
     <nav class="pogled-tabovi" aria-label="Leveli izazova" data-testid="izazov-level-tabovi">
       {#each leveli as L (L.level)}
         <button
@@ -334,10 +391,10 @@
           class:zakljucan={L.status === 'zakljucan'}
           data-testid={`izazov-level-${L.level}`}
           aria-pressed={L.level === odabraniLevel}
-          aria-disabled={L.status === 'zakljucan'}
+          disabled={L.status === 'zakljucan'}
           onclick={() => odaberiLevel(L.level)}
         >
-          {L.naziv}
+          <span class="tab-naziv">{L.naziv}</span>
           <span class="tab-meta">{L.zavrseno}/{L.ukupno}</span>
         </button>
       {/each}
@@ -347,41 +404,86 @@
       <p class="banner-info" role="status" data-testid="izazov-level-obavijest">{levelObavijest}</p>
     {/if}
 
-    {#if aktivniAgregat}
-      <p class="level-sažetak" data-testid="izazov-level-sazetak">
-        {aktivniAgregat.naziv} · {aktivniAgregat.zavrseno}/{aktivniAgregat.ukupno} · bot
-        {NAZIVI_PROFILA_BOTA[aktivniAgregat.profileId]}
-      </p>
+    {#if startUTijeku}
+      <p class="ucitavanje" role="status" data-testid="izazov-pokretanje">Pokretanje izazova…</p>
     {/if}
 
     {#each karticePoFormatu as sekcija (sekcija.format)}
-      <section class="format-sekcija" aria-labelledby={`format-${sekcija.format}`} data-testid={`izazov-format-${sekcija.format}`}>
-        <h2 id={`format-${sekcija.format}`}>
-          {sekcija.naziv}
-          <span class="format-meta">{sekcija.zavrseno}/5</span>
-        </h2>
+      <section
+        class="format-sekcija"
+        aria-labelledby={`format-${sekcija.format}`}
+        data-testid={`izazov-format-${sekcija.format}`}
+      >
+        <div class="format-glava">
+          <h2 id={`format-${sekcija.format}`}>
+            {sekcija.naziv}
+            <span class="format-meta">· {sekcija.zavrseno}/5</span>
+          </h2>
+          <div class="format-tocke" aria-hidden="true">
+            {#each Array.from({ length: 5 }, (_, i) => i < sekcija.zavrseno) as gotovo}
+              <span class="format-tocka" class:gotovo></span>
+            {/each}
+          </div>
+        </div>
         <div class="mreza">
           {#each sekcija.kartice as kartica (kartica.id)}
-            <button
-              type="button"
+            {@const uvjeti = posebniUvjeti(kartica)}
+            <div
               class="kartica"
               class:zakljucan={kartica.status === 'zakljucan'}
               class:zavrsen={kartica.status === 'zavrsen'}
               class:dostupan={kartica.status === 'dostupan'}
+              class:ceka={startUTijeku}
+              role="button"
+              tabindex={startUTijeku ? -1 : 0}
               data-testid={`izazov-kartica-${kartica.id}`}
               data-status={kartica.status}
-              aria-label={`${kartica.id} ${kartica.naziv}, ${statusOznaka(kartica.status)}`}
-              onclick={() => otvoriDetalj(kartica)}
+              aria-label={`Izazov ${kartica.redoslijedUFormatu}, ${statusOznaka(kartica.status)}`}
+              aria-disabled={startUTijeku}
+              onclick={() => klikNaKarticu(kartica)}
+              onkeydown={(e) => tipkaNaKartici(e, kartica)}
             >
               <span class="kartica-glava">
-                <span class="kartica-id">{kartica.redoslijedUFormatu}. {NAZIVI_VARIJANTI_IZAZOVA[kartica.varijanta]}</span>
+                <strong class="kartica-broj">{kartica.redoslijedUFormatu}</strong>
                 {#if kartica.status === 'zavrsen'}
                   <span class="kvacica" aria-hidden="true">✓</span>
+                {:else if kartica.status === 'zakljucan'}
+                  <span class="brava" aria-hidden="true">
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+                      <path
+                        d="M8 1a3 3 0 0 0-3 3v2H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V4a3 3 0 0 0-3-3Zm1.5 5h-3V4a1.5 1.5 0 1 1 3 0v2Z"
+                      />
+                    </svg>
+                  </span>
+                {:else}
+                  <span class="kartica-strelica" aria-hidden="true">›</span>
                 {/if}
               </span>
-              <strong class="kartica-naziv">{kartica.naziv}</strong>
-              <span class="kartica-meta">{statusOznaka(kartica.status)} · {kartica.xp} XP</span>
-            </button>
+              <span class="kartica-uvjeti">
+                <span class="kartica-uvjeti-oznaka">Posebni uvjet:</span>
+                {#if uvjeti.length === 0}
+                  <span class="kartica-uvjet-nema">nema</span>
+                {:else}
+                  <span class="kartica-uvjeti-lista">
+                    {#each uvjeti as uvjet, i (uvjet.kljuc)}
+                      {#if i > 0}
+                        <span class="kartica-uvjet-razdjelnik" aria-hidden="true">|</span>
+                      {/if}
+                      <PojamPomoc
+                        tekst={uvjet.naziv}
+                        opis={uvjet.opis}
+                        id={`izazov-uvjet-${kartica.id}-${uvjet.kljuc}`}
+                        ariaLabel={`Što znači ${uvjet.naziv}?`}
+                        pozicioniranje="uz-okidac"
+                      />
+                    {/each}
+                  </span>
+                {/if}
+              </span>
+              <span class="kartica-status" data-status={kartica.status}>
+                {statusOznaka(kartica.status)}
+              </span>
+            </div>
           {/each}
         </div>
       </section>
@@ -391,114 +493,73 @@
   <p class="povratak"><a href="/">← Povratak na naslovnu</a></p>
 </main>
 
-{#if odabrani}
-  <div class="modal-podloga" role="presentation" onclick={zatvoriDetalj}>
-    <div
-      class="modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="izazov-detalj-naslov"
-      data-testid="izazov-detalj"
-      onclick={(e) => e.stopPropagation()}
-    >
-      <header>
-        <p class="detalj-id">{odabrani.id}</p>
-        <h2 id="izazov-detalj-naslov">{odabrani.naziv}</h2>
-        <p class="detalj-status">{statusOznaka(odabrani.status)}</p>
-      </header>
-      <p class="detalj-cilj">{odabrani.opisCilja}</p>
-      <ul class="detalj-lista">
-        <li><span>Level</span><strong>{NAZIVI_LEVELA_IZAZOVA[odabrani.level]}</strong></li>
-        <li><span>Pravilnik</span><strong>{nazivPravilnika(odabrani.pravila)}</strong></li>
-        <li><span>Format</span><strong>{nazivFormata(odabrani.mod)}</strong></li>
-        <li><span>Bot</span><strong>{NAZIVI_PROFILA_BOTA[odabrani.effectiveProfileId]}</strong></li>
-        <li><span>Tvoj potez</span><strong>{tekstTrajanjaCovjek(odabrani.turnDurationMs)}</strong></li>
-        <li><span>Bot potez</span><strong>{Math.round(odabrani.botTurnDurationMs / 1000)} s</strong></li>
-        <li>
-          <span>XP</span>
-          <strong>
-            {odabrani.xp}
-            {#if odabrani.xpOsvojen} (već osvojen){/if}
-          </strong>
-        </li>
-      </ul>
-      {#if odabrani.status === 'zakljucan'}
-        <p class="detalj-lock" role="status">
-          {tekstRazlogaZakljucavanja(odabrani.razlogZakljucavanja)}
-        </p>
-      {/if}
-      {#if startPoruka}
-        <p class="greska" role="alert">{startPoruka}</p>
-      {/if}
-      <div class="detalj-akcije">
-        <button
-          type="button"
-          class="primarni-gumb"
-          data-testid="izazov-start"
-          disabled={odabrani.status === 'zakljucan' || startUTijeku || !omogucen}
-          onclick={() => {
-            if (odabrani) zapocni(odabrani.id);
-          }}
-        >
-          {#if startUTijeku}
-            Pokretanje…
-          {:else if !omogucen}
-            Još nije dostupno
-          {:else if odabrani.status === 'zakljucan'}
-            Zaključano
-          {:else if odabrani.status === 'zavrsen'}
-            Igraj ponovno
-          {:else}
-            Započni
-          {/if}
-        </button>
-        <button type="button" class="sporedni-gumb" disabled={startUTijeku} onclick={zatvoriDetalj}
-          >Zatvori</button
-        >
-      </div>
-    </div>
-  </div>
-{/if}
-
 <style>
   .izazovi-stranica {
-    max-width: 720px;
+    max-width: 960px;
     margin: 0 auto;
     padding: 16px 16px 48px;
   }
+
   .naslov h1 {
-    margin: 0 0 6px;
+    margin: 0;
     font-size: var(--naslov-3);
   }
-  .naslov p {
-    margin: 0 0 12px;
+
+  .podnaslov {
+    margin: 6px 0 0;
     color: var(--boja-tekst-sekundarni);
   }
-  .izazivac {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
+
+  .meta-blok {
+    margin: 18px 0 0;
+    padding: 14px 16px;
     border: 1px solid var(--boja-obrub);
-    border-radius: 8px;
+    border-radius: 12px;
     background: var(--boja-povrsina-2);
   }
-  .izazivac-naziv {
+
+  .meta-napredak-naslov {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mali);
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
-  .zvjezdice {
-    display: inline-flex;
-    gap: 2px;
+
+  .meta-napredak-broj {
+    margin: 4px 0 0;
+    color: var(--boja-tekst-osnovni);
+    font-weight: 700;
+    font-size: var(--tekst-baza);
   }
+
+  .meta-traka {
+    margin-top: 8px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--boja-povrsina-3);
+    overflow: hidden;
+  }
+
+  .meta-traka-ispuna {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--boja-zuta-krema);
+    min-width: 0;
+    transition: width 0.25s ease;
+  }
+
   .banner-info,
-  .banner-aktivni,
-  .gost-napomena {
-    margin: 16px 0;
+  .banner-aktivni {
+    margin: 14px 0 0;
     padding: 12px 14px;
-    border-radius: 8px;
+    border-radius: 10px;
     background: var(--boja-povrsina-2);
     border: 1px solid var(--boja-obrub);
   }
+
   .banner-aktivni {
     display: flex;
     flex-wrap: wrap;
@@ -506,206 +567,269 @@
     justify-content: space-between;
     gap: 12px;
   }
+
   .banner-aktivni p {
     margin: 0;
   }
-  .gost-napomena {
-    font-size: var(--tekst-mali);
-    color: var(--boja-tekst-sekundarni);
-  }
+
   .pogled-tabovi {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    margin: 20px 0 8px;
+    margin: 16px 0 0;
   }
+
+  @media (min-width: 640px) {
+    .pogled-tabovi {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
   .pogled-tabovi button {
-    flex: 1 1 calc(50% - 8px);
     min-width: 0;
-    padding: 9px 14px;
+    padding: 10px 12px;
     border: 1px solid var(--boja-obrub);
-    border-radius: var(--radijus-pill);
+    border-radius: 10px;
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-osnovni);
     font: inherit;
     font-size: var(--tekst-sitni);
     font-weight: 700;
     cursor: pointer;
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 2px;
   }
-  @media (min-width: 560px) {
-    .pogled-tabovi button {
-      flex: 1 1 0;
-    }
-  }
+
   .pogled-tabovi button.aktivan {
     border-color: var(--boja-cta-pozadina);
     background: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
   }
-  .pogled-tabovi button.zakljucan {
+
+  .pogled-tabovi button.zakljucan,
+  .pogled-tabovi button:disabled {
     opacity: 0.55;
     cursor: not-allowed;
   }
+
   .tab-meta {
     font-weight: 600;
     opacity: 0.85;
   }
-  .level-sažetak {
-    margin: 0 0 16px;
-    color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-mali);
-  }
+
   .format-sekcija {
-    margin-top: 22px;
+    margin-top: 24px;
   }
-  .format-sekcija h2 {
+
+  .format-glava {
     margin: 0 0 12px;
-    font-size: var(--tekst-baza);
-    color: var(--boja-tekst-sekundarni);
+  }
+
+  .format-sekcija h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--boja-tekst-osnovni);
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: 6px;
   }
+
   .format-meta {
     font-weight: 600;
     font-size: var(--tekst-mali);
+    color: var(--boja-tekst-sekundarni);
   }
+
+  .format-tocke {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .format-tocka {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid var(--boja-obrub-jaci);
+    background: transparent;
+  }
+
+  .format-tocka.gotovo {
+    background: var(--boja-zuta-krema);
+    border-color: var(--boja-zuta-krema);
+  }
+
   .mreza {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 10px;
   }
-  @media (min-width: 560px) {
+
+  @media (min-width: 720px) {
     .mreza {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
+
   .kartica {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
-    min-height: 96px;
-    padding: 12px;
+    gap: 6px;
+    min-height: 104px;
+    padding: 14px;
     text-align: left;
     border: 1px solid var(--boja-obrub);
-    border-radius: 10px;
+    border-radius: 12px;
     background: var(--boja-povrsina);
     color: inherit;
     cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   }
-  .kartica:hover,
-  .kartica:focus-visible {
+
+  .kartica:hover:not(:disabled),
+  .kartica:focus-visible:not(:disabled) {
     border-color: var(--boja-isticanje-tekst);
     outline: none;
   }
+
+  .kartica.ceka {
+    cursor: wait;
+  }
+
   .kartica.zakljucan {
-    opacity: 0.72;
+    opacity: 0.68;
+    background: var(--boja-povrsina-3);
   }
+
   .kartica.zavrsen {
-    border-color: #e67e22;
-    box-shadow: inset 0 0 0 1px #e67e22;
+    border-color: var(--boja-zlato-obrub);
+    box-shadow: inset 0 0 0 1px var(--boja-zlato-obrub);
   }
+
   .kartica.dostupan {
-    box-shadow: inset 0 0 0 1px var(--boja-isticanje-tekst);
+    box-shadow: inset 0 0 0 1px rgb(248 221 154 / 35%);
   }
+
   .kartica-glava {
     display: flex;
     width: 100%;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: 8px;
   }
-  .kartica-id {
-    font-size: var(--tekst-mali);
-    font-weight: 700;
-    color: var(--boja-tekst-sekundarni);
-  }
-  .kvacica {
-    color: #e67e22;
+
+  .kartica-broj {
+    font-size: 1.35rem;
+    line-height: 1.1;
     font-weight: 800;
   }
-  .kartica-naziv {
-    font-size: var(--tekst-baza);
-    line-height: 1.25;
+
+  .kvacica {
+    color: var(--boja-zlato-tekst);
+    font-weight: 800;
   }
-  .kartica-meta {
+
+  .brava {
+    color: var(--boja-tekst-sekundarni);
+    display: inline-flex;
+  }
+
+  .kartica-strelica {
+    color: var(--boja-tekst-sekundarni);
+    font-size: 1.25rem;
+    line-height: 1;
+    font-weight: 700;
+  }
+
+  .kartica-uvjeti {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 6px;
     font-size: var(--tekst-mali);
     color: var(--boja-tekst-sekundarni);
+    line-height: 1.45;
   }
+
+  .kartica-uvjeti-oznaka {
+    font-weight: 700;
+  }
+
+  .kartica-uvjet-nema {
+    font-weight: 600;
+  }
+
+  .kartica-uvjeti-lista {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+  }
+
+  .kartica-uvjet-razdjelnik {
+    color: var(--boja-tekst-sekundarni);
+    opacity: 0.7;
+    font-weight: 600;
+  }
+
+  .kartica-uvjeti :global(.pojam-gumb) {
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mali);
+    font-weight: 700;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .kartica-uvjeti :global(.pojasnjenje) {
+    z-index: 40;
+  }
+
+  .kartica-status {
+    margin-top: auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: var(--tekst-sitni);
+    font-weight: 800;
+    border: 1px solid var(--boja-obrub);
+    background: var(--boja-povrsina-2);
+  }
+
+  .kartica-status[data-status='dostupan'] {
+    border-color: var(--boja-uspjeh-tekst);
+    color: var(--boja-uspjeh-tekst);
+    background: var(--boja-uspjeh-pozadina);
+  }
+
+  .kartica-status[data-status='zavrsen'] {
+    border-color: var(--boja-zlato-obrub);
+    color: var(--boja-zlato-tekst);
+    background: var(--boja-zlato-pozadina);
+  }
+
   .ucitavanje,
   .greska {
     margin: 16px 0;
   }
+
   .greska {
     color: var(--boja-opasnost, #b00020);
   }
+
   .povratak {
     margin-top: 32px;
   }
-  .modal-podloga {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    display: grid;
-    place-items: center;
-    padding: 16px;
-    background: rgb(0 0 0 / 45%);
-  }
-  .modal {
-    width: min(100%, 420px);
-    max-height: min(90dvh, 640px);
-    overflow: auto;
-    padding: 20px;
-    border-radius: 12px;
-    background: var(--boja-povrsina);
-    border: 1px solid var(--boja-obrub);
-  }
-  .detalj-id {
-    margin: 0;
-    font-weight: 700;
+
+  .povratak a {
     color: var(--boja-tekst-sekundarni);
   }
-  .modal h2 {
-    margin: 4px 0 0;
-    font-size: var(--naslov-3);
-  }
-  .detalj-status {
-    margin: 4px 0 12px;
-    color: var(--boja-tekst-sekundarni);
-  }
-  .detalj-cilj {
-    margin: 0 0 16px;
-    font-weight: 600;
-  }
-  .detalj-lista {
-    margin: 0 0 16px;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    gap: 8px;
-  }
-  .detalj-lista li {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .detalj-lista span {
-    color: var(--boja-tekst-sekundarni);
-  }
-  .detalj-lock {
-    margin: 0 0 12px;
-    color: var(--boja-tekst-sekundarni);
-  }
-  .detalj-akcije {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
+
   .primarni-gumb,
   .sporedni-gumb {
     display: inline-flex;
@@ -716,14 +840,12 @@
     border: none;
     cursor: pointer;
   }
+
   .primarni-gumb {
     background: var(--boja-pozadina-primarna);
     color: var(--boja-tekst-na-primarnoj, #fff);
   }
-  .primarni-gumb:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
+
   .sporedni-gumb {
     background: transparent;
     border: 1px solid var(--boja-obrub);

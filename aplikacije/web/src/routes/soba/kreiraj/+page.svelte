@@ -3,6 +3,15 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import {
+    Check,
+    ClipboardList,
+    Crown,
+    Info,
+    Lock,
+    Play,
+    Timer,
+  } from 'lucide-svelte';
+  import {
     REDOSLIJED_PRAVILNIKA,
     TEKSTOVI_PRAVILNIKA,
     parsajPravilnikIzQuery,
@@ -14,7 +23,7 @@
     type VrstaRijeci,
   } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
-  import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
+
   const OZNACI_VRSTA: Record<VrstaRijeci, string> = {
     imenica: 'Imenice',
     glagol: 'Glagoli',
@@ -29,15 +38,40 @@
     vlastito_ime: 'Vlastita imena',
   };
 
+  const OPCIJE_TAJMERA = [
+    { sek: 15, oznaka: '15 s' },
+    { sek: 30, oznaka: '30 s' },
+    { sek: 60, oznaka: '60 s' },
+    { sek: 0, oznaka: 'Bez tajmera' },
+  ] as const;
+
   let trajanjePotezaSek = $state(30);
   let eliminacijskiBodovi = $state(true);
-  // HINT PR14: ?pravila= iz Igraj koraka; inače KA-ZNA.
+  // HINT PR14: ?pravila= iz Igraj koraka; inače zadani pravilnik.
   let pravilnik = $state<PravilnikPartije>(
     parsajPravilnikIzQuery($page.url.searchParams.get('pravila')),
   );
   let odabraneVrste = $state<Set<VrstaRijeci>>(new Set(SVE_VRSTE_RIJECI));
   let poruka = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
+
+  const sveVrsteOdabrane = $derived(
+    odabraneVrste.size === SVE_VRSTE_RIJECI.length &&
+      SVE_VRSTE_RIJECI.every((v) => odabraneVrste.has(v)),
+  );
+  const samoImenice = $derived(odabraneVrste.size === 1 && odabraneVrste.has('imenica'));
+
+  const sazetakVremena = $derived(
+    trajanjePotezaSek === 0
+      ? 'Bez tajmera'
+      : trajanjePotezaSek === 1
+        ? '1 sekunda'
+        : `${trajanjePotezaSek} sekundi`,
+  );
+
+  const sazetakVrsta = $derived(
+    sveVrsteOdabrane ? 'Sve' : samoImenice ? 'Samo imenice' : `${odabraneVrste.size} odabrano`,
+  );
 
   function ukljuciSve() {
     odabraneVrste = new Set(SVE_VRSTE_RIJECI);
@@ -107,17 +141,23 @@
 </svelte:head>
 
 <main class="kreiraj-sobu">
-  <h1>Nova privatna soba</h1>
-  <p class="podnaslov">
-    Kreiraj sobu po svojim pravilima i pozovi prijatelje izravnim linkom. Dodaj do 8 igrača tako da im pošalješ link od sobe kada ju kreiraš!
-  </p>
+  <header class="uvod">
+    <h1>Nova privatna soba</h1>
+    <p class="podnaslov">
+      Odaberi pravila i pozovi do 8 igrača. Poveznicu za pozivanje dobit ćeš nakon stvaranja sobe.
+    </p>
+  </header>
 
   <form onsubmit={stvoriSobu}>
+    <section class="grupa" aria-labelledby="naslov-pravila">
+      <div class="grupa-glava">
+        <span class="grupa-ikona" aria-hidden="true">
+          <Crown size={22} strokeWidth={2.2} />
+        </span>
+        <h2 id="naslov-pravila">Pravila igre</h2>
+      </div>
 
-    <section class="grupa">
-      <h2>Pravilnik partije</h2>
-      <p class="objasnjenje-imenica">Gosti na pozivnici nasljeđuju ovaj pravilnik sa servera.</p>
-      <div class="opcije-gumbi" role="radiogroup" aria-label="Pravilnik">
+      <div class="opcije-gumbi opcije-gumbi--pravila" role="radiogroup" aria-label="Pravilnik">
         {#each REDOSLIJED_PRAVILNIKA as p (p)}
           <button
             type="button"
@@ -127,188 +167,277 @@
             aria-checked={pravilnik === p}
             onclick={() => (pravilnik = p)}
           >
+            {#if pravilnik === p}
+              <Check size={16} strokeWidth={2.6} aria-hidden="true" />
+            {/if}
             {TEKSTOVI_PRAVILNIKA[p].naziv}
           </button>
         {/each}
       </div>
-      <p class="objasnjenje-skupa">{TEKSTOVI_PRAVILNIKA[pravilnik].opis}</p>
-    </section>
 
-    <section class="grupa">
-      <h2>Pravila igranja i tajmer</h2>
-
-      <label class="preklopnik-redak">
-        <span>Dodjeljuj bodove za eliminaciju (+1 bod za eliminaciju — kada protivnik ispadne zbog riječi koju si ti rekao)</span>
-        <input type="checkbox" bind:checked={eliminacijskiBodovi} />
-      </label>
-
-      <div class="tajmer-sekcija">
-        <span class="sub-naslov">Ograničenje za potez (tajmer):</span>
-        <div class="opcije-gumbi">
-          <button
-            type="button"
-            class="odabir-gumb"
-            class:odabran={trajanjePotezaSek === 15}
-            onclick={() => (trajanjePotezaSek = 15)}
-          >
-            15 s
-          </button>
-          <button
-            type="button"
-            class="odabir-gumb"
-            class:odabran={trajanjePotezaSek === 30}
-            onclick={() => (trajanjePotezaSek = 30)}
-          >
-            30 s (standardno)
-          </button>
-          <button
-            type="button"
-            class="odabir-gumb"
-            class:odabran={trajanjePotezaSek === 60}
-            onclick={() => (trajanjePotezaSek = 60)}
-          >
-            60 s
-          </button>
-          <button
-            type="button"
-            class="odabir-gumb"
-            class:odabran={trajanjePotezaSek === 0}
-            onclick={() => (trajanjePotezaSek = 0)}
-          >
-            Bez tajmera
-          </button>
-        </div>
+      <div class="pravila-opis">
+        <p>{TEKSTOVI_PRAVILNIKA[pravilnik].opis}</p>
+        <a class="detaljna-pravila" href="/pravila-kaladonta">Detaljna pravila</a>
       </div>
     </section>
 
-    <section class="grupa">
-      <div class="vrste-sekcija">
-        <div class="naslov-redak">
-          <h2>Dopuštene vrste riječi</h2>
-          <div class="brze-akcije">
-            <button type="button" class="link-gumb" onclick={ukljuciSve}>Sve</button> ·
-            <button type="button" class="link-gumb" onclick={iskljuciSve}>Samo imenice</button>
-          </div>
+    <section class="grupa" aria-labelledby="naslov-postavke">
+      <div class="grupa-glava">
+        <span class="grupa-ikona" aria-hidden="true">
+          <Timer size={22} strokeWidth={2.2} />
+        </span>
+        <h2 id="naslov-postavke">Postavke partije</h2>
+      </div>
+
+      <div class="postavka-blok">
+        <label class="prekidac-redak">
+          <span class="prekidac-tekst">
+            <strong>Bodovi za izbacivanje</strong>
+            <small>+1 bod kada tvoja riječ izbaci protivnika.</small>
+          </span>
+          <span class="prekidac-omot">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Bodovi za izbacivanje"
+              bind:checked={eliminacijskiBodovi}
+            />
+            <span class="prekidac" aria-hidden="true"><span></span></span>
+          </span>
+        </label>
+      </div>
+
+      <div class="postavka-blok">
+        <div class="tajmer-zaglavlje">
+          <strong class="sub-naslov">Vrijeme za potez</strong>
+          <span class="tajmer-hint">Standardno: 30 sekundi</span>
         </div>
-
-        <p class="objasnjenje-imenica">Imenice su obavezne kako bi svaka runda imala dovoljno nastavaka.</p>
-        <p class="objasnjenje-skupa">
-          Sustav rundu otvara iz
-          <PojamPomoc
-            tekst="skupa sigurnih riječi"
-            opis="Zbirka riječi koja uvijek ima nastavak te njihov nastavak isto ima nastavak."
-            id="pojasnjenje-skupa-sigurnih-rijeci"
-          />.
-        </p>
-
-        <div class="vrste-mrezica">
-          {#each SVE_VRSTE_RIJECI as vrsta (vrsta)}
-            <label
-              class="vrsta-labela"
-              class:aktivno={odabraneVrste.has(vrsta)}
-              class:zakljucano={vrsta === 'imenica'}
-              title={vrsta === 'imenica' ? 'Imenice su uvijek uključene.' : undefined}
+        <div class="opcije-gumbi opcije-gumbi--tajmer" role="radiogroup" aria-label="Vrijeme za potez">
+          {#each OPCIJE_TAJMERA as opcija (opcija.sek)}
+            <button
+              type="button"
+              class="odabir-gumb"
+              class:odabran={trajanjePotezaSek === opcija.sek}
+              role="radio"
+              aria-checked={trajanjePotezaSek === opcija.sek}
+              onclick={() => (trajanjePotezaSek = opcija.sek)}
             >
-              <input
-                type="checkbox"
-                checked={odabraneVrste.has(vrsta)}
-                disabled={vrsta === 'imenica'}
-                onchange={() => preklopiVrstu(vrsta)}
-              />
-              <span>{OZNACI_VRSTA[vrsta]}</span>
-            </label>
+              {#if trajanjePotezaSek === opcija.sek}
+                <Check size={16} strokeWidth={2.6} aria-hidden="true" />
+              {/if}
+              {opcija.oznaka}
+            </button>
           {/each}
         </div>
       </div>
     </section>
 
-    {#if poruka}
-      <p role="alert" class="greska">{poruka}</p>
-    {/if}
+    <section class="grupa" aria-labelledby="naslov-vrste">
+      <div class="grupa-glava">
+        <span class="grupa-ikona grupa-ikona--slova" aria-hidden="true">
+          <span>A</span><span>B</span>
+        </span>
+        <h2 id="naslov-vrste">Vrste riječi</h2>
+      </div>
 
-    <button type="submit" class="glavni-gumb" disabled={slanjeUTijeku}>
-      {slanjeUTijeku ? 'Stvaranje sobe...' : 'Stvori privatnu sobu'}
-    </button>
+      <div class="opcije-gumbi opcije-gumbi--brze" role="group" aria-label="Brzi odabir vrsta">
+        <button
+          type="button"
+          class="odabir-gumb"
+          class:odabran={sveVrsteOdabrane}
+          aria-pressed={sveVrsteOdabrane}
+          onclick={ukljuciSve}
+        >
+          {#if sveVrsteOdabrane}
+            <Check size={16} strokeWidth={2.6} aria-hidden="true" />
+          {/if}
+          Sve riječi
+        </button>
+        <button
+          type="button"
+          class="odabir-gumb"
+          class:odabran={samoImenice}
+          aria-pressed={samoImenice}
+          onclick={iskljuciSve}
+        >
+          {#if samoImenice}
+            <Check size={16} strokeWidth={2.6} aria-hidden="true" />
+          {/if}
+          Samo imenice
+        </button>
+      </div>
+
+      <div class="vrste-mrezica">
+        {#each SVE_VRSTE_RIJECI as vrsta (vrsta)}
+          <label
+            class="vrsta-labela"
+            class:aktivno={odabraneVrste.has(vrsta)}
+            class:zakljucano={vrsta === 'imenica'}
+            title={vrsta === 'imenica' ? 'Imenice su uvijek uključene.' : undefined}
+          >
+            {#if vrsta === 'imenica'}
+              <span class="vrsta-oznaka" aria-hidden="true">
+                <Lock size={14} strokeWidth={2.4} />
+              </span>
+              <input
+                type="checkbox"
+                checked
+                disabled
+                aria-label="Imenice"
+              />
+              <span>Imenice <em>(obavezno)</em></span>
+            {:else}
+              <input
+                type="checkbox"
+                checked={odabraneVrste.has(vrsta)}
+                onchange={() => preklopiVrstu(vrsta)}
+              />
+              <span>{OZNACI_VRSTA[vrsta]}</span>
+            {/if}
+          </label>
+        {/each}
+      </div>
+
+      <p class="info-napomena">
+        <Info size={16} strokeWidth={2.2} aria-hidden="true" />
+        <span>Imenice su uvijek uključene kako bi bilo dovoljno mogućih nastavaka.</span>
+      </p>
+    </section>
+
+    <section class="grupa sazetak" aria-labelledby="naslov-sazetak">
+      <div class="grupa-glava">
+        <span class="grupa-ikona" aria-hidden="true">
+          <ClipboardList size={22} strokeWidth={2.2} />
+        </span>
+        <h2 id="naslov-sazetak">Sažetak sobe</h2>
+      </div>
+
+      <dl class="sazetak-tablica">
+        <div>
+          <dt>Pravilnik</dt>
+          <dd>{TEKSTOVI_PRAVILNIKA[pravilnik].naziv}</dd>
+        </div>
+        <div>
+          <dt>Vrijeme</dt>
+          <dd>{sazetakVremena}</dd>
+        </div>
+        <div>
+          <dt>Bodovi za izbacivanje</dt>
+          <dd>{eliminacijskiBodovi ? 'Uključeno' : 'Isključeno'}</dd>
+        </div>
+        <div>
+          <dt>Vrste riječi</dt>
+          <dd>{sazetakVrsta}</dd>
+        </div>
+      </dl>
+
+      {#if poruka}
+        <p role="alert" class="greska">{poruka}</p>
+      {/if}
+
+      <button type="submit" class="glavni-gumb" disabled={slanjeUTijeku} aria-busy={slanjeUTijeku}>
+        {#if !slanjeUTijeku}
+          <Play size={18} strokeWidth={2.6} aria-hidden="true" />
+        {/if}
+        {slanjeUTijeku ? 'Stvaranje sobe...' : 'Stvori privatnu sobu'}
+      </button>
+    </section>
   </form>
 </main>
 
 <style>
   .kreiraj-sobu {
-    max-width: 540px;
-    padding: 24px 0;
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 20px 0 48px;
     display: flex;
     flex-direction: column;
     gap: 20px;
   }
 
+  .uvod {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   h1 {
     font-family: var(--font-naslov);
-    line-height: 1.1;
+    font-size: clamp(28px, 4.5vw, 40px);
+    line-height: 1.15;
     margin: 0;
   }
 
   .podnaslov {
     margin: 0;
+    max-width: 42rem;
     color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mali);
+    line-height: 1.45;
   }
 
   form {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
   }
 
   .grupa {
     background: var(--boja-povrsina);
     border: 1px solid var(--boja-obrub);
     border-radius: var(--radijus-kartica);
-    padding: 20px;
+    padding: 18px;
     box-shadow: var(--sjena-suptilna);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
+  }
+
+  .grupa-glava {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 
   .grupa h2 {
-    font-size: var(--naslov-3);
+    font-family: var(--font-naslov);
+    font-size: clamp(18px, 2.4vw, 22px);
     margin: 0;
+    line-height: 1.2;
   }
 
-  .sub-naslov {
-    font-weight: 700;
-    font-size: var(--tekst-sitni);
-    color: var(--boja-tekst-naslov);
+  .grupa-ikona {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--boja-isticanje-slova) 22%, transparent);
+    color: var(--boja-isticanje-tekst);
   }
 
-  .objasnjenje-imenica,
-  .objasnjenje-skupa {
-    margin: 0;
-    color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-sitni);
-  }
-
-  .naslov-redak {
-    display: flex;
+  .grupa-ikona--slova {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
+    justify-content: center;
+    gap: 2px;
+    font-family: var(--font-naslov);
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
   }
 
-  .brze-akcije {
-    font-size: var(--tekst-sitni);
-    color: var(--boja-tekst-sekundarni);
-  }
-
-  .link-gumb {
-    background: none;
-    border: none;
-    color: var(--boja-tekst-naslov);
-    font-weight: 700;
-    cursor: pointer;
-    text-decoration: underline;
-    padding: 0;
-    font-size: inherit;
+  .grupa-ikona--slova span {
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: var(--boja-isticanje-slova);
+    color: var(--boja-cta-tekst);
+    line-height: 1;
   }
 
   .opcije-gumbi {
@@ -317,221 +446,356 @@
     gap: 8px;
   }
 
+  .opcije-gumbi--pravila,
+  .opcije-gumbi--brze {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .opcije-gumbi--tajmer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
   .odabir-gumb {
-    background: var(--boja-povrsina-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 16px;
     border: 2px solid var(--boja-obrub);
-    color: var(--boja-tekst-osnovni);
-    padding: 8px 16px;
     border-radius: var(--radijus-pill);
-    font-weight: 600;
-    cursor: pointer;
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
     font-size: var(--tekst-sitni);
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
   }
 
   .odabir-gumb.odabran {
     background: var(--boja-cta-pozadina);
     border-color: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
-    font-weight: 700;
   }
 
-  .preklopnik-redak {
+  .pravila-opis {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pravila-opis p {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+    line-height: 1.45;
+  }
+
+  .detaljna-pravila {
+    align-self: flex-start;
+    color: var(--boja-uspjeh-tekst);
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .postavka-blok {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 4px;
+  }
+
+  .postavka-blok + .postavka-blok {
+    border-top: 1px solid var(--boja-obrub);
+    padding-top: 14px;
+  }
+
+  .prekidac-redak {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    font-weight: 600;
-    font-size: var(--tekst-sitni);
     cursor: pointer;
   }
 
-  input[type='checkbox'] {
-    width: 20px;
-    height: 20px;
+  .prekidac-tekst {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .prekidac-tekst strong {
+    font-size: var(--tekst-mali);
+    color: var(--boja-tekst-naslov);
+  }
+
+  .prekidac-tekst small {
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+    line-height: 1.4;
+  }
+
+  .prekidac-omot {
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .prekidac-omot input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+
+  .prekidac {
+    display: flex;
+    align-items: center;
+    width: 46px;
+    height: 28px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--boja-obrub-jaci);
+    transition: background-color 160ms ease;
+  }
+
+  .prekidac span {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 160ms ease;
+  }
+
+  .prekidac-omot input:checked + .prekidac {
+    background: var(--boja-uspjeh-tekst);
+  }
+
+  .prekidac-omot input:checked + .prekidac span {
+    transform: translateX(18px);
+  }
+
+  .prekidac-omot input:focus-visible + .prekidac {
+    outline: 3px solid var(--boja-fokus);
+    outline-offset: 3px;
+  }
+
+  .tajmer-zaglavlje {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px 12px;
+  }
+
+  .sub-naslov {
+    font-size: var(--tekst-mali);
+    color: var(--boja-tekst-naslov);
+  }
+
+  .tajmer-hint {
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+  }
+
+  .vrste-mrezica {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .vrsta-labela {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 8px 10px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 10px;
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    font-size: var(--tekst-sitni);
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .vrsta-labela input {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
     accent-color: var(--boja-isticanje-slova);
     cursor: pointer;
   }
 
-  .tajmer-sekcija, .vrste-sekcija {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .vrste-mrezica {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 10px;
-  }
-
-  .vrsta-labela {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--boja-povrsina-2);
-    border: 1px solid var(--boja-obrub);
-    padding: 8px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: var(--tekst-sitni);
-    font-weight: 600;
-    user-select: none;
-  }
-
   .vrsta-labela.aktivno {
-    background: var(--boja-povrsina-3);
-    border-color: var(--boja-isticanje-slova);
-    color: var(--boja-isticanje-tekst);
-    font-weight: 700;
+    border-color: color-mix(in srgb, var(--boja-isticanje-slova) 55%, var(--boja-obrub));
+    background: color-mix(in srgb, var(--boja-isticanje-slova) 12%, var(--boja-povrsina-2));
   }
 
   .vrsta-labela.zakljucano {
-    opacity: 0.58;
-    cursor: not-allowed;
+    border-color: color-mix(in srgb, var(--boja-uspjeh-tekst) 45%, var(--boja-obrub));
+    background: color-mix(in srgb, var(--boja-uspjeh-tekst) 14%, var(--boja-povrsina-2));
+    color: var(--boja-uspjeh-tekst);
+    cursor: default;
   }
 
   .vrsta-labela.zakljucano input {
-    cursor: not-allowed;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
   }
 
-  .glavni-gumb {
-    font-family: var(--font-naslov);
-    font-size: 22px;
-    letter-spacing: 1.5px;
+  .vrsta-labela.zakljucano em {
+    font-style: normal;
     font-weight: 700;
-    border: none;
-    border-radius: var(--radijus-pill);
-    padding: 14px 32px;
-    background: var(--boja-cta-pozadina);
-    color: var(--boja-cta-tekst);
-    cursor: pointer;
-    align-self: flex-start;
+    opacity: 0.85;
   }
 
-  .glavni-gumb:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .greska {
-    color: var(--boja-poraz-tekst);
-    margin: 0;
-    font-weight: 600;
-  }
-
-  .grupa {
-    background: var(--boja-povrsina);
-    border: 1px solid var(--boja-obrub);
-    border-radius: var(--radijus-kartica);
-    padding: 20px;
-    box-shadow: var(--sjena-suptilna);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .grupa h2 {
-    font-size: var(--naslov-3);
-    margin: 0;
-  }
-
-  .naslov-redak {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .brze-akcije {
-    font-size: var(--tekst-sitni);
-    color: var(--boja-tekst-sekundarni);
-  }
-
-  .link-gumb {
-    background: none;
-    border: none;
-    color: var(--boja-tekst-naslov);
-    font-weight: 700;
-    cursor: pointer;
-    text-decoration: underline;
-    padding: 0;
-    font-size: inherit;
-  }
-
-  .opcije-gumbi {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .odabir-gumb {
-    background: var(--boja-povrsina-2);
-    border: 2px solid var(--boja-obrub);
-    color: var(--boja-tekst-osnovni);
-    padding: 8px 16px;
-    border-radius: var(--radijus-pill);
-    font-weight: 600;
-    cursor: pointer;
-    font-size: var(--tekst-sitni);
-  }
-
-  .odabir-gumb.odabran {
-    background: var(--boja-cta-pozadina);
-    border-color: var(--boja-cta-pozadina);
-    color: var(--boja-cta-tekst);
-    font-weight: 700;
-  }
-
-  .vrste-mrezica {
+  .vrsta-oznaka {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 10px;
+    place-items: center;
+    flex: 0 0 auto;
   }
 
-  .vrsta-labela {
+  .info-napomena {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
-    background: var(--boja-povrsina-2);
-    border: 1px solid var(--boja-obrub);
-    padding: 8px 12px;
-    border-radius: 8px;
-    cursor: pointer;
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-sitni);
-    font-weight: 600;
-    user-select: none;
+    line-height: 1.4;
   }
 
-  .vrsta-labela.aktivno {
-    background: var(--boja-povrsina-3);
-    border-color: var(--boja-isticanje-slova);
+  .info-napomena :global(svg) {
+    flex: 0 0 auto;
+    margin-top: 1px;
     color: var(--boja-isticanje-tekst);
+  }
+
+  .sazetak {
+    gap: 16px;
+  }
+
+  .sazetak-tablica {
+    display: grid;
+    gap: 0;
+    margin: 0;
+  }
+
+  .sazetak-tablica > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--boja-obrub);
+  }
+
+  .sazetak-tablica dt {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+  }
+
+  .sazetak-tablica dd {
+    margin: 0;
+    text-align: right;
+    font-size: var(--tekst-sitni);
     font-weight: 700;
+    color: var(--boja-tekst-naslov);
   }
 
   .glavni-gumb {
-    font-family: var(--font-naslov);
-    font-size: 22px;
-    letter-spacing: 1.5px;
-    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 52px;
+    padding: 14px 24px;
     border: none;
     border-radius: var(--radijus-pill);
-    padding: 14px 32px;
     background: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
+    font-family: var(--font-naslov);
+    font-size: clamp(18px, 2.5vw, 22px);
+    font-weight: 700;
+    letter-spacing: 0.4px;
     cursor: pointer;
-    align-self: flex-start;
   }
 
   .glavni-gumb:disabled {
-    opacity: 0.5;
+    opacity: 0.55;
     cursor: default;
   }
 
   .greska {
-    color: var(--boja-poraz-tekst);
     margin: 0;
+    color: var(--boja-poraz-tekst);
     font-weight: 600;
+    font-size: var(--tekst-sitni);
+  }
+
+  @media (min-width: 600px) {
+    .kreiraj-sobu {
+      max-width: 620px;
+      padding-top: 28px;
+    }
+
+    .grupa {
+      padding: 22px;
+    }
+
+    .opcije-gumbi--pravila {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .opcije-gumbi--brze {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .opcije-gumbi--tajmer {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .vrste-mrezica {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .pravila-opis {
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .detaljna-pravila {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+  }
+
+  @media (min-width: 1000px) {
+    .kreiraj-sobu {
+      max-width: 680px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .prekidac,
+    .prekidac span {
+      transition: none;
+    }
   }
 </style>

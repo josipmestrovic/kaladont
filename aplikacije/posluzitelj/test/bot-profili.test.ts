@@ -9,38 +9,67 @@ import {
 } from '../src/bot/profili-bota.js';
 
 describe('profili bota (PR02)', () => {
-  it('Iskusni je parity s ZADANA na četiri poluge', () => {
+  it('profil v2 i Iskusni KA/taktika parity s ZADANA', () => {
     const { konfiguracija, profileId, botProfileVersion } = razrijesiProfilBota('iskusni');
     expect(profileId).toBe('iskusni');
     expect(botProfileVersion).toBe(VERZIJA_PROFILA_BOTA);
+    expect(VERZIJA_PROFILA_BOTA).toBe(2);
     expect(konfiguracija.vjerojatnostTaktickogPoteza).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza);
-    expect(konfiguracija.vjerojatnostNeznanjaUMalomSkupu).toBe(
-      ZADANA_KONFIGURACIJA_BOTA.vjerojatnostNeznanjaUMalomSkupu,
-    );
     expect(konfiguracija.vjerojatnostPropustaKa).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropustaKa);
     expect(konfiguracija.vjerojatnostOstavljanjaKa).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa);
     expect(POLUGE_PROFILA_BOTA.iskusni).toEqual({
       vjerojatnostTaktickogPoteza: 0.25,
-      vjerojatnostNeznanjaUMalomSkupu: 0.1,
+      vjerojatnostNeznanjaUMalomSkupu: 0.18,
       vjerojatnostPropustaKa: 0.08,
       vjerojatnostOstavljanjaKa: 0.015,
+      maksimalnoOpcijaMalogSkupa: 5,
+      dokaziBudzetDetaljneProvjere: 8,
+      dokaziBudzetDodatneProvjere: 8,
+      vjerojatnostDokaziPreskokaPotvrde: 0.12,
+      dokaziFaktorPropusaPotvrde: 0.3,
     });
   });
 
-  it('profili se razlikuju i ne mutiraju ZADANA', () => {
+  it('profili se razlikuju monotono i ne mutiraju ZADANA', () => {
     const prije = { ...ZADANA_KONFIGURACIJA_BOTA };
     const pocetnik = razrijesiProfilBota('pocetnik').konfiguracija;
+    const iskusni = razrijesiProfilBota('iskusni').konfiguracija;
+    const majstor = razrijesiProfilBota('majstor').konfiguracija;
     const velemajstor = razrijesiProfilBota('velemajstor').konfiguracija;
+
     expect(pocetnik.vjerojatnostTaktickogPoteza).toBe(0.1);
     expect(velemajstor.vjerojatnostTaktickogPoteza).toBe(0.75);
-    expect(pocetnik.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(
-      velemajstor.vjerojatnostNeznanjaUMalomSkupu,
-    );
+
+    expect(pocetnik.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(iskusni.vjerojatnostNeznanjaUMalomSkupu);
+    expect(iskusni.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(majstor.vjerojatnostNeznanjaUMalomSkupu);
+    expect(majstor.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(velemajstor.vjerojatnostNeznanjaUMalomSkupu);
+
+    expect(pocetnik.dokaziFaktorPropusaPotvrde).toBeGreaterThan(iskusni.dokaziFaktorPropusaPotvrde);
+    expect(iskusni.dokaziFaktorPropusaPotvrde).toBeGreaterThan(majstor.dokaziFaktorPropusaPotvrde);
+    expect(majstor.dokaziFaktorPropusaPotvrde).toBeGreaterThan(velemajstor.dokaziFaktorPropusaPotvrde);
+
+    expect(pocetnik.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(iskusni.vjerojatnostDokaziPreskokaPotvrde);
+    expect(iskusni.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(majstor.vjerojatnostDokaziPreskokaPotvrde);
+    expect(majstor.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(velemajstor.vjerojatnostDokaziPreskokaPotvrde);
+
+    expect(pocetnik.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(iskusni.maksimalnoOpcijaMalogSkupa);
+    expect(iskusni.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(majstor.maksimalnoOpcijaMalogSkupa);
+    expect(majstor.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(velemajstor.maksimalnoOpcijaMalogSkupa);
+
+    expect(pocetnik.dokaziBudzetDetaljneProvjere).toBeLessThan(iskusni.dokaziBudzetDetaljneProvjere);
+    expect(iskusni.dokaziBudzetDetaljneProvjere).toBeLessThanOrEqual(majstor.dokaziBudzetDetaljneProvjere);
+
     expect(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza).toBe(prije.vjerojatnostTaktickogPoteza);
-    // Compute limiti ostaju isti.
     expect(pocetnik.maksimalnoTaktickihKandidata).toBe(12);
     expect(velemajstor.maksimalnoTaktickihKandidata).toBe(12);
     expect(pocetnik.trajanjePotezaBotaMs).toBe(ZADANA_KONFIGURACIJA_BOTA.trajanjePotezaBotaMs);
+  });
+
+  it('javni ZADANA ostaje strog na Dokaži polugama', () => {
+    expect(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostDokaziPreskokaPotvrde).toBe(0);
+    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziFaktorPropusaPotvrde).toBe(0);
+    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziBudzetDetaljneProvjere).toBe(12);
+    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziBudzetDodatneProvjere).toBe(12);
   });
 
   it('izostanak profileId → Iskusni; nepoznat id baca', () => {

@@ -7,12 +7,13 @@ import { grafemi, PRAGOVI_DULJINE, zadnjaDva, type FazaPoteza, type PravilnikPar
 import { promijesajNiz } from '../igra/raspored-sjedala.js';
 import { type KategorijaRijeci, type KonfiguracijaBota } from './konfiguracija-bota.js';
 import {
-  DETALJNA_PROVJERA_PO_POTEZU,
-  DOKAZ_DODATNA_PROVJERA,
   RADNI_UZORAK_PO_POTEZU,
   jeOpasanZavrsetak,
 } from './repertoar.js';
 import { CHECKPOINT_ZAPISA } from './raspored-odziva.js';
+
+/** Gornja granica brojanja neovisnih nastavaka za Dokaži propust potvrde. */
+const BUDZET_BROJA_NASTAVAKA_ZA_PROPUST = 8;
 
 /** Vraća broj u [0, 1). */
 export type Rng = () => number;
@@ -55,6 +56,10 @@ export interface StanjeBotaUPartiji {
    * Drži samo aktualni token (ne povijest partije).
    */
   taktikaPoTokenu: Map<string, boolean>;
+  /** Dokaži: jednokratni preskok potvrde nastavka po turnTokenu. */
+  dokaziPreskokPoTokenu: Map<string, boolean>;
+  /** Dokaži: jednokratni propust potvrde po `turnToken|rijec`. */
+  dokaziPropustPoKljucu: Map<string, boolean>;
   konfiguracija: KonfiguracijaBota;
   brojKandidata: number;
   zadnjiTokenKa: string | null;
@@ -67,6 +72,8 @@ export function stvoriStanjeBota(konfig: KonfiguracijaBota, rng: Rng): StanjeBot
     zadnjiToken: null,
     neznanjePoTokenu: new Map(),
     taktikaPoTokenu: new Map(),
+    dokaziPreskokPoTokenu: new Map(),
+    dokaziPropustPoKljucu: new Map(),
     konfiguracija: structuredClone(konfig),
     brojKandidata: 0,
     zadnjiTokenKa: null,
@@ -396,6 +403,67 @@ function odlukaTaktikeZaToken(
   return vrijednost;
 }
 
+function odlukaDokaziPreskokaZaToken(
+  stanje: StanjeBotaUPartiji,
+  turnToken: string | undefined,
+  oporavak: boolean | undefined,
+  vjerojatnost: number,
+  rng: Rng,
+): boolean {
+  if (vjerojatnost <= 0) return false;
+  if (oporavak && turnToken && stanje.dokaziPreskokPoTokenu.has(turnToken)) {
+    return stanje.dokaziPreskokPoTokenu.get(turnToken)!;
+  }
+  if (!turnToken) return rng() < vjerojatnost;
+  const postojece = stanje.dokaziPreskokPoTokenu.get(turnToken);
+  if (postojece !== undefined) return postojece;
+  const vrijednost = rng() < vjerojatnost;
+  zapisiOdlukuTokena(stanje.dokaziPreskokPoTokenu, turnToken, vrijednost);
+  return vrijednost;
+}
+
+function vjerojatnostPropusaPotvrde(brojNastavaka: number, faktor: number): number {
+  if (faktor <= 0 || brojNastavaka <= 0) return 0;
+  return Math.min(0.95, faktor / brojNastavaka);
+}
+
+function odlukaDokaziPropusaPotvrde(
+  stanje: StanjeBotaUPartiji,
+  turnToken: string | undefined,
+  rijec: string,
+  brojNastavaka: number,
+  faktor: number,
+  rng: Rng,
+): boolean {
+  const vjerojatnost = vjerojatnostPropusaPotvrde(brojNastavaka, faktor);
+  if (vjerojatnost <= 0) return false;
+  if (!turnToken) return rng() < vjerojatnost;
+  const kljuc = `${turnToken}|${rijec}`;
+  const postojece = stanje.dokaziPropustPoKljucu.get(kljuc);
+  if (postojece !== undefined) return postojece;
+  const vrijednost = rng() < vjerojatnost;
+  stanje.dokaziPropustPoKljucu.set(kljuc, vrijednost);
+  return vrijednost;
+}
+
+/** Očisti Dokaži odluke kad stigne novi turnToken. */
+function ocistiDokaziOdlukeZaNoviToken(stanje: StanjeBotaUPartiji, turnToken: string): void {
+  if (stanje.dokaziPreskokPoTokenu.size > 0 && !stanje.dokaziPreskokPoTokenu.has(turnToken)) {
+    stanje.dokaziPreskokPoTokenu.clear();
+  }
+  if (stanje.dokaziPropustPoKljucu.size > 0) {
+    const prefiks = `${turnToken}|`;
+    let imaAktualni = false;
+    for (const kljuc of stanje.dokaziPropustPoKljucu.keys()) {
+      if (kljuc.startsWith(prefiks)) {
+        imaAktualni = true;
+        break;
+      }
+    }
+    if (!imaAktualni) stanje.dokaziPropustPoKljucu.clear();
+  }
+}
+
 /**
  * true = bot zna legalan nastavak;
  * false = potvrđeno mrtvo (nema legalne riječi u cijelom rječniku);
@@ -476,6 +544,29 @@ function brojCestihPoznatihNastavaka(
     if (vidjene.has(kljuc)) continue;
     vidjene.add(kljuc);
     if (jeCesta(nastavak, ulaz.frekvencijaZa, konfig)) broj += 1;
+    if (broj >= budzet) break;
+  }
+  return broj;
+}
+
+/** Broj neovisnih poznatih nastavaka (za Dokaži propust potvrde). */
+function brojPoznatihNastavaka(
+  rijec: string,
+  ulaz: UlazOdabira,
+  iskoristene: ReadonlySet<string>,
+  budzet = BUDZET_BROJA_NASTAVAKA_ZA_PROPUST,
+): number | null {
+  if (!ulaz.poznatiKandidatiNa) return null;
+  const nakon = potroseneNakonRijeci(iskoristene, ulaz.grupeZa(rijec));
+  const prefiks = zadnjaDva(rijec);
+  let broj = 0;
+  const vidjene = new Set<string>();
+  for (const nastavak of ulaz.poznatiKandidatiNa(prefiks, nakon.kaoReadonlySet())) {
+    const grupe = ulaz.grupeZa(nastavak);
+    const kljuc = grupe.length ? grupe.join('|') : nastavak;
+    if (vidjene.has(kljuc)) continue;
+    vidjene.add(kljuc);
+    broj += 1;
     if (broj >= budzet) break;
   }
   return broj;
@@ -578,6 +669,7 @@ function traziPotvrdjeneDokazi(
   iskoristene: ReadonlySet<string>,
   konfig: KonfiguracijaBota,
   rng: Rng,
+  stanje: StanjeBotaUPartiji,
 ): string[] {
   const bezKa = kandidati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
   if (!bezKa.length) return [];
@@ -587,13 +679,19 @@ function traziPotvrdjeneDokazi(
   const ostatak = bezKa.filter((rijec) => !radni.includes(rijec));
   const potvrdjeni: string[] = [];
   const provjeri = (lista: readonly string[], limit: number): void => {
+    if (limit <= 0) return;
     const uzorak = lista.length <= limit ? lista : uzorkujPonderirano([...lista], limit, ulaz.frekvencijaZa, rng, konfig);
     for (const rijec of uzorak) {
-      if (imaPoznatiNastavak(rijec, ulaz, iskoristene) === true) potvrdjeni.push(rijec);
+      if (imaPoznatiNastavak(rijec, ulaz, iskoristene) !== true) continue;
+      const n = brojPoznatihNastavaka(rijec, ulaz, iskoristene) ?? 1;
+      if (odlukaDokaziPropusaPotvrde(stanje, ulaz.turnToken, rijec, n, konfig.dokaziFaktorPropusaPotvrde, rng)) {
+        continue;
+      }
+      potvrdjeni.push(rijec);
     }
   };
-  provjeri(radni, DETALJNA_PROVJERA_PO_POTEZU);
-  if (potvrdjeni.length === 0) provjeri(ostatak, DOKAZ_DODATNA_PROVJERA);
+  provjeri(radni, konfig.dokaziBudzetDetaljneProvjere);
+  if (potvrdjeni.length === 0) provjeri(ostatak, konfig.dokaziBudzetDodatneProvjere);
   return potvrdjeni;
 }
 
@@ -639,6 +737,7 @@ export function odaberiPotez(
     if (stanje.taktikaPoTokenu.size > 0 && !stanje.taktikaPoTokenu.has(ulaz.turnToken)) {
       stanje.taktikaPoTokenu.clear();
     }
+    ocistiDokaziOdlukeZaNoviToken(stanje, ulaz.turnToken);
   }
   let propustKa = false;
   const pravila = ulaz.pravila ?? 'ka_zna';
@@ -697,11 +796,20 @@ export function odaberiPotez(
   }
 
   if (politikaSirowa === 'bez_ka' && faza === 'obican_potez' && poznati.length > 0) {
-    const potvrdjeni = traziPotvrdjeneDokazi(poznati, ulaz, iskoristene, konfig, rng);
-    if (!potvrdjeni.length) {
-      return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
+    const preskoci = odlukaDokaziPreskokaZaToken(
+      stanje,
+      ulaz.turnToken,
+      ulaz.oporavak,
+      konfig.vjerojatnostDokaziPreskokaPotvrde,
+      rng,
+    );
+    if (!preskoci) {
+      const potvrdjeni = traziPotvrdjeneDokazi(poznati, ulaz, iskoristene, konfig, rng, stanje);
+      if (!potvrdjeni.length) {
+        return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
+      }
+      poznati = potvrdjeni;
     }
-    poznati = potvrdjeni;
   }
 
   if (poznati.length > RADNI_UZORAK_PO_POTEZU) {
@@ -839,6 +947,41 @@ async function brojCestihNastavivo(
   return broj;
 }
 
+async function brojPoznatihNastavakaNastavivo(
+  rijec: string,
+  ulaz: UlazOdabira,
+  iskoristene: ReadonlySet<string>,
+  predaj: PredajKontrolu,
+  aktivan: () => boolean,
+  budzet = BUDZET_BROJA_NASTAVAKA_ZA_PROPUST,
+): Promise<number | null | 'otkazano'> {
+  if (!ulaz.poznatiKandidatiNaNastavivo && !ulaz.poznatiKandidatiNa) return null;
+  if (ulaz.poznatiKandidatiNa && !ulaz.poznatiKandidatiNaNastavivo) {
+    return brojPoznatihNastavaka(rijec, ulaz, iskoristene, budzet);
+  }
+  const nakon = potroseneNakonRijeci(iskoristene, ulaz.grupeZa(rijec));
+  const potrosene = nakon.kaoReadonlySet();
+  const prefiks = zadnjaDva(rijec);
+  let broj = 0;
+  const vidjene = new Set<string>();
+  let n = 0;
+  for await (const nastavak of ulaz.poznatiKandidatiNaNastavivo!(prefiks, potrosene)) {
+    n += 1;
+    const grupe = ulaz.grupeZa(nastavak);
+    const kljuc = grupe.length ? grupe.join('|') : nastavak;
+    if (!vidjene.has(kljuc)) {
+      vidjene.add(kljuc);
+      broj += 1;
+      if (broj >= budzet) break;
+    }
+    if (n % CHECKPOINT_ZAPISA === 0) {
+      await predaj();
+      if (!aktivan()) return 'otkazano';
+    }
+  }
+  return broj;
+}
+
 /**
  * Nastavivi odabir: ista politika kao `odaberiPotez`, uz predaju kontrole tijekom skupih nastavaka.
  * Vraća `null` ako je posao otkazan (`aktivan() === false`).
@@ -867,6 +1010,7 @@ export async function odaberiPotezNastavivo(
     if (stanje.taktikaPoTokenu.size > 0 && !stanje.taktikaPoTokenu.has(ulaz.turnToken)) {
       stanje.taktikaPoTokenu.clear();
     }
+    ocistiDokaziOdlukeZaNoviToken(stanje, ulaz.turnToken);
   }
   let propustKa = false;
   const pravila = ulaz.pravila ?? 'ka_zna';
@@ -941,33 +1085,50 @@ export async function odaberiPotezNastavivo(
   }
 
   if (politikaSirowa === 'bez_ka' && faza === 'obican_potez' && poznati.length > 0) {
-    const bezKa = poznati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
-    if (!bezKa.length) {
-      return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
-    }
-    const radni = bezKa.length > RADNI_UZORAK_PO_POTEZU
-      ? uzorkujPonderirano(bezKa, RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
-      : bezKa;
-    const potvrdjeni: string[] = [];
-    const provjeriListu = async (lista: readonly string[], limit: number): Promise<'otkazano' | null> => {
-      const uzorak = lista.length <= limit ? lista : uzorkujPonderirano([...lista], limit, ulaz.frekvencijaZa, rng, konfig);
-      for (const kandidat of uzorak) {
-        const nastavak = await imaPoznatiNastavakNastavivo(kandidat, ulaz, iskoristene, predaj, aktivan);
-        if (nastavak === 'otkazano') return 'otkazano';
-        if (nastavak === true) potvrdjeni.push(kandidat);
+    const preskoci = odlukaDokaziPreskokaZaToken(
+      stanje,
+      ulaz.turnToken,
+      ulaz.oporavak,
+      konfig.vjerojatnostDokaziPreskokaPotvrde,
+      rng,
+    );
+    if (!preskoci) {
+      const bezKa = poznati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
+      if (!bezKa.length) {
+        return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
       }
-      return null;
-    };
-    let ishod = await provjeriListu(radni, DETALJNA_PROVJERA_PO_POTEZU);
-    if (ishod === 'otkazano') return null;
-    if (potvrdjeni.length === 0) {
-      ishod = await provjeriListu(bezKa.filter((rijec) => !radni.includes(rijec)), DOKAZ_DODATNA_PROVJERA);
+      const radni = bezKa.length > RADNI_UZORAK_PO_POTEZU
+        ? uzorkujPonderirano(bezKa, RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
+        : bezKa;
+      const potvrdjeni: string[] = [];
+      const provjeriListu = async (lista: readonly string[], limit: number): Promise<'otkazano' | null> => {
+        if (limit <= 0) return null;
+        const uzorak = lista.length <= limit ? lista : uzorkujPonderirano([...lista], limit, ulaz.frekvencijaZa, rng, konfig);
+        for (const kandidat of uzorak) {
+          const nastavak = await imaPoznatiNastavakNastavivo(kandidat, ulaz, iskoristene, predaj, aktivan);
+          if (nastavak === 'otkazano') return 'otkazano';
+          if (nastavak !== true) continue;
+          const brojN = await brojPoznatihNastavakaNastavivo(kandidat, ulaz, iskoristene, predaj, aktivan);
+          if (brojN === 'otkazano') return 'otkazano';
+          const n = brojN ?? 1;
+          if (odlukaDokaziPropusaPotvrde(stanje, ulaz.turnToken, kandidat, n, konfig.dokaziFaktorPropusaPotvrde, rng)) {
+            continue;
+          }
+          potvrdjeni.push(kandidat);
+        }
+        return null;
+      };
+      let ishod = await provjeriListu(radni, konfig.dokaziBudzetDetaljneProvjere);
       if (ishod === 'otkazano') return null;
+      if (potvrdjeni.length === 0) {
+        ishod = await provjeriListu(bezKa.filter((rijec) => !radni.includes(rijec)), konfig.dokaziBudzetDodatneProvjere);
+        if (ishod === 'otkazano') return null;
+      }
+      if (potvrdjeni.length === 0) {
+        return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
+      }
+      poznati = potvrdjeni;
     }
-    if (potvrdjeni.length === 0) {
-      return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
-    }
-    poznati = potvrdjeni;
   }
 
   if (poznati.length > RADNI_UZORAK_PO_POTEZU) {

@@ -92,26 +92,48 @@ export function porukaZaKodIzazova(kod: string | null | undefined, fallback: str
 export function tekstRazlogaNeuspjeha(razlog: RazlogNeuspjehaIzazova | null | undefined): string {
   switch (razlog) {
     case 'cilj_neispunjen':
-      return 'Pobijedio si, ali nisu ispunjeni svi ciljevi izazova.';
+      return 'Pobijedio si u partiji, ali nisu ispunjeni svi ciljevi izazova. Možeš pokušati ponovno.';
     case 'eliminiran':
-      return 'Ispao si prije pobjede.';
+      return 'Ispao si prije pobjede, pa je izazov izgubljen. Možeš pokušati ponovno.';
     case 'nevaljana_rijec':
-      return 'Nevaljana riječ prekinula je izazov.';
+      return 'Pogriješio si riječ, a ovaj izazov ne dopušta pogreške. Možeš pokušati ponovno.';
+    case 'odustao':
+      return 'Odustao si od izazova. Možeš pokušati ponovno.';
+    case 'prekid_veze':
+      return 'Veza je prekinuta tijekom izazova. Možeš pokušati ponovno.';
+    default:
+      return 'Izazov nije uspio. Možeš pokušati ponovno.';
+  }
+}
+
+/** Kratki naslov za sažetak kraja partije (odbrojavanje do rezultata). */
+export function kratkiSazetakNeuspjehaIzazova(
+  razlog: RazlogNeuspjehaIzazova | null | undefined,
+): string {
+  switch (razlog) {
+    case 'nevaljana_rijec':
+      return 'Izgubio si izazov jer si pogriješio — uvjet je bez pogreške.';
+    case 'cilj_neispunjen':
+      return 'Pobijedio si partiju, ali nisu ispunjeni svi ciljevi izazova.';
     case 'odustao':
       return 'Odustao si od izazova.';
     case 'prekid_veze':
-      return 'Veza je prekinuta tijekom izazova.';
+      return 'Izazov je prekinut zbog gubitka veze.';
+    case 'eliminiran':
+      return 'Izgubio si izazov jer si ispao prije pobjede.';
     default:
-      return 'Izazov nije uspio.';
+      return 'Izgubio si izazov.';
   }
 }
 
 export function tekstRazlogaZakljucavanja(razlog: RazlogZakljucavanja | null | undefined): string {
   if (!razlog) return 'Zaključano.';
   if (razlog.vrsta === 'prethodni_level') {
-    return `Zaključano — najprije dovrši level ${razlog.level} (${NAZIVI_LEVELA_IZAZOVA[razlog.level]}).`;
+    return `Otključava se nakon levela ${razlog.level} (${NAZIVI_LEVELA_IZAZOVA[razlog.level]}).`;
   }
-  return 'Zaključano — najprije dovrši varijante 1–4 ovog formata.';
+  const zavrseno = 4 - razlog.nedostaje.length;
+  if (zavrseno <= 0) return 'Otključava se nakon prva 4 izazova ovog formata.';
+  return `Najprije dovrši prethodna 4 izazova ovog formata (${zavrseno}/4).`;
 }
 
 /** Najviši otključani nezavršen level; inače najviši otključani; fallback 1. */

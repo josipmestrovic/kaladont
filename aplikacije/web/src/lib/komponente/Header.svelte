@@ -176,7 +176,7 @@
                   avatarConfig={profil.avatarConfig}
                   rang={profil.rang === 'Piskaralo' ? null : profil.rang}
                   gost={jeGost}
-                  velicina={44}
+                  velicina={50}
                 />
               </span>
             </button>
@@ -241,11 +241,19 @@
 
   .header--naslovnica .header-sadrzaj {
     pointer-events: none;
+    /* Veliki H1 ne smije vertikalno centrirati avatar — inače skače na /profil. */
+    align-items: flex-start;
   }
 
   .header--naslovnica .logo-naslovnica,
   .header--naslovnica .desno {
     pointer-events: auto;
+  }
+
+  .header--naslovnica .desno {
+    /* Usklađeno s 44px akcijama na ostalim stranicama (avatar 50px + 4px padding). */
+    min-height: 44px;
+    padding-top: 0;
   }
 
   .logo-naslovnica {
@@ -264,6 +272,13 @@
     white-space: nowrap;
   }
 
+  @media (min-width: 1000px) {
+    .logo-naslovnica {
+      font-size: 60px;
+      max-width: min(100%, calc(100vw - 160px));
+    }
+  }
+
   .logo-naslovnica .ime-igre,
   .logo-naslovnica .vrsta-igre {
     display: inline;
@@ -273,6 +288,18 @@
     margin-left: 0.2em;
     font-size: 0.72em;
     font-weight: 700;
+  }
+
+  /* Uski mobitel: samo KALADONT, veći kao pravi naslov. */
+  @media (max-width: 499px) {
+    .logo-naslovnica {
+      font-size: clamp(30px, 9vw, 40px);
+      max-width: min(100%, calc(100vw - 120px));
+    }
+
+    .logo-naslovnica .vrsta-igre {
+      display: none;
+    }
   }
 
   .header-sadrzaj {
@@ -406,7 +433,7 @@
     background: transparent;
     color: var(--boja-tekst-osnovni);
     font: inherit;
-    font-size: var(--tekst-sitni);
+    font-size: 18px;
     font-weight: 700;
     text-align: left;
     text-decoration: none;

@@ -564,7 +564,7 @@ test('mobilni prekid mreže zaključava potez i reconnect vraća stanje partije'
     const vlasnik = igraci[0]!.stranica;
     const gost = igraci[1]!.stranica;
     await vlasnik.goto('/soba/kreiraj');
-    await vlasnik.getByRole('button', { name: 'Bez tajmera' }).click();
+    await vlasnik.getByRole('radio', { name: 'Bez tajmera' }).click();
     await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
     const kodSobe = await vlasnik.locator('.oznaka-koda strong').innerText();
     await gost.goto(`/soba/${kodSobe}`);
@@ -683,7 +683,7 @@ test('mobilna privatna partija završava i Igraj ponovno vraća u sobu', async (
     const vlasnik = igraci[0]!.stranica;
     const gost = igraci[1]!.stranica;
     await vlasnik.goto('/soba/kreiraj');
-    await vlasnik.getByRole('button', { name: 'Bez tajmera' }).click();
+    await vlasnik.getByRole('radio', { name: 'Bez tajmera' }).click();
     await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
     const kodSobe = await vlasnik.locator('.oznaka-koda strong').innerText();
     await gost.goto(`/soba/${kodSobe}`);

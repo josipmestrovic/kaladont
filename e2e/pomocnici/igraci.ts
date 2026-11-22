@@ -153,7 +153,7 @@ export async function pokreniPrivatnuPartiju(
     'aria-checked',
     'true',
   );
-  await vlasnik.getByRole('button', { name: 'Bez tajmera' }).click();
+  await vlasnik.getByRole('radio', { name: 'Bez tajmera' }).click();
   await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
   await expect(vlasnik).toHaveURL(/\/soba\/[A-Z0-9]+$/);
   const kodSobe = await vlasnik.locator('.oznaka-koda strong').innerText();

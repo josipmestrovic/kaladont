@@ -257,7 +257,7 @@ Dodaj blok s točnim tekstom:
 Ponašanje:
 
 - „Zadnje ažuriranje:” je običan tekst, nije poveznica.
-- Datum je poveznica na `urlIzdanja(NAJNOVIJE_IZDANJE)` i sadrži `<time datetime="YYYY-MM-DD">`.
+- Datum je običan `<time datetime="YYYY-MM-DD">` (nije poveznica). Samo „Vidi što je novo” vodi na `/novosti`.
 - „Vidi što je novo” je zasebna poveznica na `/novosti`.
 - Razdjelnik `·` ima `aria-hidden="true"`.
 - Ako nema objavljenog izdanja, blok se ne renderira.
@@ -401,7 +401,7 @@ Koraci:
 1. Checkout commita slike (`needs.promocija.outputs.verzija`), zatim sparse checkout skripti u `_workflow`.
 2. Potvrda da produkcija prikazuje izdanje, uz nekoliko ponovnih pokušaja:
    - `https://kaladont.hr/novosti` sadrži `id="<sidro>"`;
-   - `https://kaladont.hr/` sadrži `/novosti#<sidro>`.
+   - `https://kaladont.hr/` sadrži `datetime="<datum>"` i „Vidi što je novo”.
 3. Ako Release s tom oznakom već postoji, job završava uspješno bez izmjena.
 4. Ako tag postoji bez Releasea, mora pokazivati na commit slike; inače job pada s jasnom porukom.
 5. Generira bilješke i stvara Release:
@@ -449,7 +449,7 @@ Očekivano ponašanje neposredno nakon spajanja PR-a, a prije faze D: sažetak u
 2. Job `slika`: nakon koraka „Provjeriti health endpoint CI imagea” dodaj korak koji dokazuje da skripta i izgrađena slika vide isto izdanje:
    - `odredi-izdanje.sh --samo-izvjestaj` daje `sidro` i `datum` najnovijeg datiranog zapisa;
    - `http://127.0.0.1:3000/novosti` mora sadržavati `id="<sidro>"` i `datetime="<datum>"`;
-   - `http://127.0.0.1:3000/` mora sadržavati `/novosti#<sidro>`;
+   - `http://127.0.0.1:3000/` mora sadržavati `datetime="<datum>"` i „Vidi što je novo”;
    - odgovore spremi u datoteke pa ih pretraži (vidi napomenu o `pipefail` u 8.6);
    - ako nema datiranih zapisa, korak se preskače.
 
@@ -495,7 +495,7 @@ Naslovnica:
 
 6. Tekst bloka je `Zadnje ažuriranje: <datumHr> · Vidi što je novo`, a datum odgovara najnovijem objavljenom zapisu.
 7. „Zadnje ažuriranje:” nije unutar poveznice.
-8. Klik na datum vodi na `/novosti#<sidro>` i taj je zapis vidljiv u prozoru.
+8. Klik na „Vidi što je novo” vodi na `/novosti`; datum nije poveznica.
 9. „Vidi što je novo” vodi na `/novosti`.
 10. Blok postoji u SSR HTML-u dobivenom preko `request.get('/')`.
 11. Na zaslonima 320×568, 380×760, 390×844, 1100×700, 1440×900 i 1366×500 nema vodoravnog overflowa, blok je iznad footera i ne preklapa glavnu navigaciju, kontrole pristupačnosti ni ilustraciju. Od 1000 px naviše blok ne povećava visinu stranice.

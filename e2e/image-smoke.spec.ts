@@ -15,7 +15,7 @@ test('buildani image podržava kratku partiju i ponovnu igru', async ({
     const gost = igraci[1]!.stranica;
 
     await vlasnik.goto('/soba/kreiraj');
-    await vlasnik.getByRole('button', { name: 'Bez tajmera' }).click();
+    await vlasnik.getByRole('radio', { name: 'Bez tajmera' }).click();
     await vlasnik.getByRole('button', { name: 'Stvori privatnu sobu' }).click();
     await expect(vlasnik).toHaveURL(/\/soba\/[A-Z0-9]+$/);
 

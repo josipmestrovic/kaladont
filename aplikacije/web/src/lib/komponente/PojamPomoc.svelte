@@ -144,7 +144,7 @@
     background: var(--boja-povrsina-2);
     box-shadow: var(--sjena-modal);
     color: var(--boja-tekst-osnovni);
-    font-family: var(--font-tekst);
+    font-family: var(--font-tijelo);
     font-size: var(--tekst-sitni);
     font-weight: 500;
     line-height: 1.45;

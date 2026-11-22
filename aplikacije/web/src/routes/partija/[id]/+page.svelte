@@ -19,7 +19,10 @@
   import PanelPrijavaRijeci from '$lib/komponente/PanelPrijavaRijeci.svelte';
   import PanelPrijavaIgraca from '$lib/komponente/PanelPrijavaIgraca.svelte';
   import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
-  import { procitajZadnjiChallengeId } from '$lib/izazovi-klijent.js';
+  import {
+    kratkiSazetakNeuspjehaIzazova,
+    procitajZadnjiChallengeId,
+  } from '$lib/izazovi-klijent.js';
   import {
     dohvatiBrojZaZavrsniSazetak,
     dohvatiStanjeSanducica,
@@ -1842,13 +1845,37 @@
     {/if}
     {#if stanje.kraj}
       <div class="zavrsni-sazetak">
-        {#if stanje.eliminacije.at(-1)}
-          <p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>
-        {/if}
-        {#if pobjednikPartije()}
-          <p class="pobjednik-sazetak"><strong>{imeIgraca(pobjednikPartije()!.igracId)}</strong> je pobjednik/pobjednica!</p>
+        {#if jeIzazov}
+          {#if stanje.izazovTerminal?.status === 'uspjeh'}
+            <p class="pobjednik-sazetak" data-testid="izazov-kraj-sazetak">Izazov uspješan!</p>
+          {:else if stanje.izazovTerminal?.status === 'tehnicki_prekinuto'}
+            <p class="pobjednik-sazetak" data-testid="izazov-kraj-sazetak">
+              Izazov je prekinut zbog tehničke greške. Možeš pokušati ponovno.
+            </p>
+          {:else if stanje.izazovTerminal?.status === 'neuspjeh'}
+            <p class="pobjednik-sazetak" data-testid="izazov-kraj-sazetak">
+              {kratkiSazetakNeuspjehaIzazova(stanje.izazovTerminal.reason)}
+            </p>
+            {#if stanje.izazovTerminal.reason === 'nevaljana_rijec'}
+              <p class="sustav-bira-obrazlozenje">Možeš pokušati ponovno.</p>
+            {:else if stanje.izazovTerminal.reason === 'eliminiran' && stanje.eliminacije.at(-1)}
+              <p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>
+            {/if}
+          {:else if stanje.eliminacije.at(-1)}
+            <p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>
+            <p class="pobjednik-sazetak" data-testid="izazov-kraj-sazetak">Izazov je završen.</p>
+          {:else}
+            <p class="pobjednik-sazetak" data-testid="izazov-kraj-sazetak">Izazov je završen.</p>
+          {/if}
         {:else}
-          <p class="pobjednik-sazetak">Nitko nije pobijedio</p>
+          {#if stanje.eliminacije.at(-1)}
+            <p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>
+          {/if}
+          {#if pobjednikPartije()}
+            <p class="pobjednik-sazetak"><strong>{imeIgraca(pobjednikPartije()!.igracId)}</strong> je pobjednik/pobjednica!</p>
+          {:else}
+            <p class="pobjednik-sazetak">Nitko nije pobijedio</p>
+          {/if}
         {/if}
         <p class="odbrojavanje-najava" aria-live="polite">
           Rezultati za: <strong>{sekundeDoRezultata}</strong>
@@ -1857,7 +1884,11 @@
     {:else}
       {#if stanje.statusSpremanja === 'spremanje_rezultata'}
         <div class="zavrsni-sazetak" aria-live="polite">
-          {#if stanje.ishodDokazaPoruka}
+          {#if jeIzazov && stanje.izazovTerminal?.status === 'neuspjeh'}
+            <p class="sustav-bira-obrazlozenje" data-testid="izazov-kraj-sazetak">
+              {kratkiSazetakNeuspjehaIzazova(stanje.izazovTerminal.reason)}
+            </p>
+          {:else if stanje.ishodDokazaPoruka}
             <p class="sustav-bira-obrazlozenje">{stanje.ishodDokazaPoruka}</p>
           {:else if stanje.eliminacije.at(-1)}
             <p class="sustav-bira-obrazlozenje">{sazetakEliminacije(stanje.eliminacije.at(-1)!)}</p>
