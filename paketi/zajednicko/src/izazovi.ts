@@ -649,11 +649,3 @@ export function izracunajZvjezdiceIzazivaca(zavrseni: ReadonlySet<string>): 0 | 
   }
   return zvijezde;
 }
-
-/**
- * @deprecated Linearni prethodnik uklonjen u v2. Zadržano kao stub za eventualne stare importe —
- * vraća null. Koristiti `dostupnostIzazova`.
- */
-export function prethodniIzazovId(_id: IdIzazova): IdIzazova | null {
-  return null;
-}
