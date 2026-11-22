@@ -25,13 +25,22 @@ export async function udjiUJavniRed(igraci: readonly E2EIgrac[]) {
     throw new Error(`Brza igra (Troboj) prima 1–3 igrača u javni red, dobiveno ${igraci.length}.`);
   }
   const query = '/red?mod=tri_igraca&pravila=klasicni';
-  // Ulaz jedan-po-jedan + potvrda sjedala: paralelni goto često ostavi stol na 1–2
-  // i cekajIstuPartiju onda visi desetke sekundi (bez bot-filla u E2E).
+  // Ulaz jedan-po-jedan: paralelni goto ostavlja stol na 1–2. Treći igrač može odmah
+  // otići u /partija — zato prihvaćamo lobby ILI partiju, ne samo sjedalo.
   for (const igrac of igraci) {
     await igrac.stranica.goto(query);
-    await expect(igrac.stranica.locator('ul.mjesta > li.moje-sjedalo')).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect
+      .poll(
+        async () => {
+          if (/\/partija\/[0-9a-f-]+$/.test(igrac.stranica.url())) return 'partija';
+          if (await igrac.stranica.locator('ul.mjesta > li.moje-sjedalo').isVisible().catch(() => false)) {
+            return 'lobby';
+          }
+          return 'ceka';
+        },
+        { timeout: 10_000 },
+      )
+      .not.toBe('ceka');
   }
 }
 

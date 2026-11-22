@@ -1,6 +1,6 @@
 /**
  * Reprodukcija buga: odbrojavanje u čekaonici radi samo za prvu partiju.
- * Ista 4 igrača odigraju partiju do kraja (svi "ne znam"), vrate se u red
+ * Ista 3 igrača (Troboj) odigraju partiju do kraja (svi "ne znam"), vrate se u red
  * i očekuju drugi partija:pocetak s valjanim pocetakIso.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -48,14 +48,14 @@ function cekajPocetke(klijenti: ClientSocket[]): Promise<PocetakPartije[]> {
 
 describe('dva lobbyja zaredom s istim igračima', () => {
   it('drugi partija:pocetak stiže svima s valjanim pocetakIso', async () => {
-    const klijenti = await Promise.all([spojiSe(), spojiSe(), spojiSe(), spojiSe()]);
+    const klijenti = await Promise.all([spojiSe(), spojiSe(), spojiSe()]);
 
     // 1. partija
     const prviPocetciPromise = cekajPocetke(klijenti);
     const prvaRundaPromise = new Promise<string>((resolve) => {
       klijenti[0]!.once('partija:runda-otvorena', (runda: RundaOtvorena) => resolve(runda.naPotezuId));
     });
-    for (const klijent of klijenti) klijent.emit('red:udji');
+    for (const klijent of klijenti) klijent.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     const prviPocetci = await prviPocetciPromise;
     expect(new Set(prviPocetci.map((p) => p.partijaId)).size).toBe(1);
     expect(Number.isNaN(new Date(prviPocetci[0]!.pocetakIso).getTime())).toBe(false);
@@ -84,9 +84,9 @@ describe('dva lobbyja zaredom s istim igračima', () => {
     // 2. partija: svi se vraćaju u red; ponovi zahtjev dok se završno spremanje prve partije ne obradi.
     const drugiPocetciPromise = cekajPocetke(klijenti);
     const ponovnoSlanje = setInterval(() => {
-      for (const klijent of klijenti) klijent.emit('red:udji');
+      for (const klijent of klijenti) klijent.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     }, 500);
-    for (const klijent of klijenti) klijent.emit('red:udji');
+    for (const klijent of klijenti) klijent.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
 
     const drugiPocetci = await Promise.race([
       drugiPocetciPromise.finally(() => clearInterval(ponovnoSlanje)),

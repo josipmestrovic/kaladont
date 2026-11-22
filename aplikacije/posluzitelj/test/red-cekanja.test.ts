@@ -187,7 +187,8 @@ describe('red čekanja', () => {
   });
 
   it('RS-18: zamjenska veza ponovno ulazi na kraj reda bez duplikata', async () => {
-    const gosti = await stvoriGoste(3);
+    // Troboj puni red pri trećem ulasku — testiramo s dvoje u čekanju.
+    const gosti = await stvoriGoste(2);
     const veze = gosti.map((gost) => gost.socket);
     for (const veza of veze) {
       const stanjePromise = new Promise<StanjeReda>((resolve) => veza.once('red:stanje', resolve));
@@ -198,20 +199,23 @@ describe('red čekanja', () => {
     const odjavaStare = new Promise<void>((resolve) => veze[1]!.once('disconnect', () => resolve()));
     const zamjenskaVeza = await spojiSe(gosti[1]!.token);
     await odjavaStare;
+    const stanjeNakonPrekida = new Promise<StanjeReda>((resolve) => veze[0]!.once('red:stanje', resolve));
+    const bezOdspojenog = await stanjeNakonPrekida;
+    expect(bezOdspojenog.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([gosti[0]!.igracId]);
+
     const stanjePromise = new Promise<StanjeReda>((resolve) => zamjenskaVeza.once('red:stanje', resolve));
-    zamjenskaveza.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
+    zamjenskaVeza.emit('red:udji', { mod: 'tri_igraca', pravila: 'klasicni' });
     const stanje = await stanjePromise;
 
     expect(stanje.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
       gosti[0]!.igracId,
-      gosti[2]!.igracId,
       gosti[1]!.igracId,
     ]);
     for (const veza of [...veze, zamjenskaVeza]) veza.disconnect();
   });
 
   it('RS-16: stvarni prekid oslobađa mjesto, a povratak ulazi na kraj reda', async () => {
-    const gosti = await stvoriGoste(3);
+    const gosti = await stvoriGoste(2);
     const veze = gosti.map((gost) => gost.socket);
     for (const veza of veze) {
       const stanjePromise = new Promise<StanjeReda>((resolve) => veza.once('red:stanje', resolve));
@@ -222,10 +226,7 @@ describe('red čekanja', () => {
     const stanjeNakonPrekida = new Promise<StanjeReda>((resolve) => veze[0]!.once('red:stanje', resolve));
     veze[1]!.disconnect();
     const bezOdspojenog = await stanjeNakonPrekida;
-    expect(bezOdspojenog.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
-      gosti[0]!.igracId,
-      gosti[2]!.igracId,
-    ]);
+    expect(bezOdspojenog.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([gosti[0]!.igracId]);
 
     const povratnaVeza = await spojiSe(gosti[1]!.token);
     const stanjeNakonPovratka = new Promise<StanjeReda>((resolve) => povratnaVeza.once('red:stanje', resolve));
@@ -233,7 +234,6 @@ describe('red čekanja', () => {
     const stanje = await stanjeNakonPovratka;
     expect(stanje.mjesta.filter(Boolean).map((mjesto) => mjesto!.igracId)).toEqual([
       gosti[0]!.igracId,
-      gosti[2]!.igracId,
       gosti[1]!.igracId,
     ]);
 

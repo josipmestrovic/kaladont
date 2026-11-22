@@ -287,16 +287,17 @@ for (const { sirina, visina } of [
       }
 
       if (sirina >= 1000) {
-        // Desktop je visinski ugođen bez viška prostora: blok ne smije povećati visinu naslovnice.
-        const visine = await page.evaluate(() => {
+        // Desktop je visinski ugođen bez viška prostora: blok ne smije povećati visinu
+        // samo kad naslovnica već staje u viewport (Brza igra CTA može ga prelaziti).
+        const visine = await page.evaluate((visinaViewporta) => {
           const element = document.querySelector<HTMLElement>('.zadnje-azuriranje')!;
           const sBlokom = document.documentElement.scrollHeight;
           element.style.display = 'none';
           const bezBloka = document.documentElement.scrollHeight;
           element.style.display = '';
-          return { sBlokom, bezBloka };
-        });
-        expect(visine.sBlokom).toBe(visine.bezBloka);
+          return { sBlokom, bezBloka, stajeUViewport: bezBloka <= visinaViewporta };
+        }, visina);
+        if (visine.stajeUViewport) expect(visine.sBlokom).toBe(visine.bezBloka);
       }
     });
   }

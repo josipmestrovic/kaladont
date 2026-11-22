@@ -3,7 +3,7 @@
  * HINT: dokaz UI se injektira preko window.__KALADONT_E2E_EMIT__ (vidi stanje-igre).
  * HINT: „dokaz smoke” ide stvarnim putem (riječ → Ne znam → zona), bez injekcije.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   cekajIgracaNaPotezu,
   cekajIstuPartiju,
@@ -19,32 +19,16 @@ import {
 } from './pomocnici/igraci.js';
 import { pronadjiIgrivuRijec } from './pomocnici/rjecnik.js';
 
-async function otvoriRankedKorak1(page: Page) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Ranked', exact: true }).click();
-  const dijalog = page.getByRole('dialog', { name: 'Ranked' });
-  await expect(
-    dijalog.getByRole('heading', { name: 'Odaberi pravila po kojima želiš igrati' }),
-  ).toBeVisible();
-  return dijalog;
-}
-
 for (const sirina of [380, 1100] as const) {
-  test(`Igraj koraci 1–2 čitljivi na ${sirina}px`, async ({ page }) => {
+  test(`Brza igra CTA čitljiv na ${sirina}px`, async ({ page }) => {
     await page.setViewportSize({ width: sirina, height: sirina < 1000 ? 720 : 900 });
-    const dijalog = await otvoriRankedKorak1(page);
-    await expect(dijalog.getByText(/Ako protivnik zapne/)).toBeVisible();
-    await dijalog.getByRole('button', { name: /Dokaži nastavak/ }).click();
-    await expect(dijalog.getByRole('heading', { name: 'Odaberi stol' })).toBeVisible();
-    await expect(dijalog.getByRole('link', { name: /Dvoboj/ })).toBeVisible();
-    await expect(dijalog.getByRole('link', { name: /Troboj/ })).toBeVisible();
-    await expect(dijalog.getByRole('button', { name: 'Natrag' })).toBeVisible();
-    const potvrdaNeZnamNijeTu = dijalog.getByRole('button', { name: 'Da' });
-    await expect(potvrdaNeZnamNijeTu).toHaveCount(0);
-    await dijalog.getByRole('button', { name: 'Natrag' }).click();
-    await expect(
-      dijalog.getByRole('heading', { name: 'Odaberi pravila po kojima želiš igrati' }),
-    ).toBeVisible();
+    await page.goto('/');
+    const cta = page.getByTestId('naslovnica-brza-igra');
+    await expect(cta).toBeVisible();
+    await expect(cta.getByText('Brza igra', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Igraj brzu igru u troje/)).toBeVisible();
+    await cta.click();
+    await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
   });
 }
 

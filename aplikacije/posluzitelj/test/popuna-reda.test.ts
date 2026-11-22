@@ -361,8 +361,18 @@ describe('popuna javnog reda botovima', () => {
       expect(pocetak.sjedala.every((s) => s.jeGost)).toBe(true);
       expect(pocetak.sjedala).toHaveLength(3);
       const poId = new Map((await Promise.all(pocetci)).map((p, i) => [p.mojIgracId, socke[i]!] as const));
-      const runda = await rundaPromise;
-      poId.get(runda.naPotezuId)!.emit('potez:ne-znam', { turnToken: runda.turnToken });
+      let runda = await rundaPromise;
+      // Troboj: dvoje eliminacija do kraja (jedan ne-znam ne završava partiju).
+      for (let i = 0; i < 2; i += 1) {
+        const naPotezu = poId.get(runda.naPotezuId)!;
+        if (i === 0) {
+          const sljedeca = cekaj<RundaOtvorena>(socke[0]!, 'partija:runda-otvorena');
+          naPotezu.emit('potez:ne-znam', { turnToken: runda.turnToken });
+          runda = await sljedeca;
+        } else {
+          naPotezu.emit('potez:ne-znam', { turnToken: runda.turnToken });
+        }
+      }
       const kraj = await krajPromise;
       const [partija] = await baza.select().from(partije).where(eq(partije.id, kraj.partijaId));
       expect(partija?.brojBotova).toBe(0);

@@ -92,9 +92,11 @@ describe('metrike misija', () => {
 });
 
 describe('PR12 — osam novih predložaka', () => {
-  it('pool ima 25 dnevnih i 25 tjednih (PR04 D25/W25)', () => {
-    expect(DEFINICIJE_MISIJA.filter((d) => d.vrsta === 'dnevna' && d.aktivna)).toHaveLength(25);
-    expect(DEFINICIJE_MISIJA.filter((d) => d.vrsta === 'tjedna' && d.aktivna)).toHaveLength(25);
+  it('aktivni pool ima 17 dnevnih i 17 tjednih nakon Brze igre (PR04 D25/W25)', () => {
+    expect(DEFINICIJE_MISIJA.filter((d) => d.vrsta === 'dnevna' && d.aktivna)).toHaveLength(17);
+    expect(DEFINICIJE_MISIJA.filter((d) => d.vrsta === 'tjedna' && d.aktivna)).toHaveLength(17);
+    expect(definicijaMisije('D22')?.aktivna).toBe(false);
+    expect(definicijaMisije('W22')?.aktivna).toBe(false);
   });
 
   it('copy nikad ne koristi riječ partija', () => {
