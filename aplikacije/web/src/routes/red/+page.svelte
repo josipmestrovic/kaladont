@@ -208,7 +208,7 @@
 {#if countdown !== null}
   <h1 aria-live="polite">Svi igrači su tu! Igra kreće za {countdown}…</h1>
 {:else}
-  <h1>Čekamo još {preostaloIgraca} {preostaloIgraca === 1 ? (trazeneMod === 'dva_igraca' ? 'igrača' : 'igrač') : 'igrača'}...</h1>
+  <h1>Čekamo još {preostaloIgraca} {preostaloIgraca === 1 ? 'igrač' : 'igrača'}...</h1>
 {/if}
 
 <p class="oznaka-izbora" data-testid="red-oznaka-izbora">{naslovLobbyja}</p>

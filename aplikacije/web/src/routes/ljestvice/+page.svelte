@@ -217,12 +217,11 @@
     }
   }
 
-  function vrijednostRetka(redak: RedakLjestvice, m: ModPartije, me: MetrikaLjestvice): string {
+  function vrijednostRetka(redak: RedakLjestvice): string {
     if (redak.vrijednost.vrsta === 'niz_pobjeda') return String(redak.vrijednost.broj);
-    if (m === 'dva_igraca' && me === 'prosjek_bodova') {
-      return `${new Intl.NumberFormat('hr-HR', { maximumFractionDigits: 0 }).format(redak.vrijednost.prosjek * 100)} %`;
-    }
-    return new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(redak.vrijednost.prosjek);
+    return new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+      redak.vrijednost.prosjek,
+    );
   }
 
   const redakUlaska = $derived(
@@ -305,7 +304,7 @@
           <tr>
             <th scope="col">Mjesto</th>
             <th scope="col">Igrač</th>
-            <th scope="col">{nazivMetrike(podaci.metrika, podaci.mod)}</th>
+            <th scope="col">{nazivMetrike(podaci.metrika)}</th>
             <th scope="col">Igre</th>
           </tr>
         </thead>
@@ -321,7 +320,7 @@
                 {/if}
                 {#if redak.jeJa}<span class="oznaka-ti">Ovo si ti</span>{/if}
               </th>
-              <td data-label={nazivMetrike(podaci.metrika, podaci.mod)}>{vrijednostRetka(redak, podaci.mod, podaci.metrika)}</td>
+              <td data-label={nazivMetrike(podaci.metrika)}>{vrijednostRetka(redak)}</td>
               <td data-label="Igre">{redak.odigraneIgre}</td>
             </tr>
           {/each}
