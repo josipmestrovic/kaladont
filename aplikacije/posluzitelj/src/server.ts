@@ -61,6 +61,7 @@ import { registrirajTrening } from './trening/servis-treninga.js';
 import { registrirajIzazoviRute } from './izazovi/rute.js';
 import { registrirajIzazovSocket } from './izazovi/socket.js';
 import { ocistiStareGostIzazove, oznaciNedovrsenePokusajeTehnickimPrekidom } from './izazovi/pohrana.js';
+import { ocistiStarePokusajeIzazova } from './izazovi/analitika.js';
 import { stvoriVoditeljIzazova, type IshodKrajaIzazova } from './izazovi/voditelj.js';
 import type { SettlementIzazova } from './izazovi/obracun.js';
 import { dohvatiIpKlijenta, jeDopustenaTestnaIp, OgranicivacDogadaja, type PostavkeSocketOgranicenja } from './sigurnost/socket-ogranicenja.js';
@@ -652,6 +653,16 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     void ocistiStareGostIzazove().catch((greska) => app.log.error({ greska }, 'Čišćenje gostujućih Izazova nije uspjelo'));
   }, 24 * 60 * 60 * 1000);
   cistacGostIzazova.unref();
+
+  void ocistiStarePokusajeIzazova().then((broj) => {
+    if (broj.obrisano > 0 || broj.zadrzanoZbogZavrsaka > 0) {
+      app.log.info(broj, 'Retencija pokušaja Izazova (90 dana)');
+    }
+  }).catch((greska) => app.log.error({ greska }, 'Retencija pokušaja Izazova nije uspjela'));
+  const cistacRetencijeIzazova = setInterval(() => {
+    void ocistiStarePokusajeIzazova().catch((greska) => app.log.error({ greska }, 'Retencija pokušaja Izazova nije uspjela'));
+  }, 24 * 60 * 60 * 1000);
+  cistacRetencijeIzazova.unref();
 
   io.use(async (socket, next) => {
     const pocetakAutorizacije = performance.now();
