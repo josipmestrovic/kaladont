@@ -1630,8 +1630,8 @@
   {#if jeIzazov && !stanje.kraj}
     <NapredakCiljevaIzazova
       napredak={stanje.goalProgress}
+      meta={stanje.izazovMeta}
       pravila={stanje.pravila}
-      trajanjePotezaSek={stanje.trajanjePotezaSek}
     />
   {/if}
   {#if prikazanaSjedala.length > 0}
