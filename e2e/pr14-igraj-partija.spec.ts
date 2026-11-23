@@ -258,7 +258,8 @@ test('klasični trening ima dva Iskusna (3 sjedala)', async ({ page }) => {
   await page.goto('/zagrijavanje?pravila=klasicni');
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });
   await expect(page.locator('.igraci-red > li')).toHaveCount(3);
-  await expect(page.getByText(/Iskusni/)).toHaveCount(2);
+  await expect(page.locator('.igraci-red').getByText(/Iskusni/)).toHaveCount(2);
+  await expect(page.getByTestId('trening-meta')).toContainText('Iskusni');
 });
 
 test('privatna soba: gost vidi domaćinov pravilnik', async ({ browser }) => {

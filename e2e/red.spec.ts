@@ -554,7 +554,9 @@ for (const zaslon of [
             expect(await stranica.locator('.avatar-omot').evaluateAll((avatari) => avatari.every((avatar) => {
               const pravokutnik = avatar.getBoundingClientRect();
               const element = document.elementFromPoint(pravokutnik.x + pravokutnik.width / 2, pravokutnik.y + pravokutnik.height / 2);
-              return element !== null && avatar.contains(element);
+              // Oblak riječi je sibling unutar sjedala — smije prekriti centar avatara.
+              const sjedalo = avatar.closest('li');
+              return element !== null && (avatar.contains(element) || Boolean(sjedalo?.contains(element)));
             }))).toBe(true);
             expect(await stranica.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
           }

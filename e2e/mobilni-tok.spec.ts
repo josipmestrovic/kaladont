@@ -202,39 +202,50 @@ test('prazan nastavak šalje prefiks kao cijelu riječ (#111)', async ({ browser
 });
 
 test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomicanja', async ({
-  page,
+  browser,
 }) => {
   for (const sirina of [320, 360, 390, 768, 999]) {
-    await page.setViewportSize({ width: sirina, height: 760 });
-    await page.goto('/pravila-kaladonta');
-    const tablice = page.locator('table');
-    await expect(tablice.first()).toBeVisible();
-    const neoznacene = await page
-      .locator('table.tablica-mobilni-retci tbody td:not(:first-child):not([data-label])')
-      .count();
-    expect(neoznacene).toBe(0);
-    const prelijevanje = await tablice.evaluateAll((elementi) =>
-      elementi.some((tablica) => {
-        const okvir = tablica.getBoundingClientRect();
-        return (
-          tablica.scrollWidth > tablica.clientWidth + 1 ||
-          okvir.right > window.innerWidth + 1 ||
-          okvir.left < -1
-        );
-      }),
-    );
-    expect(prelijevanje).toBe(false);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
-      ),
-    ).toBe(true);
+    const page = await browser.newPage();
+    try {
+      await page.setViewportSize({ width: sirina, height: 760 });
+      await page.goto('/pravila-kaladonta', { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => document.fonts.ready);
+      const tablice = page.locator('table');
+      await expect(tablice.first()).toBeVisible();
+      const neoznacene = await page
+        .locator('table.tablica-mobilni-retci tbody td:not(:first-child):not([data-label])')
+        .count();
+      expect(neoznacene).toBe(0);
+      const prelijevanje = await tablice.evaluateAll((elementi) =>
+        elementi.some((tablica) => {
+          const okvir = tablica.getBoundingClientRect();
+          return (
+            tablica.scrollWidth > tablica.clientWidth + 1 ||
+            okvir.right > window.innerWidth + 1 ||
+            okvir.left < -1
+          );
+        }),
+      );
+      expect(prelijevanje).toBe(false);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      ).toBe(true);
+    } finally {
+      await page.close();
+    }
   }
 
-  await page.setViewportSize({ width: 1000, height: 760 });
-  await page.goto('/pravila-kaladonta');
-  await expect(page.getByRole('heading', { name: 'Pravila igre' })).toBeVisible();
-  await expect(page.locator('table').first()).toHaveCSS('display', 'table');
+  const desktop = await browser.newPage();
+  try {
+    await desktop.setViewportSize({ width: 1000, height: 760 });
+    await desktop.goto('/pravila-kaladonta', { waitUntil: 'domcontentloaded' });
+    await expect(desktop.getByRole('heading', { name: 'Pravila igre' })).toBeVisible();
+    await expect(desktop.locator('table').first()).toHaveCSS('display', 'table');
+  } finally {
+    await desktop.close();
+  }
 });
 
 // Jedan goto po kombinaciji (svježi page) — WebKit na CI pada na reload/dvostruki goto ("internal error").
