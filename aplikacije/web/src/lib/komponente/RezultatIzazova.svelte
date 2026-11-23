@@ -8,7 +8,7 @@
   } from 'zajednicko';
   import { jeIdIzazova, pokusajDefinicijuIzazova, PRAG_DUGE_RIJECI_IZAZOVA } from 'zajednicko';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { tekstRazlogaNeuspjeha } from '$lib/izazovi-klijent.js';
+  import { sljedeciDostupanIzazov, tekstRazlogaNeuspjeha } from '$lib/izazovi-klijent.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
 
   let {
@@ -44,6 +44,12 @@
     return 1;
   })());
   const mapaHref = $derived(`/izazovi?level=${levelOdigranog}`);
+  const sljedeci = $derived(
+    uspjeh && challengeId && jeIdIzazova(challengeId)
+      ? sljedeciDostupanIzazov(challengeId)
+      : null,
+  );
+  let navigacijaUTijeku = $state(false);
 
   const naslov = $derived(
     terminalStatus === 'tehnicki_prekinuto'
@@ -59,6 +65,10 @@
     if (!dio) return '—';
     if (dio.awarded === 0 && dio.nominal > 0) return `0 / ${dio.nominal} XP`;
     return `+${dio.awarded} XP`;
+  }
+
+  function naNavigaciju() {
+    navigacijaUTijeku = true;
   }
 </script>
 
@@ -184,21 +194,54 @@
     </p>
   {/if}
 
-  <div class="akcije">
-    {#if challengeId && !uspjeh}
+  <div class="akcije" class:ceka={navigacijaUTijeku}>
+    {#if uspjeh && sljedeci}
       <a
         class="primarni"
-        href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`}
-        data-testid="izazov-ponovo">Pokušaj ponovno</a
+        class:onesposobljen={navigacijaUTijeku}
+        href={`/izazovi?zapocni=${sljedeci.id}&level=${sljedeci.level}`}
+        data-testid="izazov-sljedeci"
+        aria-disabled={navigacijaUTijeku}
+        tabindex={navigacijaUTijeku ? -1 : undefined}
+        onclick={(e) => {
+          if (navigacijaUTijeku) {
+            e.preventDefault();
+            return;
+          }
+          naNavigaciju();
+        }}>Igraj sljedeći: {sljedeci.naziv}</a
       >
-      <a class="sporedni" href={mapaHref} data-testid="izazov-odaberi">Odaberi izazov</a>
-    {:else}
-      <a class="primarni" href={mapaHref} data-testid="izazov-odaberi">Odaberi izazov</a>
       {#if challengeId}
         <a
           class="sporedni"
           href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`}
-          data-testid="izazov-ponovo">Pokušaj ponovno</a
+          data-testid="izazov-ponovo"
+          onclick={naNavigaciju}>Pokušaj ponovno</a
+        >
+      {/if}
+      <a class="sporedni" href={mapaHref} data-testid="izazov-odaberi" onclick={naNavigaciju}
+        >Svi izazovi</a
+      >
+    {:else if challengeId && !uspjeh}
+      <a
+        class="primarni"
+        href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`}
+        data-testid="izazov-ponovo"
+        onclick={naNavigaciju}>Pokušaj ponovno</a
+      >
+      <a class="sporedni" href={mapaHref} data-testid="izazov-odaberi" onclick={naNavigaciju}
+        >Odaberi izazov</a
+      >
+    {:else}
+      <a class="primarni" href={mapaHref} data-testid="izazov-odaberi" onclick={naNavigaciju}
+        >Odaberi izazov</a
+      >
+      {#if challengeId}
+        <a
+          class="sporedni"
+          href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`}
+          data-testid="izazov-ponovo"
+          onclick={naNavigaciju}>Pokušaj ponovno</a
         >
       {/if}
     {/if}
@@ -309,6 +352,10 @@
     gap: 10px;
     margin-bottom: 16px;
   }
+  .akcije.ceka {
+    pointer-events: none;
+    opacity: 0.72;
+  }
   .akcije a {
     display: inline-flex;
     align-items: center;
@@ -320,6 +367,10 @@
   .primarni {
     background: var(--boja-pozadina-primarna);
     color: var(--boja-tekst-na-primarnoj, #fff);
+  }
+  .primarni.onesposobljen {
+    opacity: 0.6;
+    cursor: wait;
   }
   .sporedni {
     border: 1px solid var(--boja-obrub);

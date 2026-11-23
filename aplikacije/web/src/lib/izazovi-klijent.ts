@@ -10,8 +10,9 @@ import type {
   StatusSpremanjaIzazova,
   GoalProgressIzazova,
   RazlogNeuspjehaIzazova,
+  StavkaKatalogaIzazovaDto,
 } from 'zajednicko';
-import { NAZIVI_LEVELA_IZAZOVA, jeIdIzazova } from 'zajednicko';
+import { idEviFormata, NAZIVI_LEVELA_IZAZOVA, jeIdIzazova, pokusajDefinicijuIzazova } from 'zajednicko';
 import { ApiGreska, api } from './api.js';
 
 export { ApiGreska };
@@ -89,16 +90,24 @@ export function porukaZaKodIzazova(kod: string | null | undefined, fallback: str
   }
 }
 
-export function tekstRazlogaNeuspjeha(razlog: RazlogNeuspjehaIzazova | null | undefined): string {
+export function tekstRazlogaNeuspjeha(
+  razlog: RazlogNeuspjehaIzazova | null | undefined,
+  rijec?: string | null,
+): string {
+  const rijecTekst = rijec?.normalize('NFC').trim();
   switch (razlog) {
     case 'cilj_neispunjen':
       return 'Pobijedio si u partiji, ali nisu ispunjeni svi ciljevi izazova. Možeš pokušati ponovno.';
     case 'eliminiran':
       return 'Ispao si prije pobjede, pa je izazov izgubljen. Možeš pokušati ponovno.';
     case 'nevaljana_rijec':
-      return 'Pogriješio si riječ, a ovaj izazov ne dopušta pogreške. Možeš pokušati ponovno.';
+      return rijecTekst
+        ? `Pogriješio si — riječ „${rijecTekst}” nije prihvaćena, a ovaj izazov ne dopušta pogreške. Možeš pokušati ponovno.`
+        : 'Pogriješio si riječ, a ovaj izazov ne dopušta pogreške. Možeš pokušati ponovno.';
     case 'zavrsio_na_ka':
-      return 'Završio si riječ na ka, a ovaj izazov to ne dopušta. Možeš pokušati ponovno.';
+      return rijecTekst
+        ? `Završio si riječ „${rijecTekst}” na ka, a ovaj izazov to ne dopušta. Možeš pokušati ponovno.`
+        : 'Završio si riječ na ka, a ovaj izazov to ne dopušta. Možeš pokušati ponovno.';
     case 'odustao':
       return 'Odustao si od izazova. Možeš pokušati ponovno.';
     case 'prekid_veze':
@@ -111,12 +120,18 @@ export function tekstRazlogaNeuspjeha(razlog: RazlogNeuspjehaIzazova | null | un
 /** Kratki naslov za sažetak kraja partije (odbrojavanje do rezultata). */
 export function kratkiSazetakNeuspjehaIzazova(
   razlog: RazlogNeuspjehaIzazova | null | undefined,
+  rijec?: string | null,
 ): string {
+  const rijecTekst = rijec?.normalize('NFC').trim();
   switch (razlog) {
     case 'nevaljana_rijec':
-      return 'Izgubio si izazov jer si pogriješio — uvjet je bez pogreške.';
+      return rijecTekst
+        ? `Izgubio si izazov jer si pogriješio — riječ „${rijecTekst}” nije prihvaćena.`
+        : 'Izgubio si izazov jer si pogriješio — uvjet je bez pogreške.';
     case 'zavrsio_na_ka':
-      return 'Izgubio si izazov jer si završio riječ na ka.';
+      return rijecTekst
+        ? `Izgubio si izazov jer si završio riječ „${rijecTekst}” na ka.`
+        : 'Izgubio si izazov jer si završio riječ na ka.';
     case 'cilj_neispunjen':
       return 'Pobijedio si partiju, ali nisu ispunjeni svi ciljevi izazova.';
     case 'odustao':
@@ -128,6 +143,30 @@ export function kratkiSazetakNeuspjehaIzazova(
     default:
       return 'Izgubio si izazov.';
   }
+}
+
+/**
+ * Sljedeći izazov istog levela+formata (veći redoslijedUFormatu).
+ * Ako je `katalog` dan, vraća samo stavku sa statusom `dostupan`.
+ * Bez kataloga (npr. odmah nakon uspjeha) pretpostavlja otključavanje N→N+1.
+ */
+export function sljedeciDostupanIzazov(
+  trenutniId: IdIzazova,
+  katalog: readonly StavkaKatalogaIzazovaDto[] = [],
+): { id: IdIzazova; naziv: string; level: LevelIzazova } | null {
+  const def = pokusajDefinicijuIzazova(trenutniId);
+  if (!def) return null;
+  const kandidati = idEviFormata(def.level, def.format)
+    .map((id) => pokusajDefinicijuIzazova(id))
+    .filter((d): d is NonNullable<typeof d> => !!d && d.redoslijedUFormatu > def.redoslijedUFormatu)
+    .sort((a, b) => a.redoslijedUFormatu - b.redoslijedUFormatu);
+  const nextDef = kandidati[0];
+  if (!nextDef) return null;
+  if (katalog.length > 0) {
+    const stavka = katalog.find((s) => s.id === nextDef.id);
+    if (!stavka || stavka.status !== 'dostupan') return null;
+  }
+  return { id: nextDef.id, naziv: nextDef.naziv, level: nextDef.level };
 }
 
 export function tekstRazlogaZakljucavanja(razlog: RazlogZakljucavanja | null | undefined): string {
