@@ -1310,16 +1310,19 @@ export function stvoriUpraviteljPartija(
     // Čekanje se mjeri samo ljudima; botov ulazak u stol nije čekanje.
     const cekanjeMsPoIgracu = new Map(izmjesano.map((s) => [s.igracId, s.upravljac === 'bot' ? 0 : sat.sada() - s.usaoU]));
     const ljudi = sudionici.filter((s) => s.upravljac === 'covjek');
-    // Javni botovi imaju redak u bazi; privremeno Računalo u treningu nema ništa.
-    const sudioniciUBazi = politika.zapisujePovijest ? sudionici : [];
+    // Javni botovi imaju redak u bazi; privremeno Računalo (trening/izazov) nema UUID u igraci.
+    const jePrivremeniRacunalo = (igracId: string) => igracId.startsWith('racunalo-');
+    const sudioniciUBazi = politika.zapisujePovijest
+      ? sudionici.filter((s) => !jePrivremeniRacunalo(s.igracId))
+      : [];
     const praznaMapa = <T,>(vrijednost: () => T) => new Map(sudionici.map((s) => [s.igracId, vrijednost()]));
-    // Trening ništa ne čita ni ne piše; računalni protivnik nema redak u bazi.
+    // Trening ništa ne čita ni ne piše; izazov upisuje samo ljudske sudionike (+ partiju/poteze).
     const upisPocetkaPromise = politika.zapisujePovijest
       ? (() => {
         let pocetakUspio = false;
         const osiguraj = async () => {
           if (pocetakUspio) return;
-          await zapisiPocetakPartije(partijaId, sudionici, cekanjeMsPoIgracu, mod, sudionici.length - ljudi.length, {
+          await zapisiPocetakPartije(partijaId, sudioniciUBazi, cekanjeMsPoIgracu, mod, sudionici.length - ljudi.length, {
             pravila: pravilaStola,
             spojeniDvoboj,
           });
@@ -1446,7 +1449,9 @@ export function stvoriUpraviteljPartija(
 
   function spremiPotezAkoTreba(stanje: StanjeStola, zapis: Omit<ZapisPoteza, 'partijaId'>) {
     if (!stanje.politika.zapisujePovijest) return;
-    const potpuni: ZapisPoteza = { partijaId: stanje.partijaId, ...zapis };
+    // Privremeni botovi (racunalo-*) nisu u igraci — potez ostaje u povijesti bez FK autora.
+    const igracId = zapis.igracId && zapis.igracId.startsWith('racunalo-') ? null : zapis.igracId;
+    const potpuni: ZapisPoteza = { partijaId: stanje.partijaId, ...zapis, igracId };
     const stavka = { zapis: potpuni, uspio: false };
     stanje.zapisiPotezaZaOsigurati.push(stavka);
     // Fire-and-forget: grešku bilježi zapisiPotez; završni tok retrya samo !uspio.
@@ -2896,12 +2901,13 @@ export function stvoriUpraviteljPartija(
       aktivni: stanje.aktivni,
     });
     const zrtvaAktivna = ishod.zrtvaId && stanje.aktivni.has(ishod.zrtvaId) ? ishod.zrtvaId : null;
+    const uuidIliNull = (id: string | null) => (id && !id.startsWith('racunalo-') ? id : null);
     const zapis = {
       partijaId: stanje.partijaId,
       redniBroj: stanje.redniBroj,
       rijec,
-      uzrocnikId: sayerId,
-      zrtvaId: zrtvaAktivna,
+      uzrocnikId: uuidIliNull(sayerId),
+      zrtvaId: uuidIliNull(zrtvaAktivna),
       vrstaMete: ishod.vrstaMete,
       brojAktivnihPrije,
       ucinak: (zrtvaAktivna ? 'eliminacija' : 'bez_zrtve') as 'eliminacija' | 'bez_zrtve',

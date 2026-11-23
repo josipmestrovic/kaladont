@@ -338,6 +338,7 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
       expect(prijava?.rijec).toBe('testnaprijava');
     } finally {
       await baza.delete(prijave).where(eq(prijave.partijaId, partijaId));
+      await baza.delete(potezi).where(eq(potezi.partijaId, partijaId));
       await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
       await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
       await baza.delete(partije).where(eq(partije.id, partijaId));

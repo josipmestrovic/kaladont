@@ -224,12 +224,14 @@ export async function zakljuciPovijestIzazovaUBazi(
   pobjednikId: string | null,
   zavrsenoU: Date,
 ): Promise<void> {
+  // Privremeni botovi (racunalo-*) nisu u igraci — pobjednik_id ostaje null.
+  const pobjednikUuid = pobjednikId && !pobjednikId.startsWith('racunalo-') ? pobjednikId : null;
   await baza.transaction(async (tx) => {
     await tx.insert(obracuniPartija)
       .values({ partijaId, vrsta: 'privatna_gamifikacija' })
       .onConflictDoNothing();
     await tx.update(partije)
-      .set({ status: 'zavrsena', kraj: zavrsenoU, pobjednikId })
+      .set({ status: 'zavrsena', kraj: zavrsenoU, pobjednikId: pobjednikUuid })
       .where(and(eq(partije.id, partijaId), eq(partije.status, 'u_tijeku')));
   });
 }
