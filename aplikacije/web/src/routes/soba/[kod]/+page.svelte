@@ -79,6 +79,18 @@
         void goto('/potvrdi-email');
         return;
       }
+      // Terminalne greške (soba nestala / izbačen / partija u tijeku) — overlay,
+      // čak i ako UI još drži zastarjelo stanje nakon disconnecta.
+      if (
+        p.kod === 'SOBA_NE_POSTOJI' ||
+        p.kod === 'IZBACEN_IZ_SOBE' ||
+        p.kod === 'SOBA_U_TIJEKU'
+      ) {
+        stanjeSobe = null;
+        obavijest = null;
+        greska = p.poruka;
+        return;
+      }
       // Dok smo u lobbyju, greške (pokreni, kick…) ostaju inline — terminalni overlay
       // bi preko „početna” zatvorio sobu za sve.
       if (stanjeSobe) {
@@ -102,16 +114,22 @@
       stanjeSobe = null;
     };
 
+    const udjiUSobu = () => {
+      socket.emit('soba:udji', { kod: kodSobe });
+    };
+
     socket.on('soba:stanje', naStanjeSobe);
     socket.on('greska', naGresku);
     socket.on('partija:pocetak', naPocetak);
     socket.on('soba:vlasnik-napustio', naVlasnikNapustio);
     socket.on('soba:izbacen', naIzbacen);
+    socket.on('connect', udjiUSobu);
 
     aktivirajAudio();
-    socket.emit('soba:udji', { kod: kodSobe });
+    if (socket.connected) udjiUSobu();
 
     return () => {
+      socket.off('connect', udjiUSobu);
       socket.off('soba:stanje', naStanjeSobe);
       socket.off('greska', naGresku);
       socket.off('partija:pocetak', naPocetak);

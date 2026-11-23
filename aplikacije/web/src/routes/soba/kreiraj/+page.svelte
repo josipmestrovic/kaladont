@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import {
@@ -23,6 +23,8 @@
     type VrstaRijeci,
   } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
+
+  const TIMEOUT_ODGOVORA_MS = 8000;
 
   const OZNACI_VRSTA: Record<VrstaRijeci, string> = {
     imenica: 'Imenice',
@@ -54,6 +56,14 @@
   let odabraneVrste = $state<Set<VrstaRijeci>>(new Set(SVE_VRSTE_RIJECI));
   let poruka = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
+  let timeoutOdgovora: ReturnType<typeof setTimeout> | null = null;
+
+  function ocistiTimeoutOdgovora() {
+    if (timeoutOdgovora) {
+      clearTimeout(timeoutOdgovora);
+      timeoutOdgovora = null;
+    }
+  }
 
   const sveVrsteOdabrane = $derived(
     odabraneVrste.size === SVE_VRSTE_RIJECI.length &&
@@ -96,11 +106,13 @@
     const socket = dohvatiSocket();
 
     const naStvorenu = (payload: { kod: string }) => {
+      ocistiTimeoutOdgovora();
       slanjeUTijeku = false;
       void goto(`/soba/${payload.kod}`);
     };
 
     const naGresku = (greska: { kod?: string; poruka: string }) => {
+      ocistiTimeoutOdgovora();
       slanjeUTijeku = false;
       if (greska.kod === 'EMAIL_NIJE_POTVRDEN') {
         void goto('/potvrdi-email');
@@ -118,6 +130,10 @@
     };
   });
 
+  onDestroy(() => {
+    ocistiTimeoutOdgovora();
+  });
+
   async function stvoriSobu(e: SubmitEvent) {
     e.preventDefault();
     if (slanjeUTijeku) return;
@@ -130,6 +146,13 @@
       dopusteneVrste: [...odabraneVrste],
       pravila: pravilnik,
     };
+
+    ocistiTimeoutOdgovora();
+    timeoutOdgovora = setTimeout(() => {
+      timeoutOdgovora = null;
+      slanjeUTijeku = false;
+      poruka = 'Poslužitelj ne odgovara. Pokušaj ponovno.';
+    }, TIMEOUT_ODGOVORA_MS);
 
     const socket = dohvatiSocket();
     socket.emit('soba:stvori', { postavke });
