@@ -178,6 +178,11 @@ test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page
   await expect(page.getByTestId('rezultat-izazova')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('heading', { name: 'Izazov uspješan!' })).toBeVisible();
   await expect(page.getByTestId('izazov-challenge-xp')).toContainText('100');
+  await expect(page.getByTestId('izazov-sljedeci')).toBeVisible();
+  await expect(page.getByTestId('izazov-sljedeci')).toHaveAttribute(
+    'href',
+    /\/izazovi\?zapocni=IZ-L1-DV-02&level=1/,
+  );
   await expect(page.getByTestId('izazov-odaberi')).toHaveAttribute('href', '/izazovi?level=1');
   await expect(page.getByTestId('izazov-gost-cta')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Završni poredak' })).toHaveCount(0);

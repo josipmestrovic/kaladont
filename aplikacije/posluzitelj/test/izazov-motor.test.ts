@@ -15,7 +15,7 @@ import {
 } from 'zajednicko';
 import { izgradiPosluzitelj, type Posluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { igraci, pokusajiIzazova } from '../src/baza/shema.js';
+import { igraci, obracuniPartija, partije, pokusajiIzazova, potezi, prijave, sudioniciPartije } from '../src/baza/shema.js';
 import { stvoriGostSesiju } from '../src/racuni/sesije.js';
 import { stvoriKontroliraniSat } from '../src/igra/sat.js';
 import {
@@ -214,8 +214,30 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   afterAll(async () => {
     await posluzitelj.zaustavi();
     for (const id of igraciZaBrisanje) {
+      const sudjelovanja = await baza
+        .select({ partijaId: sudioniciPartije.partijaId })
+        .from(sudioniciPartije)
+        .where(eq(sudioniciPartije.igracId, id));
+      const botIds: string[] = [];
+      for (const { partijaId } of sudjelovanja) {
+        const sudionici = await baza
+          .select({ igracId: sudioniciPartije.igracId })
+          .from(sudioniciPartije)
+          .where(eq(sudioniciPartije.partijaId, partijaId));
+        for (const s of sudionici) {
+          if (s.igracId !== id) botIds.push(s.igracId);
+        }
+        await baza.delete(prijave).where(eq(prijave.partijaId, partijaId));
+        await baza.delete(potezi).where(eq(potezi.partijaId, partijaId));
+        await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+        await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+        await baza.delete(partije).where(eq(partije.id, partijaId));
+      }
       await baza.delete(pokusajiIzazova).where(eq(pokusajiIzazova.igracId, id));
       await baza.delete(igraci).where(eq(igraci.id, id));
+      for (const botId of botIds) {
+        await baza.delete(igraci).where(eq(igraci.id, botId));
+      }
     }
   });
 
@@ -240,9 +262,10 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
     });
   }
 
-  async function pokreniIzazov(challengeId: 'IZ-L1-DV-01' | 'IZ-L1-DV-03' | 'IZ-L1-TR-02' = 'IZ-L1-DV-01'): Promise<{
+  async function pokreniIzazov(challengeId: 'IZ-L1-DV-01' | 'IZ-L1-DV-03' | 'IZ-L1-DV-04' | 'IZ-L1-TR-02' = 'IZ-L1-DV-01'): Promise<{
     socket: ClientSocket;
     igracId: string;
+    token: string;
     attemptId: string;
     partijaId: string;
     pocetak: PocetakPartije;
@@ -275,12 +298,53 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
     return {
       socket,
       igracId: gost.igracId,
+      token: gost.token,
       attemptId: pokusaj.id,
       partijaId: motor.partijaId,
       pocetak,
       runda,
     };
   }
+
+  it('zapisuje partiju u bazu i dopušta POST /prijave', async () => {
+    const { socket, token, partijaId, igracId } = await pokreniIzazov('IZ-L1-DV-01');
+    try {
+      // Početak je fire-and-forget — kratko pričekaj redak.
+      let redakPartije: { id: string; status: string } | undefined;
+      for (let i = 0; i < 40 && !redakPartije; i += 1) {
+        const [red] = await baza.select({ id: partije.id, status: partije.status })
+          .from(partije).where(eq(partije.id, partijaId)).limit(1);
+        if (red) redakPartije = red;
+        else await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(redakPartije?.id).toBe(partijaId);
+      expect(redakPartije?.status).toBe('u_tijeku');
+
+      const [sudionik] = await baza.select({ igracId: sudioniciPartije.igracId })
+        .from(sudioniciPartije)
+        .where(eq(sudioniciPartije.partijaId, partijaId))
+        .limit(1);
+      expect(sudionik?.igracId).toBe(igracId);
+
+      const odgovor = await posluzitelj.app.inject({
+        url: '/api/prijave',
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ partijaId, tip: 'za_dodavanje', rijec: 'testnaprijava' }),
+      });
+      expect(odgovor.statusCode).toBe(200);
+      const [prijava] = await baza.select().from(prijave).where(eq(prijave.partijaId, partijaId)).limit(1);
+      expect(prijava?.tip).toBe('za_dodavanje');
+      expect(prijava?.rijec).toBe('testnaprijava');
+    } finally {
+      await baza.delete(prijave).where(eq(prijave.partijaId, partijaId));
+      await baza.delete(potezi).where(eq(potezi.partijaId, partijaId));
+      await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+      await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+      await baza.delete(partije).where(eq(partije.id, partijaId));
+      socket.disconnect();
+    }
+  });
 
   it('start: kontekst izazov, timer 30s unatoč timerOnemogucen, status u_tijeku', async () => {
     const { socket, attemptId, pocetak, runda } = await pokreniIzazov('IZ-L1-DV-01');
@@ -460,8 +524,30 @@ describe('Izazov PR03 — parametrizirani start (uzorak pravilnika/formata)', ()
   afterAll(async () => {
     await posluzitelj.zaustavi();
     for (const id of igraciZaBrisanje) {
+      const sudjelovanja = await baza
+        .select({ partijaId: sudioniciPartije.partijaId })
+        .from(sudioniciPartije)
+        .where(eq(sudioniciPartije.igracId, id));
+      const botIds: string[] = [];
+      for (const { partijaId } of sudjelovanja) {
+        const sudionici = await baza
+          .select({ igracId: sudioniciPartije.igracId })
+          .from(sudioniciPartije)
+          .where(eq(sudioniciPartije.partijaId, partijaId));
+        for (const s of sudionici) {
+          if (s.igracId !== id) botIds.push(s.igracId);
+        }
+        await baza.delete(prijave).where(eq(prijave.partijaId, partijaId));
+        await baza.delete(potezi).where(eq(potezi.partijaId, partijaId));
+        await baza.delete(obracuniPartija).where(eq(obracuniPartija.partijaId, partijaId));
+        await baza.delete(sudioniciPartije).where(eq(sudioniciPartije.partijaId, partijaId));
+        await baza.delete(partije).where(eq(partije.id, partijaId));
+      }
       await baza.delete(pokusajiIzazova).where(eq(pokusajiIzazova.igracId, id));
       await baza.delete(igraci).where(eq(igraci.id, id));
+      for (const botId of botIds) {
+        await baza.delete(igraci).where(eq(igraci.id, botId));
+      }
     }
   });
 

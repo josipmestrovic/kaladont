@@ -60,6 +60,16 @@
   const LIMIT_PRIJAVA_DODAVANJE = 3;
   const PORUKA_ZAHVALE_PRIJAVA = 'Hvala! Tvoja prijava nam pomaže poboljšati rječnik.';
   const TRAJANJE_ZAHVALE_PRIJAVA_MS = 7000;
+  /** Usklađeno s poslužiteljskim KODOVI_PRAVE_POGRESKE — odbijene riječi za prijavu. */
+  const KODOVI_ODBIJENE_ZA_PRIJAVU = new Set([
+    'RIJEC_NE_POSTOJI',
+    'VLASTITO_IME',
+    'KRIVA_SLOVA',
+    'RIJEC_ISKORISTENA',
+    'NEDOPUSTENA_VRSTA',
+    'NIJE_OSNOVNI_OBLIK',
+    'PREKRATKA_RIJEC',
+  ]);
   let izbornikPrijaveIgracaId = $state<string | null>(null);
   let slanjeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let porukaPoteza = $state<string | null>(null);
@@ -69,6 +79,8 @@
   const [uvodPorukeOblika = '', krajPorukeOblika = ''] = PORUKE.rijecIskoristenaOblik('{oblik}').split('{oblik}');
   let vlastitoImeRijec = $state<string | null>(null);
   let zadnjaPoslanaRijec = $state<string | null>(null);
+  /** Zadrži odbijenu riječ za sažetak Izazova (nevaljana_rijec). */
+  let odbijenaRijecZaIzazov = $state<string | null>(null);
   let brojGreskeUnosa = $state(0);
   let potezi = $state<{ id: number; rijec: string | null; igracId: string | null; vrsta: string; redniBroj: number; trazenaSlova: string | null; vrijeme: string }[]>([]);
   let imaJosPoteza = $state(false);
@@ -1144,7 +1156,10 @@
       const oblik = kod === 'RIJEC_ISKORISTENA' && poruka.startsWith(uvodPorukeOblika) && poruka.endsWith(krajPorukeOblika)
         ? poruka.slice(uvodPorukeOblika.length, poruka.length - krajPorukeOblika.length) || null
         : null;
-      if (kod === 'RIJEC_NE_POSTOJI' && zadnjaPoslanaRijec) dodajOdbijenuRijec(zadnjaPoslanaRijec);
+      if (KODOVI_ODBIJENE_ZA_PRIJAVU.has(kod) && zadnjaPoslanaRijec) {
+        dodajOdbijenuRijec(zadnjaPoslanaRijec);
+        if (jeIzazov) odbijenaRijecZaIzazov = zadnjaPoslanaRijec;
+      }
       zadnjaPoslanaRijec = null;
       prikaziGreskuPoteza(poruka, kod === 'RIJEC_NE_POSTOJI' ? odbijenaRijec : null, kod === 'VLASTITO_IME' ? odbijenaRijec : null, kod === 'RIJEC_ISKORISTENA' ? odbijenaRijec : null, oblik);
     };
@@ -1329,6 +1344,7 @@
       terminalStatus={stanje.izazovTerminal?.status ?? null}
       terminalReason={stanje.izazovTerminal?.reason ?? null}
       gameWon={stanje.izazovTerminal?.gameWon ?? null}
+      odbijenaRijec={odbijenaRijecZaIzazov}
     />
     <PanelPrijavaRijeci
       partijaId={partijaId!}
@@ -1854,7 +1870,7 @@
             </p>
           {:else if stanje.izazovTerminal?.status === 'neuspjeh'}
             <p class="pobjednik-sazetak" data-testid="izazov-kraj-sazetak">
-              {kratkiSazetakNeuspjehaIzazova(stanje.izazovTerminal.reason)}
+              {kratkiSazetakNeuspjehaIzazova(stanje.izazovTerminal.reason, odbijenaRijecZaIzazov)}
             </p>
             {#if stanje.izazovTerminal.reason === 'nevaljana_rijec'}
               <p class="sustav-bira-obrazlozenje">Možeš pokušati ponovno.</p>
@@ -1886,7 +1902,7 @@
         <div class="zavrsni-sazetak" aria-live="polite">
           {#if jeIzazov && stanje.izazovTerminal?.status === 'neuspjeh'}
             <p class="sustav-bira-obrazlozenje" data-testid="izazov-kraj-sazetak">
-              {kratkiSazetakNeuspjehaIzazova(stanje.izazovTerminal.reason)}
+              {kratkiSazetakNeuspjehaIzazova(stanje.izazovTerminal.reason, odbijenaRijecZaIzazov)}
             </p>
           {:else if stanje.ishodDokazaPoruka}
             <p class="sustav-bira-obrazlozenje">{stanje.ishodDokazaPoruka}</p>

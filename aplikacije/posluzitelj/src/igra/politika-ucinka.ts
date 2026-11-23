@@ -20,8 +20,11 @@ const POLITIKE: Record<KontekstPartije, PolitikaUcinkaPartije> = {
   javna: { kontekst: 'javna', zapisujePovijest: true, dajeNapredak: true, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
   privatna: { kontekst: 'privatna', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
   trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: false, zapisujeKolekcijuTreninga: false },
-  /** Pokušaji/završeci Izazova su autoritet; javni XP/rang/kolekcija isključeni (nagrade PR04). */
-  izazov: { kontekst: 'izazov', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: false, zapisujeKolekcijuTreninga: false },
+  /**
+   * Pokušaji/završeci Izazova su autoritet; javni XP/rang/kolekcija isključeni (nagrade PR04).
+   * zapisujePovijest: partije+potezi radi prijave riječi (FK); bez napretka/dostignuća.
+   */
+  izazov: { kontekst: 'izazov', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: false, zapisujeKolekcijuTreninga: false },
 };
 
 export function politikaZaKontekst(kontekst: KontekstPartije): PolitikaUcinkaPartije {
