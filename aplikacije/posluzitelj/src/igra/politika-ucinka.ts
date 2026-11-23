@@ -8,9 +8,12 @@ export interface PolitikaUcinkaPartije {
   kontekst: KontekstPartije;
   /** partije, sudionici_partije, potezi i završni upis u bazu */
   zapisujePovijest: boolean;
-  /** XP, bodovi, rang, forma, nizovi, rani poraz, DNK i obavijesti o napretku */
+  /**
+   * XP stavke tijekom partije i zbroj u iskustvoUkupno.
+   * Rang, DNK, forma, bodovi i rani poraz i dalje samo u javnom završnom upisu.
+   */
   dajeNapredak: boolean;
-  /** kolekcije riječi i dostignuća (javna, privatna, trening, izazov; bez ljestvičnog XP) */
+  /** kolekcije riječi i dostignuća (svi konteksti) */
   dajeDostignucaIKolekcije: boolean;
   /** Ako true, registrirani ljudski trening-sudionik trajno sprema vlastite riječi (legacy; kolekcija ide preko dajeDostignucaIKolekcije). */
   zapisujeKolekcijuTreninga: boolean;
@@ -18,14 +21,14 @@ export interface PolitikaUcinkaPartije {
 
 const POLITIKE: Record<KontekstPartije, PolitikaUcinkaPartije> = {
   javna: { kontekst: 'javna', zapisujePovijest: true, dajeNapredak: true, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
-  privatna: { kontekst: 'privatna', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
-  trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
+  privatna: { kontekst: 'privatna', zapisujePovijest: true, dajeNapredak: true, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
+  trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: true, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
   /**
-   * Pokušaji/završeci Izazova su autoritet za challenge XP (PR04).
+   * Pokušaji/završeci Izazova su autoritet za challenge XP (PR04); riječi dodaju i profilni XP.
    * zapisujePovijest: partije+potezi radi prijave riječi (FK).
-   * Kolekcija i opća dostignuća riječi (Dugometraš/Rijetkolovac…) uključeni; bez ljestvičnog XP/ranga.
+   * Kolekcija i opća dostignuća riječi uključeni; bez ranga/DNK/forme.
    */
-  izazov: { kontekst: 'izazov', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
+  izazov: { kontekst: 'izazov', zapisujePovijest: true, dajeNapredak: true, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
 };
 
 export function politikaZaKontekst(kontekst: KontekstPartije): PolitikaUcinkaPartije {

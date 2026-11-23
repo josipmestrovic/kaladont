@@ -889,7 +889,8 @@ export function stvoriUpraviteljPartija(
     plasman: number,
     razlog: RazlogEliminacije,
   ): void {
-    if (!stanje.politika.dajeNapredak) return;
+    // Forma/nizovi samo iz javnih partija — ne privatna/trening/izazov.
+    if (!stanje.politika.dajeNapredak || stanje.kontekst !== 'javna') return;
     const nacinIspadanja = razlog.startsWith('mrtva_slova')
       ? 'mrtva_slova'
       : razlog as 'ne_znam' | 'istek' | 'prekid' | 'kaladont';
@@ -1519,7 +1520,7 @@ export function stvoriUpraviteljPartija(
           if (stanje.politika.zapisujePovijest) {
             await zakljuciPovijestIzazovaUBazi(stanje.partijaId, pobjednikId, zavrsenoU);
           }
-          const gamifikacijaRijeci = stanje.politika.dajeDostignucaIKolekcije
+          const gamifikacijaRijeci = (stanje.politika.dajeDostignucaIKolekcije || stanje.politika.dajeNapredak)
             ? await upisiKolekcijuIDostignucaRijeci({
               partijaId: stanje.partijaId,
               izvorTip: 'izazov',
@@ -1533,6 +1534,8 @@ export function stvoriUpraviteljPartija(
                     return st ? zapisStatistikeZaStol(stanje, s.igracId, st) : undefined;
                   })(),
                   napredak: stanje.napredakDostignuca.get(s.igracId),
+                  stavkeIskustva: stanje.stavkeIskustva.get(s.igracId),
+                  iskustvoPrije: stanje.iskustvoPrije.get(s.igracId),
                 })),
             })
             : new Map();
@@ -1545,7 +1548,8 @@ export function stvoriUpraviteljPartija(
           await obavijestiPrvuIgruSudionicima(stanje, 'izazov');
           for (const p of plasmani) {
             const covjek = stanje.sudionici.find((s) => s.igracId === p.igracId)?.upravljac === 'covjek';
-            const rijeciDostignuca = covjek ? (gamifikacijaRijeci.get(p.igracId)?.novaDostignuca ?? []) : [];
+            const gamifikacija = covjek ? gamifikacijaRijeci.get(p.igracId) : undefined;
+            const rijeciDostignuca = gamifikacija?.novaDostignuca ?? [];
             const settlementDostignuca = covjek && settlement ? settlement.novaDostignuca : [];
             const poId = new Map([...settlementDostignuca, ...rijeciDostignuca].map((d) => [d.id, d]));
             const poruka: KrajPartije = {
@@ -1554,7 +1558,7 @@ export function stvoriUpraviteljPartija(
               plasmani,
               mojNoviProsjek: 0,
               mojRang: null,
-              mojeIskustvo: null,
+              mojeIskustvo: gamifikacija?.obracunIskustva ?? null,
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,
               novaDostignuca: [...poId.values()],
@@ -1620,7 +1624,7 @@ export function stvoriUpraviteljPartija(
               throw greska;
             }
           }
-          const gamifikacijaRijeci = stanje.politika.dajeDostignucaIKolekcije
+          const gamifikacijaRijeci = (stanje.politika.dajeDostignucaIKolekcije || stanje.politika.dajeNapredak)
             ? await upisiKolekcijuIDostignucaRijeci({
               partijaId: stanje.partijaId,
               izvorTip: 'trening',
@@ -1634,6 +1638,8 @@ export function stvoriUpraviteljPartija(
                     return st ? zapisStatistikeZaStol(stanje, s.igracId, st) : undefined;
                   })(),
                   napredak: stanje.napredakDostignuca.get(s.igracId),
+                  stavkeIskustva: stanje.stavkeIskustva.get(s.igracId),
+                  iskustvoPrije: stanje.iskustvoPrije.get(s.igracId),
                 })),
             })
             : new Map();
@@ -1641,7 +1647,8 @@ export function stvoriUpraviteljPartija(
           await obradiDovrseneIgreTreninga(stanje);
           for (const p of plasmani) {
             const ishod = p.igracId === pobjednikId ? nagrada?.ishodMisija : null;
-            const rijeciDostignuca = gamifikacijaRijeci.get(p.igracId)?.novaDostignuca ?? [];
+            const gamifikacija = gamifikacijaRijeci.get(p.igracId);
+            const rijeciDostignuca = gamifikacija?.novaDostignuca ?? [];
             const novaDostignuca = [
               ...(p.igracId === pobjednikId && nagrada?.novaRazina
                 ? [{ id: 'zagrijan', novaRazina: nagrada.novaRazina, maksimalnaRazina: nagrada.maksimalnaRazina }]
@@ -1657,7 +1664,7 @@ export function stvoriUpraviteljPartija(
               plasmani,
               mojNoviProsjek: 0,
               mojRang: null,
-              mojeIskustvo: null,
+              mojeIskustvo: gamifikacija?.obracunIskustva ?? null,
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,
               novaDostignuca: [...poId.values()],
@@ -1695,14 +1702,28 @@ export function stvoriUpraviteljPartija(
           zapisStatistikeZaStol(stanje, igracId, statistika),
         ]),
       );
-      const privatniRezultati = plasmani.map((p) => ({
-        igracId: p.igracId,
-        plasman: p.plasman as 1 | 2 | 3 | 4,
-        bodovi: 0,
-        eliminacije: 0,
-        iskustvo: 0,
-        nacinIspadanja: p.plasman === 1 ? ('pobjednik' as const) : nacinIspadanjaZaIgraca(stanje, p.igracId),
-      }));
+      const privatniObracuni = new Map<string, ReturnType<typeof izracunajObracunIskustva>>();
+      const privatniRezultati = plasmani.map((p) => {
+        const nacinIspadanja = p.plasman === 1
+          ? ('pobjednik' as const)
+          : nacinIspadanjaZaIgraca(stanje, p.igracId);
+        const obracun = nacinIspadanja === 'prekid'
+          ? izracunajObracunIskustva(stanje.iskustvoPrije.get(p.igracId) ?? 0, [], 0)
+          : izracunajObracunIskustva(
+            stanje.iskustvoPrije.get(p.igracId) ?? 0,
+            stanje.stavkeIskustva.get(p.igracId) ?? [],
+            stanje.statistikeRijeci.get(p.igracId)?.najduziStreak ?? 0,
+          );
+        privatniObracuni.set(p.igracId, obracun);
+        return {
+          igracId: p.igracId,
+          plasman: p.plasman as 1 | 2 | 3 | 4,
+          bodovi: 0,
+          eliminacije: 0,
+          iskustvo: obracun.osvojenoIskustvo,
+          nacinIspadanja,
+        };
+      });
       pokreniSpremanjeRezultata(
         stanje,
         () => zakljuciPartijuUBazi(stanje.partijaId, pobjednikId, privatniRezultati, stanje.mod, privatneStatistike, true, new Map(
@@ -1719,7 +1740,7 @@ export function stvoriUpraviteljPartija(
               plasmani,
               mojNoviProsjek: 0,
               mojRang: null,
-              mojeIskustvo: null,
+              mojeIskustvo: privatniObracuni.get(p.igracId) ?? null,
               // Privatne partije ne ulaze u javnu ocjenu igre ni XP bonus ocjene.
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,

@@ -4,7 +4,7 @@
  * uspješan upis početka i svih poteza prije isplate XP-a (idempotentni retry).
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajNovaDostignuca, izracunajOcjenuIgre, izracunajUniverzalniUcinak, jeNapredakUniverzalnogRanga, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type UkupnoIskustvoIshoda } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajObracunIskustva, izracunajOcjenuIgre, izracunajUniverzalniUcinak, jeNapredakUniverzalnogRanga, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type ObracunIskustva, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type StavkaIskustva, type UkupnoIskustvoIshoda } from 'zajednicko';
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
@@ -239,11 +239,13 @@ export async function zakljuciPovijestIzazovaUBazi(
 
 export type IshodGamifikacijeRijeci = {
   novaDostignuca: NovoDostignuce[];
+  obracunIskustva: ObracunIskustva | null;
 };
 
 /**
- * Upis kolekcije i dostignuća riječi bez ljestvičnog XP/ranga/DNK.
- * Za trening (nema retka partije) i izazov (povijest već zatvorena). Filter kao privatna (`vrijediUPrivatnoj`).
+ * Upis kolekcije, dostignuća riječi i zbroja XP (bez ranga/DNK/forme).
+ * Za trening (nema retka partije) i izazov (povijest već zatvorena). Filter kao privatna (`vrijediUPrivatnoj`);
+ * Iskusnjara ide uz XP (razina).
  */
 export async function upisiKolekcijuIDostignucaRijeci(ulaz: {
   partijaId: string;
@@ -253,6 +255,8 @@ export async function upisiKolekcijuIDostignucaRijeci(ulaz: {
     igracId: string;
     statistika?: ZapisStatistikeRijeci;
     napredak?: DeltaNapretkaDostignuca;
+    stavkeIskustva?: readonly StavkaIskustva[];
+    iskustvoPrije?: number;
   }>;
 }): Promise<Map<string, IshodGamifikacijeRijeci>> {
   const rezultati = new Map<string, IshodGamifikacijeRijeci>();
@@ -269,7 +273,7 @@ export async function upisiKolekcijuIDostignucaRijeci(ulaz: {
 
   const pridruziNova = (igracId: string, nova: readonly NovoDostignuce[]) => {
     if (nova.length === 0) return;
-    const postojeci = rezultati.get(igracId) ?? { novaDostignuca: [] };
+    const postojeci = rezultati.get(igracId) ?? { novaDostignuca: [], obracunIskustva: null };
     const poId = new Map(postojeci.novaDostignuca.map((d) => [d.id, d]));
     for (const d of nova) {
       const staro = poId.get(d.id);
@@ -295,7 +299,73 @@ export async function upisiKolekcijuIDostignucaRijeci(ulaz: {
       if (!racun) continue;
       const botTip = (racun.botTip ?? null) as BotTipPrezentacije | null;
       if (!primaProfilnuGamifikaciju(racun.vrsta, racun.upravljac, botTip)) continue;
-      if (!rezultati.has(sudionik.igracId)) rezultati.set(sudionik.igracId, { novaDostignuca: [] });
+      if (!rezultati.has(sudionik.igracId)) {
+        rezultati.set(sudionik.igracId, { novaDostignuca: [], obracunIskustva: null });
+      }
+
+      const iskustvoPrije = sudionik.iskustvoPrije ?? racun.iskustvoUkupno;
+      const stavke = [...(sudionik.stavkeIskustva ?? [])];
+      const najduziStreak = sudionik.statistika?.najduziStreak ?? 0;
+      const obracun = stavke.length > 0 || najduziStreak > 0
+        ? izracunajObracunIskustva(iskustvoPrije, stavke, najduziStreak, 0)
+        : null;
+      if (obracun && obracun.osvojenoIskustvo > 0) {
+        const [azurirano] = await tx.update(igraci)
+          .set({
+            iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${obracun.osvojenoIskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
+          })
+          .where(eq(igraci.id, sudionik.igracId))
+          .returning({ iskustvoUkupno: igraci.iskustvoUkupno });
+        if (azurirano) {
+          obracun.poslije = stanjeIskustva(azurirano.iskustvoUkupno);
+          const razinaPrije = stanjeIskustva(iskustvoPrije).razina;
+          const razinaPoslije = obracun.poslije.razina;
+          const xpBroj = await stvoriPorukeXpRazina({
+            igracId: sudionik.igracId,
+            razinaPrije,
+            razinaPoslije,
+            tx,
+            izvorTip: ulaz.izvorTip,
+            izvorId: ulaz.partijaId,
+          });
+          if (xpBroj > 0) sanducicIgraci.add(sudionik.igracId);
+          // Iskusnjara: vrijediUPrivatnoj false, ali XP je stvaran — otključaj uz razinu.
+          const iskusnjara = izracunajNovaDostignuca(
+            { razina: razinaPrije },
+            {},
+            razinaPoslije,
+            false,
+          ).filter((d) => d.id === 'iskusnjara');
+          if (iskusnjara.length > 0) {
+            await tx.insert(dostignucaIgraca).values(iskusnjara.map((dostignuce) => ({
+              igracId: sudionik.igracId,
+              dostignuceId: dostignuce.id,
+              razina: dostignuce.novaRazina,
+              prvoOtkljucano: new Date(),
+              zadnjeOtkljucavanje: new Date(),
+            }))).onConflictDoUpdate({
+              target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
+              set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
+            });
+            for (const dostignuce of iskusnjara) {
+              if (!jeLjudskiZaSanducic(racun.upravljac)) continue;
+              const broj = await stvoriPorukeZvjezdica({
+                igracId: sudionik.igracId,
+                dostignuceId: dostignuce.id,
+                staraRazina: razinaPrije >= dostignuce.novaRazina ? dostignuce.novaRazina : 0,
+                novaRazina: dostignuce.novaRazina,
+                tx,
+                izvorTip: ulaz.izvorTip,
+                izvorId: ulaz.partijaId,
+              });
+              if (broj > 0) sanducicIgraci.add(sudionik.igracId);
+            }
+            pridruziNova(sudionik.igracId, iskusnjara);
+          }
+        }
+      }
+      const ishod = rezultati.get(sudionik.igracId)!;
+      ishod.obracunIskustva = obracun;
 
       const statistika = sudionik.statistika;
       let brojNovihRijetkihGrupa = 0;
@@ -1175,6 +1245,82 @@ export async function zakljuciPartijuUBazi(
             botTip,
             iskustvoPrijePartije: stariIgrac?.iskustvoUkupno ?? 0,
           });
+        }
+      } else if (samoStatistika) {
+        // Privatna: zbroj XP riječi bez ranga/DNK/forme/bodova.
+        const iskustvoPrije = stariIgrac?.iskustvoUkupno ?? 0;
+        let iskustvoUkupno = iskustvoPrije;
+        if (primaGamifikaciju && r.iskustvo > 0) {
+          const [azurirano] = await tx.update(igraci)
+            .set({
+              iskustvoUkupno: sql`least(${igraci.iskustvoUkupno} + ${r.iskustvo}, ${MAKSIMALNO_ISKUSTVO})`,
+            })
+            .where(eq(igraci.id, r.igracId))
+            .returning({ iskustvoUkupno: igraci.iskustvoUkupno });
+          if (azurirano) {
+            iskustvoUkupno = azurirano.iskustvoUkupno;
+            const razinaPrije = stanjeIskustva(iskustvoPrije).razina;
+            const razinaPoslije = stanjeIskustva(iskustvoUkupno).razina;
+            const xpBroj = await stvoriPorukeXpRazina({
+              igracId: r.igracId,
+              razinaPrije,
+              razinaPoslije,
+              tx,
+              izvorTip: 'privatna',
+              izvorId: partijaId,
+            });
+            if (xpBroj > 0) sanducicIgraci.add(r.igracId);
+            const iskusnjara = izracunajNovaDostignuca(
+              { razina: razinaPrije },
+              {},
+              razinaPoslije,
+              false,
+            ).filter((d) => d.id === 'iskusnjara');
+            if (iskusnjara.length > 0) {
+              await tx.insert(dostignucaIgraca).values(iskusnjara.map((dostignuce) => ({
+                igracId: r.igracId,
+                dostignuceId: dostignuce.id,
+                razina: dostignuce.novaRazina,
+                prvoOtkljucano: new Date(),
+                zadnjeOtkljucavanje: new Date(),
+              }))).onConflictDoUpdate({
+                target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
+                set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
+              });
+              pridruziDostignuca(r.igracId, iskusnjara, upravljac, vrstaIgraca, iskustvoPrije);
+            }
+          }
+        }
+        if (!agregati.has(r.igracId)) {
+          agregati.set(r.igracId, {
+            bodoviUkupno: brojaciPrije.bodovi,
+            odigrane: brojaciPrije.odigrane,
+            pobjede: brojaciPrije.pobjede,
+            iskustvoUkupno,
+            dovrseneIgre: 0,
+            novaDostignuca: [],
+            dnkPrije: [],
+            dnkPoslije: [],
+            ocjenaIgre: null,
+            bonusOcjenaIgre: 0,
+            nizPrije: 0,
+            nizPoslije: 0,
+            najboljiNiz: 0,
+            osnovniXp: r.iskustvo,
+            bonusPobjednickogNizaPostotak: 0,
+            bonusPobjednickogNizaXp: 0,
+            forma: null,
+            pohvale: [],
+            upravljac,
+            vrstaIgraca,
+            botTip,
+            iskustvoPrijePartije: iskustvoPrije,
+          });
+        } else {
+          const agregat = agregati.get(r.igracId)!;
+          agregat.iskustvoUkupno = iskustvoUkupno;
+          agregat.iskustvoPrijePartije = iskustvoPrije;
+          agregat.osnovniXp = r.iskustvo;
         }
       }
 
