@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   brojBotovaZaIzazov,
+  brojDugihRijeciZaLevel,
   definicijaIzazova,
   dostupnostIzazova,
   ID_OVI_IZAZOVA,
@@ -15,18 +16,19 @@ import {
   levelDostupan,
   nadimakProfilaBota,
   PRAG_DUGE_RIJECI_IZAZOVA,
+  sekundiBrzogPotezaIzazova,
   UKUPNI_NOMINALNI_XP_IZAZOVA,
   validirajKatalogIzazova,
   VERZIJA_DEFINICIJE_IZAZOVA,
   ZADANI_PROFIL_TRENINGA,
 } from '../src/izazovi.js';
 
-describe('katalog izazova v2', () => {
+describe('katalog izazova v3', () => {
   it('validira 60 definicija, fond XP i verziju', () => {
     expect(() => validirajKatalogIzazova()).not.toThrow();
     expect(KATALOG_IZAZOVA).toHaveLength(60);
     expect(ID_OVI_IZAZOVA).toHaveLength(60);
-    expect(VERZIJA_DEFINICIJE_IZAZOVA).toBe(2);
+    expect(VERZIJA_DEFINICIJE_IZAZOVA).toBe(3);
     expect(KATALOG_IZAZOVA.reduce((s, d) => s + d.xp, 0)).toBe(UKUPNI_NOMINALNI_XP_IZAZOVA);
     expect(UKUPNI_NOMINALNI_XP_IZAZOVA).toBe(106_540);
   });
@@ -35,7 +37,7 @@ describe('katalog izazova v2', () => {
     expect(PRAG_DUGE_RIJECI_IZAZOVA).toBe(10);
   });
 
-  it('matrica: profili, formati, varijante, timeri', () => {
+  it('matrica: profili, formati, varijante, timeri i skaliranje', () => {
     const l1dv01 = definicijaIzazova('IZ-L1-DV-01');
     expect(l1dv01.varijanta).toBe('obicni');
     expect(l1dv01.turnDurationMs).toBe(30_000);
@@ -44,17 +46,46 @@ describe('katalog izazova v2', () => {
     expect(l1dv01.profileId).toBe('pocetnik');
     expect(brojBotovaZaIzazov(l1dv01)).toBe(1);
 
-    const brzi = definicijaIzazova('IZ-L1-TR-02');
-    expect(brzi.varijanta).toBe('brzi');
-    expect(brzi.turnDurationMs).toBe(15_000);
-    expect(brzi.botTurnDurationMs).toBe(30_000);
+    const brziL1 = definicijaIzazova('IZ-L1-TR-02');
+    expect(brziL1.varijanta).toBe('brzi');
+    expect(brziL1.turnDurationMs).toBe(15_000);
+    expect(brziL1.botTurnDurationMs).toBe(30_000);
+
+    const brziL2 = definicijaIzazova('IZ-L2-TR-02');
+    expect(brziL2.turnDurationMs).toBe(13_000);
+    expect(sekundiBrzogPotezaIzazova(2)).toBe(13);
+
+    const brziL4 = definicijaIzazova('IZ-L4-DV-02');
+    expect(brziL4.turnDurationMs).toBe(9_000);
+
+    const duge = definicijaIzazova('IZ-L1-DV-03');
+    expect(duge.varijanta).toBe('duge_rijeci');
+    expect(duge.pravila).toBe('klasicni');
+    expect(duge.ciljevi.dugeRijeci).toBe(1);
+    expect(duge.ciljevi.bezPogreske).toBeUndefined();
+
+    const dugeL3 = definicijaIzazova('IZ-L3-CE-03');
+    expect(dugeL3.ciljevi.dugeRijeci).toBe(3);
+    expect(brojDugihRijeciZaLevel(3)).toBe(3);
+
+    const bezPogreske = definicijaIzazova('IZ-L1-DV-04');
+    expect(bezPogreske.varijanta).toBe('bez_pogreske');
+    expect(bezPogreske.ciljevi.bezPogreske).toBe(true);
+    expect(bezPogreske.pravila).toBe('klasicni');
 
     const finale = definicijaIzazova('IZ-L2-CE-05');
     expect(finale.varijanta).toBe('zavrsni');
-    expect(finale.pravila).toBe('dokazi_nastavak');
+    expect(finale.pravila).toBe('klasicni');
+    expect(finale.turnDurationMs).toBe(13_000);
     expect(finale.ciljevi.bezPogreske).toBe(true);
+    expect(finale.ciljevi.bezZavrsavanjaNaKa).toBe(true);
+    expect(finale.ciljevi.dugeRijeci).toBe(2);
     expect(finale.ciljevi.uspjesanDokaz).toBeUndefined();
     expect(finale.profileId).toBe('iskusni');
+  });
+
+  it('nema dokazi_nastavak u katalogu', () => {
+    expect(KATALOG_IZAZOVA.every((d) => d.pravila === 'klasicni')).toBe(true);
   });
 
   it('početnih 12 dostupnih; finala zaključana; stari IZ* ne otključava', () => {

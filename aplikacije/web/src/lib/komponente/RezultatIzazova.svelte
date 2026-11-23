@@ -6,7 +6,7 @@
     LevelIzazova,
     SettlementIzazovaDto,
   } from 'zajednicko';
-  import { jeIdIzazova, pokusajDefinicijuIzazova } from 'zajednicko';
+  import { jeIdIzazova, pokusajDefinicijuIzazova, PRAG_DUGE_RIJECI_IZAZOVA } from 'zajednicko';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { tekstRazlogaNeuspjeha } from '$lib/izazovi-klijent.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
@@ -96,9 +96,22 @@
           {/if}
         </li>
       {/if}
+      {#if goalProgress.bezZavrsavanjaNaKa?.required}
+        <li
+          class:met={goalProgress.bezZavrsavanjaNaKa.met}
+          class:prekseno={!goalProgress.bezZavrsavanjaNaKa.met}
+          data-testid="izazov-rezultat-bez-ka"
+        >
+          {#if goalProgress.bezZavrsavanjaNaKa.met}
+            Ne završi na ka
+          {:else}
+            Ne završi na ka — završio si na ka
+          {/if}
+        </li>
+      {/if}
       {#if goalProgress.dugeRijeci.required > 0}
-        <li class:met={goalProgress.dugeRijeci.met}>
-          Duge {goalProgress.dugeRijeci.current}/{goalProgress.dugeRijeci.required}
+        <li class:met={goalProgress.dugeRijeci.met} data-testid="izazov-rezultat-duge">
+          Duge (≥{PRAG_DUGE_RIJECI_IZAZOVA}) {goalProgress.dugeRijeci.current}/{goalProgress.dugeRijeci.required}
         </li>
       {/if}
       {#if goalProgress.rijetkeRijeci.required > 0}

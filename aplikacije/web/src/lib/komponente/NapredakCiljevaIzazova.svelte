@@ -9,12 +9,9 @@
     NAZIVI_LEVELA_IZAZOVA,
     NAZIVI_PROFILA_BOTA,
     NAZIVI_VARIJANTI_IZAZOVA,
+    PRAG_DUGE_RIJECI_IZAZOVA,
   } from 'zajednicko';
   import { nazivPravilnika } from '$lib/igraj-rute.js';
-  import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
-
-  const OPIS_DOKAZI_NASTAVAK =
-    'Ako sljedeći igrač ne zna nastavak, autor prethodne riječi mora dokazati da nastavak postoji tako da ga odigra. Uspije li, ispada igrač koji nije znao nastavak. Ne uspije li, ispada autor prethodne riječi.';
 
   let {
     napredak,
@@ -30,7 +27,6 @@
   const tvojPotezSek = $derived(
     meta ? Math.round(meta.humanTurnDurationMs / 1000) : null,
   );
-  const prikaziDokazPomoc = $derived(efektivnaPravila === 'dokazi_nastavak');
 </script>
 
 {#if napredak || meta}
@@ -42,17 +38,7 @@
       <p class="meta-reda">
         <span>Botovi: {NAZIVI_PROFILA_BOTA[meta.profileId]}</span>
         {#if efektivnaPravila}
-          <span class="pravila">
-            Pravila: {nazivPravilnika(efektivnaPravila)}
-            {#if prikaziDokazPomoc}
-              <PojamPomoc
-                id="izazov-dokazi-pomoc"
-                opis={OPIS_DOKAZI_NASTAVAK}
-                ariaLabel="Što znači Dokaži nastavak?"
-                pozicioniranje="uz-okidac"
-              />
-            {/if}
-          </span>
+          <span class="pravila">Pravila: {nazivPravilnika(efektivnaPravila)}</span>
         {/if}
       </p>
     {:else if efektivnaPravila}
@@ -73,15 +59,36 @@
             Bez pogrešne riječi
           {/if}
         </span>
-      {:else}
+      {/if}
+      {#if napredak?.bezZavrsavanjaNaKa?.required}
+        <span data-testid="izazov-uvjet-bez-ka">
+          {#if napredak.bezZavrsavanjaNaKa.met}
+            Ne završi na ka — zasad ispunjeno
+          {:else}
+            Ne završi na ka
+          {/if}
+        </span>
+      {/if}
+      {#if napredak && napredak.dugeRijeci.required > 0}
+        <span data-testid="izazov-uvjet-duge">
+          Duge (≥{PRAG_DUGE_RIJECI_IZAZOVA}): {napredak.dugeRijeci.current}/{napredak.dugeRijeci.required}
+        </span>
+      {/if}
+      {#if napredak && !napredak.bezPogreske.required && !napredak.bezZavrsavanjaNaKa?.required && napredak.dugeRijeci.required === 0}
+        <span>Pobijedi</span>
+      {:else if !napredak}
         <span>Pobijedi</span>
       {/if}
     </p>
 
     {#if napredak}
       <p class="napomena">
-        {#if napredak.bezPogreske.required}
+        {#if napredak.bezPogreske.required && napredak.bezZavrsavanjaNaKa?.required}
+          Za prolaz moraš pobijediti. Prva pogrešna riječ ili završetak na ka završava izazov.
+        {:else if napredak.bezPogreske.required}
           Za prolaz moraš pobijediti. Prva pogrešna riječ završava izazov.
+        {:else if napredak.bezZavrsavanjaNaKa?.required}
+          Za prolaz moraš pobijediti. Završetak riječi na ka završava izazov.
         {:else}
           Za prolaz moraš pobijediti.
         {/if}

@@ -83,8 +83,15 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   page.once('dialog', (dijalog) => dijalog.accept());
   await odjava.click();
   await odjavaOdgovor;
+  // Odjava može navigirati i uništiti execution context — tretiraj to kao opozvan token.
   await expect
-    .poll(async () => page.evaluate(() => localStorage.getItem('kaladont_sesijski_token')), {
+    .poll(async () => {
+      try {
+        return await page.evaluate(() => localStorage.getItem('kaladont_sesijski_token'));
+      } catch {
+        return null;
+      }
+    }, {
       timeout: 15_000,
     })
     .toBeNull();

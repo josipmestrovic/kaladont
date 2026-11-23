@@ -179,14 +179,15 @@ export interface PostavkeMotoraPartije {
   naIzazovPrihvacenPotez?: (ulaz: {
     partijaId: string;
     igracId: string;
+    rijecNormalizirana: string;
     brojGrafema: number;
     frekvencija: number | null | undefined;
     uspjesanDokaz: boolean;
-  }) => void;
+  }) => { zaustavi: true; razlog: 'zavrsio_na_ka' } | { zaustavi: false } | void;
   naIzazovKraj?: (ulaz: {
     partijaId: string;
     pobjednikId: string | null;
-    terminalHint?: 'nevaljana_rijec' | 'odustao' | 'prekid_veze' | null;
+    terminalHint?: 'nevaljana_rijec' | 'zavrsio_na_ka' | 'odustao' | 'prekid_veze' | null;
   }) => void | Promise<{
     settlement?: import('../izazovi/obracun.js').SettlementIzazova;
   } | void>;
@@ -257,7 +258,9 @@ interface StanjeStola {
    * PR03: forsiran terminalni razlog Izazova (bez-pogreške / odustajanje / prekid veze).
    * Settlement ga čita pri zaključivanju.
    */
-  izazovTerminalHint?: 'nevaljana_rijec' | 'odustao' | 'prekid_veze' | null;
+  izazovTerminalHint?: 'nevaljana_rijec' | 'zavrsio_na_ka' | 'odustao' | 'prekid_veze' | null;
+  /** Odgođeni stop nakon prihvaćene riječi (ne-završi-na-ka) — forsaj nakon obrade poteza. */
+  izazovPendingStopRazlog?: 'zavrsio_na_ka' | null;
   /** PR redesign: odvojeni rok čovjek/bot; samo kontekst izazov. */
   izazovTimerPolitika?: { covjekMs: number; botMs: number };
   /** Autoritativni metadata kampanje (refresh/reconnect). */
@@ -1218,6 +1221,7 @@ export function stvoriUpraviteljPartija(
       kontekst,
       politika,
       izazovTerminalHint: null,
+      izazovPendingStopRazlog: null,
       izazovTimerPolitika: kontekst === 'izazov' ? opcije.izazovTimerPolitika : undefined,
       izazovMeta: kontekst === 'izazov' ? opcije.izazovMeta : undefined,
       trajanjePotezaSek: kontekst === 'izazov'
@@ -2555,13 +2559,15 @@ export function stvoriUpraviteljPartija(
     const brojGrafema = grafemi(rijecNormalizirana).length;
     // PR03: činjenice Izazova izvan dajeDostignucaIKolekcije (inače bi duge/rijetke ostale 0).
     if (stanje.kontekst === 'izazov' && !stanje.dokaz) {
-      postavke.naIzazovPrihvacenPotez?.({
+      const stop = postavke.naIzazovPrihvacenPotez?.({
         partijaId: stanje.partijaId,
         igracId,
+        rijecNormalizirana,
         brojGrafema,
         frekvencija,
         uspjesanDokaz: false,
       });
+      if (stop && stop.zaustavi) stanje.izazovPendingStopRazlog = stop.razlog;
     }
     const rijetkaTier = frekvencija === 0 && brojGrafema >= 4 ? 0 : typeof frekvencija === 'number' && frekvencija <= 9 ? 1 : typeof frekvencija === 'number' && frekvencija <= 99 ? 2 : null;
     for (const grupa of noveGrupe) grupeIgraca.set(grupa, rijetkaTier);
@@ -2741,13 +2747,15 @@ export function stvoriUpraviteljPartija(
       const cekateljId = stanje.dokaz.cekateljId;
       statistikaPoteza.uspjesniDokazi += 1;
       if (stanje.kontekst === 'izazov') {
-        postavke.naIzazovPrihvacenPotez?.({
+        const stop = postavke.naIzazovPrihvacenPotez?.({
           partijaId: stanje.partijaId,
           igracId,
+          rijecNormalizirana,
           brojGrafema,
           frekvencija,
           uspjesanDokaz: true,
         });
+        if (stop && stop.zaustavi) stanje.izazovPendingStopRazlog = stop.razlog;
       }
       emitirajPrihvacenPotezSvima(stanje, {
         igracId,
@@ -2975,6 +2983,11 @@ export function stvoriUpraviteljPartija(
       return { ishod: 'odbijen', kod: rezultat.kod!, poruka: rezultat.poruka! };
     }
     obradiPrihvacenPotez(stanje, igracId, rijecNormalizirana, izvorniSocket);
+    if (stanje.izazovPendingStopRazlog) {
+      const razlog = stanje.izazovPendingStopRazlog;
+      stanje.izazovPendingStopRazlog = null;
+      forsajTerminalIzazova(stanje, razlog);
+    }
     return { ishod: 'prihvacen' };
   }
 
@@ -3002,7 +3015,7 @@ export function stvoriUpraviteljPartija(
    */
   function forsajTerminalIzazova(
     stanje: StanjeStola,
-    razlog: 'nevaljana_rijec' | 'odustao' | 'prekid_veze',
+    razlog: 'nevaljana_rijec' | 'zavrsio_na_ka' | 'odustao' | 'prekid_veze',
   ): void {
     if (stanje.zavrsena || stanje.kontekst !== 'izazov') return;
     stanje.izazovTerminalHint = razlog;

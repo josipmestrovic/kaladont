@@ -118,6 +118,7 @@ test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page
       ];
       stanje.goalProgress = {
         bezPogreske: { required: false, met: true },
+        bezZavrsavanjaNaKa: { required: false, met: true },
         dugeRijeci: { required: 0, current: 0, met: true },
         rijetkeRijeci: { required: 0, current: 0, met: true },
         uspjesanDokaz: { required: 0, current: 0, met: true },

@@ -498,6 +498,13 @@
       "when": 1795060000000,
       "tag": "0070_izazivac_zvjezdice",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1795070000000,
+      "tag": "0071_zavrsio_na_ka",
+      "breakpoints": true
     }
   ]
 }

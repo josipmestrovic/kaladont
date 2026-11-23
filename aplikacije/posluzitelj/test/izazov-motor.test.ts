@@ -24,7 +24,9 @@ import {
   jePravaPogreskaPoteza,
   odlukaNakonKrajaIgre,
   odlukaNakonOdbijenogPoteza,
+  odlukaNakonPrihvaceneRijeci,
   prazneCinjenice,
+  rijecZavrsavaNaKa,
 } from '../src/izazovi/evaluacija.js';
 import { umetniRezerviraniPokusaj, dohvatiPokusajPoId } from '../src/izazovi/pohrana.js';
 import { zavrsiPokusajIzazova, ODGODA_REZULTATA_IZAZOVA_MS } from '../src/izazovi/zavrsetak.js';
@@ -80,7 +82,7 @@ describe('Izazov PR03 — evaluacija (čista)', () => {
     expect(elim.razlog).toBe('eliminiran');
   });
 
-  it('parametrizirano: pravilnici × formati × timer iz kataloga', () => {
+  it('parametrizirano: pravilnici × formati × timer iz kataloga v3', () => {
     const uzorci = [
       definicijaIzazova('IZ-L1-DV-01'),
       definicijaIzazova('IZ-L1-DV-03'),
@@ -91,11 +93,43 @@ describe('Izazov PR03 — evaluacija (čista)', () => {
     ] as const;
     for (const d of uzorci) {
       expect([2, 3, 4]).toContain(d.brojIgraca);
-      expect(['klasicni', 'ka_zna', 'dokazi_nastavak']).toContain(d.pravila);
-      expect([15_000, 30_000]).toContain(d.turnDurationMs);
+      expect(d.pravila).toBe('klasicni');
+      expect([9_000, 11_000, 13_000, 15_000, 30_000]).toContain(d.turnDurationMs);
       const napredak = evaluirajNapredak(d.ciljevi, prazneCinjenice());
       expect(typeof napredak.sviCiljeviIspunjeni).toBe('boolean');
+      expect(napredak.bezZavrsavanjaNaKa.required).toBe(Boolean(d.ciljevi.bezZavrsavanjaNaKa));
     }
+    const finaleL4 = definicijaIzazova('IZ-L4-CE-05');
+    expect(finaleL4.turnDurationMs).toBe(9_000);
+    expect(finaleL4.ciljevi.dugeRijeci).toBe(4);
+    expect(finaleL4.ciljevi.bezZavrsavanjaNaKa).toBe(true);
+  });
+
+  it('prihvaćena riječ na ka forsira zavrsio_na_ka; duga riječ se broji', () => {
+    expect(rijecZavrsavaNaKa('banka')).toBe(true);
+    expect(rijecZavrsavaNaKa('kava')).toBe(false);
+
+    const stop = odlukaNakonPrihvaceneRijeci({
+      ciljevi: { bezZavrsavanjaNaKa: true, dugeRijeci: 1 },
+      cinjenice: prazneCinjenice(),
+      rijecNormalizirana: 'banka',
+      brojGrafema: 5,
+      frekvencija: 10,
+    });
+    expect(stop.stop).toBe(true);
+    if (stop.stop) expect(stop.razlog).toBe('zavrsio_na_ka');
+    expect(stop.cinjenice.zavrsioNaKa).toBe(true);
+
+    const ok = odlukaNakonPrihvaceneRijeci({
+      ciljevi: { bezZavrsavanjaNaKa: true, dugeRijeci: 1 },
+      cinjenice: prazneCinjenice(),
+      rijecNormalizirana: 'inteligencija',
+      brojGrafema: 12,
+      frekvencija: 10,
+    });
+    expect(ok.stop).toBe(false);
+    expect(ok.cinjenice.dugeRijeci).toBe(1);
+    expect(ok.cinjenice.zavrsioNaKa).toBe(false);
   });
 });
 
@@ -336,7 +370,8 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   });
 
   it('bez-pogreške: prava pogreška odmah terminalira pokušaj', async () => {
-    const { socket, igracId, attemptId, runda } = await pokreniIzazov('IZ-L1-DV-03');
+    // Slot 04 = bez_pogreske (v3; ranije je bio 03).
+    const { socket, igracId, attemptId, runda } = await pokreniIzazov('IZ-L1-DV-04');
     try {
       if (runda.naPotezuId !== igracId) {
         // Raspored bez našeg poteza — potvrdi da je igra živa; evaluator je pokriven unit testom.
@@ -430,13 +465,14 @@ describe('Izazov PR03 — parametrizirani start (uzorak pravilnika/formata)', ()
     }
   });
 
-  const uzorak: { id: 'IZ-L1-DV-01' | 'IZ-L1-TR-01' | 'IZ-L1-CE-01' | 'IZ-L1-TR-04' | 'IZ-L1-TR-02' | 'IZ-L1-DV-04'; pravila: PravilnikPartije; broj: 2 | 3 | 4; sek: 15 | 30 }[] = [
+  const uzorak: { id: 'IZ-L1-DV-01' | 'IZ-L1-TR-01' | 'IZ-L1-CE-01' | 'IZ-L1-TR-04' | 'IZ-L1-TR-02' | 'IZ-L1-DV-03' | 'IZ-L1-DV-05'; pravila: PravilnikPartije; broj: 2 | 3 | 4; sek: number }[] = [
     { id: 'IZ-L1-DV-01', pravila: 'klasicni', broj: 2, sek: 30 },
     { id: 'IZ-L1-TR-01', pravila: 'klasicni', broj: 3, sek: 30 },
     { id: 'IZ-L1-CE-01', pravila: 'klasicni', broj: 4, sek: 30 },
-    { id: 'IZ-L1-TR-04', pravila: 'dokazi_nastavak', broj: 3, sek: 30 },
+    { id: 'IZ-L1-TR-04', pravila: 'klasicni', broj: 3, sek: 30 },
     { id: 'IZ-L1-TR-02', pravila: 'klasicni', broj: 3, sek: 15 },
-    { id: 'IZ-L1-DV-04', pravila: 'dokazi_nastavak', broj: 2, sek: 30 },
+    { id: 'IZ-L1-DV-03', pravila: 'klasicni', broj: 2, sek: 30 },
+    { id: 'IZ-L1-DV-05', pravila: 'klasicni', broj: 2, sek: 15 },
   ];
 
   it.each(uzorak)('$id: $pravila / $broj igrača / $sek s', async ({ id, pravila, broj, sek }) => {

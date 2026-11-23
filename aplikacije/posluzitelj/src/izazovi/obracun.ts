@@ -42,6 +42,7 @@ import type { RedakPokusajaIzazova, SnapshotPokusajaIzazova } from './pohrana.js
 const MISIJA_RAZLOZI = new Set<RazlogNeuspjehaIzazova>([
   'eliminiran',
   'nevaljana_rijec',
+  'zavrsio_na_ka',
   'cilj_neispunjen',
 ]);
 

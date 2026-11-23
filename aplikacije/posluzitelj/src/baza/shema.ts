@@ -76,6 +76,7 @@ export const razlogNeuspjehaIzazova = pgEnum('razlog_neuspjeha_izazova', [
   'cilj_neispunjen',
   'eliminiran',
   'nevaljana_rijec',
+  'zavrsio_na_ka',
   'odustao',
   'prekid_veze',
 ]);
