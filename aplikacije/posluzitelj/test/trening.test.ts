@@ -203,25 +203,25 @@ describe('Zagrijavanje', () => {
       expect(prihvacen.rijec).toBe(runda.kandidat);
       const [oblik] = await baza.execute<{ rijec: string }>(sql`select rijec from trening_rijeci_igraca where igrac_id = ${igracId} and rijec = ${runda.kandidat}`);
       expect(oblik).toBeUndefined();
-      const grupe = await baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
-      expect(grupe).toHaveLength(0);
-      const kolekcija = await fetch(`${adresa}/api/profil/kolekcija`, { headers: { authorization: `Bearer ${sesija.token}` } });
-      expect(kolekcija.status).toBe(200);
-      expect((await kolekcija.json() as { kategorije: { vrsta: string }[] }).kategorije.some((stavka) => stavka.vrsta === 'oblici_treninga')).toBe(false);
+      const grupePrijeKraja = await baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
+      expect(grupePrijeKraja).toHaveLength(0);
       const kraj = await krajPromise;
       expect(kraj.kontekst).toBe('trening');
-      expect(kraj.kolekcija).toBeUndefined();
-      expect(kraj.mojeIskustvo).toBeNull();
+      expect(kraj.kolekcija).toBeDefined();
+      expect(kraj.mojeIskustvo).not.toBeNull();
+      expect(kraj.mojeIskustvo!.osvojenoIskustvo).toBeGreaterThan(0);
       expect(kraj.mojaForma).toBeUndefined();
+      expect(kraj.mojRang).toBeNull();
       const [partija] = await baza.execute<{ broj: number }>(sql`select count(*)::int as broj from partije where id = ${pocetak.partijaId}`);
       expect(partija?.broj).toBe(0);
+      const grupe = await baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
+      expect(grupe.length).toBeGreaterThan(0);
       const [igrac] = await baza.select({ iskustvo: igraci.iskustvoUkupno, odigrane: igraci.odigrane }).from(igraci).where(eq(igraci.id, igracId));
-      // Trening ne piše partijski XP/odigrane; dnevna/tjedna misija smije dodati XP u istom završetku.
+      // Trening zbraja XP riječi, ali ne odigrane/rang/formu; misije mogu dodati još XP.
       expect(igrac?.odigrane).toBe(0);
+      expect(igrac?.iskustvo).toBeGreaterThan(0);
       if (kraj.ukupnoIskustvo) {
         expect(igrac?.iskustvo).toBe(kraj.ukupnoIskustvo.poslije.ukupno);
-      } else {
-        expect(igrac?.iskustvo).toBe(0);
       }
     } finally {
       socket.off('partija:pocetak', naPocetak);
@@ -252,8 +252,7 @@ describe('Zagrijavanje', () => {
     expect(await baza.select().from(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igracId))).toHaveLength(100);
   });
 
-  it('gost igra protiv Iskusnog (zadani profil), dobiva kraj bez napretka i baza ostaje netaknuta', async () => {
-    const prije = await snimkaNapretka();
+  it('gost igra protiv Iskusnog (zadani profil), dobiva XP/kolekciju bez ranga i forme', async () => {
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
       const { pocetak, kraj } = await odigrajTreningDoKraja(socket);
@@ -262,17 +261,14 @@ describe('Zagrijavanje', () => {
       expect(pocetak.sjedala).toHaveLength(2);
       expect(pocetak.sjedala.some((s) => s.nadimak === 'Iskusni')).toBe(true);
       expect(kraj.kontekst).toBe('trening');
-      expect(kraj.mojeIskustvo).toBeNull();
-      expect(kraj.novaDostignuca).toEqual([]);
+      expect(kraj.mojeIskustvo).not.toBeNull();
       expect(kraj.mojaForma).toBeUndefined();
       expect(kraj.mojDnk).toBeUndefined();
-      expect(kraj.kolekcija).toBeUndefined();
+      expect(kraj.mojRang).toBeNull();
       expect(kraj.plasmani.every((p) => p.bodovi === 0)).toBe(true);
     } finally {
       socket.disconnect();
     }
-    // Gost je stvoren pri spajanju; sve tablice igre i napretka moraju biti identične.
-    expect(await snimkaNapretka()).toEqual(prije);
   });
 
   it('bot odigra legalnu riječ kad je na potezu i isti igrač može odmah u novi trening', async () => {

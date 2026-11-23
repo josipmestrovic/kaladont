@@ -1367,7 +1367,7 @@
   <h2>{jeTrening ? 'Kraj treninga' : 'Završni poredak'}</h2>
   {#if jeTrening}
     <p class="privatna-obavijest" data-testid="trening-obavijest">
-      Trening se ne bilježi kao partija i ne utječe na bodove, XP, rang, formu ni natjecateljsku statistiku.
+      Trening nije natjecateljska partija: XP, kolekcija i dostignuća riječi se bilježe, ali bez bodova, ranga, forme i ljestvice.
     </p>
     {#if jeRegistriranKorisnik()}
       <p class="privatna-obavijest">Pobjeda u treningu može otključati dostignuće Zagrijan.</p>
@@ -1523,7 +1523,7 @@
       mod={stanje.kraj.mod ?? stanje.mod ?? 'cetiri_igraca'}
     />
   {/if}
-  {#if stanje.kraj.kolekcija}
+  {#if stanje.kraj.kolekcija && (stanje.kraj.kolekcija.dodaneKategorije.length > 0 || (!jeTrening && !jeIzazov))}
     {@const kolekcija = stanje.kraj.kolekcija}
     <section class="zavrsna-kolekcija" aria-labelledby="zavrsna-kolekcija-naslov">
       <h3 id="zavrsna-kolekcija-naslov">Kolekcija riječi</h3>
