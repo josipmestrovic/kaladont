@@ -2,12 +2,16 @@
 
 Kratki postupak za usporedbu težine izazova nakon promjene. **Nema automatske težine** — admin gleda kohorte i odlučuje.
 
-## Katalog v2 (referenca)
+## Katalog v3 (referenca)
 
 - Matrica **4×3×5 = 60** ID-jeva: `IZ-L{1-4}-{DV|TR|CE}-{01-05}`.
 - Nominalni fond challenge XP = **106.540** (2× starog).
-- `definitionVersion = 2`. Stari `IZ01`–`IZ24` se ne migriraju u napredak.
-- Ljudski rok po varijanti (15/30 s); bot uvijek 30 s. Uspjeh = pobjeda (+ `bezPogreske` gdje treba).
+- `definitionVersion = 3`. Stari `IZ01`–`IZ24` se ne migriraju u napredak.
+- Pravilnik u katalogu: **samo `klasicni`** (nema `dokazi_nastavak` / `ka_zna` kao pravilnik).
+- Varijante po formatu: 01 obični → 02 brzi → 03 duge riječi → 04 bez pogreške → 05 završni.
+- Skaliranje po levelu (Početnik→Velemajstor): brzi/finale timer **15 − 2×(L−1)** s; duge riječi = **L** (≥10 grafema).
+- Završni: `bezPogreske` + `dugeRijeci` + `bezZavrsavanjaNaKa` (prihvaćena riječ na „ka” → `zavrsio_na_ka`).
+- Bot uvijek 30 s. Uspjeh = pobjeda + svi ciljevi.
 
 ## Tijek
 

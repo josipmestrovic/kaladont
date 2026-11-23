@@ -97,6 +97,8 @@ export function tekstRazlogaNeuspjeha(razlog: RazlogNeuspjehaIzazova | null | un
       return 'Ispao si prije pobjede, pa je izazov izgubljen. Možeš pokušati ponovno.';
     case 'nevaljana_rijec':
       return 'Pogriješio si riječ, a ovaj izazov ne dopušta pogreške. Možeš pokušati ponovno.';
+    case 'zavrsio_na_ka':
+      return 'Završio si riječ na ka, a ovaj izazov to ne dopušta. Možeš pokušati ponovno.';
     case 'odustao':
       return 'Odustao si od izazova. Možeš pokušati ponovno.';
     case 'prekid_veze':
@@ -113,6 +115,8 @@ export function kratkiSazetakNeuspjehaIzazova(
   switch (razlog) {
     case 'nevaljana_rijec':
       return 'Izgubio si izazov jer si pogriješio — uvjet je bez pogreške.';
+    case 'zavrsio_na_ka':
+      return 'Izgubio si izazov jer si završio riječ na ka.';
     case 'cilj_neispunjen':
       return 'Pobijedio si partiju, ali nisu ispunjeni svi ciljevi izazova.';
     case 'odustao':

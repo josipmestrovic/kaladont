@@ -493,7 +493,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
         sobaServis?.registrirajRezultatPartije(kodSobe, partijaId, pobjednikId, rezultati);
       },
       naIzazovOdbijenPotez: (ulaz) => voditeljIzazova?.naOdbijenPotez(ulaz) ?? { zaustavi: false },
-      naIzazovPrihvacenPotez: (ulaz) => { voditeljIzazova?.naPrihvacenPotez(ulaz); },
+      naIzazovPrihvacenPotez: (ulaz) => voditeljIzazova?.naPrihvacenPotez(ulaz) ?? { zaustavi: false },
       naIzazovKraj: async (ulaz) => {
         const terminal = await voditeljIzazova?.naKrajIgre(ulaz) as IshodKrajaIzazova | null | undefined;
         if (!terminal) return;

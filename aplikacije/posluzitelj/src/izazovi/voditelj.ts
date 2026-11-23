@@ -21,11 +21,11 @@ import type { KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
 import type { RezultatPokretanja } from '../igra/politika-ucinka.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
 import {
-  azurirajCinjenicePrihvacenomRijeci,
   evaluirajNapredak,
   metrikeIzCinjenica,
   odlukaNakonKrajaIgre,
   odlukaNakonOdbijenogPoteza,
+  odlukaNakonPrihvaceneRijeci,
   prazneCinjenice,
   type CinjeniceIzazova,
   type GoalProgress,
@@ -134,10 +134,11 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
   naPrihvacenPotez: (ulaz: {
     partijaId: string;
     igracId: string;
+    rijecNormalizirana: string;
     brojGrafema: number;
     frekvencija: number | null | undefined;
     uspjesanDokaz: boolean;
-  }) => void;
+  }) => { zaustavi: true; razlog: 'zavrsio_na_ka' } | { zaustavi: false };
   naKrajIgre: (ulaz: {
     partijaId: string;
     pobjednikId: string | null;
@@ -299,13 +300,29 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
   function naPrihvacenPotez(ulaz: {
     partijaId: string;
     igracId: string;
+    rijecNormalizirana: string;
     brojGrafema: number;
     frekvencija: number | null | undefined;
     uspjesanDokaz: boolean;
-  }): void {
+  }): { zaustavi: true; razlog: 'zavrsio_na_ka' } | { zaustavi: false } {
     const sesija = sesijePoPartiji.get(ulaz.partijaId);
-    if (!sesija || sesija.zavrseno || ulaz.igracId !== sesija.covjekId) return;
-    sesija.cinjenice = azurirajCinjenicePrihvacenomRijeci(sesija.cinjenice, ulaz);
+    if (!sesija || sesija.zavrseno || ulaz.igracId !== sesija.covjekId) {
+      return { zaustavi: false };
+    }
+    const odluka = odlukaNakonPrihvaceneRijeci({
+      ciljevi: sesija.ciljevi,
+      cinjenice: sesija.cinjenice,
+      rijecNormalizirana: ulaz.rijecNormalizirana,
+      brojGrafema: ulaz.brojGrafema,
+      frekvencija: ulaz.frekvencija,
+      uspjesanDokaz: ulaz.uspjesanDokaz,
+    });
+    sesija.cinjenice = odluka.cinjenice;
+    if (odluka.stop) {
+      sesija.forsiranRazlog = odluka.razlog;
+      return { zaustavi: true, razlog: odluka.razlog };
+    }
+    return { zaustavi: false };
   }
 
   function oznaciForsiranRazlog(partijaId: string, razlog: RazlogNeuspjehaIzazova): void {

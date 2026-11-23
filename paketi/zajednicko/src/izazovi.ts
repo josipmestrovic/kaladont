@@ -1,12 +1,13 @@
 /**
- * Katalog Izazova v2 — matrica 4 levela × 3 formata × 5 varijanti (60).
+ * Katalog Izazova v3 — matrica 4 levela × 3 formata × 5 varijanti (60).
+ * Bez dokazi_nastavak; duge riječi + ne-završi-na-ka na finalu; timer skaliran po levelu.
  */
 import { PRAGOVI_DULJINE } from './nagrada-za-rijec.js';
 import type { ModPartije, PravilnikPartije } from './katalog-partije.js';
 import { MODOVI_PARTIJE, PRAVILNICI_PARTIJE } from './katalog-partije.js';
 
 /** Verzija kataloga definicija; balansi bumpaju ovo, ne otvaraju ponovno XP (rewardEpoch). */
-export const VERZIJA_DEFINICIJE_IZAZOVA = 2;
+export const VERZIJA_DEFINICIJE_IZAZOVA = 3;
 
 /** Ukupni nominalni fond challenge XP (2× starih 53.270). */
 export const UKUPNI_NOMINALNI_XP_IZAZOVA = 106_540;
@@ -49,7 +50,7 @@ export function nadimakProfilaBota(
   return ukupno <= 1 ? baza : `${baza} ${indeks}`;
 }
 
-export const TRAJANJA_POTEZA_IZAZOVA_MS = [15_000, 30_000] as const;
+export const TRAJANJA_POTEZA_IZAZOVA_MS = [9_000, 11_000, 13_000, 15_000, 30_000] as const;
 export type TrajanjePotezaIzazovaMs = (typeof TRAJANJA_POTEZA_IZAZOVA_MS)[number];
 
 export const STATUSI_POKUSAJA_IZAZOVA = [
@@ -65,6 +66,7 @@ export const RAZLOZI_NEUSPJEHA_IZAZOVA = [
   'cilj_neispunjen',
   'eliminiran',
   'nevaljana_rijec',
+  'zavrsio_na_ka',
   'odustao',
   'prekid_veze',
 ] as const;
@@ -79,15 +81,15 @@ export type StatusSpremanjaIzazova = (typeof STATUSI_SPREMANJA_IZAZOVA)[number];
 
 export type LevelIzazova = 1 | 2 | 3 | 4;
 export type FormatIzazova = 'DV' | 'TR' | 'CE';
-export type VarijantaIzazova = 'obicni' | 'brzi' | 'bez_pogreske' | 'dokazi' | 'zavrsni';
+export type VarijantaIzazova = 'obicni' | 'brzi' | 'duge_rijeci' | 'bez_pogreske' | 'zavrsni';
 
 export const LEVELOVI_IZAZOVA = [1, 2, 3, 4] as const satisfies readonly LevelIzazova[];
 export const FORMATI_IZAZOVA = ['DV', 'TR', 'CE'] as const satisfies readonly FormatIzazova[];
 export const VARIJANTE_IZAZOVA = [
   'obicni',
   'brzi',
+  'duge_rijeci',
   'bez_pogreske',
-  'dokazi',
   'zavrsni',
 ] as const satisfies readonly VarijantaIzazova[];
 
@@ -100,10 +102,20 @@ export const NAZIVI_FORMATA_IZAZOVA: Readonly<Record<FormatIzazova, string>> = {
 export const NAZIVI_VARIJANTI_IZAZOVA: Readonly<Record<VarijantaIzazova, string>> = {
   obicni: 'Obični',
   brzi: 'Brzi',
+  duge_rijeci: 'Duga riječ',
   bez_pogreske: 'Bez pogreške',
-  dokazi: 'Dokaži nastavak',
   zavrsni: 'Završni izazov',
 };
+
+/** Brzi / finale: 15 s na L1, −2 s po sljedećem levelu. */
+export function sekundiBrzogPotezaIzazova(level: LevelIzazova): 9 | 11 | 13 | 15 {
+  return (15 - 2 * (level - 1)) as 9 | 11 | 13 | 15;
+}
+
+/** Broj dugih riječi = campaign level (L1→1 … L4→4). */
+export function brojDugihRijeciZaLevel(level: LevelIzazova): 1 | 2 | 3 | 4 {
+  return level;
+}
 
 function brojIgracaZaFormat(format: FormatIzazova): 2 | 3 | 4 {
   if (format === 'DV') return 2;
@@ -165,8 +177,13 @@ export interface CiljeviIzazova {
   bezPogreske?: boolean;
   dugeRijeci?: number;
   rijetkeRijeci?: number;
-  /** Stari katalog / evaluator; novi katalog ne koristi. */
+  /** Stari katalog / evaluator; v3 katalog ne koristi. */
   uspjesanDokaz?: number;
+  /**
+   * Finale: prihvaćena riječ koja završava na „ka” odmah gubi izazov
+   * (nije pravilnik ka_zna).
+   */
+  bezZavrsavanjaNaKa?: boolean;
 }
 
 /** Autoritativni napredak ciljeva u snimci / GET pokušaja. */
@@ -178,6 +195,7 @@ export interface StavkaNapretkaCiljaIzazova {
 
 export interface GoalProgressIzazova {
   bezPogreske: { required: boolean; met: boolean };
+  bezZavrsavanjaNaKa: { required: boolean; met: boolean };
   dugeRijeci: StavkaNapretkaCiljaIzazova;
   rijetkeRijeci: StavkaNapretkaCiljaIzazova;
   uspjesanDokaz: StavkaNapretkaCiljaIzazova;
@@ -213,21 +231,36 @@ function modZaBroj(brojIgraca: 2 | 3 | 4): ModPartije {
   return 'cetiri_igraca';
 }
 
-function predlozakVarijante(varijanta: VarijantaIzazova): {
+function opisDugihRijeci(broj: number): string {
+  const slova = PRAG_DUGE_RIJECI_IZAZOVA;
+  if (broj === 1) return `Odigraj 1 riječ od najmanje ${slova} slova.`;
+  return `Odigraj ${broj} riječi od najmanje ${slova} slova.`;
+}
+
+function predlozakVarijante(varijanta: VarijantaIzazova, level: LevelIzazova): {
   pravila: PravilnikPartije;
-  sekundiCovjek: 15 | 30;
+  sekundiCovjek: number;
   ciljevi: CiljeviIzazova;
   opisCilja: string;
 } {
+  const duge = brojDugihRijeciZaLevel(level);
+  const brziSek = sekundiBrzogPotezaIzazova(level);
   switch (varijanta) {
     case 'obicni':
       return { pravila: 'klasicni', sekundiCovjek: 30, ciljevi: {}, opisCilja: 'Pobijedi.' };
     case 'brzi':
       return {
         pravila: 'klasicni',
-        sekundiCovjek: 15,
+        sekundiCovjek: brziSek,
         ciljevi: {},
-        opisCilja: 'Pobijedi (15 s po tvom potezu).',
+        opisCilja: `Pobijedi (${brziSek} s po tvom potezu).`,
+      };
+    case 'duge_rijeci':
+      return {
+        pravila: 'klasicni',
+        sekundiCovjek: 30,
+        ciljevi: { dugeRijeci: duge },
+        opisCilja: `Pobijedi. ${opisDugihRijeci(duge)}`,
       };
     case 'bez_pogreske':
       return {
@@ -236,19 +269,17 @@ function predlozakVarijante(varijanta: VarijantaIzazova): {
         ciljevi: { bezPogreske: true },
         opisCilja: 'Pobijedi bez pogrešne riječi.',
       };
-    case 'dokazi':
-      return {
-        pravila: 'dokazi_nastavak',
-        sekundiCovjek: 30,
-        ciljevi: {},
-        opisCilja: 'Pobijedi (pravila Dokaži nastavak).',
-      };
     case 'zavrsni':
       return {
-        pravila: 'dokazi_nastavak',
-        sekundiCovjek: 15,
-        ciljevi: { bezPogreske: true },
-        opisCilja: 'Pobijedi bez pogrešne riječi (15 s, Dokaži nastavak).',
+        pravila: 'klasicni',
+        sekundiCovjek: brziSek,
+        ciljevi: {
+          bezPogreske: true,
+          dugeRijeci: duge,
+          bezZavrsavanjaNaKa: true,
+        },
+        opisCilja:
+          `Pobijedi bez pogreške i bez završetka na ka (${brziSek} s). ${opisDugihRijeci(duge)}`,
       };
   }
 }
@@ -265,7 +296,7 @@ function izgradiKatalog(): DefinicijaIzazova[] {
         const varijanta = VARIJANTE_IZAZOVA[vi]!;
         const redoslijedUFormatu = (vi + 1) as 1 | 2 | 3 | 4 | 5;
         redniBroj += 1;
-        const pred = predlozakVarijante(varijanta);
+        const pred = predlozakVarijante(varijanta, level);
         const xp = XP_MATRICA_2X[level - 1]![fi]![vi]!;
         rezultat.push({
           id: idIzazova(level, format, redoslijedUFormatu) as IdIzazova,
@@ -291,7 +322,7 @@ function izgradiKatalog(): DefinicijaIzazova[] {
   return rezultat;
 }
 
-/** Autoritativni katalog nagrada i postava v2. */
+/** Autoritativni katalog nagrada i postava v3. */
 export const KATALOG_IZAZOVA: readonly DefinicijaIzazova[] = izgradiKatalog();
 
 const KATALOG_PO_IDU = new Map<string, DefinicijaIzazova>(
@@ -600,15 +631,23 @@ export function validirajKatalogIzazova(katalog: readonly DefinicijaIzazova[] = 
       throw new Error(`${d.id}: nevaljan XP`);
     }
     zbrojXp += d.xp;
-    const pred = predlozakVarijante(d.varijanta);
+    if (d.pravila !== 'klasicni') {
+      throw new Error(`${d.id}: v3 katalog koristi samo klasicni pravilnik`);
+    }
+    const pred = predlozakVarijante(d.varijanta, d.level);
     if (d.pravila !== pred.pravila) throw new Error(`${d.id}: pravilnik ≠ predložak`);
     if (d.turnDurationMs !== pred.sekundiCovjek * 1000) throw new Error(`${d.id}: timer ≠ predložak`);
     if (Boolean(d.ciljevi.bezPogreske) !== Boolean(pred.ciljevi.bezPogreske)) {
       throw new Error(`${d.id}: cilj bezPogreske ≠ predložak`);
     }
-    if (d.ciljevi.dugeRijeci !== undefined || d.ciljevi.rijetkeRijeci !== undefined
-      || d.ciljevi.uspjesanDokaz !== undefined) {
-      throw new Error(`${d.id}: novi katalog ne smije imati duge/rijetke/uspjesanDokaz`);
+    if (Boolean(d.ciljevi.bezZavrsavanjaNaKa) !== Boolean(pred.ciljevi.bezZavrsavanjaNaKa)) {
+      throw new Error(`${d.id}: cilj bezZavrsavanjaNaKa ≠ predložak`);
+    }
+    if ((d.ciljevi.dugeRijeci ?? 0) !== (pred.ciljevi.dugeRijeci ?? 0)) {
+      throw new Error(`${d.id}: cilj dugeRijeci ≠ predložak`);
+    }
+    if (d.ciljevi.rijetkeRijeci !== undefined || d.ciljevi.uspjesanDokaz !== undefined) {
+      throw new Error(`${d.id}: v3 katalog ne smije imati rijetke/uspjesanDokaz`);
     }
   }
   for (const id of ID_OVI_IZAZOVA) {
@@ -625,8 +664,10 @@ export function validirajKatalogIzazova(katalog: readonly DefinicijaIzazova[] = 
   if (zbrojXp !== UKUPNI_NOMINALNI_XP_IZAZOVA) {
     throw new Error(`XP zbroj ${zbrojXp} ≠ ${UKUPNI_NOMINALNI_XP_IZAZOVA}`);
   }
-  const petnaest = katalog.filter((d) => d.turnDurationMs === 15_000);
-  if (petnaest.length < 1) throw new Error('Katalog mora imati barem jednu 15-s razinu');
+  const brziSlotovi = katalog.filter((d) => d.varijanta === 'brzi' || d.varijanta === 'zavrsni');
+  if (brziSlotovi.length !== 24) {
+    throw new Error(`Očekivano 24 brza/finale slotova, dobiveno ${brziSlotovi.length}`);
+  }
 }
 
 /**

@@ -1,9 +1,10 @@
 /**
  * Čista evaluacija ciljeva Izazova — bez IO-a i bez drugog validatora riječi.
- * Motor šalje činjenice; ovdje se broje ciljevi i odlučuje stop (bez-pogreške).
+ * Motor šalje činjenice; ovdje se broje ciljevi i odlučuje stop (bez-pogreške / ne-ka).
  */
 import {
   PRAGOVI_DULJINE,
+  zadnjaDva,
   type CiljeviIzazova,
   type GoalProgressIzazova,
   type RazlogNeuspjehaIzazova,
@@ -27,6 +28,8 @@ export function jePravaPogreskaPoteza(kod: string): boolean {
 
 export interface CinjeniceIzazova {
   imaPravuPogresku: boolean;
+  /** Čovjek je odigrao prihvaćenu riječ koja završava na „ka”. */
+  zavrsioNaKa: boolean;
   dugeRijeci: number;
   rijetkeRijeci: number;
   uspjesniDokazi: number;
@@ -37,11 +40,17 @@ export interface CinjeniceIzazova {
 export function prazneCinjenice(): CinjeniceIzazova {
   return {
     imaPravuPogresku: false,
+    zavrsioNaKa: false,
     dugeRijeci: 0,
     rijetkeRijeci: 0,
     uspjesniDokazi: 0,
     prihvaceneRijeci: 0,
   };
+}
+
+/** Prihvaćena riječ završava na „ka” (isti grafemski nastavak kao u motoru). */
+export function rijecZavrsavaNaKa(rijecNormalizirana: string): boolean {
+  return zadnjaDva(rijecNormalizirana) === 'ka';
 }
 
 export type StavkaNapretkaCilja = StavkaNapretkaCiljaIzazova;
@@ -93,6 +102,7 @@ export function azurirajCinjenicePravomPogreskom(cinjenice: CinjeniceIzazova): C
 
 export function evaluirajNapredak(ciljevi: CiljeviIzazova, cinjenice: CinjeniceIzazova): GoalProgress {
   const bezRequired = Boolean(ciljevi.bezPogreske);
+  const kaRequired = Boolean(ciljevi.bezZavrsavanjaNaKa);
   const dugeRequired = ciljevi.dugeRijeci ?? 0;
   const rijetkeRequired = ciljevi.rijetkeRijeci ?? 0;
   const dokazRequired = ciljevi.uspjesanDokaz ?? 0;
@@ -100,6 +110,10 @@ export function evaluirajNapredak(ciljevi: CiljeviIzazova, cinjenice: CinjeniceI
   const bezPogreske = {
     required: bezRequired,
     met: !bezRequired || !cinjenice.imaPravuPogresku,
+  };
+  const bezZavrsavanjaNaKa = {
+    required: kaRequired,
+    met: !kaRequired || !cinjenice.zavrsioNaKa,
   };
   const dugeRijeci: StavkaNapretkaCilja = {
     required: dugeRequired,
@@ -119,11 +133,16 @@ export function evaluirajNapredak(ciljevi: CiljeviIzazova, cinjenice: CinjeniceI
 
   return {
     bezPogreske,
+    bezZavrsavanjaNaKa,
     dugeRijeci,
     rijetkeRijeci,
     uspjesanDokaz,
     sviCiljeviIspunjeni:
-      bezPogreske.met && dugeRijeci.met && rijetkeRijeci.met && uspjesanDokaz.met,
+      bezPogreske.met
+      && bezZavrsavanjaNaKa.met
+      && dugeRijeci.met
+      && rijetkeRijeci.met
+      && uspjesanDokaz.met,
   };
 }
 
@@ -153,6 +172,34 @@ export function odlukaNakonOdbijenogPoteza(ulaz: {
   const cinjenice = azurirajCinjenicePravomPogreskom(ulaz.cinjenice);
   if (ulaz.ciljevi.bezPogreske) {
     return { stop: true, razlog: 'nevaljana_rijec', cinjenice };
+  }
+  return { stop: false, cinjenice };
+}
+
+/**
+ * Sinkroni stop nakon prihvaćene riječi — cilj bezZavrsavanjaNaKa + završetak na „ka”.
+ * Činjenice (duge/rijetke) se prvo ažuriraju, pa se eventualno forsira terminal.
+ */
+export function odlukaNakonPrihvaceneRijeci(ulaz: {
+  ciljevi: CiljeviIzazova;
+  cinjenice: CinjeniceIzazova;
+  rijecNormalizirana: string;
+  brojGrafema: number;
+  frekvencija: number | null | undefined;
+  uspjesanDokaz?: boolean;
+}): {
+  stop: true;
+  razlog: 'zavrsio_na_ka';
+  cinjenice: CinjeniceIzazova;
+} | { stop: false; cinjenice: CinjeniceIzazova } {
+  let cinjenice = azurirajCinjenicePrihvacenomRijeci(ulaz.cinjenice, {
+    brojGrafema: ulaz.brojGrafema,
+    frekvencija: ulaz.frekvencija,
+    uspjesanDokaz: ulaz.uspjesanDokaz,
+  });
+  if (ulaz.ciljevi.bezZavrsavanjaNaKa && rijecZavrsavaNaKa(ulaz.rijecNormalizirana)) {
+    cinjenice = { ...cinjenice, zavrsioNaKa: true };
+    return { stop: true, razlog: 'zavrsio_na_ka', cinjenice };
   }
   return { stop: false, cinjenice };
 }

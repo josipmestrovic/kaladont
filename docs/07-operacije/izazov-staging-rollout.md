@@ -9,7 +9,7 @@ Suženi enablement: **flag on samo na stagingu**. Produkcija ostaje `IZAZOV_OMOG
 3. Compose staging zadano ima `IZAZOV_OMOGUCEN=true` (`docker-compose.staging.yml`). Override u `.env` samo ako treba privremeno ugasiti.
 4. Potvrdi flag on:
    - UI: naslovnica → **Izazovi** (katalog nije disabled).
-   - Ili `GET /api/izazovi` s valjanom sesijom — `omogucen: true`, `definitionVersion: 2`, 60 kartica.
+   - Ili `GET /api/izazovi` s valjanom sesijom — `omogucen: true`, `definitionVersion: 3`, 60 kartica.
 5. Prođi smoke checklist ispod.
 6. Perf smoke: `GET /zdravlje` nakon nekoliko Izazov partija.
 

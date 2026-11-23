@@ -18,6 +18,7 @@
     FORMATI_IZAZOVA,
     NAZIVI_FORMATA_IZAZOVA,
     NAZIVI_LEVELA_IZAZOVA,
+    PRAG_DUGE_RIJECI_IZAZOVA,
   } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
@@ -32,28 +33,29 @@
     tekstRazlogaZakljucavanja,
     zadaniLevelIzazova,
   } from '$lib/izazovi-klijent.js';
-  import { nazivPravilnika } from '$lib/igraj-rute.js';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
 
   const UKUPNO_IZAZOVA = 60;
 
   type UvjetKartice = {
-    kljuc: 'dokazi_nastavak' | 'ka_zna' | 'bez_pogreske' | '15s';
+    kljuc: 'duge_rijeci' | 'bez_pogreske' | 'bez_ka' | 'brzi_timer';
     naziv: string;
     opis: string;
   };
 
-  /** Opisi posebnih uvjeta na karticama (igra protiv botova — bez isteka vremena u dokazu). */
+  /** Opisi posebnih uvjeta na karticama. */
   const OPISI_UVJETA = {
-    dokazi_nastavak:
-      'Ako sljedeći igrač ne zna nastavak, autor prethodne riječi mora dokazati da nastavak postoji tako da ga odigra. Uspije li, ispada igrač koji nije znao nastavak. Ne uspije li, ispada autor prethodne riječi.',
-    ka_zna:
-      'Ispada igrač koji ne zna nastavak, osim u slučaju kaladonta — tada ispada onaj koji ga je omogućio.',
+    duge_rijeci: (broj: number) =>
+      broj === 1
+        ? `Moraš odigrati 1 riječ od najmanje ${PRAG_DUGE_RIJECI_IZAZOVA} slova.`
+        : `Moraš odigrati ${broj} riječi od najmanje ${PRAG_DUGE_RIJECI_IZAZOVA} slova.`,
     bez_pogreske:
       'Ne smiješ pogriješiti nijednu riječ. Prva pogrešna riječ završava izazov — moraš pobijediti bez greške.',
-    '15s':
-      'Na svom potezu imaš samo 15 sekundi za odgovor umjesto uobičajenih 30.',
-  } as const satisfies Record<UvjetKartice['kljuc'], string>;
+    bez_ka:
+      'Ne smiješ završiti riječ na ka. Ako odigraš riječ koja završava na ka, izazov odmah završava.',
+    brzi_timer: (sek: number) =>
+      `Na svom potezu imaš samo ${sek} sekundi za odgovor umjesto uobičajenih 30.`,
+  } as const;
 
   const igra = dohvatiStanjeIgre();
 
@@ -156,26 +158,23 @@
     sinkronizirajUrl(level, false);
   }
 
-  function statusOznaka(status: StavkaKatalogaIzazovaDto['status']): string {
-    if (status === 'zavrsen') return 'Završeno';
-    if (status === 'dostupan') return 'Dostupan';
-    return 'Zaključan';
+  function statusAria(status: StavkaKatalogaIzazovaDto['status']): string {
+    if (status === 'zavrsen') return 'završen';
+    if (status === 'dostupan') return 'dostupan';
+    return 'zaključan';
   }
 
-  /** Posebni uvjeti kartice — redom: pravilnik, bez pogreške, 15 s. */
+  /** Posebni uvjeti kartice — duge riječi, bez pogreške, ne-ka, brzi timer. */
   function posebniUvjeti(kartica: StavkaKatalogaIzazovaDto): UvjetKartice[] {
     const uvjeti: UvjetKartice[] = [];
-    if (kartica.pravila === 'dokazi_nastavak') {
+    const duge = kartica.ciljevi.dugeRijeci ?? 0;
+    if (duge > 0) {
       uvjeti.push({
-        kljuc: 'dokazi_nastavak',
-        naziv: nazivPravilnika('dokazi_nastavak'),
-        opis: OPISI_UVJETA.dokazi_nastavak,
-      });
-    } else if (kartica.pravila === 'ka_zna') {
-      uvjeti.push({
-        kljuc: 'ka_zna',
-        naziv: nazivPravilnika('ka_zna'),
-        opis: OPISI_UVJETA.ka_zna,
+        kljuc: 'duge_rijeci',
+        naziv: duge === 1
+          ? `1× ≥${PRAG_DUGE_RIJECI_IZAZOVA} slova`
+          : `${duge}× ≥${PRAG_DUGE_RIJECI_IZAZOVA} slova`,
+        opis: OPISI_UVJETA.duge_rijeci(duge),
       });
     }
     if (kartica.ciljevi.bezPogreske) {
@@ -185,11 +184,19 @@
         opis: OPISI_UVJETA.bez_pogreske,
       });
     }
-    if (kartica.turnDurationMs <= 15_000) {
+    if (kartica.ciljevi.bezZavrsavanjaNaKa) {
       uvjeti.push({
-        kljuc: '15s',
-        naziv: '15 s',
-        opis: OPISI_UVJETA['15s'],
+        kljuc: 'bez_ka',
+        naziv: 'Ne završi na ka',
+        opis: OPISI_UVJETA.bez_ka,
+      });
+    }
+    if (kartica.turnDurationMs < 30_000) {
+      const sek = Math.round(kartica.turnDurationMs / 1000);
+      uvjeti.push({
+        kljuc: 'brzi_timer',
+        naziv: `${sek} s`,
+        opis: OPISI_UVJETA.brzi_timer(sek),
       });
     }
     return uvjeti;
@@ -438,7 +445,7 @@
               tabindex={startUTijeku ? -1 : 0}
               data-testid={`izazov-kartica-${kartica.id}`}
               data-status={kartica.status}
-              aria-label={`Izazov ${kartica.redoslijedUFormatu}, ${statusOznaka(kartica.status)}`}
+              aria-label={`Izazov ${kartica.redoslijedUFormatu}, ${statusAria(kartica.status)}`}
               aria-disabled={startUTijeku}
               onclick={() => klikNaKarticu(kartica)}
               onkeydown={(e) => tipkaNaKartici(e, kartica)}
@@ -446,9 +453,9 @@
               <span class="kartica-glava">
                 <strong class="kartica-broj">{kartica.redoslijedUFormatu}</strong>
                 {#if kartica.status === 'zavrsen'}
-                  <span class="kvacica" aria-hidden="true">✓</span>
+                  <span class="kvacica" aria-hidden="true" title="Završeno">✓</span>
                 {:else if kartica.status === 'zakljucan'}
-                  <span class="brava" aria-hidden="true">
+                  <span class="brava" aria-hidden="true" title="Zaključan">
                     <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
                       <path
                         d="M8 1a3 3 0 0 0-3 3v2H4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V4a3 3 0 0 0-3-3Zm1.5 5h-3V4a1.5 1.5 0 1 1 3 0v2Z"
@@ -456,7 +463,7 @@
                     </svg>
                   </span>
                 {:else}
-                  <span class="kartica-strelica" aria-hidden="true">›</span>
+                  <span class="kartica-strelica" aria-hidden="true" title="Dostupan">›</span>
                 {/if}
               </span>
               <span class="kartica-uvjeti">
@@ -479,9 +486,6 @@
                     {/each}
                   </span>
                 {/if}
-              </span>
-              <span class="kartica-status" data-status={kartica.status}>
-                {statusOznaka(kartica.status)}
               </span>
             </div>
           {/each}
@@ -787,30 +791,6 @@
 
   .kartica-uvjeti :global(.pojasnjenje) {
     z-index: 40;
-  }
-
-  .kartica-status {
-    margin-top: auto;
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: var(--tekst-sitni);
-    font-weight: 800;
-    border: 1px solid var(--boja-obrub);
-    background: var(--boja-povrsina-2);
-  }
-
-  .kartica-status[data-status='dostupan'] {
-    border-color: var(--boja-uspjeh-tekst);
-    color: var(--boja-uspjeh-tekst);
-    background: var(--boja-uspjeh-pozadina);
-  }
-
-  .kartica-status[data-status='zavrsen'] {
-    border-color: var(--boja-zlato-obrub);
-    color: var(--boja-zlato-tekst);
-    background: var(--boja-zlato-pozadina);
   }
 
   .ucitavanje,
