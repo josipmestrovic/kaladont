@@ -10,21 +10,22 @@ export interface PolitikaUcinkaPartije {
   zapisujePovijest: boolean;
   /** XP, bodovi, rang, forma, nizovi, rani poraz, DNK i obavijesti o napretku */
   dajeNapredak: boolean;
-  /** kolekcije riječi i dostignuća (privatne sobe ih zadržavaju) */
+  /** kolekcije riječi i dostignuća (javna, privatna, trening, izazov; bez ljestvičnog XP) */
   dajeDostignucaIKolekcije: boolean;
-  /** Ako true, registrirani ljudski trening-sudionik trajno sprema vlastite riječi (trenutno isključeno). */
+  /** Ako true, registrirani ljudski trening-sudionik trajno sprema vlastite riječi (legacy; kolekcija ide preko dajeDostignucaIKolekcije). */
   zapisujeKolekcijuTreninga: boolean;
 }
 
 const POLITIKE: Record<KontekstPartije, PolitikaUcinkaPartije> = {
   javna: { kontekst: 'javna', zapisujePovijest: true, dajeNapredak: true, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
   privatna: { kontekst: 'privatna', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
-  trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: false, zapisujeKolekcijuTreninga: false },
+  trening: { kontekst: 'trening', zapisujePovijest: false, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
   /**
-   * Pokušaji/završeci Izazova su autoritet; javni XP/rang/kolekcija isključeni (nagrade PR04).
-   * zapisujePovijest: partije+potezi radi prijave riječi (FK); bez napretka/dostignuća.
+   * Pokušaji/završeci Izazova su autoritet za challenge XP (PR04).
+   * zapisujePovijest: partije+potezi radi prijave riječi (FK).
+   * Kolekcija i opća dostignuća riječi (Dugometraš/Rijetkolovac…) uključeni; bez ljestvičnog XP/ranga.
    */
-  izazov: { kontekst: 'izazov', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: false, zapisujeKolekcijuTreninga: false },
+  izazov: { kontekst: 'izazov', zapisujePovijest: true, dajeNapredak: false, dajeDostignucaIKolekcije: true, zapisujeKolekcijuTreninga: false },
 };
 
 export function politikaZaKontekst(kontekst: KontekstPartije): PolitikaUcinkaPartije {
