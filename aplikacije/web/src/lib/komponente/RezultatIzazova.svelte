@@ -59,6 +59,10 @@
       return;
     }
     const id = challengeId;
+    // Optimistic: slotovi 1–4 su otvoreni zajedno — CTA odmah; finale čeka katalog.
+    const optimistic = sljedeciDostupanIzazov(id);
+    const optDef = optimistic ? pokusajDefinicijuIzazova(optimistic.id) : null;
+    sljedeci = optDef && optDef.redoslijedUFormatu < 5 ? optimistic : null;
     let otkazano = false;
     void dohvatiKatalogIzazova()
       .then((odgovor) => {
@@ -66,11 +70,7 @@
         sljedeci = sljedeciDostupanIzazov(id, odgovor.katalog);
       })
       .catch(() => {
-        if (otkazano) return;
-        // Bez kataloga: slotovi 1–4 su otvoreni zajedno; finale (5) zahtijeva status.
-        const kandidat = sljedeciDostupanIzazov(id);
-        const def = kandidat ? pokusajDefinicijuIzazova(kandidat.id) : null;
-        sljedeci = def && def.redoslijedUFormatu < 5 ? kandidat : null;
+        /* zadrži optimistic (bez finala) */
       });
     return () => {
       otkazano = true;

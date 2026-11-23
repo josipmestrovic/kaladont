@@ -147,8 +147,8 @@ export function kratkiSazetakNeuspjehaIzazova(
 
 /**
  * Sljedeći izazov istog levela+formata (veći redoslijedUFormatu).
- * Ako je `katalog` dan, vraća samo stavku sa statusom `dostupan`.
- * Bez kataloga (npr. odmah nakon uspjeha) pretpostavlja otključavanje N→N+1.
+ * S katalogom: prvi kasniji slot sa statusom `dostupan` (preskače već `zavrsen`).
+ * Bez kataloga: neposredni N+1 (optimistic; finale treba potvrditi katalogom).
  */
 export function sljedeciDostupanIzazov(
   trenutniId: IdIzazova,
@@ -160,13 +160,17 @@ export function sljedeciDostupanIzazov(
     .map((id) => pokusajDefinicijuIzazova(id))
     .filter((d): d is NonNullable<typeof d> => !!d && d.redoslijedUFormatu > def.redoslijedUFormatu)
     .sort((a, b) => a.redoslijedUFormatu - b.redoslijedUFormatu);
-  const nextDef = kandidati[0];
-  if (!nextDef) return null;
-  if (katalog.length > 0) {
-    const stavka = katalog.find((s) => s.id === nextDef.id);
-    if (!stavka || stavka.status !== 'dostupan') return null;
+  if (katalog.length === 0) {
+    const nextDef = kandidati[0];
+    return nextDef ? { id: nextDef.id, naziv: nextDef.naziv, level: nextDef.level } : null;
   }
-  return { id: nextDef.id, naziv: nextDef.naziv, level: nextDef.level };
+  for (const nextDef of kandidati) {
+    const stavka = katalog.find((s) => s.id === nextDef.id);
+    if (stavka?.status === 'dostupan') {
+      return { id: nextDef.id, naziv: nextDef.naziv, level: nextDef.level };
+    }
+  }
+  return null;
 }
 
 export function tekstRazlogaZakljucavanja(razlog: RazlogZakljucavanja | null | undefined): string {
