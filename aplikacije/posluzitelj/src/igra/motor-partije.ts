@@ -2545,9 +2545,11 @@ export function stvoriUpraviteljPartija(
     const sudionik = stanje.sudionici.find((stavka) => stavka.igracId === igracId);
     const gamifikacijaAktivna = stanje.politika.dajeDostignucaIKolekcije;
     const kolekcijaAktivna = gamifikacijaAktivna || (stanje.politika.zapisujeKolekcijuTreninga && sudionik?.upravljac === 'covjek');
-    const trenutniStreak = gamifikacijaAktivna ? (stanje.streakovi.get(igracId) ?? 0) + 1 : 0;
+    // Izazov: prikaži lokalni 🔥 niz bez dodjele dostignuća (dajeDostignucaIKolekcije ostaje false).
+    const prikazujeStreak = gamifikacijaAktivna || stanje.kontekst === 'izazov';
+    const trenutniStreak = prikazujeStreak ? (stanje.streakovi.get(igracId) ?? 0) + 1 : 0;
     if (stanje.kontekst === 'trening' && sudionik?.upravljac === 'covjek') zakaziNeaktivnostTreninga(stanje);
-    if (gamifikacijaAktivna) stanje.streakovi.set(igracId, trenutniStreak);
+    if (prikazujeStreak) stanje.streakovi.set(igracId, trenutniStreak);
     const statistikaPoteza = stanje.statistikeRijeci.get(igracId)!;
     statistikaPoteza.prihvaceniPotezi += 1;
     statistikaPoteza.ukupnoTrajanjePrihvaceniPoteziMs += Math.max(0, trajanjeMs);

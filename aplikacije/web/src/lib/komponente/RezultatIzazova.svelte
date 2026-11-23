@@ -18,6 +18,7 @@
     terminalStatus = null,
     terminalReason = null,
     gameWon = null,
+    odbijenaRijec = null,
   }: {
     kraj: KrajPartije;
     challengeId?: IdIzazova | null;
@@ -25,6 +26,7 @@
     terminalStatus?: 'uspjeh' | 'neuspjeh' | 'tehnicki_prekinuto' | string | null;
     terminalReason?: string | null;
     gameWon?: boolean | null;
+    odbijenaRijec?: string | null;
   } = $props();
 
   const settlement = $derived(kraj.izazovSettlement ?? null);
@@ -87,7 +89,7 @@
       {tekstRazlogaNeuspjeha('cilj_neispunjen')}
     </p>
   {:else}
-    <p class="opis">{tekstRazlogaNeuspjeha(terminalReason as never)}</p>
+    <p class="opis">{tekstRazlogaNeuspjeha(terminalReason as never, odbijenaRijec)}</p>
   {/if}
 
   {#if goalProgress}
