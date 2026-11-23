@@ -72,7 +72,7 @@ import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
-import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, zakljuciPovijestIzazovaUBazi, type KontekstMisijaZavrseneIgre, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
+import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, upisiKolekcijuIDostignucaRijeci, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, zakljuciPovijestIzazovaUBazi, type KontekstMisijaZavrseneIgre, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { imaJavniProfil, primaProfilnuGamifikacijuUIgri } from './gamifikacija-racuna.js';
@@ -1519,6 +1519,23 @@ export function stvoriUpraviteljPartija(
           if (stanje.politika.zapisujePovijest) {
             await zakljuciPovijestIzazovaUBazi(stanje.partijaId, pobjednikId, zavrsenoU);
           }
+          const gamifikacijaRijeci = stanje.politika.dajeDostignucaIKolekcije
+            ? await upisiKolekcijuIDostignucaRijeci({
+              partijaId: stanje.partijaId,
+              izvorTip: 'izazov',
+              zavrsenoU,
+              sudionici: stanje.sudionici
+                .filter((s) => s.upravljac === 'covjek')
+                .map((s) => ({
+                  igracId: s.igracId,
+                  statistika: (() => {
+                    const st = stanje.statistikeRijeci.get(s.igracId);
+                    return st ? zapisStatistikeZaStol(stanje, s.igracId, st) : undefined;
+                  })(),
+                  napredak: stanje.napredakDostignuca.get(s.igracId),
+                })),
+            })
+            : new Map();
           const krajIshod = await postavke.naIzazovKraj?.({
             partijaId: stanje.partijaId,
             pobjednikId,
@@ -1528,6 +1545,9 @@ export function stvoriUpraviteljPartija(
           await obavijestiPrvuIgruSudionicima(stanje, 'izazov');
           for (const p of plasmani) {
             const covjek = stanje.sudionici.find((s) => s.igracId === p.igracId)?.upravljac === 'covjek';
+            const rijeciDostignuca = covjek ? (gamifikacijaRijeci.get(p.igracId)?.novaDostignuca ?? []) : [];
+            const settlementDostignuca = covjek && settlement ? settlement.novaDostignuca : [];
+            const poId = new Map([...settlementDostignuca, ...rijeciDostignuca].map((d) => [d.id, d]));
             const poruka: KrajPartije = {
               partijaId: stanje.partijaId,
               prikazRezultataOdIso,
@@ -1537,7 +1557,8 @@ export function stvoriUpraviteljPartija(
               mojeIskustvo: null,
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,
-              novaDostignuca: covjek && settlement ? settlement.novaDostignuca : [],
+              novaDostignuca: [...poId.values()],
+              kolekcija: covjek ? kolekcijaZaKraj(stanje, p.igracId) : undefined,
               promjeneMisija: covjek ? settlement?.ishodMisija?.promjeneMisija : undefined,
               ukupnoIskustvo: covjek ? settlement?.ishodMisija?.ukupnoIskustvo : undefined,
               misijeStanjeVerzija: covjek ? settlement?.ishodMisija?.misijeStanjeVerzija : undefined,
@@ -1599,17 +1620,37 @@ export function stvoriUpraviteljPartija(
               throw greska;
             }
           }
+          const gamifikacijaRijeci = stanje.politika.dajeDostignucaIKolekcije
+            ? await upisiKolekcijuIDostignucaRijeci({
+              partijaId: stanje.partijaId,
+              izvorTip: 'trening',
+              zavrsenoU,
+              sudionici: stanje.sudionici
+                .filter((s) => s.upravljac === 'covjek')
+                .map((s) => ({
+                  igracId: s.igracId,
+                  statistika: (() => {
+                    const st = stanje.statistikeRijeci.get(s.igracId);
+                    return st ? zapisStatistikeZaStol(stanje, s.igracId, st) : undefined;
+                  })(),
+                  napredak: stanje.napredakDostignuca.get(s.igracId),
+                })),
+            })
+            : new Map();
           await obavijestiPrvuIgruSudionicima(stanje, 'trening');
           await obradiDovrseneIgreTreninga(stanje);
           for (const p of plasmani) {
             const ishod = p.igracId === pobjednikId ? nagrada?.ishodMisija : null;
+            const rijeciDostignuca = gamifikacijaRijeci.get(p.igracId)?.novaDostignuca ?? [];
             const novaDostignuca = [
               ...(p.igracId === pobjednikId && nagrada?.novaRazina
                 ? [{ id: 'zagrijan', novaRazina: nagrada.novaRazina, maksimalnaRazina: nagrada.maksimalnaRazina }]
                 : []),
               ...(ishod?.novaDostignuca ?? []),
+              ...rijeciDostignuca,
             ];
             const poId = new Map(novaDostignuca.map((d) => [d.id, d]));
+            const covjek = stanje.sudionici.find((s) => s.igracId === p.igracId)?.upravljac === 'covjek';
             const poruka: KrajPartije = {
               partijaId: stanje.partijaId,
               prikazRezultataOdIso,
@@ -1620,6 +1661,7 @@ export function stvoriUpraviteljPartija(
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,
               novaDostignuca: [...poId.values()],
+              kolekcija: covjek ? kolekcijaZaKraj(stanje, p.igracId) : undefined,
               promjeneMisija: ishod?.promjeneMisija,
               ukupnoIskustvo: ishod?.ukupnoIskustvo,
               misijeStanjeVerzija: ishod?.misijeStanjeVerzija,

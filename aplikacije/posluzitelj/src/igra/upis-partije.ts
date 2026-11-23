@@ -216,8 +216,9 @@ export async function ponistiPartijeUTijekuUBazi(partijaIdovi?: readonly string[
 }
 
 /**
- * Zatvara izazov-partiju u bazi bez XP/kolekcije/dostignuća.
- * Marker `privatna_gamifikacija` isključuje red iz javne aktivnosti/ljestvica (isti filter kao privatne sobe).
+ * Zatvara izazov-partiju u bazi (povijest). Kolekcija/dostignuća riječi idu zasebno
+ * preko `upisiKolekcijuIDostignucaRijeci`. Marker `privatna_gamifikacija` isključuje red
+ * iz javne aktivnosti/ljestvica (isti filter kao privatne sobe).
  */
 export async function zakljuciPovijestIzazovaUBazi(
   partijaId: string,
@@ -234,6 +235,236 @@ export async function zakljuciPovijestIzazovaUBazi(
       .set({ status: 'zavrsena', kraj: zavrsenoU, pobjednikId: pobjednikUuid })
       .where(and(eq(partije.id, partijaId), eq(partije.status, 'u_tijeku')));
   });
+}
+
+export type IshodGamifikacijeRijeci = {
+  novaDostignuca: NovoDostignuce[];
+};
+
+/**
+ * Upis kolekcije i dostignuća riječi bez ljestvičnog XP/ranga/DNK.
+ * Za trening (nema retka partije) i izazov (povijest već zatvorena). Filter kao privatna (`vrijediUPrivatnoj`).
+ */
+export async function upisiKolekcijuIDostignucaRijeci(ulaz: {
+  partijaId: string;
+  izvorTip: 'trening' | 'izazov';
+  zavrsenoU?: Date;
+  sudionici: ReadonlyArray<{
+    igracId: string;
+    statistika?: ZapisStatistikeRijeci;
+    napredak?: DeltaNapretkaDostignuca;
+  }>;
+}): Promise<Map<string, IshodGamifikacijeRijeci>> {
+  const rezultati = new Map<string, IshodGamifikacijeRijeci>();
+  const sanducicIgraci = new Set<string>();
+  const obavijestiPoIgracu = new Map<string, ObavijestOtkljucanogDostignuca[]>();
+  const zavrsenoU = ulaz.zavrsenoU ?? new Date();
+
+  const zapamtiObavijesti = (igracId: string, obavijesti: readonly ObavijestOtkljucanogDostignuca[]) => {
+    if (obavijesti.length === 0) return;
+    const lista = obavijestiPoIgracu.get(igracId) ?? [];
+    lista.push(...obavijesti);
+    obavijestiPoIgracu.set(igracId, lista);
+  };
+
+  const pridruziNova = (igracId: string, nova: readonly NovoDostignuce[]) => {
+    if (nova.length === 0) return;
+    const postojeci = rezultati.get(igracId) ?? { novaDostignuca: [] };
+    const poId = new Map(postojeci.novaDostignuca.map((d) => [d.id, d]));
+    for (const d of nova) {
+      const staro = poId.get(d.id);
+      if (!staro || d.novaRazina > staro.novaRazina) poId.set(d.id, d);
+    }
+    postojeci.novaDostignuca = [...poId.values()];
+    rezultati.set(igracId, postojeci);
+  };
+
+  await baza.transaction(async (tx) => {
+    for (const sudionik of ulaz.sudionici) {
+      if (sudionik.igracId.startsWith('racunalo-')) continue;
+      const [racun] = await tx
+        .select({
+          upravljac: igraci.upravljac,
+          vrsta: igraci.vrsta,
+          iskustvoUkupno: igraci.iskustvoUkupno,
+          botTip: botovi.tip,
+        })
+        .from(igraci)
+        .leftJoin(botovi, eq(botovi.igracId, igraci.id))
+        .where(eq(igraci.id, sudionik.igracId));
+      if (!racun) continue;
+      const botTip = (racun.botTip ?? null) as BotTipPrezentacije | null;
+      if (!primaProfilnuGamifikaciju(racun.vrsta, racun.upravljac, botTip)) continue;
+      if (!rezultati.has(sudionik.igracId)) rezultati.set(sudionik.igracId, { novaDostignuca: [] });
+
+      const statistika = sudionik.statistika;
+      let brojNovihRijetkihGrupa = 0;
+      if (statistika && statistika.grupe.length > 0) {
+        const kolekcijaPrije = jeLjudskiZaSanducic(racun.upravljac)
+          ? await brojKolekcijskihStavki(tx, sudionik.igracId)
+          : 0;
+        const grupeNovootkljucane = await tx.insert(otkljucaneGrupeIgraca)
+          .values(statistika.grupe.map(({ grupa, tier }) => ({
+            igracId: sudionik.igracId,
+            grupa,
+            tier,
+            zaDostignuca: true,
+          })))
+          .onConflictDoNothing()
+          .returning({ grupa: otkljucaneGrupeIgraca.grupa });
+        const grupePromovirane = await tx.update(otkljucaneGrupeIgraca)
+          .set({ zaDostignuca: true })
+          .where(and(
+            eq(otkljucaneGrupeIgraca.igracId, sudionik.igracId),
+            eq(otkljucaneGrupeIgraca.zaDostignuca, false),
+            inArray(otkljucaneGrupeIgraca.grupa, statistika.grupe.map(({ grupa }) => grupa)),
+          ))
+          .returning({ grupa: otkljucaneGrupeIgraca.grupa });
+        const promijenjene = new Set([...grupeNovootkljucane, ...grupePromovirane].map(({ grupa }) => grupa));
+        brojNovihRijetkihGrupa = statistika.grupe.filter(({ grupa, tier }) => promijenjene.has(grupa) && tier !== null).length;
+        if (jeLjudskiZaSanducic(racun.upravljac) && (grupeNovootkljucane.length > 0 || grupePromovirane.length > 0)) {
+          const kolekcijaPoslije = await brojKolekcijskihStavki(tx, sudionik.igracId);
+          const broj = await stvoriPorukeKolekcije({
+            igracId: sudionik.igracId,
+            brojPrije: kolekcijaPrije,
+            brojPoslije: kolekcijaPoslije,
+            tx,
+            izvorTip: ulaz.izvorTip,
+            izvorId: ulaz.partijaId,
+          });
+          if (broj > 0) sanducicIgraci.add(sudionik.igracId);
+        }
+      }
+
+      if (statistika && statistika.otkljucaneRijeci.length > 0) {
+        await tx.insert(otkljucaneRijeciIgraca)
+          .values(statistika.otkljucaneRijeci.map((redak) => ({ igracId: sudionik.igracId, ...redak })))
+          .onConflictDoUpdate({
+            target: [otkljucaneRijeciIgraca.igracId, otkljucaneRijeciIgraca.rijec],
+            set: {
+              jakoDuga: sql`otkljucane_rijeci_igraca.jako_duga or excluded.jako_duga`,
+              jakoRijetka: sql`otkljucane_rijeci_igraca.jako_rijetka or excluded.jako_rijetka`,
+              dugaTier: sql`coalesce(otkljucane_rijeci_igraca.duga_tier, excluded.duga_tier)`,
+              rijetkaTier: sql`coalesce(otkljucane_rijeci_igraca.rijetka_tier, excluded.rijetka_tier)`,
+            },
+          });
+      }
+
+      const delta: DeltaNapretkaDostignuca = { ...(sudionik.napredak ?? {}) };
+      delta.rijetkeLeksemskeGrupe = brojNovihRijetkihGrupa;
+      const imaDeltu = Object.values(delta).some((v) => typeof v === 'number' && v !== 0);
+      if (imaDeltu) {
+        const [stariNapredak] = await tx.select().from(napredakDostignucaIgraca)
+          .where(eq(napredakDostignucaIgraca.igracId, sudionik.igracId));
+        const azuriraniNapredak = await tx.insert(napredakDostignucaIgraca).values({
+          igracId: sudionik.igracId,
+          valjaniPoteziUkupno: delta.valjaniPoteziUkupno ?? 0,
+          rijetkeLeksemskeGrupe: delta.rijetkeLeksemskeGrupe ?? 0,
+          dugeRijeci: delta.dugeRijeci ?? 0,
+          najduziStreak: delta.najduziStreak ?? 0,
+          kaladontIzvedbe: delta.kaladontIzvedbe ?? 0,
+          kaladontZrtve: delta.kaladontZrtve ?? 0,
+          izazvaneEliminacije: delta.izazvaneEliminacije ?? 0,
+          mrtvaSlovaEliminacije: delta.mrtvaSlovaEliminacije ?? 0,
+          javnePobjede: delta.javnePobjede ?? 0,
+        }).onConflictDoUpdate({
+          target: napredakDostignucaIgraca.igracId,
+          set: {
+            valjaniPoteziUkupno: sql`${napredakDostignucaIgraca.valjaniPoteziUkupno} + ${delta.valjaniPoteziUkupno ?? 0}`,
+            rijetkeLeksemskeGrupe: sql`${napredakDostignucaIgraca.rijetkeLeksemskeGrupe} + ${delta.rijetkeLeksemskeGrupe ?? 0}`,
+            dugeRijeci: sql`${napredakDostignucaIgraca.dugeRijeci} + ${delta.dugeRijeci ?? 0}`,
+            najduziStreak: sql`greatest(${napredakDostignucaIgraca.najduziStreak}, ${delta.najduziStreak ?? 0})`,
+            kaladontIzvedbe: sql`${napredakDostignucaIgraca.kaladontIzvedbe} + ${delta.kaladontIzvedbe ?? 0}`,
+            kaladontZrtve: sql`${napredakDostignucaIgraca.kaladontZrtve} + ${delta.kaladontZrtve ?? 0}`,
+            izazvaneEliminacije: sql`${napredakDostignucaIgraca.izazvaneEliminacije} + ${delta.izazvaneEliminacije ?? 0}`,
+            mrtvaSlovaEliminacije: sql`${napredakDostignucaIgraca.mrtvaSlovaEliminacije} + ${delta.mrtvaSlovaEliminacije ?? 0}`,
+            javnePobjede: sql`${napredakDostignucaIgraca.javnePobjede} + ${delta.javnePobjede ?? 0}`,
+            azurirano: new Date(),
+          },
+        }).returning();
+        const napredak = azuriraniNapredak[0] ?? stariNapredak;
+        const napredakPrijeIgre = stariNapredak ?? {
+          rijetkeLeksemskeGrupe: 0,
+          dugeRijeci: 0,
+          najduziStreak: 0,
+          kaladontIzvedbe: 0,
+          kaladontZrtve: 0,
+          izazvaneEliminacije: 0,
+          mrtvaSlovaEliminacije: 0,
+          javnePobjede: 0,
+        };
+        if (napredak) {
+          const razina = stanjeIskustva(racun.iskustvoUkupno).razina;
+          const trajniPrije = {
+            razina,
+            rijetkeLeksemskeGrupe: napredakPrijeIgre.rijetkeLeksemskeGrupe,
+            dugeRijeci: napredakPrijeIgre.dugeRijeci,
+            najduziStreak: napredakPrijeIgre.najduziStreak,
+            kaladontIzvedbe: napredakPrijeIgre.kaladontIzvedbe,
+            kaladontZrtve: napredakPrijeIgre.kaladontZrtve,
+            izazvaneEliminacije: napredakPrijeIgre.izazvaneEliminacije,
+            mrtvaSlovaEliminacije: napredakPrijeIgre.mrtvaSlovaEliminacije,
+            javnePobjede: napredakPrijeIgre.javnePobjede,
+          };
+          const nova = izracunajNovaDostignuca(trajniPrije, delta, razina, true);
+          if (nova.length > 0) {
+            const stareRazina = await tx.select({
+              dostignuceId: dostignucaIgraca.dostignuceId,
+              razina: dostignucaIgraca.razina,
+            }).from(dostignucaIgraca).where(and(
+              eq(dostignucaIgraca.igracId, sudionik.igracId),
+              inArray(dostignucaIgraca.dostignuceId, nova.map((d) => d.id)),
+            ));
+            const staraPoId = new Map(stareRazina.map((red) => [red.dostignuceId, red.razina]));
+            await tx.insert(dostignucaIgraca).values(nova.map((dostignuce) => ({
+              igracId: sudionik.igracId,
+              dostignuceId: dostignuce.id,
+              razina: dostignuce.novaRazina,
+              prvoOtkljucano: new Date(),
+              zadnjeOtkljucavanje: new Date(),
+            }))).onConflictDoUpdate({
+              target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
+              set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
+            });
+            for (const dostignuce of nova) {
+              if (!jeLjudskiZaSanducic(racun.upravljac)) continue;
+              const broj = await stvoriPorukeZvjezdica({
+                igracId: sudionik.igracId,
+                dostignuceId: dostignuce.id,
+                staraRazina: staraPoId.get(dostignuce.id) ?? 0,
+                novaRazina: dostignuce.novaRazina,
+                tx,
+                izvorTip: ulaz.izvorTip,
+                izvorId: ulaz.partijaId,
+              });
+              if (broj > 0) sanducicIgraci.add(sudionik.igracId);
+            }
+            pridruziNova(sudionik.igracId, nova);
+          }
+        }
+      }
+
+      const oblici = statistika?.dugeRijetkeRijeci ?? [];
+      for (const oblik of oblici) {
+        const grdosija = await priznajRijetkuGrdosiju(tx, {
+          igracId: sudionik.igracId,
+          normaliziraniOblik: oblik,
+          zavrsenoU,
+        });
+        zapamtiObavijesti(sudionik.igracId, grdosija.noveObavijesti);
+        pridruziNova(sudionik.igracId, grdosija.novaDostignuca);
+        if (grdosija.novaDostignuca.length > 0 && jeLjudskiZaSanducic(racun.upravljac)) {
+          sanducicIgraci.add(sudionik.igracId);
+        }
+      }
+    }
+  });
+
+  for (const [igracId, obavijesti] of obavijestiPoIgracu) {
+    emitirajNovostiDostignuca(igracId, obavijesti);
+  }
+  emitirajPromjeneSanducica([...sanducicIgraci]);
+  return rezultati;
 }
 
 export interface ZapisPoteza {
