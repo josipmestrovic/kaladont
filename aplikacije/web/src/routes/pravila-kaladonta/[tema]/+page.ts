@@ -1,17 +1,10 @@
-import { error, redirect } from '@sveltejs/kit';
-import { jePravilaTema, putanjaPravilaTeme } from '$lib/seo.js';
+import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
+/** Pristupačnost ostaje kao tema; kako-igrati i ostale stare teme → hub. */
 export const load: PageLoad = ({ params }) => {
-  const sirova = params.tema;
-
-  if (sirova === 'kako-igrati' || sirova === 'pravila') {
-    redirect(308, putanjaPravilaTeme('kako-igrati'));
+  if (params.tema === 'pristupacnost') {
+    return { tema: 'pristupacnost' as const };
   }
-
-  if (!jePravilaTema(sirova)) {
-    error(404, 'Nepoznata tema pravila');
-  }
-
-  return { tema: sirova };
+  redirect(308, '/pravila-kaladonta');
 };

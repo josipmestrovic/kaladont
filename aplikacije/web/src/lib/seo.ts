@@ -26,8 +26,8 @@ export const PRAVILA_TEME_META: {
 }[] = [
   {
     id: 'kako-igrati',
-    naziv: 'Kako igrati',
-    title: 'Pravila - Kaladont Online',
+    naziv: 'Pravila igre',
+    title: 'Pravila igre - Kaladont Online',
     description:
       'Pročitajte pravila igre kaladont koja se odnose na našu online multiplayer verziju. Kaladont možete besplatno igrati bez potrebe za registracijom.',
   },
@@ -36,7 +36,7 @@ export const PRAVILA_TEME_META: {
     naziv: 'Kako sve možeš igrati?',
     title: 'Načini igre Kaladont — Dvoboj, Troboj, Četveroboj i sobe',
     description:
-      'Usporedi načine igre Kaladonta: Dvoboj, Troboj, Četveroboj, tri pravilnika, Zagrijavanje i privatne sobe.',
+      'Usporedi načine igre Kaladonta: Dvoboj, Troboj, Četveroboj, Zagrijavanje i privatne sobe.',
   },
   {
     id: 'bodovi',
@@ -118,7 +118,7 @@ export const FAQ_PITANJA: { pitanje: string; odgovor: string }[] = [
   {
     pitanje: 'Zašto sam odmah ispao?',
     odgovor:
-      '„Ne znam”, istek vremena, mrtva slova, posebna riječ na „ka” (u Klasičnom ispada sljedeći, u KA-zna autor „ka”), neuspješan dokaz u Dokaži nastavak, ili prekid veze dulji od 10 sekundi.',
+      '„Ne znam”, istek vremena, mrtva slova, posebna riječ na „ka” (ispada sljedeći na redu), ili prekid veze dulji od 10 sekundi.',
   },
   {
     pitanje: 'Kako prijaviti riječ ili problem?',

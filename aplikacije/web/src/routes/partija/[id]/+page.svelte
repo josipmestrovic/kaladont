@@ -12,6 +12,7 @@
   import IskustvoPartije from '$lib/komponente/IskustvoPartije.svelte';
   import NapredakMisijaPartije from '$lib/komponente/NapredakMisijaPartije.svelte';
   import NapredakCiljevaIzazova from '$lib/komponente/NapredakCiljevaIzazova.svelte';
+  import TreningMeta from '$lib/komponente/TreningMeta.svelte';
   import RezultatIzazova from '$lib/komponente/RezultatIzazova.svelte';
   import KaladontDnkPromjena from '$lib/komponente/KaladontDnkPromjena.svelte';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
@@ -1653,6 +1654,9 @@
       pravila={stanje.pravila}
     />
   {/if}
+  {#if jeTrening && !stanje.kraj}
+    <TreningMeta pravila={stanje.pravila} profileId={treningProfileId} />
+  {/if}
   {#if prikazanaSjedala.length > 0}
   <ul
     class="igraci-red"
@@ -2020,14 +2024,20 @@
         {/if}
 
         {#if prikazanaRijec?.rijec && prikazanaRijec.vrsta === 'sustav_rijec'}
-          <p class="kontekst-rijeci obavijest-igre" aria-live="polite">
-            {#if stanje.runda === 1}
-              Igra počinje, sustav je dodijelio:
-            {:else}
-              Ostaje {brojPreostalihIgraca} igrača, započinje nova runda. Sustav je dodijelio riječ:
-            {/if}
-            {@render trenutnaRijec(prikazanaRijec.rijec)}
-          </p>
+          {@const sustavRijec = prikazanaRijec.rijec}
+          {@const sustavZavrsetak = zadnjaDva(sustavRijec)}
+          <div class="sustav-dodijelio" aria-live="polite">
+            <p class="sustav-dodijelio-tekst">
+              {#if stanje.runda === 1}
+                Igra počinje, sustav je dodijelio:
+              {:else}
+                Ostaje {brojPreostalihIgraca} igrača, započinje nova runda. Sustav je dodijelio riječ:
+              {/if}
+            </p>
+            <p class="sustav-dodijelio-rijec" aria-label={sustavRijec}>
+              <span class="sustav-dodijelio-tijelo">{sustavRijec.slice(0, sustavRijec.length - sustavZavrsetak.length)}</span><span class="sustav-dodijelio-zavrsetak">{sustavZavrsetak}</span>
+            </p>
+          </div>
         {/if}
 
         {#if porukaPoteza && !jeNaPotezu}
@@ -3006,6 +3016,56 @@
     margin-top: 12px;
     text-align: center;
   }
+  .sustav-dodijelio {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+  }
+  .sustav-dodijelio-tekst {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mali);
+    font-weight: 400;
+    max-width: 36ch;
+  }
+  .sustav-dodijelio-rijec {
+    margin: 0;
+    font-family: var(--font-naslov);
+    font-size: clamp(2.4rem, 8vw, 3.6rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+    color: var(--boja-tekst-osnovni);
+    animation: sustav-dodijelio-ulaz 280ms ease-out both;
+  }
+  .sustav-dodijelio-tijelo {
+    color: var(--boja-tekst-osnovni);
+  }
+  .sustav-dodijelio-zavrsetak {
+    display: inline-block;
+    margin-left: 0.06em;
+    padding: 0.08em 0.22em 0.04em;
+    border-radius: 0.22em;
+    color: var(--boja-isticanje-slova);
+    background: #1a1815;
+    text-decoration: underline;
+    text-decoration-color: var(--boja-isticanje-slova);
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.08em;
+  }
+  @keyframes sustav-dodijelio-ulaz {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
   .trenutna-rijec {
     color: var(--boja-tekst-osnovni);
     font-size: 18px;
@@ -3396,9 +3456,9 @@
   .igraci-red.dvoboj {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  /* HINT PR14: Troboj — 3 stupca na desktopu (ne 4 s praznim stupcem). */
+  /* Troboj: na mobitelu 2 u redu; 3 stupca tek na širem ekranu. */
   .igraci-red.troboj {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   @media (min-width: 1000px) {
     .igraci-red.troboj {
@@ -3438,6 +3498,9 @@
   @media (max-height: 500px) and (min-width: 500px) {
     .igraci-red { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .igraci-red.dvoboj { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .igraci-red.troboj { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-height: 500px) and (min-width: 1000px) {
     .igraci-red.troboj { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   .plasmani-lista {

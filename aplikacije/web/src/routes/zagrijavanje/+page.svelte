@@ -16,7 +16,8 @@
     type RundaOtvorena,
     type StanjePartije,
   } from 'zajednicko';
-  import { parsajProfilIzQuery } from '$lib/igraj-rute.js';
+  import { parsajProfilIzQuery, TEKSTOVI_PRAVILNIKA } from '$lib/igraj-rute.js';
+  import TreningMeta from '$lib/komponente/TreningMeta.svelte';
 
   const igra = dohvatiStanjeIgre();
   const savjeti = dohvatiSavjete('dva_igraca');
@@ -33,16 +34,13 @@
   })());
   const trazeniProfil = $derived(parsajProfilIzQuery($page.url.searchParams.get('profil')));
   const nazivProfila = $derived(NAZIVI_PROFILA_BOTA[trazeniProfil]);
+  const nazivPravila = $derived(
+    trazenaPravila ? TEKSTOVI_PRAVILNIKA[trazenaPravila].naziv : null,
+  );
   const tekstPripreme = $derived(
-    trazeniBotovi === 1
-      ? `Pripremamo dvoboj · ${nazivProfila}…`
-      : trazeniBotovi === 2
-        ? `Pripremamo igru s 2 bota · ${nazivProfila}…`
-        : trazeniBotovi === 3
-          ? `Pripremamo igru s 3 bota · ${nazivProfila}…`
-          : trazenaPravila === 'klasicni'
-            ? `Pripremamo igru s 2 bota · ${nazivProfila}…`
-            : `Pripremamo dvoboj · ${nazivProfila}…`,
+    nazivPravila
+      ? `Pripremamo trening · ${nazivPravila} · ${nazivProfila}…`
+      : `Pripremamo trening · ${nazivProfila}…`,
   );
 
   let poruka = $state<string | null>(null);
@@ -149,6 +147,7 @@
 <main class="zagrijavanje">
   {#if countdown !== null}
     <h1 aria-live="polite">Računalo je spremno! Trening kreće za {countdown}…</h1>
+    <TreningMeta pravila={trazenaPravila} profileId={trazeniProfil} />
   {:else if poruka}
     <h1>Zagrijavanje</h1>
     <p role="alert">{poruka}</p>
@@ -158,6 +157,7 @@
     </div>
   {:else}
     <h1 aria-live="polite">{tekstPripreme}</h1>
+    <TreningMeta pravila={trazenaPravila} profileId={trazeniProfil} />
     <p class="napomena">Ovo je trening. Ne bilježi se i ne mijenja statistiku, rang, XP ni formu. Registriranim igračima pobjeda broji dostignuće Zagrijan.</p>
     <a href="/" class="sporedni-gumb">Odustani</a>
   {/if}

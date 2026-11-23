@@ -202,12 +202,14 @@ test('prazan nastavak šalje prefiks kao cijelu riječ (#111)', async ({ browser
 });
 
 test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomicanja', async ({
-  page,
+  browser,
 }) => {
   for (const sirina of [320, 360, 390, 768, 999]) {
-    await page.setViewportSize({ width: sirina, height: 760 });
-    for (const tema of ['nacini', 'bodovi', 'napredak']) {
-      await page.goto(`/pravila-kaladonta/${tema}`);
+    const page = await browser.newPage();
+    try {
+      await page.setViewportSize({ width: sirina, height: 760 });
+      await page.goto('/pravila-kaladonta', { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => document.fonts.ready);
       const tablice = page.locator('table');
       await expect(tablice.first()).toBeVisible();
       const neoznacene = await page
@@ -230,20 +232,20 @@ test('mobilne tablice pravila zadržavaju sve vrijednosti bez vodoravnog pomican
           () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
         ),
       ).toBe(true);
+    } finally {
+      await page.close();
     }
   }
 
-  await page.goto('/pravila-kaladonta/bodovi');
-  const rangovi = page.locator('.tablica-rangova tbody tr');
-  await expect(rangovi).toHaveCount(10);
-  // PR09: univerzalni pragovi (cijeli brojevi), ne stari udio pobjeda.
-  await expect(rangovi.first().locator('td').last()).toContainText('< 60');
-  await expect(rangovi.last().locator('td').last()).toContainText('≥ 178');
-  await expect(rangovi.first().locator('.rang-uzorak')).toHaveCSS('border-top-width', '5px');
-
-  await page.setViewportSize({ width: 1000, height: 760 });
-  await expect(page.locator('.tablica-rangova thead')).toBeVisible();
-  await expect(page.locator('.tablica-rangova')).toHaveCSS('display', 'table');
+  const desktop = await browser.newPage();
+  try {
+    await desktop.setViewportSize({ width: 1000, height: 760 });
+    await desktop.goto('/pravila-kaladonta', { waitUntil: 'domcontentloaded' });
+    await expect(desktop.getByRole('heading', { name: 'Pravila igre' })).toBeVisible();
+    await expect(desktop.locator('table').first()).toHaveCSS('display', 'table');
+  } finally {
+    await desktop.close();
+  }
 });
 
 // Jedan goto po kombinaciji (svježi page) — WebKit na CI pada na reload/dvostruki goto ("internal error").
@@ -260,7 +262,7 @@ for (const svijetla of [false, true]) {
         { svijetlaTema: svijetla, font: disleksijskiFont },
       );
       await page.setViewportSize({ width: 320, height: 760 });
-      await page.goto('/pravila-kaladonta/napredak', { waitUntil: 'domcontentloaded' });
+      await page.goto('/pravila-kaladonta', { waitUntil: 'domcontentloaded' });
       await page.evaluate(() => document.fonts.ready);
       const prelijevanje = await page.locator('table').evaluateAll((elementi) =>
         elementi.some((tablica) => {

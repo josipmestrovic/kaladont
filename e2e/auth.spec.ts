@@ -60,7 +60,12 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
     const zatvori = popupMisija.getByRole('button', { name: 'Zatvori' });
     // API oznake pregleda drži gumb disabled — pričekaj pa klikni.
     await expect(zatvori).toBeEnabled({ timeout: 15_000 });
+    const pregled = page.waitForResponse(
+      (odgovor) => odgovor.url().includes('/misije/pregled') && odgovor.request().method() === 'POST',
+      { timeout: 15_000 },
+    );
     await zatvori.click();
+    await pregled.catch(() => {});
     // Daily→weekly zamjenjuje dijalog in place; čekaj nestanak ili promjenu naslova.
     await expect.poll(async () => {
       if (await popupMisija.count() === 0) return 'gone';

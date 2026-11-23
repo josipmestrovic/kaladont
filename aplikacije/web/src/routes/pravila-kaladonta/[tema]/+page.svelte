@@ -1,8 +1,5 @@
 <script lang="ts">
-  import PravilaSadrzaj from '$lib/komponente/PravilaSadrzaj.svelte';
-  import type { PageData } from './$types';
-
-  let { data }: { data: PageData } = $props();
+  import PristupacnostSadrzaj from '$lib/komponente/PristupacnostSadrzaj.svelte';
 </script>
 
-<PravilaSadrzaj tema={data.tema} />
+<PristupacnostSadrzaj />
