@@ -422,20 +422,18 @@
     if (!jeAktualnaPartija()) return;
 
     const noviSadrzaj = praznaSadrzajObavijesti();
-    if (!stanje.jePrivatna && !jeTrening) {
-      if (stanje.zadnjaNagrada && stanje.zadnjaNagrada !== prethodnaNagrada) {
-        noviSadrzaj.nagrada = stanje.zadnjaNagrada;
-      }
+    if (stanje.zadnjaNagrada && stanje.zadnjaNagrada !== prethodnaNagrada) {
+      noviSadrzaj.nagrada = stanje.zadnjaNagrada;
+    }
 
-      const stavkeIskustvaPromijenjene = stanje.oznakaStavkiIskustva !== prethodnaOznakaStavkiIskustva;
-      const otkljucavanjePromijenjeno = stanje.oznakaOtkljucavanjaRijeci !== prethodnaOznakaOtkljucavanja;
-      if (stavkeIskustvaPromijenjene || otkljucavanjePromijenjeno) {
-        const stavke = stavkeIskustvaPromijenjene ? stanje.stavkeIskustva : [];
-        const otkljucavanje = otkljucavanjePromijenjeno ? stanje.otkljucavanjeRijeci : null;
-        if (stavke.length > 0 || otkljucavanje) {
-          noviSadrzaj.stavke = [...stavke];
-          noviSadrzaj.otkljucavanje = otkljucavanje;
-        }
+    const stavkeIskustvaPromijenjene = stanje.oznakaStavkiIskustva !== prethodnaOznakaStavkiIskustva;
+    const otkljucavanjePromijenjeno = stanje.oznakaOtkljucavanjaRijeci !== prethodnaOznakaOtkljucavanja;
+    if (stavkeIskustvaPromijenjene || otkljucavanjePromijenjeno) {
+      const stavke = stavkeIskustvaPromijenjene ? stanje.stavkeIskustva : [];
+      const otkljucavanje = otkljucavanjePromijenjeno ? stanje.otkljucavanjeRijeci : null;
+      if (stavke.length > 0 || otkljucavanje) {
+        noviSadrzaj.stavke = [...stavke];
+        noviSadrzaj.otkljucavanje = otkljucavanje;
       }
     }
 

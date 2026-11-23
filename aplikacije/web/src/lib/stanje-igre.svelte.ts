@@ -189,11 +189,43 @@ function pokreniKonfete(intenzitet: 'mali' | 'srednji' | 'veliki', trajanjeMs = 
   }, trajanjeMs);
 }
 
-function prikaziKonfeteIskustva(stavke: readonly StavkaIskustva[]): void {
-  if (stanje.jePrivatna || stanje.kontekst === 'trening') return;
-  const najjaca = Math.max(...stavke.filter((stavka) => stavka.vrsta === 'duge_rijeci' || stavka.vrsta === 'rijetke_rijeci').map((stavka) => stavka.iskustvo), 0);
-  if (najjaca === 0) return;
-  pokreniKonfete(najjaca >= 35 ? 'veliki' : najjaca >= 20 ? 'srednji' : 'mali');
+function intenzitetIzKategorijaRijeci(
+  duljina: 'duga' | 'srednje_duga' | 'jako_duga' | null | undefined,
+  rijetkost: 'rijetka' | 'srednje_rijetka' | 'jako_rijetka' | null | undefined,
+): 'mali' | 'srednji' | 'veliki' | null {
+  const rang = (v: string | null | undefined) =>
+    v === 'jako_duga' || v === 'jako_rijetka' ? 3
+      : v === 'srednje_duga' || v === 'srednje_rijetka' ? 2
+        : v === 'duga' || v === 'rijetka' ? 1
+          : 0;
+  const max = Math.max(rang(duljina), rang(rijetkost));
+  return max >= 3 ? 'veliki' : max === 2 ? 'srednji' : max === 1 ? 'mali' : null;
+}
+
+/** Konfeti za duge/rijetke: XP stavke (javna), inače nagrada ili kategorije s rijec:otkljucana. */
+function prikaziKonfeteZaPotez(
+  stavke: readonly StavkaIskustva[],
+  nagrada: NagradaZaRijec | null,
+): void {
+  const najjaca = Math.max(
+    ...stavke
+      .filter((stavka) => stavka.vrsta === 'duge_rijeci' || stavka.vrsta === 'rijetke_rijeci')
+      .map((stavka) => stavka.iskustvo),
+    0,
+  );
+  if (najjaca > 0) {
+    pokreniKonfete(najjaca >= 35 ? 'veliki' : najjaca >= 20 ? 'srednji' : 'mali');
+    return;
+  }
+  if (nagrada?.intenzitet) {
+    pokreniKonfete(nagrada.intenzitet);
+    return;
+  }
+  const otk = stanje.otkljucavanjeRijeci;
+  const izKategorija = otk
+    ? intenzitetIzKategorijaRijeci(otk.dugaKategorija, otk.rijetkaKategorija)
+    : null;
+  if (izKategorija) pokreniKonfete(izKategorija);
 }
 
 function prikaziKonfeteKaladont(): void {
@@ -570,7 +602,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.zadnjaNagrada = mojPotez ? p.nagrada : null;
     if (mojPotez) {
       prikaziStavkeIskustva(p.iskustvo ?? []);
-      prikaziKonfeteIskustva(p.iskustvo ?? []);
+      prikaziKonfeteZaPotez(p.iskustvo ?? [], mojPotez ? p.nagrada : null);
       // Osvježi serverski goalProgress nakon vlastite riječi.
       if (stanje.kontekst === 'izazov') socket.emit('partija:stanje');
     }
