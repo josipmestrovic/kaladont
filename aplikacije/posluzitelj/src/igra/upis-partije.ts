@@ -215,6 +215,25 @@ export async function ponistiPartijeUTijekuUBazi(partijaIdovi?: readonly string[
   return ponistene.length;
 }
 
+/**
+ * Zatvara izazov-partiju u bazi bez XP/kolekcije/dostignuća.
+ * Marker `privatna_gamifikacija` isključuje red iz javne aktivnosti/ljestvica (isti filter kao privatne sobe).
+ */
+export async function zakljuciPovijestIzazovaUBazi(
+  partijaId: string,
+  pobjednikId: string | null,
+  zavrsenoU: Date,
+): Promise<void> {
+  await baza.transaction(async (tx) => {
+    await tx.insert(obracuniPartija)
+      .values({ partijaId, vrsta: 'privatna_gamifikacija' })
+      .onConflictDoNothing();
+    await tx.update(partije)
+      .set({ status: 'zavrsena', kraj: zavrsenoU, pobjednikId })
+      .where(and(eq(partije.id, partijaId), eq(partije.status, 'u_tijeku')));
+  });
+}
+
 export interface ZapisPoteza {
   partijaId: string;
   runda: number;

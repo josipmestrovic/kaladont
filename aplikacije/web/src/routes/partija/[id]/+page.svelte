@@ -60,6 +60,16 @@
   const LIMIT_PRIJAVA_DODAVANJE = 3;
   const PORUKA_ZAHVALE_PRIJAVA = 'Hvala! Tvoja prijava nam pomaže poboljšati rječnik.';
   const TRAJANJE_ZAHVALE_PRIJAVA_MS = 7000;
+  /** Usklađeno s poslužiteljskim KODOVI_PRAVE_POGRESKE — odbijene riječi za prijavu. */
+  const KODOVI_ODBIJENE_ZA_PRIJAVU = new Set([
+    'RIJEC_NE_POSTOJI',
+    'VLASTITO_IME',
+    'KRIVA_SLOVA',
+    'RIJEC_ISKORISTENA',
+    'NEDOPUSTENA_VRSTA',
+    'NIJE_OSNOVNI_OBLIK',
+    'PREKRATKA_RIJEC',
+  ]);
   let izbornikPrijaveIgracaId = $state<string | null>(null);
   let slanjeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let porukaPoteza = $state<string | null>(null);
@@ -1144,7 +1154,7 @@
       const oblik = kod === 'RIJEC_ISKORISTENA' && poruka.startsWith(uvodPorukeOblika) && poruka.endsWith(krajPorukeOblika)
         ? poruka.slice(uvodPorukeOblika.length, poruka.length - krajPorukeOblika.length) || null
         : null;
-      if (kod === 'RIJEC_NE_POSTOJI' && zadnjaPoslanaRijec) dodajOdbijenuRijec(zadnjaPoslanaRijec);
+      if (KODOVI_ODBIJENE_ZA_PRIJAVU.has(kod) && zadnjaPoslanaRijec) dodajOdbijenuRijec(zadnjaPoslanaRijec);
       zadnjaPoslanaRijec = null;
       prikaziGreskuPoteza(poruka, kod === 'RIJEC_NE_POSTOJI' ? odbijenaRijec : null, kod === 'VLASTITO_IME' ? odbijenaRijec : null, kod === 'RIJEC_ISKORISTENA' ? odbijenaRijec : null, oblik);
     };

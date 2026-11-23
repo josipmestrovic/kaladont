@@ -72,7 +72,7 @@ import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
-import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, type KontekstMisijaZavrseneIgre, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
+import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, zakljuciPovijestIzazovaUBazi, type KontekstMisijaZavrseneIgre, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { imaJavniProfil, primaProfilnuGamifikacijuUIgri } from './gamifikacija-racuna.js';
@@ -1510,6 +1510,9 @@ export function stvoriUpraviteljPartija(
       pokreniSpremanjeRezultata(
         stanje,
         async () => {
+          if (stanje.politika.zapisujePovijest) {
+            await zakljuciPovijestIzazovaUBazi(stanje.partijaId, pobjednikId, zavrsenoU);
+          }
           const krajIshod = await postavke.naIzazovKraj?.({
             partijaId: stanje.partijaId,
             pobjednikId,
