@@ -692,6 +692,7 @@
     background: var(--boja-povrsina);
     color: inherit;
     cursor: pointer;
+    overflow: visible;
     transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   }
 
@@ -758,6 +759,7 @@
     font-size: var(--tekst-mali);
     color: var(--boja-tekst-sekundarni);
     line-height: 1.45;
+    overflow: visible;
   }
 
   .kartica-uvjeti-oznaka {
