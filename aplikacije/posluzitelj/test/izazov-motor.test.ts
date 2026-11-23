@@ -370,7 +370,8 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   });
 
   it('bez-pogreške: prava pogreška odmah terminalira pokušaj', async () => {
-    const { socket, igracId, attemptId, runda } = await pokreniIzazov('IZ-L1-DV-03');
+    // Slot 04 = bez_pogreske (v3; ranije je bio 03).
+    const { socket, igracId, attemptId, runda } = await pokreniIzazov('IZ-L1-DV-04');
     try {
       if (runda.naPotezuId !== igracId) {
         // Raspored bez našeg poteza — potvrdi da je igra živa; evaluator je pokriven unit testom.
