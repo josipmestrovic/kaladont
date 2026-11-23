@@ -91,6 +91,12 @@
         greska = p.poruka;
         return;
       }
+      // VEC_U_SOBI: igrač je već u sobi (npr. race nakon retryja na kreiraj).
+      // Ne terminalni overlay — „početna” bi emitala soba:izadji i zatvorila sobu.
+      if (p.kod === 'VEC_U_SOBI') {
+        if (stanjeSobe) obavijest = p.poruka;
+        return;
+      }
       // Dok smo u lobbyju, greške (pokreni, kick…) ostaju inline — terminalni overlay
       // bi preko „početna” zatvorio sobu za sve.
       if (stanjeSobe) {

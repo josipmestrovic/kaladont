@@ -1,1 +1,5 @@
-<!-- Preusmjerava na /pravila-kaladonta (+page.ts). -->
+<script lang="ts">
+  import PristupacnostSadrzaj from '$lib/komponente/PristupacnostSadrzaj.svelte';
+</script>
+
+<PristupacnostSadrzaj />

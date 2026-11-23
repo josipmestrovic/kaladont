@@ -148,10 +148,11 @@
     };
 
     ocistiTimeoutOdgovora();
+    // Timeout ne otključava gumb — drugi emit može stići kao VEC_U_SOBI nakon
+    // uspješnog soba:stvorena i zatvoriti sobu preko lobby overlaya.
     timeoutOdgovora = setTimeout(() => {
       timeoutOdgovora = null;
-      slanjeUTijeku = false;
-      poruka = 'Poslužitelj ne odgovara. Pokušaj ponovno.';
+      poruka = 'Poslužitelj ne odgovara. Još čekam odgovor…';
     }, TIMEOUT_ODGOVORA_MS);
 
     const socket = dohvatiSocket();
@@ -362,7 +363,7 @@
         {#if !slanjeUTijeku}
           <Play size={18} strokeWidth={2.6} aria-hidden="true" />
         {/if}
-        {slanjeUTijeku ? 'Stvaranje sobe...' : 'Stvori privatnu sobu'}
+        {slanjeUTijeku ? (poruka ? 'Još čekam…' : 'Stvaranje sobe...') : 'Stvori privatnu sobu'}
       </button>
     </section>
   </form>

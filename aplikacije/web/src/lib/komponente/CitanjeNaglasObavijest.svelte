@@ -41,7 +41,15 @@
   }
 
   function poveznicaPomoci(): string {
-    return '/pravila-kaladonta';
+    const odjeljci: Record<string, string> = {
+      Android: 'upute-android',
+      'iOS/iPadOS': 'upute-ios',
+      Windows: 'upute-windows',
+      macOS: 'upute-macos',
+      Linux: 'upute-linux',
+    };
+    const sidro = odjeljci[govornoOkruzenje.platforma] ?? 'upute-opcenito';
+    return `/pravila-kaladonta/pristupacnost#${sidro}`;
   }
 
   onMount(() => {
