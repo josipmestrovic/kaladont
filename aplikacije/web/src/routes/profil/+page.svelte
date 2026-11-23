@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { page } from '$app/stores';
+  import { Pencil } from 'lucide-svelte';
   import { api } from '$lib/api.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import DostignuceKartica from '$lib/komponente/DostignuceKartica.svelte';
@@ -230,7 +231,9 @@
               razinaVatre={headerForma?.razinaVatre ?? 0}
               nizPobjeda={headerForma?.trenutniNiz ?? 0}
             />
-            <img class="ikona-uredi" src="/ikone/23-uredi-avatar.png" alt="" aria-hidden="true" />
+            <span class="ikona-uredi" aria-hidden="true">
+              <Pencil size={20} strokeWidth={2.2} />
+            </span>
           </a>
           <div class="info-profila">
             <div class="profil-gornji-red">
@@ -507,7 +510,25 @@
     color: inherit;
     text-decoration: none;
   }
-  .ikona-uredi { position: absolute; z-index: 555; right: 14px; bottom: 13px; width: 51px; height: 51px; object-fit: contain; }
+  .ikona-uredi {
+    position: absolute;
+    z-index: 555;
+    right: 14px;
+    bottom: 13px;
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--boja-obrub);
+    background: var(--boja-povrsina);
+    color: var(--boja-tekst-osnovni);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  }
+  .avatar-uredivanje:hover .ikona-uredi,
+  .avatar-uredivanje:focus-visible .ikona-uredi {
+    color: var(--boja-akcent-tekst);
+  }
   .profil-akcije { position: absolute; top: 0; right: 0; display: flex; min-width: 112px; flex-direction: column; align-items: flex-start; gap: 8px; }
   .profil-akcija { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: var(--boja-pozadina-primarna); font: inherit; font-size: var(--tekst-sitni); font-weight: 800; text-decoration: none; cursor: pointer; }
   .odjava-akcija { color: var(--boja-akcent); }
@@ -553,7 +574,7 @@
       margin-left: auto;
       align-items: flex-end;
     }
-    .ikona-uredi { width: 44px; height: 44px; }
+    .ikona-uredi { width: 36px; height: 36px; }
   }
 
   @media (max-width: 379px) {

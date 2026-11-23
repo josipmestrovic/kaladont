@@ -50,11 +50,9 @@ test('dva igrača stvaraju privatnu sobu i pokreću partiju', async ({ browser }
 
 test('pojašnjenje mrtvih slova radi na mobilnom prikazu', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/pravila-kaladonta/pitanja');
+  await page.goto('/pravila-kaladonta');
 
-  // Pojam je unutar zatvorenog <details>; tipka nije dostupna dok se ne otvori summary.
-  await page.locator('summary', { hasText: 'Zašto sam odmah ispao?' }).click();
-  await page.getByRole('button', { name: 'mrtva slova' }).click();
+  await page.getByRole('button', { name: 'Mrtva slova' }).click();
   const pojasnjenje = page.getByRole('tooltip');
   await expect(pojasnjenje).toBeVisible();
   await expect(pojasnjenje).toContainText(

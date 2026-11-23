@@ -15,16 +15,12 @@ export const MODAL_IGRA_IKONE: readonly string[] = [
 export const POZADINSKE_SLIKE_LANDINGA: readonly string[] = [
   '/ikone/01-sto-je-novo.png',
   '/ikone/02-pomozi-poboljsati-igru.png',
-  '/ikone/03-nazad.png',
-  '/ikone/04-naslovna.png',
-  '/ikone/05-naprijed.png',
   ...MODAL_IGRA_IKONE,
 ];
 
 /** Profil / dostignuća — tek kad se ode na profil. */
 export const SLIKE_PROFILA: readonly string[] = [
   '/ikone/15-kaladont-dnk.png',
-  '/ikone/23-uredi-avatar.png',
   '/ikone/26-zvjezdica-prazna.png',
   '/ikone/27-zvjezdica-puna.png',
   '/ikone/29-random-avatar.png',

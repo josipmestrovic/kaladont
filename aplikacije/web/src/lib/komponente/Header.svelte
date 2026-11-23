@@ -1,12 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { ArrowLeft, ArrowRight, Home } from 'lucide-svelte';
   import { api, ApiGreska } from '$lib/api.js';
   import { osvjeziGostSesijuNakon401, prijediNaGostujucuSesiju } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
   import { type AvatarConfigV1 } from 'zajednicko';
+
+  const IKONA_VELICINA = 32;
+  const IKONA_DEBLjINA = 2.2;
 
   interface Profil {
     nadimak: string;
@@ -142,16 +146,16 @@
     {:else}
       <div class="lijeve-akcije">
         <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
-          <img class="header-ikona" src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
+          <ArrowLeft class="header-ikona" size={IKONA_VELICINA} strokeWidth={IKONA_DEBLjINA} aria-hidden="true" />
         </button>
         {#if prikaziPovratakNaPocetnu}
           <a href="/" class="header-akcija" aria-label="Početna">
-            <img class="header-ikona" src="/ikone/04-naslovna.png" alt="" aria-hidden="true" />
+            <Home class="header-ikona" size={IKONA_VELICINA} strokeWidth={IKONA_DEBLjINA} aria-hidden="true" />
           </a>
         {/if}
         {#if mozeNaprijed}
           <button type="button" class="header-akcija" aria-label="Naprijed" onclick={idiNaprijed}>
-            <img class="header-ikona" src="/ikone/05-naprijed.png" alt="" aria-hidden="true" />
+            <ArrowRight class="header-ikona" size={IKONA_VELICINA} strokeWidth={IKONA_DEBLjINA} aria-hidden="true" />
           </button>
         {/if}
       </div>
@@ -320,10 +324,8 @@
   }
 
   .header-ikona {
-    width: 44px;
-    height: 44px;
     display: block;
-    object-fit: contain;
+    flex-shrink: 0;
   }
 
   .lijeve-akcije {
@@ -349,7 +351,7 @@
 
   .header-akcija:hover,
   .header-akcija:focus-visible {
-    color: var(--boja-akcent);
+    color: var(--boja-akcent-tekst);
     text-decoration: none;
   }
 
