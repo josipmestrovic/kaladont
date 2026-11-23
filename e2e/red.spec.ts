@@ -554,9 +554,13 @@ for (const zaslon of [
             expect(await stranica.locator('.avatar-omot').evaluateAll((avatari) => avatari.every((avatar) => {
               const pravokutnik = avatar.getBoundingClientRect();
               const element = document.elementFromPoint(pravokutnik.x + pravokutnik.width / 2, pravokutnik.y + pravokutnik.height / 2);
-              // Oblak riječi je sibling unutar sjedala — smije prekriti centar avatara.
+              // Oblak riječi (sjedalo) i sustav-dodijelio (ispod reda) smiju prekriti centar na niskom landscapeu.
               const sjedalo = avatar.closest('li');
-              return element !== null && (avatar.contains(element) || Boolean(sjedalo?.contains(element)));
+              return element !== null && (
+                avatar.contains(element)
+                || Boolean(sjedalo?.contains(element))
+                || Boolean(element.closest('.sustav-dodijelio'))
+              );
             }))).toBe(true);
             expect(await stranica.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
           }

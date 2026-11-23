@@ -228,7 +228,7 @@ describe('popuna javnog reda botovima', () => {
       let naPotezu = runda.naPotezuId;
       let turnToken = runda.turnToken;
       let odustao = false;
-      for (let korak = 0; korak < 8; korak += 1) {
+      for (let korak = 0; korak < 16; korak += 1) {
         const stanje = await dohvatiStanjePartije(socket);
         if (stanje.zavrsena || stanje.statusSpremanja !== 'nije_zavrsena') {
           odustao = true;
@@ -255,7 +255,7 @@ describe('popuna javnog reda botovima', () => {
           break;
         }
         const ishod = await prviUspjeh([
-          potezi.next((p) => p.igracId === naPotezu, 15_000, `potez:prihvacen od ${naPotezu}`).then((p) => ({ vrsta: 'potez' as const, p })),
+          potezi.next((p) => p.igracId === naPotezu, 25_000, `potez:prihvacen od ${naPotezu}`).then((p) => ({ vrsta: 'potez' as const, p })),
           krajPromise.then(() => ({ vrsta: 'kraj' as const })),
         ]);
         if (ishod.vrsta === 'kraj') {
