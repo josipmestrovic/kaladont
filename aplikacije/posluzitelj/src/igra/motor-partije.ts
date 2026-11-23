@@ -714,7 +714,8 @@ export function stvoriUpraviteljPartija(
     const delta = stanje.napredakDostignuca.get(igracId) ?? {};
     const razinaIskustva = stanje.sudionici.find((s) => s.igracId === igracId)?.razina ?? 0;
     const vecNajavljena = stanje.najavljenaDostignuca.get(igracId) ?? new Set<string>();
-    const nova = izracunajNovaDostignuca(prije, delta, razinaIskustva, Boolean(stanje.jePrivatna))
+    // Ne-javni konteksti (privatna/trening/izazov) dijele filter vrijediUPrivatnoj.
+    const nova = izracunajNovaDostignuca(prije, delta, razinaIskustva, stanje.kontekst !== 'javna')
       .filter((dostignuce) => !vecNajavljena.has(`${dostignuce.id}:${dostignuce.novaRazina}`));
     if (nova.length === 0) return;
     for (const dostignuce of nova) vecNajavljena.add(`${dostignuce.id}:${dostignuce.novaRazina}`);
@@ -2550,7 +2551,6 @@ export function stvoriUpraviteljPartija(
     const sudionik = stanje.sudionici.find((stavka) => stavka.igracId === igracId);
     const gamifikacijaAktivna = stanje.politika.dajeDostignucaIKolekcije;
     const kolekcijaAktivna = gamifikacijaAktivna || (stanje.politika.zapisujeKolekcijuTreninga && sudionik?.upravljac === 'covjek');
-    // Izazov: prikaži lokalni 🔥 niz bez dodjele dostignuća (dajeDostignucaIKolekcije ostaje false).
     const prikazujeStreak = gamifikacijaAktivna || stanje.kontekst === 'izazov';
     const trenutniStreak = prikazujeStreak ? (stanje.streakovi.get(igracId) ?? 0) + 1 : 0;
     if (stanje.kontekst === 'trening' && sudionik?.upravljac === 'covjek') zakaziNeaktivnostTreninga(stanje);
@@ -2621,12 +2621,11 @@ export function stvoriUpraviteljPartija(
         }
         // Rijetka grdosija: isti prihvaćeni potez je dugačak i bilo kojeg tiera rijetkosti, uključujući 0.
         // Provjera je !== null (tier 0 nije truthy). Skup oblika ide u završni obračun, ne u brojač usred igre.
-        // Isti normalizirani oblik ne ulazi dvaput. Ne uključuje bota, gosta, trening ni sustavsku početnu riječ.
+        // Isti normalizirani oblik ne ulazi dvaput. Ne uključuje bota, gosta ni sustavsku početnu riječ.
         if (
           sudionik
           && primaProfilnuGamifikacijuUIgri(sudionik)
           && (sudionik.vrsta === 'registriran' || sudionik.vrsta === 'admin')
-          && stanje.kontekst !== 'trening'
           && brojGrafema >= PRAGOVI_DULJINE.duga
           && tier !== null
         ) {
