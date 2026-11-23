@@ -20,11 +20,19 @@
   let otvorenoKlikom = $state(false);
   let omotac: HTMLSpanElement;
   let tooltipEl: HTMLSpanElement | undefined;
-  let stilTooltips = $state<string>('');
   const samoIkona = $derived(!tekst);
   const uzOkidac = $derived(pozicioniranje === 'uz-okidac');
 
   const RUB_VIEWPORTA_PX = 16;
+
+  function resetirajStilTooltips(tip: HTMLSpanElement) {
+    tip.style.left = '0';
+    tip.style.right = 'auto';
+    tip.style.top = 'calc(100% + 8px)';
+    tip.style.bottom = 'auto';
+    tip.style.maxHeight = '';
+    tip.style.overflowY = '';
+  }
 
   async function pozicionirajUzOkidac() {
     if (!uzOkidac || !omotac) return;
@@ -32,12 +40,9 @@
     const tip = tooltipEl;
     if (!tip) return;
     const okidac = omotac.getBoundingClientRect();
-    // Reset to measure natural size below trigger.
-    tip.style.left = '0';
-    tip.style.right = 'auto';
-    tip.style.top = 'calc(100% + 8px)';
-    tip.style.bottom = 'auto';
-    tip.style.maxHeight = '';
+    // Mjeri u zadanom položaju, zatim uvijek upiši konačni stil na element
+    // (ne ovisi o Svelte style bindu koji može preskočiti isti string nakon resizea).
+    resetirajStilTooltips(tip);
     const tipRect = tip.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -53,18 +58,17 @@
     const trebaGore = tipRect.height > mjestoIspod && mjestoIznad > mjestoIspod;
     const dostupnaVisina = Math.max(80, trebaGore ? mjestoIznad : mjestoIspod);
 
-    const dijelovi = [
-      `left: ${leftPx}px`,
-      `right: auto`,
-      `max-height: ${Math.min(tipRect.height, dostupnaVisina)}px`,
-      `overflow-y: auto`,
-    ];
+    tip.style.left = `${leftPx}px`;
+    tip.style.right = 'auto';
+    tip.style.maxHeight = `${Math.min(tipRect.height, dostupnaVisina)}px`;
+    tip.style.overflowY = 'auto';
     if (trebaGore) {
-      dijelovi.push('top: auto', 'bottom: calc(100% + 8px)');
+      tip.style.top = 'auto';
+      tip.style.bottom = 'calc(100% + 8px)';
     } else {
-      dijelovi.push('top: calc(100% + 8px)', 'bottom: auto');
+      tip.style.top = 'calc(100% + 8px)';
+      tip.style.bottom = 'auto';
     }
-    stilTooltips = dijelovi.join('; ');
   }
 
   function otvori(klikom: boolean) {
@@ -78,7 +82,6 @@
     if (otvoreno && otvorenoKlikom) {
       otvoreno = false;
       otvorenoKlikom = false;
-      stilTooltips = '';
       return;
     }
     otvori(true);
@@ -88,14 +91,12 @@
     if (!omotac?.contains(dogadaj.target as Node)) {
       otvoreno = false;
       otvorenoKlikom = false;
-      stilTooltips = '';
     }
   }
 
   function zatvori() {
     otvoreno = false;
     otvorenoKlikom = false;
-    stilTooltips = '';
   }
 
   function naHoverEnter() {
@@ -106,7 +107,6 @@
   function naHoverLeave() {
     if (!uzOkidac || otvorenoKlikom) return;
     otvoreno = false;
-    stilTooltips = '';
   }
 
   function naFocus() {
@@ -117,7 +117,6 @@
   function naBlur() {
     if (!uzOkidac || otvorenoKlikom) return;
     otvoreno = false;
-    stilTooltips = '';
   }
 </script>
 
@@ -157,7 +156,6 @@
       class:uz-okidac={uzOkidac}
       role="tooltip"
       bind:this={tooltipEl}
-      style={uzOkidac ? stilTooltips : undefined}
       onclick={(e) => e.stopPropagation()}
     >{opis}</span>
   {/if}

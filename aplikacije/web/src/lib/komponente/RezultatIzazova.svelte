@@ -8,7 +8,11 @@
   } from 'zajednicko';
   import { jeIdIzazova, pokusajDefinicijuIzazova, PRAG_DUGE_RIJECI_IZAZOVA } from 'zajednicko';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { sljedeciDostupanIzazov, tekstRazlogaNeuspjeha } from '$lib/izazovi-klijent.js';
+  import {
+    dohvatiKatalogIzazova,
+    sljedeciDostupanIzazov,
+    tekstRazlogaNeuspjeha,
+  } from '$lib/izazovi-klijent.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
 
   let {
@@ -46,12 +50,32 @@
     return 1;
   })());
   const mapaHref = $derived(`/izazovi?level=${levelOdigranog}`);
-  const sljedeci = $derived(
-    uspjeh && challengeId && jeIdIzazova(challengeId)
-      ? sljedeciDostupanIzazov(challengeId)
-      : null,
-  );
+  let sljedeci = $state<{ id: IdIzazova; naziv: string; level: LevelIzazova } | null>(null);
   let navigacijaUTijeku = $state(false);
+
+  $effect(() => {
+    if (!uspjeh || !challengeId || !jeIdIzazova(challengeId)) {
+      sljedeci = null;
+      return;
+    }
+    const id = challengeId;
+    let otkazano = false;
+    void dohvatiKatalogIzazova()
+      .then((odgovor) => {
+        if (otkazano) return;
+        sljedeci = sljedeciDostupanIzazov(id, odgovor.katalog);
+      })
+      .catch(() => {
+        if (otkazano) return;
+        // Bez kataloga: slotovi 1–4 su otvoreni zajedno; finale (5) zahtijeva status.
+        const kandidat = sljedeciDostupanIzazov(id);
+        const def = kandidat ? pokusajDefinicijuIzazova(kandidat.id) : null;
+        sljedeci = def && def.redoslijedUFormatu < 5 ? kandidat : null;
+      });
+    return () => {
+      otkazano = true;
+    };
+  });
 
   const naslov = $derived(
     terminalStatus === 'tehnicki_prekinuto'
