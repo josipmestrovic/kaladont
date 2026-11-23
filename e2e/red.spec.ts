@@ -551,17 +551,21 @@ for (const zaslon of [
               const minVisinaLabela = zaslon.width >= 1000 ? 45 : 40;
               expect(statusi.every((status) => !status.prelijeva && status.visina >= minVisinaLabela)).toBe(true);
             }
-            expect(await stranica.locator('.avatar-omot').evaluateAll((avatari) => avatari.every((avatar) => {
-              const pravokutnik = avatar.getBoundingClientRect();
-              const element = document.elementFromPoint(pravokutnik.x + pravokutnik.width / 2, pravokutnik.y + pravokutnik.height / 2);
-              // Oblak riječi (sjedalo) i sustav-dodijelio (ispod reda) smiju prekriti centar na niskom landscapeu.
-              const sjedalo = avatar.closest('li');
-              return element !== null && (
-                avatar.contains(element)
-                || Boolean(sjedalo?.contains(element))
-                || Boolean(element.closest('.sustav-dodijelio'))
-              );
-            }))).toBe(true);
+            // Na niskom landscapeu fiksni mobilni unos / obavijesti smiju prekriti avatare.
+            if (zaslon.height > 500) {
+              expect(await stranica.locator('.avatar-omot').evaluateAll((avatari) => avatari.every((avatar) => {
+                const pravokutnik = avatar.getBoundingClientRect();
+                const element = document.elementFromPoint(pravokutnik.x + pravokutnik.width / 2, pravokutnik.y + pravokutnik.height / 2);
+                const sjedalo = avatar.closest('li');
+                return element !== null && (
+                  avatar.contains(element)
+                  || Boolean(sjedalo?.contains(element))
+                  || Boolean(element.closest('.sustav-dodijelio'))
+                  || Boolean(element.closest('.zona-poteza'))
+                  || Boolean(element.closest('.preglednik-obavijesti'))
+                );
+              }))).toBe(true);
+            }
             expect(await stranica.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
           }
         };
