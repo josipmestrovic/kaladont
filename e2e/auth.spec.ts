@@ -52,27 +52,20 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   );
   await page.goto('/');
   await misijeOdgovor.catch(() => {});
-  const popupMisija = page.getByRole('dialog', { name: /Nove (dnevne|tjedne) misije/ });
-  await popupMisija.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
-  for (let i = 0; i < 5; i += 1) {
-    if (await popupMisija.count() === 0) break;
-    const naslovPrije = await popupMisija.locator('h2').textContent().catch(() => null);
-    const zatvori = popupMisija.getByRole('button', { name: 'Zatvori' });
-    // API oznake pregleda drži gumb disabled — pričekaj pa klikni.
-    await expect(zatvori).toBeEnabled({ timeout: 15_000 });
+  // Nove misije: toast umjesto popupa — zatvori da ne blokira profil izbornik.
+  const toastMisija = page.getByRole('status').filter({ hasText: /Imaš nove (dnevne|tjedne)/ });
+  await toastMisija.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {});
+  if (await toastMisija.count() > 0) {
+    const zatvori = toastMisija.getByRole('button', { name: 'Zatvori obavijest' });
     const pregled = page.waitForResponse(
       (odgovor) => odgovor.url().includes('/misije/pregled') && odgovor.request().method() === 'POST',
       { timeout: 15_000 },
     );
     await zatvori.click();
     await pregled.catch(() => {});
-    // Daily→weekly zamjenjuje dijalog in place; čekaj nestanak ili promjenu naslova.
-    await expect.poll(async () => {
-      if (await popupMisija.count() === 0) return 'gone';
-      return (await popupMisija.locator('h2').textContent()) ?? '';
-    }, { timeout: 15_000 }).not.toBe(naslovPrije);
+    await expect(toastMisija).toHaveCount(0, { timeout: 15_000 });
   }
-  await expect(popupMisija).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: /Nove (dnevne|tjedne) misije/ })).toHaveCount(0);
   const profilGumb = page.getByRole('banner').getByRole('button', { name: /Izbornik profila/ });
   await expect(profilGumb).toBeVisible({ timeout: 20_000 });
   await profilGumb.click();
