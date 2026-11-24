@@ -226,9 +226,9 @@
             />
             <span class="stavka-tekst">
               <strong id="naslov-brza-igra">Troboj</strong>
-              <small id="opis-brza-igra">Igraj online u troje.</small>
+              <small id="opis-brza-igra">Igraj online* u troje.</small>
               <small id="napomena-brza-igra" class="stavka-napomena"
-                >Ako nema igrača, pridruže se botovi.</small
+                >*Ako nema igrača, pridruže se botovi.</small
               >
             </span>
           </span>

@@ -86,10 +86,10 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toBeVisible();
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText('Troboj');
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
-    'Igraj online u troje.',
+    'Igraj online* u troje.',
   );
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
-    'Ako nema igrača, pridruže se botovi.',
+    '*Ako nema igrača, pridruže se botovi.',
   );
   await expect(navigacija.getByRole('link', { name: 'Izazovi', exact: true })).toHaveAttribute(
     'href',
