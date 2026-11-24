@@ -374,10 +374,9 @@
               onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
             >Što je novo?</a>
           </span>
-          <span class="razdjelnik" aria-hidden="true">·</span>
         {/if}
-        <span class="copyright">© {godinaCopyright} Kaladont</span>
       </span>
+      <span class="copyright">© {godinaCopyright} Kaladont</span>
       <span class="podnozje-desno">
         {#if jeRegistriran}
           <a href="/povratne-informacije">Povratne informacije</a>
@@ -888,19 +887,28 @@
     }
 
     .podnozje-red {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
       flex-wrap: nowrap;
-      justify-content: space-between;
       gap: 16px;
     }
 
-    .podnozje-lijevo,
-    .podnozje-desno {
+    .podnozje-lijevo {
       flex-wrap: nowrap;
       justify-content: flex-start;
+      justify-self: start;
+    }
+
+    .copyright {
+      justify-self: center;
+      text-align: center;
     }
 
     .podnozje-desno {
+      flex-wrap: nowrap;
       justify-content: flex-end;
+      justify-self: end;
     }
 
     .glavna-navigacija {
