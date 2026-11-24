@@ -1,17 +1,22 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
+  import NaslovnicaNapredak from '$lib/komponente/NaslovnicaNapredak.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
     NASLOVNICA_SEO_DESCRIPTION,
     NASLOVNICA_SEO_TITLE,
     naslovnicaJsonLd,
   } from '$lib/seo.js';
+  import { osigurajProfil } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
+
+  const FOCUS_REFRESH_MS = 45_000;
+  let zadnjiFocusRefresh = 0;
 
   function idiUBrzuIgru() {
     zabiljeziUmamiDogadjaj('igraj-klik');
@@ -24,9 +29,24 @@
     zagrijGameplayZvukove();
   }
 
+  afterNavigate(({ to }) => {
+    if (to?.url.pathname === '/') void osigurajProfil({ forsaj: true });
+  });
+
   onMount(() => {
     // ?igraj=1 → izravno Brza igra (bez modala).
     if ($page.url.searchParams.get('igraj') === '1') idiUBrzuIgru();
+
+    const naVidljivost = () => {
+      if (document.visibilityState !== 'visible') return;
+      if ($page.url.pathname !== '/') return;
+      const sada = Date.now();
+      if (sada - zadnjiFocusRefresh < FOCUS_REFRESH_MS) return;
+      zadnjiFocusRefresh = sada;
+      void osigurajProfil({ forsaj: true });
+    };
+    document.addEventListener('visibilitychange', naVidljivost);
+    return () => document.removeEventListener('visibilitychange', naVidljivost);
   });
 </script>
 
@@ -41,6 +61,7 @@
   <div class="landing-prostor landing-prostor--gore" aria-hidden="true"></div>
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <div class="navigacijski-blok">
+      <NaslovnicaNapredak />
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
         <button
           type="button"
