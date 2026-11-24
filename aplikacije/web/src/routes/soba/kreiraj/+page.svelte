@@ -14,10 +14,10 @@
   import {
     REDOSLIJED_PRAVILNIKA,
     TEKSTOVI_PRAVILNIKA,
-    parsajPravilnikIzQuery,
   } from '$lib/igraj-rute.js';
   import {
     SVE_VRSTE_RIJECI,
+    jePoznatiPravilnik,
     type PostavkePrivatneSobe,
     type PravilnikPartije,
     type VrstaRijeci,
@@ -49,10 +49,11 @@
 
   let trajanjePotezaSek = $state(30);
   let eliminacijskiBodovi = $state(true);
-  // HINT PR14: ?pravila= iz Igraj koraka; inače zadani pravilnik.
-  let pravilnik = $state<PravilnikPartije>(
-    parsajPravilnikIzQuery($page.url.searchParams.get('pravila')),
-  );
+  // ?pravila= iz queryja; inače prvi u redu (lijevo).
+  let pravilnik = $state<PravilnikPartije>((() => {
+    const izQuery = $page.url.searchParams.get('pravila');
+    return jePoznatiPravilnik(izQuery) ? izQuery : REDOSLIJED_PRAVILNIKA[0]!;
+  })());
   let odabraneVrste = $state<Set<VrstaRijeci>>(new Set(SVE_VRSTE_RIJECI));
   let poruka = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
@@ -201,7 +202,6 @@
 
       <div class="pravila-opis">
         <p>{TEKSTOVI_PRAVILNIKA[pravilnik].opis}</p>
-        <a class="detaljna-pravila" href="/pravila-kaladonta">Detaljna pravila</a>
       </div>
     </section>
 
@@ -372,8 +372,8 @@
 <style>
   .kreiraj-sobu {
     width: 100%;
-    max-width: 680px;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
     padding: 20px 0 48px;
     display: flex;
     flex-direction: column;
@@ -473,7 +473,7 @@
   .opcije-gumbi--pravila,
   .opcije-gumbi--brze {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 8px;
   }
 
@@ -518,15 +518,6 @@
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-sitni);
     line-height: 1.45;
-  }
-
-  .detaljna-pravila {
-    align-self: flex-start;
-    color: var(--boja-uspjeh-tekst);
-    font-size: var(--tekst-sitni);
-    font-weight: 700;
-    text-decoration: underline;
-    text-underline-offset: 3px;
   }
 
   .postavka-blok {
@@ -773,7 +764,6 @@
 
   @media (min-width: 600px) {
     .kreiraj-sobu {
-      max-width: 620px;
       padding-top: 28px;
     }
 
@@ -797,23 +787,6 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .pravila-opis {
-      flex-direction: row;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .detaljna-pravila {
-      flex: 0 0 auto;
-      white-space: nowrap;
-    }
-  }
-
-  @media (min-width: 1000px) {
-    .kreiraj-sobu {
-      max-width: 680px;
-    }
   }
 
   @media (prefers-reduced-motion: reduce) {

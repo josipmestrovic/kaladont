@@ -358,7 +358,9 @@
   }
   h2 {
     margin: 0;
-    font-size: var(--naslov-3);
+    font-family: var(--font-naslov);
+    font-size: var(--naslov-2);
+    color: var(--boja-tekst-naslov);
   }
   .opis {
     margin: 0;

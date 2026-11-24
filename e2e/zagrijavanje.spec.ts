@@ -2,12 +2,21 @@ import { expect, test } from '@playwright/test';
 import { otvoriZagrijavanjeKorak1 } from './pomocnici/naslovnica.js';
 
 test('gost pokreće Zagrijavanje, odustaje i vidi kraj treninga bez napretka', async ({ page }) => {
-  const dijalog = await otvoriZagrijavanjeKorak1(page);
-  await dijalog.getByRole('button', { name: /KA-zna/ }).click();
-  await expect(dijalog.getByRole('heading', { name: 'Odaberi težinu bota' })).toBeVisible();
-  await dijalog.getByRole('button', { name: 'Iskusni' }).click();
-  await expect(dijalog.getByRole('heading', { name: 'Koliko botova želiš?' })).toBeVisible();
-  await dijalog.getByRole('link', { name: 'Igraj s 1 botom' }).click();
+  const setup = await otvoriZagrijavanjeKorak1(page);
+
+  // Defaulti = prvi u redu (lijevo): Klasični, Početnik, 1 bot.
+  await expect(setup.getByRole('radio', { name: 'Klasični Kaladont' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await expect(setup.getByRole('radio', { name: 'Početnik' })).toHaveAttribute('aria-checked', 'true');
+  await expect(setup.getByRole('radio', { name: '1 bot' })).toHaveAttribute('aria-checked', 'true');
+
+  await setup.getByRole('radio', { name: 'KA-zna' }).click();
+  await setup.getByRole('radio', { name: 'Iskusni' }).click();
+  await setup.getByRole('radio', { name: '1 bot' }).click();
+  await setup.getByTestId('trening-zapocni').click();
+
   await expect(page).toHaveURL(/\/zagrijavanje\?pravila=ka_zna&botovi=1&profil=iskusni$/);
 
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });
