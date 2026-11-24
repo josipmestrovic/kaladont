@@ -362,28 +362,31 @@
 
   <footer class="landing-footer">
     <p class="podnozje-red">
-      {#if NAJNOVIJE_IZDANJE}
-        <span class="zadnje-azuriranje">
-          Ažurirano
-          <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
+      <span class="podnozje-lijevo">
+        {#if NAJNOVIJE_IZDANJE}
+          <span class="zadnje-azuriranje">
+            Ažurirano
+            <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
+            <span class="razdjelnik" aria-hidden="true">·</span>
+            <a
+              class="sto-je-novo"
+              href="/novosti"
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
+            >Što je novo?</a>
+          </span>
           <span class="razdjelnik" aria-hidden="true">·</span>
-          <a
-            class="sto-je-novo"
-            href="/novosti"
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
-          >Što je novo?</a>
-        </span>
+        {/if}
+        <span class="copyright">© {godinaCopyright} Kaladont</span>
+      </span>
+      <span class="podnozje-desno">
+        {#if jeRegistriran}
+          <a href="/povratne-informacije">Povratne informacije</a>
+          <span class="razdjelnik" aria-hidden="true">·</span>
+        {/if}
+        <a href="/uvjeti">Uvjeti</a>
         <span class="razdjelnik" aria-hidden="true">·</span>
-      {/if}
-      <span class="copyright">© {godinaCopyright} Kaladont</span>
-      {#if jeRegistriran}
-        <span class="razdjelnik" aria-hidden="true">·</span>
-        <a href="/povratne-informacije">Povratne informacije</a>
-      {/if}
-      <span class="razdjelnik" aria-hidden="true">·</span>
-      <a href="/uvjeti">Uvjeti</a>
-      <span class="razdjelnik" aria-hidden="true">·</span>
-      <a href="/privatnost">Privatnost</a>
+        <a href="/privatnost">Privatnost</a>
+      </span>
     </p>
   </footer>
 </main>
@@ -794,10 +797,20 @@
     align-items: center;
     justify-content: center;
     gap: 4px 8px;
+    width: 100%;
     max-width: 100%;
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-sitni);
     line-height: 1.3;
+  }
+
+  .podnozje-lijevo,
+  .podnozje-desno {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 8px;
   }
 
   .podnozje-red .razdjelnik {
@@ -866,6 +879,28 @@
       width: 100%;
       max-width: none;
       margin-inline: 0;
+    }
+
+    .landing-footer {
+      width: min(100%, var(--sirina-grida));
+      justify-content: stretch;
+      text-align: left;
+    }
+
+    .podnozje-red {
+      flex-wrap: nowrap;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .podnozje-lijevo,
+    .podnozje-desno {
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+    }
+
+    .podnozje-desno {
+      justify-content: flex-end;
     }
 
     .glavna-navigacija {
