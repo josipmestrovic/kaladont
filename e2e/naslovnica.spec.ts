@@ -156,6 +156,15 @@ test('naslovnica prikazuje XP sažetak i default opis izazova bez trake', async 
   await expect(izazovi.locator('.izazovi-napredak')).toHaveCount(0);
 });
 
+test('naslovnica prikazuje brze postavke gostu', async ({ page }) => {
+  await page.goto('/');
+  const grupe = page.getByTestId('naslovnica-brze-postavke');
+  await expect(grupe).toBeVisible({ timeout: 20_000 });
+  await expect(grupe.getByRole('switch', { name: 'Svijetli način' })).toBeVisible();
+  await expect(grupe.getByRole('switch', { name: 'Čitanje naglas' })).toBeVisible();
+  await expect(grupe.getByRole('switch', { name: 'Font za disleksiju' })).toBeVisible();
+});
+
 test('/novosti prikazuje objavljena izdanja po datumima, najnovije prvo', async ({ page, request }) => {
   const izdanja = ocekivanaIzdanja();
   expect(izdanja.length).toBeGreaterThan(0);

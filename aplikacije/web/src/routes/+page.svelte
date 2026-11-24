@@ -12,6 +12,7 @@
     izracunajPrikazIzazova,
     type PrikazIzazovaKartice,
   } from '$lib/naslovnica-izazovi.js';
+  import BrzePostavke from '$lib/komponente/BrzePostavke.svelte';
   import NaslovnicaNapredak from '$lib/komponente/NaslovnicaNapredak.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
@@ -259,6 +260,9 @@
           <span>Kako igrati?</span>
         </a>
       </nav>
+
+      <hr class="brze-postavke-razdjelnik" />
+      <BrzePostavke />
 
       {#if NAJNOVIJE_IZDANJE}
         <p class="zadnje-azuriranje">
@@ -596,6 +600,13 @@
     color: color-mix(in srgb, var(--boja-tekst-sekundarni) 55%, transparent);
     font-size: 14px;
     user-select: none;
+  }
+
+  .brze-postavke-razdjelnik {
+    width: min(100%, 280px);
+    margin: 4px auto 0;
+    border: 0;
+    border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 28%, transparent);
   }
 
   .zadnje-azuriranje {
