@@ -45,14 +45,15 @@
         <button
           type="button"
           class="navigacijska-stavka primarna"
-          aria-label="Igraj"
+          aria-label="Brza igra"
           data-testid="naslovnica-brza-igra"
           onclick={idiUBrzuIgru}
         >
           <span class="stavka-sadrzaj" aria-hidden="true">
             <span class="stavka-tekst">
-              <strong>Igraj</strong>
-              <small>Klasična online igra u 3 igrača.</small>
+              <strong>Brza igra</strong>
+              <small>Odigraj klasičnu partiju u troje.</small>
+              <small class="stavka-napomena">Ako nema igrača, pridružit će ti se botovi.</small>
             </span>
           </span>
           <span class="cta" aria-hidden="true">
@@ -67,7 +68,7 @@
           <span class="stavka-sadrzaj" aria-hidden="true">
             <span class="stavka-tekst">
               <strong>Izazovi</strong>
-              <small>Svladavaj sve teže izazove.</small>
+              <small>Svladavaj 60 sve težih izazova.</small>
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>
@@ -83,36 +84,41 @@
           <span class="stavka-sadrzaj" aria-hidden="true">
             <span class="stavka-tekst">
               <strong>Trening</strong>
-              <small>Vježbaj protiv računala.</small>
+              <small>Vježbaj protiv botova po svojim pravilima.</small>
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>
         </a>
 
-        <a href="/soba/kreiraj" class="navigacijska-stavka privatna" aria-label="Privatna soba">
+        <a
+          href="/soba/kreiraj"
+          class="navigacijska-stavka privatna"
+          aria-label="Privatna soba"
+          data-testid="naslovnica-privatna-soba"
+        >
           <span class="stavka-sadrzaj" aria-hidden="true">
             <span class="stavka-tekst">
               <strong>Privatna soba</strong>
-              <small>Pozovi ekipu i igrajte zajedno.</small>
+              <small>Pozovi ekipu i igrajte po svojim pravilima.</small>
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>
         </a>
 
-        <div
-          class="navigacijska-stavka turniri uskoro"
-          role="status"
-          aria-label="Turniri, izlazi uskoro"
-          data-testid="naslovnica-turniri"
+        <a
+          href="/ljestvice"
+          class="navigacijska-stavka"
+          aria-label="Ljestvice"
+          data-testid="naslovnica-ljestvice"
         >
-          <span class="stavka-sadrzaj">
+          <span class="stavka-sadrzaj" aria-hidden="true">
             <span class="stavka-tekst">
-              <strong>Turniri</strong>
-              <small>Izlazi uskoro</small>
+              <strong>Ljestvice</strong>
+              <small>Usporedi se s najboljim igračima.</small>
             </span>
           </span>
-          <span class="oznaka-uskoro" aria-hidden="true">Uskoro</span>
-        </div>
+          <span class="strelica" aria-hidden="true">›</span>
+        </a>
       </nav>
       {#if NAJNOVIJE_IZDANJE}
         <p class="zadnje-azuriranje">
@@ -299,34 +305,9 @@
     pointer-events: none;
   }
 
-  .navigacijska-stavka.uskoro {
-    cursor: not-allowed;
-    opacity: 0.78;
-  }
-
-  .navigacijska-stavka.uskoro:hover,
-  .navigacijska-stavka.uskoro:focus-visible {
-    transform: none;
-    border-color: var(--boja-plocica-obrub);
-    box-shadow: var(--sjena-suptilna);
-  }
-
-  .oznaka-uskoro {
-    display: inline-flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 10px;
-    border-radius: var(--radijus-pill);
-    background: color-mix(in srgb, #1a1815 8%, transparent);
-    color: color-mix(in srgb, #1a1815 55%, transparent);
-    font-family: var(--font-tijelo);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    line-height: 1;
-    pointer-events: none;
+  .stavka-napomena {
+    display: block;
+    margin-top: 2px;
   }
 
   .navigacijska-stavka.primarna {
