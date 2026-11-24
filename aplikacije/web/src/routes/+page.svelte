@@ -55,11 +55,20 @@
   let kolekcijaGeneracija = 0;
   let dostignucaGeneracija = 0;
   let kolekcijaRazinaNaziv = $state('Početnik');
+  let brojRijeciKolekcije = $state<number | null>(null);
   let dostignucaZvjezdice = $state<PrikazZvjezdicaDostignuca>({
     ukupno: 0,
     maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
   });
   const kolekcijaLabela = $derived(`razina: ${kolekcijaRazinaNaziv}`);
+  const kolekcijaBadge = $derived(
+    brojRijeciKolekcije !== null && brojRijeciKolekcije > 0 ? String(brojRijeciKolekcije) : null,
+  );
+  const kolekcijaAria = $derived(
+    kolekcijaBadge
+      ? `Kolekcija riječi, ${kolekcijaLabela}, ${brojRijeciKolekcije === 1 ? '1 riječ' : `${brojRijeciKolekcije} riječi`}`
+      : `Kolekcija riječi, ${kolekcijaLabela}`,
+  );
   const dostignucaLabela = $derived(labelaZvjezdicaDostignuca(dostignucaZvjezdice));
   const dostignucaAria = $derived(ariaBadgaDostignuca(dostignucaZvjezdice));
   const jeGost = $derived(
@@ -98,14 +107,19 @@
     const generacija = ++kolekcijaGeneracija;
     try {
       const odgovor = await api<{
+        ukupnoOtkljucano?: number;
         kolekcionarskaRazina?: { naziv?: string };
       }>('/profil/kolekcija');
       if (generacija !== kolekcijaGeneracija) return;
       const naziv = odgovor.kolekcionarskaRazina?.naziv?.trim();
       kolekcijaRazinaNaziv = naziv && naziv.length > 0 ? naziv : 'Početnik';
+      const broj = odgovor.ukupnoOtkljucano;
+      brojRijeciKolekcije =
+        typeof broj === 'number' && Number.isFinite(broj) && broj >= 0 ? Math.floor(broj) : null;
     } catch {
       if (generacija !== kolekcijaGeneracija) return;
       kolekcijaRazinaNaziv = 'Početnik';
+      brojRijeciKolekcije = null;
     }
   }
 
@@ -147,6 +161,7 @@
       dostignucaGeneracija += 1;
       izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
       kolekcijaRazinaNaziv = 'Početnik';
+      brojRijeciKolekcije = null;
       dostignucaZvjezdice = {
         ukupno: 0,
         maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
@@ -198,6 +213,64 @@
         <NaslovnicaNapredak
           izazoviZavrseno={izazoviPrikaz.vrsta === 'napredak' ? izazoviPrikaz.zavrseno : 0}
         />
+        <div class="sporedni-red">
+          <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
+            <a
+              href="/misije"
+              class="sporedni-precac"
+              data-testid="naslovnica-misije"
+              aria-label={misijeBadge ? `Misije, ${misijeBadgeAria}` : 'Misije'}
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
+            >
+              <span class="sporedni-precac__ikona sporedni-precac__ikona--s-badgeom">
+                <img src="/ikone/62-misije.webp" alt="" width="48" height="48" />
+                {#if misijeBadge}
+                  <span class="sporedni-precac__badge" data-testid="naslovnica-misije-badge" aria-hidden="true"
+                    >{misijeBadge}</span
+                  >
+                {/if}
+              </span>
+              <span>Misije</span>
+            </a>
+            <a
+              href="/profil#rijeci"
+              class="sporedni-precac"
+              data-testid="naslovnica-kolekcija"
+              aria-label={kolekcijaAria}
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
+            >
+              <span class="sporedni-precac__ikona sporedni-precac__ikona--s-badgeom">
+                <img src="/ikone/08-pravila.png" alt="" width="48" height="48" />
+                {#if kolekcijaBadge}
+                  <span
+                    class="sporedni-precac__badge"
+                    data-testid="naslovnica-kolekcija-badge"
+                    aria-hidden="true">{kolekcijaBadge}</span
+                  >
+                {/if}
+              </span>
+              <span class="sporedni-precac__tekst">
+                <span>Kolekcija riječi</span>
+                <small data-testid="naslovnica-kolekcija-labela">{kolekcijaLabela}</small>
+              </span>
+            </a>
+            <a
+              href="/profil#dostignuca"
+              class="sporedni-precac"
+              data-testid="naslovnica-dostignuca"
+              aria-label={`Dostignuća, ${dostignucaAria}`}
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-dostignuca-klik')}
+            >
+              <span class="sporedni-precac__ikona">
+                <img src="/ikone/27-zvjezdica-puna.png" alt="" width="48" height="48" />
+              </span>
+              <span class="sporedni-precac__tekst">
+                <span>Dostignuća</span>
+                <small data-testid="naslovnica-dostignuca-labela">{dostignucaLabela}</small>
+              </span>
+            </a>
+          </nav>
+        </div>
       </div>
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
         <button
@@ -332,58 +405,6 @@
         </a>
       </nav>
 
-      <div class="sporedni-red">
-        <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
-          <a
-            href="/misije"
-            class="sporedni-precac"
-            data-testid="naslovnica-misije"
-            aria-label={misijeBadge ? `Misije, ${misijeBadgeAria}` : 'Misije'}
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
-          >
-            <span class="sporedni-precac__ikona">
-              <img src="/ikone/62-misije.webp" alt="" width="40" height="40" />
-              {#if misijeBadge}
-                <span class="sporedni-precac__badge" data-testid="naslovnica-misije-badge" aria-hidden="true"
-                  >{misijeBadge}</span
-                >
-              {/if}
-            </span>
-            <span>Misije</span>
-          </a>
-          <a
-            href="/profil#rijeci"
-            class="sporedni-precac"
-            data-testid="naslovnica-kolekcija"
-            aria-label={`Kolekcija riječi, ${kolekcijaLabela}`}
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
-          >
-            <span class="sporedni-precac__ikona">
-              <img src="/ikone/08-pravila.png" alt="" width="40" height="40" />
-            </span>
-            <span class="sporedni-precac__tekst">
-              <span>Kolekcija riječi</span>
-              <small data-testid="naslovnica-kolekcija-labela">{kolekcijaLabela}</small>
-            </span>
-          </a>
-          <a
-            href="/profil#dostignuca"
-            class="sporedni-precac"
-            data-testid="naslovnica-dostignuca"
-            aria-label={`Dostignuća, ${dostignucaAria}`}
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-dostignuca-klik')}
-          >
-            <span class="sporedni-precac__ikona">
-              <img src="/ikone/27-zvjezdica-puna.png" alt="" width="40" height="40" />
-            </span>
-            <span class="sporedni-precac__tekst">
-              <span>Dostignuća</span>
-              <small data-testid="naslovnica-dostignuca-labela">{dostignucaLabela}</small>
-            </span>
-          </a>
-        </nav>
-      </div>
-
       <div class="brze-postavke-blok">
         <BrzePostavke />
       </div>
@@ -492,6 +513,10 @@
   }
 
   .profil-red {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
     width: 100%;
     min-width: 0;
   }
@@ -802,8 +827,8 @@
   }
 
   .sporedni-precac img {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     object-fit: contain;
   }
 
@@ -812,12 +837,17 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    overflow: visible;
+  }
+
+  .sporedni-precac__ikona--s-badgeom {
+    padding: 6px 14px 2px 6px;
   }
 
   .sporedni-precac__badge {
     position: absolute;
-    top: -8px;
-    right: -12px;
+    top: 0;
+    right: 0;
     min-width: 22px;
     padding: 1px 6px;
     border-radius: 999px;
@@ -829,6 +859,7 @@
     line-height: 1.25;
     text-align: center;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--boja-pozadina) 80%, transparent);
+    pointer-events: none;
   }
 
   .sporedni-precac:hover {
@@ -924,7 +955,17 @@
       gap: 20px;
     }
 
+    .profil-red {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px 28px;
+    }
+
     .profil-red :global(.naslovnica-napredak-omotac) {
+      flex: 1 1 auto;
+      min-width: 0;
       margin: 0;
     }
 
@@ -984,19 +1025,27 @@
     }
 
     .sporedni-red {
-      gap: 12px;
-      margin-top: 4px;
+      flex: 0 0 auto;
+      align-items: flex-end;
+      justify-content: flex-end;
+      gap: 0;
+      margin-top: 0;
+      width: auto;
+      max-width: none;
     }
 
     .sporedna-navigacija {
-      gap: 8px 16px;
+      gap: 8px 18px;
       margin: 0;
-      max-width: 520px;
+      width: auto;
+      max-width: none;
+      grid-template-columns: repeat(3, auto);
+      justify-content: end;
     }
 
     .sporedni-precac {
       gap: 8px;
-      padding: 8px 6px;
+      padding: 4px 6px;
       font-size: 18px;
     }
 
@@ -1007,8 +1056,12 @@
     }
 
     .sporedni-precac img {
-      width: 40px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
+    }
+
+    .sporedni-precac__ikona--s-badgeom {
+      padding: 6px 16px 2px 6px;
     }
   }
 
