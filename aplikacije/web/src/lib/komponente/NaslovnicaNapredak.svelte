@@ -30,77 +30,32 @@
       imaZavrseneIzazove: izazoviZavrseno > 0,
     }),
   );
+  const linkNaProfil = $derived(stanjeProfila.status === 'spreman' && !jeGostProfil);
 </script>
 
 <div
   class="naslovnica-napredak-omotac"
   class:naslovnica-napredak-omotac--gost={prikaziGostCta}
 >
-  <a
-    href="/profil"
-    class="naslovnica-napredak"
-    data-testid="naslovnica-napredak"
-    aria-label={ariaProfil}
-    onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
-  >
-    {#if prikaziAvatar && profil}
-      <span class="naslovnica-napredak__avatar" aria-hidden="true">
-        <Avatar
-          avatarId={profil.avatarId}
-          avatarConfig={profil.avatarConfig}
-          rang={profil.rang}
-          gost={profil.vrsta === 'gost'}
-          velicina={56}
-        />
-      </span>
-    {:else}
-      <span class="naslovnica-napredak__avatar naslovnica-napredak__avatar--rezerva" aria-hidden="true"
-      ></span>
-    {/if}
-
-    <span class="naslovnica-napredak__sadrzaj">
-      {#if prikaz.vrsta === 'napredak'}
-        <span class="naslovnica-napredak__red">
-          <span class="naslovnica-napredak__nadimak">{nadimak}</span>
-          <span class="naslovnica-napredak__lvl">LVL {prikaz.razina}</span>
-        </span>
-        <span class="naslovnica-napredak__rang">{prikaz.rang}</span>
-        {#if prikaz.maksimalna}
-          <span class="naslovnica-napredak__xp">Maksimalna razina</span>
-          <span
-            class="naslovnica-napredak__traka"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={100}
-            aria-label="Maksimalna razina"
-          >
-            <span style="width: 100%"></span>
-          </span>
-        {:else if prikaz.doIduceTekst !== null && prikaz.postotak !== null}
-          <span
-            class="naslovnica-napredak__traka"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(prikaz.postotak)}
-            aria-label={`Napredak do sljedeće razine: ${prikaz.uRaziniTekst} od ${prikaz.doIduceTekst} XP`}
-          >
-            <span style={`width: ${prikaz.postotak}%`}></span>
-          </span>
-          <span class="naslovnica-napredak__xp"
-            >{prikaz.uRaziniTekst} / {prikaz.doIduceTekst} XP</span
-          >
-        {/if}
-      {:else}
-        <span class="naslovnica-napredak__nadimak naslovnica-napredak__nadimak--neutralan"
-          >{prikaz.natpis}</span
-        >
-        <span class="naslovnica-napredak__traka naslovnica-napredak__traka--prazna" aria-hidden="true"
-        ></span>
-      {/if}
-    </span>
-  </a>
+  {#if linkNaProfil}
+    <a
+      href="/profil"
+      class="naslovnica-napredak"
+      data-testid="naslovnica-napredak"
+      aria-label={ariaProfil}
+      onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
+    >
+      {@render sadrzajNapretka()}
+    </a>
+  {:else}
+    <div
+      class="naslovnica-napredak naslovnica-napredak--staticki"
+      data-testid="naslovnica-napredak"
+      aria-label={ariaProfil}
+    >
+      {@render sadrzajNapretka()}
+    </div>
+  {/if}
 
   {#if prikaziGostCta}
     <div class="naslovnica-gost-cta" data-testid="naslovnica-gost-cta">
@@ -125,6 +80,66 @@
   {/if}
 </div>
 
+{#snippet sadrzajNapretka()}
+  {#if prikaziAvatar && profil}
+    <span class="naslovnica-napredak__avatar" aria-hidden="true">
+      <Avatar
+        avatarId={profil.avatarId}
+        avatarConfig={profil.avatarConfig}
+        rang={profil.rang}
+        gost={profil.vrsta === 'gost'}
+        velicina={52}
+      />
+    </span>
+  {:else}
+    <span class="naslovnica-napredak__avatar naslovnica-napredak__avatar--rezerva" aria-hidden="true"
+    ></span>
+  {/if}
+
+  <span class="naslovnica-napredak__sadrzaj">
+    {#if prikaz.vrsta === 'napredak'}
+      <span class="naslovnica-napredak__red">
+        <span class="naslovnica-napredak__nadimak">{nadimak}</span>
+        <span class="naslovnica-napredak__lvl">LVL {prikaz.razina}</span>
+      </span>
+      <span class="naslovnica-napredak__rang">{prikaz.rang}</span>
+      {#if prikaz.maksimalna}
+        <span
+          class="naslovnica-napredak__traka"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={100}
+          aria-label="Maksimalna razina"
+        >
+          <span style="width: 100%"></span>
+        </span>
+        <span class="naslovnica-napredak__xp">Maksimalna razina</span>
+      {:else if prikaz.doIduceTekst !== null && prikaz.postotak !== null}
+        <span
+          class="naslovnica-napredak__traka"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(prikaz.postotak)}
+          aria-label={`Napredak do sljedeće razine: ${prikaz.uRaziniTekst} od ${prikaz.doIduceTekst} XP`}
+        >
+          <span style={`width: ${prikaz.postotak}%`}></span>
+        </span>
+        <span class="naslovnica-napredak__xp"
+          >{prikaz.uRaziniTekst} / {prikaz.doIduceTekst} XP</span
+        >
+      {/if}
+    {:else}
+      <span class="naslovnica-napredak__nadimak naslovnica-napredak__nadimak--neutralan"
+        >{prikaz.natpis}</span
+      >
+      <span class="naslovnica-napredak__traka naslovnica-napredak__traka--prazna" aria-hidden="true"
+      ></span>
+    {/if}
+  </span>
+{/snippet}
+
 <style>
   .naslovnica-napredak-omotac {
     display: flex;
@@ -132,9 +147,13 @@
     align-items: stretch;
     gap: 8px;
     width: 100%;
-    max-width: min(100%, 420px);
+    max-width: min(100%, 380px);
     margin: 0 auto;
-    min-height: 92px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--boja-plocica) 55%, transparent);
+    border: 1px solid color-mix(in srgb, var(--boja-plocica-obrub) 70%, transparent);
+    min-height: 0;
   }
 
   .naslovnica-napredak-omotac--gost {
@@ -142,7 +161,7 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 10px 20px;
+    gap: 10px 16px;
     max-width: min(100%, 560px);
   }
 
@@ -153,10 +172,14 @@
     gap: 12px;
     width: 100%;
     min-width: 0;
-    padding: 4px 2px;
+    padding: 0;
     color: var(--boja-tekst-sekundarni);
     text-decoration: none;
     text-align: left;
+  }
+
+  .naslovnica-napredak--staticki {
+    cursor: default;
   }
 
   .naslovnica-napredak-omotac--gost .naslovnica-napredak {
@@ -165,11 +188,11 @@
     min-width: 0;
   }
 
-  .naslovnica-napredak:hover {
+  a.naslovnica-napredak:hover {
     color: var(--boja-akcent-tekst);
   }
 
-  .naslovnica-napredak:focus-visible {
+  a.naslovnica-napredak:focus-visible {
     outline: 3px solid var(--boja-fokus);
     outline-offset: 3px;
     border-radius: 8px;
@@ -178,8 +201,8 @@
   .naslovnica-napredak__avatar {
     flex: 0 0 auto;
     display: inline-flex;
-    width: 52px;
-    height: 52px;
+    width: 48px;
+    height: 48px;
   }
 
   .naslovnica-napredak__avatar--rezerva {
@@ -188,8 +211,8 @@
   }
 
   .naslovnica-napredak__avatar :global(.avatar) {
-    width: 52px !important;
-    height: 52px !important;
+    width: 48px !important;
+    height: 48px !important;
   }
 
   .naslovnica-napredak__sadrzaj {
@@ -202,33 +225,39 @@
 
   .naslovnica-napredak__red {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: baseline;
     justify-content: flex-start;
-    gap: 4px 10px;
+    gap: 8px;
     min-width: 0;
   }
 
   .naslovnica-napredak__nadimak {
     margin: 0;
     min-width: 0;
+    flex: 1 1 auto;
     color: var(--boja-tekst-osnovni);
     font-family: var(--font-naslov);
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.2;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .naslovnica-napredak__nadimak--neutralan {
     color: var(--boja-tekst-sekundarni);
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
   }
 
   .naslovnica-napredak__lvl {
     flex: 0 0 auto;
     color: var(--boja-zuta-krema);
     font-family: var(--font-naslov);
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 700;
     line-height: 1.2;
   }
@@ -237,7 +266,7 @@
     margin: 0;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
     line-height: 1.2;
   }
@@ -246,7 +275,7 @@
     display: block;
     width: 100%;
     min-width: 0;
-    height: 9px;
+    height: 8px;
     overflow: hidden;
     border-radius: var(--radijus-pill);
     background: color-mix(in srgb, var(--boja-tekst-sekundarni) 28%, transparent);
@@ -265,9 +294,11 @@
 
   .naslovnica-napredak__xp {
     margin: 0;
+    align-self: flex-end;
     font-family: var(--font-tijelo);
-    font-size: 16px;
+    font-size: 12px;
     line-height: 1.2;
+    text-align: right;
   }
 
   .naslovnica-gost-cta {
@@ -355,11 +386,11 @@
 
   @media (min-width: 1000px) {
     .naslovnica-napredak-omotac {
-      align-items: center;
-      width: auto;
-      max-width: min(100%, 420px);
+      align-items: stretch;
+      width: 360px;
+      max-width: min(100%, 380px);
       margin: 0;
-      min-height: 88px;
+      padding: 14px 16px;
     }
 
     .naslovnica-napredak-omotac--gost {
@@ -372,9 +403,9 @@
     }
 
     .naslovnica-napredak {
-      width: auto;
+      width: 100%;
       max-width: none;
-      justify-content: center;
+      justify-content: flex-start;
     }
 
     .naslovnica-napredak-omotac--gost .naslovnica-napredak {
@@ -384,28 +415,37 @@
     }
 
     .naslovnica-napredak__nadimak {
-      font-size: 20px;
+      font-size: 17px;
     }
 
-    .naslovnica-napredak__lvl,
-    .naslovnica-napredak__rang,
+    .naslovnica-napredak__lvl {
+      font-size: 13px;
+    }
+
+    .naslovnica-napredak__rang {
+      font-size: 14px;
+    }
+
     .naslovnica-napredak__xp {
-      font-size: 18px;
+      font-size: 12px;
     }
 
     .naslovnica-napredak__sadrzaj {
-      min-width: 180px;
+      min-width: 0;
+      width: 100%;
     }
 
     .naslovnica-napredak__traka {
-      min-width: 180px;
+      min-width: 0;
+      width: 100%;
       max-width: 280px;
+      height: 9px;
     }
 
     .naslovnica-napredak__avatar,
     .naslovnica-napredak__avatar :global(.avatar) {
-      width: 58px !important;
-      height: 58px !important;
+      width: 52px !important;
+      height: 52px !important;
     }
 
     .naslovnica-gost-cta {
@@ -415,23 +455,24 @@
 
   @media (max-width: 999px) {
     .naslovnica-napredak-omotac:not(.naslovnica-napredak-omotac--gost) {
-      width: min(100%, 360px);
+      width: 100%;
+      max-width: 100%;
     }
 
     .naslovnica-napredak-omotac--gost {
       flex-direction: column;
       flex-wrap: nowrap;
-      align-items: center;
+      align-items: stretch;
       justify-content: flex-start;
       width: 100%;
-      max-width: min(100%, 420px);
+      max-width: 100%;
       gap: 10px;
     }
 
     .naslovnica-napredak-omotac--gost .naslovnica-napredak {
       flex: 0 1 auto;
       width: 100%;
-      justify-content: center;
+      justify-content: flex-start;
     }
 
     .naslovnica-gost-cta {
@@ -447,12 +488,6 @@
 
     .naslovnica-gost-prijava {
       text-align: center;
-    }
-
-    .naslovnica-napredak__avatar,
-    .naslovnica-napredak__avatar :global(.avatar) {
-      width: 52px !important;
-      height: 52px !important;
     }
   }
 

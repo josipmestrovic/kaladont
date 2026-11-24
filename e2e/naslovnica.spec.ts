@@ -83,10 +83,10 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toBeVisible();
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText('Troboj');
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
-    'Igraj online* u troje.',
+    'Igraj online u troje.',
   );
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
-    '*Ako nema igrača, pridruže se botovi.',
+    'Ako nema igrača, pridružit će se botovi.',
   );
   await expect(navigacija.getByRole('link', { name: 'Izazovi', exact: true })).toHaveAttribute(
     'href',
@@ -107,13 +107,19 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   const sporedna = page.getByRole('navigation', { name: 'Napredak i pomoć' });
   await expect(sporedna.getByTestId('naslovnica-misije')).toHaveAttribute('href', '/misije');
   await expect(sporedna.getByTestId('naslovnica-kolekcija')).toHaveAttribute('href', '/profil#rijeci');
-  await expect(sporedna.getByTestId('naslovnica-kolekcija-labela')).toContainText(/^razina:/);
+  await expect(sporedna.getByTestId('naslovnica-kolekcija-labela')).toContainText(/riječ/, {
+    timeout: 20_000,
+  });
+  await expect(sporedna.getByTestId('naslovnica-misije-labela')).toContainText(/aktivn/, {
+    timeout: 20_000,
+  });
   await expect(sporedna.getByTestId('naslovnica-dostignuca')).toHaveAttribute(
     'href',
     '/profil#dostignuca',
   );
   await expect(sporedna.getByTestId('naslovnica-dostignuca-labela')).toContainText(/zvjezdica/);
   await expect(sporedna.getByTestId('naslovnica-pravila')).toHaveCount(0);
+  await expect(sporedna.getByTestId('naslovnica-kolekcija-badge')).toHaveCount(0);
 
   const izbornik = await otvoriProfilIzbornik(page);
   await expect(izbornik.getByRole('menuitem', { name: 'Moj profil' })).toHaveAttribute('href', '/profil');
@@ -137,12 +143,12 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(page.getByTestId('red-oznaka-izbora')).toHaveText('Brza igra · Troboj · Klasična pravila');
 });
 
-test('naslovnica prikazuje XP sažetak i default opis izazova bez trake', async ({ page }) => {
+test('naslovnica prikazuje XP sažetak i gostujući CTA bez linka na profil', async ({ page }) => {
   await page.goto('/');
   const napredak = page.getByTestId('naslovnica-napredak');
   await expect(napredak).toBeVisible({ timeout: 20_000 });
   await expect(napredak).toContainText(/LVL|Moj napredak/);
-  await expect(napredak).toHaveAttribute('href', '/profil');
+  await expect(napredak).not.toHaveAttribute('href');
 
   const gostCta = page.getByTestId('naslovnica-gost-registracija');
   await expect(gostCta).toBeVisible({ timeout: 20_000 });
@@ -163,7 +169,13 @@ test('naslovnica prikazuje XP sažetak i default opis izazova bez trake', async 
 
   const izazovi = page.getByTestId('naslovnica-izazovi');
   await expect(izazovi).toContainText(/Svladavaj \d+ sve težih izazova/);
-  await expect(izazovi.locator('.izazovi-napredak')).toHaveCount(0);
+  // Katalog s 0 završenih prikazuje 0% traku; bez kataloga ostaje samo opis.
+  const traka = izazovi.locator('.izazovi-napredak');
+  if ((await traka.count()) > 0) {
+    await expect(traka.locator('.izazovi-napredak__broj')).toContainText(
+      /0 \/ \d+ završenih izazova/,
+    );
+  }
 });
 
 test('naslovnica prikazuje brze postavke gostu', async ({ page }) => {
@@ -301,7 +313,7 @@ for (const { sirina, visina } of [
           footer: okvir('.landing-footer'),
           susjedi: {
             navigacija: okvir('.glavna-navigacija'),
-            kontrolePristupacnosti: okvir('.kontrole-pristupacnosti-naslovnica'),
+            kontrolePristupacnosti: okvir('[data-testid="naslovnica-brze-postavke"]'),
             ilustracija: okvir('.scena-2d5d'),
           },
           sirinaSadrzaja: document.documentElement.scrollWidth,

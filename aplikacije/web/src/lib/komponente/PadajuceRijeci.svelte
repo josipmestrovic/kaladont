@@ -4,8 +4,8 @@
 
   /** Širina središnjeg sadržaja naslovnice — usklađena s --sirina-grida. */
   const SIRINA_SREDISTA = 980;
-  /** Minimalna širina bočne zone da animacija ima smisla. */
-  const MIN_ZONA = 110;
+  /** Minimalna širina bočne zone da animacija ima smisla (uz 28px sigurnosni umetak). */
+  const MIN_ZONA = 140;
 
   let pauzirano = $state(false);
   let uskaZona = $state(false);
@@ -15,7 +15,7 @@
     const sirina = window.innerWidth;
     const zona = (sirina - SIRINA_SREDISTA) / 2;
     dovoljnoProstora = zona >= MIN_ZONA;
-    uskaZona = zona < 180;
+    uskaZona = zona < 200;
   }
 
   onMount(() => {
