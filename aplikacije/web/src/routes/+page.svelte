@@ -758,17 +758,17 @@
 
   .sporedni-precac__badge {
     position: absolute;
-    top: -6px;
-    right: -10px;
+    top: -8px;
+    right: -12px;
     min-width: 22px;
-    padding: 1px 5px;
+    padding: 1px 6px;
     border-radius: 999px;
     background: var(--boja-crvena);
     color: #fff;
     font-family: var(--font-tijelo);
-    font-size: 11px;
+    font-size: 14px;
     font-weight: 800;
-    line-height: 1.3;
+    line-height: 1.25;
     text-align: center;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--boja-pozadina) 80%, transparent);
   }
@@ -900,8 +900,10 @@
       font-size: 16px;
     }
 
-    .sporedni-precac__nadlabel {
+    .sporedni-precac__badge {
       font-size: 16px;
+      min-width: 24px;
+      padding: 1px 7px;
     }
 
     .sporedni-precac img {
