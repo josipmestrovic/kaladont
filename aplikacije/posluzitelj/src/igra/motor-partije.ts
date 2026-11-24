@@ -1638,6 +1638,7 @@ export function stvoriUpraviteljPartija(
                 nacinIspadanja: 'pobjednik',
                 prihvaceneRijeci: statistika?.prihvaceniPotezi ?? 0,
                 najduziNiz: statistika?.najduziStreak ?? 0,
+                iskustvoPrijePartije: stanje.iskustvoPrije.get(pobjednikId) ?? 0,
               });
             } catch (greska) {
               aktivneVeze.dohvatiSocket(pobjednikId)?.emit('greska', {

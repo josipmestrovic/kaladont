@@ -55,7 +55,8 @@ async function ucitajIliNullIshod(
 
 /**
  * Obračun misija za jednog igrača unutar postojeće TX (nakon partijskog XP-a).
- * `iskustvoNakonPartije` = zaključano DB stanje nakon partijskog dijela (trening: isto kao prije).
+ * `iskustvoNakonPartije` = zaključano DB stanje nakon partijskog dijela (uklj. word XP).
+ * `iskustvoPrijePartije` = XP na početku partije (trening mora proslijediti eksplicitno nakon word XP-a).
  */
 export async function obracunajMisijeZaIgraca(
   tx: MisijeTx,
