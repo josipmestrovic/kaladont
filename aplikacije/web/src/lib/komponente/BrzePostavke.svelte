@@ -77,23 +77,30 @@
   .brze-postavke {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
     gap: 8px 12px;
     width: 100%;
     margin-inline: auto;
     min-width: 0;
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
   }
 
   .brze-postavke :global(.prekidac-postavke) {
     min-width: 0;
     width: 100%;
+    max-width: 100%;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
+    align-self: start;
     gap: 8px;
-    min-height: 0;
+    min-height: 44px;
+    height: auto;
     padding: 8px 4px 10px;
     border: 0;
-    border-radius: 0;
+    border-radius: 10px;
     background: transparent;
   }
 

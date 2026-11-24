@@ -49,6 +49,9 @@
     background: color-mix(in srgb, var(--boja-povrsina) 55%, transparent);
     color: var(--boja-tekst-osnovni);
     cursor: pointer;
+    /* Sprečava da apsolutni input „pobjegne” izvan labele i lovi tuđe klikove. */
+    overflow: hidden;
+    isolation: isolate;
   }
 
   .prekidac-postavke.ukljuceno {
@@ -68,14 +71,18 @@
     flex: 1 1 auto;
   }
 
+  /*
+   * Nevidljivi, ali i dalje u labeli — native <label> hvata klik po cijeloj
+   * kontroli. Bez width/height: 100% koji u nekim layoutima rastegnuli hit-box
+   * izvan labele (npr. aktivacija „Font za disleksiju” tuđim klikom).
+   */
   input {
     position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
     margin: 0;
     opacity: 0;
     cursor: pointer;
+    z-index: 1;
   }
 
   .prekidac {
