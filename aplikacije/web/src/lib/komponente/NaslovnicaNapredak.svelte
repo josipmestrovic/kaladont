@@ -365,8 +365,10 @@
     .naslovnica-napredak-omotac--gost {
       flex-wrap: nowrap;
       align-items: center;
+      justify-content: flex-start;
+      width: max-content;
       max-width: min(100%, 560px);
-      gap: 16px 32px;
+      gap: 16px 24px;
     }
 
     .naslovnica-napredak {

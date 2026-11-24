@@ -952,27 +952,23 @@
     }
 
     .profil-red {
-      display: flex;
-      flex-direction: row;
-      flex-wrap: nowrap;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      justify-content: space-between;
       gap: 16px 20px;
     }
 
     .profil-red :global(.naslovnica-napredak-omotac) {
-      flex: 1 1 auto;
-      min-width: 0;
+      justify-self: center;
+      width: max-content;
       max-width: 100%;
+      min-width: 0;
       margin: 0;
-      align-items: center;
     }
 
     .profil-red .sporedni-red {
-      flex: 0 1 auto;
-      min-width: 0;
-      max-width: min(100%, 420px);
       justify-self: end;
+      min-width: 0;
     }
 
     .brze-postavke-blok {
