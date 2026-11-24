@@ -106,6 +106,12 @@
     border-color: transparent;
   }
 
+  .brze-postavke :global(.prekidac-postavke:focus-within) {
+    outline: 3px solid var(--boja-fokus);
+    outline-offset: 3px;
+    border-radius: 10px;
+  }
+
   .brze-postavke :global(.prekidac-postavke__sadrzaj) {
     flex: 0 0 auto;
     flex-direction: column;

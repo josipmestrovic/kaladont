@@ -726,15 +726,18 @@
 
     .glavna-navigacija {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: stretch;
     }
 
     .navigacijska-stavka {
       min-height: 92px;
+      height: 100%;
       box-sizing: border-box;
     }
 
     .navigacijska-stavka.primarna {
       grid-column: 1 / -1;
+      height: auto;
     }
 
     .sporedni-red {

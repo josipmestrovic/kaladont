@@ -287,5 +287,22 @@
       width: 50px !important;
       height: 50px !important;
     }
+
+    .naslovnica-gost-registracija {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px 8px;
+      padding: 8px 12px;
+    }
+  }
+
+  :global(html[data-font-disleksiju]) .naslovnica-napredak__nadimak {
+    font-size: clamp(15px, 2.2dvh, 17px);
+    line-height: 1.3;
+  }
+
+  :global(html[data-tema='svijetla']) .naslovnica-napredak__lvl {
+    color: color-mix(in srgb, var(--boja-akcent-tekst) 90%, #8a6a00);
   }
 </style>
