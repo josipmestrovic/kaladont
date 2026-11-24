@@ -19,6 +19,7 @@ export type UmamiDogadjaj =
   | 'naslovnica-ljestvice-klik'
   | 'naslovnica-misije-klik'
   | 'naslovnica-kolekcija-klik'
+  | 'naslovnica-dostignuca-klik'
   | 'naslovnica-profil-klik'
   | 'naslovnica-registracija-klik'
   | 'naslovnica-prijava-klik'

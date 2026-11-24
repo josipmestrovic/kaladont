@@ -595,7 +595,7 @@ export async function registrirajProfilRute(
     },
   );
 
-  app.get('/dostignuca', { preHandler: zahtijevajPrijavu }, async (zahtjev) => {
+  app.get('/dostignuca', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev) => {
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
     return { ok: true, ...(await dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno)) };
   });

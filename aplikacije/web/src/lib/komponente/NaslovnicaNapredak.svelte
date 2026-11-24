@@ -406,8 +406,34 @@
     }
 
     .naslovnica-napredak-omotac--gost {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: flex-start;
       width: 100%;
       max-width: min(100%, 420px);
+      gap: 10px;
+    }
+
+    .naslovnica-napredak-omotac--gost .naslovnica-napredak {
+      flex: 0 1 auto;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .naslovnica-gost-cta {
+      align-items: center;
+      width: 100%;
+      text-align: center;
+    }
+
+    .naslovnica-gost-registracija {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .naslovnica-gost-prijava {
+      text-align: center;
     }
 
     .naslovnica-napredak__avatar,

@@ -17,6 +17,13 @@
   import NaslovnicaNapredak from '$lib/komponente/NaslovnicaNapredak.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
+    ariaBadgaDostignuca,
+    labelaZvjezdicaDostignuca,
+    MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+    normalizirajZvjezdiceDostignuca,
+    type PrikazZvjezdicaDostignuca,
+  } from '$lib/naslovnica-dostignuca.js';
+  import {
     ariaBadgaMisija,
     natpisBadgaMisija,
   } from '$lib/naslovnica-misije.js';
@@ -46,7 +53,12 @@
   });
   let izazoviGeneracija = 0;
   let kolekcijaGeneracija = 0;
+  let dostignucaGeneracija = 0;
   let brojRijeciKolekcije = $state<number | null>(null);
+  let dostignucaZvjezdice = $state<PrikazZvjezdicaDostignuca>({
+    ukupno: 0,
+    maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+  });
   const kolekcijaBadge = $derived(
     brojRijeciKolekcije !== null && brojRijeciKolekcije > 0 ? String(brojRijeciKolekcije) : null,
   );
@@ -57,6 +69,8 @@
         : `${brojRijeciKolekcije} riječi u kolekciji`
       : null,
   );
+  const dostignucaLabela = $derived(labelaZvjezdicaDostignuca(dostignucaZvjezdice));
+  const dostignucaAria = $derived(ariaBadgaDostignuca(dostignucaZvjezdice));
   const jeGost = $derived(
     stanjeProfila.status === 'spreman' && stanjeProfila.profil?.vrsta === 'gost',
   );
@@ -103,25 +117,48 @@
     }
   }
 
+  async function osvjeziDostignucaZvjezdice() {
+    const generacija = ++dostignucaGeneracija;
+    try {
+      const odgovor = await api<{ ukupnoZvjezdica?: number; maksimalnoZvjezdica?: number }>(
+        '/dostignuca',
+      );
+      if (generacija !== dostignucaGeneracija) return;
+      dostignucaZvjezdice = normalizirajZvjezdiceDostignuca(odgovor);
+    } catch {
+      if (generacija !== dostignucaGeneracija) return;
+      dostignucaZvjezdice = {
+        ukupno: 0,
+        maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+      };
+    }
+  }
+
   function osvjeziNaslovnicu() {
     void osigurajProfil({ forsaj: true }).then(() => {
       if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
         void osvjeziIzazove();
         void osigurajStanjeMisija({ forsaj: true });
         void osvjeziBrojRijeciKolekcije();
+        void osvjeziDostignucaZvjezdice();
       }
     });
   }
 
   onMount(() => {
-    // ?igraj=1 → izravno Brza igra (bez modala).
+    // ?igraj=1 → izravno Troboj / Brza igra (bez modala).
     if ($page.url.searchParams.get('igraj') === '1') idiUBrzuIgru({ izQueryja: true });
 
     const naIdentitet = () => {
       izazoviGeneracija += 1;
       kolekcijaGeneracija += 1;
+      dostignucaGeneracija += 1;
       izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
       brojRijeciKolekcije = null;
+      dostignucaZvjezdice = {
+        ukupno: 0,
+        maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+      };
       invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
@@ -137,11 +174,12 @@
     };
     document.addEventListener('visibilitychange', naVidljivost);
 
-    // Dijeli in-flight s Headerom; zatim GET /izazovi, /misije i sažetak kolekcije.
+    // Dijeli in-flight s Headerom; zatim GET /izazovi, /misije, kolekcija i dostignuća.
     void osigurajProfil().then(() => {
       void osvjeziIzazove();
       void osigurajStanjeMisija();
       void osvjeziBrojRijeciKolekcije();
+      void osvjeziDostignucaZvjezdice();
     });
 
     return () => {
@@ -149,6 +187,7 @@
       document.removeEventListener('visibilitychange', naVidljivost);
       izazoviGeneracija += 1;
       kolekcijaGeneracija += 1;
+      dostignucaGeneracija += 1;
     };
   });
 </script>
@@ -186,7 +225,7 @@
               height="72"
             />
             <span class="stavka-tekst">
-              <strong id="naslov-brza-igra">Brza igra</strong>
+              <strong id="naslov-brza-igra">Troboj</strong>
               <small id="opis-brza-igra">Odigraj klasičnu partiju u troje.</small>
               <small id="napomena-brza-igra" class="stavka-napomena"
                 >Ako nema igrača, pridružit će ti se botovi.</small
@@ -330,7 +369,7 @@
             onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
           >
             <span class="sporedni-precac__ikona">
-              <img src="/ikone/61-korisnicki-profil.webp" alt="" width="40" height="40" />
+              <img src="/ikone/08-pravila.png" alt="" width="40" height="40" />
               {#if kolekcijaBadge}
                 <span
                   class="sporedni-precac__badge"
@@ -342,13 +381,19 @@
             <span>Kolekcija riječi</span>
           </a>
           <a
-            href="/pravila-kaladonta"
+            href="/profil#dostignuca"
             class="sporedni-precac"
-            data-testid="naslovnica-pravila"
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-pravila-klik')}
+            data-testid="naslovnica-dostignuca"
+            aria-label={`Dostignuća, ${dostignucaAria}`}
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-dostignuca-klik')}
           >
-            <img src="/ikone/08-pravila.png" alt="" width="40" height="40" />
-            <span>Kako igrati?</span>
+            <span class="sporedni-precac__ikona">
+              <img src="/ikone/27-zvjezdica-puna.png" alt="" width="40" height="40" />
+            </span>
+            <span class="sporedni-precac__tekst">
+              <span>Dostignuća</span>
+              <small data-testid="naslovnica-dostignuca-labela">{dostignucaLabela}</small>
+            </span>
           </a>
         </nav>
       </div>
@@ -378,10 +423,16 @@
       </span>
       <span class="copyright">© {godinaCopyright} Kaladont</span>
       <span class="podnozje-desno">
+        <a
+          href="/pravila-kaladonta"
+          data-testid="naslovnica-pravila"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-pravila-klik')}
+        >Pravila igre</a>
         {#if jeRegistriran}
-          <a href="/povratne-informacije">Povratne informacije</a>
           <span class="razdjelnik" aria-hidden="true">·</span>
+          <a href="/povratne-informacije">Povratne informacije</a>
         {/if}
+        <span class="razdjelnik" aria-hidden="true">·</span>
         <a href="/uvjeti">Uvjeti</a>
         <span class="razdjelnik" aria-hidden="true">·</span>
         <a href="/privatnost">Privatnost</a>
@@ -743,6 +794,20 @@
     line-height: 1.25;
     text-align: center;
     text-decoration: none;
+  }
+
+  .sporedni-precac__tekst {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .sporedni-precac__tekst small {
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 88%, transparent);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
   }
 
   .sporedni-precac img {
