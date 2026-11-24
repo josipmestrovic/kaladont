@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { izracunajPrikazXp, postotakXpTrake } from './naslovnica-napredak.js';
+import {
+  gostImaXp,
+  izracunajPrikazXp,
+  postotakXpTrake,
+  tekstRegistracijeGosta,
+} from './naslovnica-napredak.js';
 
 describe('postotakXpTrake', () => {
   it('računa postotak unutar 0–100', () => {
@@ -41,5 +46,36 @@ describe('izracunajPrikazXp', () => {
       'spreman',
     );
     expect(prikaz.vrsta === 'napredak' && prikaz.rang).toBe('Piskaralo');
+  });
+});
+
+describe('tekstRegistracijeGosta', () => {
+  it('prednost daje izazovima pred XP-om', () => {
+    expect(tekstRegistracijeGosta({ imaXp: true, imaZavrseneIzazove: true })).toBe(
+      'Sačuvaj napredak u izazovima.',
+    );
+  });
+
+  it('koristi XP tekst kad nema izazova', () => {
+    expect(tekstRegistracijeGosta({ imaXp: true, imaZavrseneIzazove: false })).toBe(
+      'Sačuvaj svoje iskustvo.',
+    );
+  });
+
+  it('koristi default bez napretka', () => {
+    expect(tekstRegistracijeGosta({ imaXp: false, imaZavrseneIzazove: false })).toBe(
+      'Sačuvaj svoj napredak.',
+    );
+  });
+});
+
+describe('gostImaXp', () => {
+  it('prepoznaje ukupni XP', () => {
+    expect(gostImaXp({ razina: 2, ukupno: 10, uRazini: 0, doIduce: 100 })).toBe(true);
+  });
+
+  it('vraća false bez iskustva', () => {
+    expect(gostImaXp(undefined)).toBe(false);
+    expect(gostImaXp({ razina: 1, ukupno: 0, uRazini: 0, doIduce: 100 })).toBe(false);
   });
 });

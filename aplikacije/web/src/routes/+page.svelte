@@ -108,7 +108,9 @@
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <div class="navigacijski-blok">
       <div class="profil-i-postavke">
-        <NaslovnicaNapredak />
+        <NaslovnicaNapredak
+          izazoviZavrseno={izazoviPrikaz.vrsta === 'napredak' ? izazoviPrikaz.zavrseno : 0}
+        />
         <BrzePostavke />
       </div>
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
