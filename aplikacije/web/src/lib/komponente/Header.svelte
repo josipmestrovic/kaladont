@@ -9,7 +9,7 @@
     azurirajAvatarProfila,
     invalidirajProfil,
     osigurajProfil,
-    profil,
+    stanjeProfila,
   } from '$lib/stanje-profila.svelte.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
@@ -23,6 +23,7 @@
   let omotIzbornika: HTMLDivElement | undefined = $state();
   const jeNaslovna = $derived($page.url.pathname === '/');
   const prikaziPovratakNaPocetnu = $derived(!jeNaslovna && prethodnaPutanja !== '/');
+  const profil = $derived(stanjeProfila.profil);
   const jeGost = $derived(!profil?.email);
   const prikaziAdminNav = $derived(!jeNaslovna && profil?.vrsta === 'admin');
 

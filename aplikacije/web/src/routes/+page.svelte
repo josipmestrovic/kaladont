@@ -19,7 +19,7 @@
     NASLOVNICA_SEO_TITLE,
     naslovnicaJsonLd,
   } from '$lib/seo.js';
-  import { osigurajProfil, statusProfila } from '$lib/stanje-profila.svelte.js';
+  import { osigurajProfil, stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const FOCUS_REFRESH_MS = 45_000;
@@ -55,12 +55,16 @@
 
   function osvjeziNaslovnicu() {
     void osigurajProfil({ forsaj: true }).then(() => {
-      if (statusProfila === 'spreman' || statusProfila === 'greska') void osvjeziIzazove();
+      if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
+        void osvjeziIzazove();
+      }
     });
   }
 
-  afterNavigate(({ to }) => {
-    if (to?.url.pathname === '/') osvjeziNaslovnicu();
+  afterNavigate(({ from, to }) => {
+    // Početni ulazak pokriva onMount; forsaj samo pri povratku na /.
+    if (to?.url.pathname !== '/' || !from) return;
+    osvjeziNaslovnicu();
   });
 
   onMount(() => {
@@ -84,6 +88,7 @@
     };
     document.addEventListener('visibilitychange', naVidljivost);
 
+    // Dijeli in-flight s Headerom; zatim jedan GET /izazovi.
     void osigurajProfil().then(() => void osvjeziIzazove());
 
     return () => {

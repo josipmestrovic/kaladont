@@ -1,9 +1,9 @@
 <script lang="ts">
   import { izracunajPrikazXp } from '$lib/naslovnica-napredak.js';
-  import { profil, statusProfila } from '$lib/stanje-profila.svelte.js';
+  import { stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
-  const prikaz = $derived(izracunajPrikazXp(profil, statusProfila));
+  const prikaz = $derived(izracunajPrikazXp(stanjeProfila.profil, stanjeProfila.status));
 </script>
 
 <a

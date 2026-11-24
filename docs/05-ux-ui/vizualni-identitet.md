@@ -39,6 +39,13 @@ Pravila upotrebe:
 - Motiv **tube paste**: diskretno u logotipu i praznim stanjima (npr. tuba koja istiskuje slova).
 - Stol je topla ovalna ploha (tamniji krem/mint), po uzoru na stolnjak — ne zeleni poker filc.
 
+## Naslovnica (glavni izbornik)
+
+- Jedan raspored za gosta i registriranog: žuta **Brza igra**, krem kartice Izazovi / Trening / Privatna soba / Ljestvice, zatim mali prečaci Misije · Moj profil · Kako igrati?.
+- Osobni XP sažetak (rang · LVL · traka) iznad grida; napredak izazova na kartici samo kad je broj završenih > 0.
+- Prirodni vertikalni scroll je dopušten; CTA se ne skriva na niskom viewportu. Maksimalna širina grida oko 820 px.
+- Profilni dropdown služi računu (Moj profil, Uredi avatar, Postavke, prijava/odjava) — bez Misija, Ljestvica i Pravila.
+
 ## Ton komunikacije
 
 - Prijateljski, duhovit, kratak; hrvatski bez anglizama („Ajmo!" da, „Let's go" nikad).
