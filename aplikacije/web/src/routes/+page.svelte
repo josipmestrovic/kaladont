@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { BROJ_AKTIVNIH_IZAZOVA } from 'zajednicko';
+  import { api } from '$lib/api.js';
   import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
@@ -16,12 +17,33 @@
   import NaslovnicaNapredak from '$lib/komponente/NaslovnicaNapredak.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
+    ariaBadgaDostignuca,
+    labelaZvjezdicaDostignuca,
+    MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+    normalizirajZvjezdiceDostignuca,
+    type PrikazZvjezdicaDostignuca,
+  } from '$lib/naslovnica-dostignuca.js';
+  import {
+    ariaBadgaMisija,
+    natpisBadgaMisija,
+  } from '$lib/naslovnica-misije.js';
+  import {
     NASLOVNICA_SEO_DESCRIPTION,
     NASLOVNICA_SEO_TITLE,
     naslovnicaJsonLd,
   } from '$lib/seo.js';
+  import {
+    dohvatiStanjeMisijaStore,
+    invalidirajStanjeMisija,
+    osigurajStanjeMisija,
+  } from '$lib/stanje-misija.svelte.js';
   import { osigurajProfil, stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
+
+  const misijeStore = dohvatiStanjeMisijaStore();
+  const misijeBadge = $derived(natpisBadgaMisija(misijeStore.aktivne));
+  const misijeBadgeAria = $derived(ariaBadgaMisija(misijeStore.aktivne));
+  const godinaCopyright = new Date().getFullYear();
 
   const FOCUS_REFRESH_MS = 45_000;
   let zadnjiFocusRefresh = 0;
@@ -30,6 +52,33 @@
     opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA),
   });
   let izazoviGeneracija = 0;
+  let kolekcijaGeneracija = 0;
+  let dostignucaGeneracija = 0;
+  let kolekcijaRazinaNaziv = $state('Početnik');
+  let brojRijeciKolekcije = $state<number | null>(null);
+  let dostignucaZvjezdice = $state<PrikazZvjezdicaDostignuca>({
+    ukupno: 0,
+    maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+  });
+  const kolekcijaLabela = $derived(`razina: ${kolekcijaRazinaNaziv}`);
+  const kolekcijaBadge = $derived(
+    brojRijeciKolekcije !== null && brojRijeciKolekcije > 0 ? String(brojRijeciKolekcije) : null,
+  );
+  const kolekcijaAria = $derived(
+    kolekcijaBadge
+      ? `Kolekcija riječi, ${kolekcijaLabela}, ${brojRijeciKolekcije === 1 ? '1 riječ' : `${brojRijeciKolekcije} riječi`}`
+      : `Kolekcija riječi, ${kolekcijaLabela}`,
+  );
+  const dostignucaLabela = $derived(labelaZvjezdicaDostignuca(dostignucaZvjezdice));
+  const dostignucaAria = $derived(ariaBadgaDostignuca(dostignucaZvjezdice));
+  const jeGost = $derived(
+    stanjeProfila.status === 'spreman' && stanjeProfila.profil?.vrsta === 'gost',
+  );
+  const jeRegistriran = $derived(
+    stanjeProfila.status === 'spreman' &&
+      stanjeProfila.profil !== null &&
+      stanjeProfila.profil.vrsta !== 'gost',
+  );
 
   function idiUBrzuIgru(opcije: { izQueryja?: boolean } = {}) {
     if (!opcije.izQueryja) zabiljeziUmamiDogadjaj('naslovnica-brza-igra-klik');
@@ -54,21 +103,66 @@
     }
   }
 
+  async function osvjeziKolekciju() {
+    const generacija = ++kolekcijaGeneracija;
+    try {
+      const odgovor = await api<{
+        ukupnoOtkljucano?: number;
+        kolekcionarskaRazina?: { naziv?: string };
+      }>('/profil/kolekcija');
+      if (generacija !== kolekcijaGeneracija) return;
+      const naziv = odgovor.kolekcionarskaRazina?.naziv?.trim();
+      kolekcijaRazinaNaziv = naziv && naziv.length > 0 ? naziv : 'Početnik';
+      const broj = odgovor.ukupnoOtkljucano;
+      brojRijeciKolekcije =
+        typeof broj === 'number' && Number.isFinite(broj) && broj >= 0 ? Math.floor(broj) : null;
+    } catch {
+      // Zadrži zadnji uspješan sažetak; ne piši Početnik/0 preko stvarnog napretka.
+      if (generacija !== kolekcijaGeneracija) return;
+    }
+  }
+
+  async function osvjeziDostignucaZvjezdice() {
+    const generacija = ++dostignucaGeneracija;
+    try {
+      const odgovor = await api<{ ukupnoZvjezdica?: number; maksimalnoZvjezdica?: number }>(
+        '/dostignuca',
+      );
+      if (generacija !== dostignucaGeneracija) return;
+      dostignucaZvjezdice = normalizirajZvjezdiceDostignuca(odgovor);
+    } catch {
+      // Zadrži zadnji uspješan sažetak; ne piši 0 zvjezdica preko stvarnog napretka.
+      if (generacija !== dostignucaGeneracija) return;
+    }
+  }
+
   function osvjeziNaslovnicu() {
     void osigurajProfil({ forsaj: true }).then(() => {
       if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
         void osvjeziIzazove();
+        void osigurajStanjeMisija({ forsaj: true });
+        void osvjeziKolekciju();
+        void osvjeziDostignucaZvjezdice();
       }
     });
   }
 
   onMount(() => {
-    // ?igraj=1 → izravno Brza igra (bez modala).
+    // ?igraj=1 → izravno Troboj / Brza igra (bez modala).
     if ($page.url.searchParams.get('igraj') === '1') idiUBrzuIgru({ izQueryja: true });
 
     const naIdentitet = () => {
       izazoviGeneracija += 1;
+      kolekcijaGeneracija += 1;
+      dostignucaGeneracija += 1;
       izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
+      kolekcijaRazinaNaziv = 'Početnik';
+      brojRijeciKolekcije = null;
+      dostignucaZvjezdice = {
+        ukupno: 0,
+        maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+      };
+      invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
@@ -83,13 +177,20 @@
     };
     document.addEventListener('visibilitychange', naVidljivost);
 
-    // Dijeli in-flight s Headerom; zatim jedan GET /izazovi.
-    void osigurajProfil().then(() => void osvjeziIzazove());
+    // Dijeli in-flight s Headerom; zatim GET /izazovi, /misije, kolekcija i dostignuća.
+    void osigurajProfil().then(() => {
+      void osvjeziIzazove();
+      void osigurajStanjeMisija();
+      void osvjeziKolekciju();
+      void osvjeziDostignucaZvjezdice();
+    });
 
     return () => {
       window.removeEventListener('kaladont:identitet-promijenjen', naIdentitet);
       document.removeEventListener('visibilitychange', naVidljivost);
       izazoviGeneracija += 1;
+      kolekcijaGeneracija += 1;
+      dostignucaGeneracija += 1;
     };
   });
 </script>
@@ -102,34 +203,111 @@
 />
 
 <main class="landing">
-  <div class="landing-prostor landing-prostor--gore" aria-hidden="true"></div>
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <div class="navigacijski-blok">
-      <NaslovnicaNapredak />
+      <div class="profil-red">
+        <NaslovnicaNapredak
+          izazoviZavrseno={izazoviPrikaz.vrsta === 'napredak' ? izazoviPrikaz.zavrseno : 0}
+        />
+        <div class="sporedni-red">
+          <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
+            <a
+              href="/misije"
+              class="sporedni-precac"
+              data-testid="naslovnica-misije"
+              aria-label={misijeBadge ? `Misije, ${misijeBadgeAria}` : 'Misije'}
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
+            >
+              <span class="sporedni-precac__ikona sporedni-precac__ikona--s-badgeom">
+                <img src="/ikone/62-misije.webp" alt="" width="48" height="48" />
+                {#if misijeBadge}
+                  <span class="sporedni-precac__badge" data-testid="naslovnica-misije-badge" aria-hidden="true"
+                    >{misijeBadge}</span
+                  >
+                {/if}
+              </span>
+              <span>Misije</span>
+            </a>
+            <a
+              href="/profil#rijeci"
+              class="sporedni-precac"
+              data-testid="naslovnica-kolekcija"
+              aria-label={kolekcijaAria}
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
+            >
+              <span class="sporedni-precac__ikona sporedni-precac__ikona--s-badgeom">
+                <img src="/ikone/08-pravila.png" alt="" width="48" height="48" />
+                {#if kolekcijaBadge}
+                  <span
+                    class="sporedni-precac__badge"
+                    data-testid="naslovnica-kolekcija-badge"
+                    aria-hidden="true">{kolekcijaBadge}</span
+                  >
+                {/if}
+              </span>
+              <span class="sporedni-precac__tekst">
+                <span>Kolekcija riječi</span>
+                <small data-testid="naslovnica-kolekcija-labela">{kolekcijaLabela}</small>
+              </span>
+            </a>
+            <a
+              href="/profil#dostignuca"
+              class="sporedni-precac"
+              data-testid="naslovnica-dostignuca"
+              aria-label={`Dostignuća, ${dostignucaAria}`}
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-dostignuca-klik')}
+            >
+              <span class="sporedni-precac__ikona">
+                <img src="/ikone/27-zvjezdica-puna.png" alt="" width="48" height="48" />
+              </span>
+              <span class="sporedni-precac__tekst">
+                <span>Dostignuća</span>
+                <small data-testid="naslovnica-dostignuca-labela">{dostignucaLabela}</small>
+              </span>
+            </a>
+          </nav>
+        </div>
+      </div>
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
         <button
           type="button"
           class="navigacijska-stavka primarna"
           aria-labelledby="naslov-brza-igra"
-          aria-describedby="opis-brza-igra napomena-brza-igra"
+          aria-describedby="opis-brza-igra napomena-brza-igra{jeGost ? ' gost-napomena-brza-igra' : ''}"
           data-testid="naslovnica-brza-igra"
           onclick={() => idiUBrzuIgru()}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona stavka-ikona--primarna" src="/ikone/07-igraj.png" alt="" width="48" height="48" />
+            <img
+              class="stavka-ikona stavka-ikona--primarna"
+              src="/ikone/07-igraj.png"
+              alt=""
+              width="72"
+              height="72"
+            />
             <span class="stavka-tekst">
-              <strong id="naslov-brza-igra">Brza igra</strong>
-              <small id="opis-brza-igra">Odigraj klasičnu partiju u troje.</small>
+              <strong id="naslov-brza-igra">Troboj</strong>
+              <small id="opis-brza-igra">Igraj online* u troje.</small>
               <small id="napomena-brza-igra" class="stavka-napomena"
-                >Ako nema igrača, pridružit će ti se botovi.</small
+                >*Ako nema igrača, pridruže se botovi.</small
               >
             </span>
           </span>
-          <span class="cta" aria-hidden="true">
-            <svg class="cta-play" viewBox="0 0 12 14" width="16" height="18" aria-hidden="true">
-              <path fill="currentColor" d="M1 1.2v11.6L11 7 1 1.2Z" />
-            </svg>
-            Igraj odmah
+          <span class="primarna-akcija">
+            <span class="cta" aria-hidden="true">
+              <svg class="cta-play" viewBox="0 0 12 14" width="16" height="18" aria-hidden="true">
+                <path fill="currentColor" d="M1 1.2v11.6L11 7 1 1.2Z" />
+              </svg>
+              Igraj odmah
+            </span>
+            {#if jeGost}
+              <small
+                id="gost-napomena-brza-igra"
+                class="stavka-napomena stavka-napomena--gost"
+                data-testid="naslovnica-brza-igra-gost-napomena"
+                >Besplatno · Bez registracije</small
+              >
+            {/if}
           </span>
         </button>
 
@@ -142,7 +320,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-izazovi-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/06-trofej.png" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/06-trofej.png" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-izazovi">Izazovi</strong>
               <small id="opis-izazovi">{izazoviPrikaz.opis}</small>
@@ -177,7 +355,7 @@
           onclick={naTreningKlik}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/67-zagrijavanje-bot.webp" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/67-zagrijavanje-bot.webp" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-trening">Trening</strong>
               <small id="opis-trening">Vježbaj protiv botova po svojim pravilima.</small>
@@ -195,7 +373,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-privatna-soba-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/18-privatna-soba.png" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/18-privatna-soba.png" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-privatna">Privatna soba</strong>
               <small id="opis-privatna">Pozovi ekipu i igrajte po svojim pravilima.</small>
@@ -213,7 +391,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-ljestvice-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/09-ljestvice.png" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/09-ljestvice.png" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-ljestvice">Ljestvice</strong>
               <small id="opis-ljestvice">Usporedi se s najboljim igračima.</small>
@@ -223,82 +401,65 @@
         </a>
       </nav>
 
-      <div class="sporedni-red">
-        <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
-          <a
-            href="/misije"
-            class="sporedni-precac"
-            data-testid="naslovnica-misije"
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
-          >
-            <img src="/ikone/62-misije.webp" alt="" width="40" height="40" />
-            <span>Misije</span>
-          </a>
-          <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
-          <a
-            href="/profil"
-            class="sporedni-precac"
-            data-testid="naslovnica-profil"
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
-          >
-            <img src="/ikone/61-korisnicki-profil.webp" alt="" width="40" height="40" />
-            <span>Moj profil</span>
-          </a>
-          <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
-          <a
-            href="/pravila-kaladonta"
-            class="sporedni-precac"
-            data-testid="naslovnica-pravila"
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-pravila-klik')}
-          >
-            <img src="/ikone/08-pravila.png" alt="" width="40" height="40" />
-            <span>Kako igrati?</span>
-          </a>
-        </nav>
-
-        <hr class="brze-postavke-razdjelnik" />
+      <div class="brze-postavke-blok">
         <BrzePostavke />
-
-        {#if NAJNOVIJE_IZDANJE}
-          <p class="zadnje-azuriranje">
-            Zadnje ažuriranje:
-            <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
-            <span class="razdjelnik" aria-hidden="true">·</span>
-            <a
-              class="sto-je-novo"
-              href="/novosti"
-              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
-            >Vidi što je novo</a>
-          </p>
-        {/if}
       </div>
     </div>
   </section>
   <div class="landing-prostor landing-prostor--dolje" aria-hidden="true"></div>
 
   <footer class="landing-footer">
-    <nav aria-label="Dodatne poveznice">
-      <a href="/pravila-kaladonta">Pravila</a>
-      <a href="/povratne-informacije">Povratne informacije</a>
-      <a href="/uvjeti">Uvjeti</a>
-      <a href="/privatnost">Privatnost</a>
-    </nav>
-    <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
+    <p class="podnozje-red">
+      <span class="podnozje-lijevo">
+        {#if NAJNOVIJE_IZDANJE}
+          <span class="zadnje-azuriranje">
+            Ažurirano
+            <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
+            <span class="razdjelnik" aria-hidden="true">·</span>
+            <a
+              class="sto-je-novo"
+              href="/novosti"
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
+            >Što je novo?</a>
+          </span>
+        {/if}
+      </span>
+      <span class="copyright">© {godinaCopyright} Kaladont</span>
+      <span class="podnozje-desno">
+        <a
+          href="/pravila-kaladonta"
+          data-testid="naslovnica-pravila"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-pravila-klik')}
+        >Pravila igre</a>
+        {#if jeRegistriran}
+          <span class="razdjelnik" aria-hidden="true">·</span>
+          <a href="/povratne-informacije">Povratne informacije</a>
+        {/if}
+        <span class="razdjelnik" aria-hidden="true">·</span>
+        <a href="/uvjeti">Uvjeti</a>
+        <span class="razdjelnik" aria-hidden="true">·</span>
+        <a href="/privatnost">Privatnost</a>
+      </span>
+    </p>
   </footer>
 </main>
 
 <style>
-  /* Centriran landing; naslov (h1) je u Headeru kao logo. */
+  /* Centriran landing; naslov (h1) je u Headeru kao logo (absolute overlay). */
   .landing {
-    --landing-padding: clamp(8px, 2.2dvh, 32px);
+    /* Visina absolute headera + željeni razmak do profila (16–24 mobitel). */
+    --header-clearance: 52px;
+    --razmak-header-profil: 20px;
+    --landing-padding-dolje: clamp(8px, 2.2dvh, 32px);
     --razmak-stavki: 12px;
     --font-stavke: clamp(20px, 2.8dvh, 24px);
     --font-opisa: clamp(15px, 2.1dvh, 17px);
-    --padding-stavke: clamp(20px, 2.8dvh, 28px);
+    --padding-stavke: clamp(16px, 2.6dvh, 24px);
     --razmak-naslov-opis: 6px;
     --radijus-stavke: 18px;
-    --ikona-sporedna: 40px;
-    --ikona-primarna: 48px;
+    --ikona-sporedna: 48px;
+    --ikona-primarna: 60px;
+    --font-brza-igra: clamp(22px, 3dvh, 26px);
     --sirina-grida: 980px;
 
     position: relative;
@@ -310,20 +471,17 @@
     align-items: center;
     min-height: 100vh;
     min-height: 100dvh;
-    padding-block: var(--landing-padding);
+    padding-top: calc(var(--header-clearance) + var(--razmak-header-profil));
+    padding-bottom: var(--landing-padding-dolje);
     padding-inline: 16px;
   }
 
+  /* Donji spacer: footer na dnu kad sadržaj stane; bez gornjeg flex zraka. */
   .landing-prostor {
     flex: 1 1 0;
     min-height: 8px;
     width: 100%;
     pointer-events: none;
-  }
-
-  .landing-prostor--gore {
-    box-sizing: content-box;
-    padding-top: 56px;
   }
 
   .izbornik {
@@ -334,7 +492,7 @@
     flex-direction: column;
     justify-content: flex-start;
     align-items: center;
-    gap: clamp(12px, 1.8dvh, 18px);
+    gap: 16px;
     width: min(100%, var(--sirina-grida));
     min-width: 0;
     max-width: 100%;
@@ -345,9 +503,29 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(12px, 1.8dvh, 18px);
+    gap: 16px;
     min-width: 0;
     width: 100%;
+  }
+
+  .profil-red {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .brze-postavke-blok {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding-top: 10px;
+    border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 24%, transparent);
   }
 
   .glavna-navigacija {
@@ -424,7 +602,28 @@
 
   .stavka-napomena {
     display: block;
-    margin-top: 2px;
+    margin-top: 4px;
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 82%, transparent);
+    font-size: clamp(12px, 1.8dvh, 14px);
+    font-weight: 500;
+    font-style: italic;
+    line-height: 1.3;
+  }
+
+  .stavka-napomena--gost {
+    margin-top: 0;
+    color: color-mix(in srgb, #1a1815 62%, transparent);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .primarna-akcija {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    min-width: 0;
   }
 
   .izazovi-napredak {
@@ -436,7 +635,7 @@
   .izazovi-napredak__traka {
     display: block;
     width: 100%;
-    height: 8px;
+    height: 9px;
     overflow: hidden;
     border-radius: var(--radijus-pill);
     background: color-mix(in srgb, #1a1815 12%, transparent);
@@ -446,7 +645,7 @@
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: var(--boja-mint);
+    background: var(--boja-zuta-krema);
   }
 
   .izazovi-napredak__broj {
@@ -510,16 +709,29 @@
     gap: 14px;
   }
 
+  .navigacijska-stavka.primarna .stavka-tekst strong {
+    font-size: var(--font-brza-igra);
+  }
+
   .navigacijska-stavka.primarna .stavka-tekst small {
     color: color-mix(in srgb, #1a1815 72%, transparent);
+    font-size: clamp(15px, 2.1dvh, 17px);
     font-weight: 500;
   }
 
   .navigacijska-stavka.primarna .cta {
     margin-top: 0;
+    min-height: 46px;
   }
 
   @media (min-width: 1000px) {
+    .landing {
+      --ikona-primarna: 76px;
+      --ikona-sporedna: 52px;
+      --padding-stavke: 22px 24px;
+      --font-brza-igra: 26px;
+    }
+
     .navigacijska-stavka.primarna {
       grid-template-columns: minmax(0, 1fr) minmax(200px, 34%);
       align-items: stretch;
@@ -527,10 +739,13 @@
       min-height: 112px;
     }
 
-    .navigacijska-stavka.primarna .cta {
+    .navigacijska-stavka.primarna .primarna-akcija {
       align-self: center;
+    }
+
+    .navigacijska-stavka.primarna .cta {
       width: 100%;
-      min-height: 48px;
+      min-height: 50px;
       margin-top: 0;
       padding: 12px 20px;
       border-radius: 14px;
@@ -563,84 +778,88 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
     min-width: 0;
   }
 
   .sporedna-navigacija {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 10px 16px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px 8px;
     width: 100%;
-    margin: 6px 0 0;
+    margin: 2px 0 0;
   }
 
   .sporedni-precac {
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 9px;
-    min-height: 48px;
-    padding: 6px 4px;
+    justify-content: flex-start;
+    gap: 6px;
+    min-height: 44px;
+    padding: 8px 4px;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 700;
+    line-height: 1.25;
+    text-align: center;
     text-decoration: none;
   }
 
+  .sporedni-precac__tekst {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .sporedni-precac__tekst small {
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 88%, transparent);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
   .sporedni-precac img {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     object-fit: contain;
+  }
+
+  .sporedni-precac__ikona {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+  }
+
+  .sporedni-precac__ikona--s-badgeom {
+    padding: 6px 14px 2px 6px;
+  }
+
+  .sporedni-precac__badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 22px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--boja-crvena);
+    color: #fff;
+    font-family: var(--font-tijelo);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.25;
+    text-align: center;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--boja-pozadina) 80%, transparent);
+    pointer-events: none;
   }
 
   .sporedni-precac:hover {
     color: var(--boja-akcent-tekst);
-  }
-
-  .sporedni-razdjelnik {
-    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 55%, transparent);
-    font-size: 16px;
-    user-select: none;
-  }
-
-  .brze-postavke-razdjelnik {
-    width: min(100%, 240px);
-    margin: 8px auto 2px;
-    border: 0;
-    border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 24%, transparent);
-  }
-
-  .zadnje-azuriranje {
-    margin: 0;
-    width: 100%;
-    color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-sitni);
-    line-height: 1.3;
-    text-align: center;
-  }
-
-  .zadnje-azuriranje time {
-    white-space: nowrap;
-  }
-
-  .zadnje-azuriranje a {
-    color: inherit;
-    font-weight: inherit;
-    text-decoration: underline;
-    white-space: nowrap;
-  }
-
-  .zadnje-azuriranje a:hover { color: var(--boja-akcent-tekst); }
-
-  :global(html[data-font-disleksiju]) .zadnje-azuriranje .razdjelnik { display: none; }
-  :global(html[data-font-disleksiju]) .zadnje-azuriranje .sto-je-novo {
-    display: block;
-    width: fit-content;
-    margin-inline: auto;
   }
 
   .landing-footer {
@@ -648,32 +867,58 @@
     z-index: 1;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px 16px;
+    justify-content: center;
     width: min(100%, var(--sirina-grida));
+    text-align: center;
   }
 
-  .copyright {
-    flex: none;
-    font-size: var(--tekst-sitni);
-    line-height: 1.2;
-    color: var(--boja-tekst-sekundarni);
-    white-space: nowrap;
-  }
-
-  .landing-footer nav {
+  .podnozje-red {
+    margin: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-start;
-    gap: 8px 18px;
+    justify-content: center;
+    gap: 4px 8px;
+    width: 100%;
+    max-width: 100%;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+    line-height: 1.3;
+  }
+
+  .podnozje-lijevo,
+  .podnozje-desno {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 8px;
+  }
+
+  .podnozje-red .razdjelnik {
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 70%, transparent);
+  }
+
+  .zadnje-azuriranje {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 8px;
+  }
+
+  .zadnje-azuriranje time {
+    white-space: nowrap;
+  }
+
+  .copyright {
+    white-space: nowrap;
   }
 
   .landing-footer a {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: clamp(4px, 1dvh, 8px) 10px;
+    padding: clamp(4px, 1dvh, 8px) 2px;
     border: 0;
     background: transparent;
     color: var(--boja-tekst-sekundarni);
@@ -681,103 +926,159 @@
     font-size: var(--tekst-sitni);
     text-decoration: underline;
     cursor: pointer;
+    white-space: nowrap;
   }
 
   .landing-footer a:hover { color: var(--boja-akcent-tekst); }
 
   @media (min-width: 1000px) {
     .landing {
-      --landing-padding: clamp(8px, 1.8dvh, 24px);
+      /* Desktop H1 ~60px + top 6px; razmak header→profil 24–40 px. */
+      --header-clearance: 70px;
+      --razmak-header-profil: 32px;
+      --landing-padding-dolje: clamp(8px, 1.8dvh, 24px);
       --font-stavke: clamp(20px, 2.4dvh, 24px);
       --font-opisa: 16px;
       --padding-stavke: 22px 24px;
-      --ikona-sporedna: 44px;
+      --ikona-sporedna: 48px;
+      --ikona-primarna: 56px;
+      --font-brza-igra: clamp(24px, 2.6dvh, 26px);
       --razmak-stavki: 14px;
     }
 
-    .landing-prostor--gore {
-      padding-top: 80px;
+    .izbornik,
+    .navigacijski-blok {
+      gap: 20px;
+    }
+
+    .profil-red {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px 20px;
+    }
+
+    .profil-red :global(.naslovnica-napredak-omotac) {
+      justify-self: center;
+      width: max-content;
+      max-width: 100%;
+      min-width: 0;
+      margin: 0;
+    }
+
+    .profil-red .sporedni-red {
+      justify-self: end;
+      min-width: 0;
+    }
+
+    .brze-postavke-blok {
+      gap: 12px;
+      padding-top: 12px;
+      width: 100%;
+      max-width: none;
+      margin-inline: 0;
+    }
+
+    .landing-footer {
+      width: min(100%, var(--sirina-grida));
+      justify-content: stretch;
+      text-align: left;
+    }
+
+    .podnozje-red {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: 12px 16px;
+    }
+
+    .podnozje-lijevo {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      justify-self: start;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .copyright {
+      justify-self: center;
+      text-align: center;
+      min-width: 0;
+    }
+
+    .podnozje-desno {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      justify-self: end;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .zadnje-azuriranje {
+      justify-content: flex-start;
     }
 
     .glavna-navigacija {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: stretch;
     }
 
     .navigacijska-stavka {
       min-height: 92px;
+      height: 100%;
       box-sizing: border-box;
     }
 
     .navigacijska-stavka.primarna {
       grid-column: 1 / -1;
+      height: auto;
     }
 
     .sporedni-red {
-      display: grid;
-      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-      grid-template-areas:
-        'nav novosti'
-        'toggles .';
-      align-items: center;
-      gap: 10px 20px;
-      margin-top: 4px;
+      align-items: flex-end;
+      justify-content: flex-end;
+      gap: 0;
+      margin-top: 0;
+      width: auto;
     }
 
     .sporedna-navigacija {
-      grid-area: nav;
-      flex-wrap: nowrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
+      gap: 8px 12px;
       margin: 0;
-      min-width: 0;
-    }
-
-    .sporedni-razdjelnik {
-      display: none;
-    }
-
-    .brze-postavke-razdjelnik {
-      display: none;
-    }
-
-    .sporedni-red :global(.brze-postavke) {
-      grid-area: toggles;
-      width: max-content;
-      max-width: 100%;
-      justify-self: start;
-      margin-top: 12px;
-    }
-
-    .zadnje-azuriranje {
-      grid-area: novosti;
-      justify-self: end;
       width: auto;
       max-width: 100%;
-      text-align: right;
+      grid-template-columns: repeat(3, minmax(0, auto));
+      justify-content: end;
     }
 
     .sporedni-precac {
-      gap: 10px;
-      min-height: 48px;
-      padding: 6px 4px;
+      gap: 8px;
+      padding: 4px 6px;
       font-size: 18px;
-      white-space: nowrap;
+    }
+
+    .sporedni-precac__badge {
+      font-size: 16px;
+      min-width: 24px;
+      padding: 1px 7px;
     }
 
     .sporedni-precac img {
-      width: 40px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
     }
 
-    .landing-footer a { padding-inline: 0; }
+    .sporedni-precac__ikona--s-badgeom {
+      padding: 6px 16px 2px 6px;
+    }
   }
 
   /* Niski desktop: smanji prazan prostor, CTA ostaje vidljiv, scroll je dopušten. */
   @media (min-width: 1000px) and (max-height: 700px) {
     .landing {
       --razmak-stavki: 10px;
-      --landing-padding: clamp(4px, 1dvh, 12px);
+      --razmak-header-profil: 24px;
+      --landing-padding-dolje: clamp(4px, 1dvh, 12px);
       --padding-stavke: 16px 20px;
       --razmak-naslov-opis: 4px;
     }
@@ -786,11 +1087,8 @@
       min-height: 4px;
     }
 
-    .landing-prostor--gore {
-      padding-top: 72px;
-    }
-
-    .izbornik {
+    .izbornik,
+    .navigacijski-blok {
       gap: 12px;
     }
 
@@ -805,21 +1103,21 @@
 
   @media (max-width: 999px) {
     .landing {
-      --landing-padding: clamp(6px, 1.2dvh, 12px);
+      --header-clearance: 48px;
+      --razmak-header-profil: 16px;
+      --landing-padding-dolje: clamp(6px, 1.2dvh, 12px);
       --font-stavke: clamp(20px, 3dvh, 22px);
       --font-opisa: clamp(15px, 2.2dvh, 16px);
-      --ikona-sporedna: 36px;
-      --ikona-primarna: 40px;
+      --ikona-sporedna: 40px;
+      --ikona-primarna: 48px;
+      --font-brza-igra: clamp(22px, 3dvh, 24px);
       --sirina-grida: 440px;
       padding-inline: 12px;
     }
 
-    .landing-prostor--gore {
-      padding-top: 60px;
-    }
-
-    .izbornik {
-      gap: 12px;
+    .izbornik,
+    .navigacijski-blok {
+      gap: 14px;
     }
 
     .navigacijska-stavka:not(.primarna) {
@@ -827,41 +1125,12 @@
       box-sizing: border-box;
     }
 
-    .sporedna-navigacija {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 4px;
-      margin-top: 2px;
-    }
-
-    .sporedni-razdjelnik {
-      display: none;
-    }
-
-    .sporedni-precac {
-      flex-direction: column;
-      justify-content: flex-start;
-      gap: 6px;
-      min-height: 0;
-      padding: 8px 4px;
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.2;
-      text-align: center;
-    }
-
-    .sporedni-precac img {
-      width: 34px;
-      height: 34px;
-    }
-
-    .landing-footer { flex-direction: column; gap: 2px; }
-    .landing-footer nav { justify-content: center; gap: 0 8px; }
     .landing-footer a {
-      padding: clamp(2px, 0.6dvh, 8px) 6px;
+      padding: clamp(2px, 0.6dvh, 8px) 2px;
       font-size: clamp(12px, 2dvh, var(--tekst-sitni));
       line-height: 1.2;
     }
+
     .copyright {
       font-size: clamp(12px, 2dvh, var(--tekst-sitni));
       line-height: 1.2;
@@ -873,13 +1142,6 @@
       --font-stavke: 20px;
       --font-opisa: clamp(14px, 3.6vw, 15px);
       --padding-stavke: 16px 18px;
-    }
-
-    .zadnje-azuriranje .razdjelnik { display: none; }
-    .zadnje-azuriranje .sto-je-novo {
-      display: block;
-      width: fit-content;
-      margin-inline: auto;
     }
   }
 

@@ -15,6 +15,24 @@ export type PrikazXpSazetka =
       maksimalna: boolean;
     };
 
+/** Personalizirani popratni tekst uz registraciju gosta (bez novog API-ja). */
+export function tekstRegistracijeGosta(opcije: {
+  imaXp: boolean;
+  imaZavrseneIzazove: boolean;
+}): string {
+  if (opcije.imaZavrseneIzazove) return 'Sačuvaj napredak u izazovima.';
+  if (opcije.imaXp) return 'Sačuvaj svoje iskustvo.';
+  return 'Sačuvaj svoj napredak.';
+}
+
+export function gostImaXp(iskustvo: ProfilIskustvo | undefined): boolean {
+  if (!iskustvo) return false;
+  return (
+    (Number.isFinite(iskustvo.ukupno) && iskustvo.ukupno > 0) ||
+    (Number.isFinite(iskustvo.uRazini) && iskustvo.uRazini > 0)
+  );
+}
+
 export function postotakXpTrake(iskustvo: ProfilIskustvo): number | null {
   if (iskustvo.doIduce === null) return 100;
   if (!(iskustvo.doIduce > 0)) return null;

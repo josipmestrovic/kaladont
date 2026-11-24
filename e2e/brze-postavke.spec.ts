@@ -129,13 +129,9 @@ for (const { sirina, visina } of [
       };
     });
     expect(mjere.navigacija && mjere.brze && mjere.novosti).toBeTruthy();
+    // Na svim širinama postavke su ispod glavne navigacije / prečaca.
     expect(mjere.brze!.y).toBeGreaterThan(mjere.navigacija!.y + mjere.navigacija!.height - 1);
+    // Novosti su uvijek ispod glavne navigacije, neposredno iznad footera.
     expect(mjere.novosti!.y).toBeGreaterThan(mjere.navigacija!.y + mjere.navigacija!.height - 1);
-    // Mobitel: novosti ispod togglea. Desktop: novosti u istoj razini s prečacima, togglei dolje lijevo.
-    if (sirina < 1000) {
-      expect(mjere.novosti!.y).toBeGreaterThan(mjere.brze!.y + mjere.brze!.height - 1);
-    } else {
-      expect(mjere.brze!.y).toBeGreaterThan(mjere.novosti!.y - 1);
-    }
   });
 }

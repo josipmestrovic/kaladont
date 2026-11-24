@@ -623,7 +623,7 @@ jobs:
           mora_sadrzavati "$RUNNER_TEMP/novosti.html" "id=\"${sidro}\""
           mora_sadrzavati "$RUNNER_TEMP/novosti.html" "datetime=\"${datum}\""
           mora_sadrzavati "$RUNNER_TEMP/naslovnica.html" "datetime=\"${datum}\""
-          mora_sadrzavati "$RUNNER_TEMP/naslovnica.html" "Vidi što je novo"
+          mora_sadrzavati "$RUNNER_TEMP/naslovnica.html" "Što je novo?"
           echo "Image prikazuje izdanje ${sidro} (${datum}) na naslovnici i u Novostima."
 
       - name: Pokrenuti Playwright browser runtime

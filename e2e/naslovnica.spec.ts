@@ -26,27 +26,19 @@ for (const sirina of [320, 390, 1440]) {
     await page.setViewportSize({ width: sirina, height: sirina < 1000 ? 568 : 900 });
     await page.goto('/');
     const footer = page.locator('.landing-footer');
+    const godina = String(new Date().getFullYear());
     // Duži timeout zbog gost-sesije / CI latency.
-    await expect(footer.locator('.copyright')).toHaveText('© 2026 Kaladont. Sva prava pridržana.', {
+    await expect(footer.locator('.copyright')).toContainText(`© ${godina} Kaladont`, {
       timeout: 20_000,
     });
     await page.evaluate(() => document.fonts.ready);
-    const nav = await footer.locator('nav').boundingBox();
-    const copyright = await footer.locator('.copyright').boundingBox();
-    if (sirina >= 1000) {
-      expect(copyright!.x).toBeGreaterThan(nav!.x + nav!.width);
-      expect(Math.abs(copyright!.y + copyright!.height / 2 - nav!.y - nav!.height / 2)).toBeLessThanOrEqual(1);
-    } else {
-      expect(copyright!.y).toBeGreaterThanOrEqual(nav!.y + nav!.height);
-    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: podaciTesta.outputPath('footer.png') });
-    await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveAttribute(
-      'href',
-      '/povratne-informacije',
-    );
+    await expect(footer.getByTestId('naslovnica-pravila')).toHaveAttribute('href', '/pravila-kaladonta');
+    await expect(footer.getByRole('link', { name: 'Pravila igre' })).toBeVisible();
     await expect(footer.getByRole('link', { name: 'Uvjeti' })).toHaveAttribute('href', '/uvjeti');
     await expect(footer.getByRole('link', { name: 'Privatnost' })).toHaveAttribute('href', '/privatnost');
+    await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveCount(0);
     await page.goto('/o-igri');
     await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toHaveAttribute(
@@ -80,24 +72,24 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(page.locator('.ilustracija')).toHaveCount(0);
 
   const footer = page.locator('.landing-footer');
-  const footerLinkovi = footer.locator('nav a');
-  await expect(footerLinkovi).toHaveCount(4);
-  await expect(footerLinkovi.nth(0)).toHaveAttribute('href', '/pravila-kaladonta');
-  await expect(footerLinkovi.nth(0)).toHaveText('Pravila');
-  await expect(footerLinkovi.nth(1)).toHaveAttribute('href', '/povratne-informacije');
-  await expect(footerLinkovi.nth(1)).toHaveText('Povratne informacije');
-  await expect(footerLinkovi.nth(2)).toHaveAttribute('href', '/uvjeti');
-  await expect(footerLinkovi.nth(3)).toHaveAttribute('href', '/privatnost');
+  await expect(footer.getByRole('link', { name: 'Što je novo?' })).toHaveAttribute('href', '/novosti');
+  await expect(footer.getByTestId('naslovnica-pravila')).toHaveAttribute('href', '/pravila-kaladonta');
+  await expect(footer.getByRole('link', { name: 'Pravila igre' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Uvjeti' })).toHaveAttribute('href', '/uvjeti');
+  await expect(footer.getByRole('link', { name: 'Privatnost' })).toHaveAttribute('href', '/privatnost');
+  await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveCount(0);
+  await expect(footer.locator('.copyright')).toContainText('Kaladont');
 
   await expect(page.getByTestId('naslovnica-napredak')).toBeVisible({ timeout: 20_000 });
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toBeVisible();
+  await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText('Troboj');
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
-    'Odigraj klasičnu partiju u troje.',
+    'Igraj online* u troje.',
   );
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
-    'Ako nema igrača, pridružit će ti se botovi.',
+    '*Ako nema igrača, pridruže se botovi.',
   );
   await expect(navigacija.getByRole('link', { name: 'Izazovi', exact: true })).toHaveAttribute(
     'href',
@@ -117,17 +109,20 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   const sporedna = page.getByRole('navigation', { name: 'Napredak i pomoć' });
   await expect(sporedna.getByTestId('naslovnica-misije')).toHaveAttribute('href', '/misije');
-  await expect(sporedna.getByTestId('naslovnica-profil')).toHaveAttribute('href', '/profil');
-  await expect(sporedna.getByTestId('naslovnica-pravila')).toHaveAttribute('href', '/pravila-kaladonta');
+  await expect(sporedna.getByTestId('naslovnica-kolekcija')).toHaveAttribute('href', '/profil#rijeci');
+  await expect(sporedna.getByTestId('naslovnica-kolekcija-labela')).toContainText(/^razina:/);
+  await expect(sporedna.getByTestId('naslovnica-dostignuca')).toHaveAttribute(
+    'href',
+    '/profil#dostignuca',
+  );
+  await expect(sporedna.getByTestId('naslovnica-dostignuca-labela')).toContainText(/zvjezdica/);
+  await expect(sporedna.getByTestId('naslovnica-pravila')).toHaveCount(0);
 
   const izbornik = await otvoriProfilIzbornik(page);
   await expect(izbornik.getByRole('menuitem', { name: 'Moj profil' })).toHaveAttribute('href', '/profil');
-  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toHaveAttribute(
-    'href',
-    '/profil/avatar',
-  );
-  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toBeVisible();
+  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Postavke' })).toHaveAttribute('href', '/postavke');
+  await expect(izbornik.getByRole('menuitem', { name: 'Povratne informacije' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Misije' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Ljestvice' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Pravila' })).toHaveCount(0);
@@ -150,6 +145,23 @@ test('naslovnica prikazuje XP sažetak i default opis izazova bez trake', async 
   await expect(napredak).toBeVisible({ timeout: 20_000 });
   await expect(napredak).toContainText(/LVL|Moj napredak/);
   await expect(napredak).toHaveAttribute('href', '/profil');
+
+  const gostCta = page.getByTestId('naslovnica-gost-registracija');
+  await expect(gostCta).toBeVisible({ timeout: 20_000 });
+  await expect(gostCta).toHaveAttribute('href', '/registracija');
+  await expect(gostCta).toContainText('Sačuvaj svoj napredak.');
+  await expect(gostCta).toContainText('Registriraj se');
+  const gostBlok = page.getByTestId('naslovnica-gost-cta');
+  await expect(gostBlok).toContainText('Već imaš račun?');
+  await expect(page.getByTestId('naslovnica-gost-prijava')).toHaveAttribute('href', '/prijava');
+
+  const brzaIgra = page.getByTestId('naslovnica-brza-igra');
+  await expect(brzaIgra.getByTestId('naslovnica-brza-igra-gost-napomena')).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(brzaIgra.getByTestId('naslovnica-brza-igra-gost-napomena')).toHaveText(
+    'Besplatno · Bez registracije',
+  );
 
   const izazovi = page.getByTestId('naslovnica-izazovi');
   await expect(izazovi).toContainText(/Svladavaj \d+ sve težih izazova/);
@@ -215,23 +227,25 @@ test('naslovnica prikazuje zadnje ažuriranje iz istog izvora kao Novosti', asyn
   // Blok mora biti u SSR HTML-u: CI i produkcijski workflow provjeravaju ga bez preglednika.
   const ssr = await (await request.get('/')).text();
   expect(ssr).toContain(`datetime="${najnovije.objavljeno}"`);
-  expect(ssr).toContain('Vidi što je novo');
+  expect(ssr).toContain('Što je novo?');
   expect(ssr).toContain('href="/novosti"');
   expect(ssr).not.toContain(`href="/novosti#${najnovije.sidro}"`);
 
   await page.goto('/');
-  const blok = page.locator('.zadnje-azuriranje');
-  await expect(blok).toHaveText(`Zadnje ažuriranje: ${najnovije.datumHr} · Vidi što je novo`);
-  await expect(blok.locator('.razdjelnik')).toHaveAttribute('aria-hidden', 'true');
+  const footer = page.locator('.landing-footer');
+  const blok = footer.locator('.zadnje-azuriranje');
+  await expect(blok).toContainText(`Ažurirano ${najnovije.datumHr}`);
+  await expect(blok).toContainText('Što je novo?');
   await expect(blok.locator('time')).toHaveAttribute('datetime', najnovije.objavljeno);
   await expect(blok.locator('time')).toHaveText(najnovije.datumHr);
+  await expect(footer.locator('.copyright')).toContainText('Kaladont');
+  await expect(footer.getByRole('link', { name: 'Uvjeti' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Privatnost' })).toBeVisible();
 
-  const poveznice = blok.getByRole('link');
-  await expect(poveznice).toHaveCount(1);
-  await expect(poveznice).toHaveText('Vidi što je novo');
-  await expect(poveznice).toHaveAttribute('href', '/novosti');
+  const poveznica = blok.getByRole('link', { name: 'Što je novo?' });
+  await expect(poveznica).toHaveAttribute('href', '/novosti');
 
-  await poveznice.click();
+  await poveznica.click();
   await expect(page).toHaveURL('/novosti');
   await expect(page.getByRole('heading', { name: 'Novosti', exact: true })).toBeVisible();
 });
@@ -267,17 +281,13 @@ for (const { sirina, visina } of [
       await page.setViewportSize({ width: sirina, height: visina });
       await page.goto('/');
 
-      const blok = page.locator('.zadnje-azuriranje');
       const footer = page.locator('.landing-footer');
+      const blok = footer.locator('.zadnje-azuriranje');
       await expect(blok).toBeVisible();
       await expect(footer.locator('.copyright')).toBeVisible({ timeout: 20_000 });
       if (svijetla) await expect(page.locator('html')).toHaveAttribute('data-tema', 'svijetla');
       if (disleksija) await expect(page.locator('html')).toHaveAttribute('data-font-disleksiju', '');
-      for (const poveznica of await blok.getByRole('link').all()) {
-        await expect(poveznica).toBeVisible();
-      }
-      // Blok je brat footera, a ne njegov dio: postojeći testovi mjere raspored unutar footera.
-      await expect(footer.locator('.zadnje-azuriranje')).toHaveCount(0);
+      await expect(blok.getByRole('link', { name: 'Što je novo?' })).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
 
       // Svi okviri mjere se u jednom pozivu, da pomak rasporeda između mjerenja ne da lažan rezultat.
@@ -290,7 +300,6 @@ for (const { sirina, visina } of [
           return { x: pravokutnik.x, y: pravokutnik.y, width: pravokutnik.width, height: pravokutnik.height };
         };
         return {
-          blok: okvir('.zadnje-azuriranje'),
           footer: okvir('.landing-footer'),
           susjedi: {
             navigacija: okvir('.glavna-navigacija'),
@@ -303,15 +312,14 @@ for (const { sirina, visina } of [
       });
 
       expect(mjere.sirinaSadrzaja).toBeLessThanOrEqual(mjere.sirinaProzora);
-      expect(mjere.blok).not.toBeNull();
       expect(mjere.footer).not.toBeNull();
       expect(mjere.susjedi.navigacija).not.toBeNull();
-      const okvirBloka = mjere.blok!;
-      expect(okvirBloka.x).toBeGreaterThanOrEqual(0);
-      expect(okvirBloka.x + okvirBloka.width).toBeLessThanOrEqual(mjere.sirinaProzora + 1);
-      expect(okvirBloka.y + okvirBloka.height).toBeLessThanOrEqual(mjere.footer!.y + 1);
+      const okvirFootera = mjere.footer!;
+      expect(okvirFootera.x).toBeGreaterThanOrEqual(0);
+      expect(okvirFootera.x + okvirFootera.width).toBeLessThanOrEqual(mjere.sirinaProzora + 1);
+      expect(okvirFootera.y).toBeGreaterThanOrEqual(mjere.susjedi.navigacija!.y + mjere.susjedi.navigacija!.height - 1);
       for (const [naziv, okvir] of Object.entries(mjere.susjedi)) {
-        if (okvir) expect(preklapajuSe(okvirBloka, okvir), `${naziv} se preklapa s blokom`).toBe(false);
+        if (okvir) expect(preklapajuSe(okvirFootera, okvir), `${naziv} se preklapa s footerom`).toBe(false);
       }
 
       // Prirodni scroll je dopušten; CTA mora ostati u DOM-u i biti dostupan.
@@ -333,9 +341,10 @@ test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ 
   await expect(header.getByRole('button', { name: 'Nazad' })).toHaveCount(0);
   await expect(header.locator('.avatar')).toBeVisible({ timeout: 20_000 });
   const footer = page.locator('.landing-footer');
-  await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Pravila igre' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Uvjeti' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Privatnost' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveCount(0);
   await expect(footer.getByRole('link', { name: 'Novosti' })).toHaveCount(0);
   await expect(footer.getByRole('link', { name: 'O igri' })).toHaveCount(0);
 
@@ -385,6 +394,16 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await expect(pocetna.locator('svg')).toBeVisible();
   await pocetna.click();
   await expect(page).toHaveURL('/');
+});
+
+test('naslovnica otvara dostignuća deep link na profilu', async ({ page }) => {
+  await page.goto('/');
+  const dostignuca = page.getByTestId('naslovnica-dostignuca');
+  await expect(dostignuca).toBeVisible({ timeout: 20_000 });
+  await expect(dostignuca).toHaveAttribute('href', '/profil#dostignuca');
+  await expect(page.getByTestId('naslovnica-dostignuca-labela')).toContainText(/\/\d+ zvjezdica/);
+  await dostignuca.click();
+  await expect(page).toHaveURL(/\/profil#dostignuca/);
 });
 
 for (const { sirina, visina } of [

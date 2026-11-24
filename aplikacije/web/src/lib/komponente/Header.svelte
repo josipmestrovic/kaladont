@@ -24,7 +24,8 @@
   const jeNaslovna = $derived($page.url.pathname === '/');
   const prikaziPovratakNaPocetnu = $derived(!jeNaslovna && prethodnaPutanja !== '/');
   const profil = $derived(stanjeProfila.profil);
-  const jeGost = $derived(!profil?.email);
+  const jeGost = $derived(profil?.vrsta === 'gost');
+  const jeRegistriran = $derived(profil !== null && profil.vrsta !== 'gost');
   const prikaziAdminNav = $derived(!jeNaslovna && profil?.vrsta === 'admin');
 
   function vratiSe() {
@@ -151,13 +152,18 @@
                 aria-label="Profil i račun"
               >
                 <a href="/profil" class="profil-stavka" role="menuitem">Moj profil</a>
-                <a href="/profil/avatar" class="profil-stavka" role="menuitem">Uredi avatar</a>
+                {#if jeRegistriran}
+                  <a href="/profil/avatar" class="profil-stavka" role="menuitem">Uredi avatar</a>
+                {/if}
                 <a href="/postavke" class="profil-stavka" role="menuitem">Postavke</a>
+                {#if jeRegistriran}
+                  <a href="/povratne-informacije" class="profil-stavka" role="menuitem">Povratne informacije</a>
+                {/if}
                 <div class="profil-razdjelnik" role="separator"></div>
                 {#if jeGost}
                   <a href="/prijava" class="profil-stavka" role="menuitem">Prijavi se</a>
                   <a href="/registracija" class="profil-stavka" role="menuitem">Registriraj se</a>
-                {:else}
+                {:else if jeRegistriran}
                   <button type="button" class="profil-stavka odjava" role="menuitem" onclick={odjaviSe}>
                     Odjavi se
                   </button>

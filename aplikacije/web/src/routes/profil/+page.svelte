@@ -347,7 +347,7 @@
     {/if}
 
     {#if ucitaniPogledi.has('rijeci')}
-      <div hidden={aktivniPogled !== 'rijeci'}>
+      <div id="rijeci" hidden={aktivniPogled !== 'rijeci'}>
         <KolekcijaRijeci igracId={profil.igracId} igracNaziv={profil.nadimak} />
       </div>
     {/if}
