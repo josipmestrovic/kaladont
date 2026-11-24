@@ -62,6 +62,17 @@
     ukupno: 0,
     maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
   });
+  type DostignuceNaslovnice = {
+    id: string;
+    naziv: string;
+    opis: string;
+    kategorija: 'napredak' | 'rijeci' | 'vjestina' | 'kaladont' | 'igra';
+    pragovi: readonly number[];
+    razina: number;
+    vrijednost: number;
+    sljedeciPrag: number | null;
+  };
+  let dostignucaPopis = $state<DostignuceNaslovnice[]>([]);
   const kolekcijaBrojLabela = $derived(
     brojRijeciKolekcije === null
       ? '…'
@@ -125,11 +136,14 @@
   async function osvjeziDostignucaZvjezdice() {
     const generacija = ++dostignucaGeneracija;
     try {
-      const odgovor = await api<{ ukupnoZvjezdica?: number; maksimalnoZvjezdica?: number }>(
-        '/dostignuca',
-      );
+      const odgovor = await api<{
+        ukupnoZvjezdica?: number;
+        maksimalnoZvjezdica?: number;
+        dostignuca?: DostignuceNaslovnice[];
+      }>('/dostignuca');
       if (generacija !== dostignucaGeneracija) return;
       dostignucaZvjezdice = normalizirajZvjezdiceDostignuca(odgovor);
+      dostignucaPopis = Array.isArray(odgovor.dostignuca) ? odgovor.dostignuca : [];
     } catch {
       // Zadrži zadnji uspješan sažetak; ne piši 0 zvjezdica preko stvarnog napretka.
       if (generacija !== dostignucaGeneracija) return;
@@ -162,6 +176,7 @@
         ukupno: 0,
         maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
       };
+      dostignucaPopis = [];
       invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
@@ -208,6 +223,7 @@
       <div class="profil-red">
         <NaslovnicaNapredak
           izazoviZavrseno={izazoviPrikaz.vrsta === 'napredak' ? izazoviPrikaz.zavrseno : 0}
+          dostignuca={dostignucaPopis}
         />
       </div>
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
@@ -773,7 +789,13 @@
 
     .sporedni-precac:hover {
       color: var(--boja-akcent-tekst);
-      background: color-mix(in srgb, var(--boja-plocica) 70%, transparent);
+      background: var(--boja-povrsina-2);
+      border-color: color-mix(in srgb, #fff 20%, transparent);
+    }
+
+    :global(html[data-tema='svijetla']) .sporedni-precac:hover {
+      background: color-mix(in srgb, var(--boja-mint) 12%, transparent);
+      border-color: color-mix(in srgb, var(--boja-mint) 34%, transparent);
     }
   }
 
@@ -819,8 +841,8 @@
     min-height: 100%;
     padding: 12px 8px;
     border-radius: 12px;
-    background: color-mix(in srgb, var(--boja-plocica) 48%, transparent);
-    border: 1px solid color-mix(in srgb, var(--boja-plocica-obrub) 55%, transparent);
+    background: var(--boja-povrsina);
+    border: 1px solid color-mix(in srgb, #fff 14%, transparent);
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
     font-size: 16px;
@@ -829,6 +851,11 @@
     text-align: center;
     text-decoration: none;
     transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+
+  :global(html[data-tema='svijetla']) .sporedni-precac {
+    background: color-mix(in srgb, var(--boja-mint) 7%, transparent);
+    border-color: color-mix(in srgb, var(--boja-mint) 26%, transparent);
   }
 
   .sporedni-precac__tekst {
@@ -1001,15 +1028,15 @@
     }
 
     .profil-red {
-      align-items: center;
+      align-items: stretch;
       width: 100%;
     }
 
     .profil-red :global(.naslovnica-napredak-omotac) {
-      width: max-content;
+      width: 100%;
       max-width: 100%;
       min-width: 0;
-      margin: 0 auto;
+      margin: 0;
     }
 
     .brze-postavke-blok {

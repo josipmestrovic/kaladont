@@ -7,8 +7,26 @@
   import { stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import Avatar from './Avatar.svelte';
+  import DostignucaIstaknuta from './DostignucaIstaknuta.svelte';
 
-  let { izazoviZavrseno = 0 }: { izazoviZavrseno?: number } = $props();
+  type DostignuceNaslovnice = {
+    id: string;
+    naziv: string;
+    opis: string;
+    kategorija: 'napredak' | 'rijeci' | 'vjestina' | 'kaladont' | 'igra';
+    pragovi: readonly number[];
+    razina: number;
+    vrijednost: number;
+    sljedeciPrag: number | null;
+  };
+
+  let {
+    izazoviZavrseno = 0,
+    dostignuca = [],
+  }: {
+    izazoviZavrseno?: number;
+    dostignuca?: readonly DostignuceNaslovnice[];
+  } = $props();
 
   const prikaz = $derived(izracunajPrikazXp(stanjeProfila.profil, stanjeProfila.status));
   const profil = $derived(stanjeProfila.profil);
@@ -31,11 +49,13 @@
     }),
   );
   const linkNaProfil = $derived(stanjeProfila.status === 'spreman' && !jeGostProfil);
+  const prikaziIstaknuta = $derived(linkNaProfil && dostignuca.length > 0);
 </script>
 
 <div
   class="naslovnica-napredak-omotac"
   class:naslovnica-napredak-omotac--gost={prikaziGostCta}
+  class:naslovnica-napredak-omotac--registriran={linkNaProfil}
 >
   {#if linkNaProfil}
     <a
@@ -54,6 +74,12 @@
       aria-label={ariaProfil}
     >
       {@render sadrzajNapretka()}
+    </div>
+  {/if}
+
+  {#if prikaziIstaknuta}
+    <div class="naslovnica-istaknuta">
+      <DostignucaIstaknuta dostignuca={dostignuca} limit={3} kompaktno />
     </div>
   {/if}
 
@@ -147,13 +173,20 @@
     align-items: stretch;
     gap: 8px;
     width: 100%;
-    max-width: min(100%, 380px);
-    margin: 0 auto;
+    max-width: 100%;
+    margin: 0;
     padding: 12px 14px;
     border-radius: 12px;
-    background: color-mix(in srgb, var(--boja-plocica) 55%, transparent);
-    border: 1px solid color-mix(in srgb, var(--boja-plocica-obrub) 70%, transparent);
+    /* Tamniji mint od pozadine — bez krem/bijele pločice. */
+    background: var(--boja-povrsina);
+    border: 1px solid color-mix(in srgb, #fff 14%, transparent);
     min-height: 0;
+    box-sizing: border-box;
+  }
+
+  :global(html[data-tema='svijetla']) .naslovnica-napredak-omotac {
+    background: color-mix(in srgb, var(--boja-mint) 7%, transparent);
+    border-color: color-mix(in srgb, var(--boja-mint) 26%, transparent);
   }
 
   .naslovnica-napredak-omotac--gost {
@@ -162,7 +195,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px 16px;
-    max-width: min(100%, 560px);
   }
 
   .naslovnica-napredak {
@@ -384,11 +416,15 @@
     border-radius: 4px;
   }
 
+  .naslovnica-istaknuta {
+    display: none;
+  }
+
   @media (min-width: 1000px) {
     .naslovnica-napredak-omotac {
       align-items: stretch;
-      width: 360px;
-      max-width: min(100%, 380px);
+      width: 100%;
+      max-width: 100%;
       margin: 0;
       padding: 14px 16px;
     }
@@ -396,16 +432,25 @@
     .naslovnica-napredak-omotac--gost {
       flex-wrap: nowrap;
       align-items: center;
-      justify-content: flex-start;
-      width: max-content;
-      max-width: min(100%, 560px);
+      justify-content: space-between;
+      width: 100%;
+      max-width: 100%;
       gap: 16px 24px;
     }
 
+    .naslovnica-napredak-omotac--registriran {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px 28px;
+    }
+
     .naslovnica-napredak {
-      width: 100%;
+      width: auto;
       max-width: none;
       justify-content: flex-start;
+      flex: 0 1 380px;
     }
 
     .naslovnica-napredak-omotac--gost .naslovnica-napredak {
@@ -433,12 +478,13 @@
     .naslovnica-napredak__sadrzaj {
       min-width: 0;
       width: 100%;
+      max-width: 360px;
     }
 
     .naslovnica-napredak__traka {
       min-width: 0;
       width: 100%;
-      max-width: 280px;
+      max-width: none;
       height: 9px;
     }
 
@@ -448,15 +494,22 @@
       height: 52px !important;
     }
 
+    .naslovnica-istaknuta {
+      display: block;
+      flex: 0 1 auto;
+      margin-left: auto;
+      min-width: 0;
+    }
+
     .naslovnica-gost-cta {
       flex: 0 0 auto;
+      margin-left: auto;
     }
   }
 
   @media (max-width: 999px) {
-    .naslovnica-napredak-omotac:not(.naslovnica-napredak-omotac--gost) {
-      width: 100%;
-      max-width: 100%;
+    .naslovnica-istaknuta {
+      display: none !important;
     }
 
     .naslovnica-napredak-omotac--gost {

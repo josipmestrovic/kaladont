@@ -26,7 +26,7 @@ for (const sirina of [380, 1100] as const) {
     const cta = page.getByTestId('naslovnica-brza-igra');
     await expect(cta).toBeVisible();
     await expect(cta.getByText('Troboj', { exact: true })).toBeVisible();
-    await expect(page.getByText(/Igraj online\* u troje/)).toBeVisible();
+    await expect(page.getByText(/Igraj online u troje/)).toBeVisible();
     await cta.click();
     await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
   });
