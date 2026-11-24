@@ -140,7 +140,7 @@ Provjera:
 
 1. `https://kaladont.hr` → DevTools → Network → zahtjevi prema `analitika.kaladont.hr`
 2. Klik **Brza igra** na naslovnici → `naslovnica-brza-igra-klik` (stari `igraj-klik` više se ne šalje s naslovnice; ostaje u tipu radi povijesnih potrošača)
-3. Ostale kartice/prečaci: `naslovnica-izazovi-klik`, `naslovnica-trening-klik`, `naslovnica-privatna-soba-klik`, `naslovnica-ljestvice-klik`, `naslovnica-misije-klik`, `naslovnica-profil-klik`, `naslovnica-pravila-klik`, `naslovnica-novosti-klik`
+3. Ostale kartice/prečaci: `naslovnica-izazovi-klik`, `naslovnica-trening-klik`, `naslovnica-privatna-soba-klik`, `naslovnica-ljestvice-klik`, `naslovnica-misije-klik`, `naslovnica-kolekcija-klik`, `naslovnica-profil-klik`, `naslovnica-pravila-klik`, `naslovnica-novosti-klik`
 4. Automatski `?igraj=1` **nije** klik-event
 5. Klik **Pridruži se zajednici** → `forum-klik-landing`
 6. Na `/o-igri` forum CTA → `forum-klik-o-igri`

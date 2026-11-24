@@ -46,7 +46,8 @@ export async function osigurajStanjeMisija(opcije: { forsaj?: boolean } = {}): P
   if (!opcije.forsaj && status === 'spreman' && stanje) return stanje;
 
   status = 'ucitavanje';
-  const zahtjev = (async () => {
+  let zahtjev!: Promise<StanjeMisijaDto | null>;
+  zahtjev = (async () => {
     try {
       const odgovor = await dohvatiStanjeMisija();
       stanje = odgovor;

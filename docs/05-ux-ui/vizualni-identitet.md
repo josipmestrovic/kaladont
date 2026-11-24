@@ -41,12 +41,12 @@ Pravila upotrebe:
 
 ## Naslovnica (glavni izbornik)
 
-- Jedan raspored za gosta i registriranog: žuta **Brza igra**, krem kartice Izazovi / Trening / Privatna soba / Ljestvice, zatim tri ravnomjerna prečaca Misije / Moj profil / Kako igrati? (ikona iznad teksta).
-- Horizontalni XP sažetak (avatar · nadimak · rang · LVL · traka) iznad grida; gostu sibling CTA „Sačuvaj svoj napredak.” → `/registracija`. Napredak izazova na kartici samo kad je broj završenih > 0.
-- Ispod prečaca: diskretni razdjelnik i **brze postavke** (ikona + Svijetli/Tamni način, Čitanje naglas, Font za disleksiju) — iste lokalne postavke kao u profilu, bez novog API-ja.
-- Novosti („Ažurirano … · Što je novo?”) neposredno iznad footera, izvan `<footer>`.
+- Jedan raspored za gosta i registriranog: žuta **Brza igra**, krem kartice Izazovi / Trening / Privatna soba / Ljestvice, zatim tri ravnomjerna prečaca Misije / Kolekcija riječi / Kako igrati? (ikona iznad teksta).
+- Horizontalni XP sažetak (avatar · nadimak · rang · LVL · traka) iznad grida; gostu sibling CTA „Sačuvaj svoj napredak.” (ili personalizirani tekst) → `/registracija`. Napredak izazova na kartici samo kad je broj završenih > 0.
+- Ispod prečaca: diskretni razdjelnik „Prilagodi igru sebi” i **brze postavke** (ikona + Svijetli način, Čitanje naglas, Font za disleksiju) — iste lokalne postavke kao u profilu, bez novog API-ja.
+- Novosti („Ažurirano … · Što je novo?”) neposredno iznad footera, izvan `<footer>`. Footer: © godina · Uvjeti · Privatnost.
 - Prirodni vertikalni scroll je dopušten; CTA se ne skriva na niskom viewportu. Maksimalna širina grida oko 980 px.
-- Profilni dropdown služi računu (Moj profil, Uredi avatar, Postavke, prijava/odjava) — bez Misija, Ljestvica i Pravila.
+- Profilni dropdown: gost (Moj profil, Postavke, prijava/registracija); registriran (Moj profil, Uredi avatar, Postavke, Povratne informacije, odjava) — bez Misija, Ljestvica i Pravila.
 
 ## Ton komunikacije
 

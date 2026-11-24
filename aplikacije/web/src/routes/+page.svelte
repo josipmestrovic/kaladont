@@ -35,6 +35,7 @@
   const misijeStore = dohvatiStanjeMisijaStore();
   const misijeBadge = $derived(natpisBadgaMisija(misijeStore.aktivne));
   const misijeBadgeAria = $derived(ariaBadgaMisija(misijeStore.aktivne));
+  const godinaCopyright = new Date().getFullYear();
 
   const FOCUS_REFRESH_MS = 45_000;
   let zadnjiFocusRefresh = 0;
@@ -326,7 +327,7 @@
 
   <footer class="landing-footer">
     <p class="copyright">
-      © {new Date().getFullYear()} Kaladont
+      © {godinaCopyright} Kaladont
       <span class="razdjelnik" aria-hidden="true">·</span>
       <a href="/uvjeti">Uvjeti</a>
       <span class="razdjelnik" aria-hidden="true">·</span>
