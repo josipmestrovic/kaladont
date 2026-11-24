@@ -30,6 +30,9 @@
     opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA),
   });
   let izazoviGeneracija = 0;
+  const jeGost = $derived(
+    stanjeProfila.status === 'spreman' && stanjeProfila.profil?.vrsta === 'gost',
+  );
 
   function idiUBrzuIgru(opcije: { izQueryja?: boolean } = {}) {
     if (!opcije.izQueryja) zabiljeziUmamiDogadjaj('naslovnica-brza-igra-klik');
@@ -110,18 +113,26 @@
           type="button"
           class="navigacijska-stavka primarna"
           aria-labelledby="naslov-brza-igra"
-          aria-describedby="opis-brza-igra napomena-brza-igra"
+          aria-describedby="opis-brza-igra napomena-brza-igra{jeGost ? ' gost-napomena-brza-igra' : ''}"
           data-testid="naslovnica-brza-igra"
           onclick={() => idiUBrzuIgru()}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona stavka-ikona--primarna" src="/ikone/07-igraj.png" alt="" width="48" height="48" />
+            <img class="stavka-ikona stavka-ikona--primarna" src="/ikone/07-igraj.png" alt="" width="56" height="56" />
             <span class="stavka-tekst">
               <strong id="naslov-brza-igra">Brza igra</strong>
               <small id="opis-brza-igra">Odigraj klasičnu partiju u troje.</small>
               <small id="napomena-brza-igra" class="stavka-napomena"
                 >Ako nema igrača, pridružit će ti se botovi.</small
               >
+              {#if jeGost}
+                <small
+                  id="gost-napomena-brza-igra"
+                  class="stavka-napomena stavka-napomena--gost"
+                  data-testid="naslovnica-brza-igra-gost-napomena"
+                  >Igraj besplatno, bez registracije.</small
+                >
+              {/if}
             </span>
           </span>
           <span class="cta" aria-hidden="true">
@@ -141,7 +152,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-izazovi-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/06-trofej.png" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/06-trofej.png" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-izazovi">Izazovi</strong>
               <small id="opis-izazovi">{izazoviPrikaz.opis}</small>
@@ -176,7 +187,7 @@
           onclick={naTreningKlik}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/67-zagrijavanje-bot.webp" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/67-zagrijavanje-bot.webp" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-trening">Trening</strong>
               <small id="opis-trening">Vježbaj protiv botova po svojim pravilima.</small>
@@ -194,7 +205,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-privatna-soba-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/18-privatna-soba.png" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/18-privatna-soba.png" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-privatna">Privatna soba</strong>
               <small id="opis-privatna">Pozovi ekipu i igrajte po svojim pravilima.</small>
@@ -212,7 +223,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-ljestvice-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/09-ljestvice.png" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/09-ljestvice.png" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-ljestvice">Ljestvice</strong>
               <small id="opis-ljestvice">Usporedi se s najboljim igračima.</small>
@@ -301,6 +312,7 @@
     --radijus-stavke: 18px;
     --ikona-sporedna: 40px;
     --ikona-primarna: 48px;
+    --font-brza-igra: clamp(22px, 3dvh, 24px);
     --sirina-grida: 980px;
 
     position: relative;
@@ -426,6 +438,12 @@
     margin-top: 2px;
   }
 
+  .stavka-napomena--gost {
+    margin-top: 4px;
+    color: color-mix(in srgb, #1a1815 62%, transparent);
+    font-weight: 600;
+  }
+
   .izazovi-napredak {
     display: grid;
     gap: 6px;
@@ -435,7 +453,7 @@
   .izazovi-napredak__traka {
     display: block;
     width: 100%;
-    height: 8px;
+    height: 9px;
     overflow: hidden;
     border-radius: var(--radijus-pill);
     background: color-mix(in srgb, #1a1815 12%, transparent);
@@ -445,7 +463,7 @@
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: var(--boja-mint);
+    background: var(--boja-zuta-krema);
   }
 
   .izazovi-napredak__broj {
@@ -509,13 +527,19 @@
     gap: 14px;
   }
 
+  .navigacijska-stavka.primarna .stavka-tekst strong {
+    font-size: var(--font-brza-igra);
+  }
+
   .navigacijska-stavka.primarna .stavka-tekst small {
     color: color-mix(in srgb, #1a1815 72%, transparent);
+    font-size: clamp(15px, 2.1dvh, 17px);
     font-weight: 500;
   }
 
   .navigacijska-stavka.primarna .cta {
     margin-top: 0;
+    min-height: 48px;
   }
 
   @media (min-width: 1000px) {
@@ -693,7 +717,9 @@
       --font-stavke: clamp(20px, 2.4dvh, 24px);
       --font-opisa: 16px;
       --padding-stavke: 22px 24px;
-      --ikona-sporedna: 44px;
+      --ikona-sporedna: 48px;
+      --ikona-primarna: 56px;
+      --font-brza-igra: clamp(24px, 2.6dvh, 26px);
       --razmak-stavki: 14px;
     }
 
@@ -811,8 +837,9 @@
       --landing-padding-dolje: clamp(6px, 1.2dvh, 12px);
       --font-stavke: clamp(20px, 3dvh, 22px);
       --font-opisa: clamp(15px, 2.2dvh, 16px);
-      --ikona-sporedna: 36px;
-      --ikona-primarna: 40px;
+      --ikona-sporedna: 40px;
+      --ikona-primarna: 48px;
+      --font-brza-igra: clamp(22px, 3dvh, 24px);
       --sirina-grida: 440px;
       padding-inline: 12px;
     }
