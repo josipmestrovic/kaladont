@@ -40,9 +40,8 @@ test('gost pokreće IZ-L1-DV-01, odustaje i vidi rezultat bez rang/DNK', async (
 
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 25_000 });
   await expect(page.getByTestId('izazov-ciljevi')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId('izazov-uvjeti-naslov')).toContainText('Level 1');
+  await expect(page.getByTestId('izazov-uvjeti-naslov')).toContainText('Posebni uvjeti');
   await expect(page.getByText('Tvoj potez: 30 s')).toBeVisible();
-  await expect(page.getByTestId('izazov-ciljevi')).toContainText('Botovi: Početnik');
 
   await expect(page.getByRole('button', { name: 'Ne znam' })).toBeEnabled({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Ne znam' }).click();

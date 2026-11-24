@@ -12,10 +12,41 @@ import type {
   RazlogNeuspjehaIzazova,
   StavkaKatalogaIzazovaDto,
 } from 'zajednicko';
-import { idEviFormata, NAZIVI_LEVELA_IZAZOVA, jeIdIzazova, pokusajDefinicijuIzazova } from 'zajednicko';
+import {
+  idEviFormata,
+  NAZIVI_LEVELA_IZAZOVA,
+  jeIdIzazova,
+  pokusajDefinicijuIzazova,
+} from 'zajednicko';
 import { ApiGreska, api } from './api.js';
 
 export { ApiGreska };
+
+/** Početni goalProgress iz kataloga (prazne činjenice) — UI uvjeta odmah pri startu. */
+export function pocetniGoalProgressIzazova(challengeId: IdIzazova): GoalProgressIzazova {
+  const ciljevi = pokusajDefinicijuIzazova(challengeId)?.ciljevi ?? {};
+  const duge = ciljevi.dugeRijeci ?? 0;
+  const rijetke = ciljevi.rijetkeRijeci ?? 0;
+  const dokaz = ciljevi.uspjesanDokaz ?? 0;
+  const bezPogreske = { required: Boolean(ciljevi.bezPogreske), met: true };
+  const bezZavrsavanjaNaKa = { required: Boolean(ciljevi.bezZavrsavanjaNaKa), met: true };
+  const dugeRijeci = { required: duge, current: 0, met: duge === 0 };
+  const rijetkeRijeci = { required: rijetke, current: 0, met: rijetke === 0 };
+  const uspjesanDokaz = { required: dokaz, current: 0, met: dokaz === 0 };
+  return {
+    bezPogreske,
+    bezZavrsavanjaNaKa,
+    dugeRijeci,
+    rijetkeRijeci,
+    uspjesanDokaz,
+    sviCiljeviIspunjeni:
+      bezPogreske.met &&
+      bezZavrsavanjaNaKa.met &&
+      dugeRijeci.met &&
+      rijetkeRijeci.met &&
+      uspjesanDokaz.met,
+  };
+}
 
 export type OdgovorPokusajaIzazova = {
   ok: true;

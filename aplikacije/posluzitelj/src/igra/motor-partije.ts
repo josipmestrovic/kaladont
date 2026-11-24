@@ -64,10 +64,12 @@ import {
   type FazaPoteza,
   type RazlogOtvaranjaDokaza,
   type DokazZatrazen,
+  definicijaIzazova,
   javnaSjedalaZaMod,
   KLJUCEVI_JAVNOG_REDA,
   ZADANI_PRAVILNIK,
 } from 'zajednicko';
+import { evaluirajNapredak, prazneCinjenice } from '../izazovi/evaluacija.js';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca } from '../baza/shema.js';
@@ -1448,7 +1450,15 @@ export function stvoriUpraviteljPartija(
         spojeniDvoboj,
         kontekst,
         trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
-        ...(stanje.izazovMeta ? { izazov: stanje.izazovMeta } : {}),
+        ...(stanje.izazovMeta
+          ? {
+              izazov: stanje.izazovMeta,
+              goalProgress: evaluirajNapredak(
+                definicijaIzazova(stanje.izazovMeta.challengeId).ciljevi,
+                prazneCinjenice(),
+              ),
+            }
+          : {}),
       };
       for (const s of sudionici) {
         aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });

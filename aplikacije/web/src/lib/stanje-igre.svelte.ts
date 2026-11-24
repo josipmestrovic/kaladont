@@ -20,6 +20,7 @@ import type {
   TreningNeaktivnost,
 } from 'zajednicko';
 import { pustiAudio, zaustaviSveZvukove, type AudioDogadaj } from './audio-manager.js';
+import { pocetniGoalProgressIzazova } from './izazovi-klijent.js';
 import { dohvatiSocket, oznaciPartijuDostupnom } from './socket.js';
 
 interface StanjeIgre {
@@ -307,12 +308,17 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.kodSobe = p.kodSobe ?? null;
   stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
   if (stanje.kontekst === 'izazov') {
-    if (p.goalProgress !== undefined) stanje.goalProgress = p.goalProgress ?? null;
-    if (p.izazovTerminal !== undefined) stanje.izazovTerminal = p.izazovTerminal ?? null;
     if (p.izazov) {
       stanje.izazovMeta = p.izazov;
       stanje.izazovChallengeId = p.izazov.challengeId;
     }
+    if (p.goalProgress !== undefined) {
+      const challengeId = p.izazov?.challengeId ?? stanje.izazovMeta?.challengeId;
+      stanje.goalProgress =
+        p.goalProgress ??
+        (challengeId ? pocetniGoalProgressIzazova(challengeId) : null);
+    }
+    if (p.izazovTerminal !== undefined) stanje.izazovTerminal = p.izazovTerminal ?? null;
   } else {
     stanje.goalProgress = null;
     stanje.izazovTerminal = null;
@@ -485,13 +491,18 @@ export function pokreniSlusateljeIgre(): void {
     stanje.kodSobe = p.kodSobe ?? null;
     // Mora stići prije prvog potez:prihvacen — inače prazan istek izgleda kao ubojita riječ.
     stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
-    stanje.goalProgress = null;
     stanje.izazovTerminal = null;
     if (p.izazov) {
       stanje.izazovMeta = p.izazov;
       stanje.izazovChallengeId = p.izazov.challengeId;
+      // Odmah katalogski uvjeti — ne čekaj prvi potez / partija:stanje.
+      stanje.goalProgress =
+        p.goalProgress ?? pocetniGoalProgressIzazova(p.izazov.challengeId);
     } else if (stanje.kontekst !== 'izazov') {
       stanje.izazovMeta = null;
+      stanje.goalProgress = null;
+    } else {
+      stanje.goalProgress = p.goalProgress ?? null;
     }
   });
 

@@ -187,7 +187,8 @@
     justify-content: flex-start;
     align-items: center;
     gap: clamp(12px, 1.8dvh, 18px);
-    width: min(100%, 560px);
+    /* Ista širina kao header/footer (parent .landing + max 980). */
+    width: min(100%, 980px);
     min-width: 0;
     max-width: 100%;
     text-align: center;
@@ -461,10 +462,6 @@
       padding-top: 80px;
     }
 
-    .izbornik {
-      width: min(100%, 820px);
-    }
-
     .glavna-navigacija {
       grid-template-columns: 1fr 1fr;
       grid-auto-rows: var(--visina-stavke);
@@ -559,7 +556,6 @@
     }
 
     .izbornik {
-      width: min(100%, 440px);
       gap: clamp(12px, 1.6dvh, 16px);
     }
 
