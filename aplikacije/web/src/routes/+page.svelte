@@ -54,21 +54,12 @@
   let izazoviGeneracija = 0;
   let kolekcijaGeneracija = 0;
   let dostignucaGeneracija = 0;
-  let brojRijeciKolekcije = $state<number | null>(null);
+  let kolekcijaRazinaNaziv = $state('Početnik');
   let dostignucaZvjezdice = $state<PrikazZvjezdicaDostignuca>({
     ukupno: 0,
     maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
   });
-  const kolekcijaBadge = $derived(
-    brojRijeciKolekcije !== null && brojRijeciKolekcije > 0 ? String(brojRijeciKolekcije) : null,
-  );
-  const kolekcijaBadgeAria = $derived(
-    brojRijeciKolekcije !== null && brojRijeciKolekcije > 0
-      ? brojRijeciKolekcije === 1
-        ? '1 riječ u kolekciji'
-        : `${brojRijeciKolekcije} riječi u kolekciji`
-      : null,
-  );
+  const kolekcijaLabela = $derived(`razina: ${kolekcijaRazinaNaziv}`);
   const dostignucaLabela = $derived(labelaZvjezdicaDostignuca(dostignucaZvjezdice));
   const dostignucaAria = $derived(ariaBadgaDostignuca(dostignucaZvjezdice));
   const jeGost = $derived(
@@ -103,17 +94,18 @@
     }
   }
 
-  async function osvjeziBrojRijeciKolekcije() {
+  async function osvjeziKolekciju() {
     const generacija = ++kolekcijaGeneracija;
     try {
-      const odgovor = await api<{ ukupnoOtkljucano?: number }>('/profil/kolekcija');
+      const odgovor = await api<{
+        kolekcionarskaRazina?: { naziv?: string };
+      }>('/profil/kolekcija');
       if (generacija !== kolekcijaGeneracija) return;
-      const broj = odgovor.ukupnoOtkljucano;
-      brojRijeciKolekcije =
-        typeof broj === 'number' && Number.isFinite(broj) && broj >= 0 ? Math.floor(broj) : null;
+      const naziv = odgovor.kolekcionarskaRazina?.naziv?.trim();
+      kolekcijaRazinaNaziv = naziv && naziv.length > 0 ? naziv : 'Početnik';
     } catch {
       if (generacija !== kolekcijaGeneracija) return;
-      brojRijeciKolekcije = null;
+      kolekcijaRazinaNaziv = 'Početnik';
     }
   }
 
@@ -139,7 +131,7 @@
       if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
         void osvjeziIzazove();
         void osigurajStanjeMisija({ forsaj: true });
-        void osvjeziBrojRijeciKolekcije();
+        void osvjeziKolekciju();
         void osvjeziDostignucaZvjezdice();
       }
     });
@@ -154,7 +146,7 @@
       kolekcijaGeneracija += 1;
       dostignucaGeneracija += 1;
       izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
-      brojRijeciKolekcije = null;
+      kolekcijaRazinaNaziv = 'Početnik';
       dostignucaZvjezdice = {
         ukupno: 0,
         maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
@@ -178,7 +170,7 @@
     void osigurajProfil().then(() => {
       void osvjeziIzazove();
       void osigurajStanjeMisija();
-      void osvjeziBrojRijeciKolekcije();
+      void osvjeziKolekciju();
       void osvjeziDostignucaZvjezdice();
     });
 
@@ -363,22 +355,16 @@
             href="/profil#rijeci"
             class="sporedni-precac"
             data-testid="naslovnica-kolekcija"
-            aria-label={kolekcijaBadgeAria
-              ? `Kolekcija riječi, ${kolekcijaBadgeAria}`
-              : 'Kolekcija riječi'}
+            aria-label={`Kolekcija riječi, ${kolekcijaLabela}`}
             onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
           >
             <span class="sporedni-precac__ikona">
               <img src="/ikone/08-pravila.png" alt="" width="40" height="40" />
-              {#if kolekcijaBadge}
-                <span
-                  class="sporedni-precac__badge"
-                  data-testid="naslovnica-kolekcija-badge"
-                  aria-hidden="true">{kolekcijaBadge}</span
-                >
-              {/if}
             </span>
-            <span>Kolekcija riječi</span>
+            <span class="sporedni-precac__tekst">
+              <span>Kolekcija riječi</span>
+              <small data-testid="naslovnica-kolekcija-labela">{kolekcijaLabela}</small>
+            </span>
           </a>
           <a
             href="/profil#dostignuca"
