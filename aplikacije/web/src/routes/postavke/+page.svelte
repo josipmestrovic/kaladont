@@ -3,8 +3,14 @@
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
+  import {
+    animiranaPozadinaUkljucena,
+    inicijalizirajAnimacijuPozadine,
+    postaviAnimiranuPozadinu,
+  } from '$lib/postavke-animacije.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import AudioKontrola from '$lib/komponente/AudioKontrola.svelte';
+  import PrekidacPostavke from '$lib/komponente/PrekidacPostavke.svelte';
 
   interface Profil {
     igracId: string;
@@ -29,15 +35,23 @@
   let trenutnaLozinka = $state('');
   let novaLozinka = $state('');
   let porukaLozinka = $state<string | null>(null);
+  let animacijaUkljucena = $state(true);
 
   const registriran = jeRegistriranKorisnik();
 
-  onMount(async () => {
-    try {
-      profil = await api<Profil>('/profil');
-    } catch (e) {
-      greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje profilnih podataka.';
-    }
+  onMount(() => {
+    inicijalizirajAnimacijuPozadine();
+    const odjava = animiranaPozadinaUkljucena.subscribe((v) => {
+      animacijaUkljucena = v;
+    });
+    void (async () => {
+      try {
+        profil = await api<Profil>('/profil');
+      } catch (e) {
+        greska = e instanceof Error ? e.message : 'Neuspjelo dohvaćanje profilnih podataka.';
+      }
+    })();
+    return () => odjava();
   });
 
   async function promijeniEmail(e: SubmitEvent) {
@@ -78,6 +92,19 @@
     <div class="zvuk-okvir">
       <AudioKontrola />
     </div>
+  </section>
+
+  <section class="sekcija">
+    <h2>Animirana pozadina</h2>
+    <p class="podtekst">Padajuće riječi na naslovnici</p>
+    <PrekidacPostavke
+      checked={animacijaUkljucena}
+      ariaLabel="Animirana pozadina"
+      testId="postavka-animirana-pozadina"
+      onchange={(ukljucen) => postaviAnimiranuPozadinu(ukljucen)}
+    >
+      <strong>Animirana pozadina</strong>
+    </PrekidacPostavke>
   </section>
 
   {#if !registriran}

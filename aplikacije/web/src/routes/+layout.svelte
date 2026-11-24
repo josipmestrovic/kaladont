@@ -17,6 +17,10 @@
   import { ucitajKriticneIkone, ucitajPozadinskeAseteLandinga } from '$lib/asetovi-core.js';
   import { inicijalizirajFontPostavku } from '$lib/postavke-fonta.js';
   import { inicijalizirajTemu } from '$lib/postavke-teme.js';
+  import {
+    animiranaPozadinaUkljucena,
+    inicijalizirajAnimacijuPozadine,
+  } from '$lib/postavke-animacije.js';
   import { inicijalizirajGlas } from '$lib/glasovni-manager.js';
   import Header from '$lib/komponente/Header.svelte';
   import VezaObavijest from '$lib/komponente/VezaObavijest.svelte';
@@ -31,6 +35,8 @@
   let { children, data } = $props();
   let sesijaSpreman = $state(false);
   let desktopPadajuceRijeci = $state(false);
+  let reducedMotion = $state(false);
+  let animacijaUkljucena = $state(true);
   let prethodnaPutanja = $state<string | null>(null);
   let mozeNaprijed = $state(false);
   let povijestAplikacije: string[] = [];
@@ -89,10 +95,19 @@
   const robotsMeta = $derived(
     jeIndeksabilnaPutanja($page.url.pathname) ? 'index, follow' : 'noindex, follow',
   );
+  // Bočne partije: desktop prostor + ručna postavka; reduced motion ima prednost.
+  const prikaziPadajuceRijeci = $derived(
+    $page.url.pathname === '/' &&
+      sesijaSpreman &&
+      desktopPadajuceRijeci &&
+      animacijaUkljucena &&
+      !reducedMotion,
+  );
 
   onMount(() => {
     inicijalizirajTemu();
     inicijalizirajFontPostavku();
+    inicijalizirajAnimacijuPozadine();
     inicijalizirajGlas();
     inicijalizirajAudio();
 
@@ -103,13 +118,23 @@
     const sesija = inicijalizirajGostSesiju();
     postaviPutanjuSanducica($page.url.pathname);
 
-    // Padajuće riječi samo iznad 1000px — ne montirati na mobitelu/tabletu.
-    const upitPadajucih = window.matchMedia('(min-width: 1001px)');
+    const odjavaAnimacije = animiranaPozadinaUkljucena.subscribe((v) => {
+      animacijaUkljucena = v;
+    });
+
+    // Padajuće partije od 1280px — uži desktop nema dovoljno bočnog prostora uz 980px sadržaj.
+    const upitPadajucih = window.matchMedia('(min-width: 1280px)');
+    const upitReduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     const osvjeziPadajuce = () => {
       desktopPadajuceRijeci = upitPadajucih.matches;
     };
+    const osvjeziReduced = () => {
+      reducedMotion = upitReduced.matches;
+    };
     osvjeziPadajuce();
+    osvjeziReduced();
     upitPadajucih.addEventListener('change', osvjeziPadajuce);
+    upitReduced.addEventListener('change', osvjeziReduced);
 
     void (async () => {
       try {
@@ -132,7 +157,9 @@
     })();
 
     return () => {
+      odjavaAnimacije();
       upitPadajucih.removeEventListener('change', osvjeziPadajuce);
+      upitReduced.removeEventListener('change', osvjeziReduced);
       zaustaviEvidenciju();
       zaustaviObavijesti();
       zaustaviSanducic();
@@ -160,7 +187,7 @@
     <DostignuceObavijest />
     <CitanjeNaglasObavijest />
   </div>
-  {#if $page.url.pathname === '/' && sesijaSpreman && desktopPadajuceRijeci}<PadajuceRijeci />{/if}
+  {#if prikaziPadajuceRijeci}<PadajuceRijeci />{/if}
   <!-- Naslovnica: Header (s h1) i u SSR-u prije gost-sesije, radi indeksabilnog naslova. -->
   {#if !bezHeadera && (sesijaSpreman || $page.url.pathname === '/')}
     <Header {prethodnaPutanja} {mozeNaprijed} />

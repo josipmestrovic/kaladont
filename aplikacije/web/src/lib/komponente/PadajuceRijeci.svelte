@@ -1,23 +1,56 @@
 <script lang="ts">
-  const sigurneRijeci = [
-    'šećer', 'biser', 'bager', 'bunker', 'laser', 'trener', 'frizer', 'jezik',
-    'učenik', 'radnik', 'dnevnik', 'putnik', 'med', 'led', 'sladoled', 'ured',
-    'razred', 'pogled', 'raspored', 'rep', 'džep', 'čep', 'zid', 'papir', 'sir',
-    'krumpir', 'leptir', 'šešir', 'orah', 'okvir', 'svemir', 'klavir', 'mir',
-    'automobil', 'krokodil', 'miš', 'slatkiš', 'nož', 'velik', 'lijep', 'loš',
-    'suh', 'gluh', 'duhovit', 'jučer', 'navečer', 'prekjučer', 'naprijed',
-    'unaprijed', 'još', 'blizu', 'noću',
-  ];
+  import { onMount } from 'svelte';
+  import PadajucaPartija from './PadajucaPartija.svelte';
+
+  /** Širina središnjeg sadržaja naslovnice — usklađena s --sirina-grida. */
+  const SIRINA_SREDISTA = 980;
+  /** Minimalna širina bočne zone da animacija ima smisla. */
+  const MIN_ZONA = 110;
+
+  let pauzirano = $state(false);
+  let uskaZona = $state(false);
+  let dovoljnoProstora = $state(true);
+
+  function osvjeziProstor() {
+    const sirina = window.innerWidth;
+    const zona = (sirina - SIRINA_SREDISTA) / 2;
+    dovoljnoProstora = zona >= MIN_ZONA;
+    uskaZona = zona < 180;
+  }
+
+  onMount(() => {
+    osvjeziProstor();
+    const naVidljivost = () => {
+      pauzirano = document.hidden;
+    };
+    naVidljivost();
+    document.addEventListener('visibilitychange', naVidljivost);
+    window.addEventListener('resize', osvjeziProstor);
+    return () => {
+      document.removeEventListener('visibilitychange', naVidljivost);
+      window.removeEventListener('resize', osvjeziProstor);
+    };
+  });
 </script>
 
-<div class="pozadina-rijeci" aria-hidden="true">
-  {#each sigurneRijeci as rijec, indeks}
-    <span
-      class="rijec"
-      style={`--indeks: ${indeks}; --lijevo: ${(indeks * 37) % 96}%; --odgoda: ${(indeks % 13) * -0.8}s; --trajanje: ${8 + (indeks % 7)}s;`}
-    >{rijec}</span>
-  {/each}
-</div>
+{#if dovoljnoProstora}
+  <div class="pozadina-rijeci" aria-hidden="true" data-testid="pozadina-rijeci">
+    <PadajucaPartija
+      strana="lijevo"
+      brzinaPxPoSekundi={32}
+      intervalMs={3500}
+      {pauzirano}
+      {uskaZona}
+    />
+    <PadajucaPartija
+      strana="desno"
+      brzinaPxPoSekundi={26}
+      intervalMs={4500}
+      {pauzirano}
+      {uskaZona}
+    />
+  </div>
+{/if}
 
 <style>
   .pozadina-rijeci {
@@ -26,31 +59,6 @@
     inset: 0;
     overflow: hidden;
     pointer-events: none;
-  }
-
-  /* Pune boje bez prozirnosti - preklapanje dviju rijeci inace postaje vidljivo. */
-  .rijec {
-    position: absolute;
-    top: -30px;
-    left: var(--lijevo);
-    color: #3f8474;
-    font-family: var(--font-naslov);
-    font-size: 24px;
-    font-weight: 700;
-    transform: rotate(-8deg);
-    animation: padanje var(--trajanje) linear var(--odgoda) infinite;
-  }
-
-  :global(html[data-tema='svijetla']) .rijec {
-    color: #bfd4c9;
-  }
-
-  @keyframes padanje {
-    0% { transform: translateY(-30px) rotate(-8deg); }
-    100% { transform: translateY(calc(100vh + 80px)) rotate(8deg); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .rijec { animation: none; }
+    --sirina-grida: 980px;
   }
 </style>

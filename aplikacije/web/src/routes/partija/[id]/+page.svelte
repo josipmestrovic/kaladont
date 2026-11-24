@@ -1036,6 +1036,7 @@
       const id = sljedeciIdReakcije++;
       reakcije = [...reakcije, { id, igracId, poruka }];
       odskociAvatara = { ...odskociAvatara, [igracId]: (odskociAvatara[igracId] ?? 0) + 1 };
+      pustiAudio('chat-poruka');
       window.setTimeout(() => {
         reakcije = reakcije.filter((reakcija) => reakcija.id !== id);
       }, 3500);
@@ -1065,6 +1066,7 @@
       if (eliminacija.razlog !== 'ne_znam') return;
       const id = sljedeciIdReakcije++;
       reakcije = [...reakcije, { id, igracId: eliminacija.igracId, poruka: 'tuzan' }];
+      odskociAvatara = { ...odskociAvatara, [eliminacija.igracId]: (odskociAvatara[eliminacija.igracId] ?? 0) + 1 };
       window.setTimeout(() => {
         reakcije = reakcije.filter((reakcija) => reakcija.id !== id);
       }, 3500);
@@ -1791,6 +1793,14 @@
                   <span class="rang-razina">{statusSjedala(sjedalo)}</span>
                 {/if}
             </span>
+          </div>
+          <div class="reakcije-overlay" aria-live="polite">
+            {#each reakcije.filter((reakcija) => reakcija.igracId === sjedalo.igracId) as reakcija (reakcija.id)}
+              <span class="reakcija-oblak" role="status">
+                <span aria-hidden="true">{REAKCIJE_EMOJI_PROSIRENE[reakcija.poruka]}</span>
+                {REAKCIJE_TEKST_PROSIRENE[reakcija.poruka]}
+              </span>
+            {/each}
           </div>
         {:else}
           <button
@@ -2658,7 +2668,8 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    width: min(220px, calc(100vw - 24px));
+    width: max-content;
+    max-width: min(280px, calc(100vw - 24px));
     pointer-events: none;
     transform: translateX(-50%);
   }
@@ -3356,7 +3367,24 @@
     position: relative;
     z-index: 1000;
     margin-top: 4px;
+    max-width: min(260px, calc(100vw - 32px));
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow-wrap: normal;
     animation: reakcija-dolazak 3.5s ease both;
+  }
+
+  @media (min-width: 1000px) {
+    .reakcije-overlay {
+      max-width: 360px;
+    }
+
+    .reakcija-oblak {
+      max-width: 360px;
+      font-size: 20px;
+    }
   }
   .rijec-oblak {
     position: absolute;
