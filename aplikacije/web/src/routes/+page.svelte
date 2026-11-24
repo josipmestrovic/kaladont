@@ -325,13 +325,13 @@
   {/if}
 
   <footer class="landing-footer">
-    <nav aria-label="Dodatne poveznice">
-      <a href="/pravila-kaladonta">Pravila</a>
-      <a href="/povratne-informacije">Povratne informacije</a>
+    <p class="copyright">
+      © {new Date().getFullYear()} Kaladont
+      <span class="razdjelnik" aria-hidden="true">·</span>
       <a href="/uvjeti">Uvjeti</a>
+      <span class="razdjelnik" aria-hidden="true">·</span>
       <a href="/privatnost">Privatnost</a>
-    </nav>
-    <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
+    </p>
   </footer>
 </main>
 
@@ -770,32 +770,31 @@
     z-index: 1;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px 16px;
+    justify-content: center;
     width: min(100%, var(--sirina-grida));
+    text-align: center;
   }
 
   .copyright {
-    flex: none;
-    font-size: var(--tekst-sitni);
-    line-height: 1.2;
-    color: var(--boja-tekst-sekundarni);
-    white-space: nowrap;
-  }
-
-  .landing-footer nav {
+    margin: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-start;
-    gap: 8px 18px;
+    justify-content: center;
+    gap: 4px 8px;
+    font-size: var(--tekst-sitni);
+    line-height: 1.3;
+    color: var(--boja-tekst-sekundarni);
+  }
+
+  .copyright .razdjelnik {
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 70%, transparent);
   }
 
   .landing-footer a {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: clamp(4px, 1dvh, 8px) 10px;
+    padding: clamp(4px, 1dvh, 8px) 2px;
     border: 0;
     background: transparent;
     color: var(--boja-tekst-sekundarni);
@@ -880,7 +879,6 @@
       margin-bottom: 10px;
     }
 
-    .landing-footer a { padding-inline: 0; }
   }
 
   /* Niski desktop: smanji prazan prostor, CTA ostaje vidljiv, scroll je dopušten. */
@@ -935,13 +933,12 @@
       box-sizing: border-box;
     }
 
-    .landing-footer { flex-direction: column; gap: 2px; }
-    .landing-footer nav { justify-content: center; gap: 0 8px; }
     .landing-footer a {
-      padding: clamp(2px, 0.6dvh, 8px) 6px;
+      padding: clamp(2px, 0.6dvh, 8px) 2px;
       font-size: clamp(12px, 2dvh, var(--tekst-sitni));
       line-height: 1.2;
     }
+
     .copyright {
       font-size: clamp(12px, 2dvh, var(--tekst-sitni));
       line-height: 1.2;

@@ -26,38 +26,18 @@ for (const sirina of [320, 390, 1440]) {
     await page.setViewportSize({ width: sirina, height: sirina < 1000 ? 568 : 900 });
     await page.goto('/');
     const footer = page.locator('.landing-footer');
+    const godina = String(new Date().getFullYear());
     // Duži timeout zbog gost-sesije / CI latency.
-    await expect(footer.locator('.copyright')).toHaveText('© 2026 Kaladont. Sva prava pridržana.', {
+    await expect(footer.locator('.copyright')).toContainText(`© ${godina} Kaladont`, {
       timeout: 20_000,
     });
     await page.evaluate(() => document.fonts.ready);
-    if (sirina >= 1000) {
-      // Čekaj stabilan layout (font metrics) prije provjere vertikalnog poravnanja.
-      await expect
-        .poll(
-          async () => {
-            const nav = await footer.locator('nav').boundingBox();
-            const copyright = await footer.locator('.copyright').boundingBox();
-            if (!nav || !copyright) return Number.POSITIVE_INFINITY;
-            if (copyright.x <= nav.x + nav.width) return Number.POSITIVE_INFINITY;
-            return Math.abs(copyright.y + copyright.height / 2 - nav.y - nav.height / 2);
-          },
-          { timeout: 5_000 },
-        )
-        .toBeLessThanOrEqual(1);
-    } else {
-      const nav = await footer.locator('nav').boundingBox();
-      const copyright = await footer.locator('.copyright').boundingBox();
-      expect(copyright!.y).toBeGreaterThanOrEqual(nav!.y + nav!.height);
-    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: podaciTesta.outputPath('footer.png') });
-    await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveAttribute(
-      'href',
-      '/povratne-informacije',
-    );
     await expect(footer.getByRole('link', { name: 'Uvjeti' })).toHaveAttribute('href', '/uvjeti');
     await expect(footer.getByRole('link', { name: 'Privatnost' })).toHaveAttribute('href', '/privatnost');
+    await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveCount(0);
+    await expect(footer.getByRole('link', { name: 'Pravila' })).toHaveCount(0);
     await page.goto('/o-igri');
     await expect(page.getByRole('heading', { name: 'O igri' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toHaveAttribute(
@@ -91,14 +71,14 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(page.locator('.ilustracija')).toHaveCount(0);
 
   const footer = page.locator('.landing-footer');
-  const footerLinkovi = footer.locator('nav a');
-  await expect(footerLinkovi).toHaveCount(4);
-  await expect(footerLinkovi.nth(0)).toHaveAttribute('href', '/pravila-kaladonta');
-  await expect(footerLinkovi.nth(0)).toHaveText('Pravila');
-  await expect(footerLinkovi.nth(1)).toHaveAttribute('href', '/povratne-informacije');
-  await expect(footerLinkovi.nth(1)).toHaveText('Povratne informacije');
-  await expect(footerLinkovi.nth(2)).toHaveAttribute('href', '/uvjeti');
-  await expect(footerLinkovi.nth(3)).toHaveAttribute('href', '/privatnost');
+  const footerLinkovi = footer.locator('a');
+  await expect(footerLinkovi).toHaveCount(2);
+  await expect(footerLinkovi.nth(0)).toHaveAttribute('href', '/uvjeti');
+  await expect(footerLinkovi.nth(0)).toHaveText('Uvjeti');
+  await expect(footerLinkovi.nth(1)).toHaveAttribute('href', '/privatnost');
+  await expect(footerLinkovi.nth(1)).toHaveText('Privatnost');
+  await expect(footer.getByRole('link', { name: 'Pravila' })).toHaveCount(0);
+  await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveCount(0);
 
   await expect(page.getByTestId('naslovnica-napredak')).toBeVisible({ timeout: 20_000 });
 
@@ -355,9 +335,9 @@ test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ 
   await expect(header.getByRole('button', { name: 'Nazad' })).toHaveCount(0);
   await expect(header.locator('.avatar')).toBeVisible({ timeout: 20_000 });
   const footer = page.locator('.landing-footer');
-  await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Uvjeti' })).toBeVisible();
   await expect(footer.getByRole('link', { name: 'Privatnost' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveCount(0);
   await expect(footer.getByRole('link', { name: 'Novosti' })).toHaveCount(0);
   await expect(footer.getByRole('link', { name: 'O igri' })).toHaveCount(0);
 
