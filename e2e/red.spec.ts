@@ -125,7 +125,7 @@ test('PR02-12/19: puni završni DTO u ciljanom DOM redoslijedu; pohvale nepromij
     const yOcjena = await y(stranica.getByRole('region', { name: 'Ocjena igre' }));
     const yXp = await y(stranica.getByRole('region', { name: 'Osvojeno iskustvo' }));
     const yPohvala = await y(stranica.getByRole('region', { name: 'Pohvale ove igre' }));
-    const yDostignuca = await y(stranica.getByRole('heading', { name: 'Dostignuća otključana u ovoj partiji' }));
+    const yDostignuca = await y(stranica.getByRole('heading', { name: 'Dostignuća otključana u ovoj igri' }));
     const yForma = await y(stranica.getByRole('heading', { name: 'Forma' }));
     const yKolekcija = await y(stranica.getByRole('heading', { name: 'Kolekcija riječi' }));
     const yAkcije = await y(stranica.locator('.kraj-akcije').first());
@@ -195,7 +195,7 @@ test('PR02-13: minimalni završni DTO skriva opcionalne blokove; akcije i prijav
     await expect(stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible({ timeout: 5_000 });
     await expect(stranica.getByRole('region', { name: 'Pohvale ove igre' })).toHaveCount(0);
     await expect(stranica.getByRole('heading', { name: 'Kolekcija riječi' })).toHaveCount(0);
-    await expect(stranica.getByRole('heading', { name: 'Dostignuća otključana u ovoj partiji' })).toHaveCount(0);
+    await expect(stranica.getByRole('heading', { name: 'Dostignuća otključana u ovoj igri' })).toHaveCount(0);
     await expect(stranica.locator('.kraj-akcije')).toBeVisible();
     await expect(stranica.getByText('Prijavi riječ').first()).toBeVisible();
     await expect(stranica.getByText('Prijavi igrača').first()).toBeVisible();

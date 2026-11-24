@@ -245,7 +245,7 @@
           startPoruka =
             ishod.status === 'tehnicki_prekinuto'
               ? 'Izazov se nije mogao pokrenuti. Pokušaj ponovno.'
-              : 'Partija još nije krenula. Pokušaj ponovno ili osvježi mapu.';
+              : 'Igra još nije krenula. Pokušaj ponovno ili osvježi mapu.';
           void ucitaj();
           return;
         }

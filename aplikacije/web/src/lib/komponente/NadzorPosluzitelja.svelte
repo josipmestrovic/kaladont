@@ -61,8 +61,8 @@
       <div><dt>Event-loop p95</dt><dd>{broj(uzorak.eventLoopP95Ms, ' ms')}</dd></div>
       <div><dt>HTTP p95 / zahtjevi u 5 s</dt><dd>{broj(uzorak.http.p95Ms, ' ms')} / {uzorak.http.zahtjevi}</dd></div>
       <div><dt>HTTP 4xx / 5xx u 5 s</dt><dd>{uzorak.http.greske4xx} / {uzorak.http.greske5xx}</dd></div>
-      <div><dt>Veze / partije / treninzi</dt><dd>{uzorak.igra.veze} / {uzorak.igra.partije} / {uzorak.igra.treninzi}</dd></div>
-      <div><dt>Slobodni botovi / u partiji</dt><dd>{uzorak.igra.slobodniBotovi} / {uzorak.igra.botoviUPartiji}</dd></div>
+      <div><dt>Veze / igre / treninzi</dt><dd>{uzorak.igra.veze} / {uzorak.igra.partije} / {uzorak.igra.treninzi}</dd></div>
+      <div><dt>Slobodni botovi / u igri</dt><dd>{uzorak.igra.slobodniBotovi} / {uzorak.igra.botoviUPartiji}</dd></div>
       <div><dt>Botovi neočekivani isteci / greške od pokretanja</dt><dd>{uzorak.igra.isteciBotova} / {uzorak.igra.greskeBotova}</dd><small>Namjerni isteci: {uzorak.igra.namjerniIsteciBotova}</small></div>
       <div><dt>Baza / trajanje provjere</dt><dd>{uzorak.baza.dostupna === null ? 'Čeka provjeru' : uzorak.baza.dostupna ? 'Dostupna' : 'Nedostupna'} / {broj(uzorak.baza.trajanjeMs, ' ms')}</dd><small>Provjereno {vrijeme(uzorak.baza.provjerenoU)}</small></div>
       <div><dt>Socket.IO pokušaji / odbijeni od pokretanja</dt><dd>{uzorak.socket.pokusaji} / {uzorak.socket.odbijeni}</dd><small>Origin {uzorak.socket.odbijeniOrigin} · IP limit {uzorak.socket.odbijeniIp} · Kapacitet {uzorak.socket.odbijeniLimit}</small></div>

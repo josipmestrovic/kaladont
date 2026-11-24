@@ -34,7 +34,7 @@ test('gost pokreće Zagrijavanje, odustaje i vidi kraj treninga bez napretka', a
   await potvrda.getByRole('button', { name: 'Da' }).click();
 
   await expect(page.getByRole('heading', { name: 'Kraj treninga' })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('trening-obavijest')).toContainText('nije natjecateljska partija');
+  await expect(page.getByTestId('trening-obavijest')).toContainText('nije natjecateljska igra');
   await expect(page.getByRole('heading', { name: 'Forma' })).toHaveCount(0);
   // Gost je odmah odustao — bez novih riječi nema sekcije kolekcije ni XP obračuna.
   await expect(page.getByRole('heading', { name: 'Kolekcija riječi' })).toHaveCount(0);

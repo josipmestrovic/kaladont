@@ -113,7 +113,7 @@ export function porukaZaKodIzazova(kod: string | null | undefined, fallback: str
     case 'IZAZOV_AKTIVAN':
       return 'Već imaš aktivan pokušaj. Nastavi ga ili pričekaj završetak.';
     case 'VEC_U_PARTIJI':
-      return 'Već si u partiji. Završi je prije novog izazova.';
+      return 'Već si u igri. Završi je prije novog izazova.';
     case 'NEVALJAN_PAYLOAD':
       return 'Neispravan zahtjev. Pokušaj ponovno.';
     default:
@@ -128,7 +128,7 @@ export function tekstRazlogaNeuspjeha(
   const rijecTekst = rijec?.normalize('NFC').trim();
   switch (razlog) {
     case 'cilj_neispunjen':
-      return 'Pobijedio si u partiji, ali nisu ispunjeni svi ciljevi izazova. Možeš pokušati ponovno.';
+      return 'Pobijedio si u igri, ali nisu ispunjeni svi ciljevi izazova. Možeš pokušati ponovno.';
     case 'eliminiran':
       return 'Ispao si prije pobjede, pa je izazov izgubljen. Možeš pokušati ponovno.';
     case 'nevaljana_rijec':
@@ -164,7 +164,7 @@ export function kratkiSazetakNeuspjehaIzazova(
         ? `Izgubio si izazov jer si završio riječ „${rijecTekst}” na ka.`
         : 'Izgubio si izazov jer si završio riječ na ka.';
     case 'cilj_neispunjen':
-      return 'Pobijedio si partiju, ali nisu ispunjeni svi ciljevi izazova.';
+      return 'Pobijedio si igru, ali nisu ispunjeni svi ciljevi izazova.';
     case 'odustao':
       return 'Odustao si od izazova.';
     case 'prekid_veze':

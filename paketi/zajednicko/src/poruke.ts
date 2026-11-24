@@ -16,7 +16,7 @@ export const PORUKE = {
   mrtvaSlovaBaza: (dvaGrafema: string) =>
     `Trenutno u bazi nemamo riječ na '${dvaGrafema}'.`,
   mrtvaSlovaIskoristeno: (dvaGrafema: string) =>
-    `Sve riječi na '${dvaGrafema}' već su iskorištene u ovoj partiji.`,
+    `Sve riječi na '${dvaGrafema}' već su iskorištene u ovoj igri.`,
   nijeTvojPotez: 'Nisi na potezu.',
   sustavBiraRijec: 'Sustav bira novu riječ. Pričekaj trenutak.',
   prebrzo: 'Usporeni, molimo pričekaj trenutak.',

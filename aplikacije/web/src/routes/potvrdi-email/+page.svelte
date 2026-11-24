@@ -69,7 +69,7 @@
   {#if profil}
     <p>Poslali smo poveznicu za potvrdu na:</p>
     <strong class="email">{emailZaPotvrdu}</strong>
-    <p>Provjeri primljenu poštu i mapu Neželjena pošta. Dok ne potvrdiš adresu, ne možeš ulaziti u javne ni privatne partije.</p>
+    <p>Provjeri primljenu poštu i mapu Neželjena pošta. Dok ne potvrdiš adresu, ne možeš ulaziti u javne ni privatne igre.</p>
     <div class="akcije">
       <button type="button" onclick={() => void ponovnoPosalji()} disabled={saljeSe}>
         {saljeSe ? 'Šaljem...' : 'Ponovno pošalji potvrdu'}

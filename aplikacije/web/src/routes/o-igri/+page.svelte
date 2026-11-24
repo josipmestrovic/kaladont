@@ -156,7 +156,7 @@
             </tr>
             <tr>
               <th scope="row">Ljestvice</th>
-              <td data-label="Kako se boduje">Zasebno za Dvoboj, Troboj i Četveroboj; dnevno od 5, dulje od 10 partija.</td>
+              <td data-label="Kako se boduje">Zasebno za Dvoboj, Troboj i Četveroboj; dnevno od 5, dulje od 10 igara.</td>
             </tr>
           </tbody>
         </table>
@@ -239,7 +239,7 @@
     <section>
       <h2>Zajednica</h2>
       <p>
-        Rasprave, dogovori za partije i povratne informacije žive na forumu.
+        Rasprave, dogovori za igre i povratne informacije žive na forumu.
         Čitanje je otvoreno; račun trebaš tek kad želiš sudjelovati.
       </p>
       <p class="poveznica">

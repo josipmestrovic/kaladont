@@ -15,7 +15,7 @@
     agresivan: 'Uvijek traži priliku odigrati riječ koja će eliminirati sljedećeg igrača.',
     uravnotežen: 'Nekad eliminira druge, ali eliminacije mu nisu glavni prioritet.',
     dobrica: 'Ne voli kad drugi ispadaju zbog njegove riječi.',
-    neodređen: 'Stil igre prikazat ćemo kad bude dovoljno podataka iz partija.',
+    neodređen: 'Stil igre prikazat ćemo kad bude dovoljno podataka iz igara.',
   };
 
   async function preklopi(dogadaj: MouseEvent): Promise<void> {

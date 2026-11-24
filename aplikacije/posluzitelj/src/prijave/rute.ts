@@ -59,7 +59,7 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
           .from(partije)
           .where(and(eq(partije.id, rezultat.data.partijaId), inArray(partije.status, ['u_tijeku', 'zavrsena'])))
           .limit(1);
-        if (!partija) throw new GreskaPrijave(404, 'Partija ne postoji ili nije dostupna za prijavu.');
+        if (!partija) throw new GreskaPrijave(404, 'Igra ne postoji ili nije dostupna za prijavu.');
 
         const [sudionik] = await tx
           .select({ igracId: sudioniciPartije.igracId })
@@ -67,7 +67,7 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
           .where(and(eq(sudioniciPartije.partijaId, rezultat.data.partijaId), eq(sudioniciPartije.igracId, igrac.id)))
           .for('update')
           .limit(1);
-        if (!sudionik) throw new GreskaPrijave(403, 'Samo sudionici partije mogu prijaviti riječ.');
+        if (!sudionik) throw new GreskaPrijave(403, 'Samo sudionici igre mogu prijaviti riječ.');
 
         const [redakBrojaca] = await tx
           .select({ ukupno: count() })
@@ -75,8 +75,8 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
           .where(and(eq(prijave.partijaId, rezultat.data.partijaId), eq(prijave.igracId, igrac.id), eq(prijave.tip, tip)));
         if (Number(redakBrojaca?.ukupno ?? 0) >= 3) {
           throw new GreskaPrijave(429, tip === 'za_brisanje'
-            ? 'Dosegnut je limit od 3 prijave odigranih riječi po partiji.'
-            : 'Dosegnut je limit od 3 prijave odbijenih riječi po partiji.');
+            ? 'Dosegnut je limit od 3 prijave odigranih riječi po igri.'
+            : 'Dosegnut je limit od 3 prijave odbijenih riječi po igri.');
         }
 
         if (tip === 'za_brisanje') {
@@ -98,7 +98,7 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
             .from(potezi)
             .where(uvjetPoteza)
             .limit(1);
-          if (!potez?.rijec) throw new GreskaPrijave(404, 'Riječ ne pripada navedenoj partiji.');
+          if (!potez?.rijec) throw new GreskaPrijave(404, 'Riječ ne pripada navedenoj igri.');
 
           const [duplikat] = await tx
             .select({ id: prijave.id })
@@ -176,13 +176,13 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
           .from(partije)
           .where(and(eq(partije.id, rezultat.data.partijaId), inArray(partije.status, ['u_tijeku', 'zavrsena'])))
           .limit(1);
-        if (!partija) throw new GreskaPrijave(404, 'Partija nije pronađena.');
+        if (!partija) throw new GreskaPrijave(404, 'Igra nije pronađena.');
 
         const [sudionik] = await tx.select({ igracId: sudioniciPartije.igracId }).from(sudioniciPartije).where(and(
           eq(sudioniciPartije.partijaId, rezultat.data.partijaId),
           eq(sudioniciPartije.igracId, prijavitelj.id),
         )).limit(1);
-        if (!sudionik) throw new GreskaPrijave(403, 'Samo sudionici partije mogu prijaviti igrača.');
+        if (!sudionik) throw new GreskaPrijave(403, 'Samo sudionici igre mogu prijaviti igrača.');
 
         const [prijavljeni] = await tx.select({
           igracId: sudioniciPartije.igracId,
@@ -193,7 +193,7 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
             eq(sudioniciPartije.partijaId, rezultat.data.partijaId),
             eq(sudioniciPartije.igracId, rezultat.data.prijavljeniIgracId),
           )).limit(1);
-        if (!prijavljeni) throw new GreskaPrijave(404, 'Igrač nije sudjelovao u toj partiji.');
+        if (!prijavljeni) throw new GreskaPrijave(404, 'Igrač nije sudjelovao u toj igri.');
         if (prijavljeni.upravljac === 'bot') throw new GreskaPrijave(400, 'Računalnog protivnika nije moguće prijaviti.');
 
         await tx.insert(prijaveIgraca).values({
@@ -207,7 +207,7 @@ export async function registrirajPrijaveRute(app: FastifyInstance): Promise<void
     } catch (greska) {
       if (greska instanceof GreskaPrijave) return odgovor.code(greska.status).send({ ok: false, greska: greska.message });
       if (jeJedinstvenostPrekrsena(greska)) {
-        return odgovor.code(409).send({ ok: false, greska: 'Ovog si igrača već prijavio/la za tu partiju.' });
+        return odgovor.code(409).send({ ok: false, greska: 'Ovog si igrača već prijavio/la za tu igru.' });
       }
       throw greska;
     }

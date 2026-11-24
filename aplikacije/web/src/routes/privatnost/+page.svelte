@@ -14,7 +14,7 @@
     <h2>Koje podatke koristimo?</h2>
     <ul>
       <li>email adresu i hash lozinke registriranog računa za prijavu i oporavak računa;</li>
-      <li>nadimak, avatar, statistiku i povijest partija za rad igre;</li>
+      <li>nadimak, avatar, statistiku i povijest igara za rad igre;</li>
       <li>sesijski token u nužnom kolačiću i lokalni UUID gosta za prepoznavanje igrača;</li>
       <li>
         za registrirani račun: izjavu o dobi (najmanje 16 godina), verziju prihvaćenih Uvjeta korištenja
@@ -52,7 +52,7 @@
     <h2>Zašto ih koristimo?</h2>
     <p>
       Podatke obrađujemo kako bismo omogućili račun, prijavu, oporavak lozinke, multiplayer igru,
-      povijest partija, provedbu dobne politike i Uvjeta korištenja, zaštitu od zlouporabe i
+      povijest igara, provedbu dobne politike i Uvjeta korištenja, zaštitu od zlouporabe i
       rješavanje prijava grešaka. Email potvrde i upute za reset šalju se preko Resenda.
       {#if data.umami}
         Anonimnu web analitiku koristimo da vidimo odakle dolaze posjetitelji i koje pozive na akciju koriste.
@@ -69,7 +69,7 @@
       <li>
         evidencija prihvata Uvjeta i izjave o dobi čuva se uz registrirani račun dok je račun aktivan;
       </li>
-      <li>anonimizirana povijest partija čuva se dok je potrebna za integritet igre;</li>
+      <li>anonimizirana povijest igara čuva se dok je potrebna za integritet igre;</li>
       <li>backup kopije rotiraju se prema operativnom postupku i ne uklanjaju se pojedinačno na zahtjev.</li>
     </ul>
   </section>
@@ -82,7 +82,7 @@
     </p>
     <p>
       Kod brisanja uklanjamo email, lozinku, potvrdu emaila, evidenciju prihvata Uvjeta i izjave o dobi,
-      aktivne sesije i privatni napredak. Zajedničke partije, potezi, plasmani i prijave ostaju, ali se
+      aktivne sesije i privatni napredak. Zajedničke igre, potezi, plasmani i prijave ostaju, ali se
       račun prikazuje kao „Obrisani igrač", kako se ne bi promijenila povijest drugih igrača.
     </p>
     <p>

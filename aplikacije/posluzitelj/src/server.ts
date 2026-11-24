@@ -407,7 +407,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     socket: KaladontSocket,
   ): Promise<{ kod: 'EMAIL_NIJE_POTVRDEN'; poruka: string } | null> => {
     if (socket.data.vrsta !== 'gost' && !socket.data.emailPotvrdjen) {
-      return { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u partiju.' };
+      return { kod: 'EMAIL_NIJE_POTVRDEN', poruka: 'Potvrdi email adresu prije ulaska u igru.' };
     }
     return null;
   };

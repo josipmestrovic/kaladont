@@ -1250,13 +1250,13 @@
 
 {#snippet obavijestiNapretka()}
 {#if povijestObavijestiNapretka.length > 0 && odabranaObavijestNapretka >= 0}
-  <section class="preglednik-obavijesti" class:sakrij-desktop={jeNaPotezu} aria-label="Obavijesti tijekom partije">
+  <section class="preglednik-obavijesti" class:sakrij-desktop={jeNaPotezu} aria-label="Obavijesti tijekom igre">
     <div
       class="klizac-obavijesti"
       bind:this={klizacObavijesti}
       use:povuciScroll={{ jedanKorak: true }}
       role="group"
-      aria-label="Povijest obavijesti tijekom partije"
+      aria-label="Povijest obavijesti tijekom igre"
       onscroll={() => {
         if (klizacObavijesti?.clientWidth) {
           odabranaObavijestNapretka = Math.round(klizacObavijesti.scrollLeft / klizacObavijesti.clientWidth);
@@ -1366,7 +1366,7 @@
   <h2>{jeTrening ? 'Kraj treninga' : 'Završni poredak'}</h2>
   {#if jeTrening}
     <p class="privatna-obavijest" data-testid="trening-obavijest">
-      Trening nije natjecateljska partija: XP, kolekcija i dostignuća riječi se bilježe, ali bez bodova, ranga, forme i ljestvice.
+      Trening nije natjecateljska igra: XP, kolekcija i dostignuća riječi se bilježe, ali bez bodova, ranga, forme i ljestvice.
     </p>
     {#if jeRegistriranKorisnik()}
       <p class="privatna-obavijest">Pobjeda u treningu može otključati dostignuće Zagrijan.</p>
@@ -1417,7 +1417,7 @@
     {#if stanje.kraj.jePrivatna || stanje.jePrivatna}
       <span>Ocjena igre se ne računa u privatnoj sobi.</span>
     {:else if stanje.kraj.mojaOcjenaIgre === null || stanje.kraj.mojaOcjenaIgre === undefined}
-      <span>Ocjena igre nije dostupna za ovu partiju.</span>
+      <span>Ocjena igre nije dostupna za ovu igru.</span>
     {:else}
       <strong>Tvoja ocjena</strong>
       <span class="ocjena-zvjezdice" aria-label={`Moja ocjena: ${stanje.kraj.mojaOcjenaIgre} od 5 zvjezdica`}>
@@ -1426,7 +1426,7 @@
         {/each}
       </span>
       <PojamPomoc
-        opis="Ocjena partije gleda tvoj učinak u ovoj igri (riječi, bodovi, eliminacije). Ne mijenja bodove ni rang, nego utječe na dodatni XP. Pobjeda daje 5 zvjezdica."
+        opis="Ocjena igre gleda tvoj učinak u ovoj igri (riječi, bodovi, eliminacije). Ne mijenja bodove ni rang, nego utječe na dodatni XP. Pobjeda daje 5 zvjezdica."
         id="ocjena-partije-pomoc"
       />
     {/if}
@@ -1461,7 +1461,7 @@
   {/if}
   {#if stanje.kraj.novaDostignuca.length > 0}
     <section class="zavrsna-dostignuca" aria-labelledby="zavrsna-dostignuca-naslov">
-      <h3 id="zavrsna-dostignuca-naslov">{jeTrening ? 'Dostignuće treninga' : 'Dostignuća otključana u ovoj partiji'}</h3>
+      <h3 id="zavrsna-dostignuca-naslov">{jeTrening ? 'Dostignuće treninga' : 'Dostignuća otključana u ovoj igri'}</h3>
       <div class="zavrsna-dostignuca-mrezica">
         {#each stanje.kraj.novaDostignuca as dostignuce (dostignuce.id)}
           {@const detalji = opisDostignuca(dostignuce.id)}
@@ -1562,7 +1562,7 @@
           <dialog open class="kolekcija-modal" aria-labelledby="kolekcija-modal-naslov" onclick={(event) => event.stopPropagation()} onkeydown={(event) => event.key === 'Escape' && (otvorenaKolekcijaKategorija = null)}>
             <button type="button" class="kolekcija-modal-zatvori" aria-label="Zatvori popis riječi" onclick={() => (otvorenaKolekcijaKategorija = null)}>×</button>
             <h3 id="kolekcija-modal-naslov">{naziviKategorijaKolekcije[stavka.vrsta] ?? stavka.vrsta}</h3>
-            <p>Riječi dodane u kolekciju u ovoj partiji:</p>
+            <p>Riječi dodane u kolekciju u ovoj igri:</p>
             <ul class="kolekcija-modal-rijeci">
               {#each stavka.rijeci as rijec}
                 {@const oznake = oznakeZaRijecKolekcije(rijec, kolekcija.oznakeNovihRijeci)}

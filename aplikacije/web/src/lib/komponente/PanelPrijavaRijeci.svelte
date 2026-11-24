@@ -245,7 +245,7 @@
         </div>
       {/if}
     {:else if odbijeneRijeci.length === 0}
-      <p class="prazno">Nemaš odbijenih riječi u ovoj partiji.</p>
+      <p class="prazno">Nemaš odbijenih riječi u ovoj igri.</p>
       <div class="panel-podnozje">
         <button type="button" class="zatvori-panel" onclick={zatvoriPanel}>Zatvori</button>
       </div>

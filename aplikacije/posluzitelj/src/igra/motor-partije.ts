@@ -1062,7 +1062,7 @@ export function stvoriUpraviteljPartija(
   function emitirajSpremanjeRezultata(stanje: StanjeStola): void {
     const poruka = {
       partijaId: stanje.partijaId,
-      poruka: 'Partija je završila. Konačni rezultat se još sprema, pokušavamo ponovno.',
+      poruka: 'Igra je završila. Konačni rezultat se još sprema, pokušavamo ponovno.',
     };
     for (const sudionik of stanje.sudionici) {
       aktivneVeze.dohvatiSocket(sudionik.igracId)?.emit('partija:spremanje-rezultata', poruka);
@@ -1093,7 +1093,7 @@ export function stvoriUpraviteljPartija(
       for (const sudionik of stanje.sudionici) {
         aktivneVeze.dohvatiSocket(sudionik.igracId)?.emit('partija:ponistena', {
           partijaId: stanje.partijaId,
-          poruka: 'Partija je prekinuta zbog gašenja poslužitelja. Rezultat nije dodijeljen.',
+          poruka: 'Igra je prekinuta zbog gašenja poslužitelja. Rezultat nije dodijeljen.',
         });
         aktivneVeze.dohvatiSocket(sudionik.igracId)?.leave(SOBA_PARTIJE(stanje.partijaId));
         if (partijaPoIgracu.get(sudionik.igracId) === stanje.partijaId) partijaPoIgracu.delete(sudionik.igracId);
@@ -1482,7 +1482,7 @@ export function stvoriUpraviteljPartija(
         socket?.leave(SOBA_PARTIJE(partijaId));
         socket?.emit('greska', {
           kod: 'UPIS_PARTIJE_NEUSPJEO',
-          poruka: 'Partiju nije moguće pokrenuti zbog pogreške pri spremanju. Pokušaj ponovno.',
+          poruka: 'Igru nije moguće pokrenuti zbog pogreške pri spremanju. Pokušaj ponovno.',
         });
       }
       return { ishod: 'greska' as const, partijaId: null };
@@ -3306,7 +3306,7 @@ export function stvoriUpraviteljPartija(
     if (stanje.statusSpremanja === 'spremanje_rezultata') {
       socket.emit('partija:spremanje-rezultata', {
         partijaId: stanje.partijaId,
-        poruka: 'Partija je završila. Konačni rezultat se još sprema, pokušavamo ponovno.',
+        poruka: 'Igra je završila. Konačni rezultat se još sprema, pokušavamo ponovno.',
       });
       // Reconnect: retrySpremanjaHandle postoji samo dok čekamo backoff (ne dok traje upis).
       if (stanje.ponoviZavrsnoSpremanje && stanje.retrySpremanjaHandle) {

@@ -132,7 +132,7 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
   { id: 'ka_zna', naziv: 'KA-zna', opis: 'Budi izbačen Kaladontom.', kategorija: 'kaladont', pragovi: [1, 5, 15, 25, 50], vrijediUPrivatnoj: false, brojac: 'kaladontZrtve' },
   { id: 'lovac_na_glave', naziv: 'Lovac na glave', opis: 'Izazovi eliminacije.', kategorija: 'igra', pragovi: [1, 10, 30, 75, 150], vrijediUPrivatnoj: false, brojac: 'izazvaneEliminacije' },
   { id: 'slijepa_ulica', naziv: 'Slijepa ulica', opis: 'Izazovi eliminacije mrtvim slovima.', kategorija: 'igra', pragovi: [1, 5, 15, 40, 100], vrijediUPrivatnoj: false, brojac: 'mrtvaSlovaEliminacije' },
-  { id: 'zavrsna_rijec', naziv: 'Završna riječ', opis: 'Pobijedi u javnoj partiji.', kategorija: 'igra', pragovi: [1, 5, 20, 50, 100], vrijediUPrivatnoj: false, brojac: 'javnePobjede' },
+  { id: 'zavrsna_rijec', naziv: 'Završna riječ', opis: 'Pobijedi u javnoj igri.', kategorija: 'igra', pragovi: [1, 5, 20, 50, 100], vrijediUPrivatnoj: false, brojac: 'javnePobjede' },
   { id: 'glas_zajednice', naziv: 'Glas zajednice', opis: 'Pošalji povratnu informaciju o igri.', kategorija: 'igra', pragovi: [1, 2, 3, 4, 5], vrijediUPrivatnoj: false, brojac: 'povratneInformacije' },
   { id: 'zagrijan', naziv: 'Zagrijan', opis: 'Pobijedi u treningu protiv Računala.', kategorija: 'igra', pragovi: [1, 5, 20, 50, 100], vrijediUPrivatnoj: false, brojac: 'treningPobjede' },
   {

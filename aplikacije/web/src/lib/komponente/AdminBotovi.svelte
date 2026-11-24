@@ -121,7 +121,7 @@
       if (!aktivan) return;
       zapis = odgovor;
       nacrt = kopija(odgovor.konfiguracija);
-      poruka = `Spremljena revizija ${odgovor.revizija}. Nove postavke vrijede za nove partije i epizode reda.`;
+      poruka = `Spremljena revizija ${odgovor.revizija}. Nove postavke vrijede za nove igre i epizode reda.`;
     } catch (pogreska) { if (aktivan) greska = pogreska instanceof Error ? pogreska.message : 'Spremanje nije uspjelo.'; }
     finally { if (aktivan) spremanje = false; }
   }
@@ -142,7 +142,7 @@
         body: JSON.stringify({ aktivan: !bot.aktivan }),
       });
       if (!aktivan) return;
-      poruka = odgovor.dovrsavaIgru ? 'Bot je deaktiviran za nove rezervacije i dovršit će aktivnu partiju.' : `Bot je ${odgovor.aktivan ? 'aktiviran' : 'deaktiviran'}.`;
+      poruka = odgovor.dovrsavaIgru ? 'Bot je deaktiviran za nove rezervacije i dovršit će aktivnu igru.' : `Bot je ${odgovor.aktivan ? 'aktiviran' : 'deaktiviran'}.`;
       await ucitajPregled();
     } catch (pogreska) { if (aktivan) greska = pogreska instanceof Error ? pogreska.message : 'Promjena aktivacije nije uspjela.'; }
     finally {
@@ -209,7 +209,7 @@
           {#if zapis.brziRazvojDopusten}<label><input type="checkbox" bind:checked={nacrt.brziRazvoj} /> Brzi lokalni razvoj</label>{/if}
         </fieldset>
         <fieldset><legend>Tempo i reakcije</legend>
-          <p class="napomena">Potez bota: {(nacrt.trajanjePotezaBotaMs / 1000).toLocaleString('hr-HR', { maximumFractionDigits: 1 })} s (±{(nacrt.jitterPotezaBotaMs / 1000).toLocaleString('hr-HR', { maximumFractionDigits: 1 })} s). Reakcije su obvezne (pool poruka) u javnim, privatnim i trening partijama. Namjerni izostanak je isključen.</p>
+          <p class="napomena">Potez bota: {(nacrt.trajanjePotezaBotaMs / 1000).toLocaleString('hr-HR', { maximumFractionDigits: 1 })} s (±{(nacrt.jitterPotezaBotaMs / 1000).toLocaleString('hr-HR', { maximumFractionDigits: 1 })} s). Reakcije su obvezne (pool poruka) u javnim, privatnim i trening igrama. Namjerni izostanak je isključen.</p>
           <div class="polja">
             <label>Sigurnosna margina (ms)<input type="number" min="150" max="1500" step="50" bind:value={nacrt.marginaRokaMs} /></label>
             <label>Odgoda reakcije min. (ms)<input type="number" min="0" max="10000" step="100" bind:value={nacrt.odgodaReakcijeMinMs} /></label>
@@ -274,7 +274,7 @@
           </div>
         </fieldset>
         {#if promjenePostavki.length > 0}
-          <details class="diff"><summary>Pregled promjena ({promjenePostavki.length})</summary><p>Nove vrijednosti primjenjuju se na nove partije, redne epizode i treninge. Aktivne odluke i rokovi ostaju nepromijenjeni.</p>
+          <details class="diff"><summary>Pregled promjena ({promjenePostavki.length})</summary><p>Nove vrijednosti primjenjuju se na nove igre, redne epizode i treninge. Aktivne odluke i rokovi ostaju nepromijenjeni.</p>
             <dl>{#each promjenePostavki as promjena (promjena.kljuc)}<div><dt>{promjena.kljuc}</dt><dd><code>{JSON.stringify(promjena.prije)}</code><span aria-hidden="true"> → </span><code>{JSON.stringify(promjena.poslije)}</code></dd></div>{/each}</dl>
           </details>
         {/if}
@@ -283,23 +283,23 @@
     {:else}<p role="status">Učitavanje postavki…</p>{/if}
   {:else if pregled}
     <p class="revizija" class:zastario={pregledZastario}>Snimka {datum(pregled.vrijemeIso)} · {pregledZastario ? 'Zastarjelo' : 'Aktualno'} · revizija postavki {pregled.revizijaPostavki}</p>
-    <dl class="fond"><div><dt>Aktivni fond</dt><dd>{pregled.fond.ukupno}</dd></div><div><dt>Slobodni</dt><dd>{pregled.fond.slobodni}</dd></div><div><dt>Rezervirani</dt><dd>{pregled.fond.rezervirani}</dd></div><div><dt>U partiji</dt><dd>{pregled.fond.uPartiji}</dd></div><div><dt>Iscrpljenja</dt><dd>{pregled.fond.iscrpljenja}</dd></div></dl>
+    <dl class="fond"><div><dt>Aktivni fond</dt><dd>{pregled.fond.ukupno}</dd></div><div><dt>Slobodni</dt><dd>{pregled.fond.slobodni}</dd></div><div><dt>Rezervirani</dt><dd>{pregled.fond.rezervirani}</dd></div><div><dt>U igri</dt><dd>{pregled.fond.uPartiji}</dd></div><div><dt>Iscrpljenja</dt><dd>{pregled.fond.iscrpljenja}</dd></div></dl>
     <form class="stvori" onsubmit={(event) => { event.preventDefault(); void stvoriBotove(); }}>
       <label>Tip računalnog protivnika<select bind:value={tipNovogBota}><option value="imenovani">Imenovani bot</option></select></label>
       <label>Broj<input type="number" min="1" max="30" bind:value={brojNovihBotova} /></label>
       <button type="submit" disabled={stvaranje}><Save size={16} />{stvaranje ? 'Stvaranje…' : 'Stvori botove'}</button>
     </form>
     <div class="filtri" aria-label="Filtriraj botove">
-      <label>Stanje<select bind:value={filterStatus}><option value="sve">Sva stanja</option><option value="slobodan">Slobodan</option><option value="rezerviran">Rezerviran</option><option value="pokretanje">Pokretanje</option><option value="izbor_rijeci">Izbor riječi</option><option value="u_partiji">U partiji</option><option value="spremanje_rezultata">Spremanje rezultata</option><option value="osvjezavanje_profila">Osvježavanje profila</option><option value="tehnicki_kvar">Tehnički kvar</option><option value="deaktiviran">Deaktiviran</option></select></label>
+      <label>Stanje<select bind:value={filterStatus}><option value="sve">Sva stanja</option><option value="slobodan">Slobodan</option><option value="rezerviran">Rezerviran</option><option value="pokretanje">Pokretanje</option><option value="izbor_rijeci">Izbor riječi</option><option value="u_partiji">U igri</option><option value="spremanje_rezultata">Spremanje rezultata</option><option value="osvjezavanje_profila">Osvježavanje profila</option><option value="tehnicki_kvar">Tehnički kvar</option><option value="deaktiviran">Deaktiviran</option></select></label>
       <label>Tip<select bind:value={filterTip}><option value="sve">Svi tipovi</option><option value="imenovani">Imenovani</option><option value="gost">Gost</option></select></label>
       <label>Mod<select bind:value={filterMod}><option value="sve">Svi modovi</option><option value="dva_igraca">Dvoboj</option><option value="cetiri_igraca">Četveroboj</option></select></label>
       <label>Traži<input type="search" bind:value={pretragaBota} placeholder="Nadimak, ključ ili ID" /></label>
       <label>Sortiraj<select bind:value={sortiranjeBotova}><option value="noviji">Aktivnost: novija</option><option value="stariji">Aktivnost: starija</option></select></label>
       <span>{filtriraniBotovi.length} / {pregled.botovi.length}</span>
     </div>
-    <div class="tablica-omot"><table><thead><tr><th>Bot</th><th>Status</th><th>Trajanje / aktivnost</th><th>Partija / mjesto</th><th>Na redu</th><th>Plan</th><th>Profil</th><th>Tehničke pogreške</th><th>Aktivacija</th></tr></thead><tbody>
+    <div class="tablica-omot"><table><thead><tr><th>Bot</th><th>Status</th><th>Trajanje / aktivnost</th><th>Igra / mjesto</th><th>Na redu</th><th>Plan</th><th>Profil</th><th>Tehničke pogreške</th><th>Aktivacija</th></tr></thead><tbody>
       {#each filtriraniBotovi as bot (bot.igracId)}
-        <tr><td data-label="Bot"><strong>{bot.tip === 'gost' ? 'Gost' : bot.nadimak}</strong><small>{bot.kljucSeeda ?? bot.igracId}</small><small>{bot.igracId}</small></td><td data-label="Status">{bot.status}{bot.dovrsavaPrijeDeaktivacije ? ' · dovršava' : ''}</td><td data-label="Trajanje / aktivnost">{trajanje(bot.stanjeOdMs)}<small>{datum(bot.zadnjaAktivnostMs)}</small></td><td data-label="Partija / mjesto">{bot.igra ? `${bot.igra.mod} · ${bot.igra.partijaId}` : bot.rezervacija ? `${bot.rezervacija.grupaId} · gen. ${bot.rezervacija.generacija}` : '—'}</td><td data-label="Na redu">{bot.igra?.naPotezu ? 'Da' : 'Ne'}</td><td data-label="Plan">{bot.plan ? `${bot.plan.vrsta ?? 'akcija'} · ${sekunde(bot.plan.izvrsitiUMs)}` : '—'}</td><td data-label="Profil">{bot.greskaProfila ? 'Pogreška' : bot.osvjezavanjeUTijeku ? 'Osvježava se' : bot.profilAktualan ? 'Aktualan' : 'Zastario'}</td><td data-label="Tehničke pogreške">{bot.greska ? `${bot.greska.broj} · ${bot.greska.posljednja}` : '—'}</td><td data-label="Aktivacija"><button type="button" disabled={izmjeneAktivacije.has(bot.igracId)} onclick={() => void promijeniAktivacijuBota(bot)}>{izmjeneAktivacije.has(bot.igracId) ? 'Spremanje…' : bot.aktivan ? 'Deaktiviraj' : 'Aktiviraj'}</button></td></tr>
+        <tr><td data-label="Bot"><strong>{bot.tip === 'gost' ? 'Gost' : bot.nadimak}</strong><small>{bot.kljucSeeda ?? bot.igracId}</small><small>{bot.igracId}</small></td><td data-label="Status">{bot.status}{bot.dovrsavaPrijeDeaktivacije ? ' · dovršava' : ''}</td><td data-label="Trajanje / aktivnost">{trajanje(bot.stanjeOdMs)}<small>{datum(bot.zadnjaAktivnostMs)}</small></td><td data-label="Igra / mjesto">{bot.igra ? `${bot.igra.mod} · ${bot.igra.partijaId}` : bot.rezervacija ? `${bot.rezervacija.grupaId} · gen. ${bot.rezervacija.generacija}` : '—'}</td><td data-label="Na redu">{bot.igra?.naPotezu ? 'Da' : 'Ne'}</td><td data-label="Plan">{bot.plan ? `${bot.plan.vrsta ?? 'akcija'} · ${sekunde(bot.plan.izvrsitiUMs)}` : '—'}</td><td data-label="Profil">{bot.greskaProfila ? 'Pogreška' : bot.osvjezavanjeUTijeku ? 'Osvježava se' : bot.profilAktualan ? 'Aktualan' : 'Zastario'}</td><td data-label="Tehničke pogreške">{bot.greska ? `${bot.greska.broj} · ${bot.greska.posljednja}` : '—'}</td><td data-label="Aktivacija"><button type="button" disabled={izmjeneAktivacije.has(bot.igracId)} onclick={() => void promijeniAktivacijuBota(bot)}>{izmjeneAktivacije.has(bot.igracId) ? 'Spremanje…' : bot.aktivan ? 'Deaktiviraj' : 'Aktiviraj'}</button></td></tr>
       {/each}
     </tbody></table></div>
   {:else}<p role="status">Učitavanje živog pregleda…</p>{/if}

@@ -210,7 +210,7 @@
         <span class="grupa-ikona" aria-hidden="true">
           <Timer size={22} strokeWidth={2.2} />
         </span>
-        <h2 id="naslov-postavke">Postavke partije</h2>
+        <h2 id="naslov-postavke">Postavke igre</h2>
       </div>
 
       <div class="postavka-blok">
