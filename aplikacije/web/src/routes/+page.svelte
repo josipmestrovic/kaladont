@@ -863,8 +863,9 @@
     .brze-postavke-blok {
       gap: 12px;
       padding-top: 12px;
-      max-width: 560px;
-      margin-inline: auto;
+      width: 100%;
+      max-width: none;
+      margin-inline: 0;
     }
 
     .glavna-navigacija {
