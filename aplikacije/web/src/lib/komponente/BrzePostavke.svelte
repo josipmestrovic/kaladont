@@ -198,9 +198,17 @@
 
   @media (min-width: 1000px) {
     .brze-postavke {
-      width: 100%;
-      max-width: 640px;
-      gap: 12px 24px;
+      width: auto;
+      max-width: none;
+      margin-inline: 0;
+      gap: 4px 10px;
+      grid-template-columns: repeat(3, max-content);
+    }
+
+    .brze-postavke :global(.prekidac-postavke) {
+      width: auto;
+      min-width: 108px;
+      padding: 6px 8px 8px;
     }
 
     .brze-postavke__naziv {

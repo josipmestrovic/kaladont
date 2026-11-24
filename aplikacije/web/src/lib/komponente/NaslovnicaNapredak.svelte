@@ -253,16 +253,18 @@
     .naslovnica-napredak-omotac {
       flex-direction: row;
       align-items: center;
-      justify-content: center;
-      gap: 16px;
-      width: min(100%, 560px);
+      justify-content: flex-start;
+      gap: 12px 16px;
+      width: auto;
+      max-width: min(100%, 480px);
+      margin: 0;
     }
 
     .naslovnica-napredak {
-      flex: 1 1 auto;
+      flex: 0 1 auto;
       width: auto;
       min-width: 0;
-      max-width: 320px;
+      max-width: 300px;
     }
 
     .naslovnica-napredak__avatar :global(.avatar) {

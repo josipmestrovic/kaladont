@@ -129,8 +129,14 @@ for (const { sirina, visina } of [
       };
     });
     expect(mjere.navigacija && mjere.brze && mjere.novosti).toBeTruthy();
-    expect(mjere.brze!.y).toBeGreaterThan(mjere.navigacija!.y + mjere.navigacija!.height - 1);
-    // Novosti su uvijek ispod brzih postavki, neposredno iznad footera.
-    expect(mjere.novosti!.y).toBeGreaterThan(mjere.brze!.y + mjere.brze!.height - 1);
+    if (sirina < 1000) {
+      // Mobitel: postavke ispod glavne navigacije / prečaca.
+      expect(mjere.brze!.y).toBeGreaterThan(mjere.navigacija!.y + mjere.navigacija!.height - 1);
+    } else {
+      // Desktop: postavke u istom redu s profilom, iznad kartica.
+      expect(mjere.navigacija!.y).toBeGreaterThan(mjere.brze!.y + mjere.brze!.height - 1);
+    }
+    // Novosti su uvijek ispod glavne navigacije, neposredno iznad footera.
+    expect(mjere.novosti!.y).toBeGreaterThan(mjere.navigacija!.y + mjere.navigacija!.height - 1);
   });
 }
