@@ -337,6 +337,14 @@ export async function upisiKolekcijuIDostignucaRijeci(ulaz: {
             false,
           ).filter((d) => d.id === 'iskusnjara');
           if (iskusnjara.length > 0) {
+            const stareRazina = await tx.select({
+              dostignuceId: dostignucaIgraca.dostignuceId,
+              razina: dostignucaIgraca.razina,
+            }).from(dostignucaIgraca).where(and(
+              eq(dostignucaIgraca.igracId, sudionik.igracId),
+              inArray(dostignucaIgraca.dostignuceId, iskusnjara.map((d) => d.id)),
+            ));
+            const staraPoId = new Map(stareRazina.map((red) => [red.dostignuceId, red.razina]));
             await tx.insert(dostignucaIgraca).values(iskusnjara.map((dostignuce) => ({
               igracId: sudionik.igracId,
               dostignuceId: dostignuce.id,
@@ -352,7 +360,7 @@ export async function upisiKolekcijuIDostignucaRijeci(ulaz: {
               const broj = await stvoriPorukeZvjezdica({
                 igracId: sudionik.igracId,
                 dostignuceId: dostignuce.id,
-                staraRazina: razinaPrije >= dostignuce.novaRazina ? dostignuce.novaRazina : 0,
+                staraRazina: staraPoId.get(dostignuce.id) ?? 0,
                 novaRazina: dostignuce.novaRazina,
                 tx,
                 izvorTip: ulaz.izvorTip,
@@ -1277,6 +1285,14 @@ export async function zakljuciPartijuUBazi(
               false,
             ).filter((d) => d.id === 'iskusnjara');
             if (iskusnjara.length > 0) {
+              const stareRazina = await tx.select({
+                dostignuceId: dostignucaIgraca.dostignuceId,
+                razina: dostignucaIgraca.razina,
+              }).from(dostignucaIgraca).where(and(
+                eq(dostignucaIgraca.igracId, r.igracId),
+                inArray(dostignucaIgraca.dostignuceId, iskusnjara.map((d) => d.id)),
+              ));
+              const staraPoId = new Map(stareRazina.map((red) => [red.dostignuceId, red.razina]));
               await tx.insert(dostignucaIgraca).values(iskusnjara.map((dostignuce) => ({
                 igracId: r.igracId,
                 dostignuceId: dostignuce.id,
@@ -1287,6 +1303,19 @@ export async function zakljuciPartijuUBazi(
                 target: [dostignucaIgraca.igracId, dostignucaIgraca.dostignuceId],
                 set: { razina: sql`greatest(${dostignucaIgraca.razina}, excluded.razina)`, zadnjeOtkljucavanje: new Date() },
               });
+              for (const dostignuce of iskusnjara) {
+                if (!jeLjudskiZaSanducic(upravljac)) continue;
+                const broj = await stvoriPorukeZvjezdica({
+                  igracId: r.igracId,
+                  dostignuceId: dostignuce.id,
+                  staraRazina: staraPoId.get(dostignuce.id) ?? 0,
+                  novaRazina: dostignuce.novaRazina,
+                  tx,
+                  izvorTip: 'privatna',
+                  izvorId: partijaId,
+                });
+                if (broj > 0) sanducicIgraci.add(r.igracId);
+              }
               pridruziDostignuca(r.igracId, iskusnjara, upravljac, vrstaIgraca, iskustvoPrije);
             }
           }
