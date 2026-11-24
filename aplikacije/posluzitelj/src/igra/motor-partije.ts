@@ -1572,13 +1572,14 @@ export function stvoriUpraviteljPartija(
             const rijeciDostignuca = gamifikacija?.novaDostignuca ?? [];
             const settlementDostignuca = covjek && settlement ? settlement.novaDostignuca : [];
             const poId = new Map([...settlementDostignuca, ...rijeciDostignuca].map((d) => [d.id, d]));
+            const obracun = gamifikacija?.obracunIskustva;
             const poruka: KrajPartije = {
               partijaId: stanje.partijaId,
               prikazRezultataOdIso,
               plasmani,
               mojNoviProsjek: 0,
               mojRang: null,
-              mojeIskustvo: gamifikacija?.obracunIskustva ?? null,
+              mojeIskustvo: obracun && obracun.osvojenoIskustvo > 0 ? obracun : null,
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,
               novaDostignuca: [...poId.values()],
@@ -1624,6 +1625,8 @@ export function stvoriUpraviteljPartija(
       pokreniSpremanjeRezultata(
         stanje,
         async () => {
+          // Word XP prije Zagrijan/misija da ishodMisija.ukupnoIskustvo uključi već upisan XP.
+          const gamifikacijaRijeci = await osigurajGamifikacijuRijeci(stanje, 'trening', zavrsenoU);
           type NagradaTreninga = Awaited<ReturnType<typeof zabiljeziPobjeduTreninga>>;
           let nagrada: NagradaTreninga = null;
           if (pobjednik?.upravljac === 'covjek') {
@@ -1644,7 +1647,6 @@ export function stvoriUpraviteljPartija(
               throw greska;
             }
           }
-          const gamifikacijaRijeci = await osigurajGamifikacijuRijeci(stanje, 'trening', zavrsenoU);
           await obavijestiPrvuIgruSudionicima(stanje, 'trening');
           await obradiDovrseneIgreTreninga(stanje);
           for (const p of plasmani) {
@@ -1659,14 +1661,15 @@ export function stvoriUpraviteljPartija(
               ...rijeciDostignuca,
             ];
             const poId = new Map(novaDostignuca.map((d) => [d.id, d]));
-            const covjek = stanje.sudionici.find((s) => s.igracId === p.igracId)?.upravljac === 'covjek';
+            const covjek = stanje.sudionici.find((s) => s.upravljac === 'covjek' && s.igracId === p.igracId);
+            const obracun = gamifikacija?.obracunIskustva;
             const poruka: KrajPartije = {
               partijaId: stanje.partijaId,
               prikazRezultataOdIso,
               plasmani,
               mojNoviProsjek: 0,
               mojRang: null,
-              mojeIskustvo: gamifikacija?.obracunIskustva ?? null,
+              mojeIskustvo: obracun && obracun.osvojenoIskustvo > 0 ? obracun : null,
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,
               novaDostignuca: [...poId.values()],
@@ -1736,13 +1739,14 @@ export function stvoriUpraviteljPartija(
             postavke.naPrivatnaPartijaZavrsila?.(stanje.kodSobe, stanje.partijaId, pobjednikId, plasmani);
           }
           for (const p of plasmani) {
+            const obracun = privatniObracuni.get(p.igracId);
             const poruka: KrajPartije = {
               partijaId: stanje.partijaId,
               prikazRezultataOdIso,
               plasmani,
               mojNoviProsjek: 0,
               mojRang: null,
-              mojeIskustvo: privatniObracuni.get(p.igracId) ?? null,
+              mojeIskustvo: obracun && obracun.osvojenoIskustvo > 0 ? obracun : null,
               // Privatne partije ne ulaze u javnu ocjenu igre ni XP bonus ocjene.
               mojaOcjenaIgre: null,
               bonusOcjenaIgre: 0,
