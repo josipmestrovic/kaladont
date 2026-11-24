@@ -21,7 +21,8 @@ export function izracunajAktivneMisije(stanje: StanjeMisijaDto): PrikazAktivnihM
  * Narančasti badge samo za događaje koji traže pažnju (npr. nepreuzeta nagrada).
  * Bez API-ja za taj signal — badge se ne prikazuje; broj aktivnih ide u podnaslov.
  */
-export function natpisBadgaMisija(_prikaz: PrikazAktivnihMisija): string | null {
+export function natpisBadgaMisija(prikaz: PrikazAktivnihMisija): string | null {
+  void prikaz;
   return null;
 }
 
