@@ -201,19 +201,20 @@
       width: 100%;
       max-width: none;
       margin-inline: 0;
-      gap: 10px 16px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px 20px;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
       align-items: center;
     }
 
     .brze-postavke :global(.prekidac-postavke) {
       flex-direction: row;
       align-items: center;
-      justify-content: flex-start;
+      justify-content: space-between;
       width: 100%;
-      min-width: 0;
-      padding: 8px 10px;
-      gap: 10px;
+      min-width: 220px;
+      padding: 10px 12px;
+      gap: 14px;
+      overflow: visible;
     }
 
     .brze-postavke :global(.prekidac-postavke__sadrzaj) {
@@ -221,25 +222,28 @@
       flex-direction: row;
       align-items: center;
       justify-content: flex-start;
-      gap: 8px;
+      gap: 10px;
       width: auto;
       min-width: 0;
     }
 
     .brze-postavke :global(.prekidac) {
-      margin-left: auto;
+      flex: 0 0 auto;
+      margin-left: 0;
     }
 
     .brze-postavke__naziv {
+      flex: 1 1 auto;
       width: auto;
+      min-width: 0;
       font-size: 16px;
       text-align: left;
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: normal;
     }
 
     :global(html[data-font-disleksiju]) .brze-postavke__naziv {
       font-size: 16px;
-      white-space: normal;
     }
   }
 </style>
