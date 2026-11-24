@@ -70,9 +70,12 @@
 
   input {
     position: absolute;
-    width: 1px;
-    height: 1px;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
     opacity: 0;
+    cursor: pointer;
   }
 
   .prekidac {
