@@ -736,7 +736,7 @@
     padding: 8px 4px;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.25;
     text-align: center;
@@ -897,7 +897,7 @@
     .sporedni-precac {
       gap: 8px;
       padding: 8px 6px;
-      font-size: 16px;
+      font-size: 18px;
     }
 
     .sporedni-precac__badge {
