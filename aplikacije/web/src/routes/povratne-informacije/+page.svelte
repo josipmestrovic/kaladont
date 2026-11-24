@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { api } from '$lib/api.js';
+  import { ApiGreska, api } from '$lib/api.js';
 
   type KljucOcjene = 'pravila' | 'rjecnik' | 'vrijemePoteza' | 'snalazenjeUAplikaciji' | 'brzinaUcitavanja' | 'gamifikacija';
   const pitanja: { kljuc: KljucOcjene; naziv: string }[] = [
@@ -27,7 +27,10 @@
       prikaziAnketu = !stanje.anketaIspunjena;
     } catch (razlog) {
       const porukaGreske = razlog instanceof Error ? razlog.message : 'Povratne informacije nisu dostupne.';
-      if (porukaGreske.includes('Potrebna je prijava')) {
+      const nijePrijavljen =
+        (razlog instanceof ApiGreska && razlog.status === 401) ||
+        porukaGreske.includes('Potrebna je prijava');
+      if (nijePrijavljen) {
         await goto('/prijava');
         return;
       }
@@ -58,6 +61,10 @@
       });
       await goto('/zahvala-za-informacije');
     } catch (razlog) {
+      if (razlog instanceof ApiGreska && razlog.status === 401) {
+        await goto('/prijava');
+        return;
+      }
       greska = razlog instanceof Error ? razlog.message : 'Slanje nije uspjelo.';
     } finally {
       saljeSe = false;

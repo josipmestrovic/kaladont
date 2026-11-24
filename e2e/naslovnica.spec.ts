@@ -133,12 +133,9 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   const izbornik = await otvoriProfilIzbornik(page);
   await expect(izbornik.getByRole('menuitem', { name: 'Moj profil' })).toHaveAttribute('href', '/profil');
-  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toHaveAttribute(
-    'href',
-    '/profil/avatar',
-  );
-  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toBeVisible();
+  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Postavke' })).toHaveAttribute('href', '/postavke');
+  await expect(izbornik.getByRole('menuitem', { name: 'Povratne informacije' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Misije' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Ljestvice' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Pravila' })).toHaveCount(0);
