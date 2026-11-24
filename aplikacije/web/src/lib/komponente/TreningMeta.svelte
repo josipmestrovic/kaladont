@@ -44,14 +44,17 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 14px;
+    width: 100vw;
     margin: 0 0 10px;
-    padding: 8px 12px;
+    margin-left: calc(50% - 50vw);
+    padding: 10px max(16px, calc(50vw - 50%));
     border: 1px solid var(--boja-obrub);
-    border-radius: 8px;
+    border-radius: 0 0 8px 8px;
     background: var(--boja-povrsina-2);
     font-size: var(--tekst-mali);
     line-height: 1.35;
     overflow: visible;
+    box-sizing: border-box;
   }
 
   .stavka {

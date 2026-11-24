@@ -40,8 +40,8 @@ export interface SnapshotPokusajaIzazova {
   botProfileVersion: number;
   /** Rok čovjeka. */
   turnDurationMs: TrajanjePotezaIzazovaMs;
-  /** Rok bota (obično 30_000). */
-  botTurnDurationMs: TrajanjePotezaIzazovaMs;
+  /** Rok bota (0 = bez poteznog timera). */
+  botTurnDurationMs: 0 | TrajanjePotezaIzazovaMs;
   brojIgraca: 2 | 3 | 4;
   ciljevi: CiljeviIzazova;
   xp: number;

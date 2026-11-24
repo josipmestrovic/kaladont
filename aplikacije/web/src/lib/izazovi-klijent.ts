@@ -139,7 +139,7 @@ export function kratkiSazetakNeuspjehaIzazova(
     case 'prekid_veze':
       return 'Izazov je prekinut zbog gubitka veze.';
     case 'eliminiran':
-      return 'Izgubio si izazov jer si ispao prije pobjede.';
+      return 'Izgubio si izazov.';
     default:
       return 'Izgubio si izazov.';
   }

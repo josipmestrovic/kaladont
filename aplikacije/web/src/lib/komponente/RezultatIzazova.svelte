@@ -138,7 +138,7 @@
       <p class="opis" data-testid="izazov-cilj-neispunjen">
         {tekstRazlogaNeuspjeha('cilj_neispunjen')}
       </p>
-    {:else}
+    {:else if terminalReason === 'nevaljana_rijec' || terminalReason === 'zavrsio_na_ka' || terminalReason === 'odustao' || terminalReason === 'prekid_veze'}
       <p class="opis">{tekstRazlogaNeuspjeha(terminalReason as never, odbijenaRijec)}</p>
     {/if}
   </header>

@@ -177,7 +177,7 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
     const { konfiguracija: botKonfiguracija } = razrijesiProfilBotaIliZadani(profileId);
     const brojBotova = (snapshot.brojIgraca - 1) as 1 | 2 | 3;
     const covjekMs = snapshot.turnDurationMs;
-    const botMs = snapshot.botTurnDurationMs ?? 30_000;
+    const botMs = snapshot.botTurnDurationMs ?? 0;
     const trajanjePotezaSek = Math.round(covjekMs / 1000);
 
     const igrac = ovisnosti.dohvatiIgracaZaStol(ulaz.igracId);

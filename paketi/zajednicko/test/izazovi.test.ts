@@ -41,7 +41,7 @@ describe('katalog izazova v3', () => {
     const l1dv01 = definicijaIzazova('IZ-L1-DV-01');
     expect(l1dv01.varijanta).toBe('obicni');
     expect(l1dv01.turnDurationMs).toBe(30_000);
-    expect(l1dv01.botTurnDurationMs).toBe(30_000);
+    expect(l1dv01.botTurnDurationMs).toBe(0);
     expect(l1dv01.pravila).toBe('klasicni');
     expect(l1dv01.profileId).toBe('pocetnik');
     expect(brojBotovaZaIzazov(l1dv01)).toBe(1);
@@ -49,7 +49,7 @@ describe('katalog izazova v3', () => {
     const brziL1 = definicijaIzazova('IZ-L1-TR-02');
     expect(brziL1.varijanta).toBe('brzi');
     expect(brziL1.turnDurationMs).toBe(15_000);
-    expect(brziL1.botTurnDurationMs).toBe(30_000);
+    expect(brziL1.botTurnDurationMs).toBe(0);
 
     const brziL2 = definicijaIzazova('IZ-L2-TR-02');
     expect(brziL2.turnDurationMs).toBe(13_000);

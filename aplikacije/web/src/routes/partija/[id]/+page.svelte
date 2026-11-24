@@ -675,7 +675,6 @@
     izvediLokalniRedSjedala(stanje.sjedala, stanje.mojIgracId),
   );
   const vezaSpremna = $derived(stanjeVeze.stanje === 'spremno' || stanjeVeze.stanje === 'nepoznato');
-  const brojPreostalihIgraca = $derived(stanje.sjedala.length - stanje.eliminacije.length);
   const prefiksRijeci = $derived(stanje.trazenaSlova?.normalize('NFC').trim() ?? '');
   const najviseZnakovaNastavka = $derived(Math.max(0, 31 - prefiksRijeci.length));
   const definicijaJezikUPlamenu = dohvatiDefinicijuDostignuca('jezik_u_plamenu');
@@ -2025,13 +2024,7 @@
           {@const sustavRijec = prikazanaRijec.rijec}
           {@const sustavZavrsetak = zadnjaDva(sustavRijec)}
           <div class="sustav-dodijelio" aria-live="polite">
-            <p class="sustav-dodijelio-tekst">
-              {#if stanje.runda === 1}
-                Igra počinje, sustav je dodijelio:
-              {:else}
-                Ostaje {brojPreostalihIgraca} igrača, započinje nova runda. Sustav je dodijelio riječ:
-              {/if}
-            </p>
+            <p class="sustav-dodijelio-tekst">Igra je dodijelila riječ</p>
             <p class="sustav-dodijelio-rijec" aria-label={sustavRijec}>
               <span class="sustav-dodijelio-tijelo">{sustavRijec.slice(0, sustavRijec.length - sustavZavrsetak.length)}</span><span class="sustav-dodijelio-zavrsetak">{sustavZavrsetak}</span>
             </p>
@@ -2171,7 +2164,9 @@
     margin: 8px 0;
     color: var(--boja-isticanje-slova);
     font-family: var(--font-naslov);
-    font-size: calc(16px * 1.2);
+    font-size: clamp(1.45rem, 4.2vw, 2rem);
+    font-weight: 800;
+    line-height: 1.15;
   }
   .odbrojavanje-najava {
     margin: 8px 0 0;
@@ -3025,14 +3020,14 @@
   .sustav-dodijelio-tekst {
     margin: 0;
     color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-mali);
+    font-size: var(--tekst-sitni);
     font-weight: 400;
     max-width: 36ch;
   }
   .sustav-dodijelio-rijec {
     margin: 0;
     font-family: var(--font-naslov);
-    font-size: clamp(2.4rem, 8vw, 3.6rem);
+    font-size: clamp(1.2rem, 4vw, 1.8rem);
     font-weight: 700;
     line-height: 1.05;
     letter-spacing: 0.02em;
@@ -3087,8 +3082,9 @@
     max-width: 620px;
     margin: 0 auto;
     color: var(--boja-tekst-osnovni);
-    font-size: calc(16px * 1.35);
-    font-weight: 600;
+    font-family: var(--font-naslov);
+    font-size: clamp(1.25rem, 3.6vw, 1.7rem);
+    font-weight: 700;
     line-height: 1.2;
   }
   .igrac-ispao {

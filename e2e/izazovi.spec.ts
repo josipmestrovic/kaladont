@@ -23,8 +23,8 @@ test('naslovnica vodi na mapu; level tabovi i zaključani finale', async ({ page
   // Klik na broj kartice — izbjegava PojamPomoc gumbe koji stopPropagation.
   await dv05.locator('.kartica-broj').click();
   await expect(page.getByTestId('izazov-detalj')).toHaveCount(0);
-  await expect(page.getByTestId('izazov-start-poruka')).toBeVisible();
-  await expect(page.getByTestId('izazov-start-poruka')).toContainText(/Otključava|dovrši/i);
+  await expect(page.getByTestId('izazov-zakljucan-popup')).toBeVisible();
+  await expect(page.getByTestId('izazov-zakljucan-popup')).toContainText(/Otključava|dovrši/i);
 });
 
 test('zaključani ?level= fallback + obavijest', async ({ page }) => {
@@ -90,7 +90,7 @@ test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page
         naziv: 'Obični',
         profileId: 'pocetnik',
         humanTurnDurationMs: 30_000,
-        botTurnDurationMs: 30_000,
+        botTurnDurationMs: 0,
       };
       stanje.sjedala = [
         {

@@ -34,9 +34,7 @@
 <main class="trening-setup" data-testid="trening-setup">
   <header class="uvod">
     <h1>Trening</h1>
-    <p class="podnaslov">
-      Namjesti pravila i vježbaj protiv računala. XP i kolekcija se bilježe, bez bodova, ranga i forme.
-    </p>
+    <p class="podnaslov">Namjesti pravila i vježbaj protiv računala.</p>
   </header>
 
   <div class="postavke">

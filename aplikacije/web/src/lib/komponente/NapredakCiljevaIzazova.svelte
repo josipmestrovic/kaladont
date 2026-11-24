@@ -103,12 +103,15 @@
 
 <style>
   .ciljevi-izazova {
+    width: 100vw;
     margin: 0 0 10px;
-    padding: 10px 12px;
+    margin-left: calc(50% - 50vw);
+    padding: 10px max(16px, calc(50vw - 50%));
     border: 1px solid var(--boja-obrub);
-    border-radius: 8px;
+    border-radius: 0 0 8px 8px;
     background: var(--boja-povrsina-2);
     font-size: var(--tekst-mali);
+    box-sizing: border-box;
   }
   .naslov-reda {
     margin: 0 0 4px;
