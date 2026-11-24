@@ -46,8 +46,7 @@ export async function osigurajStanjeMisija(opcije: { forsaj?: boolean } = {}): P
   if (!opcije.forsaj && status === 'spreman' && stanje) return stanje;
 
   status = 'ucitavanje';
-  let zahtjev!: Promise<StanjeMisijaDto | null>;
-  zahtjev = (async () => {
+  const zahtjev = (async (): Promise<StanjeMisijaDto | null> => {
     try {
       const odgovor = await dohvatiStanjeMisija();
       stanje = odgovor;
@@ -61,11 +60,12 @@ export async function osigurajStanjeMisija(opcije: { forsaj?: boolean } = {}): P
       }
       status = 'greska';
       return null;
-    } finally {
-      if (ucitavanje === zahtjev) ucitavanje = null;
     }
   })();
 
   ucitavanje = zahtjev;
+  void zahtjev.finally(() => {
+    if (ucitavanje === zahtjev) ucitavanje = null;
+  });
   return zahtjev;
 }
