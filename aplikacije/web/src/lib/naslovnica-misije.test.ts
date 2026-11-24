@@ -44,15 +44,15 @@ describe('natpisBadgaMisija', () => {
     expect(natpisBadgaMisija({ dnevneAktivne: 0, tjedneAktivne: 0, ukupnoAktivnih: 0 })).toBeNull();
   });
 
-  it('prikazuje dnevne·tjedne', () => {
-    expect(natpisBadgaMisija({ dnevneAktivne: 2, tjedneAktivne: 1, ukupnoAktivnih: 3 })).toBe('2·1');
+  it('prikazuje ukupan broj', () => {
+    expect(natpisBadgaMisija({ dnevneAktivne: 2, tjedneAktivne: 1, ukupnoAktivnih: 3 })).toBe('3');
   });
 });
 
 describe('ariaBadgaMisija', () => {
-  it('opisuje brojeve', () => {
+  it('opisuje ukupan broj', () => {
     expect(ariaBadgaMisija({ dnevneAktivne: 2, tjedneAktivne: 1, ukupnoAktivnih: 3 })).toBe(
-      '2 dnevnih i 1 tjednih aktivnih misija',
+      '3 aktivne misije',
     );
   });
 });

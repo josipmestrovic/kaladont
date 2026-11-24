@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { BROJ_AKTIVNIH_IZAZOVA } from 'zajednicko';
+  import { api } from '$lib/api.js';
   import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
@@ -44,6 +45,8 @@
     opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA),
   });
   let izazoviGeneracija = 0;
+  let kolekcijaGeneracija = 0;
+  let kolekcionarskaRazinaNaziv = $state<string | null>(null);
   const jeGost = $derived(
     stanjeProfila.status === 'spreman' && stanjeProfila.profil?.vrsta === 'gost',
   );
@@ -76,11 +79,27 @@
     }
   }
 
+  async function osvjeziKolekcionarskuRazinu() {
+    const generacija = ++kolekcijaGeneracija;
+    try {
+      const odgovor = await api<{
+        kolekcionarskaRazina?: { naziv?: string };
+      }>('/profil/kolekcija');
+      if (generacija !== kolekcijaGeneracija) return;
+      const naziv = odgovor.kolekcionarskaRazina?.naziv?.trim();
+      kolekcionarskaRazinaNaziv = naziv && naziv.length > 0 ? naziv : null;
+    } catch {
+      if (generacija !== kolekcijaGeneracija) return;
+      kolekcionarskaRazinaNaziv = null;
+    }
+  }
+
   function osvjeziNaslovnicu() {
     void osigurajProfil({ forsaj: true }).then(() => {
       if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
         void osvjeziIzazove();
         void osigurajStanjeMisija({ forsaj: true });
+        void osvjeziKolekcionarskuRazinu();
       }
     });
   }
@@ -91,7 +110,9 @@
 
     const naIdentitet = () => {
       izazoviGeneracija += 1;
+      kolekcijaGeneracija += 1;
       izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
+      kolekcionarskaRazinaNaziv = null;
       invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
@@ -107,16 +128,18 @@
     };
     document.addEventListener('visibilitychange', naVidljivost);
 
-    // Dijeli in-flight s Headerom; zatim jedan GET /izazovi i dijeljeni GET /misije.
+    // Dijeli in-flight s Headerom; zatim GET /izazovi, /misije i sažetak kolekcije.
     void osigurajProfil().then(() => {
       void osvjeziIzazove();
       void osigurajStanjeMisija();
+      void osvjeziKolekcionarskuRazinu();
     });
 
     return () => {
       window.removeEventListener('kaladont:identitet-promijenjen', naIdentitet);
       document.removeEventListener('visibilitychange', naVidljivost);
       izazoviGeneracija += 1;
+      kolekcijaGeneracija += 1;
     };
   });
 </script>
@@ -292,8 +315,16 @@
             href="/profil#rijeci"
             class="sporedni-precac"
             data-testid="naslovnica-kolekcija"
+            aria-label={kolekcionarskaRazinaNaziv
+              ? `Kolekcija riječi, ${kolekcionarskaRazinaNaziv}`
+              : 'Kolekcija riječi'}
             onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
           >
+            {#if kolekcionarskaRazinaNaziv}
+              <span class="sporedni-precac__nadlabel" data-testid="naslovnica-kolekcija-razina"
+                >{kolekcionarskaRazinaNaziv}</span
+              >
+            {/if}
             <img src="/ikone/61-korisnicki-profil.webp" alt="" width="40" height="40" />
             <span>Kolekcija riječi</span>
           </a>
@@ -694,7 +725,7 @@
     font-family: var(--font-tijelo);
     font-size: 14px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.25;
     text-align: center;
     text-decoration: none;
   }
@@ -710,6 +741,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .sporedni-precac__nadlabel {
+    display: block;
+    max-width: 100%;
+    color: var(--boja-zuta-krema);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
   }
 
   .sporedni-precac__badge {
@@ -731,6 +772,10 @@
 
   .sporedni-precac:hover {
     color: var(--boja-akcent-tekst);
+  }
+
+  :global(html[data-tema='svijetla']) .sporedni-precac__nadlabel {
+    color: color-mix(in srgb, var(--boja-akcent-tekst) 85%, #8a6a00);
   }
 
   .landing-footer {
@@ -853,6 +898,10 @@
     .sporedni-precac {
       gap: 8px;
       padding: 8px 6px;
+      font-size: 16px;
+    }
+
+    .sporedni-precac__nadlabel {
       font-size: 16px;
     }
 

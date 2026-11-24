@@ -176,8 +176,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 4px 12px;
+    justify-content: flex-start;
+    gap: 4px 10px;
     min-width: 0;
   }
 

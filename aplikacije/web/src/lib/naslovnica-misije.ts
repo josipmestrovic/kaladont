@@ -19,9 +19,12 @@ export function izracunajAktivneMisije(stanje: StanjeMisijaDto): PrikazAktivnihM
 
 export function natpisBadgaMisija(prikaz: PrikazAktivnihMisija): string | null {
   if (prikaz.ukupnoAktivnih <= 0) return null;
-  return `${prikaz.dnevneAktivne}·${prikaz.tjedneAktivne}`;
+  return String(prikaz.ukupnoAktivnih);
 }
 
 export function ariaBadgaMisija(prikaz: PrikazAktivnihMisija): string {
-  return `${prikaz.dnevneAktivne} dnevnih i ${prikaz.tjedneAktivne} tjednih aktivnih misija`;
+  const broj = prikaz.ukupnoAktivnih;
+  if (broj === 1) return '1 aktivna misija';
+  if (broj >= 2 && broj <= 4) return `${broj} aktivne misije`;
+  return `${broj} aktivnih misija`;
 }
