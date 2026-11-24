@@ -2,9 +2,16 @@
   import { onMount } from 'svelte';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { BROJ_AKTIVNIH_IZAZOVA } from 'zajednicko';
   import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
+  import { dohvatiKatalogIzazova } from '$lib/izazovi-klijent.js';
+  import {
+    defaultOpisIzazova,
+    izracunajPrikazIzazova,
+    type PrikazIzazovaKartice,
+  } from '$lib/naslovnica-izazovi.js';
   import NaslovnicaNapredak from '$lib/komponente/NaslovnicaNapredak.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
@@ -12,11 +19,16 @@
     NASLOVNICA_SEO_TITLE,
     naslovnicaJsonLd,
   } from '$lib/seo.js';
-  import { osigurajProfil } from '$lib/stanje-profila.svelte.js';
+  import { osigurajProfil, statusProfila } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const FOCUS_REFRESH_MS = 45_000;
   let zadnjiFocusRefresh = 0;
+  let izazoviPrikaz = $state<PrikazIzazovaKartice>({
+    vrsta: 'default',
+    opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA),
+  });
+  let izazoviGeneracija = 0;
 
   function idiUBrzuIgru() {
     zabiljeziUmamiDogadjaj('igraj-klik');
@@ -29,13 +41,38 @@
     zagrijGameplayZvukove();
   }
 
+  async function osvjeziIzazove() {
+    const generacija = ++izazoviGeneracija;
+    try {
+      const katalog = await dohvatiKatalogIzazova();
+      if (generacija !== izazoviGeneracija) return;
+      izazoviPrikaz = izracunajPrikazIzazova(katalog);
+    } catch {
+      if (generacija !== izazoviGeneracija) return;
+      izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
+    }
+  }
+
+  function osvjeziNaslovnicu() {
+    void osigurajProfil({ forsaj: true }).then(() => {
+      if (statusProfila === 'spreman' || statusProfila === 'greska') void osvjeziIzazove();
+    });
+  }
+
   afterNavigate(({ to }) => {
-    if (to?.url.pathname === '/') void osigurajProfil({ forsaj: true });
+    if (to?.url.pathname === '/') osvjeziNaslovnicu();
   });
 
   onMount(() => {
     // ?igraj=1 → izravno Brza igra (bez modala).
     if ($page.url.searchParams.get('igraj') === '1') idiUBrzuIgru();
+
+    const naIdentitet = () => {
+      izazoviGeneracija += 1;
+      izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
+      osvjeziNaslovnicu();
+    };
+    window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
 
     const naVidljivost = () => {
       if (document.visibilityState !== 'visible') return;
@@ -43,10 +80,17 @@
       const sada = Date.now();
       if (sada - zadnjiFocusRefresh < FOCUS_REFRESH_MS) return;
       zadnjiFocusRefresh = sada;
-      void osigurajProfil({ forsaj: true });
+      osvjeziNaslovnicu();
     };
     document.addEventListener('visibilitychange', naVidljivost);
-    return () => document.removeEventListener('visibilitychange', naVidljivost);
+
+    void osigurajProfil().then(() => void osvjeziIzazove());
+
+    return () => {
+      window.removeEventListener('kaladont:identitet-promijenjen', naIdentitet);
+      document.removeEventListener('visibilitychange', naVidljivost);
+      izazoviGeneracija += 1;
+    };
   });
 </script>
 
@@ -91,7 +135,24 @@
             <img class="stavka-ikona" src="/ikone/06-trofej.png" alt="" width="44" height="44" />
             <span class="stavka-tekst">
               <strong>Izazovi</strong>
-              <small>Svladavaj 60 sve težih izazova.</small>
+              <small>{izazoviPrikaz.opis}</small>
+              {#if izazoviPrikaz.vrsta === 'napredak'}
+                <span class="izazovi-napredak">
+                  <span
+                    class="izazovi-napredak__traka"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={izazoviPrikaz.ukupno}
+                    aria-valuenow={izazoviPrikaz.zavrseno}
+                    aria-label={`${izazoviPrikaz.zavrseno} od ${izazoviPrikaz.ukupno} završenih izazova`}
+                  >
+                    <span style={`width: ${izazoviPrikaz.postotak}%`}></span>
+                  </span>
+                  <span class="izazovi-napredak__broj">
+                    {izazoviPrikaz.zavrseno} / {izazoviPrikaz.ukupno} završenih izazova
+                  </span>
+                </span>
+              {/if}
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>
@@ -325,6 +386,36 @@
   .stavka-napomena {
     display: block;
     margin-top: 2px;
+  }
+
+  .izazovi-napredak {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .izazovi-napredak__traka {
+    display: block;
+    width: 100%;
+    height: 8px;
+    overflow: hidden;
+    border-radius: var(--radijus-pill);
+    background: color-mix(in srgb, #1a1815 12%, transparent);
+  }
+
+  .izazovi-napredak__traka > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--boja-mint);
+  }
+
+  .izazovi-napredak__broj {
+    color: color-mix(in srgb, #1a1815 70%, transparent);
+    font-family: var(--font-tijelo);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
   }
 
   .cta {

@@ -4,6 +4,7 @@ import {
   brojDugihRijeciZaLevel,
   definicijaIzazova,
   dostupnostIzazova,
+  BROJ_AKTIVNIH_IZAZOVA,
   ID_OVI_IZAZOVA,
   idEviFormata,
   idEviLevela,
@@ -28,6 +29,7 @@ describe('katalog izazova v3', () => {
     expect(() => validirajKatalogIzazova()).not.toThrow();
     expect(KATALOG_IZAZOVA).toHaveLength(60);
     expect(ID_OVI_IZAZOVA).toHaveLength(60);
+    expect(BROJ_AKTIVNIH_IZAZOVA).toBe(KATALOG_IZAZOVA.length);
     expect(VERZIJA_DEFINICIJE_IZAZOVA).toBe(3);
     expect(KATALOG_IZAZOVA.reduce((s, d) => s + d.xp, 0)).toBe(UKUPNI_NOMINALNI_XP_IZAZOVA);
     expect(UKUPNI_NOMINALNI_XP_IZAZOVA).toBe(106_540);
