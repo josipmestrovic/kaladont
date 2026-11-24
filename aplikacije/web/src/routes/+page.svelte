@@ -515,7 +515,7 @@
   .profil-red {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     gap: 12px;
     width: 100%;
     min-width: 0;
@@ -956,17 +956,21 @@
     }
 
     .profil-red {
-      flex-direction: row;
-      flex-wrap: nowrap;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       align-items: center;
-      justify-content: space-between;
-      gap: 16px 28px;
+      gap: 16px 20px;
     }
 
     .profil-red :global(.naslovnica-napredak-omotac) {
-      flex: 1 1 auto;
-      min-width: 0;
+      grid-column: 2;
+      justify-self: center;
       margin: 0;
+    }
+
+    .profil-red .sporedni-red {
+      grid-column: 3;
+      justify-self: end;
     }
 
     .brze-postavke-blok {

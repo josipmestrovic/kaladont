@@ -214,7 +214,7 @@
     min-width: 0;
     color: var(--boja-tekst-osnovni);
     font-family: var(--font-naslov);
-    font-size: clamp(16px, 2.2dvh, 18px);
+    font-size: 18px;
     font-weight: 700;
     line-height: 1.2;
     overflow-wrap: anywhere;
@@ -228,7 +228,7 @@
     flex: 0 0 auto;
     color: var(--boja-zuta-krema);
     font-family: var(--font-naslov);
-    font-size: clamp(14px, 2dvh, 16px);
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.2;
   }
@@ -237,7 +237,7 @@
     margin: 0;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: var(--tekst-sitni);
+    font-size: 16px;
     font-weight: 500;
     line-height: 1.2;
   }
@@ -266,7 +266,7 @@
   .naslovnica-napredak__xp {
     margin: 0;
     font-family: var(--font-tijelo);
-    font-size: var(--tekst-sitni);
+    font-size: 16px;
     line-height: 1.2;
   }
 
@@ -355,9 +355,9 @@
 
   @media (min-width: 1000px) {
     .naslovnica-napredak-omotac {
-      align-items: flex-start;
-      width: 100%;
-      max-width: none;
+      align-items: center;
+      width: auto;
+      max-width: min(100%, 420px);
       margin: 0;
       min-height: 88px;
     }
@@ -365,19 +365,30 @@
     .naslovnica-napredak-omotac--gost {
       flex-wrap: nowrap;
       align-items: center;
-      max-width: none;
+      max-width: min(100%, 560px);
       gap: 16px 32px;
     }
 
     .naslovnica-napredak {
-      width: 100%;
+      width: auto;
       max-width: none;
+      justify-content: center;
     }
 
     .naslovnica-napredak-omotac--gost .naslovnica-napredak {
       flex: 1 1 auto;
       width: auto;
       max-width: none;
+    }
+
+    .naslovnica-napredak__nadimak {
+      font-size: 20px;
+    }
+
+    .naslovnica-napredak__lvl,
+    .naslovnica-napredak__rang,
+    .naslovnica-napredak__xp {
+      font-size: 18px;
     }
 
     .naslovnica-napredak__sadrzaj {
@@ -444,7 +455,6 @@
   }
 
   :global(html[data-font-disleksiju]) .naslovnica-napredak__nadimak {
-    font-size: clamp(15px, 2.2dvh, 17px);
     line-height: 1.3;
   }
 
