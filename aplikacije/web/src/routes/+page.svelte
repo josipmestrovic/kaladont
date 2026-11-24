@@ -47,6 +47,11 @@
   const jeGost = $derived(
     stanjeProfila.status === 'spreman' && stanjeProfila.profil?.vrsta === 'gost',
   );
+  const jeRegistriran = $derived(
+    stanjeProfila.status === 'spreman' &&
+      stanjeProfila.profil !== null &&
+      stanjeProfila.profil.vrsta !== 'gost',
+  );
 
   function idiUBrzuIgru(opcije: { izQueryja?: boolean } = {}) {
     if (!opcije.izQueryja) zabiljeziUmamiDogadjaj('naslovnica-brza-igra-klik');
@@ -305,29 +310,32 @@
       </div>
 
       <div class="brze-postavke-blok">
-        <p class="brze-postavke-naslov">Prilagodi igru sebi</p>
         <BrzePostavke />
       </div>
     </div>
   </section>
   <div class="landing-prostor landing-prostor--dolje" aria-hidden="true"></div>
 
-  {#if NAJNOVIJE_IZDANJE}
-    <p class="zadnje-azuriranje">
-      Ažurirano
-      <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
-      <span class="razdjelnik" aria-hidden="true">·</span>
-      <a
-        class="sto-je-novo"
-        href="/novosti"
-        onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
-      >Što je novo?</a>
-    </p>
-  {/if}
-
   <footer class="landing-footer">
-    <p class="copyright">
-      © {godinaCopyright} Kaladont
+    <p class="podnozje-red">
+      {#if NAJNOVIJE_IZDANJE}
+        <span class="zadnje-azuriranje">
+          Ažurirano
+          <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
+          <span class="razdjelnik" aria-hidden="true">·</span>
+          <a
+            class="sto-je-novo"
+            href="/novosti"
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
+          >Što je novo?</a>
+        </span>
+        <span class="razdjelnik" aria-hidden="true">·</span>
+      {/if}
+      <span class="copyright">© {godinaCopyright} Kaladont</span>
+      {#if jeRegistriran}
+        <span class="razdjelnik" aria-hidden="true">·</span>
+        <a href="/povratne-informacije">Povratne informacije</a>
+      {/if}
       <span class="razdjelnik" aria-hidden="true">·</span>
       <a href="/uvjeti">Uvjeti</a>
       <span class="razdjelnik" aria-hidden="true">·</span>
@@ -414,16 +422,6 @@
     min-width: 0;
     padding-top: 10px;
     border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 24%, transparent);
-  }
-
-  .brze-postavke-naslov {
-    margin: 0;
-    color: var(--boja-tekst-sekundarni);
-    font-family: var(--font-tijelo);
-    font-size: var(--tekst-sitni);
-    font-weight: 600;
-    line-height: 1.3;
-    text-align: center;
   }
 
   .glavna-navigacija {
@@ -735,37 +733,6 @@
     color: var(--boja-akcent-tekst);
   }
 
-  .zadnje-azuriranje {
-    position: relative;
-    z-index: 1;
-    margin: 0 0 8px;
-    width: min(100%, var(--sirina-grida));
-    color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-sitni);
-    line-height: 1.3;
-    text-align: center;
-  }
-
-  .zadnje-azuriranje time {
-    white-space: nowrap;
-  }
-
-  .zadnje-azuriranje a {
-    color: inherit;
-    font-weight: inherit;
-    text-decoration: underline;
-    white-space: nowrap;
-  }
-
-  .zadnje-azuriranje a:hover { color: var(--boja-akcent-tekst); }
-
-  :global(html[data-font-disleksiju]) .zadnje-azuriranje .razdjelnik { display: none; }
-  :global(html[data-font-disleksiju]) .zadnje-azuriranje .sto-je-novo {
-    display: block;
-    width: fit-content;
-    margin-inline: auto;
-  }
-
   .landing-footer {
     position: relative;
     z-index: 1;
@@ -776,20 +743,37 @@
     text-align: center;
   }
 
-  .copyright {
+  .podnozje-red {
     margin: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
     gap: 4px 8px;
+    max-width: 100%;
+    color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-sitni);
     line-height: 1.3;
-    color: var(--boja-tekst-sekundarni);
   }
 
-  .copyright .razdjelnik {
+  .podnozje-red .razdjelnik {
     color: color-mix(in srgb, var(--boja-tekst-sekundarni) 70%, transparent);
+  }
+
+  .zadnje-azuriranje {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 8px;
+  }
+
+  .zadnje-azuriranje time {
+    white-space: nowrap;
+  }
+
+  .copyright {
+    white-space: nowrap;
   }
 
   .landing-footer a {
@@ -803,6 +787,7 @@
     font-size: var(--tekst-sitni);
     text-decoration: underline;
     cursor: pointer;
+    white-space: nowrap;
   }
 
   .landing-footer a:hover { color: var(--boja-akcent-tekst); }
@@ -875,11 +860,6 @@
       width: 40px;
       height: 40px;
     }
-
-    .zadnje-azuriranje {
-      margin-bottom: 10px;
-    }
-
   }
 
   /* Niski desktop: smanji prazan prostor, CTA ostaje vidljiv, scroll je dopušten. */
@@ -951,13 +931,6 @@
       --font-stavke: 20px;
       --font-opisa: clamp(14px, 3.6vw, 15px);
       --padding-stavke: 16px 18px;
-    }
-
-    .zadnje-azuriranje .razdjelnik { display: none; }
-    .zadnje-azuriranje .sto-je-novo {
-      display: block;
-      width: fit-content;
-      margin-inline: auto;
     }
   }
 

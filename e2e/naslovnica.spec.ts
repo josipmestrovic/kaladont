@@ -71,14 +71,12 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(page.locator('.ilustracija')).toHaveCount(0);
 
   const footer = page.locator('.landing-footer');
-  const footerLinkovi = footer.locator('a');
-  await expect(footerLinkovi).toHaveCount(2);
-  await expect(footerLinkovi.nth(0)).toHaveAttribute('href', '/uvjeti');
-  await expect(footerLinkovi.nth(0)).toHaveText('Uvjeti');
-  await expect(footerLinkovi.nth(1)).toHaveAttribute('href', '/privatnost');
-  await expect(footerLinkovi.nth(1)).toHaveText('Privatnost');
+  await expect(footer.getByRole('link', { name: 'Što je novo?' })).toHaveAttribute('href', '/novosti');
+  await expect(footer.getByRole('link', { name: 'Uvjeti' })).toHaveAttribute('href', '/uvjeti');
+  await expect(footer.getByRole('link', { name: 'Privatnost' })).toHaveAttribute('href', '/privatnost');
   await expect(footer.getByRole('link', { name: 'Pravila' })).toHaveCount(0);
   await expect(footer.getByRole('link', { name: 'Povratne informacije' })).toHaveCount(0);
+  await expect(footer.locator('.copyright')).toContainText('Kaladont');
 
   await expect(page.getByTestId('naslovnica-napredak')).toBeVisible({ timeout: 20_000 });
 
@@ -222,18 +220,20 @@ test('naslovnica prikazuje zadnje ažuriranje iz istog izvora kao Novosti', asyn
   expect(ssr).not.toContain(`href="/novosti#${najnovije.sidro}"`);
 
   await page.goto('/');
-  const blok = page.locator('.zadnje-azuriranje');
-  await expect(blok).toHaveText(`Ažurirano ${najnovije.datumHr} · Što je novo?`);
-  await expect(blok.locator('.razdjelnik')).toHaveAttribute('aria-hidden', 'true');
+  const footer = page.locator('.landing-footer');
+  const blok = footer.locator('.zadnje-azuriranje');
+  await expect(blok).toContainText(`Ažurirano ${najnovije.datumHr}`);
+  await expect(blok).toContainText('Što je novo?');
   await expect(blok.locator('time')).toHaveAttribute('datetime', najnovije.objavljeno);
   await expect(blok.locator('time')).toHaveText(najnovije.datumHr);
+  await expect(footer.locator('.copyright')).toContainText('Kaladont');
+  await expect(footer.getByRole('link', { name: 'Uvjeti' })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Privatnost' })).toBeVisible();
 
-  const poveznice = blok.getByRole('link');
-  await expect(poveznice).toHaveCount(1);
-  await expect(poveznice).toHaveText('Što je novo?');
-  await expect(poveznice).toHaveAttribute('href', '/novosti');
+  const poveznica = blok.getByRole('link', { name: 'Što je novo?' });
+  await expect(poveznica).toHaveAttribute('href', '/novosti');
 
-  await poveznice.click();
+  await poveznica.click();
   await expect(page).toHaveURL('/novosti');
   await expect(page.getByRole('heading', { name: 'Novosti', exact: true })).toBeVisible();
 });
@@ -269,17 +269,13 @@ for (const { sirina, visina } of [
       await page.setViewportSize({ width: sirina, height: visina });
       await page.goto('/');
 
-      const blok = page.locator('.zadnje-azuriranje');
       const footer = page.locator('.landing-footer');
+      const blok = footer.locator('.zadnje-azuriranje');
       await expect(blok).toBeVisible();
       await expect(footer.locator('.copyright')).toBeVisible({ timeout: 20_000 });
       if (svijetla) await expect(page.locator('html')).toHaveAttribute('data-tema', 'svijetla');
       if (disleksija) await expect(page.locator('html')).toHaveAttribute('data-font-disleksiju', '');
-      for (const poveznica of await blok.getByRole('link').all()) {
-        await expect(poveznica).toBeVisible();
-      }
-      // Blok je brat footera, a ne njegov dio: postojeći testovi mjere raspored unutar footera.
-      await expect(footer.locator('.zadnje-azuriranje')).toHaveCount(0);
+      await expect(blok.getByRole('link', { name: 'Što je novo?' })).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
 
       // Svi okviri mjere se u jednom pozivu, da pomak rasporeda između mjerenja ne da lažan rezultat.
@@ -292,7 +288,6 @@ for (const { sirina, visina } of [
           return { x: pravokutnik.x, y: pravokutnik.y, width: pravokutnik.width, height: pravokutnik.height };
         };
         return {
-          blok: okvir('.zadnje-azuriranje'),
           footer: okvir('.landing-footer'),
           susjedi: {
             navigacija: okvir('.glavna-navigacija'),
@@ -305,15 +300,14 @@ for (const { sirina, visina } of [
       });
 
       expect(mjere.sirinaSadrzaja).toBeLessThanOrEqual(mjere.sirinaProzora);
-      expect(mjere.blok).not.toBeNull();
       expect(mjere.footer).not.toBeNull();
       expect(mjere.susjedi.navigacija).not.toBeNull();
-      const okvirBloka = mjere.blok!;
-      expect(okvirBloka.x).toBeGreaterThanOrEqual(0);
-      expect(okvirBloka.x + okvirBloka.width).toBeLessThanOrEqual(mjere.sirinaProzora + 1);
-      expect(okvirBloka.y + okvirBloka.height).toBeLessThanOrEqual(mjere.footer!.y + 1);
+      const okvirFootera = mjere.footer!;
+      expect(okvirFootera.x).toBeGreaterThanOrEqual(0);
+      expect(okvirFootera.x + okvirFootera.width).toBeLessThanOrEqual(mjere.sirinaProzora + 1);
+      expect(okvirFootera.y).toBeGreaterThanOrEqual(mjere.susjedi.navigacija!.y + mjere.susjedi.navigacija!.height - 1);
       for (const [naziv, okvir] of Object.entries(mjere.susjedi)) {
-        if (okvir) expect(preklapajuSe(okvirBloka, okvir), `${naziv} se preklapa s blokom`).toBe(false);
+        if (okvir) expect(preklapajuSe(okvirFootera, okvir), `${naziv} se preklapa s footerom`).toBe(false);
       }
 
       // Prirodni scroll je dopušten; CTA mora ostati u DOM-u i biti dostupan.
