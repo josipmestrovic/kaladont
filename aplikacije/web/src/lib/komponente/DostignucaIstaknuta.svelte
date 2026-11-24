@@ -122,9 +122,13 @@
   .dostignuca-istaknuta { width: 90%; min-width: 0; }
   .dostignuca-istaknuta--kompaktno { width: auto; max-width: 100%; }
   .dostignuca-istaknuta--kompaktno .popis {
-    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
-    gap: 10px 14px;
-    justify-content: end;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 10px 12px;
+    max-width: 420px;
   }
   .dostignuca-istaknuta--kompaktno .ikona { width: 40px; height: 40px; }
   .dostignuca-istaknuta--kompaktno .zvjezdice img { width: 10px; height: 10px; }

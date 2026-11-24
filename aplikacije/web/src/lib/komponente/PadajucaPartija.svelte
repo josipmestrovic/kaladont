@@ -65,11 +65,12 @@
     return zonaEl.clientHeight + 120;
   }
 
+  /** Determinističke trake — bez ponovnog RNG-a pri svakom potezu (flicker). */
   function opacityZaIndeks(indeksOdKraja: number, aktivna: boolean, posebna: boolean): number {
     if (posebna) return 0.72;
-    if (aktivna) return slucajni(0.45, 0.55);
-    if (indeksOdKraja <= 2) return slucajni(0.25, 0.35);
-    return slucajni(0.15, 0.25);
+    if (aktivna) return 0.5;
+    if (indeksOdKraja <= 2) return 0.3;
+    return 0.2;
   }
 
   function vizualIzPoteza(
@@ -256,7 +257,11 @@
         {:else}
           <span
             class="grafem grafem--pocetak"
-            class:grafem--povezan={prethodna !== null && prethodna.nastavak === rijec.pocetak}
+            class:grafem--povezan={
+              prethodna !== null &&
+              prethodna.idPartije === rijec.idPartije &&
+              prethodna.nastavak === rijec.pocetak
+            }
             >{rijec.pocetak}</span
           ><span class="grafem grafem--sredina">{rijec.rijec.slice(rijec.pocetak.length)}</span>
         {/if}

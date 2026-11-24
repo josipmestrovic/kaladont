@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { odaberiIstaknutaDostignuca } from 'zajednicko';
   import {
     gostImaXp,
     izracunajPrikazXp,
@@ -49,13 +50,14 @@
     }),
   );
   const linkNaProfil = $derived(stanjeProfila.status === 'spreman' && !jeGostProfil);
-  const prikaziIstaknuta = $derived(linkNaProfil && dostignuca.length > 0);
+  const istaknutaZaPrikaz = $derived(odaberiIstaknutaDostignuca(dostignuca, 6));
+  const prikaziIstaknuta = $derived(linkNaProfil && istaknutaZaPrikaz.length > 0);
 </script>
 
 <div
   class="naslovnica-napredak-omotac"
   class:naslovnica-napredak-omotac--gost={prikaziGostCta}
-  class:naslovnica-napredak-omotac--registriran={linkNaProfil}
+  class:naslovnica-napredak-omotac--registriran={prikaziIstaknuta}
 >
   {#if linkNaProfil}
     <a
@@ -79,7 +81,8 @@
 
   {#if prikaziIstaknuta}
     <div class="naslovnica-istaknuta">
-      <DostignucaIstaknuta dostignuca={dostignuca} limit={3} kompaktno />
+      <p class="naslovnica-istaknuta__naslov">Istaknuta dostignuća</p>
+      <DostignucaIstaknuta dostignuca={dostignuca} limit={6} kompaktno />
     </div>
   {/if}
 
@@ -495,10 +498,25 @@
     }
 
     .naslovnica-istaknuta {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
       flex: 0 1 auto;
       margin-left: auto;
       min-width: 0;
+    }
+
+    .naslovnica-istaknuta__naslov {
+      margin: 0;
+      color: color-mix(in srgb, var(--boja-tekst-sekundarni) 90%, transparent);
+      font-family: var(--font-tijelo);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: 0.01em;
+      text-align: right;
+      white-space: nowrap;
     }
 
     .naslovnica-gost-cta {

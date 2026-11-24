@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ALargeSmall, Moon, Sun, Volume2, VolumeX } from 'lucide-svelte';
+  import { ALargeSmall, Sun, Volume2, VolumeX } from 'lucide-svelte';
   import { glasUkljucen, postaviGlas } from '$lib/glasovni-manager.js';
   import { openDyslexicUkljucen, postaviOpenDyslexic } from '$lib/postavke-fonta.js';
   import { postaviTemu, tema } from '$lib/postavke-teme.js';
@@ -30,20 +30,14 @@
 >
   <PrekidacPostavke
     checked={svijetlaUkljucena}
-    ariaLabel={svijetlaUkljucena ? 'Tamni način' : 'Svijetli način'}
+    ariaLabel="Svijetli način"
     testId="brza-postavka-tema"
     onchange={(ukljucen) => postaviTemu(ukljucen ? 'svijetla' : 'tamna')}
   >
     <span class="brze-postavke__ikona" aria-hidden="true">
-      {#if svijetlaUkljucena}
-        <Moon size={24} strokeWidth={2} />
-      {:else}
-        <Sun size={24} strokeWidth={2} />
-      {/if}
+      <Sun size={24} strokeWidth={2} />
     </span>
-    <strong class="brze-postavke__naziv">
-      {#if svijetlaUkljucena}Tamni način{:else}Svijetli način{/if}
-    </strong>
+    <strong class="brze-postavke__naziv">Svijetli način</strong>
   </PrekidacPostavke>
 
   <PrekidacPostavke
