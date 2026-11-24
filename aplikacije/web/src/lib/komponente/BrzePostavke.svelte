@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { ALargeSmall, Moon, Sun, Volume2, VolumeX } from 'lucide-svelte';
   import { glasUkljucen, postaviGlas } from '$lib/glasovni-manager.js';
   import { openDyslexicUkljucen, postaviOpenDyslexic } from '$lib/postavke-fonta.js';
   import { postaviTemu, tema } from '$lib/postavke-teme.js';
@@ -33,6 +34,13 @@
     testId="brza-postavka-tema"
     onchange={(ukljucen) => postaviTemu(ukljucen ? 'svijetla' : 'tamna')}
   >
+    <span class="brze-postavke__ikona" aria-hidden="true">
+      {#if svijetlaUkljucena}
+        <Sun size={24} strokeWidth={2} />
+      {:else}
+        <Moon size={24} strokeWidth={2} />
+      {/if}
+    </span>
     <strong class="brze-postavke__naziv">{svijetlaUkljucena ? 'Svijetli način' : 'Tamni način'}</strong>
   </PrekidacPostavke>
 
@@ -42,6 +50,13 @@
     testId="brza-postavka-glas"
     onchange={(ukljucen) => postaviGlas(ukljucen)}
   >
+    <span class="brze-postavke__ikona" aria-hidden="true">
+      {#if govorUkljucen}
+        <Volume2 size={24} strokeWidth={2} />
+      {:else}
+        <VolumeX size={24} strokeWidth={2} />
+      {/if}
+    </span>
     <strong class="brze-postavke__naziv">Čitanje naglas</strong>
   </PrekidacPostavke>
 
@@ -51,6 +66,9 @@
     testId="brza-postavka-font"
     onchange={(ukljucen) => postaviOpenDyslexic(ukljucen)}
   >
+    <span class="brze-postavke__ikona" aria-hidden="true">
+      <ALargeSmall size={24} strokeWidth={2} />
+    </span>
     <strong class="brze-postavke__naziv">Font za disleksiju</strong>
   </PrekidacPostavke>
 </div>
@@ -59,7 +77,7 @@
   .brze-postavke {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    gap: 8px 12px;
     width: 100%;
     margin-inline: auto;
     min-width: 0;
@@ -68,85 +86,108 @@
   .brze-postavke :global(.prekidac-postavke) {
     min-width: 0;
     width: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    min-height: 0;
+    padding: 8px 4px 10px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .brze-postavke :global(.prekidac-postavke.ukljuceno) {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .brze-postavke :global(.prekidac-postavke:hover) {
+    border-color: transparent;
+  }
+
+  .brze-postavke :global(.prekidac-postavke__sadrzaj) {
+    flex: 0 0 auto;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .brze-postavke :global(.prekidac) {
+    margin-left: 0;
+  }
+
+  .brze-postavke__ikona {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: var(--boja-zuta-krema);
+  }
+
+  .brze-postavke__ikona :global(svg) {
+    width: 24px;
+    height: 24px;
   }
 
   .brze-postavke__naziv {
     flex: 0 1 auto;
     min-width: 0;
+    width: 100%;
     font-family: var(--font-tijelo);
-    font-size: var(--tekst-mikro);
+    font-size: 12px;
     font-weight: 600;
-    line-height: 1.2;
-    text-align: left;
-    white-space: nowrap;
+    line-height: 1.25;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: break-word;
+    hyphens: auto;
   }
 
   :global(html[data-font-disleksiju]) .brze-postavke__naziv {
-    font-size: var(--tekst-sitni);
+    font-size: 13px;
     line-height: 1.3;
   }
 
-  /* Mobitel: 3 stupca — naziv gore, prekidač dolje. */
-  @media (max-width: 999px) {
+  :global(html[data-tema='svijetla']) .brze-postavke__ikona {
+    color: color-mix(in srgb, var(--boja-akcent-tekst) 85%, #1a1815);
+  }
+
+  @media (max-width: 359px) {
     .brze-postavke {
-      gap: 8px;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 6px;
+      max-width: 280px;
     }
 
     .brze-postavke :global(.prekidac-postavke) {
-      flex-direction: column;
+      flex-direction: row;
       align-items: center;
-      justify-content: flex-start;
-      gap: 8px;
-      min-height: 0;
-      padding: 10px 6px 12px;
-      border-radius: 10px;
-      background: color-mix(in srgb, var(--boja-povrsina) 78%, transparent);
+      justify-content: space-between;
+      padding: 8px 10px;
     }
 
     .brze-postavke :global(.prekidac-postavke__sadrzaj) {
-      flex: 0 0 auto;
-      justify-content: center;
-      width: 100%;
+      flex-direction: row;
+      justify-content: flex-start;
+      width: auto;
     }
 
     .brze-postavke__naziv {
-      width: 100%;
-      font-size: 12px;
-      line-height: 1.25;
-      text-align: center;
-      white-space: normal;
-      overflow-wrap: break-word;
-      hyphens: auto;
-    }
-
-    .brze-postavke :global(.prekidac) {
-      margin-left: 0;
-    }
-
-    :global(html[data-tema='svijetla']) .brze-postavke :global(.prekidac-postavke) {
-      background: color-mix(in srgb, var(--boja-povrsina) 94%, transparent);
-    }
-
-    :global(html[data-font-disleksiju]) .brze-postavke__naziv {
-      font-size: 13px;
-      line-height: 1.3;
+      width: auto;
+      text-align: left;
+      font-size: var(--tekst-sitni);
     }
   }
 
   @media (min-width: 1000px) {
     .brze-postavke {
-      grid-template-columns: repeat(3, max-content);
-      gap: 8px;
-      width: max-content;
-      max-width: 100%;
-      margin-inline: 0;
-      justify-content: start;
-    }
-
-    .brze-postavke :global(.prekidac-postavke) {
-      width: auto;
-      gap: 6px;
-      padding: 5px 10px;
+      width: 100%;
+      max-width: 640px;
+      gap: 12px 24px;
     }
 
     .brze-postavke__naziv {
