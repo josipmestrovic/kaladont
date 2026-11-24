@@ -43,11 +43,14 @@
     !uspjeh && terminalReason === 'cilj_neispunjen',
   );
 
-  const xpOdIgre = $derived(
-    kraj.ukupnoIskustvo?.partijskiXpStvarno
-      ?? kraj.mojeIskustvo?.osvojenoIskustvo
-      ?? 0,
-  );
+  // Word XP iz obračuna riječi; ukupnoIskustvo.partijski može biti 0/challenge-only nakon settlementa.
+  const xpOdIgre = $derived((() => {
+    const izRijeci = kraj.mojeIskustvo?.osvojenoIskustvo;
+    if (izRijeci != null && izRijeci > 0) return izRijeci;
+    const izUkupno = kraj.ukupnoIskustvo?.partijskiXpStvarno;
+    if (izUkupno != null && izUkupno > 0) return izUkupno;
+    return izRijeci ?? izUkupno ?? 0;
+  })());
   const prikaziXpIzazova = $derived(
     Boolean(
       settlement
