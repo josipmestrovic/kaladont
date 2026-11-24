@@ -192,9 +192,7 @@
                 aria-label="Profil i račun"
               >
                 <a href="/profil" class="profil-stavka" role="menuitem">Moj profil</a>
-                <a href="/misije" class="profil-stavka" role="menuitem">Misije</a>
-                <a href="/ljestvice" class="profil-stavka" role="menuitem">Ljestvice</a>
-                <a href="/pravila-kaladonta" class="profil-stavka" role="menuitem">Pravila</a>
+                <a href="/profil/avatar" class="profil-stavka" role="menuitem">Uredi avatar</a>
                 <a href="/postavke" class="profil-stavka" role="menuitem">Postavke</a>
                 <div class="profil-razdjelnik" role="separator"></div>
                 {#if jeGost}

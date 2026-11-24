@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { otvoriProfilIzbornik } from './pomocnici/naslovnica.js';
 
 async function registrirajSe(page: Page, nadimak: string): Promise<void> {
   const email = `e2e-misije-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`;
@@ -20,9 +19,9 @@ async function registrirajSe(page: Page, nadimak: string): Promise<void> {
 
 test('navigacija vodi na Misije; gost vidi objašnjenje', async ({ page }) => {
   await page.goto('/');
-  const izbornik = await otvoriProfilIzbornik(page);
-  await expect(izbornik.getByRole('menuitem', { name: 'Misije' })).toHaveAttribute('href', '/misije');
-  await izbornik.getByRole('menuitem', { name: 'Misije' }).click();
+  const precac = page.getByTestId('naslovnica-misije');
+  await expect(precac).toHaveAttribute('href', '/misije');
+  await precac.click();
   await expect(page).toHaveURL('/misije');
   await expect(page.getByRole('heading', { name: 'Misije', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Misije za registrirane igrače' })).toBeVisible();

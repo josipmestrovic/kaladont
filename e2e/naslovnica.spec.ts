@@ -113,15 +113,21 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(navigacija.getByTestId('naslovnica-ljestvice')).toContainText('Ljestvice');
   await expect(navigacija.getByTestId('naslovnica-turniri')).toHaveCount(0);
 
+  const sporedna = page.getByRole('navigation', { name: 'Napredak i pomoć' });
+  await expect(sporedna.getByTestId('naslovnica-misije')).toHaveAttribute('href', '/misije');
+  await expect(sporedna.getByTestId('naslovnica-profil')).toHaveAttribute('href', '/profil');
+  await expect(sporedna.getByTestId('naslovnica-pravila')).toHaveAttribute('href', '/pravila-kaladonta');
+
   const izbornik = await otvoriProfilIzbornik(page);
   await expect(izbornik.getByRole('menuitem', { name: 'Moj profil' })).toHaveAttribute('href', '/profil');
-  await expect(izbornik.getByRole('menuitem', { name: 'Misije' })).toHaveAttribute('href', '/misije');
-  await expect(izbornik.getByRole('menuitem', { name: 'Ljestvice' })).toHaveAttribute('href', '/ljestvice');
-  await expect(izbornik.getByRole('menuitem', { name: 'Pravila' })).toHaveAttribute(
+  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toHaveAttribute(
     'href',
-    '/pravila-kaladonta',
+    '/profil/avatar',
   );
   await expect(izbornik.getByRole('menuitem', { name: 'Postavke' })).toHaveAttribute('href', '/postavke');
+  await expect(izbornik.getByRole('menuitem', { name: 'Misije' })).toHaveCount(0);
+  await expect(izbornik.getByRole('menuitem', { name: 'Ljestvice' })).toHaveCount(0);
+  await expect(izbornik.getByRole('menuitem', { name: 'Pravila' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Prijavi se' })).toHaveAttribute('href', '/prijava');
   await expect(izbornik.getByRole('menuitem', { name: 'Registriraj se' })).toHaveAttribute(
     'href',
@@ -329,8 +335,7 @@ test('na niskom desktop ekranu CTA ostaje vidljiv i scroll je dopušten', async 
 
 test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page }) => {
   await page.goto('/');
-  const izbornik = await otvoriProfilIzbornik(page);
-  await izbornik.getByRole('menuitem', { name: 'Pravila' }).click();
+  await page.getByTestId('naslovnica-pravila').click();
   await expect(page).toHaveURL('/pravila-kaladonta');
 
   const povratak = page.getByRole('button', { name: 'Nazad' });
@@ -345,10 +350,10 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await povratak.click();
   await expect(page).toHaveURL('/');
 
-  const izbornik2 = await otvoriProfilIzbornik(page);
-  await izbornik2.getByRole('menuitem', { name: 'Pravila' }).click();
-  const izbornik3 = await otvoriProfilIzbornik(page);
-  await izbornik3.getByRole('menuitem', { name: 'Moj profil' }).click();
+  await page.getByTestId('naslovnica-pravila').click();
+  await expect(page).toHaveURL('/pravila-kaladonta');
+  const izbornik = await otvoriProfilIzbornik(page);
+  await izbornik.getByRole('menuitem', { name: 'Moj profil' }).click();
   await expect(page).toHaveURL('/profil');
   const pocetna = page.getByRole('link', { name: 'Početna' });
   await expect(pocetna).toBeVisible();

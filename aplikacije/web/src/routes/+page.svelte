@@ -125,6 +125,24 @@
           <span class="strelica" aria-hidden="true">›</span>
         </a>
       </nav>
+
+      <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
+        <a href="/misije" class="sporedni-precac" data-testid="naslovnica-misije">
+          <img src="/ikone/62-misije.webp" alt="" width="28" height="28" />
+          <span>Misije</span>
+        </a>
+        <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
+        <a href="/profil" class="sporedni-precac" data-testid="naslovnica-profil">
+          <img src="/ikone/61-korisnicki-profil.webp" alt="" width="28" height="28" />
+          <span>Moj profil</span>
+        </a>
+        <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
+        <a href="/pravila-kaladonta" class="sporedni-precac" data-testid="naslovnica-pravila">
+          <img src="/ikone/08-pravila.png" alt="" width="28" height="28" />
+          <span>Kako igrati?</span>
+        </a>
+      </nav>
+
       {#if NAJNOVIJE_IZDANJE}
         <p class="zadnje-azuriranje">
           Zadnje ažuriranje:
@@ -377,6 +395,45 @@
 
   .navigacijska-stavka.primarna:hover {
     border-color: transparent;
+  }
+
+  .sporedna-navigacija {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 14px;
+    width: 100%;
+    margin: 4px 0 0;
+  }
+
+  .sporedni-precac {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 4px 2px;
+    color: var(--boja-tekst-sekundarni);
+    font-family: var(--font-tijelo);
+    font-size: var(--tekst-mali);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .sporedni-precac img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+
+  .sporedni-precac:hover {
+    color: var(--boja-akcent-tekst);
+  }
+
+  .sporedni-razdjelnik {
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 55%, transparent);
+    font-size: 14px;
+    user-select: none;
   }
 
   .zadnje-azuriranje {
