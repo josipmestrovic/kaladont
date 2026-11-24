@@ -226,9 +226,9 @@
             />
             <span class="stavka-tekst">
               <strong id="naslov-brza-igra">Troboj</strong>
-              <small id="opis-brza-igra">Odigraj klasičnu partiju u troje.</small>
+              <small id="opis-brza-igra">Igraj online u troje.</small>
               <small id="napomena-brza-igra" class="stavka-napomena"
-                >Ako nema igrača, pridružit će ti se botovi.</small
+                >Ako nema igrača, pridruže se botovi.</small
               >
             </span>
           </span>
@@ -595,7 +595,12 @@
 
   .stavka-napomena {
     display: block;
-    margin-top: 2px;
+    margin-top: 4px;
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 82%, transparent);
+    font-size: clamp(12px, 1.8dvh, 14px);
+    font-weight: 500;
+    font-style: italic;
+    line-height: 1.3;
   }
 
   .stavka-napomena--gost {
