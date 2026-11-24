@@ -102,7 +102,6 @@
 />
 
 <main class="landing">
-  <div class="landing-prostor landing-prostor--gore" aria-hidden="true"></div>
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <div class="navigacijski-blok">
       <NaslovnicaNapredak />
@@ -288,9 +287,12 @@
 </main>
 
 <style>
-  /* Centriran landing; naslov (h1) je u Headeru kao logo. */
+  /* Centriran landing; naslov (h1) je u Headeru kao logo (absolute overlay). */
   .landing {
-    --landing-padding: clamp(8px, 2.2dvh, 32px);
+    /* Visina absolute headera + željeni razmak do profila (16–24 mobitel). */
+    --header-clearance: 52px;
+    --razmak-header-profil: 20px;
+    --landing-padding-dolje: clamp(8px, 2.2dvh, 32px);
     --razmak-stavki: 12px;
     --font-stavke: clamp(20px, 2.8dvh, 24px);
     --font-opisa: clamp(15px, 2.1dvh, 17px);
@@ -310,20 +312,17 @@
     align-items: center;
     min-height: 100vh;
     min-height: 100dvh;
-    padding-block: var(--landing-padding);
+    padding-top: calc(var(--header-clearance) + var(--razmak-header-profil));
+    padding-bottom: var(--landing-padding-dolje);
     padding-inline: 16px;
   }
 
+  /* Donji spacer: footer na dnu kad sadržaj stane; bez gornjeg flex zraka. */
   .landing-prostor {
     flex: 1 1 0;
     min-height: 8px;
     width: 100%;
     pointer-events: none;
-  }
-
-  .landing-prostor--gore {
-    box-sizing: content-box;
-    padding-top: 56px;
   }
 
   .izbornik {
@@ -334,7 +333,7 @@
     flex-direction: column;
     justify-content: flex-start;
     align-items: center;
-    gap: clamp(12px, 1.8dvh, 18px);
+    gap: 16px;
     width: min(100%, var(--sirina-grida));
     min-width: 0;
     max-width: 100%;
@@ -345,7 +344,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(12px, 1.8dvh, 18px);
+    gap: 16px;
     min-width: 0;
     width: 100%;
   }
@@ -687,7 +686,10 @@
 
   @media (min-width: 1000px) {
     .landing {
-      --landing-padding: clamp(8px, 1.8dvh, 24px);
+      /* Desktop H1 ~60px + top 6px; razmak header→profil 24–40 px. */
+      --header-clearance: 70px;
+      --razmak-header-profil: 32px;
+      --landing-padding-dolje: clamp(8px, 1.8dvh, 24px);
       --font-stavke: clamp(20px, 2.4dvh, 24px);
       --font-opisa: 16px;
       --padding-stavke: 22px 24px;
@@ -695,8 +697,9 @@
       --razmak-stavki: 14px;
     }
 
-    .landing-prostor--gore {
-      padding-top: 80px;
+    .izbornik,
+    .navigacijski-blok {
+      gap: 20px;
     }
 
     .glavna-navigacija {
@@ -777,7 +780,8 @@
   @media (min-width: 1000px) and (max-height: 700px) {
     .landing {
       --razmak-stavki: 10px;
-      --landing-padding: clamp(4px, 1dvh, 12px);
+      --razmak-header-profil: 24px;
+      --landing-padding-dolje: clamp(4px, 1dvh, 12px);
       --padding-stavke: 16px 20px;
       --razmak-naslov-opis: 4px;
     }
@@ -786,11 +790,8 @@
       min-height: 4px;
     }
 
-    .landing-prostor--gore {
-      padding-top: 72px;
-    }
-
-    .izbornik {
+    .izbornik,
+    .navigacijski-blok {
       gap: 12px;
     }
 
@@ -805,7 +806,9 @@
 
   @media (max-width: 999px) {
     .landing {
-      --landing-padding: clamp(6px, 1.2dvh, 12px);
+      --header-clearance: 48px;
+      --razmak-header-profil: 16px;
+      --landing-padding-dolje: clamp(6px, 1.2dvh, 12px);
       --font-stavke: clamp(20px, 3dvh, 22px);
       --font-opisa: clamp(15px, 2.2dvh, 16px);
       --ikona-sporedna: 36px;
@@ -814,12 +817,9 @@
       padding-inline: 12px;
     }
 
-    .landing-prostor--gore {
-      padding-top: 60px;
-    }
-
-    .izbornik {
-      gap: 12px;
+    .izbornik,
+    .navigacijski-blok {
+      gap: 14px;
     }
 
     .navigacijska-stavka:not(.primarna) {
