@@ -90,7 +90,11 @@ test('tipkovnica aktivira brze postavke; nema horizontalnog overflowa', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await otvoriNaslovnicu(page);
   const font = page.getByTestId('brza-postavka-font').getByRole('switch');
-  await font.press('Space');
+  // Native focus+click: Playwright Space na opacity-0 switch nije pouzdan u headless CI.
+  await font.evaluate((el: HTMLInputElement) => {
+    el.focus();
+    el.click();
+  });
   await expect(page.locator('html')).toHaveAttribute('data-font-disleksiju', '');
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),

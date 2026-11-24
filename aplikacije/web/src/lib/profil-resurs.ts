@@ -94,16 +94,13 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
     }
 
     const mojaGeneracija = generacija;
-    let pokretanje!: Promise<void>;
-    pokretanje = (async () => {
-      try {
-        await dohvati(mojaGeneracija, opcije.pokusaji ?? 3);
-      } finally {
-        if (inFlight === pokretanje) inFlight = null;
-      }
-    })();
-    inFlight = pokretanje;
-    await pokretanje;
+    const ovajDohvat = dohvati(mojaGeneracija, opcije.pokusaji ?? 3);
+    inFlight = ovajDohvat;
+    try {
+      await ovajDohvat;
+    } finally {
+      if (inFlight === ovajDohvat) inFlight = null;
+    }
   }
 
   function invalidiraj() {
