@@ -603,10 +603,10 @@
   }
 
   .brze-postavke-razdjelnik {
-    width: min(100%, 280px);
-    margin: 4px auto 0;
+    width: min(100%, 240px);
+    margin: 8px auto 2px;
     border: 0;
-    border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 28%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 24%, transparent);
   }
 
   .zadnje-azuriranje {

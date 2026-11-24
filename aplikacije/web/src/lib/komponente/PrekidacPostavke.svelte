@@ -20,7 +20,7 @@
   }
 </script>
 
-<label class="prekidac-postavke" data-testid={testId}>
+<label class="prekidac-postavke" class:ukljuceno={checked} data-testid={testId}>
   <span class="prekidac-postavke__sadrzaj">
     {@render children()}
   </span>
@@ -40,14 +40,24 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    min-width: 0;
+    box-sizing: border-box;
+    min-width: min(100%, 168px);
     min-height: 44px;
     padding: 8px 12px;
     border: 1px solid var(--boja-obrub);
     border-radius: 10px;
-    background: color-mix(in srgb, var(--boja-povrsina) 72%, transparent);
+    background: color-mix(in srgb, var(--boja-povrsina) 55%, transparent);
     color: var(--boja-tekst-osnovni);
     cursor: pointer;
+  }
+
+  .prekidac-postavke.ukljuceno {
+    background: color-mix(in srgb, var(--boja-povrsina) 82%, transparent);
+    border-color: color-mix(in srgb, var(--boja-mint) 45%, var(--boja-obrub));
+  }
+
+  .prekidac-postavke:hover {
+    border-color: color-mix(in srgb, var(--boja-mint) 35%, var(--boja-obrub));
   }
 
   .prekidac-postavke__sadrzaj {
@@ -82,7 +92,8 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: white;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
     transition: transform 160ms ease;
   }
 
@@ -97,6 +108,14 @@
   input:focus-visible + .prekidac {
     outline: 3px solid var(--boja-fokus);
     outline-offset: 3px;
+  }
+
+  :global(html[data-tema='svijetla']) .prekidac-postavke {
+    background: color-mix(in srgb, var(--boja-povrsina) 88%, transparent);
+  }
+
+  :global(html[data-tema='svijetla']) .prekidac-postavke.ukljuceno {
+    background: color-mix(in srgb, var(--boja-mint) 10%, var(--boja-povrsina));
   }
 
   @media (prefers-reduced-motion: reduce) {

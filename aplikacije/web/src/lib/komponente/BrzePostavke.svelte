@@ -72,8 +72,10 @@
     flex-wrap: wrap;
     align-items: stretch;
     justify-content: center;
-    gap: 8px;
+    gap: 8px 10px;
     width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
     min-width: 0;
   }
 
@@ -87,16 +89,33 @@
     font-family: var(--font-tijelo);
     font-size: 14px;
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.25;
+    text-align: left;
+  }
+
+  :global(html[data-font-disleksiju]) .brze-postavke {
+    gap: 10px;
+  }
+
+  :global(html[data-font-disleksiju]) .brze-postavke__naziv {
+    font-size: 15px;
+    line-height: 1.35;
   }
 
   @media (min-width: 1000px) {
     .brze-postavke {
-      gap: 10px;
+      gap: 10px 12px;
+      flex-wrap: nowrap;
     }
 
     .brze-postavke__naziv {
       font-size: 15px;
+    }
+  }
+
+  @media (max-width: 379px) {
+    .brze-postavke {
+      gap: 8px;
     }
   }
 </style>
