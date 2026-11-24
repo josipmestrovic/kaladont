@@ -129,7 +129,7 @@ async function odigrajTreningDoKraja(
 }
 
 describe('Zagrijavanje', () => {
-  it('registrirani čovjek ne sprema kolekciju ni XP, a potez se prihvaća bez upisa partije', async () => {
+  it('registrirani čovjek dobiva kolekciju i XP riječi, a potez se prihvaća bez upisa partije', async () => {
     const igracId = randomUUID();
     igraciZaBrisanje.push(igracId);
     const email = `trening-${igracId}@example.com`;
@@ -217,12 +217,13 @@ describe('Zagrijavanje', () => {
       const grupe = await baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
       expect(grupe.length).toBeGreaterThan(0);
       const [igrac] = await baza.select({ iskustvo: igraci.iskustvoUkupno, odigrane: igraci.odigrane }).from(igraci).where(eq(igraci.id, igracId));
-      // Trening zbraja XP riječi, ali ne odigrane/rang/formu; misije mogu dodati još XP.
+      // Trening zbraja XP riječi (prije misije), ali ne odigrane/rang/formu.
       expect(igrac?.odigrane).toBe(0);
       expect(igrac?.iskustvo).toBeGreaterThan(0);
-      if (kraj.ukupnoIskustvo) {
-        expect(igrac?.iskustvo).toBe(kraj.ukupnoIskustvo.poslije.ukupno);
-      }
+      expect(igrac?.iskustvo).toBe(
+        kraj.ukupnoIskustvo?.poslije.ukupno
+          ?? kraj.mojeIskustvo!.poslije.ukupno,
+      );
     } finally {
       socket.off('partija:pocetak', naPocetak);
       socket.off('partija:runda-otvorena', naRunda);
@@ -252,7 +253,7 @@ describe('Zagrijavanje', () => {
     expect(await baza.select().from(pobjedeTreninga).where(eq(pobjedeTreninga.igracId, igracId))).toHaveLength(100);
   });
 
-  it('gost igra protiv Iskusnog (zadani profil), dobiva XP/kolekciju bez ranga i forme', async () => {
+  it('gost igra protiv Iskusnog (zadani profil) bez riječi: bez XP/ranga/forme', async () => {
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
       const { pocetak, kraj } = await odigrajTreningDoKraja(socket);
@@ -261,7 +262,8 @@ describe('Zagrijavanje', () => {
       expect(pocetak.sjedala).toHaveLength(2);
       expect(pocetak.sjedala.some((s) => s.nadimak === 'Iskusni')).toBe(true);
       expect(kraj.kontekst).toBe('trening');
-      expect(kraj.mojeIskustvo).not.toBeNull();
+      // Default odigrajTreningDoKraja samo „ne znam” → nema osvojenog XP.
+      expect(kraj.mojeIskustvo).toBeNull();
       expect(kraj.mojaForma).toBeUndefined();
       expect(kraj.mojDnk).toBeUndefined();
       expect(kraj.mojRang).toBeNull();
