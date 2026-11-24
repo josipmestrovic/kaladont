@@ -444,7 +444,7 @@ jobs:
             fi
             if curl --fail --silent --show-error --max-time 20 --output "$RUNNER_TEMP/naslovnica.html" https://kaladont.hr/ \
               && grep -F -q -- "datetime=\"${DATUM}\"" "$RUNNER_TEMP/naslovnica.html" \
-              && grep -F -q -- "Vidi što je novo" "$RUNNER_TEMP/naslovnica.html"; then
+              && grep -F -q -- "Što je novo?" "$RUNNER_TEMP/naslovnica.html"; then
               naslovnica=da
             fi
             echo "Pokušaj ${pokusaj}: novosti=${novosti} naslovnica=${naslovnica}"
