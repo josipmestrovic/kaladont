@@ -72,7 +72,7 @@ import type { KaladontIo, KaladontSocket } from '../server.js';
 import { baza } from '../baza/klijent.js';
 import { igraci, napredakDostignucaIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca } from '../baza/shema.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
-import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, upisiKolekcijuIDostignucaRijeci, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, zakljuciPovijestIzazovaUBazi, type KontekstMisijaZavrseneIgre, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
+import { osigurajUpisePoteza, osigurajUpiseUcinakaPosebneRijeci, ponistiPartijeUTijekuUBazi, spremiRaniPorazUBazi, upisiKolekcijuIDostignucaRijeci, zapisiPocetakPartije, zapisiPotez, zapisiUcinakPosebneRijeci, zakljuciPartijuUBazi, zakljuciPovijestIzazovaUBazi, type IshodGamifikacijeRijeci, type KontekstMisijaZavrseneIgre, type ZapisPoteza, type ZapisStatistikeRijeci, type ZapisUcinakPosebneRijeci } from './upis-partije.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { politikaZaKontekst, type DogadajPoteza, type PolitikaUcinkaPartije, type RezultatNaredbe, type RezultatPokretanja } from './politika-ucinka.js';
 import { imaJavniProfil, primaProfilnuGamifikacijuUIgri } from './gamifikacija-racuna.js';
@@ -330,6 +330,11 @@ interface StanjeStola {
   prekidiUTijeku: Map<string, PrekidUTijeku>;
   obradaPrekidaZakazana: boolean;
   rezultatiKraja: Map<string, KrajPartije>;
+  /**
+   * Cache upisa kolekcije/XP/dostignuća riječi (trening/izazov) — sprječava dvostruki zbroj
+   * pri retryju `pokreniSpremanjeRezultata` u istom procesu.
+   */
+  ishodGamifikacijeRijeci: Map<string, IshodGamifikacijeRijeci> | null;
   zavrsena: boolean;
   jePrivatna?: boolean;
   kodSobe?: string;
@@ -733,6 +738,38 @@ export function stvoriUpraviteljPartija(
 
   function nadimak(stanje: StanjeStola, igracId: string): string {
     return stanje.sudionici.find((s) => s.igracId === igracId)?.nadimak ?? '???';
+  }
+
+  /** Idempotentan upis kolekcije/XP riječi unutar retryja završnog spremanja. */
+  async function osigurajGamifikacijuRijeci(
+    stanje: StanjeStola,
+    izvorTip: 'trening' | 'izazov',
+    zavrsenoU: Date,
+  ): Promise<Map<string, IshodGamifikacijeRijeci>> {
+    if (stanje.ishodGamifikacijeRijeci) return stanje.ishodGamifikacijeRijeci;
+    if (!(stanje.politika.dajeDostignucaIKolekcije || stanje.politika.dajeNapredak)) {
+      stanje.ishodGamifikacijeRijeci = new Map();
+      return stanje.ishodGamifikacijeRijeci;
+    }
+    const ishod = await upisiKolekcijuIDostignucaRijeci({
+      partijaId: stanje.partijaId,
+      izvorTip,
+      zavrsenoU,
+      sudionici: stanje.sudionici
+        .filter((s) => s.upravljac === 'covjek')
+        .map((s) => ({
+          igracId: s.igracId,
+          statistika: (() => {
+            const st = stanje.statistikeRijeci.get(s.igracId);
+            return st ? zapisStatistikeZaStol(stanje, s.igracId, st) : undefined;
+          })(),
+          napredak: stanje.napredakDostignuca.get(s.igracId),
+          stavkeIskustva: stanje.stavkeIskustva.get(s.igracId),
+          iskustvoPrije: stanje.iskustvoPrije.get(s.igracId),
+        })),
+    });
+    stanje.ishodGamifikacijeRijeci = ishod;
+    return ishod;
   }
 
   function kolekcijaZaKraj(stanje: StanjeStola, igracId: string): NonNullable<KrajPartije['kolekcija']> {
@@ -1289,6 +1326,7 @@ export function stvoriUpraviteljPartija(
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
       rezultatiKraja: new Map(),
+      ishodGamifikacijeRijeci: null,
       zavrsena: false,
       // PR05: nema dokaza do Brunina Ne znam/isteka/napusti.
       dokaz: null,
@@ -1520,25 +1558,7 @@ export function stvoriUpraviteljPartija(
           if (stanje.politika.zapisujePovijest) {
             await zakljuciPovijestIzazovaUBazi(stanje.partijaId, pobjednikId, zavrsenoU);
           }
-          const gamifikacijaRijeci = (stanje.politika.dajeDostignucaIKolekcije || stanje.politika.dajeNapredak)
-            ? await upisiKolekcijuIDostignucaRijeci({
-              partijaId: stanje.partijaId,
-              izvorTip: 'izazov',
-              zavrsenoU,
-              sudionici: stanje.sudionici
-                .filter((s) => s.upravljac === 'covjek')
-                .map((s) => ({
-                  igracId: s.igracId,
-                  statistika: (() => {
-                    const st = stanje.statistikeRijeci.get(s.igracId);
-                    return st ? zapisStatistikeZaStol(stanje, s.igracId, st) : undefined;
-                  })(),
-                  napredak: stanje.napredakDostignuca.get(s.igracId),
-                  stavkeIskustva: stanje.stavkeIskustva.get(s.igracId),
-                  iskustvoPrije: stanje.iskustvoPrije.get(s.igracId),
-                })),
-            })
-            : new Map();
+          const gamifikacijaRijeci = await osigurajGamifikacijuRijeci(stanje, 'izazov', zavrsenoU);
           const krajIshod = await postavke.naIzazovKraj?.({
             partijaId: stanje.partijaId,
             pobjednikId,
@@ -1624,25 +1644,7 @@ export function stvoriUpraviteljPartija(
               throw greska;
             }
           }
-          const gamifikacijaRijeci = (stanje.politika.dajeDostignucaIKolekcije || stanje.politika.dajeNapredak)
-            ? await upisiKolekcijuIDostignucaRijeci({
-              partijaId: stanje.partijaId,
-              izvorTip: 'trening',
-              zavrsenoU,
-              sudionici: stanje.sudionici
-                .filter((s) => s.upravljac === 'covjek')
-                .map((s) => ({
-                  igracId: s.igracId,
-                  statistika: (() => {
-                    const st = stanje.statistikeRijeci.get(s.igracId);
-                    return st ? zapisStatistikeZaStol(stanje, s.igracId, st) : undefined;
-                  })(),
-                  napredak: stanje.napredakDostignuca.get(s.igracId),
-                  stavkeIskustva: stanje.stavkeIskustva.get(s.igracId),
-                  iskustvoPrije: stanje.iskustvoPrije.get(s.igracId),
-                })),
-            })
-            : new Map();
+          const gamifikacijaRijeci = await osigurajGamifikacijuRijeci(stanje, 'trening', zavrsenoU);
           await obavijestiPrvuIgruSudionicima(stanje, 'trening');
           await obradiDovrseneIgreTreninga(stanje);
           for (const p of plasmani) {
@@ -3510,6 +3512,7 @@ export function stvoriUpraviteljPartija(
       prekidiUTijeku: new Map(),
       obradaPrekidaZakazana: false,
       rezultatiKraja: new Map(),
+      ishodGamifikacijeRijeci: null,
       zavrsena: false,
       dokaz: null,
       jePrivatna: true,
