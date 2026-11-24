@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { ArrowLeft, ArrowRight, Home } from 'lucide-svelte';
   import { api } from '$lib/api.js';
   import { prijediNaGostujucuSesiju } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
@@ -14,9 +13,6 @@
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
   import { type AvatarConfigV1 } from 'zajednicko';
-
-  const IKONA_VELICINA = 32;
-  const IKONA_DEBLjINA = 2.2;
 
   let { prethodnaPutanja = null, mozeNaprijed = false } = $props<{ prethodnaPutanja?: string | null; mozeNaprijed?: boolean }>();
   let otvorenIzbornik = $state(false);
@@ -106,16 +102,16 @@
     {:else}
       <div class="lijeve-akcije">
         <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
-          <ArrowLeft class="header-ikona" size={IKONA_VELICINA} strokeWidth={IKONA_DEBLjINA} aria-hidden="true" />
+          <img class="header-ikona" src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
         </button>
         {#if prikaziPovratakNaPocetnu}
           <a href="/" class="header-akcija" aria-label="Početna">
-            <Home class="header-ikona" size={IKONA_VELICINA} strokeWidth={IKONA_DEBLjINA} aria-hidden="true" />
+            <img class="header-ikona" src="/ikone/04-naslovna.png" alt="" aria-hidden="true" />
           </a>
         {/if}
         {#if mozeNaprijed}
           <button type="button" class="header-akcija" aria-label="Naprijed" onclick={idiNaprijed}>
-            <ArrowRight class="header-ikona" size={IKONA_VELICINA} strokeWidth={IKONA_DEBLjINA} aria-hidden="true" />
+            <img class="header-ikona" src="/ikone/05-naprijed.png" alt="" aria-hidden="true" />
           </button>
         {/if}
       </div>
@@ -156,6 +152,12 @@
                   <a href="/profil/avatar" class="profil-stavka" role="menuitem">Uredi avatar</a>
                 {/if}
                 <a href="/postavke" class="profil-stavka" role="menuitem">Postavke</a>
+                <a
+                  href="/pravila-kaladonta"
+                  class="profil-stavka"
+                  role="menuitem"
+                  data-testid="naslovnica-pravila"
+                >Pravila igre</a>
                 {#if jeRegistriran}
                   <a href="/povratne-informacije" class="profil-stavka" role="menuitem">Povratne informacije</a>
                 {/if}
@@ -288,6 +290,9 @@
 
   .header-ikona {
     display: block;
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
     flex-shrink: 0;
   }
 
@@ -379,7 +384,8 @@
     top: calc(100% + 6px);
     right: 0;
     display: grid;
-    min-width: 200px;
+    min-width: 260px;
+    width: max-content;
     gap: 2px;
     padding: 8px;
     border: 1px solid var(--boja-obrub);
@@ -392,7 +398,7 @@
     display: block;
     width: 100%;
     min-height: 40px;
-    padding: 8px 10px;
+    padding: 8px 12px;
     border: 0;
     border-radius: 6px;
     background: transparent;
@@ -402,6 +408,7 @@
     font-weight: 700;
     text-align: left;
     text-decoration: none;
+    white-space: nowrap;
     cursor: pointer;
   }
 

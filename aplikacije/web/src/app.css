@@ -120,6 +120,9 @@
   --font-naslov: 'Baloo 2', sans-serif;
   --font-tijelo: 'Inter', sans-serif;
 
+  /* Širina središnjeg sadržaja naslovnice (bočne zone animacije). */
+  --sirina-grida: 980px;
+
   /*
   * Tipografija - responzivne veličine (vrijednosti za mobitel; desktop u @media 1000px).
    * Sav tekst u aplikaciji koristi ove tokene — nove veličine dodavati ovdje, ne po komponentama.

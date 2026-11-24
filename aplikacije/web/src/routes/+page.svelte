@@ -25,6 +25,7 @@
   } from '$lib/naslovnica-dostignuca.js';
   import {
     ariaBadgaMisija,
+    labelaAktivnihMisija,
     natpisBadgaMisija,
   } from '$lib/naslovnica-misije.js';
   import {
@@ -42,7 +43,8 @@
 
   const misijeStore = dohvatiStanjeMisijaStore();
   const misijeBadge = $derived(natpisBadgaMisija(misijeStore.aktivne));
-  const misijeBadgeAria = $derived(ariaBadgaMisija(misijeStore.aktivne));
+  const misijeLabela = $derived(labelaAktivnihMisija(misijeStore.aktivne));
+  const misijeAria = $derived(ariaBadgaMisija(misijeStore.aktivne));
   const godinaCopyright = new Date().getFullYear();
 
   const FOCUS_REFRESH_MS = 45_000;
@@ -60,24 +62,33 @@
     ukupno: 0,
     maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
   });
-  const kolekcijaLabela = $derived(`razina: ${kolekcijaRazinaNaziv}`);
-  const kolekcijaBadge = $derived(
-    brojRijeciKolekcije !== null && brojRijeciKolekcije > 0 ? String(brojRijeciKolekcije) : null,
+  type DostignuceNaslovnice = {
+    id: string;
+    naziv: string;
+    opis: string;
+    kategorija: 'napredak' | 'rijeci' | 'vjestina' | 'kaladont' | 'igra';
+    pragovi: readonly number[];
+    razina: number;
+    vrijednost: number;
+    sljedeciPrag: number | null;
+  };
+  let dostignucaPopis = $state<DostignuceNaslovnice[]>([]);
+  const kolekcijaBrojLabela = $derived(
+    brojRijeciKolekcije === null
+      ? '…'
+      : brojRijeciKolekcije === 1
+        ? '1 riječ'
+        : `${brojRijeciKolekcije} riječi`,
   );
   const kolekcijaAria = $derived(
-    kolekcijaBadge
-      ? `Kolekcija riječi, ${kolekcijaLabela}, ${brojRijeciKolekcije === 1 ? '1 riječ' : `${brojRijeciKolekcije} riječi`}`
-      : `Kolekcija riječi, ${kolekcijaLabela}`,
+    brojRijeciKolekcije === null
+      ? `Kolekcija riječi, ${kolekcijaRazinaNaziv}`
+      : `Kolekcija riječi, ${kolekcijaBrojLabela}, ${kolekcijaRazinaNaziv}`,
   );
   const dostignucaLabela = $derived(labelaZvjezdicaDostignuca(dostignucaZvjezdice));
   const dostignucaAria = $derived(ariaBadgaDostignuca(dostignucaZvjezdice));
   const jeGost = $derived(
     stanjeProfila.status === 'spreman' && stanjeProfila.profil?.vrsta === 'gost',
-  );
-  const jeRegistriran = $derived(
-    stanjeProfila.status === 'spreman' &&
-      stanjeProfila.profil !== null &&
-      stanjeProfila.profil.vrsta !== 'gost',
   );
 
   function idiUBrzuIgru(opcije: { izQueryja?: boolean } = {}) {
@@ -125,11 +136,14 @@
   async function osvjeziDostignucaZvjezdice() {
     const generacija = ++dostignucaGeneracija;
     try {
-      const odgovor = await api<{ ukupnoZvjezdica?: number; maksimalnoZvjezdica?: number }>(
-        '/dostignuca',
-      );
+      const odgovor = await api<{
+        ukupnoZvjezdica?: number;
+        maksimalnoZvjezdica?: number;
+        dostignuca?: DostignuceNaslovnice[];
+      }>('/dostignuca');
       if (generacija !== dostignucaGeneracija) return;
       dostignucaZvjezdice = normalizirajZvjezdiceDostignuca(odgovor);
+      dostignucaPopis = Array.isArray(odgovor.dostignuca) ? odgovor.dostignuca : [];
     } catch {
       // Zadrži zadnji uspješan sažetak; ne piši 0 zvjezdica preko stvarnog napretka.
       if (generacija !== dostignucaGeneracija) return;
@@ -162,6 +176,7 @@
         ukupno: 0,
         maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
       };
+      dostignucaPopis = [];
       invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
@@ -208,65 +223,8 @@
       <div class="profil-red">
         <NaslovnicaNapredak
           izazoviZavrseno={izazoviPrikaz.vrsta === 'napredak' ? izazoviPrikaz.zavrseno : 0}
+          dostignuca={dostignucaPopis}
         />
-        <div class="sporedni-red">
-          <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
-            <a
-              href="/misije"
-              class="sporedni-precac"
-              data-testid="naslovnica-misije"
-              aria-label={misijeBadge ? `Misije, ${misijeBadgeAria}` : 'Misije'}
-              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
-            >
-              <span class="sporedni-precac__ikona sporedni-precac__ikona--s-badgeom">
-                <img src="/ikone/62-misije.webp" alt="" width="48" height="48" />
-                {#if misijeBadge}
-                  <span class="sporedni-precac__badge" data-testid="naslovnica-misije-badge" aria-hidden="true"
-                    >{misijeBadge}</span
-                  >
-                {/if}
-              </span>
-              <span>Misije</span>
-            </a>
-            <a
-              href="/profil#rijeci"
-              class="sporedni-precac"
-              data-testid="naslovnica-kolekcija"
-              aria-label={kolekcijaAria}
-              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
-            >
-              <span class="sporedni-precac__ikona sporedni-precac__ikona--s-badgeom">
-                <img src="/ikone/08-pravila.png" alt="" width="48" height="48" />
-                {#if kolekcijaBadge}
-                  <span
-                    class="sporedni-precac__badge"
-                    data-testid="naslovnica-kolekcija-badge"
-                    aria-hidden="true">{kolekcijaBadge}</span
-                  >
-                {/if}
-              </span>
-              <span class="sporedni-precac__tekst">
-                <span>Kolekcija riječi</span>
-                <small data-testid="naslovnica-kolekcija-labela">{kolekcijaLabela}</small>
-              </span>
-            </a>
-            <a
-              href="/profil#dostignuca"
-              class="sporedni-precac"
-              data-testid="naslovnica-dostignuca"
-              aria-label={`Dostignuća, ${dostignucaAria}`}
-              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-dostignuca-klik')}
-            >
-              <span class="sporedni-precac__ikona">
-                <img src="/ikone/27-zvjezdica-puna.png" alt="" width="48" height="48" />
-              </span>
-              <span class="sporedni-precac__tekst">
-                <span>Dostignuća</span>
-                <small data-testid="naslovnica-dostignuca-labela">{dostignucaLabela}</small>
-              </span>
-            </a>
-          </nav>
-        </div>
       </div>
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
         <button
@@ -287,9 +245,9 @@
             />
             <span class="stavka-tekst">
               <strong id="naslov-brza-igra">Troboj</strong>
-              <small id="opis-brza-igra">Igraj online* u troje.</small>
+              <small id="opis-brza-igra">Igraj online u troje.</small>
               <small id="napomena-brza-igra" class="stavka-napomena"
-                >*Ako nema igrača, pridruže se botovi.</small
+                >Ako nema igrača, pridružit će se botovi.</small
               >
             </span>
           </span>
@@ -401,6 +359,74 @@
         </a>
       </nav>
 
+      <div class="sporedni-red">
+        <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
+          <a
+            href="/misije"
+            class="sporedni-precac"
+            data-testid="naslovnica-misije"
+            aria-label={`Misije, ${misijeAria}`}
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
+          >
+            <span class="sporedni-precac__ikona">
+              <img src="/ikone/62-misije.webp" alt="" width="48" height="48" />
+              {#if misijeBadge}
+                <span class="sporedni-precac__badge" data-testid="naslovnica-misije-badge" aria-hidden="true"
+                  >{misijeBadge}</span
+                >
+              {/if}
+            </span>
+            <span class="sporedni-precac__tekst">
+              <span class="sporedni-precac__naslov">Misije</span>
+              <small class="sporedni-precac__podnaslov" data-testid="naslovnica-misije-labela"
+                >{misijeLabela}</small
+              >
+            </span>
+          </a>
+          <a
+            href="/profil#rijeci"
+            class="sporedni-precac"
+            data-testid="naslovnica-kolekcija"
+            aria-label={kolekcijaAria}
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
+          >
+            <span class="sporedni-precac__ikona">
+              <img src="/ikone/08-pravila.png" alt="" width="48" height="48" />
+            </span>
+            <span class="sporedni-precac__tekst">
+              <span class="sporedni-precac__naslov">
+                <span class="samo-desktop">Kolekcija riječi</span>
+                <span class="samo-mobilni">Kolekcija</span>
+              </span>
+              <small class="sporedni-precac__podnaslov" data-testid="naslovnica-kolekcija-labela">
+                <span class="samo-desktop">{kolekcijaBrojLabela}</span>
+                <span class="samo-mobilni">{kolekcijaBrojLabela}</span>
+              </small>
+              <small class="sporedni-precac__razina samo-desktop" aria-hidden="true"
+                >{kolekcijaRazinaNaziv}</small
+              >
+            </span>
+          </a>
+          <a
+            href="/profil#dostignuca"
+            class="sporedni-precac"
+            data-testid="naslovnica-dostignuca"
+            aria-label={`Dostignuća, ${dostignucaAria}`}
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-dostignuca-klik')}
+          >
+            <span class="sporedni-precac__ikona">
+              <img src="/ikone/27-zvjezdica-puna.png" alt="" width="48" height="48" />
+            </span>
+            <span class="sporedni-precac__tekst">
+              <span class="sporedni-precac__naslov">Dostignuća</span>
+              <small class="sporedni-precac__podnaslov" data-testid="naslovnica-dostignuca-labela"
+                >{dostignucaLabela}</small
+              >
+            </span>
+          </a>
+        </nav>
+      </div>
+
       <div class="brze-postavke-blok">
         <BrzePostavke />
       </div>
@@ -426,16 +452,6 @@
       </span>
       <span class="copyright">© {godinaCopyright} Kaladont</span>
       <span class="podnozje-desno">
-        <a
-          href="/pravila-kaladonta"
-          data-testid="naslovnica-pravila"
-          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-pravila-klik')}
-        >Pravila igre</a>
-        {#if jeRegistriran}
-          <span class="razdjelnik" aria-hidden="true">·</span>
-          <a href="/povratne-informacije">Povratne informacije</a>
-        {/if}
-        <span class="razdjelnik" aria-hidden="true">·</span>
         <a href="/uvjeti">Uvjeti</a>
         <span class="razdjelnik" aria-hidden="true">·</span>
         <a href="/privatnost">Privatnost</a>
@@ -452,15 +468,17 @@
     --razmak-header-profil: 20px;
     --landing-padding-dolje: clamp(8px, 2.2dvh, 32px);
     --razmak-stavki: 12px;
-    --font-stavke: clamp(20px, 2.8dvh, 24px);
-    --font-opisa: clamp(15px, 2.1dvh, 17px);
-    --padding-stavke: clamp(16px, 2.6dvh, 24px);
+    --font-stavke: clamp(16px, 2.6dvh, 20px);
+    --font-opisa: clamp(13px, 2dvh, 15px);
+    --padding-stavke: 16px;
     --razmak-naslov-opis: 6px;
-    --radijus-stavke: 18px;
-    --ikona-sporedna: 48px;
-    --ikona-primarna: 60px;
-    --font-brza-igra: clamp(22px, 3dvh, 26px);
+    --radijus-stavke: 16px;
+    --ikona-sporedna: 36px;
+    --ikona-primarna: 48px;
+    --font-brza-igra: clamp(22px, 3dvh, 24px);
     --sirina-grida: 980px;
+    --sjena-stavke: 0 1px 4px rgb(0 0 0 / 18%);
+    --sjena-stavke-hover: 0 4px 14px rgb(0 0 0 / 22%);
 
     position: relative;
     isolation: isolate;
@@ -503,7 +521,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 20px;
     min-width: 0;
     width: 100%;
   }
@@ -549,12 +567,12 @@
     border: 1px solid var(--boja-plocica-obrub);
     border-radius: var(--radijus-stavke);
     background: var(--boja-plocica);
-    box-shadow: var(--sjena-suptilna);
+    box-shadow: var(--sjena-stavke);
     color: var(--boja-plocica-tekst);
     font: inherit;
     text-decoration: none;
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
   }
 
   .stavka-sadrzaj {
@@ -593,7 +611,7 @@
   }
 
   .stavka-tekst small {
-    color: #5c554a;
+    color: color-mix(in srgb, var(--boja-plocica-tekst) 72%, transparent);
     font-family: var(--font-tijelo);
     font-size: var(--font-opisa);
     font-weight: 500;
@@ -603,10 +621,10 @@
   .stavka-napomena {
     display: block;
     margin-top: 4px;
-    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 82%, transparent);
-    font-size: clamp(12px, 1.8dvh, 14px);
+    color: color-mix(in srgb, #1a1815 68%, transparent);
+    font-size: clamp(13px, 1.9dvh, 15px);
     font-weight: 500;
-    font-style: italic;
+    font-style: normal;
     line-height: 1.3;
   }
 
@@ -635,7 +653,7 @@
   .izazovi-napredak__traka {
     display: block;
     width: 100%;
-    height: 9px;
+    height: 7px;
     overflow: hidden;
     border-radius: var(--radijus-pill);
     background: color-mix(in srgb, #1a1815 12%, transparent);
@@ -651,7 +669,7 @@
   .izazovi-napredak__broj {
     color: color-mix(in srgb, #1a1815 70%, transparent);
     font-family: var(--font-tijelo);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     line-height: 1.2;
   }
@@ -663,10 +681,10 @@
     gap: 8px;
     box-sizing: border-box;
     width: 100%;
-    min-height: 44px;
+    min-height: 46px;
     margin-top: 4px;
     padding: 10px 18px;
-    border-radius: var(--radijus-pill);
+    border-radius: 12px;
     background: var(--boja-mint);
     color: #fff;
     font-family: var(--font-naslov);
@@ -684,22 +702,22 @@
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: color-mix(in srgb, #1a1815 8%, transparent);
-    color: color-mix(in srgb, #1a1815 45%, transparent);
-    font-size: 18px;
-    font-weight: 600;
+    width: 18px;
+    height: 18px;
+    color: color-mix(in srgb, var(--boja-plocica-tekst) 55%, transparent);
+    font-size: 20px;
+    font-weight: 500;
     line-height: 1;
     pointer-events: none;
+    transition: transform 180ms ease;
   }
 
   .navigacijska-stavka.primarna {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
     gap: 16px;
-    min-height: 100px;
+    min-height: 112px;
+    padding: 20px;
     border-color: transparent;
     background: var(--boja-zuta-krema);
     color: #1a1815;
@@ -726,17 +744,18 @@
 
   @media (min-width: 1000px) {
     .landing {
-      --ikona-primarna: 76px;
-      --ikona-sporedna: 52px;
+      --ikona-primarna: 52px;
+      --ikona-sporedna: 40px;
       --padding-stavke: 22px 24px;
-      --font-brza-igra: 26px;
+      --font-brza-igra: 24px;
     }
 
     .navigacijska-stavka.primarna {
-      grid-template-columns: minmax(0, 1fr) minmax(200px, 34%);
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
       align-items: stretch;
       gap: 24px;
-      min-height: 112px;
+      min-height: 128px;
+      padding: 24px;
     }
 
     .navigacijska-stavka.primarna .primarna-akcija {
@@ -748,15 +767,36 @@
       min-height: 50px;
       margin-top: 0;
       padding: 12px 20px;
-      border-radius: 14px;
+      border-radius: 12px;
       font-size: 17px;
     }
   }
 
-  .navigacijska-stavka:hover {
-    transform: translateY(-2px);
-    border-color: var(--boja-mint);
-    box-shadow: var(--sjena-modal);
+  @media (hover: hover) and (pointer: fine) {
+    .navigacijska-stavka:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--boja-mint) 55%, var(--boja-plocica-obrub));
+      box-shadow: var(--sjena-stavke-hover);
+    }
+
+    .navigacijska-stavka:hover .strelica {
+      transform: translateX(3px);
+    }
+
+    .navigacijska-stavka.primarna:hover {
+      border-color: transparent;
+    }
+
+    .sporedni-precac:hover {
+      color: var(--boja-akcent-tekst);
+      background: var(--boja-povrsina-2);
+      border-color: color-mix(in srgb, #fff 20%, transparent);
+    }
+
+    :global(html[data-tema='svijetla']) .sporedni-precac:hover {
+      background: color-mix(in srgb, var(--boja-mint) 12%, transparent);
+      border-color: color-mix(in srgb, var(--boja-mint) 34%, transparent);
+    }
   }
 
   .navigacijska-stavka:focus-visible {
@@ -764,14 +804,10 @@
     outline-offset: 3px;
   }
 
-  .navigacijska-stavka.primarna:hover {
-    border-color: transparent;
-  }
-
   .sporedni-precac:focus-visible {
     outline: 3px solid var(--boja-zuta-krema);
     outline-offset: 2px;
-    border-radius: 6px;
+    border-radius: 12px;
   }
 
   .sporedni-red {
@@ -786,9 +822,13 @@
   .sporedna-navigacija {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px 8px;
+    gap: 8px;
     width: 100%;
-    margin: 2px 0 0;
+    max-width: 100%;
+    margin: 0 auto;
+    justify-content: center;
+    justify-items: stretch;
+    align-items: stretch;
   }
 
   .sporedni-precac {
@@ -796,9 +836,13 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    gap: 6px;
-    min-height: 44px;
-    padding: 8px 4px;
+    gap: 8px;
+    width: 100%;
+    min-height: 100%;
+    padding: 12px 8px;
+    border-radius: 12px;
+    background: var(--boja-povrsina);
+    border: 1px solid color-mix(in srgb, #fff 14%, transparent);
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
     font-size: 16px;
@@ -806,6 +850,12 @@
     line-height: 1.25;
     text-align: center;
     text-decoration: none;
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+
+  :global(html[data-tema='svijetla']) .sporedni-precac {
+    background: color-mix(in srgb, var(--boja-mint) 7%, transparent);
+    border-color: color-mix(in srgb, var(--boja-mint) 26%, transparent);
   }
 
   .sporedni-precac__tekst {
@@ -813,53 +863,77 @@
     flex-direction: column;
     align-items: center;
     gap: 2px;
+    min-height: 0;
   }
 
-  .sporedni-precac__tekst small {
-    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 88%, transparent);
+  .sporedni-precac__naslov {
+    display: block;
+    margin: 0;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.2;
   }
 
+  .sporedni-precac__podnaslov,
+  .sporedni-precac__razina {
+    display: block;
+    margin: 0;
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 88%, transparent);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .sporedni-precac__razina {
+    font-weight: 500;
+    opacity: 0.9;
+  }
+
+  .samo-mobilni {
+    display: none;
+  }
+
+  .samo-desktop {
+    display: inline;
+  }
+
   .sporedni-precac img {
-    width: 44px;
-    height: 44px;
+    display: block;
+    width: 36px;
+    height: 36px;
     object-fit: contain;
   }
 
   .sporedni-precac__ikona {
     position: relative;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
     overflow: visible;
-  }
-
-  .sporedni-precac__ikona--s-badgeom {
-    padding: 6px 14px 2px 6px;
   }
 
   .sporedni-precac__badge {
     position: absolute;
-    top: 0;
-    right: 0;
+    top: -6px;
+    right: -10px;
+    z-index: 1;
     min-width: 22px;
-    padding: 1px 6px;
+    height: 20px;
+    padding: 0 6px;
     border-radius: 999px;
     background: var(--boja-crvena);
     color: #fff;
     font-family: var(--font-tijelo);
     font-size: 14px;
     font-weight: 800;
-    line-height: 1.25;
+    line-height: 20px;
     text-align: center;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--boja-pozadina) 80%, transparent);
     pointer-events: none;
-  }
-
-  .sporedni-precac:hover {
-    color: var(--boja-akcent-tekst);
   }
 
   .landing-footer {
@@ -937,38 +1011,32 @@
       --header-clearance: 70px;
       --razmak-header-profil: 32px;
       --landing-padding-dolje: clamp(8px, 1.8dvh, 24px);
-      --font-stavke: clamp(20px, 2.4dvh, 24px);
-      --font-opisa: 16px;
+      --font-stavke: 20px;
+      --font-opisa: 15px;
       --padding-stavke: 22px 24px;
-      --ikona-sporedna: 48px;
-      --ikona-primarna: 56px;
-      --font-brza-igra: clamp(24px, 2.6dvh, 26px);
+      --ikona-sporedna: 40px;
+      --ikona-primarna: 52px;
+      --font-brza-igra: 24px;
       --razmak-stavki: 14px;
+      --sjena-stavke: 0 1px 5px rgb(0 0 0 / 16%);
+      --sjena-stavke-hover: 0 4px 16px rgb(0 0 0 / 20%);
     }
 
     .izbornik,
     .navigacijski-blok {
-      gap: 20px;
+      gap: 24px;
     }
 
     .profil-red {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 16px 20px;
+      align-items: stretch;
+      width: 100%;
     }
 
     .profil-red :global(.naslovnica-napredak-omotac) {
-      justify-self: center;
-      width: max-content;
+      width: 100%;
       max-width: 100%;
       min-width: 0;
       margin: 0;
-    }
-
-    .profil-red .sporedni-red {
-      justify-self: end;
-      min-width: 0;
     }
 
     .brze-postavke-blok {
@@ -1024,7 +1092,7 @@
     }
 
     .navigacijska-stavka {
-      min-height: 92px;
+      min-height: 116px;
       height: 100%;
       box-sizing: border-box;
     }
@@ -1035,41 +1103,59 @@
     }
 
     .sporedni-red {
-      align-items: flex-end;
-      justify-content: flex-end;
+      align-items: center;
+      justify-content: center;
       gap: 0;
       margin-top: 0;
-      width: auto;
+      width: 100%;
     }
 
     .sporedna-navigacija {
-      gap: 8px 12px;
-      margin: 0;
-      width: auto;
-      max-width: 100%;
-      grid-template-columns: repeat(3, minmax(0, auto));
-      justify-content: end;
+      gap: 12px;
+      margin: 0 auto;
+      width: min(100%, 580px);
+      max-width: 580px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      justify-content: center;
+      justify-items: stretch;
     }
 
     .sporedni-precac {
-      gap: 8px;
-      padding: 4px 6px;
-      font-size: 18px;
+      gap: 10px;
+      padding: 14px 12px;
+      font-size: 15px;
+    }
+
+    .sporedni-precac__tekst {
+      min-height: 0;
+      gap: 3px;
+    }
+
+    .sporedni-precac__naslov {
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .sporedni-precac__podnaslov,
+    .sporedni-precac__razina {
+      font-size: 12px;
+      line-height: 1.25;
     }
 
     .sporedni-precac__badge {
-      font-size: 16px;
-      min-width: 24px;
-      padding: 1px 7px;
+      top: -7px;
+      right: -12px;
+      font-size: 14px;
+      min-width: 22px;
+      height: 20px;
+      padding: 0 6px;
+      line-height: 20px;
     }
 
-    .sporedni-precac img {
-      width: 48px;
-      height: 48px;
-    }
-
-    .sporedni-precac__ikona--s-badgeom {
-      padding: 6px 16px 2px 6px;
+    .sporedni-precac img,
+    .sporedni-precac__ikona {
+      width: 40px;
+      height: 40px;
     }
   }
 
@@ -1115,25 +1201,43 @@
       padding-inline: 12px;
     }
 
+    .samo-desktop {
+      display: none;
+    }
+
+    .samo-mobilni {
+      display: inline;
+    }
+
     .izbornik,
     .navigacijski-blok {
       gap: 14px;
     }
 
     .navigacijska-stavka:not(.primarna) {
-      min-height: 80px;
+      min-height: 88px;
       box-sizing: border-box;
     }
 
+    .podnozje-red {
+      flex-direction: column;
+      gap: 10px;
+    }
+
     .landing-footer a {
-      padding: clamp(2px, 0.6dvh, 8px) 2px;
-      font-size: clamp(12px, 2dvh, var(--tekst-sitni));
-      line-height: 1.2;
+      padding: 6px 4px;
+      font-size: 13px;
+      line-height: 1.3;
     }
 
     .copyright {
-      font-size: clamp(12px, 2dvh, var(--tekst-sitni));
-      line-height: 1.2;
+      font-size: 13px;
+      line-height: 1.3;
+      order: 3;
+    }
+
+    .podnozje-desno {
+      order: 2;
     }
   }
 
@@ -1146,6 +1250,19 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .navigacijska-stavka { transition: none; }
+    .navigacijska-stavka,
+    .strelica,
+    .sporedni-precac {
+      transition: none;
+    }
+
+    .navigacijska-stavka:hover .strelica {
+      transform: none;
+    }
+  }
+
+  :global(html[data-tema='svijetla']) .landing {
+    --sjena-stavke: 0 1px 4px rgb(38 34 27 / 8%);
+    --sjena-stavke-hover: 0 4px 14px rgb(38 34 27 / 12%);
   }
 </style>

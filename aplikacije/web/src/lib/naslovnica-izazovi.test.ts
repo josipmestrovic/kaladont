@@ -32,10 +32,14 @@ describe('naslovnica-izazovi', () => {
     expect(defaultOpisIzazova()).toBe(`Svladavaj ${BROJ_AKTIVNIH_IZAZOVA} sve težih izazova.`);
   });
 
-  it('pri 0 završenih nema trake', () => {
+  it('pri 0 završenih prikazuje traku na 0%', () => {
     expect(izracunajPrikazIzazova(odgovor(0))).toEqual({
-      vrsta: 'default',
+      vrsta: 'napredak',
       opis: defaultOpisIzazova(),
+      zavrseno: 0,
+      ukupno: BROJ_AKTIVNIH_IZAZOVA,
+      postotak: 0,
+      sveZavrseno: false,
     });
   });
 

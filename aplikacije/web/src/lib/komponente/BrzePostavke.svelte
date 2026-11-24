@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ALargeSmall, Moon, Sun, Volume2, VolumeX } from 'lucide-svelte';
+  import { ALargeSmall, Sun, Volume2, VolumeX } from 'lucide-svelte';
   import { glasUkljucen, postaviGlas } from '$lib/glasovni-manager.js';
   import { openDyslexicUkljucen, postaviOpenDyslexic } from '$lib/postavke-fonta.js';
   import { postaviTemu, tema } from '$lib/postavke-teme.js';
@@ -35,11 +35,7 @@
     onchange={(ukljucen) => postaviTemu(ukljucen ? 'svijetla' : 'tamna')}
   >
     <span class="brze-postavke__ikona" aria-hidden="true">
-      {#if svijetlaUkljucena}
-        <Sun size={24} strokeWidth={2} />
-      {:else}
-        <Moon size={24} strokeWidth={2} />
-      {/if}
+      <Sun size={24} strokeWidth={2} />
     </span>
     <strong class="brze-postavke__naziv">Svijetli način</strong>
   </PrekidacPostavke>
@@ -57,7 +53,10 @@
         <VolumeX size={24} strokeWidth={2} />
       {/if}
     </span>
-    <strong class="brze-postavke__naziv">Čitanje naglas</strong>
+    <strong class="brze-postavke__naziv">
+      <span class="samo-desktop">Čitanje naglas</span>
+      <span class="samo-mobilni">Čitanje</span>
+    </strong>
   </PrekidacPostavke>
 
   <PrekidacPostavke
@@ -69,7 +68,10 @@
     <span class="brze-postavke__ikona" aria-hidden="true">
       <ALargeSmall size={24} strokeWidth={2} />
     </span>
-    <strong class="brze-postavke__naziv">Font za disleksiju</strong>
+    <strong class="brze-postavke__naziv">
+      <span class="samo-desktop">Font za disleksiju</span>
+      <span class="samo-mobilni">Disleksija</span>
+    </strong>
   </PrekidacPostavke>
 </div>
 
@@ -160,6 +162,14 @@
     hyphens: auto;
   }
 
+  .samo-desktop {
+    display: none;
+  }
+
+  .samo-mobilni {
+    display: inline;
+  }
+
   :global(html[data-font-disleksiju]) .brze-postavke__naziv {
     font-size: 14px;
     line-height: 1.3;
@@ -239,14 +249,22 @@
       flex: 0 0 auto;
       width: auto;
       min-width: 0;
-      font-size: 16px;
+      font-size: 15px;
       text-align: left;
       white-space: nowrap;
       overflow-wrap: normal;
     }
 
+    .samo-desktop {
+      display: inline;
+    }
+
+    .samo-mobilni {
+      display: none;
+    }
+
     :global(html[data-font-disleksiju]) .brze-postavke__naziv {
-      font-size: 16px;
+      font-size: 15px;
     }
   }
 </style>

@@ -17,7 +17,8 @@ export type AudioDogadaj =
   | 'partija-kraj'
   | 'pred-istek-vremena'
   | 'klik-misa'
-  | 'hover-efekt';
+  | 'hover-efekt'
+  | 'chat-poruka';
 
 const KLJUC_POSTAVKI = 'kaladont_audio_postavke_v1';
 const ZVUKOVI: Record<AudioDogadaj, string> = {
@@ -38,6 +39,7 @@ const ZVUKOVI: Record<AudioDogadaj, string> = {
   'pred-istek-vremena': '/zvukovi/pred-istek-vremena.mp3',
   'klik-misa': '/zvukovi/klik-misa.mp3',
   'hover-efekt': '/zvukovi/hover-efekt.mp3',
+  'chat-poruka': '/zvukovi/chat-poruka.mp3',
 };
 
 const UI_ZVUKOVI: AudioDogadaj[] = ['klik-misa', 'hover-efekt'];
@@ -69,6 +71,7 @@ const GAMEPLAY_ZVUKOVI: AudioDogadaj[] = [
   'aplauz-kaladont',
   'partija-kraj',
   'pred-istek-vremena',
+  'chat-poruka',
 ];
 
 interface AudioPostavke {
@@ -96,6 +99,8 @@ const POJACANJE_PO_DOGADAJU: Record<AudioDogadaj, number> = {
   'pred-istek-vremena': 0.6,
   'klik-misa': 0.3,
   'hover-efekt': 0.3,
+  // Chat bubble — tih, suptilan pop (niži od UI klika).
+  'chat-poruka': 0.22,
 };
 
 const zadanePostavke: AudioPostavke = { volumen: 0.65, utišano: false };

@@ -1,4 +1,4 @@
-/** Sažetak aktivnih misija za badge na naslovnici. */
+/** Sažetak aktivnih misija za badge/podnaslov na naslovnici. */
 import type { StanjeMisijaDto } from 'zajednicko';
 
 export type PrikazAktivnihMisija = {
@@ -17,9 +17,20 @@ export function izracunajAktivneMisije(stanje: StanjeMisijaDto): PrikazAktivnihM
   };
 }
 
+/**
+ * Narančasti badge samo za događaje koji traže pažnju (npr. nepreuzeta nagrada).
+ * Bez API-ja za taj signal — badge se ne prikazuje; broj aktivnih ide u podnaslov.
+ */
 export function natpisBadgaMisija(prikaz: PrikazAktivnihMisija): string | null {
-  if (prikaz.ukupnoAktivnih <= 0) return null;
-  return String(prikaz.ukupnoAktivnih);
+  void prikaz;
+  return null;
+}
+
+export function labelaAktivnihMisija(prikaz: PrikazAktivnihMisija): string {
+  const broj = prikaz.ukupnoAktivnih;
+  if (broj === 1) return '1 aktivna';
+  if (broj >= 2 && broj <= 4) return `${broj} aktivne`;
+  return `${broj} aktivnih`;
 }
 
 export function ariaBadgaMisija(prikaz: PrikazAktivnihMisija): string {

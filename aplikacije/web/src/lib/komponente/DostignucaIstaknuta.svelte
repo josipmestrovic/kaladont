@@ -1,19 +1,32 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { odaberiIstaknutaDostignuca, type DefinicijaDostignuca } from 'zajednicko';
+  import { odaberiIstaknutaDostignuca } from 'zajednicko';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
 
-  interface Dostignuce extends DefinicijaDostignuca {
+  /** Minimalni oblik za istaknuta dostignuća (profil i naslovnica). */
+  interface Dostignuce {
+    id: string;
+    naziv: string;
+    opis: string;
+    pragovi: readonly number[];
     razina: number;
     vrijednost: number;
     sljedeciPrag: number | null;
   }
 
-  let { dostignuca }: { dostignuca: readonly Dostignuce[] } = $props();
+  let {
+    dostignuca,
+    limit = 6,
+    kompaktno = false,
+  }: {
+    dostignuca: readonly Dostignuce[];
+    limit?: number;
+    kompaktno?: boolean;
+  } = $props();
   let otvorenoId = $state<string | null>(null);
   let omotac = $state<HTMLDivElement | undefined>();
   let pozicijaPojasnjenja = $state('');
-  const istaknuta = $derived(odaberiIstaknutaDostignuca(dostignuca, 6));
+  const istaknuta = $derived(odaberiIstaknutaDostignuca(dostignuca, limit));
 
   async function preklopi(dogadaj: MouseEvent, id: string, tooltipId: string) {
     dogadaj.stopPropagation();
@@ -63,7 +76,12 @@
 />
 
 {#if istaknuta.length > 0}
-  <section class="dostignuca-istaknuta" aria-label="Istaknuta dostignuća">
+  <section
+    class="dostignuca-istaknuta"
+    class:dostignuca-istaknuta--kompaktno={kompaktno}
+    aria-label="Istaknuta dostignuća"
+    data-testid="naslovnica-istaknuta-dostignuca"
+  >
     <div class="popis" bind:this={omotac}>
       {#each istaknuta as dostignuce (dostignuce.id)}
         {@const tooltipId = `opis-dostignuca-${dostignuce.id}`}
@@ -102,6 +120,18 @@
 
 <style>
   .dostignuca-istaknuta { width: 90%; min-width: 0; }
+  .dostignuca-istaknuta--kompaktno { width: auto; max-width: 100%; }
+  .dostignuca-istaknuta--kompaktno .popis {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 10px 12px;
+    max-width: 420px;
+  }
+  .dostignuca-istaknuta--kompaktno .ikona { width: 40px; height: 40px; }
+  .dostignuca-istaknuta--kompaktno .zvjezdice img { width: 10px; height: 10px; }
   .popis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .stavka { position: relative; display: grid; justify-items: center; }
   .stavka button { display: grid; justify-items: center; gap: 3px; padding: 2px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }

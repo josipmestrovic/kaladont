@@ -3,6 +3,7 @@ import type { MisijaDto, StanjeMisijaDto } from 'zajednicko';
 import {
   ariaBadgaMisija,
   izracunajAktivneMisije,
+  labelaAktivnihMisija,
   natpisBadgaMisija,
 } from './naslovnica-misije.js';
 
@@ -40,12 +41,23 @@ describe('izracunajAktivneMisije', () => {
 });
 
 describe('natpisBadgaMisija', () => {
-  it('skriva badge bez aktivnih', () => {
+  it('ne koristi broj aktivnih kao notifikacijski badge', () => {
     expect(natpisBadgaMisija({ dnevneAktivne: 0, tjedneAktivne: 0, ukupnoAktivnih: 0 })).toBeNull();
+    expect(natpisBadgaMisija({ dnevneAktivne: 2, tjedneAktivne: 1, ukupnoAktivnih: 3 })).toBeNull();
   });
+});
 
-  it('prikazuje ukupan broj', () => {
-    expect(natpisBadgaMisija({ dnevneAktivne: 2, tjedneAktivne: 1, ukupnoAktivnih: 3 })).toBe('3');
+describe('labelaAktivnihMisija', () => {
+  it('formatira podnaslov', () => {
+    expect(labelaAktivnihMisija({ dnevneAktivne: 0, tjedneAktivne: 0, ukupnoAktivnih: 0 })).toBe(
+      '0 aktivnih',
+    );
+    expect(labelaAktivnihMisija({ dnevneAktivne: 1, tjedneAktivne: 0, ukupnoAktivnih: 1 })).toBe(
+      '1 aktivna',
+    );
+    expect(labelaAktivnihMisija({ dnevneAktivne: 2, tjedneAktivne: 1, ukupnoAktivnih: 3 })).toBe(
+      '3 aktivne',
+    );
   });
 });
 
