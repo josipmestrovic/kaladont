@@ -2,9 +2,15 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { ArrowLeft, ArrowRight, Home } from 'lucide-svelte';
-  import { api, ApiGreska } from '$lib/api.js';
-  import { osvjeziGostSesijuNakon401, prijediNaGostujucuSesiju } from '$lib/identitet.js';
+  import { api } from '$lib/api.js';
+  import { prijediNaGostujucuSesiju } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
+  import {
+    azurirajAvatarProfila,
+    invalidirajProfil,
+    osigurajProfil,
+    profil,
+  } from '$lib/stanje-profila.svelte.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
   import { type AvatarConfigV1 } from 'zajednicko';
@@ -12,25 +18,12 @@
   const IKONA_VELICINA = 32;
   const IKONA_DEBLjINA = 2.2;
 
-  interface Profil {
-    nadimak: string;
-    avatarId: number;
-    rang: string | null;
-    rang1v1: string | null;
-    email: string | null;
-    vrsta: 'gost' | 'registriran' | 'admin';
-    avatarConfig: AvatarConfigV1 | null;
-  }
-
   let { prethodnaPutanja = null, mozeNaprijed = false } = $props<{ prethodnaPutanja?: string | null; mozeNaprijed?: boolean }>();
-  let profil = $state<Profil | null>(null);
-  let jeGost = $state(true);
   let otvorenIzbornik = $state(false);
   let omotIzbornika: HTMLDivElement | undefined = $state();
-  let ucitavanjeProfila = false;
-  let zakazanoUcitavanje = false;
   const jeNaslovna = $derived($page.url.pathname === '/');
   const prikaziPovratakNaPocetnu = $derived(!jeNaslovna && prethodnaPutanja !== '/');
+  const jeGost = $derived(!profil?.email);
   const prikaziAdminNav = $derived(!jeNaslovna && profil?.vrsta === 'admin');
 
   function vratiSe() {
@@ -56,55 +49,20 @@
     // Novi gost token prije socketa/profila — prazan Bearer ostavlja avatar/sandučic mrtvim.
     await prijediNaGostujucuSesiju();
     await osvjeziSocketIdentitet().catch(() => {});
+    invalidirajProfil();
     window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
     window.location.assign('/');
-  }
-
-  async function ucitajProfil(pokusaji = 3) {
-    // Vanjski identitet event usred loada — jedan follow-up, bez do/while petlje.
-    if (ucitavanjeProfila) {
-      zakazanoUcitavanje = true;
-      return;
-    }
-    ucitavanjeProfila = true;
-    try {
-      let oporavakOdrađen = false;
-      let pokusaj = 0;
-      while (pokusaj < pokusaji) {
-        try {
-          const odgovor = await api<Profil>('/profil');
-          profil = odgovor;
-          jeGost = !odgovor.email;
-          return;
-        } catch (greska) {
-          const je401 = greska instanceof ApiGreska && greska.status === 401;
-          if (!oporavakOdrađen && je401) {
-            oporavakOdrađen = true;
-            // Bez identitet eventa — inače bismo opet ušli u ovaj loader i mintali goste u petlji.
-            await osvjeziGostSesijuNakon401({ emitirajIdentitet: false }).catch(() => {});
-            continue; // isti pokusaj brojač: jedan free retry nakon zamjene tokena
-          }
-          pokusaj += 1;
-          if (pokusaj < pokusaji) await new Promise((r) => setTimeout(r, 250 * pokusaj));
-        }
-      }
-      profil = null;
-      jeGost = true;
-    } finally {
-      ucitavanjeProfila = false;
-      if (zakazanoUcitavanje) {
-        zakazanoUcitavanje = false;
-        void ucitajProfil();
-      }
-    }
   }
 
   onMount(() => {
     const azurirajAvatar = (dogadaj: Event) => {
       const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1 }>).detail;
-      profil = profil ? { ...profil, avatarConfig: detalji.avatarConfig } : profil;
+      azurirajAvatarProfila(detalji.avatarConfig);
     };
-    const azurirajIdentitet = () => void ucitajProfil();
+    const azurirajIdentitet = () => {
+      invalidirajProfil();
+      void osigurajProfil({ forsaj: true });
+    };
     const naKlikIzvana = (dogadaj: MouseEvent) => {
       if (!otvorenIzbornik || !omotIzbornika) return;
       if (omotIzbornika.contains(dogadaj.target as Node)) return;
@@ -119,7 +77,7 @@
     document.addEventListener('click', naKlikIzvana);
     document.addEventListener('keydown', naTipku);
 
-    void ucitajProfil();
+    void osigurajProfil();
 
     return () => {
       window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
