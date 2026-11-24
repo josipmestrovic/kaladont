@@ -123,28 +123,36 @@
           onclick={() => idiUBrzuIgru()}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona stavka-ikona--primarna" src="/ikone/07-igraj.png" alt="" width="56" height="56" />
+            <img
+              class="stavka-ikona stavka-ikona--primarna"
+              src="/ikone/07-igraj.png"
+              alt=""
+              width="72"
+              height="72"
+            />
             <span class="stavka-tekst">
               <strong id="naslov-brza-igra">Brza igra</strong>
               <small id="opis-brza-igra">Odigraj klasičnu partiju u troje.</small>
               <small id="napomena-brza-igra" class="stavka-napomena"
                 >Ako nema igrača, pridružit će ti se botovi.</small
               >
-              {#if jeGost}
-                <small
-                  id="gost-napomena-brza-igra"
-                  class="stavka-napomena stavka-napomena--gost"
-                  data-testid="naslovnica-brza-igra-gost-napomena"
-                  >Igraj besplatno, bez registracije.</small
-                >
-              {/if}
             </span>
           </span>
-          <span class="cta" aria-hidden="true">
-            <svg class="cta-play" viewBox="0 0 12 14" width="16" height="18" aria-hidden="true">
-              <path fill="currentColor" d="M1 1.2v11.6L11 7 1 1.2Z" />
-            </svg>
-            Igraj odmah
+          <span class="primarna-akcija">
+            <span class="cta" aria-hidden="true">
+              <svg class="cta-play" viewBox="0 0 12 14" width="16" height="18" aria-hidden="true">
+                <path fill="currentColor" d="M1 1.2v11.6L11 7 1 1.2Z" />
+              </svg>
+              Igraj odmah
+            </span>
+            {#if jeGost}
+              <small
+                id="gost-napomena-brza-igra"
+                class="stavka-napomena stavka-napomena--gost"
+                data-testid="naslovnica-brza-igra-gost-napomena"
+                >Besplatno · Bez registracije</small
+              >
+            {/if}
           </span>
         </button>
 
@@ -307,12 +315,12 @@
     --razmak-stavki: 12px;
     --font-stavke: clamp(20px, 2.8dvh, 24px);
     --font-opisa: clamp(15px, 2.1dvh, 17px);
-    --padding-stavke: clamp(20px, 2.8dvh, 28px);
+    --padding-stavke: clamp(16px, 2.6dvh, 24px);
     --razmak-naslov-opis: 6px;
     --radijus-stavke: 18px;
-    --ikona-sporedna: 40px;
-    --ikona-primarna: 48px;
-    --font-brza-igra: clamp(22px, 3dvh, 24px);
+    --ikona-sporedna: 48px;
+    --ikona-primarna: 60px;
+    --font-brza-igra: clamp(22px, 3dvh, 26px);
     --sirina-grida: 980px;
 
     position: relative;
@@ -444,9 +452,19 @@
   }
 
   .stavka-napomena--gost {
-    margin-top: 4px;
+    margin-top: 0;
     color: color-mix(in srgb, #1a1815 62%, transparent);
+    font-size: 13px;
     font-weight: 600;
+    text-align: center;
+  }
+
+  .primarna-akcija {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    min-width: 0;
   }
 
   .izazovi-napredak {
@@ -544,10 +562,17 @@
 
   .navigacijska-stavka.primarna .cta {
     margin-top: 0;
-    min-height: 48px;
+    min-height: 46px;
   }
 
   @media (min-width: 1000px) {
+    .landing {
+      --ikona-primarna: 76px;
+      --ikona-sporedna: 52px;
+      --padding-stavke: 22px 24px;
+      --font-brza-igra: 26px;
+    }
+
     .navigacijska-stavka.primarna {
       grid-template-columns: minmax(0, 1fr) minmax(200px, 34%);
       align-items: stretch;
@@ -555,10 +580,13 @@
       min-height: 112px;
     }
 
-    .navigacijska-stavka.primarna .cta {
+    .navigacijska-stavka.primarna .primarna-akcija {
       align-self: center;
+    }
+
+    .navigacijska-stavka.primarna .cta {
       width: 100%;
-      min-height: 48px;
+      min-height: 50px;
       margin-top: 0;
       padding: 12px 20px;
       border-radius: 14px;

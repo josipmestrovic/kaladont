@@ -170,7 +170,7 @@ test('naslovnica prikazuje XP sažetak i default opis izazova bez trake', async 
     timeout: 20_000,
   });
   await expect(brzaIgra.getByTestId('naslovnica-brza-igra-gost-napomena')).toHaveText(
-    'Igraj besplatno, bez registracije.',
+    'Besplatno · Bez registracije',
   );
 
   const izazovi = page.getByTestId('naslovnica-izazovi');
