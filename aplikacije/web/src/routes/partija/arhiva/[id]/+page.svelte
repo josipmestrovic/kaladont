@@ -90,7 +90,7 @@
       try {
         arhiva = (await api<{ partija: Arhiva }>(`/partije/${$page.params.id}/plasmani`)).partija;
       } catch (e) {
-        greska = e instanceof Error ? e.message : 'Arhiva partije nije dostupna.';
+        greska = e instanceof Error ? e.message : 'Arhiva igre nije dostupna.';
       }
     })();
   });

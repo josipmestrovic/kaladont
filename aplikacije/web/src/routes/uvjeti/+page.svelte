@@ -31,7 +31,7 @@
     <p>
       Kaladont je namijenjen osobama koje imaju <strong>najmanje 16 godina</strong>. Osobe mlađe od 16
       godina ne smiju koristiti igru, ni kao gosti ni putem registriranog korisničkog računa. Dobno
-      ograničenje vrijedi za javne partije, privatne sobe i način Zagrijavanje. Informativne stranice,
+      ograničenje vrijedi za javne igre, privatne sobe i način Zagrijavanje. Informativne stranice,
       poput pravila igre i ovih Uvjeta, mogu se čitati bez igranja.
     </p>
     <p>
@@ -64,7 +64,7 @@
       Ako želiš zatražiti pristup, ispravak ili brisanje podataka računa, piši s registrirane email
       adrese na <a href="mailto:info@kaladont.hr">info@kaladont.hr</a>. Pri brisanju računa podaci se
       uklanjaju ili anonimiziraju prema <a href="/privatnost">Pravilima privatnosti</a>; zajednička
-      povijest partija može ostati u anonimiziranom obliku radi očuvanja rezultata drugih sudionika.
+      povijest igara može ostati u anonimiziranom obliku radi očuvanja rezultata drugih sudionika.
     </p>
   </section>
 
@@ -76,7 +76,7 @@
       mogu dogoditi pogreške, primjerice neprihvaćanje valjane riječi ili prihvaćanje sporne riječi.
     </p>
     <p>
-      Odluke igre o valjanosti poteza i završetku partije nastaju prema pravilima i stanju sustava u
+      Odluke igre o valjanosti poteza i završetku igre nastaju prema pravilima i stanju sustava u
       trenutku odigravanja. Ako smatraš da je riječ pogrešno ocijenjena, možeš je prijaviti kroz igru.
       Pregledom prijava možemo ispraviti rječnik i buduće odluke; ne obećavamo automatsko retroaktivno
       mijenjanje svih prethodnih rezultata.
@@ -86,7 +86,7 @@
   <section>
     <h2>5. Računalni protivnici (botovi)</h2>
     <p>
-      U javnim partijama Kaladonta mogu sudjelovati <strong>botovi</strong>, odnosno računalni
+      U javnim igrama Kaladonta mogu sudjelovati <strong>botovi</strong>, odnosno računalni
       protivnici kojima upravlja igra. Ako u čekaonici nema dovoljno stvarnih igrača, sustav može
       popuniti slobodna mjesta botovima. Uobičajeno se to događa nakon približno 30 sekundi u Dvoboju
       te postupno nakon otprilike 20, 30 i 40 sekundi u Četveroboju. Vremena su okvirna i mogu se
@@ -108,7 +108,7 @@
       ljestvicama niti dobivaju korisničke rangove, XP, dostignuća i ostali osobni napredak.
     </p>
     <p>
-      <strong>Ljudima se javna partija s botovima računa kao i druga javna partija.</strong> Ako igraš
+      <strong>Ljudima se javna igra s botovima računa kao i druga javna igra.</strong> Ako igraš
       protiv jednog ili više botova, tvoji bodovi, XP, dostignuća i položaj na ljestvicama mogu se
       mijenjati prema redovnim pravilima igre. Botovi sami nisu kandidati za ljudski poredak. Sustav
       može čuvati nužne tehničke zapise njihovih poteza i rezultata kako bi igra ispravno funkcionirala.
@@ -128,7 +128,7 @@
       osoba te uznemiravanje drugih igrača.
     </p>
     <p>
-      Nije dopušteno namještanje partija i rezultata, neovlašteno automatiziranje igranja,
+      Nije dopušteno namještanje igara i rezultata, neovlašteno automatiziranje igranja,
       iskorištavanje sigurnosnih propusta, ometanje rada sustava, zaobilaženje ograničenja ili slanje
       lažnih prijava radi uznemiravanja. Pomagala za pristupačnost, poput čitača zaslona i prilagođenih
       fontova, nisu zabranjena.
@@ -178,7 +178,7 @@
     <h2>9. Dostupnost, razvoj igre i odgovornost</h2>
     <p>
       Kaladont se aktivno razvija. Povremeno može biti nedostupan zbog održavanja, tehničkih poteškoća,
-      promjena rječnika ili sigurnosnih razloga. Pojedina partija može se prekinuti ili završiti bez
+      promjena rječnika ili sigurnosnih razloga. Pojedina igra može se prekinuti ili završiti bez
       očekivanog rezultata ako dođe do tehničke pogreške.
     </p>
     <p>

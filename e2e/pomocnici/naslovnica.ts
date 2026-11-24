@@ -23,13 +23,12 @@ export async function otvoriRankedKorak1(page: Page) {
   return page.getByRole('main');
 }
 
-/** Trening modal: pravilnik → profil → botovi. */
+/** Trening setup stranica (full-width, bez modala). */
 export async function otvoriZagrijavanjeKorak1(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Trening', exact: true }).click();
-  const dijalog = page.getByRole('dialog', { name: 'Trening' });
-  await expect(
-    dijalog.getByRole('heading', { name: 'Odaberi pravila po kojima želiš igrati' }),
-  ).toBeVisible();
-  return dijalog;
+  await page.getByRole('link', { name: 'Trening', exact: true }).click();
+  await expect(page).toHaveURL(/\/trening$/);
+  const setup = page.getByTestId('trening-setup');
+  await expect(setup.getByRole('heading', { name: 'Trening', exact: true })).toBeVisible();
+  return setup;
 }

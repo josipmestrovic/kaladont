@@ -75,7 +75,7 @@
         <dt>Zastavice</dt>
         <dd>Trening {statistika.zivo.zastavice.trening ? 'uključen' : 'isključen'} · Dvoboj botovi {statistika.zivo.zastavice.botoviDvoboj ? 'uključeni' : 'isključeni'} · Troboj botovi {statistika.zivo.zastavice.botoviTroboj ? 'uključeni' : 'isključeni'} · Četveroboj botovi {statistika.zivo.zastavice.botoviCetveroboj ? 'uključeni' : 'isključeni'}</dd>
         <dt>Fond botova</dt>
-        <dd>{statistika.zivo.fond.slobodni} slobodnih / {statistika.zivo.fond.rezervirani} rezerviranih / {statistika.zivo.fond.uPartiji} u partiji od {statistika.zivo.fond.ukupno}; iscrpljenja od pokretanja: {statistika.zivo.fond.iscrpljenja}</dd>
+        <dd>{statistika.zivo.fond.slobodni} slobodnih / {statistika.zivo.fond.rezervirani} rezerviranih / {statistika.zivo.fond.uPartiji} u igri od {statistika.zivo.fond.ukupno}; iscrpljenja od pokretanja: {statistika.zivo.fond.iscrpljenja}</dd>
         <dt>Botovi od pokretanja</dt>
         <dd>{statistika.zivo.bot.odigranihRijeci} riječi · {statistika.zivo.bot.dobrovoljniKa} dobrovoljnih KA · {statistika.zivo.bot.prisilniKa} prisilnih KA · {statistika.zivo.bot.propustPrimljenogKa} propusta tuđeg KA · {statistika.zivo.bot.namjernihPropusta} namjernih propusta · {statistika.zivo.bot.bezRijeci} bez riječi · {statistika.zivo.bot.zastarjelo} zastarjelih · {statistika.zivo.bot.tehnickeGreske} tehničkih grešaka</dd>
         <dt>Zagrijavanje</dt>
@@ -83,14 +83,14 @@
       </dl>
     {/if}
     {#if statistika.poDanu.length === 0}
-      <p>Nema završenih javnih partija u odabranom razdoblju.</p>
+      <p>Nema završenih javnih igara u odabranom razdoblju.</p>
     {:else}
       <table class="tablica tablica-mobilni-retci">
         <thead>
           <tr>
             <th scope="col">Dan</th>
             <th scope="col">Mod</th>
-            <th scope="col">Partije</th>
+            <th scope="col">Igre</th>
             <th scope="col">Prosjek čekanja</th>
             <th scope="col">Medijan</th>
             <th scope="col">P95</th>
@@ -105,14 +105,14 @@
             <tr>
               <td>{redak.dan}</td>
               <td data-label="Mod">{nazivModa(redak.mod)}</td>
-              <td data-label="Partije">{redak.partije}</td>
+              <td data-label="Igre">{redak.partije}</td>
               <td data-label="Prosjek čekanja">{sekunde(redak.prosjekCekanjaMs)}</td>
               <td data-label="Medijan čekanja">{sekunde(redak.medijanCekanjaMs)}</td>
               <td data-label="P95 čekanja">{sekunde(redak.p95CekanjaMs)}</td>
-              <td data-label="Partije bez botova">{redak.partijeBezBotova}</td>
-              <td data-label="Partije s jednim botom">{redak.partijeSJednimBotom}</td>
-              <td data-label="Partije s dva bota">{redak.partijeSDvaBota}</td>
-              <td data-label="Partije s tri bota">{redak.partijeSTriBota}</td>
+              <td data-label="Igre bez botova">{redak.partijeBezBotova}</td>
+              <td data-label="Igre s jednim botom">{redak.partijeSJednimBotom}</td>
+              <td data-label="Igre s dva bota">{redak.partijeSDvaBota}</td>
+              <td data-label="Igre s tri bota">{redak.partijeSTriBota}</td>
             </tr>
           {/each}
         </tbody>
@@ -125,7 +125,7 @@
           <tr>
             <th scope="col">Mod</th>
             <th scope="col">Botova za stolom</th>
-            <th scope="col">Partije</th>
+            <th scope="col">Igre</th>
             <th scope="col">Pobjede ljudi</th>
             <th scope="col">Udio</th>
           </tr>
@@ -135,7 +135,7 @@
             <tr>
               <td>{nazivModa(redak.mod)}</td>
               <td data-label="Botova za stolom">{redak.brojBotova}</td>
-              <td data-label="Partije">{redak.partije}</td>
+              <td data-label="Igre">{redak.partije}</td>
               <td data-label="Pobjede ljudi">{redak.pobjedeLjudi}</td>
               <td data-label="Udio pobjeda ljudi">{redak.udioPobjedaLjudi === null ? '–' : `${Math.round(redak.udioPobjedaLjudi * 100)} %`}</td>
             </tr>

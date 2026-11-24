@@ -96,7 +96,7 @@
       <div class="zakljucani-graf" aria-hidden="true">✦</div>
       <div>
         <strong>DNK se tek oblikuje</strong>
-        <p>Jedan dijeljeni Kaladont DNK za sve javne formate — otključava se nakon 10 partija ukupno.</p>
+        <p>Jedan dijeljeni Kaladont DNK za sve javne formate — otključava se nakon 10 igara ukupno.</p>
       </div>
     </div>
   {/if}

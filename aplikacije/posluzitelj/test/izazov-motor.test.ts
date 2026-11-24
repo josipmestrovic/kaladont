@@ -347,16 +347,22 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   });
 
   it('start: kontekst izazov, timer 30s unatoč timerOnemogucen, status u_tijeku', async () => {
-    const { socket, attemptId, pocetak, runda } = await pokreniIzazov('IZ-L1-DV-01');
+    const { socket, attemptId, pocetak, runda, igracId } = await pokreniIzazov('IZ-L1-DV-01');
     try {
       expect(pocetak.kontekst).toBe('izazov');
-      expect(pocetak.trajanjePotezaSek).toBe(30);
       expect(pocetak.izazov?.humanTurnDurationMs).toBe(30_000);
-      expect(pocetak.izazov?.botTurnDurationMs).toBe(30_000);
-      expect(runda.istekPotezaIso).not.toBe('');
-      const rokMs = new Date(runda.istekPotezaIso).getTime() - sat.sada();
-      expect(rokMs).toBeGreaterThanOrEqual(29_000);
-      expect(rokMs).toBeLessThanOrEqual(30_000);
+      expect(pocetak.izazov?.botTurnDurationMs).toBe(0);
+      // Živi rok: čovjek 30 s, bot 0 (prazan istek).
+      if (runda.naPotezuId === igracId) {
+        expect(pocetak.trajanjePotezaSek).toBe(30);
+        expect(runda.istekPotezaIso).not.toBe('');
+        const rokMs = new Date(runda.istekPotezaIso).getTime() - sat.sada();
+        expect(rokMs).toBeGreaterThanOrEqual(29_000);
+        expect(rokMs).toBeLessThanOrEqual(30_000);
+      } else {
+        expect(pocetak.trajanjePotezaSek).toBe(0);
+        expect(runda.istekPotezaIso).toBe('');
+      }
 
       const redak = await dohvatiPokusajPoId(attemptId);
       expect(redak?.status).toBe('u_tijeku');
@@ -366,25 +372,26 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
       socket.emit('partija:stanje');
       const stanje = await stanjePromise;
       expect(stanje.goalProgress).toBeTruthy();
-      expect(stanje.trajanjePotezaSek).toBe(30);
+      expect(stanje.trajanjePotezaSek).toBe(stanje.naPotezuId === igracId ? 30 : 0);
       expect(stanje.izazov?.challengeId).toBe('IZ-L1-DV-01');
     } finally {
       socket.disconnect();
     }
   });
 
-  it('brzi: ljudski rok 15s u meta; bot rok 30s', async () => {
+  it('brzi: ljudski rok 15s u meta; bot rok 0s', async () => {
     const { socket, pocetak, runda, igracId } = await pokreniIzazov('IZ-L1-TR-02');
     try {
       expect(pocetak.izazov?.humanTurnDurationMs).toBe(15_000);
-      expect(pocetak.izazov?.botTurnDurationMs).toBe(30_000);
+      expect(pocetak.izazov?.botTurnDurationMs).toBe(0);
       if (runda.naPotezuId === igracId) {
         expect(runda.trajanjePotezaSek).toBe(15);
         const rokMs = new Date(runda.istekPotezaIso).getTime() - sat.sada();
         expect(rokMs).toBeGreaterThanOrEqual(14_900);
         expect(rokMs).toBeLessThanOrEqual(15_000);
       } else {
-        expect(runda.trajanjePotezaSek).toBe(30);
+        expect(runda.trajanjePotezaSek).toBe(0);
+        expect(runda.istekPotezaIso).toBe('');
       }
     } finally {
       socket.disconnect();
@@ -394,16 +401,15 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
   it('fake clock: ljudski rok ≈ 15 s; deadline eliminira čovjeka na potezu', async () => {
     const { socket, igracId, runda } = await pokreniIzazov('IZ-L1-TR-02');
     try {
-      expect(runda.istekPotezaIso).not.toBe('');
-      const preostalo = new Date(runda.istekPotezaIso).getTime() - sat.sada();
       if (runda.naPotezuId !== igracId) {
-        // Bot na potezu — efektivni rok 30 s (per-seat politika).
-        expect(preostalo).toBeGreaterThanOrEqual(29_000);
-        expect(preostalo).toBeLessThanOrEqual(30_000);
-        expect(runda.trajanjePotezaSek).toBe(30);
+        // Bot na potezu — rok 0, prazan istek (bez ljudskog deadline testa).
+        expect(runda.trajanjePotezaSek).toBe(0);
+        expect(runda.istekPotezaIso).toBe('');
         return;
       }
 
+      expect(runda.istekPotezaIso).not.toBe('');
+      const preostalo = new Date(runda.istekPotezaIso).getTime() - sat.sada();
       expect(preostalo).toBeGreaterThanOrEqual(14_900);
       expect(preostalo).toBeLessThanOrEqual(15_000);
 
@@ -601,9 +607,9 @@ describe('Izazov PR03 — parametrizirani start (uzorak pravilnika/formata)', ()
       expect(pocetak.pravila).toBe(pravila);
       expect(pocetak.sjedala).toHaveLength(broj);
       expect(pocetak.izazov?.humanTurnDurationMs).toBe(sek * 1000);
-      expect(pocetak.izazov?.botTurnDurationMs).toBe(30_000);
-      // Živi trajanjePotezaSek = rok aktivnog sjedala (čovjek sek ili bot 30).
-      expect([sek, 30]).toContain(pocetak.trajanjePotezaSek);
+      expect(pocetak.izazov?.botTurnDurationMs).toBe(0);
+      // Živi trajanjePotezaSek = rok aktivnog sjedala (čovjek sek ili bot 0).
+      expect([sek, 0]).toContain(pocetak.trajanjePotezaSek);
       expect(pocetak.sjedala.filter((s) => s.jeBot)).toHaveLength(broj - 1);
     } finally {
       socket.disconnect();

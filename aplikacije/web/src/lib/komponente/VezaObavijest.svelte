@@ -52,7 +52,7 @@
 
   const naslov = $derived(
     stanjeVeze.partijaNedostupna
-      ? 'Partija više nije dostupna.'
+      ? 'Igra više nije dostupna.'
       : prikaziIstekSesije
       ? 'Sesija je istekla.'
       : stanjeVeze.stanje === 'druga_kartica'

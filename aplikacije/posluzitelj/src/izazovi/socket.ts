@@ -62,7 +62,7 @@ export function registrirajIzazovSocket(io: KaladontIo, opcije: OpcijeServisaIza
         return;
       }
       if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {
-        odbij(socket, potvrda, 'VEC_U_PARTIJI', 'Već si u partiji. Završi je prije Izazova.');
+        odbij(socket, potvrda, 'VEC_U_PARTIJI', 'Već si u igri. Završi je prije Izazova.');
         return;
       }
       if (opcije.igracImaPrivatnuSobu(socket.data.igracId)) {

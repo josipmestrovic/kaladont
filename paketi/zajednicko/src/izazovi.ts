@@ -217,8 +217,8 @@ export interface DefinicijaIzazova {
   profileId: ProfilBotaIzazova;
   /** Rok ČOVJEKA (ms). */
   turnDurationMs: TrajanjePotezaIzazovaMs;
-  /** Rok bota (ms); u v2 uvijek 30_000. */
-  botTurnDurationMs: TrajanjePotezaIzazovaMs;
+  /** Rok bota (ms); 0 = bez poteznog timera (kao trening). */
+  botTurnDurationMs: 0 | TrajanjePotezaIzazovaMs;
   ciljevi: CiljeviIzazova;
   xp: number;
   /** Kratki ljudski opis dodatnih ciljeva (bez pobjede). */
@@ -311,7 +311,7 @@ function izgradiKatalog(): DefinicijaIzazova[] {
           pravila: pred.pravila,
           profileId,
           turnDurationMs: (pred.sekundiCovjek * 1000) as TrajanjePotezaIzazovaMs,
-          botTurnDurationMs: 30_000,
+          botTurnDurationMs: 0,
           ciljevi: { ...pred.ciljevi },
           xp,
           opisCilja: pred.opisCilja,
@@ -438,7 +438,7 @@ export interface StavkaKatalogaIzazovaDto {
   pravila: PravilnikPartije;
   effectiveProfileId: ProfilBotaIzazova;
   turnDurationMs: TrajanjePotezaIzazovaMs;
-  botTurnDurationMs: TrajanjePotezaIzazovaMs;
+  botTurnDurationMs: 0 | TrajanjePotezaIzazovaMs;
   ciljevi: CiljeviIzazova;
   opisCilja: string;
   xp: number;
@@ -618,8 +618,8 @@ export function validirajKatalogIzazova(katalog: readonly DefinicijaIzazova[] = 
     if (!(TRAJANJA_POTEZA_IZAZOVA_MS as readonly number[]).includes(d.turnDurationMs)) {
       throw new Error(`${d.id}: nepodržan turnDurationMs ${d.turnDurationMs}`);
     }
-    if (d.botTurnDurationMs !== 30_000) {
-      throw new Error(`${d.id}: botTurnDurationMs mora biti 30000`);
+    if (d.botTurnDurationMs !== 0) {
+      throw new Error(`${d.id}: botTurnDurationMs mora biti 0`);
     }
     if (d.mod !== modZaBroj(d.brojIgraca)) {
       throw new Error(`${d.id}: mod ne odgovara broju igrača`);

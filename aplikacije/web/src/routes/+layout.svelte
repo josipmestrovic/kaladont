@@ -165,7 +165,11 @@
   {#if !bezHeadera && (sesijaSpreman || $page.url.pathname === '/')}
     <Header {prethodnaPutanja} {mozeNaprijed} />
   {/if}
-  <div class:landing-stranica={$page.url.pathname === '/'} class="stranica">
+  <div
+    class:landing-stranica={$page.url.pathname === '/'}
+    class:stranica--partija={$page.url.pathname.startsWith('/partija/')}
+    class="stranica"
+  >
     {#if prikaziKosturCekanja}
       <RedCekanjaKostur ukupnoMjesta={brojMjestaKostura} />
     {:else if prikaziChildren}
@@ -261,6 +265,11 @@
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
+  }
+
+  /* Partija: pusti bleed gornje meta trake (100vw); html/body i dalje clipaju scroll. */
+  .stranica.stranica--partija {
+    overflow-x: visible;
   }
 
   @media (max-width: 999px) {

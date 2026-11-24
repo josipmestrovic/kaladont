@@ -66,6 +66,7 @@
   let levelObavijest = $state<string | null>(null);
   let startUTijeku = $state(false);
   let startPoruka = $state<string | null>(null);
+  let zakljucanPopup = $state<string | null>(null);
   let timeoutPotvrde: ReturnType<typeof setTimeout> | null = null;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -205,10 +206,14 @@
   function klikNaKarticu(kartica: StavkaKatalogaIzazovaDto) {
     if (startUTijeku) return;
     if (kartica.status === 'zakljucan') {
-      startPoruka = tekstRazlogaZakljucavanja(kartica.razlogZakljucavanja);
+      zakljucanPopup = tekstRazlogaZakljucavanja(kartica.razlogZakljucavanja);
       return;
     }
     zapocni(kartica.id);
+  }
+
+  function zatvoriZakljucanPopup() {
+    zakljucanPopup = null;
   }
 
   function zapocni(challengeId: IdIzazova) {
@@ -240,7 +245,7 @@
           startPoruka =
             ishod.status === 'tehnicki_prekinuto'
               ? 'Izazov se nije mogao pokrenuti. Pokušaj ponovno.'
-              : 'Partija još nije krenula. Pokušaj ponovno ili osvježi mapu.';
+              : 'Igra još nije krenula. Pokušaj ponovno ili osvježi mapu.';
           void ucitaj();
           return;
         }
@@ -363,6 +368,30 @@
 
   {#if startPoruka}
     <p class="banner-info" role="status" data-testid="izazov-start-poruka">{startPoruka}</p>
+  {/if}
+
+  {#if zakljucanPopup}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="zakljucan-podloga"
+      role="presentation"
+      data-testid="izazov-zakljucan-popup"
+      onclick={zatvoriZakljucanPopup}
+      onkeydown={(e) => e.key === 'Escape' && zatvoriZakljucanPopup()}
+    >
+      <div
+        class="zakljucan-dijalog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="izazov-zakljucan-naslov"
+        tabindex="-1"
+        onclick={(e) => e.stopPropagation()}
+      >
+        <h2 id="izazov-zakljucan-naslov">Zaključano</h2>
+        <p>{zakljucanPopup}</p>
+        <button type="button" class="primarni-gumb" onclick={zatvoriZakljucanPopup}>U redu</button>
+      </div>
+    </div>
   {/if}
 
   {#if ucitava && !odgovor}
@@ -562,6 +591,45 @@
     border-radius: 10px;
     background: var(--boja-povrsina-2);
     border: 1px solid var(--boja-obrub);
+  }
+
+  .zakljucan-podloga {
+    position: fixed;
+    z-index: 160;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: var(--boja-zastor);
+    backdrop-filter: blur(6px);
+  }
+
+  .zakljucan-dijalog {
+    width: min(100%, 360px);
+    padding: 22px 20px 18px;
+    border: 1px solid var(--boja-obrub-jaci);
+    border-radius: 12px;
+    background: var(--boja-povrsina);
+    box-shadow: var(--sjena-modal);
+    text-align: center;
+    display: grid;
+    gap: 12px;
+  }
+
+  .zakljucan-dijalog h2 {
+    margin: 0;
+    font-size: var(--naslov-3);
+  }
+
+  .zakljucan-dijalog p {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mali);
+    line-height: 1.4;
+  }
+
+  .zakljucan-dijalog .primarni-gumb {
+    justify-self: center;
   }
 
   .banner-aktivni {

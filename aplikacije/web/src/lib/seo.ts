@@ -50,7 +50,7 @@ export const PRAVILA_TEME_META: {
     naziv: 'Iskustvo',
     title: 'Iskustvo u Kaladontu — XP, nizovi i ocjena igre',
     description:
-      'Saznaj kako se u Kaladontu dobiva iskustvo (XP), kako se množi nizovima i kako se ocjenjuje partija.',
+      'Saznaj kako se u Kaladontu dobiva iskustvo (XP), kako se množi nizovima i kako se ocjenjuje igra.',
   },
   {
     id: 'dnk',

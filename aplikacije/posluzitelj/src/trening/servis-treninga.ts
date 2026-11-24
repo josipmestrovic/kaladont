@@ -125,7 +125,7 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
       }
       // Zagrijavanje ostaje otvoreno i bez potvrđenog emaila (ADR-017 / protokol §6).
       if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {
-        odbij(socket, potvrda, 'VEC_U_PARTIJI', 'Već si u partiji. Završi je prije treninga.');
+        odbij(socket, potvrda, 'VEC_U_PARTIJI', 'Već si u igri. Završi je prije treninga.');
         return;
       }
       if (opcije.igracImaPrivatnuSobu(socket.data.igracId)) {

@@ -123,7 +123,7 @@ test('objašnjenje stila radi na vlastitom i javnom profilu te se zatvara prema 
   await expect(naziv).toHaveText('neodređen');
   await naziv.click();
   const objasnjenje = page.getByRole('dialog', { name: 'Objašnjenje stila: neodređen' });
-  await expect(objasnjenje).toContainText('Stil igre prikazat ćemo kad bude dovoljno podataka iz partija.');
+  await expect(objasnjenje).toContainText('Stil igre prikazat ćemo kad bude dovoljno podataka iz igara.');
   await objasnjenje.getByRole('button', { name: 'Zatvori objašnjenje stila' }).click();
   await expect(objasnjenje).toHaveCount(0);
 

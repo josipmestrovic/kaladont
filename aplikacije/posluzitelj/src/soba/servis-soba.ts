@@ -299,7 +299,7 @@ export function registrirajPrivatneSobe(
         return;
       }
       if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {
-        socket.emit('greska', { kod: 'VEC_U_PARTIJI', poruka: 'Ne možeš stvoriti sobu dok je partija aktivna.' });
+        socket.emit('greska', { kod: 'VEC_U_PARTIJI', poruka: 'Ne možeš stvoriti sobu dok je igra aktivna.' });
         return;
       }
       if (sobaPoIgracu.has(socket.data.igracId)) {
@@ -379,7 +379,7 @@ export function registrirajPrivatneSobe(
       const kod = rezultat.data.kod.toUpperCase();
 
       if (opcije.igracImaAktivnuPartiju(socket.data.igracId)) {
-        socket.emit('greska', { kod: 'VEC_U_PARTIJI', poruka: 'Ne možeš ući u sobu dok je partija aktivna.' });
+        socket.emit('greska', { kod: 'VEC_U_PARTIJI', poruka: 'Ne možeš ući u sobu dok je igra aktivna.' });
         return;
       }
 
@@ -500,7 +500,7 @@ export function registrirajPrivatneSobe(
       if (soba.status !== 'cekanje') return;
 
       if (opcije.brojAktivnihPartija() >= opcije.maksimalnoAktivnihPartija) {
-        socket.emit('greska', { kod: 'PREVISE_PARTIJA', poruka: 'Privremeno je dosegnut najveći broj aktivnih partija.' });
+        socket.emit('greska', { kod: 'PREVISE_PARTIJA', poruka: 'Privremeno je dosegnut najveći broj aktivnih igara.' });
         return;
       }
 
@@ -553,7 +553,7 @@ export function registrirajPrivatneSobe(
       }
 
       if (soba.status !== 'cekanje') {
-        socket.emit('greska', { kod: 'SOBA_U_TIJEKU', poruka: 'Ne možeš izbaciti igrača dok je partija u tijeku.' });
+        socket.emit('greska', { kod: 'SOBA_U_TIJEKU', poruka: 'Ne možeš izbaciti igrača dok je igra u tijeku.' });
         return;
       }
 

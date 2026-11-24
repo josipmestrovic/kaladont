@@ -604,7 +604,7 @@
   {#if tab === 'sigurni'}
     <h2>Sigurni skup</h2>
     <p class="opis-ciscenja">
-      Odobrene početne riječi za otvaranje runde. Odabir i dalje radi 2-ply provjeru u trenutku partije
+      Odobrene početne riječi za otvaranje runde. Odabir i dalje radi 2-ply provjeru u trenutku igre
       (nastavak + nastavak svakog odgovora).
     </p>
     <form class="forma-rjecnik" onsubmit={dodajSigurnu}>

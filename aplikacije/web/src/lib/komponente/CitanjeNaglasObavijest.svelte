@@ -85,7 +85,7 @@
     <div class="sadrzaj-obavijesti">
       <strong>O čitanju naglas</strong>
       <p>
-        Kaladont koristi govorne glasove koje preglednik izlaže, najčešće s uređaja. Izgovara se samo nova riječ u partiji, a traženi jezik glasa hrvatski (hr-HR). Ako preglednik ili odabrani glas koristi engleski, hrvatska riječ može zvučati pogrešno ili se uopće ne izgovoriti.
+        Kaladont koristi govorne glasove koje preglednik izlaže, najčešće s uređaja. Izgovara se samo nova riječ u igri, a traženi jezik glasa hrvatski (hr-HR). Ako preglednik ili odabrani glas koristi engleski, hrvatska riječ može zvučati pogrešno ili se uopće ne izgovoriti.
       </p>
       <p>
         Prepoznata platforma: <strong>{govornoOkruzenje.platforma}</strong>. Jezik preglednika: <strong>{jeziciPreglednika}</strong>. To nije pouzdano očitanje jezika operacijskog sustava. Te podatke koristimo samo u ovoj obavijesti; ne šalju se na poslužitelj.

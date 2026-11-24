@@ -169,6 +169,8 @@ export interface PocetakPartije {
   trajanjePotezaSek?: number;
   /** Kampanjski Izazov — autoritativni kontekst (refresh/reconnect). */
   izazov?: import('./izazovi.js').IzazovPartijaMeta;
+  /** Početni napredak ciljeva (prazne činjenice) — UI uvjeta odmah pri startu. */
+  goalProgress?: import('./izazovi.js').GoalProgressIzazova | null;
 }
 
 /**

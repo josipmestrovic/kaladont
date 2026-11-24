@@ -158,7 +158,7 @@
   {:else}
     <h1 aria-live="polite">{tekstPripreme}</h1>
     <TreningMeta pravila={trazenaPravila} profileId={trazeniProfil} />
-    <p class="napomena">Ovo je trening. Ne bilježi se i ne mijenja statistiku, rang, XP ni formu. Registriranim igračima pobjeda broji dostignuće Zagrijan.</p>
+    <p class="napomena">Ovo je trening. XP, kolekcija i dostignuća riječi se bilježe, ali bez bodova, ranga, forme i ljestvice. Registriranim igračima pobjeda broji dostignuće Zagrijan.</p>
     <a href="/" class="sporedni-gumb">Odustani</a>
   {/if}
 

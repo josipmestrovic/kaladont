@@ -3,10 +3,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
-  import { ucitajModalIgraAsete } from '$lib/asetovi-core.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
-  import ModalIgraj from '$lib/komponente/ModalIgraj.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
     NASLOVNICA_SEO_DESCRIPTION,
@@ -15,18 +13,14 @@
   } from '$lib/seo.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
-  let otvoreniModal = $state(false);
-
   function idiUBrzuIgru() {
     zabiljeziUmamiDogadjaj('igraj-klik');
     zagrijGameplayZvukove();
     void goto(putanjaBrzeIgre());
   }
 
-  function otvoriTrening() {
-    otvoreniModal = true;
+  function naTreningKlik() {
     zabiljeziUmamiDogadjaj('igraj-klik');
-    ucitajModalIgraAsete();
     zagrijGameplayZvukove();
   }
 
@@ -79,12 +73,12 @@
           <span class="strelica" aria-hidden="true">›</span>
         </a>
 
-        <button
-          type="button"
+        <a
+          href="/trening"
           class="navigacijska-stavka"
           aria-label="Trening"
           data-testid="naslovnica-trening"
-          onclick={otvoriTrening}
+          onclick={naTreningKlik}
         >
           <span class="stavka-sadrzaj" aria-hidden="true">
             <span class="stavka-tekst">
@@ -93,7 +87,7 @@
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>
-        </button>
+        </a>
 
         <a href="/soba/kreiraj" class="navigacijska-stavka privatna" aria-label="Privatna soba">
           <span class="stavka-sadrzaj" aria-hidden="true">
@@ -142,8 +136,6 @@
     <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
   </footer>
 </main>
-
-<ModalIgraj otvoren={otvoreniModal} nacin="laganini" onZatvori={() => (otvoreniModal = false)} />
 
 <style>
   /* Centriran landing; naslov (h1) je u Headeru kao logo. */
@@ -195,7 +187,8 @@
     justify-content: flex-start;
     align-items: center;
     gap: clamp(12px, 1.8dvh, 18px);
-    width: min(100%, 560px);
+    /* Ista širina kao header/footer (parent .landing + max 980). */
+    width: min(100%, 980px);
     min-width: 0;
     max-width: 100%;
     text-align: center;
@@ -469,10 +462,6 @@
       padding-top: 80px;
     }
 
-    .izbornik {
-      width: min(100%, 820px);
-    }
-
     .glavna-navigacija {
       grid-template-columns: 1fr 1fr;
       grid-auto-rows: var(--visina-stavke);
@@ -567,7 +556,6 @@
     }
 
     .izbornik {
-      width: min(100%, 440px);
       gap: clamp(12px, 1.6dvh, 16px);
     }
 

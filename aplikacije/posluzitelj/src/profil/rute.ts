@@ -1104,7 +1104,7 @@ export async function registrirajProfilRute(
         ),
       ))
       .limit(1);
-    if (!partija || !partija.kraj) return odgovor.code(404).send({ ok: false, greska: 'Arhiva javne partije nije pronađena.' });
+    if (!partija || !partija.kraj) return odgovor.code(404).send({ ok: false, greska: 'Arhiva javne igre nije pronađena.' });
     const retci = await baza
       .select({
         igracId: sudioniciPartije.igracId,

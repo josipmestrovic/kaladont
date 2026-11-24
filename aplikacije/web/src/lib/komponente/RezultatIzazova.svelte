@@ -43,6 +43,35 @@
     !uspjeh && terminalReason === 'cilj_neispunjen',
   );
 
+  // Word XP iz obračuna riječi; ukupnoIskustvo.partijski može biti 0/challenge-only nakon settlementa.
+  const xpOdIgre = $derived((() => {
+    const izRijeci = kraj.mojeIskustvo?.osvojenoIskustvo;
+    if (izRijeci != null && izRijeci > 0) return izRijeci;
+    const izUkupno = kraj.ukupnoIskustvo?.partijskiXpStvarno;
+    if (izUkupno != null && izUkupno > 0) return izUkupno;
+    return izRijeci ?? izUkupno ?? 0;
+  })());
+  const prikaziXpIzazova = $derived(
+    Boolean(
+      settlement
+        && (settlement.challengeXp.awarded > 0
+          || (uspjeh && settlement.challengeXp.nominal > 0)),
+    ),
+  );
+  const prikaziXpMisija = $derived(
+    Boolean(
+      settlement
+        && (settlement.missionXp.awarded > 0 || settlement.missionXp.nominal > 0),
+    ),
+  );
+  const imaNagrade = $derived(
+    pending
+      || Boolean(settlement)
+      || xpOdIgre > 0
+      || Boolean(kraj.ukupnoIskustvo)
+      || Boolean(kraj.mojeIskustvo),
+  );
+
   const levelOdigranog = $derived(((): LevelIzazova => {
     if (challengeId && jeIdIzazova(challengeId)) {
       return pokusajDefinicijuIzazova(challengeId)?.level ?? 1;
@@ -99,125 +128,152 @@
 </script>
 
 <section class="rezultat-izazova" aria-labelledby="rezultat-izazova-naslov" data-testid="rezultat-izazova">
-  <h2 id="rezultat-izazova-naslov">{naslov}</h2>
-  {#if challengeId}
-    <p class="challenge-id">{challengeId}</p>
-  {/if}
-
-  {#if terminalStatus === 'tehnicki_prekinuto'}
-    <p class="opis">Pokušaj je prekinut zbog tehničke greške. Možeš pokušati ponovno.</p>
-  {:else if uspjeh}
-    <p class="opis">Svi ciljevi su ispunjeni.</p>
-  {:else if gameWonBezCilja}
-    <p class="opis" data-testid="izazov-cilj-neispunjen">
-      {tekstRazlogaNeuspjeha('cilj_neispunjen')}
-    </p>
-  {:else}
-    <p class="opis">{tekstRazlogaNeuspjeha(terminalReason as never, odbijenaRijec)}</p>
-  {/if}
+  <header class="zaglavlje">
+    <h2 id="rezultat-izazova-naslov">{naslov}</h2>
+    {#if terminalStatus === 'tehnicki_prekinuto'}
+      <p class="opis">Pokušaj je prekinut zbog tehničke greške. Možeš pokušati ponovno.</p>
+    {:else if uspjeh}
+      <p class="opis">Svi ciljevi su ispunjeni.</p>
+    {:else if gameWonBezCilja}
+      <p class="opis" data-testid="izazov-cilj-neispunjen">
+        {tekstRazlogaNeuspjeha('cilj_neispunjen')}
+      </p>
+    {:else if terminalReason === 'nevaljana_rijec' || terminalReason === 'zavrsio_na_ka' || terminalReason === 'odustao' || terminalReason === 'prekid_veze'}
+      <p class="opis">{tekstRazlogaNeuspjeha(terminalReason as never, odbijenaRijec)}</p>
+    {/if}
+  </header>
 
   {#if goalProgress}
-    <ul class="podciljevi" aria-label="Podciljevi">
-      <li class:met={pobjedaPartije}>Pobjeda</li>
-      {#if goalProgress.bezPogreske.required}
+    <div class="uvjeti" data-testid="izazov-uvjeti-prelazak">
+      <h3 class="uvjeti-naslov">Uvjeti za prelazak izazova</h3>
+      <ul class="podciljevi" aria-label="Uvjeti za prelazak izazova">
         <li
-          class:met={goalProgress.bezPogreske.met}
-          class:prekseno={!goalProgress.bezPogreske.met}
-          data-testid="izazov-rezultat-bez-pogreske"
+          class:met={pobjedaPartije}
+          class:prekseno={!pobjedaPartije}
+          data-testid="izazov-rezultat-pobjeda"
         >
-          {#if goalProgress.bezPogreske.met}
-            Bez pogreške
-          {:else}
-            Bez pogreške — pogriješio si
-          {/if}
+          Pobjeda
         </li>
-      {/if}
-      {#if goalProgress.bezZavrsavanjaNaKa?.required}
-        <li
-          class:met={goalProgress.bezZavrsavanjaNaKa.met}
-          class:prekseno={!goalProgress.bezZavrsavanjaNaKa.met}
-          data-testid="izazov-rezultat-bez-ka"
-        >
-          {#if goalProgress.bezZavrsavanjaNaKa.met}
-            Ne završi na ka
-          {:else}
-            Ne završi na ka — završio si na ka
-          {/if}
-        </li>
-      {/if}
-      {#if goalProgress.dugeRijeci.required > 0}
-        <li class:met={goalProgress.dugeRijeci.met} data-testid="izazov-rezultat-duge">
-          Duge (≥{PRAG_DUGE_RIJECI_IZAZOVA}) {goalProgress.dugeRijeci.current}/{goalProgress.dugeRijeci.required}
-        </li>
-      {/if}
-      {#if goalProgress.rijetkeRijeci.required > 0}
-        <li class:met={goalProgress.rijetkeRijeci.met}>
-          Rijetke {goalProgress.rijetkeRijeci.current}/{goalProgress.rijetkeRijeci.required}
-        </li>
-      {/if}
-      {#if goalProgress.uspjesanDokaz.required > 0}
-        <li class:met={goalProgress.uspjesanDokaz.met}>
-          Dokaz {goalProgress.uspjesanDokaz.current}/{goalProgress.uspjesanDokaz.required}
-        </li>
-      {/if}
-    </ul>
+        {#if goalProgress.bezPogreske.required}
+          <li
+            class:met={goalProgress.bezPogreske.met}
+            class:prekseno={!goalProgress.bezPogreske.met}
+            data-testid="izazov-rezultat-bez-pogreske"
+          >
+            {#if goalProgress.bezPogreske.met}
+              Bez pogreške
+            {:else}
+              Bez pogreške — pogriješio si
+            {/if}
+          </li>
+        {/if}
+        {#if goalProgress.bezZavrsavanjaNaKa?.required}
+          <li
+            class:met={goalProgress.bezZavrsavanjaNaKa.met}
+            class:prekseno={!goalProgress.bezZavrsavanjaNaKa.met}
+            data-testid="izazov-rezultat-bez-ka"
+          >
+            {#if goalProgress.bezZavrsavanjaNaKa.met}
+              Ne završi na ka
+            {:else}
+              Ne završi na ka — završio si na ka
+            {/if}
+          </li>
+        {/if}
+        {#if goalProgress.dugeRijeci.required > 0}
+          <li
+            class:met={goalProgress.dugeRijeci.met}
+            class:prekseno={!goalProgress.dugeRijeci.met}
+            data-testid="izazov-rezultat-duge"
+          >
+            Duge (≥{PRAG_DUGE_RIJECI_IZAZOVA}) {goalProgress.dugeRijeci.current}/{goalProgress.dugeRijeci.required}
+          </li>
+        {/if}
+        {#if goalProgress.rijetkeRijeci.required > 0}
+          <li
+            class:met={goalProgress.rijetkeRijeci.met}
+            class:prekseno={!goalProgress.rijetkeRijeci.met}
+          >
+            Rijetke {goalProgress.rijetkeRijeci.current}/{goalProgress.rijetkeRijeci.required}
+          </li>
+        {/if}
+        {#if goalProgress.uspjesanDokaz.required > 0}
+          <li
+            class:met={goalProgress.uspjesanDokaz.met}
+            class:prekseno={!goalProgress.uspjesanDokaz.met}
+          >
+            Dokaz {goalProgress.uspjesanDokaz.current}/{goalProgress.uspjesanDokaz.required}
+          </li>
+        {/if}
+      </ul>
+    </div>
   {/if}
 
   {#if pending}
     <p class="pending" role="status" data-testid="izazov-settlement-pending">
       Nagrada se još sprema…
     </p>
-  {:else if settlement}
+  {:else if imaNagrade}
     <div class="nagrade" aria-label="Nagrade izazova">
-      <p>
-        <span>XP izazova</span>
-        <strong data-testid="izazov-challenge-xp">{prikaziXp(settlement.challengeXp)}</strong>
+      <p class="nagrada" data-testid="izazov-xp-igre">
+        <span>XP od igre</span>
+        <strong>+{xpOdIgre} XP</strong>
       </p>
-      {#if settlement.missionXp.nominal > 0 || settlement.missionXp.awarded > 0}
-        <p>
+      {#if prikaziXpIzazova && settlement}
+        <p class="nagrada">
+          <span>XP izazova</span>
+          <strong data-testid="izazov-challenge-xp">{prikaziXp(settlement.challengeXp)}</strong>
+        </p>
+      {/if}
+      {#if prikaziXpMisija && settlement}
+        <p class="nagrada">
           <span>XP misija</span>
           <strong>{prikaziXp(settlement.missionXp)}</strong>
         </p>
       {/if}
-      <p class="izazivac" aria-label={`Izazivač: ${settlement.izazivac.zvjezdice} zvjezdica`}>
-        <span>Izazivač</span>
-        <span class="zvjezdice">
-          {#each Array.from({ length: 5 }, (_, i) => i < settlement.izazivac.zvjezdice) as puna}
-            <img
-              src={puna ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'}
-              alt=""
-              aria-hidden="true"
-              width="20"
-              height="20"
-            />
-          {/each}
-        </span>
-      </p>
-      {#if settlement.izazivac.novaRazina > 0}
-        <p class="level-up">Nova razina Izazivača: {settlement.izazivac.novaRazina}</p>
+      {#if kraj.ukupnoIskustvo}
+        <p class="nagrada level" data-testid="izazov-level">
+          <span>Razina</span>
+          <strong>
+            LVL {kraj.ukupnoIskustvo.poslije.razina}
+            {#if kraj.ukupnoIskustvo.prije.razina !== kraj.ukupnoIskustvo.poslije.razina}
+              <span class="level-up">
+                ({kraj.ukupnoIskustvo.prije.razina} → {kraj.ukupnoIskustvo.poslije.razina})
+              </span>
+            {/if}
+          </strong>
+        </p>
+      {:else if kraj.mojeIskustvo}
+        <p class="nagrada level" data-testid="izazov-level">
+          <span>Razina</span>
+          <strong>
+            LVL {kraj.mojeIskustvo.poslije.razina}
+            {#if kraj.mojeIskustvo.prije.razina !== kraj.mojeIskustvo.poslije.razina}
+              <span class="level-up">
+                ({kraj.mojeIskustvo.prije.razina} → {kraj.mojeIskustvo.poslije.razina})
+              </span>
+            {/if}
+          </strong>
+        </p>
+      {/if}
+      {#if settlement?.izazivac.novaRazina}
+        <p class="nagrada level-up-red">
+          <span>Nova razina Izazivača</span>
+          <strong>{settlement.izazivac.novaRazina}</strong>
+        </p>
       {/if}
     </div>
-    {#if settlement.novaDostignuca.length > 0}
-      <ul class="dostignuca" aria-label="Nova dostignuća">
-        {#each settlement.novaDostignuca as d (d.id)}
-          <li>
-            <img src={ikonaDostignuca(d.id)} alt="" width="28" height="28" />
-            <span>{d.id} · razina {d.novaRazina}/{d.maksimalnaRazina}</span>
-          </li>
-        {/each}
-      </ul>
-    {/if}
   {/if}
 
-  {#if kraj.ukupnoIskustvo}
-    <p class="level" data-testid="izazov-level">
-      LVL {kraj.ukupnoIskustvo.poslije.razina}
-      {#if kraj.ukupnoIskustvo.prije.razina !== kraj.ukupnoIskustvo.poslije.razina}
-        <span class="level-up">
-          ({kraj.ukupnoIskustvo.prije.razina} → {kraj.ukupnoIskustvo.poslije.razina})
-        </span>
-      {/if}
-    </p>
+  {#if settlement?.novaDostignuca && settlement.novaDostignuca.length > 0}
+    <ul class="dostignuca" aria-label="Nova dostignuća">
+      {#each settlement.novaDostignuca as d (d.id)}
+        <li>
+          <img src={ikonaDostignuca(d.id)} alt="" width="28" height="28" />
+          <span>{d.id} · razina {d.novaRazina}/{d.maksimalnaRazina}</span>
+        </li>
+      {/each}
+    </ul>
   {/if}
 
   <div class="akcije" class:ceka={navigacijaUTijeku}>
@@ -235,19 +291,19 @@
             return;
           }
           naNavigaciju();
-        }}>Igraj sljedeći: {sljedeci.naziv}</a
+        }}>Idi na sljedeći izazov</a
+      >
+      <a class="sporedni" href={mapaHref} data-testid="izazov-odaberi" onclick={naNavigaciju}
+        >Odaberi drugi izazov</a
       >
       {#if challengeId}
         <a
-          class="sporedni"
+          class="tercijarni"
           href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`}
           data-testid="izazov-ponovo"
-          onclick={naNavigaciju}>Pokušaj ponovno</a
+          onclick={naNavigaciju}>Igraj ovaj izazov ponovno</a
         >
       {/if}
-      <a class="sporedni" href={mapaHref} data-testid="izazov-odaberi" onclick={naNavigaciju}
-        >Svi izazovi</a
-      >
     {:else if challengeId && !uspjeh}
       <a
         class="primarni"
@@ -256,108 +312,133 @@
         onclick={naNavigaciju}>Pokušaj ponovno</a
       >
       <a class="sporedni" href={mapaHref} data-testid="izazov-odaberi" onclick={naNavigaciju}
-        >Odaberi izazov</a
+        >Odaberi neki drugi izazov</a
       >
     {:else}
       <a class="primarni" href={mapaHref} data-testid="izazov-odaberi" onclick={naNavigaciju}
-        >Odaberi izazov</a
+        >Odaberi drugi izazov</a
       >
       {#if challengeId}
         <a
           class="sporedni"
           href={`/izazovi?zapocni=${challengeId}&level=${levelOdigranog}`}
           data-testid="izazov-ponovo"
-          onclick={naNavigaciju}>Pokušaj ponovno</a
+          onclick={naNavigaciju}>Igraj ovaj izazov ponovno</a
         >
       {/if}
     {/if}
   </div>
 
   {#if !jeRegistriranKorisnik()}
-    <p class="gost-cta" data-testid="izazov-gost-cta">
-      Registracijom novog računa zadržavaš napredak s ovog uređaja. Prijava na
-      <strong>postojeći</strong> račun ne spaja gost progres.
-    </p>
-    <div class="gost-akcije">
-      <a href="/registracija">Registriraj se</a>
-      <a href="/prijava">Prijavi se</a>
+    <div class="gost" data-testid="izazov-gost-cta">
+      <p class="gost-cta">
+        Registracijom novog računa zadržavaš napredak s ovog uređaja. Prijava na
+        <strong>postojeći</strong> račun ne spaja gost progres.
+      </p>
+      <div class="gost-akcije">
+        <a href="/registracija">Registriraj se</a>
+        <a href="/prijava">Prijavi se</a>
+      </div>
     </div>
   {/if}
 </section>
 
 <style>
   .rezultat-izazova {
-    max-width: 480px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: none;
+    margin: 0;
     padding: 8px 0 24px;
+    display: grid;
+    gap: 20px;
+  }
+  .zaglavlje {
+    display: grid;
+    gap: 6px;
   }
   h2 {
-    margin: 0 0 4px;
-    font-size: var(--naslov-3);
-  }
-  .challenge-id {
-    margin: 0 0 12px;
-    color: var(--boja-tekst-sekundarni);
-    font-weight: 700;
+    margin: 0;
+    font-family: var(--font-naslov);
+    font-size: var(--naslov-2);
+    color: var(--boja-tekst-naslov);
   }
   .opis {
-    margin: 0 0 16px;
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+  }
+  .uvjeti {
+    display: grid;
+    gap: 10px;
+  }
+  .uvjeti-naslov {
+    margin: 0;
+    font-size: var(--tekst-baza);
+    font-weight: 800;
   }
   .podciljevi {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin: 0 0 16px;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
   .podciljevi li {
-    padding: 4px 10px;
+    padding: 6px 12px;
     border-radius: 999px;
     border: 1px solid var(--boja-obrub);
     font-size: var(--tekst-mali);
     color: var(--boja-tekst-sekundarni);
+    background: var(--boja-povrsina-2);
   }
   .podciljevi li.met {
-    border-color: var(--boja-isticanje-tekst);
-    color: var(--boja-isticanje-tekst);
+    border-color: var(--boja-uspjeh-tekst);
+    color: var(--boja-uspjeh-tekst);
+    background: var(--boja-uspjeh-pozadina);
     font-weight: 700;
   }
   .podciljevi li.prekseno {
-    border-color: var(--boja-opasnost, #b00020);
-    color: var(--boja-opasnost, #b00020);
+    border-color: var(--boja-poraz-tekst);
+    color: var(--boja-poraz-tekst);
+    background: var(--boja-poraz-pozadina);
     font-weight: 700;
   }
   .pending {
-    margin: 0 0 16px;
+    margin: 0;
     color: var(--boja-tekst-sekundarni);
   }
   .nagrade {
-    display: grid;
-    gap: 8px;
-    margin: 0 0 16px;
-    padding: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    margin: 0;
+    padding: 14px 16px;
     border: 1px solid var(--boja-obrub);
     border-radius: 8px;
     background: var(--boja-povrsina-2);
   }
-  .nagrade p {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin: 0;
-  }
-  .zvjezdice {
+  .nagrada {
     display: inline-flex;
-    gap: 2px;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0;
+    min-width: min(100%, 180px);
+    flex: 1 1 180px;
+    padding: 4px 0;
+  }
+  .nagrada strong {
+    white-space: nowrap;
   }
   .level-up {
     color: var(--boja-isticanje-tekst);
     font-weight: 700;
   }
+  .level-up-red strong {
+    color: var(--boja-isticanje-tekst);
+  }
   .dostignuca {
-    margin: 0 0 16px;
+    margin: 0;
     padding: 0;
     list-style: none;
     display: grid;
@@ -368,15 +449,11 @@
     align-items: center;
     gap: 8px;
   }
-  .level {
-    margin: 0 0 16px;
-    font-weight: 700;
-  }
   .akcije {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 16px;
+    align-items: center;
+    gap: 10px 14px;
   }
   .akcije.ceka {
     pointer-events: none;
@@ -402,13 +479,44 @@
     border: 1px solid var(--boja-obrub);
     color: inherit;
   }
+  .tercijarni {
+    padding: 8px 4px;
+    border: 0;
+    background: transparent;
+    color: var(--boja-tekst-sekundarni);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .gost {
+    display: grid;
+    gap: 10px;
+    padding-top: 4px;
+    border-top: 1px solid var(--boja-obrub);
+  }
   .gost-cta {
-    margin: 0 0 8px;
+    margin: 0;
     font-size: var(--tekst-mali);
     color: var(--boja-tekst-sekundarni);
   }
   .gost-akcije {
     display: flex;
+    flex-wrap: wrap;
     gap: 16px;
+  }
+  @media (min-width: 720px) {
+    .nagrade {
+      align-items: center;
+    }
+    .nagrada {
+      flex: 0 1 auto;
+      min-width: 0;
+      padding-right: 16px;
+      border-right: 1px solid var(--boja-obrub);
+    }
+    .nagrada:last-child {
+      border-right: 0;
+      padding-right: 0;
+    }
   }
 </style>

@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-  <title>Povijest partija | Kaladont</title>
+  <title>Povijest igara | Kaladont</title>
 </svelte:head>
 
 <p>Preusmjeravanje na profil...</p>

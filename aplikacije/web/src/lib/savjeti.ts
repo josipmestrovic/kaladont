@@ -1,6 +1,6 @@
 const SAVJETI_ZAJEDNICKI = [
   // PR09: jedan univerzalni rang nakon 10 javnih partija.
-  'Nakon 10 završenih javnih partija dobivaš rang prema univerzalnom učinku. Do tada si Piskaralo.',
+  'Nakon 10 završenih javnih igara dobivaš rang prema univerzalnom učinku. Do tada si Piskaralo.',
   'Igrač koji ne zna riječ ispada, osim kod Kaladonta: tada ispada onaj tko je omogućio „ka”.',
   'Radi pravednosti, sustav uvijek određuje prvu riječ i bira samo riječ koja ima slobodan nastavak.',
   'Sustav ne bira riječ koja bi mogla postaviti klopku bez nastavka — osim ako su sve riječi već potrošene.',

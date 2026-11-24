@@ -95,7 +95,10 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
     'href',
     '/izazovi',
   );
-  await expect(navigacija.getByRole('button', { name: 'Trening', exact: true })).toBeVisible();
+  await expect(navigacija.getByRole('link', { name: 'Trening', exact: true })).toHaveAttribute(
+    'href',
+    '/trening',
+  );
   await expect(navigacija.getByRole('link', { name: 'Privatna soba', exact: true })).toHaveAttribute(
     'href',
     '/soba/kreiraj',
@@ -421,7 +424,7 @@ test('mobilna navigacija ima pet stavki s razmakom', async ({ page }) => {
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   const igraj = navigacija.getByRole('button', { name: 'Igraj', exact: true });
   const izazovi = navigacija.getByRole('link', { name: 'Izazovi', exact: true });
-  const trening = navigacija.getByRole('button', { name: 'Trening', exact: true });
+  const trening = navigacija.getByRole('link', { name: 'Trening', exact: true });
   const privatna = navigacija.getByRole('link', { name: 'Privatna soba', exact: true });
   const turniri = navigacija.getByTestId('naslovnica-turniri');
 
