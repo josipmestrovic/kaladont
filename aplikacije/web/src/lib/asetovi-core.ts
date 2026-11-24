@@ -2,7 +2,7 @@ import { IKONE_DOSTIGNUCA } from './ikone-dostignuca.js';
 
 const TIMEOUT_ASETA_MS = 8_000;
 
-/** Warm-up ikona navigacije na landingu — trenutačno prazno (kartice bez ilustracija). */
+/** Warm-up ikona navigacije na landingu — ne blokira children(). */
 export const KRITICNE_IKONE: readonly string[] = [];
 
 /** Ikone u modalu „Igraj” — warm na klik, ne blocking. */
@@ -13,6 +13,14 @@ export const MODAL_IGRA_IKONE: readonly string[] = [
 
 /** Idle warm-up na landingu — ne blokira children(). */
 export const POZADINSKE_SLIKE_LANDINGA: readonly string[] = [
+  '/ikone/07-igraj.png',
+  '/ikone/06-trofej.png',
+  '/ikone/67-zagrijavanje-bot.webp',
+  '/ikone/18-privatna-soba.png',
+  '/ikone/09-ljestvice.png',
+  '/ikone/62-misije.webp',
+  '/ikone/61-korisnicki-profil.webp',
+  '/ikone/08-pravila.png',
   '/ikone/01-sto-je-novo.png',
   '/ikone/02-pomozi-poboljsati-igru.png',
   ...MODAL_IGRA_IKONE,

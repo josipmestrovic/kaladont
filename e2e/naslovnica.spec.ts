@@ -89,8 +89,16 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(footerLinkovi.nth(2)).toHaveAttribute('href', '/uvjeti');
   await expect(footerLinkovi.nth(3)).toHaveAttribute('href', '/privatnost');
 
+  await expect(page.getByTestId('naslovnica-napredak')).toBeVisible({ timeout: 20_000 });
+
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
-  await expect(navigacija.getByRole('button', { name: 'Igraj', exact: true })).toBeVisible();
+  await expect(navigacija.getByTestId('naslovnica-brza-igra')).toBeVisible();
+  await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
+    'Odigraj klasičnu partiju u troje.',
+  );
+  await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
+    'Ako nema igrača, pridružit će ti se botovi.',
+  );
   await expect(navigacija.getByRole('link', { name: 'Izazovi', exact: true })).toHaveAttribute(
     'href',
     '/izazovi',
@@ -99,23 +107,30 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
     'href',
     '/trening',
   );
-  await expect(navigacija.getByRole('link', { name: 'Privatna soba', exact: true })).toHaveAttribute(
+  await expect(navigacija.getByTestId('naslovnica-privatna-soba')).toHaveAttribute(
     'href',
     '/soba/kreiraj',
   );
-  await expect(navigacija.getByTestId('naslovnica-turniri')).toBeVisible();
-  await expect(navigacija.getByTestId('naslovnica-turniri')).toContainText('Turniri');
-  await expect(navigacija.getByTestId('naslovnica-turniri')).toContainText('Izlazi uskoro');
+  await expect(navigacija.getByTestId('naslovnica-ljestvice')).toHaveAttribute('href', '/ljestvice');
+  await expect(navigacija.getByTestId('naslovnica-ljestvice')).toContainText('Ljestvice');
+  await expect(navigacija.getByTestId('naslovnica-turniri')).toHaveCount(0);
+
+  const sporedna = page.getByRole('navigation', { name: 'Napredak i pomoć' });
+  await expect(sporedna.getByTestId('naslovnica-misije')).toHaveAttribute('href', '/misije');
+  await expect(sporedna.getByTestId('naslovnica-profil')).toHaveAttribute('href', '/profil');
+  await expect(sporedna.getByTestId('naslovnica-pravila')).toHaveAttribute('href', '/pravila-kaladonta');
 
   const izbornik = await otvoriProfilIzbornik(page);
   await expect(izbornik.getByRole('menuitem', { name: 'Moj profil' })).toHaveAttribute('href', '/profil');
-  await expect(izbornik.getByRole('menuitem', { name: 'Misije' })).toHaveAttribute('href', '/misije');
-  await expect(izbornik.getByRole('menuitem', { name: 'Ljestvice' })).toHaveAttribute('href', '/ljestvice');
-  await expect(izbornik.getByRole('menuitem', { name: 'Pravila' })).toHaveAttribute(
+  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toHaveAttribute(
     'href',
-    '/pravila-kaladonta',
+    '/profil/avatar',
   );
+  await expect(izbornik.getByRole('menuitem', { name: 'Uredi avatar' })).toBeVisible();
   await expect(izbornik.getByRole('menuitem', { name: 'Postavke' })).toHaveAttribute('href', '/postavke');
+  await expect(izbornik.getByRole('menuitem', { name: 'Misije' })).toHaveCount(0);
+  await expect(izbornik.getByRole('menuitem', { name: 'Ljestvice' })).toHaveCount(0);
+  await expect(izbornik.getByRole('menuitem', { name: 'Pravila' })).toHaveCount(0);
   await expect(izbornik.getByRole('menuitem', { name: 'Prijavi se' })).toHaveAttribute('href', '/prijava');
   await expect(izbornik.getByRole('menuitem', { name: 'Registriraj se' })).toHaveAttribute(
     'href',
@@ -124,9 +139,30 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
   await expect(izbornik.getByRole('menuitem', { name: 'Odjavi se' })).toHaveCount(0);
   await page.keyboard.press('Escape');
 
-  await navigacija.getByRole('button', { name: 'Igraj', exact: true }).click();
+  await navigacija.getByTestId('naslovnica-brza-igra').click();
   await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
   await expect(page.getByTestId('red-oznaka-izbora')).toHaveText('Brza igra · Troboj · Klasična pravila');
+});
+
+test('naslovnica prikazuje XP sažetak i default opis izazova bez trake', async ({ page }) => {
+  await page.goto('/');
+  const napredak = page.getByTestId('naslovnica-napredak');
+  await expect(napredak).toBeVisible({ timeout: 20_000 });
+  await expect(napredak).toContainText(/LVL|Moj napredak/);
+  await expect(napredak).toHaveAttribute('href', '/profil');
+
+  const izazovi = page.getByTestId('naslovnica-izazovi');
+  await expect(izazovi).toContainText(/Svladavaj \d+ sve težih izazova/);
+  await expect(izazovi.locator('.izazovi-napredak')).toHaveCount(0);
+});
+
+test('naslovnica prikazuje brze postavke gostu', async ({ page }) => {
+  await page.goto('/');
+  const grupe = page.getByTestId('naslovnica-brze-postavke');
+  await expect(grupe).toBeVisible({ timeout: 20_000 });
+  await expect(grupe.getByRole('switch', { name: 'Svijetli način' })).toBeVisible();
+  await expect(grupe.getByRole('switch', { name: 'Čitanje naglas' })).toBeVisible();
+  await expect(grupe.getByRole('switch', { name: 'Font za disleksiju' })).toBeVisible();
 });
 
 test('/novosti prikazuje objavljena izdanja po datumima, najnovije prvo', async ({ page, request }) => {
@@ -278,19 +314,11 @@ for (const { sirina, visina } of [
         if (okvir) expect(preklapajuSe(okvirBloka, okvir), `${naziv} se preklapa s blokom`).toBe(false);
       }
 
-      if (sirina >= 1000) {
-        // Desktop je visinski ugođen bez viška prostora: blok ne smije povećati visinu
-        // samo kad naslovnica već staje u viewport (Brza igra CTA može ga prelaziti).
-        const visine = await page.evaluate((visinaViewporta) => {
-          const element = document.querySelector<HTMLElement>('.zadnje-azuriranje')!;
-          const sBlokom = document.documentElement.scrollHeight;
-          element.style.display = 'none';
-          const bezBloka = document.documentElement.scrollHeight;
-          element.style.display = '';
-          return { sBlokom, bezBloka, stajeUViewport: bezBloka < visinaViewporta };
-        }, visina);
-        if (visine.stajeUViewport) expect(visine.sBlokom).toBe(visine.bezBloka);
-      }
+      // Prirodni scroll je dopušten; CTA mora ostati u DOM-u i biti dostupan.
+      const cta = page.getByTestId('naslovnica-brza-igra').locator('.cta');
+      await expect(cta).toBeVisible();
+      const ctaStil = await cta.evaluate((el) => getComputedStyle(el).display);
+      expect(ctaStil).not.toBe('none');
     });
   }
 }
@@ -319,16 +347,19 @@ test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ 
   expect(nemaHorizontalnogPrelijevanja).toBe(true);
 });
 
-test('na niskom desktop ekranu ilustracija se skriva', async ({ page }) => {
+test('na niskom desktop ekranu CTA ostaje vidljiv i scroll je dopušten', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 500 });
   await page.goto('/');
-  await expect(page.locator('.scena-2d5d')).toBeHidden();
+  await expect(page.locator('.scena-2d5d')).toHaveCount(0);
+  const cta = page.getByTestId('naslovnica-brza-igra').locator('.cta');
+  await expect(cta).toBeVisible();
+  expect(await cta.evaluate((el) => getComputedStyle(el).display)).not.toBe('none');
+  await expect(page.locator('.landing-footer')).toBeVisible();
 });
 
 test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page }) => {
   await page.goto('/');
-  const izbornik = await otvoriProfilIzbornik(page);
-  await izbornik.getByRole('menuitem', { name: 'Pravila' }).click();
+  await page.getByTestId('naslovnica-pravila').click();
   await expect(page).toHaveURL('/pravila-kaladonta');
 
   const povratak = page.getByRole('button', { name: 'Nazad' });
@@ -343,10 +374,10 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await povratak.click();
   await expect(page).toHaveURL('/');
 
-  const izbornik2 = await otvoriProfilIzbornik(page);
-  await izbornik2.getByRole('menuitem', { name: 'Pravila' }).click();
-  const izbornik3 = await otvoriProfilIzbornik(page);
-  await izbornik3.getByRole('menuitem', { name: 'Moj profil' }).click();
+  await page.getByTestId('naslovnica-pravila').click();
+  await expect(page).toHaveURL('/pravila-kaladonta');
+  const izbornik = await otvoriProfilIzbornik(page);
+  await izbornik.getByRole('menuitem', { name: 'Moj profil' }).click();
   await expect(page).toHaveURL('/profil');
   const pocetna = page.getByRole('link', { name: 'Početna' });
   await expect(pocetna).toBeVisible();
@@ -422,23 +453,23 @@ test('mobilna navigacija ima pet stavki s razmakom', async ({ page }) => {
   await expect(page.locator('.landing-footer')).toBeVisible({ timeout: 20_000 });
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
-  const igraj = navigacija.getByRole('button', { name: 'Igraj', exact: true });
-  const izazovi = navigacija.getByRole('link', { name: 'Izazovi', exact: true });
-  const trening = navigacija.getByRole('link', { name: 'Trening', exact: true });
-  const privatna = navigacija.getByRole('link', { name: 'Privatna soba', exact: true });
-  const turniri = navigacija.getByTestId('naslovnica-turniri');
+  const brzaIgra = navigacija.getByTestId('naslovnica-brza-igra');
+  const izazovi = navigacija.getByTestId('naslovnica-izazovi');
+  const trening = navigacija.getByTestId('naslovnica-trening');
+  const privatna = navigacija.getByTestId('naslovnica-privatna-soba');
+  const ljestvice = navigacija.getByTestId('naslovnica-ljestvice');
 
-  const igrajBox = await igraj.boundingBox();
+  const brzaIgraBox = await brzaIgra.boundingBox();
   const izazoviBox = await izazovi.boundingBox();
   const treningBox = await trening.boundingBox();
   const privatnaBox = await privatna.boundingBox();
-  const turniriBox = await turniri.boundingBox();
-  expect(igrajBox && izazoviBox && treningBox && privatnaBox && turniriBox).toBeTruthy();
+  const ljestviceBox = await ljestvice.boundingBox();
+  expect(brzaIgraBox && izazoviBox && treningBox && privatnaBox && ljestviceBox).toBeTruthy();
 
-  const razmak1 = izazoviBox!.y - (igrajBox!.y + igrajBox!.height);
+  const razmak1 = izazoviBox!.y - (brzaIgraBox!.y + brzaIgraBox!.height);
   const razmak2 = treningBox!.y - (izazoviBox!.y + izazoviBox!.height);
   const razmak3 = privatnaBox!.y - (treningBox!.y + treningBox!.height);
-  const razmak4 = turniriBox!.y - (privatnaBox!.y + privatnaBox!.height);
+  const razmak4 = ljestviceBox!.y - (privatnaBox!.y + privatnaBox!.height);
   expect(razmak1).toBeGreaterThanOrEqual(5);
   expect(razmak2).toBeGreaterThanOrEqual(5);
   expect(razmak3).toBeGreaterThanOrEqual(5);

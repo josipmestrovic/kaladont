@@ -139,9 +139,13 @@ sudo -u deploy docker compose -f docker-compose.prod.yml --env-file .env up -d a
 Provjera:
 
 1. `https://kaladont.hr` → DevTools → Network → zahtjevi prema `analitika.kaladont.hr`
-2. Klik **Igraj** → u Umami eventu `igraj-klik`
-3. Klik **Pridruži se zajednici** → `forum-klik-landing`
-4. Na `/o-igri` forum CTA → `forum-klik-o-igri`
+2. Klik **Brza igra** na naslovnici → `naslovnica-brza-igra-klik` (stari `igraj-klik` više se ne šalje s naslovnice; ostaje u tipu radi povijesnih potrošača)
+3. Ostale kartice/prečaci: `naslovnica-izazovi-klik`, `naslovnica-trening-klik`, `naslovnica-privatna-soba-klik`, `naslovnica-ljestvice-klik`, `naslovnica-misije-klik`, `naslovnica-profil-klik`, `naslovnica-pravila-klik`, `naslovnica-novosti-klik`
+4. Automatski `?igraj=1` **nije** klik-event
+5. Klik **Pridruži se zajednici** → `forum-klik-landing`
+6. Na `/o-igri` forum CTA → `forum-klik-o-igri`
+
+**Prijelaz (2026-11):** naslovnica prelazi na zasebne evente bez dual-write. Povijesni dashboardi na `igraj-klik` više ne reflektiraju klikove s nove naslovnice.
 
 Gašenje trackera bez gašenja kontejnera: isprazni `UMAMI_URL` i `UMAMI_WEBSITE_ID`, restart `aplikacija`.
 

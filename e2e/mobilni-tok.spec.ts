@@ -386,10 +386,7 @@ test('mobilna ljestvica privatne sobe prikazuje označene rezultate', async ({ p
 test('mobilna naslovnica prikazuje poveznicu Misije', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  const gumb = page.getByRole('banner').getByRole('button', { name: /Izbornik profila/ });
-  await expect(gumb).toBeVisible({ timeout: 20_000 });
-  await gumb.click();
-  const misije = page.getByRole('menu', { name: 'Profil i račun' }).getByRole('menuitem', { name: 'Misije' });
+  const misije = page.getByTestId('naslovnica-misije');
   await expect(misije).toBeVisible();
   await expect(misije).toHaveAttribute('href', '/misije');
   await misije.click();

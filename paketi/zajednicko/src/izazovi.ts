@@ -141,6 +141,9 @@ export const ID_OVI_IZAZOVA = LEVELOVI_IZAZOVA.flatMap((level) =>
 ];
 export type IdIzazova = (typeof ID_OVI_IZAZOVA)[number];
 
+/** Lagani broj aktivnih izazova (4×3×5) — bez uvoza cijelog kataloga u landing bundle. */
+export const BROJ_AKTIVNIH_IZAZOVA = ID_OVI_IZAZOVA.length;
+
 /**
  * Nominalni XP ×2 (osnovna tablica iz redizajn speca).
  * Indeks: [level-1][formatIndex][varijanta-1]
