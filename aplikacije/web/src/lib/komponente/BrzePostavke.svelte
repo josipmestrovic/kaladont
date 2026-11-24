@@ -198,25 +198,48 @@
 
   @media (min-width: 1000px) {
     .brze-postavke {
-      width: auto;
+      width: 100%;
       max-width: none;
       margin-inline: 0;
-      gap: 4px 10px;
-      grid-template-columns: repeat(3, max-content);
+      gap: 10px 16px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: center;
     }
 
     .brze-postavke :global(.prekidac-postavke) {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      min-width: 0;
+      padding: 8px 10px;
+      gap: 10px;
+    }
+
+    .brze-postavke :global(.prekidac-postavke__sadrzaj) {
+      flex: 1 1 auto;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
       width: auto;
-      min-width: 108px;
-      padding: 6px 8px 8px;
+      min-width: 0;
+    }
+
+    .brze-postavke :global(.prekidac) {
+      margin-left: auto;
     }
 
     .brze-postavke__naziv {
+      width: auto;
       font-size: 16px;
+      text-align: left;
+      white-space: nowrap;
     }
 
     :global(html[data-font-disleksiju]) .brze-postavke__naziv {
       font-size: 16px;
+      white-space: normal;
     }
   }
 </style>
