@@ -46,7 +46,17 @@
   });
   let izazoviGeneracija = 0;
   let kolekcijaGeneracija = 0;
-  let kolekcionarskaRazinaNaziv = $state<string | null>(null);
+  let brojRijeciKolekcije = $state<number | null>(null);
+  const kolekcijaBadge = $derived(
+    brojRijeciKolekcije !== null && brojRijeciKolekcije > 0 ? String(brojRijeciKolekcije) : null,
+  );
+  const kolekcijaBadgeAria = $derived(
+    brojRijeciKolekcije !== null && brojRijeciKolekcije > 0
+      ? brojRijeciKolekcije === 1
+        ? '1 riječ u kolekciji'
+        : `${brojRijeciKolekcije} riječi u kolekciji`
+      : null,
+  );
   const jeGost = $derived(
     stanjeProfila.status === 'spreman' && stanjeProfila.profil?.vrsta === 'gost',
   );
@@ -79,18 +89,17 @@
     }
   }
 
-  async function osvjeziKolekcionarskuRazinu() {
+  async function osvjeziBrojRijeciKolekcije() {
     const generacija = ++kolekcijaGeneracija;
     try {
-      const odgovor = await api<{
-        kolekcionarskaRazina?: { naziv?: string };
-      }>('/profil/kolekcija');
+      const odgovor = await api<{ ukupnoOtkljucano?: number }>('/profil/kolekcija');
       if (generacija !== kolekcijaGeneracija) return;
-      const naziv = odgovor.kolekcionarskaRazina?.naziv?.trim();
-      kolekcionarskaRazinaNaziv = naziv && naziv.length > 0 ? naziv : null;
+      const broj = odgovor.ukupnoOtkljucano;
+      brojRijeciKolekcije =
+        typeof broj === 'number' && Number.isFinite(broj) && broj >= 0 ? Math.floor(broj) : null;
     } catch {
       if (generacija !== kolekcijaGeneracija) return;
-      kolekcionarskaRazinaNaziv = null;
+      brojRijeciKolekcije = null;
     }
   }
 
@@ -99,7 +108,7 @@
       if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
         void osvjeziIzazove();
         void osigurajStanjeMisija({ forsaj: true });
-        void osvjeziKolekcionarskuRazinu();
+        void osvjeziBrojRijeciKolekcije();
       }
     });
   }
@@ -112,7 +121,7 @@
       izazoviGeneracija += 1;
       kolekcijaGeneracija += 1;
       izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
-      kolekcionarskaRazinaNaziv = null;
+      brojRijeciKolekcije = null;
       invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
@@ -132,7 +141,7 @@
     void osigurajProfil().then(() => {
       void osvjeziIzazove();
       void osigurajStanjeMisija();
-      void osvjeziKolekcionarskuRazinu();
+      void osvjeziBrojRijeciKolekcije();
     });
 
     return () => {
@@ -315,17 +324,21 @@
             href="/profil#rijeci"
             class="sporedni-precac"
             data-testid="naslovnica-kolekcija"
-            aria-label={kolekcionarskaRazinaNaziv
-              ? `Kolekcija riječi, ${kolekcionarskaRazinaNaziv}`
+            aria-label={kolekcijaBadgeAria
+              ? `Kolekcija riječi, ${kolekcijaBadgeAria}`
               : 'Kolekcija riječi'}
             onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
           >
-            {#if kolekcionarskaRazinaNaziv}
-              <span class="sporedni-precac__nadlabel" data-testid="naslovnica-kolekcija-razina"
-                >{kolekcionarskaRazinaNaziv}</span
-              >
-            {/if}
-            <img src="/ikone/61-korisnicki-profil.webp" alt="" width="40" height="40" />
+            <span class="sporedni-precac__ikona">
+              <img src="/ikone/61-korisnicki-profil.webp" alt="" width="40" height="40" />
+              {#if kolekcijaBadge}
+                <span
+                  class="sporedni-precac__badge"
+                  data-testid="naslovnica-kolekcija-badge"
+                  aria-hidden="true">{kolekcijaBadge}</span
+                >
+              {/if}
+            </span>
             <span>Kolekcija riječi</span>
           </a>
           <a
@@ -743,16 +756,6 @@
     justify-content: center;
   }
 
-  .sporedni-precac__nadlabel {
-    display: block;
-    max-width: 100%;
-    color: var(--boja-zuta-krema);
-    font-size: 14px;
-    font-weight: 800;
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-  }
-
   .sporedni-precac__badge {
     position: absolute;
     top: -6px;
@@ -772,10 +775,6 @@
 
   .sporedni-precac:hover {
     color: var(--boja-akcent-tekst);
-  }
-
-  :global(html[data-tema='svijetla']) .sporedni-precac__nadlabel {
-    color: color-mix(in srgb, var(--boja-akcent-tekst) 85%, #8a6a00);
   }
 
   .landing-footer {
