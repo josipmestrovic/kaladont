@@ -151,7 +151,7 @@
     min-width: 0;
     width: 100%;
     font-family: var(--font-tijelo);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 1.25;
     text-align: center;
@@ -161,7 +161,7 @@
   }
 
   :global(html[data-font-disleksiju]) .brze-postavke__naziv {
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.3;
   }
 
@@ -192,7 +192,7 @@
     .brze-postavke__naziv {
       width: auto;
       text-align: left;
-      font-size: var(--tekst-sitni);
+      font-size: 14px;
     }
   }
 
@@ -212,7 +212,11 @@
     }
 
     .brze-postavke__naziv {
-      font-size: var(--tekst-mikro);
+      font-size: 16px;
+    }
+
+    :global(html[data-font-disleksiju]) .brze-postavke__naziv {
+      font-size: 16px;
     }
   }
 </style>
