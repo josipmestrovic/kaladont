@@ -9,21 +9,33 @@
     ukupnoIskustvo?: UkupnoIskustvoIshoda | null;
   } = $props();
 
+  // Word XP iz obračuna riječi; ukupno.partijski može podcijeniti nakon settlementa.
+  const xpOdIgre = $derived((() => {
+    const izRijeci = obracun?.osvojenoIskustvo;
+    if (izRijeci != null && izRijeci > 0) return izRijeci;
+    return ukupnoIskustvo?.partijskiXpStvarno ?? 0;
+  })());
+  const xpMisija = $derived(ukupnoIskustvo?.misijskiXpStvarno ?? 0);
   const konacno = $derived(ukupnoIskustvo?.poslije ?? obracun?.poslije ?? null);
-  const prikazOsvojenog = $derived(
-    ukupnoIskustvo ? ukupnoIskustvo.ukupnoXpStvarno : (obracun?.osvojenoIskustvo ?? 0),
-  );
+  const prikazOsvojenog = $derived((() => {
+    if (!ukupnoIskustvo) return xpOdIgre;
+    if (obracun && obracun.osvojenoIskustvo > (ukupnoIskustvo.partijskiXpStvarno ?? 0)) {
+      return obracun.osvojenoIskustvo + xpMisija;
+    }
+    return ukupnoIskustvo.ukupnoXpStvarno;
+  })());
   const postotak = $derived(
     !konacno || konacno.doIduce === null ? 100 : (konacno.uRazini / konacno.doIduce) * 100,
   );
   const imaSadrzaj = $derived(Boolean(konacno) && (obracun || ukupnoIskustvo));
+  const prikaziIzvore = $derived(xpOdIgre > 0 || xpMisija > 0);
 </script>
 
 {#if imaSadrzaj && konacno}
-  <section class="iskustvo-partije" aria-label="Osvojeno iskustvo">
+  <section class="iskustvo-partije" aria-label="Osvojeno iskustvo" data-testid="iskustvo-partije">
     <header>
       <strong>LVL {konacno.razina}</strong>
-      <strong>+{prikazOsvojenog} XP</strong>
+      <strong data-testid="iskustvo-ukupno-xp">+{prikazOsvojenog} XP</strong>
     </header>
     {#if konacno.doIduce === null}
       <p class="max">MAX</p>
@@ -36,10 +48,18 @@
     {:else if obracun && obracun.prije.razina !== obracun.poslije.razina && !ukupnoIskustvo}
       <p class="razina-povecana">Razina povećana: {obracun.prije.razina} → {obracun.poslije.razina}</p>
     {/if}
-    {#if ukupnoIskustvo && (ukupnoIskustvo.partijskiXpStvarno > 0 || ukupnoIskustvo.misijskiXpStvarno > 0)}
+    {#if prikaziIzvore}
       <ul class="izvori">
-        <li><span>Iz igre</span><strong>+{ukupnoIskustvo.partijskiXpStvarno} XP</strong></li>
-        <li><span>Iz misija</span><strong>+{ukupnoIskustvo.misijskiXpStvarno} XP</strong></li>
+        <li data-testid="iskustvo-xp-igre">
+          <span>XP od igre</span>
+          <strong>+{xpOdIgre} XP</strong>
+        </li>
+        {#if xpMisija > 0 || (ukupnoIskustvo && ukupnoIskustvo.misijskiXpNominalno > 0)}
+          <li data-testid="iskustvo-xp-misija">
+            <span>XP misija</span>
+            <strong>+{xpMisija} XP</strong>
+          </li>
+        {/if}
       </ul>
     {/if}
     {#if obracun}
