@@ -1352,11 +1352,16 @@ export function stvoriUpraviteljPartija(
     const ljudi = sudionici.filter((s) => s.upravljac === 'covjek');
     // Javni botovi imaju redak u bazi; privremeno Računalo (trening/izazov) nema UUID u igraci.
     const jePrivremeniRacunalo = (igracId: string) => igracId.startsWith('racunalo-');
+    const ljudskiSudionici = sudionici.filter((s) => s.upravljac === 'covjek' && !jePrivremeniRacunalo(s.igracId));
+    // Povijest partije (javna/izazov/privatna): svi trajni sudionici. Trening ne upisuje partiju.
     const sudioniciUBazi = politika.zapisujePovijest
       ? sudionici.filter((s) => !jePrivremeniRacunalo(s.igracId))
       : [];
+    // XP/kolekcija/dostignuća trebaju ljudski baseline i kad zapisujePovijest=false (trening).
+    const sudioniciZaGamifikaciju = (politika.dajeNapredak || politika.dajeDostignucaIKolekcije)
+      ? ljudskiSudionici
+      : sudioniciUBazi;
     const praznaMapa = <T,>(vrijednost: () => T) => new Map(sudionici.map((s) => [s.igracId, vrijednost()]));
-    // Trening ništa ne čita ni ne piše; izazov upisuje samo ljudske sudionike (+ partiju/poteze).
     const upisPocetkaPromise = politika.zapisujePovijest
       ? (() => {
         let pocetakUspio = false;
@@ -1377,7 +1382,9 @@ export function stvoriUpraviteljPartija(
     stanje.upisiPotezaUTijeku.push(upisPocetkaPromise.catch(() => undefined));
     const sudioniciZaKolekciju = politika.zapisujeKolekcijuTreninga
       ? sudionici.filter((sudionik) => sudionik.upravljac === 'covjek' && sudionik.vrsta === 'registriran')
-      : sudioniciUBazi;
+      : politika.dajeDostignucaIKolekcije
+        ? ljudskiSudionici
+        : sudioniciUBazi;
     const ucitajIliPrazno = <T,>(ucitaj: () => Promise<Map<string, T>>, prazno: () => T, opis: string, dopusteno = politika.dajeDostignucaIKolekcije || politika.dajeNapredak) =>
       dopusteno
         ? ucitaj().catch((greska) => {
@@ -1387,7 +1394,7 @@ export function stvoriUpraviteljPartija(
         : Promise.resolve(praznaMapa(prazno));
     // Igrači dobivaju countdown tek kad je poslužitelj spreman objaviti prvu rundu.
     const grupeDostignucaPromise = politika.dajeDostignucaIKolekcije
-      ? ucitajGrupeZaDostignuca(sudioniciUBazi).catch((greska) => {
+      ? ucitajGrupeZaDostignuca(sudioniciZaGamifikaciju).catch((greska) => {
         console.error('Neuspjelo učitavanje grupa za dostignuća:', greska);
         return new Map(sudionici.map((igrac) => [igrac.igracId, new Set<string>()]));
       })
@@ -1395,9 +1402,9 @@ export function stvoriUpraviteljPartija(
     return Promise.all([
       upisPocetkaPromise,
       ucitajIliPrazno(() => ucitajOtkljucaneGrupe(sudioniciZaKolekciju), () => new Map<string, number | null>(), 'otključanih grupa', politika.zapisujeKolekcijuTreninga || politika.dajeDostignucaIKolekcije),
-      ucitajIliPrazno(() => ucitajOtkljucaneOblike(sudioniciUBazi), () => [] as { rijec: string; jakoDuga: boolean; jakoRijetka: boolean; dugaTier: number | null; rijetkaTier: number | null }[], 'otključanih oblika'),
-      ucitajIliPrazno(() => ucitajIskustvo(sudioniciUBazi), () => 0, 'iskustva'),
-      ucitajIliPrazno(() => ucitajNapredakDostignuca(sudioniciUBazi), () => ({}) as Record<string, number>, 'napretka dostignuća'),
+      ucitajIliPrazno(() => ucitajOtkljucaneOblike(sudioniciZaGamifikaciju), () => [] as { rijec: string; jakoDuga: boolean; jakoRijetka: boolean; dugaTier: number | null; rijetkaTier: number | null }[], 'otključanih oblika'),
+      ucitajIliPrazno(() => ucitajIskustvo(sudioniciZaGamifikaciju), () => 0, 'iskustva'),
+      ucitajIliPrazno(() => ucitajNapredakDostignuca(sudioniciZaGamifikaciju), () => ({}) as Record<string, number>, 'napretka dostignuća'),
       grupeDostignucaPromise,
     ]).then(([, grupe, oblici, iskustvo, napredak, grupeDostignuca]) => {
       stanje.grupeSNagradom = new Map(sudionici.map((s) => [s.igracId, grupe.get(s.igracId) ?? new Map<string, number | null>()]));

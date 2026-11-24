@@ -133,7 +133,16 @@ describe('Zagrijavanje', () => {
     const igracId = randomUUID();
     igraciZaBrisanje.push(igracId);
     const email = `trening-${igracId}@example.com`;
-    await baza.insert(igraci).values({ id: igracId, vrsta: 'registriran', nadimak: `Tr${igracId.slice(0, 6)}`, email, emailPotvrdjen: true, ...PRIHVAT_UVJETA_ZA_TEST });
+    const iskustvoPrije = 5_000;
+    await baza.insert(igraci).values({
+      id: igracId,
+      vrsta: 'registriran',
+      nadimak: `Tr${igracId.slice(0, 6)}`,
+      email,
+      emailPotvrdjen: true,
+      iskustvoUkupno: iskustvoPrije,
+      ...PRIHVAT_UVJETA_ZA_TEST,
+    });
     const sesija = await izdajSesiju(igracId);
     const socket = await spoji(sesija.token);
     let odigraoRijec = false;
@@ -209,9 +218,16 @@ describe('Zagrijavanje', () => {
       expect(kraj.kontekst).toBe('trening');
       expect(kraj.kolekcija).toBeDefined();
       expect(kraj.mojeIskustvo).not.toBeNull();
+      expect(kraj.mojeIskustvo!.prije.ukupno).toBe(iskustvoPrije);
       expect(kraj.mojeIskustvo!.osvojenoIskustvo).toBeGreaterThan(0);
+      expect(kraj.mojeIskustvo!.osvojenoIskustvo).toBeLessThan(iskustvoPrije);
       expect(kraj.mojaForma).toBeUndefined();
       expect(kraj.mojRang).toBeNull();
+      if (kraj.ukupnoIskustvo) {
+        expect(kraj.ukupnoIskustvo.prije.ukupno).toBe(iskustvoPrije);
+        expect(kraj.ukupnoIskustvo.partijskiXpStvarno).toBe(kraj.mojeIskustvo!.osvojenoIskustvo);
+        expect(kraj.ukupnoIskustvo.partijskiXpStvarno).toBeLessThan(iskustvoPrije);
+      }
       const [partija] = await baza.execute<{ broj: number }>(sql`select count(*)::int as broj from partije where id = ${pocetak.partijaId}`);
       expect(partija?.broj).toBe(0);
       const grupe = await baza.select({ grupa: otkljucaneGrupeIgraca.grupa }).from(otkljucaneGrupeIgraca).where(eq(otkljucaneGrupeIgraca.igracId, igracId));
@@ -219,7 +235,7 @@ describe('Zagrijavanje', () => {
       const [igrac] = await baza.select({ iskustvo: igraci.iskustvoUkupno, odigrane: igraci.odigrane }).from(igraci).where(eq(igraci.id, igracId));
       // Trening zbraja XP riječi (prije misije), ali ne odigrane/rang/formu.
       expect(igrac?.odigrane).toBe(0);
-      expect(igrac?.iskustvo).toBeGreaterThan(0);
+      expect(igrac?.iskustvo).toBeGreaterThan(iskustvoPrije);
       expect(igrac?.iskustvo).toBe(
         kraj.ukupnoIskustvo?.poslije.ukupno
           ?? kraj.mojeIskustvo!.poslije.ukupno,
