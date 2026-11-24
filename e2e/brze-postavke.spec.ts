@@ -89,12 +89,8 @@ test('brze postavke i profilne kontrole dijele isto stanje', async ({ page }) =>
 test('tipkovnica aktivira brze postavke; nema horizontalnog overflowa', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await otvoriNaslovnicu(page);
-  const font = page.getByTestId('brza-postavka-font').getByRole('switch');
-  // Native focus+click: Playwright Space na opacity-0 switch nije pouzdan u headless CI.
-  await font.evaluate((el: HTMLInputElement) => {
-    el.focus();
-    el.click();
-  });
+  // Klik na label (cijela površina / jedan tab-stop); Space na opacity-0 switch nije pouzdan u headless CI.
+  await page.getByTestId('brza-postavka-font').click();
   await expect(page.locator('html')).toHaveAttribute('data-font-disleksiju', '');
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
