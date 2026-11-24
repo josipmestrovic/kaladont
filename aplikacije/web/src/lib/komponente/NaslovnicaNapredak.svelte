@@ -1,6 +1,7 @@
 <script lang="ts">
   import { izracunajPrikazXp } from '$lib/naslovnica-napredak.js';
   import { profil, statusProfila } from '$lib/stanje-profila.svelte.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const prikaz = $derived(izracunajPrikazXp(profil, statusProfila));
 </script>
@@ -12,6 +13,7 @@
   aria-label={prikaz.vrsta === 'napredak'
     ? `${prikaz.rang}, razina ${prikaz.razina}`
     : prikaz.natpis}
+  onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
 >
   {#if prikaz.vrsta === 'napredak'}
     <p class="naslovnica-napredak__identitet">

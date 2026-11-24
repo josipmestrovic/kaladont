@@ -8,7 +8,19 @@ declare global {
   }
 }
 
-export type UmamiDogadjaj = 'igraj-klik' | 'forum-klik-landing' | 'forum-klik-o-igri';
+export type UmamiDogadjaj =
+  | 'igraj-klik'
+  | 'forum-klik-landing'
+  | 'forum-klik-o-igri'
+  | 'naslovnica-brza-igra-klik'
+  | 'naslovnica-izazovi-klik'
+  | 'naslovnica-trening-klik'
+  | 'naslovnica-privatna-soba-klik'
+  | 'naslovnica-ljestvice-klik'
+  | 'naslovnica-misije-klik'
+  | 'naslovnica-profil-klik'
+  | 'naslovnica-pravila-klik'
+  | 'naslovnica-novosti-klik';
 
 export function zabiljeziUmamiDogadjaj(naziv: UmamiDogadjaj): void {
   try {

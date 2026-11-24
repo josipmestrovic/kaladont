@@ -30,14 +30,14 @@
   });
   let izazoviGeneracija = 0;
 
-  function idiUBrzuIgru() {
-    zabiljeziUmamiDogadjaj('igraj-klik');
+  function idiUBrzuIgru(opcije: { izQueryja?: boolean } = {}) {
+    if (!opcije.izQueryja) zabiljeziUmamiDogadjaj('naslovnica-brza-igra-klik');
     zagrijGameplayZvukove();
     void goto(putanjaBrzeIgre());
   }
 
   function naTreningKlik() {
-    zabiljeziUmamiDogadjaj('igraj-klik');
+    zabiljeziUmamiDogadjaj('naslovnica-trening-klik');
     zagrijGameplayZvukove();
   }
 
@@ -65,7 +65,7 @@
 
   onMount(() => {
     // ?igraj=1 → izravno Brza igra (bez modala).
-    if ($page.url.searchParams.get('igraj') === '1') idiUBrzuIgru();
+    if ($page.url.searchParams.get('igraj') === '1') idiUBrzuIgru({ izQueryja: true });
 
     const naIdentitet = () => {
       izazoviGeneracija += 1;
@@ -110,16 +110,19 @@
         <button
           type="button"
           class="navigacijska-stavka primarna"
-          aria-label="Brza igra"
+          aria-labelledby="naslov-brza-igra"
+          aria-describedby="opis-brza-igra napomena-brza-igra"
           data-testid="naslovnica-brza-igra"
-          onclick={idiUBrzuIgru}
+          onclick={() => idiUBrzuIgru()}
         >
-          <span class="stavka-sadrzaj" aria-hidden="true">
+          <span class="stavka-sadrzaj">
             <img class="stavka-ikona stavka-ikona--primarna" src="/ikone/07-igraj.png" alt="" width="48" height="48" />
             <span class="stavka-tekst">
-              <strong>Brza igra</strong>
-              <small>Odigraj klasičnu partiju u troje.</small>
-              <small class="stavka-napomena">Ako nema igrača, pridružit će ti se botovi.</small>
+              <strong id="naslov-brza-igra">Brza igra</strong>
+              <small id="opis-brza-igra">Odigraj klasičnu partiju u troje.</small>
+              <small id="napomena-brza-igra" class="stavka-napomena"
+                >Ako nema igrača, pridružit će ti se botovi.</small
+              >
             </span>
           </span>
           <span class="cta" aria-hidden="true">
@@ -130,12 +133,19 @@
           </span>
         </button>
 
-        <a href="/izazovi" class="navigacijska-stavka" aria-label="Izazovi" data-testid="naslovnica-izazovi">
-          <span class="stavka-sadrzaj" aria-hidden="true">
+        <a
+          href="/izazovi"
+          class="navigacijska-stavka"
+          aria-labelledby="naslov-izazovi"
+          aria-describedby="opis-izazovi{izazoviPrikaz.vrsta === 'napredak' ? ' broj-izazovi' : ''}"
+          data-testid="naslovnica-izazovi"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-izazovi-klik')}
+        >
+          <span class="stavka-sadrzaj">
             <img class="stavka-ikona" src="/ikone/06-trofej.png" alt="" width="44" height="44" />
             <span class="stavka-tekst">
-              <strong>Izazovi</strong>
-              <small>{izazoviPrikaz.opis}</small>
+              <strong id="naslov-izazovi">Izazovi</strong>
+              <small id="opis-izazovi">{izazoviPrikaz.opis}</small>
               {#if izazoviPrikaz.vrsta === 'napredak'}
                 <span class="izazovi-napredak">
                   <span
@@ -144,11 +154,11 @@
                     aria-valuemin={0}
                     aria-valuemax={izazoviPrikaz.ukupno}
                     aria-valuenow={izazoviPrikaz.zavrseno}
-                    aria-label={`${izazoviPrikaz.zavrseno} od ${izazoviPrikaz.ukupno} završenih izazova`}
+                    aria-labelledby="broj-izazovi"
                   >
                     <span style={`width: ${izazoviPrikaz.postotak}%`}></span>
                   </span>
-                  <span class="izazovi-napredak__broj">
+                  <span id="broj-izazovi" class="izazovi-napredak__broj">
                     {izazoviPrikaz.zavrseno} / {izazoviPrikaz.ukupno} završenih izazova
                   </span>
                 </span>
@@ -161,15 +171,16 @@
         <a
           href="/trening"
           class="navigacijska-stavka"
-          aria-label="Trening"
+          aria-labelledby="naslov-trening"
+          aria-describedby="opis-trening"
           data-testid="naslovnica-trening"
           onclick={naTreningKlik}
         >
-          <span class="stavka-sadrzaj" aria-hidden="true">
+          <span class="stavka-sadrzaj">
             <img class="stavka-ikona" src="/ikone/67-zagrijavanje-bot.webp" alt="" width="44" height="44" />
             <span class="stavka-tekst">
-              <strong>Trening</strong>
-              <small>Vježbaj protiv botova po svojim pravilima.</small>
+              <strong id="naslov-trening">Trening</strong>
+              <small id="opis-trening">Vježbaj protiv botova po svojim pravilima.</small>
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>
@@ -178,14 +189,16 @@
         <a
           href="/soba/kreiraj"
           class="navigacijska-stavka privatna"
-          aria-label="Privatna soba"
+          aria-labelledby="naslov-privatna"
+          aria-describedby="opis-privatna"
           data-testid="naslovnica-privatna-soba"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-privatna-soba-klik')}
         >
-          <span class="stavka-sadrzaj" aria-hidden="true">
+          <span class="stavka-sadrzaj">
             <img class="stavka-ikona" src="/ikone/18-privatna-soba.png" alt="" width="44" height="44" />
             <span class="stavka-tekst">
-              <strong>Privatna soba</strong>
-              <small>Pozovi ekipu i igrajte po svojim pravilima.</small>
+              <strong id="naslov-privatna">Privatna soba</strong>
+              <small id="opis-privatna">Pozovi ekipu i igrajte po svojim pravilima.</small>
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>
@@ -194,14 +207,16 @@
         <a
           href="/ljestvice"
           class="navigacijska-stavka"
-          aria-label="Ljestvice"
+          aria-labelledby="naslov-ljestvice"
+          aria-describedby="opis-ljestvice"
           data-testid="naslovnica-ljestvice"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-ljestvice-klik')}
         >
-          <span class="stavka-sadrzaj" aria-hidden="true">
+          <span class="stavka-sadrzaj">
             <img class="stavka-ikona" src="/ikone/09-ljestvice.png" alt="" width="44" height="44" />
             <span class="stavka-tekst">
-              <strong>Ljestvice</strong>
-              <small>Usporedi se s najboljim igračima.</small>
+              <strong id="naslov-ljestvice">Ljestvice</strong>
+              <small id="opis-ljestvice">Usporedi se s najboljim igračima.</small>
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>
@@ -209,17 +224,32 @@
       </nav>
 
       <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
-        <a href="/misije" class="sporedni-precac" data-testid="naslovnica-misije">
+        <a
+          href="/misije"
+          class="sporedni-precac"
+          data-testid="naslovnica-misije"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
+        >
           <img src="/ikone/62-misije.webp" alt="" width="28" height="28" />
           <span>Misije</span>
         </a>
         <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
-        <a href="/profil" class="sporedni-precac" data-testid="naslovnica-profil">
+        <a
+          href="/profil"
+          class="sporedni-precac"
+          data-testid="naslovnica-profil"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
+        >
           <img src="/ikone/61-korisnicki-profil.webp" alt="" width="28" height="28" />
           <span>Moj profil</span>
         </a>
         <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
-        <a href="/pravila-kaladonta" class="sporedni-precac" data-testid="naslovnica-pravila">
+        <a
+          href="/pravila-kaladonta"
+          class="sporedni-precac"
+          data-testid="naslovnica-pravila"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-pravila-klik')}
+        >
           <img src="/ikone/08-pravila.png" alt="" width="28" height="28" />
           <span>Kako igrati?</span>
         </a>
@@ -230,7 +260,11 @@
           Zadnje ažuriranje:
           <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
           <span class="razdjelnik" aria-hidden="true">·</span>
-          <a class="sto-je-novo" href="/novosti">Vidi što je novo</a>
+          <a
+            class="sto-je-novo"
+            href="/novosti"
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
+          >Vidi što je novo</a>
         </p>
       {/if}
     </div>
@@ -505,8 +539,19 @@
     box-shadow: var(--sjena-modal);
   }
 
+  .navigacijska-stavka:focus-visible {
+    outline: 3px solid var(--boja-zuta-krema);
+    outline-offset: 3px;
+  }
+
   .navigacijska-stavka.primarna:hover {
     border-color: transparent;
+  }
+
+  .sporedni-precac:focus-visible {
+    outline: 3px solid var(--boja-zuta-krema);
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 
   .sporedna-navigacija {
