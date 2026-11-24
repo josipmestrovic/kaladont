@@ -25,6 +25,8 @@ export async function zabiljeziPobjeduTreninga(
     nacinIspadanja: string;
     prihvaceneRijeci: number;
     najduziNiz: number;
+    /** XP prije word XP-a; ako je word XP već upisan, mora biti eksplicitno. */
+    iskustvoPrijePartije?: number;
   },
 ): Promise<RezultatTreningPobjede | null> {
   const rezultat = await baza.transaction(async (tx) => {
@@ -124,8 +126,11 @@ export async function zabiljeziPobjeduTreninga(
       kaladontSljedeciUzTriPlus: 0,
     };
 
+    // Nakon word XP-a DB već uključuje partijski XP; prije mora biti vrijednost s početka partije.
+    const iskustvoNakonPartije = igrac.iskustvoUkupno;
+    const iskustvoPrijePartije = metrike?.iskustvoPrijePartije ?? iskustvoNakonPartije;
     const ishodMisija = jeRegistriran
-      ? await obracunajMisijeZaIgraca(tx, potpuneMetrike, igrac.iskustvoUkupno, igrac.iskustvoUkupno)
+      ? await obracunajMisijeZaIgraca(tx, potpuneMetrike, iskustvoNakonPartije, iskustvoPrijePartije)
       : null;
 
     return {

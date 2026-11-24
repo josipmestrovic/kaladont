@@ -67,7 +67,7 @@ sequenceDiagram
 
 ## Kontekst partije i politika učinaka (ADR-017)
 
-Stol pri stvaranju dobiva `kontekst: javna | privatna | trening` i iz njega izvedenu `PolitikaUcinkaPartije`. Javna partija piše povijest i natjecateljski napredak; privatna piše povijest i kolekcije/opća dostignuća, ali ne XP/bodove; trening nema zapis partije, XP, natjecateljske statistike ni kolekcije. Pobjeda može idempotentno zabilježiti samo dostignuće Zagrijan. Gosti i privremeno Računalo nemaju DB upise. Tehnički prekid treninga ne daje pobjedu ni poraz.
+Stol pri stvaranju dobiva `kontekst: javna | privatna | trening | izazov` i iz njega izvedenu `PolitikaUcinkaPartije`. Javna partija piše povijest i puni natjecateljski napredak (XP, rang, DNK, forma, bodovi). Privatna, trening i izazov također zbrajaju XP za odigrane riječi u `iskustvoUkupno` te pišu kolekcije i opća dostignuća riječi (npr. Dugometraš, Rijetkolovac), ali bez ranga/DNK/forme/bodova. Trening nema zapis partije; pobjeda dodatno idempotentno zabilježi Zagrijan. Gosti i privremeno Računalo nemaju DB upise. Tehnički prekid treninga ne daje pobjedu ni poraz.
 
 Trening emitira upozorenje neaktivnosti nakon 4 minute i poništava sesiju nakon 5 minuta. Resetiraju je samo prihvaćen ljudski potez ili scoped `trening:nastavi`; heartbeat, reconnect i botov potez ne resetiraju sat.
 
