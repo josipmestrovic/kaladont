@@ -117,9 +117,8 @@
       brojRijeciKolekcije =
         typeof broj === 'number' && Number.isFinite(broj) && broj >= 0 ? Math.floor(broj) : null;
     } catch {
+      // Zadrži zadnji uspješan sažetak; ne piši Početnik/0 preko stvarnog napretka.
       if (generacija !== kolekcijaGeneracija) return;
-      kolekcijaRazinaNaziv = 'Početnik';
-      brojRijeciKolekcije = null;
     }
   }
 
@@ -132,11 +131,8 @@
       if (generacija !== dostignucaGeneracija) return;
       dostignucaZvjezdice = normalizirajZvjezdiceDostignuca(odgovor);
     } catch {
+      // Zadrži zadnji uspješan sažetak; ne piši 0 zvjezdica preko stvarnog napretka.
       if (generacija !== dostignucaGeneracija) return;
-      dostignucaZvjezdice = {
-        ukupno: 0,
-        maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
-      };
     }
   }
 
@@ -956,20 +952,26 @@
     }
 
     .profil-red {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
       align-items: center;
+      justify-content: space-between;
       gap: 16px 20px;
     }
 
     .profil-red :global(.naslovnica-napredak-omotac) {
-      grid-column: 2;
-      justify-self: center;
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 100%;
       margin: 0;
+      align-items: center;
     }
 
     .profil-red .sporedni-red {
-      grid-column: 3;
+      flex: 0 1 auto;
+      min-width: 0;
+      max-width: min(100%, 420px);
       justify-self: end;
     }
 
@@ -989,27 +991,35 @@
 
     .podnozje-red {
       display: grid;
-      grid-template-columns: 1fr auto 1fr;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       align-items: center;
-      flex-wrap: nowrap;
-      gap: 16px;
+      gap: 12px 16px;
     }
 
     .podnozje-lijevo {
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       justify-content: flex-start;
       justify-self: start;
+      min-width: 0;
+      max-width: 100%;
     }
 
     .copyright {
       justify-self: center;
       text-align: center;
+      min-width: 0;
     }
 
     .podnozje-desno {
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       justify-content: flex-end;
       justify-self: end;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .zadnje-azuriranje {
+      justify-content: flex-start;
     }
 
     .glavna-navigacija {
@@ -1029,21 +1039,19 @@
     }
 
     .sporedni-red {
-      flex: 0 0 auto;
       align-items: flex-end;
       justify-content: flex-end;
       gap: 0;
       margin-top: 0;
       width: auto;
-      max-width: none;
     }
 
     .sporedna-navigacija {
-      gap: 8px 18px;
+      gap: 8px 12px;
       margin: 0;
       width: auto;
-      max-width: none;
-      grid-template-columns: repeat(3, auto);
+      max-width: 100%;
+      grid-template-columns: repeat(3, minmax(0, auto));
       justify-content: end;
     }
 

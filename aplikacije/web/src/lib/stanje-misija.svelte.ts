@@ -12,6 +12,7 @@ import {
 let stanje = $state<StanjeMisijaDto | null>(null);
 let status = $state<'prazno' | 'ucitavanje' | 'spreman' | 'gost' | 'greska'>('prazno');
 let ucitavanje: Promise<StanjeMisijaDto | null> | null = null;
+let generacija = 0;
 
 export function dohvatiStanjeMisijaStore() {
   return {
@@ -29,6 +30,7 @@ export function dohvatiStanjeMisijaStore() {
 }
 
 export function invalidirajStanjeMisija(): void {
+  generacija += 1;
   stanje = null;
   status = 'prazno';
   ucitavanje = null;
@@ -36,6 +38,7 @@ export function invalidirajStanjeMisija(): void {
 
 export async function osigurajStanjeMisija(opcije: { forsaj?: boolean } = {}): Promise<StanjeMisijaDto | null> {
   if (!jeRegistriranKorisnik()) {
+    generacija += 1;
     stanje = null;
     status = 'gost';
     ucitavanje = null;
@@ -45,14 +48,18 @@ export async function osigurajStanjeMisija(opcije: { forsaj?: boolean } = {}): P
   if (!opcije.forsaj && ucitavanje) return ucitavanje;
   if (!opcije.forsaj && status === 'spreman' && stanje) return stanje;
 
+  if (opcije.forsaj) generacija += 1;
+  const mojaGeneracija = generacija;
   status = 'ucitavanje';
   const zahtjev = (async (): Promise<StanjeMisijaDto | null> => {
     try {
       const odgovor = await dohvatiStanjeMisija();
+      if (mojaGeneracija !== generacija) return null;
       stanje = odgovor;
       status = 'spreman';
       return odgovor;
     } catch (e) {
+      if (mojaGeneracija !== generacija) return null;
       if (e instanceof ApiGreska && (e.status === 401 || e.status === 403)) {
         stanje = null;
         status = 'gost';
