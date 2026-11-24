@@ -16,12 +16,25 @@
   import NaslovnicaNapredak from '$lib/komponente/NaslovnicaNapredak.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
+    ariaBadgaMisija,
+    natpisBadgaMisija,
+  } from '$lib/naslovnica-misije.js';
+  import {
     NASLOVNICA_SEO_DESCRIPTION,
     NASLOVNICA_SEO_TITLE,
     naslovnicaJsonLd,
   } from '$lib/seo.js';
+  import {
+    dohvatiStanjeMisijaStore,
+    invalidirajStanjeMisija,
+    osigurajStanjeMisija,
+  } from '$lib/stanje-misija.svelte.js';
   import { osigurajProfil, stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
+
+  const misijeStore = dohvatiStanjeMisijaStore();
+  const misijeBadge = $derived(natpisBadgaMisija(misijeStore.aktivne));
+  const misijeBadgeAria = $derived(ariaBadgaMisija(misijeStore.aktivne));
 
   const FOCUS_REFRESH_MS = 45_000;
   let zadnjiFocusRefresh = 0;
@@ -61,6 +74,7 @@
     void osigurajProfil({ forsaj: true }).then(() => {
       if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
         void osvjeziIzazove();
+        void osigurajStanjeMisija({ forsaj: true });
       }
     });
   }
@@ -72,6 +86,7 @@
     const naIdentitet = () => {
       izazoviGeneracija += 1;
       izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
+      invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
@@ -86,8 +101,11 @@
     };
     document.addEventListener('visibilitychange', naVidljivost);
 
-    // Dijeli in-flight s Headerom; zatim jedan GET /izazovi.
-    void osigurajProfil().then(() => void osvjeziIzazove());
+    // Dijeli in-flight s Headerom; zatim jedan GET /izazovi i dijeljeni GET /misije.
+    void osigurajProfil().then(() => {
+      void osvjeziIzazove();
+      void osigurajStanjeMisija();
+    });
 
     return () => {
       window.removeEventListener('kaladont:identitet-promijenjen', naIdentitet);
@@ -252,19 +270,27 @@
             href="/misije"
             class="sporedni-precac"
             data-testid="naslovnica-misije"
+            aria-label={misijeBadge ? `Misije, ${misijeBadgeAria}` : 'Misije'}
             onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
           >
-            <img src="/ikone/62-misije.webp" alt="" width="40" height="40" />
+            <span class="sporedni-precac__ikona">
+              <img src="/ikone/62-misije.webp" alt="" width="40" height="40" />
+              {#if misijeBadge}
+                <span class="sporedni-precac__badge" data-testid="naslovnica-misije-badge" aria-hidden="true"
+                  >{misijeBadge}</span
+                >
+              {/if}
+            </span>
             <span>Misije</span>
           </a>
           <a
-            href="/profil"
+            href="/profil#rijeci"
             class="sporedni-precac"
-            data-testid="naslovnica-profil"
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
+            data-testid="naslovnica-kolekcija"
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
           >
             <img src="/ikone/61-korisnicki-profil.webp" alt="" width="40" height="40" />
-            <span>Moj profil</span>
+            <span>Kolekcija riječi</span>
           </a>
           <a
             href="/pravila-kaladonta"
@@ -653,6 +679,30 @@
     width: 36px;
     height: 36px;
     object-fit: contain;
+  }
+
+  .sporedni-precac__ikona {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sporedni-precac__badge {
+    position: absolute;
+    top: -6px;
+    right: -10px;
+    min-width: 22px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: var(--boja-crvena);
+    color: #fff;
+    font-family: var(--font-tijelo);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.3;
+    text-align: center;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--boja-pozadina) 80%, transparent);
   }
 
   .sporedni-precac:hover {

@@ -128,7 +128,7 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   const sporedna = page.getByRole('navigation', { name: 'Napredak i pomoć' });
   await expect(sporedna.getByTestId('naslovnica-misije')).toHaveAttribute('href', '/misije');
-  await expect(sporedna.getByTestId('naslovnica-profil')).toHaveAttribute('href', '/profil');
+  await expect(sporedna.getByTestId('naslovnica-kolekcija')).toHaveAttribute('href', '/profil#rijeci');
   await expect(sporedna.getByTestId('naslovnica-pravila')).toHaveAttribute('href', '/pravila-kaladonta');
 
   const izbornik = await otvoriProfilIzbornik(page);

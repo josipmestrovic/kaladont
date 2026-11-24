@@ -1,15 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import {
-    ApiGreska,
-    dohvatiStanjeMisija,
-    oznaciPregledMisija,
-  } from '$lib/misije-klijent.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
+  import { oznaciPregledMisija } from '$lib/misije-klijent.js';
+  import {
+    dohvatiStanjeMisijaStore,
+    invalidirajStanjeMisija,
+    osigurajStanjeMisija,
+  } from '$lib/stanje-misija.svelte.js';
 
   type Skupina = 'dnevna' | 'tjedna';
 
+  const misijeStore = dohvatiStanjeMisijaStore();
   let poruka = $state<string | null>(null);
   let skupineNaCekanju = $state<Skupina[]>([]);
   let zatvaranje = $state(false);
@@ -38,17 +40,12 @@
       ocisti();
       return;
     }
-    let stanje;
-    try {
-      stanje = await dohvatiStanjeMisija();
-    } catch (e) {
-      if (e instanceof ApiGreska && (e.status === 401 || e.status === 403)) {
-        if (ova === generacija) ocisti();
-      }
+    const stanje = await osigurajStanjeMisija({ forsaj: true });
+    if (ova !== generacija || !smijePrikazati()) return;
+    if (!stanje) {
+      ocisti();
       return;
     }
-    // Nakon await: ruta/sesija mogu biti drugačije — ne ostavljaj toast van naslovnice.
-    if (ova !== generacija || !smijePrikazati()) return;
     const skupine: Skupina[] = [];
     if (stanje.novosti.dnevne) skupine.push('dnevna');
     if (stanje.novosti.tjedne) skupine.push('tjedna');
@@ -97,6 +94,7 @@
     const naIdentitet = () => {
       generacija += 1;
       ocisti();
+      invalidirajStanjeMisija();
       void pokreni();
     };
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
@@ -111,6 +109,11 @@
       generacija += 1;
       ocisti();
     }
+  });
+
+  // Referenca da store ostane živ za badge na naslovnici dok je toast mountan.
+  $effect(() => {
+    void misijeStore.status;
   });
 </script>
 
