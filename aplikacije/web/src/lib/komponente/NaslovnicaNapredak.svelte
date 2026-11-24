@@ -32,7 +32,10 @@
   );
 </script>
 
-<div class="naslovnica-napredak-omotac">
+<div
+  class="naslovnica-napredak-omotac"
+  class:naslovnica-napredak-omotac--gost={prikaziGostCta}
+>
   <a
     href="/profil"
     class="naslovnica-napredak"
@@ -100,15 +103,25 @@
   </a>
 
   {#if prikaziGostCta}
-    <a
-      href="/registracija"
-      class="naslovnica-gost-registracija"
-      data-testid="naslovnica-gost-registracija"
-      onclick={() => zabiljeziUmamiDogadjaj('naslovnica-registracija-klik')}
-    >
-      <span class="naslovnica-gost-registracija__tekst">{gostCtaTekst}</span>
-      <span class="naslovnica-gost-registracija__akcija">Registriraj se ›</span>
-    </a>
+    <div class="naslovnica-gost-cta" data-testid="naslovnica-gost-cta">
+      <a
+        href="/registracija"
+        class="naslovnica-gost-registracija"
+        data-testid="naslovnica-gost-registracija"
+        onclick={() => zabiljeziUmamiDogadjaj('naslovnica-registracija-klik')}
+      >
+        <span class="naslovnica-gost-registracija__tekst">{gostCtaTekst}</span>
+        <span class="naslovnica-gost-registracija__akcija">Registriraj se ›</span>
+      </a>
+      <p class="naslovnica-gost-prijava">
+        Već imaš račun?
+        <a
+          href="/prijava"
+          data-testid="naslovnica-gost-prijava"
+          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-prijava-klik')}
+        >Prijavi se</a>
+      </p>
+    </div>
   {/if}
 </div>
 
@@ -124,6 +137,15 @@
     min-height: 92px;
   }
 
+  .naslovnica-napredak-omotac--gost {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 20px;
+    max-width: min(100%, 560px);
+  }
+
   .naslovnica-napredak {
     display: flex;
     flex-direction: row;
@@ -135,6 +157,12 @@
     color: var(--boja-tekst-sekundarni);
     text-decoration: none;
     text-align: left;
+  }
+
+  .naslovnica-napredak-omotac--gost .naslovnica-napredak {
+    flex: 1 1 200px;
+    width: auto;
+    min-width: 0;
   }
 
   .naslovnica-napredak:hover {
@@ -242,19 +270,32 @@
     line-height: 1.2;
   }
 
-  .naslovnica-gost-registracija {
+  .naslovnica-gost-cta {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    align-items: flex-end;
+    gap: 4px;
+    flex: 0 1 auto;
+    min-width: 0;
     max-width: 100%;
-    padding: 2px 2px 4px;
+    text-align: right;
+  }
+
+  .naslovnica-gost-registracija {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 4px 8px;
+    max-width: 100%;
+    padding: 2px 2px 0;
     border: 0;
     border-radius: 0;
     background: transparent;
     color: var(--boja-tekst-sekundarni);
     text-decoration: none;
-    text-align: left;
+    text-align: right;
   }
 
   .naslovnica-gost-registracija:hover .naslovnica-gost-registracija__akcija {
@@ -281,6 +322,35 @@
     font-weight: 800;
     line-height: 1.25;
     text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .naslovnica-gost-prijava {
+    margin: 0;
+    padding: 0 2px 2px;
+    color: var(--boja-tekst-sekundarni);
+    font-family: var(--font-tijelo);
+    font-size: var(--tekst-sitni);
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  .naslovnica-gost-prijava a {
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .naslovnica-gost-prijava a:hover {
+    color: var(--boja-akcent-tekst);
+  }
+
+  .naslovnica-gost-prijava a:focus-visible {
+    outline: 3px solid var(--boja-fokus);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 
   @media (min-width: 1000px) {
@@ -292,8 +362,21 @@
       min-height: 88px;
     }
 
+    .naslovnica-napredak-omotac--gost {
+      flex-wrap: nowrap;
+      align-items: center;
+      max-width: none;
+      gap: 16px 32px;
+    }
+
     .naslovnica-napredak {
       width: 100%;
+      max-width: none;
+    }
+
+    .naslovnica-napredak-omotac--gost .naslovnica-napredak {
+      flex: 1 1 auto;
+      width: auto;
       max-width: none;
     }
 
@@ -311,22 +394,26 @@
       width: 58px !important;
       height: 58px !important;
     }
+
+    .naslovnica-gost-cta {
+      flex: 0 0 auto;
+    }
   }
 
   @media (max-width: 999px) {
-    .naslovnica-napredak-omotac {
+    .naslovnica-napredak-omotac:not(.naslovnica-napredak-omotac--gost) {
       width: min(100%, 360px);
+    }
+
+    .naslovnica-napredak-omotac--gost {
+      width: 100%;
+      max-width: min(100%, 420px);
     }
 
     .naslovnica-napredak__avatar,
     .naslovnica-napredak__avatar :global(.avatar) {
       width: 52px !important;
       height: 52px !important;
-    }
-
-    .naslovnica-gost-registracija {
-      align-items: center;
-      text-align: center;
     }
   }
 
