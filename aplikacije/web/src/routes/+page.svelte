@@ -244,7 +244,6 @@
             <img src="/ikone/62-misije.webp" alt="" width="40" height="40" />
             <span>Misije</span>
           </a>
-          <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
           <a
             href="/profil"
             class="sporedni-precac"
@@ -254,7 +253,6 @@
             <img src="/ikone/61-korisnicki-profil.webp" alt="" width="40" height="40" />
             <span>Moj profil</span>
           </a>
-          <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
           <a
             href="/pravila-kaladonta"
             class="sporedni-precac"
@@ -268,23 +266,23 @@
 
         <hr class="brze-postavke-razdjelnik" />
         <BrzePostavke />
-
-        {#if NAJNOVIJE_IZDANJE}
-          <p class="zadnje-azuriranje">
-            Zadnje ažuriranje:
-            <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
-            <span class="razdjelnik" aria-hidden="true">·</span>
-            <a
-              class="sto-je-novo"
-              href="/novosti"
-              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
-            >Vidi što je novo</a>
-          </p>
-        {/if}
       </div>
     </div>
   </section>
   <div class="landing-prostor landing-prostor--dolje" aria-hidden="true"></div>
+
+  {#if NAJNOVIJE_IZDANJE}
+    <p class="zadnje-azuriranje">
+      Ažurirano
+      <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
+      <span class="razdjelnik" aria-hidden="true">·</span>
+      <a
+        class="sto-je-novo"
+        href="/novosti"
+        onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
+      >Što je novo?</a>
+    </p>
+  {/if}
 
   <footer class="landing-footer">
     <nav aria-label="Dodatne poveznice">
@@ -586,37 +584,39 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
     min-width: 0;
   }
 
   .sporedna-navigacija {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 10px 16px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px 8px;
     width: 100%;
-    margin: 6px 0 0;
+    margin: 2px 0 0;
   }
 
   .sporedni-precac {
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 9px;
-    min-height: 48px;
-    padding: 6px 4px;
+    justify-content: flex-start;
+    gap: 6px;
+    min-height: 44px;
+    padding: 8px 4px;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: 17px;
+    font-size: 14px;
     font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
     text-decoration: none;
   }
 
   .sporedni-precac img {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     object-fit: contain;
   }
 
@@ -624,22 +624,18 @@
     color: var(--boja-akcent-tekst);
   }
 
-  .sporedni-razdjelnik {
-    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 55%, transparent);
-    font-size: 16px;
-    user-select: none;
-  }
-
   .brze-postavke-razdjelnik {
-    width: min(100%, 240px);
-    margin: 8px auto 2px;
+    width: min(100%, 280px);
+    margin: 4px auto 0;
     border: 0;
     border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 24%, transparent);
   }
 
   .zadnje-azuriranje {
-    margin: 0;
-    width: 100%;
+    position: relative;
+    z-index: 1;
+    margin: 0 0 8px;
+    width: min(100%, var(--sirina-grida));
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-sitni);
     line-height: 1.3;
@@ -742,61 +738,34 @@
     }
 
     .sporedni-red {
-      display: grid;
-      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-      grid-template-areas:
-        'nav novosti'
-        'toggles .';
-      align-items: center;
-      gap: 10px 20px;
+      gap: 12px;
       margin-top: 4px;
     }
 
     .sporedna-navigacija {
-      grid-area: nav;
-      flex-wrap: nowrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
+      gap: 8px 16px;
       margin: 0;
-      min-width: 0;
-    }
-
-    .sporedni-razdjelnik {
-      display: none;
+      max-width: 520px;
     }
 
     .brze-postavke-razdjelnik {
-      display: none;
-    }
-
-    .sporedni-red :global(.brze-postavke) {
-      grid-area: toggles;
-      width: max-content;
-      max-width: 100%;
-      justify-self: start;
-      margin-top: 12px;
-    }
-
-    .zadnje-azuriranje {
-      grid-area: novosti;
-      justify-self: end;
-      width: auto;
-      max-width: 100%;
-      text-align: right;
+      width: min(100%, 360px);
+      margin-top: 6px;
     }
 
     .sporedni-precac {
-      gap: 10px;
-      min-height: 48px;
-      padding: 6px 4px;
-      font-size: 18px;
-      white-space: nowrap;
+      gap: 8px;
+      padding: 8px 6px;
+      font-size: 16px;
     }
 
     .sporedni-precac img {
       width: 40px;
       height: 40px;
+    }
+
+    .zadnje-azuriranje {
+      margin-bottom: 10px;
     }
 
     .landing-footer a { padding-inline: 0; }
@@ -852,34 +821,6 @@
     .navigacijska-stavka:not(.primarna) {
       min-height: 80px;
       box-sizing: border-box;
-    }
-
-    .sporedna-navigacija {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 4px;
-      margin-top: 2px;
-    }
-
-    .sporedni-razdjelnik {
-      display: none;
-    }
-
-    .sporedni-precac {
-      flex-direction: column;
-      justify-content: flex-start;
-      gap: 6px;
-      min-height: 0;
-      padding: 8px 4px;
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.2;
-      text-align: center;
-    }
-
-    .sporedni-precac img {
-      width: 34px;
-      height: 34px;
     }
 
     .landing-footer { flex-direction: column; gap: 2px; }
