@@ -364,7 +364,8 @@ export function dohvatiAudioPostavke(): AudioPostavke {
 
 let globalniUiZvukoviInicijalizirani = false;
 let zadnjiHoveraniGumb: Element | null = null;
-const KLIKABILNI_SELEKTOR = 'button:not(:disabled), a[href]';
+const KLIKABILNI_SELEKTOR =
+  'button:not(:disabled), a[href], label.prekidac-postavke';
 
 export function inicijalizirajGlobalneUiZvukove(): void {
   if (typeof document === 'undefined' || globalniUiZvukoviInicijalizirani) return;

@@ -177,7 +177,7 @@
           onclick={naTreningKlik}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/67-zagrijavanje-bot.webp" alt="" width="44" height="44" />
+            <img class="stavka-ikona" src="/ikone/84-trening.webp" alt="" width="44" height="44" />
             <span class="stavka-tekst">
               <strong id="naslov-trening">Trening</strong>
               <small id="opis-trening">Vježbaj protiv botova po svojim pravilima.</small>

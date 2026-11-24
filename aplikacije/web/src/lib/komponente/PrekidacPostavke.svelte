@@ -49,6 +49,11 @@
     background: color-mix(in srgb, var(--boja-povrsina) 55%, transparent);
     color: var(--boja-tekst-osnovni);
     cursor: pointer;
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease,
+      transform 160ms ease,
+      box-shadow 160ms ease;
   }
 
   .prekidac-postavke.ukljuceno {
@@ -57,7 +62,15 @@
   }
 
   .prekidac-postavke:hover {
-    border-color: color-mix(in srgb, var(--boja-crvena) 40%, var(--boja-obrub));
+    border-color: color-mix(in srgb, var(--boja-crvena) 55%, var(--boja-obrub));
+    background: color-mix(in srgb, var(--boja-crvena) 14%, var(--boja-povrsina));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
+  }
+
+  .prekidac-postavke:active {
+    transform: translateY(0);
+    box-shadow: none;
   }
 
   .prekidac-postavke__sadrzaj {
@@ -122,9 +135,16 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .prekidac-postavke,
     .prekidac,
     .prekidac span {
       transition: none;
+    }
+
+    .prekidac-postavke:hover,
+    .prekidac-postavke:active {
+      transform: none;
+      box-shadow: none;
     }
   }
 </style>

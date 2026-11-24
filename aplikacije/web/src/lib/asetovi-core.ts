@@ -15,7 +15,8 @@ export const MODAL_IGRA_IKONE: readonly string[] = [
 export const POZADINSKE_SLIKE_LANDINGA: readonly string[] = [
   '/ikone/07-igraj.png',
   '/ikone/06-trofej.png',
-  '/ikone/67-zagrijavanje-bot.webp',
+  '/ikone/84-trening.webp',
+  '/ikone/83-obavijesti.webp',
   '/ikone/18-privatna-soba.png',
   '/ikone/09-ljestvice.png',
   '/ikone/62-misije.webp',
