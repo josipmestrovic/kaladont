@@ -13,6 +13,7 @@
   let poruka = $state<string | null>(null);
   let skupineNaCekanju = $state<Skupina[]>([]);
   let zatvaranje = $state(false);
+  let generacija = 0;
 
   function tekstZa(skupine: Skupina[]): string {
     const dnevne = skupine.includes('dnevna');
@@ -22,22 +23,37 @@
     return 'Imaš nove tjedne misije';
   }
 
+  function smijePrikazati(): boolean {
+    return $page.url.pathname === '/' && jeRegistriranKorisnik();
+  }
+
+  function ocisti() {
+    poruka = null;
+    skupineNaCekanju = [];
+  }
+
   async function pokreni() {
-    if ($page.url.pathname !== '/') return;
-    if (!jeRegistriranKorisnik()) return;
+    const ova = ++generacija;
+    if (!smijePrikazati()) {
+      ocisti();
+      return;
+    }
     let stanje;
     try {
       stanje = await dohvatiStanjeMisija();
     } catch (e) {
-      if (e instanceof ApiGreska && (e.status === 401 || e.status === 403)) return;
+      if (e instanceof ApiGreska && (e.status === 401 || e.status === 403)) {
+        if (ova === generacija) ocisti();
+      }
       return;
     }
+    // Nakon await: ruta/sesija mogu biti drugačije — ne ostavljaj toast van naslovnice.
+    if (ova !== generacija || !smijePrikazati()) return;
     const skupine: Skupina[] = [];
     if (stanje.novosti.dnevne) skupine.push('dnevna');
     if (stanje.novosti.tjedne) skupine.push('tjedna');
     if (skupine.length === 0) {
-      poruka = null;
-      skupineNaCekanju = [];
+      ocisti();
       return;
     }
     skupineNaCekanju = skupine;
@@ -61,8 +77,7 @@
     try {
       await oznaciSveNaCekanju();
     } finally {
-      poruka = null;
-      skupineNaCekanju = [];
+      ocisti();
       zatvaranje = false;
     }
   }
@@ -73,16 +88,15 @@
     try {
       await oznaciSveNaCekanju();
     } finally {
-      poruka = null;
-      skupineNaCekanju = [];
+      ocisti();
       zatvaranje = false;
     }
   }
 
   onMount(() => {
     const naIdentitet = () => {
-      poruka = null;
-      skupineNaCekanju = [];
+      generacija += 1;
+      ocisti();
       void pokreni();
     };
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
@@ -94,13 +108,13 @@
   $effect(() => {
     if ($page.url.pathname === '/') void pokreni();
     else {
-      poruka = null;
-      skupineNaCekanju = [];
+      generacija += 1;
+      ocisti();
     }
   });
 </script>
 
-{#if poruka}
+{#if poruka && $page.url.pathname === '/'}
   <aside class="misije-toast" role="status" aria-live="polite">
     <div class="sadrzaj">
       <strong>{poruka}</strong>
