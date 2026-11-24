@@ -125,11 +125,10 @@
 <main class="landing">
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <div class="navigacijski-blok">
-      <div class="profil-i-postavke">
+      <div class="profil-red">
         <NaslovnicaNapredak
           izazoviZavrseno={izazoviPrikaz.vrsta === 'napredak' ? izazoviPrikaz.zavrseno : 0}
         />
-        <BrzePostavke />
       </div>
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
         <button
@@ -303,6 +302,11 @@
           </a>
         </nav>
       </div>
+
+      <div class="brze-postavke-blok">
+        <p class="brze-postavke-naslov">Prilagodi igru sebi</p>
+        <BrzePostavke />
+      </div>
     </div>
   </section>
   <div class="landing-prostor landing-prostor--dolje" aria-hidden="true"></div>
@@ -395,9 +399,30 @@
     width: 100%;
   }
 
-  /* Mobitel: sadržaj sudjeluje u parent flexu (postavke ispod prečaca). */
-  .profil-i-postavke {
-    display: contents;
+  .profil-red {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .brze-postavke-blok {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding-top: 10px;
+    border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 24%, transparent);
+  }
+
+  .brze-postavke-naslov {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-family: var(--font-tijelo);
+    font-size: var(--tekst-sitni);
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
   }
 
   .glavna-navigacija {
@@ -802,28 +827,15 @@
       gap: 20px;
     }
 
-    /* Desktop: profil lijevo, brze postavke desno. */
-    .profil-i-postavke {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px 24px;
-      width: 100%;
-      min-width: 0;
-    }
-
-    .profil-i-postavke :global(.naslovnica-napredak-omotac) {
-      flex: 0 1 auto;
-      min-width: 0;
+    .profil-red :global(.naslovnica-napredak-omotac) {
       margin: 0;
     }
 
-    .profil-i-postavke :global(.brze-postavke) {
-      flex: 0 0 auto;
-      width: auto;
-      max-width: min(420px, 48%);
-      margin-inline: 0;
+    .brze-postavke-blok {
+      gap: 12px;
+      padding-top: 12px;
+      max-width: 560px;
+      margin-inline: auto;
     }
 
     .glavna-navigacija {
@@ -921,17 +933,6 @@
     .navigacijska-stavka:not(.primarna) {
       min-height: 80px;
       box-sizing: border-box;
-    }
-
-    /* Postavke ispod prečaca, iznad novosti/footera. */
-    .navigacijski-blok :global(.naslovnica-napredak-omotac) { order: 1; }
-    .glavna-navigacija { order: 2; }
-    .sporedni-red { order: 3; }
-    .navigacijski-blok :global(.brze-postavke) {
-      order: 4;
-      width: 100%;
-      padding-top: 8px;
-      border-top: 1px solid color-mix(in srgb, var(--boja-tekst-sekundarni) 24%, transparent);
     }
 
     .landing-footer { flex-direction: column; gap: 2px; }

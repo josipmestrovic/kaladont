@@ -41,7 +41,7 @@
         <Moon size={24} strokeWidth={2} />
       {/if}
     </span>
-    <strong class="brze-postavke__naziv">{svijetlaUkljucena ? 'Svijetli način' : 'Tamni način'}</strong>
+    <strong class="brze-postavke__naziv">Svijetli način</strong>
   </PrekidacPostavke>
 
   <PrekidacPostavke
