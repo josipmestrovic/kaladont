@@ -21,7 +21,7 @@ export type ProfilSnapshot = {
 
 export type StatusProfila = 'prazno' | 'ucitavanje' | 'spreman' | 'greska';
 
-export type ProfilApi = <T>(putanja: string, opcije?: RequestInit) => Promise<T>;
+export type ProfilApi = (putanja: string, opcije?: RequestInit) => Promise<ProfilSnapshot>;
 
 export type ProfilResursOvisnosti = {
   api: ProfilApi;
@@ -34,7 +34,6 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
   let status: StatusProfila = 'prazno';
   let generacija = 0;
   let inFlight: Promise<void> | null = null;
-  let zakazano = false;
   const pretplatnici = new Set<() => void>();
 
   function objavi() {
@@ -58,7 +57,7 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
     while (pokusaj < pokusaji) {
       if (mojaGeneracija !== generacija) return;
       try {
-        const odgovor = await ovisnosti.api<ProfilSnapshot>('/profil');
+        const odgovor = await ovisnosti.api('/profil');
         if (mojaGeneracija !== generacija) return;
         postavi(odgovor, 'spreman');
         return;
@@ -82,11 +81,12 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
     if (opcije.forsaj) {
       generacija += 1;
       if (inFlight) {
-        // Stari odgovor pada na generaciji; nakon njega pokreni svježi dohvat.
-        zakazano = true;
         await inFlight.catch(() => {});
-        if (!zakazano) return;
-        zakazano = false;
+      }
+      // Drugi paralelni forsaj već pokrenuo novi dohvat — pridruži se umjesto ranog returna.
+      if (inFlight) {
+        await inFlight;
+        return;
       }
     } else if (inFlight) {
       await inFlight;
@@ -94,7 +94,8 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
     }
 
     const mojaGeneracija = generacija;
-    const pokretanje = (async () => {
+    let pokretanje!: Promise<void>;
+    pokretanje = (async () => {
       try {
         await dohvati(mojaGeneracija, opcije.pokusaji ?? 3);
       } finally {
@@ -103,17 +104,11 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
     })();
     inFlight = pokretanje;
     await pokretanje;
-
-    if (zakazano && mojaGeneracija !== generacija) {
-      zakazano = false;
-      await osiguraj({ forsaj: true });
-    }
   }
 
   function invalidiraj() {
     generacija += 1;
     inFlight = null;
-    zakazano = false;
     postavi(null, 'prazno');
   }
 

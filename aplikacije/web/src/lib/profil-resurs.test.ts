@@ -125,4 +125,31 @@ describe('profil-resurs', () => {
     expect(resurs.snapshot?.nadimak).toBe('Novi');
     expect(pozivi).toBe(2);
   });
+
+  it('paralelni forsaj dijeljenja završava u spreman statusu', async () => {
+    let otkazi!: (v: ProfilSnapshot) => void;
+    let pozivi = 0;
+    const api = vi.fn(async () => {
+      pozivi += 1;
+      if (pozivi === 1) {
+        return await new Promise<ProfilSnapshot>((resolve) => {
+          otkazi = resolve;
+        });
+      }
+      return bazaProfila('Zajednicki');
+    });
+    const resurs = stvoriProfilResurs({
+      api,
+      oporavi401: async () => {},
+      jeApiGreska401: () => false,
+    });
+
+    const a = resurs.osiguraj({ forsaj: true });
+    const b = resurs.osiguraj({ forsaj: true });
+    otkazi(bazaProfila('Privremeni'));
+    await Promise.all([a, b]);
+    expect(resurs.status).toBe('spreman');
+    expect(resurs.snapshot?.nadimak).toBe('Zajednicki');
+    expect(pozivi).toBe(2);
+  });
 });

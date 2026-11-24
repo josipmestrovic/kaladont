@@ -36,7 +36,9 @@ function osigurajResurs(): ProfilResurs | null {
   if (!resurs) {
     resurs = stvoriProfilResurs({
       api,
-      oporavi401: () => osvjeziGostSesijuNakon401({ emitirajIdentitet: false }),
+      oporavi401: async () => {
+        await osvjeziGostSesijuNakon401({ emitirajIdentitet: false });
+      },
       jeApiGreska401: (greska) => greska instanceof ApiGreska && greska.status === 401,
     });
     resurs.pretplatiSe(sinkroniziraj);

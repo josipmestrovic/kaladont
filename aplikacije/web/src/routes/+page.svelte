@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { afterNavigate, goto } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { BROJ_AKTIVNIH_IZAZOVA } from 'zajednicko';
   import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
@@ -61,12 +61,6 @@
       }
     });
   }
-
-  afterNavigate(({ from, to }) => {
-    // Početni ulazak pokriva onMount; forsaj samo pri povratku na /.
-    if (to?.url.pathname !== '/' || !from) return;
-    osvjeziNaslovnicu();
-  });
 
   onMount(() => {
     // ?igraj=1 → izravno Brza igra (bez modala).

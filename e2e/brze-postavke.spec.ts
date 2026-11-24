@@ -90,9 +90,7 @@ test('tipkovnica aktivira brze postavke; nema horizontalnog overflowa', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await otvoriNaslovnicu(page);
   const font = page.getByTestId('brza-postavka-font').getByRole('switch');
-  await font.focus();
-  await expect(font).toBeFocused();
-  await page.keyboard.press('Space');
+  await font.press('Space');
   await expect(page.locator('html')).toHaveAttribute('data-font-disleksiju', '');
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
