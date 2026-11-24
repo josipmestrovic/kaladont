@@ -2,13 +2,11 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
   import { ucitajModalIgraAsete } from '$lib/asetovi-core.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
   import ModalIgraj from '$lib/komponente/ModalIgraj.svelte';
-  import PopupNovihMisija from '$lib/komponente/PopupNovihMisija.svelte';
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
     NASLOVNICA_SEO_DESCRIPTION,
@@ -17,7 +15,6 @@
   } from '$lib/seo.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
-  const registriran = jeRegistriranKorisnik();
   let otvoreniModal = $state(false);
 
   function idiUBrzuIgru() {
@@ -145,10 +142,6 @@
     <small class="copyright">© 2026 Kaladont. Sva prava pridržana.</small>
   </footer>
 </main>
-
-{#if registriran}
-  <PopupNovihMisija />
-{/if}
 
 <ModalIgraj otvoren={otvoreniModal} nacin="laganini" onZatvori={() => (otvoreniModal = false)} />
 

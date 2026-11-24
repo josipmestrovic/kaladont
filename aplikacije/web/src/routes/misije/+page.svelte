@@ -56,7 +56,14 @@
       greska = null;
     }
     try {
-      const novo = await dohvatiStanjeMisija();
+      let novo = await dohvatiStanjeMisija();
+      // Posjet /misije gasi „nove” zastavice (toast više nije potreban).
+      if (novo.novosti.dnevne) {
+        try { novo = await oznaciPregledMisija('dnevna'); } catch { /* best-effort */ }
+      }
+      if (novo.novosti.tjedne) {
+        try { novo = await oznaciPregledMisija('tjedna'); } catch { /* best-effort */ }
+      }
       primijeniStanje(novo, ova);
       if (ova === generacija) greska = null;
     } catch (e) {

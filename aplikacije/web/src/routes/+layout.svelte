@@ -24,6 +24,7 @@
   import DostignuceObavijest from '$lib/komponente/DostignuceObavijest.svelte';
   import CitanjeNaglasObavijest from '$lib/komponente/CitanjeNaglasObavijest.svelte';
   import SanducicToast from '$lib/komponente/SanducicToast.svelte';
+  import ObavijestNovihMisija from '$lib/komponente/ObavijestNovihMisija.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import { jeIndeksabilnaPutanja } from '$lib/seo.js';
 
@@ -155,6 +156,7 @@
     <VezaObavijest />
     <UspjehObavijest />
     <SanducicToast />
+    <ObavijestNovihMisija />
     <DostignuceObavijest />
     <CitanjeNaglasObavijest />
   </div>
@@ -221,6 +223,7 @@
   .status-obavijesti :global(.obavijest-citanja-naglas),
   .status-obavijesti :global(.red-dostignuca),
   .status-obavijesti :global(.sanducic-toast),
+  .status-obavijesti :global(.misije-toast),
   .status-obavijesti :global(.uspjeh-obavijest) {
     position: relative;
     inset: auto;
