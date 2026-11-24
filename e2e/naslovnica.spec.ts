@@ -284,19 +284,11 @@ for (const { sirina, visina } of [
         if (okvir) expect(preklapajuSe(okvirBloka, okvir), `${naziv} se preklapa s blokom`).toBe(false);
       }
 
-      if (sirina >= 1000) {
-        // Desktop je visinski ugođen bez viška prostora: blok ne smije povećati visinu
-        // samo kad naslovnica već staje u viewport (Brza igra CTA može ga prelaziti).
-        const visine = await page.evaluate((visinaViewporta) => {
-          const element = document.querySelector<HTMLElement>('.zadnje-azuriranje')!;
-          const sBlokom = document.documentElement.scrollHeight;
-          element.style.display = 'none';
-          const bezBloka = document.documentElement.scrollHeight;
-          element.style.display = '';
-          return { sBlokom, bezBloka, stajeUViewport: bezBloka < visinaViewporta };
-        }, visina);
-        if (visine.stajeUViewport) expect(visine.sBlokom).toBe(visine.bezBloka);
-      }
+      // Prirodni scroll je dopušten; CTA mora ostati u DOM-u i biti dostupan.
+      const cta = page.getByTestId('naslovnica-brza-igra').locator('.cta');
+      await expect(cta).toBeVisible();
+      const ctaStil = await cta.evaluate((el) => getComputedStyle(el).display);
+      expect(ctaStil).not.toBe('none');
     });
   }
 }
@@ -325,10 +317,14 @@ test('mobilna naslovnica ima header samo-desno i poveznice u footeru', async ({ 
   expect(nemaHorizontalnogPrelijevanja).toBe(true);
 });
 
-test('na niskom desktop ekranu ilustracija se skriva', async ({ page }) => {
+test('na niskom desktop ekranu CTA ostaje vidljiv i scroll je dopušten', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 500 });
   await page.goto('/');
-  await expect(page.locator('.scena-2d5d')).toBeHidden();
+  await expect(page.locator('.scena-2d5d')).toHaveCount(0);
+  const cta = page.getByTestId('naslovnica-brza-igra').locator('.cta');
+  await expect(cta).toBeVisible();
+  expect(await cta.evaluate((el) => getComputedStyle(el).display)).not.toBe('none');
+  await expect(page.locator('.landing-footer')).toBeVisible();
 });
 
 test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page }) => {
