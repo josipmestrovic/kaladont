@@ -1,12 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Moon, Sun, Type, Volume2 } from 'lucide-svelte';
   import { glasUkljucen, postaviGlas } from '$lib/glasovni-manager.js';
   import { openDyslexicUkljucen, postaviOpenDyslexic } from '$lib/postavke-fonta.js';
   import { postaviTemu, tema } from '$lib/postavke-teme.js';
   import PrekidacPostavke from './PrekidacPostavke.svelte';
-
-  const IKONA = 22;
 
   let svijetlaUkljucena = $state(false);
   let govorUkljucen = $state(false);
@@ -36,13 +33,7 @@
     testId="brza-postavka-tema"
     onchange={(ukljucen) => postaviTemu(ukljucen ? 'svijetla' : 'tamna')}
   >
-    {#if svijetlaUkljucena}
-      <Sun class="brze-postavke__ikona" size={IKONA} strokeWidth={2} aria-hidden="true" />
-      <strong class="brze-postavke__naziv">Svijetli način</strong>
-    {:else}
-      <Moon class="brze-postavke__ikona" size={IKONA} strokeWidth={2} aria-hidden="true" />
-      <strong class="brze-postavke__naziv">Tamni način</strong>
-    {/if}
+    <strong class="brze-postavke__naziv">{svijetlaUkljucena ? 'Svijetli način' : 'Tamni način'}</strong>
   </PrekidacPostavke>
 
   <PrekidacPostavke
@@ -51,7 +42,6 @@
     testId="brza-postavka-glas"
     onchange={(ukljucen) => postaviGlas(ukljucen)}
   >
-    <Volume2 class="brze-postavke__ikona" size={IKONA} strokeWidth={2} aria-hidden="true" />
     <strong class="brze-postavke__naziv">Čitanje naglas</strong>
   </PrekidacPostavke>
 
@@ -61,61 +51,106 @@
     testId="brza-postavka-font"
     onchange={(ukljucen) => postaviOpenDyslexic(ukljucen)}
   >
-    <Type class="brze-postavke__ikona" size={IKONA} strokeWidth={2} aria-hidden="true" />
     <strong class="brze-postavke__naziv">Font za disleksiju</strong>
   </PrekidacPostavke>
 </div>
 
 <style>
   .brze-postavke {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-    justify-content: center;
-    gap: 8px 10px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
     width: 100%;
-    max-width: 640px;
     margin-inline: auto;
     min-width: 0;
   }
 
-  .brze-postavke :global(.brze-postavke__ikona) {
-    flex: 0 0 auto;
-    color: var(--boja-tekst-sekundarni);
+  .brze-postavke :global(.prekidac-postavke) {
+    min-width: 0;
+    width: 100%;
   }
 
   .brze-postavke__naziv {
+    flex: 0 1 auto;
     min-width: 0;
     font-family: var(--font-tijelo);
-    font-size: 14px;
+    font-size: var(--tekst-mikro);
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 1.2;
     text-align: left;
-  }
-
-  :global(html[data-font-disleksiju]) .brze-postavke {
-    gap: 10px;
+    white-space: nowrap;
   }
 
   :global(html[data-font-disleksiju]) .brze-postavke__naziv {
-    font-size: 15px;
-    line-height: 1.35;
+    font-size: var(--tekst-sitni);
+    line-height: 1.3;
+  }
+
+  /* Mobitel: 3 stupca — naziv gore, prekidač dolje. */
+  @media (max-width: 999px) {
+    .brze-postavke {
+      gap: 8px;
+    }
+
+    .brze-postavke :global(.prekidac-postavke) {
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      min-height: 0;
+      padding: 10px 6px 12px;
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--boja-povrsina) 78%, transparent);
+    }
+
+    .brze-postavke :global(.prekidac-postavke__sadrzaj) {
+      flex: 0 0 auto;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .brze-postavke__naziv {
+      width: 100%;
+      font-size: 12px;
+      line-height: 1.25;
+      text-align: center;
+      white-space: normal;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+
+    .brze-postavke :global(.prekidac) {
+      margin-left: 0;
+    }
+
+    :global(html[data-tema='svijetla']) .brze-postavke :global(.prekidac-postavke) {
+      background: color-mix(in srgb, var(--boja-povrsina) 94%, transparent);
+    }
+
+    :global(html[data-font-disleksiju]) .brze-postavke__naziv {
+      font-size: 13px;
+      line-height: 1.3;
+    }
   }
 
   @media (min-width: 1000px) {
     .brze-postavke {
-      gap: 10px 12px;
-      flex-wrap: nowrap;
+      grid-template-columns: repeat(3, max-content);
+      gap: 8px;
+      width: max-content;
+      max-width: 100%;
+      margin-inline: 0;
+      justify-content: start;
+    }
+
+    .brze-postavke :global(.prekidac-postavke) {
+      width: auto;
+      gap: 6px;
+      padding: 5px 10px;
     }
 
     .brze-postavke__naziv {
-      font-size: 15px;
-    }
-  }
-
-  @media (max-width: 379px) {
-    .brze-postavke {
-      gap: 8px;
+      font-size: var(--tekst-mikro);
     }
   }
 </style>

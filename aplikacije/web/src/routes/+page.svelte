@@ -229,53 +229,55 @@
         </a>
       </nav>
 
-      <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
-        <a
-          href="/misije"
-          class="sporedni-precac"
-          data-testid="naslovnica-misije"
-          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
-        >
-          <img src="/ikone/62-misije.webp" alt="" width="28" height="28" />
-          <span>Misije</span>
-        </a>
-        <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
-        <a
-          href="/profil"
-          class="sporedni-precac"
-          data-testid="naslovnica-profil"
-          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
-        >
-          <img src="/ikone/61-korisnicki-profil.webp" alt="" width="28" height="28" />
-          <span>Moj profil</span>
-        </a>
-        <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
-        <a
-          href="/pravila-kaladonta"
-          class="sporedni-precac"
-          data-testid="naslovnica-pravila"
-          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-pravila-klik')}
-        >
-          <img src="/ikone/08-pravila.png" alt="" width="28" height="28" />
-          <span>Kako igrati?</span>
-        </a>
-      </nav>
-
-      <hr class="brze-postavke-razdjelnik" />
-      <BrzePostavke />
-
-      {#if NAJNOVIJE_IZDANJE}
-        <p class="zadnje-azuriranje">
-          Zadnje ažuriranje:
-          <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
-          <span class="razdjelnik" aria-hidden="true">·</span>
+      <div class="sporedni-red">
+        <nav class="sporedna-navigacija" aria-label="Napredak i pomoć">
           <a
-            class="sto-je-novo"
-            href="/novosti"
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
-          >Vidi što je novo</a>
-        </p>
-      {/if}
+            href="/misije"
+            class="sporedni-precac"
+            data-testid="naslovnica-misije"
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
+          >
+            <img src="/ikone/62-misije.webp" alt="" width="40" height="40" />
+            <span>Misije</span>
+          </a>
+          <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
+          <a
+            href="/profil"
+            class="sporedni-precac"
+            data-testid="naslovnica-profil"
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
+          >
+            <img src="/ikone/61-korisnicki-profil.webp" alt="" width="40" height="40" />
+            <span>Moj profil</span>
+          </a>
+          <span class="sporedni-razdjelnik" aria-hidden="true">|</span>
+          <a
+            href="/pravila-kaladonta"
+            class="sporedni-precac"
+            data-testid="naslovnica-pravila"
+            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-pravila-klik')}
+          >
+            <img src="/ikone/08-pravila.png" alt="" width="40" height="40" />
+            <span>Kako igrati?</span>
+          </a>
+        </nav>
+
+        <hr class="brze-postavke-razdjelnik" />
+        <BrzePostavke />
+
+        {#if NAJNOVIJE_IZDANJE}
+          <p class="zadnje-azuriranje">
+            Zadnje ažuriranje:
+            <time datetime={NAJNOVIJE_IZDANJE.objavljeno}>{NAJNOVIJE_IZDANJE.datumHr}</time>
+            <span class="razdjelnik" aria-hidden="true">·</span>
+            <a
+              class="sto-je-novo"
+              href="/novosti"
+              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
+            >Vidi što je novo</a>
+          </p>
+        {/if}
+      </div>
     </div>
   </section>
   <div class="landing-prostor landing-prostor--dolje" aria-hidden="true"></div>
@@ -303,7 +305,7 @@
     --radijus-stavke: 18px;
     --ikona-sporedna: 40px;
     --ikona-primarna: 48px;
-    --sirina-grida: 820px;
+    --sirina-grida: 980px;
 
     position: relative;
     isolation: isolate;
@@ -563,32 +565,41 @@
     border-radius: 6px;
   }
 
+  .sporedni-red {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+  }
+
   .sporedna-navigacija {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 8px 14px;
+    gap: 10px 16px;
     width: 100%;
-    margin: 4px 0 0;
+    margin: 6px 0 0;
   }
 
   .sporedni-precac {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    padding: 4px 2px;
+    gap: 9px;
+    min-height: 48px;
+    padding: 6px 4px;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: var(--tekst-mali);
-    font-weight: 600;
+    font-size: 17px;
+    font-weight: 700;
     text-decoration: none;
   }
 
   .sporedni-precac img {
-    width: 28px;
-    height: 28px;
+    width: 40px;
+    height: 40px;
     object-fit: contain;
   }
 
@@ -598,7 +609,7 @@
 
   .sporedni-razdjelnik {
     color: color-mix(in srgb, var(--boja-tekst-sekundarni) 55%, transparent);
-    font-size: 14px;
+    font-size: 16px;
     user-select: none;
   }
 
@@ -707,6 +718,64 @@
       grid-column: 1 / -1;
     }
 
+    .sporedni-red {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      grid-template-areas:
+        'nav novosti'
+        'toggles .';
+      align-items: center;
+      gap: 10px 20px;
+      margin-top: 4px;
+    }
+
+    .sporedna-navigacija {
+      grid-area: nav;
+      flex-wrap: nowrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      min-width: 0;
+    }
+
+    .sporedni-razdjelnik {
+      display: none;
+    }
+
+    .brze-postavke-razdjelnik {
+      display: none;
+    }
+
+    .sporedni-red :global(.brze-postavke) {
+      grid-area: toggles;
+      width: max-content;
+      max-width: 100%;
+      justify-self: start;
+      margin-top: 12px;
+    }
+
+    .zadnje-azuriranje {
+      grid-area: novosti;
+      justify-self: end;
+      width: auto;
+      max-width: 100%;
+      text-align: right;
+    }
+
+    .sporedni-precac {
+      gap: 10px;
+      min-height: 48px;
+      padding: 6px 4px;
+      font-size: 18px;
+      white-space: nowrap;
+    }
+
+    .sporedni-precac img {
+      width: 40px;
+      height: 40px;
+    }
+
     .landing-footer a { padding-inline: 0; }
   }
 
@@ -762,6 +831,34 @@
     .navigacijska-stavka:not(.primarna) {
       min-height: 80px;
       box-sizing: border-box;
+    }
+
+    .sporedna-navigacija {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .sporedni-razdjelnik {
+      display: none;
+    }
+
+    .sporedni-precac {
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 6px;
+      min-height: 0;
+      padding: 8px 4px;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .sporedni-precac img {
+      width: 34px;
+      height: 34px;
     }
 
     .landing-footer { flex-direction: column; gap: 2px; }

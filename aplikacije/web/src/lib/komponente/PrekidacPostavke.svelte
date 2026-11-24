@@ -39,13 +39,13 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     box-sizing: border-box;
-    min-width: min(100%, 168px);
-    min-height: 44px;
-    padding: 8px 12px;
+    width: 100%;
+    min-height: 36px;
+    padding: 5px 10px;
     border: 1px solid var(--boja-obrub);
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--boja-povrsina) 55%, transparent);
     color: var(--boja-tekst-osnovni);
     cursor: pointer;
@@ -53,17 +53,17 @@
 
   .prekidac-postavke.ukljuceno {
     background: color-mix(in srgb, var(--boja-povrsina) 82%, transparent);
-    border-color: color-mix(in srgb, var(--boja-mint) 45%, var(--boja-obrub));
+    border-color: color-mix(in srgb, var(--boja-crvena) 55%, var(--boja-obrub));
   }
 
   .prekidac-postavke:hover {
-    border-color: color-mix(in srgb, var(--boja-mint) 35%, var(--boja-obrub));
+    border-color: color-mix(in srgb, var(--boja-crvena) 40%, var(--boja-obrub));
   }
 
   .prekidac-postavke__sadrzaj {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
     flex: 1 1 auto;
   }
@@ -81,8 +81,8 @@
   .prekidac {
     display: flex;
     align-items: center;
-    width: 36px;
-    height: 22px;
+    width: 30px;
+    height: 18px;
     flex: 0 0 auto;
     margin-left: auto;
     padding: 2px;
@@ -92,8 +92,8 @@
   }
 
   .prekidac span {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background: #fff;
     box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
@@ -101,11 +101,11 @@
   }
 
   input:checked + .prekidac {
-    background: var(--boja-mint);
+    background: var(--boja-crvena);
   }
 
   input:checked + .prekidac span {
-    transform: translateX(14px);
+    transform: translateX(12px);
   }
 
   input:focus-visible + .prekidac {
@@ -118,7 +118,7 @@
   }
 
   :global(html[data-tema='svijetla']) .prekidac-postavke.ukljuceno {
-    background: color-mix(in srgb, var(--boja-mint) 10%, var(--boja-povrsina));
+    background: color-mix(in srgb, var(--boja-crvena) 12%, var(--boja-povrsina));
   }
 
   @media (prefers-reduced-motion: reduce) {
