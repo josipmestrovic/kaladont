@@ -31,12 +31,23 @@ for (const sirina of [320, 390, 1440]) {
       timeout: 20_000,
     });
     await page.evaluate(() => document.fonts.ready);
-    const nav = await footer.locator('nav').boundingBox();
-    const copyright = await footer.locator('.copyright').boundingBox();
     if (sirina >= 1000) {
-      expect(copyright!.x).toBeGreaterThan(nav!.x + nav!.width);
-      expect(Math.abs(copyright!.y + copyright!.height / 2 - nav!.y - nav!.height / 2)).toBeLessThanOrEqual(1);
+      // Čekaj stabilan layout (font metrics) prije provjere vertikalnog poravnanja.
+      await expect
+        .poll(
+          async () => {
+            const nav = await footer.locator('nav').boundingBox();
+            const copyright = await footer.locator('.copyright').boundingBox();
+            if (!nav || !copyright) return Number.POSITIVE_INFINITY;
+            if (copyright.x <= nav.x + nav.width) return Number.POSITIVE_INFINITY;
+            return Math.abs(copyright.y + copyright.height / 2 - nav.y - nav.height / 2);
+          },
+          { timeout: 5_000 },
+        )
+        .toBeLessThanOrEqual(1);
     } else {
+      const nav = await footer.locator('nav').boundingBox();
+      const copyright = await footer.locator('.copyright').boundingBox();
       expect(copyright!.y).toBeGreaterThanOrEqual(nav!.y + nav!.height);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -151,6 +162,20 @@ test('naslovnica prikazuje XP sažetak i default opis izazova bez trake', async 
   await expect(napredak).toContainText(/LVL|Moj napredak/);
   await expect(napredak).toHaveAttribute('href', '/profil');
 
+  const gostCta = page.getByTestId('naslovnica-gost-registracija');
+  await expect(gostCta).toBeVisible({ timeout: 20_000 });
+  await expect(gostCta).toHaveAttribute('href', '/registracija');
+  await expect(gostCta).toContainText('Sačuvaj svoj napredak.');
+  await expect(gostCta).toContainText('Registriraj se');
+
+  const brzaIgra = page.getByTestId('naslovnica-brza-igra');
+  await expect(brzaIgra.getByTestId('naslovnica-brza-igra-gost-napomena')).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(brzaIgra.getByTestId('naslovnica-brza-igra-gost-napomena')).toHaveText(
+    'Igraj besplatno, bez registracije.',
+  );
+
   const izazovi = page.getByTestId('naslovnica-izazovi');
   await expect(izazovi).toContainText(/Svladavaj \d+ sve težih izazova/);
   await expect(izazovi.locator('.izazovi-napredak')).toHaveCount(0);
@@ -215,20 +240,20 @@ test('naslovnica prikazuje zadnje ažuriranje iz istog izvora kao Novosti', asyn
   // Blok mora biti u SSR HTML-u: CI i produkcijski workflow provjeravaju ga bez preglednika.
   const ssr = await (await request.get('/')).text();
   expect(ssr).toContain(`datetime="${najnovije.objavljeno}"`);
-  expect(ssr).toContain('Vidi što je novo');
+  expect(ssr).toContain('Što je novo?');
   expect(ssr).toContain('href="/novosti"');
   expect(ssr).not.toContain(`href="/novosti#${najnovije.sidro}"`);
 
   await page.goto('/');
   const blok = page.locator('.zadnje-azuriranje');
-  await expect(blok).toHaveText(`Zadnje ažuriranje: ${najnovije.datumHr} · Vidi što je novo`);
+  await expect(blok).toHaveText(`Ažurirano ${najnovije.datumHr} · Što je novo?`);
   await expect(blok.locator('.razdjelnik')).toHaveAttribute('aria-hidden', 'true');
   await expect(blok.locator('time')).toHaveAttribute('datetime', najnovije.objavljeno);
   await expect(blok.locator('time')).toHaveText(najnovije.datumHr);
 
   const poveznice = blok.getByRole('link');
   await expect(poveznice).toHaveCount(1);
-  await expect(poveznice).toHaveText('Vidi što je novo');
+  await expect(poveznice).toHaveText('Što je novo?');
   await expect(poveznice).toHaveAttribute('href', '/novosti');
 
   await poveznice.click();

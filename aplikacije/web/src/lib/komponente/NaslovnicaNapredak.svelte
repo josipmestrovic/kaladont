@@ -6,12 +6,12 @@
 
   const prikaz = $derived(izracunajPrikazXp(stanjeProfila.profil, stanjeProfila.status));
   const profil = $derived(stanjeProfila.profil);
-  const jeGost = $derived(
-    stanjeProfila.status === 'spreman' && profil?.vrsta === 'gost',
-  );
+  const jeGostProfil = $derived(profil?.vrsta === 'gost');
+  /** CTA tek kad je snapshot pouzdano učitan — bez SSR/hidratacijskog bljeska. */
+  const prikaziGostCta = $derived(stanjeProfila.status === 'spreman' && jeGostProfil);
   const prikaziAvatar = $derived(stanjeProfila.status === 'spreman' && profil !== null);
   const nadimak = $derived(
-    jeGost ? 'Gost' : (profil?.nadimak?.trim() || 'Moj napredak'),
+    jeGostProfil ? 'Gost' : (profil?.nadimak?.trim() || 'Moj napredak'),
   );
   const ariaProfil = $derived(
     prikaz.vrsta === 'napredak'
@@ -82,7 +82,7 @@
     </span>
   </a>
 
-  {#if jeGost}
+  {#if prikaziGostCta}
     <a
       href="/registracija"
       class="naslovnica-gost-registracija"
