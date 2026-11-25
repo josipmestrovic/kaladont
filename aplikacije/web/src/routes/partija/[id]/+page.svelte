@@ -13,6 +13,7 @@
   import NapredakMisijaPartije from '$lib/komponente/NapredakMisijaPartije.svelte';
   import NapredakCiljevaIzazova from '$lib/komponente/NapredakCiljevaIzazova.svelte';
   import TreningMeta from '$lib/komponente/TreningMeta.svelte';
+  import PocetnoOdbrojavanje from '$lib/komponente/PocetnoOdbrojavanje.svelte';
   import RezultatIzazova from '$lib/komponente/RezultatIzazova.svelte';
   import KaladontDnkPromjena from '$lib/komponente/KaladontDnkPromjena.svelte';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
@@ -922,8 +923,20 @@
   let sustavBrojacIntervalId: ReturnType<typeof setInterval> | null = null;
   let aplauzPobjedeZaPartijuId: string | null = null;
 
+  /** Početno 3-2-1 na stolu (privatna/trening/izazov, ili rani ulazak u javnu). */
+  const jePocetnoOdbrojavanje = $derived(
+    stanje.runda === 0
+      && !stanje.kraj
+      && stanje.statusSpremanja === 'nije_zavrsena'
+      && Boolean(stanje.pocetakPartijeIso ?? (stanje.sustavBiraRijec && stanje.istekIzboraIso)),
+  );
+  const rokPocetnogOdbrojavanja = $derived(
+    stanje.pocetakPartijeIso ?? stanje.istekIzboraIso ?? '',
+  );
+
   $effect(() => {
-    if (!stanje.sustavBiraRijec || !stanje.istekIzboraIso) {
+    // Međurundi „Nova runda za…” — ne početni overlay (zvuk/UI u PocetnoOdbrojavanje).
+    if (stanje.runda === 0 || !stanje.sustavBiraRijec || !stanje.istekIzboraIso) {
       if (sustavBrojacIntervalId !== null) {
         clearInterval(sustavBrojacIntervalId);
         sustavBrojacIntervalId = null;
@@ -1977,6 +1990,8 @@
           {/if}
           <p class="odbrojavanje-najava">Spremanje rezultata…</p>
         </div>
+      {:else if jePocetnoOdbrojavanje && rokPocetnogOdbrojavanja}
+        <PocetnoOdbrojavanje rokIso={rokPocetnogOdbrojavanja} />
       {:else if stanje.sustavBiraRijec}
         <div class="sustav-bira-inline" aria-live="polite">
           {#if stanje.ishodDokazaPoruka}

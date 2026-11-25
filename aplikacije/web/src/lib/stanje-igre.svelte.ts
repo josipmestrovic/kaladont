@@ -316,7 +316,12 @@ function primijeniStanjePartije(p: StanjePartije): void {
       ? (stanje.eliminacije.find((e) => e.igracId === prethodniDokaz.cekateljId)?.bodZa ?? null)
       : undefined;
   stanje.partijaId = p.partijaId;
-  stanje.pocetakPartijeIso = null;
+  // Ne briši početni rok preuranjenim snapshotom runde 0 — reconnect mora obnoviti odbrojavanje.
+  if (p.runda === 0 && p.istekIzboraIso) {
+    stanje.pocetakPartijeIso = p.istekIzboraIso;
+  } else if (p.runda > 0) {
+    stanje.pocetakPartijeIso = null;
+  }
   stanje.mojIgracId = p.mojIgracId;
   stanje.sjedala = p.sjedala;
   stanje.turnToken = p.turnToken ?? null;
@@ -501,6 +506,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.istekPotezaIso = null;
     stanje.serverVrijemeIso = new Date().toISOString();
     stanje.pocetakPartijeIso = p.pocetakIso;
+    stanje.runda = 0;
     stanje.trazenaSlova = null;
     stanje.brojIskoristenih = 0;
     stanje.eliminacije = [];
@@ -518,8 +524,10 @@ export function pokreniSlusateljeIgre(): void {
     if (timerKonfetaIskustva) clearTimeout(timerKonfetaIskustva);
     timerKonfetaIskustva = null;
     stanje.poruka = null;
-    stanje.sustavBiraRijec = false;
-    stanje.istekIzboraIso = null;
+    // Pre-start: blokiraj unos; UI razlikuje početni overlay od međurundi preko runda === 0.
+    stanje.sustavBiraRijec = true;
+    stanje.istekIzboraIso = p.pocetakIso;
+    stanje.faza = 'sustav_bira';
     stanje.zadnjaRijec = null;
     stanje.zadnjaRijecIgracId = null;
     stanje.zadnjaRijecVrsta = null;
@@ -529,7 +537,6 @@ export function pokreniSlusateljeIgre(): void {
     ocistiDokazHold();
     if (timerIshodDokaza) clearTimeout(timerIshodDokaza);
     timerIshodDokaza = null;
-    stanje.faza = 'obican_potez';
     stanje.dokaz = null;
     stanje.ishodDokazaPoruka = null;
     stanje.kontekst = p.kontekst ?? (p.jePrivatna ? 'privatna' : 'javna');
@@ -794,6 +801,8 @@ export function pokreniSlusateljeIgre(): void {
       pustiAudio('promjena-reda');
     }
     stanje.sustavBiraRijec = false;
+    stanje.pocetakPartijeIso = null;
+    stanje.istekIzboraIso = null;
     stanje.turnToken = p.turnToken ?? null;
     stanje.naPotezuId = p.naPotezuId;
     stanje.trazenaSlova = p.trazenaSlova;
