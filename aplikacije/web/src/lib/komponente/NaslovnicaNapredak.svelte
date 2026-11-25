@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { odaberiIstaknutaDostignuca } from 'zajednicko';
   import {
     gostImaXp,
     izracunajPrikazXp,
@@ -8,25 +7,12 @@
   import { stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import Avatar from './Avatar.svelte';
-  import DostignucaIstaknuta from './DostignucaIstaknuta.svelte';
-
-  type DostignuceNaslovnice = {
-    id: string;
-    naziv: string;
-    opis: string;
-    kategorija: 'napredak' | 'rijeci' | 'vjestina' | 'kaladont' | 'igra';
-    pragovi: readonly number[];
-    razina: number;
-    vrijednost: number;
-    sljedeciPrag: number | null;
-  };
+  import NaslovnicaObavijesti from './NaslovnicaObavijesti.svelte';
 
   let {
     izazoviZavrseno = 0,
-    dostignuca = [],
   }: {
     izazoviZavrseno?: number;
-    dostignuca?: readonly DostignuceNaslovnice[];
   } = $props();
 
   const prikaz = $derived(izracunajPrikazXp(stanjeProfila.profil, stanjeProfila.status));
@@ -50,14 +36,14 @@
     }),
   );
   const linkNaProfil = $derived(stanjeProfila.status === 'spreman' && !jeGostProfil);
-  const istaknutaZaPrikaz = $derived(odaberiIstaknutaDostignuca(dostignuca, 6));
-  const prikaziIstaknuta = $derived(linkNaProfil && istaknutaZaPrikaz.length > 0);
+  /** Desktop raspored za registrirane — neovisno o broju dostignuća. */
+  const prikaziRegistriranRaspored = $derived(linkNaProfil);
 </script>
 
 <div
   class="naslovnica-napredak-omotac"
   class:naslovnica-napredak-omotac--gost={prikaziGostCta}
-  class:naslovnica-napredak-omotac--registriran={prikaziIstaknuta}
+  class:naslovnica-napredak-omotac--registriran={prikaziRegistriranRaspored}
 >
   {#if linkNaProfil}
     <a
@@ -79,11 +65,8 @@
     </div>
   {/if}
 
-  {#if prikaziIstaknuta}
-    <div class="naslovnica-istaknuta">
-      <p class="naslovnica-istaknuta__naslov">Istaknuta dostignuća</p>
-      <DostignucaIstaknuta dostignuca={dostignuca} limit={6} kompaktno />
-    </div>
+  {#if prikaziRegistriranRaspored}
+    <NaslovnicaObavijesti />
   {/if}
 
   {#if prikaziGostCta}
@@ -419,10 +402,6 @@
     border-radius: 4px;
   }
 
-  .naslovnica-istaknuta {
-    display: none;
-  }
-
   @media (min-width: 1000px) {
     .naslovnica-napredak-omotac {
       align-items: stretch;
@@ -497,28 +476,6 @@
       height: 52px !important;
     }
 
-    .naslovnica-istaknuta {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 6px;
-      flex: 0 1 auto;
-      margin-left: auto;
-      min-width: 0;
-    }
-
-    .naslovnica-istaknuta__naslov {
-      margin: 0;
-      color: color-mix(in srgb, var(--boja-tekst-sekundarni) 90%, transparent);
-      font-family: var(--font-tijelo);
-      font-size: 12px;
-      font-weight: 600;
-      line-height: 1.2;
-      letter-spacing: 0.01em;
-      text-align: right;
-      white-space: nowrap;
-    }
-
     .naslovnica-gost-cta {
       flex: 0 0 auto;
       margin-left: auto;
@@ -526,10 +483,6 @@
   }
 
   @media (max-width: 999px) {
-    .naslovnica-istaknuta {
-      display: none !important;
-    }
-
     .naslovnica-napredak-omotac--gost {
       flex-direction: column;
       flex-wrap: nowrap;

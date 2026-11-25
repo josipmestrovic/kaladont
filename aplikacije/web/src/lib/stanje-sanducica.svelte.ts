@@ -14,6 +14,8 @@ let zaNajavu = $state<SanducicPorukaSazetak[]>([]);
 let toastPoruka = $state<string | null>(null);
 let toastIds = $state<string[]>([]);
 let toastAkcijaFokus = $state(false);
+/** Monotono raste nakon uspješnog sažetka / čišćenja — signal za lokalne liste. */
+let revizija = $state(0);
 let ucitavanje: Promise<void> | null = null;
 let trebaPonovnoUcitati = false;
 let pokrenuto = false;
@@ -36,6 +38,9 @@ export function dohvatiStanjeSanducica() {
     },
     get toastIds() {
       return toastIds;
+    },
+    get revizija() {
+      return revizija;
     },
   };
 }
@@ -70,6 +75,7 @@ function ocistiLokalno(): void {
   zaNajavu = [];
   lokalnoNajavljeno.clear();
   trebaPonovnoUcitati = false;
+  revizija += 1;
   zatvoriToast(false, true);
 }
 
@@ -170,6 +176,7 @@ export async function osvjeziSazetakSanducica(): Promise<void> {
         );
         brojNeprocitanih = odgovor.brojNeprocitanih;
         zaNajavu = odgovor.zaNajavu.filter((p) => !lokalnoNajavljeno.has(p.id));
+        revizija += 1;
       } catch {
         // Sandučic nije kritičan za igru.
       }
