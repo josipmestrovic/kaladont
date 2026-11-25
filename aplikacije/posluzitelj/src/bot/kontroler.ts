@@ -11,6 +11,7 @@ import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js'
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import type { KonfiguracijaBota } from './konfiguracija-bota.js';
 import {
+  BOT_POTEZ_BEZ_ROKA_MS,
   odaberiPotezNastavivo,
   odgodaBezRokaMs,
   PredmemorijaLegalnosti,
@@ -300,17 +301,21 @@ export class BotKontroler {
 
     // Računanje tijekom prozora razmišljanja (ne sinkrono ovdje) — Socket.IO može flushati prije CPU-a.
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
+    const imaAktivnogCovjeka = dogadaj.sudionici.some((s) => s.upravljac === 'covjek' && s.aktivan);
     const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rngPrezentacije, dogadaj.kontekst, {
       punoTrajanjeMs: dogadaj.trajanjePotezaMs,
       protekloMs: Math.max(0, this.sada() - dogadaj.pocetakPotezaMs),
     });
+    // Javna bot-only završnica: i uz aktivan timer ubrzaj na ~200 ms (gledatelji ne čekaju normalni tempo).
     const odgoda = rok === null
       ? odgodaBezRokaMs(izracunataOdgoda, {
         kontekst: dogadaj.kontekst,
-        imaAktivnogCovjeka: dogadaj.sudionici.some((s) => s.upravljac === 'covjek' && s.aktivan),
+        imaAktivnogCovjeka,
         okruzenje: this.okruzenje,
       })
-      : izracunataOdgoda;
+      : dogadaj.kontekst === 'javna' && !imaAktivnogCovjeka
+        ? Math.min(izracunataOdgoda, BOT_POTEZ_BEZ_ROKA_MS)
+        : izracunataOdgoda;
     const turnToken = dogadaj.turnToken;
     const generacija = ++this.generacijaPosla;
     const snimkaGrupa: ReadonlySet<string> = new Set(dogadaj.iskoristeneGrupe);
