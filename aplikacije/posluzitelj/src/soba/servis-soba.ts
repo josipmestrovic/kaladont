@@ -620,7 +620,12 @@ export function registrirajPrivatneSobe(
         soba.partijaId = null;
         zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
         emitirajStanje(soba);
-        // Motor je već emitirao UPIS_PARTIJE_NEUSPJEO; ne rethrowaj da wrapper ne pošalje INTERNA.
+        // Motor je već emitirao UPIS_PARTIJE_NEUSPJEO prije throwa; ponovi nakon stanja
+        // da soba:stanje ne pregazi soft poruku u lobbyju. Ne rethrowaj (inače INTERNA).
+        io.to(SOBA_PREFIX(soba.kod)).emit('greska', {
+          kod: 'UPIS_PARTIJE_NEUSPJEO',
+          poruka: 'Igru nije moguće pokrenuti zbog pogreške pri spremanju. Pokušaj ponovno.',
+        });
         return;
       }
       if (!partijaId) {

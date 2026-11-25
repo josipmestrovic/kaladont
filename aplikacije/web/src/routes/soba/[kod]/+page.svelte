@@ -54,9 +54,14 @@
     const socket = dohvatiSocket();
 
     const naStanjeSobe = (novoStanje: StanjePrivatneSobe) => {
+      const bioUTijeku = stanjeSobe?.status === 'u_tijeku';
       stanjeSobe = novoStanje;
       greska = null;
-      obavijest = null;
+      // Soft grešku (npr. UPIS_PARTIJE_NEUSPJEO) ne briši kad se lobby vraća u čekanje
+      // nakon neuspjelog starta — emitirajStanje inače pregazi poruku.
+      if (novoStanje.status === 'u_tijeku' || !bioUTijeku) {
+        obavijest = null;
+      }
     };
 
     const naGresku = (p: { kod?: string; poruka: string }) => {
