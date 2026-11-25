@@ -2,7 +2,9 @@ import path from 'node:path';
 import { config } from 'dotenv';
 import { defineConfig } from 'drizzle-kit';
 
-config({ path: path.resolve(process.cwd(), '../../.env') });
+if (process.env.KALADONT_PRESKOCI_DOTENV !== '1') {
+  config({ path: path.resolve(process.cwd(), '../../.env') });
+}
 
 if (!process.env.BAZA_URL) {
   throw new Error('BAZA_URL nije postavljen (vidi .env.primjer)');

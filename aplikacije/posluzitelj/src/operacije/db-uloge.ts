@@ -3,7 +3,10 @@ import { config as ucitajDotenv } from 'dotenv';
 import postgres from 'postgres';
 
 // Isto kao konfiguracija.ts — lokalni CLI (migracije / osiguraj-db-uloge) čita root .env.
-ucitajDotenv({ path: path.resolve(process.cwd(), '../../.env') });
+// Lokalni CI: KALADONT_PRESKOCI_DOTENV=1 sprječava nasljeđivanje BAZA_URL_MIGRACIJE iz .env.
+if (process.env.KALADONT_PRESKOCI_DOTENV !== '1') {
+  ucitajDotenv({ path: path.resolve(process.cwd(), '../../.env') });
+}
 
 export const APP_ULOGA = 'kaladont_app';
 

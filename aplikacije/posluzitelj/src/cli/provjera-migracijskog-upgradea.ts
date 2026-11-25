@@ -5,7 +5,9 @@ import { config as ucitajDotenv } from 'dotenv';
 import postgres from 'postgres';
 
 // Isto kao migracije / konfiguracija — lokalni CLI čita root .env.
-ucitajDotenv({ path: path.resolve(process.cwd(), '../../.env') });
+if (process.env.KALADONT_PRESKOCI_DOTENV !== '1') {
+  ucitajDotenv({ path: path.resolve(process.cwd(), '../../.env') });
+}
 
 const argumenti = new Map(
   process.argv.slice(2).map((argument) => {

@@ -63,7 +63,7 @@ GitHub Actions je završna neovisna provjera, a ne primarni debug alat. Lokalni 
 ### Prijelaz u review
 
 - Kad je cijeli odobreni opseg gotov, pokreni puni lokalni profil i postojeće dodatne testove prema riziku. Izvijesti korisnika o rezultatu i preostalim ograničenjima. Ako predlažeš nove testove ili izmjene izvan plana, navedi razlog, pros/cons i preporuku; ne implementiraj ih bez odobrenja.
-- Pushaj konačno stanje dok je PR još draft. Tek nakon korisnikova odobrenja za review označi ga Ready for review; provjeri da su se puni GitHub CI i Bugbot za posljednji SHA stvarno pokrenuli i dovršili. Ne radi prazne commitove za pokretanje reviewa. Ako se Bugbot ne pokrene, provjeri konfiguraciju i po potrebi zatraži od korisnika ručni review.
+- Pushaj konačno stanje, zatim **odmah označi PR Ready for review** na tom zadnjem SHA-u kako bi se pokrenuli puni GitHub CI i Bugbot. Ne čekaj dodatno odobrenje samo za Ready ako je odobreni opseg dovršen i lokalni profil prošao. Provjeri da su se puni GitHub CI i Bugbot za posljednji SHA stvarno pokrenuli i dovršili. Ne radi prazne commitove za pokretanje reviewa. Ako se Bugbot ne pokrene, provjeri konfiguraciju i po potrebi zatraži od korisnika ručni review. Merge i objava i dalje zahtijevaju eksplicitno odobrenje.
 
 ### Review: popravci u turama (chunkovima)
 

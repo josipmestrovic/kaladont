@@ -3,7 +3,10 @@ import { isIP } from 'node:net';
 import { config as ucitajDotenv } from 'dotenv';
 import { z } from 'zod';
 
-ucitajDotenv({ path: path.resolve(process.cwd(), '../../.env') });
+// Lokalni CI postavlja KALADONT_PRESKOCI_DOTENV=1 da root .env ne vrati razvojne URL-ove/tajne.
+if (process.env.KALADONT_PRESKOCI_DOTENV !== '1') {
+  ucitajDotenv({ path: path.resolve(process.cwd(), '../../.env') });
+}
 
 const shemaKonfiguracije = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
