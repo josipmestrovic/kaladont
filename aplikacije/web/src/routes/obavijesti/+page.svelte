@@ -4,6 +4,7 @@
   import { api } from '$lib/api.js';
   import { relativnoVrijemeObavijesti } from '$lib/naslovnica-obavijesti.js';
   import {
+    dohvatiStanjeSanducica,
     obrisiSavSanducic,
     oznaciSanducicProcitane,
     oznaciSavSanducicProcitanim,
@@ -31,6 +32,7 @@
   let sljedeciCursor = $state<string | null>(null);
   let ucitavanje = $state(true);
   let greska = $state<string | null>(null);
+  let greskaAkcije = $state<string | null>(null);
   let brisanje = $state(false);
   let oznacavanjeSve = $state(false);
   let oznacavanjeIds = $state<Set<string>>(new Set());
@@ -39,13 +41,18 @@
   let ciljanaNedostupna = $state(false);
   let zahtjevGen = 0;
 
+  const stanjeSanducica = dohvatiStanjeSanducica();
+
   const prikazanePoruke = $derived.by(() => {
     if (!ciljanaPoruka) return poruke;
     if (poruke.some((p) => p.id === ciljanaPoruka!.id)) return poruke;
     return [ciljanaPoruka, ...poruke];
   });
 
-  const imaNeprocitanih = $derived(prikazanePoruke.some((p) => !p.procitano));
+  /** Globalni brojač — ne samo učitana stranica. */
+  const imaNeprocitanih = $derived(
+    stanjeSanducica.brojNeprocitanih > 0 || prikazanePoruke.some((p) => !p.procitano),
+  );
 
   function formatirajVrijeme(iso: string): string {
     try {
@@ -137,6 +144,7 @@
   async function oznaciJednu(id: string): Promise<void> {
     if (oznacavanjeIds.has(id)) return;
     oznacavanjeIds = new Set([...oznacavanjeIds, id]);
+    greskaAkcije = null;
     try {
       await oznaciSanducicProcitane([id]);
       poruke = poruke.map((p) => (p.id === id ? { ...p, procitano: true } : p));
@@ -146,7 +154,7 @@
         if (ciljanaPoruka?.id === id) ciljanaPoruka = null;
       }
     } catch {
-      greska = 'Ne mogu označiti obavijest pročitanom.';
+      greskaAkcije = 'Ne mogu označiti obavijest pročitanom.';
     } finally {
       const sljedeci = new Set(oznacavanjeIds);
       sljedeci.delete(id);
@@ -157,6 +165,7 @@
   async function oznaciSve(): Promise<void> {
     if (oznacavanjeSve || !imaNeprocitanih) return;
     oznacavanjeSve = true;
+    greskaAkcije = null;
     const granica = new Date();
     try {
       await oznaciSavSanducicProcitanim(granica);
@@ -175,7 +184,7 @@
         }
       }
     } catch {
-      greska = 'Ne mogu označiti sve obavijesti pročitanima.';
+      greskaAkcije = 'Ne mogu označiti sve obavijesti pročitanima.';
     } finally {
       oznacavanjeSve = false;
     }
@@ -185,6 +194,7 @@
     if (prikazanePoruke.length === 0 || brisanje) return;
     if (!confirm('Želiš li obrisati sve obavijesti?')) return;
     brisanje = true;
+    greskaAkcije = null;
     try {
       await obrisiSavSanducic();
       poruke = [];
@@ -194,7 +204,7 @@
       istaknutiId = null;
       await osvjeziSazetakSanducica();
     } catch {
-      greska = 'Ne mogu obrisati obavijesti.';
+      greskaAkcije = 'Ne mogu obrisati obavijesti.';
     } finally {
       brisanje = false;
     }
@@ -288,6 +298,10 @@
 
   {#if ciljanaNedostupna}
     <p class="stanje upozorenje" role="status">Obavijest više nije dostupna.</p>
+  {/if}
+
+  {#if greskaAkcije}
+    <p class="stanje upozorenje" role="alert">{greskaAkcije}</p>
   {/if}
 
   {#if greska}

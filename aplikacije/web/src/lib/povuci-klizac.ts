@@ -174,12 +174,16 @@ export function povuciListanjeOkomito(element: HTMLElement, opcije: OpcijeListan
     aktivanId = dogadaj.pointerId;
     pocetniX = dogadaj.clientX;
     pocetniY = dogadaj.clientY;
+    element.setPointerCapture(dogadaj.pointerId);
   };
 
   const zavrsi = (dogadaj: PointerEvent) => {
     if (!pracenje || aktivanId !== dogadaj.pointerId) return;
     pracenje = false;
     aktivanId = null;
+    if (element.hasPointerCapture(dogadaj.pointerId)) {
+      element.releasePointerCapture(dogadaj.pointerId);
+    }
     const dx = dogadaj.clientX - pocetniX;
     const dy = dogadaj.clientY - pocetniY;
     const prag = trenutne.prag ?? 40;
@@ -194,6 +198,9 @@ export function povuciListanjeOkomito(element: HTMLElement, opcije: OpcijeListan
     if (aktivanId !== dogadaj.pointerId) return;
     pracenje = false;
     aktivanId = null;
+    if (element.hasPointerCapture(dogadaj.pointerId)) {
+      element.releasePointerCapture(dogadaj.pointerId);
+    }
   };
 
   const naKlik = (dogadaj: MouseEvent) => {
@@ -206,6 +213,7 @@ export function povuciListanjeOkomito(element: HTMLElement, opcije: OpcijeListan
   element.addEventListener('pointerdown', naPritisak);
   element.addEventListener('pointerup', zavrsi);
   element.addEventListener('pointercancel', otkazi);
+  element.addEventListener('lostpointercapture', otkazi);
   element.addEventListener('click', naKlik, true);
 
   return {
@@ -216,6 +224,7 @@ export function povuciListanjeOkomito(element: HTMLElement, opcije: OpcijeListan
       element.removeEventListener('pointerdown', naPritisak);
       element.removeEventListener('pointerup', zavrsi);
       element.removeEventListener('pointercancel', otkazi);
+      element.removeEventListener('lostpointercapture', otkazi);
       element.removeEventListener('click', naKlik, true);
     },
   };

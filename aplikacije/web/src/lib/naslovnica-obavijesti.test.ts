@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ikonaZaTipObavijesti,
   indeksNakonUklanjanja,
   kratkiBrojNovih,
   relativnoVrijemeObavijesti,
@@ -39,10 +38,8 @@ describe('naslovnica-obavijesti', () => {
     expect(indeksNakonUklanjanja(1, 3)).toBe(1);
   });
 
-  it('tekstPozicijePagera i ikone', () => {
+  it('tekstPozicijePagera', () => {
     expect(tekstPozicijePagera(0, 3, false)).toBe('1 / 3');
     expect(tekstPozicijePagera(0, 20, true)).toBe('1 / 20+');
-    expect(ikonaZaTipObavijesti('nova_zvjezdica')).toContain('zvjezdica');
-    expect(ikonaZaTipObavijesti('dobrodoslica')).toContain('mailbox');
   });
 });

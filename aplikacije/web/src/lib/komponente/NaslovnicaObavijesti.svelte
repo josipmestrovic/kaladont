@@ -3,7 +3,6 @@
   import type { SanducicPorukaDetalj } from 'zajednicko';
   import { api } from '$lib/api.js';
   import {
-    ikonaZaTipObavijesti,
     indeksNakonUklanjanja,
     relativnoVrijemeObavijesti,
     tekstPozicijePagera,
@@ -57,12 +56,16 @@
   }
 
   async function dohvatiListu(reset: boolean): Promise<void> {
+    // Generaciju povećaj tek kad stvarno kreće zahtjev — inače early return
+    // invalidira in-flight page fetch i zaključa strelice.
+    if (!reset) {
+      if (!sljedeciCursor || ucitavanjeStranice) return;
+    }
     const gen = ++zahtjevGen;
     if (reset) {
       ucitavanje = true;
       greska = null;
     } else {
-      if (!sljedeciCursor || ucitavanjeStranice) return;
       ucitavanjeStranice = true;
     }
 
@@ -230,14 +233,6 @@
       </div>
     {:else if !aktivna}
       <div class="prazno" data-testid="naslovnica-obavijesti-prazno">
-        <img
-          class="ikona"
-          src="/ikone/81-mailbox.webp"
-          alt=""
-          aria-hidden="true"
-          width="28"
-          height="28"
-        />
         <div class="prazno-tekst">
           <p class="prazno-naslov">Nema novih.</p>
           <a class="vidi-sve" href="/obavijesti">Vidi sve ›</a>
@@ -253,14 +248,6 @@
         onkeydown={naTipku}
       >
         <div class="sadrzaj">
-          <img
-            class="ikona"
-            src={ikonaZaTipObavijesti(aktivna.tip)}
-            alt=""
-            aria-hidden="true"
-            width="28"
-            height="28"
-          />
           <div class="tekst">
             <div class="naslovni-red">
               <span class="tockica" aria-hidden="true"></span>
@@ -318,13 +305,17 @@
   .naslovnica-obavijesti {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     justify-content: center;
     gap: 6px;
-    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
-    min-height: 72px;
-    padding-left: 16px;
+    min-height: 88px;
+    box-sizing: border-box;
+    padding-left: 20px;
     border-left: 1px solid color-mix(in srgb, #fff 16%, transparent);
+    text-align: left;
     touch-action: pan-y;
   }
 
@@ -337,24 +328,30 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 8px;
+    width: 100%;
     min-width: 0;
+    text-align: left;
   }
 
   .naslov {
     margin: 0;
+    min-width: 0;
+    overflow: hidden;
     color: color-mix(in srgb, var(--boja-tekst-sekundarni) 92%, transparent);
     font-family: var(--font-tijelo);
-    font-size: 12px;
+    font-size: 16px;
     font-weight: 600;
     line-height: 1.2;
     letter-spacing: 0.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .pozicija {
     flex: 0 0 auto;
     color: color-mix(in srgb, var(--boja-tekst-sekundarni) 80%, transparent);
     font-family: var(--font-tijelo);
-    font-size: 11px;
+    font-size: 16px;
     font-weight: 600;
     line-height: 1.2;
   }
@@ -363,6 +360,7 @@
     display: flex;
     align-items: stretch;
     gap: 8px;
+    width: 100%;
     min-width: 0;
     outline: none;
   }
@@ -379,30 +377,28 @@
     gap: 10px;
     min-width: 0;
     flex: 1 1 auto;
-  }
-
-  .ikona {
-    flex: 0 0 auto;
-    margin-top: 2px;
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    opacity: 0.95;
+    overflow: hidden;
   }
 
   .tekst {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 2px;
     min-width: 0;
     flex: 1 1 auto;
+    overflow: hidden;
+    text-align: left;
   }
 
   .naslovni-red {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 6px;
+    width: 100%;
     min-width: 0;
+    max-width: 100%;
   }
 
   .tockica {
@@ -414,11 +410,12 @@
   }
 
   .naslov-poruke {
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     color: var(--boja-tekst-osnovni);
     font-family: var(--font-tijelo);
-    font-size: 14px;
+    font-size: 18px;
     font-weight: 700;
     line-height: 1.25;
     text-decoration: none;
@@ -438,32 +435,47 @@
 
   .opis {
     margin: 0;
-    display: -webkit-box;
+    width: 100%;
     overflow: hidden;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 500;
     line-height: 1.3;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .meta {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
+    justify-content: flex-start;
     gap: 4px 6px;
     margin-top: 2px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
     color: color-mix(in srgb, var(--boja-tekst-sekundarni) 88%, transparent);
     font-family: var(--font-tijelo);
-    font-size: 11px;
+    font-size: 16px;
     font-weight: 500;
     line-height: 1.2;
+    text-align: left;
+  }
+
+  .meta time {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .oznaci {
+    flex: 0 0 auto;
     margin: 0;
     padding: 0;
     border: 0;
@@ -474,6 +486,7 @@
     font-weight: 700;
     text-decoration: underline;
     text-underline-offset: 2px;
+    white-space: nowrap;
   }
 
   .oznaci:disabled {
@@ -534,35 +547,50 @@
   .stanje,
   .prazno-naslov {
     margin: 0;
+    overflow: hidden;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 500;
     line-height: 1.3;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .prazno {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 10px;
+    width: 100%;
     min-width: 0;
+    text-align: left;
   }
 
   .prazno-tekst {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: 2px;
     min-width: 0;
+    overflow: hidden;
+    text-align: left;
   }
 
   .vidi-sve {
     width: fit-content;
+    max-width: 100%;
+    overflow: hidden;
     color: var(--boja-akcent-tekst, var(--boja-zuta-krema));
     font-family: var(--font-tijelo);
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.3;
+    text-align: left;
     text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .vidi-sve:hover {

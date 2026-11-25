@@ -66,7 +66,9 @@
   {/if}
 
   {#if prikaziRegistriranRaspored}
-    <NaslovnicaObavijesti />
+    <div class="naslovnica-obavijesti-slot">
+      <NaslovnicaObavijesti />
+    </div>
   {/if}
 
   {#if prikaziGostCta}
@@ -256,7 +258,8 @@
     flex: 1 1 auto;
     color: var(--boja-tekst-osnovni);
     font-family: var(--font-naslov);
-    font-size: 16px;
+    /* Mobitel: ime 20, ostalo 16 / min 14. Desktop override ispod. */
+    font-size: 20px;
     font-weight: 700;
     line-height: 1.2;
     overflow: hidden;
@@ -275,7 +278,7 @@
     flex: 0 0 auto;
     color: var(--boja-zuta-krema);
     font-family: var(--font-naslov);
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.2;
   }
@@ -284,9 +287,12 @@
     margin: 0;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 500;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .naslovnica-napredak__traka {
@@ -312,11 +318,15 @@
 
   .naslovnica-napredak__xp {
     margin: 0;
-    align-self: flex-end;
+    align-self: flex-start;
     font-family: var(--font-tijelo);
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1.2;
-    text-align: right;
+    text-align: left;
+  }
+
+  .naslovnica-obavijesti-slot {
+    display: none;
   }
 
   .naslovnica-gost-cta {
@@ -424,15 +434,26 @@
       flex-direction: row;
       flex-wrap: nowrap;
       align-items: center;
-      justify-content: space-between;
-      gap: 16px 28px;
+      justify-content: flex-start;
+      gap: 0;
     }
 
-    .naslovnica-napredak {
-      width: auto;
-      max-width: none;
+    .naslovnica-napredak-omotac--registriran .naslovnica-napredak {
+      flex: 0 0 30%;
+      width: 30%;
+      max-width: 30%;
+      box-sizing: border-box;
+      padding-right: 16px;
       justify-content: flex-start;
-      flex: 0 1 380px;
+    }
+
+    .naslovnica-obavijesti-slot {
+      display: block;
+      flex: 0 0 70%;
+      width: 70%;
+      max-width: 70%;
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .naslovnica-napredak-omotac--gost .naslovnica-napredak {
@@ -442,25 +463,25 @@
     }
 
     .naslovnica-napredak__nadimak {
-      font-size: 17px;
+      font-size: 22px;
     }
 
     .naslovnica-napredak__lvl {
-      font-size: 13px;
+      font-size: 18px;
     }
 
     .naslovnica-napredak__rang {
-      font-size: 14px;
+      font-size: 18px;
     }
 
     .naslovnica-napredak__xp {
-      font-size: 12px;
+      font-size: 16px;
     }
 
     .naslovnica-napredak__sadrzaj {
       min-width: 0;
       width: 100%;
-      max-width: 360px;
+      max-width: none;
     }
 
     .naslovnica-napredak__traka {

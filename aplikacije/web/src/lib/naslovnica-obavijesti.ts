@@ -45,18 +45,6 @@ export function relativnoVrijemeObavijesti(iso: string, sada = new Date()): stri
   }
 }
 
-export function ikonaZaTipObavijesti(tip: string): string {
-  if (
-    tip === 'nova_zvjezdica'
-    || tip === 'nova_xp_razina'
-    || tip === 'nova_kolekcionarska_razina'
-    || tip === 'promjena_ranga'
-  ) {
-    return '/ikone/26-zvjezdica-prazna.png';
-  }
-  return '/ikone/81-mailbox.webp';
-}
-
 /** Indeks nakon uklanjanja stavke; zadržava najbližu postojeću poziciju. */
 export function indeksNakonUklanjanja(trenutni: number, ukupnoPrije: number): number {
   if (ukupnoPrije <= 1) return 0;
