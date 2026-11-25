@@ -4,9 +4,14 @@
   interface Props {
     forma: FormaPodaci & { trenutniNiz: number; najboljiNiz: number; razinaVatre: RazinaVatre; sljedeciBonusPostotak: number };
     mod: import('zajednicko').ModPartije;
+    sakrijNajboljiNiz?: boolean;
   }
 
-  let { forma, mod }: Props = $props();
+  let {
+    forma,
+    mod,
+    sakrijNajboljiNiz = false,
+  }: Props = $props();
 
   function formatirajDatum(datum: string): string {
     return new Date(datum).toLocaleDateString('hr-HR', { day: 'numeric', month: 'numeric', year: 'numeric' });
@@ -45,8 +50,10 @@
   {/if}
 
   <div class="forma-statistike">
-    <span>Niz pobjeda: <strong>{forma.trenutniNiz}</strong></span>
-    <span>Najbolji niz: <strong>{forma.najboljiNiz}</strong></span>
+    <span>Trenutni niz pobjeda: <strong>{forma.trenutniNiz}</strong></span>
+    {#if !sakrijNajboljiNiz}
+      <span>Najbolji niz: <strong>{forma.najboljiNiz}</strong></span>
+    {/if}
     {#if forma.trenutniNiz > 0}
       <span>Sljedeća pobjeda: <strong>+{forma.sljedeciBonusPostotak}% XP</strong></span>
     {/if}

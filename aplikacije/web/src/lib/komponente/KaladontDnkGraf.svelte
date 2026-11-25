@@ -78,7 +78,14 @@
       <div class="zakljucani-graf" aria-hidden="true">✦</div>
       <div>
         <strong>DNK se tek oblikuje</strong>
-        <p>Odigraj još {profil.preostaloDoOtkljucavanja} javnih igara da otključaš svoj profil igre.</p>
+        <p>Otključava se nakon 10 javnih igara.</p>
+        <p class="dnk-napredak-tekst">{profil.odigrano} / 10</p>
+        <div class="dnk-traka-otkljucavanje" aria-label={`Napredak: ${profil.odigrano} od 10 javnih igara`}>
+          <span style={`width: ${Math.min(100, (profil.odigrano / 10) * 100)}%`}></span>
+        </div>
+        {#if profil.preostaloDoOtkljucavanja > 0}
+          <p>Još {profil.preostaloDoOtkljucavanja} {profil.preostaloDoOtkljucavanja === 1 ? 'igra' : 'igara'} do otključavanja.</p>
+        {/if}
       </div>
     </div>
   {/if}
@@ -246,6 +253,27 @@
     margin: 4px 0 0;
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mali);
+  }
+
+  .dnk-napredak-tekst {
+    margin-top: 8px !important;
+    font-weight: 700;
+    color: var(--boja-tekst-osnovni) !important;
+  }
+
+  .dnk-traka-otkljucavanje {
+    width: min(220px, 100%);
+    height: 8px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--boja-obrub);
+  }
+
+  .dnk-traka-otkljucavanje span {
+    display: block;
+    height: 100%;
+    background: var(--boja-isticanje-slova);
   }
 
   .dnk-pomoc {

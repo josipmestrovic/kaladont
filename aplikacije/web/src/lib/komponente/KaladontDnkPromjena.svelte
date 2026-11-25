@@ -51,7 +51,7 @@
     {/if}
   </div>
   {#if upravoOtkljucan}
-    <p class="dnk-poruka"><strong>🎉 ČESTITAMO, OTKLJUČAO SI KALADONT DNK <a href="/profil#opcenito">NA SVOM PROFILU</a>! 🎊</strong></p>
+    <p class="dnk-poruka"><strong>🎉 ČESTITAMO, OTKLJUČAO SI KALADONT DNK <a href="/profil#pregled">NA SVOM PROFILU</a>! 🎊</strong></p>
   {:else if otkljucan}
     <p class="dnk-poruka">Ukupno odigrano: <strong>{odigrano}</strong></p>
   {:else}

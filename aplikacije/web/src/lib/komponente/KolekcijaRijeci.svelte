@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { BookOpen, CheckCircle2, ChevronRight } from 'lucide-svelte';
   import { api } from '$lib/api.js';
 
   interface Kolekcija {
@@ -9,9 +10,16 @@
     kategorije: { vrsta: string; otkljucano: number; ukupno: number }[];
   }
 
+  interface NedavnaRijec {
+    rijec: string;
+    vrsta: string;
+    otkljucano: string;
+  }
+
   interface Props { igracId?: string; igracNaziv?: string; javni?: boolean; }
   let { igracId = '', igracNaziv = '', javni = false }: Props = $props();
   let kolekcija = $state<Kolekcija | null>(null);
+  let nedavno = $state<NedavnaRijec[]>([]);
   let kategorija = $state<string | null>(null);
   let rijeci = $state<string[]>([]);
   let cursor = $state<string | null>(null);
@@ -25,6 +33,7 @@
     imenica: 'Imenice', glagol: 'Glagoli', pridjev_prilog: 'Pridjevi i prilozi',
     vlastita_imena: 'Vlastita imena', zamjenica: 'Zamjenice', broj: 'Brojevi',
     prijedlog: 'Prijedlozi', veznik: 'Veznici', cestica: 'Čestice', uzvik: 'Usklici',
+    pridjev: 'Pridjev', prilog: 'Prilog', vlastito_ime: 'Vlastito ime',
   };
   const naziviZaNaslov: Record<string, string> = {
     imenica: 'imenica', glagol: 'glagola', pridjev_prilog: 'pridjeva i priloga',
@@ -38,11 +47,21 @@
 
   const putanja = $derived(javni ? `/profil/javni/${igracId}/kolekcija` : '/profil/kolekcija');
   const putanjaRijeci = $derived(javni ? `/profil/javni/${igracId}/kolekcija/rijeci` : '/profil/kolekcija/rijeci');
+  const putanjaNedavno = $derived(javni ? `/profil/javni/${igracId}/kolekcija/nedavno` : '/profil/kolekcija/nedavno');
 
   async function ucitaj() {
-    try { kolekcija = await api<Kolekcija>(putanja); }
-    catch (e) { greska = e instanceof Error ? e.message : 'Kolekciju nije moguće učitati.'; }
-    finally { ucitavanjeKolekcije = false; }
+    try {
+      const [sazetak, nedavne] = await Promise.all([
+        api<Kolekcija>(putanja),
+        api<{ rijeci: NedavnaRijec[] }>(putanjaNedavno).catch(() => ({ rijeci: [] as NedavnaRijec[] })),
+      ]);
+      kolekcija = sazetak;
+      nedavno = nedavne.rijeci ?? [];
+    } catch (e) {
+      greska = e instanceof Error ? e.message : 'Kolekciju nije moguće učitati.';
+    } finally {
+      ucitavanjeKolekcije = false;
+    }
   }
 
   async function ucitajRijeci() {
@@ -91,38 +110,65 @@
     <div class="razina">
       <div class="razina-sazetak">
         <div class="razina-sljedeca">
-          <span>Trenutna razina</span>
+          <span>Kolekcijska razina</span>
           <strong>{kolekcija.kolekcionarskaRazina.naziv}</strong>
         </div>
         <div class="ukupno-otkljucano">
+          <b>{kolekcija.ukupnoOtkljucano.toLocaleString('hr-HR')} / {kolekcija.ukupnoDostupno.toLocaleString('hr-HR')} riječi</b>
           <span>Ukupno otključanih riječi</span>
-          <b>{kolekcija.ukupnoOtkljucano} / {kolekcija.ukupnoDostupno}</b>
         </div>
       </div>
       {#if kolekcija.kolekcionarskaRazina.sljedeciPrag !== null}
         <div class="napredak-kolekcije">
-          <small>
-            Nakon dodavanja {kolekcija.kolekcionarskaRazina.doSljedece} riječi u kolekciju, otključat ćeš kolekcijsku razinu {kolekcija.kolekcionarskaRazina.sljedeciNaziv}.
-          </small>
-          <span class="brojac-napretka">{kolekcija.ukupnoOtkljucano} / {kolekcija.kolekcionarskaRazina.sljedeciPrag} riječi</span>
+          <div class="napredak-zaglavlje">
+            <small>Sljedeća razina: {kolekcija.kolekcionarskaRazina.sljedeciNaziv}</small>
+            <span class="brojac-napretka">{kolekcija.ukupnoOtkljucano} / {kolekcija.kolekcionarskaRazina.sljedeciPrag}</span>
+          </div>
           <div class="traka-kolekcije" aria-label={`${kolekcija.ukupnoOtkljucano} od ${kolekcija.kolekcionarskaRazina.sljedeciPrag} riječi`}>
             <span style={`width: ${Math.min(100, kolekcija.ukupnoOtkljucano / kolekcija.kolekcionarskaRazina.sljedeciPrag * 100)}%`}></span>
           </div>
+          <small>Još {kolekcija.kolekcionarskaRazina.doSljedece} novih riječi do sljedeće razine.</small>
         </div>
       {:else}
         <small>Najviša razina dosegnuta</small>
       {/if}
     </div>
 
+    <div class="kategorije-zaglavlje">
+      <h3>Tvoja zbirka</h3>
+      <span>{kolekcija.kategorije.length} kategorija</span>
+    </div>
     <div class="kategorije">
       {#each kolekcija.kategorije as stavka}
-        <button type="button" onclick={() => otvoriKategoriju(stavka.vrsta)}>
-          <span>{nazivi[stavka.vrsta] ?? stavka.vrsta}</span>
-          <strong>{stavka.otkljucano} / {stavka.ukupno}</strong>
-          <span class="tercijarni-gumb">Vidi kolekciju</span>
+        <button type="button" onclick={() => otvoriKategoriju(stavka.vrsta)} aria-label={`${nazivi[stavka.vrsta] ?? stavka.vrsta}, ${stavka.otkljucano} od ${stavka.ukupno}`}>
+          <span class="kat-glavno">
+            <span>{nazivi[stavka.vrsta] ?? stavka.vrsta}</span>
+            <strong>{stavka.otkljucano.toLocaleString('hr-HR')} / {stavka.ukupno.toLocaleString('hr-HR')}</strong>
+          </span>
+          <ChevronRight size={18} aria-hidden="true" />
         </button>
       {/each}
     </div>
+
+    <section class="nedavno" aria-labelledby="nedavno-naslov">
+      <h3 id="nedavno-naslov">Nedavno otključano</h3>
+      {#if nedavno.length === 0}
+        <p class="prazno">Još nema otključanih riječi.</p>
+      {:else}
+        <ul>
+          {#each nedavno as stavka}
+            <li>
+              <span class="ikona" aria-hidden="true"><BookOpen size={16} /></span>
+              <span class="tekst">
+                <strong>{stavka.rijec}</strong>
+                <small>{nazivi[stavka.vrsta] ?? stavka.vrsta}</small>
+              </span>
+              <span class="ok" aria-hidden="true"><CheckCircle2 size={16} /></span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
   {:else if ucitavanjeKolekcije}
     <div class="kolekcija-kostur" role="status" aria-label="Učitavanje kolekcije" aria-busy="true">
       <div class="kolekcija-kostur-sažetak">
@@ -130,9 +176,6 @@
         <div class="kolekcija-kostur-polje"></div>
       </div>
       <div class="kolekcija-kostur-kategorije">
-        <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
-        <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
-        <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
         <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
         <div class="kolekcija-kostur-polje"></div><div class="kolekcija-kostur-polje"></div>
       </div>
@@ -176,14 +219,47 @@
   .razina b { font-size: 1.2rem; }
   .razina small { color: var(--boja-tekst-sekundarni); }
   .napredak-kolekcije { display: grid; gap: 5px; }
+  .napredak-zaglavlje { display: flex; justify-content: space-between; gap: 12px; }
   .brojac-napretka { color: var(--boja-tekst-sekundarni); font-size: .9rem; font-weight: 700; }
   .traka-kolekcije { width: 100%; height: 8px; overflow: hidden; border-radius: 999px; background: var(--boja-obrub); }
   .traka-kolekcije span { display: block; height: 100%; border-radius: inherit; background: var(--boja-isticanje-slova); transition: width .25s ease; }
-  .kategorije { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
-  .kategorije button { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--boja-obrub); border-radius: 8px; background: var(--boja-povrsina); color: var(--boja-tekst-osnovni); text-align: left; cursor: pointer; font: inherit; }
+  .kategorije-zaglavlje { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 8px; }
+  .kategorije-zaglavlje h3 { margin: 0; font-family: var(--font-naslov); font-size: 1.2rem; }
+  .kategorije-zaglavlje span { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-sitni); }
+  .kategorije { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .kategorije button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 8px;
+    background: var(--boja-povrsina);
+    color: var(--boja-tekst-osnovni);
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+  }
+  .kat-glavno { display: grid; gap: 5px; min-width: 0; }
   .kategorije strong { color: var(--boja-isticanje-tekst); }
-  .tercijarni-gumb { width: fit-content; margin-top: 3px; color: var(--boja-isticanje-tekst); font-size: .82rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-  .kategorije button:hover .tercijarni-gumb, .kategorije button:focus-visible .tercijarni-gumb { color: var(--boja-tekst-osnovni); }
+  .nedavno { margin-top: 22px; display: grid; gap: 10px; }
+  .nedavno h3 { margin: 0; font-family: var(--font-naslov); font-size: 1.2rem; }
+  .nedavno ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .nedavno li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 8px;
+    background: var(--boja-povrsina-2);
+  }
+  .nedavno .ikona, .nedavno .ok { color: var(--boja-isticanje-tekst); display: inline-flex; }
+  .nedavno .tekst { display: grid; gap: 2px; min-width: 0; }
+  .nedavno small { color: var(--boja-tekst-sekundarni); }
+  .prazno { margin: 0; color: var(--boja-tekst-sekundarni); }
   .modal-pozadina { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: var(--boja-zastor); }
   .modal { position: relative; width: min(620px, 100%); max-height: min(680px, calc(100vh - 40px)); overflow: auto; padding: 24px; border: 0; border-radius: 10px; background: var(--boja-povrsina); box-shadow: var(--sjena-modal); }
   .zatvori { position: absolute; top: 12px; right: 14px; border: 0; background: transparent; color: var(--boja-tekst-osnovni); font-size: 1.8rem; line-height: 1; cursor: pointer; }
@@ -198,5 +274,8 @@
   @media (max-width: 999px) {
     .razina-sazetak { align-items: start; flex-direction: column; gap: 12px; }
     .kolekcija-kostur-sažetak { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) {
+    .kategorije { grid-template-columns: 1fr; }
   }
 </style>
