@@ -1169,12 +1169,12 @@
       if (!jeAktualnaPartija()) return;
       neZnamDijalog = false;
       // Sustav bira nije potvrda naredbe — sync/token rješavaju zahtjev.
-      kontrolerSlanja.obavijestiPromjenuReda(partijaId, stanje.turnToken);
+      if (partijaId) kontrolerSlanja.obavijestiPromjenuReda(partijaId, stanje.turnToken);
     };
 
     const naRunduOtvorenu = (runda: RundaOtvorena) => {
       if (!jeAktualnaPartija()) return;
-      kontrolerSlanja.obavijestiPromjenuReda(partijaId, runda.turnToken);
+      if (partijaId) kontrolerSlanja.obavijestiPromjenuReda(partijaId, runda.turnToken);
       prethodnaRijecStola = null;
       prikazanaRijec = {
         id: -Date.now(),

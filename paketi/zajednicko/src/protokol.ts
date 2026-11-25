@@ -626,14 +626,14 @@ export interface DogadajiKlijentPoslužitelj {
   'partija:izadji': () => void;
   'partija:stanje': (
     payload?: { partijaId?: string; requestId?: string },
-    potvrda?: (odgovor: {
-      snimka: StanjePartije | null;
-      potvrdaNaredbe?: PotvrdaNaredbePoteza;
-      razlog?: string;
-    }) => void,
+    /** Klasični ACK ili socket.timeout `(err, odgovor)` — labavo zbog Socket.IO timeout overloada. */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    potvrda?: (...args: any[]) => void,
   ) => void;
-  'potez:rijec': (payload: PayloadPotezRijec, potvrda?: (p: PotvrdaNaredbePoteza) => void) => void;
-  'potez:ne-znam': (payload?: PayloadNeznam, potvrda?: (p: PotvrdaNaredbePoteza) => void) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  'potez:rijec': (payload: PayloadPotezRijec, potvrda?: (...args: any[]) => void) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  'potez:ne-znam': (payload?: PayloadNeznam, potvrda?: (...args: any[]) => void) => void;
   'reakcija:posalji': (payload: PayloadReakcijaPosalji) => void;
   'igrac:avatar-azuriraj': (payload: PayloadAvatarAzuriraj) => void;
   'soba:stvori': (payload: PayloadStvoriSobu) => void;
