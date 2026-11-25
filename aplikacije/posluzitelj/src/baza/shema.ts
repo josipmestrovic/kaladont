@@ -240,6 +240,14 @@ export const dnkStatistikeIgraca = pgTable(
   (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.mod] })],
 );
 
+/** Trajni osobni rekordi (svi modovi + privatne sobe). */
+export const osobniRekordiIgraca = pgTable('osobni_rekordi_igraca', {
+  igracId: uuid('igrac_id').primaryKey().references(() => igraci.id, { onDelete: 'cascade' }),
+  najduzaRijec: text('najduza_rijec'),
+  najduzaRijecGrafemi: integer('najduza_rijec_grafemi').notNull().default(0),
+  najbrziPrihvaceniPotezMs: integer('najbrzi_prihvaceni_potez_ms'),
+});
+
 export const otkljucaneGrupeIgraca = pgTable(
   'otkljucane_grupe_igraca',
   {
@@ -249,7 +257,10 @@ export const otkljucaneGrupeIgraca = pgTable(
     zaDostignuca: boolean('za_dostignuca').notNull().default(true),
     otkljucano: timestamp('otkljucano', { withTimezone: true }).notNull().defaultNow(),
   },
-  (tablica) => [primaryKey({ columns: [tablica.igracId, tablica.grupa] })],
+  (tablica) => [
+    primaryKey({ columns: [tablica.igracId, tablica.grupa] }),
+    index('idx_otkljucane_grupe_igraca_nedavno').on(tablica.igracId, tablica.otkljucano),
+  ],
 );
 
 export const otkljucaneRijeciIgraca = pgTable(

@@ -8,7 +8,7 @@ import { izracunajNovaDostignuca, izracunajObracunIskustva, izracunajOcjenuIgre,
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
-import { botovi, dostignucaIgraca, dnkStatistikeIgraca, eliminacijePoRijeci, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeModaIgraca, statistikeRijeciIgraca, sudioniciPartije, ucinakPosebneRijeci } from '../baza/shema.js';
+import { botovi, dostignucaIgraca, dnkStatistikeIgraca, eliminacijePoRijeci, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, osobniRekordiIgraca, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeModaIgraca, statistikeRijeciIgraca, sudioniciPartije, ucinakPosebneRijeci } from '../baza/shema.js';
 import type { VrstaMetePosebneRijeci } from './odluke-pravila.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { obradiNeobradeneTop10Dokaze, zabiljeziTop10NakonPromjene } from '../dostignuca/top10.js';
@@ -42,6 +42,34 @@ import {
   type DnkPodaciZajednicki,
 } from './izracun-dnk.js';
 import { upisiUniverzalniRangZaStol, type RangSudionikUlaz, type RangUpisRezultat } from './univerzalni-rang.js';
+
+async function upsertajOsobneRekorde(
+  tx: MisijeTx,
+  igracId: string,
+  statistika: Pick<ZapisStatistikeRijeci, 'najduzaRijec' | 'najduzaRijecGrafemi' | 'najbrziPrihvaceniPotezMs'>,
+): Promise<void> {
+  const najbrziMs = statistika.najbrziPrihvaceniPotezMs ?? null;
+  if (statistika.najduzaRijecGrafemi <= 0 && !(najbrziMs !== null && najbrziMs > 0)) return;
+  await tx.insert(osobniRekordiIgraca)
+    .values({
+      igracId,
+      najduzaRijec: statistika.najduzaRijecGrafemi > 0 ? statistika.najduzaRijec : null,
+      najduzaRijecGrafemi: Math.max(0, statistika.najduzaRijecGrafemi),
+      najbrziPrihvaceniPotezMs: najbrziMs !== null && najbrziMs > 0 ? najbrziMs : null,
+    })
+    .onConflictDoUpdate({
+      target: [osobniRekordiIgraca.igracId],
+      set: {
+        najduzaRijec: sql`case when excluded.najduza_rijec_grafemi > ${osobniRekordiIgraca.najduzaRijecGrafemi} then excluded.najduza_rijec else ${osobniRekordiIgraca.najduzaRijec} end`,
+        najduzaRijecGrafemi: sql`greatest(${osobniRekordiIgraca.najduzaRijecGrafemi}, excluded.najduza_rijec_grafemi)`,
+        najbrziPrihvaceniPotezMs: sql`case
+          when excluded.najbrzi_prihvaceni_potez_ms is null then ${osobniRekordiIgraca.najbrziPrihvaceniPotezMs}
+          when ${osobniRekordiIgraca.najbrziPrihvaceniPotezMs} is null then excluded.najbrzi_prihvaceni_potez_ms
+          else least(${osobniRekordiIgraca.najbrziPrihvaceniPotezMs}, excluded.najbrzi_prihvaceni_potez_ms)
+        end`,
+      },
+    });
+}
 
 async function brojKolekcijskihStavki(tx: MisijeTx, igracId: string): Promise<number> {
   const redovi = await tx
@@ -427,6 +455,7 @@ export async function upisiKolekcijuIDostignucaRijeci(ulaz: {
             },
           });
       }
+      if (statistika) await upsertajOsobneRekorde(tx, sudionik.igracId, statistika);
 
       const delta: DeltaNapretkaDostignuca = { ...(sudionik.napredak ?? {}) };
       delta.rijetkeLeksemskeGrupe = brojNovihRijetkihGrupa;
@@ -706,6 +735,8 @@ export interface ZapisStatistikeRijeci {
   razlicitiPoceci?: string[];
   najduzaRijec: string | null;
   najduzaRijecGrafemi: number;
+  /** Najkraće trajanje prihvaćenog poteza u ovoj partiji (ms); null ako nema. */
+  najbrziPrihvaceniPotezMs?: number | null;
   najrjedaRijec: string | null;
   najrjedaRijecFrekvencija: number | null;
   najrjedaTier: number | null;
@@ -1418,6 +1449,7 @@ export async function zakljuciPartijuUBazi(
               set: { jakoDuga: sql`otkljucane_rijeci_igraca.jako_duga or excluded.jako_duga`, jakoRijetka: sql`otkljucane_rijeci_igraca.jako_rijetka or excluded.jako_rijetka`, dugaTier: sql`coalesce(otkljucane_rijeci_igraca.duga_tier, excluded.duga_tier)`, rijetkaTier: sql`coalesce(otkljucane_rijeci_igraca.rijetka_tier, excluded.rijetka_tier)` },
             });
         }
+        await upsertajOsobneRekorde(tx, r.igracId, statistika);
         if (!samoStatistika) await tx
           .insert(statistikeRijeciIgraca)
           .values({

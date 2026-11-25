@@ -9,9 +9,11 @@ import {
   AKTUALNA_VERZIJA_UVJETA,
   DEFINICIJE_DOSTIGNUCA,
   validirajAvatarConfig,
+  izgradiAgregateLevela,
   izracunajRangIzAgregata,
   izracunajUniverzalniUcinak,
   izracunajRazinuDostignuca,
+  izracunajZvjezdiceIzazivaca,
   jeDostignuceNovo,
   jeDostignuceVidljivo,
   jePrihvacenaAktualnaVerzijaUvjeta,
@@ -33,6 +35,7 @@ import {
   igraci,
   napredakDostignucaIgraca,
   obracuniPartija,
+  osobniRekordiIgraca,
   otkljucaneGrupeIgraca,
   otkljucaneRijeciIgraca,
   partije,
@@ -43,6 +46,7 @@ import {
   statistikeRijeciIgraca,
   sudioniciPartije,
 } from '../baza/shema.js';
+import { dohvatiZavrseneChallengeIds } from '../izazovi/pohrana.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { porukaPotvrdeEmaila, pokusajPoslatiEmail } from '../email.js';
@@ -325,6 +329,77 @@ function javnaStatistika(statistika: Awaited<ReturnType<typeof dohvatiStatistiku
     najrjedaRijec: statistika.najrjedaRijec,
     najrjedaRijecFrekvencija: statistika.najrjedaRijecFrekvencija,
   };
+}
+
+async function dohvatiOsobneRekorde(igracId: string) {
+  const [redak] = await baza
+    .select()
+    .from(osobniRekordiIgraca)
+    .where(eq(osobniRekordiIgraca.igracId, igracId))
+    .limit(1);
+  return redak ?? null;
+}
+
+function sastaviOsobneRekordePayload(
+  rekordi: Awaited<ReturnType<typeof dohvatiOsobneRekorde>>,
+  najboljiNizPobjeda: number,
+  nizPrihvacenihRijeci: number,
+) {
+  return {
+    najboljiNizPobjeda,
+    nizPrihvacenihRijeci,
+    najduzaRijec: rekordi?.najduzaRijec ?? null,
+    najduzaRijecGrafemi: rekordi?.najduzaRijecGrafemi ?? 0,
+    najbrziPrihvaceniPotezMs: rekordi?.najbrziPrihvaceniPotezMs ?? null,
+  };
+}
+
+async function dohvatiNapredakIzazovaZaProfil(igracId: string) {
+  const zavrseni = await dohvatiZavrseneChallengeIds(igracId);
+  const leveli = izgradiAgregateLevela(zavrseni);
+  const zavrseniIzazovi = leveli.reduce((zbroj, L) => zbroj + L.zavrseno, 0);
+  const zvjezdice = izracunajZvjezdiceIzazivaca(zavrseni);
+  let trenutniLevel = 1;
+  let napredakDoSljedeceg: { zavrseno: number; ukupno: number } | null = null;
+  for (const L of leveli) {
+    if (L.status === 'zavrsen') {
+      trenutniLevel = L.level;
+      continue;
+    }
+    if (L.status === 'dostupan') {
+      trenutniLevel = L.level;
+      napredakDoSljedeceg = { zavrseno: L.zavrseno, ukupno: L.ukupno };
+      break;
+    }
+    break;
+  }
+  if (leveli.every((L) => L.status === 'zavrsen')) {
+    trenutniLevel = leveli.at(-1)?.level ?? 1;
+    napredakDoSljedeceg = null;
+  }
+  return { trenutniLevel, zavrseniIzazovi, zvjezdice, napredakDoSljedeceg };
+}
+
+async function dohvatiNedavnoOtkljucane(igracId: string, limit = 5) {
+  const redovi = await baza
+    .select({
+      grupa: otkljucaneGrupeIgraca.grupa,
+      otkljucano: otkljucaneGrupeIgraca.otkljucano,
+    })
+    .from(otkljucaneGrupeIgraca)
+    .where(eq(otkljucaneGrupeIgraca.igracId, igracId))
+    .orderBy(desc(otkljucaneGrupeIgraca.otkljucano), asc(otkljucaneGrupeIgraca.grupa))
+    .limit(limit);
+  return redovi.map((redak) => {
+    const kljuc = kolekcijskiKljucGrupe(redak.grupa);
+    const dijelovi = kljuc.split(':');
+    const vrsta = dijelovi[0] ?? 'ostalo';
+    return {
+      rijec: osnovnaRijecIzGrupe(kljuc),
+      vrsta,
+      otkljucano: redak.otkljucano.toISOString(),
+    };
+  });
 }
 
 function opisKolekcionarskeRazine(otkljucano: number, ukupno: number) {
@@ -626,16 +701,29 @@ export async function registrirajProfilRute(
   registrirajKolekcijaRijeciRutu('/profil/kolekcija/rijeci');
   registrirajKolekcijaRijeciRutu('/profil/javni/:igracId/kolekcija/rijeci');
 
+  app.get('/profil/kolekcija/nedavno', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev) => {
+    const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
+    return { ok: true, rijeci: await dohvatiNedavnoOtkljucane(igrac.id) };
+  });
+
+  app.get<{ Params: { igracId: string } }>('/profil/javni/:igracId/kolekcija/nedavno', async (zahtjev, odgovor) => {
+    const igrac = await dohvatiJavniProfil(zahtjev.params.igracId);
+    if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
+    return { ok: true, rijeci: await dohvatiNedavnoOtkljucane(igrac.id) };
+  });
+
   app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
     odgovor.header('Cache-Control', 'private, no-store');
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    const [statistikaCetiri, agregat, dostignuca, aktivnostDana] = await Promise.all([
+    const [statistikaCetiri, agregat, dostignuca, aktivnostDana, rekordi, napredakIzazova] = await Promise.all([
       dohvatiStatistiku(igrac.id, 'cetiri_igraca'),
       sastaviProfilDnkIFormate(igrac),
       dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
       igrac.vrsta === 'gost' || igrac.upravljac !== 'covjek'
         ? Promise.resolve(null)
         : dohvatiSažetakAktivnostiDana(igrac.id),
+      dohvatiOsobneRekorde(igrac.id),
+      dohvatiNapredakIzazovaZaProfil(igrac.id),
     ]);
     const rang = izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija);
     return {
@@ -687,6 +775,12 @@ export async function registrirajProfilRute(
       statistikaRijeci: javnaStatistika(statistikaCetiri),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
       dostignuca,
+      osobniRekordi: sastaviOsobneRekordePayload(
+        rekordi,
+        agregat.formati.tri_igraca.forma.najboljiNiz,
+        agregat.dnk.metrike.nizPrihvacenihRijeci,
+      ),
+      napredakIzazova,
       ...(aktivnostDana ? { aktivnostDana } : {}),
     };
   });
@@ -706,10 +800,12 @@ export async function registrirajProfilRute(
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
 
-    const [statistikaCetiri, agregat, dostignuca] = await Promise.all([
+    const [statistikaCetiri, agregat, dostignuca, rekordi, napredakIzazova] = await Promise.all([
       dohvatiStatistiku(igrac.id, 'cetiri_igraca'),
       sastaviProfilDnkIFormate(igrac),
       dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
+      dohvatiOsobneRekorde(igrac.id),
+      dohvatiNapredakIzazovaZaProfil(igrac.id),
     ]);
     const rang = izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija);
     const jeAdmin = (zahtjev as ZahtjevSIgracem).igrac?.vrsta === 'admin';
@@ -753,6 +849,12 @@ export async function registrirajProfilRute(
       statistikaRijeci: javnaStatistika(statistikaCetiri),
       ciljeviRijeci: rjecnik.ciljeviRijeci(),
       dostignuca,
+      osobniRekordi: sastaviOsobneRekordePayload(
+        rekordi,
+        agregat.formati.tri_igraca.forma.najboljiNiz,
+        agregat.dnk.metrike.nizPrihvacenihRijeci,
+      ),
+      napredakIzazova,
     };
   });
 

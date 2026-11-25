@@ -512,6 +512,13 @@
       "when": 1795080000000,
       "tag": "0072_eliminacije_po_rijeci",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1795090000000,
+      "tag": "0073_osobni_rekordi",
+      "breakpoints": true
     }
   ]
 }
