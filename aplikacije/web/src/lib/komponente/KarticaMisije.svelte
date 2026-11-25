@@ -1,12 +1,7 @@
 <script lang="ts">
   import type { MisijaDto } from 'zajednicko';
-  import { definicijaMisije } from 'zajednicko';
-  import { Check, Play, RefreshCw } from 'lucide-svelte';
-  import {
-    putanjaBrzeIgre,
-    putanjaZagrijavanja,
-    parsajPravilnikIzQuery,
-  } from '$lib/igraj-rute.js';
+  import { Check, RefreshCw } from 'lucide-svelte';
+  import { formatirajXp, oznakaVrsteMisije } from '$lib/misije-prikaz.js';
 
   let {
     misija,
@@ -19,35 +14,17 @@
   } = $props();
 
   const dovrsena = $derived(misija.status === 'dovrsena');
-  const postotak = $derived(misija.cilj <= 0 ? 100 : Math.min(100, (misija.napredak / misija.cilj) * 100));
-  const zamjenaDostupna = $derived(!dovrsena && misija.zamjena.dopustena && !zamjenaBlokirana);
-  const xpPrikaz = $derived(
-    dovrsena && misija.nagrada
-      ? `+${formatirajXp(misija.nagrada.xpStvarnoDodijeljeno)} XP`
-      : `${formatirajXp(misija.xpNagrada)} XP`,
+  const uTijeku = $derived(!dovrsena && misija.napredak > 0);
+  const postotak = $derived(
+    misija.cilj <= 0 ? 100 : Math.min(100, (misija.napredak / misija.cilj) * 100),
   );
-
-  function formatirajXp(n: number): string {
-    return n.toLocaleString('hr-HR');
-  }
-
-  function oznakaKonteksta(m: MisijaDto): string {
-    if (m.kontekst === 'trening') return 'Trening';
-    if (m.kontekst === 'izazov') return 'Izazovi';
-    // HINT: javne misije vode u Brzu igru (Troboj); badge ostaje po formatu misije.
-    if (m.mod === 'tri_igraca') return 'Brza igra';
-    if (m.mod === 'dva_igraca') return 'Dvoboj';
-    if (m.mod === 'cetiri_igraca') return 'Četveroboj';
-    return 'Brza igra';
-  }
-
-  function putanjaIgre(m: MisijaDto): string {
-    const definicija = definicijaMisije(m.predlozakId);
-    const pravila = parsajPravilnikIzQuery(definicija?.pravilnik ?? null);
-    if (m.kontekst === 'trening') return putanjaZagrijavanja(pravila);
-    if (m.kontekst === 'izazov') return '/izazovi';
-    return putanjaBrzeIgre();
-  }
+  const zamjenaDostupna = $derived(!dovrsena && misija.zamjena.dopustena && !zamjenaBlokirana);
+  const nagradaPotvrdjena = $derived(dovrsena && misija.nagrada !== null);
+  const xpIznos = $derived(
+    nagradaPotvrdjena
+      ? formatirajXp(misija.nagrada!.xpStvarnoDodijeljeno)
+      : formatirajXp(misija.xpNagrada),
+  );
 
   function tekstNapretka(m: MisijaDto): string {
     if (m.metrika === 'niz_max') return `Najdulji niz u jednoj igri: ${m.napredak} / ${m.cilj}`;
@@ -56,12 +33,17 @@
     if (m.metrika === 'razliciti_poceci') return `Različiti počeci riječi: ${m.napredak} / ${m.cilj}`;
     if (m.metrika === 'dani') return `Različiti dani s javnom igrom: ${m.napredak} / ${m.cilj}`;
     if (m.metrika === 'duge_i_rijetke') return `Takve riječi: ${m.napredak} / ${m.cilj}`;
-    if (m.metrika === 'pobjede' || m.metrika === 'trening_pobjede') return `Pobjede: ${m.napredak} / ${m.cilj}`;
+    if (m.metrika === 'pobjede' || m.metrika === 'trening_pobjede') {
+      return `Pobjede: ${m.napredak} / ${m.cilj}`;
+    }
     if (m.metrika === 'partije') return `Igre: ${m.napredak} / ${m.cilj}`;
-    if (m.metrika === 'rijeci' || m.metrika === 'rijeci_u_partiji_max') return `Riječi: ${m.napredak} / ${m.cilj}`;
-    // PR12 W22/W23: broj igara s događajem (max 1 doprinos po igri).
+    if (m.metrika === 'rijeci' || m.metrika === 'rijeci_u_partiji_max') {
+      return `Riječi: ${m.napredak} / ${m.cilj}`;
+    }
     if (m.metrika === 'partije_s_dokazom') return `Igre s uspješnim dokazom: ${m.napredak} / ${m.cilj}`;
-    if (m.metrika === 'kaladont_sljedeci') return `Igre s kaladontom na sljedećeg: ${m.napredak} / ${m.cilj}`;
+    if (m.metrika === 'kaladont_sljedeci') {
+      return `Igre s kaladontom na sljedećeg: ${m.napredak} / ${m.cilj}`;
+    }
     return `${m.napredak} / ${m.cilj}`;
   }
 </script>
@@ -69,23 +51,14 @@
 <article
   class="kartica-misije"
   class:dovrsena
+  class:u-tijeku={uTijeku}
   data-dodjela-id={misija.dodjelaId}
   data-slot={misija.slot}
   aria-label={`${misija.naziv}${dovrsena ? ', završeno' : ''}`}
 >
   <header class="zaglavlje">
-    <span class="oznaka">{oznakaKonteksta(misija)}</span>
+    <span class="oznaka">{oznakaVrsteMisije(misija.vrsta)}</span>
     <div class="akcije">
-      {#if !dovrsena}
-        <a
-          class="gumb-akcija"
-          href={putanjaIgre(misija)}
-          aria-label={`Odmah igraj: ${misija.naziv}`}
-          title="Odmah igraj"
-        >
-          <Play size={18} aria-hidden="true" />
-        </a>
-      {/if}
       {#if !dovrsena}
         <button
           type="button"
@@ -106,14 +79,15 @@
   <h3>{misija.naziv}</h3>
   <p class="opis">{misija.opis}</p>
 
-  {#if dovrsena}
-    <p class="status">Završeno</p>
-  {:else}
-    <p class="napredak-tekst">{tekstNapretka(misija)}</p>
-  {/if}
+  <div class="napredak-red">
+    <span>{dovrsena ? 'Završeno' : 'Napredak'}</span>
+    <span class="napredak-broj">{misija.napredak} / {misija.cilj}</span>
+  </div>
+  <p class="napredak-tekst sr-only">{tekstNapretka(misija)}</p>
 
   <div
     class="traka"
+    class:puna={dovrsena || postotak >= 100}
     role="progressbar"
     aria-valuemin={0}
     aria-valuemax={misija.cilj}
@@ -131,27 +105,31 @@
     </ul>
   {/if}
 
-  <p class="xp" class:dodijeljeno={dovrsena && misija.nagrada !== null}>
-    {#if dovrsena && misija.nagrada}
-      Dodijeljeno {xpPrikaz}
-    {:else}
-      {xpPrikaz}
+  <div class="nagrada-red">
+    <p class="xp">+{xpIznos} XP</p>
+    {#if nagradaPotvrdjena}
+      <p class="osvojeno">Osvojeno</p>
     {/if}
-  </p>
+  </div>
 </article>
 
 <style>
   .kartica-misije {
     display: grid;
-    gap: 8px;
+    gap: 10px;
     padding: 14px;
     border: 1px solid var(--boja-obrub);
     border-radius: 10px;
     background: var(--boja-povrsina-2);
     min-width: 0;
+    height: 100%;
+    align-content: start;
+  }
+  .kartica-misije.u-tijeku {
+    border-color: color-mix(in srgb, var(--boja-zuta-krema) 55%, var(--boja-obrub));
   }
   .kartica-misije.dovrsena {
-    opacity: 0.92;
+    border-color: color-mix(in srgb, var(--boja-mint) 45%, var(--boja-obrub));
   }
   .zaglavlje {
     display: flex;
@@ -164,6 +142,7 @@
     color: var(--boja-tekst-sekundarni);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    font-weight: 700;
   }
   .akcije {
     display: flex;
@@ -180,7 +159,6 @@
     background: var(--boja-povrsina);
     color: var(--boja-tekst);
     cursor: pointer;
-    text-decoration: none;
   }
   .gumb-akcija:hover:not(:disabled) {
     border-color: var(--boja-isticanje-tekst);
@@ -196,7 +174,7 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    color: var(--boja-isticanje-tekst);
+    color: var(--boja-mint);
   }
   h3 {
     margin: 0;
@@ -204,25 +182,42 @@
     color: var(--boja-tekst);
   }
   .opis,
-  .napredak-tekst,
-  .status {
+  .napredak-tekst {
     margin: 0;
     color: var(--boja-tekst-sekundarni);
   }
-  .status {
-    color: var(--boja-isticanje-tekst);
-    font-weight: 700;
+  .napredak-red {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: 0.95rem;
+  }
+  .napredak-broj {
+    font-variant-numeric: tabular-nums;
+    color: var(--boja-tekst);
+    font-weight: 600;
   }
   .traka {
     height: 8px;
     overflow: hidden;
     border-radius: 4px;
-    background: var(--boja-krem);
+    background: color-mix(in srgb, var(--boja-obrub) 55%, transparent);
   }
   .traka span {
     display: block;
     height: 100%;
-    background: var(--boja-isticanje-tekst);
+    width: 0;
+    background: var(--boja-zuta-krema);
+    transition: width 0.35s ease;
+  }
+  .traka.puna span {
+    background: var(--boja-mint);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .traka span {
+      transition: none;
+    }
   }
   .podciljevi {
     margin: 0;
@@ -233,9 +228,32 @@
     color: var(--boja-tekst-sekundarni);
     font-size: 0.95rem;
   }
+  .nagrada-red {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: auto;
+  }
   .xp {
     margin: 0;
     font-weight: 700;
     color: var(--boja-isticanje-tekst);
+  }
+  .osvojeno {
+    margin: 0;
+    font-weight: 700;
+    color: var(--boja-mint);
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 </style>
