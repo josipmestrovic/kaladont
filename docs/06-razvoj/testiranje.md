@@ -22,6 +22,39 @@ Pravila igre su srce proizvoda — greška u validaciji ili bodovanju izravno kr
 | Integracijski | Vitest + socket.io-client | Engine partije kroz stvarne socket poruke                    |
 | E2E           | Playwright                | Kritični browser tokovi: auth, red, partija, soba, reconnect |
 
+## Lokalni CI (Windows, bez Dockera)
+
+Automatizirane lokalne provjere **ne** smiju dirati `kaladont_dev` ni `pnpm dev` (portovi 3000/5173). Koriste privremene baze, portove 3001/5174 i sintetički `ci-fixture`. Trajne upute za agente: [AGENTS.md](../../AGENTS.md).
+
+### Jednokratna priprema
+
+1. PostgreSQL 16 mora raditi lokalno.
+2. Stvori ulogu (psql / pgAdmin, kao superuser):
+
+```sql
+CREATE ROLE kaladont_ci_local WITH LOGIN PASSWORD '<lozinka>' CREATEDB;
+```
+
+3. Kopiraj [`.env.ci-local.primjer`](../../.env.ci-local.primjer) u `.env.ci-local` (gitignored) i postavi `KALADONT_CI_DB_URL` na maintenance bazu `postgres` na `127.0.0.1`.
+4. Preglednici: `pnpm test:e2e:install` (Chromium + WebKit).
+
+Prioritet URL-a: env `KALADONT_CI_DB_URL` > `.env.ci-local` > jasna greška. Skripte ne čitaju root `.env` za DB u lokalnom CI-ju (`KALADONT_PRESKOCI_DOTENV=1`).
+
+### Profili
+
+| Naredba | Namjena |
+| --- | --- |
+| `pnpm ci:brzi` | shared build, lint, web check, server build — bez DB/browsera |
+| `pnpm ci:test -- <filter>` | ciljani Vitest poslužitelja na izoliranoj bazi (filter obavezan) |
+| `pnpm ci:e2e -- [args]` | Playwright; bez args = puni suite (3 projekta) |
+| `pnpm ci:lokalni` | puni aplikacijski lokalni CI prije Ready for review |
+| `pnpm ci:puni` | `ci:lokalni` + upgrade migracija, audit, shell testovi, actionlint; Docker ostaje GitHub |
+| `pnpm ci:lokalni -- --provjera` | samo preduvjeti, bez mutacija |
+
+Izvještaji: `test-results/lokalni-ci/<runid>/`. Lock sprječava paralelne runove. Ako cleanup padne, obriši samo baze `kaladont_ci_local_*` koje je taj run stvorio.
+
+Obični `pnpm test` / `pnpm test:e2e` i dalje postoje za ručni razvoj; agent za automatizirane provjere koristi `ci:*`.
+
 ## Trenutačno i ciljano stanje
 
 Playwright E2E testovi žive u `e2e/` i pokreću se odvojeno od brzog Vitest ciklusa:

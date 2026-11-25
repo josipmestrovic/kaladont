@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 
 permissions:
   contents: read
@@ -22,9 +23,20 @@ jobs:
   putanje:
     name: Detekcija putanja
     runs-on: ubuntu-24.04
+    # Draft PR: i dalje računamo docs_only (jeftino); skupi jobovi se ne pale.
     outputs:
       docs_only: ${{ steps.detekcija.outputs.docs_only }}
+      je_draft: ${{ steps.draft.outputs.je_draft }}
     steps:
+      - name: Draft status
+        id: draft
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.draft }}" == "true" ]]; then
+            echo "je_draft=true" >> "$GITHUB_OUTPUT"
+            echo "PR je draft — skupi CI jobovi se ne izvršavaju."
+          else
+            echo "je_draft=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Preuzeti repozitorij
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -79,7 +91,7 @@ jobs:
   kod:
     name: Kod — lint, test, check, build
     needs: putanje
-    if: ${{ needs.putanje.outputs.docs_only != 'true' }}
+    if: ${{ needs.putanje.outputs.docs_only != 'true' && needs.putanje.outputs.je_draft != 'true' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -199,7 +211,7 @@ jobs:
   e2e:
     name: E2E — shard ${{ matrix.shard }}/2
     needs: putanje
-    if: ${{ needs.putanje.outputs.docs_only != 'true' }}
+    if: ${{ needs.putanje.outputs.docs_only != 'true' && needs.putanje.outputs.je_draft != 'true' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -300,8 +312,8 @@ jobs:
   e2e-izvjestaj:
     name: E2E — spojeni izvještaj
     needs: [putanje, e2e]
-    # Docs-only: ne spajati nepostojeće blobove (inače crveni docs PR).
-    if: ${{ always() && needs.putanje.result == 'success' && needs.putanje.outputs.docs_only != 'true' }}
+    # Docs-only / draft: ne spajati nepostojeće blobove.
+    if: ${{ always() && needs.putanje.result == 'success' && needs.putanje.outputs.docs_only != 'true' && needs.putanje.outputs.je_draft != 'true' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -389,7 +401,7 @@ jobs:
   slika:
     name: Slika — build, sken, smoke
     needs: putanje
-    if: ${{ needs.putanje.outputs.docs_only != 'true' }}
+    if: ${{ needs.putanje.outputs.docs_only != 'true' && needs.putanje.outputs.je_draft != 'true' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -741,6 +753,7 @@ jobs:
         run: |
           set -euo pipefail
           docs_only='${{ needs.putanje.outputs.docs_only }}'
+          je_draft='${{ needs.putanje.outputs.je_draft }}'
           putanje='${{ needs.putanje.result }}'
           kod='${{ needs.kod.result }}'
           e2e='${{ needs.e2e.result }}'
@@ -748,7 +761,7 @@ jobs:
           slika='${{ needs.slika.result }}'
           {
             echo '## CI agregator'
-            echo "- putanje: \`$putanje\` (docs_only=\`$docs_only\`)"
+            echo "- putanje: \`$putanje\` (docs_only=\`$docs_only\`, je_draft=\`$je_draft\`)"
             echo "- kod: \`$kod\`"
             echo "- e2e: \`$e2e\`"
             echo "- e2e-izvjestaj: \`$e2e_izvjestaj\`"
@@ -756,6 +769,10 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           if [[ "$putanje" != "success" ]]; then
             echo "Detekcija putanja nije uspjela."
+            exit 1
+          fi
+          if [[ "$je_draft" == "true" ]]; then
+            echo "DRAFT — čeka Ready for review. Puni CI nije proveden; required check namjerno nije zelen."
             exit 1
           fi
           if [[ "$docs_only" == "true" ]]; then

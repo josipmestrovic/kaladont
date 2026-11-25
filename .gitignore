@@ -2,10 +2,15 @@ node_modules/
 dist/
 build/
 .env
+.env.ci-local
 .svelte-kit/
 coverage/
 test-results/
 playwright-report/
+blob-report/
+playwright-report-e2e/
+playwright-report-http/
+playwright-report-image/
 
 # hrLex je CC BY-SA - izvedeni podaci se ne commitaju (ADR-010)
 skripte/uvoz-rjecnika/podaci/

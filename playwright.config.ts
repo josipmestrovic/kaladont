@@ -1,5 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const bazaUrlIzEnv = process.env.BAZA_URL?.trim();
+if (process.env.KALADONT_LOKALNI_CI === '1') {
+  if (!bazaUrlIzEnv) {
+    throw new Error('KALADONT_LOKALNI_CI=1 zahtijeva eksplicitni BAZA_URL (bez kaladont_dev fallbacka).');
+  }
+  if (/\/kaladont_dev(?:\?|$)/.test(bazaUrlIzEnv) || bazaUrlIzEnv.endsWith('/kaladont_dev')) {
+    throw new Error('Lokalni CI ne smije koristiti kaladont_dev.');
+  }
+}
+const bazaUrlZaWebServer =
+  bazaUrlIzEnv ?? 'postgresql://kaladont:kaladont@localhost:5432/kaladont_dev';
+
 export default defineConfig({
   testDir: './e2e',
   testIgnore: ['http-rute.spec.ts', 'image-smoke.spec.ts'],
@@ -9,6 +21,7 @@ export default defineConfig({
   expect: { timeout: 5_000 },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
+  // failOnFlakyTests: lokalni puni suite šalje --fail-on-flaky-tests putem ci:lokalni/ci:puni; GitHub shardovi bez te zastavice.
   // CI shardovi: blob (spaja e2e-izvjestaj job). Lokalno: list.
   // ONEMOGUCI_TIMER_POTEZA ostaje true u webServer envu — namjerno za glavni E2E.
   reporter: process.env.CI
@@ -61,7 +74,9 @@ export default defineConfig({
       env: {
         NODE_ENV: 'test',
         PORT: '3001',
-        BAZA_URL: process.env.BAZA_URL ?? 'postgresql://kaladont:kaladont@localhost:5432/kaladont_dev',
+        BAZA_URL: bazaUrlZaWebServer,
+        BAZA_URL_MIGRACIJE: process.env.BAZA_URL_MIGRACIJE?.trim() || bazaUrlZaWebServer,
+        KALADONT_PRESKOCI_DOTENV: process.env.KALADONT_PRESKOCI_DOTENV ?? '',
         ODGODA_POCETKA_PARTIJE_MS: '0',
         ONEMOGUCI_TIMER_POTEZA: 'true',
         TOLERANCIJA_PREKIDA_MS: '10000',
