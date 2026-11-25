@@ -66,36 +66,39 @@ function generirajKodSobe(): string {
 
 const SOBA_PREFIX = (kod: string) => `soba:${kod.toUpperCase()}`;
 const TRAJANJE_NEAKTIVNE_SOBE_MS = 15 * 60_000;
+/** Grace za privremeni prekid veze u privatnoj čekaonici (#141). */
+export const GRACE_PREKID_PRIVATNE_CEKAONICE_MS = 300_000;
+
+type ClanSobeInterni = {
+  igracId: string;
+  vrsta: 'gost' | 'registriran' | 'admin';
+  nadimak: string;
+  avatarId: number;
+  avatarConfig: AvatarConfigV1 | null;
+  avatarRevision: number;
+  rang: string | null;
+  odigrane: number;
+  pobjede: number;
+  bodoviUkupno: number;
+  odigrane1v1?: number;
+  pobjede1v1?: number;
+  bodovi1v1?: number;
+  /** PR09 univerzalni rang. */
+  rangBrojPartija?: number;
+  rangSumaJedinica?: number;
+  iskustvoUkupno?: number;
+  privremenoOdspojen?: boolean;
+};
 
 export interface Soba {
   kod: string;
   vlasnikId: string;
   postavke: PostavkePrivatneSobe;
-  clanoviMap: Map<
-    string,
-    {
-      igracId: string;
-      vrsta: 'gost' | 'registriran' | 'admin';
-      nadimak: string;
-      avatarId: number;
-      avatarConfig: AvatarConfigV1 | null;
-      avatarRevision: number;
-      rang: string | null;
-      odigrane: number;
-      pobjede: number;
-      bodoviUkupno: number;
-      odigrane1v1?: number;
-      pobjede1v1?: number;
-      bodovi1v1?: number;
-      /** PR09 univerzalni rang. */
-      rangBrojPartija?: number;
-      rangSumaJedinica?: number;
-      iskustvoUkupno?: number;
-    }
-  >;
+  clanoviMap: Map<string, ClanSobeInterni>;
   partijaId: string | null;
   status: 'cekanje' | 'u_tijeku' | 'zavrsena';
   brisanjeTimer: NodeJS.Timeout | null;
+  graceTimeri: Map<string, NodeJS.Timeout>;
   pobjedeUSeriji: Map<string, number>;
   bodoviUSeriji: Map<string, number>;
   obradenePartije: Set<string>;
@@ -164,9 +167,12 @@ export function registrirajPrivatneSobe(
     razlogBlokadeIgre: (socket: KaladontSocket) => Promise<{ kod: 'EMAIL_NIJE_POTVRDEN'; poruka: string } | null>;
     ukloniIzJavnogReda: (igracId: string) => void;
     dopustiVlastitaImena?: boolean;
+    /** Override grace perioda (samo testovi). */
+    gracePrekidCekaoniceMs?: number;
   },
 ) {
   const dopustiVlastitaImena = opcije.dopustiVlastitaImena !== false;
+  const gracePrekidMs = opcije.gracePrekidCekaoniceMs ?? GRACE_PREKID_PRIVATNE_CEKAONICE_MS;
   const sobe = new Map<string, Soba>(); // kod -> Soba
   const sobaPoIgracu = new Map<string, string>(); // igracId -> kod
 
@@ -177,10 +183,23 @@ export function registrirajPrivatneSobe(
     }
   }
 
+  function ponistiGracePrekid(soba: Soba, igracId: string) {
+    const timer = soba.graceTimeri.get(igracId);
+    if (!timer) return;
+    clearTimeout(timer);
+    soba.graceTimeri.delete(igracId);
+  }
+
+  function ponistiSveGraceTimere(soba: Soba) {
+    for (const timer of soba.graceTimeri.values()) clearTimeout(timer);
+    soba.graceTimeri.clear();
+  }
+
   function zakaziBrisanjeSobe(soba: Soba, odgodaMs = 300_000) {
     ponistiBrisanjeSobe(soba);
     soba.brisanjeTimer = setTimeout(() => {
       soba.brisanjeTimer = null;
+      ponistiSveGraceTimere(soba);
       for (const [igracId, kod] of sobaPoIgracu.entries()) {
         if (kod === soba.kod) sobaPoIgracu.delete(igracId);
       }
@@ -191,6 +210,7 @@ export function registrirajPrivatneSobe(
 
   function zatvoriSobuZbogVlasnika(soba: Soba): void {
     ponistiBrisanjeSobe(soba);
+    ponistiSveGraceTimere(soba);
     const sobaSocketi = io.sockets.adapter.rooms.get(SOBA_PREFIX(soba.kod));
     if (sobaSocketi) {
       for (const socketId of sobaSocketi) {
@@ -203,6 +223,35 @@ export function registrirajPrivatneSobe(
       if (sobaPoIgracu.get(igracId) === soba.kod) sobaPoIgracu.delete(igracId);
     }
     sobe.delete(soba.kod);
+  }
+
+  function zavrsiGracePrekid(soba: Soba, igracId: string) {
+    if (!sobe.has(soba.kod) || !soba.clanoviMap.has(igracId)) return;
+
+    if (soba.vlasnikId === igracId) {
+      zatvoriSobuZbogVlasnika(soba);
+      return;
+    }
+
+    soba.clanoviMap.delete(igracId);
+    if (sobaPoIgracu.get(igracId) === soba.kod) sobaPoIgracu.delete(igracId);
+
+    if (soba.clanoviMap.size === 0) {
+      zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
+    } else {
+      zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
+      emitirajStanje(soba);
+    }
+  }
+
+  function zakaziGracePrekid(soba: Soba, igracId: string) {
+    ponistiGracePrekid(soba, igracId);
+    const timer = setTimeout(() => {
+      soba.graceTimeri.delete(igracId);
+      zavrsiGracePrekid(soba, igracId);
+    }, gracePrekidMs);
+    timer.unref();
+    soba.graceTimeri.set(igracId, timer);
   }
 
   function izradiStanje(soba: Soba, mojIgracId: string): StanjePrivatneSobe {
@@ -220,12 +269,13 @@ export function registrirajPrivatneSobe(
         rang: rang === 'Piskaralo' ? null : rang,
         razina: stanjeIskustva(c.iskustvoUkupno ?? 0).razina,
         jeVlasnik: c.igracId === soba.vlasnikId,
-          pobjedeUSobi: soba.pobjedeUSeriji.get(c.igracId) ?? 0,
-          bodoviUSobi: soba.bodoviUSeriji.get(c.igracId) ?? 0,
+        pobjedeUSobi: soba.pobjedeUSeriji.get(c.igracId) ?? 0,
+        bodoviUSobi: soba.bodoviUSeriji.get(c.igracId) ?? 0,
+        ...(c.privremenoOdspojen ? { privremenoOdspojen: true as const } : {}),
       };
     });
 
-       clanovi.sort((a, b) => b.bodoviUSobi - a.bodoviUSobi || b.pobjedeUSobi - a.pobjedeUSobi);
+    clanovi.sort((a, b) => b.bodoviUSobi - a.bodoviUSobi || b.pobjedeUSobi - a.pobjedeUSobi);
 
     return {
       kod: soba.kod,
@@ -265,6 +315,7 @@ export function registrirajPrivatneSobe(
       return;
     }
 
+    ponistiGracePrekid(soba, igracId);
     socket.leave(SOBA_PREFIX(kod));
 
     if (soba.status !== 'u_tijeku') {
@@ -278,6 +329,33 @@ export function registrirajPrivatneSobe(
       if (soba.status === 'cekanje') zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
       emitirajStanje(soba);
     }
+  }
+
+  /** Privremeni prekid veze: u čekaonici zadrži članstvo kroz grace period. */
+  function obradiPrekidVezeUSobi(socket: KaladontSocket) {
+    const igracId = socket.data.igracId;
+    const kod = sobaPoIgracu.get(igracId);
+    if (!kod) return;
+
+    const soba = sobe.get(kod);
+    if (!soba) {
+      sobaPoIgracu.delete(igracId);
+      return;
+    }
+
+    socket.leave(SOBA_PREFIX(kod));
+
+    if (soba.status !== 'cekanje') {
+      // U partiji membership već ostaje; grace čekaonice se ne primjenjuje.
+      return;
+    }
+
+    const clan = soba.clanoviMap.get(igracId);
+    if (!clan) return;
+
+    clan.privremenoOdspojen = true;
+    zakaziGracePrekid(soba, igracId);
+    emitirajStanje(soba);
   }
 
   io.on('connection', (socket) => {
@@ -348,6 +426,7 @@ export function registrirajPrivatneSobe(
         partijaId: null,
         status: 'cekanje',
         brisanjeTimer: null,
+        graceTimeri: new Map(),
         pobjedeUSeriji: new Map(),
         bodoviUSeriji: new Map(),
         obradenePartije: new Set(),
@@ -399,6 +478,9 @@ export function registrirajPrivatneSobe(
       ponistiBrisanjeSobe(soba);
 
       if (soba.clanoviMap.has(igracId)) {
+        const clan = soba.clanoviMap.get(igracId)!;
+        ponistiGracePrekid(soba, igracId);
+        clan.privremenoOdspojen = false;
         sobaPoIgracu.set(igracId, kod);
         socket.join(SOBA_PREFIX(kod));
         emitirajStanje(soba);
@@ -497,6 +579,14 @@ export function registrirajPrivatneSobe(
         return;
       }
 
+      if ([...soba.clanoviMap.values()].some((c) => c.privremenoOdspojen)) {
+        socket.emit('greska', {
+          kod: 'CLANOVI_NEDOSTUPNI',
+          poruka: 'Ne možeš pokrenuti igru dok su neki igrači privremeno odspojeni.',
+        });
+        return;
+      }
+
       if (soba.status !== 'cekanje') return;
 
       if (opcije.brojAktivnihPartija() >= opcije.maksimalnoAktivnihPartija) {
@@ -568,6 +658,7 @@ export function registrirajPrivatneSobe(
         return;
       }
 
+      ponistiGracePrekid(soba, metaId);
       soba.izbaceniIds.add(metaId);
       soba.clanoviMap.delete(metaId);
       soba.pobjedeUSeriji.delete(metaId);
@@ -589,7 +680,7 @@ export function registrirajPrivatneSobe(
     }));
 
     socket.on('disconnect', omotajSocketHandler(socket, 'disconnect', opcije.zapisSocketHandlerGreske, () => {
-      izadjiIzSobe(socket);
+      obradiPrekidVezeUSobi(socket);
     }));
   });
 

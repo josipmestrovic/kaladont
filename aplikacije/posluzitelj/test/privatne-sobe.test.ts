@@ -25,15 +25,24 @@ import { PRIHVAT_UVJETA_ZA_TEST } from './pomocnici/uvjeti.js';
 
 let app: FastifyInstance;
 let adresa: string;
+/** Kratki grace u testovima (#141) — dovoljno za asertacije bez čekanja 5 min. */
+const TEST_GRACE_PREKID_MS = 200;
 
 beforeAll(async () => {
   // Datoteka otvara desetke gostiju s iste IP adrese; produkcijski limit handshakea nije predmet ovih testova.
-  ({ app } = await izgradiPosluzitelj({ socketOgranicenja: { handshakePoIpMinuti: 1_000, dogadajiPoProzoru: 1_000 } }));
+  ({ app } = await izgradiPosluzitelj({
+    socketOgranicenja: { handshakePoIpMinuti: 1_000, dogadajiPoProzoru: 1_000 },
+    gracePrekidPrivatneCekaoniceMs: TEST_GRACE_PREKID_MS,
+  }));
   await app.listen({ port: 0, host: '127.0.0.1' });
   const podaci = app.server.address();
   const port = typeof podaci === 'object' && podaci ? podaci.port : 0;
   adresa = `http://127.0.0.1:${port}`;
 });
+
+function cekaj(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 afterAll(async () => {
   await app.close();
@@ -253,15 +262,23 @@ describe('privatne sobe', () => {
     }
   });
 
-  it('zatvara sobu i obavještava članove nakon prekida veze vlasnika', async () => {
+  it('zadržava sobu nakon prekida veze vlasnika te je zatvara tek nakon grace perioda', async () => {
     const vlasnik = await spojiIgraca();
     const drugi = await spojiIgraca();
 
     try {
       const { kod } = await stvoriSobu(vlasnik.socket);
       await udjiUSobu(drugi, kod);
-      const vlasnikNapustio = cekajDogadaj<{ kod: string }>(drugi.socket, 'soba:vlasnik-napustio');
+
+      const stanjeGrace = cekajDogadaj<StanjePrivatneSobe>(drugi.socket, 'soba:stanje');
       vlasnik.socket.disconnect();
+      const stanje = await stanjeGrace;
+      expect(stanje.kod).toBe(kod);
+      expect(stanje.clanovi).toHaveLength(2);
+      expect(stanje.clanovi.find((c) => c.igracId === vlasnik.token)?.privremenoOdspojen).toBe(true);
+
+      const vlasnikNapustio = cekajDogadaj<{ kod: string }>(drugi.socket, 'soba:vlasnik-napustio');
+      await cekaj(TEST_GRACE_PREKID_MS + 80);
       expect(await vlasnikNapustio).toEqual({ kod });
     } finally {
       drugi.socket.disconnect();
@@ -389,16 +406,81 @@ describe('privatne sobe', () => {
     try {
       const { kod } = await stvoriSobu(vlasnik.socket);
       await udjiUSobu(clan, kod);
+
+      const stanjeGrace = cekajDogadaj<StanjePrivatneSobe>(vlasnik.socket, 'soba:stanje');
       clan.socket.disconnect();
+      const odspojen = await stanjeGrace;
+      expect(odspojen.clanovi.find((c) => c.igracId === clan.token)?.privremenoOdspojen).toBe(true);
 
       const novaVeza = await spojiIgraca(clan.authToken);
       try {
         const stanje = await udjiUSobu(novaVeza, kod);
         expect(stanje.clanovi.filter((sudionik) => sudionik.igracId === clan.token)).toHaveLength(1);
         expect(stanje.clanovi).toHaveLength(2);
+        expect(stanje.clanovi.find((c) => c.igracId === clan.token)?.privremenoOdspojen).toBeUndefined();
       } finally {
         novaVeza.socket.disconnect();
       }
+    } finally {
+      vlasnik.socket.disconnect();
+    }
+  });
+
+  it('dopušta ulazak pozvanog igrača dok je vlasnik privremeno odspojen', async () => {
+    const vlasnik = await spojiIgraca();
+    const pozvani = await spojiIgraca();
+
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket);
+      vlasnik.socket.disconnect();
+
+      const stanje = await udjiUSobu(pozvani, kod);
+      expect(stanje.kod).toBe(kod);
+      expect(stanje.vlasnikId).toBe(vlasnik.token);
+      expect(stanje.clanovi).toHaveLength(2);
+      expect(stanje.clanovi.find((c) => c.igracId === vlasnik.token)?.privremenoOdspojen).toBe(true);
+    } finally {
+      pozvani.socket.disconnect();
+    }
+  });
+
+  it('uklanja člana nakon isteka grace perioda', async () => {
+    const vlasnik = await spojiIgraca();
+    const clan = await spojiIgraca();
+
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket);
+      await udjiUSobu(clan, kod);
+
+      const stanjeGrace = cekajDogadaj<StanjePrivatneSobe>(vlasnik.socket, 'soba:stanje');
+      clan.socket.disconnect();
+      expect((await stanjeGrace).clanovi).toHaveLength(2);
+
+      const stanjeNakonGrace = cekajDogadaj<StanjePrivatneSobe>(vlasnik.socket, 'soba:stanje');
+      await cekaj(TEST_GRACE_PREKID_MS + 80);
+      const stanje = await stanjeNakonGrace;
+      expect(stanje.kod).toBe(kod);
+      expect(stanje.clanovi.map((c) => c.igracId)).toEqual([vlasnik.token]);
+    } finally {
+      vlasnik.socket.disconnect();
+    }
+  });
+
+  it('odbija pokretanje partije dok je član privremeno odspojen', async () => {
+    const vlasnik = await spojiIgraca();
+    const clan = await spojiIgraca();
+
+    try {
+      const { kod } = await stvoriSobu(vlasnik.socket);
+      await udjiUSobu(clan, kod);
+
+      const stanjeGrace = cekajDogadaj<StanjePrivatneSobe>(vlasnik.socket, 'soba:stanje');
+      clan.socket.disconnect();
+      await stanjeGrace;
+
+      const greska = cekajDogadaj<{ kod: string }>(vlasnik.socket, 'greska');
+      vlasnik.socket.emit('soba:pokreni');
+      expect((await greska).kod).toBe('CLANOVI_NEDOSTUPNI');
     } finally {
       vlasnik.socket.disconnect();
     }

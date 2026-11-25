@@ -36,6 +36,12 @@
   const jeVlasnik = $derived(
     Boolean(stanjeSobe && stanjeSobe.vlasnikId === stanjeSobe.mojIgracId)
   );
+  const imaOdspojenogClana = $derived(
+    Boolean(stanjeSobe?.clanovi.some((clan) => clan.privremenoOdspojen))
+  );
+  const mozePokrenuti = $derived(
+    Boolean(stanjeSobe && stanjeSobe.clanovi.length >= 2 && !imaOdspojenogClana)
+  );
 
   function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {
     if (odbrojavanjePartije) clearInterval(odbrojavanjePartije);
@@ -204,13 +210,16 @@
 
         <div class="clanovi-lista">
           {#each stanjeSobe.clanovi as clan (clan.igracId)}
-            <div class="clan-redak">
+            <div class="clan-redak" class:clan-odspojen={clan.privremenoOdspojen}>
               <Avatar avatarId={clan.avatarId} avatarConfig={clan.avatarConfig} rang={clan.rang} gost={clan.jeGost} velicina={48} />
               <div class="clan-info">
                 <span class="clan-ime">{clan.nadimak}</span>
                 <span class="clan-rang">{clan.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {clan.razina}</span>
                 {#if clan.jeVlasnik}
                   <span class="vlasnik-bedz">Vlasnik sobe</span>
+                {/if}
+                {#if clan.privremenoOdspojen}
+                  <span class="odspojen-oznaka">Privremeno odspojen</span>
                 {/if}
               </div>
               <div class="clan-desno">
@@ -242,10 +251,14 @@
             <button
               type="button"
               class="glavni-gumb"
-              disabled={stanjeSobe.clanovi.length < 2}
+              disabled={!mozePokrenuti}
               onclick={pokreniIgru}
             >
-              {stanjeSobe.clanovi.length < 2 ? 'Čekaju se igrači (min. 2)...' : 'Započni igru'}
+              {stanjeSobe.clanovi.length < 2
+                ? 'Čekaju se igrači (min. 2)...'
+                : imaOdspojenogClana
+                  ? 'Čeka se povratak igrača...'
+                  : 'Započni igru'}
             </button>
           {:else}
             <p class="cekanje-tekst">Čekanje da vlasnik sobe započne igru...</p>
@@ -392,6 +405,18 @@
     padding: 8px 12px;
     border-radius: 12px;
     background: var(--boja-povrsina-2);
+  }
+
+  .clan-redak.clan-odspojen {
+    opacity: 0.72;
+  }
+
+  .odspojen-oznaka {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: var(--tekst-sitni);
+    color: var(--boja-tekst-sekundarni);
+    font-style: italic;
   }
 
   .clan-desno {

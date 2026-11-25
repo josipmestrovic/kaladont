@@ -108,6 +108,8 @@ export interface ClanSobe {
   jeVlasnik: boolean;
   pobjedeUSobi: number;
   bodoviUSobi: number;
+  /** Čekaonica: privremeni prekid veze unutar serverskog grace perioda. */
+  privremenoOdspojen?: boolean;
 }
 
 export interface StanjePrivatneSobe {
