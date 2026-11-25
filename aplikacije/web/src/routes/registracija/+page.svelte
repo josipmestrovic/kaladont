@@ -23,7 +23,7 @@
     }
   }
 
-  // Racun se stvara ovdje jer je editor avatara autenticirana ruta; avatar je zadnji korak tijeka.
+  // Račun se stvara ovdje; poslužitelj dodjeljuje zadani avatar, uređivanje je naknadno na profilu.
   async function dovrsiregistraciju(e: SubmitEvent): Promise<void> {
     e.preventDefault();
     if (slanjeUTijeku || !email || lozinka.length < 8 || !potvrdaDob16 || !prihvacamUvjete) return;
@@ -43,7 +43,7 @@
       spremiSesijskiToken(odgovor.sesijskiToken);
       await osvjeziSocketIdentitet();
       window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
-      void goto('/profil/avatar?registracija=1', { replaceState: true });
+      void goto('/potvrdi-email?dobrodosao=1', { replaceState: true });
     } catch (greska) {
       poruka = greska instanceof Error ? greska.message : 'Registracija nije uspjela.';
       slanjeUTijeku = false;
@@ -120,7 +120,7 @@
         class="glavni-gumb"
         disabled={!email || lozinka.length < 8 || !potvrdaDob16 || !prihvacamUvjete || slanjeUTijeku}
       >
-        {slanjeUTijeku ? 'Stvaram račun…' : 'Dalje: stvori avatar'}
+        {slanjeUTijeku ? 'Stvaram račun…' : 'Registriraj se'}
       </button>
     </form>
   {/if}

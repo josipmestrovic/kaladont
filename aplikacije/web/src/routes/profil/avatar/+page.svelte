@@ -8,24 +8,34 @@
   import { ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
 
   let konfiguracija = $state<AvatarConfigV1>(ZADANI_AVATAR_CONFIG);
+  let rang = $state<string | null>(null);
   let ucitavanje = $state(true);
   let spremanje = $state(false);
   let greska = $state<string | null>(null);
   let jeGost = $state(false);
-
-  // Zadnji korak registracije vodi ovamo; tada se mijenjaju natpisi i odrediste nakon spremanja.
-  const zavrsavaRegistraciju = $derived($page.url.searchParams.get('registracija') === '1');
+  let legacyBezConfiga = $state(false);
 
   onMount(async () => {
     try {
-      const profil = await api<{ avatarConfig: AvatarConfigV1 | null; email: string | null; vrsta: string }>(
-        '/profil',
-      );
+      const profil = await api<{
+        avatarConfig: AvatarConfigV1 | null;
+        email: string | null;
+        emailPotvrdjen: boolean;
+        vrsta: string;
+        rang: string | null;
+      }>('/profil');
       jeGost = profil.vrsta === 'gost' || !profil.email;
-      if (jeGost && !zavrsavaRegistraciju) {
+      if (jeGost) {
         return;
       }
+      // Stari URL ?registracija=1 više ne otvara registracijski mod.
+      if ($page.url.searchParams.get('registracija') === '1' && !profil.emailPotvrdjen) {
+        void goto('/potvrdi-email', { replaceState: true });
+        return;
+      }
+      legacyBezConfiga = profil.avatarConfig == null;
       konfiguracija = profil.avatarConfig ?? ZADANI_AVATAR_CONFIG;
+      rang = profil.rang ?? null;
     } catch (e) {
       greska = e instanceof Error ? e.message : 'Avatar nije moguće učitati.';
     } finally {
@@ -42,9 +52,10 @@
         body: JSON.stringify({ avatarConfig: novaKonfiguracija }),
       });
       konfiguracija = odgovor.avatarConfig;
+      legacyBezConfiga = false;
       dohvatiSocket().emit('igrac:avatar-azuriraj', { avatarConfig: odgovor.avatarConfig, avatarRevision: odgovor.avatarRevision });
       window.dispatchEvent(new CustomEvent('kaladont:avatar-promijenjen', { detail: { avatarConfig: odgovor.avatarConfig } }));
-      void goto(zavrsavaRegistraciju ? '/potvrdi-email?dobrodosao=1' : '/profil');
+      void goto('/profil');
     } catch (e) {
       greska = e instanceof Error ? e.message : 'Spremanje avatara nije uspjelo.';
       throw e;
@@ -55,14 +66,15 @@
 </script>
 
 <svelte:head>
-  <title>{zavrsavaRegistraciju ? 'Stvori avatar' : 'Uredi avatar'} | Kaladont</title>
+  <title>Uredi avatar | Kaladont</title>
 </svelte:head>
 
 <main class="avatar-stranica">
-  {#if greska}<p role="alert" class="greska">{greska}</p>{/if}
   {#if ucitavanje}
     <p>Učitavanje avatara…</p>
-  {:else if jeGost && !zavrsavaRegistraciju}
+  {:else if greska}
+    <p role="alert" class="greska">{greska}</p>
+  {:else if jeGost}
     <section class="gost-gate" aria-labelledby="avatar-gost-naslov">
       <h1 id="avatar-gost-naslov">Avatar za registrirane igrače</h1>
       <p>
@@ -76,9 +88,10 @@
   {:else}
     <AvatarEditor
       pocetnaKonfiguracija={konfiguracija}
-      naslov={zavrsavaRegistraciju ? 'Stvori avatar' : 'Uredi avatar'}
-      tekstSpremanja={zavrsavaRegistraciju ? 'Završi registraciju' : 'Spremi'}
-      spremiBezPromjene={zavrsavaRegistraciju}
+      {rang}
+      naslov="Uredi avatar"
+      tekstSpremanja="Spremi avatar"
+      spremiBezPromjene={legacyBezConfiga}
       spremanje={spremanje}
       onSpremi={spremiAvatar}
     />

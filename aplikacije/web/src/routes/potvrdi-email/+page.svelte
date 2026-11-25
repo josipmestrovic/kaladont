@@ -61,7 +61,7 @@
   {#if tekStigao}
     <p class="nadnaslov">Registracija je gotova</p>
     <h1>Dobrodošao/la u Kaladont!</h1>
-    <p class="cestitka">Račun i avatar su spremni. Ostao je još samo jedan korak.</p>
+    <p class="cestitka">Tvoj račun je spreman. Ostao je još samo jedan korak.</p>
   {:else}
     <p class="nadnaslov">Još jedan korak</p>
     <h1>Potvrdi email adresu</h1>

@@ -9,11 +9,9 @@ async function registrirajSe(page: Page, nadimak: string): Promise<void> {
   await page.getByLabel('Lozinka').fill('lozinka123');
   await page.getByRole('checkbox', { name: /najmanje 16 godina/i }).check();
   await page.getByRole('checkbox', { name: /Uvjete korištenja/i }).check();
-  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
-  await expect(daljeAvatar).toBeEnabled();
-  await daljeAvatar.click();
-  await expect(page).toHaveURL('/profil/avatar?registracija=1');
-  await page.getByRole('button', { name: 'Završi registraciju' }).click();
+  const registriraj = page.getByRole('button', { name: 'Registriraj se', exact: true });
+  await expect(registriraj).toBeEnabled();
+  await registriraj.click();
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 }
 
