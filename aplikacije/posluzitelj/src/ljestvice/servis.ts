@@ -7,6 +7,7 @@ import {
   graniceRazdoblja,
   minimumIgaraZaRazdoblje,
   RAZDOBLJA_LJESTVICA,
+  type AvatarConfigV1,
   type MetrikaLjestvice,
   type ModPartije,
   type PozicijaNaLjestvici,
@@ -26,6 +27,9 @@ export interface StavkaPoretka {
   vrijednost: VrijednostLjestvice;
   imaRezultat: boolean;
   mjesto: number | null;
+  avatarId: number;
+  avatarConfig: AvatarConfigV1 | null;
+  avatarRevision: number;
 }
 
 export interface Poredak {
@@ -45,6 +49,9 @@ interface RedakUpita extends Record<string, unknown> {
   niz: number;
   nepotpuno: boolean;
   mjesto: number | null;
+  avatar_id: number;
+  avatar_config: AvatarConfigV1 | null;
+  avatar_revision: number;
 }
 
 /** Sortni izraz i uvjet rezultata po metrici; samo serverska mapa, nikad iz upita korisnika. */
@@ -111,6 +118,7 @@ function upitPoretka(mod: ModPartije, metrika: MetrikaLjestvice, od: Date, doTre
       left join najbolji_niz n on n.igrac_id = a.igrac_id
     )
     select k.igrac_id, i.nadimak, i.vrsta, k.igre, k.zbroj_bodova, k.niz, k.nepotpuno,
+      i.avatar_id, i.avatar_config, i.avatar_revision,
       (case when k.kvalificiran then row_number() over (
         partition by k.kvalificiran
         order by k.sort_vrijednost desc, k.igre desc, k.ostvareno_u asc, k.igrac_id asc
@@ -133,6 +141,9 @@ function uStavku(metrika: MetrikaLjestvice, redak: RedakUpita): StavkaPoretka {
     vrijednost,
     imaRezultat: metrika === 'prosjek_bodova' || redak.niz > 0,
     mjesto: redak.mjesto,
+    avatarId: Number(redak.avatar_id ?? 0),
+    avatarConfig: redak.avatar_config ?? null,
+    avatarRevision: Number(redak.avatar_revision ?? 0),
   };
 }
 

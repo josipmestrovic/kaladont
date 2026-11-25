@@ -33,24 +33,25 @@ Trajne upute za AI agente koji rade u ovom repozitoriju. Vrijede za cijeli repoz
 
 ## 4. Obvezne lokalne provjere
 
-GitHub Actions je završna neovisna provjera, a ne primarni debug alat. Lokalni CI ne zamjenjuje GitHub CI ni Bugbot.
+GitHub Actions je završna neovisna provjera (puni suite, migracije, E2E, Bugbot). Lokalno agent **nikad** ne pokreće puni CI.
+
+**Zabranjeno bez eksplicitnog zahtjeva korisnika:** `pnpm ci:lokalni`, `pnpm ci:puni`, `pnpm ci:e2e` bez filtera (glavni suite), te bilo koji ekvivalent koji pokreće sve Vitest testove ili sva tri Playwright projekta. To je sporo i duplicira GitHub.
+
+**Dopuštene lokalne provjere (samo osnovne / ciljane):**
 
 | Naredba | Kada | Što provjerava |
 | --- | --- | --- |
-| `pnpm ci:brzi` | Tijekom implementacije | Zajednički build, lint, Svelte/TypeScript provjere; bez DB-a i browsera. |
-| `pnpm ci:test -- <datoteka ili filter>` | Kod promjena poslužitelja | Ciljani Vitest poslužitelja na izoliranoj testnoj bazi. |
-| `pnpm ci:e2e -- <Playwright argumenti>` | Kod promjena UI-ja ili gameplaya | Odabrani E2E testovi na novom testnom serveru i izoliranoj bazi. Bez argumenata pokreće glavni suite. |
-| `pnpm ci:lokalni` | Prije Ready for review i svakog naknadnog review pusha | Puni lokalni aplikacijski CI: priprema, lint, migracije, fixture, svi Vitest testovi, check, build i glavni E2E suite (sva tri projekta). |
-| `pnpm ci:puni` | Infrastruktura, migracije, CI/CD, sigurnost | `ci:lokalni` i dodatne lokalno dostupne operativne provjere. Docker provjere ostaju na GitHubu ako Docker nije dostupan. |
+| `pnpm ci:brzi` | Tijekom implementacije i prije pusha | Zajednički build, lint, Svelte/TypeScript; bez DB-a i browsera. |
+| `pnpm ci:test -- <datoteka ili filter>` | Kod promjena poslužitelja | Samo odabrani Vitest na izoliranoj testnoj bazi. |
+| `pnpm ci:e2e -- <Playwright argumenti>` | Kod promjena UI-ja ili gameplaya | Samo odabrani E2E (datoteka, grep, project). **Uvijek** uz filter; nikad cijeli suite. |
+| `pnpm --filter web test -- <filter>` / `pnpm --filter zajednicko test` | Čisti unit testovi | Ciljani paketni testovi. |
 
-- Ako je u tijeku sam infrastrukturni PR koji uvodi ove naredbe, agent ih najprije implementira i testira; do tada koristi postojeće pojedinačne naredbe s jednako sigurnom izolacijom. Nemoj tvrditi da nepostojeća naredba radi.
-- Nakon svake logičke cjeline pokreni relevantne provjere. Npr. UI zahtijeva ciljane browser testove; promjena motora, protokola, reconnecta ili timera zahtijeva i odgovarajuće server/shared testove i E2E regresije. Za čisto dokumentacijske promjene dovoljno je provjeriti dokumentaciju i diff ako nema promjena koda ili konfiguracije.
-- Za čiste web unit testove možeš koristiti `pnpm --filter web test -- <filter>`; za zajednički paket `pnpm --filter zajednicko test`. Provjeri stvarne skripte u `package.json`.
-- Prije draft pusha moraju proći `ci:brzi` i postojeći relevantni ciljani testovi za sve promjene od prethodnog pusha; puni lokalni CI pokreni ranije ako rizik to zahtijeva. Prije Ready for review i svakog naknadnog review pusha mora proći `ci:lokalni` za konačno stanje koda. Za promjene migracija, infrastrukture ili CI-ja pokreni `ci:puni` umjesto ponavljanja cijelog `ci:lokalni`. Ako promijeniš kod nakon prolaza, ponovno potvrdi aktualno stanje.
-- Ako provjera padne, analiziraj točan test, log, trace i stvarni uzrok. Popravi i prvo lokalno ponovi neuspjeli test, zatim relevantni suite; prije review pusha ponovno puni lokalni profil.
-- Za nestabilnost koristi ciljano ponavljanje (npr. `pnpm ci:e2e -- e2e/izazovi.spec.ts:37 --project=desktop-chrome --repeat-each=5 --retries=0`). Retry nije zamjena za popravak. Zabilježi flaky ishode i ne proglasi ih čistim prolazom.
-- Ne uklanjaj test, ne mijenjaj očekivanje, ne povećavaj timeout, ne dodaj `skip`, `only`, proizvoljan sleep ili retry samo radi zelenog statusa. Promjena očekivanja mora slijediti odobrenu promjenu ponašanja.
-- Ako lokalni CI ne može raditi zbog okoline, to je blokada, a ne prolaz. Reci točno što nedostaje. Iznimni push uz nedovršene lokalne provjere zahtijeva odobrenje korisnika; GitHub obvezne provjere ostaju uključene.
+- Nakon svake logičke cjeline pokreni `ci:brzi` i najmanji relevantni ciljani test (jedna datoteka / jedan filter). Ne širi na „za svaki slučaj” cijeli paket.
+- Prije draft pusha i prije Ready for review: dovoljno je `ci:brzi` + postojeći relevantni ciljani testovi za promjene od prethodnog pusha. Ne čekaj lokalni puni profil.
+- Ako ciljana provjera padne, analiziraj uzrok, popravi i ponovi **samo** taj test (po potrebi uzak regresijski filter). Ne pokreći puni suite radi potvrde.
+- Za nestabilnost koristi ciljano ponavljanje (npr. `pnpm ci:e2e -- e2e/izazovi.spec.ts:37 --project=desktop-chrome --repeat-each=5 --retries=0`). Retry nije zamjena za popravak.
+- Ne uklanjaj test, ne mijenjaj očekivanje, ne povećavaj timeout, ne dodaj `skip`, `only`, proizvoljan sleep ili retry samo radi zelenog statusa.
+- Ako osnovna lokalna provjera ne može raditi zbog okoline, reci što nedostaje. Push uz nedovršene osnovne provjere zahtijeva odobrenje korisnika; GitHub obvezne provjere ostaju uključene.
 
 ## 5. Git, draft PR, CI i Bugbot
 
@@ -62,15 +63,15 @@ GitHub Actions je završna neovisna provjera, a ne primarni debug alat. Lokalni 
 
 ### Prijelaz u review
 
-- Kad je cijeli odobreni opseg gotov, pokreni puni lokalni profil i postojeće dodatne testove prema riziku. Izvijesti korisnika o rezultatu i preostalim ograničenjima. Ako predlažeš nove testove ili izmjene izvan plana, navedi razlog, pros/cons i preporuku; ne implementiraj ih bez odobrenja.
-- Pushaj konačno stanje, zatim **odmah označi PR Ready for review** na tom zadnjem SHA-u kako bi se pokrenuli puni GitHub CI i Bugbot. Ne čekaj dodatno odobrenje samo za Ready ako je odobreni opseg dovršen i lokalni profil prošao. Provjeri da su se puni GitHub CI i Bugbot za posljednji SHA stvarno pokrenuli i dovršili. Ne radi prazne commitove za pokretanje reviewa. Ako se Bugbot ne pokrene, provjeri konfiguraciju i po potrebi zatraži od korisnika ručni review. Merge i objava i dalje zahtijevaju eksplicitno odobrenje.
+- Kad je cijeli odobreni opseg gotov, dovoljni su `ci:brzi` i ciljani relevantni testovi. Izvijesti korisnika o tome što je lokalno pokrenuto i što ostaje GitHubu. Ako predlažeš nove testove ili izmjene izvan plana, navedi razlog, pros/cons i preporuku; ne implementiraj ih bez odobrenja.
+- Pushaj konačno stanje, zatim **odmah označi PR Ready for review** na tom zadnjem SHA-u kako bi se pokrenuli puni GitHub CI i Bugbot. Ne čekaj lokalni puni CI ni dodatno odobrenje samo za Ready ako je odobreni opseg dovršen i osnovne lokalne provjere prošle. Provjeri da su se puni GitHub CI i Bugbot za posljednji SHA stvarno pokrenuli. Ne radi prazne commitove za pokretanje reviewa. Merge i objava i dalje zahtijevaju eksplicitno odobrenje.
 
 ### Review: popravci u turama (chunkovima)
 
 - Prati CI jobove, logove, artefakte i Bugbot komentare/status za posljednji head SHA i odgovarajući PR merge SHA; pričekaj završetak relevantnih jobova i reviewa prije planiranja ture, osim kod potvrđene blokade ili otkazivanja. Ne tretiraj starije zelene rezultate ni neutralni Bugbot status kao dokaz odsutnosti nalaza.
 - Prikupi sve nalaze iste ture. Razvrstaj: potvrđena greška u odobrenom opsegu, povezani simptomi istog uzroka, infrastrukturni/flaky problem, neutemeljen nalaz, prijedlog izvan opsega. Navedi dokaz i prioritet. Popravi potvrđene greške unutar odobrenog opsega; za sve ostalo predloži opcije, razlog, prednosti, nedostatke i preporuku te čekaj odobrenje. Ne proširuj opseg prema Bugbotu na svoju ruku.
 - Reproduciraj padove lokalno, popravi grupu povezanih uzroka i pokreni neuspjele te relevantne postojeće regresijske testove. Agent samostalno odabire dodatne postojeće testove i obrazlaže izbor. Nove testove ili promjene testnih očekivanja mimo odobrenog plana samo predloži. Ne iskrivljuj test radi zelenog statusa.
-- Kad su svi popravci ture gotovi, pokreni puni lokalni profil, commitaj logičke cjeline i napravi jedan grupirani push u isti PR. PR ostaje Ready for review tijekom review popravaka; ne vraćaj ga u draft nakon svake greške. Prati novi CI i Bugbot za novi SHA i ponovi postupak. Potvrđenu prolaznu infrastrukturnu grešku rješavaj ograničenim rerunom neuspjelih jobova istog SHA, bez praznih commitova. Kod ponavljajućeg istog pada ili nedostupnog reviewa prijavi blokadu umjesto beskonačnih pokušaja.
+- Kad su svi popravci ture gotovi, pokreni `ci:brzi` i ciljane testove za popravljeno, commitaj logičke cjeline i napravi jedan grupirani push u isti PR. Ne pokreći lokalni puni CI. PR ostaje Ready for review tijekom review popravaka; ne vraćaj ga u draft nakon svake greške. Prati novi GitHub CI i Bugbot za novi SHA i ponovi postupak. Potvrđenu prolaznu infrastrukturnu grešku rješavaj ograničenim rerunom neuspjelih jobova istog SHA, bez praznih commitova. Kod ponavljajućeg istog pada ili nedostupnog reviewa prijavi blokadu umjesto beskonačnih pokušaja.
 - Ne zatvaraj Bugbot nalaz samo radi zelenog statusa. Za potvrđeni popravak navedi commit/test; za pogrešan nalaz obrazloži dokaz; za stvarni nalaz izvan opsega zatraži odluku. Ne tvrdi da je review dovršen bez potvrde. Ako agent nema pristup statusima/logovima, ne glumi praćenje; zatraži odgovarajući pristup ili rezultat korisnika.
 - Spremno za merge tek kad je puni obvezni GitHub CI zelen za aktualnu reviziju, Bugbot pregled aktualan i nema neriješenih blokirajućih nalaza, a sva ograničenja i odobrene iznimke su evidentirane. Nikad ne zaobilazi granske zaštite, ne mergeaj i ne objavljuj bez eksplicitnog odobrenja. Staging i produkcija slijede postojeće procedure.
 

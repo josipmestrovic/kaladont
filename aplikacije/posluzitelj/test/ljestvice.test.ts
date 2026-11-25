@@ -239,6 +239,7 @@ describe('GET /api/ljestvice', () => {
     expect(tijelo.redci.length).toBeLessThanOrEqual(10);
     expect(tijelo.minimumIgara).toBe(5);
     expect(tijelo.mojaPozicija.status).toBe('prijava_potrebna');
+    expect(tijelo.mojRedak).toBeNull();
     expect(tijelo.razdoblje.do).not.toBeNull();
     expect(Object.keys(tijelo.pozicijePoRazdobljima)).toEqual(['dnevno', 'tjedno', 'mjesecno', 'godisnje', 'svih_vremena']);
 
@@ -252,6 +253,19 @@ describe('GET /api/ljestvice', () => {
     expect(svih.razdoblje.otkljucavaSe).not.toBeNull();
     expect(svih.redci).toEqual([]);
     expect(svih.mojaPozicija.status).toBe('zakljucano');
+
+    const sazetak = await app.inject({ method: 'GET', url: '/api/ljestvice/sazetak' });
+    expect(sazetak.statusCode).toBe(200);
+    expect(sazetak.headers['cache-control']).toBe('private, no-store');
+    expect(sazetak.json()).toMatchObject({ ok: true, status: { vrsta: 'neutralan' } });
+
+    const najopasnije = await app.inject({ method: 'GET', url: '/api/rijeci/najopasnije?limit=10' });
+    expect(najopasnije.statusCode).toBe(200);
+    const tijeloNajopasnije = najopasnije.json<{ ok: boolean; rijeci: unknown[]; imaJos: boolean }>();
+    expect(tijeloNajopasnije.ok).toBe(true);
+    expect(Array.isArray(tijeloNajopasnije.rijeci)).toBe(true);
+    expect(tijeloNajopasnije.rijeci.length).toBeLessThanOrEqual(10);
+    expect(typeof tijeloNajopasnije.imaJos).toBe('boolean');
     await app.close();
   });
 });

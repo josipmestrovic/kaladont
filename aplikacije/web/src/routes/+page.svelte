@@ -39,7 +39,9 @@
     osigurajStanjeMisija,
   } from '$lib/stanje-misija.svelte.js';
   import { osigurajProfil, stanjeProfila } from '$lib/stanje-profila.svelte.js';
+  import { tekstSazetkaLjestvice } from '$lib/naslovnica-ljestvice.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
+  import type { OdgovorSazetkaLjestvice } from 'zajednicko';
 
   const misijeStore = dohvatiStanjeMisijaStore();
   const misijeBadge = $derived(natpisBadgaMisija(misijeStore.aktivne));
@@ -56,6 +58,8 @@
   let izazoviGeneracija = 0;
   let kolekcijaGeneracija = 0;
   let dostignucaGeneracija = 0;
+  let ljestviceGeneracija = 0;
+  let ljestviceTekst = $state<ReturnType<typeof tekstSazetkaLjestvice>>(null);
   let kolekcijaRazinaNaziv = $state('Početnik');
   let brojRijeciKolekcije = $state<number | null>(null);
   let dostignucaZvjezdice = $state<PrikazZvjezdicaDostignuca>({
@@ -137,6 +141,18 @@
     }
   }
 
+  async function osvjeziLjestviceSazetak() {
+    const generacija = ++ljestviceGeneracija;
+    try {
+      const odgovor = await api<OdgovorSazetkaLjestvice>('/ljestvice/sazetak');
+      if (generacija !== ljestviceGeneracija) return;
+      ljestviceTekst = tekstSazetkaLjestvice(odgovor.status);
+    } catch {
+      // Zadrži zadnji uspješan sažetak; ne briši rang zbog prolazne greške mreže.
+      if (generacija !== ljestviceGeneracija) return;
+    }
+  }
+
   function osvjeziNaslovnicu() {
     void osigurajProfil({ forsaj: true }).then(() => {
       if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
@@ -144,6 +160,7 @@
         void osigurajStanjeMisija({ forsaj: true });
         void osvjeziKolekciju();
         void osvjeziDostignucaZvjezdice();
+        void osvjeziLjestviceSazetak();
       }
     });
   }
@@ -156,6 +173,7 @@
       izazoviGeneracija += 1;
       kolekcijaGeneracija += 1;
       dostignucaGeneracija += 1;
+      ljestviceGeneracija += 1;
       izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
       kolekcijaRazinaNaziv = 'Početnik';
       brojRijeciKolekcije = null;
@@ -163,6 +181,7 @@
         ukupno: 0,
         maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
       };
+      ljestviceTekst = null;
       invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
@@ -178,12 +197,13 @@
     };
     document.addEventListener('visibilitychange', naVidljivost);
 
-    // Dijeli in-flight s Headerom; zatim GET /izazovi, /misije, kolekcija i dostignuća.
+    // Dijeli in-flight s Headerom; zatim GET /izazovi, /misije, kolekcija, dostignuća i ljestvice.
     void osigurajProfil().then(() => {
       void osvjeziIzazove();
       void osigurajStanjeMisija();
       void osvjeziKolekciju();
       void osvjeziDostignucaZvjezdice();
+      void osvjeziLjestviceSazetak();
     });
 
     return () => {
@@ -192,6 +212,7 @@
       izazoviGeneracija += 1;
       kolekcijaGeneracija += 1;
       dostignucaGeneracija += 1;
+      ljestviceGeneracija += 1;
     };
   });
 </script>
@@ -329,7 +350,7 @@
           href="/ljestvice"
           class="navigacijska-stavka"
           aria-labelledby="naslov-ljestvice"
-          aria-describedby="opis-ljestvice"
+          aria-describedby={ljestviceTekst ? 'status-ljestvice' : 'opis-ljestvice'}
           data-testid="naslovnica-ljestvice"
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-ljestvice-klik')}
         >
@@ -337,10 +358,25 @@
             <img class="stavka-ikona" src="/ikone/09-ljestvice.png" alt="" width="48" height="48" />
             <span class="stavka-tekst">
               <strong id="naslov-ljestvice">Ljestvice</strong>
-              <small id="opis-ljestvice">Usporedi se s najboljim igračima.</small>
+              {#if !ljestviceTekst}
+                <small id="opis-ljestvice">Usporedi se s najboljim igračima.</small>
+              {/if}
             </span>
           </span>
-          <span class="strelica" aria-hidden="true">›</span>
+          {#if ljestviceTekst}
+            <span
+              id="status-ljestvice"
+              class="stavka-status"
+              data-testid="naslovnica-ljestvice-status"
+              title={ljestviceTekst.puni}
+            >
+              <span class="stavka-status__desktop">{ljestviceTekst.puni}</span>
+              <span class="stavka-status__mobilni">{ljestviceTekst.kratki}</span>
+              <span class="sr-only">{ljestviceTekst.aria}</span>
+            </span>
+          {:else}
+            <span class="strelica" aria-hidden="true">›</span>
+          {/if}
         </a>
       </nav>
 
@@ -601,6 +637,52 @@
     font-size: var(--font-opisa);
     font-weight: 500;
     line-height: 1.35;
+  }
+
+  .stavka-status {
+    min-width: 0;
+    max-width: 48%;
+    justify-self: end;
+    text-align: right;
+    color: var(--boja-isticanje-tekst);
+    font-family: var(--font-tijelo);
+    font-size: var(--font-opisa);
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  .stavka-status__desktop,
+  .stavka-status__mobilni {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stavka-status__mobilni {
+    display: none;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: 999px) {
+    .stavka-status__desktop {
+      display: none;
+    }
+
+    .stavka-status__mobilni {
+      display: block;
+    }
   }
 
   .stavka-napomena {

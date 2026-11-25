@@ -174,16 +174,17 @@ Odabir „Ne znam” otvara kratku potvrdu s naslovom „Predati potez?” i bez
 - Registrirani igrači vide izbor avatara, izmjenu email adrese i lozinke.
 - Gosti vide obavijest da su napredne postavke rezervirane za registrirane korisnike uz gumb za registraciju.
 
-## 8. Ljestvice (`/ljestvice?kategorija&mod&metrika&razdoblje&prikaz`)
+## 8. Ljestvice (`/ljestvice?kategorija&metrika&razdoblje`)
 
-Jedna stranica s odabirima u URL-u. Pravila: [bodovanje-i-rangovi.md](../02-pravila-igre/bodovanje-i-rangovi.md#vremenske-ljestvice). Stara `/ljestvica` preusmjerava ovamo. Zadano: **Igrači → Četveroboj → Prosjek bodova → Tjedna → Top 10**.
-- Redoslijed: kategorija **Igrači | Najčešće riječi**, način **Četveroboj | Troboj | Dvoboj**, metrika (**Prosjek bodova | Niz pobjeda**; u Dvoboju Prosjek = **Udio pobjeda**), pet razdoblja, statusni redak, tablica.
+Jedna stranica s odabirima u URL-u. Pravila: [bodovanje-i-rangovi.md](../02-pravila-igre/bodovanje-i-rangovi.md#vremenske-ljestvice). Stara `/ljestvica` preusmjerava ovamo. Zadano: **Igrači → Prosjek bodova → Dnevna → Top 10**.
+- Redoslijed: kategorija **Igrači | Najopasnije riječi**, metrika (**Prosjek bodova | Niz pobjeda**), pet razdoblja. Poredak igrača je javni Troboj (Brza igra). Gosti i registrirani ulaze pod istim pravilima.
 - <!-- HINT PR15: ulaz 5 dnevno / 10 dulje (PR11). -->
-- Statusni redak npr. „Za ulazak treba 5 (dnevno) ili 10 (dulje) javnih igara tog formata.” Osobni napredak samo za aktivni filter. Zaključano **Svih vremena**: „Ljestvica svih vremena stiže {godina}.”
-- Tablica: Mjesto · Igrač · metrika · Igre; Top 10; **Oko mene** izvan Top 10. Ispod: **Pravila bodovanja** (po formatu), **Pravila izjednačenja**, prag/reset.
+- Osobna kartica: mjesto i vrijednost, ili progress do poretka. Zaključano **Svih vremena**: „Ljestvica svih vremena stiže {godina}.”
+- Tablica: # · Igrač (avatar) · metrika · Igre; Top 10; vlastiti redak ispod ako je mjesto > 10. Proširivo **Kako funkcioniraju ljestvice?**. CTA registracije rangiranom gostu.
+- Naslovnica: dinamički status (najbolje mjesto ili broj Troboja do ulaska) preko `GET /ljestvice/sazetak`.
 - Greška učitavanja prikazuje poruku i gumb „Pokušaj ponovno”, nikad „nije odigrano”.
-- Na mobitelu se razdoblja slažu u dva stupca, tablica u retke s `data-label` oznakama bez vodoravnog pomicanja.
-- Kategorija **Najčešće riječi**: Top 10 zadano najučestalijih ljudskih riječi iz **završenih javnih** partija (stvarna upotreba iz `potezi`, ne statička frekvencija iz uvoznog korpusa; privatne, poništene i botovi se ne broje; čovjek protiv bota broji se čovjeku). Stupci: riječ, broj ponavljanja; bez uvoda iznad tablice. Gumb **„Učitaj do 100"** s loading indikatorom; nema osobnih pozicija.
+- Na mobitelu tablica u retke s `data-label` oznakama bez vodoravnog pomicanja.
+- **Najopasnije riječi**: univerzalna lista riječi s ≥ 3 potvrđene eliminacije iz svih konteksta; Top 10 + **Prikaži sve** do 100; filter aktivnog rječnika; zadnja dva grafema istaknuta. Stari `/rijeci/top` (učestalost) ostaje u API-ju radi kompatibilnosti.
 - Nadimak vodi na javni profil samo za registrirane igrače; gost nema link.
 
 ## 9. Admin (`/admin`) — zaštićena uloga

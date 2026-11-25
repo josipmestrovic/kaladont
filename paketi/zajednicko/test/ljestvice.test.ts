@@ -5,8 +5,20 @@ import {
   graniceRazdoblja,
   kalendarskeGranice,
   minimumIgaraZaRazdoblje,
+  odaberiSazetakLjestvice,
   prozorOkoMjesta,
+  type PozicijaNaLjestvici,
 } from '../src/ljestvice.js';
+
+function pozicija(dijelovi: Partial<PozicijaNaLjestvici> & Pick<PozicijaNaLjestvici, 'status'>): PozicijaNaLjestvici {
+  return {
+    mjesto: null,
+    odigraneIgre: null,
+    minimumIgara: 10,
+    nedostajeIgara: null,
+    ...dijelovi,
+  };
+}
 
 const sati = (od: Date, doTrenutka: Date) => (doTrenutka.getTime() - od.getTime()) / 3_600_000;
 
@@ -106,5 +118,52 @@ describe('odbrojavanje', () => {
 
   it('od jednog dana prikazuje dane i sate', () => {
     expect(formatirajOdbrojavanje((5 * 86_400 + 4 * 3600 + 59) * 1000)).toBe('5 d 4 h');
+  });
+});
+
+describe('odaberiSazetakLjestvice', () => {
+  it('bira najmanje mjesto, pri izjednačenju prosjek pa dulje razdoblje', () => {
+    expect(
+      odaberiSazetakLjestvice([
+        { metrika: 'niz_pobjeda', razdoblje: 'dnevno', pozicija: pozicija({ status: 'rangiran', mjesto: 4 }) },
+        { metrika: 'prosjek_bodova', razdoblje: 'tjedno', pozicija: pozicija({ status: 'rangiran', mjesto: 4 }) },
+        { metrika: 'prosjek_bodova', razdoblje: 'mjesecno', pozicija: pozicija({ status: 'rangiran', mjesto: 4 }) },
+        { metrika: 'prosjek_bodova', razdoblje: 'dnevno', pozicija: pozicija({ status: 'rangiran', mjesto: 24 }) },
+      ]),
+    ).toEqual({ vrsta: 'rangiran', mjesto: 4, metrika: 'prosjek_bodova', razdoblje: 'mjesecno' });
+  });
+
+  it('bez ranga bira najmanji pozitivni nedostajeIgara', () => {
+    expect(
+      odaberiSazetakLjestvice([
+        {
+          metrika: 'prosjek_bodova',
+          razdoblje: 'tjedno',
+          pozicija: pozicija({ status: 'nedovoljan_broj_igara', odigraneIgre: 5, nedostajeIgara: 5 }),
+        },
+        {
+          metrika: 'prosjek_bodova',
+          razdoblje: 'dnevno',
+          pozicija: pozicija({ status: 'nedovoljan_broj_igara', odigraneIgre: 4, minimumIgara: 5, nedostajeIgara: 1 }),
+        },
+        {
+          metrika: 'niz_pobjeda',
+          razdoblje: 'dnevno',
+          pozicija: pozicija({ status: 'nema_rezultata', odigraneIgre: 5, nedostajeIgara: 0 }),
+        },
+      ]),
+    ).toEqual({ vrsta: 'nedostaje', nedostajeIgara: 1, metrika: 'prosjek_bodova', razdoblje: 'dnevno' });
+  });
+
+  it('za niz bez pobjede vraća nema_rezultata kad nema boljeg statusa', () => {
+    expect(
+      odaberiSazetakLjestvice([
+        {
+          metrika: 'niz_pobjeda',
+          razdoblje: 'tjedno',
+          pozicija: pozicija({ status: 'nema_rezultata', odigraneIgre: 10, nedostajeIgara: 0 }),
+        },
+      ]),
+    ).toEqual({ vrsta: 'nema_rezultata', metrika: 'niz_pobjeda', razdoblje: 'tjedno' });
   });
 });
