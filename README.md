@@ -58,7 +58,18 @@ pnpm test
 pnpm build
 ```
 
-Playwright E2E zahtijeva podignutu lokalnu okolinu — detalji u [docs/06-razvoj/testiranje.md](docs/06-razvoj/testiranje.md).
+Lokalni CI (izolirana testna baza, bez Dockera; ne dira `pnpm dev` ni `kaladont_dev`):
+
+```powershell
+# jednokratno: kopiraj .env.ci-local.primjer → .env.ci-local i stvori ulogu kaladont_ci_local
+pnpm ci:brzi
+pnpm ci:test -- test/motor-partije.test.ts
+pnpm ci:e2e -- e2e/izazovi.spec.ts --project=desktop-chrome
+pnpm ci:lokalni
+pnpm ci:puni
+```
+
+Detalji: [docs/06-razvoj/testiranje.md](docs/06-razvoj/testiranje.md), [AGENTS.md](AGENTS.md).
 
 ## Dokumentacija
 

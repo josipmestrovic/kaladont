@@ -18,6 +18,18 @@ flowchart LR
 
 Razvojno računalo nema virtualizaciju pa se Docker slika ne može testirati lokalno — **CI je jedino mjesto koje dokazuje da slika radi** prije staginga. Zato smoke test nije opcionalan korak nego bloker objave (osim docs-only pusha).
 
+## Lokalni CI i draft / Ready for review
+
+Lokalne naredbe `pnpm ci:brzi` / `ci:test` / `ci:e2e` / `ci:lokalni` / `ci:puni` reproduciraju većinu aplikacijskih GitHub provjera na Windowsu bez Dockera (vidi [testiranje.md](../06-razvoj/testiranje.md) i [AGENTS.md](../../AGENTS.md)). Image smoke, Trivy image i Caddy validacija ostaju na GitHubu.
+
+**Draft PR:** skupi jobovi (`kod`, `e2e`, `e2e-izvjestaj`, `slika`) se ne izvršavaju. Agregator **Lint, test, check i build** namjerno završava s `exit 1` i porukom `DRAFT — čeka Ready for review` (fail-closed; skipped job ne smije biti lažno zelen merge gate).
+
+**Ready for review** (i kasniji pushovi na Ready PR): puni postojeći CI, uključujući Docker image smoke. Eventi: `ready_for_review`, `synchronize`, `reopened`. `converted_to_draft` otkazuje zastarjeli run preko concurrency grupe.
+
+**Bugbot:** repo konfiguracija `.cursor/config/bugbot.yaml` (`drafts: false`, `frequency: everyPush`, autofix disabled) čita se s **base** grane (obično `main`) — učinak nakon mergea. Osobni override „Enable reviews on draft PRs” može i dalje uključiti draft review; isključi ga u dashboardu za puni draft-skip.
+
+Kad je odobreni opseg gotov i lokalni profil prošao, agent pusha konačno stanje i **odmah** označava PR Ready for review da se pokrenu GitHub CI i Bugbot. Merge i dalje zahtijeva eksplicitno odobrenje.
+
 ## Pravila koja vrijede za sve workflowe
 
 - Sve third-party GitHub Actions reference pinaju se na puni commit SHA; komentar uz SHA navodi čitljivu verziju. Dependabot ih ažurira kroz Pull Request (PR).
