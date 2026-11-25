@@ -2,8 +2,10 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { api } from '$lib/api.js';
+  import { relativnoVrijemeObavijesti } from '$lib/naslovnica-obavijesti.js';
   import {
     obrisiSavSanducic,
+    oznaciSanducicProcitane,
     oznaciSavSanducicProcitanim,
     osvjeziSazetakSanducica,
   } from '$lib/stanje-sanducica.svelte.js';
@@ -22,20 +24,28 @@
     type SanducicPorukaDetalj,
   } from 'zajednicko';
 
-  type Prikaz = 'nove' | 'sve';
+  type Prikaz = 'neprocitane' | 'sve';
 
-  let prikaz = $state<Prikaz>('nove');
+  let prikaz = $state<Prikaz>('sve');
   let poruke = $state<SanducicPorukaDetalj[]>([]);
-  let novePoruke = $state<SanducicPorukaDetalj[]>([]);
-  let noveIds = $state<Set<string>>(new Set());
   let sljedeciCursor = $state<string | null>(null);
   let ucitavanje = $state(true);
   let greska = $state<string | null>(null);
   let brisanje = $state(false);
+  let oznacavanjeSve = $state(false);
+  let oznacavanjeIds = $state<Set<string>>(new Set());
   let istaknutiId = $state<string | null>(null);
-  let oznacenoProcitanima = $state(false);
+  let ciljanaPoruka = $state<SanducicPorukaDetalj | null>(null);
+  let ciljanaNedostupna = $state(false);
+  let zahtjevGen = 0;
 
-  const prikazanePoruke = $derived(prikaz === 'nove' ? novePoruke : poruke);
+  const prikazanePoruke = $derived.by(() => {
+    if (!ciljanaPoruka) return poruke;
+    if (poruke.some((p) => p.id === ciljanaPoruka!.id)) return poruke;
+    return [ciljanaPoruka, ...poruke];
+  });
+
+  const imaNeprocitanih = $derived(prikazanePoruke.some((p) => !p.procitano));
 
   function formatirajVrijeme(iso: string): string {
     try {
@@ -78,67 +88,39 @@
     );
   }
 
-  function mapirajProcitano(lista: SanducicPorukaDetalj[]): SanducicPorukaDetalj[] {
-    return lista.map((p) => ({ ...p, procitano: true }));
-  }
-
   async function ucitaj(reset = true): Promise<void> {
+    const gen = ++zahtjevGen;
     ucitavanje = true;
     greska = null;
     try {
       const params = new URLSearchParams();
-      if (prikaz === 'nove') {
-        params.set('filter', 'neprocitane');
-        params.set('limit', '50');
-      }
+      params.set('limit', '30');
+      if (prikaz === 'neprocitane') params.set('filter', 'neprocitane');
       if (!reset && sljedeciCursor) params.set('cursor', sljedeciCursor);
       const odgovor = await api<{ ok: true; poruke: SanducicPorukaDetalj[]; sljedeciCursor: string | null }>(
         `/sanducic?${params.toString()}`,
       );
+      if (gen !== zahtjevGen) return;
       if (reset) {
-        const granica = new Date();
-        const mapirane = mapirajProcitano(odgovor.poruke);
-        if (prikaz === 'nove') {
-          noveIds = new Set(odgovor.poruke.map((p) => p.id));
-          novePoruke = mapirane;
-        } else {
-          if (!oznacenoProcitanima) {
-            noveIds = new Set(odgovor.poruke.filter((p) => !p.procitano).map((p) => p.id));
-            novePoruke = mapirajProcitano(odgovor.poruke.filter((p) => !p.procitano));
-          }
-          poruke = mapirane;
-        }
-        sljedeciCursor = prikaz === 'nove' ? null : odgovor.sljedeciCursor;
-        if (!oznacenoProcitanima) {
-          try {
-            await oznaciSavSanducicProcitanim(granica);
-            oznacenoProcitanima = true;
-          } catch {
-            // Lista je već učitana; crvena točka može ostati dok korisnik ne osvježi.
-          }
-        }
+        poruke = odgovor.poruke;
+        sljedeciCursor = odgovor.sljedeciCursor;
       } else {
-        const mapirane = mapirajProcitano(odgovor.poruke);
-        if (prikaz === 'nove') {
-          novePoruke = [...novePoruke, ...mapirane];
-          noveIds = new Set([...noveIds, ...mapirane.map((p) => p.id)]);
-        } else {
-          poruke = [...poruke, ...mapirane];
-        }
+        const poznati = new Set(poruke.map((p) => p.id));
+        poruke = [...poruke, ...odgovor.poruke.filter((p) => !poznati.has(p.id))];
         sljedeciCursor = odgovor.sljedeciCursor;
       }
+      if (ciljanaPoruka && poruke.some((p) => p.id === ciljanaPoruka!.id)) {
+        ciljanaPoruka = null;
+      }
     } catch {
+      if (gen !== zahtjevGen) return;
       greska = 'Ne mogu učitati obavijesti.';
       if (reset) {
-        if (prikaz === 'nove') {
-          novePoruke = [];
-          noveIds = new Set();
-        } else {
-          poruke = [];
-        }
+        poruke = [];
+        sljedeciCursor = null;
       }
     } finally {
-      ucitavanje = false;
+      if (gen === zahtjevGen) ucitavanje = false;
     }
   }
 
@@ -146,12 +128,57 @@
     if (novi === prikaz) return;
     prikaz = novi;
     istaknutiId = null;
+    ciljanaPoruka = null;
+    ciljanaNedostupna = false;
     sljedeciCursor = null;
-    if (novi === 'sve') {
-      await ucitaj(true);
-      return;
+    await ucitaj(true);
+  }
+
+  async function oznaciJednu(id: string): Promise<void> {
+    if (oznacavanjeIds.has(id)) return;
+    oznacavanjeIds = new Set([...oznacavanjeIds, id]);
+    try {
+      await oznaciSanducicProcitane([id]);
+      poruke = poruke.map((p) => (p.id === id ? { ...p, procitano: true } : p));
+      if (ciljanaPoruka?.id === id) ciljanaPoruka = { ...ciljanaPoruka, procitano: true };
+      if (prikaz === 'neprocitane') {
+        poruke = poruke.filter((p) => p.id !== id);
+        if (ciljanaPoruka?.id === id) ciljanaPoruka = null;
+      }
+    } catch {
+      greska = 'Ne mogu označiti obavijest pročitanom.';
+    } finally {
+      const sljedeci = new Set(oznacavanjeIds);
+      sljedeci.delete(id);
+      oznacavanjeIds = sljedeci;
     }
-    // Povratak na Nove: lokalni cache (neprocitane bi bile prazne nakon mark-read).
+  }
+
+  async function oznaciSve(): Promise<void> {
+    if (oznacavanjeSve || !imaNeprocitanih) return;
+    oznacavanjeSve = true;
+    const granica = new Date();
+    try {
+      await oznaciSavSanducicProcitanim(granica);
+      if (prikaz === 'neprocitane') {
+        poruke = [];
+        sljedeciCursor = null;
+        ciljanaPoruka = null;
+      } else {
+        poruke = poruke.map((p) =>
+          !p.procitano && new Date(p.stvorenaAt).getTime() <= granica.getTime()
+            ? { ...p, procitano: true }
+            : p,
+        );
+        if (ciljanaPoruka && !ciljanaPoruka.procitano) {
+          ciljanaPoruka = { ...ciljanaPoruka, procitano: true };
+        }
+      }
+    } catch {
+      greska = 'Ne mogu označiti sve obavijesti pročitanima.';
+    } finally {
+      oznacavanjeSve = false;
+    }
   }
 
   async function obrisiSve(): Promise<void> {
@@ -161,8 +188,8 @@
     try {
       await obrisiSavSanducic();
       poruke = [];
-      novePoruke = [];
-      noveIds = new Set();
+      ciljanaPoruka = null;
+      ciljanaNedostupna = false;
       sljedeciCursor = null;
       istaknutiId = null;
       await osvjeziSazetakSanducica();
@@ -180,17 +207,30 @@
     });
   }
 
+  async function obradiDeepLink(id: string): Promise<void> {
+    prikaz = 'sve';
+    if (poruke.some((p) => p.id === id)) {
+      istakniPoruku(id);
+      if (!poruke.find((p) => p.id === id)?.procitano) await oznaciJednu(id);
+      return;
+    }
+    try {
+      const odgovor = await api<{ ok: true; poruka: SanducicPorukaDetalj }>(`/sanducic/${id}`);
+      ciljanaPoruka = odgovor.poruka;
+      ciljanaNedostupna = false;
+      istakniPoruku(id);
+      if (!odgovor.poruka.procitano) await oznaciJednu(id);
+    } catch {
+      ciljanaPoruka = null;
+      ciljanaNedostupna = true;
+    }
+  }
+
   onMount(() => {
     void (async () => {
       await ucitaj(true);
       const id = $page.url.searchParams.get('id');
-      if (!id) return;
-      if (novePoruke.some((p) => p.id === id)) {
-        istakniPoruku(id);
-        return;
-      }
-      await postaviPrikaz('sve');
-      if (poruke.some((p) => p.id === id)) istakniPoruku(id);
+      if (id) await obradiDeepLink(id);
     })();
   });
 </script>
@@ -207,16 +247,6 @@
         <button
           type="button"
           class="filter-gumb"
-          class:aktivan={prikaz === 'nove'}
-          aria-pressed={prikaz === 'nove'}
-          disabled={ucitavanje}
-          onclick={() => void postaviPrikaz('nove')}
-        >
-          Nove
-        </button>
-        <button
-          type="button"
-          class="filter-gumb"
           class:aktivan={prikaz === 'sve'}
           aria-pressed={prikaz === 'sve'}
           disabled={ucitavanje}
@@ -224,17 +254,41 @@
         >
           Sve
         </button>
+        <button
+          type="button"
+          class="filter-gumb"
+          class:aktivan={prikaz === 'neprocitane'}
+          aria-pressed={prikaz === 'neprocitane'}
+          disabled={ucitavanje}
+          onclick={() => void postaviPrikaz('neprocitane')}
+        >
+          Nepročitane
+        </button>
       </div>
-      <button
-        type="button"
-        class="obrisi-sve"
-        disabled={brisanje || prikazanePoruke.length === 0}
-        onclick={() => void obrisiSve()}
-      >
-        Obriši sve obavijesti
-      </button>
+      <div class="akcije-desno">
+        <button
+          type="button"
+          class="oznaci-sve"
+          disabled={oznacavanjeSve || !imaNeprocitanih}
+          onclick={() => void oznaciSve()}
+        >
+          Označi sve pročitanima
+        </button>
+        <button
+          type="button"
+          class="obrisi-sve"
+          disabled={brisanje || prikazanePoruke.length === 0}
+          onclick={() => void obrisiSve()}
+        >
+          Obriši sve obavijesti
+        </button>
+      </div>
     </div>
   </header>
+
+  {#if ciljanaNedostupna}
+    <p class="stanje upozorenje" role="status">Obavijest više nije dostupna.</p>
+  {/if}
 
   {#if greska}
     <div class="greska" role="alert">
@@ -244,9 +298,9 @@
   {:else if ucitavanje && prikazanePoruke.length === 0}
     <p class="stanje">Učitavanje…</p>
   {:else if prikazanePoruke.length === 0}
-    {#if prikaz === 'nove'}
+    {#if prikaz === 'neprocitane'}
       <div class="stanje prazno-nove">
-        <p>Nema novih obavijesti.</p>
+        <p>Nema nepročitanih obavijesti.</p>
         <button type="button" class="filter-gumb aktivan" onclick={() => void postaviPrikaz('sve')}>
           Prikaži sve
         </button>
@@ -258,13 +312,23 @@
     <ul class="lista">
       {#each prikazanePoruke as poruka (poruka.id)}
         <li id="obavijest-{poruka.id}">
-          <article class="stavka" class:novo={noveIds.has(poruka.id)} class:istaknuto={istaknutiId === poruka.id}>
+          <article
+            class="stavka"
+            class:novo={!poruka.procitano}
+            class:procitano={poruka.procitano}
+            class:istaknuto={istaknutiId === poruka.id}
+          >
             <img class="ikona" src="/ikone/81-mailbox.webp" alt="" aria-hidden="true" width="36" height="36" />
             <div class="tekst">
               <div class="naslovni-red">
-                <strong>{poruka.naslov}</strong>
-                {#if noveIds.has(poruka.id)}
-                  <span class="oznaka-novo">Novo</span>
+                {#if !poruka.procitano}
+                  <span class="tockica" aria-hidden="true"></span>
+                {/if}
+                <strong class:naslov-muted={poruka.procitano}>{poruka.naslov}</strong>
+                {#if !poruka.procitano}
+                  <span class="oznaka-novo">Nepročitano</span>
+                {:else}
+                  <span class="oznaka-procitano">Pročitano</span>
                 {/if}
               </div>
               {#if poruka.tip === TIP_SANDUCIC_NOVA_XP_RAZINA}
@@ -325,7 +389,22 @@
               {:else}
                 <p class="tijelo">{poruka.tekst}</p>
               {/if}
-              <time datetime={poruka.stvorenaAt}>{formatirajVrijeme(poruka.stvorenaAt)}</time>
+              <div class="meta-red">
+                <time datetime={poruka.stvorenaAt}>
+                  {relativnoVrijemeObavijesti(poruka.stvorenaAt)}
+                  <span class="meta-apsolutno">({formatirajVrijeme(poruka.stvorenaAt)})</span>
+                </time>
+                {#if !poruka.procitano}
+                  <button
+                    type="button"
+                    class="oznaci-jednu"
+                    disabled={oznacavanjeIds.has(poruka.id)}
+                    onclick={() => void oznaciJednu(poruka.id)}
+                  >
+                    Označi pročitanom
+                  </button>
+                {/if}
+              </div>
               {#if poruka.poveznica}
                 <a class="poveznica" href={poruka.poveznica}>Otvori</a>
               {/if}
@@ -370,6 +449,12 @@
     justify-content: space-between;
   }
 
+  .akcije-desno {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   .filter {
     display: inline-flex;
     gap: 6px;
@@ -377,7 +462,9 @@
 
   .filter-gumb,
   .obrisi-sve,
+  .oznaci-sve,
   .ucitaj-jos,
+  .oznaci-jednu,
   .greska button {
     min-height: 40px;
     padding: 8px 14px;
@@ -396,15 +483,26 @@
   }
 
   .filter-gumb:disabled,
-  .obrisi-sve:disabled {
+  .obrisi-sve:disabled,
+  .oznaci-sve:disabled,
+  .oznaci-jednu:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .oznaci-sve {
+    border-color: color-mix(in srgb, var(--boja-akcent) 35%, transparent);
   }
 
   .stanje,
   .greska {
     padding: 24px 8px;
     text-align: center;
+  }
+
+  .upozorenje {
+    padding: 8px;
+    opacity: 0.9;
   }
 
   .prazno-nove {
@@ -439,6 +537,10 @@
     background: color-mix(in srgb, var(--boja-akcent) 8%, transparent);
   }
 
+  .stavka.procitano {
+    opacity: 0.88;
+  }
+
   .stavka.istaknuto {
     outline: 2px solid var(--boja-akcent);
   }
@@ -461,12 +563,33 @@
     font-size: 1.05rem;
   }
 
-  .oznaka-novo {
+  .naslov-muted {
+    font-weight: 600;
+    color: var(--boja-tekst-sekundarni);
+  }
+
+  .tockica {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--boja-zuta-krema, #f0d878);
+  }
+
+  .oznaka-novo,
+  .oznaka-procitano {
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     text-transform: uppercase;
+  }
+
+  .oznaka-novo {
     color: var(--boja-akcent);
+  }
+
+  .oznaka-procitano {
+    color: var(--boja-tekst-sekundarni);
+    font-weight: 600;
   }
 
   .tijelo {
@@ -521,9 +644,27 @@
     white-space: pre-wrap;
   }
 
-  .tekst time {
+  .meta-red {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+  }
+
+  .meta-red time {
     font-size: 0.85rem;
     opacity: 0.75;
+  }
+
+  .meta-apsolutno {
+    margin-left: 4px;
+    opacity: 0.8;
+  }
+
+  .oznaci-jednu {
+    min-height: 32px;
+    padding: 4px 10px;
+    font-size: 0.85rem;
   }
 
   .poveznica {
