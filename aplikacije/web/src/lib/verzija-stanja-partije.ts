@@ -57,6 +57,7 @@ export function trebamJednokratniEfekt(
 }
 
 /** E01: klijent nikad ne završava partiju iz broja aktivnih sjedala. */
-export function klijentSmijeZakljucitiIzBrojaAktivnih(_aktivni: number): boolean {
+export function klijentSmijeZakljucitiIzBrojaAktivnih(aktivni: number): boolean {
+  void aktivni;
   return false;
 }
