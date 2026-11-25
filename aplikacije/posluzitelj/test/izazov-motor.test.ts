@@ -143,7 +143,7 @@ describe('Izazov PR03 — CAS završetak', () => {
     }
   });
 
-  it('dvostruki završetak je idempotentan; resultsVisibleAt = terminalAt + 8s', async () => {
+  it('dvostruki završetak je idempotentan; resultsVisibleAt = terminalAt + 5s', async () => {
     const gost = await stvoriGostSesiju();
     zaBrisanje.push(gost.igracId);
     const pokusaj = await umetniRezerviraniPokusaj({

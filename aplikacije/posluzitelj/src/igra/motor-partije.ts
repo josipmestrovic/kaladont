@@ -3553,7 +3553,7 @@ export function stvoriUpraviteljPartija(
             turnToken,
             ishod: 'ignoriran',
             kod: 'NEMA_PARTIJE',
-            poruka: 'Nisi u aktivnoj partiji.',
+            poruka: 'Nisi u aktivnoj igri.',
           });
         }
         return;
@@ -3566,7 +3566,7 @@ export function stvoriUpraviteljPartija(
             turnToken,
             ishod: 'ignoriran',
             kod: 'KRIVA_PARTIJA',
-            poruka: 'Naredba ne pripada aktivnoj partiji.',
+            poruka: 'Naredba ne pripada aktivnoj igri.',
           });
         }
         return;
@@ -3735,7 +3735,7 @@ export function stvoriUpraviteljPartija(
             turnToken,
             ishod: 'ignoriran',
             kod: 'NEMA_PARTIJE',
-            poruka: 'Nisi u aktivnoj partiji.',
+            poruka: 'Nisi u aktivnoj igri.',
           });
         }
         return;
@@ -3748,7 +3748,7 @@ export function stvoriUpraviteljPartija(
             turnToken,
             ishod: 'ignoriran',
             kod: 'KRIVA_PARTIJA',
-            poruka: 'Naredba ne pripada aktivnoj partiji.',
+            poruka: 'Naredba ne pripada aktivnoj igri.',
           });
         }
         return;

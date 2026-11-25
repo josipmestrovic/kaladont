@@ -87,11 +87,11 @@ export function potvrdaIzRezultataNaredbe(
     };
   }
   const poruke: Record<string, { kod: string; poruka: string }> = {
-    nema_partije: { kod: 'NEMA_PARTIJE', poruka: 'Nisi u aktivnoj partiji.' },
-    zavrsena: { kod: 'PARTIJA_ZAVRSENA', poruka: 'Partija je već završila.' },
+    nema_partije: { kod: 'NEMA_PARTIJE', poruka: 'Nisi u aktivnoj igri.' },
+    zavrsena: { kod: 'PARTIJA_ZAVRSENA', poruka: 'Igra je već završila.' },
     nije_na_potezu: { kod: 'NIJE_NA_POTEZU', poruka: 'Nisi na potezu.' },
     sustav_bira: { kod: 'SUSTAV_BIRA', poruka: 'Pričekaj dok sustav bira riječ.' },
-    nije_sudionik: { kod: 'NIJE_SUDIONIK', poruka: 'Nisi aktivan sudionik ove partije.' },
+    nije_sudionik: { kod: 'NIJE_SUDIONIK', poruka: 'Nisi aktivan sudionik ove igre.' },
   };
   const poruka = poruke[rezultat.razlog] ?? { kod: 'IGNORIRAN', poruka: 'Naredba je ignorirana.' };
   return {
