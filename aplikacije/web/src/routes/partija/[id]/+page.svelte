@@ -37,6 +37,7 @@
   import { profilIzNadimkaTreningBota, putanjaPonovneIgre } from '$lib/igraj-rute.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
+  import { stvoriKontrolerSlanjaPoteza } from '$lib/kontroler-slanja-poteza.js';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
@@ -50,6 +51,13 @@
   let unosNastavkaRijeci = $state('');
   let neZnamDijalog = $state(false);
   let slanjeUTijeku = $state(false);
+  let porukaCekanjaPotvrde = $state<string | null>(null);
+  const kontrolerSlanja = stvoriKontrolerSlanjaPoteza({
+    naPromjenu: () => {
+      slanjeUTijeku = kontrolerSlanja.slanjeUTijeku();
+      porukaCekanjaPotvrde = kontrolerSlanja.porukaStatusa();
+    },
+  });
   let odbijeneRijeci = $state<string[]>([]);
   let lokalniPoteziZaPrijavu = $state<{ id: number; rijec: string | null; igracId: string | null; vrsta: string; redniBroj: number; trazenaSlova: string | null; vrijeme: string }[]>([]);
   let prijavljeneOdbijeneRijeci = $state<Set<string>>(new Set());
@@ -72,7 +80,6 @@
     'PREKRATKA_RIJEC',
   ]);
   let izbornikPrijaveIgracaId = $state<string | null>(null);
-  let slanjeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let porukaPoteza = $state<string | null>(null);
   let nepostojecaRijec = $state<string | null>(null);
   let iskoristenaRijec = $state<string | null>(null);
@@ -195,7 +202,15 @@
   function posaljiPotez() {
     const rijec = `${prefiksRijeci}${unosNastavkaRijeci}`.normalize('NFC').toLocaleLowerCase('hr-HR').trim();
     // Prefiks-only (prazan nastavak) je valjana riječ od točno trazenaSlova — RS-05/RS-06.
-    if (!rijec || rijec.length < prefiksRijeci.length || slanjeUTijeku) return;
+    if (!rijec || rijec.length < prefiksRijeci.length || !kontrolerSlanja.mozePokrenuti()) return;
+    if (!stanje.partijaId || !stanje.turnToken) return;
+    const zahtjev = kontrolerSlanja.pokreniZahtjev({
+      partijaId: stanje.partijaId,
+      turnToken: stanje.turnToken,
+      vrsta: 'rijec',
+      rijec,
+    });
+    if (!zahtjev) return;
     aktivnaGrupaObavijestiId = null;
     obavijestiNapretkaNaCekanju = praznaSadrzajObavijesti();
     porukaPoteza = null;
@@ -203,15 +218,8 @@
     iskoristenaRijec = null;
     iskoristeniOblik = null;
     vlastitoImeRijec = null;
-    slanjeUTijeku = true;
     zadnjaPoslanaRijec = rijec;
-    if (slanjeTimeoutId !== null) clearTimeout(slanjeTimeoutId);
-    slanjeTimeoutId = setTimeout(() => {
-      slanjeUTijeku = false;
-      slanjeTimeoutId = null;
-      prikaziGreskuPoteza('Poslužitelj nije potvrdio potez. Pokušaj ponovno.');
-    }, 5000);
-    dohvatiSocket().emit('potez:rijec', { rijec, turnToken: stanje.turnToken ?? undefined });
+    dohvatiSocket().emit('potez:rijec', { rijec, turnToken: zahtjev.turnToken });
     unosNastavkaRijeci = '';
   }
 
@@ -253,19 +261,20 @@
   }
 
   function posaljiNeZnam() {
-    if (slanjeUTijeku) return;
+    if (!kontrolerSlanja.mozePokrenuti() || kontrolerSlanja.slanjeUTijeku()) return;
     neZnamDijalog = true;
   }
 
   function potvrdiNeZnam() {
+    if (!stanje.partijaId || !stanje.turnToken) return;
+    const zahtjev = kontrolerSlanja.pokreniZahtjev({
+      partijaId: stanje.partijaId,
+      turnToken: stanje.turnToken,
+      vrsta: 'ne-znam',
+    });
+    if (!zahtjev) return;
     neZnamDijalog = false;
-    slanjeUTijeku = true;
-    if (slanjeTimeoutId !== null) clearTimeout(slanjeTimeoutId);
-    slanjeTimeoutId = setTimeout(() => {
-      slanjeUTijeku = false;
-      slanjeTimeoutId = null;
-    }, 5000);
-    dohvatiSocket().emit('potez:ne-znam', { turnToken: stanje.turnToken ?? undefined });
+    dohvatiSocket().emit('potez:ne-znam', { turnToken: zahtjev.turnToken });
   }
 
   function prikaziGreskuPoteza(
@@ -804,6 +813,7 @@
   // ili zaključati unos bez čekanja na refresh.
   $effect(() => {
     if (stanje.partijaId !== partijaId) return;
+    kontrolerSlanja.obavijestiPromjenuReda(stanje.partijaId, stanje.turnToken);
     const trebaBitiZakljucano =
       jeEliminiran ||
       stanje.ponistenaPoruka ||
@@ -813,10 +823,10 @@
       !jeNaPotezu;
     if (!trebaBitiZakljucano) return;
     neZnamDijalog = false;
-    slanjeUTijeku = false;
-    if (slanjeTimeoutId !== null) {
-      clearTimeout(slanjeTimeoutId);
-      slanjeTimeoutId = null;
+    // Ne završavaj aktivni zahtjev samo zbog UI zaključavanja — čisti se na
+    // potvrđenom ishodu, kraju partije ili unmountu.
+    if (stanje.kraj || stanje.ponistenaPoruka || stanje.statusSpremanja !== 'nije_zavrsena') {
+      kontrolerSlanja.ocisti({ partijaId: stanje.partijaId });
     }
   });
 
@@ -1045,11 +1055,7 @@
     const naEliminaciju = (eliminacija: Eliminacija) => {
       if (!jeAktualnaPartija()) return;
       neZnamDijalog = false;
-      slanjeUTijeku = false;
-      if (slanjeTimeoutId !== null) {
-        clearTimeout(slanjeTimeoutId);
-        slanjeTimeoutId = null;
-      }
+      kontrolerSlanja.zavrsiZahtjev('prihvacen', { partijaId });
       // Ubojita riječ (mrtva slova/kaladont) nikad ne stiže kroz potez:prihvacen - prikaži je iz eliminacije
       if (eliminacija.rijecUzrok && eliminacija.rijecUzrok !== prikazanaRijec?.rijec) {
         prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
@@ -1085,10 +1091,8 @@
       // Potvrda je dovoljna za otključavanje unosa. To vrijedi i kada riječ
       // odmah uzrokuje mrtva slova i ekran nove runde.
       neZnamDijalog = false;
-      slanjeUTijeku = false;
-      if (slanjeTimeoutId !== null) {
-        clearTimeout(slanjeTimeoutId);
-        slanjeTimeoutId = null;
+      if (potez.igracId === stanje.mojIgracId) {
+        kontrolerSlanja.zavrsiZahtjev('prihvacen', { partijaId });
       }
       // Red / prefiks / streak / nagrada: samo globalni listener (stanje-igre).
       prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
@@ -1110,16 +1114,13 @@
     const naSustavBira = () => {
       if (!jeAktualnaPartija()) return;
       neZnamDijalog = false;
-      slanjeUTijeku = false;
-      if (slanjeTimeoutId !== null) {
-        clearTimeout(slanjeTimeoutId);
-        slanjeTimeoutId = null;
-      }
+      // Sustav bira nije potvrda naredbe — sync/token rješavaju zahtjev.
+      kontrolerSlanja.obavijestiPromjenuReda(partijaId, stanje.turnToken);
     };
 
     const naRunduOtvorenu = (runda: RundaOtvorena) => {
       if (!jeAktualnaPartija()) return;
-      slanjeUTijeku = false;
+      kontrolerSlanja.obavijestiPromjenuReda(partijaId, runda.turnToken);
       prethodnaRijecStola = null;
       prikazanaRijec = {
         id: -Date.now(),
@@ -1135,23 +1136,18 @@
     const naKraj = (kraj: KrajPartije) => {
       if (kraj.partijaId !== partijaId) return;
       neZnamDijalog = false;
-      slanjeUTijeku = false;
-      if (slanjeTimeoutId !== null) {
-        clearTimeout(slanjeTimeoutId);
-        slanjeTimeoutId = null;
-      }
+      kontrolerSlanja.ocisti({ partijaId });
     };
     const naStanjePartije = (novoStanje: StanjePartije) => {
       if (novoStanje.partijaId !== partijaId) return;
-      slanjeUTijeku = false;
+      // Snimka sama po sebi nije potvrda naredbe (A02).
+      kontrolerSlanja.snimkaIstogReda(novoStanje.partijaId, novoStanje.turnToken);
+      kontrolerSlanja.razrijesiNepoznatPremaSnimci(novoStanje.partijaId, novoStanje.turnToken);
+      kontrolerSlanja.obavijestiPromjenuReda(novoStanje.partijaId, novoStanje.turnToken);
     };
     const naOdbijenPotez = ({ kod, poruka }: OdbijenPotez) => {
       if (!jeAktualnaPartija()) return;
-      slanjeUTijeku = false;
-      if (slanjeTimeoutId !== null) {
-        clearTimeout(slanjeTimeoutId);
-        slanjeTimeoutId = null;
-      }
+      kontrolerSlanja.zavrsiZahtjev('odbijen', { partijaId });
       const odbijenaRijec = kod === 'RIJEC_NE_POSTOJI' || kod === 'RIJEC_ISKORISTENA' || kod === 'VLASTITO_IME' ? zadnjaPoslanaRijec : null;
       const oblik = kod === 'RIJEC_ISKORISTENA' && poruka.startsWith(uvodPorukeOblika) && poruka.endsWith(krajPorukeOblika)
         ? poruka.slice(uvodPorukeOblika.length, poruka.length - krajPorukeOblika.length) || null
@@ -1164,12 +1160,8 @@
       prikaziGreskuPoteza(poruka, kod === 'RIJEC_NE_POSTOJI' ? odbijenaRijec : null, kod === 'VLASTITO_IME' ? odbijenaRijec : null, kod === 'RIJEC_ISKORISTENA' ? odbijenaRijec : null, oblik);
     };
     const naGresku = ({ poruka }: { poruka: string }) => {
-      if (!jeAktualnaPartija() || !slanjeUTijeku) return;
-      slanjeUTijeku = false;
-      if (slanjeTimeoutId !== null) {
-        clearTimeout(slanjeTimeoutId);
-        slanjeTimeoutId = null;
-      }
+      if (!jeAktualnaPartija() || !kontrolerSlanja.slanjeUTijeku()) return;
+      kontrolerSlanja.zavrsiZahtjev('odbijen', { partijaId });
       prikaziGreskuPoteza(poruka);
     };
 
@@ -1184,7 +1176,7 @@
     socket.on('greska', naGresku);
 
     return () => {
-      if (slanjeTimeoutId !== null) clearTimeout(slanjeTimeoutId);
+      kontrolerSlanja.ocisti();
       if (reakcijeCooldownTimeoutId !== null) clearTimeout(reakcijeCooldownTimeoutId);
       socket.off('reakcija:nova', naReakciju);
       socket.off('partija:eliminacija', naEliminaciju);
@@ -1199,6 +1191,7 @@
   });
 
   onDestroy(() => {
+    kontrolerSlanja.ocisti();
     zaustaviGovor();
     postaviZavrsniEkranSanducica(false);
   });
@@ -2019,12 +2012,14 @@
                 />
               </div>
             <div class="potez-gumbi">
-              <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? 'Provjera...' : 'Pošalji'}</button>
+              <button type="submit" disabled={slanjeUTijeku || !vezaSpremna}>{slanjeUTijeku ? (porukaCekanjaPotvrde ? 'Provjera…' : 'Šaljemo…') : 'Pošalji'}</button>
               {#if jaDokazujem || (!stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
                 <button type="button" class="ne-znam-gumb" disabled={slanjeUTijeku || !vezaSpremna} onclick={posaljiNeZnam}>Ne znam</button>
               {/if}
             </div>
-            {#if porukaPoteza}
+            {#if porukaCekanjaPotvrde}
+              <p class="poruka-cekanja-potvrde" role="status" aria-live="polite">{porukaCekanjaPotvrde}</p>
+            {:else if porukaPoteza}
               {@render porukaOdbijenogPoteza()}
             {/if}
           </form>
@@ -3196,6 +3191,12 @@
     color: var(--boja-akcent-tekst);
     font-size: var(--tekst-baza);
     font-weight: 400;
+    text-align: center;
+  }
+  .poruka-cekanja-potvrde {
+    margin: 8px 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-baza);
     text-align: center;
   }
   .poruka-poteza strong {
