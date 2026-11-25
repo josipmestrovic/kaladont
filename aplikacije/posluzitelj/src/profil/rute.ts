@@ -381,6 +381,7 @@ async function dohvatiNapredakIzazovaZaProfil(igracId: string) {
 }
 
 async function dohvatiNedavnoOtkljucane(igracId: string, limit = 5) {
+  // Uzmi više sirovih grupa jer se stupnjevi pridjeva/priloga spajaju u isti kolekcijski ključ.
   const redovi = await baza
     .select({
       grupa: otkljucaneGrupeIgraca.grupa,
@@ -389,17 +390,22 @@ async function dohvatiNedavnoOtkljucane(igracId: string, limit = 5) {
     .from(otkljucaneGrupeIgraca)
     .where(eq(otkljucaneGrupeIgraca.igracId, igracId))
     .orderBy(desc(otkljucaneGrupeIgraca.otkljucano), asc(otkljucaneGrupeIgraca.grupa))
-    .limit(limit);
-  return redovi.map((redak) => {
+    .limit(limit * 8);
+  const vidjeni = new Set<string>();
+  const rezultat: { rijec: string; vrsta: string; otkljucano: string }[] = [];
+  for (const redak of redovi) {
     const kljuc = kolekcijskiKljucGrupe(redak.grupa);
+    if (vidjeni.has(kljuc)) continue;
+    vidjeni.add(kljuc);
     const dijelovi = kljuc.split(':');
-    const vrsta = dijelovi[0] ?? 'ostalo';
-    return {
+    rezultat.push({
       rijec: osnovnaRijecIzGrupe(kljuc),
-      vrsta,
+      vrsta: dijelovi[0] ?? 'ostalo',
       otkljucano: redak.otkljucano.toISOString(),
-    };
-  });
+    });
+    if (rezultat.length >= limit) break;
+  }
+  return rezultat;
 }
 
 function opisKolekcionarskeRazine(otkljucano: number, ukupno: number) {

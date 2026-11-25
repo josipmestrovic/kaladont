@@ -78,7 +78,9 @@ test('profili prikazuju istaknuta dostignuća i tooltip na osobnom i javnom prof
   const ikona = javnaDostignuca.getByRole('button').first();
   const ikonaOkvir = await ikona.boundingBox();
   await ikona.click();
-  const mobilniTooltip = await page.getByRole('tooltip').boundingBox();
+  const tooltip = page.getByRole('tooltip');
+  await expect(tooltip).toBeVisible();
+  const mobilniTooltip = await tooltip.boundingBox();
   expect(ikonaOkvir).not.toBeNull();
   expect(mobilniTooltip).not.toBeNull();
   expect(mobilniTooltip!.x).toBeGreaterThanOrEqual(0);

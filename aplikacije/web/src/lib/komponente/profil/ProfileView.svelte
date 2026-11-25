@@ -46,7 +46,8 @@
     if (azurirajHash && typeof window !== 'undefined') {
       const cilj = hashZaPogled(pogled);
       if (window.location.hash !== cilj) {
-        history.replaceState(null, '', `${window.location.pathname}${window.location.search}${cilj}`);
+        // Zadrži SvelteKit router state — null bi razbio Back / klijentsku navigaciju.
+        history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${cilj}`);
       }
     }
   }
@@ -60,7 +61,8 @@
       return;
     }
     promijeniPogled(cilj, !izHasha);
-    if (!izHasha) return;
+    // Pregled je vrh stranice; smooth scroll tu zatvara tooltipe tijekom učitavanja.
+    if (!izHasha || cilj === 'pregled') return;
     await tick();
     document.getElementById(cilj)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

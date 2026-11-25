@@ -135,7 +135,7 @@
     </div>
 
     <div class="kategorije-zaglavlje">
-      <h3>Tvoja zbirka</h3>
+      <h3>{javni ? (igracNaziv ? `Zbirka — ${igracNaziv}` : 'Zbirka') : 'Tvoja zbirka'}</h3>
       <span>{kolekcija.kategorije.length} kategorija</span>
     </div>
     <div class="kategorije">

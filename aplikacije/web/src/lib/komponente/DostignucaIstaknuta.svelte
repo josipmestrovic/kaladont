@@ -26,6 +26,7 @@
   let otvorenoId = $state<string | null>(null);
   let omotac = $state<HTMLDivElement | undefined>();
   let pozicijaPojasnjenja = $state('');
+  let zanemariScrollDo = 0;
   const istaknuta = $derived(odaberiIstaknutaDostignuca(dostignuca, limit));
 
   async function preklopi(dogadaj: MouseEvent, id: string, tooltipId: string) {
@@ -37,6 +38,8 @@
 
     const sidro = dogadaj.currentTarget as HTMLButtonElement;
     otvorenoId = id;
+    // Playwright / mobilni scroll-into-view ne smije odmah zatvoriti tooltip.
+    zanemariScrollDo = Date.now() + 250;
     await tick();
 
     const pojasnjenje = document.getElementById(tooltipId);
@@ -66,12 +69,17 @@
   function zatvoriIzvan(dogadaj: MouseEvent) {
     if (omotac && !omotac.contains(dogadaj.target as Node)) otvorenoId = null;
   }
+
+  function zatvoriNaScroll() {
+    if (Date.now() < zanemariScrollDo) return;
+    otvorenoId = null;
+  }
 </script>
 
 <svelte:window
   onclick={zatvoriIzvan}
   onkeydown={(dogadaj) => dogadaj.key === 'Escape' && (otvorenoId = null)}
-  onscroll={() => (otvorenoId = null)}
+  onscroll={zatvoriNaScroll}
   onresize={() => (otvorenoId = null)}
 />
 
