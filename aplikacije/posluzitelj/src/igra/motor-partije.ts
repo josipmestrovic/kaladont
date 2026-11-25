@@ -2305,6 +2305,11 @@ export function stvoriUpraviteljPartija(
       odgodiNastavakRadiDokaza?: boolean;
       /** Ne otvaraj novu rundu nakon elim (npr. slijedi još jedna elim u istom zatvaranju dokaza). */
       preskociNastavak?: boolean;
+      /**
+       * Eksplicitna uzročna riječ za najopasnije (npr. uspješan dokaz: izvornaRijec, ne dokazana).
+       * Ako nije zadana, koristi se zadnja odigrana nesistemska riječ.
+       */
+      rijecZaNajopasnije?: string | null;
     },
   ): void {
     if (stanje.zavrsena || !stanje.aktivni.has(igracId)) return;
@@ -2393,18 +2398,17 @@ export function stvoriUpraviteljPartija(
     upisiPotvrdjeniRaniPoraz(stanje, igracId, plasman, razlog);
 
     // Najopasnije riječi: samo odigrana (nesistemska) uzročna riječ; brojimo sve žrtve.
+    // Uspješan dokaz: zadnjaRijec je već dokazana riječ — kredit ide na dokaz.izvornaRijec.
     const jePrekidIzvanPoteza = razlog === 'prekid' && !bioNaPotezuKodPrekida;
-    if (
-      !jePrekidIzvanPoteza
-      && stanje.zadnjaRijec
-      && stanje.zadnjaRijecVrsta === 'rijec'
-    ) {
+    const rijecZaNajopasnije = opcije?.rijecZaNajopasnije
+      ?? (stanje.zadnjaRijecVrsta === 'rijec' ? stanje.zadnjaRijec : null);
+    if (!jePrekidIzvanPoteza && rijecZaNajopasnije) {
       const zrtvaId = igracId.startsWith('racunalo-') ? null : igracId;
       const zapisEliminacije: ZapisEliminacijePoRijeci = {
         partijaId: stanje.partijaId,
         redniBroj: stanje.redniBroj,
         kontekst: stanje.kontekst,
-        rijec: stanje.zadnjaRijec,
+        rijec: rijecZaNajopasnije,
         razlog,
         zrtvaId,
       };
@@ -2501,6 +2505,7 @@ export function stvoriUpraviteljPartija(
       uzrocnikId?: string | null;
       odgodiNastavakRadiDokaza?: boolean;
       preskociNastavak?: boolean;
+      rijecZaNajopasnije?: string | null;
     },
   ): void {
     primijeniPotvrdjenuEliminaciju(stanje, igracId, razlog, kontekstPrekida, opcije);
@@ -2595,6 +2600,8 @@ export function stvoriUpraviteljPartija(
         uzrocnikId: ishod.uzrocnikId,
         // Ne koristi default sidro=uzročnik; runda ide iza Brunе.
         preskociNastavak: true,
+        // Kredit najopasnijih: riječ koju Bruno nije nastavio, ne dokazana riječ.
+        rijecZaNajopasnije: dokaz.izvornaRijec,
       });
       if (stanje.zavrsena) return;
       if (stanje.aktivni.size <= 1) {

@@ -35,7 +35,7 @@ test('stranice s queryjem, hashom, ljestvicom i javnim profilom rade nakon refre
   await expect(page).toHaveURL(/\/profil\?tab=postavke#avatar$/);
 
   await page.goto('/ljestvica?tab=rijeci');
-  await expect(page).toHaveURL(/\/ljestvice\?kategorija=rijeci$/);
+  await expect(page).toHaveURL(/\/ljestvice\?kategorija=najopasnije$/);
   await expect(page.getByRole('heading', { name: 'Ljestvice' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Ljestvice' })).toBeVisible();

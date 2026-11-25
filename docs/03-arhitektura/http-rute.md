@@ -1,7 +1,7 @@
 # HTTP rute
 
 Poslovne HTTP rute Kaladonta imaju namespace `/api`. URL-ovi stranica ostaju bez tog prefiksa:
-`/profil`, `/profil/javni/:igracId`, `/ljestvice`, `/novosti`, `/admin` i ostali SvelteKit ekrani. Stara stranica `/ljestvica` trajno (308) preusmjerava na `/ljestvice` (`?tab=rijeci` → `?kategorija=rijeci`).
+`/profil`, `/profil/javni/:igracId`, `/ljestvice`, `/novosti`, `/admin` i ostali SvelteKit ekrani. Stara stranica `/ljestvica` trajno (308) preusmjerava na `/ljestvice` (`?tab=rijeci` → `?kategorija=najopasnije`).
 
 <!-- HINT PR15: /novosti je prava stranica (200), više nije 307 na /o-igri; indeksabilna + sitemap. -->
 

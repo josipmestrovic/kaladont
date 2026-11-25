@@ -154,14 +154,22 @@
 
   onMount(() => {
     void osigurajProfil();
-    const stariMod = url.searchParams.get('mod');
-    const stariPrikaz = url.searchParams.get('prikaz');
-    const staraKategorija = url.searchParams.get('kategorija');
-    if (stariMod && stariMod !== 'tri_igraca' || stariPrikaz === 'oko_mene' || staraKategorija === 'rijeci') {
-      const novi = new URL(url);
+    const novi = new URL(url);
+    let trebaZamjena = false;
+    if (novi.searchParams.get('kategorija') === 'rijeci') {
+      novi.searchParams.set('kategorija', 'najopasnije');
+      trebaZamjena = true;
+    }
+    const stariMod = novi.searchParams.get('mod');
+    if (stariMod && stariMod !== 'tri_igraca') {
       novi.searchParams.set('mod', 'tri_igraca');
+      trebaZamjena = true;
+    }
+    if (novi.searchParams.get('prikaz') === 'oko_mene') {
       novi.searchParams.delete('prikaz');
-      if (staraKategorija === 'rijeci') novi.searchParams.set('kategorija', 'najopasnije');
+      trebaZamjena = true;
+    }
+    if (trebaZamjena) {
       void goto(`${novi.pathname}${novi.search}`, { replaceState: true, noScroll: true });
     }
     const tik = setInterval(() => {

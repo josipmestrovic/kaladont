@@ -148,8 +148,8 @@
       if (generacija !== ljestviceGeneracija) return;
       ljestviceTekst = tekstSazetkaLjestvice(odgovor.status);
     } catch {
+      // Zadrži zadnji uspješan sažetak; ne briši rang zbog prolazne greške mreže.
       if (generacija !== ljestviceGeneracija) return;
-      ljestviceTekst = null;
     }
   }
 
