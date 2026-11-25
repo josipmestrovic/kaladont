@@ -44,11 +44,43 @@ export interface ZatvaranjeVeze {
 export interface PayloadPotezRijec {
   rijec: string;
   turnToken?: string;
+  /** Novi klijent (#142): izolacija partije. */
+  partijaId?: string;
+  /** Novi klijent (#142): identitet jedne naredbe. */
+  requestId?: string;
 }
 
 export interface PayloadNeznam {
   turnToken?: string;
+  partijaId?: string;
+  requestId?: string;
 }
+
+/** Identitet naredbe poteza (novi ugovor #142). */
+export interface IdentitetNaredbePoteza {
+  partijaId: string;
+  turnToken: string;
+  requestId: string;
+}
+
+/** Korelirani ACK za potez:rijec / potez:ne-znam. */
+export type PotvrdaNaredbePoteza =
+  | {
+      partijaId: string;
+      requestId: string;
+      turnToken: string;
+      ishod: 'prihvacen';
+      verzijaStanja: number;
+    }
+  | {
+      partijaId: string;
+      requestId: string;
+      turnToken: string;
+      ishod: 'odbijen' | 'ignoriran';
+      kod: string;
+      poruka: string;
+      verzijaStanja?: number;
+    };
 
 export interface PayloadReakcijaPosalji {
   poruka: BrzaPoruka;
@@ -108,6 +140,8 @@ export interface ClanSobe {
   jeVlasnik: boolean;
   pobjedeUSobi: number;
   bodoviUSobi: number;
+  /** Čekaonica: privremeni prekid veze unutar serverskog grace perioda. */
+  privremenoOdspojen?: boolean;
 }
 
 export interface StanjePrivatneSobe {
@@ -200,7 +234,7 @@ export interface SnimkaDokaza {
   /** true kad je čekač već potvrđen (napusti/prekid); false dok čeka odluku nakon „Ne znam”/isteka. */
   cekateljVecIspao: boolean;
   pocetakIso: string;
-  istekPotezaIso: string;
+  istekPotezaIso: string | null;
 }
 
 export interface StanjePartije {
@@ -208,9 +242,14 @@ export interface StanjePartije {
   mojIgracId: string;
   sjedala: PocetakPartije['sjedala'];
   turnToken: string;
+  /** Monotona verzija kanonskog stanja (#142); stari klijent ignorira. */
+  verzijaStanja?: number;
   naPotezuId: string;
   trazenaSlova: string | null;
-  istekPotezaIso: string;
+  /** null = nema auto-roka; prazan string na žici normalizirati na null. */
+  istekPotezaIso: string | null;
+  /** true samo dok aktualna faza ima aktivni vremenski rok. */
+  timerAktivan?: boolean;
   serverVrijemeIso: string;
   runda: number;
   brojIskoristenih: number;
@@ -256,6 +295,9 @@ export interface StanjePartije {
 export interface DokazZatrazen {
   partijaId: string;
   izazovId: string;
+  /** #142: stabilni ID događaja za dedup efekata. */
+  dogadajId?: string;
+  verzijaStanja?: number;
   autorId: string;
   cekateljId: string;
   izvornaRijec: string;
@@ -263,7 +305,8 @@ export interface DokazZatrazen {
   razlogOtvaranja: RazlogOtvaranjaDokaza;
   cekateljVecIspao: boolean;
   turnToken: string;
-  istekPotezaIso: string;
+  istekPotezaIso: string | null;
+  timerAktivan?: boolean;
   serverVrijemeIso: string;
   naPotezuId: string;
   /** Efektivni rok aktivnog (dokaznog) sudionika. */
@@ -283,7 +326,8 @@ export interface PrihvacenPotez {
   trazenaSlova: string;
   sljedeciId: string;
   turnToken: string;
-  istekPotezaIso: string;
+  istekPotezaIso: string | null;
+  timerAktivan?: boolean;
   serverVrijemeIso: string;
   brojIskoristenih: number;
   streak: number;
@@ -292,6 +336,10 @@ export interface PrihvacenPotez {
   iskustvo?: StavkaIskustva[];
   /** Efektivni rok sljedećeg igrača (posebno relevantno za Izazov 15/30). */
   trajanjePotezaSek?: number;
+  /** #142: izolacija partije / dedup efekata. */
+  partijaId?: string;
+  dogadajId?: string;
+  verzijaStanja?: number;
 }
 
 export interface OtkljucavanjeRijeci {
@@ -375,6 +423,10 @@ export interface Eliminacija {
   /** Riječ koja je izazvala mrtva slova (za obrazloženje na klijentu); null za ostale razloge. */
   rijecUzrok: string | null;
   iskustvo?: StavkaIskustva | null;
+  /** #142: izolacija partije / dedup efekata. */
+  partijaId?: string;
+  dogadajId?: string;
+  verzijaStanja?: number;
 }
 
 export interface KrajPartije {
@@ -462,6 +514,9 @@ export interface PonistenaPartija {
 /** Sustav je pocelo birati rijec za otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta). */
 export interface SustavBiraRijec {
   istekIzboraIso: string;
+  partijaId?: string;
+  dogadajId?: string;
+  verzijaStanja?: number;
 }
 
 /** Sustav je otkrio nasumicno odabranu rijec; sljedeci igrac na potezu na nju odgovara kao normalan nastavak. */
@@ -470,11 +525,15 @@ export interface RundaOtvorena {
   trazenaSlova: string;
   naPotezuId: string;
   turnToken: string;
-  istekPotezaIso: string;
+  istekPotezaIso: string | null;
+  timerAktivan?: boolean;
   serverVrijemeIso: string;
   runda: number;
   /** Efektivni rok igrača na potezu. */
   trajanjePotezaSek?: number;
+  partijaId?: string;
+  dogadajId?: string;
+  verzijaStanja?: number;
 }
 
 export type KodGreske =
@@ -489,6 +548,7 @@ export type KodGreske =
   | 'IZBACEN_IZ_SOBE'
   | 'NISI_VLASNIK'
   | 'NEDOVOLJNO_IGRACA'
+  | 'CLANOVI_NEDOSTUPNI'
   | 'VEC_U_PARTIJI'
   | 'VEC_U_SOBI'
   | 'EMAIL_NIJE_POTVRDEN'
@@ -564,9 +624,16 @@ export interface DogadajiKlijentPoslužitelj {
   'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;
-  'partija:stanje': () => void;
-  'potez:rijec': (payload: PayloadPotezRijec) => void;
-  'potez:ne-znam': (payload?: PayloadNeznam) => void;
+  'partija:stanje': (
+    payload?: { partijaId?: string; requestId?: string },
+    /** Klasični ACK ili socket.timeout `(err, odgovor)` — labavo zbog Socket.IO timeout overloada. */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    potvrda?: (...args: any[]) => void,
+  ) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  'potez:rijec': (payload: PayloadPotezRijec, potvrda?: (...args: any[]) => void) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  'potez:ne-znam': (payload?: PayloadNeznam, potvrda?: (...args: any[]) => void) => void;
   'reakcija:posalji': (payload: PayloadReakcijaPosalji) => void;
   'igrac:avatar-azuriraj': (payload: PayloadAvatarAzuriraj) => void;
   'soba:stvori': (payload: PayloadStvoriSobu) => void;

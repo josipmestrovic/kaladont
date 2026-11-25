@@ -162,6 +162,8 @@ export interface OpcijePosluzitelja {
     cetveroboj?: boolean;
     pragoviMs?: Partial<Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>>;
   };
+  /** Samo testovi: skraćeni grace prekida veze u privatnoj čekaonici. */
+  gracePrekidPrivatneCekaoniceMs?: number;
 }
 
 /** Izgrađuje Fastify + Socket.IO instancu (bez pokretanja listen-a) - koristi ga i index.ts i testovi. */
@@ -894,6 +896,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       razlogBlokadeIgre,
       ukloniIzJavnogReda: redServis.ukloniIzReda,
       dopustiVlastitaImena: konfiguracija.DOPUSTI_VLASTITA_IMENA === 'true',
+      gracePrekidCekaoniceMs: opcije.gracePrekidPrivatneCekaoniceMs,
     },
   );
   igracImaPrivatnuSobu = sobaServis.imaPrivatnuSobu;

@@ -355,13 +355,13 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
       // Živi rok: čovjek 30 s, bot 0 (prazan istek).
       if (runda.naPotezuId === igracId) {
         expect(pocetak.trajanjePotezaSek).toBe(30);
-        expect(runda.istekPotezaIso).not.toBe('');
+        expect(runda.istekPotezaIso).toBeTruthy();
         const rokMs = new Date(runda.istekPotezaIso).getTime() - sat.sada();
         expect(rokMs).toBeGreaterThanOrEqual(29_000);
         expect(rokMs).toBeLessThanOrEqual(30_000);
       } else {
         expect(pocetak.trajanjePotezaSek).toBe(0);
-        expect(runda.istekPotezaIso).toBe('');
+        expect(runda.istekPotezaIso).toBeNull();
       }
 
       const redak = await dohvatiPokusajPoId(attemptId);
@@ -391,7 +391,7 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
         expect(rokMs).toBeLessThanOrEqual(15_000);
       } else {
         expect(runda.trajanjePotezaSek).toBe(0);
-        expect(runda.istekPotezaIso).toBe('');
+        expect(runda.istekPotezaIso).toBeNull();
       }
     } finally {
       socket.disconnect();
@@ -404,11 +404,11 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
       if (runda.naPotezuId !== igracId) {
         // Bot na potezu — rok 0, prazan istek (bez ljudskog deadline testa).
         expect(runda.trajanjePotezaSek).toBe(0);
-        expect(runda.istekPotezaIso).toBe('');
+        expect(runda.istekPotezaIso).toBeNull();
         return;
       }
 
-      expect(runda.istekPotezaIso).not.toBe('');
+      expect(runda.istekPotezaIso).toBeTruthy();
       const preostalo = new Date(runda.istekPotezaIso).getTime() - sat.sada();
       expect(preostalo).toBeGreaterThanOrEqual(14_900);
       expect(preostalo).toBeLessThanOrEqual(15_000);

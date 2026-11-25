@@ -485,9 +485,17 @@ async function polozajiAvatara(stranica: Page) {
 
 async function emitiranjeStanja(stranica: Page, stanje: StanjePartije) {
   await stranica.evaluate(async (poruka) => {
-    const putanja = '/src/lib/socket.ts';
-    const { dohvatiSocket } = await import(putanja);
-    dohvatiSocket().emitEvent(['partija:stanje', poruka]);
+    const putanjaSocketa = '/src/lib/socket.ts';
+    const putanjaStanja = '/src/lib/stanje-igre.svelte.ts';
+    const { dohvatiSocket } = await import(putanjaSocketa);
+    const { dohvatiStanjeIgre } = await import(putanjaStanja);
+    // #142: ista verzija snimke ne primjenjuje turn/unos — bump iznad lokalne.
+    const lokalna = dohvatiStanjeIgre().verzijaStanja ?? 0;
+    const snimka = poruka.verzijaStanja ?? 0;
+    dohvatiSocket().emitEvent(['partija:stanje', {
+      ...poruka,
+      verzijaStanja: Math.max(lokalna, snimka) + 1,
+    }]);
   }, stanje);
 }
 
@@ -923,8 +931,11 @@ test('eliminator nakon zadnje eliminacije vidi spremanje a ne zamrznuti stol', a
     await stranica.evaluate(
       async ({ autorId, ostali }) => {
         const putanja = '/src/lib/socket.ts';
+        const putanjaStanja = '/src/lib/stanje-igre.svelte.ts';
         const { dohvatiSocket } = await import(putanja);
+        const { dohvatiStanjeIgre } = await import(putanjaStanja);
         const socket = dohvatiSocket();
+        const partijaId = dohvatiStanjeIgre().partijaId;
         for (const [indeks, zrtvaId] of ostali.slice(0, 2).entries()) {
           socket.emitEvent([
             'partija:eliminacija',
@@ -966,6 +977,13 @@ test('eliminator nakon zadnje eliminacije vidi spremanje a ne zamrznuti stol', a
             rijecUzrok: 'kaladont',
           },
         ]);
+        // #142 E: klijent više ne zaključuje kraj iz broja aktivnih — server emitira spremanje.
+        if (partijaId) {
+          socket.emitEvent([
+            'partija:spremanje-rezultata',
+            { partijaId, poruka: 'Spremanje rezultata…' },
+          ]);
+        }
       },
       { autorId: ids.mojIgracId, ostali: ids.ostali },
     );

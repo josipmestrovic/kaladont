@@ -630,7 +630,9 @@ async function scenarijIgra(postavke: Postavke, tokeni: readonly string[]) {
         poruka.naPotezuId === igracId
       ) {
         partija.timerTestirano = true;
-        partija.timerCekaMs = performance.now() + Math.max(0, Date.parse(poruka.istekPotezaIso) - Date.now());
+        if (poruka.istekPotezaIso) {
+          partija.timerCekaMs = performance.now() + Math.max(0, Date.parse(poruka.istekPotezaIso) - Date.now());
+        }
         return;
       }
       if (poruka.naPotezuId === igracId) zakaziPotez(partija);
