@@ -37,9 +37,9 @@
   import { profilIzNadimkaTreningBota, putanjaPonovneIgre } from '$lib/igraj-rute.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
-  import { stvoriKontrolerSlanjaPoteza } from '$lib/kontroler-slanja-poteza.js';
+  import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
-  import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
+  import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
   const stanjeVeze = dohvatiStanjeVeze();
@@ -52,12 +52,29 @@
   let neZnamDijalog = $state(false);
   let slanjeUTijeku = $state(false);
   let porukaCekanjaPotvrde = $state<string | null>(null);
+  // Interni timeout isključen — koristi se socket.timeout ACK (#142 B).
   const kontrolerSlanja = stvoriKontrolerSlanjaPoteza({
+    trajanjeCekanjaMs: 0,
     naPromjenu: () => {
       slanjeUTijeku = kontrolerSlanja.slanjeUTijeku();
       porukaCekanjaPotvrde = kontrolerSlanja.porukaStatusa();
     },
   });
+
+  function obradiPotvrduNaredbe(potvrda: PotvrdaNaredbePoteza, zaOdbijanje?: {
+    kod?: string;
+    poruka: string;
+  }) {
+    const primijenjeno = kontrolerSlanja.primijeniPotvrdu(potvrda);
+    if (!primijenjeno) return;
+    if (potvrda.ishod === 'odbijen' && zaOdbijanje) {
+      // UX odbijanja i dalje vodi postojeći potez:odbijen handler / lokalni poziv.
+    }
+    if (potvrda.ishod === 'ignoriran' && potvrda.poruka) {
+      // Ne tretiraj kao jezičnu grešku — samo status.
+      porukaCekanjaPotvrde = null;
+    }
+  }
   let odbijeneRijeci = $state<string[]>([]);
   let lokalniPoteziZaPrijavu = $state<{ id: number; rijec: string | null; igracId: string | null; vrsta: string; redniBroj: number; trazenaSlova: string | null; vrijeme: string }[]>([]);
   let prijavljeneOdbijeneRijeci = $state<Set<string>>(new Set());
@@ -219,8 +236,25 @@
     iskoristeniOblik = null;
     vlastitoImeRijec = null;
     zadnjaPoslanaRijec = rijec;
-    dohvatiSocket().emit('potez:rijec', { rijec, turnToken: zahtjev.turnToken });
     unosNastavkaRijeci = '';
+    dohvatiSocket()
+      .timeout(TRAJANJE_CEKANJA_POTVRDE_MS)
+      .emit(
+        'potez:rijec',
+        {
+          rijec,
+          turnToken: zahtjev.turnToken,
+          partijaId: zahtjev.partijaId,
+          requestId: zahtjev.requestId,
+        },
+        (greska: Error | null, potvrda?: PotvrdaNaredbePoteza) => {
+          if (greska || !potvrda) {
+            kontrolerSlanja.naTransportniTimeout(zahtjev.requestId);
+            return;
+          }
+          obradiPotvrduNaredbe(potvrda);
+        },
+      );
   }
 
   function nastaviTrening() {
@@ -274,7 +308,23 @@
     });
     if (!zahtjev) return;
     neZnamDijalog = false;
-    dohvatiSocket().emit('potez:ne-znam', { turnToken: zahtjev.turnToken });
+    dohvatiSocket()
+      .timeout(TRAJANJE_CEKANJA_POTVRDE_MS)
+      .emit(
+        'potez:ne-znam',
+        {
+          turnToken: zahtjev.turnToken,
+          partijaId: zahtjev.partijaId,
+          requestId: zahtjev.requestId,
+        },
+        (greska: Error | null, potvrda?: PotvrdaNaredbePoteza) => {
+          if (greska || !potvrda) {
+            kontrolerSlanja.naTransportniTimeout(zahtjev.requestId);
+            return;
+          }
+          obradiPotvrduNaredbe(potvrda);
+        },
+      );
   }
 
   function prikaziGreskuPoteza(

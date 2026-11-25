@@ -72,6 +72,7 @@ export function stvoriKontrolerSlanjaPoteza(opcije?: {
   }
 
   function zakaziTimeout(requestId: string) {
+    if (trajanjeCekanjaMs <= 0) return;
     ponistiTimeout();
     timeoutHandle = timeoutApi.postavi(() => {
       timeoutHandle = null;
@@ -80,6 +81,30 @@ export function stvoriKontrolerSlanjaPoteza(opcije?: {
       aktivni = { ...aktivni, status: 'nepoznat_ishod' };
       objavi();
     }, trajanjeCekanjaMs);
+  }
+
+  /** Transportni timeout (socket.timeout) → nepoznat ishod. */
+  function naTransportniTimeout(requestId: string): boolean {
+    if (!aktivni || aktivni.requestId !== requestId) return false;
+    if (aktivni.status !== 'slanje') return false;
+    ponistiTimeout();
+    aktivni = { ...aktivni, status: 'nepoznat_ishod' };
+    objavi();
+    return true;
+  }
+
+  function primijeniPotvrdu(potvrda: {
+    requestId: string;
+    ishod: 'prihvacen' | 'odbijen' | 'ignoriran';
+  }): boolean {
+    if (potvrda.ishod === 'prihvacen') {
+      return zavrsiZahtjev('prihvacen', { requestId: potvrda.requestId });
+    }
+    if (potvrda.ishod === 'odbijen') {
+      return zavrsiZahtjev('odbijen', { requestId: potvrda.requestId });
+    }
+    // ignoriran: očisti kao odbijen za UI (nema nove riječi), bez lažne jezične greške
+    return zavrsiZahtjev('odbijen', { requestId: potvrda.requestId });
   }
 
   function mozePokrenuti(): boolean {
@@ -201,6 +226,8 @@ export function stvoriKontrolerSlanjaPoteza(opcije?: {
   return {
     pokreniZahtjev,
     zavrsiZahtjev,
+    naTransportniTimeout,
+    primijeniPotvrdu,
     snimkaIstogReda,
     razrijesiNepoznatPremaSnimci,
     obavijestiPromjenuReda,

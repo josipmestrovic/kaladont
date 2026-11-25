@@ -44,11 +44,43 @@ export interface ZatvaranjeVeze {
 export interface PayloadPotezRijec {
   rijec: string;
   turnToken?: string;
+  /** Novi klijent (#142): izolacija partije. */
+  partijaId?: string;
+  /** Novi klijent (#142): identitet jedne naredbe. */
+  requestId?: string;
 }
 
 export interface PayloadNeznam {
   turnToken?: string;
+  partijaId?: string;
+  requestId?: string;
 }
+
+/** Identitet naredbe poteza (novi ugovor #142). */
+export interface IdentitetNaredbePoteza {
+  partijaId: string;
+  turnToken: string;
+  requestId: string;
+}
+
+/** Korelirani ACK za potez:rijec / potez:ne-znam. */
+export type PotvrdaNaredbePoteza =
+  | {
+      partijaId: string;
+      requestId: string;
+      turnToken: string;
+      ishod: 'prihvacen';
+      verzijaStanja: number;
+    }
+  | {
+      partijaId: string;
+      requestId: string;
+      turnToken: string;
+      ishod: 'odbijen' | 'ignoriran';
+      kod: string;
+      poruka: string;
+      verzijaStanja?: number;
+    };
 
 export interface PayloadReakcijaPosalji {
   poruka: BrzaPoruka;
@@ -210,6 +242,8 @@ export interface StanjePartije {
   mojIgracId: string;
   sjedala: PocetakPartije['sjedala'];
   turnToken: string;
+  /** Monotona verzija kanonskog stanja (#142); stari klijent ignorira. */
+  verzijaStanja?: number;
   naPotezuId: string;
   trazenaSlova: string | null;
   istekPotezaIso: string;
@@ -491,6 +525,7 @@ export type KodGreske =
   | 'IZBACEN_IZ_SOBE'
   | 'NISI_VLASNIK'
   | 'NEDOVOLJNO_IGRACA'
+  | 'CLANOVI_NEDOSTUPNI'
   | 'VEC_U_PARTIJI'
   | 'VEC_U_SOBI'
   | 'EMAIL_NIJE_POTVRDEN'
@@ -566,9 +601,16 @@ export interface DogadajiKlijentPoslužitelj {
   'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;
-  'partija:stanje': () => void;
-  'potez:rijec': (payload: PayloadPotezRijec) => void;
-  'potez:ne-znam': (payload?: PayloadNeznam) => void;
+  'partija:stanje': (
+    payload?: { partijaId?: string; requestId?: string },
+    potvrda?: (odgovor: {
+      snimka: StanjePartije | null;
+      potvrdaNaredbe?: PotvrdaNaredbePoteza;
+      razlog?: string;
+    }) => void,
+  ) => void;
+  'potez:rijec': (payload: PayloadPotezRijec, potvrda?: (p: PotvrdaNaredbePoteza) => void) => void;
+  'potez:ne-znam': (payload?: PayloadNeznam, potvrda?: (p: PotvrdaNaredbePoteza) => void) => void;
   'reakcija:posalji': (payload: PayloadReakcijaPosalji) => void;
   'igrac:avatar-azuriraj': (payload: PayloadAvatarAzuriraj) => void;
   'soba:stvori': (payload: PayloadStvoriSobu) => void;
