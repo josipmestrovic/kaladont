@@ -16,17 +16,21 @@
   $effect(() => {
     const trenutna = ++generacija;
     const izvor = putanja;
+    const bojaZaBojanje = boja;
+    // Ne prikazuj prethodnu varijantu dok se nova ne pripremi.
+    prikazanaPutanja = izvor;
     if (!izvor) {
       prikazanaPutanja = null;
       return;
     }
-    if (!boja) {
-      prikazanaPutanja = izvor;
-      return;
-    }
-    void dohvatiObojeniSvg(izvor, boja, bojiStroke(kategorija)).then((obojeno) => {
-      if (trenutna === generacija) prikazanaPutanja = obojeno;
-    });
+    if (!bojaZaBojanje) return;
+    void dohvatiObojeniSvg(izvor, bojaZaBojanje, bojiStroke(kategorija))
+      .then((obojeno) => {
+        if (trenutna === generacija) prikazanaPutanja = obojeno;
+      })
+      .catch(() => {
+        if (trenutna === generacija) prikazanaPutanja = izvor;
+      });
   });
 </script>
 

@@ -12,11 +12,12 @@
   let { konfiguracija = ZADANI_AVATAR_CONFIG, rang = null, velicina = 280 }: Props = $props();
   const border = $derived(bojaBordera(rang));
   const debljina = $derived(border ? debljinaBorderaRanga(velicina) : 0);
+  /** Obojeni URL-ovi samo za trenutni identitet sloja (putanja+boja). */
   let obojanePutanje = $state<Record<string, string>>({});
+  let identitetiSlojeva = $state<Record<string, string>>({});
   let generacijaBojanja = 0;
 
   const dioPutanja = putanjaDijela;
-
 
   const slojevi = $derived([
     { kategorija: 'background', vrijednost: konfiguracija.parts.background, x: 0, y: 0, sirina: 380, visina: 380 },
@@ -31,7 +32,6 @@
     { kategorija: 'earrings', vrijednost: konfiguracija.parts.earrings, x: 89, y: 207, sirina: 52, visina: 52 },
     { kategorija: 'glasses', vrijednost: konfiguracija.parts.glasses, x: 116, y: 132, sirina: 151, visina: 65 },
     { kategorija: 'hair', vrijednost: konfiguracija.parts.hair, x: 59, y: 28, sirina: 240, visina: 203 },
-    // Dugacka kosa te veliki nosovi i usi imaju vlastiti okvir; ostali zadrzavaju okvir kategorije.
   ].map((sloj) => ({ ...sloj, ...(okvirDijela(sloj.kategorija, sloj.vrijednost) ?? {}) })));
 
   function bojaZaKategoriju(kategorija: string): string | null {
@@ -46,22 +46,50 @@
     return null;
   }
 
+  function identitetSloja(kategorija: string, vrijednost: string | null, boja: string | null): string {
+    return `${kategorija}|${vrijednost ?? ''}|${boja ?? ''}`;
+  }
+
+  function hrefSloja(kategorija: string, vrijednost: string | null, putanja: string): string {
+    const boja = bojaZaKategoriju(kategorija);
+    const id = identitetSloja(kategorija, vrijednost, boja);
+    if (identitetiSlojeva[kategorija] === id && obojanePutanje[kategorija]) {
+      return obojanePutanje[kategorija]!;
+    }
+    // Dok se novo bojanje ne završi, prikaži neobojeni original nove geometrije (ne stari sloj).
+    return putanja;
+  }
+
   $effect(() => {
     const trenutnaGeneracija = ++generacijaBojanja;
-    obojanePutanje = {};
     const slojeviZaBojanje = slojevi.filter((sloj) => dioPutanja(sloj.kategorija, sloj.vrijednost) && bojaZaKategoriju(sloj.kategorija));
+
     const ucitavanja = slojeviZaBojanje.map(async (sloj) => {
       const putanja = dioPutanja(sloj.kategorija, sloj.vrijednost)!;
       const boja = bojaZaKategoriju(sloj.kategorija)!;
-      const obojiStroke = bojiStroke(sloj.kategorija);
-      return [sloj.kategorija, await dohvatiObojeniSvg(putanja, boja, obojiStroke)] as const;
+      const id = identitetSloja(sloj.kategorija, sloj.vrijednost, boja);
+      try {
+        const url = await dohvatiObojeniSvg(putanja, boja, bojiStroke(sloj.kategorija));
+        return [sloj.kategorija, url, id] as const;
+      } catch {
+        return [sloj.kategorija, putanja, id] as const;
+      }
     });
 
     void Promise.all(ucitavanja).then((rezultati) => {
       if (trenutnaGeneracija !== generacijaBojanja) return;
-      obojanePutanje = Object.fromEntries(rezultati);
+      const novo: Record<string, string> = {};
+      const ids: Record<string, string> = {};
+      for (const [kategorija, url, id] of rezultati) {
+        novo[kategorija] = url;
+        ids[kategorija] = id;
+      }
+      // Atomski zamijeni cijeli kompozit zadnje tražene konfiguracije.
+      obojanePutanje = novo;
+      identitetiSlojeva = ids;
     });
-  });</script>
+  });
+</script>
 
 <div
   class="avatar-konfiguracija"
@@ -75,8 +103,15 @@
     <circle cx="190" cy="190" r="190" fill="#FFEDEF" />
     {#each slojevi as sloj (sloj.kategorija)}
       {@const putanja = dioPutanja(sloj.kategorija, sloj.vrijednost)}
-      {#if putanja && sloj.kategorija !== 'background' && (sloj.kategorija !== 'earrings' || konfiguracija.parts.ears !== 'detached') && (!bojaZaKategoriju(sloj.kategorija) || obojanePutanje[sloj.kategorija])}
-        <image href={obojanePutanje[sloj.kategorija] ?? putanja} x={sloj.x} y={sloj.y} width={sloj.sirina} height={sloj.visina} preserveAspectRatio="none" />
+      {#if putanja && sloj.kategorija !== 'background' && (sloj.kategorija !== 'earrings' || konfiguracija.parts.ears !== 'detached')}
+        <image
+          href={hrefSloja(sloj.kategorija, sloj.vrijednost, putanja)}
+          x={sloj.x}
+          y={sloj.y}
+          width={sloj.sirina}
+          height={sloj.visina}
+          preserveAspectRatio="none"
+        />
       {/if}
     {/each}
   </svg>

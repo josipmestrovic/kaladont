@@ -95,7 +95,10 @@ export function ulogaBojeKategorije(kategorija: string): string | null {
 }
 
 const cacheSirovih = new Map<string, Promise<string>>();
+/** LRU cache obojenih data URL-ova; 512 drži tipičnu sesiju editora uz custom boje. */
+const MAKS_CACHE_OBOJENIH = 512;
 const cacheObojenih = new Map<string, string>();
+const uTijekuBojanja = new Map<string, Promise<string>>();
 
 function dohvatiSirovi(putanja: string): Promise<string> {
   const spremljeno = cacheSirovih.get(putanja);
@@ -111,16 +114,42 @@ function dohvatiSirovi(putanja: string): Promise<string> {
   return obecanje;
 }
 
+function zapamtiObojeni(kljuc: string, dataUrl: string): void {
+  if (cacheObojenih.has(kljuc)) cacheObojenih.delete(kljuc);
+  cacheObojenih.set(kljuc, dataUrl);
+  while (cacheObojenih.size > MAKS_CACHE_OBOJENIH) {
+    const najstariji = cacheObojenih.keys().next().value;
+    if (najstariji === undefined) break;
+    cacheObojenih.delete(najstariji);
+  }
+}
+
 export async function dohvatiObojeniSvg(putanja: string, boja: string, obojiStroke: boolean): Promise<string> {
   const kljuc = `${putanja}|${boja}|${obojiStroke ? 'stroke' : 'fill'}`;
   const spremljeno = cacheObojenih.get(kljuc);
-  if (spremljeno) return spremljeno;
+  if (spremljeno) {
+    // LRU: pomakni na kraj.
+    cacheObojenih.delete(kljuc);
+    cacheObojenih.set(kljuc, spremljeno);
+    return spremljeno;
+  }
 
-  const svg = await dohvatiSirovi(putanja);
-  let obojeni = svg.replace(/fill="(?:#[0-9A-Fa-f]{6}|black|white)"/g, `fill="${boja}"`);
-  if (obojiStroke) obojeni = obojeni.replace(/stroke="(?:#[0-9A-Fa-f]{6}|black|white)"/g, `stroke="${boja}"`);
+  const postojece = uTijekuBojanja.get(kljuc);
+  if (postojece) return postojece;
 
-  const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(obojeni)}`;
-  cacheObojenih.set(kljuc, dataUrl);
-  return dataUrl;
+  const obecanje = (async () => {
+    const svg = await dohvatiSirovi(putanja);
+    let obojeni = svg.replace(/fill="(?:#[0-9A-Fa-f]{6}|black|white)"/g, `fill="${boja}"`);
+    if (obojiStroke) obojeni = obojeni.replace(/stroke="(?:#[0-9A-Fa-f]{6}|black|white)"/g, `stroke="${boja}"`);
+    const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(obojeni)}`;
+    zapamtiObojeni(kljuc, dataUrl);
+    return dataUrl;
+  })();
+
+  uTijekuBojanja.set(kljuc, obecanje);
+  try {
+    return await obecanje;
+  } finally {
+    uTijekuBojanja.delete(kljuc);
+  }
 }
