@@ -37,11 +37,17 @@ test('registrirani igrač vidi 1 dnevnu i 3 tjedne; zamjena s potvrdom', async (
   await expect(page.getByText(/1 \/ 3 sačuvane/)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Tjedne misije' })).toBeVisible();
   await expect(page.getByText(/0 \/ 3 završene/)).toBeVisible();
+  await expect(page.getByText(/Danas završeno/)).toBeVisible();
+  await expect(page.getByText(/Dostupno za osvojiti/)).toBeVisible();
+  await expect(page.locator('.kartica-misije a[aria-label*="Odmah igraj"]')).toHaveCount(0);
+  await expect(page.locator('.kartica-misije').getByRole('link', { name: /Igraj/i })).toHaveCount(0);
 
   const dnevneKartice = page.locator('.sekcija').filter({ has: page.getByRole('heading', { name: 'Dnevne misije' }) }).locator('.kartica-misije');
   await expect(dnevneKartice).toHaveCount(1);
+  await expect(dnevneKartice.first().getByText('DNEVNA')).toBeVisible();
   const tjedneKartice = page.locator('.sekcija').filter({ has: page.getByRole('heading', { name: 'Tjedne misije' }) }).locator('.kartica-misije');
   await expect(tjedneKartice).toHaveCount(3);
+  await expect(tjedneKartice.first().getByText('TJEDNA')).toBeVisible();
 
   const nazivPrije = await dnevneKartice.first().locator('h3').innerText();
   await dnevneKartice.first().getByRole('button', { name: /Zamijeni misiju/ }).click();
@@ -65,5 +71,5 @@ test('druga zamjena iste vrste pokazuje grešku kvote', async ({ page }) => {
   await page.getByRole('dialog').getByRole('button', { name: 'Zamijeni' }).click();
   await expect(page.getByText('Misija zamijenjena.')).toBeVisible();
   await expect(dnevna.getByRole('button', { name: /Zamijeni misiju/ })).toBeDisabled();
-  await expect(page.getByText(/Današnja zamjena je iskorištena/)).toBeVisible();
+  await expect(page.getByText(/Nema dostupnih zamjena/)).toBeVisible();
 });
