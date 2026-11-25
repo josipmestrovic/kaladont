@@ -4,6 +4,7 @@
  * HINT PR14: faza/dokaz/pravila dolaze sa snimke — UI ne sudi iz broja avatara.
  */
 import type {
+  BrzaPoruka,
   DokazZatrazen,
   Eliminacija,
   FazaPoteza,
@@ -316,7 +317,12 @@ function primijeniStanjePartije(p: StanjePartije): void {
       ? (stanje.eliminacije.find((e) => e.igracId === prethodniDokaz.cekateljId)?.bodZa ?? null)
       : undefined;
   stanje.partijaId = p.partijaId;
-  stanje.pocetakPartijeIso = null;
+  // Ne briši početni rok preuranjenim snapshotom runde 0 — reconnect mora obnoviti odbrojavanje.
+  if (p.runda === 0 && p.istekIzboraIso) {
+    stanje.pocetakPartijeIso = p.istekIzboraIso;
+  } else if (p.runda > 0) {
+    stanje.pocetakPartijeIso = null;
+  }
   stanje.mojIgracId = p.mojIgracId;
   stanje.sjedala = p.sjedala;
   stanje.turnToken = p.turnToken ?? null;
@@ -485,10 +491,21 @@ export function pokreniSlusateljeIgre(): void {
   pokrenuto = true;
   const socket = dohvatiSocket();
 
+  socket.on('reakcija:nova', (p: { partijaId?: string; igracId: string; poruka: BrzaPoruka }) => {
+    if (napustioPartiju) return;
+    const partijaId = p.partijaId ?? stanje.partijaId;
+    if (!partijaId) return;
+    // Buffer dok stol nije registrirao live listener (gap nakon goto, prije onMount).
+    if (!stolReakcijeAktivne) {
+      spremiPendingReakciju(partijaId, p.igracId, p.poruka);
+    }
+  });
+
   socket.on('partija:pocetak', (p) => {
     napustioPartiju = false;
     odsviranPocetakZaPartijuId = null;
     zadnjiDokazIzazovId = null;
+    pendingReakcije = pendingReakcije.filter((r) => r.partijaId === p.partijaId);
     oznaciPartijuDostupnom();
     brojOdbijenihNaPotezu = 0;
     stanje.partijaId = p.partijaId;
@@ -501,6 +518,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.istekPotezaIso = null;
     stanje.serverVrijemeIso = new Date().toISOString();
     stanje.pocetakPartijeIso = p.pocetakIso;
+    stanje.runda = 0;
     stanje.trazenaSlova = null;
     stanje.brojIskoristenih = 0;
     stanje.eliminacije = [];
@@ -518,8 +536,10 @@ export function pokreniSlusateljeIgre(): void {
     if (timerKonfetaIskustva) clearTimeout(timerKonfetaIskustva);
     timerKonfetaIskustva = null;
     stanje.poruka = null;
-    stanje.sustavBiraRijec = false;
-    stanje.istekIzboraIso = null;
+    // Pre-start: blokiraj unos; UI razlikuje početni overlay od međurundi preko runda === 0.
+    stanje.sustavBiraRijec = true;
+    stanje.istekIzboraIso = p.pocetakIso;
+    stanje.faza = 'sustav_bira';
     stanje.zadnjaRijec = null;
     stanje.zadnjaRijecIgracId = null;
     stanje.zadnjaRijecVrsta = null;
@@ -529,7 +549,6 @@ export function pokreniSlusateljeIgre(): void {
     ocistiDokazHold();
     if (timerIshodDokaza) clearTimeout(timerIshodDokaza);
     timerIshodDokaza = null;
-    stanje.faza = 'obican_potez';
     stanje.dokaz = null;
     stanje.ishodDokazaPoruka = null;
     stanje.kontekst = p.kontekst ?? (p.jePrivatna ? 'privatna' : 'javna');
@@ -727,10 +746,14 @@ export function pokreniSlusateljeIgre(): void {
       // Treća osoba ispala tijekom dokaza: ne diraj snimku dokaza.
     }
     // #142 E: kraj i statusSpremanja određuje samo server (snimka / terminalni eventi).
-    // Vizualni prijelaz na sustav_bira ostaje prezentacijski dok ne stigne snimka.
+    // Vizualni prijelaz na sustav_bira ostaje prezentacijski dok ne stigne snimka —
+    // ali ne kad je ovo završna eliminacija (plasman 2 = ostaje jedan pobjednik → kraj),
+    // inače bljesne „Nova runda” / promatrač prije partija:kraj.
     const dokazJosTraje = stanje.faza === 'dokaz_nastavka' && stanje.dokaz !== null;
+    const zavrsnaEliminacija = p.plasman === 2;
     if (
       !dokazJosTraje &&
+      !zavrsnaEliminacija &&
       p.razlog !== 'prekid' &&
       !stanje.kraj &&
       stanje.statusSpremanja === 'nije_zavrsena' &&
@@ -794,6 +817,8 @@ export function pokreniSlusateljeIgre(): void {
       pustiAudio('promjena-reda');
     }
     stanje.sustavBiraRijec = false;
+    stanje.pocetakPartijeIso = null;
+    stanje.istekIzboraIso = null;
     stanje.turnToken = p.turnToken ?? null;
     stanje.naPotezuId = p.naPotezuId;
     stanje.trazenaSlova = p.trazenaSlova;
@@ -902,6 +927,35 @@ export function dohvatiStanjeIgre(): StanjeIgre {
   return stanje;
 }
 
+const TTL_PENDING_REAKCIJE_MS = 4_000;
+type PendingReakcija = { partijaId: string; igracId: string; poruka: BrzaPoruka; expiresAt: number };
+let pendingReakcije: PendingReakcija[] = [];
+/** true kad partija page ima aktivan live `reakcija:nova` listener. */
+let stolReakcijeAktivne = false;
+
+export function postaviStolReakcijeAktivne(aktivno: boolean): void {
+  stolReakcijeAktivne = aktivno;
+}
+
+function ocistiIsteklePendingReakcije(sada = Date.now()): void {
+  pendingReakcije = pendingReakcije.filter((r) => r.expiresAt > sada);
+}
+
+/** Reakcije koje su stigle prije mounta stola — potroši jednom po partiji. */
+export function preuzmiPendingReakcije(partijaId: string): { igracId: string; poruka: BrzaPoruka }[] {
+  const sada = Date.now();
+  ocistiIsteklePendingReakcije(sada);
+  const trenutne = pendingReakcije.filter((r) => r.partijaId === partijaId);
+  pendingReakcije = pendingReakcije.filter((r) => r.partijaId !== partijaId);
+  return trenutne.map(({ igracId, poruka }) => ({ igracId, poruka }));
+}
+
+function spremiPendingReakciju(partijaId: string, igracId: string, poruka: BrzaPoruka): void {
+  const sada = Date.now();
+  ocistiIsteklePendingReakcije(sada);
+  pendingReakcije.push({ partijaId, igracId, poruka, expiresAt: sada + TTL_PENDING_REAKCIJE_MS });
+}
+
 /**
  * Lokalno napuštanje partije: gasi SFX i ignorira kasne socket evente stare partije
  * dok ne stigne nova partija:pocetak. Pozvati prije emit('partija:izadji').
@@ -922,6 +976,7 @@ export function napustiLokalnuPartiju(): void {
   timerNagradePoteza = null;
   timerNovaDostignuca = null;
   timerKonfetaIskustva = null;
+  pendingReakcije = [];
   stanje.partijaId = null;
   stanje.mojIgracId = null;
   stanje.sjedala = [];

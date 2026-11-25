@@ -864,8 +864,8 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
     expect(rezultat.stanje.partijaId).toBe(pocetak.partijaId);
     expect(rezultat.stanje.zavrsena).toBe(true);
     expect(rezultat.kraj.plasmani.find((p) => p.igracId === buduciPobjednik.token)?.plasman).toBe(1);
-    expect(Date.parse(rezultat.kraj.prikazRezultataOdIso!) - Date.now()).toBeGreaterThan(6_000);
-    expect(Date.parse(rezultat.kraj.prikazRezultataOdIso!) - Date.now()).toBeLessThanOrEqual(8_000);
+    expect(Date.parse(rezultat.kraj.prikazRezultataOdIso!) - Date.now()).toBeGreaterThan(3_000);
+    expect(Date.parse(rezultat.kraj.prikazRezultataOdIso!) - Date.now()).toBeLessThanOrEqual(5_000);
     rezultat.igrac.socket.disconnect();
     const ponovljeni = await spojiIgracaIPricekajStanjeIKraj(buduciPobjednik.authToken);
     expect(ponovljeni.kraj.prikazRezultataOdIso).toBe(rezultat.kraj.prikazRezultataOdIso);

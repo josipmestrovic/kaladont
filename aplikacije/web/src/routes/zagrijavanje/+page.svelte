@@ -5,7 +5,7 @@
   import { dohvatiSocket } from '$lib/socket.js';
   import { dohvatiSavjete } from '$lib/savjeti.js';
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
-  import { aktivirajAudio, pustiAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
+  import { aktivirajAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import {
     jePoznatiPravilnik,
     NAZIVI_PROFILA_BOTA,
@@ -44,34 +44,15 @@
   );
 
   let poruka = $state<string | null>(null);
-  let countdown = $state<number | null>(null);
   let pokretanjeUTijeku = $state(false);
   let savjet = $state('');
-  let odbrojavanje: ReturnType<typeof setInterval> | null = null;
   let timeoutPotvrde: ReturnType<typeof setTimeout> | null = null;
+  let navigiranPartijaId: string | null = null;
 
-  function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {
-    if (odbrojavanje) clearInterval(odbrojavanje);
-    const pocetakMs = new Date(pocetakIso).getTime();
-    if (pocetakMs - Date.now() < -3000) return;
-    let zadnjaOdsvirana = Number.POSITIVE_INFINITY;
-    const azuriraj = () => {
-      const preostalo = Math.max(0, Math.ceil((pocetakMs - Date.now()) / 1000));
-      countdown = preostalo;
-      if (preostalo > 0 && preostalo < zadnjaOdsvirana) {
-        zadnjaOdsvirana = preostalo;
-        pustiAudio('odbrojavanje-single-count-sound');
-      }
-      if (preostalo <= 0) {
-        if (odbrojavanje) clearInterval(odbrojavanje);
-        odbrojavanje = null;
-        igra.pocetakPartijeIso = null;
-        // pocetak-partije svira stanje-igre na runda-otvorena (runda 1), ne ovdje.
-        void goto(`/partija/${partijaId}`);
-      }
-    };
-    odbrojavanje = setInterval(azuriraj, 250);
-    azuriraj();
+  function idiNaStol(partijaId: string) {
+    if (!partijaId || navigiranPartijaId === partijaId) return;
+    navigiranPartijaId = partijaId;
+    void goto(`/partija/${partijaId}`);
   }
 
   function zapocni() {
@@ -113,12 +94,12 @@
     pokreniSlusateljeIgre();
     savjet = savjeti[Math.floor(Math.random() * savjeti.length)] ?? '';
     const socket = dohvatiSocket();
-    const naPocetak = (pocetak: PocetakPartije) => pokreniOdbrojavanje(pocetak.pocetakIso, pocetak.partijaId);
+    const naPocetak = (pocetak: PocetakPartije) => idiNaStol(pocetak.partijaId);
     const naStanje = (stanje: StanjePartije) => {
-      if (!stanje.zavrsena) void goto(`/partija/${stanje.partijaId}`);
+      if (!stanje.zavrsena) idiNaStol(stanje.partijaId);
     };
     const naRundu = (_runda: RundaOtvorena) => {
-      if (igra.partijaId) void goto(`/partija/${igra.partijaId}`);
+      if (igra.partijaId) idiNaStol(igra.partijaId);
     };
     socket.on('partija:pocetak', naPocetak);
     socket.on('partija:stanje', naStanje);
@@ -135,7 +116,6 @@
   });
 
   onDestroy(() => {
-    if (odbrojavanje) clearInterval(odbrojavanje);
     if (timeoutPotvrde) clearTimeout(timeoutPotvrde);
   });
 </script>
@@ -145,10 +125,7 @@
 </svelte:head>
 
 <main class="zagrijavanje">
-  {#if countdown !== null}
-    <h1 aria-live="polite">Računalo je spremno! Trening kreće za {countdown}…</h1>
-    <TreningMeta pravila={trazenaPravila} profileId={trazeniProfil} />
-  {:else if poruka}
+  {#if poruka}
     <h1>Zagrijavanje</h1>
     <p role="alert">{poruka}</p>
     <div class="akcije">

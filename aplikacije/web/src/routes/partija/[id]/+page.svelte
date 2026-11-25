@@ -5,7 +5,7 @@
   import { api } from '$lib/api.js';
   import { dohvatiSocket, dohvatiStanjeVeze } from '$lib/socket.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { dohvatiStanjeIgre, napustiLokalnuPartiju, zatraziSinkronizacijuPartije } from '$lib/stanje-igre.svelte.js';
+  import { dohvatiStanjeIgre, napustiLokalnuPartiju, postaviStolReakcijeAktivne, preuzmiPendingReakcije, zatraziSinkronizacijuPartije } from '$lib/stanje-igre.svelte.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import Konfeti from '$lib/komponente/Konfeti.svelte';
@@ -13,6 +13,7 @@
   import NapredakMisijaPartije from '$lib/komponente/NapredakMisijaPartije.svelte';
   import NapredakCiljevaIzazova from '$lib/komponente/NapredakCiljevaIzazova.svelte';
   import TreningMeta from '$lib/komponente/TreningMeta.svelte';
+  import PocetnoOdbrojavanje from '$lib/komponente/PocetnoOdbrojavanje.svelte';
   import RezultatIzazova from '$lib/komponente/RezultatIzazova.svelte';
   import KaladontDnkPromjena from '$lib/komponente/KaladontDnkPromjena.svelte';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
@@ -38,7 +39,7 @@
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
-  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
+  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
@@ -175,7 +176,7 @@
     if (sjedalo.jeGost) return 'Gost';
     return `${sjedalo.rang ?? 'Piskaralo'} | LVL ${sjedalo.razina}`;
   }
-  let sekundeDoRezultata = $state(8);
+  let sekundeDoRezultata = $state(Math.ceil(ODGODA_PRIKAZA_REZULTATA_MS / 1_000));
   let rezervniRokRezultataMs: number | null = null;
   type VrstaReakcije = BrzaPoruka | 'tuzan';
   let reakcije = $state<{ id: number; igracId: string; poruka: VrstaReakcije }[]>([]);
@@ -922,8 +923,20 @@
   let sustavBrojacIntervalId: ReturnType<typeof setInterval> | null = null;
   let aplauzPobjedeZaPartijuId: string | null = null;
 
+  /** Početno 3-2-1 na stolu (privatna/trening/izazov, ili rani ulazak u javnu). */
+  const jePocetnoOdbrojavanje = $derived(
+    stanje.runda === 0
+      && !stanje.kraj
+      && stanje.statusSpremanja === 'nije_zavrsena'
+      && Boolean(stanje.pocetakPartijeIso ?? (stanje.sustavBiraRijec && stanje.istekIzboraIso)),
+  );
+  const rokPocetnogOdbrojavanja = $derived(
+    stanje.pocetakPartijeIso ?? stanje.istekIzboraIso ?? '',
+  );
+
   $effect(() => {
-    if (!stanje.sustavBiraRijec || !stanje.istekIzboraIso) {
+    // Međurundi „Nova runda za…” — ne početni overlay (zvuk/UI u PocetnoOdbrojavanje).
+    if (stanje.runda === 0 || !stanje.sustavBiraRijec || !stanje.istekIzboraIso) {
       if (sustavBrojacIntervalId !== null) {
         clearInterval(sustavBrojacIntervalId);
         sustavBrojacIntervalId = null;
@@ -959,7 +972,7 @@
     }
 
     prikaziRezultate = false;
-    rezervniRokRezultataMs ??= Date.now() + 8_000;
+    rezervniRokRezultataMs ??= Date.now() + ODGODA_PRIKAZA_REZULTATA_MS;
     const izazovRok = stanje.izazovTerminal?.resultsVisibleAtIso
       ? Date.parse(stanje.izazovTerminal.resultsVisibleAtIso)
       : NaN;
@@ -1100,15 +1113,19 @@
     void ucitajPoteze(false);
     const socket = dohvatiSocket();
 
-    const naReakciju = ({ igracId, poruka }: { igracId: string; poruka: BrzaPoruka }) => {
-      if (!jeAktualnaPartija()) return;
+    const prikaziReakciju = (igracId: string, poruka: VrstaReakcije, saZvukom = true) => {
       const id = sljedeciIdReakcije++;
       reakcije = [...reakcije, { id, igracId, poruka }];
       odskociAvatara = { ...odskociAvatara, [igracId]: (odskociAvatara[igracId] ?? 0) + 1 };
-      pustiAudio('chat-poruka');
+      if (saZvukom) pustiAudio('chat-poruka');
       window.setTimeout(() => {
         reakcije = reakcije.filter((reakcija) => reakcija.id !== id);
       }, 3500);
+    };
+
+    const naReakciju = ({ igracId, poruka }: { igracId: string; poruka: BrzaPoruka }) => {
+      if (!jeAktualnaPartija()) return;
+      prikaziReakciju(igracId, poruka);
     };
 
     const naEliminaciju = (eliminacija: Eliminacija) => {
@@ -1236,8 +1253,15 @@
     socket.on('partija:runda-otvorena', naRunduOtvorenu);
     socket.on('partija:kraj', naKraj);
     socket.on('greska', naGresku);
+    postaviStolReakcijeAktivne(true);
+    if (partijaId) {
+      for (const pending of preuzmiPendingReakcije(partijaId)) {
+        prikaziReakciju(pending.igracId, pending.poruka);
+      }
+    }
 
     return () => {
+      postaviStolReakcijeAktivne(false);
       kontrolerSlanja.ocisti();
       if (reakcijeCooldownTimeoutId !== null) clearTimeout(reakcijeCooldownTimeoutId);
       socket.off('reakcija:nova', naReakciju);
@@ -1389,7 +1413,7 @@
 {#if stanje.kraj && prikaziRezultate}
   <div class="zavrsni-header"><Header /></div>
   {#if jeIzazov}
-    {#if stanje.izazovTerminal?.status === 'uspjeh' || pobjednikPartije()?.igracId === stanje.mojIgracId}
+    {#if stanje.izazovTerminal?.status === 'uspjeh'}
       <Konfeti intenzitet="veliki" />
     {/if}
     <RezultatIzazova
@@ -1400,6 +1424,8 @@
       terminalReason={stanje.izazovTerminal?.reason ?? null}
       gameWon={stanje.izazovTerminal?.gameWon ?? null}
       odbijenaRijec={odbijenaRijecZaIzazov}
+      mojIgracId={stanje.mojIgracId}
+      {brojSanducicSazetka}
     />
     <PanelPrijavaRijeci
       partijaId={partijaId!}
@@ -1701,14 +1727,14 @@
   {/if}
 {:else}
   <div class="aktivna-partija-sadrzaj">
-  {#if jeIzazov && !stanje.kraj}
+  {#if jeIzazov && !prikaziRezultate}
     <NapredakCiljevaIzazova
       napredak={stanje.goalProgress}
       meta={stanje.izazovMeta}
       pravila={stanje.pravila}
     />
   {/if}
-  {#if jeTrening && !stanje.kraj}
+  {#if jeTrening && !prikaziRezultate}
     <TreningMeta pravila={stanje.pravila} profileId={treningProfileId} />
   {/if}
   {#if prikazanaSjedala.length > 0}
@@ -1977,6 +2003,8 @@
           {/if}
           <p class="odbrojavanje-najava">Spremanje rezultata…</p>
         </div>
+      {:else if jePocetnoOdbrojavanje && rokPocetnogOdbrojavanja}
+        <PocetnoOdbrojavanje rokIso={rokPocetnogOdbrojavanja} />
       {:else if stanje.sustavBiraRijec}
         <div class="sustav-bira-inline" aria-live="polite">
           {#if stanje.ishodDokazaPoruka}
@@ -2103,11 +2131,11 @@
         {/if}
       {/if}
     {/if}
-    {#if cekamDokaz && !stanje.ponistenaPoruka}
+    {#if cekamDokaz && !stanje.ponistenaPoruka && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena'}
       <aside class="promatranje-traka dokaz-cekam" aria-live="polite" data-testid="dokaz-cekam">
         <p>Čekaš dokaz. Još nisi ispao.</p>
       </aside>
-    {:else if jeEliminiran && !stanje.ponistenaPoruka}
+    {:else if jeEliminiran && !stanje.ponistenaPoruka && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena'}
       <aside class="promatranje-traka" aria-live="polite">
         {#if stanje.obracunIskustva && !jeTrening}
           <p class="obracun-promatraca">Ukupno iskustva za ovu igru: <strong>{stanje.obracunIskustva.mojeIskustvo.osvojenoIskustvo} XP</strong>.</p>
@@ -2118,7 +2146,7 @@
           <button type="button" onclick={napustiPartiju}>Izađi</button>
         </div>
         {#if !stanje.obracunIskustva || jeTrening}
-          <p>{#if jeTrening}Ovo je trening. Možeš slobodno izaći.{:else if stanje.statusSpremanja === 'rezultati_spremljeni'}Sve je spremljeno. Možeš slobodno izaći.{:else if stanje.statusSpremanja === 'spremanje_rezultata'}Rezultat se još sprema. Možeš slobodno izaći.{:else}Možeš slobodno izaći. Tvoj rezultat spremit će se kada igra završi.{/if}</p>
+          <p>{#if jeTrening}Ovo je trening. Možeš slobodno izaći.{:else}Možeš slobodno izaći. Tvoj rezultat spremit će se kada igra završi.{/if}</p>
         {/if}
       </aside>
     {/if}

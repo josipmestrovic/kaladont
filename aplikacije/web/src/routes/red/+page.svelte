@@ -125,10 +125,20 @@
       ulazakPoslan = false;
     };
     const naStanjePartije = (stanjePartije: StanjePartije) => {
-      if (!stanjePartije.zavrsena) void goto(`/partija/${stanjePartije.partijaId}`);
+      // Tijekom lobby odbrojavanja ostani na /red — inače bi bilo dvostruko 3-2-1.
+      if (stanjePartije.zavrsena) return;
+      if (stanjePartije.runda === 0 && countdown !== null) return;
+      void goto(`/partija/${stanjePartije.partijaId}`);
     };
     const naRunduOtvorenu = (_runda: RundaOtvorena) => {
-      if (igra.partijaId) void goto(`/partija/${igra.partijaId}`);
+      if (!igra.partijaId) return;
+      if (odbrojavanjePartije) {
+        clearInterval(odbrojavanjePartije);
+        odbrojavanjePartije = null;
+      }
+      countdown = null;
+      igra.pocetakPartijeIso = null;
+      void goto(`/partija/${igra.partijaId}`);
     };
     const naPocetakPartije = (pocetak: PocetakPartije) => {
       const mod = pocetak.mod ?? trazeneMod;

@@ -10,6 +10,7 @@ import {
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
   odaberiReakcijuPriIspadanju,
+  odgodaPocetnogPozdravaMs,
   odgodaReakcijeMs,
 } from '../src/bot/reakcije.js';
 import type { RjecnikUMemoriji } from '../src/rjecnik/ucitaj.js';
@@ -23,6 +24,15 @@ describe('bot reakcije — odabir', () => {
     expect(odgodaReakcijeMs(() => 0.5, { odgodaReakcijeMinMs: 2_500 })).toBe(
       2_500 + Math.floor(0.5 * (DODATNA_ODGODA_REAKCIJE_MS + 1)),
     );
+  });
+
+  it('početni pozdravi: javna od 1. runde, stol tijekom odbrojavanja', () => {
+    expect(odgodaPocetnogPozdravaMs('javna', 0, () => 0)).toBe(1_000);
+    expect(odgodaPocetnogPozdravaMs('javna', 0, () => 0.999)).toBe(1_500);
+    expect(odgodaPocetnogPozdravaMs('javna', 1, () => 0)).toBe(2_150);
+    expect(odgodaPocetnogPozdravaMs('trening', 0, () => 0)).toBe(500);
+    expect(odgodaPocetnogPozdravaMs('privatna', 1, () => 0)).toBe(1_200);
+    expect(odgodaPocetnogPozdravaMs('izazov', 0, () => 0.999)).toBe(1_000);
   });
 
   it('obvezni poolovi: pozdrav / sorry / bravo', () => {
@@ -72,22 +82,81 @@ describe('bot reakcije — kontroler', () => {
     });
   }
 
-  it('zakazuje pozdrave u javnoj, privatnoj i trening partiji', () => {
-    for (const kontekst of ['javna', 'privatna', 'trening'] as const) {
+  it('privatna/trening/izazov: pozdravi odmah na najavi (stolni raspored)', () => {
+    for (const kontekst of ['privatna', 'trening', 'izazov'] as const) {
       const poslano: { partijaId: string; igracId: string; poruka: string }[] = [];
       const zakazano: { ms: number; posao: () => void }[] = [];
       const kontroler = stvoriKontroler({ poslano, zakazano });
       kontroler.naPocetakPartije('p1', kontekst, ['bot-a', 'bot-b']);
       expect(zakazano).toHaveLength(2);
-      expect(zakazano.every((z) => z.ms >= MINIMALNA_ODGODA_REAKCIJE_MS && z.ms <= MINIMALNA_ODGODA_REAKCIJE_MS + DODATNA_ODGODA_REAKCIJE_MS)).toBe(true);
+      expect(zakazano[0]!.ms).toBeGreaterThanOrEqual(500);
+      expect(zakazano[0]!.ms).toBeLessThanOrEqual(1_000);
+      expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(1_000);
+      expect(zakazano[1]!.ms).toBeLessThanOrEqual(3_500);
       for (const z of zakazano) z.posao();
       expect(poslano).toHaveLength(2);
       expect(poslano.every((p) => (POOL_POZDRAV as readonly string[]).includes(p.poruka))).toBe(true);
-      // dedup: drugi poziv ne dodaje nove pozdrave
       const prije = zakazano.length;
       kontroler.naPocetakPartije('p1', kontekst, ['bot-a', 'bot-b']);
       expect(zakazano).toHaveLength(prije);
     }
+  });
+
+  it('javna: pozdravi tek nakon otvaranja prve runde', () => {
+    const poslano: { partijaId: string; igracId: string; poruka: string }[] = [];
+    const zakazano: { ms: number; posao: () => void }[] = [];
+    const kontroler = stvoriKontroler({ poslano, zakazano });
+    kontroler.naPocetakPartije('p-javna', 'javna', ['bot-a', 'bot-b']);
+    expect(zakazano).toHaveLength(0);
+    kontroler.naPromjenuPoteza({
+      partijaId: 'p-javna',
+      kontekst: 'javna',
+      turnToken: 't1',
+      naPotezuId: 'covjek',
+      trazenaSlova: 'ka',
+      izborUToku: false,
+      zavrsena: false,
+      istekPotezaMs: null,
+      trajanjePotezaMs: 30_000,
+      pocetakPotezaMs: 0,
+      sudionici: [
+        { igracId: 'covjek', upravljac: 'covjek', aktivan: true },
+        { igracId: 'bot-a', upravljac: 'bot', aktivan: true },
+        { igracId: 'bot-b', upravljac: 'bot', aktivan: true },
+      ],
+      dokaz: null,
+      pravila: 'klasicna',
+    } as never);
+    expect(zakazano).toHaveLength(2);
+    expect(zakazano[0]!.ms).toBeGreaterThanOrEqual(1_000);
+    expect(zakazano[0]!.ms).toBeLessThanOrEqual(1_500);
+    expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(2_000);
+    for (const z of zakazano) z.posao();
+    expect(poslano).toHaveLength(2);
+    // drugi turn ne ponavlja pozdrave (smije zakazati potez bota)
+    poslano.length = 0;
+    zakazano.length = 0;
+    kontroler.naPromjenuPoteza({
+      partijaId: 'p-javna',
+      kontekst: 'javna',
+      turnToken: 't2',
+      naPotezuId: 'covjek',
+      trazenaSlova: 'la',
+      izborUToku: false,
+      zavrsena: false,
+      istekPotezaMs: null,
+      trajanjePotezaMs: 30_000,
+      pocetakPotezaMs: 0,
+      sudionici: [
+        { igracId: 'covjek', upravljac: 'covjek', aktivan: true },
+        { igracId: 'bot-a', upravljac: 'bot', aktivan: true },
+        { igracId: 'bot-b', upravljac: 'bot', aktivan: true },
+      ],
+      dokaz: null,
+      pravila: 'klasicna',
+    } as never);
+    expect(zakazano).toHaveLength(0);
+    expect(poslano).toHaveLength(0);
   });
 
   it('eliminacija: sorry + bravo kad postoji zaslužni; tišina bez bodZa', () => {
@@ -138,15 +207,15 @@ describe('bot reakcije — kontroler', () => {
       },
       otkazi: vi.fn(),
     });
-    kontroler.naPocetakPartije('p4', 'javna', ['bot-a']);
-    expect(zakazano[0]!.ms).toBe(2_000);
+    kontroler.naPocetakPartije('p4', 'privatna', ['bot-a']);
+    expect(zakazano[0]!.ms).toBe(500);
     // Ista bot eliminira — druga poruka mora čekati cooldown nakon prve.
-    kontroler.naEliminaciju('p4', 'javna', 'covjek', 'bot-a', [
+    kontroler.naEliminaciju('p4', 'privatna', 'covjek', 'bot-a', [
       { igracId: 'bot-a', upravljac: 'bot' },
       { igracId: 'covjek', upravljac: 'covjek' },
     ], 'p4:1');
     expect(zakazano).toHaveLength(2);
-    expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(4_000);
+    expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(2_500);
   });
 
   it('odbijena reakcija zbog cooldowna se jednom ponavlja', () => {

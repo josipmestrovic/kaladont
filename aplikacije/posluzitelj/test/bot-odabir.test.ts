@@ -949,6 +949,18 @@ describe('bot kontroler', () => {
     expect(timeri[0]!.ms).toBe(BOT_POTEZ_BEZ_ROKA_MS);
   });
 
+  it('javna bot-only uz aktivan timer ubrzava odgodu na ≤ 200 ms', () => {
+    const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfigBezPropusta);
+    kontroler.naPromjenuPoteza(dogadaj({
+      sudionici: [
+        { igracId: 'covjek', upravljac: 'covjek', aktivan: false },
+        { igracId: 'bot', upravljac: 'bot', aktivan: true },
+        { igracId: 'bot2', upravljac: 'bot', aktivan: true },
+      ],
+    }));
+    expect(timeri[0]!.ms).toBeLessThanOrEqual(BOT_POTEZ_BEZ_ROKA_MS);
+  });
+
   it('isti token se ne planira dvaput; novi token dobiva novi plan', () => {
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
     const { kontroler, timeri } = stvori(izvrsi);

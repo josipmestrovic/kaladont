@@ -67,6 +67,7 @@ import {
   definicijaIzazova,
   javnaSjedalaZaMod,
   KLJUCEVI_JAVNOG_REDA,
+  ODGODA_PRIKAZA_REZULTATA_MS,
   ZADANI_PRAVILNIK,
 } from 'zajednicko';
 import { evaluirajNapredak, prazneCinjenice } from '../izazovi/evaluacija.js';
@@ -137,11 +138,8 @@ const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odig
 const TRAJANJE_POTEZA_MS = konfiguracija.TRAJANJE_POTEZA_MS;
 const TRAJANJE_IZBORA_SUSTAVA_MS = 8_000;
 const PROZOR_ISTODOBNIH_PREKIDA_MS = 25;
-// UX ekran mora trajati 5 s u razvoju, stagingu i produkciji. Samo testno okruženje
-// preskače čekanje kako integracijski testovi ne bi čekali stvarno vrijeme.
+// Jedno početno odbrojavanje (3 s) u svim kontekstima. Test/CI postavlja 0 preko env-a.
 const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;
-/** Privatna soba: domaćin je već pokrenuo igru — bez dodatnog odbrojavanja. */
-const ODGODA_POCETKA_PRIVATNE_PARTIJE_MS = 0;
 const ZADRZAVANJE_SOBE_NAKON_KRAJA_MS = 15_000; // reakcije rade dok igrači gledaju sažetak partije
 const POCETNI_ODMAK_RETRYJA_REZULTATA_MS = 1_000;
 const MAKSIMALNI_ODMAK_RETRYJA_REZULTATA_MS = 30_000;
@@ -1613,7 +1611,7 @@ export function stvoriUpraviteljPartija(
     if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
     // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.
     const zavrsenoU = new Date(sat.sada());
-    const prikazRezultataOdIso = new Date(zavrsenoU.getTime() + 8_000).toISOString();
+    const prikazRezultataOdIso = new Date(zavrsenoU.getTime() + ODGODA_PRIKAZA_REZULTATA_MS).toISOString();
     if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
     if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
     for (const prekid of stanje.prekidiUTijeku.values()) sat.otkazi(prekid.timerHandle);
@@ -3555,7 +3553,7 @@ export function stvoriUpraviteljPartija(
             turnToken,
             ishod: 'ignoriran',
             kod: 'NEMA_PARTIJE',
-            poruka: 'Nisi u aktivnoj partiji.',
+            poruka: 'Nisi u aktivnoj igri.',
           });
         }
         return;
@@ -3568,7 +3566,7 @@ export function stvoriUpraviteljPartija(
             turnToken,
             ishod: 'ignoriran',
             kod: 'KRIVA_PARTIJA',
-            poruka: 'Naredba ne pripada aktivnoj partiji.',
+            poruka: 'Naredba ne pripada aktivnoj igri.',
           });
         }
         return;
@@ -3737,7 +3735,7 @@ export function stvoriUpraviteljPartija(
             turnToken,
             ishod: 'ignoriran',
             kod: 'NEMA_PARTIJE',
-            poruka: 'Nisi u aktivnoj partiji.',
+            poruka: 'Nisi u aktivnoj igri.',
           });
         }
         return;
@@ -3750,7 +3748,7 @@ export function stvoriUpraviteljPartija(
             turnToken,
             ishod: 'ignoriran',
             kod: 'KRIVA_PARTIJA',
-            poruka: 'Naredba ne pripada aktivnoj partiji.',
+            poruka: 'Naredba ne pripada aktivnoj igri.',
           });
         }
         return;
@@ -3875,11 +3873,11 @@ export function stvoriUpraviteljPartija(
     obnoviVezuPartije(socket);
   }
 
-  function zapocniPrivatnuPartiju(
+  async function zapocniPrivatnuPartiju(
     sudioniciUlaz: StavkaReda[],
     postavkeSobe: PostavkePrivatneSobe,
     kodSobe: string,
-  ): string {
+  ): Promise<string> {
     if (zaustavljanje || partije.size >= maksimalnoAktivnihPartija) return '';
     const izmjesano = promijesajNiz(sudioniciUlaz);
     const pravilaSobe = postavkeSobe.pravila ?? ZADANI_PRAVILNIK;
@@ -3903,8 +3901,7 @@ export function stvoriUpraviteljPartija(
     });
     const partijaId = randomUUID();
     const prviIgracId = sudionici[0]!.igracId;
-    const odgodaMs = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PRIVATNE_PARTIJE_MS;
-    const pocetakIso = new Date(sat.sada() + odgodaMs).toISOString();
+    const odgodaMs = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PARTIJE_MS;
 
     const stanje: StanjeStola = {
       partijaId,
@@ -3938,7 +3935,7 @@ export function stvoriUpraviteljPartija(
       timerHandle: null,
       izborUToku: true,
       izborHandle: null,
-      istekIzboraIso: pocetakIso,
+      istekIzboraIso: '',
       eliminacije: [],
       eliminacijeBrojac: new Map(),
       zadnjiPotezi: new Map(),
@@ -3985,6 +3982,10 @@ export function stvoriUpraviteljPartija(
 
     partije.set(partijaId, stanje);
     for (const s of sudionici) partijaPoIgracu.set(s.igracId, partijaId);
+    for (const s of sudionici) {
+      aktivneVeze.dohvatiSocket(s.igracId)?.join(SOBA_PARTIJE(partijaId));
+    }
+
     let pocetakPrivatneUspio = false;
     const osigurajPocetakPrivatne = async () => {
       if (pocetakPrivatneUspio) return;
@@ -3999,58 +4000,76 @@ export function stvoriUpraviteljPartija(
       pocetakPrivatneUspio = true;
     };
     stanje.osigurajPocetakPartije = osigurajPocetakPrivatne;
-    const upisPocetkaPrivatnePartije = osigurajPocetakPrivatne();
-    stanje.upisiPotezaUTijeku.push(upisPocetkaPrivatnePartije.catch(() => undefined));
 
-    const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
-      partijaId,
-      pocetakIso,
-      sjedala: sudionici.map((s) => ({
-        igracId: s.igracId,
-        nadimak: s.nadimak,
-        jeGost: s.upravljac !== 'bot' && s.vrsta === 'gost',
-        jeBot: s.upravljac === 'bot',
-        avatarId: s.avatarId,
-        avatarConfig: s.avatarConfig,
-        avatarRevision: s.avatarRevision,
-        rang: s.rang,
-        razina: s.razina,
-        trenutniNiz: s.trenutniNiz,
-        razinaVatre: s.razinaVatre,
-        odabranaPravila: s.odabranaPravila,
-      })),
-      mod: 'cetiri_igraca',
-      pravila: pravilaSobe,
-      spojeniDvoboj: false,
-      kontekst: 'privatna',
-      jePrivatna: true,
-      kodSobe,
-      trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
-    };
-
-    for (const s of sudionici) {
-      const socket = aktivneVeze.dohvatiSocket(s.igracId);
-      socket?.join(SOBA_PARTIJE(partijaId));
-    }
-    for (const s of sudionici) {
-      aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
-    }
-    postavke.naPocetakPartijeZaBotove?.(
-      partijaId,
-      'privatna',
-      sudionici.filter((s) => s.upravljac === 'bot').map((s) => s.igracId),
-    );
-    zabiljeziAnalitikuPocetka(stanje);
-
-    void Promise.all([upisPocetkaPrivatnePartije, ucitajOtkljucaneGrupe(sudionici), ucitajGrupeZaDostignuca(sudionici)]).then(([, grupe, grupeDostignuca]) => {
+    try {
+      const [, grupe, grupeDostignuca] = await Promise.all([
+        osigurajPocetakPrivatne(),
+        ucitajOtkljucaneGrupe(sudionici),
+        ucitajGrupeZaDostignuca(sudionici),
+      ]);
+      if (stanje.zavrsena || !partije.has(partijaId)) {
+        throw new Error('Privatna partija je poništena prije najave početka.');
+      }
       stanje.grupeSNagradom = grupe;
       stanje.grupeZaDostignuca = grupeDostignuca;
-      stanje.pocetneKolekcijskeGrupe = new Map([...grupe].map(([igracId, mape]) => [igracId, new Set([...mape.keys()].map(kolekcijskiKljucGrupe))]));
-      const preostaloMs = Math.max(0, new Date(pocetakIso).getTime() - sat.sada());
-      stanje.izborHandle = sat.zakazi(() => objaviRijecSustava(stanje, null), preostaloMs);
-    }).catch((greska) => console.error('Neuspio pripremiti privatnu partiju:', greska));
+      stanje.pocetneKolekcijskeGrupe = new Map(
+        [...grupe].map(([igracId, mape]) => [igracId, new Set([...mape.keys()].map(kolekcijskiKljucGrupe))]),
+      );
 
-    return partijaId;
+      const pocetakIso = new Date(sat.sada() + odgodaMs).toISOString();
+      stanje.istekIzboraIso = pocetakIso;
+      const poruka: Omit<PocetakPartije, 'mojIgracId'> = {
+        partijaId,
+        pocetakIso,
+        sjedala: sudionici.map((s) => ({
+          igracId: s.igracId,
+          nadimak: s.nadimak,
+          jeGost: s.upravljac !== 'bot' && s.vrsta === 'gost',
+          jeBot: s.upravljac === 'bot',
+          avatarId: s.avatarId,
+          avatarConfig: s.avatarConfig,
+          avatarRevision: s.avatarRevision,
+          rang: s.rang,
+          razina: s.razina,
+          trenutniNiz: s.trenutniNiz,
+          razinaVatre: s.razinaVatre,
+          odabranaPravila: s.odabranaPravila,
+        })),
+        mod: 'cetiri_igraca',
+        pravila: pravilaSobe,
+        spojeniDvoboj: false,
+        kontekst: 'privatna',
+        jePrivatna: true,
+        kodSobe,
+        trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
+      };
+      for (const s of sudionici) {
+        aktivneVeze.dohvatiSocket(s.igracId)?.emit('partija:pocetak', { ...poruka, mojIgracId: s.igracId });
+      }
+      postavke.naPocetakPartijeZaBotove?.(
+        partijaId,
+        'privatna',
+        sudionici.filter((s) => s.upravljac === 'bot').map((s) => s.igracId),
+      );
+      zabiljeziAnalitikuPocetka(stanje);
+      stanje.izborHandle = sat.zakazi(() => objaviRijecSustava(stanje, null), odgodaMs);
+      return partijaId;
+    } catch (greska) {
+      console.error(`Neuspjelo pokretanje privatne partije ${partijaId}:`, greska);
+      if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
+      if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
+      partije.delete(partijaId);
+      for (const sudionik of sudionici) {
+        if (partijaPoIgracu.get(sudionik.igracId) === partijaId) partijaPoIgracu.delete(sudionik.igracId);
+        const socket = aktivneVeze.dohvatiSocket(sudionik.igracId);
+        socket?.leave(SOBA_PARTIJE(partijaId));
+        socket?.emit('greska', {
+          kod: 'UPIS_PARTIJE_NEUSPJEO',
+          poruka: 'Igru nije moguće pokrenuti zbog pogreške pri spremanju. Pokušaj ponovno.',
+        });
+      }
+      throw greska;
+    }
   }
 
   return {

@@ -32,6 +32,9 @@ export type BrzaPoruka =
 export const LJUDSKE_BRZE_PORUKE = ['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci'] as const;
 export type LjudskaBrzaPoruka = (typeof LJUDSKE_BRZE_PORUKE)[number];
 
+/** Zajednički rok od `partija:kraj` / terminalnog izazova do ekrana rezultata (5–4–3–2–1). */
+export const ODGODA_PRIKAZA_REZULTATA_MS = 5_000;
+
 export type KodRazlogaVeze = 'SESIJA_ISTEKLA' | 'NEVALJAN_TOKEN' | 'DRUGA_KARTICA' | 'SERVIS_NEDOSTUPAN';
 
 export interface ZatvaranjeVeze {
@@ -175,7 +178,7 @@ export type KontekstPartije = 'javna' | 'privatna' | 'trening' | 'izazov';
 export interface PocetakPartije {
   partijaId: string;
   mojIgracId: string;
-  /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
+  /** Autoritativni rok prve runde (sat poslužitelja). Javna: odbrojavanje u čekaonici; privatna/trening/izazov: na stolu. */
   pocetakIso: string;
   sjedala: {
     igracId: string;

@@ -43,7 +43,7 @@ services:
       PUBLIC_UMAMI_URL: ${UMAMI_URL:-}
       PUBLIC_UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
       ONEMOGUCI_TIMER_POTEZA: "false"
-      ODGODA_POCETKA_PARTIJE_MS: "6000"
+      ODGODA_POCETKA_PARTIJE_MS: "3000"
       TOLERANCIJA_PREKIDA_MS: "10000"
       TRENING_OMOGUCEN: ${TRENING_OMOGUCEN:-true}
       # Produkcija: Izazov ostaje off do release gatea nakon lvl redesigna (PR07 staging-only).

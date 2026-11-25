@@ -155,7 +155,7 @@ export function registrirajPrivatneSobe(
     sudionici: StavkaReda[],
     postavke: PostavkePrivatneSobe,
     kodSobe: string,
-  ) => string,
+  ) => string | Promise<string>,
   opcije: {
     maksimalnoSoba: number;
     maksimalnoAktivnihPartija: number;
@@ -596,6 +596,8 @@ export function registrirajPrivatneSobe(
 
       ponistiBrisanjeSobe(soba);
       soba.status = 'u_tijeku';
+      // Odmah javi klijentima da je pokretanje u tijeku — Start se gasi prije awaita na bazu.
+      emitirajStanje(soba);
 
       const sudioniciUlaz: StavkaReda[] = [...soba.clanoviMap.values()].map((c) => ({
         igracId: c.igracId,
@@ -612,11 +614,27 @@ export function registrirajPrivatneSobe(
 
       let partijaId: string;
       try {
-        partijaId = zapocniPrivatnuPartiju(sudioniciUlaz, soba.postavke, soba.kod);
-      } catch (greska) {
+        partijaId = await zapocniPrivatnuPartiju(sudioniciUlaz, soba.postavke, soba.kod);
+      } catch {
         soba.status = 'cekanje';
+        soba.partijaId = null;
         zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
-        throw greska;
+        emitirajStanje(soba);
+        // Motor je već emitirao UPIS_PARTIJE_NEUSPJEO prije throwa; ponovi nakon stanja
+        // da soba:stanje ne pregazi soft poruku u lobbyju. Ne rethrowaj (inače INTERNA).
+        io.to(SOBA_PREFIX(soba.kod)).emit('greska', {
+          kod: 'UPIS_PARTIJE_NEUSPJEO',
+          poruka: 'Igru nije moguće pokrenuti zbog pogreške pri spremanju. Pokušaj ponovno.',
+        });
+        return;
+      }
+      if (!partijaId) {
+        soba.status = 'cekanje';
+        soba.partijaId = null;
+        zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
+        emitirajStanje(soba);
+        socket.emit('greska', { kod: 'PREVISE_PARTIJA', poruka: 'Privremeno je dosegnut najveći broj aktivnih igara.' });
+        return;
       }
       soba.partijaId = partijaId;
 

@@ -50,19 +50,20 @@ test('gost pokreće IZ-L1-DV-01, odustaje i vidi rezultat bez rang/DNK', async (
   await potvrda.getByRole('button', { name: 'Da' }).click();
 
   await expect(page.getByTestId('rezultat-izazova')).toBeVisible({ timeout: 25_000 });
-  await expect(page.getByRole('heading', { name: /Izgubio si izazov|Izazov nije uspio|Tehnički prekid/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Izazov nije završen|Izazov je prekinut|Rezultat izazova/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Završni poredak' })).toHaveCount(0);
+  await expect(page.getByTestId('izazov-rezultat-partije')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Forma' })).toHaveCount(0);
   await expect(page.getByTestId('izazov-gost-cta')).toContainText('postojeći');
   await expect(page.getByTestId('izazov-xp-igre')).toBeVisible();
   await expect(page.getByTestId('izazov-challenge-xp')).toHaveCount(0);
   await expect(page.getByTestId('izazov-ponovo')).toHaveText('Pokušaj ponovno');
-  await expect(page.getByTestId('izazov-odaberi')).toHaveText('Odaberi neki drugi izazov');
+  await expect(page.getByTestId('izazov-odaberi')).toHaveText('Svi izazovi');
   await expect(page.getByTestId('izazov-odaberi')).toHaveAttribute('href', /\/izazovi\?level=1/);
   await expect(page.getByTestId('izazov-ponovo')).toHaveAttribute('href', /zapocni=IZ-L1-DV-01/);
 });
 
-test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page }) => {
+test('injicirani uspjeh prikazuje nagrade, poredak i CTA', async ({ page }) => {
   const partijaId = '00000000-0000-4000-8000-000000000501';
   const mojId = 'igrac-e2e-izazov';
 
@@ -188,20 +189,22 @@ test('injicirani uspjeh prikazuje nagrade i CTA bez rang tablice', async ({ page
   );
 
   await expect(page.getByTestId('rezultat-izazova')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('heading', { name: 'Izazov uspješan!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Izazov prijeđen!' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Uvjeti za prelazak izazova' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Završni poredak' })).toBeVisible();
+  await expect(page.getByTestId('izazov-zavrsni-poredak')).toContainText('Pobjeda');
   await expect(page.getByTestId('izazov-xp-igre')).toContainText('+150 XP');
   await expect(page.getByTestId('izazov-challenge-xp')).toContainText('100');
-  await expect(page.getByTestId('izazov-sljedeci')).toHaveText('Idi na sljedeći izazov');
+  await expect(page.getByTestId('izazov-sljedeci')).toContainText('Igraj sljedeći izazov');
   await expect(page.getByTestId('izazov-sljedeci')).toHaveAttribute(
     'href',
     /\/izazovi\?zapocni=IZ-L1-DV-02&level=1/,
   );
-  await expect(page.getByTestId('izazov-odaberi')).toHaveText('Odaberi drugi izazov');
+  await expect(page.getByTestId('izazov-odaberi')).toHaveText('Svi izazovi');
   await expect(page.getByTestId('izazov-odaberi')).toHaveAttribute('href', '/izazovi?level=1');
-  await expect(page.getByTestId('izazov-ponovo')).toHaveText('Igraj ovaj izazov ponovno');
+  await expect(page.getByTestId('izazov-ponovo')).toHaveText('Igraj ponovno');
   await expect(page.getByTestId('izazov-gost-cta')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Završni poredak' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Forma' })).toHaveCount(0);
 });
 
 test('mapa na 380px bez horizontalnog scrolla; tabovi wrap', async ({ page }) => {

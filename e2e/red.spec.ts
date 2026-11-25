@@ -633,7 +633,7 @@ for (const zaslon of [
         const vrijemeRezultata = Date.now();
         for (const { stranica } of igraci) {
           // install sam ne pauzira sat. pauseAt(isti timestamp) baca „Cannot fast-forward to the past”
-          // čim sat odmakne između awaitova — pauziraj 1s unaprijed, rok rezultata = pauza + 8s.
+          // čim sat odmakne između awaitova — pauziraj 1s unaprijed, rok rezultata = pauza + 5s.
           const pauzaMs = vrijemeRezultata + 1_000;
           await stranica.clock.install({ time: new Date(vrijemeRezultata) });
           await stranica.clock.pauseAt(new Date(pauzaMs));
@@ -645,15 +645,15 @@ for (const zaslon of [
               plasmani: [], mojNoviProsjek: 0, mojRang: null, mojeIskustvo: null,
               mojaOcjenaIgre: null, bonusOcjenaIgre: 0, novaDostignuca: [],
             }]);
-          }, { id: partijaId, rok: pauzaMs + 8_000 });
+          }, { id: partijaId, rok: pauzaMs + 5_000 });
           await expect(stranica.getByText(/Rezultati za:/)).toBeVisible();
         }
         await provjeri();
         await igraci[0]!.stranica.screenshot({ path: podaciTesta.outputPath('stabilni-avatari.png'), fullPage: true });
         for (const { stranica } of igraci) {
+          await stranica.clock.fastForward(2_000);
+          await expect(stranica.getByText(/Rezultati za:/)).toContainText('3');
           await stranica.clock.fastForward(3_000);
-          await expect(stranica.getByText(/Rezultati za:/)).toContainText('5');
-          await stranica.clock.fastForward(5_000);
           await expect(stranica.getByRole('heading', { name: 'Završni poredak' })).toBeVisible();
         }
       } finally {

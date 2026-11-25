@@ -6,11 +6,12 @@
  * odvojen od odluke o riječi; bez namjernog izostanka.
  * PR07: odaberiPotez dobiva pravilnik + broj aktivnih; čekač dokaza ne dobiva reakciju ispadanja.
  */
-import type { BrzaPoruka } from 'zajednicko';
+import type { BrzaPoruka, KontekstPartije } from 'zajednicko';
 import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import type { KonfiguracijaBota } from './konfiguracija-bota.js';
 import {
+  BOT_POTEZ_BEZ_ROKA_MS,
   odaberiPotezNastavivo,
   odgodaBezRokaMs,
   PredmemorijaLegalnosti,
@@ -30,6 +31,7 @@ import {
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
   odaberiReakcijuPriIspadanju,
+  odgodaPocetnogPozdravaMs,
   odgodaReakcijeMs,
 } from './reakcije.js';
 
@@ -110,6 +112,8 @@ export class BotKontroler {
   private readonly raspored: RasporedjivacOdziva;
   private readonly posloviRasporeda = new Map<string, number>();
   private readonly poslaniPozdravi = new Map<string, Set<string>>();
+  /** Javna: pozdravi čekaju otvaranje 1. runde (stol), ne najavu u čekaonici. */
+  private readonly cekajuciPozdraviJavne = new Map<string, readonly string[]>();
   private readonly poslaneEliminacijskeReakcije = new Set<string>();
   /** Sljedeći trenutak (ms) kad igrač smije novu reakciju zbog RS-22 (2 s). */
   private readonly sljedecaReakcijaMs = new Map<string, number>();
@@ -177,24 +181,49 @@ export class BotKontroler {
     this.aktualniPotezi.set(dogadaj.partijaId, dogadaj);
     try {
       if (!dogadaj.zavrsena) this.osigurajKonfiguracijuPartije(dogadaj.partijaId);
+      if (
+        dogadaj.kontekst === 'javna'
+        && !dogadaj.zavrsena
+        && !dogadaj.izborUToku
+        && this.cekajuciPozdraviJavne.has(dogadaj.partijaId)
+      ) {
+        const botIds = this.cekajuciPozdraviJavne.get(dogadaj.partijaId) ?? [];
+        this.cekajuciPozdraviJavne.delete(dogadaj.partijaId);
+        this.zakaziPocetnePozdrave(dogadaj.partijaId, 'javna', botIds);
+      }
       this.planiraj(dogadaj);
     } catch (greska) {
       this.oporavi(dogadaj, dogadaj.naPotezuId, 0, new Set(), greska);
     }
   }
 
-  /** Svaki bot pozdravi jednom na početku (javna, privatna, trening). */
+  /** Svaki bot pozdravi jednom na početku (javna, privatna, trening, izazov). */
   naPocetakPartije(partijaId: string, kontekst: DogadajPoteza['kontekst'], botIds: readonly string[]): void {
-    void kontekst;
     if (this.zaustavljen || !this.ovisnosti.posaljiReakciju || botIds.length === 0) return;
     this.osigurajKonfiguracijuPartije(partijaId);
+    if (kontekst === 'javna') {
+      // Sidro = otvaranje 1. runde (vidljiv stol), ne najava u čekaonici.
+      this.cekajuciPozdraviJavne.set(partijaId, [...botIds]);
+      return;
+    }
+    this.zakaziPocetnePozdrave(partijaId, kontekst, botIds);
+  }
+
+  private zakaziPocetnePozdrave(
+    partijaId: string,
+    kontekst: KontekstPartije,
+    botIds: readonly string[],
+  ): void {
+    let indeks = 0;
     for (const igracId of botIds) {
       const poslani = this.poslaniPozdravi.get(partijaId) ?? new Set<string>();
       if (poslani.has(igracId)) continue;
       poslani.add(igracId);
       this.poslaniPozdravi.set(partijaId, poslani);
       const poruka = odaberiReakcijuNaPocetku(this.rngPrezentacije);
-      this.zakaziReakciju(partijaId, igracId, poruka);
+      const odgodaMs = odgodaPocetnogPozdravaMs(kontekst, indeks, this.rngPrezentacije);
+      this.zakaziReakciju(partijaId, igracId, poruka, odgodaMs);
+      indeks += 1;
     }
   }
 
@@ -252,6 +281,7 @@ export class BotKontroler {
       this.odluke.delete(dogadaj.partijaId);
       this.predmemorije.delete(dogadaj.partijaId);
       this.poslaniPozdravi.delete(dogadaj.partijaId);
+      this.cekajuciPozdraviJavne.delete(dogadaj.partijaId);
       this.ocistiEliminacijskeKljuceve(dogadaj.partijaId);
       // Zakazane reakcije smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
       return;
@@ -271,17 +301,21 @@ export class BotKontroler {
 
     // Računanje tijekom prozora razmišljanja (ne sinkrono ovdje) — Socket.IO može flushati prije CPU-a.
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
+    const imaAktivnogCovjeka = dogadaj.sudionici.some((s) => s.upravljac === 'covjek' && s.aktivan);
     const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rngPrezentacije, dogadaj.kontekst, {
       punoTrajanjeMs: dogadaj.trajanjePotezaMs,
       protekloMs: Math.max(0, this.sada() - dogadaj.pocetakPotezaMs),
     });
+    // Javna bot-only završnica: i uz aktivan timer ubrzaj na ~200 ms (gledatelji ne čekaju normalni tempo).
     const odgoda = rok === null
       ? odgodaBezRokaMs(izracunataOdgoda, {
         kontekst: dogadaj.kontekst,
-        imaAktivnogCovjeka: dogadaj.sudionici.some((s) => s.upravljac === 'covjek' && s.aktivan),
+        imaAktivnogCovjeka,
         okruzenje: this.okruzenje,
       })
-      : izracunataOdgoda;
+      : dogadaj.kontekst === 'javna' && !imaAktivnogCovjeka
+        ? Math.min(izracunataOdgoda, BOT_POTEZ_BEZ_ROKA_MS)
+        : izracunataOdgoda;
     const turnToken = dogadaj.turnToken;
     const generacija = ++this.generacijaPosla;
     const snimkaGrupa: ReadonlySet<string> = new Set(dogadaj.iskoristeneGrupe);
@@ -454,6 +488,7 @@ export class BotKontroler {
     this.odluke.clear();
     this.predmemorije.clear();
     this.poslaniPozdravi.clear();
+    this.cekajuciPozdraviJavne.clear();
     this.poslaneEliminacijskeReakcije.clear();
     this.sljedecaReakcijaMs.clear();
   }
@@ -769,13 +804,18 @@ export class BotKontroler {
     return `${partijaId}:${igracId}`;
   }
 
-  private zakaziReakciju(partijaId: string, igracId: string, poruka: BrzaPoruka): void {
+  private zakaziReakciju(
+    partijaId: string,
+    igracId: string,
+    poruka: BrzaPoruka,
+    fiksnaOdgodaMs?: number,
+  ): void {
     if (!this.ovisnosti.posaljiReakciju) return;
     const konfiguracija = this.konfiguracijePartija.get(partijaId) ?? this.ovisnosti.konfiguracija;
     const sada = this.sada();
     const kljucIgraca = this.kljucReakcijeIgraca(partijaId, igracId);
     const sljedeca = this.sljedecaReakcijaMs.get(kljucIgraca) ?? 0;
-    const bazaOdgode = odgodaReakcijeMs(this.rngPrezentacije, konfiguracija);
+    const bazaOdgode = fiksnaOdgodaMs ?? odgodaReakcijeMs(this.rngPrezentacije, konfiguracija);
     const cilj = Math.max(sada + bazaOdgode, sljedeca);
     const odgoda = Math.max(0, cilj - sada);
     // Rezerviraj slot unaprijed (+mala margina zbog setTimeout kašnjenja); nakon uspješnog emit-a usklađujemo.
