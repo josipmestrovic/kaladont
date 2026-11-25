@@ -23,6 +23,8 @@
     aktivna: boolean;
     odgodaSekundi: number;
     trajanjeSekundi: number;
+    /** Zamrznuta putanja pri stvaranju — resize ne smije dirati in-flight animacije. */
+    putanjaPx: number;
   }
 
   let {
@@ -62,9 +64,10 @@
 
   function izracunajPutanju(): number {
     const visinaZone = zonaEl?.clientHeight ?? 0;
-    const visinaProzora = typeof window !== 'undefined' ? window.innerHeight : 800;
-    // Uvijek barem cijeli viewport — inače seedane riječi kreću „od pola”.
-    return Math.max(visinaZone, visinaProzora, 800) + 120;
+    const visinaProzora = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const baza = Math.max(visinaZone, visinaProzora);
+    // 800 samo dok zona/prozor još nisu izmjerivi (SSR / prije layouta).
+    return (baza > 0 ? baza : 800) + 120;
   }
 
   /** Determinističke trake — bez ponovnog RNG-a pri svakom potezu (flicker). */
@@ -83,6 +86,7 @@
   ): PadajucaRijec {
     const baza = uskaZona ? slucajni(14, 20) : slucajni(15, 24);
     const velicina = potez.posebnaRijec ? Math.min(baza * 1.1, 24) : baza;
+    const putanja = putanjaPx;
     return {
       id: ++idElementa,
       idPartije: potez.idPartije,
@@ -97,7 +101,8 @@
       posebnaRijec: potez.posebnaRijec,
       aktivna,
       odgodaSekundi,
-      trajanjeSekundi: putanjaPx / brzinaPxPoSekundi,
+      trajanjeSekundi: putanja / brzinaPxPoSekundi,
+      putanjaPx: putanja,
     };
   }
 
@@ -263,7 +268,7 @@
       class="rijec"
       class:rijec--kaladont={rijec.posebnaRijec}
       class:rijec--aktivna={rijec.aktivna}
-      style={`--velicina:${rijec.velicinaFonta}px;--debljina:${rijec.debljinaFonta};--rotacija:${rijec.rotacija}deg;--pomak:${rijec.pomak}px;--odgoda:${rijec.odgodaSekundi}s;--trajanje:${rijec.trajanjeSekundi}s;--putanja:${putanjaPx}px;--njihanje:${2.8 + (rijec.id % 5) * 0.35}s;--neprozirnost:${rijec.opacity};`}
+      style={`--velicina:${rijec.velicinaFonta}px;--debljina:${rijec.debljinaFonta};--rotacija:${rijec.rotacija}deg;--pomak:${rijec.pomak}px;--odgoda:${rijec.odgodaSekundi}s;--trajanje:${rijec.trajanjeSekundi}s;--putanja:${rijec.putanjaPx}px;--njihanje:${2.8 + (rijec.id % 5) * 0.35}s;--neprozirnost:${rijec.opacity};`}
       onanimationend={(e) => {
         if (e.animationName.includes('dizanje-partije')) ukloniRijec(rijec.id);
       }}
