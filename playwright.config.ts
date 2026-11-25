@@ -21,7 +21,7 @@ export default defineConfig({
   expect: { timeout: 5_000 },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  failOnFlakyTests: Boolean(process.env.CI),
+  // failOnFlakyTests: lokalni puni suite šalje --fail-on-flaky-tests putem ci:lokalni/ci:puni; GitHub shardovi bez te zastavice.
   // CI shardovi: blob (spaja e2e-izvjestaj job). Lokalno: list.
   // ONEMOGUCI_TIMER_POTEZA ostaje true u webServer envu — namjerno za glavni E2E.
   reporter: process.env.CI
