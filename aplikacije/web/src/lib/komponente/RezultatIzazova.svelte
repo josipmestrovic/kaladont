@@ -188,6 +188,9 @@
   const imaKolekciju = $derived(
     Boolean(kraj.kolekcija && kraj.kolekcija.dodaneKategorije.length > 0),
   );
+  const bogatiXp = $derived(
+    xp.ukupno > 0 || Boolean(xp.konacno) || Boolean(kraj.mojeIskustvo) || Boolean(kraj.ukupnoIskustvo),
+  );
 
   function nazivPravilnika(pravila: PravilnikPartije): string {
     if (pravila === 'klasicni') return 'Klasična pravila';
@@ -380,8 +383,8 @@
     <p class="pending" role="status" data-testid="izazov-settlement-pending">
       Nagrada se još sprema…
     </p>
-  {:else if xp.ukupno > 0 || xp.xpIzazovaNominal > 0 || kraj.mojeIskustvo || kraj.ukupnoIskustvo || settlement}
-    <div data-testid="izazov-xp-igre">
+  {:else}
+    {#if bogatiXp}
       <IskustvoPartije
         obracun={kraj.mojeIskustvo}
         ukupnoIskustvo={kraj.ukupnoIskustvo ?? null}
@@ -391,7 +394,16 @@
         prijeStanje={xp.prije}
         forsirajUkupno={xp.ukupno}
       />
-    </div>
+    {/if}
+    <!-- Vidljiv za gosta/+0; sr-only kad IskustvoPartije već prikazuje XP (E2E hook ostaje). -->
+    <p
+      class="nagrada-jednostavna"
+      class:sr-only={bogatiXp}
+      data-testid="izazov-xp-igre"
+    >
+      <span>XP od igre</span>
+      <strong>+{xp.xpIgre} XP</strong>
+    </p>
     {#if uspjeh && xp.firstCompletion === false && xp.xpIzazova === 0 && xp.xpIzazovaNominal > 0}
       <p class="ponavljanje-napomena">Nagrada za prvi prelazak već je ostvarena.</p>
     {/if}
@@ -741,6 +753,16 @@
   .ponavljanje-napomena {
     margin: 0;
     color: var(--boja-tekst-sekundarni);
+  }
+  .nagrada-jednostavna {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0;
+    padding: 10px 14px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 8px;
+    background: var(--boja-povrsina-2);
   }
   .zavrsna-dostignuca-mrezica {
     display: grid;

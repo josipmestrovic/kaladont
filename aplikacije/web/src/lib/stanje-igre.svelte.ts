@@ -495,8 +495,8 @@ export function pokreniSlusateljeIgre(): void {
     if (napustioPartiju) return;
     const partijaId = p.partijaId ?? stanje.partijaId;
     if (!partijaId) return;
-    // Buffer dok stol nije mountan — partija page potroši preuzmiPendingReakcije.
-    if (typeof window !== 'undefined' && !window.location.pathname.includes(`/partija/${partijaId}`)) {
+    // Buffer dok stol nije registrirao live listener (gap nakon goto, prije onMount).
+    if (!stolReakcijeAktivne) {
       spremiPendingReakciju(partijaId, p.igracId, p.poruka);
     }
   });
@@ -930,6 +930,12 @@ export function dohvatiStanjeIgre(): StanjeIgre {
 const TTL_PENDING_REAKCIJE_MS = 4_000;
 type PendingReakcija = { partijaId: string; igracId: string; poruka: BrzaPoruka; expiresAt: number };
 let pendingReakcije: PendingReakcija[] = [];
+/** true kad partija page ima aktivan live `reakcija:nova` listener. */
+let stolReakcijeAktivne = false;
+
+export function postaviStolReakcijeAktivne(aktivno: boolean): void {
+  stolReakcijeAktivne = aktivno;
+}
 
 function ocistiIsteklePendingReakcije(sada = Date.now()): void {
   pendingReakcije = pendingReakcije.filter((r) => r.expiresAt > sada);

@@ -5,7 +5,7 @@
   import { api } from '$lib/api.js';
   import { dohvatiSocket, dohvatiStanjeVeze } from '$lib/socket.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { dohvatiStanjeIgre, napustiLokalnuPartiju, preuzmiPendingReakcije, zatraziSinkronizacijuPartije } from '$lib/stanje-igre.svelte.js';
+  import { dohvatiStanjeIgre, napustiLokalnuPartiju, postaviStolReakcijeAktivne, preuzmiPendingReakcije, zatraziSinkronizacijuPartije } from '$lib/stanje-igre.svelte.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import Konfeti from '$lib/komponente/Konfeti.svelte';
@@ -1123,12 +1123,6 @@
       }, 3500);
     };
 
-    if (partijaId) {
-      for (const pending of preuzmiPendingReakcije(partijaId)) {
-        prikaziReakciju(pending.igracId, pending.poruka);
-      }
-    }
-
     const naReakciju = ({ igracId, poruka }: { igracId: string; poruka: BrzaPoruka }) => {
       if (!jeAktualnaPartija()) return;
       prikaziReakciju(igracId, poruka);
@@ -1259,8 +1253,15 @@
     socket.on('partija:runda-otvorena', naRunduOtvorenu);
     socket.on('partija:kraj', naKraj);
     socket.on('greska', naGresku);
+    postaviStolReakcijeAktivne(true);
+    if (partijaId) {
+      for (const pending of preuzmiPendingReakcije(partijaId)) {
+        prikaziReakciju(pending.igracId, pending.poruka);
+      }
+    }
 
     return () => {
+      postaviStolReakcijeAktivne(false);
       kontrolerSlanja.ocisti();
       if (reakcijeCooldownTimeoutId !== null) clearTimeout(reakcijeCooldownTimeoutId);
       socket.off('reakcija:nova', naReakciju);

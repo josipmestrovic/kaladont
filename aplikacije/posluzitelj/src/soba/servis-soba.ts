@@ -596,6 +596,8 @@ export function registrirajPrivatneSobe(
 
       ponistiBrisanjeSobe(soba);
       soba.status = 'u_tijeku';
+      // Odmah javi klijentima da je pokretanje u tijeku — Start se gasi prije awaita na bazu.
+      emitirajStanje(soba);
 
       const sudioniciUlaz: StavkaReda[] = [...soba.clanoviMap.values()].map((c) => ({
         igracId: c.igracId,
@@ -613,12 +615,13 @@ export function registrirajPrivatneSobe(
       let partijaId: string;
       try {
         partijaId = await zapocniPrivatnuPartiju(sudioniciUlaz, soba.postavke, soba.kod);
-      } catch (greska) {
+      } catch {
         soba.status = 'cekanje';
         soba.partijaId = null;
         zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
         emitirajStanje(soba);
-        throw greska;
+        // Motor je već emitirao UPIS_PARTIJE_NEUSPJEO; ne rethrowaj da wrapper ne pošalje INTERNA.
+        return;
       }
       if (!partijaId) {
         soba.status = 'cekanje';
