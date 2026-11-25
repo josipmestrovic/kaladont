@@ -39,6 +39,11 @@
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
+  import {
+    autofokusPotezaUkljucen,
+    postaviAutofokusPoteza,
+    trebaAutofokusPoteza,
+  } from '$lib/postavke-autofokus-poteza.js';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
@@ -817,11 +822,15 @@
           element.style.height = `${vidljiviZaslon.height}px`;
           return;
         }
+        // Puni pokrov vidljivog viewporta: avatari ostaju u DOM-u, ali se ne vide iza forme.
         element.classList.add('mobilni-potez');
-        element.style.left = `${vidljiviZaslon.offsetLeft + 8}px`;
-        element.style.width = `${Math.max(0, vidljiviZaslon.width - 16)}px`;
-        element.style.maxHeight = `${Math.max(0, vidljiviZaslon.height - 16)}px`;
-        element.style.top = `${Math.max(vidljiviZaslon.offsetTop + 8, vidljiviZaslon.offsetTop + vidljiviZaslon.height - element.offsetHeight - 8)}px`;
+        const umetak = 8;
+        element.style.left = `${vidljiviZaslon.offsetLeft + umetak}px`;
+        element.style.width = `${Math.max(0, vidljiviZaslon.width - umetak * 2)}px`;
+        element.style.top = `${vidljiviZaslon.offsetTop + umetak}px`;
+        const visina = Math.max(0, vidljiviZaslon.height - umetak * 2);
+        element.style.height = `${visina}px`;
+        element.style.maxHeight = `${visina}px`;
       });
     };
     const dimenzije = new ResizeObserver(osvjezi);
@@ -855,17 +864,37 @@
 
   // Briši unos samo na stvarno novi potez (novi turnToken/prefiks).
   // Flicker jeNaPotezu (destroy forme + partija:stanje) ne smije obrisati tipkanje.
+  // Na mobitelu autofokus je opcionalan (localStorage); desktop i dalje fokusira unos.
   let zadnjiKljucOciscenogUnosa: string | null = null;
+  // Preživljava remount inputa: activeElement se gubi, ali korisnik je već tipkao.
+  let korisnikJeFokusiraoUnos = false;
+  let autofokusUkljucen = $state(false);
   $effect(() => {
-    if (!jeNaPotezu || !prefiksRijeci) return;
+    const odjava = autofokusPotezaUkljucen.subscribe((v) => {
+      autofokusUkljucen = v;
+    });
+    return () => odjava();
+  });
+  $effect(() => {
+    if (!jeNaPotezu) {
+      korisnikJeFokusiraoUnos = false;
+      return;
+    }
+    if (!prefiksRijeci) return;
     const kljucPoteza = `${stanje.turnToken ?? ''}|${prefiksRijeci}`;
     if (kljucPoteza === zadnjiKljucOciscenogUnosa) {
-      queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
+      // Flicker: forma se može unmountati; activeElement više nije unosInput.
+      if (trebaAutofokusPoteza() || korisnikJeFokusiraoUnos) {
+        queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
+      }
       return;
     }
     zadnjiKljucOciscenogUnosa = kljucPoteza;
     unosNastavkaRijeci = '';
-    queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
+    korisnikJeFokusiraoUnos = false;
+    if (trebaAutofokusPoteza()) {
+      queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
+    }
   });
 
   // Globalni game-state listener je izvor istine i nakon reconnecta. Ako aktivni
@@ -1755,7 +1784,7 @@
         aria-current={aktivno ? 'true' : undefined}
       >
         <span class="red-label" class:vidljiv={aktivno || Boolean(eliminacija) || pobjednik} class:ispao={Boolean(eliminacija)}>
-          {#if eliminacija}{statusEliminacije(eliminacija)}{:else if pobjednik}Pobjednik{:else}Na redu!{/if}
+          {#if eliminacija}Ispao{:else if pobjednik}Pobjednik{:else}Na redu!{/if}
         </span>
         {#if sjedalo.igracId === stanje.mojIgracId}
           {#if jeTrening}
@@ -2065,6 +2094,9 @@
 
       {#if stanje.statusSpremanja !== 'spremanje_rezultata' && !stanje.sustavBiraRijec}
         {#if jeNaPotezu}
+          {#if !autofokusUkljucen}
+            <p class="mobilni-potez-uputa" role="status">Ti si na redu — dodirni polje za unos.</p>
+          {/if}
           <form class="zona-poteza" use:pratiMobilniUnos onsubmit={(e) => { e.preventDefault(); posaljiPotez(); }}>
             <div class="mobilni-kontekst">
               {#if prikazanaRijec?.rijec}
@@ -2085,6 +2117,7 @@
                   bind:this={unosInput}
                   type="text"
                   bind:value={unosNastavkaRijeci}
+                  onfocus={() => { korisnikJeFokusiraoUnos = true; }}
                   oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
                   oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
                   autocomplete="off"
@@ -2113,6 +2146,15 @@
               {@render porukaOdbijenogPoteza()}
             {/if}
           </form>
+          <label class="mobilna-autofokus-postavka">
+            <input
+              type="checkbox"
+              checked={autofokusUkljucen}
+              data-testid="postavka-autofokus-poteza"
+              onchange={(event) => postaviAutofokusPoteza(event.currentTarget.checked)}
+            />
+            <span>Kad dođem na potez, odmah otvori tipkovnicu</span>
+          </label>
         {/if}
 
         {#if prikazanaRijec?.rijec && prikazanaRijec.vrsta === 'sustav_rijec'}
@@ -2616,10 +2658,19 @@
     animation: sjedalo-na-potezu 420ms ease-out;
   }
   .eliminiran {
-    border-color: var(--boja-akcent);
+    border-color: transparent;
     border-radius: 16px;
-    background: var(--boja-poraz-pozadina);
+    background: transparent;
     opacity: 1;
+  }
+  .eliminiran .avatar-omot {
+    filter: grayscale(1);
+    opacity: 0.55;
+  }
+  .eliminiran .ime-igraca,
+  .eliminiran .nadimak,
+  .eliminiran .rang-razina {
+    color: var(--boja-tekst-sekundarni);
   }
   .igraci-red li.izbornik-otvoren {
     z-index: 20;
@@ -2637,6 +2688,7 @@
     margin: 0 -16px;
     padding: 8px 16px;
     background: var(--boja-pozadina-podloga);
+    overflow-x: clip;
   }
   .aktivna-partija-sadrzaj {
     display: flex;
@@ -2703,7 +2755,8 @@
     color: var(--boja-isticanje-slova);
   }
   .red-label.ispao {
-    color: var(--boja-akcent);
+    color: var(--boja-tekst-sekundarni);
+    font-weight: 600;
   }
   .ime-igraca.aktivno {
     color: var(--boja-isticanje-slova);
@@ -3206,15 +3259,39 @@
     display: block;
   }
   .mobilni-kontekst { display: none; }
+  .mobilni-potez-uputa {
+    display: none;
+    margin: 0 0 8px;
+    color: var(--boja-isticanje-slova);
+    font-weight: 700;
+    text-align: center;
+  }
+  .mobilna-autofokus-postavka {
+    display: none;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 10px 0 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: 14px;
+    line-height: 1.35;
+    cursor: pointer;
+  }
+  .mobilna-autofokus-postavka input {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+  }
   .zona-poteza:global(.mobilni-potez) {
     position: fixed;
     z-index: 1100;
     box-sizing: border-box;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
     gap: 6px;
     margin: 0;
-    padding: 8px;
+    padding: 12px 8px 8px;
     overflow-y: auto;
     border: 1px solid var(--boja-obrub-jaci);
     border-radius: 8px;
@@ -3237,6 +3314,8 @@
   @media (max-width: 999px) {
     .trenutni-streak { display: none; }
     .mobilni-kontekst { display: flex; align-items: center; justify-content: space-between; gap: 4px 12px; margin-bottom: 6px; font-size: 16px; line-height: 20px; overflow-wrap: anywhere; }
+    .mobilni-potez-uputa { display: block; }
+    .mobilna-autofokus-postavka { display: flex; }
   }
   :global(.mobilni-potez) .potez-gumbi { margin: 0; }
   :global(.mobilni-potez) .potez-gumbi button { margin: 0; }

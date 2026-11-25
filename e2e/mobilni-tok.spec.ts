@@ -45,6 +45,9 @@ for (const brojSjedala of [2, 3, 4, 8]) {
       }, brojSjedala);
       const unos = stranica.getByRole('textbox', { name: 'Dovrši riječ na ČA' });
       await expect(unos).toBeVisible();
+      // Zadano bez autofokusa: overlay se ne otvara dok igrač ne fokusira unos.
+      await expect(stranica.locator('.zona-poteza')).not.toHaveClass(/mobilni-potez/);
+      await expect(stranica.getByTestId('postavka-autofokus-poteza')).toBeVisible();
       await unos.focus();
       await expect(unos).toHaveCSS('font-size', '18px');
       await expect(unos).toHaveAttribute('autocapitalize', 'none');
@@ -68,7 +71,13 @@ for (const brojSjedala of [2, 3, 4, 8]) {
         }, geometrija);
         await expect.poll(async () => {
           const pravokutnik = await stranica.locator('.zona-poteza').boundingBox();
-          return pravokutnik !== null && pravokutnik.y >= geometrija.offsetTop && pravokutnik.y + pravokutnik.height <= geometrija.offsetTop + geometrija.height - 7;
+          if (pravokutnik === null) return false;
+          const unutar =
+            pravokutnik.y >= geometrija.offsetTop &&
+            pravokutnik.y + pravokutnik.height <= geometrija.offsetTop + geometrija.height - 7;
+          // Puni pokrov: visina forme ≈ vidljivi viewport − 16 px umetka.
+          const pokriva = Math.abs(pravokutnik.height - (geometrija.height - 16)) <= 2;
+          return unutar && pokriva;
         }).toBe(true);
         await expect(unos).toHaveAttribute('data-provjera', 'isti-input');
         expect(await unos.evaluate((element) => element.selectionStart)).toBe(2);
