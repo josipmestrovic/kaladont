@@ -866,6 +866,8 @@
   // Flicker jeNaPotezu (destroy forme + partija:stanje) ne smije obrisati tipkanje.
   // Na mobitelu autofokus je opcionalan (localStorage); desktop i dalje fokusira unos.
   let zadnjiKljucOciscenogUnosa: string | null = null;
+  // Preživljava remount inputa: activeElement se gubi, ali korisnik je već tipkao.
+  let korisnikJeFokusiraoUnos = false;
   let autofokusUkljucen = $state(false);
   $effect(() => {
     const odjava = autofokusPotezaUkljucen.subscribe((v) => {
@@ -874,17 +876,22 @@
     return () => odjava();
   });
   $effect(() => {
-    if (!jeNaPotezu || !prefiksRijeci) return;
+    if (!jeNaPotezu) {
+      korisnikJeFokusiraoUnos = false;
+      return;
+    }
+    if (!prefiksRijeci) return;
     const kljucPoteza = `${stanje.turnToken ?? ''}|${prefiksRijeci}`;
     if (kljucPoteza === zadnjiKljucOciscenogUnosa) {
-      // Flicker: vrati fokus samo ako je unos već bio fokusiran ili je autofokus uključen.
-      if (trebaAutofokusPoteza() || document.activeElement === unosInput) {
+      // Flicker: forma se može unmountati; activeElement više nije unosInput.
+      if (trebaAutofokusPoteza() || korisnikJeFokusiraoUnos) {
         queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
       }
       return;
     }
     zadnjiKljucOciscenogUnosa = kljucPoteza;
     unosNastavkaRijeci = '';
+    korisnikJeFokusiraoUnos = false;
     if (trebaAutofokusPoteza()) {
       queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
     }
@@ -2110,6 +2117,7 @@
                   bind:this={unosInput}
                   type="text"
                   bind:value={unosNastavkaRijeci}
+                  onfocus={() => { korisnikJeFokusiraoUnos = true; }}
                   oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
                   oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
                   autocomplete="off"
@@ -2655,8 +2663,7 @@
     background: transparent;
     opacity: 1;
   }
-  .eliminiran .avatar-omot,
-  .eliminiran .avatar-animacija {
+  .eliminiran .avatar-omot {
     filter: grayscale(1);
     opacity: 0.55;
   }
