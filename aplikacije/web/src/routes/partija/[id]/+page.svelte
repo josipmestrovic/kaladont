@@ -1412,7 +1412,7 @@
 {#if stanje.kraj && prikaziRezultate}
   <div class="zavrsni-header"><Header /></div>
   {#if jeIzazov}
-    {#if stanje.izazovTerminal?.status === 'uspjeh' || pobjednikPartije()?.igracId === stanje.mojIgracId}
+    {#if stanje.izazovTerminal?.status === 'uspjeh'}
       <Konfeti intenzitet="veliki" />
     {/if}
     <RezultatIzazova
@@ -1423,6 +1423,8 @@
       terminalReason={stanje.izazovTerminal?.reason ?? null}
       gameWon={stanje.izazovTerminal?.gameWon ?? null}
       odbijenaRijec={odbijenaRijecZaIzazov}
+      mojIgracId={stanje.mojIgracId}
+      {brojSanducicSazetka}
     />
     <PanelPrijavaRijeci
       partijaId={partijaId!}
@@ -2143,7 +2145,7 @@
           <button type="button" onclick={napustiPartiju}>Izađi</button>
         </div>
         {#if !stanje.obracunIskustva || jeTrening}
-          <p>{#if jeTrening}Ovo je trening. Možeš slobodno izaći.{:else if stanje.statusSpremanja === 'rezultati_spremljeni'}Sve je spremljeno. Možeš slobodno izaći.{:else if stanje.statusSpremanja === 'spremanje_rezultata'}Rezultat se još sprema. Možeš slobodno izaći.{:else}Možeš slobodno izaći. Tvoj rezultat spremit će se kada igra završi.{/if}</p>
+          <p>{#if jeTrening}Ovo je trening. Možeš slobodno izaći.{:else}Možeš slobodno izaći. Tvoj rezultat spremit će se kada igra završi.{/if}</p>
         {/if}
       </aside>
     {/if}
