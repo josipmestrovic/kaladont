@@ -46,6 +46,19 @@ export function tekstZamjenaPreostalo(preostalo: number): string {
 }
 
 /**
+ * Hrvatska množina za brojeve (1 X / 2–4 X-a / 5+ X-i), uključujući 21/22… i teens 11–14.
+ */
+export function hrBrojOblik(n: number, jednina: string, paukal: string, mnozina: string): string {
+  const abs = Math.abs(Math.trunc(n));
+  const desetice = abs % 100;
+  const jedinice = abs % 10;
+  if (desetice >= 11 && desetice <= 14) return `${abs} ${mnozina}`;
+  if (jedinice === 1) return `${abs} ${jednina}`;
+  if (jedinice >= 2 && jedinice <= 4) return `${abs} ${paukal}`;
+  return `${abs} ${mnozina}`;
+}
+
+/**
  * Relativno vrijeme do budućeg ISO trenutka (HR).
  * Primjeri: „za manje od minute”, „za 9 h 10 min”, „za 4 dana i 9 sati”.
  */
@@ -64,9 +77,9 @@ export function relativnoDo(iso: string, sada = new Date()): string {
   const minute = ukupnoMin % 60;
 
   if (dani >= 1) {
-    const danTekst = dani === 1 ? '1 dan' : `${dani} dana`;
+    const danTekst = hrBrojOblik(dani, 'dan', 'dana', 'dana');
     if (sati <= 0) return `za ${danTekst}`;
-    const satTekst = sati === 1 ? '1 sat' : sati >= 2 && sati <= 4 ? `${sati} sata` : `${sati} sati`;
+    const satTekst = hrBrojOblik(sati, 'sat', 'sata', 'sati');
     return `za ${danTekst} i ${satTekst}`;
   }
 

@@ -4,6 +4,7 @@ import {
   dostupniXp,
   dnevniBrojac,
   formatirajXp,
+  hrBrojOblik,
   oznakaVrsteMisije,
   relativnoDo,
   tekstSlobodnihMjesta,
@@ -145,6 +146,18 @@ describe('tekstSlobodnihMjesta', () => {
   });
 });
 
+describe('hrBrojOblik', () => {
+  it('ispravno sklanja sate uključujući 21–23', () => {
+    expect(hrBrojOblik(1, 'sat', 'sata', 'sati')).toBe('1 sat');
+    expect(hrBrojOblik(2, 'sat', 'sata', 'sati')).toBe('2 sata');
+    expect(hrBrojOblik(5, 'sat', 'sata', 'sati')).toBe('5 sati');
+    expect(hrBrojOblik(11, 'sat', 'sata', 'sati')).toBe('11 sati');
+    expect(hrBrojOblik(21, 'sat', 'sata', 'sati')).toBe('21 sat');
+    expect(hrBrojOblik(22, 'sat', 'sata', 'sati')).toBe('22 sata');
+    expect(hrBrojOblik(23, 'sat', 'sata', 'sati')).toBe('23 sata');
+  });
+});
+
 describe('relativnoDo', () => {
   const baza = new Date('2026-11-25T12:00:00.000Z');
 
@@ -164,6 +177,12 @@ describe('relativnoDo', () => {
     expect(
       relativnoDo(new Date(baza.getTime() + (4 * 24 + 9) * 60 * 60_000).toISOString(), baza),
     ).toBe('za 4 dana i 9 sati');
+  });
+
+  it('1 dan i 22 sata (ne sati)', () => {
+    expect(
+      relativnoDo(new Date(baza.getTime() + (1 * 24 + 22) * 60 * 60_000).toISOString(), baza),
+    ).toBe('za 1 dan i 22 sata');
   });
 
   it('prošlo vrijeme ne ide u negativno', () => {
