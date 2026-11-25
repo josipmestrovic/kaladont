@@ -977,7 +977,7 @@ describe('motor partije - kraj do kraja koristeći samo "ne znam"', () => {
         }),
       ]);
       expect(prihvacen.iskustvo).toContainEqual(expect.objectContaining({ vrsta: 'kaladont', iskustvo: 100 }));
-      expect(prihvacen.istekPotezaIso).toBe('');
+      expect(prihvacen.istekPotezaIso).toBeNull();
       const eliminacija = await eliminacijaPromise;
       expect(eliminacija.igracId).toBe(igracKojiJeOmoguciKa); // otvarac je omogucio "ka" - on ispada
       expect(eliminacija.razlog).toBe('kaladont');

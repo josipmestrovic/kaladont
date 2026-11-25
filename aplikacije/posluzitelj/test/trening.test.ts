@@ -118,7 +118,7 @@ async function odigrajTreningDoKraja(
     });
     expect(potvrda.pokrenut).toBe(true);
     const pocetak = await pocetakPromise;
-    expect((await rundaPromise).istekPotezaIso).toBe('');
+    expect((await rundaPromise).istekPotezaIso).toBeNull();
     const kraj = await Promise.race([krajPromise, greskaPrvogPoteza]);
     return { pocetak, kraj, botIgrao: posluzitelj.brojaciBota.odigranihRijeci > brojRijeciPrije };
   } finally {
@@ -332,7 +332,7 @@ describe('Zagrijavanje', () => {
       });
       expect(potvrda.pokrenut).toBe(true);
       const pocetak = await pocetakPromise;
-      expect((await rundaPromise).istekPotezaIso).toBe('');
+      expect((await rundaPromise).istekPotezaIso).toBeNull();
       expect(pocetak.mod).toBe('tri_igraca');
       expect(pocetak.pravila).toBe('klasicni');
       expect(pocetak.kontekst).toBe('trening');

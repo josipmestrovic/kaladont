@@ -685,7 +685,7 @@ describe('privatne sobe', () => {
       const pocetak = await pocetakV;
       expect(pocetak.pravila).toBe('dokazi_nastavak');
       const runda = await rundaV;
-      expect(runda.istekPotezaIso).toBe('');
+      expect(runda.istekPotezaIso).toBeNull();
 
       const naPotezu = runda.naPotezuId === vlasnik.token ? vlasnik : gost;
       const drugi = naPotezu.token === vlasnik.token ? gost : vlasnik;
@@ -709,12 +709,12 @@ describe('privatne sobe', () => {
       const dokazPromise = cekajDogadaj<DokazZatrazen>(naPotezu.socket, 'dokaz:zatrazen');
       naPotezu.socket.emit('potez:rijec', { rijec: kandidat!.rijec, turnToken: runda.turnToken });
       const potez = await prihvacen;
-      expect(potez.istekPotezaIso).toBe('');
+      expect(potez.istekPotezaIso).toBeNull();
       drugi.socket.emit('potez:ne-znam', { turnToken: potez.turnToken });
       const dokaz = await dokazPromise;
       expect(dokaz.autorId).toBe(naPotezu.token);
       expect(dokaz.cekateljId).toBe(drugi.token);
-      expect(dokaz.istekPotezaIso).toBe('');
+      expect(dokaz.istekPotezaIso).toBeNull();
 
       naPotezu.socket.emit('potez:ne-znam', { turnToken: dokaz.turnToken });
       await cekajDogadaj<KrajPartije>(vlasnik.socket, 'partija:kraj');
