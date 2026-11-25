@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import { CircleHelp, Clock, X } from 'lucide-svelte';
   import type { MisijaDto, StanjeMisijaDto, VrstaMisije } from 'zajednicko';
   import {
     ApiGreska,
@@ -11,6 +12,15 @@
   } from '$lib/misije-klijent.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import KarticaMisije from '$lib/komponente/KarticaMisije.svelte';
+  import {
+    dostupniXp,
+    dnevniBrojac,
+    formatirajXp,
+    relativnoDo,
+    tekstSlobodnihMjesta,
+    tekstZamjenaPreostalo,
+    tjedniBrojac,
+  } from '$lib/misije-prikaz.js';
 
   let stanje = $state<StanjeMisijaDto | null>(null);
   let ucitava = $state(true);
@@ -19,11 +29,16 @@
   let zamjenaUTijeku = $state<VrstaMisije | null>(null);
   let potvrdaZamjene = $state<MisijaDto | null>(null);
   let registriran = $state(false);
+  let infoOtvoreno = $state(false);
   let generacija = 0;
   let zadnjaVerzija = 0;
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let coalesceTimer: ReturnType<typeof setTimeout> | null = null;
+  let minuteTimer: ReturnType<typeof setInterval> | null = null;
   let pendingIdempotency: { dodjelaId: string; key: string } | null = null;
+  let sadaZaPrikaz = $state(Date.now());
+  let infoGumb = $state<HTMLButtonElement | undefined>(undefined);
+  let infoDijalog = $state<HTMLDivElement | undefined>(undefined);
 
   function primijeniStanje(novo: StanjeMisijaDto, ocekivanaGeneracija: number) {
     if (ocekivanaGeneracija !== generacija) return;
@@ -108,21 +123,6 @@
     }
   }
 
-  function tekstDotoka(s: StanjeMisijaDto): string {
-    const n = s.dnevne.aktivne.length;
-    if (n === 0) return 'Sve spremljene dnevne misije su završene. Nova stiže u ponoć.';
-    if (n >= 3) return 'Sačuvane su tri misije. Dovrši jednu kako bi u idućoj ponoći bilo mjesta za novu.';
-    return `Svake ponoći dobivaš jednu novu misiju dok ima mjesta. Sljedeća: ${formatirajVrijeme(s.dnevne.sljedeciDotokU)}.`;
-  }
-
-  function tekstZamjene(vrsta: VrstaMisije, s: StanjeMisijaDto): string {
-    const kvota = s.zamjene[vrsta];
-    if (kvota.preostalo === 0) {
-      return `Današnja zamjena je iskorištena. Nova je dostupna u ponoć (${formatirajVrijeme(kvota.obnovaU)}).`;
-    }
-    return 'Zamjene danas: 1';
-  }
-
   function otvoriPotvrdu(misija: MisijaDto) {
     if (zamjenaUTijeku) return;
     potvrdaZamjene = misija;
@@ -168,10 +168,25 @@
     }
   }
 
+  async function otvoriInfo() {
+    infoOtvoreno = true;
+    await tick();
+    infoDijalog?.focus();
+  }
+
+  function zatvoriInfo() {
+    infoOtvoreno = false;
+    infoGumb?.focus();
+  }
+
   onMount(() => {
     registriran = jeRegistriranKorisnik();
     if (registriran) void ucitaj();
     else ucitava = false;
+
+    minuteTimer = setInterval(() => {
+      sadaZaPrikaz = Date.now();
+    }, 60_000);
 
     const naIdentitet = () => {
       generacija += 1;
@@ -189,10 +204,16 @@
       }
     };
     const naVidljivost = () => {
-      if (document.visibilityState === 'visible' && jeRegistriranKorisnik()) zatraziOsvjezenje();
+      if (document.visibilityState === 'visible' && jeRegistriranKorisnik()) {
+        sadaZaPrikaz = Date.now();
+        zatraziOsvjezenje();
+      }
     };
     const naFokus = () => {
-      if (jeRegistriranKorisnik()) zatraziOsvjezenje();
+      if (jeRegistriranKorisnik()) {
+        sadaZaPrikaz = Date.now();
+        zatraziOsvjezenje();
+      }
     };
 
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
@@ -204,6 +225,7 @@
       window.removeEventListener('focus', naFokus);
       if (refreshTimer) clearTimeout(refreshTimer);
       if (coalesceTimer) clearTimeout(coalesceTimer);
+      if (minuteTimer) clearInterval(minuteTimer);
     };
   });
 
@@ -213,11 +235,17 @@
     return [1, 2, 3].map((slot) => poSlotu.get(slot as 1 | 2 | 3) ?? null);
   });
   const prviPrazniDnevni = $derived(dnevneMjesta.findIndex((m) => m === null));
+  const brojPraznihDnevnih = $derived(dnevneMjesta.filter((m) => m === null).length);
+  const svaDnevnaMjestaPopunjena = $derived(!!stanje && stanje.dnevne.aktivne.length >= 3);
 
   const tjedneKartice = $derived(
     stanje ? [...stanje.tjedne.misije].sort((a, b) => a.slot - b.slot) : [],
   );
-  const tjedneDovrsene = $derived(tjedneKartice.filter((m) => m.status === 'dovrsena').length);
+
+  const dnevni = $derived(stanje ? dnevniBrojac(stanje) : null);
+  const tjedni = $derived(stanje ? tjedniBrojac(stanje) : null);
+  const xpDostupno = $derived(stanje ? dostupniXp(stanje) : null);
+  const sada = $derived(new Date(sadaZaPrikaz));
 </script>
 
 <svelte:head>
@@ -226,8 +254,21 @@
 
 <main class="misije-stranica">
   <header class="naslov">
-    <h1>Misije</h1>
-    <p>Igraj, isprobaj različite izazove i skupljaj iskustvo.</p>
+    <div class="naslov-red">
+      <h1>Misije</h1>
+      <button
+        type="button"
+        class="info-gumb"
+        aria-label="Pravila misija"
+        aria-expanded={infoOtvoreno}
+        aria-controls="misije-info-dijalog"
+        bind:this={infoGumb}
+        onclick={() => (infoOtvoreno ? zatvoriInfo() : otvoriInfo())}
+      >
+        <CircleHelp size={20} aria-hidden="true" />
+      </button>
+    </div>
+    <p>Ispuni zadatke, skupljaj XP i napreduj.</p>
   </header>
 
   {#if !registriran}
@@ -244,7 +285,7 @@
   {:else if greska && !stanje}
     <p class="greska" role="alert">{greska}</p>
     <button type="button" class="gumb" onclick={() => ucitaj()}>Pokušaj ponovno</button>
-  {:else if stanje}
+  {:else if stanje && dnevni && tjedni && xpDostupno !== null}
     {#if stanje.obracunUTijeku}
       <p class="upozorenje" role="status">Napredak se još sprema.</p>
     {/if}
@@ -255,14 +296,39 @@
       <p class="greska" role="alert">{greska}</p>
     {/if}
 
+    <section class="pregled" aria-label="Pregled napretka misija">
+      <div class="pregled-stavka">
+        <span class="pregled-oznaka">Danas završeno</span>
+        <strong>{dnevni.zavrseno} / {dnevni.ukupno}</strong>
+      </div>
+      <div class="pregled-stavka">
+        <span class="pregled-oznaka">Ovaj tjedan</span>
+        <strong>{tjedni.zavrseno} / {tjedni.ukupno}</strong>
+      </div>
+      <div class="pregled-stavka">
+        <span class="pregled-oznaka">Dostupno za osvojiti</span>
+        <strong class="xp-vrijednost">{formatirajXp(xpDostupno)} XP</strong>
+      </div>
+    </section>
+
     <section class="sekcija" aria-labelledby="dnevne-naslov">
       <div class="sekcija-zaglavlje">
         <h2 id="dnevne-naslov">Dnevne misije</h2>
         <p class="meta">{stanje.dnevne.aktivne.length} / 3 sačuvane</p>
       </div>
-      <p class="meta">{tekstDotoka(stanje)}</p>
-      <p class="meta">{tekstZamjene('dnevna', stanje)}</p>
-      <div class="mreza">
+      <div class="sekcija-meta">
+        {#if svaDnevnaMjestaPopunjena}
+          <p class="meta">Sva mjesta su popunjena. Dovrši jednu kako bi u idućoj ponoći bilo mjesta za novu.</p>
+        {:else}
+          <p class="meta">
+            Nova misija {relativnoDo(stanje.dnevne.sljedeciDotokU, sada)}
+            <span class="meta-tocno">({formatirajVrijeme(stanje.dnevne.sljedeciDotokU)})</span>
+          </p>
+        {/if}
+        <p class="meta">{tekstZamjenaPreostalo(stanje.zamjene.dnevna.preostalo)}</p>
+      </div>
+
+      <div class="mreza mreza-dnevne">
         {#each dnevneMjesta as misija, i (misija?.dodjelaId ?? `prazno-${i}`)}
           {#if misija}
             <KarticaMisije
@@ -271,17 +337,28 @@
               onZamijeni={otvoriPotvrdu}
             />
           {:else}
-            <div class="prazno-mjesto" aria-label={`Prazno dnevno mjesto ${i + 1}`}>
-              {#if stanje.dnevne.aktivne.length < 3 && i === prviPrazniDnevni}
-                <p>Nova misija u ponoć</p>
+            <div class="prazno-mjesto prazno-desktop" aria-label={`Prazno dnevno mjesto ${i + 1}`}>
+              {#if !svaDnevnaMjestaPopunjena && i === prviPrazniDnevni}
+                <Clock size={22} aria-hidden="true" />
+                <p>Sljedeća misija</p>
+                <small>Nova misija u ponoć</small>
                 <small>{formatirajVrijeme(stanje.dnevne.sljedeciDotokU)}</small>
               {:else}
                 <p>Slobodno mjesto</p>
+                <small>Za buduću misiju</small>
               {/if}
             </div>
           {/if}
         {/each}
+        {#if brojPraznihDnevnih > 0}
+          <div class="prazno-kompaktno" aria-label="Informacije o slobodnim dnevnim mjestima">
+            <span>Nova misija {relativnoDo(stanje.dnevne.sljedeciDotokU, sada)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{tekstSlobodnihMjesta(brojPraznihDnevnih)}</span>
+          </div>
+        {/if}
       </div>
+
       {#if stanje.dnevne.danasDovrsene.length > 0}
         <div class="danas-dovrseno">
           <h3>Danas dovršeno</h3>
@@ -290,7 +367,7 @@
               <li>
                 <strong>{misija.naziv}</strong>
                 {#if misija.nagrada}
-                  <span>+{misija.nagrada.xpStvarnoDodijeljeno.toLocaleString('hr-HR')} XP</span>
+                  <span>+{formatirajXp(misija.nagrada.xpStvarnoDodijeljeno)} XP</span>
                 {/if}
               </li>
             {/each}
@@ -302,13 +379,16 @@
     <section class="sekcija" aria-labelledby="tjedne-naslov">
       <div class="sekcija-zaglavlje">
         <h2 id="tjedne-naslov">Tjedne misije</h2>
-        <p class="meta">{tjedneDovrsene} / 3 završene</p>
+        <p class="meta">{tjedni.zavrseno} / 3 završene</p>
       </div>
-      <p class="meta">
-        Nove tjedne: ponedjeljak, 00:00 ({formatirajVrijeme(stanje.tjedne.krajIso)}).
-      </p>
-      <p class="meta">{tekstZamjene('tjedna', stanje)}</p>
-      {#if tjedneDovrsene === 3}
+      <div class="sekcija-meta">
+        <p class="meta">
+          Nove misije {relativnoDo(stanje.tjedne.krajIso, sada)}
+          <span class="meta-tocno">({formatirajVrijeme(stanje.tjedne.krajIso)})</span>
+        </p>
+        <p class="meta">{tekstZamjenaPreostalo(stanje.zamjene.tjedna.preostalo)}</p>
+      </div>
+      {#if tjedni.zavrseno === 3}
         <p class="meta">Tjedne misije su završene. Nove stižu u ponedjeljak u 00:00.</p>
       {/if}
       <div class="mreza">
@@ -323,11 +403,45 @@
     </section>
 
     <p class="napomena">
-      Napredak se potvrđuje nakon spremanja igre. Trening vrijedi samo na misijama označenim „Zagrijavanje”.
+      Napredak se potvrđuje nakon spremanja igre. Trening se računa samo za misije koje ga dopuštaju.
       <a href="/pravila-kaladonta">Pravila</a>
     </p>
   {/if}
 </main>
+
+{#if infoOtvoreno}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="modal-podloga" role="presentation" onclick={zatvoriInfo}>
+    <div
+      id="misije-info-dijalog"
+      class="modal-sadrzaj"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="misije-info-naslov"
+      tabindex="-1"
+      bind:this={infoDijalog}
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.key === 'Escape' && zatvoriInfo()}
+    >
+      <div class="modal-zaglavlje">
+        <h2 id="misije-info-naslov">Kako rade misije</h2>
+        <button type="button" class="info-zatvori" aria-label="Zatvori" onclick={zatvoriInfo}>
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
+      <ul class="info-lista">
+        <li>Svake ponoći dobivaš jednu novu dnevnu misiju dok imaš slobodno mjesto (najviše tri).</li>
+        <li>Tjedne misije obnavljaju se ponedjeljkom u 00:00 (Europe/Zagreb).</li>
+        <li>Jednom dnevno možeš zamijeniti jednu dnevnu i jednu tjednu misiju; napredak zamijenjene se gubi.</li>
+        <li>Napredak i XP potvrđuju se nakon spremanja igre.</li>
+        <li>Trening se računa samo za misije koje ga dopuštaju. Privatne sobe ne napreduju misije.</li>
+      </ul>
+      <p class="info-link">
+        <a href="/pravila-kaladonta">Otvori pravila Kaladonta</a>
+      </p>
+    </div>
+  </div>
+{/if}
 
 {#if potvrdaZamjene}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -343,7 +457,7 @@
     >
       <h2 id="zamjena-naslov">Zamijeniti ovu misiju?</h2>
       <p>
-        Napredak će biti izgubljen. Današnja zamjena za ovu skupinu bit će iskorištena.
+        Dosadašnji napredak ove misije bit će izgubljen. Iskoristit ćeš jednu dostupnu zamjenu za ovu skupinu.
       </p>
       <div class="modal-akcije">
         <button type="button" class="gumb" onclick={potvrdiZamjenu}>Zamijeni</button>
@@ -361,8 +475,13 @@
     display: grid;
     gap: 28px;
   }
+  .naslov-red {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
   .naslov h1 {
-    margin: 0 0 8px;
+    margin: 0;
     color: var(--boja-isticanje-tekst);
   }
   .naslov p,
@@ -371,6 +490,54 @@
   .ucitavanje {
     margin: 0;
     color: var(--boja-tekst-sekundarni);
+  }
+  .info-gumb,
+  .info-zatvori {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 999px;
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-sekundarni);
+    cursor: pointer;
+  }
+  .info-gumb:hover,
+  .info-zatvori:hover {
+    color: var(--boja-isticanje-tekst);
+    border-color: var(--boja-isticanje-tekst);
+  }
+  .pregled {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 12px;
+    background: var(--boja-povrsina-2);
+  }
+  @media (min-width: 700px) {
+    .pregled {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+  }
+  .pregled-stavka {
+    display: grid;
+    gap: 4px;
+  }
+  .pregled-oznaka {
+    color: var(--boja-tekst-sekundarni);
+    font-size: 0.9rem;
+  }
+  .pregled-stavka strong {
+    font-size: 1.25rem;
+    color: var(--boja-tekst);
+  }
+  .xp-vrijednost {
+    color: var(--boja-isticanje-tekst) !important;
   }
   .sekcija {
     display: grid;
@@ -386,10 +553,20 @@
   .sekcija-zaglavlje h2 {
     margin: 0;
   }
+  .sekcija-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 16px;
+  }
+  .meta-tocno {
+    opacity: 0.85;
+  }
   .mreza {
     display: grid;
     gap: 12px;
     grid-template-columns: 1fr;
+    align-items: stretch;
   }
   @media (min-width: 700px) {
     .mreza {
@@ -405,16 +582,39 @@
     min-height: 160px;
     border: 1px dashed var(--boja-obrub);
     border-radius: 10px;
-    display: grid;
     place-content: center;
+    justify-items: center;
     text-align: center;
     gap: 4px;
     color: var(--boja-tekst-sekundarni);
     padding: 16px;
+    background: transparent;
   }
   .prazno-mjesto p {
     margin: 0;
     font-weight: 600;
+  }
+  .prazno-desktop {
+    display: none;
+  }
+  .prazno-kompaktno {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 12px 14px;
+    border: 1px dashed var(--boja-obrub);
+    border-radius: 10px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: 0.95rem;
+  }
+  @media (min-width: 700px) {
+    .prazno-desktop {
+      display: grid;
+    }
+    .prazno-kompaktno {
+      display: none;
+    }
   }
   .danas-dovrseno h3 {
     margin: 0 0 8px;
@@ -486,7 +686,7 @@
     z-index: 80;
   }
   .modal-sadrzaj {
-    width: min(420px, 100%);
+    width: min(440px, 100%);
     background: var(--boja-povrsina);
     border: 1px solid var(--boja-obrub);
     border-radius: 12px;
@@ -494,8 +694,24 @@
     display: grid;
     gap: 12px;
   }
+  .modal-zaglavlje {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
   .modal-sadrzaj h2,
   .modal-sadrzaj p {
+    margin: 0;
+  }
+  .info-lista {
+    margin: 0;
+    padding-left: 1.2rem;
+    display: grid;
+    gap: 8px;
+    color: var(--boja-tekst-sekundarni);
+  }
+  .info-link {
     margin: 0;
   }
 </style>
