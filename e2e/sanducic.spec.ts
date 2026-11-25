@@ -21,7 +21,7 @@ async function seedPoruku(page: Page, token: string, tekst: string): Promise<str
   return tijelo.id;
 }
 
-test('feed prikazuje tekst, auto-čita i briše sve', async ({ page }) => {
+test('feed prikazuje Sve, eksplicitno čita i briše', async ({ page }) => {
   const token = await cekajGostSesiju(page);
   const tekst = `Bravo! Otključano dostignuće test ${Date.now()}.`;
   await seedPoruku(page, token, tekst);
@@ -32,11 +32,15 @@ test('feed prikazuje tekst, auto-čita i briše sve', async ({ page }) => {
   await page.getByRole('link', { name: /Obavijesti/ }).first().click();
   await expect(page).toHaveURL('/obavijesti');
   await expect(page.getByRole('heading', { name: 'Obavijesti' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Nove' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Sve', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Nepročitane' })).toBeVisible();
   await expect(page.getByText(tekst)).toBeVisible();
-  await expect(page.getByText('Novo', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Označi sve pročitanim' })).toHaveCount(0);
+  await expect(page.getByText('Nepročitano', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Označi sve pročitanima' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Označi pročitanom' }).first().click();
+  await expect(page.getByText('Pročitano', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
 
   await page.goto('/');
   await expect(page.getByRole('banner').locator('.avatar')).toBeVisible({ timeout: 20_000 });
@@ -44,9 +48,11 @@ test('feed prikazuje tekst, auto-čita i briše sve', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Obavijesti,/ })).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Obavijesti', exact: true }).click();
-  await expect(page.getByText('Nema novih obavijesti.')).toBeVisible();
-  // exact: inače hvata i „Prikaži sve” / „Obriši sve obavijesti”
-  await page.getByRole('button', { name: 'Sve', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Sve', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText(tekst)).toBeVisible();
+  await page.getByRole('button', { name: 'Nepročitane' }).click();
+  await expect(page.getByText('Nema nepročitanih obavijesti.')).toBeVisible();
+  await page.getByRole('button', { name: 'Prikaži sve' }).click();
   await expect(page.getByText(tekst)).toBeVisible();
   page.once('dialog', (dijalog) => dijalog.accept());
   await page.getByRole('button', { name: 'Obriši sve obavijesti' }).click();
@@ -64,4 +70,58 @@ test('toast se potisne u redu bez gubitka badgea', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('banner').locator('.avatar')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('link', { name: /Obavijesti,/ })).toBeVisible({ timeout: 15_000 });
+});
+
+test('gost na desktopu nema pregled obavijesti u profilnoj kartici', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await cekajGostSesiju(page);
+  await expect(page.getByTestId('naslovnica-napredak')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('naslovnica-obavijesti')).toHaveCount(0);
+});
+
+test('registrirani desktop: pager, čitanje miče poruku, prazno stanje', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const odgovor = await page.request.post('http://127.0.0.1:3001/api/racuni/registracija', {
+    data: {
+      email: `obavijesti-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+      lozinka: 'lozinka123',
+      potvrdaDob16: true,
+      prihvacamUvjete: true,
+      nadimak: 'ObavE2E',
+    },
+  });
+  const tijelo = await odgovor.json() as { sesijskiToken: string };
+  expect(odgovor.status(), JSON.stringify(tijelo)).toBe(200);
+
+  await page.addInitScript((token) => {
+    localStorage.setItem('kaladont_sesijski_token', token);
+  }, tijelo.sesijskiToken);
+
+  const a = await seedPoruku(page, tijelo.sesijskiToken, `Pager A ${Date.now()}`);
+  const b = await seedPoruku(page, tijelo.sesijskiToken, `Pager B ${Date.now()}`);
+  expect(a).toBeTruthy();
+  expect(b).toBeTruthy();
+
+  await page.goto('/');
+  const pregled = page.getByTestId('naslovnica-obavijesti');
+  await expect(pregled).toBeVisible({ timeout: 20_000 });
+  await expect(pregled.getByText(/Obavijesti · \d+ nov/)).toBeVisible();
+  await expect(pregled.getByRole('button', { name: 'Označi pročitanom' })).toBeVisible();
+
+  // Dobrodošlica + seedane poruke: čitaj dok pager ne ostane prazan.
+  for (let i = 0; i < 12; i += 1) {
+    const prazno = page.getByTestId('naslovnica-obavijesti-prazno');
+    if (await prazno.isVisible().catch(() => false)) break;
+    const gumb = pregled.getByRole('button', { name: 'Označi pročitanom' });
+    if (!(await gumb.isVisible().catch(() => false))) break;
+    const prije = await pregled.locator('.naslov-poruke').textContent().catch(() => '');
+    await gumb.click();
+    await Promise.race([
+      prazno.waitFor({ state: 'visible', timeout: 8_000 }).catch(() => null),
+      pregled.locator('.naslov-poruke').filter({ hasNotText: prije ?? '' }).waitFor({ timeout: 8_000 }).catch(() => null),
+      expect(gumb).toBeEnabled({ timeout: 8_000 }).catch(() => null),
+    ]);
+  }
+  await expect(page.getByTestId('naslovnica-obavijesti-prazno')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('link', { name: 'Vidi sve ›' })).toBeVisible();
 });

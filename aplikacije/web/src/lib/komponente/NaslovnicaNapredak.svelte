@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { odaberiIstaknutaDostignuca } from 'zajednicko';
   import {
     gostImaXp,
     izracunajPrikazXp,
@@ -8,25 +7,12 @@
   import { stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import Avatar from './Avatar.svelte';
-  import DostignucaIstaknuta from './DostignucaIstaknuta.svelte';
-
-  type DostignuceNaslovnice = {
-    id: string;
-    naziv: string;
-    opis: string;
-    kategorija: 'napredak' | 'rijeci' | 'vjestina' | 'kaladont' | 'igra';
-    pragovi: readonly number[];
-    razina: number;
-    vrijednost: number;
-    sljedeciPrag: number | null;
-  };
+  import NaslovnicaObavijesti from './NaslovnicaObavijesti.svelte';
 
   let {
     izazoviZavrseno = 0,
-    dostignuca = [],
   }: {
     izazoviZavrseno?: number;
-    dostignuca?: readonly DostignuceNaslovnice[];
   } = $props();
 
   const prikaz = $derived(izracunajPrikazXp(stanjeProfila.profil, stanjeProfila.status));
@@ -50,14 +36,14 @@
     }),
   );
   const linkNaProfil = $derived(stanjeProfila.status === 'spreman' && !jeGostProfil);
-  const istaknutaZaPrikaz = $derived(odaberiIstaknutaDostignuca(dostignuca, 6));
-  const prikaziIstaknuta = $derived(linkNaProfil && istaknutaZaPrikaz.length > 0);
+  /** Desktop raspored za registrirane — neovisno o broju dostignuća. */
+  const prikaziRegistriranRaspored = $derived(linkNaProfil);
 </script>
 
 <div
   class="naslovnica-napredak-omotac"
   class:naslovnica-napredak-omotac--gost={prikaziGostCta}
-  class:naslovnica-napredak-omotac--registriran={prikaziIstaknuta}
+  class:naslovnica-napredak-omotac--registriran={prikaziRegistriranRaspored}
 >
   {#if linkNaProfil}
     <a
@@ -79,10 +65,9 @@
     </div>
   {/if}
 
-  {#if prikaziIstaknuta}
-    <div class="naslovnica-istaknuta">
-      <p class="naslovnica-istaknuta__naslov">Istaknuta dostignuća</p>
-      <DostignucaIstaknuta dostignuca={dostignuca} limit={6} kompaktno />
+  {#if prikaziRegistriranRaspored}
+    <div class="naslovnica-obavijesti-slot">
+      <NaslovnicaObavijesti />
     </div>
   {/if}
 
@@ -273,7 +258,8 @@
     flex: 1 1 auto;
     color: var(--boja-tekst-osnovni);
     font-family: var(--font-naslov);
-    font-size: 16px;
+    /* Mobitel: ime 20, ostalo 16 / min 14. Desktop override ispod. */
+    font-size: 20px;
     font-weight: 700;
     line-height: 1.2;
     overflow: hidden;
@@ -292,7 +278,7 @@
     flex: 0 0 auto;
     color: var(--boja-zuta-krema);
     font-family: var(--font-naslov);
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
     line-height: 1.2;
   }
@@ -301,9 +287,12 @@
     margin: 0;
     color: var(--boja-tekst-sekundarni);
     font-family: var(--font-tijelo);
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 500;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .naslovnica-napredak__traka {
@@ -329,11 +318,15 @@
 
   .naslovnica-napredak__xp {
     margin: 0;
-    align-self: flex-end;
+    align-self: flex-start;
     font-family: var(--font-tijelo);
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1.2;
-    text-align: right;
+    text-align: left;
+  }
+
+  .naslovnica-obavijesti-slot {
+    display: none;
   }
 
   .naslovnica-gost-cta {
@@ -419,10 +412,6 @@
     border-radius: 4px;
   }
 
-  .naslovnica-istaknuta {
-    display: none;
-  }
-
   @media (min-width: 1000px) {
     .naslovnica-napredak-omotac {
       align-items: stretch;
@@ -445,15 +434,26 @@
       flex-direction: row;
       flex-wrap: nowrap;
       align-items: center;
-      justify-content: space-between;
-      gap: 16px 28px;
+      justify-content: flex-start;
+      gap: 0;
     }
 
-    .naslovnica-napredak {
-      width: auto;
-      max-width: none;
+    .naslovnica-napredak-omotac--registriran .naslovnica-napredak {
+      flex: 0 0 30%;
+      width: 30%;
+      max-width: 30%;
+      box-sizing: border-box;
+      padding-right: 16px;
       justify-content: flex-start;
-      flex: 0 1 380px;
+    }
+
+    .naslovnica-obavijesti-slot {
+      display: block;
+      flex: 0 0 70%;
+      width: 70%;
+      max-width: 70%;
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .naslovnica-napredak-omotac--gost .naslovnica-napredak {
@@ -463,25 +463,25 @@
     }
 
     .naslovnica-napredak__nadimak {
-      font-size: 17px;
+      font-size: 22px;
     }
 
     .naslovnica-napredak__lvl {
-      font-size: 13px;
+      font-size: 18px;
     }
 
     .naslovnica-napredak__rang {
-      font-size: 14px;
+      font-size: 18px;
     }
 
     .naslovnica-napredak__xp {
-      font-size: 12px;
+      font-size: 16px;
     }
 
     .naslovnica-napredak__sadrzaj {
       min-width: 0;
       width: 100%;
-      max-width: 360px;
+      max-width: none;
     }
 
     .naslovnica-napredak__traka {
@@ -497,28 +497,6 @@
       height: 52px !important;
     }
 
-    .naslovnica-istaknuta {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 6px;
-      flex: 0 1 auto;
-      margin-left: auto;
-      min-width: 0;
-    }
-
-    .naslovnica-istaknuta__naslov {
-      margin: 0;
-      color: color-mix(in srgb, var(--boja-tekst-sekundarni) 90%, transparent);
-      font-family: var(--font-tijelo);
-      font-size: 12px;
-      font-weight: 600;
-      line-height: 1.2;
-      letter-spacing: 0.01em;
-      text-align: right;
-      white-space: nowrap;
-    }
-
     .naslovnica-gost-cta {
       flex: 0 0 auto;
       margin-left: auto;
@@ -526,10 +504,6 @@
   }
 
   @media (max-width: 999px) {
-    .naslovnica-istaknuta {
-      display: none !important;
-    }
-
     .naslovnica-napredak-omotac--gost {
       flex-direction: column;
       flex-wrap: nowrap;

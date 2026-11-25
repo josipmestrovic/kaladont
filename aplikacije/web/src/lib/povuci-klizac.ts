@@ -153,3 +153,79 @@ export function povuciListanje(element: HTMLElement, opcije: OpcijeListanja) {
     },
   };
 }
+
+/**
+ * Vertikalni swipe/drag za kompaktni pager.
+ * Povlačenje prema gore → sljedeći (stariji); prema dolje → prethodni (noviji).
+ */
+export function povuciListanjeOkomito(element: HTMLElement, opcije: OpcijeListanja) {
+  let trenutne = opcije;
+  let pracenje = false;
+  let pocetniX = 0;
+  let pocetniY = 0;
+  let aktivanId: number | null = null;
+  let prepoznato = false;
+
+  const naPritisak = (dogadaj: PointerEvent) => {
+    if (dogadaj.pointerType === 'mouse' && dogadaj.button !== 0) return;
+    if ((dogadaj.target as Element | null)?.closest?.('button, a, input, textarea, select, [role="button"]')) return;
+    pracenje = true;
+    prepoznato = false;
+    aktivanId = dogadaj.pointerId;
+    pocetniX = dogadaj.clientX;
+    pocetniY = dogadaj.clientY;
+    element.setPointerCapture(dogadaj.pointerId);
+  };
+
+  const zavrsi = (dogadaj: PointerEvent) => {
+    if (!pracenje || aktivanId !== dogadaj.pointerId) return;
+    pracenje = false;
+    aktivanId = null;
+    if (element.hasPointerCapture(dogadaj.pointerId)) {
+      element.releasePointerCapture(dogadaj.pointerId);
+    }
+    const dx = dogadaj.clientX - pocetniX;
+    const dy = dogadaj.clientY - pocetniY;
+    const prag = trenutne.prag ?? 40;
+    if (Math.abs(dy) < prag || Math.abs(dy) <= Math.abs(dx)) return;
+    prepoznato = true;
+    // Gore (negativan dy) → starija; dolje → novija.
+    if (dy < 0) trenutne.sljedeci();
+    else trenutne.prethodni();
+  };
+
+  const otkazi = (dogadaj: PointerEvent) => {
+    if (aktivanId !== dogadaj.pointerId) return;
+    pracenje = false;
+    aktivanId = null;
+    if (element.hasPointerCapture(dogadaj.pointerId)) {
+      element.releasePointerCapture(dogadaj.pointerId);
+    }
+  };
+
+  const naKlik = (dogadaj: MouseEvent) => {
+    if (!prepoznato) return;
+    dogadaj.preventDefault();
+    dogadaj.stopPropagation();
+    prepoznato = false;
+  };
+
+  element.addEventListener('pointerdown', naPritisak);
+  element.addEventListener('pointerup', zavrsi);
+  element.addEventListener('pointercancel', otkazi);
+  element.addEventListener('lostpointercapture', otkazi);
+  element.addEventListener('click', naKlik, true);
+
+  return {
+    update(nove: OpcijeListanja) {
+      trenutne = nove;
+    },
+    destroy() {
+      element.removeEventListener('pointerdown', naPritisak);
+      element.removeEventListener('pointerup', zavrsi);
+      element.removeEventListener('pointercancel', otkazi);
+      element.removeEventListener('lostpointercapture', otkazi);
+      element.removeEventListener('click', naKlik, true);
+    },
+  };
+}

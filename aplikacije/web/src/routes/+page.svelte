@@ -62,17 +62,6 @@
     ukupno: 0,
     maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
   });
-  type DostignuceNaslovnice = {
-    id: string;
-    naziv: string;
-    opis: string;
-    kategorija: 'napredak' | 'rijeci' | 'vjestina' | 'kaladont' | 'igra';
-    pragovi: readonly number[];
-    razina: number;
-    vrijednost: number;
-    sljedeciPrag: number | null;
-  };
-  let dostignucaPopis = $state<DostignuceNaslovnice[]>([]);
   const kolekcijaBrojLabela = $derived(
     brojRijeciKolekcije === null
       ? '…'
@@ -139,11 +128,9 @@
       const odgovor = await api<{
         ukupnoZvjezdica?: number;
         maksimalnoZvjezdica?: number;
-        dostignuca?: DostignuceNaslovnice[];
       }>('/dostignuca');
       if (generacija !== dostignucaGeneracija) return;
       dostignucaZvjezdice = normalizirajZvjezdiceDostignuca(odgovor);
-      dostignucaPopis = Array.isArray(odgovor.dostignuca) ? odgovor.dostignuca : [];
     } catch {
       // Zadrži zadnji uspješan sažetak; ne piši 0 zvjezdica preko stvarnog napretka.
       if (generacija !== dostignucaGeneracija) return;
@@ -176,7 +163,6 @@
         ukupno: 0,
         maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
       };
-      dostignucaPopis = [];
       invalidirajStanjeMisija();
       osvjeziNaslovnicu();
     };
@@ -223,7 +209,6 @@
       <div class="profil-red">
         <NaslovnicaNapredak
           izazoviZavrseno={izazoviPrikaz.vrsta === 'napredak' ? izazoviPrikaz.zavrseno : 0}
-          dostignuca={dostignucaPopis}
         />
       </div>
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">

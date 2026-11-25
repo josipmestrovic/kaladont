@@ -23,6 +23,8 @@
     aktivna: boolean;
     odgodaSekundi: number;
     trajanjeSekundi: number;
+    /** Zamrznuta putanja pri stvaranju — resize ne smije dirati in-flight animacije. */
+    putanjaPx: number;
   }
 
   let {
@@ -61,8 +63,11 @@
   }
 
   function izracunajPutanju(): number {
-    if (!zonaEl) return Math.max(window.innerHeight, 800) + 120;
-    return zonaEl.clientHeight + 120;
+    const visinaZone = zonaEl?.clientHeight ?? 0;
+    const visinaProzora = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const baza = Math.max(visinaZone, visinaProzora);
+    // 800 samo dok zona/prozor još nisu izmjerivi (SSR / prije layouta).
+    return (baza > 0 ? baza : 800) + 120;
   }
 
   /** Determinističke trake — bez ponovnog RNG-a pri svakom potezu (flicker). */
@@ -81,6 +86,7 @@
   ): PadajucaRijec {
     const baza = uskaZona ? slucajni(14, 20) : slucajni(15, 24);
     const velicina = potez.posebnaRijec ? Math.min(baza * 1.1, 24) : baza;
+    const putanja = putanjaPx;
     return {
       id: ++idElementa,
       idPartije: potez.idPartije,
@@ -95,7 +101,8 @@
       posebnaRijec: potez.posebnaRijec,
       aktivna,
       odgodaSekundi,
-      trajanjeSekundi: putanjaPx / brzinaPxPoSekundi,
+      trajanjeSekundi: putanja / brzinaPxPoSekundi,
+      putanjaPx: putanja,
     };
   }
 
@@ -219,8 +226,23 @@
   onMount(() => {
     aktivan = true;
     inicijaliziraj();
+
+    const naResize = () => {
+      putanjaPx = izracunajPutanju();
+    };
+    window.addEventListener('resize', naResize);
+    const observer =
+      typeof ResizeObserver !== 'undefined' && zonaEl
+        ? new ResizeObserver(() => {
+            putanjaPx = izracunajPutanju();
+          })
+        : null;
+    if (observer && zonaEl) observer.observe(zonaEl);
+
     return () => {
       aktivan = false;
+      window.removeEventListener('resize', naResize);
+      observer?.disconnect();
       if (timer) clearTimeout(timer);
       timer = null;
     };
@@ -246,7 +268,7 @@
       class="rijec"
       class:rijec--kaladont={rijec.posebnaRijec}
       class:rijec--aktivna={rijec.aktivna}
-      style={`--velicina:${rijec.velicinaFonta}px;--debljina:${rijec.debljinaFonta};--rotacija:${rijec.rotacija}deg;--pomak:${rijec.pomak}px;--odgoda:${rijec.odgodaSekundi}s;--trajanje:${rijec.trajanjeSekundi}s;--putanja:${putanjaPx}px;--njihanje:${2.8 + (rijec.id % 5) * 0.35}s;--neprozirnost:${rijec.opacity};`}
+      style={`--velicina:${rijec.velicinaFonta}px;--debljina:${rijec.debljinaFonta};--rotacija:${rijec.rotacija}deg;--pomak:${rijec.pomak}px;--odgoda:${rijec.odgodaSekundi}s;--trajanje:${rijec.trajanjeSekundi}s;--putanja:${rijec.putanjaPx}px;--njihanje:${2.8 + (rijec.id % 5) * 0.35}s;--neprozirnost:${rijec.opacity};`}
       onanimationend={(e) => {
         if (e.animationName.includes('dizanje-partije')) ukloniRijec(rijec.id);
       }}
@@ -299,7 +321,6 @@
   .rijec {
     position: absolute;
     top: 0;
-    left: 50%;
     font-family: var(--font-naslov);
     font-size: var(--velicina);
     font-weight: var(--debljina);
@@ -308,7 +329,18 @@
     opacity: var(--neprozirnost);
     color: var(--boja-tekst-sekundarni);
     animation: dizanje-partije var(--trajanje) linear var(--odgoda) forwards;
-    transform: translate3d(calc(-50% + var(--pomak)), var(--putanja), 0) rotate(var(--rotacija));
+    /* Bez left:50% — poravnato uz vanjski rub zone (ne prema sredini ekrana). */
+    transform: translate3d(var(--pomak), var(--putanja), 0) rotate(var(--rotacija));
+  }
+
+  .zona--lijevo .rijec {
+    left: 12%;
+    right: auto;
+  }
+
+  .zona--desno .rijec {
+    left: auto;
+    right: 12%;
   }
 
   .rijec-njihanje {
@@ -340,11 +372,10 @@
 
   @keyframes dizanje-partije {
     0% {
-      transform: translate3d(calc(-50% + var(--pomak)), var(--putanja), 0) rotate(var(--rotacija));
+      transform: translate3d(var(--pomak), var(--putanja), 0) rotate(var(--rotacija));
     }
     100% {
-      transform: translate3d(calc(-50% + var(--pomak)), -40px, 0)
-        rotate(calc(var(--rotacija) * -1));
+      transform: translate3d(var(--pomak), -40px, 0) rotate(calc(var(--rotacija) * -1));
     }
   }
 
