@@ -11,7 +11,8 @@
   let rang = $state<string | null>(null);
   let ucitavanje = $state(true);
   let spremanje = $state(false);
-  let greska = $state<string | null>(null);
+  let greskaUcitavanja = $state<string | null>(null);
+  let greskaSpremanja = $state<string | null>(null);
   let jeGost = $state(false);
   let legacyBezConfiga = $state(false);
 
@@ -37,7 +38,7 @@
       konfiguracija = profil.avatarConfig ?? ZADANI_AVATAR_CONFIG;
       rang = profil.rang ?? null;
     } catch (e) {
-      greska = e instanceof Error ? e.message : 'Avatar nije moguće učitati.';
+      greskaUcitavanja = e instanceof Error ? e.message : 'Avatar nije moguće učitati.';
     } finally {
       ucitavanje = false;
     }
@@ -45,7 +46,7 @@
 
   async function spremiAvatar(novaKonfiguracija: AvatarConfigV1): Promise<void> {
     spremanje = true;
-    greska = null;
+    greskaSpremanja = null;
     try {
       const odgovor = await api<{ avatarConfig: AvatarConfigV1; avatarRevision: number }>('/profil/avatar', {
         method: 'PUT',
@@ -57,7 +58,7 @@
       window.dispatchEvent(new CustomEvent('kaladont:avatar-promijenjen', { detail: { avatarConfig: odgovor.avatarConfig } }));
       void goto('/profil');
     } catch (e) {
-      greska = e instanceof Error ? e.message : 'Spremanje avatara nije uspjelo.';
+      greskaSpremanja = e instanceof Error ? e.message : 'Spremanje avatara nije uspjelo.';
       throw e;
     } finally {
       spremanje = false;
@@ -72,8 +73,8 @@
 <main class="avatar-stranica">
   {#if ucitavanje}
     <p>Učitavanje avatara…</p>
-  {:else if greska}
-    <p role="alert" class="greska">{greska}</p>
+  {:else if greskaUcitavanja}
+    <p role="alert" class="greska">{greskaUcitavanja}</p>
   {:else if jeGost}
     <section class="gost-gate" aria-labelledby="avatar-gost-naslov">
       <h1 id="avatar-gost-naslov">Avatar za registrirane igrače</h1>
@@ -86,6 +87,9 @@
       </div>
     </section>
   {:else}
+    {#if greskaSpremanja}
+      <p role="alert" class="greska">{greskaSpremanja}</p>
+    {/if}
     <AvatarEditor
       pocetnaKonfiguracija={konfiguracija}
       {rang}
@@ -101,8 +105,10 @@
 <style>
   .avatar-stranica {
     width: 100%;
-    max-width: 980px;
+    max-width: 1040px;
     margin: 0 auto;
+    padding: 8px 16px 0;
+    box-sizing: border-box;
   }
 
   .greska {

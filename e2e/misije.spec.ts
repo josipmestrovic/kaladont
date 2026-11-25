@@ -42,10 +42,10 @@ test('registrirani igrač vidi 1 dnevnu i 3 tjedne; zamjena s potvrdom', async (
 
   const dnevneKartice = page.locator('.sekcija').filter({ has: page.getByRole('heading', { name: 'Dnevne misije' }) }).locator('.kartica-misije');
   await expect(dnevneKartice).toHaveCount(1);
-  await expect(dnevneKartice.first().getByText('DNEVNA')).toBeVisible();
+  await expect(dnevneKartice.first().getByText('DNEVNA', { exact: true })).toBeVisible();
   const tjedneKartice = page.locator('.sekcija').filter({ has: page.getByRole('heading', { name: 'Tjedne misije' }) }).locator('.kartica-misije');
   await expect(tjedneKartice).toHaveCount(3);
-  await expect(tjedneKartice.first().getByText('TJEDNA')).toBeVisible();
+  await expect(tjedneKartice.first().getByText('TJEDNA', { exact: true })).toBeVisible();
 
   const nazivPrije = await dnevneKartice.first().locator('h3').innerText();
   await dnevneKartice.first().getByRole('button', { name: /Zamijeni misiju/ }).click();

@@ -399,7 +399,7 @@ test('na drugim stranicama header prikazuje povratnu strelicu', async ({ page })
   await expect(page).toHaveURL('/pravila-kaladonta');
   const izbornik = await otvoriProfilIzbornik(page);
   await izbornik.getByRole('menuitem', { name: 'Moj profil' }).click();
-  await expect(page).toHaveURL('/profil');
+  await expect(page).toHaveURL(/\/profil(#pregled)?$/);
   const pocetna = page.getByRole('link', { name: 'Početna' });
   await expect(pocetna).toBeVisible();
   await expect(pocetna).toHaveCSS('height', '44px');
@@ -432,7 +432,7 @@ for (const { sirina, visina } of [
 
     const izbornik = await otvoriProfilIzbornik(page);
     await izbornik.getByRole('menuitem', { name: 'Moj profil' }).click();
-    await expect(page).toHaveURL('/profil');
+    await expect(page).toHaveURL(/\/profil(#pregled)?$/);
     const avatarProfil = page.getByRole('banner').locator('.avatar');
     await expect(avatarProfil).toBeVisible({ timeout: 20_000 });
     const boxProfil = await avatarProfil.boundingBox();
