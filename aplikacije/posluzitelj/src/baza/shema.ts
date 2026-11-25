@@ -1024,6 +1024,28 @@ export const nizAktivnostiIgraca = pgTable('niz_aktivnosti_igraca', {
 ]);
 
 export const kontekstAnalitike = pgEnum('kontekst_analitike', ['javna', 'privatna', 'trening', 'izazov']);
+
+/**
+ * Potvrđene eliminacije s uzročnom odigranom riječi (najopasnije riječi).
+ * Bez FK na partije — trening nema trajni redak partije.
+ */
+export const eliminacijePoRijeci = pgTable(
+  'eliminacije_po_rijeci',
+  {
+    partijaId: uuid('partija_id').notNull(),
+    redniBroj: smallint('redni_broj').notNull(),
+    kontekst: kontekstAnalitike('kontekst').notNull(),
+    rijec: text('rijec').notNull(),
+    razlog: text('razlog').notNull(),
+    zrtvaId: uuid('zrtva_id').references(() => igraci.id, { onDelete: 'set null' }),
+    vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (tablica) => [
+    primaryKey({ columns: [tablica.partijaId, tablica.redniBroj] }),
+    index('idx_eliminacije_po_rijeci_rijec').on(tablica.rijec),
+  ],
+);
+
 export const izvorPocetneAnalitike = pgEnum('izvor_pocetne_analitike', [
   'sigurni_skup',
   'rezervni_odabir',

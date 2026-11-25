@@ -16,6 +16,7 @@ import {
 } from './pocetne-rijeci.js';
 import { ucitajSigurnePocetneRijeciIzBaze } from './sigurni-skup.js';
 import { izgradiRepertoarBotova, type SnimkaRepertoara, UpraviteljRepertoara } from '../bot/repertoar.js';
+import { ocistiMemorijuNajopasnijihRijeci } from '../ljestvice/najopasnije-rijeci.js';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
 
@@ -443,6 +444,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     osvjeziIzvedeneBrojace();
     verzija += 1;
     obnoviRepertoarBotova();
+    ocistiMemorijuNajopasnijihRijeci();
   }
 
   function grupeZa(rijec: string): readonly string[] {
@@ -612,6 +614,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     verzija += 1;
     upraviteljRepertoara.filtrirajUklonjene(uklonjene, verzija);
     zakaziObnovuRepertoara();
+    ocistiMemorijuNajopasnijihRijeci();
   }
 
   function primijeniUbaci(zapis: {
@@ -658,6 +661,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     osvjeziIzvedeneBrojace();
     verzija += 1;
     zakaziObnovuRepertoara();
+    ocistiMemorijuNajopasnijihRijeci();
   }
 
   await ucitaj();

@@ -32,6 +32,7 @@ import {
 } from './tokeni.js';
 import { stvoriDobrodoslicu, stvoriPorukuPotvrdeEmaila } from '../sanducic/okidaci.js';
 import { preuzmiGostovskeRangDoprinose } from '../igra/univerzalni-rang.js';
+import { ocistiMemorijuLjestvica } from '../ljestvice/servis.js';
 
 export interface OpcijeAuthRateLimita {
   omogucen: boolean;
@@ -206,6 +207,8 @@ export async function registrirajRacuneRute(
       }
       igracId = postojeciGost.id;
       konacniNadimak = nadimak ?? postojeciGost.nadimak;
+      // Nadimak/vrsta/avatar u poretku moraju biti svježi odmah, ne tek nakon 30 s TTL-a.
+      ocistiMemorijuLjestvica();
     } else {
       const [novi] = await baza
         .insert(igraci)

@@ -330,8 +330,23 @@ test('mobilne ljestvice prikazuju oznake i dugačke nazive bez pomicanja', async
             jeJa: true,
             odigraneIgre: 45,
             vrijednost: { vrsta: 'prosjek_bodova', prosjek: 5.12, bodoviUkupno: 230 },
+            avatarId: 0,
+            avatarConfig: null,
+            avatarRevision: 0,
           },
         ],
+        mojRedak: {
+          mjesto: 1,
+          igracId: 'test',
+          nadimak: 'JakoDugackoImeIgracaBezRazmaka',
+          jeJavanProfil: true,
+          jeJa: true,
+          odigraneIgre: 45,
+          vrijednost: { vrsta: 'prosjek_bodova', prosjek: 5.12, bodoviUkupno: 230 },
+          avatarId: 0,
+          avatarConfig: null,
+          avatarRevision: 0,
+        },
         mojaPozicija: pozicija,
         pozicijePoRazdobljima: {
           dnevno: pozicija,
@@ -345,11 +360,13 @@ test('mobilne ljestvice prikazuju oznake i dugačke nazive bez pomicanja', async
       },
     }),
   );
-  await page.route(/\/rijeci\/top\?/, (ruta) =>
+  await page.route(/\/rijeci\/najopasnije\?/, (ruta) =>
     ruta.fulfill({
       json: {
+        ok: true,
+        imaJos: false,
         rijeci: [
-          { mjesto: 1, rijec: 'najduzarijecbezrazmaka', brojUpotreba: 12 },
+          { mjesto: 1, rijec: 'najduzarijecbezrazmaka', brojEliminacija: 12 },
         ],
       },
     }),
@@ -359,7 +376,7 @@ test('mobilne ljestvice prikazuju oznake i dugačke nazive bez pomicanja', async
     await page.setViewportSize({ width: sirina, height: 760 });
     await page.goto('/ljestvice');
     await expect(page.getByText('Ovo si ti')).toBeVisible();
-    for (const tab of ['Igrači', 'Najčešće riječi']) {
+    for (const tab of ['Igrači', 'Najopasnije riječi']) {
       await page.getByRole('tab', { name: tab }).click();
       const tablica = page.locator('table.tablica-mobilni-retci');
       await expect(tablica.locator('tbody tr')).toHaveCount(1);

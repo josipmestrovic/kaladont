@@ -4,11 +4,11 @@
  * uspješan upis početka i svih poteza prije isplate XP-a (idempotentni retry).
  */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { izracunajNovaDostignuca, izracunajObracunIskustva, izracunajOcjenuIgre, izracunajUniverzalniUcinak, jeNapredakUniverzalnogRanga, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type ObracunIskustva, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type StavkaIskustva, type UkupnoIskustvoIshoda } from 'zajednicko';
+import { izracunajNovaDostignuca, izracunajObracunIskustva, izracunajOcjenuIgre, izracunajUniverzalniUcinak, jeNapredakUniverzalnogRanga, kolekcijskiKljucGrupe, odrediPohvaleIgre, postotakXpZaOcjenu, MAKSIMALNO_ISKUSTVO, stanjeIskustva, ZADANI_PRAVILNIK, type DnkOs, type DeltaNapretkaDostignuca, type KontekstPartije, type MetrikeMisijaIgre, type ModPartije, type NovoDostignuce, type ObavijestOtkljucanogDostignuca, type ObracunIskustva, type PohvalaIgre, type PravilnikPartije, type PromjenaMisije, type StavkaIskustva, type UkupnoIskustvoIshoda } from 'zajednicko';
 import { bonusPobjednickogNiza, izracunajFormu } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { jeJedinstvenostPrekrsena } from '../baza/greske.js';
-import { botovi, dostignucaIgraca, dnkStatistikeIgraca, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeModaIgraca, statistikeRijeciIgraca, sudioniciPartije, ucinakPosebneRijeci } from '../baza/shema.js';
+import { botovi, dostignucaIgraca, dnkStatistikeIgraca, eliminacijePoRijeci, igraci, napredakDostignucaIgraca, nizoviPobjedaIgraca, obracuniPartija, otkljucaneGrupeIgraca, otkljucaneRijeciIgraca, partije, pohvaleIgre, potezi, rezultatiFormeIgraca, statistikeModaIgraca, statistikeRijeciIgraca, sudioniciPartije, ucinakPosebneRijeci } from '../baza/shema.js';
 import type { VrstaMetePosebneRijeci } from './odluke-pravila.js';
 import { emitirajNovostiDostignuca } from '../dostignuca/obavijesti.js';
 import { obradiNeobradeneTop10Dokaze, zabiljeziTop10NakonPromjene } from '../dostignuca/top10.js';
@@ -602,6 +602,32 @@ export async function osigurajUpiseUcinakaPosebneRijeci(
   zapisi: readonly ZapisUcinakPosebneRijeci[],
 ): Promise<void> {
   await Promise.all(zapisi.map((zapis) => zapisiUcinakPosebneRijeci(zapis)));
+}
+
+export type ZapisEliminacijePoRijeci = {
+  partijaId: string;
+  redniBroj: number;
+  kontekst: KontekstPartije;
+  rijec: string;
+  razlog: string;
+  zrtvaId: string | null;
+};
+
+/** Idempotentan upis uzročne riječi potvrđene eliminacije (svi konteksti, uklj. trening). */
+export async function zapisiEliminacijuPoRijeci(zapis: ZapisEliminacijePoRijeci): Promise<void> {
+  try {
+    await baza.insert(eliminacijePoRijeci).values(zapis).onConflictDoNothing();
+  } catch (greska) {
+    if (jeJedinstvenostPrekrsena(greska)) return;
+    console.error('Neuspio upis eliminacije po riječi:', greska);
+    throw greska;
+  }
+}
+
+export async function osigurajUpiseEliminacijaPoRijeci(
+  zapisi: readonly ZapisEliminacijePoRijeci[],
+): Promise<void> {
+  await Promise.all(zapisi.map((zapis) => zapisiEliminacijuPoRijeci(zapis)));
 }
 
 export function spremiRaniPorazUBazi(zapis: {
