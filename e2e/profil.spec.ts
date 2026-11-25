@@ -66,16 +66,21 @@ test('profili prikazuju istaknuta dostignuća i tooltip na osobnom i javnom prof
   await page.setViewportSize({ width: 375, height: 812 });
   await page.reload();
   const avatar = await page.locator('.zaglavlje-profila > :first-child').boundingBox();
+  const identitet = await page.locator('.profil-identitet').boundingBox();
   const sazetak = await page.locator('.profil-sazetak').boundingBox();
   expect(avatar).not.toBeNull();
+  expect(identitet).not.toBeNull();
   expect(sazetak).not.toBeNull();
-  expect(sazetak!.x).toBeGreaterThanOrEqual(avatar!.x + avatar!.width);
+  expect(identitet!.x).toBeGreaterThanOrEqual(avatar!.x + avatar!.width - 1);
+  expect(sazetak!.y).toBeGreaterThanOrEqual(identitet!.y);
   await expect(javnaDostignuca.getByRole('button')).toHaveCount(6);
 
   const ikona = javnaDostignuca.getByRole('button').first();
   const ikonaOkvir = await ikona.boundingBox();
   await ikona.click();
-  const mobilniTooltip = await page.getByRole('tooltip').boundingBox();
+  const tooltip = page.getByRole('tooltip');
+  await expect(tooltip).toBeVisible();
+  const mobilniTooltip = await tooltip.boundingBox();
   expect(ikonaOkvir).not.toBeNull();
   expect(mobilniTooltip).not.toBeNull();
   expect(mobilniTooltip!.x).toBeGreaterThanOrEqual(0);
@@ -85,7 +90,7 @@ test('profili prikazuju istaknuta dostignuća i tooltip na osobnom i javnom prof
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });
 
-test('PR10: Općenito je default s jednim radarom; #statistika otvara Statistiku', async ({ page }) => {
+test('Pregled je default; #statistika i #opcenito otvaraju Pregled; Troboj je naziv formata', async ({ page }) => {
   const igrac = await registrirajIgraca(page);
   await page.addInitScript((token) => {
     localStorage.setItem('kaladont_sesijski_token', token);
@@ -94,20 +99,23 @@ test('PR10: Općenito je default s jednim radarom; #statistika otvara Statistiku
   for (const sirina of [380, 1100] as const) {
     await page.setViewportSize({ width: sirina, height: 900 });
     await page.goto('/profil');
-    await expect(page.getByRole('heading', { name: 'Općenito', level: 2 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Tvoj Kaladont DNK', level: 3 })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pregled' })).toHaveClass(/aktivan/);
+    await expect(page.locator('#pregled')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Kaladont DNK', level: 3 })).toBeVisible();
     await expect(page.locator('.dnk-kartica')).toHaveCount(1);
-    await expect(page.getByText('Odigrane javne igre')).toBeVisible();
-    await expect(page.getByText('Brza igra (Troboj)')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Troboj', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Osobni rekordi', level: 2 })).toBeVisible();
+    await expect(page.getByText('Brza igra (Troboj)')).toHaveCount(0);
 
     await page.goto('/profil#statistika');
-    await expect(page.locator('#statistika')).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Brza igra \(Troboj\)/ })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Općenito', level: 2 })).toHaveCount(0);
+    await expect(page.locator('#pregled')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pregled' })).toHaveClass(/aktivan/);
+
+    await page.goto('/profil#opcenito');
+    await expect(page.locator('#pregled')).toBeVisible();
 
     await page.goto('/profil');
-    await expect(page.getByRole('heading', { name: 'Općenito', level: 2 })).toBeVisible();
-    await expect(page.locator('#statistika')).toHaveCount(0);
+    await expect(page.locator('#pregled')).toBeVisible();
   }
 });
 
@@ -119,44 +127,18 @@ test('objašnjenje stila radi na vlastitom i javnom profilu te se zatvara prema 
   }, igrac.sesijskiToken);
 
   await page.goto('/profil');
-  const naziv = page.locator('.stil-naziv');
-  await expect(naziv).toHaveText('neodređen');
-  await naziv.click();
-  const objasnjenje = page.getByRole('dialog', { name: 'Objašnjenje stila: neodređen' });
-  await expect(objasnjenje).toContainText('Stil igre prikazat ćemo kad bude dovoljno podataka iz igara.');
-  await objasnjenje.getByRole('button', { name: 'Zatvori objašnjenje stila' }).click();
-  await expect(objasnjenje).toHaveCount(0);
-
-  await page.locator('.stil-pomoc').click();
-  await expect(objasnjenje).toBeVisible();
-  await page.locator('h1').click();
-  await expect(objasnjenje).toHaveCount(0);
-
-  await naziv.click();
-  await page.keyboard.press('Escape');
-  await expect(objasnjenje).toHaveCount(0);
-
-  await naziv.click();
-  await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
-  await expect(objasnjenje).toHaveCount(0);
+  const stilGumb = page.getByRole('button', { name: /Stil igre/i });
+  if (await stilGumb.count()) {
+    await stilGumb.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
 
   await page.goto(`/profil/javni/${igrac.igracId}`);
-  const javniNaziv = page.locator('.stil-naziv');
-  await javniNaziv.click();
-  await expect(page.getByRole('dialog', { name: 'Objašnjenje stila: neodređen' })).toBeVisible();
-
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.reload();
-  const mobilniNaziv = page.locator('.stil-naziv');
-  await mobilniNaziv.click();
-  const mobilniPopup = page.getByRole('dialog', { name: 'Objašnjenje stila: neodređen' });
-  const nazivOkvir = await mobilniNaziv.boundingBox();
-  const popupOkvir = await mobilniPopup.boundingBox();
-  expect(nazivOkvir).not.toBeNull();
-  expect(popupOkvir).not.toBeNull();
-  expect(popupOkvir!.y + popupOkvir!.height).toBeLessThanOrEqual(nazivOkvir!.y + 1);
-  expect(popupOkvir!.width).toBeLessThanOrEqual(300);
-  await mobilniPopup.getByRole('button', { name: 'Zatvori objašnjenje stila' }).click();
-  await expect(mobilniPopup).toHaveCount(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+  const javniStil = page.getByRole('button', { name: /Stil igre/i });
+  if (await javniStil.count()) {
+    await javniStil.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+  }
 });

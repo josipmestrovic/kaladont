@@ -12,10 +12,14 @@
   let {
     dostignuce,
     trenutniNiz = null,
+    prikaziNovo = true,
   }: {
     dostignuce: Dostignuce;
     trenutniNiz?: number | null;
+    prikaziNovo?: boolean;
   } = $props();
+
+  const pokaziNovo = $derived(prikaziNovo && Boolean(dostignuce.novo));
   const jeStalnoSiTu = $derived(dostignuce.id === 'stalno_si_tu');
   const postotak = $derived(
     dostignuce.sljedeciPrag === null
@@ -24,7 +28,7 @@
   );
 </script>
 
-<article class:otkljucano={dostignuce.razina > 0} class:novo={Boolean(dostignuce.novo)} class="dostignuce-kartica">
+<article class:otkljucano={dostignuce.razina > 0} class:novo={pokaziNovo} class="dostignuce-kartica">
   <div class="medaljon" aria-hidden="true"><img src={ikonaDostignuca(dostignuce.id)} alt="" /></div>
   <div class="sadrzaj">
     <header>
@@ -32,7 +36,7 @@
         <h2>{dostignuce.naziv}</h2>
       </div>
       <div class="zaglavlje-desno">
-        {#if dostignuce.novo}
+        {#if pokaziNovo}
           <span class="badge-novo">Novo</span>
         {/if}
         <strong class="razina">{dostignuce.razina} / {dostignuce.pragovi.length}</strong>
@@ -52,12 +56,19 @@
       <p class="cilj">Trenutni niz: {trenutniNiz} {trenutniNiz === 1 ? 'dan' : 'dana'}</p>
     {/if}
     {#if dostignuce.sljedeciPrag === null}
-      <p class="cilj">{jeStalnoSiTu ? `Najbolji niz: ${dostignuce.vrijednost} dana · maksimum dosegnut` : `Maksimum dosegnut · ${dostignuce.vrijednost}`}</p>
+      <p class="cilj">{jeStalnoSiTu ? `Najbolji niz: ${dostignuce.vrijednost} dana · u potpunosti otključano` : 'U potpunosti otključano'}</p>
     {:else if jeStalnoSiTu}
       <p class="cilj">Najbolji niz: {dostignuce.vrijednost} {dostignuce.vrijednost === 1 ? 'dan' : 'dana'} · sljedeća zvjezdica nakon {dostignuce.sljedeciPrag} dana zaredom</p>
       <div class="traka" aria-hidden="true"><span style={`width: ${postotak}%`}></span></div>
     {:else}
-      <p class="cilj">Sljedeći cilj: {dostignuce.id === 'iskusnjara' ? `LVL ${dostignuce.sljedeciPrag}` : dostignuce.sljedeciPrag} <span>({dostignuce.id === 'iskusnjara' ? `LVL ${dostignuce.vrijednost} / LVL ${dostignuce.sljedeciPrag}` : `${dostignuce.vrijednost} / ${dostignuce.sljedeciPrag}`})</span></p>
+      <p class="cilj">
+        Sljedeći cilj:
+        {#if dostignuce.id === 'iskusnjara'}
+          LVL {dostignuce.vrijednost} / LVL {dostignuce.sljedeciPrag}
+        {:else}
+          {dostignuce.vrijednost} / {dostignuce.sljedeciPrag}
+        {/if}
+      </p>
       <div class="traka" aria-hidden="true"><span style={`width: ${postotak}%`}></span></div>
     {/if}
   </div>
@@ -121,7 +132,6 @@
   :global(html[data-tema='svijetla']) .traka span { background: var(--boja-mint); }
   .dostignuce-kartica.novo {
     border-color: var(--boja-zlato-obrub);
-    background: var(--boja-zlato-pozadina);
   }
   .dostignuce-kartica:not(.otkljucano) .medaljon { filter: grayscale(0.8); opacity: 0.6; }
 

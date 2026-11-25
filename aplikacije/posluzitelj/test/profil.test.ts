@@ -5,7 +5,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { validirajAvatarConfig, ZADANI_AVATAR_CONFIG } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
-import { botovi, dnkStatistikeIgraca, igraci, obracuniPartija, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
+import { botovi, dnkStatistikeIgraca, igraci, obracuniPartija, osobniRekordiIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 import { ocistiMemorijuTopRijeci } from '../src/profil/rute.js';
 
@@ -33,6 +33,7 @@ afterEach(async () => {
     await baza.delete(partije).where(eq(partije.pobjednikId, igrac.id));
     await baza.delete(dnkStatistikeIgraca).where(eq(dnkStatistikeIgraca.igracId, igrac.id));
     await baza.delete(statistikeRijeciIgraca).where(eq(statistikeRijeciIgraca.igracId, igrac.id));
+    await baza.delete(osobniRekordiIgraca).where(eq(osobniRekordiIgraca.igracId, igrac.id));
   }
   await baza.delete(igraci).where(eq(igraci.email, EMAIL));
 });
@@ -60,17 +61,69 @@ describe('GET /profil', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
     });
-    const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
+    const { sesijskiToken, igracId } = (await registracija.json()) as { sesijskiToken: string; igracId: string };
 
     const odgovor = await fetch(`${adresa}/api/profil`, {
       headers: { authorization: `Bearer ${sesijskiToken}` },
     });
     expect(odgovor.status).toBe(200);
-    const tijelo = (await odgovor.json()) as { ok: boolean; rang: string; odigrane: number; iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null } };
+    const tijelo = (await odgovor.json()) as {
+      ok: boolean;
+      rang: string;
+      odigrane: number;
+      email?: string;
+      iskustvo: { razina: number; ukupno: number; uRazini: number; doIduce: number | null };
+      osobniRekordi: {
+        najboljiNizPobjeda: number;
+        nizPrihvacenihRijeci: number;
+        najduzaRijec: string | null;
+        najduzaRijecGrafemi: number;
+        najbrziPrihvaceniPotezMs: number | null;
+      };
+      napredakIzazova: {
+        trenutniLevel: number;
+        zavrseniIzazovi: number;
+        zvjezdice: number;
+        napredakDoSljedeceg: { zavrseno: number; ukupno: number } | null;
+      };
+    };
     expect(tijelo.ok).toBe(true);
     expect(tijelo.odigrane).toBe(0);
     expect(tijelo.rang).toBe('Piskaralo');
     expect(tijelo.iskustvo).toEqual({ razina: 1, ukupno: 0, uRazini: 0, doIduce: 100 });
+    expect(tijelo.osobniRekordi).toEqual({
+      najboljiNizPobjeda: 0,
+      nizPrihvacenihRijeci: 0,
+      najduzaRijec: null,
+      najduzaRijecGrafemi: 0,
+      najbrziPrihvaceniPotezMs: null,
+    });
+    expect(tijelo.napredakIzazova.trenutniLevel).toBe(1);
+    expect(tijelo.napredakIzazova.zavrseniIzazovi).toBe(0);
+    expect(tijelo.napredakIzazova.zvjezdice).toBe(0);
+
+    const nedavno = await fetch(`${adresa}/api/profil/kolekcija/nedavno`, {
+      headers: { authorization: `Bearer ${sesijskiToken}` },
+    });
+    expect(nedavno.status).toBe(200);
+    const nedavnoTijelo = (await nedavno.json()) as { ok: boolean; rijeci: unknown[] };
+    expect(nedavnoTijelo.ok).toBe(true);
+    expect(nedavnoTijelo.rijeci).toEqual([]);
+
+    const javni = await fetch(`${adresa}/api/profil/javni/${igracId}`);
+    expect(javni.status).toBe(200);
+    const javniTijelo = (await javni.json()) as {
+      ok: boolean;
+      email?: string;
+      osobniRekordi?: unknown;
+      napredakIzazova?: { zavrseniIzazovi: number };
+      aktivniPokusaj?: unknown;
+    };
+    expect(javniTijelo.ok).toBe(true);
+    expect(javniTijelo.email).toBeUndefined();
+    expect(javniTijelo.osobniRekordi).toBeTruthy();
+    expect(javniTijelo.napredakIzazova?.zavrseniIzazovi).toBe(0);
+    expect(javniTijelo.aktivniPokusaj).toBeUndefined();
   });
 
   it('klasificira stil prema eliminacijama po partiji u oba načina', async () => {

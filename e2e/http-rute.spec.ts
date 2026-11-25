@@ -24,7 +24,7 @@ async function poslovniZahtjeviImajuApiPrefiks(page: import('@playwright/test').
 test('direktan ulazak i refresh privatnog profila rade iz buildanog servera', async ({ page }) => {
   await poslovniZahtjeviImajuApiPrefiks(page);
   await page.reload();
-  await expect(page).toHaveURL(/\/profil$/);
+  await expect(page).toHaveURL(/\/profil(?:#pregled)?$/);
   await expect(page.locator('body')).toContainText('Gost');
 });
 
@@ -58,10 +58,10 @@ test('stranice s queryjem, hashom, ljestvicom i javnim profilom rade nakon refre
   expect(prviOdgovor.headers()['content-type']).toContain('text/html');
 
   await page.goto(javniProfil);
-  await expect(page).toHaveURL(new RegExp(`/profil/javni/${podaci.igracId}$`));
+  await expect(page).toHaveURL(new RegExp(`/profil/javni/${podaci.igracId}(?:#pregled)?$`));
   await expect(page.getByText('HttpE2E')).toBeVisible();
   await page.reload();
-  await expect(page).toHaveURL(new RegExp(`/profil/javni/${podaci.igracId}$`));
+  await expect(page).toHaveURL(new RegExp(`/profil/javni/${podaci.igracId}(?:#pregled)?$`));
   await expect(page.getByText('HttpE2E')).toBeVisible();
 
   const drugiOdgovor = await request.get(javniProfil);

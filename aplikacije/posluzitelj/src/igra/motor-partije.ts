@@ -257,6 +257,8 @@ interface StatistikaRijeciPartije {
   razlicitiPoceci: Set<string>;
   najduzaRijec: string | null;
   najduzaRijecGrafemi: number;
+  /** Najkraće trajanje prihvaćenog poteza u ovoj partiji (ms). */
+  najbrziPrihvaceniPotezMs: number | null;
   najrjedaRijec: string | null;
   najrjedaRijecFrekvencija: number | null;
   najrjedaTier: number | null;
@@ -874,6 +876,7 @@ export function stvoriUpraviteljPartija(
       razlicitiPoceci: new Set(),
       najduzaRijec: null,
       najduzaRijecGrafemi: 0,
+      najbrziPrihvaceniPotezMs: null,
       najrjedaRijec: null,
       najrjedaRijecFrekvencija: null,
       najrjedaTier: null,
@@ -905,6 +908,7 @@ export function stvoriUpraviteljPartija(
       razlicitiPoceci: [...statistika.razlicitiPoceci],
       najduzaRijec: statistika.najduzaRijec,
       najduzaRijecGrafemi: statistika.najduzaRijecGrafemi,
+      najbrziPrihvaceniPotezMs: statistika.najbrziPrihvaceniPotezMs,
       najrjedaRijec: statistika.najrjedaRijec,
       najrjedaRijecFrekvencija: statistika.najrjedaRijecFrekvencija,
       najrjedaTier: statistika.najrjedaTier,
@@ -2785,7 +2789,13 @@ export function stvoriUpraviteljPartija(
     if (prikazujeStreak) stanje.streakovi.set(igracId, trenutniStreak);
     const statistikaPoteza = stanje.statistikeRijeci.get(igracId)!;
     statistikaPoteza.prihvaceniPotezi += 1;
-    statistikaPoteza.ukupnoTrajanjePrihvaceniPoteziMs += Math.max(0, trajanjeMs);
+    const trajanjePotezaMs = Math.max(0, trajanjeMs);
+    statistikaPoteza.ukupnoTrajanjePrihvaceniPoteziMs += trajanjePotezaMs;
+    if (trajanjePotezaMs > 0) {
+      statistikaPoteza.najbrziPrihvaceniPotezMs = statistikaPoteza.najbrziPrihvaceniPotezMs === null
+        ? trajanjePotezaMs
+        : Math.min(statistikaPoteza.najbrziPrihvaceniPotezMs, trajanjePotezaMs);
+    }
     const grupe = rjecnik.grupeZa(rijecNormalizirana);
     const frekvencija = rjecnik.frekvencijaZa?.(rijecNormalizirana);
     const grupeIgraca = stanje.grupeSNagradom.get(igracId) ?? new Map<string, number | null>();
