@@ -10,6 +10,7 @@
     type AvatarDijelovi,
     type AvatarBojnaUloga,
   } from 'zajednicko';
+  import { Dices, Redo2, Undo2 } from 'lucide-svelte';
   import AvatarKonfiguracijaPreview from './AvatarKonfiguracijaPreview.svelte';
   import AvatarDioPreview from './AvatarDioPreview.svelte';
   import { ulogaBojeKategorije } from '$lib/avatar-render.js';
@@ -38,7 +39,6 @@
   type Potkljuc = 'skin' | keyof AvatarDijelovi;
 
   const MAKS_POVIJEST = 20;
-  const VELICINE_U_IGRI = [32, 48, 56] as const;
 
   const GLAUNE: { id: GlavnaId; naziv: string }[] = [
     { id: 'lice', naziv: 'Lice' },
@@ -326,37 +326,29 @@
 
 <section class="editor" aria-labelledby="avatar-editor-naslov" aria-busy={spremanje}>
   <div class="editor-zaglavlje">
-    <button type="button" class="natrag" onclick={odustani} aria-label="Natrag na profil">←</button>
     <h1 id="avatar-editor-naslov">{naslov}</h1>
   </div>
 
   <div class="radni-prostor">
-    <aside class="panel">
-      <div class="panel-vrh">
+    <aside class="lijevo">
+      <div class="preview-traka">
         <div class="preview" style:--preview-vel="{previewVelicina}px">
           <AvatarKonfiguracijaPreview konfiguracija={draft} velicina={previewVelicina} {rang} />
         </div>
+      </div>
 
-        <div class="izgled-u-igri desktop-only" aria-label="Izgled u igri">
-          <span class="izgled-naslov">Izgled u igri</span>
-          <div class="izgled-red">
-            {#each VELICINE_U_IGRI as velicina (velicina)}
-              <AvatarKonfiguracijaPreview konfiguracija={draft} {velicina} {rang} />
-            {/each}
-          </div>
-        </div>
-
+      <div class="panel-akcije">
         <div class="povijest-red">
           <button type="button" class="ikona-akcija" onclick={ponisti} disabled={!mozePoništiti || spremanje} aria-label="Poništi">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20a8 8 0 0 0-8-8H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <Undo2 size={22} strokeWidth={2.25} aria-hidden="true" />
             <span class="akcija-tekst">Poništi</span>
           </button>
           <button type="button" class="nasumicno" onclick={nasumicno} disabled={spremanje}>
-            <svg viewBox="0 0 24 24" aria-hidden="true" class="kockica"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="16" cy="8" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="8" cy="16" r="1.4" fill="currentColor"/><circle cx="16" cy="16" r="1.4" fill="currentColor"/></svg>
+            <Dices size={22} strokeWidth={2.25} aria-hidden="true" />
             <span>Nasumično</span>
           </button>
           <button type="button" class="ikona-akcija" onclick={ponovi} disabled={!mozePonoviti || spremanje} aria-label="Ponovi">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20a8 8 0 0 1 8-8h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <Redo2 size={22} strokeWidth={2.25} aria-hidden="true" />
             <span class="akcija-tekst">Ponovi</span>
           </button>
         </div>
@@ -532,26 +524,12 @@
 <style>
   .editor {
     display: grid;
-    gap: 16px;
-    padding: 16px 0 calc(88px + env(safe-area-inset-bottom));
+    gap: 24px;
+    padding: 12px 0 calc(96px + env(safe-area-inset-bottom));
   }
 
   .editor-zaglavlje {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .natrag {
-    width: 40px;
-    height: 40px;
-    border: 1px solid var(--boja-obrub);
-    border-radius: 999px;
-    background: var(--boja-povrsina-2);
-    color: var(--boja-tekst-osnovni);
-    font: inherit;
-    font-size: 1.2rem;
-    cursor: pointer;
+    margin-bottom: 4px;
   }
 
   h1 {
@@ -570,18 +548,23 @@
 
   .radni-prostor {
     display: grid;
-    gap: 18px;
+    gap: 24px;
   }
 
-  .panel {
+  .lijevo {
     display: grid;
-    gap: 12px;
+    gap: 16px;
     align-content: start;
   }
 
-  .panel-vrh {
+  .preview-traka {
     display: grid;
-    gap: 12px;
+    justify-items: center;
+  }
+
+  .panel-akcije {
+    display: grid;
+    gap: 10px;
     justify-items: center;
   }
 
@@ -592,30 +575,13 @@
     place-items: center;
   }
 
-  .izgled-u-igri {
-    display: grid;
-    gap: 6px;
-    justify-items: center;
-  }
-
-  .izgled-naslov {
-    font-size: var(--tekst-mikro);
-    color: var(--boja-tekst-sekundarni);
-    font-weight: 600;
-  }
-
-  .izgled-red {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-  }
-
   .povijest-red {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 12px;
     width: 100%;
+    padding-top: 4px;
   }
 
   .ikona-akcija {
@@ -634,10 +600,9 @@
     cursor: pointer;
   }
 
-  .ikona-akcija svg,
-  .nasumicno svg {
-    width: 22px;
-    height: 22px;
+  .ikona-akcija :global(svg),
+  .nasumicno :global(svg) {
+    flex-shrink: 0;
   }
 
   .nasumicno {
@@ -645,8 +610,8 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    min-height: 44px;
-    padding: 10px 16px;
+    min-height: 48px;
+    padding: 12px 20px;
     border: 1px solid var(--boja-obrub);
     border-radius: var(--radijus-pill);
     background: var(--boja-povrsina-3);
@@ -665,27 +630,35 @@
     font-size: var(--tekst-sitni);
     text-decoration: underline;
     cursor: pointer;
-    min-height: 44px;
+    min-height: 40px;
+    margin-top: 2px;
+  }
+
+  .izbori {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+    min-width: 0;
   }
 
   .glavne {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
+    gap: 10px;
   }
 
   .glavna {
     display: grid;
     justify-items: center;
-    gap: 4px;
-    min-height: 64px;
-    padding: 8px 4px;
+    gap: 6px;
+    min-height: 72px;
+    padding: 12px 6px;
     border: 1px solid var(--boja-obrub);
-    border-radius: 12px;
+    border-radius: 14px;
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-osnovni);
     font: inherit;
-    font-size: var(--tekst-mikro);
+    font-size: var(--tekst-sitni);
     font-weight: 700;
     cursor: pointer;
   }
@@ -710,16 +683,16 @@
   .potkategorije {
     display: flex;
     flex-wrap: nowrap;
-    gap: 8px;
+    gap: 10px;
     overflow-x: auto;
-    padding-bottom: 2px;
+    padding-bottom: 4px;
     -webkit-overflow-scrolling: touch;
   }
 
   .pot {
     flex: 0 0 auto;
-    min-height: 36px;
-    padding: 6px 12px;
+    min-height: 40px;
+    padding: 8px 14px;
     border: 1px solid var(--boja-obrub);
     border-radius: var(--radijus-pill);
     background: var(--boja-povrsina-2);
@@ -740,14 +713,15 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 12px;
-    margin-top: 8px;
+    gap: 16px;
+    padding-top: 4px;
   }
 
   .broj-stilova {
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mikro);
     font-weight: 600;
+    white-space: nowrap;
   }
 
   .upozorenje {
@@ -757,12 +731,12 @@
   }
 
   .paleta-prostor {
-    min-height: 72px;
+    min-height: 84px;
   }
 
   .paleta {
     display: grid;
-    gap: 8px;
+    gap: 12px;
   }
 
   .paleta-naslov {
@@ -774,7 +748,7 @@
   .paleta-red {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
   }
 
   .uzorak {
@@ -831,7 +805,8 @@
   .mrezica {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
+    gap: 12px;
+    padding-top: 4px;
   }
 
   .kartica {
@@ -839,9 +814,9 @@
     display: grid;
     place-items: center;
     aspect-ratio: 1;
-    padding: 6px;
+    padding: 8px;
     border: 2px solid var(--boja-obrub);
-    border-radius: 12px;
+    border-radius: 14px;
     background: var(--boja-povrsina);
     cursor: pointer;
   }
@@ -849,7 +824,9 @@
   .kartica.odabrano,
   .kartica[aria-pressed='true'] {
     border-color: var(--boja-isticanje-slova);
+    border-width: 3px;
     background: var(--boja-povrsina-3);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--boja-isticanje-slova) 35%, transparent);
   }
 
   .kartica:focus-visible,
@@ -859,18 +836,18 @@
   .nasumicno:focus-visible,
   .ikona-akcija:focus-visible,
   .odustani:focus-visible,
-  .spremi:focus-visible,
-  .natrag:focus-visible {
+  .spremi:focus-visible {
     outline: 3px solid var(--boja-fokus);
     outline-offset: 2px;
   }
 
   .kartica-kvacica {
     position: absolute;
-    right: 4px;
-    bottom: 4px;
-    width: 20px;
-    height: 20px;
+    right: 6px;
+    bottom: 6px;
+    z-index: 2;
+    width: 22px;
+    height: 22px;
     border-radius: 999px;
     background: var(--boja-isticanje-slova);
     color: #111;
@@ -878,6 +855,7 @@
     place-items: center;
     font-size: 12px;
     font-weight: 800;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   }
 
   .kartica.bez-dodatka {
@@ -971,24 +949,22 @@
     cursor: wait;
   }
 
-  .desktop-only {
-    display: none;
-  }
-
   @media (min-width: 960px) {
     .editor {
-      padding-bottom: 24px;
+      gap: 28px;
+      padding: 16px 0 32px;
     }
 
     .radni-prostor {
       grid-template-columns: 300px minmax(0, 1fr);
       align-items: start;
-      gap: 28px;
+      gap: 40px;
     }
 
-    .panel {
+    .lijevo {
       position: sticky;
-      top: 16px;
+      top: 20px;
+      gap: 22px;
     }
 
     .preview {
@@ -996,8 +972,8 @@
       height: 260px;
     }
 
-    .desktop-only {
-      display: grid;
+    .izbori {
+      gap: 18px;
     }
 
     .akcija-tekst {
@@ -1005,35 +981,39 @@
     }
 
     .mrezica {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
     }
 
     .akcijska-traka {
       position: sticky;
       bottom: 0;
       justify-items: end;
+      margin-top: 8px;
+      padding-top: 16px;
     }
 
     .akcije {
       width: min(420px, 100%);
+      gap: 12px;
     }
   }
 
   @media (max-width: 959px) {
-    .panel-vrh {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      padding-block: 6px 8px;
-      background: var(--boja-pozadina-podloga);
+    /*
+     * display:contents čini preview/akcije/izbore braćom unutar .radni-prostor,
+     * pa sticky avatar traje kroz mrežu i na dnu nastavlja skrolati dolje.
+     */
+    .lijevo {
+      display: contents;
     }
 
-    .glavne {
+    .preview-traka {
       position: sticky;
-      top: calc(var(--preview-vel, 140px) + 84px);
-      z-index: 2;
-      padding-block: 6px;
+      top: 0;
+      z-index: 3;
+      width: 100%;
+      padding: 8px 0 10px;
       background: var(--boja-pozadina-podloga);
     }
 
