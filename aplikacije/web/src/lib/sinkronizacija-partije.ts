@@ -66,7 +66,8 @@ export async function sinkronizirajPartiju(ulaz: {
     partijaId: ulaz.partijaId,
     ...(ulaz.requestId ? { requestId: ulaz.requestId } : {}),
   };
-  const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  // Wall-clock (Date.now), ne performance.now — pomak se uspoređuje s Date.parse(ISO).
+  const t0 = Date.now();
 
   try {
     const odgovor = await new Promise<OdgovorPartijaStanje>((resolve, reject) => {
@@ -81,7 +82,7 @@ export async function sinkronizirajPartiju(ulaz: {
         });
     });
 
-    const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const t1 = Date.now();
     const snimka = odgovor.snimka;
     if (snimka?.serverVrijemeIso) {
       pomakSataMs = pomakSataIzRtt({

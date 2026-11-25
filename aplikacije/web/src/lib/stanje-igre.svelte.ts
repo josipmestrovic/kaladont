@@ -603,7 +603,10 @@ export function pokreniSlusateljeIgre(): void {
   socket.on('potez:prihvacen', (p) => {
     if (napustioPartiju) return;
     if (!dogadajPripadaAktivnojPartiji(stanje.partijaId, p.partijaId)) return;
-    // #142 C: verzija/snimka su autoritet; ne odbacuj tuđi potez heuristikom.
+    // #142 C: starija verzija ne smije pregaziti noviji red/token.
+    if (p.verzijaStanja != null && p.verzijaStanja > 0 && p.verzijaStanja < stanje.verzijaStanja) {
+      return;
+    }
     const dozvvoliEfekt = trebamJednokratniEfekt(vidjeniDogadajiEfekata, p.dogadajId);
     if (p.verzijaStanja != null && p.verzijaStanja > stanje.verzijaStanja) {
       stanje.verzijaStanja = p.verzijaStanja;
@@ -764,6 +767,13 @@ export function pokreniSlusateljeIgre(): void {
 
   socket.on('partija:runda-otvorena', (p) => {
     if (napustioPartiju) return;
+    if (p.partijaId && !dogadajPripadaAktivnojPartiji(stanje.partijaId, p.partijaId)) return;
+    if (p.verzijaStanja != null && p.verzijaStanja > 0 && p.verzijaStanja < stanje.verzijaStanja) {
+      return;
+    }
+    if (p.verzijaStanja != null && p.verzijaStanja > stanje.verzijaStanja) {
+      stanje.verzijaStanja = p.verzijaStanja;
+    }
     ocistiDokazHold();
     stanje.zadnjaNagrada = null;
     stanje.dokaz = null;
@@ -787,7 +797,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.turnToken = p.turnToken ?? null;
     stanje.naPotezuId = p.naPotezuId;
     stanje.trazenaSlova = p.trazenaSlova;
-    stanje.istekPotezaIso = p.istekPotezaIso;
+    stanje.istekPotezaIso = normalizirajIstekPotezaIso(p.istekPotezaIso);
     stanje.serverVrijemeIso = p.serverVrijemeIso;
     stanje.runda = p.runda;
     if (p.trajanjePotezaSek !== undefined) stanje.trajanjePotezaSek = p.trajanjePotezaSek;

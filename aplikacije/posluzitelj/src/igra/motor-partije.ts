@@ -3514,10 +3514,36 @@ export function stvoriUpraviteljPartija(
       const rezultatSheme = ShemaPotezRijec.safeParse(payload);
       if (!rezultatSheme.success) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        const sirov = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+        const requestId = typeof sirov.requestId === 'string' ? sirov.requestId : null;
+        const turnToken = typeof sirov.turnToken === 'string' ? sirov.turnToken : '';
+        const partijaIdAck = typeof sirov.partijaId === 'string' ? sirov.partijaId : '';
+        if (ack && requestId) {
+          ack({
+            partijaId: partijaIdAck || '00000000-0000-0000-0000-000000000000',
+            requestId,
+            turnToken,
+            ishod: 'odbijen',
+            kod: 'NEVALJAN_PAYLOAD',
+            poruka: 'Poslana poruka nije ispravna.',
+          });
+        }
         return;
       }
-      if (!provjeriDogadaj(socket.data.igracId, 'potez:rijec')) return;
       const { rijec, turnToken, partijaId: partijaIdPayload, requestId } = rezultatSheme.data;
+      if (!provjeriDogadaj(socket.data.igracId, 'potez:rijec')) {
+        if (ack && requestId && turnToken) {
+          ack({
+            partijaId: partijaIdPayload ?? partijaPoIgracu.get(socket.data.igracId) ?? '00000000-0000-0000-0000-000000000000',
+            requestId,
+            turnToken,
+            ishod: 'odbijen',
+            kod: 'PREBRZO',
+            poruka: PORUKE.prebrzo,
+          });
+        }
+        return;
+      }
 
       const partijaId = partijaPoIgracu.get(socket.data.igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;
@@ -3669,14 +3695,40 @@ export function stvoriUpraviteljPartija(
       const rezultatSheme = ShemaNeznam.safeParse(payload);
       if (!rezultatSheme.success) {
         socket.emit('greska', { kod: 'NEVALJAN_PAYLOAD', poruka: 'Poslana poruka nije ispravna.' });
+        const sirov = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+        const requestIdSirov = typeof sirov.requestId === 'string' ? sirov.requestId : null;
+        const turnTokenSirov = typeof sirov.turnToken === 'string' ? sirov.turnToken : '';
+        const partijaIdSirov = typeof sirov.partijaId === 'string' ? sirov.partijaId : '';
+        if (ack && requestIdSirov) {
+          ack({
+            partijaId: partijaIdSirov || '00000000-0000-0000-0000-000000000000',
+            requestId: requestIdSirov,
+            turnToken: turnTokenSirov,
+            ishod: 'odbijen',
+            kod: 'NEVALJAN_PAYLOAD',
+            poruka: 'Poslana poruka nije ispravna.',
+          });
+        }
         return;
       }
-      if (!provjeriDogadaj(socket.data.igracId, 'potez:ne-znam')) return;
       const partijaId = partijaPoIgracu.get(socket.data.igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;
       const turnToken = rezultatSheme.data?.turnToken;
       const requestId = rezultatSheme.data?.requestId;
       const partijaIdPayload = rezultatSheme.data?.partijaId;
+      if (!provjeriDogadaj(socket.data.igracId, 'potez:ne-znam')) {
+        if (ack && requestId && turnToken) {
+          ack({
+            partijaId: partijaIdPayload ?? partijaId ?? '00000000-0000-0000-0000-000000000000',
+            requestId,
+            turnToken,
+            ishod: 'odbijen',
+            kod: 'PREBRZO',
+            poruka: PORUKE.prebrzo,
+          });
+        }
+        return;
+      }
       if (!stanje) {
         if (ack && requestId && turnToken && partijaIdPayload) {
           ack({
