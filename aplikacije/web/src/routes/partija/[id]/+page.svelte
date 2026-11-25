@@ -1137,10 +1137,16 @@
       }, 3500);
     };
 
+    /** Usuglašeno sa stanje-igre: starija verzija ne smije dirati prikazanu riječ. */
+    const dogadajJeZastario = (verzija?: number) =>
+      verzija != null && verzija > 0 && verzija < stanje.verzijaStanja;
+
     // Jedini izvor istine za trenutnu riječ su socket događaji - REST lista služi samo za povijest
     // (fire-and-forget upis u bazu znači da refetch odmah nakon eventa može vratiti stariju listu).
     const naPrihvacenPotez = (potez: PrihvacenPotez) => {
       if (!jeAktualnaPartija()) return;
+      if (potez.partijaId && partijaId && potez.partijaId !== partijaId) return;
+      if (dogadajJeZastario(potez.verzijaStanja)) return;
       // #142 C: bez heuristike tuđiDokSamNaPotezu — kanonsko stanje je u stanje-igre.
       // Potvrda je dovoljna za otključavanje unosa. To vrijedi i kada riječ
       // odmah uzrokuje mrtva slova i ekran nove runde.
@@ -1174,6 +1180,8 @@
 
     const naRunduOtvorenu = (runda: RundaOtvorena) => {
       if (!jeAktualnaPartija()) return;
+      if (runda.partijaId && partijaId && runda.partijaId !== partijaId) return;
+      if (dogadajJeZastario(runda.verzijaStanja)) return;
       if (partijaId) kontrolerSlanja.obavijestiPromjenuReda(partijaId, runda.turnToken);
       prethodnaRijecStola = null;
       prikazanaRijec = {
