@@ -26,7 +26,8 @@ const shemaKonfiguracije = z.object({
   PUBLIC_UMAMI_WEBSITE_ID: z.string().default(''),
   ONEMOGUCI_TIMER_POTEZA: z.enum(['true', 'false']).default('false'),
   TRAJANJE_POTEZA_MS: z.coerce.number().int().positive().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 30_000 : 5_000),
-  ODGODA_POCETKA_PARTIJE_MS: z.coerce.number().int().nonnegative().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 6_000 : 0),
+  // Test/CI postavlja 0 preko env-a. Lokalno/staging/produkcija: 3 s početnog odbrojavanja.
+  ODGODA_POCETKA_PARTIJE_MS: z.coerce.number().int().nonnegative().default(() => process.env.NODE_ENV === 'test' ? 0 : 3_000),
   TOLERANCIJA_PREKIDA_MS: z.coerce.number().int().nonnegative().default(() => process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 10_000 : 1_000),
   HTTP_DOKUMENTI_PO_IP_MINUTI: z.coerce.number().int().positive().default(30),
   SOCKET_HANDSHAKE_PO_IP_MINUTI: z.coerce.number().int().positive().default(30),

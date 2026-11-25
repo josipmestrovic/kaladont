@@ -175,7 +175,7 @@ export type KontekstPartije = 'javna' | 'privatna' | 'trening' | 'izazov';
 export interface PocetakPartije {
   partijaId: string;
   mojIgracId: string;
-  /** Kada partija stvarno kreće (poslužitelj je sat) — čekaonica odbrojava do ovog trenutka. */
+  /** Autoritativni rok prve runde (sat poslužitelja). Javna: odbrojavanje u čekaonici; privatna/trening/izazov: na stolu. */
   pocetakIso: string;
   sjedala: {
     igracId: string;

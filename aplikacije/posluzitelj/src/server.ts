@@ -884,7 +884,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   };
 
   const sobaServis = registrirajPrivatneSobe(io, (sudionici, postavke, kodSobe) =>
-    upravitelj.zapocniPrivatnuPartiju(sudionici, postavke, kodSobe),
+    Promise.resolve(upravitelj.zapocniPrivatnuPartiju(sudionici, postavke, kodSobe)),
     {
       maksimalnoSoba: socketOgranicenja.maksimalnoPrivatnihSoba,
       maksimalnoAktivnihPartija: socketOgranicenja.maksimalnoAktivnihPartija,

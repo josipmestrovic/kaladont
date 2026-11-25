@@ -44,7 +44,7 @@ services:
       PUBLIC_UMAMI_WEBSITE_ID: ""
       # QA (#100): bez roka na potezu u svim modovima; bot tempo 3 s / 0.2 s bez ljudi.
       ONEMOGUCI_TIMER_POTEZA: 'true'
-      ODGODA_POCETKA_PARTIJE_MS: '6000'
+      ODGODA_POCETKA_PARTIJE_MS: '3000'
       TOLERANCIJA_PREKIDA_MS: '10000'
       STAGING_TEST_IP: ${STAGING_TEST_IP:-}
       STAGING_PRISTUP_SIFRA: ${STAGING_PRISTUP_SIFRA:?Postavi STAGING_PRISTUP_SIFRA}

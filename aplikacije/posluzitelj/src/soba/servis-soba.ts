@@ -155,7 +155,7 @@ export function registrirajPrivatneSobe(
     sudionici: StavkaReda[],
     postavke: PostavkePrivatneSobe,
     kodSobe: string,
-  ) => string,
+  ) => string | Promise<string>,
   opcije: {
     maksimalnoSoba: number;
     maksimalnoAktivnihPartija: number;
@@ -612,11 +612,21 @@ export function registrirajPrivatneSobe(
 
       let partijaId: string;
       try {
-        partijaId = zapocniPrivatnuPartiju(sudioniciUlaz, soba.postavke, soba.kod);
+        partijaId = await zapocniPrivatnuPartiju(sudioniciUlaz, soba.postavke, soba.kod);
       } catch (greska) {
         soba.status = 'cekanje';
+        soba.partijaId = null;
         zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
+        emitirajStanje(soba);
         throw greska;
+      }
+      if (!partijaId) {
+        soba.status = 'cekanje';
+        soba.partijaId = null;
+        zakaziBrisanjeSobe(soba, TRAJANJE_NEAKTIVNE_SOBE_MS);
+        emitirajStanje(soba);
+        socket.emit('greska', { kod: 'PREVISE_PARTIJA', poruka: 'Privremeno je dosegnut najveći broj aktivnih igara.' });
+        return;
       }
       soba.partijaId = partijaId;
 
