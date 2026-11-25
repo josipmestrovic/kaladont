@@ -238,14 +238,11 @@ function pokreniPlaywright(root, args, env) {
  * @param {string} root
  * @param {string[]} args
  * @param {NodeJS.ProcessEnv} env
+ * @param {string} bashPut
  */
-function pokreniBash(root, args, env) {
+function pokreniBash(root, args, env, bashPut) {
   return new Promise((resolve, reject) => {
-    const bash =
-      process.platform === 'win32'
-        ? 'C:\\Program Files\\Git\\bin\\bash.exe'
-        : 'bash';
-    const dijete = spawn(bash, args, {
+    const dijete = spawn(bashPut, args, {
       cwd: root,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -278,6 +275,45 @@ function postojiNaredba(ime) {
     });
     dijete.on('error', () => resolve(false));
     dijete.on('close', (kod) => resolve(kod === 0));
+  });
+}
+
+/** @returns {Promise<string | null>} apsolutna putanja ili null */
+async function pronadjiBash() {
+  if (process.platform === 'win32') {
+    const kandidati = [
+      'C:\\Program Files\\Git\\bin\\bash.exe',
+      'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+      process.env.LOCALAPPDATA
+        ? path.join(process.env.LOCALAPPDATA, 'Programs', 'Git', 'bin', 'bash.exe')
+        : null,
+    ].filter(Boolean);
+    for (const k of kandidati) {
+      if (fs.existsSync(k)) return k;
+    }
+  }
+  return new Promise((resolve) => {
+    const jeWin = process.platform === 'win32';
+    const dijete = spawn(jeWin ? 'where.exe' : 'which', ['bash'], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+    });
+    let out = '';
+    dijete.stdout.on('data', (d) => {
+      out += d;
+    });
+    dijete.on('error', () => resolve(null));
+    dijete.on('close', (kod) => {
+      if (kod !== 0) {
+        resolve(null);
+        return;
+      }
+      const prva = out
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .find((l) => l && !l.toLowerCase().includes('windowsapps'));
+      resolve(prva && fs.existsSync(prva) ? prva : prva || null);
+    });
   });
 }
 
@@ -741,20 +777,30 @@ async function main() {
           return { status: r.kod === 0 ? STATUS.PROSLO : STATUS.PALO, detalj: `exit ${r.kod}` };
         });
 
-        const imaBash = fs.existsSync('C:\\Program Files\\Git\\bin\\bash.exe') || (await postojiNaredba('bash'));
+        const bashPut = await pronadjiBash();
         const imaJq = await postojiNaredba('jq');
-        if (!imaBash || !imaJq) {
+        if (!bashPut || !imaJq) {
           await izvrsiKorak(koraci, 'Backup/izdanja shell testovi', async () => ({
             status: STATUS.BLOKIRANO,
-            detalj: `Nedostaje ${!imaBash ? 'bash' : 'jq'}`,
+            detalj: `Nedostaje ${!bashPut ? 'bash' : 'jq'}`,
           }));
         } else {
           await izvrsiKorak(koraci, 'Backup testovi', async () => {
-            const r = await pokreniBash(root, ['skripte/testovi/backup/pokreni.sh'], bazniEnv);
+            const r = await pokreniBash(
+              root,
+              ['skripte/testovi/backup/pokreni.sh'],
+              bazniEnv,
+              bashPut,
+            );
             return { status: r.kod === 0 ? STATUS.PROSLO : STATUS.PALO, detalj: `exit ${r.kod}` };
           });
           await izvrsiKorak(koraci, 'Izdanja testovi', async () => {
-            const r = await pokreniBash(root, ['skripte/testovi/izdanja/pokreni.sh'], bazniEnv);
+            const r = await pokreniBash(
+              root,
+              ['skripte/testovi/izdanja/pokreni.sh'],
+              bazniEnv,
+              bashPut,
+            );
             return { status: r.kod === 0 ? STATUS.PROSLO : STATUS.PALO, detalj: `exit ${r.kod}` };
           });
         }
