@@ -1132,12 +1132,7 @@
     // (fire-and-forget upis u bazu znači da refetch odmah nakon eventa može vratiti stariju listu).
     const naPrihvacenPotez = (potez: PrihvacenPotez) => {
       if (!jeAktualnaPartija()) return;
-      const tuđiDokSamNaPotezu =
-        stanje.naPotezuId !== null &&
-        stanje.naPotezuId === stanje.mojIgracId &&
-        potez.igracId !== stanje.mojIgracId;
-      // Zastarjeli tuđi potez dok si na redu ne smije dirati UI ni prikazanu riječ.
-      if (tuđiDokSamNaPotezu) return;
+      // #142 C: bez heuristike tuđiDokSamNaPotezu — kanonsko stanje je u stanje-igre.
       // Potvrda je dovoljna za otključavanje unosa. To vrijedi i kada riječ
       // odmah uzrokuje mrtva slova i ekran nove runde.
       neZnamDijalog = false;

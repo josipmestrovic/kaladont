@@ -22,12 +22,18 @@ import type {
 import { pustiAudio, zaustaviSveZvukove, type AudioDogadaj } from './audio-manager.js';
 import { pocetniGoalProgressIzazova } from './izazovi-klijent.js';
 import { dohvatiSocket, oznaciPartijuDostupnom } from './socket.js';
+import {
+  dogadajPripadaAktivnojPartiji,
+  trebamJednokratniEfekt,
+  trebaPrimijenitiSnimku,
+} from './verzija-stanja-partije.js';
 
 interface StanjeIgre {
   partijaId: string | null;
   mojIgracId: string | null;
   sjedala: PocetakPartije['sjedala'];
   turnToken: string | null;
+  verzijaStanja: number;
   naPotezuId: string | null;
   trazenaSlova: string | null;
   istekPotezaIso: string | null;
@@ -90,6 +96,7 @@ const stanje = $state<StanjeIgre>({
   mojIgracId: null,
   sjedala: [],
   turnToken: null,
+  verzijaStanja: 0,
   naPotezuId: null,
   trazenaSlova: null,
   istekPotezaIso: null,
@@ -156,6 +163,8 @@ let timerStavkiIskustva: ReturnType<typeof setTimeout> | null = null;
 let timerNagradePoteza: ReturnType<typeof setTimeout> | null = null;
 let timerNovaDostignuca: ReturnType<typeof setTimeout> | null = null;
 let timerKonfetaIskustva: ReturnType<typeof setTimeout> | null = null;
+/** #142 C: dedup jednokratnih efekata (zvuk/XP/konfete) po dogadajId. */
+const vidjeniDogadajiEfekata = new Set<string>();
 
 function ocistiDokazHold(): void {
   if (timerZadrziDokaz) clearTimeout(timerZadrziDokaz);
@@ -270,6 +279,30 @@ function primijeniFazuIzSnimke(p: Pick<StanjePartije, 'faza' | 'dokaz' | 'sustav
 
 function primijeniStanjePartije(p: StanjePartije): void {
   if (napustioPartiju) return;
+  const odluka = trebaPrimijenitiSnimku({
+    aktivnaPartijaId: stanje.partijaId,
+    snimkaPartijaId: p.partijaId,
+    lokalnaVerzija: stanje.verzijaStanja,
+    snimkaVerzija: p.verzijaStanja,
+  });
+  if (odluka === 'odbaci_stranu') return;
+  const novaVerzija = p.verzijaStanja ?? 0;
+  if (odluka === 'odbaci_staru') {
+    // Starija snimka ne pregazi noviju (C01); sat se smije osvježiti.
+    stanje.serverVrijemeIso = p.serverVrijemeIso;
+    return;
+  }
+  if (odluka === 'ista_verzija') {
+    // C05: ista verzija ne smije dirati turnToken/prefiks (unos); osvježi sat i terminal.
+    stanje.serverVrijemeIso = p.serverVrijemeIso;
+    stanje.statusSpremanja = p.statusSpremanja;
+    if (p.zavrsena) primijeniFazuIzSnimke(p);
+    if (p.goalProgress) stanje.goalProgress = p.goalProgress;
+    if (p.izazovTerminal) stanje.izazovTerminal = p.izazovTerminal;
+    if (p.treningNeaktivnost !== undefined) stanje.treningNeaktivnost = p.treningNeaktivnost ?? null;
+    oznaciPartijuDostupnom();
+    return;
+  }
   oznaciPartijuDostupnom();
   // HINT PR14/Bugbot: uspješan dokaz kad je čekač već otišao dolazi samo kao
   // partija:stanje (zakrpljeni bodZa), bez nove partija:eliminacija — banner ovdje.
@@ -283,6 +316,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.mojIgracId = p.mojIgracId;
   stanje.sjedala = p.sjedala;
   stanje.turnToken = p.turnToken ?? null;
+  if (novaVerzija > 0) stanje.verzijaStanja = novaVerzija;
   stanje.naPotezuId = p.naPotezuId;
   stanje.trazenaSlova = p.trazenaSlova;
   stanje.istekPotezaIso = p.istekPotezaIso;
@@ -336,10 +370,8 @@ function primijeniStanjePartije(p: StanjePartije): void {
     if (elim) {
       // Kredit-snimka je PRIJE sustav-bira ili zakljuciPartiju (ako ≤1 aktivan).
       const porukaIshoda = `${nadimakIgraca(prethodniDokaz.autorId)} je dokazao nastavak.`;
-      const aktivnih = p.sjedala.filter(
-        (s) => !p.eliminacije.some((e) => e.igracId === s.igracId),
-      ).length;
-      const zavrsavaSe = p.zavrsena || aktivnih <= 1;
+      // #142 E: ne zaključuj lokalno iz broja sjedala.
+      const zavrsavaSe = p.zavrsena === true;
       stanje.dokaz = prethodniDokaz;
       stanje.faza = 'dokaz_nastavka';
       stanje.sustavBiraRijec = false;
@@ -450,6 +482,8 @@ export function pokreniSlusateljeIgre(): void {
     stanje.mojIgracId = p.mojIgracId;
     stanje.sjedala = p.sjedala;
     stanje.turnToken = null;
+    stanje.verzijaStanja = 0;
+    vidjeniDogadajiEfekata.clear();
     stanje.naPotezuId = null;
     stanje.istekPotezaIso = null;
     stanje.serverVrijemeIso = new Date().toISOString();
@@ -555,14 +589,12 @@ export function pokreniSlusateljeIgre(): void {
 
   socket.on('potez:prihvacen', (p) => {
     if (napustioPartiju) return;
-    // Dok si na potezu, tuđi potez:prihvacen je zastario/strani — primjena ruši formu
-    // (naPotezuId=null + krivi prefiks), a partija:stanje odmah vraća isti red.
-    const tuđiDokSamNaPotezu =
-      stanje.naPotezuId !== null &&
-      stanje.naPotezuId === stanje.mojIgracId &&
-      p.igracId !== stanje.mojIgracId;
-    if (tuđiDokSamNaPotezu) return;
-
+    if (!dogadajPripadaAktivnojPartiji(stanje.partijaId, p.partijaId)) return;
+    // #142 C: verzija/snimka su autoritet; ne odbacuj tuđi potez heuristikom.
+    const dozvvoliEfekt = trebamJednokratniEfekt(vidjeniDogadajiEfekata, p.dogadajId);
+    if (p.verzijaStanja != null && p.verzijaStanja > stanje.verzijaStanja) {
+      stanje.verzijaStanja = p.verzijaStanja;
+    }
     stanje.oznakaPrihvacenogPoteza += 1;
     const mojPotez = p.igracId === stanje.mojIgracId;
     // Prazan istek = ubojita/prijelaz kad timer nije isključen.
@@ -592,7 +624,7 @@ export function pokreniSlusateljeIgre(): void {
     stanje.zadnjaRijecIgracId = p.igracId;
     stanje.zadnjaRijecVrsta = 'rijec';
     stanje.zadnjaNagrada = mojPotez ? p.nagrada : null;
-    if (mojPotez) {
+    if (mojPotez && dozvvoliEfekt) {
       prikaziStavkeIskustva(p.iskustvo ?? []);
       prikaziKonfeteZaPotez(p.iskustvo ?? [], mojPotez ? p.nagrada : null);
       // Osvježi serverski goalProgress nakon vlastite riječi.
@@ -604,6 +636,7 @@ export function pokreniSlusateljeIgre(): void {
     // Autor: potvrda. Sljedeći: tvoj-red. Ostali: promjena-reda.
     // redDolaziNaMene + prijelazBezPoteza (ubojita) → tišina (slijedi eliminacija).
     // Vrijedi i u 1. rundi — jedini izuzetak je samo otvaranje partije (vidi runda-otvorena).
+    if (!dozvvoliEfekt) return;
     if (mojPotez) pustiAudio('potez-prihvacen');
     else if (mojSljedeciRed) {
       brojOdbijenihNaPotezu = 0;
@@ -624,6 +657,12 @@ export function pokreniSlusateljeIgre(): void {
 
   socket.on('partija:eliminacija', (p) => {
     if (napustioPartiju) return;
+    if (!dogadajPripadaAktivnojPartiji(stanje.partijaId, p.partijaId)) return;
+    if (p.verzijaStanja != null && p.verzijaStanja > stanje.verzijaStanja) {
+      stanje.verzijaStanja = p.verzijaStanja;
+    }
+    // C03: duplikat dogadajId — bez duple eliminacije, XP-a ni zvuka.
+    if (!trebamJednokratniEfekt(vidjeniDogadajiEfekata, p.dogadajId)) return;
     const bioDokaz = stanje.faza === 'dokaz_nastavka' && stanje.dokaz;
     const dokazSnimka = stanje.dokaz;
     // Kaladont: samo tiši aplauz (high moment). Ostali razlozi: tiša eliminacija.
@@ -666,22 +705,15 @@ export function pokreniSlusateljeIgre(): void {
       }
       // Treća osoba ispala tijekom dokaza: ne diraj snimku dokaza.
     }
-    // HINT PR14/Bugbot: dok dokaz traje ne zaključuj partiju lokalno (čekač može biti već ispao).
+    // #142 E: kraj i statusSpremanja određuje samo server (snimka / terminalni eventi).
+    // Vizualni prijelaz na sustav_bira ostaje prezentacijski dok ne stigne snimka.
     const dokazJosTraje = stanje.faza === 'dokaz_nastavka' && stanje.dokaz !== null;
-    const aktivni = stanje.sjedala.filter(
-      (s) => !stanje.eliminacije.some((e) => e.igracId === s.igracId),
-    ).length;
-    if (!dokazJosTraje && aktivni <= 1) {
-      if (stanje.statusSpremanja === 'nije_zavrsena') stanje.statusSpremanja = 'spremanje_rezultata';
-      stanje.sustavBiraRijec = false;
-      stanje.faza = 'zavrsena';
-      stanje.naPotezuId = null;
-      stanje.istekPotezaIso = null;
-    } else if (
+    if (
       !dokazJosTraje &&
       p.razlog !== 'prekid' &&
       !stanje.kraj &&
-      stanje.statusSpremanja === 'nije_zavrsena'
+      stanje.statusSpremanja === 'nije_zavrsena' &&
+      stanje.faza !== 'zavrsena'
     ) {
       stanje.sustavBiraRijec = true;
       stanje.faza = 'sustav_bira';

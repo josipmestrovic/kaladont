@@ -953,6 +953,20 @@ export function stvoriUpraviteljPartija(
     return stanje.turnToken;
   }
 
+  /** Monotona verzija kanonskog stanja (#142 C). */
+  function povecajVerzijuStanja(stanje: StanjeStola): number {
+    stanje.verzijaStanja += 1;
+    return stanje.verzijaStanja;
+  }
+
+  function metaDogadaja(stanje: StanjeStola): { partijaId: string; dogadajId: string; verzijaStanja: number } {
+    return {
+      partijaId: stanje.partijaId,
+      dogadajId: randomUUID(),
+      verzijaStanja: stanje.verzijaStanja,
+    };
+  }
+
   /**
    * Rani upis potvrđenog poraza — samo iz potvrđene eliminacije.
    * // PR05: ne zvati za Brunu koji je samo kliknuo „Ne znam” (još nije potvrđen).
@@ -1159,6 +1173,8 @@ export function stvoriUpraviteljPartija(
     if (stanje.statusSpremanja !== 'nije_zavrsena') return;
 
     stanje.statusSpremanja = 'spremanje_rezultata';
+    povecajVerzijuStanja(stanje);
+    posaljiStanjeSvima(stanje);
     const upisSaCekanjemPoteza = async () => {
       // Najprije osiguraj redak partije — inače in-flight / retry upisi poteza padaju na FK.
       if (stanje.osigurajPocetakPartije) await stanje.osigurajPocetakPartije();
@@ -1557,6 +1573,7 @@ export function stvoriUpraviteljPartija(
 
   function zakljuciPartiju(stanje: StanjeStola): void {
     stanje.zavrsena = true;
+    povecajVerzijuStanja(stanje);
     zatvoriAnalitikaProzorNepotpuno(stanje);
     zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'zavrsena', metaKrajaAnalitike(stanje));
     if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
@@ -2143,7 +2160,11 @@ export function stvoriUpraviteljPartija(
     stanje.izborUToku = true;
     stanje.napadacId = null;
     stanje.istekIzboraIso = izvorniRok || new Date(sat.sada() + trajanje).toISOString();
-    const poruka: SustavBiraRijec = { istekIzboraIso: stanje.istekIzboraIso };
+    povecajVerzijuStanja(stanje);
+    const poruka: SustavBiraRijec = {
+      istekIzboraIso: stanje.istekIzboraIso,
+      ...metaDogadaja(stanje),
+    };
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:sustav-bira-rijec', poruka);
     stanje.izborHandle = sat.zakazi(() => objaviRijecSustava(stanje, napadac), Math.max(0, Date.parse(stanje.istekIzboraIso) - sat.sada()));
     objaviPromjenuPoteza(stanje);
@@ -2165,6 +2186,7 @@ export function stvoriUpraviteljPartija(
         stanje.eliminirani.push(igracId);
         stanje.razloziEliminacije.set(igracId, 'mrtva_slova_iskoristeno');
         const plasman = stanje.aktivni.size + 1;
+        povecajVerzijuStanja(stanje);
         const porukaElim: Eliminacija = {
           igracId,
           plasman,
@@ -2173,6 +2195,7 @@ export function stvoriUpraviteljPartija(
           slova: null,
           rijecUzrok: null,
           iskustvo: null,
+          ...metaDogadaja(stanje),
         };
         stanje.eliminacije.push(porukaElim);
         io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:eliminacija', porukaElim);
@@ -2210,6 +2233,7 @@ export function stvoriUpraviteljPartija(
     });
 
     postaviTimer(stanje);
+    povecajVerzijuStanja(stanje);
     const poruka: RundaOtvorena = {
       rijec: autoRijec,
       trazenaSlova,
@@ -2219,6 +2243,7 @@ export function stvoriUpraviteljPartija(
       serverVrijemeIso: new Date(sat.sada()).toISOString(),
       runda: stanje.runda,
       trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
+      ...metaDogadaja(stanje),
     };
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('partija:runda-otvorena', poruka);
     objaviPromjenuPoteza(stanje);
@@ -2313,6 +2338,7 @@ export function stvoriUpraviteljPartija(
     }
 
     const plasman = stanje.aktivni.size + 1;
+    povecajVerzijuStanja(stanje);
     const poruka: Eliminacija = {
       igracId,
       plasman,
@@ -2321,6 +2347,7 @@ export function stvoriUpraviteljPartija(
       slova: razlog.startsWith('mrtva_slova') ? stanje.trazenaSlova : null,
       rijecUzrok: razlog.startsWith('mrtva_slova') || razlog === 'kaladont' ? stanje.zadnjaRijec : null,
       iskustvo: stavkaEliminacije,
+      ...metaDogadaja(stanje),
     };
     stanje.eliminacije.push(poruka);
     upisiPotvrdjeniRaniPoraz(stanje, igracId, plasman, razlog);
@@ -2452,6 +2479,7 @@ export function stvoriUpraviteljPartija(
     postaviTimer(stanje);
 
     const snimka = snimkaDokazaZaKlijenta(stanje)!;
+    povecajVerzijuStanja(stanje);
     const poruka: DokazZatrazen = {
       partijaId: stanje.partijaId,
       izazovId,
@@ -2466,6 +2494,8 @@ export function stvoriUpraviteljPartija(
       serverVrijemeIso: new Date(sat.sada()).toISOString(),
       naPotezuId: autorId,
       trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
+      dogadajId: randomUUID(),
+      verzijaStanja: stanje.verzijaStanja,
     };
     // Odvojeno od partija:eliminacija — Bruno na Ne znam još nije ispao.
     io.to(SOBA_PARTIJE(stanje.partijaId)).emit('dokaz:zatrazen', poruka);
@@ -3243,6 +3273,10 @@ export function stvoriUpraviteljPartija(
     // Nakon reconnecta socket može kratko biti izvan rooma; autor ipak mora dobiti potvrdu.
     // Igrači koji su dobrovoljno izašli (nema ih u partijaPoIgracu) ne primaju više poteze —
     // inače im klijent i dalje svira promjena-reda / tvoj-red nakon goto('/').
+    if (!poruka.dogadajId) {
+      povecajVerzijuStanja(stanje);
+      Object.assign(poruka, metaDogadaja(stanje));
+    }
     const poslaniSocketi = new Set<string>();
     if (izvorniSocket) {
       izvorniSocket.emit('potez:prihvacen', poruka);
@@ -3559,8 +3593,12 @@ export function stvoriUpraviteljPartija(
         }
         return;
       }
+      const verzijaPrije = stanje.verzijaStanja;
       const rezultat = odigrajRijec(stanje, socket.data.igracId, rijec, turnToken, socket);
-      if (rezultat.ishod === 'prihvacen') stanje.verzijaStanja += 1;
+      // Bump samo ako odigrajRijec nije već povećao verziju (emit/elim/dokaz).
+      if (rezultat.ishod === 'prihvacen' && stanje.verzijaStanja === verzijaPrije) {
+        povecajVerzijuStanja(stanje);
+      }
       if (rezultat.ishod === 'odbijen') socket.emit('potez:odbijen', { kod: rezultat.kod, poruka: rezultat.poruka });
       if (requestId) {
         const potvrda = potvrdaIzRezultataNaredbe(
@@ -3665,8 +3703,11 @@ export function stvoriUpraviteljPartija(
         }
         return;
       }
+      const verzijaPrijeOdustani = stanje.verzijaStanja;
       const rezultat = odustani(stanje, socket.data.igracId, turnToken);
-      if (rezultat.ishod === 'prihvacen') stanje.verzijaStanja += 1;
+      if (rezultat.ishod === 'prihvacen' && stanje.verzijaStanja === verzijaPrijeOdustani) {
+        povecajVerzijuStanja(stanje);
+      }
       if (rezultat.ishod === 'odbijen') socket.emit('potez:odbijen', { kod: rezultat.kod, poruka: rezultat.poruka });
       if (requestId) {
         const potvrda = potvrdaIzRezultataNaredbe(

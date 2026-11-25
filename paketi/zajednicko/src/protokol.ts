@@ -292,6 +292,9 @@ export interface StanjePartije {
 export interface DokazZatrazen {
   partijaId: string;
   izazovId: string;
+  /** #142: stabilni ID događaja za dedup efekata. */
+  dogadajId?: string;
+  verzijaStanja?: number;
   autorId: string;
   cekateljId: string;
   izvornaRijec: string;
@@ -328,6 +331,10 @@ export interface PrihvacenPotez {
   iskustvo?: StavkaIskustva[];
   /** Efektivni rok sljedećeg igrača (posebno relevantno za Izazov 15/30). */
   trajanjePotezaSek?: number;
+  /** #142: izolacija partije / dedup efekata. */
+  partijaId?: string;
+  dogadajId?: string;
+  verzijaStanja?: number;
 }
 
 export interface OtkljucavanjeRijeci {
@@ -411,6 +418,10 @@ export interface Eliminacija {
   /** Riječ koja je izazvala mrtva slova (za obrazloženje na klijentu); null za ostale razloge. */
   rijecUzrok: string | null;
   iskustvo?: StavkaIskustva | null;
+  /** #142: izolacija partije / dedup efekata. */
+  partijaId?: string;
+  dogadajId?: string;
+  verzijaStanja?: number;
 }
 
 export interface KrajPartije {
@@ -498,6 +509,9 @@ export interface PonistenaPartija {
 /** Sustav je pocelo birati rijec za otvaranje runde (1. runda, nakon eliminacije ili kaladont-efekta). */
 export interface SustavBiraRijec {
   istekIzboraIso: string;
+  partijaId?: string;
+  dogadajId?: string;
+  verzijaStanja?: number;
 }
 
 /** Sustav je otkrio nasumicno odabranu rijec; sljedeci igrac na potezu na nju odgovara kao normalan nastavak. */
@@ -511,6 +525,9 @@ export interface RundaOtvorena {
   runda: number;
   /** Efektivni rok igrača na potezu. */
   trajanjePotezaSek?: number;
+  partijaId?: string;
+  dogadajId?: string;
+  verzijaStanja?: number;
 }
 
 export type KodGreske =
