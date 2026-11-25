@@ -5,7 +5,7 @@
   import { api } from '$lib/api.js';
   import { dohvatiSocket, dohvatiStanjeVeze } from '$lib/socket.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { dohvatiStanjeIgre, napustiLokalnuPartiju, zatraziSinkronizacijuPartije } from '$lib/stanje-igre.svelte.js';
+  import { dohvatiStanjeIgre, napustiLokalnuPartiju, preuzmiPendingReakcije, zatraziSinkronizacijuPartije } from '$lib/stanje-igre.svelte.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import Konfeti from '$lib/komponente/Konfeti.svelte';
@@ -1113,15 +1113,25 @@
     void ucitajPoteze(false);
     const socket = dohvatiSocket();
 
-    const naReakciju = ({ igracId, poruka }: { igracId: string; poruka: BrzaPoruka }) => {
-      if (!jeAktualnaPartija()) return;
+    const prikaziReakciju = (igracId: string, poruka: VrstaReakcije, saZvukom = true) => {
       const id = sljedeciIdReakcije++;
       reakcije = [...reakcije, { id, igracId, poruka }];
       odskociAvatara = { ...odskociAvatara, [igracId]: (odskociAvatara[igracId] ?? 0) + 1 };
-      pustiAudio('chat-poruka');
+      if (saZvukom) pustiAudio('chat-poruka');
       window.setTimeout(() => {
         reakcije = reakcije.filter((reakcija) => reakcija.id !== id);
       }, 3500);
+    };
+
+    if (partijaId) {
+      for (const pending of preuzmiPendingReakcije(partijaId)) {
+        prikaziReakciju(pending.igracId, pending.poruka);
+      }
+    }
+
+    const naReakciju = ({ igracId, poruka }: { igracId: string; poruka: BrzaPoruka }) => {
+      if (!jeAktualnaPartija()) return;
+      prikaziReakciju(igracId, poruka);
     };
 
     const naEliminaciju = (eliminacija: Eliminacija) => {

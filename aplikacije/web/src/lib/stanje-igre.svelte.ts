@@ -4,6 +4,7 @@
  * HINT PR14: faza/dokaz/pravila dolaze sa snimke — UI ne sudi iz broja avatara.
  */
 import type {
+  BrzaPoruka,
   DokazZatrazen,
   Eliminacija,
   FazaPoteza,
@@ -490,10 +491,21 @@ export function pokreniSlusateljeIgre(): void {
   pokrenuto = true;
   const socket = dohvatiSocket();
 
+  socket.on('reakcija:nova', (p: { partijaId?: string; igracId: string; poruka: BrzaPoruka }) => {
+    if (napustioPartiju) return;
+    const partijaId = p.partijaId ?? stanje.partijaId;
+    if (!partijaId) return;
+    // Buffer dok stol nije mountan — partija page potroši preuzmiPendingReakcije.
+    if (typeof window !== 'undefined' && !window.location.pathname.includes(`/partija/${partijaId}`)) {
+      spremiPendingReakciju(partijaId, p.igracId, p.poruka);
+    }
+  });
+
   socket.on('partija:pocetak', (p) => {
     napustioPartiju = false;
     odsviranPocetakZaPartijuId = null;
     zadnjiDokazIzazovId = null;
+    pendingReakcije = pendingReakcije.filter((r) => r.partijaId === p.partijaId);
     oznaciPartijuDostupnom();
     brojOdbijenihNaPotezu = 0;
     stanje.partijaId = p.partijaId;
@@ -911,6 +923,29 @@ export function dohvatiStanjeIgre(): StanjeIgre {
   return stanje;
 }
 
+const TTL_PENDING_REAKCIJE_MS = 4_000;
+type PendingReakcija = { partijaId: string; igracId: string; poruka: BrzaPoruka; expiresAt: number };
+let pendingReakcije: PendingReakcija[] = [];
+
+function ocistiIsteklePendingReakcije(sada = Date.now()): void {
+  pendingReakcije = pendingReakcije.filter((r) => r.expiresAt > sada);
+}
+
+/** Reakcije koje su stigle prije mounta stola — potroši jednom po partiji. */
+export function preuzmiPendingReakcije(partijaId: string): { igracId: string; poruka: BrzaPoruka }[] {
+  const sada = Date.now();
+  ocistiIsteklePendingReakcije(sada);
+  const trenutne = pendingReakcije.filter((r) => r.partijaId === partijaId);
+  pendingReakcije = pendingReakcije.filter((r) => r.partijaId !== partijaId);
+  return trenutne.map(({ igracId, poruka }) => ({ igracId, poruka }));
+}
+
+function spremiPendingReakciju(partijaId: string, igracId: string, poruka: BrzaPoruka): void {
+  const sada = Date.now();
+  ocistiIsteklePendingReakcije(sada);
+  pendingReakcije.push({ partijaId, igracId, poruka, expiresAt: sada + TTL_PENDING_REAKCIJE_MS });
+}
+
 /**
  * Lokalno napuštanje partije: gasi SFX i ignorira kasne socket evente stare partije
  * dok ne stigne nova partija:pocetak. Pozvati prije emit('partija:izadji').
@@ -931,6 +966,7 @@ export function napustiLokalnuPartiju(): void {
   timerNagradePoteza = null;
   timerNovaDostignuca = null;
   timerKonfetaIskustva = null;
+  pendingReakcije = [];
   stanje.partijaId = null;
   stanje.mojIgracId = null;
   stanje.sjedala = [];
