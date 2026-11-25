@@ -32,12 +32,15 @@ for (const brojSjedala of [2, 3, 4, 8]) {
         const { dohvatiSocket } = await import(putanjaSocketa);
         const stanje = dohvatiStanjeIgre();
         const sjedalo = stanje.sjedala.find((igrac: { igracId: string }) => igrac.igracId === stanje.mojIgracId);
+        const lokalna = stanje.verzijaStanja ?? 0;
         dohvatiSocket().emitEvent(['partija:stanje', {
           ...JSON.parse(JSON.stringify(stanje)),
           sjedala: Array.from({ length: broj }, (_, indeks) => ({ ...sjedalo, igracId: indeks === 0 ? stanje.mojIgracId : `protivnik-${indeks}`, nadimak: `Igrac${indeks}` })),
           naPotezuId: stanje.mojIgracId, jePrivatna: broj === 8, sustavBiraRijec: false,
           zadnjaRijec: 'prepoznavanje', zadnjaRijecIgracId: 'protivnik-1', zadnjaRijecVrsta: 'rijec',
           trazenaSlova: 'ča', istekPotezaIso: '', eliminacije: [], statusSpremanja: 'nije_zavrsena',
+          // #142: ista verzija snimke ne primjenjuje naPotezu/unos.
+          verzijaStanja: lokalna + 1,
         }]);
       }, brojSjedala);
       const unos = stranica.getByRole('textbox', { name: 'Dovrši riječ na ČA' });
@@ -161,6 +164,7 @@ test('prazan nastavak šalje prefiks kao cijelu riječ (#111)', async ({ browser
       const { dohvatiSocket } = await import(putanjaSocketa);
       const stanje = dohvatiStanjeIgre();
       const sjedalo = stanje.sjedala.find((igrac: { igracId: string }) => igrac.igracId === stanje.mojIgracId);
+      const lokalna = stanje.verzijaStanja ?? 0;
       dohvatiSocket().emitEvent(['partija:stanje', {
         ...JSON.parse(JSON.stringify(stanje)),
         sjedala: [
@@ -176,6 +180,8 @@ test('prazan nastavak šalje prefiks kao cijelu riječ (#111)', async ({ browser
         istekPotezaIso: '',
         eliminacije: [],
         statusSpremanja: 'nije_zavrsena',
+        // #142: ista verzija snimke ne primjenjuje naPotezu/unos.
+        verzijaStanja: lokalna + 1,
       }]);
     });
     const unos = stranica.getByRole('textbox', { name: 'Dovrši riječ na ČA' });
