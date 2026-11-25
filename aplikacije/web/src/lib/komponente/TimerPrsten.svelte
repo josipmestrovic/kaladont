@@ -1,9 +1,12 @@
 <script lang="ts">
   /**
-  * SVG prsten koji se prazni prema serverovom roku i stvarnom trajanju poteza.
-  * Zadnjih 5s pulsira (ekrani.md §3).
+   * SVG prsten koji se prazni prema serverovom roku.
+   * Pomak sata iz RTT synca; proteklo preko performance.now() (#142 F).
+   * Nula na UI ≠ eliminacija.
    */
   import { pustiAudio } from '$lib/audio-manager.js';
+  import { dohvatiPomakSataMs, imaUzorakSata } from '$lib/sinkronizacija-partije.js';
+  import { preostaloMsPoteza } from '$lib/timer-poteza.js';
 
   interface Props {
     istekIso: string;
@@ -22,18 +25,29 @@
   let pulsPusten = false;
 
   $effect(() => {
-    const istek = new Date(istekIso).getTime();
-    const serverSada = new Date(serverVrijemeIso).getTime();
-    const pomakSataMs = serverSada - Date.now();
     const trajanjeMs = Math.max(1, trajanjeSek * 1000);
-    const serverNow = () => Date.now() + pomakSataMs;
-    pulsPusten = false;
-    const interval = setInterval(() => {
-      const preostaloMs = istek - serverNow();
+    const bazaMonotonicMs = performance.now();
+    const bazaWallMs = Date.now();
+    // Kvalitetan RTT uzorak ima prednost; inače jednokratni pomak iz snimke.
+    const pomakSataMs = imaUzorakSata()
+      ? dohvatiPomakSataMs()
+      : new Date(serverVrijemeIso).getTime() - bazaWallMs;
+
+    const osvjezi = () => {
+      const preostaloMs = preostaloMsPoteza({
+        istekIso,
+        pomakSataMs,
+        sadaMonotonicMs: performance.now(),
+        bazaMonotonicMs,
+        bazaWallMs,
+      });
       preostaliUdio = Math.max(0, Math.min(1, preostaloMs / trajanjeMs));
       preostaleSekunde = Math.max(0, Math.ceil(preostaloMs / 1000));
-    }, 200);
-    preostaleSekunde = Math.max(0, Math.ceil((istek - serverNow()) / 1000));
+    };
+
+    pulsPusten = false;
+    osvjezi();
+    const interval = setInterval(osvjezi, 200);
     return () => clearInterval(interval);
   });
 

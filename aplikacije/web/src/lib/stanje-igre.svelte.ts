@@ -23,6 +23,7 @@ import { pustiAudio, zaustaviSveZvukove, type AudioDogadaj } from './audio-manag
 import { pocetniGoalProgressIzazova } from './izazovi-klijent.js';
 import { dohvatiSocket, oznaciPartijuDostupnom } from './socket.js';
 import { biljeziPasivniServerVrijeme, sinkronizirajPartiju } from './sinkronizacija-partije.js';
+import { normalizirajIstekPotezaIso, timerAktivanIzSnimke } from './timer-poteza.js';
 import {
   dogadajPripadaAktivnojPartiji,
   trebamJednokratniEfekt,
@@ -322,7 +323,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
   if (novaVerzija > 0) stanje.verzijaStanja = novaVerzija;
   stanje.naPotezuId = p.naPotezuId;
   stanje.trazenaSlova = p.trazenaSlova;
-  stanje.istekPotezaIso = p.istekPotezaIso;
+  stanje.istekPotezaIso = normalizirajIstekPotezaIso(p.istekPotezaIso);
   stanje.serverVrijemeIso = p.serverVrijemeIso;
   stanje.runda = p.runda;
   stanje.brojIskoristenih = p.brojIskoristenih;
@@ -344,6 +345,15 @@ function primijeniStanjePartije(p: StanjePartije): void {
   stanje.jePrivatna = Boolean(p.jePrivatna);
   stanje.kodSobe = p.kodSobe ?? null;
   stanje.trajanjePotezaSek = p.trajanjePotezaSek ?? null;
+  // Ako timer nije aktivan, rok mora biti null (ne prazan string / lažni prijelaz).
+  if (!timerAktivanIzSnimke({
+    timerAktivan: p.timerAktivan,
+    istekPotezaIso: stanje.istekPotezaIso,
+    trajanjePotezaSek: stanje.trajanjePotezaSek,
+    faza: stanje.faza,
+  })) {
+    stanje.istekPotezaIso = null;
+  }
   if (stanje.kontekst === 'izazov') {
     if (p.izazov) {
       stanje.izazovMeta = p.izazov;
@@ -600,10 +610,15 @@ export function pokreniSlusateljeIgre(): void {
     }
     stanje.oznakaPrihvacenogPoteza += 1;
     const mojPotez = p.igracId === stanje.mojIgracId;
-    // Prazan istek = ubojita/prijelaz kad timer nije isključen.
-    // null trajanje = javna partija (default timer) — prazan istek i dalje briše red.
-    // 0 = privatna bez limitu / ONEMOGUCI_TIMER — prazan istek je normalan.
-    const prijelazBezPoteza = !p.istekPotezaIso && stanje.trajanjePotezaSek !== 0;
+    // #142 F: null rok + timerAktivan false nije „ubojita” — samo nema limitu / prijelaz faze.
+    const rok = normalizirajIstekPotezaIso(p.istekPotezaIso);
+    const timerAktivan = timerAktivanIzSnimke({
+      timerAktivan: p.timerAktivan,
+      istekPotezaIso: rok,
+      trajanjePotezaSek: p.trajanjePotezaSek ?? stanje.trajanjePotezaSek,
+      faza: stanje.faza,
+    });
+    const prijelazBezPoteza = !timerAktivan && stanje.trajanjePotezaSek !== 0 && rok === null;
     // Red na mene = id match; prijelazBezPoteza samo sprečava lažni tvoj-red na ubojitoj riječi.
     const redDolaziNaMene = p.sljedeciId === stanje.mojIgracId;
     const mojSljedeciRed = redDolaziNaMene && !prijelazBezPoteza;
@@ -615,7 +630,7 @@ export function pokreniSlusateljeIgre(): void {
       stanje.istekPotezaIso = null;
     } else {
       stanje.naPotezuId = p.sljedeciId;
-      stanje.istekPotezaIso = p.istekPotezaIso;
+      stanje.istekPotezaIso = timerAktivan ? rok : null;
     }
     stanje.trazenaSlova = p.trazenaSlova;
     stanje.serverVrijemeIso = p.serverVrijemeIso;

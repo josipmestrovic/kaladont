@@ -234,7 +234,7 @@ export interface SnimkaDokaza {
   /** true kad je čekač već potvrđen (napusti/prekid); false dok čeka odluku nakon „Ne znam”/isteka. */
   cekateljVecIspao: boolean;
   pocetakIso: string;
-  istekPotezaIso: string;
+  istekPotezaIso: string | null;
 }
 
 export interface StanjePartije {
@@ -246,7 +246,10 @@ export interface StanjePartije {
   verzijaStanja?: number;
   naPotezuId: string;
   trazenaSlova: string | null;
-  istekPotezaIso: string;
+  /** null = nema auto-roka; prazan string na žici normalizirati na null. */
+  istekPotezaIso: string | null;
+  /** true samo dok aktualna faza ima aktivni vremenski rok. */
+  timerAktivan?: boolean;
   serverVrijemeIso: string;
   runda: number;
   brojIskoristenih: number;
@@ -302,7 +305,8 @@ export interface DokazZatrazen {
   razlogOtvaranja: RazlogOtvaranjaDokaza;
   cekateljVecIspao: boolean;
   turnToken: string;
-  istekPotezaIso: string;
+  istekPotezaIso: string | null;
+  timerAktivan?: boolean;
   serverVrijemeIso: string;
   naPotezuId: string;
   /** Efektivni rok aktivnog (dokaznog) sudionika. */
@@ -322,7 +326,8 @@ export interface PrihvacenPotez {
   trazenaSlova: string;
   sljedeciId: string;
   turnToken: string;
-  istekPotezaIso: string;
+  istekPotezaIso: string | null;
+  timerAktivan?: boolean;
   serverVrijemeIso: string;
   brojIskoristenih: number;
   streak: number;
@@ -520,7 +525,8 @@ export interface RundaOtvorena {
   trazenaSlova: string;
   naPotezuId: string;
   turnToken: string;
-  istekPotezaIso: string;
+  istekPotezaIso: string | null;
+  timerAktivan?: boolean;
   serverVrijemeIso: string;
   runda: number;
   /** Efektivni rok igrača na potezu. */

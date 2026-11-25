@@ -480,7 +480,7 @@ export function stvoriUpraviteljPartija(
     const trajanjeMs = trajanjePotezaMsZaStol(stanje);
     const istek =
       timerOnemogucenZaStol(stanje) || trajanjeMs <= 0
-        ? ''
+        ? null
         : new Date(d.pocetakMs + trajanjeMs).toISOString();
     return {
       izazovId: d.izazovId,
@@ -996,6 +996,49 @@ export function stvoriUpraviteljPartija(
     });
   }
 
+  /** Token za koji je serverski istek već primijenjen (F02/F03: jednom po tokenu). */
+  const obradjeniIsteciPoPartiji = new Map<string, string>();
+
+  function jeRokPotezaDosegnut(stanje: StanjeStola, token: string): boolean {
+    if (stanje.zavrsena || stanje.izborUToku || stanje.turnToken !== token) return false;
+    if (timerOnemogucenZaStol(stanje)) return false;
+    const trajanjeMs = trajanjePotezaMsZaStol(stanje);
+    if (trajanjeMs <= 0) return false;
+    return sat.sada() >= stanje.vrijemePocetkaPotezaMs + trajanjeMs;
+  }
+
+  /** Jedina točka isteka poteza — timer i pre-naredba (#142 F). */
+  function obradiIstekPoteza(stanje: StanjeStola, token: string): boolean {
+    if (!jeRokPotezaDosegnut(stanje, token)) return false;
+    if (obradjeniIsteciPoPartiji.get(stanje.partijaId) === token) return false;
+    obradjeniIsteciPoPartiji.set(stanje.partijaId, token);
+    if (stanje.timerHandle) {
+      sat.otkazi(stanje.timerHandle);
+      stanje.timerHandle = null;
+    }
+    // PR05: istek u dokazu = neuspjeh dokaza (Ana), ne „istek Brunе” i ne novi dokaz.
+    if (stanje.dokaz) {
+      zakljuciDokazNeuspjehom(stanje, 'istek');
+      return true;
+    }
+    // PR05: na običnom potezu u dokazi_nastavak istek može otvoriti dokaz (kao Ne znam).
+    if (
+      trebaOtvoritiDokaz({
+        pravilnik: stanje.pravila,
+        fazaJeObicanPotez: fazaStola(stanje) === 'obican_potez',
+        autorId: stanje.napadacId,
+        autorJosAktivan: !!stanje.napadacId && stanje.aktivni.has(stanje.napadacId),
+        igracNaPotezuId: stanje.naPotezuId,
+        dogadajIgracId: stanje.naPotezuId,
+      })
+    ) {
+      otvoriDokazNastavka(stanje, stanje.naPotezuId, 'istek', false);
+      return true;
+    }
+    eliminirajIgraca(stanje, stanje.naPotezuId, 'istek');
+    return true;
+  }
+
   function postaviTimer(stanje: StanjeStola): void {
     if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
     stanje.vrijemePocetkaPotezaMs = sat.sada();
@@ -1007,35 +1050,18 @@ export function stvoriUpraviteljPartija(
     }
     const token = stanje.turnToken;
     stanje.timerHandle = sat.zakazi(() => {
-      if (stanje.zavrsena || stanje.izborUToku || stanje.turnToken !== token) return;
-      // PR05: istek u dokazu = neuspjeh dokaza (Ana), ne „istek Brunе” i ne novi dokaz.
-      if (stanje.dokaz) {
-        zakljuciDokazNeuspjehom(stanje, 'istek');
-        return;
-      }
-      // PR05: na običnom potezu u dokazi_nastavak istek može otvoriti dokaz (kao Ne znam).
-      if (
-        trebaOtvoritiDokaz({
-          pravilnik: stanje.pravila,
-          fazaJeObicanPotez: fazaStola(stanje) === 'obican_potez',
-          autorId: stanje.napadacId,
-          autorJosAktivan: !!stanje.napadacId && stanje.aktivni.has(stanje.napadacId),
-          igracNaPotezuId: stanje.naPotezuId,
-          dogadajIgracId: stanje.naPotezuId,
-        })
-      ) {
-        otvoriDokazNastavka(stanje, stanje.naPotezuId, 'istek', false);
-        return;
-      }
-      eliminirajIgraca(stanje, stanje.naPotezuId, 'istek');
+      obradiIstekPoteza(stanje, token);
     }, trajanjeMs);
   }
 
-  function istekPotezaIso(stanje: StanjeStola): string {
+  function timerAktivanZaStol(stanje: StanjeStola): boolean {
     const trajanjeMs = trajanjePotezaMsZaStol(stanje);
-    // Tijekom izbora riječi / isključenog timera nema "živog" poteza — prazan istek
-    // sprječava klijente da mountaju formu između eliminacije i nove runde.
-    if (timerOnemogucenZaStol(stanje) || stanje.izborUToku || stanje.zavrsena || trajanjeMs <= 0) return '';
+    return !(timerOnemogucenZaStol(stanje) || stanje.izborUToku || stanje.zavrsena || trajanjeMs <= 0);
+  }
+
+  function istekPotezaIso(stanje: StanjeStola): string | null {
+    if (!timerAktivanZaStol(stanje)) return null;
+    const trajanjeMs = trajanjePotezaMsZaStol(stanje);
     return new Date(stanje.vrijemePocetkaPotezaMs + trajanjeMs).toISOString();
   }
 
@@ -1074,6 +1100,7 @@ export function stvoriUpraviteljPartija(
       naPotezuId: stanje.naPotezuId,
       trazenaSlova: stanje.trazenaSlova,
       istekPotezaIso: istekPotezaIso(stanje),
+      timerAktivan: timerAktivanZaStol(stanje),
       serverVrijemeIso: new Date(sat.sada()).toISOString(),
       runda: stanje.runda,
       brojIskoristenih: stanje.brojOdigranih,
@@ -2246,6 +2273,7 @@ export function stvoriUpraviteljPartija(
       naPotezuId: naPotezu,
       turnToken: stanje.turnToken,
       istekPotezaIso: istekPotezaIso(stanje),
+      timerAktivan: timerAktivanZaStol(stanje),
       serverVrijemeIso: new Date(sat.sada()).toISOString(),
       runda: stanje.runda,
       trajanjePotezaSek: trajanjePotezaSekZaKlijenta(stanje),
@@ -2933,7 +2961,7 @@ export function stvoriUpraviteljPartija(
         trazenaSlova: stanje.dokaz.trazenaSlova,
         sljedeciId: cekateljId,
         turnToken: stanje.turnToken,
-        istekPotezaIso: '',
+        istekPotezaIso: null,
         serverVrijemeIso: new Date(sat.sada()).toISOString(),
         brojIskoristenih: stanje.brojOdigranih,
         streak: trenutniStreak,
@@ -2956,7 +2984,7 @@ export function stvoriUpraviteljPartija(
         trazenaSlova: stanje.trazenaSlova!,
         sljedeciId: sljedeci,
         turnToken: stanje.turnToken,
-        istekPotezaIso: '',
+        istekPotezaIso: null,
         serverVrijemeIso: new Date(sat.sada()).toISOString(),
         brojIskoristenih: stanje.brojOdigranih,
         streak: trenutniStreak,
@@ -3000,7 +3028,7 @@ export function stvoriUpraviteljPartija(
           trazenaSlova: novaTrazenaSlova,
           sljedeciId: zrtva,
           turnToken: stanje.turnToken,
-          istekPotezaIso: '',
+          istekPotezaIso: null,
           serverVrijemeIso: new Date(sat.sada()).toISOString(),
           brojIskoristenih: stanje.brojOdigranih,
           streak: trenutniStreak,
@@ -3030,6 +3058,7 @@ export function stvoriUpraviteljPartija(
       sljedeciId: sljedeci,
       turnToken: stanje.turnToken,
       istekPotezaIso: istekPotezaIso(stanje),
+      timerAktivan: timerAktivanZaStol(stanje),
       serverVrijemeIso: new Date(sat.sada()).toISOString(),
       brojIskoristenih: stanje.brojOdigranih,
       streak: trenutniStreak,
@@ -3118,6 +3147,10 @@ export function stvoriUpraviteljPartija(
     if (stanje.zavrsena) return { ishod: 'ignoriran', razlog: 'zavrsena' };
     if (!stanje.aktivni.has(igracId)) return { ishod: 'ignoriran', razlog: 'nije_sudionik' };
     if (turnToken && turnToken !== stanje.turnToken) {
+      return { ishod: 'odbijen', kod: 'STARI_TURN_TOKEN', poruka: 'Potez je zastario. Osvježi stanje i pokušaj ponovno.' };
+    }
+    // #142 F: istek prije naredbe — ista funkcija kao timer, jednom po tokenu.
+    if (turnToken && obradiIstekPoteza(stanje, turnToken)) {
       return { ishod: 'odbijen', kod: 'STARI_TURN_TOKEN', poruka: 'Potez je zastario. Osvježi stanje i pokušaj ponovno.' };
     }
     if (stanje.naPotezuId !== igracId) return { ishod: 'odbijen', kod: 'NIJE_TVOJ_POTEZ', poruka: PORUKE.nijeTvojPotez };
@@ -3210,6 +3243,9 @@ export function stvoriUpraviteljPartija(
     if (stanje.zavrsena) return { ishod: 'ignoriran', razlog: 'zavrsena' };
     if (!stanje.aktivni.has(igracId)) return { ishod: 'ignoriran', razlog: 'nije_sudionik' };
     if (turnToken && turnToken !== stanje.turnToken) {
+      return { ishod: 'odbijen', kod: 'STARI_TURN_TOKEN', poruka: 'Potez je zastario. Osvježi stanje i pokušaj ponovno.' };
+    }
+    if (turnToken && obradiIstekPoteza(stanje, turnToken)) {
       return { ishod: 'odbijen', kod: 'STARI_TURN_TOKEN', poruka: 'Potez je zastario. Osvježi stanje i pokušaj ponovno.' };
     }
     if (stanje.izborUToku) return { ishod: 'ignoriran', razlog: 'sustav_bira' };
