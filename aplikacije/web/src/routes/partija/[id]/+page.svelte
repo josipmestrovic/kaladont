@@ -39,7 +39,7 @@
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
-  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
+  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, izracunajRazinuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
@@ -176,7 +176,7 @@
     if (sjedalo.jeGost) return 'Gost';
     return `${sjedalo.rang ?? 'Piskaralo'} | LVL ${sjedalo.razina}`;
   }
-  let sekundeDoRezultata = $state(8);
+  let sekundeDoRezultata = $state(Math.ceil(ODGODA_PRIKAZA_REZULTATA_MS / 1_000));
   let rezervniRokRezultataMs: number | null = null;
   type VrstaReakcije = BrzaPoruka | 'tuzan';
   let reakcije = $state<{ id: number; igracId: string; poruka: VrstaReakcije }[]>([]);
@@ -972,7 +972,7 @@
     }
 
     prikaziRezultate = false;
-    rezervniRokRezultataMs ??= Date.now() + 8_000;
+    rezervniRokRezultataMs ??= Date.now() + ODGODA_PRIKAZA_REZULTATA_MS;
     const izazovRok = stanje.izazovTerminal?.resultsVisibleAtIso
       ? Date.parse(stanje.izazovTerminal.resultsVisibleAtIso)
       : NaN;

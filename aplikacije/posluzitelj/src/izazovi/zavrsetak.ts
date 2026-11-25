@@ -3,15 +3,15 @@
  * Nagrade / zavrseci / XP — PR04 settlement hook.
  */
 import { and, eq, inArray } from 'drizzle-orm';
-import type { RazlogNeuspjehaIzazova, StatusPokusajaIzazova } from 'zajednicko';
+import { ODGODA_PRIKAZA_REZULTATA_MS, type RazlogNeuspjehaIzazova, type StatusPokusajaIzazova } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { pokusajiIzazova } from '../baza/shema.js';
 import { obracunajSettlementIzazova, type SettlementIzazova } from './obracun.js';
 import type { MetrikePokusajaIzazova } from './evaluacija.js';
 import type { RedakPokusajaIzazova } from './pohrana.js';
 
-/** Rezultati vidljivi 8 s nakon terminalAt (klijent ne resetira na refresh). */
-export const ODGODA_REZULTATA_IZAZOVA_MS = 8_000;
+/** Rezultati vidljivi 5 s nakon terminalAt (klijent ne resetira na refresh). */
+export const ODGODA_REZULTATA_IZAZOVA_MS = ODGODA_PRIKAZA_REZULTATA_MS;
 
 export type TerminalniStatusIzazova = Extract<
   StatusPokusajaIzazova,
