@@ -1047,12 +1047,12 @@ export function stvoriUpraviteljPartija(
     return timerOnemogucen ? 0 : stanje.trajanjePotezaSek;
   }
 
-  function posaljiStanje(socket: KaladontSocket): void {
+  function izgradiSnimkuPartije(socket: KaladontSocket): StanjePartije | null {
     const partijaId = partijaPoIgracu.get(socket.data.igracId);
     const stanje = partijaId ? partije.get(partijaId) : undefined;
-    if (!stanje) return;
+    if (!stanje) return null;
 
-    const poruka: StanjePartije = {
+    return {
       partijaId: stanje.partijaId,
       mojIgracId: socket.data.igracId,
       sjedala: stanje.sudionici.map(({ igracId, vrsta, upravljac, nadimak, avatarId, avatarConfig, avatarRevision, rang, razina, trenutniNiz, razinaVatre, odabranaPravila }) => ({
@@ -1106,7 +1106,13 @@ export function stvoriUpraviteljPartija(
         }
         : {}),
     };
+  }
+
+  function posaljiStanje(socket: KaladontSocket): StanjePartije | null {
+    const poruka = izgradiSnimkuPartije(socket);
+    if (!poruka) return null;
     socket.emit('partija:stanje', poruka);
+    return poruka;
   }
 
   function emitirajSpremanjeRezultata(stanje: StanjeStola): void {
@@ -3446,16 +3452,16 @@ export function stvoriUpraviteljPartija(
         ack?.({ snimka: null, razlog: 'KRIVA_PARTIJA' });
         return;
       }
-      posaljiStanje(socket);
+      const snimka = posaljiStanje(socket);
       if (!ack) return;
       let potvrdaNaredbe: PotvrdaNaredbePoteza | undefined;
       if (payload?.requestId) {
         const lista = stanje.cacheIshodaNaredbi.get(socket.data.igracId) ?? [];
         potvrdaNaredbe = lista.find((z) => z.kljuc.requestId === payload.requestId)?.potvrda;
       }
-      // Snimka stiže emitom partija:stanje; ACK korelira ishod naredbe.
+      // Emit ostaje za stare klijente; ACK nosi snimku + ishod naredbe (#142 D).
       ack({
-        snimka: null,
+        snimka,
         potvrdaNaredbe,
         razlog: potvrdaNaredbe ? undefined : (payload?.requestId ? 'NEMA_ISHODA' : undefined),
       });

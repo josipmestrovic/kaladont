@@ -22,6 +22,7 @@ import type {
 import { pustiAudio, zaustaviSveZvukove, type AudioDogadaj } from './audio-manager.js';
 import { pocetniGoalProgressIzazova } from './izazovi-klijent.js';
 import { dohvatiSocket, oznaciPartijuDostupnom } from './socket.js';
+import { biljeziPasivniServerVrijeme, sinkronizirajPartiju } from './sinkronizacija-partije.js';
 import {
   dogadajPripadaAktivnojPartiji,
   trebamJednokratniEfekt,
@@ -295,6 +296,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
   if (odluka === 'ista_verzija') {
     // C05: ista verzija ne smije dirati turnToken/prefiks (unos); osvježi sat i terminal.
     stanje.serverVrijemeIso = p.serverVrijemeIso;
+    biljeziPasivniServerVrijeme(p.serverVrijemeIso);
     stanje.statusSpremanja = p.statusSpremanja;
     if (p.zavrsena) primijeniFazuIzSnimke(p);
     if (p.goalProgress) stanje.goalProgress = p.goalProgress;
@@ -304,6 +306,7 @@ function primijeniStanjePartije(p: StanjePartije): void {
     return;
   }
   oznaciPartijuDostupnom();
+  biljeziPasivniServerVrijeme(p.serverVrijemeIso);
   // HINT PR14/Bugbot: uspješan dokaz kad je čekač već otišao dolazi samo kao
   // partija:stanje (zakrpljeni bodZa), bez nove partija:eliminacija — banner ovdje.
   const prethodniDokaz = stanje.dokaz;
@@ -820,10 +823,54 @@ export function pokreniSlusateljeIgre(): void {
     stanje.poruka = g.poruka;
   });
 
+  function pokreniSinkronizacijuPartije(requestId?: string): void {
+    if (!stanje.partijaId || napustioPartiju) return;
+    void sinkronizirajPartiju({
+      socket,
+      partijaId: stanje.partijaId,
+      requestId,
+      aktivniTurnToken: stanje.turnToken,
+      naSnimku: (snimka) => primijeniStanjePartije(snimka),
+    });
+  }
+
   socket.on('connect', () => {
-    socket.emit('partija:stanje');
+    // Korelirani sync umjesto golog emita (#142 D); stari put ostaje na serveru.
+    if (stanje.partijaId) pokreniSinkronizacijuPartije();
+    else socket.emit('partija:stanje');
   });
-  if (socket.connected) socket.emit('partija:stanje');
+  if (socket.connected) {
+    if (stanje.partijaId) pokreniSinkronizacijuPartije();
+    else socket.emit('partija:stanje');
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!stanje.partijaId || napustioPartiju) return;
+      if (!socket.connected) return; // ne ubijaj zdravu vezu; čekaj connect
+      pokreniSinkronizacijuPartije();
+    });
+  }
+}
+
+/** Javni ulaz za sync nakon nepoznatog ishoda poteza (#142 D). */
+export function zatraziSinkronizacijuPartije(opcije?: {
+  requestId?: string;
+  naPotvrdu?: (potvrda: import('zajednicko').PotvrdaNaredbePoteza) => void;
+  naOcistiNaredbu?: () => void;
+}): void {
+  const socket = dohvatiSocket();
+  if (!stanje.partijaId || napustioPartiju) return;
+  void sinkronizirajPartiju({
+    socket,
+    partijaId: stanje.partijaId,
+    requestId: opcije?.requestId,
+    aktivniTurnToken: stanje.turnToken,
+    naSnimku: (snimka) => primijeniStanjePartije(snimka),
+    naPotvrdu: opcije?.naPotvrdu,
+    naOcistiNaredbu: opcije?.naOcistiNaredbu,
+  });
 }
 
 export function dohvatiStanjeIgre(): StanjeIgre {

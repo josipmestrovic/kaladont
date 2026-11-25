@@ -1,3 +1,5 @@
+import type { SpremnostPartije } from './spremnost-partije.js';
+
 export type StanjeVeze = 'nepoznato' | 'spremno' | 'prekid' | 'ponovno_spajanje' | 'sesija_istekla' | 'druga_kartica' | 'rucno_iskljuceno';
 
 export interface StanjeSocketVeze {
@@ -9,6 +11,8 @@ export interface StanjeSocketVeze {
   partijaNedostupna: boolean;
   /** Banner „Sesija je istekla” nakon oporavka u gosta — odvojeno od stanja veze (spremno). */
   obavijestIstekaSesije: boolean;
+  /** #142 D: spremnost partije, odvojeno od socket connect. */
+  spremnostPartije: SpremnostPartije;
 }
 
 export const stanjeVeze = $state<StanjeSocketVeze>({
@@ -19,6 +23,7 @@ export const stanjeVeze = $state<StanjeSocketVeze>({
   zadnjaPromjenaMs: Date.now(),
   partijaNedostupna: false,
   obavijestIstekaSesije: false,
+  spremnostPartije: 'spremna',
 });
 
 export function postaviStanjeVeze(stanje: StanjeVeze, kod: string | null = null, poruka: string | null = null): void {
@@ -34,4 +39,13 @@ export function dohvatiStanjeVeze(): StanjeSocketVeze {
 
 export function oznaciPartijuDostupnom(): void {
   stanjeVeze.partijaNedostupna = false;
+  if (stanjeVeze.spremnostPartije !== 'sinkronizacija') {
+    stanjeVeze.spremnostPartije = 'spremna';
+  }
+}
+
+export function postaviSpremnostPartije(spremnost: SpremnostPartije): void {
+  stanjeVeze.spremnostPartije = spremnost;
+  if (spremnost === 'nedostupna') stanjeVeze.partijaNedostupna = true;
+  if (spremnost === 'spremna') stanjeVeze.partijaNedostupna = false;
 }

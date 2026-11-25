@@ -5,7 +5,7 @@
   import { api } from '$lib/api.js';
   import { dohvatiSocket, dohvatiStanjeVeze } from '$lib/socket.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
-  import { dohvatiStanjeIgre, napustiLokalnuPartiju } from '$lib/stanje-igre.svelte.js';
+  import { dohvatiStanjeIgre, napustiLokalnuPartiju, zatraziSinkronizacijuPartije } from '$lib/stanje-igre.svelte.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import Konfeti from '$lib/komponente/Konfeti.svelte';
@@ -58,6 +58,15 @@
     naPromjenu: () => {
       slanjeUTijeku = kontrolerSlanja.slanjeUTijeku();
       porukaCekanjaPotvrde = kontrolerSlanja.porukaStatusa();
+      const akt = kontrolerSlanja.dohvatiAktivni();
+      if (akt?.status === 'nepoznat_ishod') {
+        kontrolerSlanja.oznaciSinkronizaciju(akt.requestId);
+        zatraziSinkronizacijuPartije({
+          requestId: akt.requestId,
+          naPotvrdu: (potvrda) => obradiPotvrduNaredbe(potvrda),
+          naOcistiNaredbu: () => kontrolerSlanja.ocisti({ partijaId: akt.partijaId }),
+        });
+      }
     },
   });
 
