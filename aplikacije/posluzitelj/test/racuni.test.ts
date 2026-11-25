@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { io as ioClient } from 'socket.io-client';
 import { eq } from 'drizzle-orm';
+import { ZADANI_AVATAR_CONFIG } from 'zajednicko';
 import { izdajTokenPotvrdeEmaila, izdajTokenResetaLozinke } from '../src/racuni/tokeni.js';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
@@ -50,11 +51,34 @@ describe('POST /racuni/registracija', () => {
     expect(redak?.lozinkaHash).not.toBe(LOZINKA); // hashirano, ne plaintext
     expect(redak?.emailPotvrdjen).toBe(false);
     expect(redak?.registriranAt?.toISOString()).toBe(redak?.stvoren.toISOString());
+    expect(redak?.avatarConfig).toEqual(ZADANI_AVATAR_CONFIG);
 
     const korisnickeSesije = await baza.select().from(sesije).where(eq(sesije.igracId, tijelo.igracId));
     expect(korisnickeSesije).toHaveLength(1);
     expect(korisnickeSesije[0]?.tokenHash).not.toBe(tijelo.sesijskiToken);
     expect(korisnickeSesije[0]?.tokenHash).toHaveLength(64);
+  });
+
+  it('ignorira klijentski avatarConfig i uvijek dodjeljuje zadani', async () => {
+    const odgovor = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: EMAIL,
+        lozinka: LOZINKA,
+        potvrdaDob16: true,
+        prihvacamUvjete: true,
+        nadimak: 'CustomAvatar',
+        avatarConfig: {
+          ...ZADANI_AVATAR_CONFIG,
+          parts: { ...ZADANI_AVATAR_CONFIG.parts, hair: 'fonze' },
+          colors: { ...ZADANI_AVATAR_CONFIG.colors, hair: '#E77979' },
+        },
+      }),
+    });
+    expect(odgovor.status).toBe(200);
+    const [redak] = await baza.select().from(igraci).where(eq(igraci.email, EMAIL));
+    expect(redak?.avatarConfig).toEqual(ZADANI_AVATAR_CONFIG);
   });
 
   it('nadograđuje gosta jednom, čuvajući ID, nastanak i postojeću statistiku', async () => {
@@ -78,6 +102,7 @@ describe('POST /racuni/registracija', () => {
     expect(nakon?.registriranAt?.getTime()).toBeGreaterThanOrEqual(prije?.stvoren.getTime() ?? 0);
     expect(nakon?.odigrane).toBe(7);
     expect(nakon?.pobjede).toBe(3);
+    expect(nakon?.avatarConfig).toEqual(ZADANI_AVATAR_CONFIG);
 
     const ponovljeniEmail = `ponovljena-${EMAIL}`;
     try {

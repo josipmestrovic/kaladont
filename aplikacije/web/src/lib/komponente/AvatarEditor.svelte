@@ -1,17 +1,23 @@
 <script lang="ts">
+  import { beforeNavigate, goto } from '$app/navigation';
+  import { onDestroy, onMount } from 'svelte';
   import {
     AVATAR_DIJELOVI,
     PRESETI_BOJA_AVATARA,
     ZADANI_AVATAR_CONFIG,
+    nasumicnaKonfiguracijaAvatara,
     type AvatarConfigV1,
     type AvatarDijelovi,
+    type AvatarBojnaUloga,
   } from 'zajednicko';
+  import { Dices, Redo2, Undo2 } from 'lucide-svelte';
   import AvatarKonfiguracijaPreview from './AvatarKonfiguracijaPreview.svelte';
   import AvatarDioPreview from './AvatarDioPreview.svelte';
   import { ulogaBojeKategorije } from '$lib/avatar-render.js';
 
   interface Props {
     pocetnaKonfiguracija?: AvatarConfigV1;
+    rang?: string | null;
     naslov?: string;
     tekstSpremanja?: string;
     spremanje?: boolean;
@@ -21,12 +27,55 @@
 
   let {
     pocetnaKonfiguracija = ZADANI_AVATAR_CONFIG,
+    rang = null,
     naslov = 'Uredi avatar',
-    tekstSpremanja = 'Spremi',
+    tekstSpremanja = 'Spremi avatar',
     spremanje = false,
     spremiBezPromjene = false,
     onSpremi,
   }: Props = $props();
+
+  type GlavnaId = 'lice' | 'kosa' | 'odjeca' | 'dodaci';
+  type Potkljuc = 'skin' | keyof AvatarDijelovi;
+
+  const MAKS_POVIJEST = 20;
+
+  const GLAUNE: { id: GlavnaId; naziv: string }[] = [
+    { id: 'lice', naziv: 'Lice' },
+    { id: 'kosa', naziv: 'Kosa' },
+    { id: 'odjeca', naziv: 'Odjeća' },
+    { id: 'dodaci', naziv: 'Dodaci' },
+  ];
+
+  const POTKATEGORIJE: Record<GlavnaId, { kljuc: Potkljuc; naziv: string; obavezno: boolean }[]> = {
+    lice: [
+      { kljuc: 'skin', naziv: 'Koža', obavezno: true },
+      { kljuc: 'eyes', naziv: 'Oči', obavezno: true },
+      { kljuc: 'eyebrows', naziv: 'Obrve', obavezno: false },
+      { kljuc: 'nose', naziv: 'Nos', obavezno: false },
+      { kljuc: 'mouth', naziv: 'Usta', obavezno: true },
+      { kljuc: 'ears', naziv: 'Uši', obavezno: true },
+    ],
+    kosa: [
+      { kljuc: 'hair', naziv: 'Frizura', obavezno: false },
+      { kljuc: 'facialHair', naziv: 'Brada i brkovi', obavezno: false },
+    ],
+    odjeca: [{ kljuc: 'shirt', naziv: 'Odjeća', obavezno: false }],
+    dodaci: [
+      { kljuc: 'glasses', naziv: 'Naočale', obavezno: false },
+      { kljuc: 'earrings', naziv: 'Naušnice', obavezno: false },
+    ],
+  };
+
+  const NAZIVI_BEZ: Partial<Record<Potkljuc, string>> = {
+    hair: 'Bez frizure',
+    eyebrows: 'Bez obrva',
+    nose: 'Bez nosa',
+    shirt: 'Bez odjeće',
+    glasses: 'Bez naočala',
+    earrings: 'Bez naušnica',
+    facialHair: 'Bez brade i brkova',
+  };
 
   function kopirajKonfiguraciju(konfiguracija: AvatarConfigV1): AvatarConfigV1 {
     return {
@@ -36,271 +85,955 @@
     };
   }
 
+  function konfiguracijeJednake(a: AvatarConfigV1, b: AvatarConfigV1): boolean {
+    for (const kljuc of Object.keys(a.parts) as (keyof AvatarDijelovi)[]) {
+      if (a.parts[kljuc] !== b.parts[kljuc]) return false;
+    }
+    const uloge = new Set([
+      ...Object.keys(a.colors),
+      ...Object.keys(b.colors),
+    ] as AvatarBojnaUloga[]);
+    for (const uloga of uloge) {
+      if ((a.colors[uloga] ?? undefined) !== (b.colors[uloga] ?? undefined)) return false;
+    }
+    return a.schemaVersion === b.schemaVersion && a.assetVersion === b.assetVersion;
+  }
+
   let draft = $state<AvatarConfigV1>(kopirajKonfiguraciju(ZADANI_AVATAR_CONFIG));
   let spremljeno = $state<AvatarConfigV1>(kopirajKonfiguraciju(ZADANI_AVATAR_CONFIG));
-  let inicijalizirano = false;
-  let aktivniKljuc = $state<keyof AvatarDijelovi>('hair');
+  let inicijalizirano = $state(false);
+  let ucitavanjeUspjelo = $state(false);
+  let proslost = $state<AvatarConfigV1[]>([]);
+  let buducnost = $state<AvatarConfigV1[]>([]);
+  let aktivnaGlavna = $state<GlavnaId>('kosa');
+  let zadnjePotkategorije = $state<Record<GlavnaId, Potkljuc>>({
+    lice: 'skin',
+    kosa: 'hair',
+    odjeca: 'shirt',
+    dodaci: 'glasses',
+  });
+  let aktivniPotkljuc = $state<Potkljuc>('hair');
+  let previewVelicina = $state(140);
+  let customBojaUTijeku: AvatarBojnaUloga | null = null;
+  let skracivanjeSpremanja = false;
+
   $effect(() => {
     if (inicijalizirano) return;
     draft = kopirajKonfiguraciju(pocetnaKonfiguracija);
     spremljeno = kopirajKonfiguraciju(pocetnaKonfiguracija);
     inicijalizirano = true;
+    ucitavanjeUspjelo = true;
   });
-  const izmijenjeno = $derived(JSON.stringify(draft) !== JSON.stringify(spremljeno));
 
-  // Koza nema mrezicu izbora - postoji samo jedna baza, a boja se bira medu ulogama boja.
-  const kategorije: { kljuc: keyof AvatarDijelovi; naziv: string; obavezno: boolean }[] = [
-    { kljuc: 'hair', naziv: 'Kosa', obavezno: false },
-    { kljuc: 'eyes', naziv: 'Oči', obavezno: true },
-    { kljuc: 'eyebrows', naziv: 'Obrve', obavezno: false },
-    { kljuc: 'nose', naziv: 'Nos', obavezno: false },
-    { kljuc: 'mouth', naziv: 'Usta', obavezno: true },
-    { kljuc: 'ears', naziv: 'Uši', obavezno: true },
-    { kljuc: 'shirt', naziv: 'Odjeća', obavezno: false },
-    { kljuc: 'glasses', naziv: 'Naočale', obavezno: false },
-    { kljuc: 'earrings', naziv: 'Naušnice', obavezno: false },
-    { kljuc: 'facialHair', naziv: 'Brada', obavezno: false },
-  ];
+  const izmijenjeno = $derived(ucitavanjeUspjelo && !konfiguracijeJednake(draft, spremljeno));
+  const mozePoništiti = $derived(proslost.length > 0);
+  const mozePonoviti = $derived(buducnost.length > 0);
+  const mozeVratitiSpremljeno = $derived(!konfiguracijeJednake(draft, spremljeno));
 
-  const bojneUloge: { uloga: keyof AvatarConfigV1['colors']; naziv: string }[] = [
-    { uloga: 'skin', naziv: 'Koža' },
-    { uloga: 'hair', naziv: 'Kosa' },
-    { uloga: 'shirt', naziv: 'Odjeća' },
-    { uloga: 'eyes', naziv: 'Oči' },
-    { uloga: 'eyebrows', naziv: 'Obrve' },
-    { uloga: 'glasses', naziv: 'Naočale' },
-    { uloga: 'earrings', naziv: 'Naušnice' },
-    { uloga: 'facialHair', naziv: 'Brada' },
-  ];
-
-  const naziviDijelova: Record<string, Record<string, string>> = {
-    mouth: { surprised: 'Iznenađena', laughing: 'Nasmijana', smile: 'Osmijeh', smirk: 'Cerek', sad: 'Tužna', frown: 'Namrštena', pucker: 'Kissy', nervous: 'Nervozna', 'k2-grin': 'Široki zubati osmijeh', 'k2-tooth-gap': 'Osmijeh s razmakom', 'k2-tongue-out': 'Isplažen jezik', 'k2-braces': 'Osmijeh s aparatićem', 'k2-gentle': 'Mali osmijeh', 'k2-whistle': 'Zviždanje', 'k2-determined': 'Odlučan izraz', 'k2-small-oh': 'Malo iznenađenje', 'k3-toothless-laugh': 'Bezub smijeh', 'k3-toothless-wide': 'Široki bezubi osmijeh', 'k3-gummy': 'Desni bez zuba', 'k3-lipstick-smile': 'Osmijeh s ružem', 'k3-lipstick-pout': 'Napučene usne s ružem', 'k3-crooked-grin': 'Šašavi osmijeh' },
-    hair: { fonze: 'Fonze', 'mr-t': 'Mr. T', 'doug-funny': 'Doug smiješni', 'mr-clean': 'Rupa u glavi', 'danny-phantom': 'Danny Phantom', full: 'Puna kosa', turban: 'Turban', pixie: 'Pixie', 'k2-crop': 'Kratko ošišana', 'k2-side-part': 'Razdjeljak sa strane', 'k2-waves': 'Valovita kratka kosa', 'k2-curls': 'Kratke kovrče', 'k2-high-puff': 'Visoki oblak kovrča', 'k2-double-bun': 'Dvije punđice', 'k2-spiky': 'Razbarušena kosa', 'k2-bob': 'Ravni bob', 'k2-short-fringe': 'Kratke šiške', 'k2-topknot': 'Punđa na vrhu', 'k3-long-straight': 'Duga ravna kosa', 'k3-long-waves': 'Dugi valovi', 'k3-pigtails': 'Dva duga repića', 'k3-twin-braids': 'Dvije pletenice', 'k3-side-braid': 'Pletenica sa strane', 'k3-high-ponytail': 'Visoki rep', 'k3-low-ponytail': 'Niski rep', 'k3-curtain-bangs': 'Duga kosa sa zavjesa šiškama', 'k3-curly-lob': 'Kovrčavi dugi bob', 'k3-space-buns-loose': 'Punđice i pramenovi', 'k3-bow-bob': 'Bob s mašnom', 'k3-sleek-bun': 'Glatka kosa s niskom punđom' },
-    eyes: { eyes: 'Obične', smiling: 'Vesele', eyeshadow: 'Na LSD-u', round: 'Okrugle', 'k2-wink': 'Namigivanje', 'k2-closed': 'Zatvorene oči', 'k2-sleepy': 'Pospane oči', 'k2-wide': 'Razrogačene oči', 'k2-look-left': 'Pogled ulijevo', 'k2-look-right': 'Pogled udesno', 'k3-long-lashes': 'Duge trepavice', 'k3-winged-liner': 'Naglašene oči', 'k3-wink-lashes': 'Namig s trepavicama', 'k3-dreamy-lashes': 'Sanjive oči', 'k3-starry': 'Zvjezdice u očima' },
-    eyebrows: { up: 'Podignute', down: 'Spuštene', 'eyelashes-up': 'Trepavice gore', 'eyelashes-down': 'Trepavice dolje', 'k2-straight': 'Ravne obrve', 'k2-bold': 'Guste obrve', 'k2-one-up': 'Jedna podignuta', 'k2-concerned': 'Zabrinute obrve', 'k2-soft-arch': 'Blagi luk', 'k2-split': 'Obrve s prorezom', 'k3-slender-arch': 'Tanke lučne obrve', 'k3-swoop': 'Izdužene obrve', 'k3-zigzag': 'Cik-cak obrve' },
-    nose: { curve: 'Zaobljeni', pointed: 'Šiljasti', round: 'Okrugli', 'k2-button': 'Gumbić', 'k2-bridge': 'Izduženi nos', 'k2-wide': 'Širi nos', 'k2-angular-soft': 'Blago uglati nos', 'k3-giant-button': 'Veliki okrugli nos', 'k3-trumpet': 'Nos truba', 'k3-curly': 'Zavrnuti nos', 'k3-zigzag': 'Cik-cak nos', 'k3-piggy': 'Praščić nos' },
-    shirt: { open: 'Otvorena', crew: 'Obična', collared: 'S kragnom', 'k2-v-neck': 'V-izrez', 'k2-hoodie': 'Duks s kapuljačom', 'k2-turtleneck': 'Dolčevita', 'k2-jersey': 'Sportski dres', 'k2-bomber': 'Jakna', 'k2-striped': 'Prugasta majica', 'k3-peter-pan': 'Bluza s okruglim ovratnikom', 'k3-ruffle': 'Bluza s volanima', 'k3-sweetheart': 'Srcoliki izrez', 'k3-bow-blouse': 'Bluza s mašnom' },
-    glasses: { round: 'Okrugle', square: 'Četvrtaste', 'k2-hexagon': 'Šesterokutne naočale', 'k2-oval': 'Ovalne naočale', 'k2-cat-eye': 'Mačkaste naočale', 'k2-aviator': 'Pilot naočale', 'k2-browline': 'Naglašen gornji okvir', 'k2-sport': 'Sportske naočale', 'k2-rimless': 'Naočale s tankim okvirom', 'k2-heart': 'Srcolike naočale', 'k3-sun-cat': 'Sunčane mačkaste', 'k3-sun-round': 'Velike okrugle sunčane', 'k3-sun-butterfly': 'Sunčane leptir', 'k3-sun-visor': 'Sunčani vizir', 'k3-sun-heart': 'Srcolike sunčane', 'k3-sun-pixel': 'Piksel sunčane' },
-    earrings: { hoop: 'Karike', stud: 'Čepići', 'k2-drop': 'Kapljica', 'k2-diamond': 'Romb', 'k2-double-hoop': 'Dvostruka karika', 'k2-bar': 'Viseći štapić', 'k3-heart-drop': 'Srce naušnica', 'k3-moon-drop': 'Mjesec naušnica', 'k3-flower': 'Cvijet naušnica', 'k3-triple-drop': 'Tri viseća kruga', 'k3-star-drop': 'Zvijezda naušnica' },
-    facialHair: { beard: 'Prava brada', scruff: 'Trodnevna brada', 'k2-moustache': 'Brkovi', 'k2-goatee': 'Kozja bradica', 'k2-chin-patch': 'Mala bradica', 'k2-sideburns': 'Zalisci', 'k3-curly-handlebar': 'Zavrnuti brkovi', 'k3-three-whiskers': 'Tri smiješne dlačice' },
-    ears: { attached: 'Priljubljene', detached: 'Odvojene', 'k2-compact': 'Male uši', 'k2-rounded': 'Okrugle uši', 'k2-pointed': 'Šiljaste uši', 'k2-angular': 'Uglate uši', 'k3-elephant': 'Ogromne klempave uši', 'k3-fan': 'Uši lepeze', 'k3-long-pointed': 'Duge vilenjačke uši', 'k3-floppy': 'Viseće komične uši' },
-  };
-
-  const presetiBoja: Record<string, readonly string[]> = PRESETI_BOJA_AVATARA;
-
-  // Naušnice nemaju smisla uz odvojene uši jer se tada taj sloj uopće ne crta.
-  const vidljiveKategorije = $derived(
-    kategorije.filter((kategorija) => !(kategorija.kljuc === 'earrings' && draft.parts.ears === 'detached')),
+  const aktivnePotkategorije = $derived(POTKATEGORIJE[aktivnaGlavna]);
+  const aktivnaPot = $derived(
+    aktivnePotkategorije.find((p) => p.kljuc === aktivniPotkljuc) ?? aktivnePotkategorije[0]!,
   );
-  const aktivnaKategorija = $derived(
-    vidljiveKategorije.find((kategorija) => kategorija.kljuc === aktivniKljuc) ?? vidljiveKategorije[0],
-  );
-  const aktivneVrijednosti = $derived([
-    ...(aktivnaKategorija.obavezno ? [] : [null]),
-    ...(AVATAR_DIJELOVI[aktivnaKategorija.kljuc] as readonly string[]),
-  ]);
-  const aktivnaVrijednost = $derived(draft.parts[aktivnaKategorija.kljuc]);
 
-  function nazivDijela(kategorija: string, vrijednost: string | null): string {
-    return vrijednost ? naziviDijelova[kategorija]?.[vrijednost] ?? vrijednost : 'Bez dodatka';
+  const nausniceOnemogucene = $derived(
+    aktivnaPot.kljuc === 'earrings' && draft.parts.ears === 'detached',
+  );
+
+  const ulogaBoje = $derived.by((): AvatarBojnaUloga | null => {
+    const kljuc = aktivnaPot.kljuc;
+    if (kljuc === 'skin') return 'skin';
+    if (kljuc === 'ears' || kljuc === 'nose' || kljuc === 'mouth' || kljuc === 'base' || kljuc === 'background') {
+      return null;
+    }
+    const uloga = ulogaBojeKategorije(kljuc) as AvatarBojnaUloga | null;
+    if (!uloga) return null;
+    if (draft.parts[kljuc] === null) return null;
+    return uloga;
+  });
+
+  const presetiAktivne = $derived(ulogaBoje ? PRESETI_BOJA_AVATARA[ulogaBoje] : []);
+  const trenutnaBoja = $derived(ulogaBoje ? draft.colors[ulogaBoje] ?? null : null);
+  const customBojaAktivna = $derived(
+    Boolean(trenutnaBoja && ulogaBoje && !PRESETI_BOJA_AVATARA[ulogaBoje].includes(trenutnaBoja)),
+  );
+
+  const aktivneVrijednosti = $derived.by(() => {
+    if (aktivnaPot.kljuc === 'skin') return [] as (string | null)[];
+    const kljuc = aktivnaPot.kljuc as keyof AvatarDijelovi;
+    return [
+      ...(aktivnaPot.obavezno ? [] : [null]),
+      ...(AVATAR_DIJELOVI[kljuc] as readonly string[]),
+    ];
+  });
+
+  const brojStilova = $derived(
+    aktivnaPot.kljuc === 'skin'
+      ? 0
+      : (AVATAR_DIJELOVI[aktivnaPot.kljuc as keyof AvatarDijelovi] as readonly string[]).length,
+  );
+
+  function zapisiPrijeIzmjene() {
+    proslost = [...proslost, kopirajKonfiguraciju(draft)].slice(-MAKS_POVIJEST);
+    buducnost = [];
   }
 
-  /** Boja kojom se slicica dijela boji; usta i nos nemaju vlastitu ulogu boje. */
-  function bojaZaIzbor(): string | null {
-    const uloga = ulogaBojeKategorije(aktivnaKategorija.kljuc) as keyof AvatarConfigV1['colors'] | null;
-    return uloga ? draft.colors[uloga] ?? null : null;
+  function postaviDraft(nova: AvatarConfigV1, zapisiPovijest = true) {
+    if (konfiguracijeJednake(nova, draft)) return;
+    if (zapisiPovijest) zapisiPrijeIzmjene();
+    draft = kopirajKonfiguraciju(nova);
   }
 
-  function promijeniDio<K extends keyof AvatarDijelovi>(kljuc: K, vrijednost: AvatarDijelovi[K]) {
+  function odaberiGlavnu(id: GlavnaId) {
+    aktivnaGlavna = id;
+    aktivniPotkljuc = zadnjePotkategorije[id];
+  }
+
+  function odaberiPot(kljuc: Potkljuc) {
+    aktivniPotkljuc = kljuc;
+    zadnjePotkategorije = { ...zadnjePotkategorije, [aktivnaGlavna]: kljuc };
+  }
+
+  function promijeniDio(kljuc: keyof AvatarDijelovi, vrijednost: AvatarDijelovi[keyof AvatarDijelovi]) {
+    if (draft.parts[kljuc] === vrijednost) return;
+    if (kljuc === 'earrings' && draft.parts.ears === 'detached') return;
     const parts = { ...draft.parts, [kljuc]: vrijednost };
     if (kljuc === 'ears' && vrijednost === 'detached') {
       parts.earrings = null;
     }
-    draft = { ...draft, parts };
+    postaviDraft({ ...draft, parts });
   }
 
-  function promijeniBoju(uloga: keyof AvatarConfigV1['colors'], vrijednost: string) {
-    draft = { ...draft, colors: { ...draft.colors, [uloga]: vrijednost } };
+  function promijeniBoju(uloga: AvatarBojnaUloga, vrijednost: string, grupirajCustom = false) {
+    if ((draft.colors[uloga] ?? null) === vrijednost) return;
+    if (grupirajCustom) {
+      if (customBojaUTijeku !== uloga) {
+        customBojaUTijeku = uloga;
+        zapisiPrijeIzmjene();
+      }
+      draft = { ...draft, colors: { ...draft.colors, [uloga]: vrijednost } };
+      return;
+    }
+    postaviDraft({ ...draft, colors: { ...draft.colors, [uloga]: vrijednost } });
   }
 
-  function ulogaBojeZaDio(kljuc: keyof AvatarDijelovi): keyof AvatarConfigV1['colors'] | null {
-    if (kljuc === 'base') return 'skin';
-    if (kljuc === 'hair' || kljuc === 'shirt' || kljuc === 'eyes' || kljuc === 'eyebrows' || kljuc === 'glasses' || kljuc === 'earrings' || kljuc === 'facialHair') return kljuc;
-    return null;
+  function zavrsiCustomBoju() {
+    customBojaUTijeku = null;
   }
 
-  function idiNaKategoriju(kljuc: keyof AvatarDijelovi) {
-    aktivniKljuc = kljuc;
+  function naslovPalete(potNaziv: string): string {
+    if (potNaziv === 'Koža') return 'Boja kože';
+    if (potNaziv === 'Frizura') return 'Boja kose';
+    if (potNaziv === 'Brada i brkovi') return 'Boja brade';
+    if (potNaziv === 'Odjeća') return 'Boja odjeće';
+    return `Boja (${potNaziv.toLowerCase()})`;
   }
 
   function nasumicno() {
-    const parts = { ...draft.parts };
-    for (const kategorija of kategorije) {
-      const izbori = AVATAR_DIJELOVI[kategorija.kljuc] as readonly string[];
-      if (!kategorija.obavezno && Math.random() < 0.45) {
-        parts[kategorija.kljuc] = null as never;
-      } else {
-        parts[kategorija.kljuc] = izbori[Math.floor(Math.random() * izbori.length)] as never;
-      }
-    }
-    if (parts.ears === 'detached') parts.earrings = null;
-    const boje = { ...draft.colors };
-    boje.skin = presetiBoja.skin[Math.floor(Math.random() * presetiBoja.skin.length)]!;
-    for (const kategorija of kategorije) {
-      const uloga = ulogaBojeZaDio(kategorija.kljuc);
-      if (!uloga || parts[kategorija.kljuc] === null) continue;
-      const izboriBoja = presetiBoja[uloga];
-      if (izboriBoja?.length) boje[uloga] = izboriBoja[Math.floor(Math.random() * izboriBoja.length)]!;
-    }
-    draft = { ...draft, parts, colors: boje };
+    postaviDraft(nasumicnaKonfiguracijaAvatara());
+  }
+
+  function ponisti() {
+    const prethodna = proslost[proslost.length - 1];
+    if (!prethodna) return;
+    proslost = proslost.slice(0, -1);
+    buducnost = [...buducnost, kopirajKonfiguraciju(draft)];
+    draft = kopirajKonfiguraciju(prethodna);
+  }
+
+  function ponovi() {
+    const sljedeca = buducnost[buducnost.length - 1];
+    if (!sljedeca) return;
+    buducnost = buducnost.slice(0, -1);
+    proslost = [...proslost, kopirajKonfiguraciju(draft)].slice(-MAKS_POVIJEST);
+    draft = kopirajKonfiguraciju(sljedeca);
+  }
+
+  function vratiSpremljeni() {
+    if (konfiguracijeJednake(draft, spremljeno)) return;
+    postaviDraft(spremljeno);
+  }
+
+  function potvrdiIzlaz(): boolean {
+    if (!izmijenjeno || skracivanjeSpremanja) return true;
+    return confirm('Imaš nespremljene promjene avatara. Želiš li ipak otići?');
   }
 
   function odustani() {
-    draft = kopirajKonfiguraciju(spremljeno);
+    if (!potvrdiIzlaz()) return;
+    skracivanjeSpremanja = true;
+    void goto('/profil');
   }
 
   async function spremi() {
-    if ((!izmijenjeno && !spremiBezPromjene) || spremanje) return;
-    await onSpremi(kopirajKonfiguraciju(draft));
-    spremljeno = kopirajKonfiguraciju(draft);
+    if ((!izmijenjeno && !spremiBezPromjene) || spremanje || !ucitavanjeUspjelo) return;
+    const snapshot = kopirajKonfiguraciju(draft);
+    skracivanjeSpremanja = true;
+    try {
+      await onSpremi(snapshot);
+      spremljeno = kopirajKonfiguraciju(snapshot);
+      draft = kopirajKonfiguraciju(snapshot);
+      proslost = [];
+      buducnost = [];
+    } catch {
+      skracivanjeSpremanja = false;
+    }
   }
+
+  function ariaLabelDijela(vrijednost: string | null, indeks: number, ukupno: number): string {
+    if (vrijednost === null) return NAZIVI_BEZ[aktivnaPot.kljuc] ?? 'Bez dodatka';
+    return `${aktivnaPot.naziv} ${indeks} od ${ukupno}`;
+  }
+
+  function bojaZaSlicicu(): string | null {
+    const uloga = ulogaBojeKategorije(String(aktivnaPot.kljuc)) as AvatarBojnaUloga | null;
+    return uloga ? draft.colors[uloga] ?? null : null;
+  }
+
+  function osvjeziPreviewVelicinu() {
+    if (typeof window === 'undefined') return;
+    previewVelicina = window.matchMedia('(min-width: 960px)').matches
+      ? 260
+      : window.matchMedia('(max-width: 480px)').matches
+        ? 120
+        : 140;
+  }
+
+  function prijeUnload(e: BeforeUnloadEvent) {
+    if (!izmijenjeno || skracivanjeSpremanja) return;
+    e.preventDefault();
+    e.returnValue = '';
+  }
+
+  beforeNavigate(({ cancel }) => {
+    if (skracivanjeSpremanja || !izmijenjeno) return;
+    if (!confirm('Imaš nespremljene promjene avatara. Želiš li ipak otići?')) {
+      cancel();
+    }
+  });
+
+  onMount(() => {
+    osvjeziPreviewVelicinu();
+    window.addEventListener('resize', osvjeziPreviewVelicinu);
+    window.addEventListener('beforeunload', prijeUnload);
+  });
+
+  onDestroy(() => {
+    if (typeof window === 'undefined') return;
+    window.removeEventListener('resize', osvjeziPreviewVelicinu);
+    window.removeEventListener('beforeunload', prijeUnload);
+  });
 </script>
 
-<section class="editor" aria-labelledby="avatar-editor-naslov">
+<section class="editor" aria-labelledby="avatar-editor-naslov" aria-busy={spremanje}>
   <div class="editor-zaglavlje">
     <h1 id="avatar-editor-naslov">{naslov}</h1>
   </div>
 
   <div class="radni-prostor">
-    <aside class="panel">
-      <div class="panel-vrh">
-        <div class="preview"><AvatarKonfiguracijaPreview konfiguracija={draft} velicina={280} rang="Lektor" /></div>
-
-        <div class="akcije">
-          <button type="button" class="odustani" onclick={odustani} disabled={!izmijenjeno || spremanje}>Odustani</button>
-          <button type="button" class="spremi" onclick={spremi} disabled={(!izmijenjeno && !spremiBezPromjene) || spremanje}>{spremanje ? 'Spremanje…' : tekstSpremanja}</button>
+    <aside class="lijevo">
+      <div class="preview-traka">
+        <div class="preview" style:--preview-vel="{previewVelicina}px">
+          <AvatarKonfiguracijaPreview konfiguracija={draft} velicina={previewVelicina} {rang} />
         </div>
       </div>
 
-      <div class="boje" role="group" aria-label="Boje avatara">
-        {#each bojneUloge as stavka (stavka.uloga)}
-          <label class="boja">
-            <input
-              type="color"
-              value={draft.colors[stavka.uloga] ?? '#000000'}
-              aria-label={`Boja: ${stavka.naziv}`}
-              oninput={(dogadaj) => promijeniBoju(stavka.uloga, dogadaj.currentTarget.value)}
-            />
-            <span>{stavka.naziv}</span>
-          </label>
-        {/each}
-      </div>
+      <div class="panel-akcije">
+        <div class="povijest-red">
+          <button type="button" class="ikona-akcija" onclick={ponisti} disabled={!mozePoništiti || spremanje} aria-label="Poništi">
+            <Undo2 size={22} strokeWidth={2.25} aria-hidden="true" />
+            <span class="akcija-tekst">Poništi</span>
+          </button>
+          <button type="button" class="nasumicno" onclick={nasumicno} disabled={spremanje}>
+            <Dices size={22} strokeWidth={2.25} aria-hidden="true" />
+            <span>Nasumično</span>
+          </button>
+          <button type="button" class="ikona-akcija" onclick={ponovi} disabled={!mozePonoviti || spremanje} aria-label="Ponovi">
+            <Redo2 size={22} strokeWidth={2.25} aria-hidden="true" />
+            <span class="akcija-tekst">Ponovi</span>
+          </button>
+        </div>
 
-      <button type="button" class="nasumicno" onclick={nasumicno} disabled={spremanje}>
-        <img src="/ikone/29-random-avatar.png" alt="" aria-hidden="true" />
-        <span>Nasumični avatar</span>
-      </button>
+        <button
+          type="button"
+          class="vrati-spremljeni"
+          onclick={vratiSpremljeni}
+          disabled={!mozeVratitiSpremljeno || spremanje}
+        >
+          Vrati spremljeni avatar
+        </button>
+      </div>
     </aside>
 
     <section class="izbori" aria-labelledby="naslov-kategorije">
-      <h2 id="naslov-kategorije">{aktivnaKategorija.naziv}</h2>
-
-      <nav class="kategorije" aria-label="Kategorije dijelova">
-        {#each vidljiveKategorije as kategorija (kategorija.kljuc)}
+      <nav class="glavne" aria-label="Glavne kategorije">
+        {#each GLAUNE as grupa (grupa.id)}
           <button
             type="button"
-            aria-pressed={kategorija.kljuc === aktivnaKategorija.kljuc}
-            onclick={() => idiNaKategoriju(kategorija.kljuc)}
+            class="glavna"
+            aria-pressed={aktivnaGlavna === grupa.id}
+            onclick={() => odaberiGlavnu(grupa.id)}
+            disabled={spremanje}
           >
-            {kategorija.naziv}
-            <small>{(AVATAR_DIJELOVI[kategorija.kljuc] as readonly string[]).length}</small>
+            <span class="glavna-ikona" aria-hidden="true">
+              {#if grupa.id === 'lice'}
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 20c1.5-3 4-4 6-4s4.5 1 6 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              {:else if grupa.id === 'kosa'}
+                <svg viewBox="0 0 24 24"><path d="M6 14c0-5 2.5-9 6-9s6 4 6 9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 14h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              {:else if grupa.id === 'odjeca'}
+                <svg viewBox="0 0 24 24"><path d="M9 6l3 2 3-2 4 3-2 3v8H7v-8L5 9l4-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+              {:else}
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 12h3M17 12h3M12 4v3M12 17v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              {/if}
+            </span>
+            <span>{grupa.naziv}</span>
           </button>
         {/each}
       </nav>
 
-      <div class="mrezica" role="group" aria-label={`Izbor za: ${aktivnaKategorija.naziv}`}>
-        {#each aktivneVrijednosti as vrijednost (vrijednost ?? 'bez')}
-          <button
-            type="button"
-            class="kartica"
-            class:bez-dodatka={vrijednost === null}
-            aria-pressed={vrijednost === aktivnaVrijednost}
-            title={nazivDijela(aktivnaKategorija.kljuc, vrijednost)}
-            aria-label={nazivDijela(aktivnaKategorija.kljuc, vrijednost)}
-            onclick={() => promijeniDio(aktivnaKategorija.kljuc, vrijednost as never)}
-          >
-            {#if vrijednost === null}
-              <span>Bez dodatka</span>
-            {:else}
-              <AvatarDioPreview kategorija={aktivnaKategorija.kljuc} {vrijednost} boja={bojaZaIzbor()} />
-            {/if}
-          </button>
-        {/each}
+      {#if aktivnePotkategorije.length > 1}
+        <div class="potkategorije" role="group" aria-label="Potkategorije">
+          {#each aktivnePotkategorije as pot (pot.kljuc)}
+            <button
+              type="button"
+              class="pot"
+              aria-pressed={aktivnaPot.kljuc === pot.kljuc}
+              onclick={() => odaberiPot(pot.kljuc)}
+              disabled={spremanje}
+            >
+              {pot.naziv}
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="sekcija-naslov">
+        <h2 id="naslov-kategorije">{aktivnaPot.naziv}</h2>
+        {#if brojStilova > 0}
+          <span class="broj-stilova">{brojStilova} stilova</span>
+        {/if}
       </div>
+
+      {#if nausniceOnemogucene}
+        <p class="upozorenje" role="status">Odaberi kompatibilne uši za dodavanje naušnica.</p>
+      {/if}
+
+      <div class="paleta-prostor" aria-hidden={ulogaBoje === null}>
+        {#if ulogaBoje}
+          <div class="paleta" role="group" aria-label={`Boja: ${aktivnaPot.naziv}`}>
+            <span class="paleta-naslov">{naslovPalete(aktivnaPot.naziv)}</span>
+            <div class="paleta-red">
+              {#each presetiAktivne as boja (boja)}
+                <button
+                  type="button"
+                  class="uzorak"
+                  style:background={boja}
+                  aria-label={`Boja ${boja}`}
+                  aria-pressed={trenutnaBoja?.toLowerCase() === boja.toLowerCase()}
+                  disabled={spremanje}
+                  onclick={() => promijeniBoju(ulogaBoje, boja)}
+                >
+                  {#if trenutnaBoja?.toLowerCase() === boja.toLowerCase()}
+                    <span class="kvacica" aria-hidden="true">✓</span>
+                  {/if}
+                </button>
+              {/each}
+              <label class="uzorak custom" class:odabran={customBojaAktivna}>
+                <input
+                  type="color"
+                  value={trenutnaBoja ?? '#888888'}
+                  aria-label="Prilagođena boja"
+                  disabled={spremanje}
+                  oninput={(e) => promijeniBoju(ulogaBoje, e.currentTarget.value, true)}
+                  onchange={zavrsiCustomBoju}
+                />
+                {#if customBojaAktivna}
+                  <span class="custom-pregled" style:background={trenutnaBoja}></span>
+                {:else}
+                  <span class="plus" aria-hidden="true">+</span>
+                {/if}
+              </label>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      {#if aktivnaPot.kljuc !== 'skin'}
+        <div
+          class="mrezica"
+          role="group"
+          aria-label={`Izbor za: ${aktivnaPot.naziv}`}
+          aria-disabled={nausniceOnemogucene || spremanje}
+        >
+          {#each aktivneVrijednosti as vrijednost, indeks (vrijednost ?? 'bez')}
+            {@const redni = vrijednost === null ? 0 : aktivnaPot.obavezno ? indeks + 1 : indeks}
+            {@const dioKljuc = aktivnaPot.kljuc as keyof AvatarDijelovi}
+            {@const odabrano = vrijednost === draft.parts[dioKljuc]}
+            <button
+              type="button"
+              class="kartica"
+              class:bez-dodatka={vrijednost === null}
+              class:odabrano={odabrano}
+              aria-pressed={odabrano}
+              aria-label={ariaLabelDijela(vrijednost, redni, brojStilova)}
+              disabled={nausniceOnemogucene || spremanje}
+              onclick={() =>
+                promijeniDio(dioKljuc, vrijednost as AvatarDijelovi[keyof AvatarDijelovi])}
+            >
+              {#if vrijednost === null}
+                <span class="bez-ikona" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </span>
+                <span class="bez-tekst">{NAZIVI_BEZ[aktivnaPot.kljuc]}</span>
+              {:else}
+                <AvatarDioPreview
+                  kategorija={String(dioKljuc)}
+                  {vrijednost}
+                  boja={bojaZaSlicicu()}
+                />
+              {/if}
+              {#if odabrano}
+                <span class="kartica-kvacica" aria-hidden="true">✓</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
     </section>
+  </div>
+
+  <div class="akcijska-traka">
+    {#if izmijenjeno}
+      <p class="dirty" role="status"><span class="dirty-tocka" aria-hidden="true"></span> Nespremljene promjene</p>
+    {:else}
+      <p class="dirty prazno" aria-hidden="true"></p>
+    {/if}
+    <div class="akcije">
+      <button type="button" class="odustani" onclick={odustani} disabled={spremanje}>Odustani</button>
+      <button
+        type="button"
+        class="spremi"
+        onclick={spremi}
+        disabled={(!izmijenjeno && !spremiBezPromjene) || spremanje || !ucitavanjeUspjelo}
+      >
+        {spremanje ? 'Spremanje…' : tekstSpremanja}
+      </button>
+    </div>
   </div>
 </section>
 
 <style>
-  .editor { display: grid; gap: 20px; padding: 24px 0 56px; }
-  .editor-zaglavlje { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-  h1 { margin: 0; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); }
-  h2 { margin: 0 0 12px; color: var(--boja-tekst-naslov); font-family: var(--font-naslov); font-size: var(--naslov-3); }
-
-  .radni-prostor { display: grid; gap: 20px; }
-  .panel { display: grid; gap: 16px; align-content: start; }
-  .panel-vrh { display: grid; gap: 12px; justify-items: center; }
-  .preview { display: grid; place-items: center; }
-
-  .boje { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 8px; }
-  .boja { display: grid; justify-items: center; gap: 5px; font-size: var(--tekst-mikro); color: var(--boja-tekst-sekundarni); }
-  .boja input { width: 100%; max-width: 52px; height: 32px; padding: 0; border: 1px solid var(--boja-obrub); border-radius: 6px; background: transparent; cursor: pointer; }
-  .boja input:focus-visible { outline: 3px solid var(--boja-fokus); outline-offset: 2px; }
-
-  .nasumicno { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border: 1px solid var(--boja-obrub); border-radius: var(--radijus-pill); background: var(--boja-povrsina-2); color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
-  .nasumicno img { width: 28px; height: 28px; object-fit: contain; }
-
-  .akcije { display: flex; gap: 10px; width: 100%; }
-  .akcije button { flex: 1; padding: 11px 14px; border: 1px solid var(--boja-obrub); border-radius: var(--radijus-pill); background: var(--boja-povrsina-2); color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
-  .akcije .spremi { border-color: var(--boja-cta-pozadina); background: var(--boja-cta-pozadina); color: var(--boja-cta-tekst); }
-  button:disabled { cursor: wait; opacity: .55; }
-
-  .kategorije { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-  .kategorije button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--boja-obrub); border-radius: var(--radijus-pill); background: var(--boja-povrsina-2); color: var(--boja-tekst-osnovni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; cursor: pointer; }
-  .kategorije button[aria-pressed='true'] { border-color: var(--boja-isticanje-slova); background: var(--boja-povrsina-3); color: var(--boja-isticanje-tekst); }
-  .kategorije small { color: var(--boja-tekst-sekundarni); font-size: var(--tekst-mikro); font-weight: 600; }
-
-  .mrezica { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
-  .kartica { display: grid; place-items: center; padding: 4px; border: 2px solid var(--boja-obrub); border-radius: 12px; background: var(--boja-povrsina); cursor: pointer; }
-  .kartica[aria-pressed='true'] { border-color: var(--boja-isticanje-slova); background: var(--boja-povrsina-3); }
-  .kartica:focus-visible { outline: 3px solid var(--boja-fokus); outline-offset: 2px; }
-  .kartica.bez-dodatka { aspect-ratio: 1; color: var(--boja-tekst-sekundarni); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; text-align: center; }
-
-  @media (min-width: 1000px) {
-    .radni-prostor { grid-template-columns: 320px minmax(0, 1fr); align-items: start; gap: 32px; }
-    .panel { position: sticky; top: 20px; }
+  .editor {
+    display: grid;
+    gap: 24px;
+    padding: 12px 0 calc(96px + env(safe-area-inset-bottom));
   }
 
-  @media (max-width: 999px) {
-    /*
-     * display: contents podize sadrzaj panela u mrezu radnog prostora.
-     * Bez toga bi se .panel-vrh lijepio samo unutar niskog .panel i odlijepio prije mrezice.
-     */
-    .radni-prostor { gap: 16px; }
-    .panel { display: contents; }
+  .editor-zaglavlje {
+    margin-bottom: 4px;
+  }
 
-    /* Samo avatar i akcije prate skrol; boje i nasumicni avatar ostaju gore. */
-    .panel-vrh {
+  h1 {
+    margin: 0;
+    color: var(--boja-tekst-naslov);
+    font-family: var(--font-naslov);
+    font-size: clamp(1.35rem, 2vw, 1.75rem);
+  }
+
+  h2 {
+    margin: 0;
+    color: var(--boja-tekst-naslov);
+    font-family: var(--font-naslov);
+    font-size: var(--naslov-3);
+  }
+
+  .radni-prostor {
+    display: grid;
+    gap: 24px;
+  }
+
+  .lijevo {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+  }
+
+  .preview-traka {
+    display: grid;
+    justify-items: center;
+  }
+
+  .panel-akcije {
+    display: grid;
+    gap: 10px;
+    justify-items: center;
+  }
+
+  .preview {
+    width: var(--preview-vel, 140px);
+    height: var(--preview-vel, 140px);
+    display: grid;
+    place-items: center;
+  }
+
+  .povijest-red {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding-top: 4px;
+  }
+
+  .ikona-akcija {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px;
+    border: none;
+    background: transparent;
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
+    font-size: var(--tekst-mikro);
+    cursor: pointer;
+  }
+
+  .ikona-akcija :global(svg),
+  .nasumicno :global(svg) {
+    flex-shrink: 0;
+  }
+
+  .nasumicno {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 12px 20px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: var(--radijus-pill);
+    background: var(--boja-povrsina-3);
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .vrati-spremljeni {
+    border: none;
+    background: transparent;
+    color: var(--boja-tekst-sekundarni);
+    font: inherit;
+    font-size: var(--tekst-sitni);
+    text-decoration: underline;
+    cursor: pointer;
+    min-height: 40px;
+    margin-top: 2px;
+  }
+
+  .izbori {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+    min-width: 0;
+  }
+
+  .glavne {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .glavna {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    min-height: 72px;
+    padding: 12px 6px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 14px;
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .glavna[aria-pressed='true'] {
+    border-color: var(--boja-isticanje-slova);
+    background: var(--boja-povrsina-3);
+    color: var(--boja-isticanje-tekst);
+  }
+
+  .glavna-ikona {
+    width: 24px;
+    height: 24px;
+    color: inherit;
+  }
+
+  .glavna-ikona svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .potkategorije {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pot {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 8px 14px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: var(--radijus-pill);
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .pot[aria-pressed='true'] {
+    border-color: var(--boja-isticanje-slova);
+    background: var(--boja-povrsina-3);
+    color: var(--boja-isticanje-tekst);
+  }
+
+  .sekcija-naslov {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding-top: 4px;
+  }
+
+  .broj-stilova {
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mikro);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .upozorenje {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+  }
+
+  .paleta-prostor {
+    min-height: 84px;
+  }
+
+  .paleta {
+    display: grid;
+    gap: 12px;
+  }
+
+  .paleta-naslov {
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    color: var(--boja-tekst-osnovni);
+  }
+
+  .paleta-red {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .uzorak {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    padding: 0;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+
+  .uzorak[aria-pressed='true'],
+  .uzorak.odabran {
+    border-color: var(--boja-isticanje-slova);
+  }
+
+  .uzorak .kvacica {
+    color: #fff;
+    font-weight: 800;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  }
+
+  .uzorak.custom {
+    border: 1px dashed var(--boja-obrub);
+    background: var(--boja-povrsina-2);
+    overflow: hidden;
+  }
+
+  .uzorak.custom input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .uzorak .plus {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--boja-tekst-sekundarni);
+  }
+
+  .custom-pregled {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .mrezica {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    padding-top: 4px;
+  }
+
+  .kartica {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    padding: 8px;
+    border: 2px solid var(--boja-obrub);
+    border-radius: 14px;
+    background: var(--boja-povrsina);
+    cursor: pointer;
+  }
+
+  .kartica.odabrano,
+  .kartica[aria-pressed='true'] {
+    border-color: var(--boja-isticanje-slova);
+    border-width: 3px;
+    background: var(--boja-povrsina-3);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--boja-isticanje-slova) 35%, transparent);
+  }
+
+  .kartica:focus-visible,
+  .glavna:focus-visible,
+  .pot:focus-visible,
+  .uzorak:focus-visible,
+  .nasumicno:focus-visible,
+  .ikona-akcija:focus-visible,
+  .odustani:focus-visible,
+  .spremi:focus-visible {
+    outline: 3px solid var(--boja-fokus);
+    outline-offset: 2px;
+  }
+
+  .kartica-kvacica {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    z-index: 2;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--boja-isticanje-slova);
+    color: #111;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 800;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  }
+
+  .kartica.bez-dodatka {
+    gap: 4px;
+    color: var(--boja-tekst-sekundarni);
+    font: inherit;
+    font-size: var(--tekst-mikro);
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .bez-ikona {
+    width: 28px;
+    height: 28px;
+  }
+
+  .bez-ikona svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .bez-tekst {
+    line-height: 1.15;
+  }
+
+  .akcijska-traka {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    display: grid;
+    gap: 8px;
+    padding: 10px 0 calc(8px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--boja-pozadina-podloga) 92%, transparent);
+    backdrop-filter: blur(6px);
+  }
+
+  .dirty {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+    font-weight: 600;
+    min-height: 1.2em;
+  }
+
+  .dirty.prazno {
+    visibility: hidden;
+  }
+
+  .dirty-tocka {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--boja-isticanje-slova, #e7a33a);
+  }
+
+  .akcije {
+    display: flex;
+    gap: 10px;
+  }
+
+  .akcije button {
+    flex: 1;
+    min-height: 48px;
+    padding: 12px 14px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: var(--radijus-pill);
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    font: inherit;
+    font-size: var(--tekst-sitni);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .akcije .spremi {
+    border-color: var(--boja-cta-pozadina);
+    background: var(--boja-cta-pozadina);
+    color: var(--boja-cta-tekst);
+    flex: 1.35;
+  }
+
+  button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .editor[aria-busy='true'] button:disabled {
+    cursor: wait;
+  }
+
+  @media (min-width: 960px) {
+    .editor {
+      gap: 28px;
+      padding: 16px 0 32px;
+    }
+
+    .radni-prostor {
+      grid-template-columns: 300px minmax(0, 1fr);
+      align-items: start;
+      gap: 40px;
+    }
+
+    .lijevo {
+      position: sticky;
+      top: 20px;
+      gap: 22px;
+    }
+
+    .preview {
+      width: 260px;
+      height: 260px;
+    }
+
+    .izbori {
+      gap: 18px;
+    }
+
+    .akcija-tekst {
+      display: inline;
+    }
+
+    .mrezica {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .akcijska-traka {
+      position: sticky;
+      bottom: 0;
+      justify-items: end;
+      margin-top: 8px;
+      padding-top: 16px;
+    }
+
+    .akcije {
+      width: min(420px, 100%);
+      gap: 12px;
+    }
+  }
+
+  @media (max-width: 959px) {
+    /*
+     * display:contents čini preview/akcije/izbore braćom unutar .radni-prostor,
+     * pa sticky avatar traje kroz mrežu i na dnu nastavlja skrolati dolje.
+     */
+    .lijevo {
+      display: contents;
+    }
+
+    .preview-traka {
       position: sticky;
       top: 0;
-      z-index: 2;
-      padding-block: 8px 10px;
+      z-index: 3;
+      width: 100%;
+      padding: 8px 0 10px;
       background: var(--boja-pozadina-podloga);
     }
-    .preview { transform: scale(.62); transform-origin: center top; height: 176px; }
-    .mrezica { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; }
-    .kartica.bez-dodatka { font-size: var(--tekst-mikro); }
-    /* Lijepljivi avatar jede vrh ekrana, pa dno treba vise zraka da se zadnji red moze doskrolati. */
-    .editor { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+    .akcija-tekst {
+      display: none;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .mrezica {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kartica,
+    .uzorak,
+    .glavna,
+    .pot {
+      transition: none;
+    }
   }
 </style>

@@ -9,11 +9,9 @@ async function registrirajSe(page: Page, nadimak: string): Promise<void> {
   await page.getByLabel('Lozinka').fill('lozinka123');
   await page.getByRole('checkbox', { name: /najmanje 16 godina/i }).check();
   await page.getByRole('checkbox', { name: /Uvjete korištenja/i }).check();
-  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
-  await expect(daljeAvatar).toBeEnabled();
-  await daljeAvatar.click();
-  await expect(page).toHaveURL('/profil/avatar?registracija=1');
-  await page.getByRole('button', { name: 'Završi registraciju' }).click();
+  const registriraj = page.getByRole('button', { name: 'Registriraj se', exact: true });
+  await expect(registriraj).toBeEnabled();
+  await registriraj.click();
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 }
 
@@ -44,10 +42,10 @@ test('registrirani igrač vidi 1 dnevnu i 3 tjedne; zamjena s potvrdom', async (
 
   const dnevneKartice = page.locator('.sekcija').filter({ has: page.getByRole('heading', { name: 'Dnevne misije' }) }).locator('.kartica-misije');
   await expect(dnevneKartice).toHaveCount(1);
-  await expect(dnevneKartice.first().getByText('DNEVNA')).toBeVisible();
+  await expect(dnevneKartice.first().getByText('DNEVNA', { exact: true })).toBeVisible();
   const tjedneKartice = page.locator('.sekcija').filter({ has: page.getByRole('heading', { name: 'Tjedne misije' }) }).locator('.kartica-misije');
   await expect(tjedneKartice).toHaveCount(3);
-  await expect(tjedneKartice.first().getByText('TJEDNA')).toBeVisible();
+  await expect(tjedneKartice.first().getByText('TJEDNA', { exact: true })).toBeVisible();
 
   const nazivPrije = await dnevneKartice.first().locator('h3').innerText();
   await dnevneKartice.first().getByRole('button', { name: /Zamijeni misiju/ }).click();

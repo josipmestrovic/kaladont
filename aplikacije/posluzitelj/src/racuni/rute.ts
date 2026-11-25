@@ -21,6 +21,7 @@ import {
   PORUKA_NEVALJANOG_NADIMKA,
   UZORAK_NADIMKA,
   validirajAvatarConfig,
+  ZADANI_AVATAR_CONFIG,
   type AvatarConfigV1,
 } from 'zajednicko';
 import {
@@ -85,6 +86,23 @@ function normalizirajEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/** Kanonska usporedba dijelova i boja; zanemaruje redoslijed ključeva u JSON-u. */
+function avatarKonfiguracijeJednake(a: AvatarConfigV1 | null | undefined, b: AvatarConfigV1): boolean {
+  if (!a || !validirajAvatarConfig(a)) return false;
+  const dijeloviA = a.parts;
+  const dijeloviB = b.parts;
+  for (const kljuc of Object.keys(dijeloviB) as (keyof AvatarConfigV1['parts'])[]) {
+    if (dijeloviA[kljuc] !== dijeloviB[kljuc]) return false;
+  }
+  const bojeA = a.colors;
+  const bojeB = b.colors;
+  const uloge = new Set([...Object.keys(bojeA), ...Object.keys(bojeB)] as (keyof AvatarConfigV1['colors'])[]);
+  for (const uloga of uloge) {
+    if ((bojeA[uloga] ?? undefined) !== (bojeB[uloga] ?? undefined)) return false;
+  }
+  return a.schemaVersion === b.schemaVersion && a.assetVersion === b.assetVersion;
+}
+
 function javnaPoveznica(putanja: string): string {
   return new URL(putanja, konfiguracija.JAVNA_ADRESA).toString();
 }
@@ -142,10 +160,10 @@ export async function registrirajRacuneRute(
     }
     const { email, lozinka, nadimak, avatarId, avatarConfig } = rezultat.data;
     const normaliziraniEmail = normalizirajEmail(email);
+    // Stari klijenti mogu slati avatar polja; validiramo oblik, ali izgled novog računa je uvijek ZADANI.
     if (avatarConfig !== undefined && !validirajAvatarConfig(avatarConfig)) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
     }
-    const kanonskiAvatarConfig = avatarConfig as AvatarConfigV1 | undefined;
     const prihvatUvjeta = {
       potvrdaDob16: true as const,
       uvjetiVerzija: AKTUALNA_VERZIJA_UVJETA,
@@ -175,6 +193,8 @@ export async function registrirajRacuneRute(
 
     if (postojeciGost) {
       // RS-20: gost → registriran + PR09 preuzimanje doprinosa u istoj transakciji.
+      const gostovAvatarConfig = postojeciGost.avatarConfig as AvatarConfigV1 | null;
+      const avatarSeMijenja = !avatarKonfiguracijeJednake(gostovAvatarConfig, ZADANI_AVATAR_CONFIG);
       try {
         await baza.transaction(async (tx) => {
           const [azuriraniGost] = await tx
@@ -188,8 +208,8 @@ export async function registrirajRacuneRute(
               emailPotvrdaZatrazenAt: new Date(),
               ...prihvatUvjeta,
               ...(nadimak ? { nadimak } : {}),
-              ...(avatarId !== undefined ? { avatarId } : {}),
-              ...(kanonskiAvatarConfig ? { avatarConfig: kanonskiAvatarConfig, avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
+              avatarConfig: ZADANI_AVATAR_CONFIG,
+              ...(avatarSeMijenja ? { avatarRevision: sql`${igraci.avatarRevision} + 1` } : {}),
             })
             .where(and(eq(igraci.id, postojeciGost.id), eq(igraci.vrsta, 'gost')))
             .returning({ id: igraci.id });
@@ -222,7 +242,7 @@ export async function registrirajRacuneRute(
           stvoren: sql`now()`,
           nadimak: nadimak ?? normaliziraniEmail.split('@')[0]!,
           avatarId: avatarId ?? Math.floor(Math.random() * BROJ_AVATARA),
-          avatarConfig: kanonskiAvatarConfig ?? null,
+          avatarConfig: ZADANI_AVATAR_CONFIG,
           ...prihvatUvjeta,
         })
         .returning();

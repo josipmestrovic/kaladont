@@ -12,15 +12,13 @@ test('registracija i prijava zadržavaju sesiju nakon reloadanja', async ({ page
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
   await oznaciPrihvatNaRegistraciji(page);
-  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
-  await expect(daljeAvatar).toBeEnabled();
-  await daljeAvatar.click();
-
-  await expect(page).toHaveURL('/profil/avatar?registracija=1');
-  await page.getByRole('button', { name: 'Završi registraciju' }).click();
+  const registriraj = page.getByRole('button', { name: 'Registriraj se', exact: true });
+  await expect(registriraj).toBeEnabled();
+  await registriraj.click();
 
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
   await expect(page.getByRole('heading', { name: 'Dobrodošao/la u Kaladont!' })).toBeVisible();
+  await expect(page.getByText('Tvoj račun je spreman. Ostao je još samo jedan korak.')).toBeVisible();
   await expect(page.getByText(email)).toBeVisible();
   await expect(page.getByText(/Neželjena pošta/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ponovno pošalji potvrdu' })).toBeVisible();
@@ -38,11 +36,9 @@ test('logout poništava sesiju nakon ponovnog učitavanja', async ({ page }) => 
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Lozinka').fill('lozinka123');
   await oznaciPrihvatNaRegistraciji(page);
-  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
-  await expect(daljeAvatar).toBeEnabled();
-  await daljeAvatar.click();
-  await expect(page).toHaveURL('/profil/avatar?registracija=1');
-  await page.getByRole('button', { name: 'Završi registraciju' }).click();
+  const registriraj = page.getByRole('button', { name: 'Registriraj se', exact: true });
+  await expect(registriraj).toBeEnabled();
+  await registriraj.click();
   await expect(page).toHaveURL('/potvrdi-email?dobrodosao=1');
 
   // waitForResponse mora biti registriran prije navigacije, inače GET /api/misije može proći neuhvaćen.
@@ -135,8 +131,8 @@ test('registracija bez kućica ne prolazi', async ({ page }) => {
   await page.getByRole('button', { name: 'Dalje', exact: true }).click();
   await page.getByLabel('Email').fill(`bez-kucica-${Date.now()}@example.com`);
   await page.getByLabel('Lozinka').fill('lozinka123');
-  const daljeAvatar = page.getByRole('button', { name: /Dalje: stvori avatar/ });
-  await expect(daljeAvatar).toBeDisabled();
+  const registriraj = page.getByRole('button', { name: 'Registriraj se', exact: true });
+  await expect(registriraj).toBeDisabled();
   await expect(page).toHaveURL('/registracija');
   await expect(page.getByRole('checkbox').first()).toBeVisible();
 });
