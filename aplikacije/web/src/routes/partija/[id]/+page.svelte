@@ -1724,14 +1724,14 @@
   {/if}
 {:else}
   <div class="aktivna-partija-sadrzaj">
-  {#if jeIzazov && !stanje.kraj}
+  {#if jeIzazov && !prikaziRezultate}
     <NapredakCiljevaIzazova
       napredak={stanje.goalProgress}
       meta={stanje.izazovMeta}
       pravila={stanje.pravila}
     />
   {/if}
-  {#if jeTrening && !stanje.kraj}
+  {#if jeTrening && !prikaziRezultate}
     <TreningMeta pravila={stanje.pravila} profileId={treningProfileId} />
   {/if}
   {#if prikazanaSjedala.length > 0}
