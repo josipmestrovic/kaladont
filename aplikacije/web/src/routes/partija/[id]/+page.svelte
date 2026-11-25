@@ -2128,11 +2128,11 @@
         {/if}
       {/if}
     {/if}
-    {#if cekamDokaz && !stanje.ponistenaPoruka}
+    {#if cekamDokaz && !stanje.ponistenaPoruka && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena'}
       <aside class="promatranje-traka dokaz-cekam" aria-live="polite" data-testid="dokaz-cekam">
         <p>Čekaš dokaz. Još nisi ispao.</p>
       </aside>
-    {:else if jeEliminiran && !stanje.ponistenaPoruka}
+    {:else if jeEliminiran && !stanje.ponistenaPoruka && !stanje.kraj && stanje.statusSpremanja === 'nije_zavrsena'}
       <aside class="promatranje-traka" aria-live="polite">
         {#if stanje.obracunIskustva && !jeTrening}
           <p class="obracun-promatraca">Ukupno iskustva za ovu igru: <strong>{stanje.obracunIskustva.mojeIskustvo.osvojenoIskustvo} XP</strong>.</p>

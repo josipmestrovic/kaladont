@@ -746,10 +746,14 @@ export function pokreniSlusateljeIgre(): void {
       // Treća osoba ispala tijekom dokaza: ne diraj snimku dokaza.
     }
     // #142 E: kraj i statusSpremanja određuje samo server (snimka / terminalni eventi).
-    // Vizualni prijelaz na sustav_bira ostaje prezentacijski dok ne stigne snimka.
+    // Vizualni prijelaz na sustav_bira ostaje prezentacijski dok ne stigne snimka —
+    // ali ne kad je ovo završna eliminacija (plasman 2 = ostaje jedan pobjednik → kraj),
+    // inače bljesne „Nova runda” / promatrač prije partija:kraj.
     const dokazJosTraje = stanje.faza === 'dokaz_nastavka' && stanje.dokaz !== null;
+    const zavrsnaEliminacija = p.plasman === 2;
     if (
       !dokazJosTraje &&
+      !zavrsnaEliminacija &&
       p.razlog !== 'prekid' &&
       !stanje.kraj &&
       stanje.statusSpremanja === 'nije_zavrsena' &&
