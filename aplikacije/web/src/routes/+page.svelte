@@ -347,7 +347,7 @@
         </a>
 
         <a
-          href="/ljestvice"
+          href={ljestviceTekst?.href ?? '/ljestvice'}
           class="navigacijska-stavka"
           aria-labelledby="naslov-ljestvice"
           aria-describedby={ljestviceTekst ? 'status-ljestvice' : 'opis-ljestvice'}

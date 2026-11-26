@@ -1,3 +1,6 @@
+import { jeDostignuceVidljivo } from './dostupnost-igranja.js';
+import { stanjeIskustva } from './iskustvo.js';
+
 export type KategorijaDostignuca = 'napredak' | 'rijeci' | 'vjestina' | 'kaladont' | 'igra';
 
 export type BrojacDostignuca =
@@ -412,4 +415,43 @@ export function jeDostignuceNovo(zadnjeOtkljucavanje: Date | string | null | und
 
 export function dohvatiDefinicijuDostignuca(id: string): DefinicijaDostignuca | undefined {
   return DEFINICIJE_DOSTIGNUCA.find((definicija) => definicija.id === id);
+}
+
+/** Brojači i dinamičke vrijednosti za izračun razina (profil i ljestvica). */
+export type BrojaciDostignucaZaIzracun = Partial<Record<BrojacDostignuca, number>> & {
+  razina?: number;
+  najboljiNizAktivnosti?: number;
+};
+
+/**
+ * Ista formula kao profil: max(spremljena razina, dinamički izračun) po vidljivim dostignućima.
+ * Koriste profil i ljestvica dostignuća.
+ */
+export function izracunajSazetakZvjezdicaDostignuca(ulaz: {
+  iskustvoUkupno: number;
+  najboljiNizAktivnosti: number;
+  spremljeneRazine: ReadonlyMap<string, number>;
+  brojac: BrojaciDostignucaZaIzracun | null | undefined;
+}): { ukupnoZvjezdica: number; ukupnoOtkljucanih: number; maksimalnoZvjezdica: number } {
+  const razinaIskustva = stanjeIskustva(ulaz.iskustvoUkupno).razina;
+  const brojac = ulaz.brojac ?? {};
+  const vidljive = DEFINICIJE_DOSTIGNUCA.filter((d) => jeDostignuceVidljivo(d.id));
+  let ukupnoZvjezdica = 0;
+  let ukupnoOtkljucanih = 0;
+  for (const definicija of vidljive) {
+    const vrijednost = definicija.brojac === 'razina'
+      ? razinaIskustva
+      : definicija.brojac === 'najboljiNizAktivnosti'
+        ? ulaz.najboljiNizAktivnosti
+        : Number(brojac[definicija.brojac] ?? 0);
+    const izracunata = izracunajRazinuDostignuca(definicija, vrijednost);
+    const razina = Math.max(ulaz.spremljeneRazine.get(definicija.id) ?? 0, izracunata);
+    ukupnoZvjezdica += razina;
+    if (razina > 0) ukupnoOtkljucanih += 1;
+  }
+  return {
+    ukupnoZvjezdica,
+    ukupnoOtkljucanih,
+    maksimalnoZvjezdica: vidljive.reduce((z, d) => z + d.pragovi.length, 0),
+  };
 }

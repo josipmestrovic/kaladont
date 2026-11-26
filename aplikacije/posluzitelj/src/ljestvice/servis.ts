@@ -1,14 +1,15 @@
 /**
- * Vremenske ljestvice: jedan izračun poretka po (mod, metrika, razdoblje) koji dijele tablica, „Oko mene" i pozicije.
- * Poredak se drži u memoriji kratko (najviše do kraja razdoblja), pa baza ne računa za svakog posjetitelja.
+ * Vremenske ljestvice Troboja: jedan izračun poretka po (mod, metrika, razdoblje).
+ * Poredak se drži u memoriji kratko (najviše do kraja razdoblja).
  */
 import { sql, type SQL } from 'drizzle-orm';
 import {
   graniceRazdoblja,
   minimumIgaraZaRazdoblje,
+  minimumPrihvacenihPotezaZaRazdoblje,
   RAZDOBLJA_LJESTVICA,
   type AvatarConfigV1,
-  type MetrikaLjestvice,
+  type MetrikaVremenskaLjestvice,
   type ModPartije,
   type PozicijaNaLjestvici,
   type RazdobljeLjestvice,
@@ -23,6 +24,8 @@ export interface StavkaPoretka {
   nadimak: string;
   jeJavanProfil: boolean;
   odigraneIgre: number;
+  /** Valjani prihvaćeni potezi (brzina); inače 0. */
+  prihvaceniPotezi: number;
   nepotpuno: boolean;
   vrijednost: VrijednostLjestvice;
   imaRezultat: boolean;
@@ -38,6 +41,7 @@ export interface Poredak {
   /** Svi igrači s barem jednom igrom u obuhvatu, za statuse nerangiranih. */
   poIgracu: Map<string, StavkaPoretka>;
   minimumIgara: number;
+  minimumPoteza: number | null;
 }
 
 interface RedakUpita extends Record<string, unknown> {
@@ -47,6 +51,9 @@ interface RedakUpita extends Record<string, unknown> {
   igre: number;
   zbroj_bodova: number;
   niz: number;
+  najbolji_niz_rijeci: number;
+  prihvaceni_potezi: number;
+  trajanje_ms: number;
   nepotpuno: boolean;
   mjesto: number | null;
   avatar_id: number;
@@ -54,25 +61,73 @@ interface RedakUpita extends Record<string, unknown> {
   avatar_revision: number;
 }
 
-/** Sortni izraz i uvjet rezultata po metrici; samo serverska mapa, nikad iz upita korisnika. */
-const DEFINICIJE_METRIKA: Record<MetrikaLjestvice, { vrijednost: SQL; ostvareno: SQL; imaRezultat: SQL }> = {
+type DefinicijaVremenske = {
+  vrijednost: SQL;
+  ostvareno: SQL;
+  imaRezultat: SQL;
+  smjer: 'desc' | 'asc';
+  /** Dodatni ORDER BY izrazi nakon sort_vrijednost (prije igre / id). */
+  dodatniRedoslijed: SQL;
+};
+
+/** Sortni izraz i uvjet rezultata; samo serverska mapa, nikad iz upita korisnika. */
+const DEFINICIJE_VREMENSKIH: Record<MetrikaVremenskaLjestvice, DefinicijaVremenske> = {
   prosjek_bodova: {
     vrijednost: sql`a.zbroj_bodova::numeric(80, 40) / a.igre`,
     ostvareno: sql`a.zadnji_kraj`,
     imaRezultat: sql`true`,
+    smjer: 'desc',
+    /** U vanjskom ORDER BY alias je `k` (kandidati). */
+    dodatniRedoslijed: sql`k.igre desc`,
   },
   niz_pobjeda: {
     vrijednost: sql`coalesce(n.duljina, 0)::numeric`,
     ostvareno: sql`n.ostvareno_u`,
     imaRezultat: sql`coalesce(n.duljina, 0) > 0`,
+    smjer: 'desc',
+    dodatniRedoslijed: sql`k.igre desc`,
+  },
+  najbrzi_igraci: {
+    // Ponderirani prosjek: ukupno trajanje / ukupni potezi (ne prosjek prosjeka).
+    vrijednost: sql`(a.trajanje_ms::numeric(80, 40) / nullif(a.prihvaceni_potezi, 0))`,
+    ostvareno: sql`a.zadnji_kraj`,
+    imaRezultat: sql`a.prihvaceni_potezi > 0 and a.trajanje_ms >= 0`,
+    smjer: 'asc',
+    dodatniRedoslijed: sql`k.prihvaceni_potezi desc, k.igre desc`,
+  },
+  niz_rijeci: {
+    vrijednost: sql`coalesce(a.najbolji_niz_rijeci, 0)::numeric`,
+    ostvareno: sql`nr.ostvareno_u`,
+    imaRezultat: sql`coalesce(a.najbolji_niz_rijeci, 0) > 0`,
+    smjer: 'desc',
+    dodatniRedoslijed: sql`k.igre desc`,
   },
 };
 
-function upitPoretka(mod: ModPartije, metrika: MetrikaLjestvice, od: Date, doTrenutka: Date, minimum: number): SQL {
-  const definicija = DEFINICIJE_METRIKA[metrika];
+function upitPoretka(
+  mod: ModPartije,
+  metrika: MetrikaVremenskaLjestvice,
+  od: Date,
+  doTrenutka: Date,
+  minimumIgara: number,
+  minimumPoteza: number | null,
+): SQL {
+  const definicija = DEFINICIJE_VREMENSKIH[metrika];
+  const redoslijedVrijednosti = definicija.smjer === 'asc'
+    ? sql`k.sort_vrijednost asc`
+    : sql`k.sort_vrijednost desc`;
+  const uvjetPoteza = metrika === 'najbrzi_igraci' && minimumPoteza !== null
+    ? sql`and a.prihvaceni_potezi >= ${minimumPoteza}`
+    : sql``;
+  // Za brzinu brojimo samo partije s pouzdanim agregatom (metrike_verzija = 1, >0 poteza).
+  const filtreBrzine = metrika === 'najbrzi_igraci'
+    ? sql`and s.metrike_verzija = 1 and s.prihvacene_rijeci > 0 and s.trajanje_prihvacenih_ms is not null and s.trajanje_prihvacenih_ms >= 0`
+    : sql``;
+
   return sql`
     with igre as (
-      select s.igrac_id, p.id as partija_id, p.pocetak, p.kraj, s.bodovi, s.plasman
+      select s.igrac_id, p.id as partija_id, p.pocetak, p.kraj, s.bodovi, s.plasman,
+        s.metrike_verzija, s.prihvacene_rijeci, s.trajanje_prihvacenih_ms, s.najduzi_niz_rijeci
       from partije p
       join sudionici_partije s on s.partija_id = p.id
       join igraci i on i.id = s.igrac_id
@@ -84,10 +139,23 @@ function upitPoretka(mod: ModPartije, metrika: MetrikaLjestvice, od: Date, doTre
           select 1 from obracuni_partija o
           where o.partija_id = p.id and o.vrsta = 'privatna_gamifikacija'
         )
+        ${filtreBrzine}
     ),
     agregati as (
-      select igrac_id, count(*)::int as igre, coalesce(sum(bodovi), 0)::int as zbroj_bodova,
-        max(kraj) as zadnji_kraj, bool_or(plasman is null) as nepotpuno
+      select igrac_id,
+        count(*)::int as igre,
+        coalesce(sum(bodovi), 0)::int as zbroj_bodova,
+        max(kraj) as zadnji_kraj,
+        bool_or(plasman is null) as nepotpuno,
+        coalesce(sum(case
+          when metrike_verzija = 1 and prihvacene_rijeci > 0 then prihvacene_rijeci
+          else 0
+        end), 0)::int as prihvaceni_potezi,
+        coalesce(sum(case
+          when metrike_verzija = 1 and prihvacene_rijeci > 0 then trajanje_prihvacenih_ms
+          else 0
+        end), 0)::bigint as trajanje_ms,
+        max(case when metrike_verzija = 1 then najduzi_niz_rijeci else null end)::int as najbolji_niz_rijeci
       from igre
       group by igrac_id
     ),
@@ -109,37 +177,72 @@ function upitPoretka(mod: ModPartije, metrika: MetrikaLjestvice, od: Date, doTre
       from blokovi
       order by igrac_id, duljina desc, ostvareno_u asc
     ),
+    niz_rijeci_ostvarenje as (
+      select distinct on (igrac_id) igrac_id, kraj as ostvareno_u
+      from igre
+      where metrike_verzija = 1 and najduzi_niz_rijeci is not null and najduzi_niz_rijeci > 0
+      order by igrac_id, najduzi_niz_rijeci desc, kraj asc
+    ),
     kandidati as (
-      select a.igrac_id, a.igre, a.zbroj_bodova, a.nepotpuno, coalesce(n.duljina, 0)::int as niz,
+      select a.igrac_id, a.igre, a.zbroj_bodova, a.nepotpuno,
+        coalesce(n.duljina, 0)::int as niz,
+        coalesce(a.najbolji_niz_rijeci, 0)::int as najbolji_niz_rijeci,
+        a.prihvaceni_potezi, a.trajanje_ms,
         ${definicija.vrijednost} as sort_vrijednost,
         ${definicija.ostvareno} as ostvareno_u,
-        (a.igre >= ${minimum} and not a.nepotpuno and ${definicija.imaRezultat}) as kvalificiran
+        (a.igre >= ${minimumIgara} and not a.nepotpuno and ${definicija.imaRezultat} ${uvjetPoteza}) as kvalificiran
       from agregati a
       left join najbolji_niz n on n.igrac_id = a.igrac_id
+      left join niz_rijeci_ostvarenje nr on nr.igrac_id = a.igrac_id
     )
-    select k.igrac_id, i.nadimak, i.vrsta, k.igre, k.zbroj_bodova, k.niz, k.nepotpuno,
+    select k.igrac_id, i.nadimak, i.vrsta, k.igre, k.zbroj_bodova, k.niz, k.najbolji_niz_rijeci,
+      k.prihvaceni_potezi, k.trajanje_ms, k.nepotpuno,
       i.avatar_id, i.avatar_config, i.avatar_revision,
       (case when k.kvalificiran then row_number() over (
         partition by k.kvalificiran
-        order by k.sort_vrijednost desc, k.igre desc, k.ostvareno_u asc, k.igrac_id asc
+        order by ${redoslijedVrijednosti}, ${definicija.dodatniRedoslijed}, k.ostvareno_u asc, k.igrac_id asc
       ) end)::int as mjesto
     from kandidati k
     join igraci i on i.id = k.igrac_id
   `;
 }
 
-function uStavku(metrika: MetrikaLjestvice, redak: RedakUpita): StavkaPoretka {
-  const vrijednost: VrijednostLjestvice = metrika === 'prosjek_bodova'
-    ? { vrsta: 'prosjek_bodova', prosjek: redak.igre > 0 ? redak.zbroj_bodova / redak.igre : 0, bodoviUkupno: redak.zbroj_bodova }
-    : { vrsta: 'niz_pobjeda', broj: redak.niz };
+function uStavku(metrika: MetrikaVremenskaLjestvice, redak: RedakUpita): StavkaPoretka {
+  let vrijednost: VrijednostLjestvice;
+  let imaRezultat: boolean;
+  if (metrika === 'prosjek_bodova') {
+    vrijednost = {
+      vrsta: 'prosjek_bodova',
+      prosjek: redak.igre > 0 ? redak.zbroj_bodova / redak.igre : 0,
+      bodoviUkupno: redak.zbroj_bodova,
+    };
+    imaRezultat = true;
+  } else if (metrika === 'niz_pobjeda') {
+    vrijednost = { vrsta: 'niz_pobjeda', broj: redak.niz };
+    imaRezultat = redak.niz > 0;
+  } else if (metrika === 'najbrzi_igraci') {
+    const prosjekMs = redak.prihvaceni_potezi > 0 ? Number(redak.trajanje_ms) / redak.prihvaceni_potezi : 0;
+    vrijednost = {
+      vrsta: 'prosjek_brzine',
+      prosjekMs,
+      prihvaceniPotezi: redak.prihvaceni_potezi,
+    };
+    imaRezultat = redak.prihvaceni_potezi > 0;
+  } else {
+    const broj = Number(redak.najbolji_niz_rijeci ?? 0);
+    vrijednost = { vrsta: 'niz_rijeci', broj };
+    imaRezultat = broj > 0;
+  }
+
   return {
     igracId: redak.igrac_id,
     nadimak: redak.nadimak,
     jeJavanProfil: redak.vrsta !== 'gost',
     odigraneIgre: redak.igre,
+    prihvaceniPotezi: Number(redak.prihvaceni_potezi ?? 0),
     nepotpuno: redak.nepotpuno,
     vrijednost,
-    imaRezultat: metrika === 'prosjek_bodova' || redak.niz > 0,
+    imaRezultat,
     mjesto: redak.mjesto,
     avatarId: Number(redak.avatar_id ?? 0),
     avatarConfig: redak.avatar_config ?? null,
@@ -154,15 +257,16 @@ export interface IzvrsiteljPoretka {
 
 export async function izracunajPoredak(
   mod: ModPartije,
-  metrika: MetrikaLjestvice,
+  metrika: MetrikaVremenskaLjestvice,
   razdoblje: RazdobljeLjestvice,
   od: Date,
   doTrenutka: Date,
   izvrsitelj?: IzvrsiteljPoretka,
 ): Promise<Poredak> {
   const minimumIgara = minimumIgaraZaRazdoblje(razdoblje);
+  const minimumPoteza = metrika === 'najbrzi_igraci' ? minimumPrihvacenihPotezaZaRazdoblje(razdoblje) : null;
   const izvor = izvrsitelj ?? (baza as unknown as IzvrsiteljPoretka);
-  const redci = await izvor.execute(upitPoretka(mod, metrika, od, doTrenutka, minimumIgara));
+  const redci = await izvor.execute(upitPoretka(mod, metrika, od, doTrenutka, minimumIgara, minimumPoteza));
   const poIgracu = new Map<string, StavkaPoretka>();
   const rangirani: StavkaPoretka[] = [];
   for (const redak of redci) {
@@ -171,7 +275,7 @@ export async function izracunajPoredak(
     if (stavka.mjesto !== null) rangirani.push(stavka);
   }
   rangirani.sort((a, b) => a.mjesto! - b.mjesto!);
-  return { rangirani, poIgracu, minimumIgara };
+  return { rangirani, poIgracu, minimumIgara, minimumPoteza };
 }
 
 interface ZapisMemorije {
@@ -188,7 +292,7 @@ export function ocistiMemorijuLjestvica(): void {
 /** Isti ključ = isti obuhvat; istovremeni zahtjevi dijele jedan upit. */
 export function dohvatiPoredak(
   mod: ModPartije,
-  metrika: MetrikaLjestvice,
+  metrika: MetrikaVremenskaLjestvice,
   razdoblje: RazdobljeLjestvice,
   od: Date,
   doTrenutka: Date,
@@ -213,16 +317,58 @@ export function dohvatiPoredak(
 
 export function pozicijaIgraca(poredak: Poredak, igracId: string | null): PozicijaNaLjestvici {
   const minimumIgara = poredak.minimumIgara;
-  const prazno = { mjesto: null, odigraneIgre: null, minimumIgara, nedostajeIgara: null };
+  const minimumPoteza = poredak.minimumPoteza;
+  const prazno = {
+    mjesto: null as number | null,
+    odigraneIgre: null as number | null,
+    minimumIgara,
+    nedostajeIgara: null as number | null,
+    prihvaceniPotezi: null as number | null,
+    minimumPoteza,
+    nedostajePoteza: null as number | null,
+  };
   if (!igracId) return { status: 'prijava_potrebna', ...prazno };
   const stavka = poredak.poIgracu.get(igracId);
-  if (!stavka) return { status: 'nije_igrano', ...prazno, odigraneIgre: 0, nedostajeIgara: minimumIgara };
-  const osnova = { minimumIgara, odigraneIgre: stavka.odigraneIgre };
+  if (!stavka) {
+    return {
+      status: 'nije_igrano',
+      ...prazno,
+      odigraneIgre: 0,
+      nedostajeIgara: minimumIgara,
+      prihvaceniPotezi: 0,
+      nedostajePoteza: minimumPoteza,
+    };
+  }
+  const osnova = {
+    minimumIgara,
+    odigraneIgre: stavka.odigraneIgre,
+    prihvaceniPotezi: stavka.prihvaceniPotezi,
+    minimumPoteza,
+    nedostajePoteza: minimumPoteza !== null
+      ? Math.max(0, minimumPoteza - stavka.prihvaceniPotezi)
+      : null,
+  };
   if (stavka.odigraneIgre < minimumIgara) {
-    return { status: 'nedovoljan_broj_igara', mjesto: null, ...osnova, nedostajeIgara: minimumIgara - stavka.odigraneIgre };
+    return {
+      status: 'nedovoljan_broj_igara',
+      mjesto: null,
+      ...osnova,
+      nedostajeIgara: minimumIgara - stavka.odigraneIgre,
+    };
+  }
+  if (minimumPoteza !== null && stavka.prihvaceniPotezi < minimumPoteza) {
+    return {
+      status: 'nedovoljan_broj_poteza',
+      mjesto: null,
+      ...osnova,
+      nedostajeIgara: 0,
+      nedostajePoteza: minimumPoteza - stavka.prihvaceniPotezi,
+    };
   }
   if (stavka.nepotpuno) return { status: 'podaci_nepotpuni', mjesto: null, ...osnova, nedostajeIgara: 0 };
-  if (!stavka.imaRezultat || stavka.mjesto === null) return { status: 'nema_rezultata', mjesto: null, ...osnova, nedostajeIgara: 0 };
+  if (!stavka.imaRezultat || stavka.mjesto === null) {
+    return { status: 'nema_rezultata', mjesto: null, ...osnova, nedostajeIgara: 0 };
+  }
   return { status: 'rangiran', mjesto: stavka.mjesto, ...osnova, nedostajeIgara: 0 };
 }
 

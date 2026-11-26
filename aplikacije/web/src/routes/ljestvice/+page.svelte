@@ -5,15 +5,22 @@
   import {
     formatirajOdbrojavanje,
     grafemi,
-    METRIKE_LJESTVICA,
+    jeMetrikaLjestvice,
+    jeNapredakMetrika,
+    jeVremenskaMetrika,
+    METRIKE_NAPRETKA_LJESTVICA,
+    METRIKE_VREMENSKE_LJESTVICA,
     RAZDOBLJA_LJESTVICA,
+    REGISTAR_METRIKA_LJESTVICA,
     type MetrikaLjestvice,
     type OdgovorLjestvice,
     type OdgovorNajopasnijihRijeci,
+    type OdgovorVremenskeLjestvice,
     type PozicijaNaLjestvici,
     type RazdobljeLjestvice,
     type RedakLjestvice,
     type StavkaNajopasnijeRijeci,
+    type VrijednostLjestvice,
   } from 'zajednicko';
   import { apiUrl } from '$lib/api-url.js';
   import { dohvatiAuthToken } from '$lib/identitet.js';
@@ -38,6 +45,16 @@
     godisnje: 'godišnji',
     svih_vremena: 'ukupni',
   };
+  const IKONE_METRIKA: Record<MetrikaLjestvice, string> = {
+    prosjek_bodova: '/ikone/06-trofej.png',
+    niz_pobjeda: '/ikone/19-vatra.png',
+    najbrzi_igraci: '/ikone/33-dnk-brzina.png',
+    niz_rijeci: '/ikone/42-jezik-u-plamenu.png',
+    iskustvo: '/ikone/39-iskusnjara.png',
+    kolekcija: '/ikone/21-kolekcija.png',
+    izazovi: '/ikone/06-trofej.png',
+    dostignuca: '/ikone/27-zvjezdica-puna.png',
+  };
 
   const url = $derived($page.url);
   const kategorija = $derived<Kategorija>(
@@ -46,7 +63,7 @@
       : 'igraci',
   );
   const metrika = $derived<MetrikaLjestvice>(
-    (METRIKE_LJESTVICA as readonly string[]).includes(url.searchParams.get('metrika') ?? '')
+    jeMetrikaLjestvice(url.searchParams.get('metrika'))
       ? (url.searchParams.get('metrika') as MetrikaLjestvice)
       : 'prosjek_bodova',
   );
@@ -55,6 +72,8 @@
       ? (url.searchParams.get('razdoblje') as RazdobljeLjestvice)
       : 'dnevno',
   );
+  const jeVremenska = $derived(jeVremenskaMetrika(metrika));
+  const opisMetrike = $derived(REGISTAR_METRIKA_LJESTVICA[metrika]);
 
   let podaci = $state<OdgovorLjestvice | null>(null);
   let ucitava = $state(false);
@@ -72,7 +91,12 @@
   let prikaziPravila = $state(false);
   let zadnjiPoslaniKljuc = '';
   let rijeciZatrazene = false;
+  /** Zadnji valjani vremenski odabir u sesiji (za povratak s napretka). */
+  let zadnjeVremenskoRazdoblje: RazdobljeLjestvice = 'dnevno';
 
+  const vremenski = $derived<OdgovorVremenskeLjestvice | null>(
+    podaci?.vrstaOdgovora === 'vremenska' ? podaci : null,
+  );
   const mojaPozicija = $derived(podaci?.mojaPozicija ?? null);
   const mojRedak = $derived(podaci?.mojRedak ?? null);
   const prikaziVlastitiIspod = $derived(
@@ -84,27 +108,48 @@
   const prikaziCtaRegistracije = $derived(jeGost && mojaPozicija?.status === 'rangiran');
 
   function nazivMetrike(me: MetrikaLjestvice, kratko = false): string {
-    if (me === 'niz_pobjeda') return kratko ? 'Niz' : 'Niz pobjeda';
-    return kratko ? 'Bod.' : 'Prosjek bodova';
+    const opis = REGISTAR_METRIKA_LJESTVICA[me];
+    return kratko ? opis.kratkiNaziv : opis.naziv;
   }
 
-  function promijeni(izmjene: Record<string, string>) {
+  function promijeni(izmjene: Record<string, string | null>) {
     const novi = new URL(url);
-    for (const [kljuc, vrijednost] of Object.entries(izmjene)) novi.searchParams.set(kljuc, vrijednost);
+    for (const [kljuc, vrijednost] of Object.entries(izmjene)) {
+      if (vrijednost === null) novi.searchParams.delete(kljuc);
+      else novi.searchParams.set(kljuc, vrijednost);
+    }
     if (izmjene.kategorija === 'igraci') novi.searchParams.delete('prikaz');
     goto(`${novi.pathname}${novi.search}`, { noScroll: true, keepFocus: true });
   }
 
-  async function ucitajLjestvicu(me: MetrikaLjestvice, r: RazdobljeLjestvice) {
+  function odaberiMetriku(me: MetrikaLjestvice) {
+    if (jeVremenskaMetrika(me)) {
+      promijeni({
+        kategorija: 'igraci',
+        metrika: me,
+        razdoblje: zadnjeVremenskoRazdoblje,
+      });
+      return;
+    }
+    if (jeVremenskaMetrika(metrika)) zadnjeVremenskoRazdoblje = razdoblje;
+    promijeni({ kategorija: 'igraci', metrika: me, razdoblje: null });
+  }
+
+  async function ucitajLjestvicu(me: MetrikaLjestvice, r: RazdobljeLjestvice | null) {
     const idZahtjeva = ++zadnjiZahtjev;
     ucitava = true;
     greska = null;
     prikaziPravila = false;
+    podaci = null;
     try {
-      const odgovor = await fetch(
-        apiUrl(`/ljestvice?mod=tri_igraca&metrika=${me}&razdoblje=${r}&prikaz=top`),
-        { headers: { authorization: `Bearer ${dohvatiAuthToken()}` } },
-      );
+      const params = new URLSearchParams({ metrika: me, prikaz: 'top' });
+      if (jeVremenskaMetrika(me)) {
+        params.set('mod', 'tri_igraca');
+        params.set('razdoblje', r ?? 'dnevno');
+      }
+      const odgovor = await fetch(apiUrl(`/ljestvice?${params}`), {
+        headers: { authorization: `Bearer ${dohvatiAuthToken()}` },
+      });
       if (!odgovor.ok) throw new Error(`HTTP ${odgovor.status}`);
       const tijelo = (await odgovor.json()) as OdgovorLjestvice;
       if (idZahtjeva !== zadnjiZahtjev) return;
@@ -138,10 +183,13 @@
 
   $effect(() => {
     if (kategorija === 'igraci') {
-      const kljuc = `igraci|${metrika}|${razdoblje}`;
+      if (jeVremenskaMetrika(metrika)) zadnjeVremenskoRazdoblje = razdoblje;
+      const kljuc = jeVremenskaMetrika(metrika)
+        ? `igraci|${metrika}|${razdoblje}`
+        : `igraci|${metrika}|napredak`;
       if (kljuc === zadnjiPoslaniKljuc) return;
       zadnjiPoslaniKljuc = kljuc;
-      void ucitajLjestvicu(metrika, razdoblje);
+      void ucitajLjestvicu(metrika, jeVremenskaMetrika(metrika) ? razdoblje : null);
       return;
     }
     const kljuc = 'najopasnije';
@@ -169,6 +217,11 @@
       novi.searchParams.delete('prikaz');
       trebaZamjena = true;
     }
+    const me = novi.searchParams.get('metrika');
+    if (jeMetrikaLjestvice(me) && jeNapredakMetrika(me) && novi.searchParams.has('razdoblje')) {
+      novi.searchParams.delete('razdoblje');
+      trebaZamjena = true;
+    }
     if (trebaZamjena) {
       void goto(`${novi.pathname}${novi.search}`, { replaceState: true, noScroll: true });
     }
@@ -179,12 +232,21 @@
   });
 
   const preostaloMs = $derived(
-    podaci?.razdoblje.do ? new Date(podaci.razdoblje.do).getTime() - (sadaMs + pomakSataMs) : null,
+    vremenski?.razdoblje.do
+      ? new Date(vremenski.razdoblje.do).getTime() - (sadaMs + pomakSataMs)
+      : null,
   );
 
   $effect(() => {
-    const kraj = podaci?.razdoblje.do;
-    if (kraj && preostaloMs !== null && preostaloMs <= 0 && osvjezenoNaKraju !== kraj && kategorija === 'igraci') {
+    const kraj = vremenski?.razdoblje.do;
+    if (
+      kraj
+      && preostaloMs !== null
+      && preostaloMs <= 0
+      && osvjezenoNaKraju !== kraj
+      && kategorija === 'igraci'
+      && jeVremenska
+    ) {
       osvjezenoNaKraju = kraj;
       void ucitajLjestvicu(metrika, razdoblje);
     }
@@ -198,16 +260,90 @@
     return 'igara';
   }
 
+  function oblikRijeci(broj: number): string {
+    const zadnjeDvije = broj % 100;
+    const zadnja = broj % 10;
+    if (zadnja === 1 && zadnjeDvije !== 11) return 'riječ';
+    if (zadnja >= 2 && zadnja <= 4 && (zadnjeDvije < 12 || zadnjeDvije > 14)) return 'riječi';
+    return 'riječi';
+  }
+
+  function oblikZvjezdica(broj: number): string {
+    const zadnjeDvije = broj % 100;
+    const zadnja = broj % 10;
+    if (zadnja === 1 && zadnjeDvije !== 11) return 'zvjezdica';
+    if (zadnja >= 2 && zadnja <= 4 && (zadnjeDvije < 12 || zadnjeDvije > 14)) return 'zvjezdice';
+    return 'zvjezdica';
+  }
+
   function godinaIzIso(iso: string): string {
     return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Zagreb', year: 'numeric' }).format(new Date(iso));
   }
 
-  function vrijednostRetka(redak: RedakLjestvice): string {
-    if (redak.vrijednost.vrsta === 'niz_pobjeda') return String(redak.vrijednost.broj);
-    return new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-      redak.vrijednost.prosjek,
-    );
+  function formatirajVrijednost(vrijednost: VrijednostLjestvice): string {
+    if (vrijednost.vrsta === 'prosjek_bodova') {
+      return new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+        vrijednost.prosjek,
+      );
+    }
+    if (vrijednost.vrsta === 'niz_pobjeda' || vrijednost.vrsta === 'niz_rijeci') {
+      return String(vrijednost.broj);
+    }
+    if (vrijednost.vrsta === 'prosjek_brzine') {
+      return `${new Intl.NumberFormat('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(vrijednost.prosjekMs / 1000)} s`;
+    }
+    if (vrijednost.vrsta === 'iskustvo') {
+      return `${new Intl.NumberFormat('hr-HR').format(vrijednost.iskustvoUkupno)} XP`;
+    }
+    if (vrijednost.vrsta === 'kolekcija') {
+      return `${new Intl.NumberFormat('hr-HR').format(vrijednost.broj)} ${oblikRijeci(vrijednost.broj)}`;
+    }
+    if (vrijednost.vrsta === 'izazovi') {
+      return `${vrijednost.zavrseno}/${vrijednost.ukupno}`;
+    }
+    return `${vrijednost.zvjezdice}`;
   }
+
+  function sekundarniTekst(vrijednost: VrijednostLjestvice, odigraneIgre: number): string | null {
+    if (vrijednost.vrsta === 'prosjek_brzine') {
+      return `${new Intl.NumberFormat('hr-HR').format(vrijednost.prihvaceniPotezi)} prihvaćenih poteza`;
+    }
+    if (vrijednost.vrsta === 'iskustvo') return `Razina ${vrijednost.razina}`;
+    if (vrijednost.vrsta === 'izazovi') {
+      if (vrijednost.zavrseno >= vrijednost.ukupno) return 'Svi izazovi završeni';
+      return vrijednost.nazivLevela;
+    }
+    if (vrijednost.vrsta === 'dostignuca') {
+      return `${vrijednost.otkljucano} otključana dostignuća`;
+    }
+    if (vrijednost.vrsta === 'niz_rijeci') return 'riječi zaredom';
+    if (vrijednost.vrsta === 'prosjek_bodova' || vrijednost.vrsta === 'niz_pobjeda') {
+      return `${odigraneIgre} ${oblikIgre(odigraneIgre)}`;
+    }
+    return null;
+  }
+
+  function udioNapretka(pozicija: PozicijaNaLjestvici): number {
+    const odigrane = pozicija.odigraneIgre ?? 0;
+    const minimum = Math.max(1, pozicija.minimumIgara);
+    return Math.max(0, Math.min(100, (odigrane / minimum) * 100));
+  }
+
+  function praznoStanjeNaslov(me: MetrikaLjestvice): string {
+    if (me === 'niz_pobjeda') return 'Za prvi niz treba ti jedna pobjeda.';
+    if (me === 'najbrzi_igraci') return 'Još nema dovoljno prihvaćenih poteza.';
+    if (me === 'niz_rijeci') return 'Još nema zabilježenog niza riječi.';
+    if (me === 'iskustvo') return 'Još nema osvojenog iskustva.';
+    if (me === 'kolekcija') return 'Još nitko nije otključao riječi u kolekciji.';
+    if (me === 'izazovi') return 'Još nitko nije završio izazov.';
+    if (me === 'dostignuca') return 'Još nema osvojenih zvjezdica.';
+    return 'Još nema rezultata.';
+  }
+
+  const prvaRijec = $derived(najopasnije[0] ?? null);
+  const naslovListeRijeci = $derived(
+    prosirenoRijeci ? `Top ${najopasnije.length} riječi` : 'Top 10 riječi',
+  );
 
   function dijeloviRijeci(rijec: string): { ostatak: string; nastavak: string } {
     const dijelovi = grafemi(rijec);
@@ -217,17 +353,6 @@
       nastavak: dijelovi.slice(-2).join(''),
     };
   }
-
-  function udioNapretka(pozicija: PozicijaNaLjestvici): number {
-    const odigrane = pozicija.odigraneIgre ?? 0;
-    const minimum = Math.max(1, pozicija.minimumIgara);
-    return Math.max(0, Math.min(100, (odigrane / minimum) * 100));
-  }
-
-  const prvaRijec = $derived(najopasnije[0] ?? null);
-  const naslovListeRijeci = $derived(
-    prosirenoRijeci ? `Top ${najopasnije.length} riječi` : 'Top 10 riječi',
-  );
 </script>
 
 <svelte:head>
@@ -258,223 +383,300 @@
 </div>
 
 {#if kategorija === 'igraci'}
-  <div class="metrike" role="group" aria-label="Ljestvica">
-    {#each METRIKE_LJESTVICA as m (m)}
-      <button
-        type="button"
-        class="metrika-gumb"
-        aria-pressed={metrika === m}
-        class:aktivan={metrika === m}
-        onclick={() => promijeni({ metrika: m })}
-      >
-        {nazivMetrike(m)}
-      </button>
-    {/each}
-  </div>
-
-  <div class="razdoblja" role="tablist" aria-label="Razdoblje">
-    {#each RAZDOBLJA_LJESTVICA as r (r)}
-      <button
-        type="button"
-        role="tab"
-        class="razdoblje"
-        aria-selected={razdoblje === r}
-        class:aktivan={razdoblje === r}
-        onclick={() => promijeni({ razdoblje: r })}
-      >
-        {NAZIVI_RAZDOBLJA[r]}
-      </button>
-    {/each}
-  </div>
-
-  {#if greska}
-    <div class="obavijest greska" role="alert">
-      <p>{greska}</p>
-      <button type="button" class="akcija-gumb" onclick={() => ucitajLjestvicu(metrika, razdoblje)}>
-        Pokušaj ponovno
-      </button>
-    </div>
-  {:else if ucitava || !podaci}
-    <p class="ucitavanje">Učitavanje…</p>
-  {:else if podaci.razdoblje.stanje === 'zakljucano'}
-    <p class="zakljucano">
-      Ljestvica svih vremena stiže {podaci.razdoblje.otkljucavaSe
-        ? godinaIzIso(podaci.razdoblje.otkljucavaSe)
-        : godinaIzIso(podaci.svihVremenaOtkljucavaSe)}.
-    </p>
-  {:else}
-    {#if mojaPozicija?.status === 'rangiran' && mojRedak}
-      <section class="osobna-kartica" aria-label="Tvoja pozicija">
-        <p class="osobna-oznaka">Tvoja pozicija</p>
-        <p class="osobna-mjesto">{mojRedak.mjesto}. mjesto</p>
-        <p class="osobna-detalji">
-          {nazivMetrike(podaci.metrika)}: {vrijednostRetka(mojRedak)}
-          <span aria-hidden="true"> · </span>
-          {mojRedak.odigraneIgre} {oblikIgre(mojRedak.odigraneIgre)}
-        </p>
-        {#if razdoblje !== 'godisnje' && razdoblje !== 'svih_vremena' && preostaloMs !== null}
-          <p class="odbrojavanje" aria-live="off">
-            Reset poretka za {formatirajOdbrojavanje(preostaloMs)}
-          </p>
-        {/if}
-      </section>
-    {:else if mojaPozicija?.status === 'nedovoljan_broj_igara' || mojaPozicija?.status === 'nije_igrano'}
-      <section class="osobna-kartica napredak" aria-label="Napredak do poretka">
-        <p class="osobna-mjesto">
-          Još {mojaPozicija.nedostajeIgara} {oblikTroboja(mojaPozicija.nedostajeIgara ?? 0)} do poretka!
-        </p>
-        <div
-          class="traka"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={mojaPozicija.minimumIgara}
-          aria-valuenow={mojaPozicija.odigraneIgre ?? 0}
-          aria-label="Napredak do ulaska u poredak"
-        >
-          <span class="traka-ispuna" style:width="{udioNapretka(mojaPozicija)}%"></span>
-        </div>
-        <p class="osobna-detalji">
-          {mojaPozicija.odigraneIgre ?? 0}/{mojaPozicija.minimumIgara}
-        </p>
-        {#if razdoblje !== 'godisnje' && razdoblje !== 'svih_vremena' && preostaloMs !== null}
-          <p class="odbrojavanje" aria-live="off">
-            Reset poretka za {formatirajOdbrojavanje(preostaloMs)}
-          </p>
-        {/if}
-      </section>
-    {:else if mojaPozicija?.status === 'nema_rezultata'}
-      <p class="osobni-napredak">
-        {metrika === 'niz_pobjeda' ? 'Za prvi niz treba ti jedna pobjeda.' : 'Još nema rezultata.'}
-      </p>
-    {:else if mojaPozicija?.status === 'podaci_nepotpuni'}
-      <p class="osobni-napredak">Rezultat još nije dostupan.</p>
-    {:else if mojaPozicija?.status === 'prijava_potrebna'}
-      <p class="osobni-napredak">Prijavi se za svoju poziciju.</p>
-    {/if}
-
-    <h2 class="naslov-tablice">Top 10 igrača</h2>
-
-    {#if podaci.redci.length === 0}
-      <div class="prazno-stanje">
-        <p class="prazno-naslov">Prvo mjesto čeka na tebe!</p>
-        <p>Još nitko nije ušao u {OBUHVAT_RAZDOBLJA[razdoblje]} poredak.</p>
-        <a class="akcija-gumb istaknut" href={putanjaBrzeIgre()}>Odigraj brzu igru</a>
-      </div>
-    {:else}
-      <table class="tablica-mobilni-retci tablica-ljestvice">
-        <thead>
-          <tr>
-            <th scope="col">#</th>
-            <th scope="col">Igrač</th>
-            <th scope="col">
-              <span class="stupac-pun">{nazivMetrike(podaci.metrika)}</span>
-              <span class="stupac-kratki">{nazivMetrike(podaci.metrika, true)}</span>
-            </th>
-            <th scope="col">Igre</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each podaci.redci as redak (redak.igracId)}
-            <tr class:moj-redak={redak.jeJa} class:medalja-1={redak.mjesto === 1} class:medalja-2={redak.mjesto === 2} class:medalja-3={redak.mjesto === 3}>
-              <td data-label="#">
-                <span class="mjesto" aria-label="{redak.mjesto}. mjesto">{redak.mjesto}.</span>
-              </td>
-              <th scope="row">
-                <span class="igrac-celija">
-                  <Avatar
-                    avatarId={redak.avatarId}
-                    avatarConfig={redak.avatarConfig}
-                    gost={!redak.jeJavanProfil}
-                    velicina={36}
-                    prikaziRangBorder={false}
-                  />
-                  <span class="igrac-tekst">
-                    {#if redak.jeJavanProfil}
-                      <a href={`/profil/javni/${redak.igracId}`}>{redak.nadimak}</a>
-                    {:else}
-                      <span class="nadimak">{redak.nadimak}</span>
-                    {/if}
-                    {#if redak.jeJa}<span class="oznaka-ti">Ovo si ti</span>{/if}
-                  </span>
-                </span>
-              </th>
-              <td data-label={nazivMetrike(podaci.metrika)}>{vrijednostRetka(redak)}</td>
-              <td data-label="Igre">{redak.odigraneIgre}</td>
-            </tr>
+  <div class="raspored-igraci">
+    <aside class="odabir-metrika" aria-label="Odabir ljestvice">
+      <section class="grupa-metrika">
+        <h2 class="grupa-naslov">Troboj</h2>
+        <div class="metrike-grid" role="group" aria-label="Troboj">
+          {#each METRIKE_VREMENSKE_LJESTVICA as m (m)}
+            <button
+              type="button"
+              class="metrika-kartica"
+              aria-pressed={metrika === m}
+              class:aktivan={metrika === m}
+              onclick={() => odaberiMetriku(m)}
+            >
+              <img class="metrika-ikona" src={IKONE_METRIKA[m]} alt="" width="28" height="28" />
+              <span class="metrika-naziv">{nazivMetrike(m)}</span>
+            </button>
           {/each}
-        </tbody>
-      </table>
+        </div>
+      </section>
+      <section class="grupa-metrika">
+        <h2 class="grupa-naslov">Ukupni napredak</h2>
+        <div class="metrike-grid" role="group" aria-label="Ukupni napredak">
+          {#each METRIKE_NAPRETKA_LJESTVICA as m (m)}
+            <button
+              type="button"
+              class="metrika-kartica"
+              aria-pressed={metrika === m}
+              class:aktivan={metrika === m}
+              onclick={() => odaberiMetriku(m)}
+            >
+              <img class="metrika-ikona" src={IKONE_METRIKA[m]} alt="" width="28" height="28" />
+              <span class="metrika-naziv">{nazivMetrike(m)}</span>
+            </button>
+          {/each}
+        </div>
+      </section>
+    </aside>
 
-      {#if prikaziVlastitiIspod && mojRedak}
-        {#if mojRedak.mjesto >= 12}
-          <p class="razdjelnik" aria-hidden="true">···</p>
-        {/if}
-        <h3 class="naslov-vlastiti">Tvoja pozicija</h3>
-        <table class="tablica-mobilni-retci tablica-ljestvice vlastiti-ispod">
-          <tbody>
-            <tr class="moj-redak">
-              <td data-label="#">{mojRedak.mjesto}.</td>
-              <th scope="row">
-                <span class="igrac-celija">
-                  <Avatar
-                    avatarId={mojRedak.avatarId}
-                    avatarConfig={mojRedak.avatarConfig}
-                    gost={!mojRedak.jeJavanProfil}
-                    velicina={36}
-                    prikaziRangBorder={false}
-                  />
-                  <span class="igrac-tekst">
-                    <span class="nadimak">{mojRedak.nadimak}</span>
-                    <span class="oznaka-ti">Ovo si ti</span>
-                  </span>
-                </span>
-              </th>
-              <td data-label={nazivMetrike(podaci.metrika)}>{vrijednostRetka(mojRedak)}</td>
-              <td data-label="Igre">{mojRedak.odigraneIgre}</td>
-            </tr>
-          </tbody>
-        </table>
+    <div class="poredak-stupac">
+      <header class="poredak-zaglavlje">
+        <h2 class="poredak-naslov">{opisMetrike.naziv}</h2>
+      </header>
+
+      {#if jeVremenska}
+        <div class="razdoblja" role="tablist" aria-label="Razdoblje">
+          {#each RAZDOBLJA_LJESTVICA as r (r)}
+            <button
+              type="button"
+              role="tab"
+              class="razdoblje"
+              aria-selected={razdoblje === r}
+              class:aktivan={razdoblje === r}
+              onclick={() => {
+                zadnjeVremenskoRazdoblje = r;
+                promijeni({ razdoblje: r });
+              }}
+            >
+              {NAZIVI_RAZDOBLJA[r]}
+            </button>
+          {/each}
+        </div>
       {/if}
-    {/if}
 
-    {#if prikaziCtaRegistracije}
-      <aside class="cta-gost">
-        <p class="cta-gost-naslov">Sačuvaj svoje mjesto na ljestvici!</p>
-        <p>Registriraj se i zadrži svoje rezultate i dosadašnji napredak.</p>
-        <a class="veza-registracija" href="/registracija">Registriraj se</a>
-      </aside>
-    {/if}
+      {#if greska}
+        <div class="obavijest greska" role="alert">
+          <p>{greska}</p>
+          <button
+            type="button"
+            class="akcija-gumb"
+            onclick={() => ucitajLjestvicu(metrika, jeVremenska ? razdoblje : null)}
+          >
+            Pokušaj ponovno
+          </button>
+        </div>
+      {:else if ucitava || !podaci}
+        <p class="ucitavanje">Učitavanje…</p>
+      {:else if vremenski?.razdoblje.stanje === 'zakljucano'}
+        <p class="zakljucano">
+          Ljestvica svih vremena stiže {vremenski.razdoblje.otkljucavaSe
+            ? godinaIzIso(vremenski.razdoblje.otkljucavaSe)
+            : godinaIzIso(vremenski.svihVremenaOtkljucavaSe)}.
+        </p>
+      {:else}
+        {#if mojaPozicija?.status === 'rangiran' && mojRedak}
+          <section class="osobna-kartica" aria-label="Tvoja pozicija">
+            <p class="osobna-oznaka">Tvoja pozicija</p>
+            <p class="osobna-mjesto">{mojRedak.mjesto}. mjesto</p>
+            <p class="osobna-detalji">
+              {nazivMetrike(metrika)}: {formatirajVrijednost(mojRedak.vrijednost)}
+              {#if sekundarniTekst(mojRedak.vrijednost, mojRedak.odigraneIgre)}
+                <span aria-hidden="true"> · </span>
+                {sekundarniTekst(mojRedak.vrijednost, mojRedak.odigraneIgre)}
+              {/if}
+            </p>
+            {#if vremenski && razdoblje !== 'godisnje' && razdoblje !== 'svih_vremena' && preostaloMs !== null}
+              <p class="odbrojavanje" aria-live="off">
+                Reset poretka za {formatirajOdbrojavanje(preostaloMs)}
+              </p>
+            {/if}
+            {#if metrika === 'prosjek_bodova'}
+              <p class="objasnjenje-bodovanja">
+                Bodovanje Troboja: 1. mjesto 2 boda (+1 za pobjedu), 2. mjesto 1 bod, 3. mjesto 0;
+                +1 bod za svaku eliminaciju koju izazoveš. Najviše 5 bodova po igri. Ova ljestvica
+                rangira prosjek tih bodova.
+              </p>
+            {/if}
+          </section>
+        {:else if mojaPozicija?.status === 'nedovoljan_broj_igara' || mojaPozicija?.status === 'nije_igrano'}
+          <section class="osobna-kartica napredak" aria-label="Napredak do poretka">
+            <p class="osobna-mjesto">
+              Još {mojaPozicija.nedostajeIgara} {oblikTroboja(mojaPozicija.nedostajeIgara ?? 0)} do poretka!
+            </p>
+            <div
+              class="traka"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={mojaPozicija.minimumIgara}
+              aria-valuenow={mojaPozicija.odigraneIgre ?? 0}
+              aria-label="Napredak do ulaska u poredak"
+            >
+              <span class="traka-ispuna" style:width="{udioNapretka(mojaPozicija)}%"></span>
+            </div>
+            <p class="osobna-detalji">
+              {mojaPozicija.odigraneIgre ?? 0}/{mojaPozicija.minimumIgara}
+            </p>
+            {#if metrika === 'prosjek_bodova'}
+              <p class="objasnjenje-bodovanja">
+                Bodovanje Troboja: 1. mjesto 2 boda (+1 za pobjedu), 2. mjesto 1 bod, 3. mjesto 0;
+                +1 bod za svaku eliminaciju koju izazoveš. Najviše 5 bodova po igri. Ova ljestvica
+                rangira prosjek tih bodova.
+              </p>
+            {/if}
+          </section>
+        {:else if mojaPozicija?.status === 'nedovoljan_broj_poteza'}
+          <section class="osobna-kartica napredak" aria-label="Napredak do poretka">
+            <p class="osobna-mjesto">
+              Još {mojaPozicija.nedostajePoteza ?? 0} prihvaćenih poteza do poretka.
+            </p>
+            <p class="osobna-detalji">
+              {mojaPozicija.prihvaceniPotezi ?? 0}/{mojaPozicija.minimumPoteza ?? 0} poteza
+            </p>
+          </section>
+        {:else if mojaPozicija?.status === 'nema_rezultata'}
+          <p class="osobni-napredak">{praznoStanjeNaslov(metrika)}</p>
+        {:else if mojaPozicija?.status === 'podaci_nepotpuni'}
+          <p class="osobni-napredak">Rezultat još nije dostupan.</p>
+        {:else if mojaPozicija?.status === 'prijava_potrebna'}
+          <p class="osobni-napredak">Prijavi se za svoju poziciju.</p>
+        {/if}
 
-    <div class="ispod-tablice">
-      <button
-        type="button"
-        class="veza-pravila"
-        aria-expanded={prikaziPravila}
-        onclick={() => {
-          prikaziPravila = !prikaziPravila;
-        }}
-      >
-        Kako funkcioniraju ljestvice?
-      </button>
-      {#if prikaziPravila}
-        <div class="pravila-sadrzaj">
-          <p>
-            Ljestvica igrača prati javni Troboj (Brza igra). Prosjek bodova i niz pobjeda računaju se
-            samo iz završenih javnih igara u odabranom razdoblju.
-          </p>
-          <p>
-            Za ulazak treba {podaci.minimumIgara} {oblikIgre(podaci.minimumIgara)}. Kod jednakog
-            rezultata prednost ima igrač s više odigranih igara; ako je i broj igara isti, ranije
-            ostvaren rezultat.
-          </p>
-          <p>
-            Dnevni poredak se resetira u ponoć, tjedni u ponedjeljak, mjesečni prvog dana u mjesecu.
-            Gosti i registrirani igrači ulaze pod istim pravilima.
-          </p>
+        <h3 class="naslov-tablice">Top 10</h3>
+
+        {#if podaci.redci.length === 0}
+          <div class="prazno-stanje">
+            <p class="prazno-naslov">{praznoStanjeNaslov(metrika)}</p>
+            {#if jeVremenska}
+              <p>Još nitko nije ušao u {OBUHVAT_RAZDOBLJA[razdoblje]} poredak.</p>
+              <a class="akcija-gumb istaknut" href={putanjaBrzeIgre()}>Odigraj brzu igru</a>
+            {/if}
+          </div>
+        {:else}
+          <table class="tablica-mobilni-retci tablica-ljestvice">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Igrač</th>
+                <th scope="col">
+                  <span class="stupac-pun">{nazivMetrike(metrika)}</span>
+                  <span class="stupac-kratki">{nazivMetrike(metrika, true)}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each podaci.redci as redak (redak.igracId)}
+                {@const sekundarno = sekundarniTekst(redak.vrijednost, redak.odigraneIgre)}
+                <tr class:moj-redak={redak.jeJa} class:medalja-1={redak.mjesto === 1}>
+                  <td data-label="#">
+                    <span class="mjesto" aria-label="{redak.mjesto}. mjesto">{redak.mjesto}.</span>
+                  </td>
+                  <th scope="row">
+                    <span class="igrac-celija">
+                      <Avatar
+                        avatarId={redak.avatarId}
+                        avatarConfig={redak.avatarConfig}
+                        gost={!redak.jeJavanProfil}
+                        velicina={36}
+                        prikaziRangBorder={false}
+                      />
+                      <span class="igrac-tekst">
+                        {#if redak.jeJavanProfil}
+                          <a href={`/profil/javni/${redak.igracId}`}>{redak.nadimak}</a>
+                        {:else}
+                          <span class="nadimak">{redak.nadimak}</span>
+                        {/if}
+                        {#if redak.jeJa}<span class="oznaka-ti">Ovo si ti</span>{/if}
+                        {#if sekundarno}
+                          <span class="sekundarno">{sekundarno}</span>
+                        {/if}
+                      </span>
+                    </span>
+                  </th>
+                  <td class="vrijednost" data-label={nazivMetrike(metrika)}>
+                    {formatirajVrijednost(redak.vrijednost)}
+                    {#if redak.vrijednost.vrsta === 'dostignuca'}
+                      <span class="sr-only">{oblikZvjezdica(redak.vrijednost.zvjezdice)}</span>
+                    {/if}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+
+          {#if prikaziVlastitiIspod && mojRedak}
+            {@const sekundarnoVlastiti = sekundarniTekst(mojRedak.vrijednost, mojRedak.odigraneIgre)}
+            {#if mojRedak.mjesto >= 12}
+              <p class="razdjelnik" aria-hidden="true">···</p>
+            {/if}
+            <h3 class="naslov-vlastiti">Tvoja pozicija</h3>
+            <table class="tablica-mobilni-retci tablica-ljestvice vlastiti-ispod">
+              <tbody>
+                <tr class="moj-redak">
+                  <td data-label="#">{mojRedak.mjesto}.</td>
+                  <th scope="row">
+                    <span class="igrac-celija">
+                      <Avatar
+                        avatarId={mojRedak.avatarId}
+                        avatarConfig={mojRedak.avatarConfig}
+                        gost={!mojRedak.jeJavanProfil}
+                        velicina={36}
+                        prikaziRangBorder={false}
+                      />
+                      <span class="igrac-tekst">
+                        <span class="nadimak">{mojRedak.nadimak}</span>
+                        <span class="oznaka-ti">Ovo si ti</span>
+                        {#if sekundarnoVlastiti}
+                          <span class="sekundarno">{sekundarnoVlastiti}</span>
+                        {/if}
+                      </span>
+                    </span>
+                  </th>
+                  <td class="vrijednost" data-label={nazivMetrike(metrika)}>
+                    {formatirajVrijednost(mojRedak.vrijednost)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          {/if}
+        {/if}
+
+        {#if prikaziCtaRegistracije}
+          <aside class="cta-gost">
+            <p class="cta-gost-naslov">Sačuvaj svoje mjesto na ljestvici!</p>
+            <p>Registriraj se i zadrži svoje rezultate i dosadašnji napredak.</p>
+            <a class="veza-registracija" href="/registracija">Registriraj se</a>
+          </aside>
+        {/if}
+
+        <div class="ispod-tablice">
+          <button
+            type="button"
+            class="veza-pravila"
+            aria-expanded={prikaziPravila}
+            onclick={() => {
+              prikaziPravila = !prikaziPravila;
+            }}
+          >
+            Kako funkcioniraju ljestvice?
+          </button>
+          {#if prikaziPravila}
+            <div class="pravila-sadrzaj">
+              {#if jeVremenska}
+                <p>
+                  Ovo je ljestvica javnog Troboja (Brza igra). Privatne sobe, trening i izazovi ne
+                  ulaze.
+                </p>
+                <p>
+                  Za ulazak treba: dnevna 5 troboja; tjedna, mjesečna, godišnja i svih vremena 10
+                  troboja
+                  {#if metrika === 'najbrzi_igraci'}
+                    (te još 30 prihvaćenih poteza dnevno, odnosno 50 na duljim ljestvicama)
+                  {/if}.
+                </p>
+              {:else}
+                <p>
+                  Ovo je ljestvica ukupnog napretka (trenutno stanje računa). Nema minimalnog broja
+                  Troboja ni vremenskog filtera.
+                </p>
+              {/if}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
-  {/if}
+  </div>
 {:else}
   <p class="uvod-rijeci desktop-uvod">
     Otkrij riječi na kojima igrači najčešće ispadaju i iskoristi ih u sljedećoj igri.
@@ -574,28 +776,83 @@
     border-bottom-color: var(--boja-isticanje-slova);
   }
 
-  .metrike {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 0 0 14px;
+  .raspored-igraci {
+    display: grid;
+    gap: 20px;
   }
 
-  .metrika-gumb {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--boja-tekst-sekundarni);
-    padding: 6px 12px;
-    border-radius: var(--radijus-pill);
+  @media (min-width: 1000px) {
+    .raspored-igraci {
+      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+      align-items: start;
+      gap: 28px;
+    }
+  }
+
+  .grupa-naslov {
+    margin: 0 0 8px;
     font-size: var(--tekst-sitni);
-    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--boja-tekst-sekundarni);
+    font-weight: 700;
+  }
+
+  .grupa-metrika + .grupa-metrika {
+    margin-top: 16px;
+  }
+
+  .metrike-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .metrika-kartica {
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+    text-align: left;
+    padding: 10px;
+    border-radius: var(--radijus-kartica, 12px);
+    border: 1px solid var(--boja-obrub);
+    background: color-mix(in srgb, var(--boja-povrsina-2) 90%, transparent);
+    color: var(--boja-tekst-osnovni);
     cursor: pointer;
   }
 
-  .metrika-gumb.aktivan {
-    background: color-mix(in srgb, var(--boja-povrsina-2) 80%, white 20%);
-    border-color: var(--boja-obrub);
-    color: var(--boja-tekst-osnovni);
+  .metrika-kartica.aktivan {
+    border-color: var(--boja-isticanje-slova);
+    outline: 1px solid var(--boja-isticanje-slova);
+  }
+
+  .metrika-ikona {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+
+  .metrika-naziv {
+    font-weight: 700;
+    font-size: var(--tekst-mali);
+  }
+
+  /* Desktop: 1 gumb po redu, ikona + tekst u istom redu */
+  @media (min-width: 1000px) {
+    .metrike-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .metrika-kartica {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+  }
+
+  .poredak-naslov {
+    margin: 0 0 12px;
+    font-size: 1.25rem;
   }
 
   .razdoblja {
@@ -646,10 +903,18 @@
 
   .osobna-detalji,
   .odbrojavanje,
-  .osobni-napredak {
+  .osobni-napredak,
+  .objasnjenje-bodovanja {
     margin: 6px 0 0;
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mali);
+  }
+
+  .objasnjenje-bodovanja {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--boja-obrub);
+    line-height: 1.4;
   }
 
   .traka {
@@ -686,6 +951,40 @@
     border-collapse: collapse;
   }
 
+  .tablica-ljestvice th,
+  .tablica-ljestvice td,
+  .tablica-rijeci th,
+  .tablica-rijeci td {
+    padding: 10px 8px;
+    vertical-align: middle;
+    text-align: left;
+  }
+
+  /* Broj mjesta uz avatar — stupac se sužava na sadržaj */
+  .tablica-ljestvice th:first-child,
+  .tablica-ljestvice td:first-child,
+  .tablica-rijeci th:first-child,
+  .tablica-rijeci td:first-child {
+    width: 1%;
+    white-space: nowrap;
+    padding-right: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tablica-ljestvice th:nth-child(2),
+  .tablica-ljestvice td:nth-child(2),
+  .tablica-ljestvice th[scope='row'],
+  .tablica-rijeci th:nth-child(2),
+  .tablica-rijeci td:nth-child(2) {
+    padding-left: 0;
+  }
+
+  .vrijednost {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
   .igrac-celija {
     display: inline-flex;
     align-items: center;
@@ -707,15 +1006,43 @@
     white-space: nowrap;
   }
 
+  .sekundarno {
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
+    font-weight: 500;
+  }
+
   .oznaka-ti {
     color: var(--boja-isticanje-tekst);
     font-size: var(--tekst-sitni);
     font-weight: 700;
   }
 
+  @media (min-width: 1000px) {
+    .igrac-tekst {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 8px;
+    }
+
+    .oznaka-ti::before,
+    .sekundarno::before {
+      content: '·';
+      margin-right: 8px;
+      color: var(--boja-tekst-sekundarni);
+      font-weight: 500;
+    }
+  }
+
   .moj-redak {
     outline: 2px solid var(--boja-isticanje-slova);
     outline-offset: -2px;
+  }
+
+  .medalja-1 .mjesto {
+    color: var(--boja-isticanje-tekst);
+    font-weight: 800;
   }
 
   .razdjelnik {

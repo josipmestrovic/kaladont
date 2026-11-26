@@ -1,9 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
+  jeNapredakMetrika,
   kanonskiModLjestvice,
   METRIKE_LJESTVICA,
+  METRIKE_NAPRETKA_LJESTVICA,
+  METRIKE_VREMENSKE_LJESTVICA,
   minimumIgaraZaRazdoblje,
+  minimumPrihvacenihPotezaZaRazdoblje,
   odaberiSazetakLjestvice,
   PRIKAZI_LJESTVICA,
   prozorOkoMjesta,
@@ -11,6 +15,8 @@ import {
   VELICINA_PRIKAZA_LJESTVICE,
   type KandidatSazetkaLjestvice,
   type MetrikaLjestvice,
+  type MetrikaNapretkaLjestvice,
+  type MetrikaVremenskaLjestvice,
   type OdgovorLjestvice,
   type OdgovorSazetkaLjestvice,
   type PozicijaNaLjestvici,
@@ -20,13 +26,14 @@ import {
 import { konfiguracija } from '../konfiguracija.js';
 import { pokusajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
 import { odgovorNajopasnijihRijeci } from './najopasnije-rijeci.js';
+import { dohvatiPoredakNapretka, pozicijaNapretka } from './servis-napredak.js';
 import { dohvatiPoredak, obuhvatiRazdoblja, pozicijaIgraca, type Poredak, type StavkaPoretka } from './servis.js';
 
 const ShemaUpitaLjestvice = z.object({
   // Stari mod parametri (2p/4p) se kanonski normaliziraju na Troboj — bez tihog miješanja metrika.
   mod: z.enum(['cetiri_igraca', 'dva_igraca', 'tri_igraca']).default('tri_igraca'),
   metrika: z.enum(METRIKE_LJESTVICA).default('prosjek_bodova'),
-  razdoblje: z.enum(RAZDOBLJA_LJESTVICA).default('dnevno'),
+  razdoblje: z.enum(RAZDOBLJA_LJESTVICA).optional(),
   prikaz: z.enum(PRIKAZI_LJESTVICA).default('top'),
 });
 
@@ -45,32 +52,85 @@ function uRedak(stavka: StavkaPoretka, mojId: string | null): RedakLjestvice {
   };
 }
 
+function izreziPrikaz(
+  poredak: Poredak,
+  prikaz: 'top' | 'oko_mene',
+  mojaPozicija: PozicijaNaLjestvici,
+  mojId: string | null,
+): { redci: RedakLjestvice[]; mojRedak: RedakLjestvice | null } {
+  const prozor = prikaz === 'oko_mene' && mojaPozicija.mjesto !== null
+    ? prozorOkoMjesta(mojaPozicija.mjesto, poredak.rangirani.length)
+    : { od: 1, do: VELICINA_PRIKAZA_LJESTVICE };
+  const redci = poredak.rangirani.slice(prozor.od - 1, prozor.do).map((stavka) => uRedak(stavka, mojId));
+  let mojRedak: RedakLjestvice | null = null;
+  if (mojId && mojaPozicija.status === 'rangiran' && mojaPozicija.mjesto !== null) {
+    const vlastita = poredak.poIgracu.get(mojId);
+    if (vlastita?.mjesto !== null && vlastita?.mjesto !== undefined) {
+      mojRedak = uRedak(vlastita, mojId);
+    }
+  }
+  return { redci, mojRedak };
+}
+
 export async function registrirajLjestviceRute(app: FastifyInstance): Promise<void> {
   app.get('/ljestvice', { preHandler: pokusajIdentifikaciju }, async (zahtjev, odgovor) => {
     const upit = ShemaUpitaLjestvice.safeParse(zahtjev.query);
     if (!upit.success) {
       return odgovor.code(400).send({ ok: false, greska: 'Neispravni parametri ljestvice.' });
     }
-    const metrika = upit.data.metrika;
-    const razdoblje = upit.data.razdoblje;
+    const metrika = upit.data.metrika as MetrikaLjestvice;
     const prikaz = upit.data.prikaz;
-    const mod = kanonskiModLjestvice(upit.data.mod);
     const mojId = (zahtjev as ZahtjevSIgracem).igrac?.id ?? null;
     const sada = new Date();
+
+    if (jeNapredakMetrika(metrika)) {
+      if (upit.data.razdoblje !== undefined) {
+        // Kumulativne metrike ne primaju vremenski filter — zanemari ili odbij?
+        // Dokument: ne forsirati razdoblje; zanemarujemo radi kompatibilnosti deep linkova.
+      }
+      const poredak = await dohvatiPoredakNapretka(metrika as MetrikaNapretkaLjestvice, sada);
+      const mojaPozicija = pozicijaNapretka(poredak, mojId);
+      const { redci, mojRedak } = izreziPrikaz(poredak, prikaz, mojaPozicija, mojId);
+      const tijelo: OdgovorLjestvice = {
+        ok: true,
+        vrstaOdgovora: 'napredak',
+        metrika: metrika as MetrikaNapretkaLjestvice,
+        prikaz,
+        opisObuhvata: 'Ukupni napredak · Svi podržani modovi',
+        redci,
+        mojRedak,
+        mojaPozicija,
+        izracunatoU: sada.toISOString(),
+      };
+      void odgovor.header('cache-control', 'private, no-store');
+      return tijelo;
+    }
+
+    const razdoblje = upit.data.razdoblje ?? 'dnevno';
+    const vremenska = metrika as MetrikaVremenskaLjestvice;
+    const mod = kanonskiModLjestvice(upit.data.mod);
     const obuhvati = obuhvatiRazdoblja(sada, new Date(konfiguracija.LJESTVICE_POCETAK));
 
     const poretci = new Map<RazdobljeLjestvice, Poredak>();
     await Promise.all(RAZDOBLJA_LJESTVICA.map(async (vrsta) => {
       const obuhvat = obuhvati[vrsta];
       if (obuhvat.zakljucano) return;
-      poretci.set(vrsta, await dohvatiPoredak(mod, metrika, vrsta, obuhvat.od, obuhvat.doUpita, sada));
+      poretci.set(vrsta, await dohvatiPoredak(mod, vremenska, vrsta, obuhvat.od, obuhvat.doUpita, sada));
     }));
 
     const pozicijePoRazdobljima = Object.fromEntries(RAZDOBLJA_LJESTVICA.map((vrsta) => {
       const poredak = poretci.get(vrsta);
       const pozicija: PozicijaNaLjestvici = poredak
         ? pozicijaIgraca(poredak, mojId)
-        : { status: 'zakljucano', mjesto: null, odigraneIgre: null, minimumIgara: minimumIgaraZaRazdoblje(vrsta), nedostajeIgara: null };
+        : {
+          status: 'zakljucano',
+          mjesto: null,
+          odigraneIgre: null,
+          minimumIgara: minimumIgaraZaRazdoblje(vrsta),
+          nedostajeIgara: null,
+          minimumPoteza: vremenska === 'najbrzi_igraci' ? minimumPrihvacenihPotezaZaRazdoblje(vrsta) : null,
+          nedostajePoteza: null,
+        };
       return [vrsta, pozicija];
     })) as Record<RazdobljeLjestvice, PozicijaNaLjestvici>;
 
@@ -80,22 +140,14 @@ export async function registrirajLjestviceRute(app: FastifyInstance): Promise<vo
     let redci: RedakLjestvice[] = [];
     let mojRedak: RedakLjestvice | null = null;
     if (poredak) {
-      const prozor = prikaz === 'oko_mene' && mojaPozicija.mjesto !== null
-        ? prozorOkoMjesta(mojaPozicija.mjesto, poredak.rangirani.length)
-        : { od: 1, do: VELICINA_PRIKAZA_LJESTVICE };
-      redci = poredak.rangirani.slice(prozor.od - 1, prozor.do).map((stavka) => uRedak(stavka, mojId));
-      if (mojId && mojaPozicija.status === 'rangiran' && mojaPozicija.mjesto !== null) {
-        const vlastita = poredak.poIgracu.get(mojId);
-        if (vlastita?.mjesto !== null && vlastita?.mjesto !== undefined) {
-          mojRedak = uRedak(vlastita, mojId);
-        }
-      }
+      ({ redci, mojRedak } = izreziPrikaz(poredak, prikaz, mojaPozicija, mojId));
     }
 
     const tijelo: OdgovorLjestvice = {
       ok: true,
+      vrstaOdgovora: 'vremenska',
       mod,
-      metrika,
+      metrika: vremenska,
       prikaz,
       razdoblje: {
         vrsta: razdoblje,
@@ -106,6 +158,7 @@ export async function registrirajLjestviceRute(app: FastifyInstance): Promise<vo
         otkljucavaSe: odabrani.otkljucavaSe?.toISOString() ?? null,
       },
       minimumIgara: minimumIgaraZaRazdoblje(razdoblje),
+      minimumPoteza: vremenska === 'najbrzi_igraci' ? minimumPrihvacenihPotezaZaRazdoblje(razdoblje) : null,
       redci,
       mojRedak,
       mojaPozicija,
@@ -131,8 +184,8 @@ export async function registrirajLjestviceRute(app: FastifyInstance): Promise<vo
     const obuhvati = obuhvatiRazdoblja(sada, new Date(konfiguracija.LJESTVICE_POCETAK));
     const kandidati: KandidatSazetkaLjestvice[] = [];
 
-    await Promise.all(
-      METRIKE_LJESTVICA.flatMap((metrika: MetrikaLjestvice) =>
+    await Promise.all([
+      ...METRIKE_VREMENSKE_LJESTVICA.flatMap((metrika) =>
         RAZDOBLJA_LJESTVICA.map(async (razdoblje) => {
           const obuhvat = obuhvati[razdoblje];
           if (obuhvat.zakljucano) return;
@@ -140,7 +193,11 @@ export async function registrirajLjestviceRute(app: FastifyInstance): Promise<vo
           kandidati.push({ metrika, razdoblje, pozicija: pozicijaIgraca(poredak, mojId) });
         }),
       ),
-    );
+      ...METRIKE_NAPRETKA_LJESTVICA.map(async (metrika) => {
+        const poredak = await dohvatiPoredakNapretka(metrika, sada);
+        kandidati.push({ metrika, razdoblje: null, pozicija: pozicijaNapretka(poredak, mojId) });
+      }),
+    ]);
 
     const tijelo: OdgovorSazetkaLjestvice = {
       ok: true,

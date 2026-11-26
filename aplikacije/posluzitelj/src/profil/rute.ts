@@ -12,8 +12,9 @@ import {
   izgradiAgregateLevela,
   izracunajRangIzAgregata,
   izracunajUniverzalniUcinak,
-  izracunajRazinuDostignuca,
   izracunajZvjezdiceIzazivaca,
+  izracunajSazetakZvjezdicaDostignuca,
+  izracunajRazinuDostignuca,
   jeDostignuceNovo,
   jeDostignuceVidljivo,
   jePrihvacenaAktualnaVerzijaUvjeta,
@@ -630,13 +631,16 @@ async function dohvatiDostignucaZaIgraca(igracId: string, iskustvoUkupno: number
       novo: razina > 0 && jeDostignuceNovo(zapis?.zadnjeOtkljucavanje ?? null),
     };
   });
+  const sazetak = izracunajSazetakZvjezdicaDostignuca({
+    iskustvoUkupno,
+    najboljiNizAktivnosti,
+    spremljeneRazine: razine,
+    brojac: brojac ?? null,
+  });
   return {
-    ukupnoZvjezdica: dostignuca.reduce((zbroj, dostignuce) => zbroj + dostignuce.razina, 0),
-    ukupnoOtkljucanih: dostignuca.filter((dostignuce) => dostignuce.razina > 0).length,
-    maksimalnoZvjezdica: vidljiveDefinicije.reduce(
-      (zbroj, definicija) => zbroj + definicija.pragovi.length,
-      0,
-    ),
+    ukupnoZvjezdica: sazetak.ukupnoZvjezdica,
+    ukupnoOtkljucanih: sazetak.ukupnoOtkljucanih,
+    maksimalnoZvjezdica: sazetak.maksimalnoZvjezdica,
     dostignuca,
   };
 }

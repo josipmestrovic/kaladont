@@ -3,10 +3,18 @@ import {
   formatirajOdbrojavanje,
   godisnjicaPocetka,
   graniceRazdoblja,
+  jeNapredakMetrika,
+  jeVremenskaMetrika,
   kalendarskeGranice,
+  METRIKE_LJESTVICA,
+  METRIKE_NAPRETKA_LJESTVICA,
+  METRIKE_VREMENSKE_LJESTVICA,
   minimumIgaraZaRazdoblje,
+  minimumPrihvacenihPotezaZaRazdoblje,
   odaberiSazetakLjestvice,
+  putanjaLjestvice,
   prozorOkoMjesta,
+  REGISTAR_METRIKA_LJESTVICA,
   type PozicijaNaLjestvici,
 } from '../src/ljestvice.js';
 
@@ -121,6 +129,34 @@ describe('odbrojavanje', () => {
   });
 });
 
+describe('registri metrika', () => {
+  it('ima osam metrika u dvije grupe', () => {
+    expect(METRIKE_VREMENSKE_LJESTVICA).toHaveLength(4);
+    expect(METRIKE_NAPRETKA_LJESTVICA).toHaveLength(4);
+    expect(METRIKE_LJESTVICA).toHaveLength(8);
+    for (const metrika of METRIKE_LJESTVICA) {
+      expect(REGISTAR_METRIKA_LJESTVICA[metrika].kljuc).toBe(metrika);
+    }
+    expect(jeVremenskaMetrika('najbrzi_igraci')).toBe(true);
+    expect(jeNapredakMetrika('kolekcija')).toBe(true);
+    expect(jeVremenskaMetrika('iskustvo')).toBe(false);
+  });
+
+  it('pragovi igara i poteza', () => {
+    expect(minimumIgaraZaRazdoblje('dnevno')).toBe(5);
+    expect(minimumIgaraZaRazdoblje('tjedno')).toBe(10);
+    expect(minimumPrihvacenihPotezaZaRazdoblje('dnevno')).toBe(30);
+    expect(minimumPrihvacenihPotezaZaRazdoblje('svih_vremena')).toBe(50);
+  });
+
+  it('gradi deep link bez razdoblja za napredak', () => {
+    expect(putanjaLjestvice('kolekcija')).toBe('/ljestvice?kategorija=igraci&metrika=kolekcija');
+    expect(putanjaLjestvice('najbrzi_igraci', 'tjedno')).toBe(
+      '/ljestvice?kategorija=igraci&metrika=najbrzi_igraci&razdoblje=tjedno',
+    );
+  });
+});
+
 describe('odaberiSazetakLjestvice', () => {
   it('bira najmanje mjesto, pri izjednačenju prosjek pa dulje razdoblje', () => {
     expect(
@@ -131,6 +167,16 @@ describe('odaberiSazetakLjestvice', () => {
         { metrika: 'prosjek_bodova', razdoblje: 'dnevno', pozicija: pozicija({ status: 'rangiran', mjesto: 24 }) },
       ]),
     ).toEqual({ vrsta: 'rangiran', mjesto: 4, metrika: 'prosjek_bodova', razdoblje: 'mjesecno' });
+  });
+
+  it('pri istom mjestu prednost ima troboj ispred napretka, zatim brzina ispred niza riječi', () => {
+    expect(
+      odaberiSazetakLjestvice([
+        { metrika: 'kolekcija', razdoblje: null, pozicija: pozicija({ status: 'rangiran', mjesto: 2 }) },
+        { metrika: 'najbrzi_igraci', razdoblje: 'tjedno', pozicija: pozicija({ status: 'rangiran', mjesto: 2 }) },
+        { metrika: 'niz_rijeci', razdoblje: 'svih_vremena', pozicija: pozicija({ status: 'rangiran', mjesto: 2 }) },
+      ]),
+    ).toEqual({ vrsta: 'rangiran', mjesto: 2, metrika: 'najbrzi_igraci', razdoblje: 'tjedno' });
   });
 
   it('bez ranga bira najmanji pozitivni nedostajeIgara', () => {

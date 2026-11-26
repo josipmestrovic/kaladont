@@ -19,6 +19,7 @@ describe('naslovnica-ljestvice', () => {
     })).toMatchObject({
       kratki: '4. tjedno',
       puni: 'Trenutno si 4. na tjednoj',
+      href: '/ljestvice?kategorija=igraci&metrika=prosjek_bodova&razdoblje=tjedno',
     });
 
     expect(tekstSazetkaLjestvice({
@@ -26,7 +27,24 @@ describe('naslovnica-ljestvice', () => {
       mjesto: 1,
       metrika: 'niz_pobjeda',
       razdoblje: 'mjesecno',
-    })?.kratki).toBe('1. mjesečno · niz');
+    })?.kratki).toBe('1. mjesečno · Niz pobjeda');
+
+    expect(tekstSazetkaLjestvice({
+      vrsta: 'rangiran',
+      mjesto: 3,
+      metrika: 'kolekcija',
+      razdoblje: null,
+    })).toMatchObject({
+      kratki: '3. među kolekcionarima',
+      href: '/ljestvice?kategorija=igraci&metrika=kolekcija',
+    });
+
+    expect(tekstSazetkaLjestvice({
+      vrsta: 'rangiran',
+      mjesto: 5,
+      metrika: 'najbrzi_igraci',
+      razdoblje: 'tjedno',
+    })?.puni).toBe('5. najbrži igrač ovog tjedna');
 
     expect(tekstSazetkaLjestvice({
       vrsta: 'nedostaje',
