@@ -1192,8 +1192,12 @@
         : rezervniRokRezultataMs;
 
     // #159: pljesak pobjede lokalnom ljudskom pobjedniku; ne duplirati nakon Kaladonta.
+    // U Izazovima samo uz uspješan izazov — pobjeda partije bez ispunjenih uvjeta ne svira pljesak.
     const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
-    pokusajPljesakPobjede(kraj.partijaId, stanje.mojIgracId, pobjednikId);
+    const pljesakIzazovaOk = !jeIzazov || stanje.izazovTerminal?.status === 'uspjeh';
+    if (pljesakIzazovaOk) {
+      pokusajPljesakPobjede(kraj.partijaId, stanje.mojIgracId, pobjednikId);
+    }
 
     const otkrijRezultate = () => {
       stanje.rezultatiPrikazaniPartijaId = kraj.partijaId;
