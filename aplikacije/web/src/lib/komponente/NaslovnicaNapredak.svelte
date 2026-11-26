@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    gostImaXp,
     izracunajPrikazXp,
     tekstRegistracijeGosta,
   } from '$lib/naslovnica-napredak.js';
@@ -8,12 +7,6 @@
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import Avatar from './Avatar.svelte';
   import NaslovnicaObavijesti from './NaslovnicaObavijesti.svelte';
-
-  let {
-    izazoviZavrseno = 0,
-  }: {
-    izazoviZavrseno?: number;
-  } = $props();
 
   const prikaz = $derived(izracunajPrikazXp(stanjeProfila.profil, stanjeProfila.status));
   const profil = $derived(stanjeProfila.profil);
@@ -29,12 +22,7 @@
       ? `${nadimak}, ${prikaz.rang}, razina ${prikaz.razina}`
       : prikaz.natpis,
   );
-  const gostCtaTekst = $derived(
-    tekstRegistracijeGosta({
-      imaXp: gostImaXp(profil?.iskustvo),
-      imaZavrseneIzazove: izazoviZavrseno > 0,
-    }),
-  );
+  const gostCtaTekst = tekstRegistracijeGosta();
   const linkNaProfil = $derived(stanjeProfila.status === 'spreman' && !jeGostProfil);
   /** Desktop raspored za registrirane — neovisno o broju dostignuća. */
   const prikaziRegistriranRaspored = $derived(linkNaProfil);
@@ -80,7 +68,6 @@
         onclick={() => zabiljeziUmamiDogadjaj('naslovnica-registracija-klik')}
       >
         <span class="naslovnica-gost-registracija__tekst">{gostCtaTekst}</span>
-        <span class="naslovnica-gost-registracija__akcija">Registriraj se ›</span>
       </a>
       <p class="naslovnica-gost-prijava">
         Već imaš račun?
@@ -357,7 +344,7 @@
     text-align: right;
   }
 
-  .naslovnica-gost-registracija:hover .naslovnica-gost-registracija__akcija {
+  .naslovnica-gost-registracija:hover .naslovnica-gost-registracija__tekst {
     text-decoration: underline;
   }
 
@@ -368,20 +355,11 @@
   }
 
   .naslovnica-gost-registracija__tekst {
-    font-family: var(--font-tijelo);
-    font-size: var(--tekst-sitni);
-    font-weight: 500;
-    line-height: 1.3;
-  }
-
-  .naslovnica-gost-registracija__akcija {
     color: var(--boja-crvena);
     font-family: var(--font-tijelo);
     font-size: clamp(15px, 2.1dvh, 17px);
     font-weight: 800;
     line-height: 1.25;
-    text-decoration: none;
-    white-space: nowrap;
   }
 
   .naslovnica-gost-prijava {
@@ -544,11 +522,11 @@
     color: color-mix(in srgb, var(--boja-akcent-tekst) 90%, #8a6a00);
   }
 
-  :global(html[data-tema='svijetla']) .naslovnica-gost-registracija__akcija {
+  :global(html[data-tema='svijetla']) .naslovnica-gost-registracija__tekst {
     color: color-mix(in srgb, var(--boja-crvena) 88%, #5a1a08);
   }
 
-  :global(html:not([data-tema='svijetla'])) .naslovnica-gost-registracija__akcija {
+  :global(html:not([data-tema='svijetla'])) .naslovnica-gost-registracija__tekst {
     color: color-mix(in srgb, var(--boja-crvena) 72%, #fff);
   }
 </style>

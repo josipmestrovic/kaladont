@@ -15,14 +15,9 @@ export type PrikazXpSazetka =
       maksimalna: boolean;
     };
 
-/** Personalizirani popratni tekst uz registraciju gosta (bez novog API-ja). */
-export function tekstRegistracijeGosta(opcije: {
-  imaXp: boolean;
-  imaZavrseneIzazove: boolean;
-}): string {
-  if (opcije.imaZavrseneIzazove) return 'Sačuvaj napredak u izazovima.';
-  if (opcije.imaXp) return 'Sačuvaj svoje iskustvo.';
-  return 'Sačuvaj svoj napredak.';
+/** Jedinstveni CTA tekst za gosta na naslovnici. */
+export function tekstRegistracijeGosta(): string {
+  return 'Sačuvaj napredak.';
 }
 
 export function gostImaXp(iskustvo: ProfilIskustvo | undefined): boolean {

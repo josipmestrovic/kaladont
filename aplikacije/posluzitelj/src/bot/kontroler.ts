@@ -31,6 +31,7 @@ import {
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
   odaberiReakcijuPriIspadanju,
+  odgodaBravoNakonNeZnamMs,
   odgodaPocetnogPozdravaMs,
   odgodaReakcijeMs,
 } from './reakcije.js';
@@ -238,6 +239,7 @@ export class BotKontroler {
   /**
    * Eliminator (sorry-pool) i žrtva-bot (bravo-pool) kad postoji zaslužni protivnik.
    * Samoeliminacija / prekid bez bodZa → tišina za žrtvu.
+   * Kod „Ne znam” bravo žrtve kasni dok klijent ne skine tužnu reakciju s istog sjedala.
    */
   naEliminaciju(
     partijaId: string,
@@ -246,6 +248,7 @@ export class BotKontroler {
     bodZaId: string | null,
     sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot' }[],
     eliminacijaId: string,
+    razlog?: string,
   ): void {
     void kontekst;
     if (this.zaustavljen || !this.ovisnosti.posaljiReakciju) return;
@@ -259,7 +262,18 @@ export class BotKontroler {
       this.zakaziEliminacijskuReakciju(partijaId, bodZaId, eliminacijaId, 'sorry', odaberiReakcijuPriEliminacijiProtivnika(this.rngPrezentacije));
     }
     if (jeBot(zrtvaId) && bodZaId) {
-      this.zakaziEliminacijskuReakciju(partijaId, zrtvaId, eliminacijaId, 'bravo', odaberiReakcijuPriIspadanju(this.rngPrezentacije));
+      const konfiguracija = this.konfiguracijePartija.get(partijaId) ?? this.ovisnosti.konfiguracija;
+      const bravoOdgoda = razlog === 'ne_znam'
+        ? odgodaBravoNakonNeZnamMs(this.rngPrezentacije, konfiguracija)
+        : undefined;
+      this.zakaziEliminacijskuReakciju(
+        partijaId,
+        zrtvaId,
+        eliminacijaId,
+        'bravo',
+        odaberiReakcijuPriIspadanju(this.rngPrezentacije),
+        bravoOdgoda,
+      );
     }
   }
 
@@ -269,11 +283,12 @@ export class BotKontroler {
     eliminacijaId: string,
     kategorija: Exclude<KategorijaReakcije, 'pozdrav'>,
     poruka: BrzaPoruka,
+    fiksnaOdgodaMs?: number,
   ): void {
     const kljuc = `${partijaId}:${eliminacijaId}:${igracId}:${kategorija}`;
     if (this.poslaneEliminacijskeReakcije.has(kljuc)) return;
     this.poslaneEliminacijskeReakcije.add(kljuc);
-    this.zakaziReakciju(partijaId, igracId, poruka);
+    this.zakaziReakciju(partijaId, igracId, poruka, fiksnaOdgodaMs);
   }
 
   private planiraj(dogadaj: DogadajPoteza): void {

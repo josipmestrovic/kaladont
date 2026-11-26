@@ -50,22 +50,8 @@ describe('izracunajPrikazXp', () => {
 });
 
 describe('tekstRegistracijeGosta', () => {
-  it('prednost daje izazovima pred XP-om', () => {
-    expect(tekstRegistracijeGosta({ imaXp: true, imaZavrseneIzazove: true })).toBe(
-      'Sačuvaj napredak u izazovima.',
-    );
-  });
-
-  it('koristi XP tekst kad nema izazova', () => {
-    expect(tekstRegistracijeGosta({ imaXp: true, imaZavrseneIzazove: false })).toBe(
-      'Sačuvaj svoje iskustvo.',
-    );
-  });
-
-  it('koristi default bez napretka', () => {
-    expect(tekstRegistracijeGosta({ imaXp: false, imaZavrseneIzazove: false })).toBe(
-      'Sačuvaj svoj napredak.',
-    );
+  it('vraća fiksni CTA Sačuvaj napredak.', () => {
+    expect(tekstRegistracijeGosta()).toBe('Sačuvaj napredak.');
   });
 });
 

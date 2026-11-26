@@ -4,12 +4,14 @@ import { ZADANA_KONFIGURACIJA_BOTA } from '../src/bot/konfiguracija-bota.js';
 import {
   DODATNA_ODGODA_REAKCIJE_MS,
   MINIMALNA_ODGODA_REAKCIJE_MS,
+  ODGODA_BRAVO_NAKON_NE_ZNAM_MS,
   POOL_BRAVO,
   POOL_POZDRAV,
   POOL_SORRY,
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
   odaberiReakcijuPriIspadanju,
+  odgodaBravoNakonNeZnamMs,
   odgodaPocetnogPozdravaMs,
   odgodaReakcijeMs,
 } from '../src/bot/reakcije.js';
@@ -24,6 +26,11 @@ describe('bot reakcije — odabir', () => {
     expect(odgodaReakcijeMs(() => 0.5, { odgodaReakcijeMinMs: 2_500 })).toBe(
       2_500 + Math.floor(0.5 * (DODATNA_ODGODA_REAKCIJE_MS + 1)),
     );
+  });
+
+  it('bravo nakon „Ne znam” čeka kraj tužne reakcije', () => {
+    expect(odgodaBravoNakonNeZnamMs(() => 0)).toBe(ODGODA_BRAVO_NAKON_NE_ZNAM_MS);
+    expect(odgodaBravoNakonNeZnamMs(() => 0, { odgodaReakcijeMinMs: 5_000 })).toBe(5_000);
   });
 
   it('početni pozdravi: javna od 1. runde, stol tijekom odbrojavanja', () => {
@@ -184,6 +191,14 @@ describe('bot reakcije — kontroler', () => {
     ], 'p3:1');
     expect(zakazano).toHaveLength(0);
     expect(poslano).toHaveLength(0);
+
+    zakazano.length = 0;
+    kontroler.naEliminaciju('p2b', 'javna', 'bot-zrtva', 'covjek', [
+      { igracId: 'bot-zrtva', upravljac: 'bot' },
+      { igracId: 'covjek', upravljac: 'covjek' },
+    ], 'p2b:1', 'ne_znam');
+    expect(zakazano).toHaveLength(1);
+    expect(zakazano[0]!.ms).toBeGreaterThanOrEqual(ODGODA_BRAVO_NAKON_NE_ZNAM_MS);
   });
 
   it('cooldown pomiče drugu reakciju istog bota', () => {

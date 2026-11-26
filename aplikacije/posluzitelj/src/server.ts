@@ -480,7 +480,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       naPromjenuPoteza: (dogadaj) => botKontroler.naPromjenuPoteza(dogadaj),
       naPocetakPartijeZaBotove: (partijaId, kontekst, botIds) => botKontroler.naPocetakPartije(partijaId, kontekst, botIds),
       naKonfiguracijuBotovaPartije: (partijaId, konfiguracija) => botKontroler.postaviKonfiguracijuPartije(partijaId, konfiguracija),
-      naEliminacijuZaBotove: (partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId) => botKontroler.naEliminaciju(partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId),
+      naEliminacijuZaBotove: (partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId, razlog) => botKontroler.naEliminaciju(partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId, razlog),
       naPartijaZavrsila: (partijaId) => {
         sobaServis?.naPartijaZavrsila(partijaId);
         naJavnaPartijaZavrsila(partijaId);

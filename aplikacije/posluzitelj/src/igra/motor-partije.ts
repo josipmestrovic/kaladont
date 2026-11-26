@@ -196,6 +196,7 @@ export interface PostavkeMotoraPartije {
     bodZaId: string | null,
     sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot' }[],
     eliminacijaId: string,
+    razlog: string,
   ) => void;
   maksimalnoAktivnihTreninga?: number;
   dohvatiRokoveNeaktivnostiTreninga?: () => { upozorenjeMs: number; zatvaranjeMs: number };
@@ -2438,6 +2439,7 @@ export function stvoriUpraviteljPartija(
       napadac,
       stanje.sudionici.map((s) => ({ igracId: s.igracId, upravljac: s.upravljac })),
       eliminacijaId,
+      razlog,
     );
 
     if (stanje.politika.dajeNapredak && razlog !== 'prekid') {

@@ -13,6 +13,10 @@ export const POOL_BRAVO = ['dobro-odigrano', 'najjaci', 'svaka-cast'] as const s
 
 export const MINIMALNA_ODGODA_REAKCIJE_MS = 2_000;
 export const DODATNA_ODGODA_REAKCIJE_MS = 1_000;
+/** Klijent drži „Ne znam” ~3,5 s na žrtvi — bravo ne smije doći dok ta reakcija traje. */
+export const TRAJANJE_NE_ZNAM_REAKCIJE_MS = 3_500;
+/** Minimalna odgoda bravo žrtve-bota nakon ispadanja na „Ne znam” (+ zračnost). */
+export const ODGODA_BRAVO_NAKON_NE_ZNAM_MS = TRAJANJE_NE_ZNAM_REAKCIJE_MS + 500;
 
 function izaberiIzPoola(pool: readonly BrzaPoruka[], rng: Rng): BrzaPoruka {
   const indeks = Math.min(pool.length - 1, Math.floor(rng() * pool.length));
@@ -27,6 +31,14 @@ function izmeduMs(minMs: number, maxMs: number, rng: Rng): number {
 export function odgodaReakcijeMs(rng: Rng, konfiguracija?: Pick<KonfiguracijaBota, 'odgodaReakcijeMinMs'>): number {
   const baza = konfiguracija?.odgodaReakcijeMinMs ?? MINIMALNA_ODGODA_REAKCIJE_MS;
   return baza + Math.floor(rng() * (DODATNA_ODGODA_REAKCIJE_MS + 1));
+}
+
+/** Bravo na istom sjedalu kao „Ne znam” — najmanje do kraja tužne reakcije (+ uobičajeni jitter). */
+export function odgodaBravoNakonNeZnamMs(
+  rng: Rng,
+  konfiguracija?: Pick<KonfiguracijaBota, 'odgodaReakcijeMinMs'>,
+): number {
+  return Math.max(ODGODA_BRAVO_NAKON_NE_ZNAM_MS, odgodaReakcijeMs(rng, konfiguracija));
 }
 
 /**

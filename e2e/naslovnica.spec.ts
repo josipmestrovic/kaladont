@@ -154,8 +154,8 @@ test('naslovnica prikazuje XP sažetak i gostujući CTA bez linka na profil', as
   const gostCta = page.getByTestId('naslovnica-gost-registracija');
   await expect(gostCta).toBeVisible({ timeout: 20_000 });
   await expect(gostCta).toHaveAttribute('href', '/registracija');
-  await expect(gostCta).toContainText('Sačuvaj svoj napredak.');
-  await expect(gostCta).toContainText('Registriraj se');
+  await expect(gostCta).toHaveText('Sačuvaj napredak.');
+  await expect(gostCta).not.toContainText('Registriraj se');
   const gostBlok = page.getByTestId('naslovnica-gost-cta');
   await expect(gostBlok).toContainText('Već imaš račun?');
   await expect(page.getByTestId('naslovnica-gost-prijava')).toHaveAttribute('href', '/prijava');
