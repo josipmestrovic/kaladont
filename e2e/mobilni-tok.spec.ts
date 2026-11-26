@@ -45,10 +45,10 @@ for (const brojSjedala of [2, 3, 4, 8]) {
       }, brojSjedala);
       const unos = stranica.getByRole('textbox', { name: 'Dovrši riječ na ČA' });
       await expect(unos).toBeVisible();
-      // Zadano bez autofokusa: overlay se ne otvara dok igrač ne fokusira unos.
-      await expect(stranica.locator('.zona-poteza')).not.toHaveClass(/mobilni-potez/);
-      await expect(stranica.getByTestId('postavka-autofokus-poteza')).toBeVisible();
-      await unos.focus();
+      // Autofokus uvijek: tipkovnički overlay se otvara čim igrač dođe na red.
+      await expect(unos).toBeFocused();
+      await expect(stranica.locator('.zona-poteza')).toHaveClass(/mobilni-potez/);
+      await expect(stranica.getByTestId('postavka-autofokus-poteza')).toHaveCount(0);
       await expect(unos).toHaveCSS('font-size', '18px');
       await expect(unos).toHaveAttribute('autocapitalize', 'none');
       await expect(unos).toHaveAttribute('autocorrect', 'off');

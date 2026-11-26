@@ -98,9 +98,9 @@
     if (!terminalStatus) return 'Rezultat izazova';
     if (tehnicki) return 'Izazov je prekinut';
     if (uspjeh) {
-      if (xp.firstCompletion === true) return 'Izazov prijeđen!';
+      if (xp.firstCompletion === true) return 'Izazov uspješno odrađen!';
       if (xp.firstCompletion === false) return 'Izazov ponovno uspješno odigran!';
-      return 'Izazov uspješan!';
+      return 'Izazov uspješno odrađen!';
     }
     if (terminalReason === 'prekid_veze') return 'Izazov je prekinut';
     return 'Izazov nije završen';

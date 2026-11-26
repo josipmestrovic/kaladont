@@ -189,7 +189,7 @@ test('injicirani uspjeh prikazuje nagrade, poredak i CTA', async ({ page }) => {
   );
 
   await expect(page.getByTestId('rezultat-izazova')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('heading', { name: 'Izazov prijeđen!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Izazov uspješno odrađen!' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Uvjeti za prelazak izazova' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Završni poredak' })).toBeVisible();
   await expect(page.getByTestId('izazov-zavrsni-poredak')).toContainText('Pobjeda');

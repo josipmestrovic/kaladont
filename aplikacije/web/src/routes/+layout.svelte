@@ -15,7 +15,6 @@
     preucitajUiZvukove,
   } from '$lib/audio-manager.js';
   import { ucitajKriticneIkone, ucitajPozadinskeAseteLandinga } from '$lib/asetovi-core.js';
-  import { inicijalizirajAutofokusPoteza } from '$lib/postavke-autofokus-poteza.js';
   import { inicijalizirajFontPostavku } from '$lib/postavke-fonta.js';
   import { inicijalizirajTemu } from '$lib/postavke-teme.js';
   import {
@@ -108,7 +107,6 @@
   onMount(() => {
     inicijalizirajTemu();
     inicijalizirajFontPostavku();
-    inicijalizirajAutofokusPoteza();
     inicijalizirajAnimacijuPozadine();
     inicijalizirajGlas();
     inicijalizirajAudio();
