@@ -167,11 +167,8 @@
       .map((s) => profilIzNadimkaTreningBota(s.nadimak))
       .find((id) => id != null) ?? null;
   })());
-  const IKONA_RACUNALA = '/ikone/67-zagrijavanje-bot.webp';
-  function slikaSjedala(igracId: string, jeBot = false): string | null {
-    if (igracId.startsWith('racunalo-')) return IKONA_RACUNALA;
-    if (jeBot) return putanjaBotAvatara(igracId);
-    return null;
+  function slikaSjedala(igracId: string, nadimak: string, jeBot = false): string | null {
+    return putanjaBotAvatara({ jeBot, nadimak, igracId });
   }
   function statusSjedala(sjedalo: { jeBot?: boolean; jeGost?: boolean; rang: string | null; razina: number }): string | null {
     // U čekaonici/partiji nema bedža „Bot”; status Bot ide samo na završni poredak.
@@ -1967,7 +1964,7 @@
                 {/if}
                 <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                   {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.jeBot === true)} /></span>
+                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
                   {/key}
                   {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                     <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -2001,7 +1998,7 @@
                 {/if}
                 <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                   {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.jeBot === true)} /></span>
+                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
                   {/key}
                   {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                     <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -2059,7 +2056,7 @@
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                 {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.jeBot === true)} /></span>
+                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                   <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -2099,7 +2096,7 @@
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                 {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, false)} /></span>
+                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, false)} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                   <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />

@@ -250,7 +250,7 @@
           velicina={84}
           razinaVatre={mjesto.jeBot ? 0 : mjesto.razinaVatre}
           nizPobjeda={mjesto.jeBot ? 0 : mjesto.trenutniNiz}
-          vanjskaSlika={mjesto.jeBot ? putanjaBotAvatara(mjesto.igracId) : null}
+          vanjskaSlika={mjesto.jeBot ? putanjaBotAvatara({ jeBot: true, nadimak: mjesto.nadimak, igracId: mjesto.igracId }) : null}
           opisSlike={mjesto.jeBot ? `Bot: ${mjesto.nadimak}` : null}
         />
         <div class="podaci">

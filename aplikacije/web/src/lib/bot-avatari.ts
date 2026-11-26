@@ -1,7 +1,9 @@
 /**
- * Katalog namjenskih bot ilustracija (redom 01→20).
- * Dodjela: hash(igracId) % N — ciklus kroz katalog, isti ID → isti avatar.
+ * Namjenske bot ilustracije: stabilni lookup po nadimku iz zajedničkog kataloga.
+ * Nepoznati povijesni botovi padaju na hash(igracId) kroz isti katalog putanja.
  */
+import { putanjaIlustracijeBota } from 'zajednicko';
+
 export const BOT_AVATAR_PUTANJE: readonly string[] = [
   '/avatari/botovi/01-skafander.webp',
   '/avatari/botovi/02-pastoljub.webp',
@@ -34,9 +36,31 @@ function hashIdentiteta(identitet: string): number {
   return h >>> 0;
 }
 
-/** Deterministička putanja avatara za bota; null ako katalog još nije popunjen. */
-export function putanjaBotAvatara(igracId: string): string | null {
+export type UlazBotAvatara = {
+  jeBot: boolean;
+  nadimak?: string | null;
+  igracId?: string | null;
+};
+
+/**
+ * Putanja bot ilustracije samo kad je `jeBot` autoritativno true.
+ * Ljudski igrač s „BOT” u nadimku zadržava vlastiti avatar (vraća null).
+ */
+export function putanjaBotAvatara(ulaz: UlazBotAvatara | string): string | null {
   if (BOT_AVATAR_PUTANJE.length === 0) return null;
-  const indeks = hashIdentiteta(igracId) % BOT_AVATAR_PUTANJE.length;
+
+  // Legacy: samo igracId string → hash fallback (povijesni pozivi / testovi).
+  if (typeof ulaz === 'string') {
+    const indeks = hashIdentiteta(ulaz) % BOT_AVATAR_PUTANJE.length;
+    return BOT_AVATAR_PUTANJE[indeks] ?? null;
+  }
+
+  if (!ulaz.jeBot) return null;
+
+  const izKataloga = putanjaIlustracijeBota(ulaz.nadimak);
+  if (izKataloga) return izKataloga;
+
+  if (!ulaz.igracId) return BOT_AVATAR_PUTANJE[0] ?? null;
+  const indeks = hashIdentiteta(ulaz.igracId) % BOT_AVATAR_PUTANJE.length;
   return BOT_AVATAR_PUTANJE[indeks] ?? null;
 }
