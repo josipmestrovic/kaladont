@@ -128,12 +128,26 @@
 
   $effect(() => {
     if (inicijalizirano) return;
-    // Spremljeno ostaje izvornik (npr. detached); draft je normaliziran → Save ostaje omogućen.
     const izvor = kopirajKonfiguraciju(pocetnaKonfiguracija);
-    spremljeno = kopirajKonfiguraciju(izvor);
-    draft = normalizirajKonfiguraciju(izvor);
+    const normalizirana = normalizirajKonfiguraciju(izvor);
+    const trebaMigraciju = !konfiguracijeJednake(izvor, normalizirana);
+    draft = normalizirana;
+    // Dok auto-spremanje migracije ne uspije, spremljeno ostaje izvor → Save aktivan.
+    spremljeno = trebaMigraciju ? izvor : kopirajKonfiguraciju(normalizirana);
     inicijalizirano = true;
     ucitavanjeUspjelo = true;
+    if (trebaMigraciju) {
+      queueMicrotask(() => {
+        void (async () => {
+          try {
+            await onSpremi(kopirajKonfiguraciju(normalizirana));
+            spremljeno = kopirajKonfiguraciju(normalizirana);
+          } catch {
+            /* Spremi ostaje omogućen dok korisnik ne snimi ručno. */
+          }
+        })();
+      });
+    }
   });
 
   const izmijenjeno = $derived(ucitavanjeUspjelo && !konfiguracijeJednake(draft, spremljeno));
@@ -277,8 +291,9 @@
   }
 
   function vratiSpremljeni() {
-    if (konfiguracijeJednake(draft, spremljeno)) return;
-    postaviDraft(spremljeno);
+    const cilj = normalizirajKonfiguraciju(spremljeno);
+    if (konfiguracijeJednake(draft, cilj)) return;
+    postaviDraft(cilj);
   }
 
   function potvrdiIzlaz(): boolean {
