@@ -132,22 +132,10 @@
     const normalizirana = normalizirajKonfiguraciju(izvor);
     const trebaMigraciju = !konfiguracijeJednake(izvor, normalizirana);
     draft = normalizirana;
-    // Dok auto-spremanje migracije ne uspije, spremljeno ostaje izvor → Save aktivan.
+    // Izvor s detached ostaje u spremljeno → Save aktivan; bez auto-spremanja (inače redirect na /profil).
     spremljeno = trebaMigraciju ? izvor : kopirajKonfiguraciju(normalizirana);
     inicijalizirano = true;
     ucitavanjeUspjelo = true;
-    if (trebaMigraciju) {
-      queueMicrotask(() => {
-        void (async () => {
-          try {
-            await onSpremi(kopirajKonfiguraciju(normalizirana));
-            spremljeno = kopirajKonfiguraciju(normalizirana);
-          } catch {
-            /* Spremi ostaje omogućen dok korisnik ne snimi ručno. */
-          }
-        })();
-      });
-    }
   });
 
   const izmijenjeno = $derived(ucitavanjeUspjelo && !konfiguracijeJednake(draft, spremljeno));
