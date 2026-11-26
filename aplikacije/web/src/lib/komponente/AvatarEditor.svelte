@@ -675,7 +675,7 @@
     min-height: 48px;
     padding: 12px 20px;
     border: 1px solid var(--boja-obrub);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-3);
     color: var(--boja-tekst-osnovni);
     font: inherit;
@@ -756,7 +756,7 @@
     min-height: 40px;
     padding: 8px 14px;
     border: 1px solid var(--boja-obrub);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-osnovni);
     font: inherit;
@@ -1033,7 +1033,7 @@
     min-height: 48px;
     padding: 12px 14px;
     border: 1px solid var(--boja-obrub);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-osnovni);
     font: inherit;

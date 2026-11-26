@@ -111,7 +111,7 @@
     letter-spacing: 1.5px;
     font-weight: 700;
     border: none;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     padding: 14px 32px;
     background: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);

@@ -171,7 +171,7 @@
   .sporedni-gumb {
     display: inline-flex;
     align-items: center;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     padding: 10px 24px;
     font-size: var(--tekst-baza);
     font-weight: 700;

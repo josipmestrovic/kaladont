@@ -339,7 +339,7 @@
     color: var(--boja-cta-tekst);
     font-weight: 700;
     padding: 10px 20px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     cursor: pointer;
     font-size: var(--tekst-sitni);
   }
@@ -421,7 +421,7 @@
     font-weight: 600;
     font-size: 12px;
     padding: 6px 10px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     cursor: pointer;
     white-space: nowrap;
   }
@@ -517,7 +517,7 @@
     letter-spacing: 1px;
     font-weight: 700;
     border: none;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     padding: 12px 28px;
     background: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);

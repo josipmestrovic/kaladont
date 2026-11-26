@@ -884,7 +884,7 @@
   .sporedni-gumb {
     display: inline-flex;
     align-items: center;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     padding: 10px 20px;
     font-weight: 700;
     border: none;

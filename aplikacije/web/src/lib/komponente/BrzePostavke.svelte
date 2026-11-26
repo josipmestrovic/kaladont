@@ -99,7 +99,7 @@
     height: auto;
     padding: 8px 4px 10px;
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--radijus-kontrola);
     background: transparent;
   }
 
@@ -115,7 +115,7 @@
   .brze-postavke :global(.prekidac-postavke:focus-within) {
     outline: 3px solid var(--boja-fokus);
     outline-offset: 3px;
-    border-radius: 10px;
+    border-radius: var(--radijus-kontrola);
   }
 
   .brze-postavke :global(.prekidac-postavke__sadrzaj) {
@@ -225,7 +225,7 @@
       /* Isti box model / radijus kao .sporedni-precac — vanjska širina = kartica. */
       padding: 10px 16px;
       border: 1px solid transparent;
-      border-radius: 12px;
+      border-radius: var(--radijus-kontrola);
       gap: 10px;
       overflow: visible;
       box-sizing: border-box;
@@ -235,7 +235,7 @@
     .brze-postavke :global(.prekidac-postavke:focus-within) {
       outline: none;
       border-color: var(--boja-fokus);
-      border-radius: 12px;
+      border-radius: var(--radijus-kontrola);
     }
 
     .brze-postavke :global(.prekidac-postavke__sadrzaj) {

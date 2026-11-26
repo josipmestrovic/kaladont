@@ -211,7 +211,7 @@
     font-weight: 700;
     text-decoration: none;
     padding: 10px 20px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     font-size: var(--tekst-sitni);
   }
 
@@ -253,7 +253,7 @@
     font-weight: 700;
     font-size: 16px;
     border: none;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     padding: 10px 24px;
     cursor: pointer;
   }

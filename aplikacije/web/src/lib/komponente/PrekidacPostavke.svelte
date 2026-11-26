@@ -93,7 +93,7 @@
     flex: 0 0 auto;
     margin-left: auto;
     padding: 2px;
-    border-radius: 999px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-obrub-jaci);
     transition: background-color 160ms ease;
   }

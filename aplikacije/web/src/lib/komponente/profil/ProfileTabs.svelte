@@ -39,7 +39,7 @@
   button {
     padding: 10px 14px;
     border: 1px solid var(--boja-obrub);
-    border-radius: var(--radijus-pill, 999px);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-osnovni);
     font: inherit;

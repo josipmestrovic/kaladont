@@ -718,7 +718,7 @@
     min-height: 46px;
     margin-top: 4px;
     padding: 10px 18px;
-    border-radius: 12px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-mint);
     color: #fff;
     font-family: var(--font-naslov);
@@ -815,7 +815,7 @@
       min-height: 56px;
       margin-top: 0;
       padding: 14px 20px;
-      border-radius: 12px;
+      border-radius: var(--radijus-kontrola);
       font-size: 20px;
     }
   }
@@ -855,7 +855,7 @@
   .sporedni-precac:focus-visible {
     outline: 3px solid var(--boja-zuta-krema);
     outline-offset: 2px;
-    border-radius: 12px;
+    border-radius: var(--radijus-kontrola);
   }
 
   .sporedni-red {
@@ -888,7 +888,7 @@
     width: 100%;
     min-height: 100%;
     padding: 12px 8px;
-    border-radius: 12px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina);
     border: 1px solid color-mix(in srgb, #fff 14%, transparent);
     color: var(--boja-tekst-sekundarni);

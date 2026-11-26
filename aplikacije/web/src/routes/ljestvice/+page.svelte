@@ -1071,7 +1071,7 @@
     justify-content: center;
     margin-top: 12px;
     padding: 10px 16px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     border: 1px solid var(--boja-obrub);
     background: transparent;
     color: var(--boja-tekst-osnovni);

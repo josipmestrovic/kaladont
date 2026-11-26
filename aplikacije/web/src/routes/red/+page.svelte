@@ -315,7 +315,7 @@
     display: inline-block;
     margin-left: 6px;
     padding: 2px 6px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-isticanje-slova);
     color: #1a1815;
     font-size: var(--tekst-mikro);
@@ -395,7 +395,7 @@
     background: none;
     border: 1px solid var(--boja-akcent);
     color: var(--boja-akcent);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     padding: 10px 24px;
     font-size: var(--tekst-baza);
     font-weight: 700;

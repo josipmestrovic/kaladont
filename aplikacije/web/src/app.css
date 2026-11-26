@@ -116,7 +116,8 @@
 
   /* Radijusi */
   --radijus-kartica: 16px;
-  --radijus-pill: 999px;
+  --radijus-kontrola: 12px; /* gumbi, toggle trake, tabovi, chipovi */
+  --radijus-pill: 999px; /* progress trake, brojački bedževi, kapsule */
 
   /* Tipografija - obitelji */
   --font-naslov: 'Baloo 2', sans-serif;
