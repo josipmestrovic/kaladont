@@ -223,7 +223,10 @@ export function oprezKa(pravila: PravilnikPartije = 'ka_zna', brojAktivnih = 2):
   return politikaKa(pravila, brojAktivnih) === 'oprezni';
 }
 
-export type RazlogInterniOdustajanja = 'nema_potvrdjenog_nastavka_u_budzetu';
+export type RazlogInterniOdustajanja =
+  | 'nema_potvrdjenog_nastavka_u_budzetu'
+  /** Javna Brza igra: nakon 10 poteza u bot-duelu forsiran „Ne znam”. */
+  | 'bot_duel_limit';
 
 export type OdlukaBota =
   | { vrsta: 'rijec'; rijec: string; kategorija: KategorijaRijeci | 'kaladont'; izborKa?: 'dobrovoljni' | 'prisilni'; propustKa?: boolean; takticki?: boolean }

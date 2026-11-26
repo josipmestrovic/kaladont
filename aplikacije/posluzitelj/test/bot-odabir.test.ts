@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DogadajPoteza, RezultatNaredbe } from '../src/igra/politika-ucinka.js';
-import { BotKontroler } from '../src/bot/kontroler.js';
+import { BotKontroler, MAKS_POTEZA_BOT_DUELA_BRZA } from '../src/bot/kontroler.js';
 import { RasporedjivacOdziva } from '../src/bot/raspored-odziva.js';
 import { izgradiRepertoarBotova } from '../src/bot/repertoar.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
@@ -961,6 +961,40 @@ describe('bot kontroler', () => {
       ],
     }));
     expect(timeri[0]!.ms).toBeLessThanOrEqual(BOT_POTEZ_BEZ_ROKA_MS);
+  });
+
+  it('javna bot-duel nakon 10 poteza forsira Ne znam', async () => {
+    const sudionici = [
+      { igracId: 'covjek', upravljac: 'covjek' as const, aktivan: false },
+      { igracId: 'bot', upravljac: 'bot' as const, aktivan: true },
+      { igracId: 'bot2', upravljac: 'bot' as const, aktivan: true },
+    ];
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri, odgubi } = stvori(izvrsi, () => 1, konfigBezPropusta);
+    for (let i = 1; i <= MAKS_POTEZA_BOT_DUELA_BRZA; i += 1) {
+      const naPotezuId = i % 2 === 1 ? 'bot' : 'bot2';
+      kontroler.naPromjenuPoteza(dogadaj({ turnToken: `t${i}`, naPotezuId, sudionici }));
+      const indeks = timeri.findLastIndex((t) => t.ms !== -1);
+      expect(indeks).toBeGreaterThanOrEqual(0);
+      await odgubi(indeks);
+    }
+    expect(izvrsi).toHaveBeenCalledTimes(MAKS_POTEZA_BOT_DUELA_BRZA);
+    expect(izvrsi.mock.calls.every(([, , n]) => (n as { vrsta: string }).vrsta === 'rijec')).toBe(true);
+
+    kontroler.naPromjenuPoteza(dogadaj({
+      turnToken: `t${MAKS_POTEZA_BOT_DUELA_BRZA + 1}`,
+      naPotezuId: 'bot',
+      sudionici,
+    }));
+    const indeksForsiranog = timeri.findLastIndex((t) => t.ms !== -1);
+    await odgubi(indeksForsiranog);
+    expect(izvrsi).toHaveBeenCalledTimes(MAKS_POTEZA_BOT_DUELA_BRZA + 1);
+    expect(izvrsi.mock.calls.at(-1)?.[2]).toEqual(expect.objectContaining({
+      vrsta: 'odustani',
+      turnToken: `t${MAKS_POTEZA_BOT_DUELA_BRZA + 1}`,
+    }));
+    expect(kontroler.brojaci.namjernihPropusta).toBe(1);
+    kontroler.zaustavi();
   });
 
   it('isti token se ne planira dvaput; novi token dobiva novi plan', () => {
