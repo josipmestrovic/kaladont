@@ -43,6 +43,7 @@
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
   import { trebaAutofokusPoteza } from '$lib/postavke-autofokus-poteza.js';
   import { otkljucajPozadinu, zakljucajPozadinu } from '$lib/zakljucaj-pozadinu.js';
+  import { pokusajPljesakPobjede, trebaKonfetiRezultata } from '$lib/nagrade-efekti.js';
   import { ArrowUp, CircleAlert } from 'lucide-svelte';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, formatirajNadimakBota, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, ODGODA_PRIKAZA_REZULTATA_TRENING_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
@@ -1107,7 +1108,7 @@
 
   let sustavBrojac = $state(5);
   let sustavBrojacIntervalId: ReturnType<typeof setInterval> | null = null;
-  let aplauzPobjedeZaPartijuId: string | null = null;
+  let prikaziKonfetiRezultata = $state(false);
 
   /** Početno 3-2-1 na stolu (privatna/trening/izazov, ili rani ulazak u javnu). */
   const jePocetnoOdbrojavanje = $derived(
@@ -1154,6 +1155,12 @@
     if (stanje.rezultatiPrikazaniPartijaId === kraj.partijaId) {
       prikaziRezultate = true;
       sekundeDoRezultata = 0;
+      const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
+      const uspjehIzazova = jeIzazov && stanje.izazovTerminal?.status === 'uspjeh';
+      const pobjedaOstalo = !jeIzazov && pobjednikId === stanje.mojIgracId;
+      if ((uspjehIzazova || pobjedaOstalo) && trebaKonfetiRezultata(kraj.partijaId)) {
+        prikaziKonfetiRezultata = true;
+      }
       return;
     }
 
@@ -1169,19 +1176,20 @@
         ? Date.parse(kraj.prikazRezultataOdIso)
         : rezervniRokRezultataMs;
 
-    if (aplauzPobjedeZaPartijuId !== kraj.partijaId) {
-      aplauzPobjedeZaPartijuId = kraj.partijaId;
-      const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
-      if (pobjednikId && pobjednikId === stanje.mojIgracId) {
-        pustiAudio('aplauz-kaladont');
-      }
-    }
+    // #159: pljesak pobjede lokalnom ljudskom pobjedniku; ne duplirati nakon Kaladonta.
+    const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
+    pokusajPljesakPobjede(kraj.partijaId, stanje.mojIgracId, pobjednikId);
 
     const otkrijRezultate = () => {
       stanje.rezultatiPrikazaniPartijaId = kraj.partijaId;
       prikaziRezultate = true;
       sekundeDoRezultata = 0;
       pustiAudio('partija-kraj');
+      const uspjehIzazova = jeIzazov && stanje.izazovTerminal?.status === 'uspjeh';
+      const pobjedaOstalo = !jeIzazov && pobjednikId === stanje.mojIgracId;
+      if ((uspjehIzazova || pobjedaOstalo) && trebaKonfetiRezultata(kraj.partijaId)) {
+        prikaziKonfetiRezultata = true;
+      }
     };
 
     if (rok - Date.now() <= 0) {
@@ -1662,12 +1670,12 @@
     <Konfeti intenzitet={stanje.intenzitetKonfetaIskustva} />
   {/key}
 {/if}
+{#if prikaziKonfetiRezultata}
+  <Konfeti intenzitet="veliki" />
+{/if}
 {#if stanje.kraj && prikaziRezultate}
   <div class="zavrsni-header"><Header /></div>
   {#if jeIzazov}
-    {#if stanje.izazovTerminal?.status === 'uspjeh'}
-      <Konfeti intenzitet="veliki" />
-    {/if}
     <RezultatIzazova
       kraj={stanje.kraj}
       challengeId={izazovChallengeId}
@@ -1695,9 +1703,6 @@
     />
     <div class="kraj-donje-praznine" aria-hidden="true"></div>
   {:else}
-  {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
-    <Konfeti intenzitet="veliki" />
-  {/if}
   <h2>{jeTrening ? 'Kraj treninga' : 'Završni poredak'}</h2>
   {#if jeTrening}
     <p class="privatna-obavijest" data-testid="trening-obavijest">

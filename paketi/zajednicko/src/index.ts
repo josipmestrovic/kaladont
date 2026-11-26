@@ -7,6 +7,7 @@ export * from './protokol.js';
 export * from './poruke.js';
 export * from './rangovi.js';
 export * from './nagrada-za-rijec.js';
+export * from './efekti-nagrade.js';
 export * from './iskustvo.js';
 export * from './oznake-novih-rijeci.js';
 export * from './dostignuca.js';

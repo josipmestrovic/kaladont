@@ -31,11 +31,12 @@ Kontrola zvuka prikazuje se na landingu i u `/postavke`; tijekom čekanja i akti
 | Svaka sekunda odbrojavanja u čekaonici | svi u sobi | `odbrojavanje-single-count-sound` | Svira na svaku cijelu sekundu prikazanog odbrojavanja, ne samo zadnje 3. Najviše jednom po sekundi. Isto vrijedi za privatnu sobu. |
 | Svaka sekunda „Nova runda za” | svi u partiji | `odbrojavanje-single-count-sound` | Nakon eliminacije, dok sustav bira novu riječ. Najviše jednom po sekundi. |
 | Svaka sekunda „Rezultati za” | svi u partiji | `odbrojavanje-single-count-sound` | Završno odbrojavanje do detaljnih rezultata. Najviše jednom po sekundi. |
-| Početak završnog odbrojavanja (pobjeda) | samo pobjednik | `aplauz-kaladont` | Jednom kad krene „Rezultati za”, neovisno o razlogu zadnje eliminacije. Kaladont-aplauz na eliminaciji i dalje čuju svi. |
+| Početak završnog odbrojavanja (pobjeda) | samo lokalni ljudski pobjednik | `aplauz-kaladont` | Jednom kad krene „Rezultati za”. Ako je isti igrač već dobio Kaladont-aplauz na prihvaćenom potezu, pljesak pobjede se ne ponavlja. |
 | Početak partije | svi | `pocetak-partije` | Jednom, točno kad odbrojavanje u čekaonici istekne i partija krene (ne na najavu budućeg početka). |
 | Zadnjih 5 sekundi poteza (30s timer) | svi za stolom | `pred-istek-vremena` | Isti prag kao vizualni puls prstena oko igrača na potezu; jednom po potezu koji uđe u tu fazu. |
-| Prihvaćena riječ | samo autoru poteza | potvrđujući ton | Ostali ne čuju tu potvrdu; njihov osobni signal dolazi kada je njihov red. |
-| Nagrada za rijetku/dugu riječ | svi u partiji | jedan složeni nagradni zvuk + konfeti | Server izračunava tier nakon prihvaćenog igračevog poteza. Ako riječ ima oba svojstva, zvuk i efekt pokreću se samo jednom, a tekst navodi oba razloga. |
+| Prihvaćena riječ | samo autoru poteza | potvrđujući ton | Ostali ne čuju tu potvrdu; njihov osobni signal dolazi kada je njihov red. Za Kaladont umjesto potvrde ide pljesak. |
+| Nagrada za rijetku/dugu riječ | samo lokalni autor poteza | konfeti (bez zasebnog nagradnog zvuka) | Tier iz XP/nagrade nakon prihvaćenog poteza. Duga+rijetka = jedan kombinirani intenzitet. |
+| Prihvaćeni Kaladont | samo lokalni autor poteza | `aplauz-kaladont` + najjači konfeti | Na `potez:prihvacen`, ne na eliminaciji za cijeli stol. Prednost nad efektom duge/rijetke. |
 | Odbijena riječ | samo autoru poteza | neutralni error ton | Nikad ne svirati drugim igračima. |
 | `Ne znam` | nitko | nema zvuka | Vizualna potvrda je dovoljna. |
 | Red prijeđe na igrača | samo tom igraču | signal `tvoj red` | Jednom po prijelazu na njegov red. Vizualni puls prstena prikazuje se i na prvom potezu, ali bez dodatnog zvuka uz `pocetak-partije`. |

@@ -19,9 +19,11 @@ import type {
   StavkaIskustva,
   StanjePartije,
   TreningNeaktivnost,
+  odrediEfektPrihvacenogPoteza,
 } from 'zajednicko';
 import { pustiAudio, zaustaviSveZvukove, type AudioDogadaj } from './audio-manager.js';
 import { pocetniGoalProgressIzazova } from './izazovi-klijent.js';
+import { resetirajNagradeEfekte, zabiljeziAplauzKaladonta } from './nagrade-efekti.js';
 import { dohvatiSocket, oznaciPartijuDostupnom } from './socket.js';
 import { biljeziPasivniServerVrijeme, sinkronizirajPartiju } from './sinkronizacija-partije.js';
 import { normalizirajIstekPotezaIso, timerAktivanIzSnimke } from './timer-poteza.js';
@@ -200,30 +202,6 @@ function pokreniKonfete(intenzitet: 'mali' | 'srednji' | 'veliki', trajanjeMs = 
     stanje.intenzitetKonfetaIskustva = null;
     timerKonfetaIskustva = null;
   }, trajanjeMs);
-}
-
-/** Konfeti za duge/rijetke: XP stavke ili nagrada ovog poteza (bez stale otkljucavanjeRijeci). */
-function prikaziKonfeteZaPotez(
-  stavke: readonly StavkaIskustva[],
-  nagrada: NagradaZaRijec | null,
-): void {
-  const najjaca = Math.max(
-    ...stavke
-      .filter((stavka) => stavka.vrsta === 'duge_rijeci' || stavka.vrsta === 'rijetke_rijeci')
-      .map((stavka) => stavka.iskustvo),
-    0,
-  );
-  if (najjaca > 0) {
-    pokreniKonfete(najjaca >= 35 ? 'veliki' : najjaca >= 20 ? 'srednji' : 'mali');
-    return;
-  }
-  if (nagrada?.intenzitet) {
-    pokreniKonfete(nagrada.intenzitet);
-  }
-}
-
-function prikaziKonfeteKaladont(): void {
-  pokreniKonfete('veliki', 4_000);
 }
 
 function prikaziStavkeIskustva(stavke: readonly StavkaIskustva[]): void {
@@ -664,9 +642,19 @@ export function pokreniSlusateljeIgre(): void {
     stanje.zadnjaRijecIgracId = p.igracId;
     stanje.zadnjaRijecVrsta = 'rijec';
     stanje.zadnjaNagrada = mojPotez ? p.nagrada : null;
+    let kaladontAplauz = false;
     if (mojPotez && dozvvoliEfekt) {
       prikaziStavkeIskustva(p.iskustvo ?? []);
-      prikaziKonfeteZaPotez(p.iskustvo ?? [], mojPotez ? p.nagrada : null);
+      // #159: nagradni efekti samo lokalnom autoru; Kaladont > duga/rijetka.
+      const efekt = odrediEfektPrihvacenogPoteza(p.rijec, p.iskustvo ?? [], p.nagrada ?? null);
+      if (efekt) {
+        pokreniKonfete(efekt.intenzitetKonfeta, efekt.vrsta === 'kaladont' ? 4_000 : 3_200);
+        if (efekt.zvuk) {
+          pustiAudio(efekt.zvuk);
+          zabiljeziAplauzKaladonta(stanje.partijaId);
+          kaladontAplauz = true;
+        }
+      }
       // Osvježi serverski goalProgress nakon vlastite riječi.
       if (stanje.kontekst === 'izazov') socket.emit('partija:stanje');
     }
@@ -677,8 +665,9 @@ export function pokreniSlusateljeIgre(): void {
     // redDolaziNaMene + prijelazBezPoteza (ubojita) → tišina (slijedi eliminacija).
     // Vrijedi i u 1. rundi — jedini izuzetak je samo otvaranje partije (vidi runda-otvorena).
     if (!dozvvoliEfekt) return;
-    if (mojPotez) pustiAudio('potez-prihvacen');
-    else if (mojSljedeciRed) {
+    if (mojPotez) {
+      if (!kaladontAplauz) pustiAudio('potez-prihvacen');
+    } else if (mojSljedeciRed) {
       brojOdbijenihNaPotezu = 0;
       pustiAudio('tvoj-red');
     } else if (!redDolaziNaMene) {
@@ -705,9 +694,8 @@ export function pokreniSlusateljeIgre(): void {
     if (!trebamJednokratniEfekt(vidjeniDogadajiEfekata, p.dogadajId)) return;
     const bioDokaz = stanje.faza === 'dokaz_nastavka' && stanje.dokaz;
     const dokazSnimka = stanje.dokaz;
-    // Kaladont: samo tiši aplauz (high moment). Ostali razlozi: tiša eliminacija.
-    pustiAudio(p.razlog === 'kaladont' ? 'aplauz-kaladont' : 'eliminacija');
-    if (p.razlog === 'kaladont') prikaziKonfeteKaladont();
+    // #159: Kaladont konfeti/pljesak su na potez:prihvacen autora; ovdje uvijek eliminacija.
+    pustiAudio('eliminacija');
     stanje.eliminacije = [...stanje.eliminacije, p];
     stanje.zadnjaEliminacija = p;
     // Samo XP eliminacije — ne šalji ponovo XP poteza (kaladont/mrtva), inače obavijest
@@ -963,6 +951,7 @@ function spremiPendingReakciju(partijaId: string, igracId: string, poruka: BrzaP
 export function napustiLokalnuPartiju(): void {
   napustioPartiju = true;
   odsviranPocetakZaPartijuId = null;
+  resetirajNagradeEfekte();
   zaustaviSveZvukove();
   brojOdbijenihNaPotezu = 0;
   ocistiDokazHold();
