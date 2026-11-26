@@ -35,12 +35,10 @@ test('feed prikazuje Sve, eksplicitno čita i briše', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Sve', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Nepročitane' })).toBeVisible();
   await expect(page.getByText(tekst)).toBeVisible();
-  await expect(page.getByText('Nepročitano', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Označi sve pročitanima' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeVisible();
-
-  await page.getByRole('button', { name: 'Označi pročitanom' }).first().click();
+  // Ulazak na /obavijesti automatski označi sve pročitanima.
   await expect(page.getByText('Pročitano', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Označi sve pročitanima' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeVisible();
 
   await page.goto('/');
   await expect(page.getByRole('banner').locator('.avatar')).toBeVisible({ timeout: 20_000 });
@@ -123,5 +121,5 @@ test('registrirani desktop: pager, čitanje miče poruku, prazno stanje', async 
     ]);
   }
   await expect(page.getByTestId('naslovnica-obavijesti-prazno')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole('link', { name: 'Vidi sve ›' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Vidi starije obavijesti ›' })).toBeVisible();
 });

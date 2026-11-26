@@ -270,7 +270,7 @@ export const DEFINICIJE_DOSTIGNUCA: readonly DefinicijaDostignuca[] = [
   {
     id: ID_DOSTIGNUCA_TRECA_SRECA,
     naziv: 'Treća sreća',
-    opis: 'Pobijedi u javnim Trobojima.',
+    opis: 'Pobijedi u javnim Brzim igrama.',
     kategorija: 'igra',
     pragovi: [1, 5, 15, 40, 100],
     vrijediUPrivatnoj: false,

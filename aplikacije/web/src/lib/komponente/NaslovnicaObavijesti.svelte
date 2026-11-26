@@ -220,13 +220,13 @@
     {:else if greska && poruke.length === 0}
       <div class="prazno">
         <p class="prazno-naslov">{greska}</p>
-        <a class="vidi-sve" href="/obavijesti">Vidi sve ›</a>
+        <a class="vidi-sve" href="/obavijesti">Vidi starije obavijesti ›</a>
       </div>
     {:else if !aktivna}
       <div class="prazno" data-testid="naslovnica-obavijesti-prazno">
         <div class="prazno-tekst">
-          <p class="prazno-naslov">Nema novih.</p>
-          <a class="vidi-sve" href="/obavijesti">Vidi sve ›</a>
+          <p class="prazno-naslov">Nema novih obavijesti</p>
+          <a class="vidi-sve" href="/obavijesti">Vidi starije obavijesti ›</a>
         </div>
       </div>
     {:else}
@@ -529,7 +529,7 @@
     font-size: 18px;
     font-weight: 500;
     line-height: 1.3;
-    text-align: left;
+    text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -537,21 +537,21 @@
   .prazno {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 10px;
     width: 100%;
     min-width: 0;
-    text-align: left;
+    text-align: center;
   }
 
   .prazno-tekst {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: 2px;
     min-width: 0;
     overflow: hidden;
-    text-align: left;
+    text-align: center;
   }
 
   .vidi-sve {
@@ -563,7 +563,7 @@
     font-size: 16px;
     font-weight: 700;
     line-height: 1.3;
-    text-align: left;
+    text-align: center;
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;

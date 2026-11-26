@@ -81,7 +81,7 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toBeVisible();
-  await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText('Troboj');
+  await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText('Brza igra');
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
     'Igraj online u troje.',
   );
@@ -117,7 +117,8 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
     'href',
     '/profil#dostignuca',
   );
-  await expect(sporedna.getByTestId('naslovnica-dostignuca-labela')).toContainText(/zvjezdica/);
+  await expect(sporedna.getByTestId('naslovnica-dostignuca-labela')).toContainText(/\d+\/\d+/);
+  await expect(sporedna.getByTestId('naslovnica-dostignuca')).toHaveAttribute('title', /zvjezdica/);
   await expect(sporedna.getByTestId('naslovnica-pravila')).toHaveCount(0);
   await expect(sporedna.getByTestId('naslovnica-kolekcija-badge')).toHaveCount(0);
 
@@ -140,7 +141,7 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   await navigacija.getByTestId('naslovnica-brza-igra').click();
   await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
-  await expect(page.getByTestId('red-oznaka-izbora')).toHaveText('Brza igra · Troboj · Klasična pravila');
+  await expect(page.getByTestId('red-oznaka-izbora')).toHaveText('Brza igra · Klasična pravila');
 });
 
 test('naslovnica prikazuje XP sažetak i gostujući CTA bez linka na profil', async ({ page }) => {
@@ -413,7 +414,8 @@ test('naslovnica otvara dostignuća deep link na profilu', async ({ page }) => {
   const dostignuca = page.getByTestId('naslovnica-dostignuca');
   await expect(dostignuca).toBeVisible({ timeout: 20_000 });
   await expect(dostignuca).toHaveAttribute('href', '/profil#dostignuca');
-  await expect(page.getByTestId('naslovnica-dostignuca-labela')).toContainText(/\/\d+ zvjezdica/);
+  await expect(page.getByTestId('naslovnica-dostignuca-labela')).toContainText(/\d+\/\d+/);
+  await expect(dostignuca).toHaveAttribute('title', /\d+\/\d+ zvjezdica/);
   await dostignuca.click();
   await expect(page).toHaveURL(/\/profil#dostignuca/);
 });

@@ -39,7 +39,7 @@
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
   const preostaloIgraca = $derived(Math.max(0, ukupnoMjesta - brojIgraca));
   const stanjeUskladjeno = $derived(stanje.mod === trazeneMod);
-  const naslovLobbyja = 'Brza igra · Troboj · Klasična pravila';
+  const naslovLobbyja = 'Brza igra · Klasična pravila';
   const objasnjenjeLobbyja = 'Igra utječe na rang i mjesto na ljestvici.';
 
   function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {

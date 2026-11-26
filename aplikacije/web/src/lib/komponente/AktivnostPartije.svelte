@@ -106,7 +106,7 @@
           {#each stavke as stavka (stavka.partijaId)}
             <tr>
               <th scope="row">{formatirajDatum(stavka.kraj)}</th>
-              <td data-label="Mod">{stavka.mod === 'dva_igraca' ? 'Dvoboj' : stavka.mod === 'tri_igraca' ? 'Troboj' : 'Četveroboj'}</td>
+              <td data-label="Mod">{stavka.mod === 'dva_igraca' ? 'Dvoboj' : stavka.mod === 'tri_igraca' ? 'Brza igra' : 'Četveroboj'}</td>
               <td data-label="Plasman">{stavka.plasman}. mjesto</td>
               <td data-label="Bodovi">{stavka.bodovi}</td>
               <td data-label="Povijest"><a href={`/partija/arhiva/${stavka.partijaId}`}>Vidi igru</a></td>

@@ -386,8 +386,8 @@
   <div class="raspored-igraci">
     <aside class="odabir-metrika" aria-label="Odabir ljestvice">
       <section class="grupa-metrika">
-        <h2 class="grupa-naslov">Troboj</h2>
-        <div class="metrike-grid" role="group" aria-label="Troboj">
+        <h2 class="grupa-naslov">Brza igra</h2>
+        <div class="metrike-grid" role="group" aria-label="Brza igra">
           {#each METRIKE_VREMENSKE_LJESTVICA as m (m)}
             <button
               type="button"
@@ -484,7 +484,7 @@
             {/if}
             {#if metrika === 'prosjek_bodova'}
               <p class="objasnjenje-bodovanja">
-                Bodovanje Troboja: 1. mjesto 2 boda (+1 za pobjedu), 2. mjesto 1 bod, 3. mjesto 0;
+                Bodovanje Brze igre: 1. mjesto 2 boda (+1 za pobjedu), 2. mjesto 1 bod, 3. mjesto 0;
                 +1 bod za svaku eliminaciju koju izazoveš. Najviše 5 bodova po igri. Ova ljestvica
                 rangira prosjek tih bodova.
               </p>
@@ -510,7 +510,7 @@
             </p>
             {#if metrika === 'prosjek_bodova'}
               <p class="objasnjenje-bodovanja">
-                Bodovanje Troboja: 1. mjesto 2 boda (+1 za pobjedu), 2. mjesto 1 bod, 3. mjesto 0;
+                Bodovanje Brze igre: 1. mjesto 2 boda (+1 za pobjedu), 2. mjesto 1 bod, 3. mjesto 0;
                 +1 bod za svaku eliminaciju koju izazoveš. Najviše 5 bodova po igri. Ova ljestvica
                 rangira prosjek tih bodova.
               </p>
@@ -655,12 +655,11 @@
             <div class="pravila-sadrzaj">
               {#if jeVremenska}
                 <p>
-                  Ovo je ljestvica javnog Troboja (Brza igra). Privatne sobe, trening i izazovi ne
-                  ulaze.
+                  Ovo je ljestvica Brze igre. Privatne sobe, trening i izazovi ne ulaze.
                 </p>
                 <p>
-                  Za ulazak treba: dnevna 5 troboja; tjedna, mjesečna, godišnja i svih vremena 10
-                  troboja
+                  Za ulazak treba: dnevna 5 brzih igara; tjedna, mjesečna, godišnja i svih vremena 10
+                  brzih igara
                   {#if metrika === 'najbrzi_igraci'}
                     (te još 30 prihvaćenih poteza dnevno, odnosno 50 na duljim ljestvicama)
                   {/if}.
@@ -668,7 +667,7 @@
               {:else}
                 <p>
                   Ovo je ljestvica ukupnog napretka (trenutno stanje računa). Nema minimalnog broja
-                  Troboja ni vremenskog filtera.
+                  Brzih igara ni vremenskog filtera.
                 </p>
               {/if}
             </div>

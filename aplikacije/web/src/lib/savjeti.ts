@@ -18,7 +18,7 @@ const SAVJETI_CETIRI_IGRACA = [
 
 const SAVJETI_DVA_IGRACA = [
   'U dvoboju pobjeda donosi 1 bod, a poraz 0 bodova.',
-  'Rang je zajednički za sve javne formate — Dvoboj, Troboj i Četveroboj grade isti učinak.',
+  'Rang je zajednički za sve javne formate — Dvoboj, Brza igra i Četveroboj grade isti učinak.',
   'Najviši rang zove se Kaladont i traži univerzalni učinak 178 ili više.',
 ] as const;
 

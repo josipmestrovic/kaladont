@@ -26,7 +26,7 @@
   let greskaStatistike = $state<string | null>(null);
   let greska = $state<string | null>(null);
   const nazivModa = (mod: import('zajednicko').ModPartije) => (
-    mod === 'dva_igraca' ? 'Dvoboj' : mod === 'tri_igraca' ? 'Troboj' : 'Četveroboj'
+    mod === 'dva_igraca' ? 'Dvoboj' : mod === 'tri_igraca' ? 'Brza igra' : 'Četveroboj'
   );
   const sekunde = (ms: number | null) => (ms === null ? '–' : `${(ms / 1000).toFixed(1)} s`);
 
@@ -73,7 +73,7 @@
     {#if statistika.zivo}
       <dl class="zivo-stanje">
         <dt>Zastavice</dt>
-        <dd>Trening {statistika.zivo.zastavice.trening ? 'uključen' : 'isključen'} · Dvoboj botovi {statistika.zivo.zastavice.botoviDvoboj ? 'uključeni' : 'isključeni'} · Troboj botovi {statistika.zivo.zastavice.botoviTroboj ? 'uključeni' : 'isključeni'} · Četveroboj botovi {statistika.zivo.zastavice.botoviCetveroboj ? 'uključeni' : 'isključeni'}</dd>
+        <dd>Trening {statistika.zivo.zastavice.trening ? 'uključen' : 'isključen'} · Dvoboj botovi {statistika.zivo.zastavice.botoviDvoboj ? 'uključeni' : 'isključeni'} · Brza igra botovi {statistika.zivo.zastavice.botoviTroboj ? 'uključeni' : 'isključeni'} · Četveroboj botovi {statistika.zivo.zastavice.botoviCetveroboj ? 'uključeni' : 'isključeni'}</dd>
         <dt>Fond botova</dt>
         <dd>{statistika.zivo.fond.slobodni} slobodnih / {statistika.zivo.fond.rezervirani} rezerviranih / {statistika.zivo.fond.uPartiji} u igri od {statistika.zivo.fond.ukupno}; iscrpljenja od pokretanja: {statistika.zivo.fond.iscrpljenja}</dd>
         <dt>Botovi od pokretanja</dt>

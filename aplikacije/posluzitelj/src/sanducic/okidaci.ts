@@ -342,7 +342,7 @@ export async function stvoriPorukeKolekcije(ulaz: {
 
 function nazivFormata(mod: import('zajednicko').ModPartije): string {
   if (mod === 'dva_igraca') return 'Dvoboj';
-  if (mod === 'tri_igraca') return 'Troboj';
+  if (mod === 'tri_igraca') return 'Brza igra';
   return 'Četveroboj';
 }
 

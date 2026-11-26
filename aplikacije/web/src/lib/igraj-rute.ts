@@ -51,7 +51,7 @@ export function nazivFormata(mod: ModPartije): string {
     case 'dva_igraca':
       return 'Dvoboj';
     case 'tri_igraca':
-      return 'Troboj';
+      return 'Brza igra';
     case 'cetiri_igraca':
       return 'Četveroboj';
     default: {
@@ -67,7 +67,7 @@ export function opisFormata(mod: ModPartije): string {
       return '2 igrača';
     case 'tri_igraca':
       // HINT PR14: bez privremenog asseta — tekstualni placeholder dok vlasnik ne dostavi ikonu.
-      return 'Troboj · 3 igrača';
+      return '3 igrača';
     case 'cetiri_igraca':
       return '4 igrača';
     default: {

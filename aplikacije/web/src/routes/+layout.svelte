@@ -280,14 +280,12 @@
     .stranica {
       max-width: 980px;
     }
-
-    .stranica.landing-stranica {
-      max-width: 100%;
-      padding-inline: 0;
-    }
   }
 
+  /* Naslovnica: bez dodatnog side-paddinga — širinu dijele header i .landing (16px). */
   .stranica.landing-stranica {
+    max-width: 100%;
+    padding-inline: 0;
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;

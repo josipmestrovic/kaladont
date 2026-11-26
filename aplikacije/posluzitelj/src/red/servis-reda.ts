@@ -38,7 +38,7 @@ const ShemaPayloadReda = z.object({
 }).strict().optional();
 const PORUKA_NEVALJANOG_PAYLOADA = 'Poslana poruka nije ispravna.';
 const PORUKA_JAVNI_RED_NEDOSTUPAN =
-  'Ovaj javni red trenutačno nije dostupan. Otvori Brzu igru (Troboj · Klasična pravila).';
+  'Ovaj javni red trenutačno nije dostupan. Otvori Brzu igru (Klasična pravila).';
 
 
 function sobaZaKljuc(kljuc: KljucJavnogReda): string {

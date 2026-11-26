@@ -34,9 +34,9 @@ export const PRAVILA_TEME_META: {
   {
     id: 'nacini',
     naziv: 'Kako sve možeš igrati?',
-    title: 'Načini igre Kaladont — Dvoboj, Troboj, Četveroboj i sobe',
+    title: 'Načini igre Kaladont — Dvoboj, Brza igra, Četveroboj i sobe',
     description:
-      'Usporedi načine igre Kaladonta: Dvoboj, Troboj, Četveroboj, Zagrijavanje i privatne sobe.',
+      'Usporedi načine igre Kaladonta: Dvoboj, Brza igra, Četveroboj, Zagrijavanje i privatne sobe.',
   },
   {
     id: 'bodovi',
@@ -99,7 +99,7 @@ export const FAQ_PITANJA: { pitanje: string; odgovor: string }[] = [
   {
     pitanje: 'Kako igrati bez tajmera?',
     odgovor:
-      'Zagrijavanje nema tajmer. U privatnoj sobi domaćin bira „Bez tajmera”. Javni Dvoboj, Troboj i Četveroboj imaju 30 sekundi.',
+      'Zagrijavanje nema tajmer. U privatnoj sobi domaćin bira „Bez tajmera”. Javni Dvoboj, Brza igra i Četveroboj imaju 30 sekundi.',
   },
   {
     pitanje: 'Vide li drugi moj font i čitanje naglas?',
@@ -133,7 +133,7 @@ export const FAQ_PITANJA: { pitanje: string; odgovor: string }[] = [
     pitanje: 'Zašto piše Piskaralo?',
     // HINT PR15: jedan rang + jedan DNK nakon 10 javnih ukupno (ne po formatu).
     odgovor:
-      'Rang i Kaladont DNK stižu nakon 10 javnih igara ukupno (Dvoboj, Troboj i Četveroboj zajedno). Do tada si Piskaralo.',
+      'Rang i Kaladont DNK stižu nakon 10 javnih igara ukupno (Dvoboj, Brza igra i Četveroboj zajedno). Do tada si Piskaralo.',
   },
   {
     pitanje: 'Zašto nisam na ljestvici?',

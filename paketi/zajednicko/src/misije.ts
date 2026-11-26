@@ -327,7 +327,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   dnevna(
     'D21',
     'Za stolom troje',
-    'Završi jedan javni Troboj i odigraj barem jednu prihvaćenu riječ.',
+    'Završi jednu javnu Brzu igru i odigraj barem jednu prihvaćenu riječ.',
     'partije',
     1,
     'aktivnost',
@@ -348,7 +348,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   dnevna(
     'D23',
     'Idući na redu',
-    'Završi jedan javni klasični Troboj ili Četveroboj i odigraj barem jednu prihvaćenu riječ.',
+    'Završi jednu javnu klasičnu Brzu igru ili Četveroboj i odigraj barem jednu prihvaćenu riječ.',
     'partije',
     1,
     'aktivnost',
@@ -400,7 +400,7 @@ export const DEFINICIJE_MISIJA: readonly DefinicijaMisije[] = [
   tjedna(
     'W21',
     'Tri puta prvi',
-    'Pobijedi u 3 javna Troboja.',
+    'Pobijedi u 3 javne Brze igre.',
     'pobjede',
     3,
     'plasman',

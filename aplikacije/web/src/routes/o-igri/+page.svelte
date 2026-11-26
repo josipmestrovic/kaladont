@@ -99,7 +99,7 @@
               <td data-label="Dostignuća">Da</td>
             </tr>
             <tr>
-              <th scope="row">Troboj</th>
+              <th scope="row">Brza igra</th>
               <td data-label="Tko igra">3 igrača</td>
               <td data-label="Bodovi i rang">Da</td>
               <td data-label="Dostignuća">Da</td>
@@ -143,7 +143,7 @@
               <td data-label="Kako se boduje">Plasman + pobjeda + eliminacije (najviše 7).</td>
             </tr>
             <tr>
-              <th scope="row">Troboj</th>
+              <th scope="row">Brza igra</th>
               <td data-label="Kako se boduje">Plasman + pobjeda + eliminacije (najviše 5).</td>
             </tr>
             <tr>
@@ -156,7 +156,7 @@
             </tr>
             <tr>
               <th scope="row">Ljestvice</th>
-              <td data-label="Kako se boduje">Zasebno za Dvoboj, Troboj i Četveroboj; dnevno od 5, dulje od 10 igara.</td>
+              <td data-label="Kako se boduje">Zasebno za Dvoboj, Brzu igru i Četveroboj; dnevno od 5, dulje od 10 igara.</td>
             </tr>
           </tbody>
         </table>

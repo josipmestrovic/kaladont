@@ -210,8 +210,7 @@
 
   .header--naslovnica .header-sadrzaj {
     pointer-events: none;
-    /* Veliki H1 ne smije vertikalno centrirati avatar — inače skače na /profil. */
-    align-items: flex-start;
+    align-items: center;
   }
 
   .header--naslovnica .logo-naslovnica,
@@ -220,20 +219,23 @@
   }
 
   .header--naslovnica .desno {
-    /* Usklađeno s 44px akcijama na ostalim stranicama (avatar 50px + 4px padding). */
+    align-items: center;
     min-height: 44px;
-    padding-top: 0;
+    gap: 12px;
   }
 
   .logo-naslovnica {
     margin: 0;
     min-width: 0;
     max-width: min(100%, calc(100vw - 140px));
+    display: flex;
+    align-items: center;
+    min-height: 44px;
     color: var(--boja-tekst-osnovni);
     font-family: var(--font-naslov);
     font-size: clamp(22px, 4.2vw, 34px);
     font-weight: 800;
-    line-height: 0.95;
+    line-height: 1;
     letter-spacing: 0.01em;
     text-align: left;
     overflow: hidden;

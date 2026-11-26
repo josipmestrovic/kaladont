@@ -50,7 +50,7 @@
     </div>
     <div class="stat-kartica">
       <span class="stat-broj">{odigraneBrzaIgra}</span>
-      <span class="stat-naziv">Brza igra (Troboj)</span>
+      <span class="stat-naziv">Brza igra</span>
     </div>
     <div class="stat-kartica">
       <span class="stat-broj">{pobjedeJavne}</span>

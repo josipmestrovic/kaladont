@@ -108,7 +108,7 @@
       <p class="oznaka-stanja">Odigrana stara igra</p>
       <h1>Završni poredak</h1>
       <p>
-        {arhiva.mod === 'dva_igraca' ? 'Dvoboj' : arhiva.mod === 'tri_igraca' ? 'Troboj' : 'Četveroboj'}
+        {arhiva.mod === 'dva_igraca' ? 'Dvoboj' : arhiva.mod === 'tri_igraca' ? 'Brza igra' : 'Četveroboj'}
         · {nazivPravilnikaArhive(arhiva.pravila)}
         · {formatirajDatum(arhiva.kraj)}
       </p>
