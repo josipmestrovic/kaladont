@@ -18,14 +18,14 @@
   import SeoGlava from '$lib/komponente/SeoGlava.svelte';
   import {
     ariaBadgaDostignuca,
-    labelaZvjezdicaDostignuca,
     MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+    natpisBadgaDostignuca,
     normalizirajZvjezdiceDostignuca,
     type PrikazZvjezdicaDostignuca,
   } from '$lib/naslovnica-dostignuca.js';
   import {
     ariaBadgaMisija,
-    labelaAktivnihMisija,
+    jedinicaAktivnihMisija,
     natpisBadgaMisija,
   } from '$lib/naslovnica-misije.js';
   import {
@@ -45,7 +45,8 @@
 
   const misijeStore = dohvatiStanjeMisijaStore();
   const misijeBadge = $derived(natpisBadgaMisija(misijeStore.aktivne));
-  const misijeLabela = $derived(labelaAktivnihMisija(misijeStore.aktivne));
+  const misijeBroj = $derived(misijeStore.aktivne.ukupnoAktivnih);
+  const misijeJedinica = $derived(jedinicaAktivnihMisija(misijeBroj));
   const misijeAria = $derived(ariaBadgaMisija(misijeStore.aktivne));
   const godinaCopyright = new Date().getFullYear();
 
@@ -66,19 +67,21 @@
     ukupno: 0,
     maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
   });
+  const kolekcijaBrojTekst = $derived(
+    brojRijeciKolekcije === null ? '…' : String(brojRijeciKolekcije),
+  );
+  const kolekcijaJedinica = $derived(
+    brojRijeciKolekcije === null ? null : brojRijeciKolekcije === 1 ? 'riječ' : 'riječi',
+  );
   const kolekcijaBrojLabela = $derived(
-    brojRijeciKolekcije === null
-      ? '…'
-      : brojRijeciKolekcije === 1
-        ? '1 riječ'
-        : `${brojRijeciKolekcije} riječi`,
+    kolekcijaJedinica === null ? kolekcijaBrojTekst : `${kolekcijaBrojTekst} ${kolekcijaJedinica}`,
   );
   const kolekcijaAria = $derived(
     brojRijeciKolekcije === null
       ? `Kolekcija riječi, ${kolekcijaRazinaNaziv}`
       : `Kolekcija riječi, ${kolekcijaBrojLabela}, ${kolekcijaRazinaNaziv}`,
   );
-  const dostignucaLabela = $derived(labelaZvjezdicaDostignuca(dostignucaZvjezdice));
+  const dostignucaBrojTekst = $derived(natpisBadgaDostignuca(dostignucaZvjezdice));
   const dostignucaAria = $derived(ariaBadgaDostignuca(dostignucaZvjezdice));
   const jeGost = $derived(
     stanjeProfila.status === 'spreman' && stanjeProfila.profil?.vrsta === 'gost',
@@ -399,9 +402,12 @@
             </span>
             <span class="sporedni-precac__tekst">
               <span class="sporedni-precac__naslov">Misije</span>
-              <small class="sporedni-precac__podnaslov" data-testid="naslovnica-misije-labela"
-                >{misijeLabela}</small
-              >
+              <span class="sporedni-precac__statistika">
+                <small class="sporedni-precac__podnaslov" data-testid="naslovnica-misije-labela">
+                  <span class="sporedni-precac__broj">{misijeBroj}</span>{' '}
+                  <span class="sporedni-precac__jedinica">{misijeJedinica}</span>
+                </small>
+              </span>
             </span>
           </a>
           <a
@@ -419,13 +425,17 @@
                 <span class="samo-desktop">Kolekcija riječi</span>
                 <span class="samo-mobilni">Kolekcija</span>
               </span>
-              <small class="sporedni-precac__podnaslov" data-testid="naslovnica-kolekcija-labela">
-                <span class="samo-desktop">{kolekcijaBrojLabela}</span>
-                <span class="samo-mobilni">{kolekcijaBrojLabela}</span>
-              </small>
-              <small class="sporedni-precac__razina samo-desktop" aria-hidden="true"
-                >{kolekcijaRazinaNaziv}</small
-              >
+              <span class="sporedni-precac__statistika">
+                <small class="sporedni-precac__podnaslov" data-testid="naslovnica-kolekcija-labela">
+                  <span class="sporedni-precac__broj">{kolekcijaBrojTekst}</span>{#if kolekcijaJedinica}
+                    {' '}
+                    <span class="sporedni-precac__jedinica">{kolekcijaJedinica}</span>
+                  {/if}
+                </small>
+                <small class="sporedni-precac__razina samo-desktop" aria-hidden="true"
+                  >{kolekcijaRazinaNaziv}</small
+                >
+              </span>
             </span>
           </a>
           <a
@@ -440,9 +450,15 @@
             </span>
             <span class="sporedni-precac__tekst">
               <span class="sporedni-precac__naslov">Dostignuća</span>
-              <small class="sporedni-precac__podnaslov" data-testid="naslovnica-dostignuca-labela"
-                >{dostignucaLabela}</small
-              >
+              <span class="sporedni-precac__statistika">
+                <small
+                  class="sporedni-precac__podnaslov sporedni-precac__podnaslov--slozen"
+                  data-testid="naslovnica-dostignuca-labela"
+                >
+                  <span class="sporedni-precac__broj">{dostignucaBrojTekst}</span>{' '}
+                  <span class="sporedni-precac__jedinica">zvjezdica</span>
+                </small>
+              </span>
             </span>
           </a>
         </nav>
@@ -930,6 +946,7 @@
     flex-direction: column;
     align-items: center;
     gap: 2px;
+    min-width: 0;
     min-height: 0;
   }
 
@@ -941,6 +958,14 @@
     line-height: 1.2;
   }
 
+  .sporedni-precac__statistika {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
   .sporedni-precac__podnaslov,
   .sporedni-precac__razina {
     display: block;
@@ -950,6 +975,12 @@
     font-weight: 600;
     line-height: 1.25;
     white-space: nowrap;
+  }
+
+  .sporedni-precac__broj,
+  .sporedni-precac__jedinica {
+    color: inherit;
+    font: inherit;
   }
 
   .sporedni-precac__razina {
@@ -1170,43 +1201,103 @@
     }
 
     .sporedni-red {
-      align-items: center;
-      justify-content: center;
+      align-items: stretch;
+      justify-content: stretch;
       gap: 0;
       margin-top: 0;
       width: 100%;
     }
 
     .sporedna-navigacija {
-      gap: 12px;
-      margin: 0 auto;
-      width: min(100%, 580px);
-      max-width: 580px;
+      gap: var(--razmak-stavki);
+      margin: 0;
+      width: 100%;
+      max-width: none;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      justify-content: center;
+      justify-content: stretch;
       justify-items: stretch;
     }
 
     .sporedni-precac {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
       gap: 10px;
-      padding: 14px 12px;
+      min-height: 80px;
+      padding: 12px 16px;
       font-size: 15px;
+      text-align: left;
+      box-sizing: border-box;
     }
 
     .sporedni-precac__tekst {
+      flex: 1 1 auto;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 12px;
+      min-width: 0;
       min-height: 0;
-      gap: 3px;
     }
 
     .sporedni-precac__naslov {
+      flex: 1 1 auto;
+      min-width: 0;
+      color: var(--boja-tekst-osnovni);
       font-size: 15px;
       line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sporedni-precac__statistika {
+      flex: 0 1 auto;
+      align-items: flex-end;
+      gap: 2px;
+      max-width: 48%;
+      text-align: right;
     }
 
     .sporedni-precac__podnaslov,
     .sporedni-precac__razina {
+      max-width: 100%;
       font-size: 12px;
       line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sporedni-precac__podnaslov--slozen {
+      display: flex;
+      flex-flow: column wrap;
+      align-items: flex-end;
+      gap: 2px;
+      white-space: normal;
+    }
+
+    .sporedni-precac__podnaslov--slozen .sporedni-precac__broj,
+    .sporedni-precac__podnaslov--slozen .sporedni-precac__jedinica {
+      display: block;
+      white-space: nowrap;
+    }
+
+    .sporedni-precac__broj {
+      color: var(--boja-zuta-krema);
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .sporedni-precac__jedinica {
+      color: color-mix(in srgb, var(--boja-tekst-sekundarni) 88%, transparent);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .sporedni-precac__razina {
+      font-size: 12px;
     }
 
     .sporedni-precac__badge {
@@ -1221,8 +1312,12 @@
 
     .sporedni-precac img,
     .sporedni-precac__ikona {
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
+    }
+
+    :global(html[data-tema='svijetla']) .sporedni-precac__broj {
+      color: color-mix(in srgb, var(--boja-akcent-tekst) 90%, #8a6a00);
     }
   }
 
