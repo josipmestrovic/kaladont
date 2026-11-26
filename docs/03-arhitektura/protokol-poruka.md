@@ -50,7 +50,7 @@ type BrzaPoruka = "pozdrav" | "sorry" | "dobro-odigrano" | "najjaci" | "cao" | "
 | `partija:runda-otvorena` | `RundaOtvorena` | Sustav je otkrio odabranu riječ; red ide na sljedećeg aktivnog igrača nakon napadača |
 | `partija:spremanje-rezultata` | `SpremanjeRezultataPartije` | Igra je završila, ali se konačni rezultat još pokušava spremiti; šalje se pri svakom ponovnom pokušaju/reconnectu |
 | `partija:ponistena` | `PonistenaPartija` | Partija je prekinuta restartom ili kontroliranim gašenjem; rezultat nije dodijeljen |
-| `partija:kraj` | `KrajPartije` | Konačni plasmani, bodovi i privatni XP obračun primatelja; opcionalni `prikazRezultataOdIso` je zajednički rok prikaza detalja, 5 s od završetka igre (`ODGODA_PRIKAZA_REZULTATA_MS`), ne mijenja se pri reconnectu |
+| `partija:kraj` | `KrajPartije` | Konačni plasmani, bodovi i privatni XP obračun primatelja; opcionalni `prikazRezultataOdIso` je zajednički rok prikaza detalja, 8 s od završetka igre (`ODGODA_PRIKAZA_REZULTATA_MS`), ne mijenja se pri reconnectu |
 | `trening:neaktivnost` | `{ upozorenje: boolean, upozorenjeIso: string, zatvaraIso: string }` | Samo aktivnom ljudskom sudioniku treninga; apsolutni rok upozorenja i tehničkog zatvaranja, obnovljiv je kroz `StanjePartije` |
 | `iskustvo:obracun` | `ObracunIskustvaTijekomPartije` | Privatni XP obračun eliminiranog igrača |
 | `sanducic:promjena` | `{ razlog: 'nova' \| 'stanje' }` | Privatni signal vlasniku pretinca; bez sadržaja poruke — klijent dohvaća `GET /api/sanducic/sazetak` |

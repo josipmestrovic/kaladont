@@ -33,7 +33,7 @@ export const LJUDSKE_BRZE_PORUKE = ['pozdrav', 'sorry', 'dobro-odigrano', 'najja
 export type LjudskaBrzaPoruka = (typeof LJUDSKE_BRZE_PORUKE)[number];
 
 /** Zajednički rok od `partija:kraj` / terminalnog izazova do ekrana rezultata (5–4–3–2–1). */
-export const ODGODA_PRIKAZA_REZULTATA_MS = 5_000;
+export const ODGODA_PRIKAZA_REZULTATA_MS = 8_000;
 
 export type KodRazlogaVeze = 'SESIJA_ISTEKLA' | 'NEVALJAN_TOKEN' | 'DRUGA_KARTICA' | 'SERVIS_NEDOSTUPAN';
 

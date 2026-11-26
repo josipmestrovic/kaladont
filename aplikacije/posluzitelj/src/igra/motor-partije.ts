@@ -136,7 +136,7 @@ const ShemaTreningNastavi = z.object({}).strict();
 const ShemaReakcija = z.object({ poruka: z.enum(['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci']) }).strict(); // ljudski picker; botovi smiju i micro-flavour kodove
 
 const TRAJANJE_POTEZA_MS = konfiguracija.TRAJANJE_POTEZA_MS;
-const TRAJANJE_IZBORA_SUSTAVA_MS = 8_000;
+const TRAJANJE_IZBORA_SUSTAVA_MS = 5_000;
 const PROZOR_ISTODOBNIH_PREKIDA_MS = 25;
 // Jedno početno odbrojavanje (3 s) u svim kontekstima. Test/CI postavlja 0 preko env-a.
 const ODGODA_POCETKA_PARTIJE_MS = konfiguracija.ODGODA_POCETKA_PARTIJE_MS;

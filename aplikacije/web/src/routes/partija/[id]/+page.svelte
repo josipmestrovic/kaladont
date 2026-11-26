@@ -41,6 +41,7 @@
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
   import { trebaAutofokusPoteza } from '$lib/postavke-autofokus-poteza.js';
+  import { ArrowUp } from 'lucide-svelte';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
@@ -2246,6 +2247,7 @@
           onsubmit={(e) => { e.preventDefault(); if (jeNaPotezu) posaljiPotez(); }}
           aria-disabled={!jeNaPotezu}
         >
+          <p class="mobilni-tvoj-red" aria-live="polite">TVOJ RED</p>
           <div class="mobilni-kontekst">
             {#if prikazanaRijec?.rijec}
               {@const duljinaTrenutne = Array.from(prikazanaRijec.rijec).length}
@@ -2270,52 +2272,60 @@
               />
             </div>
           {/if}
-          <div class="unos-rijeci" class:unos-ima-gresku={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}>
+          <div class="desktop-unos-omot">
+            <div class="unos-rijeci" class:unos-ima-gresku={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}>
+              {#if jeNaPotezu}
+                <span class="prefiks-unosa" aria-hidden="true">{prefiksRijeci}</span>
+              {/if}
+              <input
+                bind:this={unosInput}
+                type="text"
+                bind:value={unosNastavkaRijeci}
+                placeholder={!jeNaPotezu ? 'Pričekaj svoj red' : ''}
+                onfocus={() => {
+                  if (!jeNaPotezu) {
+                    unosInput?.blur();
+                    return;
+                  }
+                  korisnikJeFokusiraoUnos = true;
+                  if (mobilniZaslon()) osigurajZastituPovijesti('fokus');
+                }}
+                onblur={() => {
+                  // Ručni blur (tipkovnica zatvorena): skini fokus entry s history stacka.
+                  if (
+                    mobilniZaslon() &&
+                    zastitaPovijesti === 'fokus' &&
+                    !zatvaramFokusBezPovijesti
+                  ) {
+                    ignorirajSljedeciPopstate = true;
+                    zastitaPovijesti = 'igra';
+                    history.back();
+                  }
+                }}
+                oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
+                oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
+                autocomplete="off"
+                autocapitalize="none"
+                autocorrect="off"
+                spellcheck={false}
+                inputmode="text"
+                enterkeyhint="send"
+                maxlength={najviseZnakovaNastavka}
+                aria-label={!jeNaPotezu
+                  ? 'Pričekaj svoj red'
+                  : jaDokazujem
+                    ? `Dokaži nastavak na ${prefiksRijeci.toUpperCase()}`
+                    : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
+                aria-invalid={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}
+                disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna}
+              />
+            </div>
             {#if jeNaPotezu}
-              <span class="prefiks-unosa" aria-hidden="true">{prefiksRijeci}</span>
+              <p class="desktop-tvoj-red-hint" aria-hidden="true">
+                <ArrowUp size={22} strokeWidth={2.5} />
+                <span>Tvoj red, unesi riječ ovdje!</span>
+              </p>
             {/if}
-            <input
-              bind:this={unosInput}
-              type="text"
-              bind:value={unosNastavkaRijeci}
-              placeholder={!jeNaPotezu ? 'Pričekaj svoj red' : ''}
-              onfocus={() => {
-                if (!jeNaPotezu) {
-                  unosInput?.blur();
-                  return;
-                }
-                korisnikJeFokusiraoUnos = true;
-                if (mobilniZaslon()) osigurajZastituPovijesti('fokus');
-              }}
-              onblur={() => {
-                // Ručni blur (tipkovnica zatvorena): skini fokus entry s history stacka.
-                if (
-                  mobilniZaslon() &&
-                  zastitaPovijesti === 'fokus' &&
-                  !zatvaramFokusBezPovijesti
-                ) {
-                  ignorirajSljedeciPopstate = true;
-                  zastitaPovijesti = 'igra';
-                  history.back();
-                }
-              }}
-              oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
-              oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
-              autocomplete="off"
-              autocapitalize="none"
-              autocorrect="off"
-              spellcheck={false}
-              inputmode="text"
-              enterkeyhint="send"
-              maxlength={najviseZnakovaNastavka}
-              aria-label={!jeNaPotezu
-                ? 'Pričekaj svoj red'
-                : jaDokazujem
-                  ? `Dokaži nastavak na ${prefiksRijeci.toUpperCase()}`
-                  : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
-              aria-invalid={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}
-              disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna}
-            />
           </div>
           <div class="potez-gumbi">
             {#if jaDokazujem || (!stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
@@ -3439,6 +3449,7 @@
   }
   .mobilni-kontekst { display: none; }
   .mobilni-timer-crta { display: none; }
+  .mobilni-tvoj-red { display: none; }
   .zona-poteza:global(.mobilni-potez) {
     position: fixed;
     z-index: 1100;
@@ -3448,7 +3459,7 @@
     justify-content: flex-end;
     gap: 10px;
     margin: 0;
-    padding: 16px 10px 10px;
+    padding: 0 10px 10px;
     overflow-y: auto;
     border: 1px solid color-mix(in srgb, var(--boja-obrub-jaci) 55%, transparent);
     border-radius: 12px;
@@ -3456,6 +3467,23 @@
     box-shadow: var(--sjena-modal);
     -webkit-backdrop-filter: blur(18px);
     backdrop-filter: blur(18px);
+  }
+  :global(.mobilni-potez) .mobilni-tvoj-red {
+    display: block;
+    flex: none;
+    box-sizing: border-box;
+    width: calc(100% + 20px);
+    margin: 0 -10px;
+    padding: 12px 10px;
+    border-radius: 11px 11px 0 0;
+    background: color-mix(in srgb, var(--boja-isticanje-slova) 28%, transparent);
+    color: var(--boja-uspjeh-tekst);
+    font-family: var(--font-naslov);
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    line-height: 1.2;
+    text-align: center;
   }
   :global(.mobilni-potez) .mobilni-kontekst {
     display: flex;
@@ -3745,12 +3773,19 @@
       width: 100%;
     }
   }
+  .desktop-unos-omot {
+    display: contents;
+  }
+  .desktop-tvoj-red-hint {
+    display: none;
+  }
   @media (min-width: 1000px) {
-    form {
+    form.zona-poteza {
       display: grid;
       grid-template-columns: minmax(0, 5.2fr) minmax(16rem, 4.8fr);
       align-items: end;
-      gap: var(--razmak-8);
+      column-gap: var(--razmak-8);
+      row-gap: 8px;
     }
     form button,
     .unos-rijeci {
@@ -3761,6 +3796,41 @@
     }
     form .poruka-poteza-slot {
       grid-column: 1 / -1;
+      grid-row: 1;
+    }
+    /* Omot ostaje contents: input i gumbi dijele isti red, hint ide ispod inputa. */
+    .desktop-unos-omot {
+      display: contents;
+    }
+    form.zona-poteza .unos-rijeci {
+      grid-column: 1;
+      grid-row: 2;
+    }
+    form.zona-poteza .potez-gumbi {
+      grid-column: 2;
+      grid-row: 2;
+    }
+    .desktop-tvoj-red-hint {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      grid-column: 1;
+      grid-row: 3;
+      margin: 0;
+      color: var(--boja-uspjeh-tekst);
+      font-family: var(--font-naslov);
+      font-size: var(--tekst-baza);
+      font-weight: 700;
+      line-height: 1.25;
+      text-align: center;
+    }
+    .desktop-tvoj-red-hint :global(svg) {
+      flex: none;
+      color: var(--boja-isticanje-slova);
+    }
+    :global(.mobilni-potez) .desktop-tvoj-red-hint {
+      display: none;
     }
     .potez-gumbi {
       gap: 10px;

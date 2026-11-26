@@ -764,7 +764,7 @@ export function pokreniSlusateljeIgre(): void {
       stanje.naPotezuId = null;
       stanje.istekPotezaIso = null;
       if (!stanje.istekIzboraIso) {
-        stanje.istekIzboraIso = new Date(Date.now() + 8_000).toISOString();
+        stanje.istekIzboraIso = new Date(Date.now() + 5_000).toISOString();
       }
     }
   });
