@@ -377,6 +377,8 @@
     brojGreskeUnosa += 1;
     pokreniAnimacijuOdbijanjaGumba();
     void tick().then(() => {
+      // #156: ne vraćaj fokus nakon isteka/eliminacije (kasni potez:odbijen).
+      if (!jeNaPotezu) return;
       unosInput?.focus({ preventScroll: true });
     });
   }
@@ -867,7 +869,12 @@
     const osvjezi = () => {
       cancelAnimationFrame(okvir);
       okvir = requestAnimationFrame(() => {
-        const fokusiran = dijalog || zadrziPolozaj || element.contains(document.activeElement);
+        // #156: tijekom slanja drži overlay i ako input kratko izgubi activeElement.
+        const fokusiran =
+          dijalog ||
+          zadrziPolozaj ||
+          element.contains(document.activeElement) ||
+          (!dijalog && jeNaPotezu && slanjeUTijeku);
         if (!mobitel.matches || !fokusiran || (vidljiviZaslon && Math.abs(vidljiviZaslon.scale - 1) > 0.01)) {
           ocisti();
           return;
@@ -943,7 +950,10 @@
         odbijanjeGumbaTimeout = null;
       }
       // Na mobitelu skini fokus/overlay kad red prođe (forma ostaje mountana radi desktopa).
-      if (mobilniZaslon()) unosInput?.blur();
+      if (mobilniZaslon()) {
+        if (zastitaPovijesti === 'fokus') spustiFokusNaIgruBezPovijesti();
+        else unosInput?.blur();
+      }
       return;
     }
     if (!prefiksRijeci) return;
@@ -1417,6 +1427,8 @@
         if (jeIzazov) odbijenaRijecZaIzazov = zadnjaPoslanaRijec;
       }
       zadnjaPoslanaRijec = null;
+      // #156: kasni odbijen nakon gubitka poteza ne smije ponovno otvoriti fokus.
+      if (!jeNaPotezu) return;
       prikaziGreskuPoteza(poruka, kod === 'RIJEC_NE_POSTOJI' ? odbijenaRijec : null, kod === 'VLASTITO_IME' ? odbijenaRijec : null, kod === 'RIJEC_ISKORISTENA' ? odbijenaRijec : null, oblik);
     };
     const naGresku = ({ poruka }: { poruka: string }) => {
@@ -2368,7 +2380,9 @@
                       ? `Dokaži nastavak na ${prefiksRijeci.toUpperCase()}`
                       : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
                   aria-invalid={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}
-                  disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna}
+                  aria-busy={jeNaPotezu && slanjeUTijeku}
+                  readonly={jeNaPotezu && slanjeUTijeku}
+                  disabled={!jeNaPotezu || !vezaSpremna}
                 />
               </div>
               {#if jeNaPotezu}
