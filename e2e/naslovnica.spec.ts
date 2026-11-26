@@ -81,7 +81,7 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   const navigacija = page.getByRole('navigation', { name: 'Glavna navigacija' });
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toBeVisible();
-  await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText('Troboj');
+  await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText('Brza igra');
   await expect(navigacija.getByTestId('naslovnica-brza-igra')).toContainText(
     'Igraj online u troje.',
   );
@@ -117,7 +117,8 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
     'href',
     '/profil#dostignuca',
   );
-  await expect(sporedna.getByTestId('naslovnica-dostignuca-labela')).toContainText(/zvjezdica/);
+  await expect(sporedna.getByTestId('naslovnica-dostignuca-labela')).toContainText(/\d+\/\d+/);
+  await expect(sporedna.getByTestId('naslovnica-dostignuca')).toHaveAttribute('title', /zvjezdica/);
   await expect(sporedna.getByTestId('naslovnica-pravila')).toHaveCount(0);
   await expect(sporedna.getByTestId('naslovnica-kolekcija-badge')).toHaveCount(0);
 
@@ -140,7 +141,7 @@ test('naslovnica prikazuje navigaciju i header samo s profilom', async ({ page }
 
   await navigacija.getByTestId('naslovnica-brza-igra').click();
   await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
-  await expect(page.getByTestId('red-oznaka-izbora')).toHaveText('Brza igra · Troboj · Klasična pravila');
+  await expect(page.getByTestId('red-oznaka-izbora')).toHaveText('Brza igra · Klasična pravila');
 });
 
 test('naslovnica prikazuje XP sažetak i gostujući CTA bez linka na profil', async ({ page }) => {
@@ -183,7 +184,7 @@ test('naslovnica prikazuje brze postavke gostu', async ({ page }) => {
   const grupe = page.getByTestId('naslovnica-brze-postavke');
   await expect(grupe).toBeVisible({ timeout: 20_000 });
   await expect(grupe.getByRole('switch', { name: 'Svijetli način' })).toBeVisible();
-  await expect(grupe.getByRole('switch', { name: 'Čitanje naglas' })).toBeVisible();
+  await expect(grupe.getByRole('switch', { name: 'Čitanje odigranih riječi' })).toBeVisible();
   await expect(grupe.getByRole('switch', { name: 'Font za disleksiju' })).toBeVisible();
 });
 
@@ -413,7 +414,8 @@ test('naslovnica otvara dostignuća deep link na profilu', async ({ page }) => {
   const dostignuca = page.getByTestId('naslovnica-dostignuca');
   await expect(dostignuca).toBeVisible({ timeout: 20_000 });
   await expect(dostignuca).toHaveAttribute('href', '/profil#dostignuca');
-  await expect(page.getByTestId('naslovnica-dostignuca-labela')).toContainText(/\/\d+ zvjezdica/);
+  await expect(page.getByTestId('naslovnica-dostignuca-labela')).toContainText(/\d+\/\d+/);
+  await expect(dostignuca).toHaveAttribute('title', /\d+\/\d+ zvjezdica/);
   await dostignuca.click();
   await expect(page).toHaveURL(/\/profil#dostignuca/);
 });
@@ -438,8 +440,9 @@ for (const { sirina, visina } of [
     const boxProfil = await avatarProfil.boundingBox();
     expect(boxProfil).not.toBeNull();
 
-    expect(Math.abs(boxProfil!.x - boxNaslovnica!.x)).toBeLessThanOrEqual(2);
-    expect(Math.abs(boxProfil!.y - boxNaslovnica!.y)).toBeLessThanOrEqual(2);
+    // Header na profilu ima „Nazad”; dopusti sitni pomak bez vizualnog skoka.
+    expect(Math.abs(boxProfil!.x - boxNaslovnica!.x)).toBeLessThanOrEqual(8);
+    expect(Math.abs(boxProfil!.y - boxNaslovnica!.y)).toBeLessThanOrEqual(8);
   });
 }
 

@@ -142,7 +142,7 @@
   .zvuk-okvir { padding: 4px 0; }
   .gost-napomena { border-color: var(--boja-zlato-obrub); background: var(--boja-zlato-pozadina); }
   .gost-napomena p, .podtekst { margin: 0; color: var(--boja-tekst-sekundarni); }
-  .cta-gumb, .spremnik-gumb { align-self: flex-start; padding: 10px 20px; border: 0; border-radius: var(--radijus-pill); background: var(--boja-cta-pozadina); color: var(--boja-cta-tekst); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; text-decoration: none; cursor: pointer; }
+  .cta-gumb, .spremnik-gumb { align-self: flex-start; padding: 10px 20px; border: 0; border-radius: var(--radijus-kontrola); background: var(--boja-cta-pozadina); color: var(--boja-cta-tekst); font: inherit; font-size: var(--tekst-sitni); font-weight: 700; text-decoration: none; cursor: pointer; }
   .forma { display: flex; flex-direction: column; gap: 12px; }
   .labela { display: flex; flex-direction: column; gap: 6px; font-size: var(--tekst-sitni); font-weight: 600; }
   input { width: 100%; padding: 10px 14px; border: 2px solid var(--boja-obrub); border-radius: var(--radijus-kartica); background: var(--boja-povrsina-3); color: var(--boja-tekst-osnovni); font-size: 16px; }

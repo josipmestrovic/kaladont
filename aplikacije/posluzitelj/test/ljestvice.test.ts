@@ -35,6 +35,11 @@ async function igra(
     status?: 'zavrsena' | 'u_tijeku' | 'ponistena';
     pocetak?: Date;
     kraj?: Date;
+    metrike?: {
+      prihvaceneRijeci: number;
+      trajanjePrihvacenihMs: number;
+      najduziNizRijeci: number;
+    } | null;
   },
 ): Promise<void> {
   brojac += 1;
@@ -49,12 +54,26 @@ async function igra(
     pocetak,
     kraj: rezultat.kraj ?? new Date(pocetak.getTime() + 30_000),
   });
+  const metrike = rezultat.metrike === null
+    ? {}
+    : rezultat.metrike
+      ? {
+        metrikeVerzija: 1 as const,
+        prihvaceneRijeci: rezultat.metrike.prihvaceneRijeci,
+        trajanjePrihvacenihMs: rezultat.metrike.trajanjePrihvacenihMs,
+        najduziNizRijeci: rezultat.metrike.najduziNizRijeci,
+        ...(rezultat.metrike.prihvaceneRijeci > 0
+          ? { najduzaRijec: 'test', najduzaRijecGrafemi: 4 }
+          : { najduzaRijec: null, najduzaRijecGrafemi: null }),
+      }
+      : {};
   await baza.insert(sudioniciPartije).values({
     partijaId: id,
     igracId,
     sjedalo: 0,
     plasman: rezultat.plasman,
     bodovi: rezultat.bodovi ?? (rezultat.plasman === 1 ? 4 : 0),
+    ...metrike,
   });
 }
 
@@ -224,6 +243,93 @@ describe('poredak vremenskih ljestvica (stvarni Postgres)', () => {
   });
 });
 
+describe('brzina i niz riječi', () => {
+  it('koristi ponderirani prosjek brzine i MAX niza riječi', async () => {
+    const dnevniOd = new Date('2001-04-01T22:00:00Z');
+    const dnevniDo = new Date('2001-04-02T22:00:00Z');
+    let lokalni = 0;
+    const uDanu = () => {
+      lokalni += 1;
+      const pocetak = new Date(dnevniOd.getTime() + lokalni * 60_000);
+      return { pocetak, kraj: new Date(pocetak.getTime() + 30_000) };
+    };
+
+    const brzi = await noviIgrac(`Brz${randomUUID().slice(0, 6)}`);
+    const sporiji = await noviIgrac(`Spo${randomUUID().slice(0, 6)}`);
+    // 2 poteza / 4 s + 8 poteza / 40 s (+ 3×10/44 s) = 4,4 s ponderirano
+    const brziMetrike = [
+      { prihvaceneRijeci: 2, trajanjePrihvacenihMs: 4_000, najduziNizRijeci: 2 },
+      { prihvaceneRijeci: 8, trajanjePrihvacenihMs: 40_000, najduziNizRijeci: 3 },
+      { prihvaceneRijeci: 10, trajanjePrihvacenihMs: 44_000, najduziNizRijeci: 4 },
+      { prihvaceneRijeci: 10, trajanjePrihvacenihMs: 44_000, najduziNizRijeci: 4 },
+      { prihvaceneRijeci: 10, trajanjePrihvacenihMs: 44_000, najduziNizRijeci: 4 },
+    ];
+    for (const metrike of brziMetrike) {
+      await igra(brzi, { plasman: 2, mod: 'tri_igraca', ...uDanu(), metrike });
+    }
+    for (let i = 0; i < 5; i += 1) {
+      await igra(sporiji, {
+        plasman: 2,
+        mod: 'tri_igraca',
+        ...uDanu(),
+        metrike: { prihvaceneRijeci: 10, trajanjePrihvacenihMs: 50_000, najduziNizRijeci: 4 },
+      });
+    }
+
+    const brzina = await izracunajPoredak('tri_igraca', 'najbrzi_igraci', 'dnevno', dnevniOd, dnevniDo);
+    expect(brzina.minimumPoteza).toBe(30);
+    const brziStavka = brzina.poIgracu.get(brzi);
+    expect(brziStavka?.vrijednost).toMatchObject({ vrsta: 'prosjek_brzine' });
+    if (brziStavka?.vrijednost.vrsta === 'prosjek_brzine') {
+      expect(brziStavka.vrijednost.prosjekMs).toBeCloseTo(4_400, 5);
+      expect(brziStavka.vrijednost.prihvaceniPotezi).toBe(40);
+    }
+    expect(pozicijaIgraca(brzina, brzi).mjesto).toBeLessThan(pozicijaIgraca(brzina, sporiji).mjesto!);
+
+    const nizovi = await noviIgrac(`NzR${randomUUID().slice(0, 6)}`);
+    await igra(nizovi, {
+      plasman: 2,
+      mod: 'tri_igraca',
+      ...uDanu(),
+      metrike: { prihvaceneRijeci: 12, trajanjePrihvacenihMs: 20_000, najduziNizRijeci: 12 },
+    });
+    await igra(nizovi, {
+      plasman: 2,
+      mod: 'tri_igraca',
+      ...uDanu(),
+      metrike: { prihvaceneRijeci: 18, trajanjePrihvacenihMs: 30_000, najduziNizRijeci: 18 },
+    });
+    for (let i = 0; i < 3; i += 1) {
+      await igra(nizovi, {
+        plasman: 3,
+        mod: 'tri_igraca',
+        ...uDanu(),
+        metrike: { prihvaceneRijeci: 1, trajanjePrihvacenihMs: 1_000, najduziNizRijeci: 1 },
+      });
+    }
+    const privatniRekord = await noviIgrac(`PrivNz${randomUUID().slice(0, 6)}`);
+    await igra(privatniRekord, {
+      plasman: 1,
+      mod: 'tri_igraca',
+      ...uDanu(),
+      metrike: { prihvaceneRijeci: 50, trajanjePrihvacenihMs: 10_000, najduziNizRijeci: 50 },
+    });
+    const zadnja = stvorenePartije.at(-1)!;
+    await baza.insert(obracuniPartija).values({ partijaId: zadnja, vrsta: 'privatna_gamifikacija' });
+
+    const nizRijeci = await izracunajPoredak('tri_igraca', 'niz_rijeci', 'dnevno', dnevniOd, dnevniDo);
+    expect(nizRijeci.poIgracu.get(nizovi)?.vrijednost).toEqual({ vrsta: 'niz_rijeci', broj: 18 });
+    expect(pozicijaIgraca(nizRijeci, privatniRekord).status).toBe('nije_igrano');
+
+    const bezMetrika = await noviIgrac(`NullM${randomUUID().slice(0, 6)}`);
+    for (let i = 0; i < 5; i += 1) {
+      await igra(bezMetrika, { plasman: 2, mod: 'tri_igraca', ...uDanu(), metrike: null });
+    }
+    const brzinaNull = await izracunajPoredak('tri_igraca', 'najbrzi_igraci', 'dnevno', dnevniOd, dnevniDo);
+    expect(pozicijaIgraca(brzinaNull, bezMetrika).status).toBe('nije_igrano');
+  });
+});
+
 describe('GET /api/ljestvice', () => {
   it('validira parametre, ne kešira osobni odgovor i zaključava svih vremena', async () => {
     const app = Fastify();
@@ -236,7 +342,9 @@ describe('GET /api/ljestvice', () => {
     const tijelo = dnevna.json<OdgovorLjestvice>();
     expect(dnevna.statusCode).toBe(200);
     expect(dnevna.headers['cache-control']).toBe('private, no-store');
+    expect(tijelo.vrstaOdgovora).toBe('vremenska');
     expect(tijelo.redci.length).toBeLessThanOrEqual(10);
+    if (tijelo.vrstaOdgovora !== 'vremenska') throw new Error('očekivan vremenski odgovor');
     expect(tijelo.minimumIgara).toBe(5);
     expect(tijelo.mojaPozicija.status).toBe('prijava_potrebna');
     expect(tijelo.mojRedak).toBeNull();
@@ -245,14 +353,27 @@ describe('GET /api/ljestvice', () => {
 
     const troboj = await app.inject({ method: 'GET', url: '/api/ljestvice?mod=tri_igraca&razdoblje=tjedno' });
     expect(troboj.statusCode).toBe(200);
-    expect(troboj.json<OdgovorLjestvice>().mod).toBe('tri_igraca');
-    expect(troboj.json<OdgovorLjestvice>().minimumIgara).toBe(10);
+    const trobojTijelo = troboj.json<OdgovorLjestvice>();
+    expect(trobojTijelo.vrstaOdgovora).toBe('vremenska');
+    if (trobojTijelo.vrstaOdgovora !== 'vremenska') throw new Error('očekivan vremenski odgovor');
+    expect(trobojTijelo.mod).toBe('tri_igraca');
+    expect(trobojTijelo.minimumIgara).toBe(10);
 
     const svih = (await app.inject({ method: 'GET', url: '/api/ljestvice?razdoblje=svih_vremena' })).json<OdgovorLjestvice>();
+    expect(svih.vrstaOdgovora).toBe('vremenska');
+    if (svih.vrstaOdgovora !== 'vremenska') throw new Error('očekivan vremenski odgovor');
     expect(svih.razdoblje.stanje).toBe('zakljucano');
     expect(svih.razdoblje.otkljucavaSe).not.toBeNull();
     expect(svih.redci).toEqual([]);
     expect(svih.mojaPozicija.status).toBe('zakljucano');
+
+    const napredak = await app.inject({ method: 'GET', url: '/api/ljestvice?metrika=kolekcija' });
+    expect(napredak.statusCode).toBe(200);
+    const napredakTijelo = napredak.json<OdgovorLjestvice>();
+    expect(napredakTijelo.vrstaOdgovora).toBe('napredak');
+    if (napredakTijelo.vrstaOdgovora !== 'napredak') throw new Error('očekivan napredak');
+    expect(napredakTijelo.metrika).toBe('kolekcija');
+    expect(napredakTijelo.opisObuhvata).toContain('Ukupni napredak');
 
     const sazetak = await app.inject({ method: 'GET', url: '/api/ljestvice/sazetak' });
     expect(sazetak.statusCode).toBe(200);

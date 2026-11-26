@@ -42,7 +42,7 @@
 
   <PrekidacPostavke
     checked={govorUkljucen}
-    ariaLabel="Čitanje naglas"
+    ariaLabel="Čitanje odigranih riječi"
     testId="brza-postavka-glas"
     onchange={(ukljucen) => postaviGlas(ukljucen)}
   >
@@ -53,10 +53,7 @@
         <VolumeX size={24} strokeWidth={2} />
       {/if}
     </span>
-    <strong class="brze-postavke__naziv">
-      <span class="samo-desktop">Čitanje naglas</span>
-      <span class="samo-mobilni">Čitanje</span>
-    </strong>
+    <strong class="brze-postavke__naziv">Čitanje odigranih riječi</strong>
   </PrekidacPostavke>
 
   <PrekidacPostavke
@@ -102,7 +99,7 @@
     height: auto;
     padding: 8px 4px 10px;
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--radijus-kontrola);
     background: transparent;
   }
 
@@ -118,7 +115,7 @@
   .brze-postavke :global(.prekidac-postavke:focus-within) {
     outline: 3px solid var(--boja-fokus);
     outline-offset: 3px;
-    border-radius: 10px;
+    border-radius: var(--radijus-kontrola);
   }
 
   .brze-postavke :global(.prekidac-postavke__sadrzaj) {
@@ -183,7 +180,8 @@
     .brze-postavke {
       grid-template-columns: minmax(0, 1fr);
       gap: 6px;
-      max-width: 280px;
+      width: 100%;
+      max-width: none;
     }
 
     .brze-postavke :global(.prekidac-postavke) {
@@ -208,30 +206,40 @@
 
   @media (min-width: 1000px) {
     .brze-postavke {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: center;
       width: 100%;
       max-width: none;
       margin-inline: 0;
-      gap: 12px 32px;
+      /* Isti stupci kao Misije/Kolekcija/Dostignuća. */
+      gap: var(--razmak-stavki, 14px);
     }
 
     .brze-postavke :global(.prekidac-postavke) {
-      flex: 0 0 auto;
       flex-direction: row;
       align-items: center;
       justify-content: flex-start;
-      width: auto;
+      width: 100%;
       min-width: 0;
-      padding: 10px 12px;
-      gap: 14px;
+      /* Isti box model / radijus kao .sporedni-precac — vanjska širina = kartica. */
+      padding: 10px 16px;
+      border: 1px solid transparent;
+      border-radius: var(--radijus-kontrola);
+      gap: 10px;
       overflow: visible;
+      box-sizing: border-box;
+    }
+
+    /* Fokus u borderu (1px), ne outline van kutije — inače red izgleda šire od kartica. */
+    .brze-postavke :global(.prekidac-postavke:focus-within) {
+      outline: none;
+      border-color: var(--boja-fokus);
+      border-radius: var(--radijus-kontrola);
     }
 
     .brze-postavke :global(.prekidac-postavke__sadrzaj) {
-      flex: 0 0 auto;
+      flex: 1 1 auto;
       flex-direction: row;
       align-items: center;
       justify-content: flex-start;
@@ -242,14 +250,26 @@
 
     .brze-postavke :global(.prekidac) {
       flex: 0 0 auto;
-      margin-left: 0;
+      margin-left: auto;
+    }
+
+    /* Isti slot 32px kao sporedne kartice; SVG centriran ≈ optički rub PNG ikona. */
+    .brze-postavke__ikona {
+      width: 32px;
+      height: 32px;
+      flex: 0 0 32px;
+    }
+
+    .brze-postavke__ikona :global(svg) {
+      width: 24px;
+      height: 24px;
     }
 
     .brze-postavke__naziv {
-      flex: 0 0 auto;
+      flex: 0 1 auto;
       width: auto;
       min-width: 0;
-      font-size: 15px;
+      font-size: 16px;
       text-align: left;
       white-space: nowrap;
       overflow-wrap: normal;
@@ -264,7 +284,7 @@
     }
 
     :global(html[data-font-disleksiju]) .brze-postavke__naziv {
-      font-size: 15px;
+      font-size: 16px;
     }
   }
 </style>

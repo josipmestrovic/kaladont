@@ -240,6 +240,8 @@
     void (async () => {
       await ucitaj(true);
       const id = $page.url.searchParams.get('id');
+      // Ulazak na stranicu = sve pročitano (prije deep-linka da badge nestane odmah).
+      await oznaciSve();
       if (id) await obradiDeepLink(id);
     })();
   });

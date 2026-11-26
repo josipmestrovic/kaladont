@@ -112,7 +112,7 @@
     justify-content: center;
     padding: 3px 7px;
     border: 1px solid var(--boja-zlato-obrub);
-    border-radius: 999px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-zlato-pozadina);
     color: var(--boja-zlato-tekst);
     font-size: 0.65rem;

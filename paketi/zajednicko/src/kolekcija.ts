@@ -1,4 +1,6 @@
 /** Kolekcionarske razine — zajednički pragovi za profil, motor i sandučic. */
+import { kolekcijskiKljucGrupe } from './pravila.js';
+
 
 export const PRAGOVI_KOLEKCIONARSKE_RAZINE = [
   { prag: 0, naziv: 'Početnik' },
@@ -29,4 +31,19 @@ export function noviKolekcionarskiPragovi(brojPrije: number, brojPoslije: number
   return PRAGOVI_KOLEKCIONARSKE_RAZINE.filter(
     (prag) => prag.prag > 0 && brojPrije < prag.prag && brojPoslije >= prag.prag,
   );
+}
+
+/** Broj jedinstvenih kolekcijskih jedinica (ista normalizacija kao profil). */
+export function brojKolekcijskihJedinica(
+  grupe: readonly string[],
+  opcije: { dopustiVlastitaImena: boolean },
+): number {
+  const kljucevi = new Set<string>();
+  for (const grupa of grupe) {
+    const kljuc = kolekcijskiKljucGrupe(grupa);
+    const vrsta = kljuc.split(':')[0] ?? 'ostalo';
+    if (!opcije.dopustiVlastitaImena && vrsta === 'vlastito_ime') continue;
+    kljucevi.add(kljuc);
+  }
+  return kljucevi.size;
 }

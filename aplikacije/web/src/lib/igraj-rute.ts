@@ -10,6 +10,7 @@ import {
   jePoznatiProfilBota,
   NAZIVI_PROFILA_BOTA,
   PROFILI_BOTA_IZAZOVA,
+  profilIzNadimkaFiksnogBota,
   ZADANI_PRAVILNIK,
   ZADANI_PROFIL_TRENINGA,
 } from 'zajednicko';
@@ -50,7 +51,7 @@ export function nazivFormata(mod: ModPartije): string {
     case 'dva_igraca':
       return 'Dvoboj';
     case 'tri_igraca':
-      return 'Troboj';
+      return 'Brza igra';
     case 'cetiri_igraca':
       return 'Četveroboj';
     default: {
@@ -66,7 +67,7 @@ export function opisFormata(mod: ModPartije): string {
       return '2 igrača';
     case 'tri_igraca':
       // HINT PR14: bez privremenog asseta — tekstualni placeholder dok vlasnik ne dostavi ikonu.
-      return 'Troboj · 3 igrača';
+      return '3 igrača';
     case 'cetiri_igraca':
       return '4 igrača';
     default: {
@@ -103,9 +104,11 @@ export function parsajProfilIzQuery(vrijednost: string | null | undefined): Prof
   return jePoznatiProfilBota(vrijednost) ? vrijednost : ZADANI_PROFIL_TRENINGA;
 }
 
-/** Iz nadimka „Majstor” / „Majstor 2” → profileId (Trening imena po težini). */
+/** Iz nadimka fiksnog Trening/Izazov bota (ili legacy „Majstor 2”) → profileId. */
 export function profilIzNadimkaTreningBota(nadimak: string | null | undefined): ProfilBotaIzazova | null {
   if (!nadimak) return null;
+  const izKataloga = profilIzNadimkaFiksnogBota(nadimak);
+  if (izKataloga) return izKataloga;
   for (const id of PROFILI_BOTA_IZAZOVA) {
     const naziv = NAZIVI_PROFILA_BOTA[id];
     if (nadimak === naziv || nadimak.startsWith(`${naziv} `)) return id;

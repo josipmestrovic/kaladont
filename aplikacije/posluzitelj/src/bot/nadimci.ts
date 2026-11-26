@@ -1,8 +1,16 @@
-import { jeValjanNadimak, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, UZORAK_NADIMKA } from 'zajednicko';
+import {
+  BROJ_JAVNIH_BOTOVA_V5,
+  NADIMCI_JAVNIH_BOTOVA_V5,
+  REZERVNI_NADIMAK_JAVNOG_FONDA_V5,
+  jeValjanNadimak,
+  MAKSIMALNA_DULJINA_NADIMKA,
+  MINIMALNA_DULJINA_NADIMKA,
+  UZORAK_NADIMKA,
+} from 'zajednicko';
 
 /**
- * Fond nadimaka za javne botove (ADR-017): usklađen s UZORAK_NADIMKA (3–12 znakova),
- * bez stvarnih osoba i bez tvrdnji o identitetu. Redoslijed je stabilan; seed bira po ključu.
+ * Povijesni generički kandidati (admin fallback prije V5). Novi V5 fond ih ne koristi.
+ * Zadržano samo radi kompatibilnosti starih testova / dokumentacije.
  */
 export const NADIMCI_BOTOVA: readonly string[] = [
   'Slovko', 'Riječnik', 'Vokalko', 'Konsonanta', 'Grafem', 'Digraf', 'Lektorka', 'Tipkalo', 'Pisanko', 'Čitanka',
@@ -35,12 +43,12 @@ for (const korijen of KORIJENI_NADIMAKA) {
   for (const nastavak of NASTAVCI_NADIMAKA) JEZGRI.add(`${korijen}${nastavak}`.toLocaleLowerCase('hr-HR'));
 }
 
-/** Stabilan skup budućih imenovanih botova, dedupliciran bez obzira na velika/mala slova. */
+/** @deprecated Generički kandidati; novi botovi koriste samo odobreni V5 katalog. */
 export const KANDIDATI_NADIMAKA_BOTOVA: readonly string[] = [...JEZGRI].filter((nadimak) =>
   nadimak.length >= MINIMALNA_DULJINA_NADIMKA && nadimak.length <= MAKSIMALNA_DULJINA_NADIMKA && UZORAK_NADIMKA.test(nadimak),
 );
 
-/** Curirani zamjenski fond: 80 imenovanih, bez aktivnih gost-botova. */
+/** @deprecated Zamijenjeno fondom V5. */
 export const NADIMCI_POCETNOG_FONDA_V4: readonly { nadimak: string; pocetnoSlovo: 'malo' | 'veliko' }[] = [
   'kaladontaš', 'Lik33', 'Mare', 'burek', 'Nika_7', 'jos5min', 'Fićo', 'iva_k', 'Gogo82', 'šogi',
   'TinaM', 'samo_gledam', 'Žućo', 'kokica', 'Bero', 'katastrofica', 'TetaVesna', 'nabrzinu', 'Maya', 'silver',
@@ -59,15 +67,31 @@ export const NADIMCI_POCETNOG_FONDA_V4: readonly { nadimak: string; pocetnoSlovo
 export const NADIMCI_POCETNOG_FONDA_V3 = NADIMCI_POCETNOG_FONDA_V4;
 
 export const BROJ_IMENOVANIH_FONDA_V4 = 80;
-/** Povijesni gost-botovi ostaju u bazi, ali novi fond nema aktivnih gost-botova. */
 export const BROJ_GOSTIJU_FONDA_V4 = 0;
 export const CILJ_AKTIVNIH_FONDA_V4 = BROJ_IMENOVANIH_FONDA_V4;
 
-if (KANDIDATI_NADIMAKA_BOTOVA.length < 200) throw new Error('Fond nadimaka botova mora imati najmanje 200 različitih kandidata.');
-if (NADIMCI_POCETNOG_FONDA_V4.length !== BROJ_IMENOVANIH_FONDA_V4) throw new Error(`Početni fond v4 mora imati ${BROJ_IMENOVANIH_FONDA_V4} nadimaka.`);
-if (new Set(NADIMCI_POCETNOG_FONDA_V4.map(({ nadimak }) => nadimak.toLocaleLowerCase('hr-HR'))).size !== BROJ_IMENOVANIH_FONDA_V4) {
-  throw new Error(`Početni fond v4 mora imati ${BROJ_IMENOVANIH_FONDA_V4} različitih nadimaka.`);
+export const NADIMCI_POCETNOG_FONDA_V5: readonly { nadimak: string; pocetnoSlovo: 'veliko' }[] =
+  NADIMCI_JAVNIH_BOTOVA_V5.map((nadimak) => ({ nadimak, pocetnoSlovo: 'veliko' as const }));
+
+export const BROJ_IMENOVANIH_FONDA_V5 = BROJ_JAVNIH_BOTOVA_V5;
+export const BROJ_GOSTIJU_FONDA_V5 = 0;
+export const CILJ_AKTIVNIH_FONDA_V5 = BROJ_IMENOVANIH_FONDA_V5;
+
+/** Odobreni nadimci za nove bot identitete (javni katalog + rezervni). */
+export const ODOBRENI_NADIMCI_NOVIH_BOTOVA: readonly string[] = [
+  ...NADIMCI_JAVNIH_BOTOVA_V5,
+  REZERVNI_NADIMAK_JAVNOG_FONDA_V5,
+];
+
+if (NADIMCI_POCETNOG_FONDA_V5.length !== BROJ_IMENOVANIH_FONDA_V5) {
+  throw new Error(`Početni fond v5 mora imati ${BROJ_IMENOVANIH_FONDA_V5} nadimaka.`);
 }
-for (const { nadimak } of NADIMCI_POCETNOG_FONDA_V4) {
-  if (!jeValjanNadimak(nadimak)) throw new Error(`Nadimak fonda v4 nije valjan: ${nadimak}`);
+if (new Set(NADIMCI_POCETNOG_FONDA_V5.map(({ nadimak }) => nadimak.toLocaleLowerCase('hr-HR'))).size !== BROJ_IMENOVANIH_FONDA_V5) {
+  throw new Error(`Početni fond v5 mora imati ${BROJ_IMENOVANIH_FONDA_V5} različitih nadimaka.`);
+}
+for (const { nadimak } of NADIMCI_POCETNOG_FONDA_V5) {
+  if (!jeValjanNadimak(nadimak)) throw new Error(`Nadimak fonda v5 nije valjan: ${nadimak}`);
+}
+for (const nadimak of ODOBRENI_NADIMCI_NOVIH_BOTOVA) {
+  if (!jeValjanNadimak(nadimak)) throw new Error(`Odobreni nadimak bota nije valjan: ${nadimak}`);
 }

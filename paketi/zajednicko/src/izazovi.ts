@@ -40,16 +40,6 @@ export function jePoznatiProfilBota(vrijednost: unknown): vrijednost is ProfilBo
   return typeof vrijednost === 'string' && (PROFILI_BOTA_IZAZOVA as readonly string[]).includes(vrijednost);
 }
 
-/** Jedan bot: „Majstor”; više: „Majstor 1”, „Majstor 2”, … */
-export function nadimakProfilaBota(
-  profileId: ProfilBotaIzazova,
-  indeks: number,
-  ukupno: number,
-): string {
-  const baza = NAZIVI_PROFILA_BOTA[profileId];
-  return ukupno <= 1 ? baza : `${baza} ${indeks}`;
-}
-
 export const TRAJANJA_POTEZA_IZAZOVA_MS = [9_000, 11_000, 13_000, 15_000, 30_000] as const;
 export type TrajanjePotezaIzazovaMs = (typeof TRAJANJA_POTEZA_IZAZOVA_MS)[number];
 
@@ -95,7 +85,7 @@ export const VARIJANTE_IZAZOVA = [
 
 export const NAZIVI_FORMATA_IZAZOVA: Readonly<Record<FormatIzazova, string>> = {
   DV: 'Dvoboj',
-  TR: 'Troboj',
+  TR: 'Brza igra',
   CE: 'Četveroboj',
 };
 

@@ -53,19 +53,37 @@ Javni formati (Dvoboj, Troboj, Četveroboj) imaju zaseban broj partija, pobjeda 
 
 Stari ukupni poredak (`GET /api/ljestvica`, najmanje **5 završenih javnih partija u odabranom formatu**) ostaje privremeno radi kompatibilnosti; stranica ga više ne prikazuje.
 
-### Vremenske ljestvice
+### Ljestvice igrača
 
-Stranica `/ljestvice` ima zasebne poretke za Četveroboj, Troboj i Dvoboj, po metrici i razdoblju. Prva faza: **Prosjek bodova** i **Niz pobjeda**; Niz riječi, Najduža riječ i Najbrži igrači dolaze u sljedećoj fazi.
+Stranica `/ljestvice` (tab **Igrači**) ima dvije grupe metrika. Tab **Najopasnije riječi** ostaje zaseban.
 
+#### Troboj (vremenske)
+
+Javni Troboj (Brza igra) po metrici i razdoblju. Privatne, trening i izazov partije ne ulaze.
+
+- **Metrike:** **Prosjek bodova**, **Niz pobjeda**, **Najbrži igrači**, **Niz riječi**.
 - **Razdoblja:** Dnevna, Tjedna (ponedjeljak–ponedjeljak), Mjesečna, Godišnja (kalendarska) i Svih vremena. Granice su ponoći po zoni `Europe/Zagreb`, interval `[početak, kraj)`.
-- **Pripadnost:** cijela igra pripada razdoblju u kojem je **završila** (`partije.kraj`). Ulaze samo završene javne igre; privatne (`obracuni_partija.vrsta = privatna_gamifikacija`), aktivne i poništene ne. Privatna igra ne smije promijeniti broj javnih igara, prosjek, niz ni mjesto.
-- **Minimum (PR11):** **5** igara u danu; **10** igara unutar svakog duljeg razdoblja posebno. Pet Troboja pod raznim pravilima otvara dnevni Troboj; miješanje formata (npr. 2 Dvoboja + 3 Troboja) ne otvara ni jednu od tih dnevnih tablica. Današnje igre pridonose svim duljim razdobljima, ali mjesto se dobiva tek kad je minimum tog razdoblja ispunjen.
+- **Pripadnost:** cijela igra pripada razdoblju u kojem je **završila** (`partije.kraj`). Ulaze samo završene javne igre; privatne (`obracuni_partija.vrsta = privatna_gamifikacija`), aktivne i poništene ne.
+- **Minimum (PR11):** **5** igara u danu; **10** igara unutar svakog duljeg razdoblja. Za **Najbrže igrače** dodatno **30** prihvaćenih poteza dnevno i **50** u duljim razdobljima (samo pouzdani agregati `metrike_verzija = 1`).
 - **Prosjek bodova:** zbroj bodova / broj igara, veći je bolji; prosjek 0 je valjan rezultat.
-- **Niz pobjeda:** najduži niz uzastopnih pobjeda (plasman 1) unutar razdoblja; svaki drugi plasman ga prekida. Igre se slažu redom **ulaska** (`partije.pocetak`, zatim ID), a ne redom završetka stolova. Pobjede izvan razdoblja se ne pribrajaju. Igrač bez pobjede nema rezultat.
-- **Izjednačenje:** glavni rezultat → više odigranih igara u razdoblju → ranije ostvaren rezultat → stabilni ID. Mjesta su jedinstvena (1, 2, 3…); isti poredak koriste tablica, „Oko mene” i vlastita pozicija.
-- **Početak praćenja:** `LJESTVICE_POCETAK` (obavezno u produkciji). Razdoblje koje počinje prije njega reže se na taj trenutak, bez smanjenja minimuma. Svih vremena otključava se na prvu kalendarsku godišnjicu tog trenutka (29. 2. → 28. 2.).
-- Obrisani igrači ne ulaze u žive poretke. Gosti ulaze kao i dosad, bez javnog profila.
-- Igra s nepotpunim konačnim zapisom (bez plasmana) označava rezultat igrača kao nepotpun umjesto da ga tiho izostavi.
+- **Niz pobjeda:** najduži niz uzastopnih pobjeda (plasman 1) unutar razdoblja; svaki drugi plasman ga prekida. Igre se slažu redom **ulaska** (`partije.pocetak`, zatim ID).
+- **Najbrži igrači:** ponderirani prosjek `SUM(trajanje_prihvacenih_ms) / SUM(prihvacene_rijeci)`; kraće je bolje. Ne računa se aritmetički prosjek prosjeka partija.
+- **Niz riječi:** `MAX(najduzi_niz_rijeci)` unutar jedne kvalificirane javne partije u razdoblju; pozitivna vrijednost za rangiranje.
+- **Izjednačenje:** postojeće metrike zadržavaju dosadašnji tie-break; brzina i niz riječi koriste determinističke sekundarne ključeve (potezi/igre, vrijeme, ID). Mjesta su jedinstvena.
+- **Početak praćenja:** `LJESTVICE_POCETAK` (obavezno u produkciji). Svih vremena otključava se na prvu kalendarsku godišnjicu.
+- Obrisani igrači i botovi ne ulaze. Gosti ulaze bez javnog profila.
+- Igra s nepotpunim zapisom (bez plasmana) označava rezultat kao nepotpun. Nepoznata `metrike_verzija` nije nula.
+
+#### Ukupni napredak (kumulativne)
+
+Bez vremenskog filtera, countdowna i minimuma Troboja. Rangiraju se samo pozitivne vrijednosti; izvor je isti kao na profilu.
+
+- **Iskustvo (XP):** `igraci.iskustvo_ukupno` (ne razina).
+- **Kolekcionari:** broj jedinstvenih kolekcijskih jedinica (`kolekcijskiKljucGrupe`).
+- **Izazivači:** broj jedinstvenih završenih aktivnih izazova / veličina kataloga.
+- **Dostignuća:** zbroj vidljivih zvjezdica (ista formula kao profil).
+
+Top 10 dostignuća i dalje koriste samo Prosjek bodova i Niz pobjeda.
 
 ## Rangovi
 

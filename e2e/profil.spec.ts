@@ -103,7 +103,7 @@ test('Pregled je default; #statistika i #opcenito otvaraju Pregled; Troboj je na
     await expect(page.locator('#pregled')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Kaladont DNK', level: 3 })).toBeVisible();
     await expect(page.locator('.dnk-kartica')).toHaveCount(1);
-    await expect(page.getByRole('heading', { name: 'Troboj', level: 2 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Brza igra', level: 2 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Osobni rekordi', level: 2 })).toBeVisible();
     await expect(page.getByText('Brza igra (Troboj)')).toHaveCount(0);
 

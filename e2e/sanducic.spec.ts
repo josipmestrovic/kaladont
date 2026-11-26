@@ -35,12 +35,10 @@ test('feed prikazuje Sve, eksplicitno čita i briše', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Sve', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Nepročitane' })).toBeVisible();
   await expect(page.getByText(tekst)).toBeVisible();
-  await expect(page.getByText('Nepročitano', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Označi sve pročitanima' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeVisible();
-
-  await page.getByRole('button', { name: 'Označi pročitanom' }).first().click();
+  // Ulazak na /obavijesti automatski označi sve pročitanima.
   await expect(page.getByText('Pročitano', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Označi sve pročitanima' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeVisible();
 
   await page.goto('/');
   await expect(page.getByRole('banner').locator('.avatar')).toBeVisible({ timeout: 20_000 });
@@ -105,14 +103,14 @@ test('registrirani desktop: pager, čitanje miče poruku, prazno stanje', async 
   await page.goto('/');
   const pregled = page.getByTestId('naslovnica-obavijesti');
   await expect(pregled).toBeVisible({ timeout: 20_000 });
-  await expect(pregled.getByText(/Obavijesti · \d+ nov/)).toBeVisible();
-  await expect(pregled.getByRole('button', { name: 'Označi pročitanom' })).toBeVisible();
+  await expect(pregled.locator('.naslov-poruke').first()).toBeVisible();
+  await expect(pregled.getByRole('button', { name: 'Označi pročitanim' })).toBeVisible();
 
   // Dobrodošlica + seedane poruke: čitaj dok pager ne ostane prazan.
   for (let i = 0; i < 12; i += 1) {
     const prazno = page.getByTestId('naslovnica-obavijesti-prazno');
     if (await prazno.isVisible().catch(() => false)) break;
-    const gumb = pregled.getByRole('button', { name: 'Označi pročitanom' });
+    const gumb = pregled.getByRole('button', { name: 'Označi pročitanim' });
     if (!(await gumb.isVisible().catch(() => false))) break;
     const prije = await pregled.locator('.naslov-poruke').textContent().catch(() => '');
     await gumb.click();
@@ -123,5 +121,5 @@ test('registrirani desktop: pager, čitanje miče poruku, prazno stanje', async 
     ]);
   }
   await expect(page.getByTestId('naslovnica-obavijesti-prazno')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole('link', { name: 'Vidi sve ›' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Vidi starije obavijesti ›' })).toBeVisible();
 });

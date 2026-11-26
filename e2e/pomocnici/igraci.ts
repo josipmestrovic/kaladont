@@ -135,7 +135,14 @@ export async function procitajPrefiksIPocetnu(stranica: Page): Promise<{
     .toLocaleLowerCase('hr');
   expect(prefiks.length).toBeGreaterThan(0);
   const pocetnaLokator = stranica
-    .locator('.sustav-dodijelio-rijec, .rijec-oblak .trenutna-rijec, .mobilna-trenutna-rijec .trenutna-rijec')
+    .locator(
+      [
+        '.sustav-dodijelio-rijec',
+        '.stol-trazena__rijec',
+        '.rijec-oblak .trenutna-rijec',
+        '.mobilna-trenutna-rijec .trenutna-rijec',
+      ].join(', '),
+    )
     .filter({ visible: true })
     .first();
   await expect(pocetnaLokator).toBeVisible({ timeout: 10_000 });

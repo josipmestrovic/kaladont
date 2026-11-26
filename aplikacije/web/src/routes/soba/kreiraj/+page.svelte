@@ -491,7 +491,7 @@
     min-height: 44px;
     padding: 10px 16px;
     border: 2px solid var(--boja-obrub);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-osnovni);
     font: inherit;
@@ -576,7 +576,7 @@
     width: 46px;
     height: 28px;
     padding: 3px;
-    border-radius: 999px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-obrub-jaci);
     transition: background-color 160ms ease;
   }
@@ -740,7 +740,7 @@
     min-height: 52px;
     padding: 14px 24px;
     border: none;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
     font-family: var(--font-naslov);

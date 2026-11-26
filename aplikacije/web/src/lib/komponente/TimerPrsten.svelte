@@ -117,6 +117,7 @@
 
   .timer-napredak {
     stroke: var(--boja-isticanje-slova);
+    transition: stroke 180ms ease;
   }
 
   :global(html[data-tema='svijetla']) .timer-napredak {
@@ -127,6 +128,7 @@
     fill: var(--boja-mint);
     stroke: var(--boja-krem);
     stroke-width: 2;
+    transition: fill 180ms ease;
   }
 
   .timer-broj {
@@ -134,6 +136,15 @@
     font-family: var(--font-naslov);
     font-size: 19px;
     font-weight: 700;
+  }
+
+  .timer-prsten.pulsira .timer-napredak,
+  :global(html[data-tema='svijetla']) .timer-prsten.pulsira .timer-napredak {
+    stroke: var(--boja-crvena);
+  }
+
+  .timer-prsten.pulsira .timer-broj-podloga {
+    fill: var(--boja-crvena);
   }
 
   .timer-prsten.pulsira {

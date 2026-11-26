@@ -6,7 +6,6 @@
     indeksNakonUklanjanja,
     relativnoVrijemeObavijesti,
     tekstPozicijePagera,
-    zaglavljeObavijesti,
   } from '$lib/naslovnica-obavijesti.js';
   import { povuciListanjeOkomito } from '$lib/povuci-klizac.js';
   import {
@@ -35,7 +34,6 @@
   const imaNavigaciju = $derived(poruke.length > 1 || sljedeciCursor != null);
   const mozeGore = $derived(indeks > 0);
   const mozeDolje = $derived(indeks < poruke.length - 1 || sljedeciCursor != null);
-  const zaglavlje = $derived(zaglavljeObavijesti(stanje.brojNeprocitanih));
   const pozicija = $derived(
     imaNavigaciju ? tekstPozicijePagera(indeks, poruke.length, sljedeciCursor != null) : '',
   );
@@ -217,25 +215,18 @@
     data-testid="naslovnica-obavijesti"
     aria-label="Pregled obavijesti"
   >
-    <div class="zaglavlje">
-      <p class="naslov">{zaglavlje}</p>
-      {#if pozicija}
-        <span class="pozicija" aria-hidden="true">{pozicija}</span>
-      {/if}
-    </div>
-
     {#if ucitavanje && poruke.length === 0}
       <p class="stanje">Učitavanje…</p>
     {:else if greska && poruke.length === 0}
       <div class="prazno">
         <p class="prazno-naslov">{greska}</p>
-        <a class="vidi-sve" href="/obavijesti">Vidi sve ›</a>
+        <a class="vidi-sve" href="/obavijesti">Vidi starije obavijesti ›</a>
       </div>
     {:else if !aktivna}
       <div class="prazno" data-testid="naslovnica-obavijesti-prazno">
         <div class="prazno-tekst">
-          <p class="prazno-naslov">Nema novih.</p>
-          <a class="vidi-sve" href="/obavijesti">Vidi sve ›</a>
+          <p class="prazno-naslov">Nema novih obavijesti</p>
+          <a class="vidi-sve" href="/obavijesti">Vidi starije obavijesti ›</a>
         </div>
       </div>
     {:else}
@@ -256,16 +247,15 @@
             <p class="opis">{aktivna.tekst}</p>
             <div class="meta">
               <time datetime={aktivna.stvorenaAt}>{relativnoVrijemeObavijesti(aktivna.stvorenaAt)}</time>
-              <span aria-hidden="true">·</span>
-              <button
-                type="button"
-                class="oznaci"
-                disabled={oznacavanjeId === aktivna.id}
-                onclick={() => void oznaciProcitano()}
-              >
-                Označi pročitanom
-              </button>
             </div>
+            <button
+              type="button"
+              class="oznaci"
+              disabled={oznacavanjeId === aktivna.id}
+              onclick={() => void oznaciProcitano()}
+            >
+              Označi pročitanim
+            </button>
           </div>
         </div>
 
@@ -281,6 +271,9 @@
             >
               <span aria-hidden="true">▲</span>
             </button>
+            {#if pozicija}
+              <span class="pozicija" aria-hidden="true">{pozicija}</span>
+            {/if}
             <button
               type="button"
               class="strelica"
@@ -321,39 +314,6 @@
 
   :global(html[data-tema='svijetla']) .naslovnica-obavijesti {
     border-left-color: color-mix(in srgb, var(--boja-mint) 28%, transparent);
-  }
-
-  .zaglavlje {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    width: 100%;
-    min-width: 0;
-    text-align: left;
-  }
-
-  .naslov {
-    margin: 0;
-    min-width: 0;
-    overflow: hidden;
-    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 92%, transparent);
-    font-family: var(--font-tijelo);
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: 0.01em;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .pozicija {
-    flex: 0 0 auto;
-    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 80%, transparent);
-    font-family: var(--font-tijelo);
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.2;
   }
 
   .pager {
@@ -476,14 +436,17 @@
 
   .oznaci {
     flex: 0 0 auto;
-    margin: 0;
+    align-self: flex-start;
+    margin: 2px 0 0;
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--boja-akcent-tekst, var(--boja-zuta-krema));
     cursor: pointer;
     font: inherit;
+    font-size: 16px;
     font-weight: 700;
+    line-height: 1.2;
     text-decoration: underline;
     text-underline-offset: 2px;
     white-space: nowrap;
@@ -503,6 +466,7 @@
   .strelice {
     display: flex;
     flex-direction: column;
+    align-items: center;
     justify-content: center;
     gap: 2px;
     flex: 0 0 auto;
@@ -510,6 +474,18 @@
 
   .strelice--rezerva {
     width: 36px;
+  }
+
+  .pozicija {
+    flex: 0 0 auto;
+    min-width: 2.5em;
+    color: color-mix(in srgb, var(--boja-tekst-sekundarni) 80%, transparent);
+    font-family: var(--font-tijelo);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
   }
 
   .strelica {
@@ -553,7 +529,7 @@
     font-size: 18px;
     font-weight: 500;
     line-height: 1.3;
-    text-align: left;
+    text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -561,21 +537,21 @@
   .prazno {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 10px;
     width: 100%;
     min-width: 0;
-    text-align: left;
+    text-align: center;
   }
 
   .prazno-tekst {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: 2px;
     min-width: 0;
     overflow: hidden;
-    text-align: left;
+    text-align: center;
   }
 
   .vidi-sve {
@@ -587,7 +563,7 @@
     font-size: 16px;
     font-weight: 700;
     line-height: 1.3;
-    text-align: left;
+    text-align: center;
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;

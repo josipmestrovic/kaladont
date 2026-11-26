@@ -25,7 +25,7 @@ for (const sirina of [380, 1100] as const) {
     await page.goto('/');
     const cta = page.getByTestId('naslovnica-brza-igra');
     await expect(cta).toBeVisible();
-    await expect(cta.getByText('Troboj', { exact: true })).toBeVisible();
+    await expect(cta.getByText('Brza igra', { exact: true })).toBeVisible();
     await expect(page.getByText(/Igraj online u troje/)).toBeVisible();
     await cta.click();
     await expect(page).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
@@ -38,7 +38,7 @@ test('stari javni URL ide u Brzu igru i tri igrača dijele stol', async ({ brows
     await igraci[0]!.stranica.goto('/red?mod=dva_igraca&pravila=klasicni');
     await expect(igraci[0]!.stranica).toHaveURL(/\/red\?mod=tri_igraca&pravila=klasicni/);
     await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Brza igra');
-    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Troboj');
+    await expect(igraci[0]!.stranica.getByTestId('red-oznaka-izbora')).toContainText('Klasična pravila');
     await expect(igraci[0]!.stranica).not.toHaveURL(/\/partija\//);
 
     await Promise.all([
@@ -58,11 +58,11 @@ test('Troboj: tri sjedala (lobby oznaka ili stol)', async ({ browser }) => {
   const igraci = await stvoriIgrace(browser, 3);
   try {
     await igraci[0]!.stranica.goto('/red?mod=tri_igraca&pravila=klasicni');
-    const ishod = await cekajOznakuIliPartiju(igraci[0]!.stranica, /Brza igra.*Troboj|Troboj.*Klasičn/i);
+    const ishod = await cekajOznakuIliPartiju(igraci[0]!.stranica, /Brza igra.*Klasičn/i);
     if (ishod === 'oznaka') {
       const oznaka = igraci[0]!.stranica.getByTestId('red-oznaka-izbora');
-      await expect(oznaka).toContainText('Troboj');
       await expect(oznaka).toContainText('Brza igra');
+      await expect(oznaka).toContainText('Klasična pravila');
     }
 
     await Promise.all([
@@ -258,8 +258,10 @@ test('klasični trening ima dva Iskusna (3 sjedala)', async ({ page }) => {
   await page.goto('/zagrijavanje?pravila=klasicni');
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });
   await expect(page.locator('.igraci-red > li')).toHaveCount(3);
-  await expect(page.locator('.igraci-red').getByText(/Iskusni/)).toHaveCount(2);
-  await expect(page.getByTestId('trening-meta')).toContainText('Iskusni');
+  // Fiksna postava Iskusni: BOTANIČAR / BOTOGRAF / BOTOVNIK (UI: BOTaničar…).
+  await expect(page.locator('.igraci-red').getByText(/BOTaničar|BOTograf|BOTovnik/i)).toHaveCount(2);
+  await expect(page.getByTestId('trening-meta')).toContainText('Trening');
+  await expect(page.getByTestId('trening-meta')).toContainText('Klasični');
 });
 
 test('privatna soba: gost vidi domaćinov pravilnik', async ({ browser }) => {

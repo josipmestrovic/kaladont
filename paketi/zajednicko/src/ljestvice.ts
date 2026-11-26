@@ -1,12 +1,34 @@
 /**
- * Vremenske ljestvice: razdoblja po zagrebačkom kalendaru, minimumi, prozor „Oko mene" i ugovor API-ja.
+ * Ljestvice igrača: vremenske (Troboj) i kumulativne (ukupni napredak), razdoblja, sažetak i API ugovor.
  * Izvor pravila: docs/02-pravila-igre/bodovanje-i-rangovi.md#vremenske-ljestvice.
  */
 import type { AvatarConfigV1 } from './avatar.js';
 import type { ModPartije } from './bodovanje.js';
 
 export const ZONA_LJESTVICA = 'Europe/Zagreb';
-export const METRIKE_LJESTVICA = ['prosjek_bodova', 'niz_pobjeda'] as const;
+
+/** Javne vremenske ljestvice Troboja (imaju razdoblja). */
+export const METRIKE_VREMENSKE_LJESTVICA = [
+  'prosjek_bodova',
+  'niz_pobjeda',
+  'najbrzi_igraci',
+  'niz_rijeci',
+] as const;
+
+/** Kumulativne ljestvice ukupnog napretka (bez vremenskog filtera). */
+export const METRIKE_NAPRETKA_LJESTVICA = [
+  'iskustvo',
+  'kolekcija',
+  'izazovi',
+  'dostignuca',
+] as const;
+
+/** Sve metrike vidljive u UI-ju i API-ju. Top 10 dostignuća koriste zaseban uski skup. */
+export const METRIKE_LJESTVICA = [
+  ...METRIKE_VREMENSKE_LJESTVICA,
+  ...METRIKE_NAPRETKA_LJESTVICA,
+] as const;
+
 export const RAZDOBLJA_LJESTVICA = ['dnevno', 'tjedno', 'mjesecno', 'godisnje', 'svih_vremena'] as const;
 /** Dulje razdoblje ima prednost pri izjednačenom mjestu u navigacijskom sažetku. */
 export const REDOSLIJED_RAZDOBLJA_SAZETKA: readonly RazdobljeLjestvice[] = [
@@ -16,17 +38,140 @@ export const REDOSLIJED_RAZDOBLJA_SAZETKA: readonly RazdobljeLjestvice[] = [
   'tjedno',
   'dnevno',
 ];
+/** Prioritet metrika pri istom mjestu u sažetku (niži indeks = veća prednost). */
+export const REDOSLIJED_METRIKA_SAZETKA: readonly MetrikaLjestvice[] = [
+  'prosjek_bodova',
+  'niz_pobjeda',
+  'najbrzi_igraci',
+  'niz_rijeci',
+  'iskustvo',
+  'kolekcija',
+  'izazovi',
+  'dostignuca',
+];
 export const PRIKAZI_LJESTVICA = ['top', 'oko_mene'] as const;
 export const VELICINA_PRIKAZA_LJESTVICE = 10;
 
+export type MetrikaVremenskaLjestvice = (typeof METRIKE_VREMENSKE_LJESTVICA)[number];
+export type MetrikaNapretkaLjestvice = (typeof METRIKE_NAPRETKA_LJESTVICA)[number];
 export type MetrikaLjestvice = (typeof METRIKE_LJESTVICA)[number];
 export type RazdobljeLjestvice = (typeof RAZDOBLJA_LJESTVICA)[number];
 export type PrikazLjestvice = (typeof PRIKAZI_LJESTVICA)[number];
+export type GrupaMetrikeLjestvice = 'troboj' | 'napredak';
+export type VrstaMetrikeLjestvice = 'vremenska' | 'napredak';
+export type SmjerRangiranjaLjestvice = 'desc' | 'asc';
+
+export interface OpisMetrikeLjestvice {
+  kljuc: MetrikaLjestvice;
+  grupa: GrupaMetrikeLjestvice;
+  vrsta: VrstaMetrikeLjestvice;
+  naziv: string;
+  kratkiNaziv: string;
+  opis: string;
+  smjer: SmjerRangiranjaLjestvice;
+  imaRazdoblje: boolean;
+}
+
+export const REGISTAR_METRIKA_LJESTVICA: Record<MetrikaLjestvice, OpisMetrikeLjestvice> = {
+  prosjek_bodova: {
+    kljuc: 'prosjek_bodova',
+    grupa: 'troboj',
+    vrsta: 'vremenska',
+    naziv: 'Prosjek bodova',
+    kratkiNaziv: 'Bod.',
+    opis: 'Najbolji učinak po partiji.',
+    smjer: 'desc',
+    imaRazdoblje: true,
+  },
+  niz_pobjeda: {
+    kljuc: 'niz_pobjeda',
+    grupa: 'troboj',
+    vrsta: 'vremenska',
+    naziv: 'Niz pobjeda',
+    kratkiNaziv: 'Niz',
+    opis: 'Najviše pobjeda zaredom.',
+    smjer: 'desc',
+    imaRazdoblje: true,
+  },
+  najbrzi_igraci: {
+    kljuc: 'najbrzi_igraci',
+    grupa: 'troboj',
+    vrsta: 'vremenska',
+    naziv: 'Najbrži igrači',
+    kratkiNaziv: 'Brzina',
+    opis: 'Najkraće prosječno vrijeme prihvaćenog poteza.',
+    smjer: 'asc',
+    imaRazdoblje: true,
+  },
+  niz_rijeci: {
+    kljuc: 'niz_rijeci',
+    grupa: 'troboj',
+    vrsta: 'vremenska',
+    naziv: 'Niz riječi',
+    kratkiNaziv: 'Niz r.',
+    opis: 'Najviše prihvaćenih riječi zaredom u jednoj partiji.',
+    smjer: 'desc',
+    imaRazdoblje: true,
+  },
+  iskustvo: {
+    kljuc: 'iskustvo',
+    grupa: 'napredak',
+    vrsta: 'napredak',
+    naziv: 'Iskustvo (XP)',
+    kratkiNaziv: 'XP',
+    opis: 'Najviše ukupno osvojenog iskustva.',
+    smjer: 'desc',
+    imaRazdoblje: false,
+  },
+  kolekcija: {
+    kljuc: 'kolekcija',
+    grupa: 'napredak',
+    vrsta: 'napredak',
+    naziv: 'Kolekcionari',
+    kratkiNaziv: 'Kolek.',
+    opis: 'Najveća kolekcija otključanih riječi.',
+    smjer: 'desc',
+    imaRazdoblje: false,
+  },
+  izazovi: {
+    kljuc: 'izazovi',
+    grupa: 'napredak',
+    vrsta: 'napredak',
+    naziv: 'Izazivači',
+    kratkiNaziv: 'Izaz.',
+    opis: 'Najviše uspješno završenih izazova.',
+    smjer: 'desc',
+    imaRazdoblje: false,
+  },
+  dostignuca: {
+    kljuc: 'dostignuca',
+    grupa: 'napredak',
+    vrsta: 'napredak',
+    naziv: 'Dostignuća',
+    kratkiNaziv: 'Zvij.',
+    opis: 'Najviše osvojenih zvjezdica.',
+    smjer: 'desc',
+    imaRazdoblje: false,
+  },
+};
+
+export function jeVremenskaMetrika(metrika: MetrikaLjestvice): metrika is MetrikaVremenskaLjestvice {
+  return REGISTAR_METRIKA_LJESTVICA[metrika].vrsta === 'vremenska';
+}
+
+export function jeNapredakMetrika(metrika: MetrikaLjestvice): metrika is MetrikaNapretkaLjestvice {
+  return REGISTAR_METRIKA_LJESTVICA[metrika].vrsta === 'napredak';
+}
+
+export function jeMetrikaLjestvice(vrijednost: string | null | undefined): vrijednost is MetrikaLjestvice {
+  return !!vrijednost && (METRIKE_LJESTVICA as readonly string[]).includes(vrijednost);
+}
 
 export type StatusPozicije =
   | 'rangiran'
   | 'nije_igrano'
   | 'nedovoljan_broj_igara'
+  | 'nedovoljan_broj_poteza'
   | 'podaci_nepotpuni'
   | 'nema_rezultata'
   | 'zakljucano'
@@ -38,11 +183,21 @@ export interface PozicijaNaLjestvici {
   odigraneIgre: number | null;
   minimumIgara: number;
   nedostajeIgara: number | null;
+  /** Relevantno za brzinu; inače `null`. */
+  prihvaceniPotezi?: number | null;
+  minimumPoteza?: number | null;
+  nedostajePoteza?: number | null;
 }
 
 export type VrijednostLjestvice =
   | { vrsta: 'prosjek_bodova'; prosjek: number; bodoviUkupno: number }
-  | { vrsta: 'niz_pobjeda'; broj: number };
+  | { vrsta: 'niz_pobjeda'; broj: number }
+  | { vrsta: 'prosjek_brzine'; prosjekMs: number; prihvaceniPotezi: number }
+  | { vrsta: 'niz_rijeci'; broj: number }
+  | { vrsta: 'iskustvo'; iskustvoUkupno: number; razina: number }
+  | { vrsta: 'kolekcija'; broj: number }
+  | { vrsta: 'izazovi'; zavrseno: number; ukupno: number; nazivLevela: string | null }
+  | { vrsta: 'dostignuca'; zvjezdice: number; otkljucano: number };
 
 export interface RedakLjestvice {
   mjesto: number;
@@ -68,35 +223,64 @@ export interface OpisRazdobljaLjestvice {
   otkljucavaSe: string | null;
 }
 
-export interface OdgovorLjestvice {
+interface OdgovorLjestviceBazni {
   ok: true;
-  mod: ModPartije;
   metrika: MetrikaLjestvice;
   prikaz: PrikazLjestvice;
-  razdoblje: OpisRazdobljaLjestvice;
-  minimumIgara: number;
   redci: RedakLjestvice[];
   /** Pun redak vlastite rangirane pozicije (i unutar i izvan Top 10); `null` ako nije rangiran. */
   mojRedak: RedakLjestvice | null;
   mojaPozicija: PozicijaNaLjestvici;
-  pozicijePoRazdobljima: Record<RazdobljeLjestvice, PozicijaNaLjestvici>;
-  svihVremenaOtkljucavaSe: string;
   izracunatoU: string;
 }
 
+export interface OdgovorVremenskeLjestvice extends OdgovorLjestviceBazni {
+  vrstaOdgovora: 'vremenska';
+  mod: ModPartije;
+  metrika: MetrikaVremenskaLjestvice;
+  razdoblje: OpisRazdobljaLjestvice;
+  minimumIgara: number;
+  minimumPoteza: number | null;
+  pozicijePoRazdobljima: Record<RazdobljeLjestvice, PozicijaNaLjestvici>;
+  svihVremenaOtkljucavaSe: string;
+}
+
+export interface OdgovorNapretkaLjestvice extends OdgovorLjestviceBazni {
+  vrstaOdgovora: 'napredak';
+  metrika: MetrikaNapretkaLjestvice;
+  opisObuhvata: string;
+}
+
+export type OdgovorLjestvice = OdgovorVremenskeLjestvice | OdgovorNapretkaLjestvice;
+
 export type StatusSazetkaLjestvice =
-  | { vrsta: 'rangiran'; mjesto: number; metrika: MetrikaLjestvice; razdoblje: RazdobljeLjestvice }
-  | { vrsta: 'nedostaje'; nedostajeIgara: number; metrika: MetrikaLjestvice; razdoblje: RazdobljeLjestvice }
-  | { vrsta: 'nema_rezultata'; metrika: MetrikaLjestvice; razdoblje: RazdobljeLjestvice }
+  | { vrsta: 'rangiran'; mjesto: number; metrika: MetrikaLjestvice; razdoblje: RazdobljeLjestvice | null }
+  | { vrsta: 'nedostaje'; nedostajeIgara: number; metrika: MetrikaVremenskaLjestvice; razdoblje: RazdobljeLjestvice }
+  | { vrsta: 'nema_rezultata'; metrika: MetrikaLjestvice; razdoblje: RazdobljeLjestvice | null }
   | { vrsta: 'neutralan' };
 
 export interface KandidatSazetkaLjestvice {
   metrika: MetrikaLjestvice;
-  razdoblje: RazdobljeLjestvice;
+  /** `null` za kumulativne metrike. */
+  razdoblje: RazdobljeLjestvice | null;
   pozicija: PozicijaNaLjestvici;
 }
 
-/** Najbolji navigacijski status: najmanje mjesto; pri izjednačenju prosjek pa dulje razdoblje; inače najmanji nedostajeIgara. */
+function indeksMetrikeSazetka(metrika: MetrikaLjestvice): number {
+  const indeks = REDOSLIJED_METRIKA_SAZETKA.indexOf(metrika);
+  return indeks >= 0 ? indeks : REDOSLIJED_METRIKA_SAZETKA.length;
+}
+
+function usporediKandidateSazetka(a: KandidatSazetkaLjestvice, b: KandidatSazetkaLjestvice): number {
+  const metrika = indeksMetrikeSazetka(a.metrika) - indeksMetrikeSazetka(b.metrika);
+  if (metrika !== 0) return metrika;
+  if (a.razdoblje === null && b.razdoblje === null) return 0;
+  if (a.razdoblje === null) return 1;
+  if (b.razdoblje === null) return -1;
+  return REDOSLIJED_RAZDOBLJA_SAZETKA.indexOf(a.razdoblje) - REDOSLIJED_RAZDOBLJA_SAZETKA.indexOf(b.razdoblje);
+}
+
+/** Najbolji navigacijski status: najmanje mjesto; pri izjednačenju prioritet metrika pa dulje razdoblje. */
 export function odaberiSazetakLjestvice(kandidati: readonly KandidatSazetkaLjestvice[]): StatusSazetkaLjestvice {
   const rangirani = kandidati.filter(
     (k) => k.pozicija.status === 'rangiran' && k.pozicija.mjesto !== null && k.pozicija.mjesto > 0,
@@ -105,10 +289,7 @@ export function odaberiSazetakLjestvice(kandidati: readonly KandidatSazetkaLjest
     const poredani = [...rangirani].sort((a, b) => {
       const mjesto = a.pozicija.mjesto! - b.pozicija.mjesto!;
       if (mjesto !== 0) return mjesto;
-      const metrika =
-        (a.metrika === 'prosjek_bodova' ? 0 : 1) - (b.metrika === 'prosjek_bodova' ? 0 : 1);
-      if (metrika !== 0) return metrika;
-      return REDOSLIJED_RAZDOBLJA_SAZETKA.indexOf(a.razdoblje) - REDOSLIJED_RAZDOBLJA_SAZETKA.indexOf(b.razdoblje);
+      return usporediKandidateSazetka(a, b);
     });
     const najbolji = poredani[0]!;
     return {
@@ -121,7 +302,11 @@ export function odaberiSazetakLjestvice(kandidati: readonly KandidatSazetkaLjest
 
   const doPoretka = kandidati.filter(
     (k) =>
-      (k.pozicija.status === 'nedovoljan_broj_igara' || k.pozicija.status === 'nije_igrano')
+      jeVremenskaMetrika(k.metrika)
+      && k.razdoblje !== null
+      && (k.pozicija.status === 'nedovoljan_broj_igara'
+        || k.pozicija.status === 'nije_igrano'
+        || k.pozicija.status === 'nedovoljan_broj_poteza')
       && k.pozicija.nedostajeIgara !== null
       && k.pozicija.nedostajeIgara > 0,
   );
@@ -129,17 +314,14 @@ export function odaberiSazetakLjestvice(kandidati: readonly KandidatSazetkaLjest
     const poredani = [...doPoretka].sort((a, b) => {
       const nedostaje = a.pozicija.nedostajeIgara! - b.pozicija.nedostajeIgara!;
       if (nedostaje !== 0) return nedostaje;
-      const metrika =
-        (a.metrika === 'prosjek_bodova' ? 0 : 1) - (b.metrika === 'prosjek_bodova' ? 0 : 1);
-      if (metrika !== 0) return metrika;
-      return REDOSLIJED_RAZDOBLJA_SAZETKA.indexOf(a.razdoblje) - REDOSLIJED_RAZDOBLJA_SAZETKA.indexOf(b.razdoblje);
+      return usporediKandidateSazetka(a, b);
     });
     const najbolji = poredani[0]!;
     return {
       vrsta: 'nedostaje',
       nedostajeIgara: najbolji.pozicija.nedostajeIgara!,
-      metrika: najbolji.metrika,
-      razdoblje: najbolji.razdoblje,
+      metrika: najbolji.metrika as MetrikaVremenskaLjestvice,
+      razdoblje: najbolji.razdoblje!,
     };
   }
 
@@ -176,6 +358,20 @@ export interface OdgovorNajopasnijihRijeci {
 /** PR11: dnevno 5, sva dulja razdoblja 10. Top 10 redaka i rang/DNK prag 10 ostaju odvojene konstante. */
 export function minimumIgaraZaRazdoblje(razdoblje: RazdobljeLjestvice): number {
   return razdoblje === 'dnevno' ? 5 : 10;
+}
+
+/** Dodatni prag prihvaćenih poteza za ljestvicu brzine. */
+export function minimumPrihvacenihPotezaZaRazdoblje(razdoblje: RazdobljeLjestvice): number {
+  return razdoblje === 'dnevno' ? 30 : 50;
+}
+
+/** Deep link na točnu metriku (i razdoblje za vremenske). */
+export function putanjaLjestvice(metrika: MetrikaLjestvice, razdoblje?: RazdobljeLjestvice | null): string {
+  const params = new URLSearchParams({ kategorija: 'igraci', metrika });
+  if (jeVremenskaMetrika(metrika)) {
+    params.set('razdoblje', razdoblje && (RAZDOBLJA_LJESTVICA as readonly string[]).includes(razdoblje) ? razdoblje : 'dnevno');
+  }
+  return `/ljestvice?${params.toString()}`;
 }
 
 interface LokalniDatum {

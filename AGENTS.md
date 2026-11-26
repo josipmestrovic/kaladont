@@ -8,7 +8,7 @@ Trajne upute za AI agente koji rade u ovom repozitoriju. Vrijede za cijeli repoz
 - Provjeri `git status --short --branch`, trenutnu granu i postojeće lokalne promjene. Nikad ne prepisuj tuđi rad, ne resetiraj granu, ne briši nepoznate datoteke i ne radi force-push.
 - **Ask:** razumij problem, postojeće ponašanje, rubne slučajeve i opseg. Ne implementiraj bez odobrenja.
 - **Plan:** navedi konkretne datoteke, promjene, rizike, testove i kriterije prihvaćanja. Ako postoje otvorena pitanja koja mijenjaju produkt, iznesi ih prije implementacije.
-- **Build:** implementiraj odobreni plan u malim logičkim cjelinama. Testiraj svaku cjelinu, ispravi uzrok greške i provjeri regresije. Ne širi opseg bez dogovora.
+- **Build:** implementiraj odobreni plan u malim logičkim cjelinama. Testiraj logiku u kodu; lokalni `ci:*` i Playwright samo na zahtjev (vidi §4). Ne širi opseg bez dogovora.
 - Jedan PR po smislenoj funkcionalnoj ili infrastrukturnoj cjelini. Ne stvaraj dodatne PR-ove ni grane bez potrebe. Ako je zadatak dio postojećeg PR-a, radi u njemu.
 
 ## 2. Jezik, struktura i kvaliteta
@@ -19,7 +19,7 @@ Trajne upute za AI agente koji rade u ovom repozitoriju. Vrijede za cijeli repoz
 - Koristi postojeće komponente, stilove, obrasce i testove. Ne dodaj ovisnost ako postojeća rješenja dostaju. Ne radi masovno formatiranje, preimenovanja, prepisivanje dokumentacije ili veliki refaktor izvan zadatka.
 - Poslužitelj je autoritet za stanje igre, tajmere, završetak, nagrade i trajni napredak. Klijent prikazuje potvrđeno stanje. Obrada ponovljenih događaja i retryja mora ostati idempotentna.
 - Kod promjena gameplaya uzmi u obzir Brzu igru, Trening, Privatne sobe i Izazove. Ne pretpostavljaj da svi konteksti imaju jednaka pravila gamifikacije.
-- Testiraj stvarno ponašanje, uključujući rubne slučajeve i regresije. Samostalno odaberi i pokreni postojeće relevantne testove. Nove testove, proširenje postojećih testova, nove funkcionalnosti, ovisnosti, refaktore ili druge izmjene izvan odobrenog plana nemoj dodavati na svoju ruku. Predloži ih korisniku uz konkretan razlog, prednosti, nedostatke, cijenu održavanja i preporuku; čekaj odobrenje. Testovi izričito uključeni u odobreni plan smiju se implementirati.
+- Testiraj stvarno ponašanje, uključujući rubne slučajeve i regresije. Nove testove, proširenje postojećih testova, nove funkcionalnosti, ovisnosti, refaktore ili druge izmjene izvan odobrenog plana nemoj dodavati na svoju ruku. Predloži ih korisniku uz konkretan razlog, prednosti, nedostatke, cijenu održavanja i preporuku; čekaj odobrenje. Testovi izričito uključeni u odobreni plan smiju se implementirati. Pokretanje lokalnog `ci:*` / Playwrighta: vidi §4.
 
 ## 3. Lokalni razvoj i izolacija
 
@@ -31,53 +31,58 @@ Trajne upute za AI agente koji rade u ovom repozitoriju. Vrijede za cijeli repoz
 - Ne zaustavljaj korisnikov razvojni server, PostgreSQL servis ili tuđe procese radi CI-ja. Testni serveri moraju biti novi i ne smiju koristiti zauzete portove ili postojeće procese.
 - Ne instaliraj globalne alate, mijenjaj sistemske postavke, omogućuj virtualizaciju, niti mijenjaj stvarne DB korisnike bez odobrenja. Ne commitaj `.env`, lokalne tajne, testne izvještaje, traceove ni privremene baze.
 
-## 4. Obvezne lokalne provjere
+## 4. Lokalne provjere
 
 GitHub Actions je završna neovisna provjera (puni suite, migracije, E2E, Bugbot). Lokalno agent **nikad** ne pokreće puni CI.
 
-**Zabranjeno bez eksplicitnog zahtjeva korisnika:** `pnpm ci:lokalni`, `pnpm ci:puni`, `pnpm ci:e2e` bez filtera (glavni suite), te bilo koji ekvivalent koji pokreće sve Vitest testove ili sva tri Playwright projekta. To je sporo i duplicira GitHub.
+**Zabranjeno bez eksplicitnog zahtjeva korisnika** (nikad „usput”, „nakon cjeline” ni „prije pusha”):
+- svi lokalni `pnpm ci:*` profili: `ci:brzi`, `ci:test`, `ci:e2e`, `ci:lokalni`, `ci:puni` i ekvivalenti
+- Playwright / E2E na bilo koji način (`pnpm ci:e2e`, `pnpm exec playwright`, …)
 
-**Dopuštene lokalne provjere (samo osnovne / ciljane):**
-
-| Naredba | Kada | Što provjerava |
-| --- | --- | --- |
-| `pnpm ci:brzi` | Tijekom implementacije i prije pusha | Zajednički build, lint, Svelte/TypeScript; bez DB-a i browsera. |
-| `pnpm ci:test -- <datoteka ili filter>` | Kod promjena poslužitelja | Samo odabrani Vitest na izoliranoj testnoj bazi. |
-| `pnpm ci:e2e -- <Playwright argumenti>` | Kod promjena UI-ja ili gameplaya | Samo odabrani E2E (datoteka, grep, project). **Uvijek** uz filter; nikad cijeli suite. |
-| `pnpm --filter web test -- <filter>` / `pnpm --filter zajednicko test` | Čisti unit testovi | Ciljani paketni testovi. |
-
-- Nakon svake logičke cjeline pokreni `ci:brzi` i najmanji relevantni ciljani test (jedna datoteka / jedan filter). Ne širi na „za svaki slučaj” cijeli paket.
-- Prije draft pusha i prije Ready for review: dovoljno je `ci:brzi` + postojeći relevantni ciljani testovi za promjene od prethodnog pusha. Ne čekaj lokalni puni profil.
-- Ako ciljana provjera padne, analiziraj uzrok, popravi i ponovi **samo** taj test (po potrebi uzak regresijski filter). Ne pokreći puni suite radi potvrde.
-- Za nestabilnost koristi ciljano ponavljanje (npr. `pnpm ci:e2e -- e2e/izazovi.spec.ts:37 --project=desktop-chrome --repeat-each=5 --retries=0`). Retry nije zamjena za popravak.
+Kad korisnik **izričito** zatraži takvu naredbu:
+- Preferiraj najuži smisleni filter (datoteka / grep / project); ne širi na cijeli paket ili suite „za svaki slučaj”.
+- `pnpm ci:e2e` **uvijek** uz filter; nikad cijeli Playwright suite osim ako korisnik to eksplicitno zatraži.
+- Ako zatražena provjera padne, analiziraj uzrok i predloži/popravi u odobrenom opsegu; ponovno pokretanje opet samo na zahtjev (osim ako korisnik kaže „popravi i ponovi”).
+- Za nestabilnost, kad je zatraženo: ciljano ponavljanje (npr. `pnpm ci:e2e -- e2e/izazovi.spec.ts:37 --project=desktop-chrome --repeat-each=5 --retries=0`). Retry nije zamjena za popravak.
 - Ne uklanjaj test, ne mijenjaj očekivanje, ne povećavaj timeout, ne dodaj `skip`, `only`, proizvoljan sleep ili retry samo radi zelenog statusa.
-- Ako osnovna lokalna provjera ne može raditi zbog okoline, reci što nedostaje. Push uz nedovršene osnovne provjere zahtijeva odobrenje korisnika; GitHub obvezne provjere ostaju uključene.
+- Ako zatražena lokalna provjera ne može raditi zbog okoline, reci što nedostaje. Push bez lokalnog `ci:*`/Playwrighta je uobičajen; GitHub obvezne provjere ostaju uključene.
+
+**Referenca — `ci:*` / Playwright (samo na zahtjev):**
+
+| Naredba | Što provjerava |
+| --- | --- |
+| `pnpm ci:brzi` | Zajednički build, lint, Svelte/TypeScript; bez DB-a i browsera. |
+| `pnpm ci:test -- <datoteka ili filter>` | Odabrani Vitest na izoliranoj testnoj bazi. |
+| `pnpm ci:e2e -- <Playwright argumenti>` | Odabrani E2E (datoteka, grep, project). |
+| `pnpm ci:lokalni` / `pnpm ci:puni` | Širi lokalni CI profili (ne pokretati bez zahtjeva). |
+
+Paketni Vitest / `node:test` (`pnpm --filter … test`) nisu `ci:*` ni Playwright; ne pokreći ih masovno ni „za svaki slučaj”, a ciljano samo kad ima smisla za zadatak ili kad korisnik zatraži.
 
 ## 5. Git, draft PR, CI i Bugbot
 
 ### Razvoj (draft)
 
-- Svaki PR otvaraj kao draft. Commitaj logičke cjeline lokalno; pushaj ih u dogovorenim turama u isti draft PR nakon uspješnih relevantnih lokalnih provjera. Ne moraš čekati puni GitHub CI niti Bugbot tijekom razvoja. Ne pushaj svaku sitnu izmjenu.
+- Svaki PR otvaraj kao draft. Commitaj logičke cjeline lokalno; pushaj ih u dogovorenim turama u isti draft PR. Ne čekaj lokalni `ci:*` / Playwright osim ako korisnik to izričito zatraži. Ne moraš čekati puni GitHub CI niti Bugbot tijekom razvoja. Ne pushaj svaku sitnu izmjenu.
 - Ciljana konfiguracija: draft PR preskače skupe GitHub CI jobove i automatski Bugbot review. Dopuštena je samo kratka GitHub kontrola draft statusa; ona nije dokaz prolaza. Dok konfiguracija nije primijenjena i provjerena, ne tvrdi da draft gasi CI ili Bugbot.
 - Prije svakog pusha pregledaj diff, status, baznu granu i udaljene promjene (`git fetch`, usporedba lokalne i udaljene grane). Kod konflikta ili neočekivanih promjena stani; ne prepisuj povijest.
 
 ### Prijelaz u review
 
-- Kad je cijeli odobreni opseg gotov, dovoljni su `ci:brzi` i ciljani relevantni testovi. Izvijesti korisnika o tome što je lokalno pokrenuto i što ostaje GitHubu. Ako predlažeš nove testove ili izmjene izvan plana, navedi razlog, pros/cons i preporuku; ne implementiraj ih bez odobrenja.
-- Pushaj konačno stanje, zatim **odmah označi PR Ready for review** na tom zadnjem SHA-u kako bi se pokrenuli puni GitHub CI i Bugbot. Ne čekaj lokalni puni CI ni dodatno odobrenje samo za Ready ako je odobreni opseg dovršen i osnovne lokalne provjere prošle. Provjeri da su se puni GitHub CI i Bugbot za posljednji SHA stvarno pokrenuli. Ne radi prazne commitove za pokretanje reviewa. Merge i objava i dalje zahtijevaju eksplicitno odobrenje.
+- Kad je cijeli odobreni opseg gotov, izvijesti korisnika što je gotovo i što ostaje GitHubu. Lokalni `ci:*` / Playwright predloži; pokreni samo na zahtjev. Ako predlažeš nove testove ili izmjene izvan plana, navedi razlog, pros/cons i preporuku; ne implementiraj ih bez odobrenja.
+- Pushaj konačno stanje, zatim **odmah označi PR Ready for review** na tom zadnjem SHA-u kako bi se pokrenuli puni GitHub CI i Bugbot. Ne čekaj lokalni `ci:*` / Playwright ni dodatno odobrenje samo za Ready ako je odobreni opseg dovršen. Provjeri da su se puni GitHub CI i Bugbot za posljednji SHA stvarno pokrenuli. Ne radi prazne commitove za pokretanje reviewa. Merge i objava i dalje zahtijevaju eksplicitno odobrenje.
 
 ### Review: popravci u turama (chunkovima)
 
 - Prati CI jobove, logove, artefakte i Bugbot komentare/status za posljednji head SHA i odgovarajući PR merge SHA; pričekaj završetak relevantnih jobova i reviewa prije planiranja ture, osim kod potvrđene blokade ili otkazivanja. Ne tretiraj starije zelene rezultate ni neutralni Bugbot status kao dokaz odsutnosti nalaza.
 - Prikupi sve nalaze iste ture. Razvrstaj: potvrđena greška u odobrenom opsegu, povezani simptomi istog uzroka, infrastrukturni/flaky problem, neutemeljen nalaz, prijedlog izvan opsega. Navedi dokaz i prioritet. Popravi potvrđene greške unutar odobrenog opsega; za sve ostalo predloži opcije, razlog, prednosti, nedostatke i preporuku te čekaj odobrenje. Ne proširuj opseg prema Bugbotu na svoju ruku.
-- Reproduciraj padove lokalno, popravi grupu povezanih uzroka i pokreni neuspjele te relevantne postojeće regresijske testove. Agent samostalno odabire dodatne postojeće testove i obrazlaže izbor. Nove testove ili promjene testnih očekivanja mimo odobrenog plana samo predloži. Ne iskrivljuj test radi zelenog statusa.
-- Kad su svi popravci ture gotovi, pokreni `ci:brzi` i ciljane testove za popravljeno, commitaj logičke cjeline i napravi jedan grupirani push u isti PR. Ne pokreći lokalni puni CI. PR ostaje Ready for review tijekom review popravaka; ne vraćaj ga u draft nakon svake greške. Prati novi GitHub CI i Bugbot za novi SHA i ponovi postupak. Potvrđenu prolaznu infrastrukturnu grešku rješavaj ograničenim rerunom neuspjelih jobova istog SHA, bez praznih commitova. Kod ponavljajućeg istog pada ili nedostupnog reviewa prijavi blokadu umjesto beskonačnih pokušaja.
+- Analiziraj padove iz GitHub logova/artefakata; lokalni `ci:*` / Playwright za reprodukciju pokreni **samo** na eksplicitni zahtjev. Popravi grupu povezanih uzroka u odobrenom opsegu. Nove testove ili promjene testnih očekivanja mimo odobrenog plana samo predloži. Ne iskrivljuj test radi zelenog statusa.
+- Kad su svi popravci ture gotovi, commitaj logičke cjeline i napravi jedan grupirani push u isti PR. Ne pokreći lokalni `ci:*` / Playwright bez zahtjeva. PR ostaje Ready for review tijekom review popravaka; ne vraćaj ga u draft nakon svake greške. Prati novi GitHub CI i Bugbot za novi SHA i ponovi postupak. Potvrđenu prolaznu infrastrukturnu grešku rješavaj ograničenim rerunom neuspjelih jobova istog SHA, bez praznih commitova. Kod ponavljajućeg istog pada ili nedostupnog reviewa prijavi blokadu umjesto beskonačnih pokušaja.
 - Ne zatvaraj Bugbot nalaz samo radi zelenog statusa. Za potvrđeni popravak navedi commit/test; za pogrešan nalaz obrazloži dokaz; za stvarni nalaz izvan opsega zatraži odluku. Ne tvrdi da je review dovršen bez potvrde. Ako agent nema pristup statusima/logovima, ne glumi praćenje; zatraži odgovarajući pristup ili rezultat korisnika.
 - Spremno za merge tek kad je puni obvezni GitHub CI zelen za aktualnu reviziju, Bugbot pregled aktualan i nema neriješenih blokirajućih nalaza, a sva ograničenja i odobrene iznimke su evidentirane. Nikad ne zaobilazi granske zaštite, ne mergeaj i ne objavljuj bez eksplicitnog odobrenja. Staging i produkcija slijede postojeće procedure.
 
 ## 6. Izvještaj na kraju rada
 
-Navedi: što je promijenjeno i zašto; relevantne datoteke; stvarno pokrenute naredbe, broj prolaznih/neuspjelih/flaky testova ako je poznat, trajanje i status (`PROŠLO`, `PALO`, `BLOKIRANO`, `NIJE POKRENUTO`, `NIJE PRIMJENJIVO`); što ostaje za GitHub/staging; eventualne rizike i odstupanja; status CI-ja i Bugbota po SHA-u, popis nalaza i popravaka po turama te prijedloge neimplementiranih dodatnih testova/izmjena s pros/cons; commit SHA-ove i PR ako postoje. Ne tvrdi da je CI zelen ako nije potvrđen za točan commit. Ne tvrdi da si ručno testirao browser, mobilni uređaj ili produkcijsku sliku ako nisi.
+Navedi: što je promijenjeno i zašto; relevantne datoteke; stvarno pokrenute naredbe (`ci:*`/Playwright samo ako ih je korisnik zatražio), broj prolaznih/neuspjelih/flaky testova ako je poznat, trajanje i status (`PROŠLO`, `PALO`, `BLOKIRANO`, `NIJE POKRENUTO`, `NIJE PRIMJENJIVO`); što ostaje za GitHub/staging; eventualne rizike i odstupanja; status CI-ja i Bugbota po SHA-u, popis nalaza i popravaka po turama te prijedloge neimplementiranih dodatnih testova/izmjena s pros/cons; commit SHA-ove i PR ako postoje. Ne tvrdi da je CI zelen ako nije potvrđen za točan commit. Ne tvrdi da si ručno testirao browser, mobilni uređaj ili produkcijsku sliku ako nisi.
 
 ## 7. Dokumentacija
 

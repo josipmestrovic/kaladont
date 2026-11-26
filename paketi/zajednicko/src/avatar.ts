@@ -139,9 +139,10 @@ export const PRESETI_BOJA_AVATARA: Record<AvatarBojnaUloga, readonly string[]> =
 /** Nasumična valjana konfiguracija; `rng` vraća [0, 1) pa je uz predani generator ponovljiva. */
 export function nasumicnaKonfiguracijaAvatara(rng: () => number = Math.random): AvatarConfigV1 {
   const izaberi = <T,>(izbori: readonly T[]): T => izbori[Math.floor(rng() * izbori.length)]!;
+  const usiZaIzbor = AVATAR_DIJELOVI.ears.filter((usi) => usi !== 'detached');
   const parts: AvatarDijelovi = {
     base: 'base-1',
-    ears: izaberi(AVATAR_DIJELOVI.ears),
+    ears: izaberi(usiZaIzbor),
     mouth: izaberi(AVATAR_DIJELOVI.mouth),
     eyes: izaberi(AVATAR_DIJELOVI.eyes),
     hair: null,
@@ -157,7 +158,6 @@ export function nasumicnaKonfiguracijaAvatara(rng: () => number = Math.random): 
     if (rng() < 0.45) continue;
     (parts as unknown as Record<string, string | null>)[kljuc] = izaberi(AVATAR_DIJELOVI[kljuc] as readonly string[]);
   }
-  if (parts.ears === 'detached') parts.earrings = null;
   const colors: AvatarBoje = { skin: izaberi(PRESETI_BOJA_AVATARA.skin) };
   for (const uloga of AVATAR_BOJNE_ULOGE) {
     if (uloga === 'skin') continue;

@@ -39,6 +39,9 @@ export type NaredbaBota =
   | { vrsta: 'rijec'; rijec: string; turnToken: string }
   | { vrsta: 'odustani'; turnToken: string };
 
+/** Brza igra (javna): nakon toliko bot-duel poteza sljedeći bot forsira „Ne znam”. */
+export const MAKS_POTEZA_BOT_DUELA_BRZA = 10;
+
 export interface OvisnostiBotKontrolera {
   rjecnik: Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika' | 'imaSlobodnuRijecNa' | 'repertoarBotova' | 'jeIgrivaRijec'> & {
     frekvencijaZa(rijec: string): number | null;
@@ -117,6 +120,11 @@ export class BotKontroler {
   private readonly poslaneEliminacijskeReakcije = new Set<string>();
   /** Sljedeći trenutak (ms) kad igrač smije novu reakciju zbog RS-22 (2 s). */
   private readonly sljedecaReakcijaMs = new Map<string, number>();
+  /**
+   * Javna partija s točno 2 aktivna bota (bez aktivnog čovjeka): broj planiranih poteza
+   * od ulaska u bot-duel. Na 11. potezu forsira se „Ne znam” da se partija zatvori.
+   */
+  private readonly poteziBotDuela = new Map<string, { brojac: number; zadnjiToken: string }>();
   private readonly rng: Rng;
   private readonly rngPrezentacije: Rng;
   private readonly sada: () => number;
@@ -280,6 +288,7 @@ export class BotKontroler {
       this.konfiguracijePartija.delete(dogadaj.partijaId);
       this.odluke.delete(dogadaj.partijaId);
       this.predmemorije.delete(dogadaj.partijaId);
+      this.poteziBotDuela.delete(dogadaj.partijaId);
       this.poslaniPozdravi.delete(dogadaj.partijaId);
       this.cekajuciPozdraviJavne.delete(dogadaj.partijaId);
       this.ocistiEliminacijskeKljuceve(dogadaj.partijaId);
@@ -491,6 +500,32 @@ export class BotKontroler {
     this.cekajuciPozdraviJavne.clear();
     this.poslaneEliminacijskeReakcije.clear();
     this.sljedecaReakcijaMs.clear();
+    this.poteziBotDuela.clear();
+  }
+
+  /** Javna Brza igra: točno 2 aktivna bota, bez aktivnog čovjeka. */
+  private jeBotDuelBrzeIgre(dogadaj: DogadajPoteza): boolean {
+    if (dogadaj.kontekst !== 'javna') return false;
+    const aktivni = dogadaj.sudionici.filter((s) => s.aktivan);
+    return aktivni.length === 2 && aktivni.every((s) => s.upravljac === 'bot');
+  }
+
+  /** Broji poteze bot-duela jednom po turnTokenu; vraća true kad treba forsirati „Ne znam”. */
+  private azurirajBotDuelIForsiraj(dogadaj: DogadajPoteza): boolean {
+    if (!this.jeBotDuelBrzeIgre(dogadaj)) {
+      this.poteziBotDuela.delete(dogadaj.partijaId);
+      return false;
+    }
+    let stanje = this.poteziBotDuela.get(dogadaj.partijaId);
+    if (!stanje) {
+      stanje = { brojac: 0, zadnjiToken: '' };
+      this.poteziBotDuela.set(dogadaj.partijaId, stanje);
+    }
+    if (stanje.zadnjiToken !== dogadaj.turnToken) {
+      stanje.brojac += 1;
+      stanje.zadnjiToken = dogadaj.turnToken;
+    }
+    return stanje.brojac > MAKS_POTEZA_BOT_DUELA_BRZA;
   }
 
   brojPlaniranih(): number {
@@ -584,10 +619,20 @@ export class BotKontroler {
     odbijene: ReadonlySet<string> = new Set(),
   ): Promise<OdlukaBota | null> {
     if (!aktivan()) return null;
+    const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const prethodna = this.odluke.get(dogadaj.partijaId);
     const ista = prethodna?.turnToken === dogadaj.turnToken ? prethodna : undefined;
+    if (ista?.odluka.vrsta === 'odustani' && ista.odluka.razlogInterni === 'bot_duel_limit') return ista.odluka;
+    if (this.azurirajBotDuelIForsiraj(dogadaj)) {
+      const forsiran: OdlukaBota = {
+        vrsta: 'odustani',
+        razlog: 'namjerni_propust',
+        razlogInterni: 'bot_duel_limit',
+      };
+      this.zabiljeziOdluku(forsiran, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
+      return forsiran;
+    }
     if (ista?.odluka.vrsta === 'odustani') return ista.odluka;
-    const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
     const kandidati = this.kandidatiZaPotez(dogadaj.trazenaSlova!, snimkaGrupa, dogadaj.dopusteneVrste).filter((rijec) => !odbijene.has(rijec));
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && (kandidati.includes(ista.odluka.rijec) || dogadaj.trazenaSlova === 'ka')) {

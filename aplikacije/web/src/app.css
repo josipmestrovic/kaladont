@@ -65,6 +65,8 @@
    */
   --boja-akcent-tekst: #ffd9cc;
   --boja-isticanje-tekst: #f8dd9a;
+  /* Istaknuti „BOT” u nadimcima botova */
+  --boja-bot-oznaka: #ff9f43;
 
   /* Plohe - u tamnoj temi idu tamnije od podloge jer bijeli tekst tako ima vise prostora */
   --boja-povrsina: #175a4b;
@@ -114,7 +116,8 @@
 
   /* Radijusi */
   --radijus-kartica: 16px;
-  --radijus-pill: 999px;
+  --radijus-kontrola: 12px; /* gumbi, toggle trake, tabovi, chipovi */
+  --radijus-pill: 999px; /* progress trake, brojački bedževi, kapsule */
 
   /* Tipografija - obitelji */
   --font-naslov: 'Baloo 2', sans-serif;
@@ -157,6 +160,7 @@ html[data-tema='svijetla'] {
 
   --boja-akcent-tekst: var(--boja-crvena);
   --boja-isticanje-tekst: #8a6400;
+  --boja-bot-oznaka: #e67e22;
 
   --boja-povrsina: #ffffff;
   --boja-povrsina-2: #fffdf5;

@@ -95,7 +95,7 @@
   .filteri button {
     padding: 8px 12px;
     border: 1px solid var(--boja-obrub);
-    border-radius: 999px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-osnovni);
     font: inherit;

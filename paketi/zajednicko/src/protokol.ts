@@ -32,8 +32,10 @@ export type BrzaPoruka =
 export const LJUDSKE_BRZE_PORUKE = ['pozdrav', 'sorry', 'dobro-odigrano', 'najjaci'] as const;
 export type LjudskaBrzaPoruka = (typeof LJUDSKE_BRZE_PORUKE)[number];
 
-/** Zajednički rok od `partija:kraj` / terminalnog izazova do ekrana rezultata (5–4–3–2–1). */
-export const ODGODA_PRIKAZA_REZULTATA_MS = 5_000;
+/** Zajednički rok od `partija:kraj` / terminalnog izazova do ekrana rezultata (javna/privatna/izazov). */
+export const ODGODA_PRIKAZA_REZULTATA_MS = 8_000;
+/** Kraća pauza do rezultata u Treningu (3–2–1). */
+export const ODGODA_PRIKAZA_REZULTATA_TRENING_MS = 3_000;
 
 export type KodRazlogaVeze = 'SESIJA_ISTEKLA' | 'NEVALJAN_TOKEN' | 'DRUGA_KARTICA' | 'SERVIS_NEDOSTUPAN';
 

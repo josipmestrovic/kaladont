@@ -198,7 +198,7 @@
     font-weight: 700;
     text-decoration: none;
     padding: 10px 20px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     font-size: var(--tekst-sitni);
   }
   .profil-ucitavanje { display: grid; gap: 24px; min-height: 420px; }

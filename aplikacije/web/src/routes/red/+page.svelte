@@ -8,8 +8,9 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
+  import NadimakBota from '$lib/komponente/NadimakBota.svelte';
   import type { ModPartije, PayloadGreska, PocetakPartije, PravilnikPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
-  import { BRZA_IGRA, javnaSjedalaZaMod } from 'zajednicko';
+  import { BRZA_IGRA, formatirajNadimakBota, javnaSjedalaZaMod } from 'zajednicko';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
 
   let { data } = $props();
@@ -38,7 +39,7 @@
   const brojIgraca = $derived(stanje.mjesta.filter((mjesto) => mjesto !== null).length);
   const preostaloIgraca = $derived(Math.max(0, ukupnoMjesta - brojIgraca));
   const stanjeUskladjeno = $derived(stanje.mod === trazeneMod);
-  const naslovLobbyja = 'Brza igra · Troboj · Klasična pravila';
+  const naslovLobbyja = 'Brza igra · Klasična pravila';
   const objasnjenjeLobbyja = 'Igra utječe na rang i mjesto na ljestvici.';
 
   function pokreniOdbrojavanje(pocetakIso: string, partijaId: string) {
@@ -250,13 +251,16 @@
           velicina={84}
           razinaVatre={mjesto.jeBot ? 0 : mjesto.razinaVatre}
           nizPobjeda={mjesto.jeBot ? 0 : mjesto.trenutniNiz}
-          vanjskaSlika={mjesto.jeBot ? putanjaBotAvatara(mjesto.igracId) : null}
-          opisSlike={mjesto.jeBot ? `Bot: ${mjesto.nadimak}` : null}
+          vanjskaSlika={mjesto.jeBot ? putanjaBotAvatara({ jeBot: true, nadimak: mjesto.nadimak, igracId: mjesto.igracId }) : null}
+          opisSlike={mjesto.jeBot ? `Bot: ${formatirajNadimakBota(mjesto.nadimak)}` : null}
         />
         <div class="podaci">
           <strong>
-            {mjesto.nadimak}
-            {#if mjesto.jeBot}<span class="oznaka-bot">BOT</span>{/if}
+            {#if mjesto.jeBot}
+              <NadimakBota nadimak={mjesto.nadimak} />
+            {:else}
+              {mjesto.nadimak}
+            {/if}
             {#if mjesto.igracId === stanje.mojIgracId}<span class="oznaka-ti">TI</span>{/if}
           </strong>
           {#if !mjesto.jeBot}
@@ -307,23 +311,17 @@
     background: var(--boja-povrsina-2);
   }
 
-  .oznaka-ti,
-  .oznaka-bot {
+  .oznaka-ti {
     display: inline-block;
     margin-left: 6px;
     padding: 2px 6px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-isticanje-slova);
     color: #1a1815;
     font-size: var(--tekst-mikro);
     line-height: 1;
     letter-spacing: 0.04em;
     vertical-align: middle;
-  }
-
-  .oznaka-bot {
-    background: var(--boja-tekst-sekundarni);
-    color: var(--boja-povrsina);
   }
 
   .objasnjenje-reda {
@@ -397,7 +395,7 @@
     background: none;
     border: 1px solid var(--boja-akcent);
     color: var(--boja-akcent);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     padding: 10px 24px;
     font-size: var(--tekst-baza);
     font-weight: 700;

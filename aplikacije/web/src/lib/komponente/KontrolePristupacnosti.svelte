@@ -99,7 +99,7 @@
     height: 24px;
     flex: 0 0 auto;
     padding: 3px;
-    border-radius: 999px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-obrub-jaci);
     transition: background-color 160ms ease;
   }

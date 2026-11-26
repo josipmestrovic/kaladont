@@ -408,6 +408,13 @@ export const botovi = pgTable('botovi', {
   stvoren: timestamp('stvoren', { withTimezone: true }).notNull().defaultNow(),
 }, (tablica) => [uniqueIndex('uq_botovi_kljuc_seeda').on(tablica.kljucSeeda)]);
 
+/** Jednokratne operativne primjene (npr. fond-botova-v5) — ne Drizzle schema migracije. */
+export const operativnePrimjene = pgTable('operativne_primjene', {
+  kljuc: text('kljuc').primaryKey(),
+  vrijeme: timestamp('vrijeme', { withTimezone: true }).notNull().defaultNow(),
+  napomena: text('napomena'),
+});
+
 export const partije = pgTable('partije', {
   id: uuid('id').primaryKey().defaultRandom(),
   mod: modPartije('mod').notNull().default('cetiri_igraca'),

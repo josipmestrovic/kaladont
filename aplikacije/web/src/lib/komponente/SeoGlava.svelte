@@ -32,7 +32,7 @@
   const kanonski = $derived(kanonskiUrl(putanja));
   const opis = $derived(
     description ??
-      'Kaladont — online hrvatska igra riječi. Igraj Dvoboj, Troboj, Četveroboj ili privatnu sobu.',
+      'Kaladont — online hrvatska igra riječi. Igraj Dvoboj, Brzu igru, Četveroboj ili privatnu sobu.',
   );
   const dijeljeniNaslov = $derived(ogTitle ?? title);
   const dijeljenaSlika = $derived(ogImage ?? SEO_OG_SLIKA);

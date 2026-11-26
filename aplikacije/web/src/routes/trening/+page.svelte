@@ -226,7 +226,7 @@
     min-height: 44px;
     padding: 10px 16px;
     border: 2px solid var(--boja-obrub);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-osnovni);
     font: inherit;
@@ -264,7 +264,7 @@
     gap: 8px;
     min-height: 48px;
     padding: 12px 22px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
     font: inherit;
@@ -278,7 +278,7 @@
     min-height: 48px;
     padding: 10px 16px;
     border: 1px solid var(--boja-obrub);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     color: inherit;
     font-weight: 700;
     text-decoration: none;

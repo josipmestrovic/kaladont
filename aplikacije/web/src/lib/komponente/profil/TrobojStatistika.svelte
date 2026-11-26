@@ -12,7 +12,7 @@
 </script>
 
 <section class="troboj" aria-labelledby="troboj-naslov">
-  <h2 id="troboj-naslov">Troboj</h2>
+  <h2 id="troboj-naslov">Brza igra</h2>
   <div class="mreza">
     <article class="kartica">
       <strong class="vrijednost">{odigrane}</strong>

@@ -102,7 +102,7 @@
     display: block;
     width: 100%;
     padding: 12px 16px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     font: inherit;
     font-weight: 700;
     text-align: center;

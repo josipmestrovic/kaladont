@@ -78,10 +78,12 @@ describe('profili bota (PR02)', () => {
     expect(() => razrijesiProfilBota('nepoznat' as 'iskusni')).toThrow(/Nepoznat profil/);
   });
 
-  it('nadimci: jedan bez broja, više s brojem', () => {
-    expect(nadimakProfilaBota('majstor', 1, 1)).toBe('Majstor');
-    expect(nadimakProfilaBota('majstor', 1, 3)).toBe('Majstor 1');
-    expect(nadimakProfilaBota('pocetnik', 2, 2)).toBe('Početnik 2');
+  it('nadimci: fiksna postava po težini i 1-based indeksu', () => {
+    expect(nadimakProfilaBota('majstor', 1, 1)).toBe('BOTOKRAT');
+    expect(nadimakProfilaBota('majstor', 1, 3)).toBe('BOTOKRAT');
+    expect(nadimakProfilaBota('majstor', 2, 3)).toBe('SABOTER');
+    expect(nadimakProfilaBota('pocetnik', 2, 2)).toBe('BOTULJAK');
+    expect(nadimakProfilaBota('velemajstor', 3, 3)).toBe('BOTIVZAUBOJSTVO');
   });
 
   it('snapshot je neovisan o kasnijoj mutaciji baze', () => {

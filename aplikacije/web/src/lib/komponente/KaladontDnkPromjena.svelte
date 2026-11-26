@@ -55,7 +55,7 @@
   {:else if otkljucan}
     <p class="dnk-poruka">Ukupno odigrano: <strong>{odigrano}</strong></p>
   {:else}
-    <p class="dnk-poruka">DNK se tek treba otključati — odigraj još <strong>{preostaloDoOtkljucavanja}</strong> javnih igara (Dvoboj, Troboj i Četveroboj zajedno).</p>
+    <p class="dnk-poruka">DNK se tek treba otključati — odigraj još <strong>{preostaloDoOtkljucavanja}</strong> javnih igara (Dvoboj, Brza igra i Četveroboj zajedno).</p>
   {/if}
 
   {#if otkljucan}

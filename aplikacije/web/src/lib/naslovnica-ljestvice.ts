@@ -1,15 +1,13 @@
 /**
- * Tekstovi statusa navigacijske stavke Ljestvice (desktop / mobitel).
+ * Tekstovi statusa navigacijske stavke Ljestvice (ispod naslova, kao opis ostalih kartica).
  */
-import type { MetrikaLjestvice, RazdobljeLjestvice, StatusSazetkaLjestvice } from 'zajednicko';
-
-const NAZIV_RAZDOBLJA_PUNI: Record<RazdobljeLjestvice, string> = {
-  dnevno: 'dnevnoj',
-  tjedno: 'tjednoj',
-  mjesecno: 'mjesečnoj',
-  godisnje: 'godišnjoj',
-  svih_vremena: 'ljestvici svih vremena',
-};
+import {
+  putanjaLjestvice,
+  REGISTAR_METRIKA_LJESTVICA,
+  type MetrikaLjestvice,
+  type RazdobljeLjestvice,
+  type StatusSazetkaLjestvice,
+} from 'zajednicko';
 
 const NAZIV_RAZDOBLJA_KRATKI: Record<RazdobljeLjestvice, string> = {
   dnevno: 'dnevno',
@@ -22,9 +20,9 @@ const NAZIV_RAZDOBLJA_KRATKI: Record<RazdobljeLjestvice, string> = {
 export function oblikTroboja(broj: number): string {
   const zadnjeDvije = broj % 100;
   const zadnja = broj % 10;
-  if (zadnja === 1 && zadnjeDvije !== 11) return 'troboj';
-  if (zadnja >= 2 && zadnja <= 4 && (zadnjeDvije < 12 || zadnjeDvije > 14)) return 'troboja';
-  return 'troboja';
+  if (zadnja === 1 && zadnjeDvije !== 11) return 'brza igra';
+  if (zadnja >= 2 && zadnja <= 4 && (zadnjeDvije < 12 || zadnjeDvije > 14)) return 'brze igre';
+  return 'brzih igara';
 }
 
 export function oblikEliminacija(broj: number): string {
@@ -36,50 +34,38 @@ export function oblikEliminacija(broj: number): string {
 }
 
 export interface TekstSazetkaLjestvice {
-  kratki: string;
-  puni: string;
+  /** Cijeli red ispod naslova „Ljestvice” (za a11y / testove). */
+  opis: string;
+  /** Rangirani dio za vizualni naglasak, npr. „1. mjesto”. */
+  rang: string;
+  /** Ostatak opisa nakon ranga, uključujući „ · ”. */
+  ostatak: string;
   aria: string;
+  href: string;
 }
 
-function oznakaNiza(metrika: MetrikaLjestvice, kratki: boolean): string {
-  if (metrika !== 'niz_pobjeda') return '';
-  return kratki ? ' · niz' : ' ljestvici niza pobjeda';
-}
-
-export function tekstSazetkaLjestvice(status: StatusSazetkaLjestvice): TekstSazetkaLjestvice | null {
-  if (status.vrsta === 'neutralan') return null;
-
-  if (status.vrsta === 'nedostaje') {
-    const oblik = oblikTroboja(status.nedostajeIgara);
-    return {
-      kratki: `Još ${status.nedostajeIgara} ${oblik}`,
-      puni: `Još ${status.nedostajeIgara} ${oblik} do poretka`,
-      aria: `Još ${status.nedostajeIgara} ${oblik} do ulaska u poredak`,
-    };
-  }
-
-  if (status.vrsta === 'nema_rezultata') {
-    if (status.metrika === 'niz_pobjeda') {
-      return {
-        kratki: 'Za niz treba pobjeda',
-        puni: 'Za niz treba pobjeda',
-        aria: 'Za ulazak na ljestvicu niza pobjeda treba barem jedna pobjeda',
-      };
-    }
-    return null;
-  }
-
-  const razdobljeKratko = NAZIV_RAZDOBLJA_KRATKI[status.razdoblje];
-  const razdobljePuno = NAZIV_RAZDOBLJA_PUNI[status.razdoblje];
-  const jeNiz = status.metrika === 'niz_pobjeda';
-
+function opisRangiranog(
+  metrika: MetrikaLjestvice,
+  mjesto: number,
+  razdoblje: RazdobljeLjestvice | null,
+): TekstSazetkaLjestvice {
+  const href = putanjaLjestvice(metrika, razdoblje);
+  const naziv = REGISTAR_METRIKA_LJESTVICA[metrika].naziv;
+  const razdobljeDodatak =
+    razdoblje && razdoblje !== 'svih_vremena' ? ` · ${NAZIV_RAZDOBLJA_KRATKI[razdoblje]}` : '';
+  const rang = `${mjesto}. mjesto`;
+  const ostatak = ` · ${naziv}${razdobljeDodatak}`;
   return {
-    kratki: `${status.mjesto}. ${razdobljeKratko}${oznakaNiza(status.metrika, true)}`,
-    puni: jeNiz
-      ? `Trenutno si ${status.mjesto}. na ${razdobljePuno} ljestvici niza pobjeda`
-      : `Trenutno si ${status.mjesto}. na ${razdobljePuno}`,
-    aria: jeNiz
-      ? `Trenutno si ${status.mjesto}. na ${razdobljePuno} ljestvici niza pobjeda`
-      : `Trenutno si ${status.mjesto}. na ${razdobljePuno} ljestvici`,
+    opis: `${rang}${ostatak}`,
+    rang,
+    ostatak,
+    aria: `Trenutno si ${mjesto}. na ljestvici ${naziv}${razdobljeDodatak}`,
+    href,
   };
+}
+
+/** Samo rangirani sažetak (najniže mjesto); inače `null` → default opis na kartici. */
+export function tekstSazetkaLjestvice(status: StatusSazetkaLjestvice): TekstSazetkaLjestvice | null {
+  if (status.vrsta !== 'rangiran') return null;
+  return opisRangiranog(status.metrika, status.mjesto, status.razdoblje);
 }

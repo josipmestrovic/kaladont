@@ -49,7 +49,7 @@ Samo u lokalnom razvojnom okruženju (`NODE_ENV=development`), radi bržeg testi
 - **KA:** bot prepoznaje KA i odigrava `kaladont` kad to pravila dopuštaju; u zadano 8 % slučajeva propusti tuđi „ka” i pokuša običnu riječ. Pri vlastitom izboru, tek među poznatim, u zadano 1,5 % slučajeva ostavlja riječ na „ka” ako postoji obična alternativa; ako su poznate samo na „ka”, odigra takvu riječ. U duelu/KA-ZNI preferira poznatu sigurniju (nije potvrđeno mrtva) pred čestom na „ka”. U **Dokaži nastavak** na običnom potezu bot **nikad** ne igra `kaladont` i **nikad** ne ostavlja riječ na „ka”; u fazi dokaza `kaladont` može biti valjan dokaz. Preferira riječ s poznatim legalnim nastavkom pred potvrđenom samoeliminacijom.
 - Bot nikada ne dogovara igru s drugim botom niti namješta ishod čovjeku.
 - **Brze poruke (svi konteksti):** obvezne. Na početku svaki bot jednom bira iz poola pozdrava (`Bok!` / `Ćao!` / `Hej!`). Kad bot eliminira nekoga — pool isprike (`Nemoj zamjerit` / `Oprosti!`). Kad bota eliminira zaslužni protivnik — pool pohvale (`Bravo!` / `Hvala` / `Svaka čast!`). Samoeliminacija i prekid bez zaslužnog protivnika → tišina. Odgoda je najmanje 2 s plus nasumično 0–1 s; cooldown 2 s po igraču (RS-22) redoslijedom pomiče preklapajuće poruke. Ljudski picker zadržava samo četiri klasične poruke.
-- Nakon eliminacije čovjeka preostali botovi normalno dovršavaju javnu partiju; eliminirani čovjek može gledati.
+- Nakon eliminacije čovjeka preostali botovi dovršavaju javnu partiju; eliminirani čovjek može gledati. U Brzoj igri (javna), kad ostanu točno dva aktivna bota, smiju odigrati još najviše 10 poteza; na 11. potezu jedan forsira „Ne znam” da se partija zatvori.
 
 Postoci su početne vrijednosti verzionirane konfiguracije i mijenjaju se nakon mjerenja, ne skrivenim promjenama u kodu.
 
@@ -70,16 +70,16 @@ Postavke se učitavaju jednom pri pokretanju procesa. Ako trajni zapis još ne p
 - Trajan profil, nadimak i avatar; statistika nastaje stvarnim odigranim javnim partijama.
 - Prije sljedeće rezervacije nakon spremljene igre osvježavaju se agregati i stvarni nizovi za oba javna moda. Bot sa zastarjelim profilom ostaje nedostupan dok osvježavanje ne uspije; neuspjeh ne zaustavlja druge slobodne botove.
 - Botovi nemaju javni profil, ne ulaze na ljudske ljestvice i ne dobivaju korisnički rang, XP, dostignuća ni misije. Ljudski rezultat u partiji s botovima ostaje valjan. Na završnom poretku bot ima nadimak i oznaku „Bot” (bez linka na profil); u čekaonici i tijekom partije nema bedža „Bot”, već namjenski avatar.
-- Jedan identitet igra najviše jednu partiju istodobno. Aktivni fond ima 80 imenovanih botova i 0 gost-botova; povijesni gost-botovi ostaju u bazi deaktivirani. Tvrdi maksimum aktivnog fonda ostaje 100. Stari identiteti se deaktiviraju, ne preimenuju niti brišu.
+- Jedan identitet igra najviše jednu partiju istodobno. Aktivni fond V5 ima **46** imenovanih botova i 0 gost-botova; stariji i povijesni gost-botovi ostaju u bazi deaktivirani. Tvrdi maksimum aktivnog fonda ostaje 100. Stari identiteti se deaktiviraju, ne preimenuju niti brišu.
 - Administrator može stvarati samo imenovane botove, aktivirati/deaktivirati ih te mijenjati validirane postavke. Deaktivacija odmah sprječava nove rezervacije i oslobađa čekajuće rezervacije; već započete partije se dovršavaju. Sve promjene identiteta bilježe se s administratorom i vremenom.
 - Bot identitet ne može se prijaviti, resetirati lozinku ni biti preuzet.
 
 ## Zagrijavanje
 
-- Trening odabranog pravilnika: **Klasični** = čovjek + 2 Računala; **KA-zna** i **Dokaži nastavak** = čovjek + 1 Računalo. Avatar „Računalo” je stalan. Dostupno gostima i registriranima.
+- Trening / Izazovi: fiksna imena protivnika po težini (npr. Početnik → BOTINI/BOTULJAK/BOTONJA); oznake težina u UI ostaju Početnik/Iskusni/Majstor/Velemajstor. Privremeni `racunalo-*` ID-evi; ista imena dijele iste WebP ilustracije kao javni botovi. Dostupno gostima i registriranima.
 - Pokreće se odmah, bez javnog reda i bez trošenja javnog fonda botova. Igrač može imati samo jedan aktivni kontekst igranja (red, soba, partija ili trening).
-- Pravila valjanosti i eliminacije prate odabrani pravilnik; trening nema timer poteza. Računalo odigrava nakon ~4 s (±0,3 s), kao i ostali botovi (tempo v5).
-- Trening ne bilježi partiju, poteze ni natjecateljski napredak: nema bodova, XP-a, ranga, forme, nizova, kolekcije riječi ni općih dostignuća. Gostu i privremenom „Računalu” ne sprema se ništa.
+- Pravila valjanosti i eliminacije prate odabrani pravilnik; trening nema timer poteza. Bot odigrava nakon ~4 s (±0,3 s), kao i ostali botovi (tempo v5).
+- Trening ne bilježi partiju, poteze ni natjecateljski napredak: nema bodova, XP-a, ranga, forme, nizova, kolekcije riječi ni općih dostignuća. Gostu i privremenom botu ne sprema se ništa.
 - Registrirani čovjek koji prirodno pobijedi dobiva napredak dostignuća **Zagrijan** na 1, 5, 20, 50 i 100 trening pobjeda. Ne dodjeljuje se pri izlasku, porazu, tehničkom prekidu ili neaktivnosti. Gosti nemaju dostignuće Zagrijan.
 - Neaktivni trening upozorava nakon 4 minute i tehnički se zatvara nakon 5 minuta bez ljudskog prihvaćenog poteza ili izričitog nastavka. Otkucaji veze i potezi Računala ne resetiraju neaktivnost. Zatvaranje nije pobjeda ni poraz.
 - Završni ekran jasno navodi da se trening ne bilježi kao partija i ne utječe na natjecateljske statistike, XP, rang, formu ni kolekciju; može prikazati novu razinu dostignuća Zagrijanog.

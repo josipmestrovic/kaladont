@@ -26,11 +26,15 @@ export function natpisBadgaMisija(prikaz: PrikazAktivnihMisija): string | null {
   return null;
 }
 
+export function jedinicaAktivnihMisija(broj: number): string {
+  if (broj === 1) return 'aktivna';
+  if (broj >= 2 && broj <= 4) return 'aktivne';
+  return 'aktivnih';
+}
+
 export function labelaAktivnihMisija(prikaz: PrikazAktivnihMisija): string {
   const broj = prikaz.ukupnoAktivnih;
-  if (broj === 1) return '1 aktivna';
-  if (broj >= 2 && broj <= 4) return `${broj} aktivne`;
-  return `${broj} aktivnih`;
+  return `${broj} ${jedinicaAktivnihMisija(broj)}`;
 }
 
 export function ariaBadgaMisija(prikaz: PrikazAktivnihMisija): string {

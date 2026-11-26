@@ -15,7 +15,6 @@
     preucitajUiZvukove,
   } from '$lib/audio-manager.js';
   import { ucitajKriticneIkone, ucitajPozadinskeAseteLandinga } from '$lib/asetovi-core.js';
-  import { inicijalizirajAutofokusPoteza } from '$lib/postavke-autofokus-poteza.js';
   import { inicijalizirajFontPostavku } from '$lib/postavke-fonta.js';
   import { inicijalizirajTemu } from '$lib/postavke-teme.js';
   import {
@@ -108,7 +107,6 @@
   onMount(() => {
     inicijalizirajTemu();
     inicijalizirajFontPostavku();
-    inicijalizirajAutofokusPoteza();
     inicijalizirajAnimacijuPozadine();
     inicijalizirajGlas();
     inicijalizirajAudio();
@@ -282,14 +280,12 @@
     .stranica {
       max-width: 980px;
     }
-
-    .stranica.landing-stranica {
-      max-width: 100%;
-      padding-inline: 0;
-    }
   }
 
+  /* Naslovnica: bez dodatnog side-paddinga — širinu dijele header i .landing (16px). */
   .stranica.landing-stranica {
+    max-width: 100%;
+    padding-inline: 0;
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;

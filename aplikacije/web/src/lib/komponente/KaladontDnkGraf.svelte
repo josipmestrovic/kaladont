@@ -126,7 +126,7 @@
 
   .dnk-status {
     padding: 5px 10px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-3);
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-mikro);

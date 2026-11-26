@@ -38,7 +38,7 @@
   .kostur-ime { width: 58%; height: 16px; }
   .kostur-rang { width: 42%; height: 12px; }
   .kostur-statistika { width: 82%; height: 12px; }
-  .kostur-gumb { width: 140px; height: 42px; margin-top: 12px; border-radius: var(--radijus-pill); }
+  .kostur-gumb { width: 140px; height: 42px; margin-top: 12px; border-radius: var(--radijus-kontrola); }
   .kostur-savjet { display: grid; gap: 8px; margin-top: 28px; }
   .kostur-savjet-naslov { width: 150px; height: 16px; }
   .kostur-savjet-tekst { width: 100%; height: 48px; border-radius: 8px; }
