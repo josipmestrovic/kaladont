@@ -36,13 +36,14 @@
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
+  import NadimakBota from '$lib/komponente/NadimakBota.svelte';
   import { profilIzNadimkaTreningBota, putanjaPonovneIgre } from '$lib/igraj-rute.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
   import { trebaAutofokusPoteza } from '$lib/postavke-autofokus-poteza.js';
   import { ArrowUp } from 'lucide-svelte';
-  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, ODGODA_PRIKAZA_REZULTATA_TRENING_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
+  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, formatirajNadimakBota, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, ODGODA_PRIKAZA_REZULTATA_TRENING_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
@@ -1657,6 +1658,8 @@
             {#if igrac.igracId === stanje.mojIgracId}
               <a href="/profil" class="nadimak">{igrac.nadimak}</a>
               <span class="oznaka-ti" aria-label="To si ti">TI</span>
+            {:else if igrac.jeBot}
+              <span class="nadimak"><NadimakBota nadimak={igrac.nadimak} /></span>
             {:else if igrac.javniProfil}
               <a href={`/profil/javni/${igrac.igracId}`} class="nadimak">{igrac.nadimak}</a>
             {:else}
@@ -1972,8 +1975,8 @@
                   {/if}
                 </span>
               </span>
-              <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.nadimak}>
-                <span class="redak-imena"><span class="nadimak">{sjedalo.nadimak}</span><span class="oznaka-ti" aria-label="To si ti">TI</span></span>
+              <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.jeBot ? formatirajNadimakBota(sjedalo.nadimak) : sjedalo.nadimak}>
+                <span class="redak-imena">{#if sjedalo.jeBot}<span class="nadimak"><NadimakBota nadimak={sjedalo.nadimak} /></span>{:else}<span class="nadimak">{sjedalo.nadimak}</span>{/if}<span class="oznaka-ti" aria-label="To si ti">TI</span></span>
                 {#if statusSjedala(sjedalo)}
                   <span class="rang-razina">{statusSjedala(sjedalo)}</span>
                 {/if}
@@ -2006,8 +2009,8 @@
                   {/if}
                 </span>
               </span>
-              <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.nadimak}>
-                <span class="redak-imena"><span class="nadimak">{sjedalo.nadimak}</span><span class="oznaka-ti" aria-label="To si ti">TI</span></span>
+              <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.jeBot ? formatirajNadimakBota(sjedalo.nadimak) : sjedalo.nadimak}>
+                <span class="redak-imena">{#if sjedalo.jeBot}<span class="nadimak"><NadimakBota nadimak={sjedalo.nadimak} /></span>{:else}<span class="nadimak">{sjedalo.nadimak}</span>{/if}<span class="oznaka-ti" aria-label="To si ti">TI</span></span>
                 {#if statusSjedala(sjedalo)}
                   <span class="rang-razina">{statusSjedala(sjedalo)}</span>
                 {/if}
@@ -2064,8 +2067,8 @@
                 {/if}
               </span>
             </span>
-            <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.nadimak}>
-              <span class="redak-imena"><span class="nadimak">{sjedalo.nadimak}</span></span>
+            <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.jeBot ? formatirajNadimakBota(sjedalo.nadimak) : sjedalo.nadimak}>
+              <span class="redak-imena">{#if sjedalo.jeBot}<span class="nadimak"><NadimakBota nadimak={sjedalo.nadimak} /></span>{:else}<span class="nadimak">{sjedalo.nadimak}</span>{/if}</span>
               {#if statusSjedala(sjedalo)}
                   <span class="rang-razina">{statusSjedala(sjedalo)}</span>
                 {/if}
@@ -2104,8 +2107,8 @@
                 {/if}
               </span>
             </span>
-            <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.nadimak}>
-              <span class="redak-imena"><span class="nadimak">{sjedalo.nadimak}</span></span>
+            <span class="ime-igraca" class:aktivno={aktivno} title={sjedalo.jeBot ? formatirajNadimakBota(sjedalo.nadimak) : sjedalo.nadimak}>
+              <span class="redak-imena">{#if sjedalo.jeBot}<span class="nadimak"><NadimakBota nadimak={sjedalo.nadimak} /></span>{:else}<span class="nadimak">{sjedalo.nadimak}</span>{/if}</span>
               {#if statusSjedala(sjedalo)}
                   <span class="rang-razina">{statusSjedala(sjedalo)}</span>
                 {/if}

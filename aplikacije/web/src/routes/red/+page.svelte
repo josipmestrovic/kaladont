@@ -8,8 +8,9 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
+  import NadimakBota from '$lib/komponente/NadimakBota.svelte';
   import type { ModPartije, PayloadGreska, PocetakPartije, PravilnikPartije, RundaOtvorena, StanjePartije, StanjeReda } from 'zajednicko';
-  import { BRZA_IGRA, javnaSjedalaZaMod } from 'zajednicko';
+  import { BRZA_IGRA, formatirajNadimakBota, javnaSjedalaZaMod } from 'zajednicko';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
 
   let { data } = $props();
@@ -251,12 +252,15 @@
           razinaVatre={mjesto.jeBot ? 0 : mjesto.razinaVatre}
           nizPobjeda={mjesto.jeBot ? 0 : mjesto.trenutniNiz}
           vanjskaSlika={mjesto.jeBot ? putanjaBotAvatara({ jeBot: true, nadimak: mjesto.nadimak, igracId: mjesto.igracId }) : null}
-          opisSlike={mjesto.jeBot ? `Bot: ${mjesto.nadimak}` : null}
+          opisSlike={mjesto.jeBot ? `Bot: ${formatirajNadimakBota(mjesto.nadimak)}` : null}
         />
         <div class="podaci">
           <strong>
-            {mjesto.nadimak}
-            {#if mjesto.jeBot}<span class="oznaka-bot">BOT</span>{/if}
+            {#if mjesto.jeBot}
+              <NadimakBota nadimak={mjesto.nadimak} />
+            {:else}
+              {mjesto.nadimak}
+            {/if}
             {#if mjesto.igracId === stanje.mojIgracId}<span class="oznaka-ti">TI</span>{/if}
           </strong>
           {#if !mjesto.jeBot}
@@ -307,8 +311,7 @@
     background: var(--boja-povrsina-2);
   }
 
-  .oznaka-ti,
-  .oznaka-bot {
+  .oznaka-ti {
     display: inline-block;
     margin-left: 6px;
     padding: 2px 6px;
@@ -319,11 +322,6 @@
     line-height: 1;
     letter-spacing: 0.04em;
     vertical-align: middle;
-  }
-
-  .oznaka-bot {
-    background: var(--boja-tekst-sekundarni);
-    color: var(--boja-povrsina);
   }
 
   .objasnjenje-reda {

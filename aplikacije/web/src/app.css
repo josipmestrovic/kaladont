@@ -65,6 +65,8 @@
    */
   --boja-akcent-tekst: #ffd9cc;
   --boja-isticanje-tekst: #f8dd9a;
+  /* Istaknuti „BOT” u nadimcima botova */
+  --boja-bot-oznaka: #ff9f43;
 
   /* Plohe - u tamnoj temi idu tamnije od podloge jer bijeli tekst tako ima vise prostora */
   --boja-povrsina: #175a4b;
@@ -157,6 +159,7 @@ html[data-tema='svijetla'] {
 
   --boja-akcent-tekst: var(--boja-crvena);
   --boja-isticanje-tekst: #8a6400;
+  --boja-bot-oznaka: #e67e22;
 
   --boja-povrsina: #ffffff;
   --boja-povrsina-2: #fffdf5;

@@ -8,6 +8,8 @@ import {
   REZERVNI_NADIMAK_JAVNOG_FONDA_V5,
   jeNadimakJavnogFondaV5,
   jeOdobrenNadimakBota,
+  dijeloviNadimkaBota,
+  formatirajNadimakBota,
   kljucIlustracijeBota,
   nadimakProfilaBota,
   profilIzNadimkaFiksnogBota,
@@ -59,5 +61,14 @@ describe('bot-identiteti V5', () => {
     const zastupljeni = new Set(Object.values(ILUSTRACIJE_BOTOVA));
     expect([...KLJUCEVI_ILUSTRACIJA_BOTA].every((k) => zastupljeni.has(k))).toBe(true);
     expect(kljucIlustracijeBota('NepoznatiBot')).toBeNull();
+  });
+
+  it('prikaz nadimka: BOT velikim, ostatak malim', () => {
+    expect(formatirajNadimakBota('BOTINA')).toBe('BOTina');
+    expect(formatirajNadimakBota('BOTANIČAR')).toBe('BOTaničar');
+    expect(formatirajNadimakBota('SABOTER')).toBe('saBOTer');
+    expect(formatirajNadimakBota('KALABOT')).toBe('kalaBOT');
+    expect(dijeloviNadimkaBota('BOTZILLA')).toEqual({ prije: '', bot: 'BOT', poslije: 'zilla' });
+    expect(dijeloviNadimkaBota('covjek')).toBeNull();
   });
 });

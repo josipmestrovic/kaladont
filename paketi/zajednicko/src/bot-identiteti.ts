@@ -205,3 +205,23 @@ export function jeNadimakJavnogFondaV5(nadimak: string | null | undefined): bool
     (n) => n.toLocaleUpperCase('hr-HR') === gornji,
   );
 }
+
+/** Prikaz: „BOT” velikim, ostatak malim (npr. BOTINA → BOTina, SABOTER → saBOTer). */
+export type DijeloviNadimkaBota = { prije: string; bot: 'BOT'; poslije: string };
+
+export function dijeloviNadimkaBota(nadimak: string | null | undefined): DijeloviNadimkaBota | null {
+  if (!nadimak) return null;
+  const indeks = nadimak.toLocaleUpperCase('hr-HR').indexOf('BOT');
+  if (indeks < 0) return null;
+  return {
+    prije: nadimak.slice(0, indeks).toLocaleLowerCase('hr-HR'),
+    bot: 'BOT',
+    poslije: nadimak.slice(indeks + 3).toLocaleLowerCase('hr-HR'),
+  };
+}
+
+export function formatirajNadimakBota(nadimak: string | null | undefined): string {
+  const dijelovi = dijeloviNadimkaBota(nadimak);
+  if (!dijelovi) return nadimak ?? '';
+  return `${dijelovi.prije}${dijelovi.bot}${dijelovi.poslije}`;
+}

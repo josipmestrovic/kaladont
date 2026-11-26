@@ -24,6 +24,7 @@
   import { izazovXpPrikaz } from '$lib/izazov-xp-prikaz.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import IskustvoPartije from '$lib/komponente/IskustvoPartije.svelte';
+  import NadimakBota from '$lib/komponente/NadimakBota.svelte';
   import NapredakMisijaPartije from '$lib/komponente/NapredakMisijaPartije.svelte';
 
   let {
@@ -275,6 +276,8 @@
                 {#if jeTi(igrac)}
                   <a href="/profil" class="nadimak">{igrac.nadimak}</a>
                   <span class="oznaka-ti" aria-label="To si ti">TI</span>
+                {:else if igrac.jeBot}
+                  <span class="nadimak"><NadimakBota nadimak={igrac.nadimak} /></span>
                 {:else}
                   <span class="nadimak">{igrac.nadimak}</span>
                 {/if}
