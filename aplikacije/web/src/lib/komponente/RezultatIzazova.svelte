@@ -464,12 +464,11 @@
           <strong>{kolekcija.ukupnoOtkljucano} / {kolekcija.ukupnoDostupno}</strong>
         </div>
       </div>
-      <p class="kolekcija-nove">
-        Nove riječi:
-        {#each kolekcija.dodaneKategorije as kat, i (kat.vrsta)}
-          {kat.vrsta} (+{kat.broj}){i < kolekcija.dodaneKategorije.length - 1 ? ', ' : ''}
-        {/each}
-      </p>
+      {#if kolekcija.sljedecaRazina}
+        <p class="zavrsna-kolekcija-sljedeca">
+          Nakon dodavanja {kolekcija.doSljedece} riječi u kolekciju, otključat ćeš kolekcijsku razinu {kolekcija.sljedecaRazina}.
+        </p>
+      {/if}
     </section>
   {/if}
 
@@ -598,11 +597,25 @@
   .poredak h3,
   .sazetak-partije h3,
   .uvjeti-naslov,
-  .zavrsna-dostignuca h3,
-  .zavrsna-kolekcija h3 {
+  .zavrsna-dostignuca h3 {
     margin: 0 0 10px;
     font-size: var(--tekst-baza);
     font-weight: 800;
+  }
+  .zavrsna-kolekcija {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 18px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: var(--radijus-kontrola);
+    background: var(--boja-povrsina-2);
+  }
+  .zavrsna-kolekcija h3 {
+    margin: 0 0 12px;
+    font-size: var(--tekst-baza);
+    font-weight: 800;
+    color: var(--boja-tekst);
   }
   .sazetak-partije {
     padding: 14px 16px;
@@ -806,22 +819,34 @@
     color: var(--boja-tekst-sekundarni);
   }
   .zavrsna-kolekcija-napredak {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px 24px;
-    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
   }
   .zavrsna-kolekcija-napredak div {
     display: grid;
-    gap: 2px;
+    gap: 4px;
   }
-  .zavrsna-kolekcija-napredak span {
-    font-size: var(--tekst-mali);
+  .zavrsna-kolekcija-napredak span,
+  .zavrsna-kolekcija-sljedeca {
     color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-sitni);
   }
-  .kolekcija-nove {
-    margin: 0;
-    color: var(--boja-tekst-sekundarni);
+  .zavrsna-kolekcija-napredak strong {
+    color: var(--boja-isticanje-tekst);
+    font-size: 1.2rem;
+  }
+  .zavrsna-kolekcija-sljedeca {
+    margin: 14px 0 0;
+  }
+  @media (max-width: 520px) {
+    .zavrsna-kolekcija {
+      padding: 14px;
+    }
+    .zavrsna-kolekcija-napredak {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
   }
   .sanducic-zavrsni-sazetak {
     display: flex;
@@ -851,7 +876,7 @@
     align-items: flex-start;
     gap: 2px;
     padding: 10px 20px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     font-weight: 700;
     text-decoration: none;
   }

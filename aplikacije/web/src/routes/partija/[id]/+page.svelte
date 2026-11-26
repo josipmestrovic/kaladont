@@ -42,7 +42,7 @@
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
   import { trebaAutofokusPoteza } from '$lib/postavke-autofokus-poteza.js';
-  import { ArrowUp } from 'lucide-svelte';
+  import { ArrowUp, CircleAlert } from 'lucide-svelte';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, formatirajNadimakBota, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, ODGODA_PRIKAZA_REZULTATA_TRENING_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
@@ -1504,19 +1504,58 @@
   {/if}
 {/snippet}
 
+{#snippet karticaTrazenaSlovaDesktop()}
+  {#if stanje.trazenaSlova}
+    {@const posljednja = prikazanaRijec?.rijec ?? null}
+    {@const zavrsetak = posljednja ? zadnjaDva(posljednja) : ''}
+    {@const autorId = prikazanaRijec?.igracId ?? null}
+    {@const autorSjedalo = autorId ? stanje.sjedala.find((s) => s.igracId === autorId) : null}
+    {@const jeSustav = prikazanaRijec?.vrsta === 'sustav_rijec' || !autorId}
+    <div class="stol-trazena" aria-live="polite">
+      {#key `${posljednja ?? ''}|${stanje.trazenaSlova}`}
+        <div class="stol-trazena__sadrzaj">
+          {#if posljednja}
+            <p class="stol-trazena__autor">
+              {#if jeSustav}
+                Igra je dodijelila
+              {:else if autorSjedalo?.jeBot}
+                <NadimakBota nadimak={autorSjedalo.nadimak} /> je odigrao
+              {:else}
+                {imeIgraca(autorId!)} je odigrao
+              {/if}
+            </p>
+            <p class="stol-trazena__rijec" aria-label={posljednja}>
+              <span class="stol-trazena__tijelo">{posljednja.slice(0, posljednja.length - zavrsetak.length)}</span><span class="stol-trazena__zavrsetak">{zavrsetak}</span>
+            </p>
+          {/if}
+          <p class="stol-trazena__uputa">Nastavi riječ na</p>
+          <p class="stol-trazena__slova">
+            <strong>{stanje.trazenaSlova.toUpperCase()}</strong>
+          </p>
+        </div>
+      {/key}
+    </div>
+  {:else}
+    <p class="priprema-partije">Igra počinje…</p>
+  {/if}
+{/snippet}
+
 {#snippet porukaOdbijenogPoteza()}
   <p class="poruka-poteza" role="alert">
-    {#if nepostojecaRijec}
-      <strong class="odbijena-rijec">{nepostojecaRijec}</strong> ne postoji u našem rječniku.
-    {:else if iskoristeniOblik}
-      {uvodPorukeOblika}<strong class="odbijena-rijec">{iskoristeniOblik}</strong>{krajPorukeOblika}
-    {:else if iskoristenaRijec}
-      <strong class="odbijena-rijec">{iskoristenaRijec}</strong> je već bilo.
-    {:else if vlastitoImeRijec}
-      <strong class="odbijena-rijec">{vlastitoImeRijec}</strong> — Osobna imena, nazive mjesta, marki i slične vlastite nazive ne priznajemo. Probaj s drugom riječi.
-    {:else}
-      {porukaPoteza}
-    {/if}
+    <CircleAlert class="poruka-poteza__ikona" size={18} strokeWidth={2.5} aria-hidden="true" />
+    <span class="poruka-poteza__tekst">
+      {#if nepostojecaRijec}
+        <strong class="odbijena-rijec">{nepostojecaRijec}</strong> ne postoji u našem rječniku.
+      {:else if iskoristeniOblik}
+        {uvodPorukeOblika}<strong class="odbijena-rijec">{iskoristeniOblik}</strong>{krajPorukeOblika}
+      {:else if iskoristenaRijec}
+        <strong class="odbijena-rijec">{iskoristenaRijec}</strong> je već bilo.
+      {:else if vlastitoImeRijec}
+        <strong class="odbijena-rijec">{vlastitoImeRijec}</strong> — Osobna imena, nazive mjesta, marki i slične vlastite nazive ne priznajemo. Probaj s drugom riječi.
+      {:else}
+        {porukaPoteza}
+      {/if}
+    </span>
   </p>
 {/snippet}
 
@@ -2235,7 +2274,7 @@
         </div>
       {:else}
         <div class="desktop-trazena">
-          {@render karticaTrazenaSlova()}
+          {@render karticaTrazenaSlovaDesktop()}
         </div>
       {/if}
 
@@ -2248,8 +2287,25 @@
           onsubmit={(e) => { e.preventDefault(); if (jeNaPotezu) posaljiPotez(); }}
           aria-disabled={!jeNaPotezu}
         >
-          <p class="mobilni-tvoj-red" aria-live="polite">TVOJ RED</p>
+          <div class="mobilni-zaglavlje">
+            <p class="mobilni-tvoj-red" aria-live="polite">TVOJ RED</p>
+            {#if stanje.istekPotezaIso && stanje.trajanjePotezaSek && stanje.trajanjePotezaSek > 0}
+              <div class="mobilni-timer-crta">
+                <TimerCrta
+                  raspored="zaglavlje"
+                  istekIso={stanje.istekPotezaIso}
+                  serverVrijemeIso={stanje.serverVrijemeIso}
+                  trajanjeSek={stanje.trajanjePotezaSek}
+                />
+              </div>
+            {/if}
+          </div>
           <div class="mobilni-kontekst">
+            {#if jaDokazujem && dokaz}
+              <p class="mobilni-poseban-uvjet">Dokaži nastavak na ‘{dokaz.izvornaRijec}’.</p>
+            {:else if cekamDokaz && dokaz}
+              <p class="mobilni-poseban-uvjet">{imeIgraca(dokaz.autorId)} dokazuje nastavak.</p>
+            {/if}
             {#if prikazanaRijec?.rijec}
               {@const duljinaTrenutne = Array.from(prikazanaRijec.rijec).length}
               <span
@@ -2259,108 +2315,105 @@
               >{@render trenutnaRijec(prikazanaRijec.rijec)}</span>
             {/if}
           </div>
-          <div class="poruka-poteza-slot" aria-live="polite">
-            {#if porukaPoteza}
-              {@render porukaOdbijenogPoteza()}
-            {/if}
-          </div>
-          {#if stanje.istekPotezaIso && stanje.trajanjePotezaSek && stanje.trajanjePotezaSek > 0}
-            <div class="mobilni-timer-crta">
-              <TimerCrta
-                istekIso={stanje.istekPotezaIso}
-                serverVrijemeIso={stanje.serverVrijemeIso}
-                trajanjeSek={stanje.trajanjePotezaSek}
-              />
+          <div class="mobilni-unos-blok">
+            <div class="poruka-poteza-slot" aria-live="polite">
+              {#if porukaPoteza}
+                {@render porukaOdbijenogPoteza()}
+              {/if}
             </div>
-          {/if}
-          <div class="desktop-unos-omot">
-            <div class="unos-rijeci" class:unos-ima-gresku={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}>
+            <div class="desktop-unos-omot">
+              <div class="unos-rijeci" class:unos-ima-gresku={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}>
+                {#if jeNaPotezu}
+                  <span class="prefiks-unosa" aria-hidden="true">{prefiksRijeci}</span>
+                {/if}
+                <input
+                  bind:this={unosInput}
+                  type="text"
+                  bind:value={unosNastavkaRijeci}
+                  placeholder={!jeNaPotezu ? (jeEliminiran ? 'Ispao si' : 'Pričekaj svoj red') : ''}
+                  onfocus={() => {
+                    if (!jeNaPotezu) {
+                      unosInput?.blur();
+                      return;
+                    }
+                    korisnikJeFokusiraoUnos = true;
+                    if (mobilniZaslon()) osigurajZastituPovijesti('fokus');
+                  }}
+                  onblur={() => {
+                    // Ručni blur (tipkovnica zatvorena): skini fokus entry s history stacka.
+                    if (
+                      mobilniZaslon() &&
+                      zastitaPovijesti === 'fokus' &&
+                      !zatvaramFokusBezPovijesti
+                    ) {
+                      ignorirajSljedeciPopstate = true;
+                      zastitaPovijesti = 'igra';
+                      history.back();
+                    }
+                  }}
+                  oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
+                  oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
+                  autocomplete="off"
+                  autocapitalize="none"
+                  autocorrect="off"
+                  spellcheck={false}
+                  inputmode="text"
+                  enterkeyhint="send"
+                  maxlength={najviseZnakovaNastavka}
+                  aria-label={!jeNaPotezu
+                    ? jeEliminiran
+                      ? 'Ispao si'
+                      : 'Pričekaj svoj red'
+                    : jaDokazujem
+                      ? `Dokaži nastavak na ${prefiksRijeci.toUpperCase()}`
+                      : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
+                  aria-invalid={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}
+                  disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna}
+                />
+              </div>
               {#if jeNaPotezu}
-                <span class="prefiks-unosa" aria-hidden="true">{prefiksRijeci}</span>
+                <p class="desktop-tvoj-red-hint" aria-hidden="true">
+                  <ArrowUp size={22} strokeWidth={2.5} />
+                  <span>Tvoj red, unesi riječ ovdje!</span>
+                </p>
               {/if}
-              <input
-                bind:this={unosInput}
-                type="text"
-                bind:value={unosNastavkaRijeci}
-                placeholder={!jeNaPotezu ? 'Pričekaj svoj red' : ''}
-                onfocus={() => {
-                  if (!jeNaPotezu) {
-                    unosInput?.blur();
-                    return;
-                  }
-                  korisnikJeFokusiraoUnos = true;
-                  if (mobilniZaslon()) osigurajZastituPovijesti('fokus');
-                }}
-                onblur={() => {
-                  // Ručni blur (tipkovnica zatvorena): skini fokus entry s history stacka.
-                  if (
-                    mobilniZaslon() &&
-                    zastitaPovijesti === 'fokus' &&
-                    !zatvaramFokusBezPovijesti
-                  ) {
-                    ignorirajSljedeciPopstate = true;
-                    zastitaPovijesti = 'igra';
-                    history.back();
-                  }
-                }}
-                oninput={(event) => { if (!(event instanceof InputEvent) || !event.isComposing) normalizirajUnos(event.currentTarget); }}
-                oncompositionend={(event) => normalizirajUnos(event.currentTarget)}
-                autocomplete="off"
-                autocapitalize="none"
-                autocorrect="off"
-                spellcheck={false}
-                inputmode="text"
-                enterkeyhint="send"
-                maxlength={najviseZnakovaNastavka}
-                aria-label={!jeNaPotezu
-                  ? 'Pričekaj svoj red'
-                  : jaDokazujem
-                    ? `Dokaži nastavak na ${prefiksRijeci.toUpperCase()}`
-                    : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
-                aria-invalid={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}
-                disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna}
-              />
             </div>
-            {#if jeNaPotezu}
-              <p class="desktop-tvoj-red-hint" aria-hidden="true">
-                <ArrowUp size={22} strokeWidth={2.5} />
-                <span>Tvoj red, unesi riječ ovdje!</span>
-              </p>
-            {/if}
-          </div>
-          <div class="potez-gumbi">
-            {#if jaDokazujem || (!stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
-              <button type="button" class="ne-znam-gumb" disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna || posaljiOdbijen} onclick={posaljiNeZnam}>Ne znam</button>
-            {/if}
-            <button
-              type="submit"
-              class="posalji-gumb"
-              class:posalji-odbijen={posaljiOdbijen && jeNaPotezu}
-              disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna || posaljiOdbijen}
-              aria-label={!jeNaPotezu
-                ? `Pošalji (nije tvoj red), niz bez greške: ${stanje.trenutniStreak}`
-                : posaljiOdbijen
-                  ? 'Odbijeno'
-                  : `Pošalji, niz bez greške: ${stanje.trenutniStreak}`}
-            >
-              {#if posaljiOdbijen && jeNaPotezu}
-                Odbijeno
-              {:else if slanjeUTijeku && jeNaPotezu}
-                {porukaCekanjaPotvrde ? 'Provjera…' : 'Šaljemo…'}
-              {:else}
-                <span class="posalji-sadrzaj">
-                  <span class="posalji-labela">Pošalji</span>
-                  <span class="posalji-streak" class:ugasen={stanje.trenutniStreak === 0} aria-hidden="true">
-                    <span class="posalji-vatre">
-                      {#each Array(brojVatriUGumbu) as _}
-                        <img src="/ikone/19-vatra.png" alt="" />
-                      {/each}
-                    </span>
-                    <strong>{stanje.trenutniStreak}</strong>
-                  </span>
-                </span>
+            <div class="potez-gumbi">
+              {#if jaDokazujem || (!stanje.jePrivatna || stanje.trajanjePotezaSek === 0 || !stanje.istekPotezaIso || stanje.istekPotezaIso === '')}
+                <button type="button" class="ne-znam-gumb" disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna || posaljiOdbijen} onclick={posaljiNeZnam}>Ne znam</button>
               {/if}
-            </button>
+              <button
+                type="submit"
+                class="posalji-gumb"
+                class:posalji-odbijen={posaljiOdbijen && jeNaPotezu}
+                disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna || posaljiOdbijen}
+                aria-label={!jeNaPotezu
+                  ? `Pošalji (nije tvoj red), niz bez greške: ${stanje.trenutniStreak}`
+                  : posaljiOdbijen
+                    ? 'Odbijeno'
+                    : `Pošalji, niz bez greške: ${stanje.trenutniStreak}`}
+              >
+                {#if posaljiOdbijen && jeNaPotezu}
+                  Odbijeno
+                {:else if slanjeUTijeku && jeNaPotezu}
+                  {porukaCekanjaPotvrde ? 'Provjera…' : 'Šaljemo…'}
+                {:else}
+                  <span class="posalji-sadrzaj">
+                    <span class="posalji-labela">Pošalji</span>
+                    {#if stanje.trenutniStreak > 0}
+                      <span class="posalji-streak" aria-hidden="true">
+                        <span class="posalji-vatre">
+                          {#each Array(brojVatriUGumbu) as _}
+                            <img src="/ikone/19-vatra.png" alt="" />
+                          {/each}
+                        </span>
+                        <strong>{stanje.trenutniStreak}</strong>
+                      </span>
+                    {/if}
+                  </span>
+                {/if}
+              </button>
+            </div>
           </div>
         </form>
       {/if}
@@ -2465,7 +2518,7 @@
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-2);
     color: var(--boja-tekst-sekundarni);
     font-size: var(--tekst-sitni);
@@ -2475,7 +2528,7 @@
   .dobitak-dostignuca strong { color: var(--boja-zlato-tekst); }
   .dobitak-dostignuca span { font-weight: 800; }
   .navigacija-obavijesti { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--boja-tekst-sekundarni); font-size: var(--tekst-sitni); }
-  .navigacija-obavijesti button { min-width: 32px; min-height: 28px; border: 1px solid var(--boja-obrub-jaci); border-radius: var(--radijus-pill); background: var(--boja-povrsina); color: var(--boja-tekst-osnovni); font: inherit; cursor: pointer; }
+  .navigacija-obavijesti button { min-width: 32px; min-height: 28px; border: 1px solid var(--boja-obrub-jaci); border-radius: var(--radijus-kontrola); background: var(--boja-povrsina); color: var(--boja-tekst-osnovni); font: inherit; cursor: pointer; }
   .navigacija-obavijesti button:disabled { opacity: 0.45; cursor: default; }
   @keyframes ulaz-dobitka { 0% { opacity: 0; transform: translateY(-28px) scale(.94); } 65% { opacity: 1; transform: translateY(2px) scale(1.04); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
   @media (prefers-reduced-motion: reduce) { .obavijest-napretka { animation: none; } }
@@ -2644,7 +2697,7 @@
     margin: 24px 0 0;
     padding: 18px;
     border: 1px solid var(--boja-obrub);
-    border-radius: 12px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-2);
   }
   .zavrsna-kolekcija h3,
@@ -2799,7 +2852,7 @@
     gap: 12px;
     padding: 12px 14px;
     border: 1.5px solid var(--boja-zlato-obrub);
-    border-radius: 12px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-zlato-pozadina);
     box-shadow: var(--sjena-suptilna);
   }
@@ -2828,7 +2881,7 @@
     justify-content: center;
     padding: 4px 8px;
     border: 1px solid var(--boja-zlato-obrub);
-    border-radius: 999px;
+    border-radius: var(--radijus-kontrola);
     background: transparent;
     color: var(--boja-zlato-tekst);
     font-size: 0.7rem;
@@ -2972,7 +3025,7 @@
     display: inline-block;
     padding: 2px 6px;
     border: 1px solid var(--boja-isticanje-slova);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-isticanje-slova);
     color: #1a1815;
     font-size: var(--tekst-mikro);
@@ -3187,7 +3240,7 @@
     min-height: 44px;
     padding: 4px 6px;
     border: 1px solid var(--boja-obrub-jaci);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-3);
     color: var(--boja-tekst-osnovni);
     font: inherit;
@@ -3229,6 +3282,89 @@
     padding: 4px 0 0;
     box-shadow: none;
     text-align: center;
+  }
+  .stol-trazena {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+    padding: 8px 0 4px;
+    text-align: center;
+  }
+  .stol-trazena__sadrzaj {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    animation: stol-trazena-fade 280ms ease-out both;
+  }
+  .stol-trazena__autor {
+    margin: 0;
+    color: var(--boja-tekst-sekundarni);
+    font-family: var(--font-tijelo);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .stol-trazena__rijec {
+    margin: 0;
+    color: var(--boja-tekst-osnovni);
+    font-family: var(--font-naslov);
+    font-size: 27px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: 0.02em;
+  }
+  .stol-trazena__tijelo {
+    color: inherit;
+  }
+  .stol-trazena__zavrsetak {
+    color: var(--boja-isticanje-slova);
+    text-decoration: underline;
+    text-decoration-color: var(--boja-isticanje-slova);
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.08em;
+  }
+  .stol-trazena__uputa {
+    margin: 4px 0 0;
+    color: var(--boja-tekst-sekundarni);
+    font-family: var(--font-tijelo);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .stol-trazena__slova {
+    margin: 0;
+  }
+  .stol-trazena__slova strong {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: var(--radijus-kontrola);
+    background: #1a1815;
+    color: var(--boja-isticanje-slova);
+    font-family: var(--font-naslov);
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+  }
+  @keyframes stol-trazena-fade {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stol-trazena__sadrzaj {
+      animation: none;
+    }
   }
   @media (max-width: 999px) {
     .mobilni-trazena-iznad {
@@ -3449,8 +3585,11 @@
     filter: grayscale(0.25);
   }
   .mobilni-kontekst { display: none; }
+  .mobilni-zaglavlje { display: none; }
   .mobilni-timer-crta { display: none; }
   .mobilni-tvoj-red { display: none; }
+  .mobilni-unos-blok { display: contents; }
+  .mobilni-poseban-uvjet { display: none; }
   .zona-poteza:global(.mobilni-potez) {
     position: fixed;
     z-index: 1100;
@@ -3463,21 +3602,45 @@
     padding: 0 10px 10px;
     overflow-y: auto;
     border: 1px solid color-mix(in srgb, var(--boja-obrub-jaci) 55%, transparent);
-    border-radius: 12px;
+    border-radius: var(--radijus-kontrola);
     background: rgb(8 28 23 / 78%);
     box-shadow: var(--sjena-modal);
     -webkit-backdrop-filter: blur(18px);
     backdrop-filter: blur(18px);
+    animation: mobilni-fokus-ulaz 180ms ease-out both;
   }
-  :global(.mobilni-potez) .mobilni-tvoj-red {
-    display: block;
+  @keyframes mobilni-fokus-ulaz {
+    from {
+      opacity: 0.72;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .zona-poteza:global(.mobilni-potez) {
+      animation: none;
+    }
+  }
+  :global(.mobilni-potez) .mobilni-zaglavlje {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     flex: none;
     box-sizing: border-box;
     width: calc(100% + 20px);
     margin: 0 -10px;
-    padding: 12px 10px;
+    padding: 12px 12px 8px;
     border-radius: 11px 11px 0 0;
     background: color-mix(in srgb, var(--boja-isticanje-slova) 28%, transparent);
+  }
+  :global(.mobilni-potez) .mobilni-tvoj-red {
+    display: block;
+    margin: 0;
+    padding: 0 3.6rem 0 0;
     color: var(--boja-uspjeh-tekst);
     font-family: var(--font-naslov);
     font-size: 1.2rem;
@@ -3485,6 +3648,14 @@
     letter-spacing: 0.1em;
     line-height: 1.2;
     text-align: center;
+  }
+  :global(.mobilni-potez) .mobilni-zaglavlje:not(:has(.mobilni-timer-crta)) .mobilni-tvoj-red {
+    padding-right: 0;
+  }
+  :global(.mobilni-potez) .mobilni-timer-crta {
+    display: block;
+    width: 100%;
+    flex: none;
   }
   :global(.mobilni-potez) .mobilni-kontekst {
     display: flex;
@@ -3499,6 +3670,16 @@
     overflow-wrap: anywhere;
     container-type: size;
   }
+  :global(.mobilni-potez) .mobilni-poseban-uvjet {
+    display: block;
+    margin: 0;
+    max-width: 28ch;
+    color: var(--boja-tekst-sekundarni);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+  }
   :global(.mobilni-potez) .mobilna-trenutna-rijec {
     display: block;
     width: 100%;
@@ -3507,26 +3688,21 @@
     text-align: center;
   }
   :global(.mobilni-potez) .mobilna-trenutna-rijec :global(.trenutna-rijec) {
-    font-size: clamp(1.6rem, 16cqh, 2.55rem);
+    font-size: clamp(1.85rem, 18.5cqh, 2.95rem);
     font-weight: 800;
     line-height: 1.15;
     letter-spacing: 0.02em;
   }
   :global(.mobilni-potez) .mobilna-trenutna-rijec.duga :global(.trenutna-rijec) {
-    font-size: clamp(1.35rem, 13cqh, 2.05rem);
+    font-size: clamp(1.55rem, 15cqh, 2.35rem);
   }
   :global(.mobilni-potez) .mobilna-trenutna-rijec.vrlo-duga :global(.trenutna-rijec) {
-    font-size: clamp(1.15rem, 11cqh, 1.7rem);
+    font-size: clamp(1.3rem, 12.5cqh, 1.95rem);
   }
   :global(.mobilni-potez) .mobilna-trenutna-rijec :global(.trenutna-rijec-zavrsetak) {
     text-decoration: underline;
     text-decoration-thickness: 0.12em;
     text-underline-offset: 0.14em;
-  }
-  :global(.mobilni-potez) .mobilni-timer-crta {
-    display: block;
-    width: 100%;
-    flex: none;
   }
   .mobilna-trenutna-rijec { min-width: 0; flex: 1 1 0; text-align: left; }
   @media (max-width: 999px) {
@@ -3541,14 +3717,36 @@
       overflow-wrap: anywhere;
     }
   }
+  :global(.mobilni-potez) .mobilni-unos-blok {
+    position: relative;
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
   :global(.mobilni-potez) .potez-gumbi { margin: 0; }
   :global(.mobilni-potez) .potez-gumbi button { margin: 0; }
   :global(.mobilni-potez) .poruka-poteza-slot {
-    flex: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
     margin: 0;
-    min-height: 2.6em;
+    min-height: 0;
+    padding: 0;
+    pointer-events: none;
   }
-  :global(.mobilni-potez) .poruka-poteza { margin: 0; font-size: 16px; line-height: 1.2; }
+  :global(.mobilni-potez) .poruka-poteza {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.2;
+    pointer-events: auto;
+  }
   .unos-rijeci {
     display: flex;
     align-items: center;
@@ -3556,7 +3754,7 @@
     height: 44px;
     padding: 0 16px;
     border: 1px solid var(--boja-obrub-jaci);
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina-3);
     font-family: var(--font-naslov);
     font-size: 18px;
@@ -3595,12 +3793,25 @@
     padding: 0 4px;
   }
   .poruka-poteza {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     margin: 0;
-    color: var(--boja-akcent-tekst);
+    color: var(--boja-bot-oznaka);
     font-size: var(--tekst-baza);
-    font-weight: 400;
+    font-weight: 600;
     line-height: 1.3;
-    text-align: center;
+    text-align: left;
+  }
+  .poruka-poteza__ikona {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--boja-bot-oznaka);
+  }
+  .poruka-poteza__tekst {
+    min-width: 0;
   }
   .poruka-poteza strong {
     font-size: 1.08em;
@@ -3628,7 +3839,7 @@
     height: 44px;
     margin-top: 8px;
     border: 0;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
     font-weight: 600;
@@ -3786,7 +3997,7 @@
       grid-template-columns: minmax(0, 5.2fr) minmax(16rem, 4.8fr);
       align-items: end;
       column-gap: var(--razmak-8);
-      row-gap: 8px;
+      row-gap: 4px;
     }
     form button,
     .unos-rijeci {
@@ -3796,8 +4007,15 @@
       margin-top: 0;
     }
     form .poruka-poteza-slot {
-      grid-column: 1 / -1;
+      grid-column: 1;
       grid-row: 1;
+      align-self: end;
+      justify-content: flex-start;
+      min-height: 0;
+      padding-left: 0;
+    }
+    form .poruka-poteza {
+      text-align: left;
     }
     /* Omot ostaje contents: input i gumbi dijele isti red, hint ide ispod inputa. */
     .desktop-unos-omot {
@@ -3859,7 +4077,7 @@
     max-width: min(180px, calc(50vw - 24px));
     padding: 5px 9px;
     border: 1px solid var(--boja-obrub-jaci);
-    border-radius: 12px;
+    border-radius: var(--radijus-kontrola);
     background: var(--boja-povrsina);
     color: var(--boja-tekst-osnovni);
     font-size: var(--tekst-mikro);
@@ -3899,7 +4117,7 @@
     max-width: 100%;
     padding: 2px 6px;
     border: none;
-    border-radius: 12px;
+    border-radius: var(--radijus-kontrola);
     background: #1a1815;
     color: var(--boja-krem);
     font-family: var(--font-naslov);
@@ -4012,9 +4230,9 @@
     color: var(--boja-mint-tamni);
   }
   @media (min-width: 1000px) {
-    .unos-rijeci { font-size: 20px; }
-    .ime-igraca { font-size: 20px; }
-    .rang-razina { font-size: 18px; }
+    .unos-rijeci { font-size: 22px; }
+    .ime-igraca { font-size: 19px; }
+    .rang-razina { font-size: 14px; }
     .red-label { font-size: 18px; min-height: 45px; }
     .trenutna-rijec { font-size: 20px; }
     .rijec-oblak { font-size: 22px; }
@@ -4149,7 +4367,7 @@
     color: var(--boja-cta-tekst);
     text-decoration: none;
     padding: 10px 24px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     font-weight: bold;
   }
   .sporedni-gumb {
@@ -4159,7 +4377,7 @@
     color: var(--boja-tekst-osnovni);
     text-decoration: none;
     padding: 10px 24px;
-    border-radius: var(--radijus-pill);
+    border-radius: var(--radijus-kontrola);
     font-weight: bold;
   }
   .prijavi-btn {
@@ -4220,7 +4438,7 @@
   .dijalog button {
     padding: 8px 16px;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radijus-kontrola);
     cursor: pointer;
     font-size: var(--tekst-baza);
   }

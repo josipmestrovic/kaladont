@@ -8,11 +8,11 @@ test('reload u aktivnoj partiji vraća isti stol i stanje igre', async ({ browse
     const partijaId = await cekajIstuPartiju(igraci);
     const igrac = igraci[0]!.stranica;
 
-    await expect(igrac.getByText(/Traži se riječ na:|Igra počinje/).first()).toBeVisible();
+    await expect(igrac.getByText(/Traži se riječ na:|Nastavi riječ na|Igra počinje/).first()).toBeVisible();
     await igrac.reload();
 
     await expect(igrac).toHaveURL(new RegExp(`/partija/${partijaId}$`));
-    await expect(igrac.getByText(/Traži se riječ na:|Igra počinje/).first()).toBeVisible();
+    await expect(igrac.getByText(/Traži se riječ na:|Nastavi riječ na|Igra počinje/).first()).toBeVisible();
     await expect(igrac.getByRole('list').first()).toBeVisible();
   } finally {
     await zatvoriIgrace(igraci);
