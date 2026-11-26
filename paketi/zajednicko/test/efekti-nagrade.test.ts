@@ -3,7 +3,8 @@ import {
   odrediEfektPrihvacenogPoteza,
   trebaPljesakPobjede,
 } from '../src/efekti-nagrade.js';
-import type { NagradaZaRijec, StavkaIskustva } from '../src/protokol.js';
+import type { StavkaIskustva } from '../src/iskustvo.js';
+import type { NagradaZaRijec } from '../src/protokol.js';
 
 const nagrada = (intenzitet: NagradaZaRijec['intenzitet']): NagradaZaRijec => ({
   intenzitet,

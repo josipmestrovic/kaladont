@@ -1,4 +1,5 @@
-import type { NagradaZaRijec, StavkaIskustva } from './protokol.js';
+import type { StavkaIskustva } from './iskustvo.js';
+import type { NagradaZaRijec } from './protokol.js';
 import { RIJECI_KALADONT } from './pravila.js';
 
 export type IntenzitetKonfeta = 'mali' | 'srednji' | 'veliki';
