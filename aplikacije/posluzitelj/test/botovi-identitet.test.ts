@@ -108,7 +108,7 @@ describe('seed botova', () => {
       expect(nadimak.length).toBeGreaterThanOrEqual(MINIMALNA_DULJINA_NADIMKA);
       expect(nadimak.length).toBeLessThanOrEqual(MAKSIMALNA_DULJINA_NADIMKA);
     }
-    expect(kljucSeedaBota(7)).toBe('bot-007');
+    expect(kljucSeedaBota(7)).toBe('bot-v5-imenovani-007');
   });
 
   it('nasumična konfiguracija avatara je valjana i ponovljiva uz isti RNG', () => {

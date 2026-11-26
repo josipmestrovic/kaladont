@@ -6,7 +6,7 @@ import { izgradiRepertoarBotova } from '../src/bot/repertoar.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
 import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, klasificirajPoznatiSkup, odaberiPotez, odaberiPotezNastavivo, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs } from '../src/bot/odabir-rijeci.js';
 import { parsajSpremljenuKonfiguraciju } from '../src/bot/trajne-postavke.js';
-import { BROJ_GOSTIJU_FONDA_V4, BROJ_IMENOVANIH_FONDA_V4, CILJ_AKTIVNIH_FONDA_V4, NADIMCI_POCETNOG_FONDA_V4 } from '../src/bot/nadimci.js';
+import { BROJ_GOSTIJU_FONDA_V5, BROJ_IMENOVANIH_FONDA_V5, CILJ_AKTIVNIH_FONDA_V5, NADIMCI_POCETNOG_FONDA_V5 } from '../src/bot/nadimci.js';
 import { stavkeZamjeneFondaBotova } from '../src/bot/servis-identiteta.js';
 import { dopustenoBotova, pragoviPopuneZaOkruzenje } from '../src/red/raspored-popune.js';
 import { jeValjanNadimak } from 'zajednicko';
@@ -758,14 +758,16 @@ describe('odabir riječi bota', () => {
     expect(konfig.vjerojatnostPropustaKa).toBe(0.08);
   });
 
-  it('fond v4 ima 80 imenovanih i 20 gostiju', () => {
-    expect(NADIMCI_POCETNOG_FONDA_V4).toHaveLength(BROJ_IMENOVANIH_FONDA_V4);
-    expect(NADIMCI_POCETNOG_FONDA_V4.every(({ nadimak }) => jeValjanNadimak(nadimak))).toBe(true);
+  it('fond v5 ima 46 imenovanih bez gostiju', () => {
+    expect(NADIMCI_POCETNOG_FONDA_V5).toHaveLength(BROJ_IMENOVANIH_FONDA_V5);
+    expect(NADIMCI_POCETNOG_FONDA_V5.every(({ nadimak }) => jeValjanNadimak(nadimak))).toBe(true);
     const stavke = stavkeZamjeneFondaBotova();
-    expect(stavke).toHaveLength(CILJ_AKTIVNIH_FONDA_V4);
-    expect(stavke.filter((s) => s.tip === 'imenovani')).toHaveLength(BROJ_IMENOVANIH_FONDA_V4);
-    expect(stavke.filter((s) => s.tip === 'gost')).toHaveLength(BROJ_GOSTIJU_FONDA_V4);
-    expect(stavke.every((s) => s.kljucSeeda.startsWith('bot-v4-'))).toBe(true);
+    expect(stavke).toHaveLength(CILJ_AKTIVNIH_FONDA_V5);
+    expect(stavke.filter((s) => s.tip === 'imenovani')).toHaveLength(BROJ_IMENOVANIH_FONDA_V5);
+    expect(stavke.filter((s) => s.tip === 'gost')).toHaveLength(BROJ_GOSTIJU_FONDA_V5);
+    expect(stavke.every((s) => s.kljucSeeda.startsWith('bot-v5-'))).toBe(true);
+    expect(stavke[0]?.kljucSeeda).toBe('bot-v5-imenovani-001');
+    expect(stavke[0]?.nadimak).toBe('BOTINA');
   });
 
   it('zakašnjeli događaj oduzima proteklo vrijeme od fiksnog cilja', () => {
