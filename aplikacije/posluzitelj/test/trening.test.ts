@@ -276,7 +276,7 @@ describe('Zagrijavanje', () => {
       expect(pocetak.kontekst).toBe('trening');
       expect(pocetak.mod).toBe('dva_igraca');
       expect(pocetak.sjedala).toHaveLength(2);
-      expect(pocetak.sjedala.some((s) => s.nadimak === 'Iskusni')).toBe(true);
+      expect(pocetak.sjedala.some((s) => s.nadimak === 'BOTANIČAR')).toBe(true);
       expect(kraj.kontekst).toBe('trening');
       // Default odigrajTreningDoKraja samo „ne znam” → nema osvojenog XP.
       expect(kraj.mojeIskustvo).toBeNull();
@@ -339,7 +339,7 @@ describe('Zagrijavanje', () => {
       expect(pocetak.sjedala).toHaveLength(3);
       const racunala = pocetak.sjedala.filter((s) => s.jeBot);
       expect(racunala).toHaveLength(2);
-      expect(racunala.map((s) => s.nadimak).sort()).toEqual(['Iskusni 1', 'Iskusni 2']);
+      expect(racunala.map((s) => s.nadimak).sort()).toEqual(['BOTANIČAR', 'BOTOGRAF']);
       const avatari = new Set(racunala.map((s) => JSON.stringify(s.avatarConfig)));
       expect(avatari.size).toBe(2);
       // #108: ispadanje jedinog čovjeka odmah završava Zagrijavanje (bez bot-vs-bot).
@@ -361,7 +361,7 @@ describe('Zagrijavanje', () => {
         expect(pocetak.pravila).toBe(pravila);
         expect(pocetak.sjedala).toHaveLength(2);
         expect(pocetak.sjedala.filter((s) => s.jeBot)).toHaveLength(1);
-        expect(pocetak.sjedala.some((s) => s.nadimak === 'Iskusni')).toBe(true);
+        expect(pocetak.sjedala.some((s) => s.nadimak === 'BOTANIČAR')).toBe(true);
       } finally {
         socket.disconnect();
       }
@@ -377,7 +377,7 @@ describe('Zagrijavanje', () => {
       });
       expect(potvrda.pokrenut).toBe(true);
       const pocetak = await pocetakPromise;
-      expect(pocetak.sjedala.some((s) => s.nadimak === 'Majstor')).toBe(true);
+      expect(pocetak.sjedala.some((s) => s.nadimak === 'BOTOKRAT')).toBe(true);
       const konfig = posluzitelj.dohvatiKonfiguracijuBotaPartije(pocetak.partijaId);
       expect(konfig?.vjerojatnostTaktickogPoteza).toBe(0.5);
       socket.emit('partija:izadji');

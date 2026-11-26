@@ -15,7 +15,6 @@ import {
   jePoznatiProfilBota,
   KATALOG_IZAZOVA,
   levelDostupan,
-  nadimakProfilaBota,
   PRAG_DUGE_RIJECI_IZAZOVA,
   sekundiBrzogPotezaIzazova,
   UKUPNI_NOMINALNI_XP_IZAZOVA,
@@ -160,11 +159,9 @@ describe('katalog izazova v3', () => {
     expect(jeIdIzazova('XYZ')).toBe(false);
   });
 
-  it('PR02: zadani trening profil i nadimci', () => {
+  it('PR02: zadani trening profil', () => {
     expect(ZADANI_PROFIL_TRENINGA).toBe('iskusni');
     expect(jePoznatiProfilBota('majstor')).toBe(true);
     expect(jePoznatiProfilBota('xyz')).toBe(false);
-    expect(nadimakProfilaBota('velemajstor', 1, 1)).toBe('Velemajstor');
-    expect(nadimakProfilaBota('velemajstor', 2, 3)).toBe('Velemajstor 2');
   });
 });
