@@ -18,7 +18,7 @@
  * na kraju i preispituje već obrađene Troboj parove (preispitajParoveNaDvijeFronte).
  */
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { kalendarskeGranice, type MetrikaLjestvice, type ModPartije } from 'zajednicko';
+import { kalendarskeGranice, type MetrikaVremenskaLjestvice, type ModPartije } from 'zajednicko';
 import { baza, zatvoriBazu } from '../baza/klijent.js';
 import { dokaziTop10Ulazaka, igraci } from '../baza/shema.js';
 import {
@@ -30,7 +30,8 @@ import { konfiguracija } from '../konfiguracija.js';
 import { izracunajPoredak, ocistiMemorijuLjestvica } from '../ljestvice/servis.js';
 
 const RAZDOBLJA = ['dnevno', 'tjedno', 'mjesecno'] as const;
-const METRIKE: readonly MetrikaLjestvice[] = ['prosjek_bodova', 'niz_pobjeda'];
+/** Top10 dokazi koriste samo vremenske metrike (ne kumulativni napredak). */
+const METRIKE: readonly MetrikaVremenskaLjestvice[] = ['prosjek_bodova', 'niz_pobjeda'];
 
 function imaZastavicu(ime: string): boolean {
   return process.argv.includes(ime);

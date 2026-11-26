@@ -107,10 +107,10 @@ async function dohvatiIdentitete(ids?: string[]): Promise<Map<string, IdentitetI
     nadimak: r.nadimak,
     vrsta: r.vrsta as IdentitetIgraca['vrsta'],
     avatarId: r.avatarId,
-    avatarConfig: r.avatarConfig,
+    avatarConfig: r.avatarConfig as AvatarConfigV1 | null,
     avatarRevision: r.avatarRevision,
     iskustvoUkupno: r.iskustvoUkupno,
-  }]));
+  } satisfies IdentitetIgraca]));
 }
 
 async function izracunajIskustvo(): Promise<Poredak> {
@@ -137,7 +137,7 @@ async function izracunajIskustvo(): Promise<Poredak> {
       nadimak: r.nadimak,
       vrsta: r.vrsta as IdentitetIgraca['vrsta'],
       avatarId: r.avatarId,
-      avatarConfig: r.avatarConfig,
+      avatarConfig: r.avatarConfig as AvatarConfigV1 | null,
       avatarRevision: r.avatarRevision,
       iskustvoUkupno: r.iskustvoUkupno,
     };
@@ -315,7 +315,7 @@ async function izracunajDostignuca(): Promise<Poredak> {
       nadimak: r.nadimak,
       vrsta: r.vrsta as IdentitetIgraca['vrsta'],
       avatarId: r.avatarId,
-      avatarConfig: r.avatarConfig,
+      avatarConfig: r.avatarConfig as AvatarConfigV1 | null,
       avatarRevision: r.avatarRevision,
       iskustvoUkupno: r.iskustvoUkupno,
     };
