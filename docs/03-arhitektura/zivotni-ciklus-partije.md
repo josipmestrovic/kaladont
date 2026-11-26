@@ -34,7 +34,7 @@ Napomene:
 
 - **SustavBiraRijec:** nakon eliminacije ili Kaladont-efekta traje 5 sekundi; nitko ne može igrati. Kandidati nikad ne završavaju na „ka” (PR02). Prva dodjela ne dodaje ovu pauzu postojećem početnom odbrojavanju. Timer poteza kreće tek po dodjeli riječi; trening ostaje bez timera.
 - **DokazNastavka (PR05):** u `dokazi_nastavak` nakon Brunina „Ne znam”/isteka/napuštanja (dok nastavak postoji) emitira se `dokaz:zatrazen`; Ana igra na isti prefiks. Snapshot/reconnect vraća istu fazu i `turnToken`. Između Brunina odustajanja i Anina dokaza **nema** nove sistemske riječi.
-- **Prikaz rezultata:** `prikazRezultataOdIso` određuje osamsekundnu pauzu (`ODGODA_PRIKAZA_REZULTATA_MS`); spremanje ne čeka taj rok.
+- **Prikaz rezultata:** `prikazRezultataOdIso` određuje pauzu do detalja — 8 s uobičajeno (`ODGODA_PRIKAZA_REZULTATA_MS`), 3 s u Treningu; spremanje ne čeka taj rok.
 - **Mrtva slova:** u Klasičnom/KA-zna eliminiraju sljedećeg (RS-02/03); u Dokaži nastavak autora riječi (RS-31).
 - **CekaPovratak:** 10-sekundna tolerancija; istek poteza ima prednost; dobrovoljni izlazak ne ulazi ovdje.
 - Eliminirani igrač prelazi u ulogu **promatrača** do `KrajPartije`.

@@ -68,6 +68,7 @@ import {
   javnaSjedalaZaMod,
   KLJUCEVI_JAVNOG_REDA,
   ODGODA_PRIKAZA_REZULTATA_MS,
+  ODGODA_PRIKAZA_REZULTATA_TRENING_MS,
   ZADANI_PRAVILNIK,
 } from 'zajednicko';
 import { evaluirajNapredak, prazneCinjenice } from '../izazovi/evaluacija.js';
@@ -1623,7 +1624,10 @@ export function stvoriUpraviteljPartija(
     if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
     // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.
     const zavrsenoU = new Date(sat.sada());
-    const prikazRezultataOdIso = new Date(zavrsenoU.getTime() + ODGODA_PRIKAZA_REZULTATA_MS).toISOString();
+    const odgodaPrikazaMs = stanje.kontekst === 'trening'
+      ? ODGODA_PRIKAZA_REZULTATA_TRENING_MS
+      : ODGODA_PRIKAZA_REZULTATA_MS;
+    const prikazRezultataOdIso = new Date(zavrsenoU.getTime() + odgodaPrikazaMs).toISOString();
     if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
     if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
     for (const prekid of stanje.prekidiUTijeku.values()) sat.otkazi(prekid.timerHandle);

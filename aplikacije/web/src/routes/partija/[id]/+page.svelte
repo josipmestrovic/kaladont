@@ -42,7 +42,7 @@
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
   import { trebaAutofokusPoteza } from '$lib/postavke-autofokus-poteza.js';
   import { ArrowUp } from 'lucide-svelte';
-  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
+  import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, ODGODA_PRIKAZA_REZULTATA_TRENING_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
@@ -1137,7 +1137,8 @@
     }
 
     prikaziRezultate = false;
-    rezervniRokRezultataMs ??= Date.now() + ODGODA_PRIKAZA_REZULTATA_MS;
+    const odgodaRezultataMs = jeTrening ? ODGODA_PRIKAZA_REZULTATA_TRENING_MS : ODGODA_PRIKAZA_REZULTATA_MS;
+    rezervniRokRezultataMs ??= Date.now() + odgodaRezultataMs;
     const izazovRok = stanje.izazovTerminal?.resultsVisibleAtIso
       ? Date.parse(stanje.izazovTerminal.resultsVisibleAtIso)
       : NaN;
