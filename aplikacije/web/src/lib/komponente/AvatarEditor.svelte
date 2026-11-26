@@ -128,9 +128,10 @@
 
   $effect(() => {
     if (inicijalizirano) return;
-    const normalizirana = normalizirajKonfiguraciju(pocetnaKonfiguracija);
-    draft = normalizirana;
-    spremljeno = kopirajKonfiguraciju(normalizirana);
+    // Spremljeno ostaje izvornik (npr. detached); draft je normaliziran → Save ostaje omogućen.
+    const izvor = kopirajKonfiguraciju(pocetnaKonfiguracija);
+    spremljeno = kopirajKonfiguraciju(izvor);
+    draft = normalizirajKonfiguraciju(izvor);
     inicijalizirano = true;
     ucitavanjeUspjelo = true;
   });

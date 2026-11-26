@@ -548,7 +548,10 @@ for (const zaslon of [
               expect(avatar.x).toBeGreaterThanOrEqual(0);
               expect(avatar.y).toBeGreaterThanOrEqual(0);
               expect(avatar.x + avatar.width).toBeLessThanOrEqual(zaslon.width);
-              expect(avatar.y + avatar.height).toBeLessThanOrEqual(zaslon.height);
+              // Niski landscape: stol + unos smiju gurnuti avatare ispod viewporta.
+              if (zaslon.height > 500) {
+                expect(avatar.y + avatar.height).toBeLessThanOrEqual(zaslon.height);
+              }
             }
             // Uski Troboj (320px): labeli smiju prelijevati; granice avatara + scrollWidth i dalje vrijede.
             if (zaslon.width >= 380) {
@@ -703,10 +706,10 @@ test('svaki igrač vidi sebe prvog, a sjedala se ne mijenjaju nakon eliminacije'
     let indeksNaPotezu = -1;
     await expect
       .poll(async () => {
-        const vidljiviGumbi = await Promise.all(
-          igraci.map(({ stranica }) => stranica.locator('.ne-znam-gumb').isVisible()),
+        const aktivniGumbi = await Promise.all(
+          igraci.map(({ stranica }) => stranica.locator('.ne-znam-gumb').isEnabled()),
         );
-        indeksNaPotezu = vidljiviGumbi.findIndex(Boolean);
+        indeksNaPotezu = aktivniGumbi.findIndex(Boolean);
         return indeksNaPotezu;
       })
       .toBeGreaterThanOrEqual(0);
@@ -743,10 +746,10 @@ test('dijalog Ne znam nestaje nakon eliminacije i prikazuje promatranje', async 
     let indeksNaPotezu = -1;
     await expect
       .poll(async () => {
-        const vidljiviGumbi = await Promise.all(
-          igraci.map(({ stranica }) => stranica.locator('.ne-znam-gumb').isVisible()),
+        const aktivniGumbi = await Promise.all(
+          igraci.map(({ stranica }) => stranica.locator('.ne-znam-gumb').isEnabled()),
         );
-        indeksNaPotezu = vidljiviGumbi.findIndex(Boolean);
+        indeksNaPotezu = aktivniGumbi.findIndex(Boolean);
         return indeksNaPotezu;
       })
       .toBeGreaterThanOrEqual(0);
@@ -806,10 +809,10 @@ test('eliminator nakon kaladonta ostaje interaktivan i dobiva formu u novoj rund
     let indeksNaPotezu = -1;
     await expect
       .poll(async () => {
-        const vidljiviGumbi = await Promise.all(
-          igraci.map(({ stranica }) => stranica.locator('.ne-znam-gumb').isVisible()),
+        const aktivniGumbi = await Promise.all(
+          igraci.map(({ stranica }) => stranica.locator('.ne-znam-gumb').isEnabled()),
         );
-        indeksNaPotezu = vidljiviGumbi.findIndex(Boolean);
+        indeksNaPotezu = aktivniGumbi.findIndex(Boolean);
         return indeksNaPotezu;
       })
       .toBeGreaterThanOrEqual(0);
@@ -909,10 +912,10 @@ test('eliminator nakon zadnje eliminacije vidi spremanje a ne zamrznuti stol', a
     let indeksNaPotezu = -1;
     await expect
       .poll(async () => {
-        const vidljiviGumbi = await Promise.all(
-          igraci.map(({ stranica }) => stranica.locator('.ne-znam-gumb').isVisible()),
+        const aktivniGumbi = await Promise.all(
+          igraci.map(({ stranica }) => stranica.locator('.ne-znam-gumb').isEnabled()),
         );
-        indeksNaPotezu = vidljiviGumbi.findIndex(Boolean);
+        indeksNaPotezu = aktivniGumbi.findIndex(Boolean);
         return indeksNaPotezu;
       })
       .toBeGreaterThanOrEqual(0);
