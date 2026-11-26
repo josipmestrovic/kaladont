@@ -260,7 +260,8 @@ test('klasični trening ima dva Iskusna (3 sjedala)', async ({ page }) => {
   await expect(page.locator('.igraci-red > li')).toHaveCount(3);
   // Fiksna postava Iskusni: BOTANIČAR / BOTOGRAF / BOTOVNIK (UI: BOTaničar…).
   await expect(page.locator('.igraci-red').getByText(/BOTaničar|BOTograf|BOTovnik/i)).toHaveCount(2);
-  await expect(page.getByTestId('trening-meta')).toContainText('Iskusni');
+  await expect(page.getByTestId('trening-meta')).toContainText('Trening');
+  await expect(page.getByTestId('trening-meta')).toContainText('Klasični');
 });
 
 test('privatna soba: gost vidi domaćinov pravilnik', async ({ browser }) => {

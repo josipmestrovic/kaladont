@@ -23,7 +23,9 @@ test('gost pokreće Zagrijavanje, odustaje i vidi kraj treninga bez napretka', a
   const sjedala = page.locator('.igraci-red > li');
   await expect(sjedala).toHaveCount(2);
   await expect(page.locator('.igraci-red').getByText('BOTaničar')).toBeVisible();
-  await expect(page.getByTestId('trening-meta')).toContainText('Iskusni');
+  // Težina više nije na traci; ostaju način i pravilnik.
+  await expect(page.getByTestId('trening-meta')).toContainText('Trening');
+  await expect(page.getByTestId('trening-meta')).toContainText('KA-zna');
   await expect(page.locator('.timer-prsten')).toHaveCount(0);
 
   // Čovjek odustaje čim dođe na potez; bot igra samo.

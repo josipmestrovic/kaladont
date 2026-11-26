@@ -534,7 +534,7 @@ for (const zaslon of [
         const prije = await Promise.all(igraci.map(({ stranica }) => polozajiAvatara(stranica)));
         for (const { stranica } of igraci) {
           const unos = stranica.getByRole('textbox', { name: /Dovrši riječ na/ });
-          if (await unos.count()) await expect(unos).toHaveCSS('font-size', zaslon.width >= 1000 ? '20px' : '18px');
+          if (await unos.count()) await expect(unos).toHaveCSS('font-size', zaslon.width >= 1000 ? '22px' : '18px');
         }
         const provjeri = async () => {
           for (let indeks = 0; indeks < igraci.length; indeks += 1) {
