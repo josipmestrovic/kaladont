@@ -33,14 +33,18 @@ export function normalizirajRijecZaEfekt(rijec: string): string {
 /**
  * Jedan nagradni efekt za potvrđeni potez lokalnog autora.
  * Kaladont ima prednost nad dugom/rijetkom (bez duplog okidanja).
+ * U `dokazi_nastavak` riječ kaladont nije posebna — nema pljeska/konfeta Kaladonta.
  */
 export function odrediEfektPrihvacenogPoteza(
   rijec: string,
   stavke: readonly StavkaIskustva[],
   nagrada: NagradaZaRijec | null,
+  opcije?: { pravila?: string | null },
 ): NagradniEfektPoteza | null {
   const normalizirana = normalizirajRijecZaEfekt(rijec);
-  if (RIJECI_KALADONT.has(normalizirana)) {
+  const kaladontNaPotezu =
+    RIJECI_KALADONT.has(normalizirana) && opcije?.pravila !== 'dokazi_nastavak';
+  if (kaladontNaPotezu || stavke.some((stavka) => stavka.vrsta === 'kaladont')) {
     return { vrsta: 'kaladont', intenzitetKonfeta: 'veliki', zvuk: 'aplauz-kaladont' };
   }
 

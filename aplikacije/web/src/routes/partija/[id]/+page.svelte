@@ -853,6 +853,9 @@
     if (pocetak !== null && kraj !== null) element.setSelectionRange(pretvori(vrijednost.slice(0, pocetak)).length, pretvori(vrijednost.slice(0, kraj)).length);
   }
 
+  /** Callback iz `pratiMobilniUnos` — osvježi overlay kad se promijeni red/slanje bez focus eventa. */
+  let osvjeziMobilniFokus: (() => void) | null = null;
+
   function pratiMobilniUnos(element: HTMLElement, dijalog = false) {
     const vidljiviZaslon = window.visualViewport;
     const mobitel = window.matchMedia('(max-width: 999px)');
@@ -912,6 +915,7 @@
         element.style.maxHeight = `${visina}px`;
       });
     };
+    if (!dijalog) osvjeziMobilniFokus = osvjezi;
     const dimenzije = new ResizeObserver(osvjezi);
     dimenzije.observe(element);
     element.addEventListener('focusin', osvjezi);
@@ -937,9 +941,18 @@
       vidljiviZaslon?.removeEventListener('scroll', osvjezi);
       window.removeEventListener('resize', osvjezi);
       mobitel.removeEventListener('change', osvjezi);
+      if (osvjeziMobilniFokus === osvjezi) osvjeziMobilniFokus = null;
       ocisti();
     } };
   }
+
+  // Kad se promijeni red ili završi slanje, ponovno procijeni overlay (bez focus eventa).
+  $effect(() => {
+    void jeNaPotezu;
+    void slanjeUTijeku;
+    if (!mobilniZaslon()) return;
+    queueMicrotask(() => osvjeziMobilniFokus?.());
+  });
 
   // Briši unos samo na stvarno novi potez (novi turnToken/prefiks).
   // Flicker jeNaPotezu (destroy forme + partija:stanje) ne smije obrisati tipkanje.
@@ -964,6 +977,8 @@
       if (mobilniZaslon()) {
         if (zastitaPovijesti === 'fokus') spustiFokusNaIgruBezPovijesti();
         else unosInput?.blur();
+        // blur je no-op ako input već nije fokusiran (npr. tijekom slanja) — forsira teardown.
+        queueMicrotask(() => osvjeziMobilniFokus?.());
       }
       return;
     }

@@ -61,6 +61,21 @@ describe('odrediEfektPrihvacenogPoteza', () => {
       zvuk: 'aplauz-kaladont',
     });
   });
+
+  it('u dokazi_nastavak Kaladont nije poseban efekt', () => {
+    expect(
+      odrediEfektPrihvacenogPoteza('kaladont', [], null, { pravila: 'dokazi_nastavak' }),
+    ).toBeNull();
+    expect(
+      odrediEfektPrihvacenogPoteza('kaladont', [stavka('duge_rijeci', 20)], null, {
+        pravila: 'dokazi_nastavak',
+      }),
+    ).toEqual({
+      vrsta: 'duza_rijetka',
+      intenzitetKonfeta: 'srednji',
+      zvuk: null,
+    });
+  });
 });
 
 describe('trebaPljesakPobjede', () => {

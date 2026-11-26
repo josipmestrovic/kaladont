@@ -19,8 +19,8 @@ import type {
   StavkaIskustva,
   StanjePartije,
   TreningNeaktivnost,
-  odrediEfektPrihvacenogPoteza,
 } from 'zajednicko';
+import { odrediEfektPrihvacenogPoteza } from 'zajednicko';
 import { pustiAudio, zaustaviSveZvukove, type AudioDogadaj } from './audio-manager.js';
 import { pocetniGoalProgressIzazova } from './izazovi-klijent.js';
 import { resetirajNagradeEfekte, zabiljeziAplauzKaladonta } from './nagrade-efekti.js';
@@ -646,7 +646,9 @@ export function pokreniSlusateljeIgre(): void {
     if (mojPotez && dozvvoliEfekt) {
       prikaziStavkeIskustva(p.iskustvo ?? []);
       // #159: nagradni efekti samo lokalnom autoru; Kaladont > duga/rijetka.
-      const efekt = odrediEfektPrihvacenogPoteza(p.rijec, p.iskustvo ?? [], p.nagrada ?? null);
+      const efekt = odrediEfektPrihvacenogPoteza(p.rijec, p.iskustvo ?? [], p.nagrada ?? null, {
+        pravila: stanje.pravila,
+      });
       if (efekt) {
         pokreniKonfete(efekt.intenzitetKonfeta, efekt.vrsta === 'kaladont' ? 4_000 : 3_200);
         if (efekt.zvuk) {
