@@ -178,6 +178,17 @@ env_stvarni_promijenjen='da'
 faza='env_azuriran'
 docker compose -f "$compose_datoteka" stop aplikacija
 docker compose -f "$compose_datoteka" rm -f aplikacija
+faza='fond_botova_v5'
+docker compose -f "$compose_datoteka" run --rm --no-deps \
+  -e BOTOVI_DVOBOJ=false \
+  -e BOTOVI_TROBOJ=false \
+  -e BOTOVI_CETVEROBOJ=false \
+  -e TRENING_OMOGUCEN=false \
+  aplikacija node dist/cli/zamijeni-fond-botova.js \
+  --primijeni=DA \
+  --posluzitelj-zaustavljen=DA \
+  --ocisti-zaostale-partije=DA
+faza='fond_botova_v5_zamijenjen'
 docker compose -f "$compose_datoteka" up -d --wait --wait-timeout 300 --force-recreate aplikacija
 faza='aplikacija_rekreirana'
 
