@@ -10,7 +10,7 @@
     type AvatarDijelovi,
     type AvatarBojnaUloga,
   } from 'zajednicko';
-  import { Dices, Redo2, Undo2 } from 'lucide-svelte';
+  import { ChevronLeft, ChevronRight, Dices, Redo2, Undo2 } from 'lucide-svelte';
   import AvatarKonfiguracijaPreview from './AvatarKonfiguracijaPreview.svelte';
   import AvatarDioPreview from './AvatarDioPreview.svelte';
   import { ulogaBojeKategorije } from '$lib/avatar-render.js';
@@ -85,6 +85,15 @@
     };
   }
 
+  /** Detached uši više nisu birive; stari snimci se u editoru prebace na attached. */
+  function normalizirajKonfiguraciju(konfiguracija: AvatarConfigV1): AvatarConfigV1 {
+    const kopija = kopirajKonfiguraciju(konfiguracija);
+    if (kopija.parts.ears === 'detached') {
+      kopija.parts.ears = 'attached';
+    }
+    return kopija;
+  }
+
   function konfiguracijeJednake(a: AvatarConfigV1, b: AvatarConfigV1): boolean {
     for (const kljuc of Object.keys(a.parts) as (keyof AvatarDijelovi)[]) {
       if (a.parts[kljuc] !== b.parts[kljuc]) return false;
@@ -119,8 +128,9 @@
 
   $effect(() => {
     if (inicijalizirano) return;
-    draft = kopirajKonfiguraciju(pocetnaKonfiguracija);
-    spremljeno = kopirajKonfiguraciju(pocetnaKonfiguracija);
+    const normalizirana = normalizirajKonfiguraciju(pocetnaKonfiguracija);
+    draft = normalizirana;
+    spremljeno = kopirajKonfiguraciju(normalizirana);
     inicijalizirano = true;
     ucitavanjeUspjelo = true;
   });
@@ -160,16 +170,25 @@
   const aktivneVrijednosti = $derived.by(() => {
     if (aktivnaPot.kljuc === 'skin') return [] as (string | null)[];
     const kljuc = aktivnaPot.kljuc as keyof AvatarDijelovi;
-    return [
-      ...(aktivnaPot.obavezno ? [] : [null]),
-      ...(AVATAR_DIJELOVI[kljuc] as readonly string[]),
-    ];
+    const dijelovi = (AVATAR_DIJELOVI[kljuc] as readonly string[]).filter(
+      (vrijednost) => kljuc !== 'ears' || vrijednost !== 'detached',
+    );
+    return [...(aktivnaPot.obavezno ? [] : [null]), ...dijelovi];
   });
 
   const brojStilova = $derived(
-    aktivnaPot.kljuc === 'skin'
-      ? 0
-      : (AVATAR_DIJELOVI[aktivnaPot.kljuc as keyof AvatarDijelovi] as readonly string[]).length,
+    aktivnaPot.kljuc === 'skin' ? 0 : aktivneVrijednosti.filter((v) => v !== null).length,
+  );
+
+  const indeksOpcije = $derived.by(() => {
+    if (aktivnaPot.kljuc === 'skin' || aktivneVrijednosti.length === 0) return 0;
+    const kljuc = aktivnaPot.kljuc as keyof AvatarDijelovi;
+    const indeks = aktivneVrijednosti.findIndex((v) => v === draft.parts[kljuc]);
+    return indeks >= 0 ? indeks : 0;
+  });
+
+  const brojacOpcije = $derived(
+    aktivneVrijednosti.length === 0 ? '' : `${indeksOpcije + 1}/${aktivneVrijednosti.length}`,
   );
 
   function zapisiPrijeIzmjene() {
@@ -196,11 +215,19 @@
   function promijeniDio(kljuc: keyof AvatarDijelovi, vrijednost: AvatarDijelovi[keyof AvatarDijelovi]) {
     if (draft.parts[kljuc] === vrijednost) return;
     if (kljuc === 'earrings' && draft.parts.ears === 'detached') return;
+    if (kljuc === 'ears' && vrijednost === 'detached') return;
     const parts = { ...draft.parts, [kljuc]: vrijednost };
-    if (kljuc === 'ears' && vrijednost === 'detached') {
-      parts.earrings = null;
-    }
     postaviDraft({ ...draft, parts });
+  }
+
+  function pomakniOpciju(smjer: -1 | 1) {
+    if (aktivnaPot.kljuc === 'skin' || aktivneVrijednosti.length === 0) return;
+    if (nausniceOnemogucene || spremanje) return;
+    const kljuc = aktivnaPot.kljuc as keyof AvatarDijelovi;
+    const ukupno = aktivneVrijednosti.length;
+    const noviIndeks = (indeksOpcije + smjer + ukupno) % ukupno;
+    const vrijednost = aktivneVrijednosti[noviIndeks] as AvatarDijelovi[keyof AvatarDijelovi];
+    promijeniDio(kljuc, vrijednost);
   }
 
   function promijeniBoju(uloga: AvatarBojnaUloga, vrijednost: string, grupirajCustom = false) {
@@ -406,7 +433,10 @@
         </div>
       {/if}
 
-      <div class="sekcija-naslov">
+      <div
+        class="sekcija-naslov"
+        class:sakrij-uz-karusel={aktivnaPot.kljuc !== 'skin'}
+      >
         <h2 id="naslov-kategorije">{aktivnaPot.naziv}</h2>
         {#if brojStilova > 0}
           <span class="broj-stilova">{brojStilova} stilova</span>
@@ -458,6 +488,38 @@
       </div>
 
       {#if aktivnaPot.kljuc !== 'skin'}
+        <div
+          class="karusel-opcija"
+          role="group"
+          aria-labelledby="naslov-kategorije-karusel"
+          aria-disabled={nausniceOnemogucene || spremanje}
+        >
+          <button
+            type="button"
+            class="karusel-strelica"
+            aria-label={`Prethodna opcija: ${aktivnaPot.naziv}`}
+            disabled={nausniceOnemogucene || spremanje || aktivneVrijednosti.length <= 1}
+            onclick={() => pomakniOpciju(-1)}
+          >
+            <ChevronLeft size={28} strokeWidth={2.25} aria-hidden="true" />
+          </button>
+          <div class="karusel-sredina">
+            <span id="naslov-kategorije-karusel" class="karusel-naziv">{aktivnaPot.naziv}</span>
+            {#if brojacOpcije}
+              <span class="karusel-brojac" aria-live="polite">{brojacOpcije}</span>
+            {/if}
+          </div>
+          <button
+            type="button"
+            class="karusel-strelica"
+            aria-label={`Sljedeća opcija: ${aktivnaPot.naziv}`}
+            disabled={nausniceOnemogucene || spremanje || aktivneVrijednosti.length <= 1}
+            onclick={() => pomakniOpciju(1)}
+          >
+            <ChevronRight size={28} strokeWidth={2.25} aria-hidden="true" />
+          </button>
+        </div>
+
         <div
           class="mrezica"
           role="group"
@@ -802,6 +864,52 @@
     pointer-events: none;
   }
 
+  .karusel-opcija {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 56px;
+    padding: 4px 0;
+  }
+
+  .karusel-strelica {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 14px;
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    cursor: pointer;
+  }
+
+  .karusel-sredina {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .karusel-naziv {
+    color: var(--boja-tekst-naslov);
+    font-family: var(--font-naslov);
+    font-size: var(--naslov-3);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .karusel-brojac {
+    color: var(--boja-tekst-sekundarni);
+    font-size: var(--tekst-mikro);
+    font-weight: 600;
+  }
+
   .mrezica {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -835,6 +943,7 @@
   .uzorak:focus-visible,
   .nasumicno:focus-visible,
   .ikona-akcija:focus-visible,
+  .karusel-strelica:focus-visible,
   .odustani:focus-visible,
   .spremi:focus-visible {
     outline: 3px solid var(--boja-fokus);
@@ -980,6 +1089,10 @@
       display: inline;
     }
 
+    .karusel-opcija {
+      display: none;
+    }
+
     .mrezica {
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 14px;
@@ -1018,6 +1131,18 @@
     }
 
     .akcija-tekst {
+      display: none;
+    }
+
+    .sekcija-naslov.sakrij-uz-karusel {
+      display: none;
+    }
+
+    .karusel-opcija {
+      display: flex;
+    }
+
+    .mrezica {
       display: none;
     }
   }
