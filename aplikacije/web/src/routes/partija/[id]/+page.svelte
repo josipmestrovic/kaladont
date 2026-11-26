@@ -42,6 +42,8 @@
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
   import { stvoriKontrolerSlanjaPoteza, TRAJANJE_CEKANJA_POTVRDE_MS } from '$lib/kontroler-slanja-poteza.js';
   import { trebaAutofokusPoteza } from '$lib/postavke-autofokus-poteza.js';
+  import { otkljucajPozadinu, zakljucajPozadinu } from '$lib/zakljucaj-pozadinu.js';
+  import { pokusajPljesakPobjede, trebaKonfetiRezultata } from '$lib/nagrade-efekti.js';
   import { ArrowUp, CircleAlert } from 'lucide-svelte';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, formatirajNadimakBota, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, ODGODA_PRIKAZA_REZULTATA_TRENING_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
   import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
@@ -377,6 +379,8 @@
     brojGreskeUnosa += 1;
     pokreniAnimacijuOdbijanjaGumba();
     void tick().then(() => {
+      // #156: ne vraćaj fokus nakon isteka/eliminacije (kasni potez:odbijen).
+      if (!jeNaPotezu) return;
       unosInput?.focus({ preventScroll: true });
     });
   }
@@ -849,12 +853,16 @@
     if (pocetak !== null && kraj !== null) element.setSelectionRange(pretvori(vrijednost.slice(0, pocetak)).length, pretvori(vrijednost.slice(0, kraj)).length);
   }
 
+  /** Callback iz `pratiMobilniUnos` — osvježi overlay kad se promijeni red/slanje bez focus eventa. */
+  let osvjeziMobilniFokus: (() => void) | null = null;
+
   function pratiMobilniUnos(element: HTMLElement, dijalog = false) {
     const vidljiviZaslon = window.visualViewport;
     const mobitel = window.matchMedia('(max-width: 999px)');
     let okvir = 0;
     let otpustanje = 0;
     let zadrziPolozaj = false;
+    let pozadinaZakljucana = false;
     const pritisni = () => { zadrziPolozaj = element.classList.contains('mobilni-potez'); };
     const otpusti = () => {
       cancelAnimationFrame(otpustanje);
@@ -863,11 +871,20 @@
     const ocisti = () => {
       element.classList.remove('mobilni-potez');
       for (const svojstvo of ['top', 'left', 'width', 'height', 'max-height']) element.style.removeProperty(svojstvo);
+      if (pozadinaZakljucana) {
+        otkljucajPozadinu();
+        pozadinaZakljucana = false;
+      }
     };
     const osvjezi = () => {
       cancelAnimationFrame(okvir);
       okvir = requestAnimationFrame(() => {
-        const fokusiran = dijalog || zadrziPolozaj || element.contains(document.activeElement);
+        // #156: tijekom slanja drži overlay i ako input kratko izgubi activeElement.
+        const fokusiran =
+          dijalog ||
+          zadrziPolozaj ||
+          element.contains(document.activeElement) ||
+          (!dijalog && jeNaPotezu && slanjeUTijeku);
         if (!mobitel.matches || !fokusiran || (vidljiviZaslon && Math.abs(vidljiviZaslon.scale - 1) > 0.01)) {
           ocisti();
           return;
@@ -884,6 +901,10 @@
           return;
         }
         // Puni pokrov vidljivog viewporta: avatari ostaju u DOM-u, ali se ne vide iza forme.
+        if (!element.classList.contains('mobilni-potez')) {
+          zakljucajPozadinu();
+          pozadinaZakljucana = true;
+        }
         element.classList.add('mobilni-potez');
         const umetak = 8;
         element.style.left = `${vidljiviZaslon.offsetLeft + umetak}px`;
@@ -894,6 +915,7 @@
         element.style.maxHeight = `${visina}px`;
       });
     };
+    if (!dijalog) osvjeziMobilniFokus = osvjezi;
     const dimenzije = new ResizeObserver(osvjezi);
     dimenzije.observe(element);
     element.addEventListener('focusin', osvjezi);
@@ -919,9 +941,18 @@
       vidljiviZaslon?.removeEventListener('scroll', osvjezi);
       window.removeEventListener('resize', osvjezi);
       mobitel.removeEventListener('change', osvjezi);
+      if (osvjeziMobilniFokus === osvjezi) osvjeziMobilniFokus = null;
       ocisti();
     } };
   }
+
+  // Kad se promijeni red ili završi slanje, ponovno procijeni overlay (bez focus eventa).
+  $effect(() => {
+    void jeNaPotezu;
+    void slanjeUTijeku;
+    if (!mobilniZaslon()) return;
+    queueMicrotask(() => osvjeziMobilniFokus?.());
+  });
 
   // Briši unos samo na stvarno novi potez (novi turnToken/prefiks).
   // Flicker jeNaPotezu (destroy forme + partija:stanje) ne smije obrisati tipkanje.
@@ -943,7 +974,12 @@
         odbijanjeGumbaTimeout = null;
       }
       // Na mobitelu skini fokus/overlay kad red prođe (forma ostaje mountana radi desktopa).
-      if (mobilniZaslon()) unosInput?.blur();
+      if (mobilniZaslon()) {
+        if (zastitaPovijesti === 'fokus') spustiFokusNaIgruBezPovijesti();
+        else unosInput?.blur();
+        // blur je no-op ako input već nije fokusiran (npr. tijekom slanja) — forsira teardown.
+        queueMicrotask(() => osvjeziMobilniFokus?.());
+      }
       return;
     }
     if (!prefiksRijeci) return;
@@ -1087,7 +1123,7 @@
 
   let sustavBrojac = $state(5);
   let sustavBrojacIntervalId: ReturnType<typeof setInterval> | null = null;
-  let aplauzPobjedeZaPartijuId: string | null = null;
+  let prikaziKonfetiRezultata = $state(false);
 
   /** Početno 3-2-1 na stolu (privatna/trening/izazov, ili rani ulazak u javnu). */
   const jePocetnoOdbrojavanje = $derived(
@@ -1134,6 +1170,12 @@
     if (stanje.rezultatiPrikazaniPartijaId === kraj.partijaId) {
       prikaziRezultate = true;
       sekundeDoRezultata = 0;
+      const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
+      const uspjehIzazova = jeIzazov && stanje.izazovTerminal?.status === 'uspjeh';
+      const pobjedaOstalo = !jeIzazov && pobjednikId === stanje.mojIgracId;
+      if ((uspjehIzazova || pobjedaOstalo) && trebaKonfetiRezultata(kraj.partijaId)) {
+        prikaziKonfetiRezultata = true;
+      }
       return;
     }
 
@@ -1149,19 +1191,20 @@
         ? Date.parse(kraj.prikazRezultataOdIso)
         : rezervniRokRezultataMs;
 
-    if (aplauzPobjedeZaPartijuId !== kraj.partijaId) {
-      aplauzPobjedeZaPartijuId = kraj.partijaId;
-      const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
-      if (pobjednikId && pobjednikId === stanje.mojIgracId) {
-        pustiAudio('aplauz-kaladont');
-      }
-    }
+    // #159: pljesak pobjede lokalnom ljudskom pobjedniku; ne duplirati nakon Kaladonta.
+    const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
+    pokusajPljesakPobjede(kraj.partijaId, stanje.mojIgracId, pobjednikId);
 
     const otkrijRezultate = () => {
       stanje.rezultatiPrikazaniPartijaId = kraj.partijaId;
       prikaziRezultate = true;
       sekundeDoRezultata = 0;
       pustiAudio('partija-kraj');
+      const uspjehIzazova = jeIzazov && stanje.izazovTerminal?.status === 'uspjeh';
+      const pobjedaOstalo = !jeIzazov && pobjednikId === stanje.mojIgracId;
+      if ((uspjehIzazova || pobjedaOstalo) && trebaKonfetiRezultata(kraj.partijaId)) {
+        prikaziKonfetiRezultata = true;
+      }
     };
 
     if (rok - Date.now() <= 0) {
@@ -1417,6 +1460,8 @@
         if (jeIzazov) odbijenaRijecZaIzazov = zadnjaPoslanaRijec;
       }
       zadnjaPoslanaRijec = null;
+      // #156: kasni odbijen nakon gubitka poteza ne smije ponovno otvoriti fokus.
+      if (!jeNaPotezu) return;
       prikaziGreskuPoteza(poruka, kod === 'RIJEC_NE_POSTOJI' ? odbijenaRijec : null, kod === 'VLASTITO_IME' ? odbijenaRijec : null, kod === 'RIJEC_ISKORISTENA' ? odbijenaRijec : null, oblik);
     };
     const naGresku = ({ poruka }: { poruka: string }) => {
@@ -1640,12 +1685,12 @@
     <Konfeti intenzitet={stanje.intenzitetKonfetaIskustva} />
   {/key}
 {/if}
+{#if prikaziKonfetiRezultata}
+  <Konfeti intenzitet="veliki" />
+{/if}
 {#if stanje.kraj && prikaziRezultate}
   <div class="zavrsni-header"><Header /></div>
   {#if jeIzazov}
-    {#if stanje.izazovTerminal?.status === 'uspjeh'}
-      <Konfeti intenzitet="veliki" />
-    {/if}
     <RezultatIzazova
       kraj={stanje.kraj}
       challengeId={izazovChallengeId}
@@ -1673,9 +1718,6 @@
     />
     <div class="kraj-donje-praznine" aria-hidden="true"></div>
   {:else}
-  {#if pobjednikPartije()?.igracId === stanje.mojIgracId}
-    <Konfeti intenzitet="veliki" />
-  {/if}
   <h2>{jeTrening ? 'Kraj treninga' : 'Završni poredak'}</h2>
   {#if jeTrening}
     <p class="privatna-obavijest" data-testid="trening-obavijest">
@@ -2368,7 +2410,9 @@
                       ? `Dokaži nastavak na ${prefiksRijeci.toUpperCase()}`
                       : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
                   aria-invalid={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}
-                  disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna}
+                  aria-busy={jeNaPotezu && slanjeUTijeku}
+                  readonly={jeNaPotezu && slanjeUTijeku}
+                  disabled={!jeNaPotezu || !vezaSpremna}
                 />
               </div>
               {#if jeNaPotezu}
@@ -3590,6 +3634,17 @@
   .mobilni-tvoj-red { display: none; }
   .mobilni-unos-blok { display: contents; }
   .mobilni-poseban-uvjet { display: none; }
+  /* #158: potpuna vizualna izolacija + scroll lock (klasa na html/body). */
+  :global(html.mobilni-fokus-pozadina),
+  :global(body.mobilni-fokus-pozadina) {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  :global(body.mobilni-fokus-pozadina) .aktivna-partija-sadrzaj {
+    pointer-events: none;
+    user-select: none;
+  }
   .zona-poteza:global(.mobilni-potez) {
     position: fixed;
     z-index: 1100;
@@ -3601,12 +3656,14 @@
     margin: 0;
     padding: 0 10px 10px;
     overflow-y: auto;
+    overscroll-behavior: none;
+    pointer-events: auto;
     border: 1px solid color-mix(in srgb, var(--boja-obrub-jaci) 55%, transparent);
     border-radius: var(--radijus-kontrola);
-    background: rgb(8 28 23 / 78%);
+    background: color-mix(in srgb, var(--boja-zastor) 55%, rgb(4 14 12 / 96%));
     box-shadow: var(--sjena-modal);
-    -webkit-backdrop-filter: blur(18px);
-    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(28px) saturate(0.7);
+    backdrop-filter: blur(28px) saturate(0.7);
     animation: mobilni-fokus-ulaz 180ms ease-out both;
   }
   @keyframes mobilni-fokus-ulaz {

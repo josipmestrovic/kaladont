@@ -87,6 +87,9 @@ for (const brojSjedala of [2, 3, 4, 8]) {
         const { dohvatiSocket } = await import(putanja);
         dohvatiSocket().emitEvent(['potez:odbijen', { kod: 'RIJEC_NE_POSTOJI', poruka: 'Ta riječ ne postoji u rječniku.' }]);
       });
+      // #156: odbijena riječ ne zatvara mobilni fokus dok je igrač i dalje na potezu.
+      await expect(stranica.locator('.zona-poteza')).toHaveClass(/mobilni-potez/);
+      await expect(unos).toBeFocused();
       await expect(unos).toHaveAttribute('data-provjera', 'isti-input');
       await expect(unos).toHaveValue('šačćžđ');
       const oblak = stranica.locator('.rijec-oblak');

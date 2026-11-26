@@ -89,7 +89,6 @@
       </div>
     </div>
   {/if}
-  <a class="dnk-pomoc" href="/pravila-kaladonta">Što je Kaladont DNK?</a>
 </section>
 
 <style>
@@ -274,14 +273,6 @@
     display: block;
     height: 100%;
     background: var(--boja-isticanje-slova);
-  }
-
-  .dnk-pomoc {
-    display: inline-block;
-    margin-top: 12px;
-    color: var(--boja-isticanje-tekst);
-    font-size: var(--tekst-sitni);
-    font-weight: 700;
   }
 
   @media (max-width: 999px) {

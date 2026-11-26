@@ -226,9 +226,7 @@
   <section class="izbornik" aria-labelledby="naslov-kaladont">
     <div class="navigacijski-blok">
       <div class="profil-red">
-        <NaslovnicaNapredak
-          izazoviZavrseno={izazoviPrikaz.vrsta === 'napredak' ? izazoviPrikaz.zavrseno : 0}
-        />
+        <NaslovnicaNapredak />
       </div>
       <nav class="glavna-navigacija" aria-label="Glavna navigacija">
         <button

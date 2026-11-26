@@ -4,12 +4,14 @@ import { ZADANA_KONFIGURACIJA_BOTA } from '../src/bot/konfiguracija-bota.js';
 import {
   DODATNA_ODGODA_REAKCIJE_MS,
   MINIMALNA_ODGODA_REAKCIJE_MS,
+  ODGODA_BRAVO_NAKON_NE_ZNAM_MS,
   POOL_BRAVO,
   POOL_POZDRAV,
   POOL_SORRY,
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
   odaberiReakcijuPriIspadanju,
+  odgodaBravoNakonNeZnamMs,
   odgodaPocetnogPozdravaMs,
   odgodaReakcijeMs,
 } from '../src/bot/reakcije.js';
@@ -24,6 +26,11 @@ describe('bot reakcije — odabir', () => {
     expect(odgodaReakcijeMs(() => 0.5, { odgodaReakcijeMinMs: 2_500 })).toBe(
       2_500 + Math.floor(0.5 * (DODATNA_ODGODA_REAKCIJE_MS + 1)),
     );
+  });
+
+  it('bravo nakon „Ne znam” čeka kraj tužne reakcije', () => {
+    expect(odgodaBravoNakonNeZnamMs(() => 0)).toBe(ODGODA_BRAVO_NAKON_NE_ZNAM_MS);
+    expect(odgodaBravoNakonNeZnamMs(() => 0, { odgodaReakcijeMinMs: 5_000 })).toBe(5_000);
   });
 
   it('početni pozdravi: javna od 1. runde, stol tijekom odbrojavanja', () => {
@@ -82,23 +89,32 @@ describe('bot reakcije — kontroler', () => {
     });
   }
 
-  it('privatna/trening/izazov: pozdravi odmah na najavi (stolni raspored)', () => {
-    for (const kontekst of ['privatna', 'trening', 'izazov'] as const) {
+  it('privatna: pozdravi odmah na najavi (stolni raspored)', () => {
+    const poslano: { partijaId: string; igracId: string; poruka: string }[] = [];
+    const zakazano: { ms: number; posao: () => void }[] = [];
+    const kontroler = stvoriKontroler({ poslano, zakazano });
+    kontroler.naPocetakPartije('p1', 'privatna', ['bot-a', 'bot-b']);
+    expect(zakazano).toHaveLength(2);
+    expect(zakazano[0]!.ms).toBeGreaterThanOrEqual(500);
+    expect(zakazano[0]!.ms).toBeLessThanOrEqual(1_000);
+    expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(1_000);
+    expect(zakazano[1]!.ms).toBeLessThanOrEqual(3_500);
+    for (const z of zakazano) z.posao();
+    expect(poslano).toHaveLength(2);
+    expect(poslano.every((p) => (POOL_POZDRAV as readonly string[]).includes(p.poruka))).toBe(true);
+    const prije = zakazano.length;
+    kontroler.naPocetakPartije('p1', 'privatna', ['bot-a', 'bot-b']);
+    expect(zakazano).toHaveLength(prije);
+  });
+
+  it('trening/izazov: bez početnih pozdrava', () => {
+    for (const kontekst of ['trening', 'izazov'] as const) {
       const poslano: { partijaId: string; igracId: string; poruka: string }[] = [];
       const zakazano: { ms: number; posao: () => void }[] = [];
       const kontroler = stvoriKontroler({ poslano, zakazano });
       kontroler.naPocetakPartije('p1', kontekst, ['bot-a', 'bot-b']);
-      expect(zakazano).toHaveLength(2);
-      expect(zakazano[0]!.ms).toBeGreaterThanOrEqual(500);
-      expect(zakazano[0]!.ms).toBeLessThanOrEqual(1_000);
-      expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(1_000);
-      expect(zakazano[1]!.ms).toBeLessThanOrEqual(3_500);
-      for (const z of zakazano) z.posao();
-      expect(poslano).toHaveLength(2);
-      expect(poslano.every((p) => (POOL_POZDRAV as readonly string[]).includes(p.poruka))).toBe(true);
-      const prije = zakazano.length;
-      kontroler.naPocetakPartije('p1', kontekst, ['bot-a', 'bot-b']);
-      expect(zakazano).toHaveLength(prije);
+      expect(zakazano).toHaveLength(0);
+      expect(poslano).toHaveLength(0);
     }
   });
 
@@ -184,6 +200,14 @@ describe('bot reakcije — kontroler', () => {
     ], 'p3:1');
     expect(zakazano).toHaveLength(0);
     expect(poslano).toHaveLength(0);
+
+    zakazano.length = 0;
+    kontroler.naEliminaciju('p2b', 'javna', 'bot-zrtva', 'covjek', [
+      { igracId: 'bot-zrtva', upravljac: 'bot' },
+      { igracId: 'covjek', upravljac: 'covjek' },
+    ], 'p2b:1', 'ne_znam');
+    expect(zakazano).toHaveLength(1);
+    expect(zakazano[0]!.ms).toBeGreaterThanOrEqual(ODGODA_BRAVO_NAKON_NE_ZNAM_MS);
   });
 
   it('cooldown pomiče drugu reakciju istog bota', () => {

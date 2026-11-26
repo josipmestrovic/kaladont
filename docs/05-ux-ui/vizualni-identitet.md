@@ -42,7 +42,7 @@ Pravila upotrebe:
 ## Naslovnica (glavni izbornik)
 
 - Jedan raspored za gosta i registriranog: žuta **Brza igra**, krem kartice Izazovi / Trening / Privatna soba / Ljestvice, zatim tri ravnomjerna prečaca Misije / Kolekcija riječi / Kako igrati? (ikona iznad teksta).
-- Horizontalni XP sažetak (avatar · nadimak · rang · LVL · traka) iznad grida; gostu sibling CTA „Sačuvaj svoj napredak.” (ili personalizirani tekst) → `/registracija`. Napredak izazova na kartici samo kad je broj završenih > 0.
+- Horizontalni XP sažetak (avatar · nadimak · rang · LVL · traka) iznad grida; gostu sibling CTA „Sačuvaj napredak.” → `/registracija`. Napredak izazova na kartici samo kad je broj završenih > 0.
 - Ispod prečaca: diskretni razdjelnik i **brze postavke** (ikona + Svijetli način, Čitanje naglas, Font za disleksiju) — iste lokalne postavke kao u profilu, bez novog API-ja.
 - Footer (jedan inline red): Ažurirano … · Što je novo? · © godina Kaladont · [Povratne informacije samo registriranima] · Uvjeti · Privatnost.
 - Prirodni vertikalni scroll je dopušten; CTA se ne skriva na niskom viewportu. Maksimalna širina grida oko 980 px.

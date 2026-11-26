@@ -352,17 +352,13 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
       expect(pocetak.kontekst).toBe('izazov');
       expect(pocetak.izazov?.humanTurnDurationMs).toBe(30_000);
       expect(pocetak.izazov?.botTurnDurationMs).toBe(0);
-      // Živi rok: čovjek 30 s, bot 0 (prazan istek).
-      if (runda.naPotezuId === igracId) {
-        expect(pocetak.trajanjePotezaSek).toBe(30);
-        expect(runda.istekPotezaIso).toBeTruthy();
-        const rokMs = new Date(runda.istekPotezaIso).getTime() - sat.sada();
-        expect(rokMs).toBeGreaterThanOrEqual(29_000);
-        expect(rokMs).toBeLessThanOrEqual(30_000);
-      } else {
-        expect(pocetak.trajanjePotezaSek).toBe(0);
-        expect(runda.istekPotezaIso).toBeNull();
-      }
+      // #157: ljudski igrač uvijek započinje; živi rok 30 s.
+      expect(runda.naPotezuId).toBe(igracId);
+      expect(pocetak.trajanjePotezaSek).toBe(30);
+      expect(runda.istekPotezaIso).toBeTruthy();
+      const rokMs = new Date(runda.istekPotezaIso).getTime() - sat.sada();
+      expect(rokMs).toBeGreaterThanOrEqual(29_000);
+      expect(rokMs).toBeLessThanOrEqual(30_000);
 
       const redak = await dohvatiPokusajPoId(attemptId);
       expect(redak?.status).toBe('u_tijeku');

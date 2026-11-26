@@ -184,7 +184,7 @@ export interface PostavkeMotoraPartije {
   naPrivatnaPartijaZavrsila?: (kodSobe: string, partijaId: string, pobjednikId: string, rezultati: { igracId: string; bodovi: number }[]) => void;
   /** Poziva se pri svakoj promjeni poteza, otvaranju runde i kraju; koristi ga bot kontroler. */
   naPromjenuPoteza?: (dogadaj: DogadajPoteza) => void;
-  /** Početak partije: bot kontroler zakazuje obvezne pozdrave (svi konteksti). */
+  /** Početak partije: bot kontroler zakazuje obvezne pozdrave (javna/privatna; trening/izazov bez početnih). */
   naPocetakPartijeZaBotove?: (partijaId: string, kontekst: KontekstPartije, botIds: readonly string[]) => void;
   /** Trening/Izazov: eksplicitni snapshot bot politike prije prvog poteza. */
   naKonfiguracijuBotovaPartije?: (partijaId: string, konfiguracija: import('../bot/konfiguracija-bota.js').KonfiguracijaBota) => void;
@@ -196,6 +196,7 @@ export interface PostavkeMotoraPartije {
     bodZaId: string | null,
     sudionici: readonly { igracId: string; upravljac: 'covjek' | 'bot' }[],
     eliminacijaId: string,
+    razlog: string,
   ) => void;
   maksimalnoAktivnihTreninga?: number;
   dohvatiRokoveNeaktivnostiTreninga?: () => { upozorenjeMs: number; zatvaranjeMs: number };
@@ -1314,7 +1315,11 @@ export function stvoriUpraviteljPartija(
       return Promise.resolve({ ishod: 'greska', partijaId: null });
     }
     const politika = politikaZaKontekst(kontekst);
-    const izmjesano = promijesajNiz(sudioniciUlaz);
+    // Trening/Izazov: ulazni red je [čovjek, …botovi] — zadrži ga da ljudski igrač uvijek krene prvi.
+    const izmjesano =
+      kontekst === 'trening' || kontekst === 'izazov'
+        ? [...sudioniciUlaz]
+        : promijesajNiz(sudioniciUlaz);
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const upravljac = s.upravljac ?? 'covjek';
       const jeBot = upravljac === 'bot';
@@ -2438,6 +2443,7 @@ export function stvoriUpraviteljPartija(
       napadac,
       stanje.sudionici.map((s) => ({ igracId: s.igracId, upravljac: s.upravljac })),
       eliminacijaId,
+      razlog,
     );
 
     if (stanje.politika.dajeNapredak && razlog !== 'prekid') {
