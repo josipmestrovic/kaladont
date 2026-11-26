@@ -89,23 +89,32 @@ describe('bot reakcije — kontroler', () => {
     });
   }
 
-  it('privatna/trening/izazov: pozdravi odmah na najavi (stolni raspored)', () => {
-    for (const kontekst of ['privatna', 'trening', 'izazov'] as const) {
+  it('privatna: pozdravi odmah na najavi (stolni raspored)', () => {
+    const poslano: { partijaId: string; igracId: string; poruka: string }[] = [];
+    const zakazano: { ms: number; posao: () => void }[] = [];
+    const kontroler = stvoriKontroler({ poslano, zakazano });
+    kontroler.naPocetakPartije('p1', 'privatna', ['bot-a', 'bot-b']);
+    expect(zakazano).toHaveLength(2);
+    expect(zakazano[0]!.ms).toBeGreaterThanOrEqual(500);
+    expect(zakazano[0]!.ms).toBeLessThanOrEqual(1_000);
+    expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(1_000);
+    expect(zakazano[1]!.ms).toBeLessThanOrEqual(3_500);
+    for (const z of zakazano) z.posao();
+    expect(poslano).toHaveLength(2);
+    expect(poslano.every((p) => (POOL_POZDRAV as readonly string[]).includes(p.poruka))).toBe(true);
+    const prije = zakazano.length;
+    kontroler.naPocetakPartije('p1', 'privatna', ['bot-a', 'bot-b']);
+    expect(zakazano).toHaveLength(prije);
+  });
+
+  it('trening/izazov: bez početnih pozdrava', () => {
+    for (const kontekst of ['trening', 'izazov'] as const) {
       const poslano: { partijaId: string; igracId: string; poruka: string }[] = [];
       const zakazano: { ms: number; posao: () => void }[] = [];
       const kontroler = stvoriKontroler({ poslano, zakazano });
       kontroler.naPocetakPartije('p1', kontekst, ['bot-a', 'bot-b']);
-      expect(zakazano).toHaveLength(2);
-      expect(zakazano[0]!.ms).toBeGreaterThanOrEqual(500);
-      expect(zakazano[0]!.ms).toBeLessThanOrEqual(1_000);
-      expect(zakazano[1]!.ms).toBeGreaterThanOrEqual(1_000);
-      expect(zakazano[1]!.ms).toBeLessThanOrEqual(3_500);
-      for (const z of zakazano) z.posao();
-      expect(poslano).toHaveLength(2);
-      expect(poslano.every((p) => (POOL_POZDRAV as readonly string[]).includes(p.poruka))).toBe(true);
-      const prije = zakazano.length;
-      kontroler.naPocetakPartije('p1', kontekst, ['bot-a', 'bot-b']);
-      expect(zakazano).toHaveLength(prije);
+      expect(zakazano).toHaveLength(0);
+      expect(poslano).toHaveLength(0);
     }
   });
 

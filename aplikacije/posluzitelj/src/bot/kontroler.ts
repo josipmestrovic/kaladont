@@ -206,9 +206,10 @@ export class BotKontroler {
     }
   }
 
-  /** Svaki bot pozdravi jednom na početku (javna, privatna, trening, izazov). */
+  /** Svaki bot pozdravi jednom na početku (javna, privatna). Trening/Izazov bez početnih pozdrava. */
   naPocetakPartije(partijaId: string, kontekst: DogadajPoteza['kontekst'], botIds: readonly string[]): void {
     if (this.zaustavljen || !this.ovisnosti.posaljiReakciju || botIds.length === 0) return;
+    if (kontekst === 'trening' || kontekst === 'izazov') return;
     this.osigurajKonfiguracijuPartije(partijaId);
     if (kontekst === 'javna') {
       // Sidro = otvaranje 1. runde (vidljiv stol), ne najava u čekaonici.

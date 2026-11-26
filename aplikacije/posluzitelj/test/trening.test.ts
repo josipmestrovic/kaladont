@@ -332,7 +332,9 @@ describe('Zagrijavanje', () => {
       });
       expect(potvrda.pokrenut).toBe(true);
       const pocetak = await pocetakPromise;
-      expect((await rundaPromise).istekPotezaIso).toBeNull();
+      const runda = await rundaPromise;
+      expect(runda.naPotezuId).toBe(pocetak.mojIgracId);
+      expect(runda.istekPotezaIso).toBeNull();
       expect(pocetak.mod).toBe('tri_igraca');
       expect(pocetak.pravila).toBe('klasicni');
       expect(pocetak.kontekst).toBe('trening');
