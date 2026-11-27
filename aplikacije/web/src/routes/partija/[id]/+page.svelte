@@ -3710,7 +3710,7 @@
   :global(.mobilni-potez) .mobilni-tvoj-red {
     display: block;
     margin: 0;
-    padding: 0 3.6rem 0 0;
+    padding: 0;
     color: var(--boja-uspjeh-tekst);
     font-family: var(--font-naslov);
     font-size: 1.2rem;
@@ -3719,8 +3719,9 @@
     line-height: 1.2;
     text-align: center;
   }
-  :global(.mobilni-potez) .mobilni-zaglavlje:not(:has(.mobilni-timer-crta)) .mobilni-tvoj-red {
-    padding-right: 0;
+  /* Simetrične bočne zone kad timer sjedi desno — naslov ostaje u sredini zaglavlja. */
+  :global(.mobilni-potez) .mobilni-zaglavlje:has(.mobilni-timer-crta) .mobilni-tvoj-red {
+    padding-inline: 3.6rem;
   }
   :global(.mobilni-potez) .mobilni-timer-crta {
     display: block;
