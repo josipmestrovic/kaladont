@@ -83,9 +83,13 @@ export function ocistiStanjeSanducica(): void {
   ocistiLokalno();
 }
 
+/** Na `/` sažetak dolazi iz GET /naslovnica/sazetak — ne dupliciraj GET /sanducic/sazetak. */
+function trebaSamostalniSazetak(): boolean {
+  return putanja !== '/';
+}
+
 /**
  * Hidracija iz `GET /naslovnica/sazetak` — izbjegava zasebni GET /sanducic/sazetak na naslovnici.
- * Ne pokreće toast najavu (layout/socket i dalje upravljaju ACK tokom).
  */
 export function primijeniSazetakSanducicaIzNaslovnice(ulaz: {
   brojNeprocitanih: number;
@@ -94,6 +98,7 @@ export function primijeniSazetakSanducicaIzNaslovnice(ulaz: {
   brojNeprocitanih = ulaz.brojNeprocitanih;
   zaNajavu = ulaz.zaNajavu.filter((p) => !lokalnoNajavljeno.has(p.id));
   revizija += 1;
+  void razmotriNajavu();
 }
 
 async function potvrdiNajavu(ids: string[]): Promise<void> {
@@ -234,17 +239,22 @@ export function pokreniSanducic(): () => void {
   putanja = window.location.pathname;
 
   const socket = dohvatiSocket();
+  // Real-time događaj — uvijek; bootstrap/reconnect/focus na `/` radi naslovnica/sazetak.
   const naPromjenu = () => {
     void osvjeziSazetakSanducica();
   };
   const naSpoj = () => {
+    if (!trebaSamostalniSazetak()) return;
     void osvjeziSazetakSanducica();
   };
   const naVidljivost = () => {
-    if (document.visibilityState === 'visible') void osvjeziSazetakSanducica();
+    if (document.visibilityState !== 'visible') return;
+    if (!trebaSamostalniSazetak()) return;
+    void osvjeziSazetakSanducica();
   };
   const naIdentitet = () => {
     ocistiLokalno();
+    if (!trebaSamostalniSazetak()) return;
     void osvjeziSazetakSanducica();
   };
 
@@ -252,7 +262,7 @@ export function pokreniSanducic(): () => void {
   socket.on('connect', naSpoj);
   document.addEventListener('visibilitychange', naVidljivost);
   window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
-  void osvjeziSazetakSanducica();
+  if (trebaSamostalniSazetak()) void osvjeziSazetakSanducica();
 
   return () => {
     socket.off('sanducic:promjena', naPromjenu);

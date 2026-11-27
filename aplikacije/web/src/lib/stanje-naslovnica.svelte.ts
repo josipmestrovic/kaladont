@@ -20,7 +20,10 @@ import {
   postaviProfilIzSazetka,
   type ProfilSnapshot,
 } from '$lib/stanje-profila.svelte.js';
-import { primijeniSazetakSanducicaIzNaslovnice } from '$lib/stanje-sanducica.svelte.js';
+import {
+  osvjeziSazetakSanducica,
+  primijeniSazetakSanducicaIzNaslovnice,
+} from '$lib/stanje-sanducica.svelte.js';
 
 export type { StatusNaslovnice };
 
@@ -82,6 +85,9 @@ function osigurajResurs(): NaslovnicaResurs | null {
             brojNeprocitanih: odgovor.obavijesti.brojNeprocitanih,
             zaNajavu: odgovor.obavijesti.zaNajavu,
           });
+        } else {
+          // Parcijalni pad sandučića u sažetku — fallback na zasebni GET.
+          void osvjeziSazetakSanducica();
         }
       },
     });

@@ -5,7 +5,7 @@
 import { access, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import { VELICINE_GENERIRANOG_AVATARA, type AvatarConfigV1 } from 'zajednicko';
+import { VELICINE_GENERIRANOG_AVATARA, validirajAvatarConfig, type AvatarConfigV1 } from 'zajednicko';
 import { konfiguracija } from '../konfiguracija.js';
 import { hashAvataraConfig } from './hash.js';
 import { sastaviSvgAvatara } from './kompozicija-svg.js';
@@ -87,5 +87,22 @@ export async function osigurajGeneriraneAvatare(
     return await posao;
   } finally {
     if (uTijeku.get(kljuc) === posao) uTijeku.delete(kljuc);
+  }
+}
+
+/**
+ * Hash + osiguranje WebP datoteka na disku (postojeći korisnici bez backfilla).
+ * Pri grešci generiranja i dalje vraća hash ako je konfiguracija valjana.
+ */
+export async function osigurajHashSlikeAvatara(
+  config: unknown,
+  naGresku?: (greska: unknown) => void,
+): Promise<string | null> {
+  if (!validirajAvatarConfig(config)) return null;
+  try {
+    return await osigurajGeneriraneAvatare(config);
+  } catch (greska) {
+    naGresku?.(greska);
+    return hashAvataraConfig(config);
   }
 }

@@ -63,7 +63,8 @@ async function konvertiraj(imePng) {
     .webp({ quality: QUALITY, alphaQuality: 90 })
     .toFile(izlaz);
   const [a, b] = await Promise.all([fs.stat(ulaz), fs.stat(izlaz)]);
-  console.log(`${imePng} → ${path.basename(izlaz)} (${a.size} → ${b.size} B)`);
+  await fs.unlink(ulaz);
+  console.log(`${imePng} → ${path.basename(izlaz)} (${a.size} → ${b.size} B, PNG uklonjen)`);
   return true;
 }
 
