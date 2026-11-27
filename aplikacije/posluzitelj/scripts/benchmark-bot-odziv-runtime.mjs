@@ -472,13 +472,11 @@ async function pokreniScenarij({
 
   async function runBotJob(idx, predaj) {
     const rng = seededRng((seed + idx * 9176) >>> 0);
-    let zadnjiSlice = performance.now();
     const predajMjeri = async () => {
       const prije = performance.now();
       await predaj();
       const poslije = performance.now();
       waitIzmeduSliceova.push(poslije - prije);
-      zadnjiSlice = poslije;
     };
     const t0 = performance.now();
     const stanje = stvoriStanjeBota(konfig, rng);
