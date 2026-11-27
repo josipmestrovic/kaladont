@@ -33,17 +33,6 @@ export interface KonfiguracijaBota {
   vjerojatnostTaktickogPoteza: number;
   /** Maksimalan broj ponderirano uzorkovanih kandidata u taktičkom potezu. */
   maksimalnoTaktickihKandidata: number;
-  /** Dokaži: prvi budžet detaljne provjere poznatog nastavka po potezu. */
-  dokaziBudzetDetaljneProvjere: number;
-  /** Dokaži: dodatni budžet ako prvi prolaz ne potvrdi nijednu riječ. */
-  dokaziBudzetDodatneProvjere: number;
-  /** Dokaži: vjerojatnost da se na običnom potezu preskoči zahtjev potvrđenog nastavka. */
-  vjerojatnostDokaziPreskokaPotvrde: number;
-  /**
-   * Dokaži: faktor probabilističkog propusta potvrde.
-   * P(fail | n poznatih nastavaka) = min(0.95, faktor / n); 0 = bez propusta.
-   */
-  dokaziFaktorPropusaPotvrde: number;
   brziRazvoj: boolean;
   odstupanjaPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
   pragoviPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
@@ -92,6 +81,11 @@ export const ZASTARJELA_POLJA_BOT_POLITIKE = [
   'maksimalniUdioPoteza',
   'vjerojatnostNeznanjaPoSudjelovanju',
   'rasponTeskogPotezaNeznanja',
+  // Botovi V8: Dokaži-specifične poluge — strip iz starih admin JSON snapshotova.
+  'dokaziBudzetDetaljneProvjere',
+  'dokaziBudzetDodatneProvjere',
+  'vjerojatnostDokaziPreskokaPotvrde',
+  'dokaziFaktorPropusaPotvrde',
 ] as const;
 
 export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
@@ -107,10 +101,6 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   maksimalnoOpcijaMalogSkupa: 3,
   vjerojatnostTaktickogPoteza: 0.25,
   maksimalnoTaktickihKandidata: 12,
-  dokaziBudzetDetaljneProvjere: 12,
-  dokaziBudzetDodatneProvjere: 12,
-  vjerojatnostDokaziPreskokaPotvrde: 0,
-  dokaziFaktorPropusaPotvrde: 0,
   brziRazvoj: false,
   odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [0, 0], cetiri_igraca: [3_000, 3_000, 3_000] },
   pragoviPopuneMs: structuredClone(PRAGOVI_POPUNE_MS),
@@ -155,10 +145,6 @@ export const ShemaKonfiguracijeBota = z.object({
   maksimalnoOpcijaMalogSkupa: z.number().int().min(1).max(20),
   vjerojatnostTaktickogPoteza: Vjerojatnost,
   maksimalnoTaktickihKandidata: z.number().int().min(1).max(50),
-  dokaziBudzetDetaljneProvjere: z.number().int().min(1).max(50).default(12),
-  dokaziBudzetDodatneProvjere: z.number().int().min(0).max(50).default(12),
-  vjerojatnostDokaziPreskokaPotvrde: Vjerojatnost.default(0),
-  dokaziFaktorPropusaPotvrde: Vjerojatnost.default(0),
   brziRazvoj: z.boolean(),
   odstupanjaPopuneMs: Pragovi,
   pragoviPopuneMs: Pragovi,

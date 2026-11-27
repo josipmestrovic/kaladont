@@ -23,10 +23,6 @@ describe('profili bota (PR02)', () => {
       vjerojatnostPropustaKa: 0.08,
       vjerojatnostOstavljanjaKa: 0.015,
       maksimalnoOpcijaMalogSkupa: 5,
-      dokaziBudzetDetaljneProvjere: 8,
-      dokaziBudzetDodatneProvjere: 8,
-      vjerojatnostDokaziPreskokaPotvrde: 0.12,
-      dokaziFaktorPropusaPotvrde: 0.3,
     });
   });
 
@@ -44,20 +40,17 @@ describe('profili bota (PR02)', () => {
     expect(iskusni.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(majstor.vjerojatnostNeznanjaUMalomSkupu);
     expect(majstor.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(velemajstor.vjerojatnostNeznanjaUMalomSkupu);
 
-    expect(pocetnik.dokaziFaktorPropusaPotvrde).toBeGreaterThan(iskusni.dokaziFaktorPropusaPotvrde);
-    expect(iskusni.dokaziFaktorPropusaPotvrde).toBeGreaterThan(majstor.dokaziFaktorPropusaPotvrde);
-    expect(majstor.dokaziFaktorPropusaPotvrde).toBeGreaterThan(velemajstor.dokaziFaktorPropusaPotvrde);
+    expect(pocetnik.vjerojatnostPropustaKa).toBeGreaterThan(iskusni.vjerojatnostPropustaKa);
+    expect(iskusni.vjerojatnostPropustaKa).toBeGreaterThan(majstor.vjerojatnostPropustaKa);
+    expect(majstor.vjerojatnostPropustaKa).toBeGreaterThan(velemajstor.vjerojatnostPropustaKa);
 
-    expect(pocetnik.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(iskusni.vjerojatnostDokaziPreskokaPotvrde);
-    expect(iskusni.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(majstor.vjerojatnostDokaziPreskokaPotvrde);
-    expect(majstor.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(velemajstor.vjerojatnostDokaziPreskokaPotvrde);
+    expect(pocetnik.vjerojatnostOstavljanjaKa).toBeGreaterThan(iskusni.vjerojatnostOstavljanjaKa);
+    expect(iskusni.vjerojatnostOstavljanjaKa).toBeGreaterThan(majstor.vjerojatnostOstavljanjaKa);
+    expect(majstor.vjerojatnostOstavljanjaKa).toBeGreaterThan(velemajstor.vjerojatnostOstavljanjaKa);
 
     expect(pocetnik.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(iskusni.maksimalnoOpcijaMalogSkupa);
     expect(iskusni.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(majstor.maksimalnoOpcijaMalogSkupa);
     expect(majstor.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(velemajstor.maksimalnoOpcijaMalogSkupa);
-
-    expect(pocetnik.dokaziBudzetDetaljneProvjere).toBeLessThan(iskusni.dokaziBudzetDetaljneProvjere);
-    expect(iskusni.dokaziBudzetDetaljneProvjere).toBeLessThanOrEqual(majstor.dokaziBudzetDetaljneProvjere);
 
     expect(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza).toBe(prije.vjerojatnostTaktickogPoteza);
     expect(pocetnik.maksimalnoTaktickihKandidata).toBe(12);
@@ -65,11 +58,11 @@ describe('profili bota (PR02)', () => {
     expect(pocetnik.trajanjePotezaBotaMs).toBe(ZADANA_KONFIGURACIJA_BOTA.trajanjePotezaBotaMs);
   });
 
-  it('javni ZADANA ostaje strog na Dokaži polugama', () => {
-    expect(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostDokaziPreskokaPotvrde).toBe(0);
-    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziFaktorPropusaPotvrde).toBe(0);
-    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziBudzetDetaljneProvjere).toBe(12);
-    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziBudzetDodatneProvjere).toBe(12);
+  it('javni ZADANA nema uklonjena Dokaži polja', () => {
+    expect('dokaziBudzetDetaljneProvjere' in ZADANA_KONFIGURACIJA_BOTA).toBe(false);
+    expect('dokaziBudzetDodatneProvjere' in ZADANA_KONFIGURACIJA_BOTA).toBe(false);
+    expect('vjerojatnostDokaziPreskokaPotvrde' in ZADANA_KONFIGURACIJA_BOTA).toBe(false);
+    expect('dokaziFaktorPropusaPotvrde' in ZADANA_KONFIGURACIJA_BOTA).toBe(false);
   });
 
   it('izostanak profileId → Iskusni; nepoznat id baca', () => {

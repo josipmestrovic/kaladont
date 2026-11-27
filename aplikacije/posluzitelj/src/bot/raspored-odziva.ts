@@ -29,8 +29,6 @@ export type KontekstPosla = {
 
 export type RunPosla = (ctx: KontekstPosla) => Promise<'gotovo' | 'odustani'>;
 
-type IshodOznaka = { vrsta: 'gotovo'; ishod: 'gotovo' | 'odustani' };
-
 type PosaoPumpa = {
   id: number;
   run: RunPosla;
@@ -38,12 +36,12 @@ type PosaoPumpa = {
   otkazan: boolean;
   /** Resolve za nastavak nakon parkiranog predaj. */
   nastaviPark: (() => void) | null;
-  /** Resolve kad slice završi (predaj pozvan) — signal pumpi. */
+  /** Resolve kad slice završi (predaj ili završetak run-a) — signal pumpi. */
   krajSlicea: (() => void) | null;
   /** Promise završetka run-a. */
   zavrsetak: Promise<'gotovo' | 'odustani'> | null;
-  /** Jednokratno tagirani završetak — bez per-slice .then na istom Promiseu. */
-  zavrsetakOznaka: Promise<IshodOznaka> | null;
+  /** Jednokratno pohranjeni ishod — bez per-slice Promise.race na završetku. */
+  zavrsenIshod: 'gotovo' | 'odustani' | null;
 };
 
 /**
@@ -73,7 +71,7 @@ export class RasporedjivacOdziva {
       nastaviPark: null,
       krajSlicea: null,
       zavrsetak: null,
-      zavrsetakOznaka: null,
+      zavrsenIshod: null,
     });
     this.pokreniPump();
     return id;
@@ -89,7 +87,7 @@ export class RasporedjivacOdziva {
     const nastavi = posao.nastaviPark;
     posao.nastaviPark = null;
     if (nastavi) nastavi();
-    // Ako čekamo slice signal a job je otkazan prije predaj — odblokiraj race.
+    // Ako čekamo slice signal a job je otkazan prije predaj — odblokiraj wait.
     const kraj = posao.krajSlicea;
     posao.krajSlicea = null;
     if (kraj) kraj();
@@ -127,15 +125,17 @@ export class RasporedjivacOdziva {
     if (!posao.pokrenut) {
       posao.pokrenut = true;
       const ctx = this.izradiKontekst(posao);
-      // Završetak se rješava kroz zavrsetak Promise (ne kroz krajSlicea) —
-      // inače race može proglasiti 'slice' i ostaviti gotov posao u redu.
+      posao.zavrsenIshod = null;
       posao.zavrsetak = Promise.resolve()
         .then(() => posao.run(ctx))
         .catch(() => 'odustani' as const);
-      posao.zavrsetakOznaka = posao.zavrsetak.then((ishod) => ({
-        vrsta: 'gotovo' as const,
-        ishod,
-      }));
+      // Jednokratni settle — buđenje preko krajSlicea (isti put kao predaj), bez Promise.race po sliceu.
+      void posao.zavrsetak.then((ishod) => {
+        posao.zavrsenIshod = ishod;
+        const kraj = posao.krajSlicea;
+        posao.krajSlicea = null;
+        if (kraj) kraj();
+      });
     } else if (posao.nastaviPark) {
       const nastavi = posao.nastaviPark;
       posao.nastaviPark = null;
@@ -146,27 +146,16 @@ export class RasporedjivacOdziva {
       return 'odustani';
     }
 
-    const slicePromise = new Promise<void>((resolve) => {
+    await new Promise<void>((resolve) => {
+      if (posao.zavrsenIshod !== null) {
+        resolve();
+        return;
+      }
       posao.krajSlicea = resolve;
     });
 
-    const oznaka = posao.zavrsetakOznaka!;
-    const pobjednik = await Promise.race([
-      oznaka,
-      slicePromise.then(() => ({ vrsta: 'slice' as const })),
-    ]);
-
-    if (pobjednik.vrsta === 'gotovo') {
-      posao.krajSlicea = null;
-      return pobjednik.ishod === 'gotovo' ? 'gotovo' : 'odustani';
-    }
-    // Slice signal — ako je run već gotov u istom ticku, preferiraj završetak.
-    const odmah = await Promise.race([
-      oznaka,
-      Promise.resolve({ vrsta: 'slice' as const }),
-    ]);
-    if (odmah.vrsta === 'gotovo') {
-      return odmah.ishod === 'gotovo' ? 'gotovo' : 'odustani';
+    if (posao.zavrsenIshod !== null) {
+      return posao.zavrsenIshod === 'gotovo' ? 'gotovo' : 'odustani';
     }
     if (posao.otkazan) return 'odustani';
     return 'nastavi';

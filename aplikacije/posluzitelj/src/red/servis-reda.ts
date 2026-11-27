@@ -114,6 +114,8 @@ export function registrirajRedCekanja(
   function stvoriPopunu(kanal: Omit<KanalReda, 'popuna'>): PopunaReda | null {
     if (!popunaOpcije) return null;
     const { mod, kljuc, red } = kanal;
+    // Botovi V8: popuna samo za Klasični — katalog i dalje ima 8 ključeva (neaktivni bez botova).
+    if (kanonskaPravilaZaKljuc(kljuc).pravila !== 'klasicni') return null;
     return new PopunaReda({
       red,
       fond: popunaOpcije.fond,

@@ -16,10 +16,6 @@
     maksimalnoOpcijaMalogSkupa: number;
     vjerojatnostTaktickogPoteza: number;
     maksimalnoTaktickihKandidata: number;
-    dokaziBudzetDetaljneProvjere: number;
-    dokaziBudzetDodatneProvjere: number;
-    vjerojatnostDokaziPreskokaPotvrde: number;
-    dokaziFaktorPropusaPotvrde: number;
     brziRazvoj: boolean;
     odstupanjaPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
     pragoviPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
@@ -228,14 +224,6 @@
             <label>Maks. opcija malog skupa<input type="number" min="1" max="20" bind:value={nacrt.maksimalnoOpcijaMalogSkupa} /></label>
             <label>Taktički potez<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostTaktickogPoteza} /><span>{postotak(nacrt.vjerojatnostTaktickogPoteza)}</span></label>
             <label>Maks. taktičkih kandidata<input type="number" min="1" max="50" bind:value={nacrt.maksimalnoTaktickihKandidata} /></label>
-          </div>
-        </fieldset>
-        <fieldset><legend>Dokaži nastavak (javni default)</legend>
-          <div class="polja">
-            <label>Budžet detaljne potvrde<input type="number" min="1" max="50" bind:value={nacrt.dokaziBudzetDetaljneProvjere} /></label>
-            <label>Budžet dodatne potvrde<input type="number" min="0" max="50" bind:value={nacrt.dokaziBudzetDodatneProvjere} /></label>
-            <label>Preskok potvrde<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostDokaziPreskokaPotvrde} /><span>{postotak(nacrt.vjerojatnostDokaziPreskokaPotvrde)}</span></label>
-            <label>Faktor propusta potvrde<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.dokaziFaktorPropusaPotvrde} /><span>{postotak(nacrt.dokaziFaktorPropusaPotvrde)}</span></label>
           </div>
         </fieldset>
         <fieldset><legend>Popuna javnog reda</legend>

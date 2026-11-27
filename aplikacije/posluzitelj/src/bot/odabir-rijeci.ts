@@ -1,6 +1,6 @@
 /**
  * Čisti odabir botove riječi (ADR-017 / PR02).
- * Kontekstualno neznanje po tokenu, duel/Dokaži oprez i ograničena 1-ply taktika.
+ * Kontekstualno neznanje po tokenu, duel oprez i ograničena 1-ply taktika.
  * Procjena nastavka koristi javni repertoar profila; ista za čovjeka i bota.
  */
 import { grafemi, PRAGOVI_DULJINE, zadnjaDva, type FazaPoteza, type PravilnikPartije, type VrstaRijeci } from 'zajednicko';
@@ -11,9 +11,6 @@ import {
   jeOpasanZavrsetak,
 } from './repertoar.js';
 import { CHECKPOINT_ZAPISA } from './raspored-odziva.js';
-
-/** Gornja granica brojanja neovisnih nastavaka za Dokaži propust potvrde. */
-const BUDZET_BROJA_NASTAVAKA_ZA_PROPUST = 8;
 
 /** Vraća broj u [0, 1). */
 export type Rng = () => number;
@@ -56,10 +53,6 @@ export interface StanjeBotaUPartiji {
    * Drži samo aktualni token (ne povijest partije).
    */
   taktikaPoTokenu: Map<string, boolean>;
-  /** Dokaži: jednokratni preskok potvrde nastavka po turnTokenu. */
-  dokaziPreskokPoTokenu: Map<string, boolean>;
-  /** Dokaži: jednokratni propust potvrde po `turnToken|rijec`. */
-  dokaziPropustPoKljucu: Map<string, boolean>;
   konfiguracija: KonfiguracijaBota;
   brojKandidata: number;
   zadnjiTokenKa: string | null;
@@ -72,8 +65,6 @@ export function stvoriStanjeBota(konfig: KonfiguracijaBota, rng: Rng): StanjeBot
     zadnjiToken: null,
     neznanjePoTokenu: new Map(),
     taktikaPoTokenu: new Map(),
-    dokaziPreskokPoTokenu: new Map(),
-    dokaziPropustPoKljucu: new Map(),
     konfiguracija: structuredClone(konfig),
     brojKandidata: 0,
     zadnjiTokenKa: null,
@@ -205,26 +196,22 @@ export interface UlazOdabira {
 export type PredajKontrolu = () => Promise<void>;
 
 /**
- * Politika „ka” po pravilniku.
- * - agresivni: Klasični ≥3 — „ka” u poolu, primljeni „ka” → uvijek kaladont
- * - oprezni: KA-ZNA / Klasični duel — 8 % propust, 1,5 % ostavljanje
- * - bez_ka: Dokaži nastavak — nikad kaladont, nikad ostavljanje „ka” (običan potez)
+ * Politika „ka” po broju aktivnih igrača.
+ * - agresivni: ≥3 aktivna — „ka” u poolu, primljeni „ka” → uvijek kaladont
+ * - oprezni: manje od 3 — 8 % propust, 1,5 % ostavljanje
  */
-export type PolitikaKa = 'agresivni' | 'oprezni' | 'bez_ka';
+export type PolitikaKa = 'agresivni' | 'oprezni';
 
-export function politikaKa(pravila: PravilnikPartije = 'ka_zna', brojAktivnih = 2): PolitikaKa {
-  if (pravila === 'dokazi_nastavak') return 'bez_ka';
-  if (pravila === 'klasicni' && brojAktivnih >= 3) return 'agresivni';
-  return 'oprezni';
+export function politikaKa(brojAktivnih = 2): PolitikaKa {
+  return brojAktivnih >= 3 ? 'agresivni' : 'oprezni';
 }
 
-/** @deprecated Preferiraj `politikaKa`; true = oprezni (ne agresivni / ne bez_ka). */
-export function oprezKa(pravila: PravilnikPartije = 'ka_zna', brojAktivnih = 2): boolean {
-  return politikaKa(pravila, brojAktivnih) === 'oprezni';
+/** @deprecated Preferiraj `politikaKa`; true = oprezni (ne agresivni). */
+export function oprezKa(brojAktivnih = 2): boolean {
+  return politikaKa(brojAktivnih) === 'oprezni';
 }
 
 export type RazlogInterniOdustajanja =
-  | 'nema_potvrdjenog_nastavka_u_budzetu'
   /** Javna Brza igra: nakon 10 poteza u bot-duelu forsiran „Ne znam”. */
   | 'bot_duel_limit';
 
@@ -406,67 +393,6 @@ function odlukaTaktikeZaToken(
   return vrijednost;
 }
 
-function odlukaDokaziPreskokaZaToken(
-  stanje: StanjeBotaUPartiji,
-  turnToken: string | undefined,
-  oporavak: boolean | undefined,
-  vjerojatnost: number,
-  rng: Rng,
-): boolean {
-  if (vjerojatnost <= 0) return false;
-  if (oporavak && turnToken && stanje.dokaziPreskokPoTokenu.has(turnToken)) {
-    return stanje.dokaziPreskokPoTokenu.get(turnToken)!;
-  }
-  if (!turnToken) return rng() < vjerojatnost;
-  const postojece = stanje.dokaziPreskokPoTokenu.get(turnToken);
-  if (postojece !== undefined) return postojece;
-  const vrijednost = rng() < vjerojatnost;
-  zapisiOdlukuTokena(stanje.dokaziPreskokPoTokenu, turnToken, vrijednost);
-  return vrijednost;
-}
-
-function vjerojatnostPropusaPotvrde(brojNastavaka: number, faktor: number): number {
-  if (faktor <= 0 || brojNastavaka <= 0) return 0;
-  return Math.min(0.95, faktor / brojNastavaka);
-}
-
-function odlukaDokaziPropusaPotvrde(
-  stanje: StanjeBotaUPartiji,
-  turnToken: string | undefined,
-  rijec: string,
-  brojNastavaka: number,
-  faktor: number,
-  rng: Rng,
-): boolean {
-  const vjerojatnost = vjerojatnostPropusaPotvrde(brojNastavaka, faktor);
-  if (vjerojatnost <= 0) return false;
-  if (!turnToken) return rng() < vjerojatnost;
-  const kljuc = `${turnToken}|${rijec}`;
-  const postojece = stanje.dokaziPropustPoKljucu.get(kljuc);
-  if (postojece !== undefined) return postojece;
-  const vrijednost = rng() < vjerojatnost;
-  stanje.dokaziPropustPoKljucu.set(kljuc, vrijednost);
-  return vrijednost;
-}
-
-/** Očisti Dokaži odluke kad stigne novi turnToken. */
-function ocistiDokaziOdlukeZaNoviToken(stanje: StanjeBotaUPartiji, turnToken: string): void {
-  if (stanje.dokaziPreskokPoTokenu.size > 0 && !stanje.dokaziPreskokPoTokenu.has(turnToken)) {
-    stanje.dokaziPreskokPoTokenu.clear();
-  }
-  if (stanje.dokaziPropustPoKljucu.size > 0) {
-    const prefiks = `${turnToken}|`;
-    let imaAktualni = false;
-    for (const kljuc of stanje.dokaziPropustPoKljucu.keys()) {
-      if (kljuc.startsWith(prefiks)) {
-        imaAktualni = true;
-        break;
-      }
-    }
-    if (!imaAktualni) stanje.dokaziPropustPoKljucu.clear();
-  }
-}
-
 /**
  * true = bot zna legalan nastavak;
  * false = potvrđeno mrtvo (nema legalne riječi u cijelom rječniku);
@@ -552,29 +478,6 @@ function brojCestihPoznatihNastavaka(
   return broj;
 }
 
-/** Broj neovisnih poznatih nastavaka (za Dokaži propust potvrde). */
-function brojPoznatihNastavaka(
-  rijec: string,
-  ulaz: UlazOdabira,
-  iskoristene: ReadonlySet<string>,
-  budzet = BUDZET_BROJA_NASTAVAKA_ZA_PROPUST,
-): number | null {
-  if (!ulaz.poznatiKandidatiNa) return null;
-  const nakon = potroseneNakonRijeci(iskoristene, ulaz.grupeZa(rijec));
-  const prefiks = zadnjaDva(rijec);
-  let broj = 0;
-  const vidjene = new Set<string>();
-  for (const nastavak of ulaz.poznatiKandidatiNa(prefiks, nakon.kaoReadonlySet())) {
-    const grupe = ulaz.grupeZa(nastavak);
-    const kljuc = grupe.length ? grupe.join('|') : nastavak;
-    if (vidjene.has(kljuc)) continue;
-    vidjene.add(kljuc);
-    broj += 1;
-    if (broj >= budzet) break;
-  }
-  return broj;
-}
-
 function filtrirajSigurne(
   rijeci: readonly string[],
   ulaz: UlazOdabira,
@@ -630,7 +533,6 @@ function ocjeniTakticki(
   ulaz: UlazOdabira,
   konfig: KonfiguracijaBota,
   politika: PolitikaKa,
-  faza: FazaPoteza,
   iskoristene: ReadonlySet<string>,
   rng: Rng,
 ): string {
@@ -646,16 +548,10 @@ function ocjeniTakticki(
 
     const zavrsavaKa = zadnjaDva(rijec) === 'ka';
     if (politika === 'agresivni' && zavrsavaKa) bod += 2;
-    if (politika === 'bez_ka' && faza === 'obican_potez' && zavrsavaKa) bod -= 500;
     if (jeOpasanZavrsetak(zadnjaDva(rijec))) bod += 3;
 
-    if (politika !== 'bez_ka' || faza === 'dokaz_nastavka') {
-      const cestih = brojCestihPoznatihNastavaka(rijec, ulaz, iskoristene, konfig);
-      if (cestih !== null) {
-        if (faza === 'dokaz_nastavka' && nastavak === true) bod += Math.max(0, 4 - cestih);
-        else if (faza !== 'dokaz_nastavka') bod += Math.max(0, 3 - cestih) * 0.5;
-      }
-    }
+    const cestih = brojCestihPoznatihNastavaka(rijec, ulaz, iskoristene, konfig);
+    if (cestih !== null) bod += Math.max(0, 3 - cestih) * 0.5;
 
     if (bod > najboljiBod) {
       najboljiBod = bod;
@@ -665,39 +561,6 @@ function ocjeniTakticki(
   return najbolja;
 }
 
-/** Potvrđeni Dokaži kandidati u budžetu — bez „ka” (običan potez ih ionako ne smije igrati). */
-function traziPotvrdjeneDokazi(
-  kandidati: readonly string[],
-  ulaz: UlazOdabira,
-  iskoristene: ReadonlySet<string>,
-  konfig: KonfiguracijaBota,
-  rng: Rng,
-  stanje: StanjeBotaUPartiji,
-): string[] {
-  const bezKa = kandidati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
-  if (!bezKa.length) return [];
-  const radni = bezKa.length > RADNI_UZORAK_PO_POTEZU
-    ? uzorkujPonderirano([...bezKa], RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
-    : [...bezKa];
-  const ostatak = bezKa.filter((rijec) => !radni.includes(rijec));
-  const potvrdjeni: string[] = [];
-  const provjeri = (lista: readonly string[], limit: number): void => {
-    if (limit <= 0) return;
-    const uzorak = lista.length <= limit ? lista : uzorkujPonderirano([...lista], limit, ulaz.frekvencijaZa, rng, konfig);
-    for (const rijec of uzorak) {
-      if (imaPoznatiNastavak(rijec, ulaz, iskoristene) !== true) continue;
-      const n = brojPoznatihNastavaka(rijec, ulaz, iskoristene) ?? 1;
-      if (odlukaDokaziPropusaPotvrde(stanje, ulaz.turnToken, rijec, n, konfig.dokaziFaktorPropusaPotvrde, rng)) {
-        continue;
-      }
-      potvrdjeni.push(rijec);
-    }
-  };
-  provjeri(radni, konfig.dokaziBudzetDetaljneProvjere);
-  if (potvrdjeni.length === 0) provjeri(ostatak, konfig.dokaziBudzetDodatneProvjere);
-  return potvrdjeni;
-}
-
 function pripremiSkupinuZaIzbor(
   poznati: readonly string[],
   politika: PolitikaKa,
@@ -705,10 +568,6 @@ function pripremiSkupinuZaIzbor(
   rng: Rng,
 ): { skupina: string[]; prisilniKa: boolean } {
   if (politika === 'agresivni') return { skupina: [...poznati], prisilniKa: false };
-  if (politika === 'bez_ka') {
-    const bezKa = poznati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
-    return { skupina: bezKa.length ? bezKa : [], prisilniKa: false };
-  }
   const kandidati: string[] = [];
   const naKa: string[] = [];
   for (const rijec of poznati) {
@@ -740,27 +599,19 @@ export function odaberiPotez(
     if (stanje.taktikaPoTokenu.size > 0 && !stanje.taktikaPoTokenu.has(ulaz.turnToken)) {
       stanje.taktikaPoTokenu.clear();
     }
-    ocistiDokaziOdlukeZaNoviToken(stanje, ulaz.turnToken);
   }
   let propustKa = false;
-  const pravila = ulaz.pravila ?? 'ka_zna';
   const brojAktivnih = ulaz.brojAktivnih ?? 2;
-  const faza = ulaz.faza ?? 'obican_potez';
   const iskoristene = ulaz.iskoristeneGrupe ?? new Set<string>();
-  const politikaSirowa = politikaKa(pravila, brojAktivnih);
-  const politika: PolitikaKa =
-    politikaSirowa === 'bez_ka' && faza === 'dokaz_nastavka' ? 'oprezni' : politikaSirowa;
+  const politika = politikaKa(brojAktivnih);
 
   // Primljeni KA.
   if (ulaz.trazenaSlova === 'ka') {
-    if (politika === 'bez_ka') {
-      propustKa = true;
-    } else if (politika === 'agresivni' || rng() >= konfig.vjerojatnostPropustaKa) {
+    if (politika === 'agresivni' || rng() >= konfig.vjerojatnostPropustaKa) {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
-    } else {
-      propustKa = true;
     }
+    propustKa = true;
   }
 
   const klasifikacija = klasificirajPoznatiSkup(sviKandidati, ulaz.frekvencijaZa, ulaz.grupeZa, konfig);
@@ -772,7 +623,7 @@ export function odaberiPotez(
   stanje.brojKandidata = poznati.length;
 
   if (poznati.length === 0) {
-    if (propustKa && politika !== 'bez_ka') {
+    if (propustKa) {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
     }
@@ -781,7 +632,7 @@ export function odaberiPotez(
 
   if (klasifikacija.vrsta === 'mali') {
     if (odlukaNeznanjaZaToken(stanje, ulaz.turnToken, ulaz.oporavak, konfig.vjerojatnostNeznanjaUMalomSkupu, rng)) {
-      if (propustKa && politika !== 'bez_ka') {
+      if (propustKa) {
         stanje.brojKandidata = 1;
         return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
       }
@@ -789,30 +640,11 @@ export function odaberiPotez(
     }
   }
 
-  // Dokaži običan / duel: preferiraj riječi s legalnim poznatim nastavkom.
-  if (politika === 'oprezni' || politikaSirowa === 'bez_ka') {
+  // Duel oprez: preferiraj riječi s legalnim poznatim nastavkom.
+  if (politika === 'oprezni') {
     poznati = izbjegniSamoeliminaciju(poznati, ulaz, iskoristene);
-    if (politika === 'oprezni') {
-      const sigurne = filtrirajSigurne(poznati, ulaz, iskoristene);
-      if (sigurne.length) poznati = sigurne;
-    }
-  }
-
-  if (politikaSirowa === 'bez_ka' && faza === 'obican_potez' && poznati.length > 0) {
-    const preskoci = odlukaDokaziPreskokaZaToken(
-      stanje,
-      ulaz.turnToken,
-      ulaz.oporavak,
-      konfig.vjerojatnostDokaziPreskokaPotvrde,
-      rng,
-    );
-    if (!preskoci) {
-      const potvrdjeni = traziPotvrdjeneDokazi(poznati, ulaz, iskoristene, konfig, rng, stanje);
-      if (!potvrdjeni.length) {
-        return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
-      }
-      poznati = potvrdjeni;
-    }
+    const sigurne = filtrirajSigurne(poznati, ulaz, iskoristene);
+    if (sigurne.length) poznati = sigurne;
   }
 
   if (poznati.length > RADNI_UZORAK_PO_POTEZU) {
@@ -821,7 +653,7 @@ export function odaberiPotez(
 
   const { skupina: odabranaSkupina, prisilniKa } = pripremiSkupinuZaIzbor(poznati, politika, konfig, rng);
   if (odabranaSkupina.length === 0) {
-    if (propustKa && politika !== 'bez_ka') {
+    if (propustKa) {
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
     }
     return { vrsta: 'odustani', razlog: 'nema_rijeci' };
@@ -830,7 +662,7 @@ export function odaberiPotez(
   const takticki = odlukaTaktikeZaToken(stanje, ulaz.turnToken, konfig.vjerojatnostTaktickogPoteza, rng);
   let rijec: string;
   if (takticki) {
-    rijec = ocjeniTakticki(odabranaSkupina, ulaz, konfig, politika, faza, iskoristene, rng);
+    rijec = ocjeniTakticki(odabranaSkupina, ulaz, konfig, politika, iskoristene, rng);
   } else {
     const izbor = odaberiPoVrsti(odabranaSkupina, stanje, ulaz, konfig);
     rijec = izaberiPonderirano(izbor, ulaz.frekvencijaZa, rng, konfig);
@@ -950,41 +782,6 @@ async function brojCestihNastavivo(
   return broj;
 }
 
-async function brojPoznatihNastavakaNastavivo(
-  rijec: string,
-  ulaz: UlazOdabira,
-  iskoristene: ReadonlySet<string>,
-  predaj: PredajKontrolu,
-  aktivan: () => boolean,
-  budzet = BUDZET_BROJA_NASTAVAKA_ZA_PROPUST,
-): Promise<number | null | 'otkazano'> {
-  if (!ulaz.poznatiKandidatiNaNastavivo && !ulaz.poznatiKandidatiNa) return null;
-  if (ulaz.poznatiKandidatiNa && !ulaz.poznatiKandidatiNaNastavivo) {
-    return brojPoznatihNastavaka(rijec, ulaz, iskoristene, budzet);
-  }
-  const nakon = potroseneNakonRijeci(iskoristene, ulaz.grupeZa(rijec));
-  const potrosene = nakon.kaoReadonlySet();
-  const prefiks = zadnjaDva(rijec);
-  let broj = 0;
-  const vidjene = new Set<string>();
-  let n = 0;
-  for await (const nastavak of ulaz.poznatiKandidatiNaNastavivo!(prefiks, potrosene)) {
-    n += 1;
-    const grupe = ulaz.grupeZa(nastavak);
-    const kljuc = grupe.length ? grupe.join('|') : nastavak;
-    if (!vidjene.has(kljuc)) {
-      vidjene.add(kljuc);
-      broj += 1;
-      if (broj >= budzet) break;
-    }
-    if (n % CHECKPOINT_ZAPISA === 0) {
-      await predaj();
-      if (!aktivan()) return 'otkazano';
-    }
-  }
-  return broj;
-}
-
 /**
  * Nastavivi odabir: ista politika kao `odaberiPotez`, uz predaju kontrole tijekom skupih nastavaka.
  * Vraća `null` ako je posao otkazan (`aktivan() === false`).
@@ -1013,26 +810,18 @@ export async function odaberiPotezNastavivo(
     if (stanje.taktikaPoTokenu.size > 0 && !stanje.taktikaPoTokenu.has(ulaz.turnToken)) {
       stanje.taktikaPoTokenu.clear();
     }
-    ocistiDokaziOdlukeZaNoviToken(stanje, ulaz.turnToken);
   }
   let propustKa = false;
-  const pravila = ulaz.pravila ?? 'ka_zna';
   const brojAktivnih = ulaz.brojAktivnih ?? 2;
-  const faza = ulaz.faza ?? 'obican_potez';
   const iskoristene = ulaz.iskoristeneGrupe ?? new Set<string>();
-  const politikaSirowa = politikaKa(pravila, brojAktivnih);
-  const politika: PolitikaKa =
-    politikaSirowa === 'bez_ka' && faza === 'dokaz_nastavka' ? 'oprezni' : politikaSirowa;
+  const politika = politikaKa(brojAktivnih);
 
   if (ulaz.trazenaSlova === 'ka') {
-    if (politika === 'bez_ka') {
-      propustKa = true;
-    } else if (politika === 'agresivni' || rng() >= konfig.vjerojatnostPropustaKa) {
+    if (politika === 'agresivni' || rng() >= konfig.vjerojatnostPropustaKa) {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
-    } else {
-      propustKa = true;
     }
+    propustKa = true;
   }
 
   if (!aktivan()) return null;
@@ -1047,7 +836,7 @@ export async function odaberiPotezNastavivo(
   stanje.brojKandidata = poznati.length;
 
   if (poznati.length === 0) {
-    if (propustKa && politika !== 'bez_ka') {
+    if (propustKa) {
       stanje.brojKandidata = 1;
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
     }
@@ -1056,7 +845,7 @@ export async function odaberiPotezNastavivo(
 
   if (klasifikacija.vrsta === 'mali') {
     if (odlukaNeznanjaZaToken(stanje, ulaz.turnToken, ulaz.oporavak, konfig.vjerojatnostNeznanjaUMalomSkupu, rng)) {
-      if (propustKa && politika !== 'bez_ka') {
+      if (propustKa) {
         stanje.brojKandidata = 1;
         return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
       }
@@ -1064,7 +853,7 @@ export async function odaberiPotezNastavivo(
     }
   }
 
-  if (politika === 'oprezni' || politikaSirowa === 'bez_ka') {
+  if (politika === 'oprezni') {
     const sigurne: string[] = [];
     const nepoznate: string[] = [];
     const mrtve: string[] = [];
@@ -1081,56 +870,9 @@ export async function odaberiPotezNastavivo(
       }
     }
     poznati = sigurne.length ? sigurne : (nepoznate.length ? nepoznate : mrtve);
-    if (politika === 'oprezni' && (sigurne.length || nepoznate.length)) {
+    if (sigurne.length || nepoznate.length) {
       const pool = sigurne.length ? sigurne : nepoznate;
       if (pool.length) poznati = pool;
-    }
-  }
-
-  if (politikaSirowa === 'bez_ka' && faza === 'obican_potez' && poznati.length > 0) {
-    const preskoci = odlukaDokaziPreskokaZaToken(
-      stanje,
-      ulaz.turnToken,
-      ulaz.oporavak,
-      konfig.vjerojatnostDokaziPreskokaPotvrde,
-      rng,
-    );
-    if (!preskoci) {
-      const bezKa = poznati.filter((rijec) => zadnjaDva(rijec) !== 'ka');
-      if (!bezKa.length) {
-        return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
-      }
-      const radni = bezKa.length > RADNI_UZORAK_PO_POTEZU
-        ? uzorkujPonderirano(bezKa, RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig)
-        : bezKa;
-      const potvrdjeni: string[] = [];
-      const provjeriListu = async (lista: readonly string[], limit: number): Promise<'otkazano' | null> => {
-        if (limit <= 0) return null;
-        const uzorak = lista.length <= limit ? lista : uzorkujPonderirano([...lista], limit, ulaz.frekvencijaZa, rng, konfig);
-        for (const kandidat of uzorak) {
-          const nastavak = await imaPoznatiNastavakNastavivo(kandidat, ulaz, iskoristene, predaj, aktivan);
-          if (nastavak === 'otkazano') return 'otkazano';
-          if (nastavak !== true) continue;
-          const brojN = await brojPoznatihNastavakaNastavivo(kandidat, ulaz, iskoristene, predaj, aktivan);
-          if (brojN === 'otkazano') return 'otkazano';
-          const n = brojN ?? 1;
-          if (odlukaDokaziPropusaPotvrde(stanje, ulaz.turnToken, kandidat, n, konfig.dokaziFaktorPropusaPotvrde, rng)) {
-            continue;
-          }
-          potvrdjeni.push(kandidat);
-        }
-        return null;
-      };
-      let ishod = await provjeriListu(radni, konfig.dokaziBudzetDetaljneProvjere);
-      if (ishod === 'otkazano') return null;
-      if (potvrdjeni.length === 0) {
-        ishod = await provjeriListu(bezKa.filter((rijec) => !radni.includes(rijec)), konfig.dokaziBudzetDodatneProvjere);
-        if (ishod === 'otkazano') return null;
-      }
-      if (potvrdjeni.length === 0) {
-        return { vrsta: 'odustani', razlog: 'nema_rijeci', razlogInterni: 'nema_potvrdjenog_nastavka_u_budzetu' };
-      }
-      poznati = potvrdjeni;
     }
   }
 
@@ -1140,7 +882,7 @@ export async function odaberiPotezNastavivo(
 
   const { skupina: odabranaSkupina, prisilniKa } = pripremiSkupinuZaIzbor(poznati, politika, konfig, rng);
   if (odabranaSkupina.length === 0) {
-    if (propustKa && politika !== 'bez_ka') {
+    if (propustKa) {
       return { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
     }
     return { vrsta: 'odustani', razlog: 'nema_rijeci' };
@@ -1160,16 +902,10 @@ export async function odaberiPotezNastavivo(
       else if (nastavak === true) bod += 5;
       const zavrsavaKa = zadnjaDva(kandidat) === 'ka';
       if (politika === 'agresivni' && zavrsavaKa) bod += 2;
-      if (politika === 'bez_ka' && faza === 'obican_potez' && zavrsavaKa) bod -= 500;
       if (jeOpasanZavrsetak(zadnjaDva(kandidat))) bod += 3;
-      if (politika !== 'bez_ka' || faza === 'dokaz_nastavka') {
-        const cestih = await brojCestihNastavivo(kandidat, ulaz, iskoristene, konfig, predaj, aktivan);
-        if (cestih === 'otkazano') return null;
-        if (cestih !== null) {
-          if (faza === 'dokaz_nastavka' && nastavak === true) bod += Math.max(0, 4 - cestih);
-          else if (faza !== 'dokaz_nastavka') bod += Math.max(0, 3 - cestih) * 0.5;
-        }
-      }
+      const cestih = await brojCestihNastavivo(kandidat, ulaz, iskoristene, konfig, predaj, aktivan);
+      if (cestih === 'otkazano') return null;
+      if (cestih !== null) bod += Math.max(0, 3 - cestih) * 0.5;
       if (bod > najboljiBod) {
         najboljiBod = bod;
         najbolja = kandidat;

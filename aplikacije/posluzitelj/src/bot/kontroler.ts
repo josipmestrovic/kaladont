@@ -670,7 +670,7 @@ export class BotKontroler {
       grupeZa: (rijec) => rjecnik.grupeZa(rijec),
       turnToken: dogadaj.turnToken,
       oporavak: ista !== undefined,
-      pravila: dogadaj.pravila ?? 'ka_zna',
+      pravila: dogadaj.pravila ?? 'klasicni',
       faza: dogadaj.faza ?? 'obican_potez',
       brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
       iskoristeneGrupe: snimkaGrupa,
@@ -821,35 +821,24 @@ export class BotKontroler {
     const generacija = generacijaOporavka ?? ++this.generacijaPosla;
     const aktivan = () => this.jeAktualanPlan(partijaId, generacija, dogadaj.turnToken, igracId);
 
-    let kandidati: string[];
-    try {
-      kandidati = this.kandidatiZaPotez(dogadaj.trazenaSlova!, dogadaj.iskoristeneGrupe, dogadaj.dopusteneVrste).filter((rijec) => !odbijene.has(rijec));
-    } catch (novaGreska) {
-      this.oporaviNastavivo(dogadaj, igracId, pokusaj, odbijene, novaGreska);
-      const planGreska = this.planirano.get(partijaId);
-      if (planGreska?.generacija === generacija && planGreska.vrsta === 'oporavak') {
-        this.planirano.delete(partijaId);
-      }
-      return;
-    }
-
-    // Prazan repertoar nakon odbijenih = normalan odustanak, ne tehnička greška.
-    if (kandidati.length === 0 && dogadaj.trazenaSlova?.toLowerCase() !== 'ka') {
-      if (!aktivan()) return;
-      this.izvrsi(dogadaj, igracId, dogadaj.turnToken, { vrsta: 'odustani', razlog: 'nema_rijeci' }, pokusaj, odbijene);
-      const planPrazan = this.planirano.get(partijaId);
-      if (planPrazan?.generacija === generacija && planPrazan.vrsta === 'oporavak') {
-        this.planirano.delete(partijaId);
-      }
-      return;
-    }
-
     const postojeci = this.posloviRasporeda.get(partijaId);
     if (postojeci !== undefined) this.raspored.otkazi(postojeci);
 
     const id = this.raspored.prijavi(async ({ predaj }: KontekstPosla) => {
       if (!aktivan()) return 'odustani';
       try {
+        // Prikupljanje unutar raspoređivača (zajednički CPU budžet / RR).
+        const kandidati = this.kandidatiZaPotez(
+          dogadaj.trazenaSlova!,
+          dogadaj.iskoristeneGrupe,
+          dogadaj.dopusteneVrste,
+        ).filter((rijec) => !odbijene.has(rijec));
+        // Prazan repertoar nakon odbijenih = normalan odustanak, ne tehnička greška.
+        if (kandidati.length === 0 && dogadaj.trazenaSlova?.toLowerCase() !== 'ka') {
+          if (!aktivan()) return 'odustani';
+          this.izvrsi(dogadaj, igracId, dogadaj.turnToken, { vrsta: 'odustani', razlog: 'nema_rijeci' }, pokusaj, odbijene);
+          return 'gotovo';
+        }
         const odluka = await this.odluciNastavivo(
           dogadaj,
           stanjeBota,
@@ -867,7 +856,10 @@ export class BotKontroler {
         this.oporaviNastavivo(dogadaj, igracId, pokusaj, odbijene, novaGreska);
         return 'odustani';
       } finally {
-        this.posloviRasporeda.delete(partijaId);
+        // Ne briši noviji handle ako je izvrsi sinkrono registrirao novi posao.
+        if (this.posloviRasporeda.get(partijaId) === id) {
+          this.posloviRasporeda.delete(partijaId);
+        }
         const plan = this.planirano.get(partijaId);
         if (plan?.generacija === generacija && plan.vrsta === 'oporavak') {
           this.planirano.delete(partijaId);
