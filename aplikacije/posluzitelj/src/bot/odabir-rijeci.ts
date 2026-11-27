@@ -235,6 +235,8 @@ export interface UlazOdabira {
     iskoristeneGrupe: ReadonlySet<string>,
     dopusteneVrste?: ReadonlySet<VrstaRijeci>,
   ) => boolean;
+  /** Riječi koje je motor već odbio u ovom oporavku — isključi i iz pool odabira. */
+  odbijeneRijeci?: ReadonlySet<string>;
 }
 
 export type PredajKontrolu = () => Promise<void>;
@@ -531,8 +533,10 @@ function legalniPoolKandidati(
 ): string[] {
   if (!ulaz.poolovi) return [];
   const raw = kandidatiPoola(ulaz.poolovi, trazenaSlova, pool);
+  const odbijene = ulaz.odbijeneRijeci;
   const legalni: string[] = [];
   for (const rijec of raw) {
+    if (odbijene?.has(rijec)) continue;
     if (jeIgriva(ulaz, rijec, iskoristene)) legalni.push(rijec);
   }
   return legalni;
@@ -554,7 +558,7 @@ function odaberiIzPoola(
   if (!grupe.length) return null;
 
   if (shieldAktivan) {
-  const sigurne: string[] = [];
+    const sigurne: string[] = [];
     for (const { kandidati } of grupe) {
       for (const rijec of kandidati) {
         if (!jeShieldPrijetnja(rijec, ulaz, iskoristene, stanje)) sigurne.push(rijec);

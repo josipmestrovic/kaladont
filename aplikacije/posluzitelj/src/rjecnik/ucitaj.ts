@@ -203,14 +203,17 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
         `Poolovi botova: ${snimka.clanovi.size} aktivnih članova, generacija ${snimka.generacija}`,
       );
     } catch (greska) {
-      // Tablica možda još nije migrirana (stari testovi) — prazna snimka.
-      console.warn('Učitavanje bot poolova nije uspjelo; nastavljam bez taktičkog indeksa.', greska);
-      upraviteljPoolova.objavi(izgradiSnimkuPoolova({
-        clanovi: [],
-        jeAktivnaURjecnika: () => false,
-        verzijaRjecnika: verzija,
-        generacija: generacijaPoolova,
-      }));
+      // Tablica možda još nije migrirana (stari testovi) — prazna snimka samo pri prvom učitavanju.
+      // Živu snimku ne briši: blip/seed race ne smije ugasiti agresivnost do sljedećeg uspjeha.
+      console.warn('Učitavanje bot poolova nije uspjelo; zadržavam postojeću snimku ako postoji.', greska);
+      if (upraviteljPoolova.dohvati().clanovi.size === 0) {
+        upraviteljPoolova.objavi(izgradiSnimkuPoolova({
+          clanovi: [],
+          jeAktivnaURjecnika: () => false,
+          verzijaRjecnika: verzija,
+          generacija: generacijaPoolova,
+        }));
+      }
     }
   }
 

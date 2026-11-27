@@ -63,7 +63,7 @@ export async function seedajPooloveAkoTreba(db: Izvrsitelj): Promise<
   await db.insert(operativnePrimjene).values({
     kljuc: KLJUC_SEEDA,
     napomena: `pool1=${pool1.length};pool2=${pool2.length}`,
-  });
+  }).onConflictDoNothing();
 
   return { preskoceno: false, uneseno: vrijednosti.length };
 }

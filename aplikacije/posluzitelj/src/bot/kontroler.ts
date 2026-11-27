@@ -746,6 +746,7 @@ export class BotKontroler {
         this.poznatiNastavciIterator(prefiks, potrosene, dopusteneVrste, aktivan, predaj),
       poolovi: rjecnik.pooloviBotova(),
       jeIgrivaRijec: (rijec, potrosene, vrste) => rjecnik.jeIgrivaRijec(rijec, potrosene, vrste),
+      odbijeneRijeci: odbijene,
       predmemorija,
       verzijaRjecnika,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng, predaj, aktivan);

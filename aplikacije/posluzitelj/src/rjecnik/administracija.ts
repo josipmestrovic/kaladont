@@ -184,6 +184,9 @@ export async function vratiRijec(
   const [postojeca] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
   if (!postojeca || postojeca.aktivna) return { promjena: 'nema', rijec };
   await db.update(rijeci).set({ aktivna: true }).where(eq(rijeci.rijec, rijec));
+  // Soft-delete briše članstvo; ovdje samo razrješava postojeće nerazriješeno (npr. seed).
+  const { razrijesiPoolClan } = await import('../bot/poolovi-trajno.js');
+  await razrijesiPoolClan(db, rijec);
   const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'vracena', razlog, adminId });
   return { promjena: 'vracena', rijec, izmjenaId };
 }

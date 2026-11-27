@@ -969,6 +969,31 @@ describe('Botovi V8 Commit 10 — agresivnost i shield', () => {
     expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'madrac', izPoola: true });
   });
 
+  it('pool odabir isključuje odbijene riječi', () => {
+    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostAgresivnosti: 1, prioritetPoolova: 'p2_p1' };
+    const poolovi = izgradiSnimkuPoolova({
+      clanovi: [
+        { rijec: 'marmor', kategorija: 'pool_1', stanje: 'razrijeseno' },
+        { rijec: 'madrac', kategorija: 'pool_2', stanje: 'razrijeseno' },
+      ],
+      jeAktivnaURjecnika: () => true,
+      verzijaRjecnika: 1,
+      generacija: 1,
+    });
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa', 'mast'],
+      frekvencijaZa: (r) => (r === 'madrac' || r === 'marmor' ? 50 : 900),
+      grupeZa: (r) => [`imenica:${r}`],
+      brojAktivnih: 3,
+      turnToken: 't-pool-odb',
+      poolovi,
+      odbijeneRijeci: new Set(['madrac']),
+      jeIgrivaRijec: (r) => ['masa', 'mast', 'marmor', 'madrac'].includes(r),
+    }, stvoriStanjeBota(konfig, () => 0.5), konfig, () => 0.5);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'marmor', izPoola: true });
+  });
+
   it('članovi poola isključeni su iz običnog uzorka', () => {
     const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostAgresivnosti: 0 };
     const poolovi = izgradiSnimkuPoolova({
