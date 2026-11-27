@@ -10,13 +10,13 @@ import {
   normalizirajZvjezdiceDostignuca,
   type PrikazZvjezdicaDostignuca,
 } from './naslovnica-dostignuca.js';
-import { tekstSazetkaLjestvice } from './naslovnica-ljestvice.js';
+import { tekstSazetkaLjestvice, type TekstSazetkaLjestvice } from './naslovnica-ljestvice.js';
 
 export type BadgeiNaslovnice = {
   izazoviPrikaz: PrikazIzazovaKartice;
   brojRijeciKolekcije: number | null;
   dostignucaZvjezdice: PrikazZvjezdicaDostignuca;
-  ljestviceTekst: string | null;
+  ljestviceTekst: TekstSazetkaLjestvice | null;
 };
 
 export function spojiSazetakNaBadgee(

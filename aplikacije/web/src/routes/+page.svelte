@@ -27,6 +27,7 @@
     type PrikazAktivnihMisija,
   } from '$lib/naslovnica-misije.js';
   import { spojiSazetakNaBadgee } from '$lib/naslovnica-sazetak-ui.js';
+  import type { TekstSazetkaLjestvice } from '$lib/naslovnica-ljestvice.js';
   import {
     NASLOVNICA_SEO_DESCRIPTION,
     NASLOVNICA_SEO_TITLE,
@@ -67,7 +68,7 @@
     vrsta: 'default',
     opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA),
   });
-  let ljestviceTekst = $state<ReturnType<typeof tekstSazetkaLjestvice>>(null);
+  let ljestviceTekst = $state<TekstSazetkaLjestvice | null>(null);
   let brojRijeciKolekcije = $state<number | null>(null);
   let dostignucaZvjezdice = $state<PrikazZvjezdicaDostignuca>({
     ukupno: 0,

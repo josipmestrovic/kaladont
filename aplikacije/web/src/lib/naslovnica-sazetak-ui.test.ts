@@ -3,10 +3,23 @@ import type { OdgovorNaslovnicaSazetka } from 'zajednicko';
 import { spojiSazetakNaBadgee, type BadgeiNaslovnice } from './naslovnica-sazetak-ui.js';
 
 const prethodno: BadgeiNaslovnice = {
-  izazoviPrikaz: { vrsta: 'napredak', opis: '12 / 45' },
+  izazoviPrikaz: {
+    vrsta: 'napredak',
+    opis: '12 / 45',
+    zavrseno: 12,
+    ukupno: 45,
+    postotak: 27,
+    sveZavrseno: false,
+  },
   brojRijeciKolekcije: 42,
   dostignucaZvjezdice: { ukupno: 7, maksimalno: 40 },
-  ljestviceTekst: '1. mjesto',
+  ljestviceTekst: {
+    opis: '1. mjesto · iskustvo',
+    rang: '1. mjesto',
+    ostatak: ' · iskustvo',
+    aria: 'Ljestvice, 1. mjesto',
+    href: '/ljestvice',
+  },
 };
 
 function sazetakDjelomicno(
