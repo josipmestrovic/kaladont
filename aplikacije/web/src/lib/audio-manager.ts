@@ -228,9 +228,11 @@ export function zagrijGameplayZvukove(): void {
   if (gameplayZvukoviPokrenuti) return;
   gameplayZvukoviPokrenuti = true;
   zagrijZvukove(GAMEPLAY_ZVUKOVI);
+  // Kraj SFX idle nakon gameplay warm-a — spremni prije aplauza, ne u kritičnom pathu ulaska.
+  pokreniUPozadini(() => zagrijKrajZvukove());
 }
 
-/** Warm aplauza / kraja partije — zove se kad se bliži ili dogodi kraj. */
+/** Warm aplauza / kraja partije — zove se iz gameplay warm-a (idle) i kao rezervni na kraj. */
 export function zagrijKrajZvukove(): void {
   if (krajZvukoviPokrenuti) return;
   krajZvukoviPokrenuti = true;

@@ -239,12 +239,11 @@ export function pokreniSanducic(): () => void {
   putanja = window.location.pathname;
 
   const socket = dohvatiSocket();
-  // Real-time događaj — uvijek; bootstrap/reconnect/focus na `/` radi naslovnica/sazetak.
+  // Promjena + reconnect uvijek; početni/focus/identitet na `/` pokriva naslovnica/sazetak.
   const naPromjenu = () => {
     void osvjeziSazetakSanducica();
   };
   const naSpoj = () => {
-    if (!trebaSamostalniSazetak()) return;
     void osvjeziSazetakSanducica();
   };
   const naVidljivost = () => {
