@@ -10,7 +10,7 @@ import {
   RADNI_UZORAK_PO_POTEZU,
   jeOpasanZavrsetak,
 } from './repertoar.js';
-import { CHECKPOINT_ZAPISA } from './raspored-odziva.js';
+import { BUDZET_SLICE_MS, CHECKPOINT_ZAPISA } from './raspored-odziva.js';
 
 /** Vraća broj u [0, 1). */
 export type Rng = () => number;
@@ -71,28 +71,52 @@ export function stvoriStanjeBota(konfig: KonfiguracijaBota, rng: Rng): StanjeBot
   };
 }
 
-/** Predmemorija 1-ply legalnosti za aktualni turnToken / verziju rječnika. */
+export type AnalizaNastavkaSpremljena =
+  | { ishod: 'poznat'; cestihNeovisnih: number }
+  | { ishod: 'indeks' }
+  | { ishod: 'legalno_nepoznato' }
+  | { ishod: 'mrtvo' };
+
+export type AnalizaNastavka = AnalizaNastavkaSpremljena | { ishod: 'otkazano' };
+
+/**
+ * Stabilan potpis skupa potrošenih grupa (veličina + sortirani ključevi).
+ * Poziv jednom po odluci — sortiranje velikog skupa je prihvatljivo.
+ */
+export function potpisPotrosenihGrupa(set: ReadonlySet<string>): string {
+  return `${set.size}:${[...set].sort().join('\0')}`;
+}
+
+/** Predmemorija 1-ply analize nastavaka za aktualni turnToken / verziju rječnika. */
 export class PredmemorijaLegalnosti {
   static readonly LIMIT_ZAPISA = 128;
 
-  private readonly zapis = new Map<string, boolean>();
+  private readonly zapis = new Map<string, AnalizaNastavkaSpremljena>();
   private verzijaRjecnika = -1;
   private turnToken: string | null = null;
+  private potrosenePotpis: string | null = null;
 
   ocisti(): void {
     this.zapis.clear();
     this.turnToken = null;
+    this.potrosenePotpis = null;
   }
 
   brojZapisa(): number {
     return this.zapis.size;
   }
 
-  /** Čisti cache kad se promijeni token ili verzija rječnika. */
-  uskladiKontekst(turnToken: string, verzija: number): void {
-    if (this.turnToken !== turnToken || this.verzijaRjecnika !== verzija) {
+  /** Čisti cache kad se promijeni token, verzija rječnika ili potpis potrošenih grupa. */
+  uskladiKontekst(turnToken: string, verzija: number, potrosenePotpis?: string): void {
+    const potpis = potrosenePotpis ?? null;
+    if (
+      this.turnToken !== turnToken
+      || this.verzijaRjecnika !== verzija
+      || this.potrosenePotpis !== potpis
+    ) {
       this.turnToken = turnToken;
       this.verzijaRjecnika = verzija;
+      this.potrosenePotpis = potpis;
       this.zapis.clear();
     }
   }
@@ -105,18 +129,18 @@ export class PredmemorijaLegalnosti {
     }
   }
 
-  peek(kljuc: string): boolean | undefined {
+  peek(kljuc: string): AnalizaNastavkaSpremljena | undefined {
     return this.zapis.get(kljuc);
   }
 
-  spremi(kljuc: string, vrijednost: boolean): void {
+  spremi(kljuc: string, vrijednost: AnalizaNastavkaSpremljena): void {
     if (this.zapis.has(kljuc)) return;
     if (this.zapis.size < PredmemorijaLegalnosti.LIMIT_ZAPISA) {
       this.zapis.set(kljuc, vrijednost);
     }
   }
 
-  dohvatiIliIzracunaj(kljuc: string, izracunaj: () => boolean): boolean {
+  dohvatiIliIzracunaj(kljuc: string, izracunaj: () => AnalizaNastavkaSpremljena): AnalizaNastavkaSpremljena {
     const postojece = this.zapis.get(kljuc);
     if (postojece !== undefined) return postojece;
     const vrijednost = izracunaj();
@@ -174,6 +198,15 @@ export interface UlazOdabira {
   dopusteneVrste?: ReadonlySet<VrstaRijeci>;
   /** Postoje li legalne riječi na prefiksu uz dane potrošene grupe (cijeli rječnik). */
   imaSlobodnuRijecNa?: (prefiks: string, iskoristeneGrupe: ReadonlySet<string>, dopusteneVrste?: ReadonlySet<VrstaRijeci>) => boolean;
+  imaSlobodnuRijecNaNastavivo?: (
+    prefiks: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    predaj: PredajKontrolu,
+    aktivan: () => boolean,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+  ) => Promise<boolean | 'otkazano'>;
+  /** Pri spremanju u cache — ako se verzija promijenila, ne spremaj. */
+  dohvatiVerzijuRjecnika?: () => number;
   /** Poznati botu kandidati na prefiksu (za 1-ply repertoar). */
   poznatiKandidatiNa?: (prefiks: string, iskoristeneGrupe: ReadonlySet<string>) => Iterable<string>;
   /**
@@ -401,14 +434,15 @@ function odlukaTaktikeZaToken(
   return vrijednost;
 }
 
-/**
- * true = bot zna legalan nastavak;
- * false = potvrđeno mrtvo (nema legalne riječi u cijelom rječniku);
- * null = težak/nepoznat botu, ali nastavak može biti živ (smije odigrati).
- */
-function kljucNastavka(prefiks: string, grupe: readonly string[], pravila: string, faza: string): string {
-  // Kanonski sort + JSON — ne kolidira na zarezu u imenu grupe kao join(',').
-  return `${pravila}|${faza}|${prefiks}|${JSON.stringify([...grupe].sort())}`;
+function kljucAnalizeNastavka(
+  prefiks: string,
+  hipotetskeGrupe: readonly string[],
+  pravila: string,
+  faza: string,
+  dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+): string {
+  const vrste = dopusteneVrste ? JSON.stringify([...dopusteneVrste].sort()) : '';
+  return `${pravila}|${faza}|${prefiks}|${JSON.stringify([...hipotetskeGrupe].sort())}|${vrste}`;
 }
 
 function potroseneNakonRijeci(
@@ -418,72 +452,170 @@ function potroseneNakonRijeci(
   return dodajGrupe(iskoristene, grupe);
 }
 
-function imaPoznatiNastavak(
-  rijec: string,
-  ulaz: UlazOdabira,
-  iskoristene: ReadonlySet<string>,
-): boolean | null {
-  const grupe = ulaz.grupeZa(rijec);
-  const nakon = potroseneNakonRijeci(iskoristene, grupe);
-  const prefiks = zadnjaDva(rijec);
-  const bazaKljuca = kljucNastavka(prefiks, grupe, ulaz.pravila ?? '', ulaz.faza ?? '');
-  const potrosene = nakon.kaoReadonlySet();
-
-  const izracunajPoznato = (): boolean => {
-    if (!ulaz.poznatiKandidatiNa) return false;
-    for (const _ of ulaz.poznatiKandidatiNa(prefiks, potrosene)) return true;
-    return false;
-  };
-
-  if (ulaz.poznatiKandidatiNa) {
-    const imaPoznato = ulaz.predmemorija
-      ? ulaz.predmemorija.dohvatiIliIzracunaj(`${bazaKljuca}|poznati`, izracunajPoznato)
-      : izracunajPoznato();
-    if (imaPoznato) return true;
-
-    if (ulaz.imaSlobodnuRijecNa) {
-      const imaLegalno = ulaz.predmemorija
-        ? ulaz.predmemorija.dohvatiIliIzracunaj(
-          `${bazaKljuca}|legalno`,
-          () => ulaz.imaSlobodnuRijecNa!(prefiks, potrosene, ulaz.dopusteneVrste),
-        )
-        : ulaz.imaSlobodnuRijecNa(prefiks, potrosene, ulaz.dopusteneVrste);
-      return imaLegalno ? null : false;
-    }
-    return null;
+function smijeSpremitiAnalizu(ulaz: UlazOdabira): boolean {
+  if (ulaz.dohvatiVerzijuRjecnika !== undefined && ulaz.verzijaRjecnika !== undefined) {
+    return ulaz.dohvatiVerzijuRjecnika() === ulaz.verzijaRjecnika;
   }
-
-  if (!ulaz.imaSlobodnuRijecNa) return null;
-  const imaLegalno = ulaz.predmemorija
-    ? ulaz.predmemorija.dohvatiIliIzracunaj(
-      `${bazaKljuca}|legalno`,
-      () => ulaz.imaSlobodnuRijecNa!(prefiks, potrosene, ulaz.dopusteneVrste),
-    )
-    : ulaz.imaSlobodnuRijecNa(prefiks, potrosene, ulaz.dopusteneVrste);
-  return imaLegalno;
+  return true;
 }
 
-function brojCestihPoznatihNastavaka(
+function dodajBodNastavka(bod: number, analiza: AnalizaNastavkaSpremljena): number {
+  if (analiza.ishod === 'mrtvo') return bod - 1000;
+  if (analiza.ishod === 'poznat') {
+    let novi = bod + 5;
+    novi += Math.max(0, 3 - analiza.cestihNeovisnih) * 0.5;
+    return novi;
+  }
+  if (analiza.ishod === 'indeks') return bod + 5;
+  return bod;
+}
+
+export function analizirajNastavak(
   rijec: string,
   ulaz: UlazOdabira,
   iskoristene: ReadonlySet<string>,
   konfig: KonfiguracijaBota,
-  budzet = 8,
-): number | null {
-  if (!ulaz.poznatiKandidatiNa) return null;
-  const nakon = potroseneNakonRijeci(iskoristene, ulaz.grupeZa(rijec));
+  budzetCestih = 8,
+): AnalizaNastavkaSpremljena {
+  const grupe = ulaz.grupeZa(rijec);
+  const nakon = potroseneNakonRijeci(iskoristene, grupe);
   const prefiks = zadnjaDva(rijec);
-  let broj = 0;
-  const vidjene = new Set<string>();
-  for (const nastavak of ulaz.poznatiKandidatiNa(prefiks, nakon.kaoReadonlySet())) {
-    const grupe = ulaz.grupeZa(nastavak);
-    const kljuc = grupe.length ? grupe.join('|') : nastavak;
-    if (vidjene.has(kljuc)) continue;
-    vidjene.add(kljuc);
-    if (jeCesta(nastavak, ulaz.frekvencijaZa, konfig)) broj += 1;
-    if (broj >= budzet) break;
+  const potrosene = nakon.kaoReadonlySet();
+  const kljuc = kljucAnalizeNastavka(prefiks, grupe, ulaz.pravila ?? '', ulaz.faza ?? '', ulaz.dopusteneVrste);
+
+  const izCachea = ulaz.predmemorija?.peek(kljuc);
+  if (izCachea !== undefined) return izCachea;
+
+  const izracunaj = (): AnalizaNastavkaSpremljena => {
+    if (ulaz.poznatiKandidatiNa) {
+      let pronadjen = false;
+      let brojCestih = 0;
+      const vidjene = new Set<string>();
+      for (const nastavak of ulaz.poznatiKandidatiNa(prefiks, potrosene)) {
+        pronadjen = true;
+        const grupeN = ulaz.grupeZa(nastavak);
+        const kljucG = grupeN.length ? grupeN.join('|') : nastavak;
+        if (!vidjene.has(kljucG)) {
+          vidjene.add(kljucG);
+          if (jeCesta(nastavak, ulaz.frekvencijaZa, konfig)) brojCestih += 1;
+          if (brojCestih >= budzetCestih) break;
+        }
+      }
+      if (pronadjen) return { ishod: 'poznat', cestihNeovisnih: brojCestih };
+      if (ulaz.imaSlobodnuRijecNa) {
+        return ulaz.imaSlobodnuRijecNa(prefiks, potrosene, ulaz.dopusteneVrste)
+          ? { ishod: 'legalno_nepoznato' }
+          : { ishod: 'mrtvo' };
+      }
+      return { ishod: 'legalno_nepoznato' };
+    }
+    if (!ulaz.imaSlobodnuRijecNa) return { ishod: 'legalno_nepoznato' };
+    return ulaz.imaSlobodnuRijecNa(prefiks, potrosene, ulaz.dopusteneVrste)
+      ? { ishod: 'indeks' }
+      : { ishod: 'mrtvo' };
+  };
+
+  return ulaz.predmemorija
+    ? ulaz.predmemorija.dohvatiIliIzracunaj(kljuc, izracunaj)
+    : izracunaj();
+}
+
+export async function analizirajNastavakNastavivo(
+  rijec: string,
+  ulaz: UlazOdabira,
+  iskoristene: ReadonlySet<string>,
+  konfig: KonfiguracijaBota,
+  predaj: PredajKontrolu,
+  aktivan: () => boolean,
+  budzetCestih = 8,
+): Promise<AnalizaNastavka> {
+  if (!aktivan()) return { ishod: 'otkazano' };
+  const grupe = ulaz.grupeZa(rijec);
+  const nakon = potroseneNakonRijeci(iskoristene, grupe);
+  const prefiks = zadnjaDva(rijec);
+  const potrosene = nakon.kaoReadonlySet();
+  const kljuc = kljucAnalizeNastavka(prefiks, grupe, ulaz.pravila ?? '', ulaz.faza ?? '', ulaz.dopusteneVrste);
+
+  const izCachea = ulaz.predmemorija?.peek(kljuc);
+  if (izCachea !== undefined) return izCachea;
+
+  const spremiAko = (analiza: AnalizaNastavkaSpremljena): AnalizaNastavka => {
+    if (!aktivan()) return { ishod: 'otkazano' };
+    if (!smijeSpremitiAnalizu(ulaz)) return { ishod: 'otkazano' };
+    ulaz.predmemorija?.spremi(kljuc, analiza);
+    return analiza;
+  };
+
+  if (ulaz.poznatiKandidatiNaNastavivo || ulaz.poznatiKandidatiNa) {
+    let pronadjen = false;
+    let brojCestih = 0;
+    const vidjene = new Set<string>();
+    let n = 0;
+    let pocetakSlicea = performance.now();
+    const izvor = ulaz.poznatiKandidatiNaNastavivo
+      ? ulaz.poznatiKandidatiNaNastavivo(prefiks, potrosene)
+      : ulaz.poznatiKandidatiNa!(prefiks, potrosene);
+
+    for await (const nastavak of izvor) {
+      n += 1;
+      pronadjen = true;
+      const grupeN = ulaz.grupeZa(nastavak);
+      const kljucG = grupeN.length ? grupeN.join('|') : nastavak;
+      if (!vidjene.has(kljucG)) {
+        vidjene.add(kljucG);
+        if (jeCesta(nastavak, ulaz.frekvencijaZa, konfig)) brojCestih += 1;
+        if (brojCestih >= budzetCestih) break;
+      }
+      const budzetIstekao = performance.now() - pocetakSlicea >= BUDZET_SLICE_MS;
+      if (n % CHECKPOINT_ZAPISA === 0 || budzetIstekao) {
+        await predaj();
+        pocetakSlicea = performance.now();
+        if (!aktivan()) return { ishod: 'otkazano' };
+      }
+    }
+
+    if (pronadjen) return spremiAko({ ishod: 'poznat', cestihNeovisnih: brojCestih });
+
+    if (ulaz.imaSlobodnuRijecNaNastavivo) {
+      await predaj();
+      if (!aktivan()) return { ishod: 'otkazano' };
+      const zivo = await ulaz.imaSlobodnuRijecNaNastavivo(
+        prefiks,
+        potrosene,
+        predaj,
+        aktivan,
+        ulaz.dopusteneVrste,
+      );
+      if (zivo === 'otkazano') return { ishod: 'otkazano' };
+      return spremiAko(zivo ? { ishod: 'legalno_nepoznato' } : { ishod: 'mrtvo' });
+    }
+    if (ulaz.imaSlobodnuRijecNa) {
+      await predaj();
+      if (!aktivan()) return { ishod: 'otkazano' };
+      const zivo = ulaz.imaSlobodnuRijecNa(prefiks, potrosene, ulaz.dopusteneVrste);
+      return spremiAko(zivo ? { ishod: 'legalno_nepoznato' } : { ishod: 'mrtvo' });
+    }
+    return spremiAko({ ishod: 'legalno_nepoznato' });
   }
-  return broj;
+
+  if (!ulaz.imaSlobodnuRijecNaNastavivo && !ulaz.imaSlobodnuRijecNa) {
+    return spremiAko({ ishod: 'legalno_nepoznato' });
+  }
+
+  if (ulaz.imaSlobodnuRijecNaNastavivo) {
+    const zivo = await ulaz.imaSlobodnuRijecNaNastavivo(
+      prefiks,
+      potrosene,
+      predaj,
+      aktivan,
+      ulaz.dopusteneVrste,
+    );
+    if (zivo === 'otkazano') return { ishod: 'otkazano' };
+    return spremiAko(zivo ? { ishod: 'indeks' } : { ishod: 'mrtvo' });
+  }
+
+  const zivo = ulaz.imaSlobodnuRijecNa!(prefiks, potrosene, ulaz.dopusteneVrste);
+  return spremiAko(zivo ? { ishod: 'indeks' } : { ishod: 'mrtvo' });
 }
 
 function odaberiPoVrsti(
@@ -516,16 +648,12 @@ function ocjeniTakticki(
 
   for (const rijec of uzorak) {
     let bod = ponderRijeci(rijec, ulaz.frekvencijaZa, konfig);
-    const nastavak = imaPoznatiNastavak(rijec, ulaz, iskoristene);
-    if (nastavak === false) bod -= 1000;
-    else if (nastavak === true) bod += 5;
+    const analiza = analizirajNastavak(rijec, ulaz, iskoristene, konfig);
+    bod = dodajBodNastavka(bod, analiza);
 
     const zavrsavaKa = zadnjaDva(rijec) === 'ka';
     if (politika === 'agresivni' && zavrsavaKa) bod += 2;
     if (jeOpasanZavrsetak(zadnjaDva(rijec))) bod += 3;
-
-    const cestih = brojCestihPoznatihNastavaka(rijec, ulaz, iskoristene, konfig);
-    if (cestih !== null) bod += Math.max(0, 3 - cestih) * 0.5;
 
     if (bod > najboljiBod) {
       najboljiBod = bod;
@@ -626,107 +754,6 @@ export function odaberiPotez(
   };
 }
 
-async function imaPoznatiNastavakNastavivo(
-  rijec: string,
-  ulaz: UlazOdabira,
-  iskoristene: ReadonlySet<string>,
-  predaj: PredajKontrolu,
-  aktivan: () => boolean,
-): Promise<boolean | null | 'otkazano'> {
-  if (!aktivan()) return 'otkazano';
-  const grupe = ulaz.grupeZa(rijec);
-  const nakon = potroseneNakonRijeci(iskoristene, grupe);
-  const potrosene = nakon.kaoReadonlySet();
-  const prefiks = zadnjaDva(rijec);
-  const bazaKljuca = kljucNastavka(prefiks, grupe, ulaz.pravila ?? '', ulaz.faza ?? '');
-  const kljucPoznati = `${bazaKljuca}|poznati`;
-  const kljucLegalno = `${bazaKljuca}|legalno`;
-
-  if (ulaz.poznatiKandidatiNaNastavivo || ulaz.poznatiKandidatiNa) {
-    const izCachea = ulaz.predmemorija?.peek(kljucPoznati);
-    let imaPoznato: boolean;
-    if (izCachea !== undefined) {
-      imaPoznato = izCachea;
-    } else {
-      let pronadjen = false;
-      if (ulaz.poznatiKandidatiNaNastavivo) {
-        for await (const _ of ulaz.poznatiKandidatiNaNastavivo(prefiks, potrosene)) {
-          void _;
-          pronadjen = true;
-          break;
-        }
-      } else {
-        let n = 0;
-        for (const _ of ulaz.poznatiKandidatiNa!(prefiks, potrosene)) {
-          void _;
-          pronadjen = true;
-          break;
-        }
-        n += 1;
-        if (n % CHECKPOINT_ZAPISA === 0) {
-          await predaj();
-          if (!aktivan()) return 'otkazano';
-        }
-      }
-      if (!aktivan()) return 'otkazano';
-      imaPoznato = pronadjen;
-      ulaz.predmemorija?.spremi(kljucPoznati, imaPoznato);
-    }
-    if (imaPoznato) return true;
-
-    if (ulaz.imaSlobodnuRijecNa) {
-      await predaj();
-      if (!aktivan()) return 'otkazano';
-      const izLegalno = ulaz.predmemorija?.peek(kljucLegalno);
-      const imaLegalno = izLegalno ?? ulaz.imaSlobodnuRijecNa(prefiks, potrosene, ulaz.dopusteneVrste);
-      if (izLegalno === undefined) ulaz.predmemorija?.spremi(kljucLegalno, imaLegalno);
-      return imaLegalno ? null : false;
-    }
-    return null;
-  }
-
-  if (!ulaz.imaSlobodnuRijecNa) return null;
-  if (!aktivan()) return 'otkazano';
-  return ulaz.imaSlobodnuRijecNa(prefiks, potrosene, ulaz.dopusteneVrste);
-}
-
-async function brojCestihNastavivo(
-  rijec: string,
-  ulaz: UlazOdabira,
-  iskoristene: ReadonlySet<string>,
-  konfig: KonfiguracijaBota,
-  predaj: PredajKontrolu,
-  aktivan: () => boolean,
-  budzet = 8,
-): Promise<number | null | 'otkazano'> {
-  if (!ulaz.poznatiKandidatiNaNastavivo && !ulaz.poznatiKandidatiNa) return null;
-  const nakon = potroseneNakonRijeci(iskoristene, ulaz.grupeZa(rijec));
-  const potrosene = nakon.kaoReadonlySet();
-  const prefiks = zadnjaDva(rijec);
-  let broj = 0;
-  const vidjene = new Set<string>();
-  let n = 0;
-  const izvor = ulaz.poznatiKandidatiNaNastavivo
-    ? ulaz.poznatiKandidatiNaNastavivo(prefiks, potrosene)
-    : ulaz.poznatiKandidatiNa!(prefiks, potrosene);
-
-  for await (const nastavak of izvor) {
-    n += 1;
-    const grupe = ulaz.grupeZa(nastavak);
-    const kljuc = grupe.length ? grupe.join('|') : nastavak;
-    if (!vidjene.has(kljuc)) {
-      vidjene.add(kljuc);
-      if (jeCesta(nastavak, ulaz.frekvencijaZa, konfig)) broj += 1;
-      if (broj >= budzet) break;
-    }
-    if (n % CHECKPOINT_ZAPISA === 0) {
-      await predaj();
-      if (!aktivan()) return 'otkazano';
-    }
-  }
-  return broj;
-}
-
 /**
  * Nastavivi odabir: ista politika kao `odaberiPotez`, uz predaju kontrole tijekom skupih nastavaka.
  * Vraća `null` ako je posao otkazan (`aktivan() === false`).
@@ -817,16 +844,12 @@ export async function odaberiPotezNastavivo(
     let najboljiBod = Number.NEGATIVE_INFINITY;
     for (const kandidat of uzorak) {
       let bod = ponderRijeci(kandidat, ulaz.frekvencijaZa, konfig);
-      const nastavak = await imaPoznatiNastavakNastavivo(kandidat, ulaz, iskoristene, predaj, aktivan);
-      if (nastavak === 'otkazano') return null;
-      if (nastavak === false) bod -= 1000;
-      else if (nastavak === true) bod += 5;
+      const analiza = await analizirajNastavakNastavivo(kandidat, ulaz, iskoristene, konfig, predaj, aktivan);
+      if (analiza.ishod === 'otkazano') return null;
+      bod = dodajBodNastavka(bod, analiza);
       const zavrsavaKa = zadnjaDva(kandidat) === 'ka';
       if (politika === 'agresivni' && zavrsavaKa) bod += 2;
       if (jeOpasanZavrsetak(zadnjaDva(kandidat))) bod += 3;
-      const cestih = await brojCestihNastavivo(kandidat, ulaz, iskoristene, konfig, predaj, aktivan);
-      if (cestih === 'otkazano') return null;
-      if (cestih !== null) bod += Math.max(0, 3 - cestih) * 0.5;
       if (bod > najboljiBod) {
         najboljiBod = bod;
         najbolja = kandidat;

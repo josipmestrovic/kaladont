@@ -66,7 +66,9 @@ describe('CI prihvat odziva botova', () => {
     for (let i = 0; i < 100; i += 1) {
       pred.uskladiKontekst(`t-${i}`, 1);
       for (let j = 0; j < 50; j += 1) {
-        pred.dohvatiIliIzracunaj(`k-${j}`, () => j % 2 === 0);
+        pred.dohvatiIliIzracunaj(`k-${j}`, () => (
+          j % 2 === 0 ? { ishod: 'poznat', cestihNeovisnih: 0 } : { ishod: 'mrtvo' }
+        ));
       }
       peak = Math.max(peak, pred.brojZapisa());
       expect(pred.brojZapisa()).toBeLessThanOrEqual(50);
@@ -80,10 +82,10 @@ describe('CI prihvat odziva botova', () => {
     const pred = new PredmemorijaLegalnosti();
     pred.uskladiKontekst('t1', 1);
     for (let i = 0; i < PredmemorijaLegalnosti.LIMIT_ZAPISA + 10; i += 1) {
-      expect(pred.dohvatiIliIzracunaj(`x-${i}`, () => true)).toBe(true);
+      expect(pred.dohvatiIliIzracunaj(`x-${i}`, () => ({ ishod: 'indeks' }))).toEqual({ ishod: 'indeks' });
     }
     expect(pred.brojZapisa()).toBe(PredmemorijaLegalnosti.LIMIT_ZAPISA);
-    expect(pred.dohvatiIliIzracunaj('x-extra', () => false)).toBe(false);
+    expect(pred.dohvatiIliIzracunaj('x-extra', () => ({ ishod: 'mrtvo' }))).toEqual({ ishod: 'mrtvo' });
   });
 
   it('nastavivi odabir predaje kontrolu najmanje jednom na dugom skenu', async () => {

@@ -230,6 +230,8 @@ async function ucitajModule() {
       return {
         odaberiPotezNastavivo: odabir.odaberiPotezNastavivo,
         stvoriStanjeBota: odabir.stvoriStanjeBota,
+        PredmemorijaLegalnosti: odabir.PredmemorijaLegalnosti,
+        potpisPotrosenihGrupa: odabir.potpisPotrosenihGrupa,
         RasporedjivacOdziva: raspored.RasporedjivacOdziva,
         CHECKPOINT_ZAPISA: raspored.CHECKPOINT_ZAPISA,
         ZADANA_KONFIGURACIJA_BOTA: konfigMod.ZADANA_KONFIGURACIJA_BOTA,
@@ -251,6 +253,8 @@ async function pokreniScenarij({
   poznatiNastavciNastavivo,
   odaberiPotezNastavivo,
   stvoriStanjeBota,
+  PredmemorijaLegalnosti,
+  potpisPotrosenihGrupa,
   konfig,
   prefiks,
   kandidati,
@@ -278,15 +282,20 @@ async function pokreniScenarij({
 
   const brojaci = {
     igrivost: 0,
-    poznatiNastavak: 0,
-    puniIndeks: 0,
+    preglediRepertoara: 0,
+    preglediPunogPrefiksa: 0,
+    pogodciPredmemorije: 0,
+    promasajiPredmemorije: 0,
+    objedinjeneAnalize: 0,
   };
 
+  // Fixture stand-in za puni prefiks: skenira snimku repertoara, ali broji kao preglediPunogPrefiksa
+  // (ne kao preglediRepertoara) — vidi meta.napomena.
   const imaSlobodnu = (pref, potrosene) => {
-    brojaci.puniIndeks += 1;
     const stavka = snimka.poPrefiksu.get(pref);
     if (!stavka) return false;
     for (const r of [...stavka.glavni, ...stavka.rezerva]) {
+      brojaci.preglediPunogPrefiksa += 1;
       const m = meta.get(r);
       if (!m || (m.frekvencija ?? 0) <= 0) continue;
       const grupe = m.grupe ?? [`imenica:${r}`];
@@ -323,6 +332,42 @@ async function pokreniScenarij({
       const t0 = performance.now();
       const stanje = stvoriStanjeBota(konfig, rng);
       try {
+        const verzijaRjecnika = snimka.generacija ?? 1;
+        const turnToken = `bench-${seed}-${prefiks}-${idx}`;
+        let predmemorija = null;
+        if (PredmemorijaLegalnosti) {
+          predmemorija = new PredmemorijaLegalnosti();
+          predmemorija.uskladiKontekst(
+            turnToken,
+            verzijaRjecnika,
+            potpisPotrosenihGrupa ? potpisPotrosenihGrupa(new Set()) : undefined,
+          );
+          const origPeek = predmemorija.peek.bind(predmemorija);
+          const origSpremi = predmemorija.spremi.bind(predmemorija);
+          const origDohvati = predmemorija.dohvatiIliIzracunaj.bind(predmemorija);
+          // Nastavivi put koristi peek+spremi; sync put dohvatiIliIzracunaj.
+          predmemorija.peek = (kljuc) => {
+            const v = origPeek(kljuc);
+            if (v !== undefined) brojaci.pogodciPredmemorije += 1;
+            return v;
+          };
+          predmemorija.spremi = (kljuc, vrijednost) => {
+            if (origPeek(kljuc) === undefined) {
+              brojaci.promasajiPredmemorije += 1;
+              brojaci.objedinjeneAnalize += 1;
+            }
+            return origSpremi(kljuc, vrijednost);
+          };
+          predmemorija.dohvatiIliIzracunaj = (kljuc, izracunaj) => {
+            if (origPeek(kljuc) !== undefined) {
+              brojaci.pogodciPredmemorije += 1;
+            } else {
+              brojaci.promasajiPredmemorije += 1;
+              brojaci.objedinjeneAnalize += 1;
+            }
+            return origDohvati(kljuc, izracunaj);
+          };
+        }
         const odluka = await odaberiPotezNastavivo(
           {
             trazenaSlova: prefiks,
@@ -334,23 +379,28 @@ async function pokreniScenarij({
             iskoristeneGrupe: new Set(),
             imaSlobodnuRijecNa: imaSlobodnu,
             poznatiKandidatiNa: (p, potrosene) => {
-              brojaci.poznatiNastavak += 1;
               const stavka = snimka.poPrefiksu.get(p);
               if (!stavka) return [];
-              return [...stavka.glavni, ...stavka.rezerva].filter((r) => provjeriIgrivost(r, potrosene));
+              const izlaz = [];
+              for (const rijec of [...stavka.glavni, ...stavka.rezerva]) {
+                brojaci.preglediRepertoara += 1;
+                if (provjeriIgrivost(rijec, potrosene)) izlaz.push(rijec);
+              }
+              return izlaz;
             },
             poznatiKandidatiNaNastavivo: (p, potrosene) => {
-              brojaci.poznatiNastavak += 1;
               if (poznatiNastavciNastavivo) {
                 return poznatiNastavciNastavivo(
                   snimka,
                   p,
-                  (r) => provjeriIgrivost(r, potrosene),
+                  (r) => {
+                    brojaci.preglediRepertoara += 1;
+                    return provjeriIgrivost(r, potrosene);
+                  },
                   predajMjeri,
                   () => true,
                 );
               }
-              // Fallback za stari SHA bez exporta — simulirani iterator s istim brojanjem.
               return {
                 async *[Symbol.asyncIterator]() {
                   let n = 0;
@@ -358,13 +408,17 @@ async function pokreniScenarij({
                   if (!stavka) return;
                   for (const rijec of [...stavka.glavni, ...stavka.rezerva]) {
                     n += 1;
+                    brojaci.preglediRepertoara += 1;
                     if (provjeriIgrivost(rijec, potrosene)) yield rijec;
                     if (n % CHECKPOINT_ZAPISA === 0) await predajMjeri();
                   }
                 },
               };
             },
-            turnToken: `bench-${seed}-${prefiks}-${idx}`,
+            predmemorija: predmemorija ?? undefined,
+            verzijaRjecnika,
+            dohvatiVerzijuRjecnika: () => verzijaRjecnika,
+            turnToken,
           },
           stanje,
           konfig,
@@ -430,8 +484,11 @@ async function pokreniScenarij({
     rssMbPoslije: Number((memPoslije.rss / 1024 / 1024).toFixed(2)),
     uspjeh: !timeoutPogoden && pogreska === 0 && nedovrseno === 0,
     brojaciIgrivost: brojaci.igrivost,
-    brojaciPoznatiNastavak: brojaci.poznatiNastavak,
-    brojaciPuniIndeks: brojaci.puniIndeks,
+    preglediRepertoara: brojaci.preglediRepertoara,
+    preglediPunogPrefiksa: brojaci.preglediPunogPrefiksa,
+    pogodciPredmemorije: brojaci.pogodciPredmemorije,
+    promasajiPredmemorije: brojaci.promasajiPredmemorije,
+    objedinjeneAnalize: brojaci.objedinjeneAnalize,
   };
 }
 
@@ -482,7 +539,7 @@ async function main() {
     validacijaRijeci: 'fixture-frekvencija-grupe',
     putRepertoara: mods.poznatiNastavciNastavivo ? 'poznatiNastavciNastavivo' : 'fallback-iterator',
     nacinSnimke,
-    napomena: 'Lokalni fixture/bench — nije produkcijski p95/VPS. Brojači: igrivost/poznati/puniIndeks.',
+    napomena: 'Lokalni simulirani fixture (vidi nacinSnimke) — nije produkcijski p95/VPS. Brojači: igrivost, preglediRepertoara, preglediPunogPrefiksa, predmemorija, objedinjeneAnalize.',
   }));
 
   let ikadFail = false;
@@ -507,6 +564,8 @@ async function main() {
               poznatiNastavciNastavivo: mods.poznatiNastavciNastavivo,
               odaberiPotezNastavivo: mods.odaberiPotezNastavivo,
               stvoriStanjeBota: mods.stvoriStanjeBota,
+              PredmemorijaLegalnosti: mods.PredmemorijaLegalnosti,
+              potpisPotrosenihGrupa: mods.potpisPotrosenihGrupa,
               konfig: scenarij.konfig,
               prefiks: pref,
               kandidati,
@@ -550,10 +609,13 @@ async function main() {
             heapUsedMbPoslijeMed: Number(percentile(runovi.map((r) => r.heapUsedMbPoslije), 50).toFixed(2)),
             rssMbPoslijeMed: Number(percentile(runovi.map((r) => r.rssMbPoslije), 50).toFixed(2)),
             brojaciIgrivostUkupno: runovi.reduce((a, r) => a + (r.brojaciIgrivost ?? 0), 0),
-            brojaciPoznatiNastavakUkupno: runovi.reduce((a, r) => a + (r.brojaciPoznatiNastavak ?? 0), 0),
-            brojaciPuniIndeksUkupno: runovi.reduce((a, r) => a + (r.brojaciPuniIndeks ?? 0), 0),
-            medPoznatiNastavakPoRunu: Math.round(percentile(runovi.map((r) => r.brojaciPoznatiNastavak ?? 0), 50)),
-            medPuniIndeksPoRunu: Math.round(percentile(runovi.map((r) => r.brojaciPuniIndeks ?? 0), 50)),
+            preglediRepertoaraUkupno: runovi.reduce((a, r) => a + (r.preglediRepertoara ?? 0), 0),
+            preglediPunogPrefiksaUkupno: runovi.reduce((a, r) => a + (r.preglediPunogPrefiksa ?? 0), 0),
+            pogodciPredmemorijeUkupno: runovi.reduce((a, r) => a + (r.pogodciPredmemorije ?? 0), 0),
+            promasajiPredmemorijeUkupno: runovi.reduce((a, r) => a + (r.promasajiPredmemorije ?? 0), 0),
+            objedinjeneAnalizeUkupno: runovi.reduce((a, r) => a + (r.objedinjeneAnalize ?? 0), 0),
+            medPreglediRepertoaraPoRunu: Math.round(percentile(runovi.map((r) => r.preglediRepertoara ?? 0), 50)),
+            medPreglediPunogPrefiksaPoRunu: Math.round(percentile(runovi.map((r) => r.preglediPunogPrefiksa ?? 0), 50)),
           }));
         }
       }

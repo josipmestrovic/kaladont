@@ -4,7 +4,7 @@ import { BotKontroler, MAKS_POTEZA_BOT_DUELA_BRZA } from '../src/bot/kontroler.j
 import { RasporedjivacOdziva } from '../src/bot/raspored-odziva.js';
 import { igriviKandidatiIzRepertoara, izgradiRepertoarBotova, RADNI_UZORAK_PO_POTEZU, type SnimkaRepertoara } from '../src/bot/repertoar.js';
 import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
-import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, klasificirajPoznatiSkup, odaberiPotez, odaberiPotezNastavivo, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs, uzorkujPonderirano } from '../src/bot/odabir-rijeci.js';
+import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, analizirajNastavak, klasificirajPoznatiSkup, odaberiPotez, odaberiPotezNastavivo, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs, uzorkujPonderirano } from '../src/bot/odabir-rijeci.js';
 import { parsajSpremljenuKonfiguraciju } from '../src/bot/trajne-postavke.js';
 import { razrijesiProfilBota } from '../src/bot/profili-bota.js';
 import { BROJ_GOSTIJU_FONDA_V5, BROJ_IMENOVANIH_FONDA_V5, CILJ_AKTIVNIH_FONDA_V5, NADIMCI_POCETNOG_FONDA_V5 } from '../src/bot/nadimci.js';
@@ -261,56 +261,72 @@ describe('odabir riječi bota', () => {
     expect(samoStrucne).toEqual({ vrsta: 'odustani', razlog: 'nema_rijeci' });
   });
 
-  it('poznati nastavak staje na prvom yieldu (prava lijenost u taktici)', () => {
-    let yieldanoUPrvomIteratoru = 0;
-    let prviIterator = true;
+  it('objedinjena analiza nastavka: jedan iterator po pozivu, rani izlaz kad je popunjen budžet čestih', () => {
+    let skenirano = 0;
     const poznatiKandidatiNa = () => ({
       *[Symbol.iterator](): Generator<string> {
-        const brojac = { n: 0 };
-        const jePrvi = prviIterator;
-        prviIterator = false;
         for (let i = 0; i < 10_000; i += 1) {
-          brojac.n += 1;
-          if (jePrvi) yieldanoUPrvomIteratoru = brojac.n;
-          if (i === 0) yield 'lampa';
-          else if (jePrvi) throw new Error('ne smije čitati ostatak nakon prvog poznatog');
-          else yield `xx${i}`;
+          skenirano += 1;
+          yield `ce${i}`;
+          if (skenirano >= 8) return;
         }
       },
     });
     const predmemorija = new PredmemorijaLegalnosti();
-    predmemorija.uskladiKontekst('t-lijeno', 1);
-    const konfigTaktika: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostTaktickogPoteza: 1 };
-    const odluka = odaberiPotez({
-      trazenaSlova: 'ma',
-      kandidati: ['masa'],
-      ...rjecnik,
-      pravila: 'klasicni',
-      brojAktivnih: 2,
-      iskoristeneGrupe: new Set(),
+    predmemorija.uskladiKontekst('t-unified', 1);
+    const ulaz = {
+      frekvencijaZa: (r: string) => (r.startsWith('ce') ? 800 : 500),
+      grupeZa: (r: string) => [`imenica:${r}`],
+      pravila: 'klasicni' as const,
+      iskoristeneGrupe: new Set<string>(),
       imaSlobodnuRijecNa: () => true,
       poznatiKandidatiNa,
       predmemorija,
-      verzijaRjecnika: 1,
-      turnToken: 't-lijeno',
-    }, stvoriStanjeBota(konfigTaktika, rng(3)), konfigTaktika, () => 0);
-    expect(odluka.vrsta).toBe('rijec');
+    };
+    const analiza = analizirajNastavak('masa', ulaz, new Set(), konfigBezPropusta);
+    expect(analiza.ishod).toBe('poznat');
+    expect(skenirano).toBeLessThanOrEqual(8);
     expect(predmemorija.brojZapisa()).toBeGreaterThan(0);
-    // Prvi prolaz (imaPoznatiNastavak) staje nakon prvog yield-a.
-    expect(yieldanoUPrvomIteratoru).toBe(1);
   });
 
   it('predmemorija se čisti na novi token; različite hipotetske grupe ne dijele ključ', () => {
     const pred = new PredmemorijaLegalnosti();
     pred.uskladiKontekst('t1', 1);
     let izracuna = 0;
-    expect(pred.dohvatiIliIzracunaj('a|poznati', () => { izracuna += 1; return true; })).toBe(true);
-    expect(pred.dohvatiIliIzracunaj('a|poznati', () => { izracuna += 1; return false; })).toBe(true);
-    expect(izracuna).toBe(1);
+    const kljucA = 'klasicni||sa|["imenica:masa"]|';
+    const kljucB = 'klasicni||sa|["imenica:mast"]|';
+    expect(pred.dohvatiIliIzracunaj(kljucA, () => { izracuna += 1; return { ishod: 'poznat', cestihNeovisnih: 1 }; }))
+      .toEqual({ ishod: 'poznat', cestihNeovisnih: 1 });
+    expect(pred.dohvatiIliIzracunaj(kljucA, () => { izracuna += 1; return { ishod: 'mrtvo' }; }))
+      .toEqual({ ishod: 'poznat', cestihNeovisnih: 1 });
+    expect(pred.dohvatiIliIzracunaj(kljucB, () => { izracuna += 1; return { ishod: 'mrtvo' }; }))
+      .toEqual({ ishod: 'mrtvo' });
+    expect(izracuna).toBe(2);
     pred.uskladiKontekst('t2', 1);
     expect(pred.brojZapisa()).toBe(0);
-    expect(pred.dohvatiIliIzracunaj('a|poznati', () => { izracuna += 1; return false; })).toBe(false);
-    expect(izracuna).toBe(2);
+    expect(pred.dohvatiIliIzracunaj(kljucA, () => { izracuna += 1; return { ishod: 'mrtvo' }; }))
+      .toEqual({ ishod: 'mrtvo' });
+    expect(izracuna).toBe(3);
+  });
+
+  it('analizirajNastavak: cache hit preskače drugi prolaz repertoara', () => {
+    let prolaz = 0;
+    const pred = new PredmemorijaLegalnosti();
+    pred.uskladiKontekst('t-cache', 1);
+    const baza = {
+      frekvencijaZa: () => 800,
+      grupeZa: (r: string) => [`imenica:${r}`],
+      pravila: 'klasicni' as const,
+      iskoristeneGrupe: new Set<string>(),
+      poznatiKandidatiNa: () => {
+        prolaz += 1;
+        return ['lampa'];
+      },
+      predmemorija: pred,
+    };
+    analizirajNastavak('masa', baza, new Set(), konfigBezPropusta);
+    analizirajNastavak('masa', baza, new Set(), konfigBezPropusta);
+    expect(prolaz).toBe(1);
   });
 
   it('SlozeneIskoristeneGrupe has gleda bazu i dodatak bez kopije Set-a', () => {
@@ -1606,5 +1622,25 @@ describe('bot kontroler', () => {
     expect(spyKandidati).not.toHaveBeenCalled();
     expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({ vrsta: 'rijec', rijec: 'kaladont' }));
     spyKandidati.mockRestore();
+  });
+
+  it('Commit 08: odbijeni kaladont na „ka” → oporavak šalje odustani, ne ponavlja kaladont', async () => {
+    const izvrsi = vi.fn((...args: [string, string, { vrsta: string; rijec?: string }]) => {
+      const n = args[2];
+      if (n.vrsta === 'rijec' && n.rijec === 'kaladont') {
+        return { ishod: 'odbijen', kod: 'RIJEC_NE_POSTOJI', poruka: '' } as RezultatNaredbe;
+      }
+      return { ishod: 'prihvacen' } as RezultatNaredbe;
+    });
+    const { kontroler, odgubi } = stvori(izvrsi, () => 1, konfigBezPropusta);
+    kontroler.naPromjenuPoteza(dogadaj({ trazenaSlova: 'ka', turnToken: 't-ka-odbij' }));
+    await odgubi(0);
+    await odgubi(1);
+    const pozivi = izvrsi.mock.calls.map(([, , n]) => n);
+    expect(pozivi).toHaveLength(2);
+    expect(pozivi[0]).toEqual(expect.objectContaining({ vrsta: 'rijec', rijec: 'kaladont', turnToken: 't-ka-odbij' }));
+    expect(pozivi[1]).toEqual(expect.objectContaining({ vrsta: 'odustani', turnToken: 't-ka-odbij' }));
+    expect(pozivi.filter((n) => n.vrsta === 'rijec' && n.rijec === 'kaladont')).toHaveLength(1);
+    kontroler.zaustavi();
   });
 });

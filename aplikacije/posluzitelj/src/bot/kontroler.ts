@@ -14,6 +14,7 @@ import {
   BOT_POTEZ_BEZ_ROKA_MS,
   odaberiPotezNastavivo,
   odgodaBezRokaMs,
+  potpisPotrosenihGrupa,
   PredmemorijaLegalnosti,
   stvoriStanjeBota,
   trajanjeRazmisljanjaMs,
@@ -49,7 +50,16 @@ export type NaredbaBota =
 export const MAKS_POTEZA_BOT_DUELA_BRZA = 10;
 
 export interface OvisnostiBotKontrolera {
-  rjecnik: Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika' | 'imaSlobodnuRijecNa' | 'repertoarBotova' | 'jeIgrivaRijec'> & {
+  rjecnik: Pick<
+    RjecnikUMemoriji,
+    | 'igriviKandidati'
+    | 'grupeZa'
+    | 'verzijaRjecnika'
+    | 'imaSlobodnuRijecNa'
+    | 'imaSlobodnuRijecNaNastavivo'
+    | 'repertoarBotova'
+    | 'jeIgrivaRijec'
+  > & {
     frekvencijaZa(rijec: string): number | null;
   };
   rasporedOdziva?: RasporedjivacOdziva;
@@ -657,6 +667,11 @@ export class BotKontroler {
       this.zabiljeziOdluku(kaladont, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
       return kaladont;
     }
+    if (dogadaj.trazenaSlova === 'ka' && odbijene.has('kaladont')) {
+      const odustani: OdlukaBota = { vrsta: 'odustani', razlog: 'nema_rijeci' };
+      this.zabiljeziOdluku(odustani, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
+      return odustani;
+    }
     const kandidati = kandidatiPretpostavljeni
       ? [...kandidatiPretpostavljeni]
       : this.kandidatiZaPotez(dogadaj.trazenaSlova!, snimkaGrupa, dogadaj.dopusteneVrste).filter((rijec) => !odbijene.has(rijec));
@@ -666,7 +681,7 @@ export class BotKontroler {
     }
     if (!aktivan()) return null;
     const predmemorija = this.predmemorijaZa(dogadaj.partijaId);
-    predmemorija.uskladiKontekst(dogadaj.turnToken, verzijaRjecnika);
+    predmemorija.uskladiKontekst(dogadaj.turnToken, verzijaRjecnika, potpisPotrosenihGrupa(snimkaGrupa));
     const rjecnik = this.ovisnosti.rjecnik;
     const dopusteneVrste = dogadaj.dopusteneVrste;
     const odluka = await odaberiPotezNastavivo({
@@ -683,6 +698,9 @@ export class BotKontroler {
       dopusteneVrste,
       imaSlobodnuRijecNa: (prefiks, potrosene, vrste) =>
         rjecnik.imaSlobodnuRijecNa(prefiks, potrosene, vrste),
+      imaSlobodnuRijecNaNastavivo: (prefiks, potrosene, predajFn, aktivanFn, vrste) =>
+        rjecnik.imaSlobodnuRijecNaNastavivo(prefiks, potrosene, predajFn, aktivanFn, vrste),
+      dohvatiVerzijuRjecnika: () => rjecnik.verzijaRjecnika(),
       poznatiKandidatiNa: (prefiks, potrosene) => {
         const snimka = this.snimkaRepertoara();
         const provjeri = (rijec: string) => rjecnik.jeIgrivaRijec(rijec, potrosene, dopusteneVrste);
@@ -833,6 +851,18 @@ export class BotKontroler {
     const id = this.raspored.prijavi(async ({ predaj }: KontekstPosla) => {
       if (!aktivan()) return 'odustani';
       try {
+        if (dogadaj.trazenaSlova === 'ka' && odbijene.has('kaladont')) {
+          if (!aktivan()) return 'odustani';
+          this.izvrsi(
+            dogadaj,
+            igracId,
+            dogadaj.turnToken,
+            { vrsta: 'odustani', razlog: 'nema_rijeci' },
+            pokusaj,
+            odbijene,
+          );
+          return 'gotovo';
+        }
         const preskociSkupljanje = dogadaj.trazenaSlova === 'ka' && !odbijene.has('kaladont');
         let odluka: OdlukaBota | null;
         if (preskociSkupljanje) {

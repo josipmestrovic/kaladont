@@ -3,7 +3,7 @@
  * Baza je izvor istine, ali igra ne pita bazu ni za jedan potez. Nazivi grupa se
  * kanoniziraju (jedan string objekt po grupi) pa su reference jeftine kao brojevi.
  */
-import type { RjecnikSucelje, VrstaRijeci } from 'zajednicko';
+import type { RazlogMrtvihSlova, RjecnikSucelje, VrstaRijeci } from 'zajednicko';
 import { asc, eq, gt, and } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { rijeci, vlastitaImena } from '../baza/shema.js';
@@ -15,6 +15,7 @@ import {
   POCETNI_SEED_SIGURNIH_RIJECI,
 } from './pocetne-rijeci.js';
 import { ucitajSigurnePocetneRijeciIzBaze } from './sigurni-skup.js';
+import { CHECKPOINT_ZAPISA, BUDZET_SLICE_MS } from '../bot/raspored-odziva.js';
 import { izgradiRepertoarBotova, type SnimkaRepertoara, UpraviteljRepertoara } from '../bot/repertoar.js';
 import { ocistiMemorijuNajopasnijihRijeci } from '../ljestvice/najopasnije-rijeci.js';
 
@@ -51,6 +52,27 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
     samoOsnovniOblici?: boolean,
     minDuljinaRijeci?: number,
   ): boolean;
+  /** Jedan prolaz po prefiksu: null = živ nastavak; inače razlog mrtvih slova. */
+  stanjePrefiksa(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): RazlogMrtvihSlova | null;
+  /**
+   * Postoji li igriva riječ na prefiksu — nastavivo, s predajom kontrole.
+   * `otkazano` nije isto što i false.
+   */
+  imaSlobodnuRijecNaNastavivo(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    predaj: () => Promise<void>,
+    aktivan: () => boolean,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): Promise<boolean | 'otkazano'>;
   /** Igrive riječi na prefiks, bez kopiranja indeksa; redoslijed je redoslijed indeksa, ne rang. */
   igriviKandidati(
     dvaGrafema: string,
@@ -532,6 +554,70 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     return false;
   }
 
+  /** Jedan prolaz po `poPrefiksu`: prva igriva → null; inače baza vs. iskorišteno. */
+  function stanjePrefiksaJedanProlaz(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): RazlogMrtvihSlova | null {
+    const lista = poPrefiksu.get(dvaGrafema);
+    if (!lista) return 'mrtva_slova_baza';
+    let vidjenaPostojeca = false;
+    for (const rijec of lista) {
+      if (jePostojecaRijec(rijec)) vidjenaPostojeca = true;
+      if (jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
+        return null;
+      }
+    }
+    return vidjenaPostojeca ? 'mrtva_slova_iskoristeno' : 'mrtva_slova_baza';
+  }
+
+  function stanjePrefiksa(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): RazlogMrtvihSlova | null {
+    return stanjePrefiksaJedanProlaz(
+      dvaGrafema,
+      iskoristeneGrupe,
+      dopusteneVrste,
+      samoOsnovniOblici,
+      minDuljinaRijeci,
+    );
+  }
+
+  async function imaSlobodnuRijecNaNastavivo(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    predaj: () => Promise<void>,
+    aktivan: () => boolean,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): Promise<boolean | 'otkazano'> {
+    const lista = poPrefiksu.get(dvaGrafema);
+    if (!lista) return false;
+    let n = 0;
+    let pocetakSlicea = performance.now();
+    for (const rijec of lista) {
+      n += 1;
+      if (jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
+        return true;
+      }
+      const budzetIstekao = performance.now() - pocetakSlicea >= BUDZET_SLICE_MS;
+      if (n % CHECKPOINT_ZAPISA === 0 || budzetIstekao) {
+        await predaj();
+        pocetakSlicea = performance.now();
+        if (!aktivan()) return 'otkazano';
+      }
+    }
+    return false;
+  }
+
   function imaSlobodnuRijecNa(
     dvaGrafema: string,
     iskoristeneGrupe: ReadonlySet<string>,
@@ -685,7 +771,9 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     jeOsnovniOblik,
     jeIgrivaRijec: jeIgriva,
     postojeRijeciNa,
+    stanjePrefiksa,
     imaSlobodnuRijecNa,
+    imaSlobodnuRijecNaNastavivo,
     igriviKandidati,
     verzijaRjecnika: () => verzija,
     nasumicnaPocetnaRijec: (iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci) => {

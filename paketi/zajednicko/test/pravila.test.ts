@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PORUKE } from '../src/poruke.js';
 import { kljucGrupe, validirajPotez, odrediRazlogMrtvihSlova } from '../src/pravila.js';
 import { stvoriTestniRjecnik } from './rjecnik-test.js';
@@ -230,5 +230,18 @@ describe('odrediRazlogMrtvihSlova', () => {
 
   it('vraca null kad postoji slobodan nastavak', () => {
     expect(odrediRazlogMrtvihSlova('ku', new Set(), rjecnik)).toBeNull();
+  });
+
+  it('Commit 08: koristi stanjePrefiksa kad postoji; inače fallback na imaSlobodnu/postojeRijeciNa', () => {
+    const saStanje = {
+      ...rjecnik,
+      stanjePrefiksa: vi.fn(() => 'mrtva_slova_iskoristeno' as const),
+      imaSlobodnuRijecNa: vi.fn(() => true),
+      postojeRijeciNa: vi.fn(() => true),
+    };
+    expect(odrediRazlogMrtvihSlova('xx', new Set(), saStanje)).toBe('mrtva_slova_iskoristeno');
+    expect(saStanje.stanjePrefiksa).toHaveBeenCalledOnce();
+    expect(saStanje.imaSlobodnuRijecNa).not.toHaveBeenCalled();
+    expect(odrediRazlogMrtvihSlova('nt', new Set(), rjecnik)).toBe('mrtva_slova_baza');
   });
 });
