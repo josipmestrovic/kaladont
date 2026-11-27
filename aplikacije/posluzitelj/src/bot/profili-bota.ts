@@ -1,6 +1,7 @@
 /**
  * Verzionirani profili botova za Trening i Izazov (PR02).
- * Javna/privatna i dalje koriste globalni admin/env resolver — ovi profili ih ne diraju.
+ * Javna Brza forsira Iskusni poluge (`konfiguracijaZaJavnuBrzu`); privatne sobe
+ * i dalje koriste globalni admin/env resolver.
  */
 import {
   jePoznatiProfilBota,
@@ -11,70 +12,51 @@ import {
 import {
   ZADANA_KONFIGURACIJA_BOTA,
   type KonfiguracijaBota,
+  type PrioritetPoolova,
 } from './konfiguracija-bota.js';
 
 export { nadimakProfilaBota, ZADANI_PROFIL_TRENINGA };
 
 /** Verzija seta profilnih poluga; odvojena od VERZIJA_BOT_POLITIKE. */
-export const VERZIJA_PROFILA_BOTA = 2;
+export const VERZIJA_PROFILA_BOTA = 3;
 
-/** Poluge iz speka 08 + Dokaži balans v2. */
+/** Poluge iz speka Botovi V8 C10. */
 export interface PolugeProfilaBota {
-  vjerojatnostTaktickogPoteza: number;
+  vjerojatnostAgresivnosti: number;
+  vjerojatnostShielda: number;
+  prioritetPoolova: PrioritetPoolova;
   vjerojatnostNeznanjaUMalomSkupu: number;
-  vjerojatnostPropustaKa: number;
-  vjerojatnostOstavljanjaKa: number;
   maksimalnoOpcijaMalogSkupa: number;
-  dokaziBudzetDetaljneProvjere: number;
-  dokaziBudzetDodatneProvjere: number;
-  vjerojatnostDokaziPreskokaPotvrde: number;
-  dokaziFaktorPropusaPotvrde: number;
 }
 
 export const POLUGE_PROFILA_BOTA: Readonly<Record<ProfilBotaIzazova, PolugeProfilaBota>> = {
   pocetnik: {
-    vjerojatnostTaktickogPoteza: 0.1,
+    vjerojatnostAgresivnosti: 0,
+    vjerojatnostShielda: 0,
+    prioritetPoolova: 'p2_p1',
     vjerojatnostNeznanjaUMalomSkupu: 0.4,
-    vjerojatnostPropustaKa: 0.2,
-    vjerojatnostOstavljanjaKa: 0.04,
     maksimalnoOpcijaMalogSkupa: 8,
-    dokaziBudzetDetaljneProvjere: 4,
-    dokaziBudzetDodatneProvjere: 4,
-    vjerojatnostDokaziPreskokaPotvrde: 0.28,
-    dokaziFaktorPropusaPotvrde: 0.55,
   },
   iskusni: {
-    vjerojatnostTaktickogPoteza: 0.25,
+    vjerojatnostAgresivnosti: 0.3,
+    vjerojatnostShielda: 0.6,
+    prioritetPoolova: 'p2_p1',
     vjerojatnostNeznanjaUMalomSkupu: 0.18,
-    vjerojatnostPropustaKa: 0.08,
-    vjerojatnostOstavljanjaKa: 0.015,
     maksimalnoOpcijaMalogSkupa: 5,
-    dokaziBudzetDetaljneProvjere: 8,
-    dokaziBudzetDodatneProvjere: 8,
-    vjerojatnostDokaziPreskokaPotvrde: 0.12,
-    dokaziFaktorPropusaPotvrde: 0.3,
   },
   majstor: {
-    vjerojatnostTaktickogPoteza: 0.5,
+    vjerojatnostAgresivnosti: 0.6,
+    vjerojatnostShielda: 0.75,
+    prioritetPoolova: 'p1_p2',
     vjerojatnostNeznanjaUMalomSkupu: 0.08,
-    vjerojatnostPropustaKa: 0.04,
-    vjerojatnostOstavljanjaKa: 0.008,
     maksimalnoOpcijaMalogSkupa: 3,
-    dokaziBudzetDetaljneProvjere: 12,
-    dokaziBudzetDodatneProvjere: 12,
-    vjerojatnostDokaziPreskokaPotvrde: 0.04,
-    dokaziFaktorPropusaPotvrde: 0.12,
   },
   velemajstor: {
-    vjerojatnostTaktickogPoteza: 0.75,
+    vjerojatnostAgresivnosti: 1,
+    vjerojatnostShielda: 1,
+    prioritetPoolova: 'p1_p2',
     vjerojatnostNeznanjaUMalomSkupu: 0.03,
-    vjerojatnostPropustaKa: 0.02,
-    vjerojatnostOstavljanjaKa: 0.003,
     maksimalnoOpcijaMalogSkupa: 2,
-    dokaziBudzetDetaljneProvjere: 12,
-    dokaziBudzetDodatneProvjere: 16,
-    vjerojatnostDokaziPreskokaPotvrde: 0,
-    dokaziFaktorPropusaPotvrde: 0.05,
   },
 };
 
@@ -93,15 +75,11 @@ export function razrijesiProfilBota(
   }
   const poluge = POLUGE_PROFILA_BOTA[profileId];
   const konfiguracija = structuredClone(baza);
-  konfiguracija.vjerojatnostTaktickogPoteza = poluge.vjerojatnostTaktickogPoteza;
+  konfiguracija.vjerojatnostAgresivnosti = poluge.vjerojatnostAgresivnosti;
+  konfiguracija.vjerojatnostShielda = poluge.vjerojatnostShielda;
+  konfiguracija.prioritetPoolova = poluge.prioritetPoolova;
   konfiguracija.vjerojatnostNeznanjaUMalomSkupu = poluge.vjerojatnostNeznanjaUMalomSkupu;
-  konfiguracija.vjerojatnostPropustaKa = poluge.vjerojatnostPropustaKa;
-  konfiguracija.vjerojatnostOstavljanjaKa = poluge.vjerojatnostOstavljanjaKa;
   konfiguracija.maksimalnoOpcijaMalogSkupa = poluge.maksimalnoOpcijaMalogSkupa;
-  konfiguracija.dokaziBudzetDetaljneProvjere = poluge.dokaziBudzetDetaljneProvjere;
-  konfiguracija.dokaziBudzetDodatneProvjere = poluge.dokaziBudzetDodatneProvjere;
-  konfiguracija.vjerojatnostDokaziPreskokaPotvrde = poluge.vjerojatnostDokaziPreskokaPotvrde;
-  konfiguracija.dokaziFaktorPropusaPotvrde = poluge.dokaziFaktorPropusaPotvrde;
   return {
     konfiguracija,
     profileId,
@@ -116,4 +94,14 @@ export function razrijesiProfilBotaIliZadani(
 ): RazrijesenaKonfiguracijaBota {
   const id = jePoznatiProfilBota(profileId) ? profileId : ZADANI_PROFIL_TRENINGA;
   return razrijesiProfilBota(id, baza);
+}
+
+/**
+ * Javna Brza: uvijek Iskusni poluge (agresivnost/Shield/prioritet/neznanje),
+ * ostalo (tempo, popuna, …) ostaje iz admin/env baze.
+ */
+export function konfiguracijaZaJavnuBrzu(
+  baza: KonfiguracijaBota = ZADANA_KONFIGURACIJA_BOTA,
+): KonfiguracijaBota {
+  return razrijesiProfilBota('iskusni', baza).konfiguracija;
 }

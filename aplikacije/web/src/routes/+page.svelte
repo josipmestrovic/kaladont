@@ -318,7 +318,7 @@
             <img class="stavka-ikona" src="/ikone/67-zagrijavanje-bot.webp" alt="" width="58" height="58" />
             <span class="stavka-tekst">
               <strong id="naslov-trening">Trening</strong>
-              <small id="opis-trening">Vježbaj protiv botova po svojim pravilima.</small>
+              <small id="opis-trening">Vježbaj protiv botova po Klasičnom pravilniku.</small>
             </span>
           </span>
           <span class="strelica" aria-hidden="true">›</span>

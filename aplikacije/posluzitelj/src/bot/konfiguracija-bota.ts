@@ -5,8 +5,10 @@
 import { z } from 'zod';
 import { PRAGOVI_POPUNE_MS } from '../red/raspored-popune.js';
 
-/** PR02 + v7: zajednički ograničeni repertoar i predvidljiv odabir. */
-export const VERZIJA_BOT_POLITIKE = 7;
+/** PR02 + v8: agresivnost poolova, shield i repertoar. */
+export const VERZIJA_BOT_POLITIKE = 8;
+
+export type PrioritetPoolova = 'p2_p1' | 'p1_p2';
 
 export type KategorijaRijeci = 'uobicajena' | 'srednja' | 'rijetka';
 
@@ -21,29 +23,16 @@ export interface KonfiguracijaBota {
   jitterPotezaBotaMs: number;
   /** Minimalna odgoda reakcije prije slanja (ms); plus nasumično 0–1000 ms. */
   odgodaReakcijeMinMs: number;
-  /** Vjerojatnost da bot ostavi riječ na „ka” kad takva postoji među poznatim kandidatima. */
-  vjerojatnostOstavljanjaKa: number;
-  /** Vjerojatnost da bot propusti tuđi „ka” i igra običnu riječ umjesto kaladonta. */
-  vjerojatnostPropustaKa: number;
   /** Vjerojatnost „Ne znam” kad je poznati skup mali (1–N opcija bez česte sigurne). */
   vjerojatnostNeznanjaUMalomSkupu: number;
   /** Gornja granica neovisnih opcija koja još čini „mali” skup. */
   maksimalnoOpcijaMalogSkupa: number;
-  /** Udio poteza u kojima se ocjenjuje uzorak kandidata (1-ply taktika). */
-  vjerojatnostTaktickogPoteza: number;
-  /** Maksimalan broj ponderirano uzorkovanih kandidata u taktičkom potezu. */
-  maksimalnoTaktickihKandidata: number;
-  /** Dokaži: prvi budžet detaljne provjere poznatog nastavka po potezu. */
-  dokaziBudzetDetaljneProvjere: number;
-  /** Dokaži: dodatni budžet ako prvi prolaz ne potvrdi nijednu riječ. */
-  dokaziBudzetDodatneProvjere: number;
-  /** Dokaži: vjerojatnost da se na običnom potezu preskoči zahtjev potvrđenog nastavka. */
-  vjerojatnostDokaziPreskokaPotvrde: number;
-  /**
-   * Dokaži: faktor probabilističkog propusta potvrde.
-   * P(fail | n poznatih nastavaka) = min(0.95, faktor / n); 0 = bez propusta.
-   */
-  dokaziFaktorPropusaPotvrde: number;
+  /** Udio poteza u kojima bot traži riječ u taktičkim poolovima (jedan roll po tokenu). */
+  vjerojatnostAgresivnosti: number;
+  /** Udio poteza u dvoboju (2 aktivna) u kojem bot preferira „sigurne” riječi (jedan roll po tokenu). */
+  vjerojatnostShielda: number;
+  /** Redoslijed pregleda pool_1 / pool_2 kad je agresivnost aktivna. */
+  prioritetPoolova: PrioritetPoolova;
   brziRazvoj: boolean;
   odstupanjaPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
   pragoviPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
@@ -92,6 +81,17 @@ export const ZASTARJELA_POLJA_BOT_POLITIKE = [
   'maksimalniUdioPoteza',
   'vjerojatnostNeznanjaPoSudjelovanju',
   'rasponTeskogPotezaNeznanja',
+  // Botovi V8: Dokaži-specifične poluge — strip iz starih admin JSON snapshotova.
+  'dokaziBudzetDetaljneProvjere',
+  'dokaziBudzetDodatneProvjere',
+  'vjerojatnostDokaziPreskokaPotvrde',
+  'dokaziFaktorPropusaPotvrde',
+  // Botovi V8: KA bez vjerojatnosti propusta/ostavljanja.
+  'vjerojatnostOstavljanjaKa',
+  'vjerojatnostPropustaKa',
+  // Botovi V8 C10: stara 1-ply taktika.
+  'vjerojatnostTaktickogPoteza',
+  'maksimalnoTaktickihKandidata',
 ] as const;
 
 export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
@@ -101,16 +101,11 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   trajanjePotezaBotaMs: 4_000,
   jitterPotezaBotaMs: 300,
   odgodaReakcijeMinMs: 2_000,
-  vjerojatnostOstavljanjaKa: 0.015,
-  vjerojatnostPropustaKa: 0.08,
   vjerojatnostNeznanjaUMalomSkupu: 0.1,
   maksimalnoOpcijaMalogSkupa: 3,
-  vjerojatnostTaktickogPoteza: 0.25,
-  maksimalnoTaktickihKandidata: 12,
-  dokaziBudzetDetaljneProvjere: 12,
-  dokaziBudzetDodatneProvjere: 12,
-  vjerojatnostDokaziPreskokaPotvrde: 0,
-  dokaziFaktorPropusaPotvrde: 0,
+  vjerojatnostAgresivnosti: 0.3,
+  vjerojatnostShielda: 0.6,
+  prioritetPoolova: 'p2_p1',
   brziRazvoj: false,
   odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [0, 0], cetiri_igraca: [3_000, 3_000, 3_000] },
   pragoviPopuneMs: structuredClone(PRAGOVI_POPUNE_MS),
@@ -149,16 +144,11 @@ export const ShemaKonfiguracijeBota = z.object({
   trajanjePotezaBotaMs: z.number().int().min(500).max(30_000),
   jitterPotezaBotaMs: z.number().int().min(0).max(2_000),
   odgodaReakcijeMinMs: z.number().int().min(0).max(10_000),
-  vjerojatnostOstavljanjaKa: Vjerojatnost,
-  vjerojatnostPropustaKa: Vjerojatnost.default(0.08),
   vjerojatnostNeznanjaUMalomSkupu: Vjerojatnost,
   maksimalnoOpcijaMalogSkupa: z.number().int().min(1).max(20),
-  vjerojatnostTaktickogPoteza: Vjerojatnost,
-  maksimalnoTaktickihKandidata: z.number().int().min(1).max(50),
-  dokaziBudzetDetaljneProvjere: z.number().int().min(1).max(50).default(12),
-  dokaziBudzetDodatneProvjere: z.number().int().min(0).max(50).default(12),
-  vjerojatnostDokaziPreskokaPotvrde: Vjerojatnost.default(0),
-  dokaziFaktorPropusaPotvrde: Vjerojatnost.default(0),
+  vjerojatnostAgresivnosti: Vjerojatnost,
+  vjerojatnostShielda: Vjerojatnost,
+  prioritetPoolova: z.enum(['p2_p1', 'p1_p2']),
   brziRazvoj: z.boolean(),
   odstupanjaPopuneMs: Pragovi,
   pragoviPopuneMs: Pragovi,
@@ -211,11 +201,10 @@ export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): K
     botoviTroboj: env.BOTOVI_TROBOJ === 'true',
     botoviCetveroboj: env.BOTOVI_CETVEROBOJ === 'true',
     brziRazvoj: lokalnoTestiranje,
-    vjerojatnostOstavljanjaKa: postotak(env.BOT_VJEROJATNOST_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa),
-    vjerojatnostPropustaKa: postotak(env.BOT_VJEROJATNOST_PROPUSTA_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropustaKa),
     vjerojatnostNeznanjaUMalomSkupu: postotak(env.BOT_NEZNANJE_U_MALOM_SKUPU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostNeznanjaUMalomSkupu),
     maksimalnoOpcijaMalogSkupa: cijeliBroj(env.BOT_MAKS_OPCIJA_MALOG_SKUPA, ZADANA_KONFIGURACIJA_BOTA.maksimalnoOpcijaMalogSkupa, 1, 20),
-    vjerojatnostTaktickogPoteza: postotak(env.BOT_VJEROJATNOST_TAKTICKOG_POTEZA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza),
-    maksimalnoTaktickihKandidata: cijeliBroj(env.BOT_MAKS_TAKTICKIH_KANDIDATA, ZADANA_KONFIGURACIJA_BOTA.maksimalnoTaktickihKandidata, 1, 50),
+    vjerojatnostAgresivnosti: postotak(env.BOT_VJEROJATNOST_AGRESIVNOSTI, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostAgresivnosti),
+    vjerojatnostShielda: postotak(env.BOT_VJEROJATNOST_SHIELDA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostShielda),
+    prioritetPoolova: env.BOT_PRIORITET_POOLOVA === 'p1_p2' ? 'p1_p2' : ZADANA_KONFIGURACIJA_BOTA.prioritetPoolova,
   };
 }

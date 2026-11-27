@@ -415,6 +415,19 @@ export const operativnePrimjene = pgTable('operativne_primjene', {
   napomena: text('napomena'),
 });
 
+export const kategorijaBotPoola = pgEnum('kategorija_bot_poola', ['pool_1', 'pool_2']);
+export const stanjeBotPoolClana = pgEnum('stanje_bot_pool_clana', ['nerazrijeseno', 'razrijeseno']);
+
+/** Urednički taktički poolovi (Botovi V8); članstvo preživljava promjene rječnika uz eksplicitna pravila. */
+export const botPoolClanovi = pgTable('bot_pool_clanovi', {
+  rijec: text('rijec').primaryKey(),
+  kategorija: kategorijaBotPoola('kategorija').notNull(),
+  stanje: stanjeBotPoolClana('stanje').notNull().default('nerazrijeseno'),
+  ranijeAktivno: boolean('ranije_aktivno').notNull().default(false),
+  dodan: timestamp('dodan', { withTimezone: true }).notNull().defaultNow(),
+  azuriran: timestamp('azuriran', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const partije = pgTable('partije', {
   id: uuid('id').primaryKey().defaultRandom(),
   mod: modPartije('mod').notNull().default('cetiri_igraca'),

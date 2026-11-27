@@ -10,16 +10,11 @@
     trajanjePotezaBotaMs: number;
     jitterPotezaBotaMs: number;
     odgodaReakcijeMinMs: number;
-    vjerojatnostOstavljanjaKa: number;
-    vjerojatnostPropustaKa: number;
     vjerojatnostNeznanjaUMalomSkupu: number;
     maksimalnoOpcijaMalogSkupa: number;
-    vjerojatnostTaktickogPoteza: number;
-    maksimalnoTaktickihKandidata: number;
-    dokaziBudzetDetaljneProvjere: number;
-    dokaziBudzetDodatneProvjere: number;
-    vjerojatnostDokaziPreskokaPotvrde: number;
-    dokaziFaktorPropusaPotvrde: number;
+    vjerojatnostAgresivnosti: number;
+    vjerojatnostShielda: number;
+    prioritetPoolova: 'p2_p1' | 'p1_p2';
     brziRazvoj: boolean;
     odstupanjaPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
     pragoviPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
@@ -222,21 +217,18 @@
             <label>Udio imenica<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.udioImenica} /><span>{postotak(nacrt.udioImenica)}</span></label>
             <label>Skala log frekvencije<input type="number" min="0" max="10" step="0.1" bind:value={nacrt.skalaLogFrekvencije} /></label>
             <label>Ponder duljine po slovu<input type="number" min="0" max="2" step="0.01" bind:value={nacrt.ponderDuljinePoGrafemu} /></label>
-            <label>Dobrovoljni KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostOstavljanjaKa} /><span>{postotak(nacrt.vjerojatnostOstavljanjaKa)}</span></label>
-            <label>Propust tuđeg KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostPropustaKa} /><span>{postotak(nacrt.vjerojatnostPropustaKa)}</span></label>
             <label>„Ne znam” u malom skupu<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostNeznanjaUMalomSkupu} /><span>{postotak(nacrt.vjerojatnostNeznanjaUMalomSkupu)}</span></label>
             <label>Maks. opcija malog skupa<input type="number" min="1" max="20" bind:value={nacrt.maksimalnoOpcijaMalogSkupa} /></label>
-            <label>Taktički potez<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostTaktickogPoteza} /><span>{postotak(nacrt.vjerojatnostTaktickogPoteza)}</span></label>
-            <label>Maks. taktičkih kandidata<input type="number" min="1" max="50" bind:value={nacrt.maksimalnoTaktickihKandidata} /></label>
+            <label>Agresivnost (poolovi)<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostAgresivnosti} /><span>{postotak(nacrt.vjerojatnostAgresivnosti)}</span></label>
+            <label>Shield (dvoboj)<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostShielda} /><span>{postotak(nacrt.vjerojatnostShielda)}</span></label>
+            <label>Prioritet poolova
+              <select bind:value={nacrt.prioritetPoolova}>
+                <option value="p2_p1">Pool 2 → Pool 1</option>
+                <option value="p1_p2">Pool 1 → Pool 2</option>
+              </select>
+            </label>
           </div>
-        </fieldset>
-        <fieldset><legend>Dokaži nastavak (javni default)</legend>
-          <div class="polja">
-            <label>Budžet detaljne potvrde<input type="number" min="1" max="50" bind:value={nacrt.dokaziBudzetDetaljneProvjere} /></label>
-            <label>Budžet dodatne potvrde<input type="number" min="0" max="50" bind:value={nacrt.dokaziBudzetDodatneProvjere} /></label>
-            <label>Preskok potvrde<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostDokaziPreskokaPotvrde} /><span>{postotak(nacrt.vjerojatnostDokaziPreskokaPotvrde)}</span></label>
-            <label>Faktor propusta potvrde<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.dokaziFaktorPropusaPotvrde} /><span>{postotak(nacrt.dokaziFaktorPropusaPotvrde)}</span></label>
-          </div>
+          <p class="napomena">Javna Brza igra forsira Iskusni poluge (agresivnost/Shield/prioritet/neznanje) bez obzira na ove postavke. Poolovi se uređuju seedom/syncem, ne ovdje.</p>
         </fieldset>
         <fieldset><legend>Popuna javnog reda</legend>
           <div class="polja">

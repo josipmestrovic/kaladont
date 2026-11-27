@@ -42,8 +42,8 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Uža glavna navigacija ima osnovne retke **Igraj**, **Pravila**, **Ljestvica** i **Moja statistika**. „Moja statistika” vodi na zadani statistički prikaz `/profil#statistika`. Sekundarne stavke imaju tamni standardni tekst i ikone, zelenu strelicu te tekst lijevo poravnat uz ikonu.
 - Glavna navigacija koristi vlastite SVG assete: `GiToothbrush` za Igraj, `GiSpellBook` za Pravila, `GiHoleLadder` za Ljestvicu, `GiGamepad` za Moju statistiku, `GiAutoRepair` za Postavke, `GiExitDoor` za Odjavu te `GiTwoShadows` za Prijavu i Registraciju. Modal igre koristi ikone formata (uključujući Troboj) i privatne sobe.
 - Svi korisnici vide **Postavke** (`/postavke`, uz preusmjeravanje na `/profil?tab=postavke#postavke`); promjena teme dostupna je isključivo ondje. Registrirani korisnik dodatno vidi blago narančastu akciju **Odjavi se**. Gost vidi **Prijavi se** i **Registriraj se**. Editor avatara (`/profil/avatar`) dostupan je i gostima.
-- <!-- HINT: Brza igra = instant ulaz u Troboj+Klasični; Trening zadržava modal. -->
-- Glavna navigacija: **Brza igra**, **Izazovi**, **Trening**, **Privatna soba**. **Brza igra** ide izravno na `/red?mod=tri_igraca&pravila=klasicni` (bez modala). **Trening** otvara modal: pravilnik → težina → broj botova (URL `/zagrijavanje` ostaje). Ostali javni redovi nisu dostupni u UI-ju.
+- <!-- HINT: Brza igra = instant ulaz u Troboj+Klasični; Trening = /trening (ADR-019). -->
+- Glavna navigacija: **Brza igra**, **Izazovi**, **Trening**, **Privatna soba**. **Brza igra** ide izravno na `/red?mod=tri_igraca&pravila=klasicni` (bez modala). **Trening** vodi na `/trening`: težina bota → broj botova (Klasični pravilnik fiksan; URL pokretanja `/zagrijavanje`). Ostali javni redovi nisu dostupni u UI-ju.
 - **Pravila** vode na `/pravila-kaladonta`, a **Ljestvice** na `/ljestvice`. Kratki SEO uvod ispod H1 vodi na hub pravila; na niskim ekranima ostaje u DOM-u (vizualno skriven) radi SEO-a. Vertikalni scroll na naslovnici je dopušten.
 - Tipografija na naslovnici: labele glavne navigacije **20px** (mobitel) / **24px** (desktop); prekidači **Font za disleksiju** i **Čitanje naglas** **16px** / **18px**. Ako labele prekidača ne stanu u jedan red, prelaze u drugi (bez truncatea).
 - Footer na dnu naslovnice sadrži **Povratne informacije** (`/povratne-informacije`), **Uvjeti** (`/uvjeti`) i **Privatnost** (`/privatnost`). CTA **pridruži zajednici** (forum) je u SEO uvodu, ne u footeru. Desktop: navigacija lijevo, copyright desno; mobitel: copyright ispod navigacije.
@@ -59,11 +59,12 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Popuna botovima za Troboj: fiksno **10 s / 20 s** bez jittera ([botovi.md](../02-pravila-igre/botovi.md)). Timer poteza ostaje **30 s**.
 - Gosti idu ravno u čekaonicu bez prompta za ime.
 
-## 2d. Trening (`/zagrijavanje`)
+## 2d. Trening (`/trening` → `/zagrijavanje`)
 
-- Stranica odmah šalje `trening:zapocni`, prikazuje „Pripremamo dvoboj protiv računala…”, napomenu da se ništa ne bilježi i gumb **Odustani**. Nakon `partija:pocetak` odbrojava kao čekaonica i vodi na `/partija/:id`.
+- Setup na `/trening`: igrač bira **težinu** (zadano Iskusni) i **broj botova** (1–3). Pravilnik je uvijek Klasični ([ADR-019](../03-arhitektura/odluke/019-trening-samo-klasicni.md)); nema odabira KA-zna / Dokaži nastavak.
+- `/zagrijavanje` odmah šalje `trening:zapocni` s `pravila=klasicni`, prikazuje pripremu s težinom, napomenu o treningu i gumb **Odustani**. Nakon `partija:pocetak` vodi na `/partija/:id`.
 - Greška (zauzet poslužitelj, isključen trening, aktivna partija ili soba) prikazuje poruku i **Pokušaj ponovno**; igrač koji već ima partiju preusmjerava se na nju.
-- Protivnik je uvijek „Računalo” s jednim stalnim avatarom (`AVATAR_RACUNALA`). Stol, timer i potezi identični su javnom Dvoboju; XP, nagrade za riječi, kolekcija i dostignuća nisu prikazani ni tijekom igre.
+- Protivnici su privremeni botovi po odabranom profilu (fiksna imena/avatari). Nema timera poteza; natjecateljski XP/rang/forma nisu dio treninga (kolekcija/XP riječi i Zagrijan po postojećim pravilima).
 
 ## 2b. Povratne informacije (`/povratne-informacije` i `/zahvala-za-informacije`)
 

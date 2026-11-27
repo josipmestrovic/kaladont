@@ -11,7 +11,7 @@ Hrvatska online višeigračka igra riječi: reci riječ koja počinje na posljed
 - **Troboj** — 3 igrača, 30 s po potezu.
 - **Četveroboj** — 4 igrača, 30 s po potezu, ispadanje do posljednjeg.
 - **Privatna soba** — 2 do 8 igrača; domaćin bira pravilnik, tajmer i vrste riječi.
-- **Zagrijavanje** — trening odabranog pravilnika protiv Računala, bez natjecateljske statistike.
+- **Zagrijavanje** — trening Klasičnog pravilnika protiv Računala (1–3 bota, odabrana težina), bez natjecateljske statistike.
 - U javnom redu prazna mjesta nakon pragova mogu popuniti **botovi**; ljudima vrijedi isti obračun.
 - Jedan univerzalni **rang** i jedan **Kaladont DNK** za sve javne formate; ljestvice su po formatu (ulaz 5/10).
 

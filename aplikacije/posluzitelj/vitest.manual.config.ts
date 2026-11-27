@@ -5,7 +5,8 @@ process.env.ODGODA_POCETKA_PARTIJE_MS = '0';
 process.env.TOLERANCIJA_PREKIDA_MS = '300';
 process.env.BOT_IZOSTANAK_PO_SUDJELOVANJU = '0';
 process.env.BOT_NEZNANJE_U_MALOM_SKUPU = '0';
-process.env.BOT_VJEROJATNOST_TAKTICKOG_POTEZA = '0';
+process.env.BOT_VJEROJATNOST_AGRESIVNOSTI = '0';
+process.env.BOT_VJEROJATNOST_SHIELDA = '0';
 
 export default defineConfig({
   test: {
@@ -20,7 +21,8 @@ export default defineConfig({
       DIGEST: 'lokalno',
       BOT_IZOSTANAK_PO_SUDJELOVANJU: '0',
       BOT_NEZNANJE_U_MALOM_SKUPU: '0',
-      BOT_VJEROJATNOST_TAKTICKOG_POTEZA: '0',
+      BOT_VJEROJATNOST_AGRESIVNOSTI: '0',
+      BOT_VJEROJATNOST_SHIELDA: '0',
       ONEMOGUCI_TIMER_POTEZA: 'true',
       ODGODA_POCETKA_PARTIJE_MS: '0',
       TOLERANCIJA_PREKIDA_MS: '300',

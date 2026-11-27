@@ -2,7 +2,9 @@
  * Zajednički ograničeni repertoar botova (politika v7).
  * Jedna generacija po procesu, dijeljena svim botovima i partijama.
  */
+import { performance } from 'node:perf_hooks';
 import { grafemi, PRAGOVI_DULJINE, zadnjaDva } from 'zajednicko';
+import { BUDZET_SLICE_MS, CHECKPOINT_ZAPISA } from './raspored-odziva.js';
 
 function jeNepoznataBotu(rijec: string, frekvencija: number | null): boolean {
   const brojGrafema = grafemi(rijec).length;
@@ -14,9 +16,6 @@ function jeNepoznataBotu(rijec: string, frekvencija: number | null): boolean {
 export const REPERTOAR_GLAVNI_PO_PREFIKSU = 256;
 export const REPERTOAR_REZERVA_PO_PREFIKSU = 256;
 export const RADNI_UZORAK_PO_POTEZU = 100;
-export const DETALJNA_PROVJERA_PO_POTEZU = 12;
-export const DOKAZ_DODATNA_PROVJERA = 12;
-export const UKUPNO_DETALJNO_PROVJERA = 24;
 
 /** Završeci koji taktici dodaju bod (teži nastavak za protivnika). */
 export const OPASNI_ZAVRSETCI_ZA_TAKTIKU: readonly string[] = ['ća', 'će', 'ši'];
@@ -229,6 +228,35 @@ export function* poznatiNastavciIzRepertoara(
   provjeriIgrivost: (rijec: string) => boolean,
 ): Generator<string> {
   yield* igriviKandidatiIzRepertoara(snimka, prefiks, provjeriIgrivost);
+}
+
+/**
+ * Nastavivi iterator poznatih kandidata: broji sve pregledane zapise prije igrivost
+ * filtera; yield samo igrive; predaje kontrolu na checkpoint / slice budžet.
+ */
+export function poznatiNastavciNastavivo(
+  snimka: SnimkaRepertoara,
+  prefiks: string,
+  provjeriIgrivost: (rijec: string) => boolean,
+  predaj: () => Promise<void>,
+  aktivan: () => boolean,
+): AsyncIterable<string> {
+  return {
+    async *[Symbol.asyncIterator](): AsyncGenerator<string> {
+      let n = 0;
+      let pocetakSlicea = performance.now();
+      for (const rijec of kandidatiRepertoaraNaPrefiksu(snimka, prefiks)) {
+        n += 1;
+        if (provjeriIgrivost(rijec)) yield rijec;
+        const budzetIstekao = performance.now() - pocetakSlicea >= BUDZET_SLICE_MS;
+        if (n % CHECKPOINT_ZAPISA === 0 || budzetIstekao) {
+          await predaj();
+          pocetakSlicea = performance.now();
+          if (!aktivan()) return;
+        }
+      }
+    },
+  };
 }
 
 export function prefiksImaPrijemljivuRijec(

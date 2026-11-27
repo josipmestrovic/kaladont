@@ -37,6 +37,14 @@
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
   import NadimakBota from '$lib/komponente/NadimakBota.svelte';
+  import BotDebugPanel from '$lib/komponente/BotDebugPanel.svelte';
+  import {
+    botDebugOtvoren,
+    botDebugPretplacen,
+    dodajBotDebugZapis,
+    postaviBotDebugPretplacen,
+    resetirajBotDebugZaPartiju,
+  } from '$lib/bot-debug-store.svelte.js';
   import { profilIzNadimkaTreningBota, putanjaPonovneIgre } from '$lib/igraj-rute.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
@@ -46,7 +54,7 @@
   import { pokusajPljesakPobjede, trebaKonfetiRezultata } from '$lib/nagrade-efekti.js';
   import { ArrowUp, CircleAlert } from 'lucide-svelte';
   import { bonusPobjednickogNiza, dohvatiDefinicijuDostignuca, formatirajNadimakBota, nazivOznakeDuljine, nazivOznakeRijetkosti, ODGODA_PRIKAZA_REZULTATA_MS, ODGODA_PRIKAZA_REZULTATA_TRENING_MS, PORUKE, tekstZavrsnogSazetka, zadnjaDva } from 'zajednicko';
-  import type { BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
+  import type { BotDebugZapis, BrzaPoruka, Eliminacija, KrajPartije, NagradaZaRijec, NovoDostignuceTijekomPartije, OdbijenPotez, OtkljucavanjeRijeci, OznakeNoveRijeci, PotvrdaNaredbePoteza, PrihvacenPotez, RundaOtvorena, StavkaIskustva, StanjePartije } from 'zajednicko';
 
   const stanje = dohvatiStanjeIgre();
   const stanjeVeze = dohvatiStanjeVeze();
@@ -1012,6 +1020,67 @@
   function mobilniZaslon(): boolean {
     return typeof window !== 'undefined' && window.matchMedia('(max-width: 999px)').matches;
   }
+
+  const stagingOkruzenje = $derived($page.data.okruzenje === 'staging');
+  const botDebugKontekstOk = $derived(
+    stanje.kontekst === 'javna' || stanje.kontekst === 'trening' || stanje.kontekst === 'izazov',
+  );
+  let botDebugDesktop = $state(false);
+  const botDebugVidljiv = $derived(
+    stagingOkruzenje && botDebugDesktop && botDebugKontekstOk && !stanje.kraj,
+  );
+
+  function naBotDebugZapis(zapis: BotDebugZapis): void {
+    if (zapis.partijaId !== partijaId) return;
+    dodajBotDebugZapis(zapis);
+  }
+
+  function osigurajBotDebugPretplatu(): void {
+    if (!botDebugVidljiv || !partijaId || botDebugPretplacen()) return;
+    const socket = dohvatiSocket();
+    socket.emit('bot:debug:pretplati', { partijaId });
+    postaviBotDebugPretplacen(true);
+  }
+
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1000px)');
+    const osvjezi = () => {
+      botDebugDesktop = mq.matches;
+    };
+    osvjezi();
+    mq.addEventListener('change', osvjezi);
+    return () => mq.removeEventListener('change', osvjezi);
+  });
+
+  $effect(() => {
+    if (!botDebugVidljiv) return;
+    const socket = dohvatiSocket();
+    socket.on('bot:debug:zapis', naBotDebugZapis);
+    return () => {
+      socket.off('bot:debug:zapis', naBotDebugZapis);
+    };
+  });
+
+  $effect(() => {
+    if (botDebugOtvoren() && botDebugVidljiv) osigurajBotDebugPretplatu();
+  });
+
+  $effect(() => {
+    // Nova partija / izlaz — očisti lokalne zapise i otkaži pretplatu.
+    const id = partijaId;
+    return () => {
+      if (!id) return;
+      if (botDebugPretplacen()) {
+        try {
+          dohvatiSocket().emit('bot:debug:otkazi', { partijaId: id });
+        } catch {
+          // ignore
+        }
+      }
+      resetirajBotDebugZaPartiju();
+    };
+  });
 
   function osigurajZastituPovijesti(razina: Exclude<ZastitaPovijesti, 'nema'>) {
     if (typeof history === 'undefined' || !mobilniZaslon()) return;
@@ -2005,6 +2074,7 @@
   <div class="kraj-donje-praznine" aria-hidden="true"></div>
   {/if}
 {:else}
+  <BotDebugPanel vidljiv={botDebugVidljiv} />
   <div class="aktivna-partija-sadrzaj">
   {#if jeIzazov && !prikaziRezultate}
     <NapredakCiljevaIzazova

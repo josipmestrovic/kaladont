@@ -13,6 +13,14 @@ describe('BotKontroler per-partija snapshot (PR02)', () => {
         verzijaRjecnika: 1,
         imaSlobodnuRijecNa: () => false,
         repertoarBotova: () => ({}) as never,
+        pooloviBotova: () => ({
+          generacija: 0,
+          verzijaRjecnika: 1,
+          poPrefiksu: new Map(),
+          clanovi: new Set(),
+          pool1Clanovi: new Set(),
+          pool2Clanovi: new Set(),
+        }),
         jeIgrivaRijec: () => false,
         frekvencijaZa: () => 0,
       },
@@ -25,13 +33,13 @@ describe('BotKontroler per-partija snapshot (PR02)', () => {
     kontroler.postaviKonfiguracijuPartije('p-iskusni', iskusni);
     kontroler.postaviKonfiguracijuPartije('p-majstor', majstor);
 
-    globalna.vjerojatnostTaktickogPoteza = 0.99;
-    expect(kontroler.dohvatiKonfiguracijuPartije('p-iskusni')?.vjerojatnostTaktickogPoteza).toBe(0.25);
-    expect(kontroler.dohvatiKonfiguracijuPartije('p-majstor')?.vjerojatnostTaktickogPoteza).toBe(0.5);
+    globalna.vjerojatnostAgresivnosti = 0.99;
+    expect(kontroler.dohvatiKonfiguracijuPartije('p-iskusni')?.vjerojatnostAgresivnosti).toBe(0.3);
+    expect(kontroler.dohvatiKonfiguracijuPartije('p-majstor')?.vjerojatnostAgresivnosti).toBe(0.6);
 
     // Mutacija vraćene kopije ne dira internu mapu.
     const kopija = kontroler.dohvatiKonfiguracijuPartije('p-majstor')!;
-    kopija.vjerojatnostTaktickogPoteza = 0.11;
-    expect(kontroler.dohvatiKonfiguracijuPartije('p-majstor')?.vjerojatnostTaktickogPoteza).toBe(0.5);
+    kopija.vjerojatnostAgresivnosti = 0.11;
+    expect(kontroler.dohvatiKonfiguracijuPartije('p-majstor')?.vjerojatnostAgresivnosti).toBe(0.6);
   });
 });

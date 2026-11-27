@@ -3,7 +3,7 @@
  * Baza je izvor istine, ali igra ne pita bazu ni za jedan potez. Nazivi grupa se
  * kanoniziraju (jedan string objekt po grupi) pa su reference jeftine kao brojevi.
  */
-import type { RjecnikSucelje, VrstaRijeci } from 'zajednicko';
+import type { RazlogMrtvihSlova, RjecnikSucelje, VrstaRijeci } from 'zajednicko';
 import { asc, eq, gt, and } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import { rijeci, vlastitaImena } from '../baza/shema.js';
@@ -15,7 +15,14 @@ import {
   POCETNI_SEED_SIGURNIH_RIJECI,
 } from './pocetne-rijeci.js';
 import { ucitajSigurnePocetneRijeciIzBaze } from './sigurni-skup.js';
+import { CHECKPOINT_ZAPISA, BUDZET_SLICE_MS } from '../bot/raspored-odziva.js';
 import { izgradiRepertoarBotova, type SnimkaRepertoara, UpraviteljRepertoara } from '../bot/repertoar.js';
+import {
+  izgradiSnimkuPoolova,
+  UpraviteljPoolova,
+  type SnimkaPoolova,
+} from '../bot/poolovi-indeks.js';
+import { uskladiPoolovePriPokretanju } from '../bot/poolovi-trajno.js';
 import { ocistiMemorijuNajopasnijihRijeci } from '../ljestvice/najopasnije-rijeci.js';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
@@ -51,6 +58,27 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
     samoOsnovniOblici?: boolean,
     minDuljinaRijeci?: number,
   ): boolean;
+  /** Jedan prolaz po prefiksu: null = živ nastavak; inače razlog mrtvih slova. */
+  stanjePrefiksa(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): RazlogMrtvihSlova | null;
+  /**
+   * Postoji li igriva riječ na prefiksu — nastavivo, s predajom kontrole.
+   * `otkazano` nije isto što i false.
+   */
+  imaSlobodnuRijecNaNastavivo(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    predaj: () => Promise<void>,
+    aktivan: () => boolean,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): Promise<boolean | 'otkazano'>;
   /** Igrive riječi na prefiks, bez kopiranja indeksa; redoslijed je redoslijed indeksa, ne rang. */
   igriviKandidati(
     dvaGrafema: string,
@@ -78,6 +106,11 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   /** Zajednički botov repertoar (256+256 po prefiksu). */
   repertoarBotova(): SnimkaRepertoara;
   verzijaRepertoara(): number;
+  /** Zajednička snimka taktičkih poolova (C09). */
+  pooloviBotova(): SnimkaPoolova;
+  verzijaPoolova(): number;
+  /** Ponovno učitaj članstva poolova iz baze i objavi snimku. */
+  obnoviPoolove(): Promise<void>;
   /** Kljucevi početnih prefiksa u RAM mapi (za izgradnju repertoara). */
   prefiksiRjecnika(): readonly string[];
   rijeciNaPrefiksu(prefiks: string): readonly string[];
@@ -128,6 +161,8 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
   let ciljevi: CiljeviRijeci = { rijetke: { ukupno: 0, niska: 0, srednja: 0, jaka: 0 }, duge: { ukupno: 0, duga: 0, srednja: 0, jaka: 0 } };
   let verzija = 0;
   const upraviteljRepertoara = new UpraviteljRepertoara();
+  const upraviteljPoolova = new UpraviteljPoolova();
+  let generacijaPoolova = 0;
   let rebuildRepertoaraZakazan = false;
   let rebuildRepertoaraUTijeku = false;
 
@@ -151,6 +186,35 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     console.info(
       `Repertoar botova: ${snimka.poPrefiksu.size} prefiksa, generacija ${snimka.generacija}, ${ms} ms`,
     );
+  }
+
+  async function obnoviPooloveIzBaze(): Promise<void> {
+    try {
+      const clanovi = await uskladiPoolovePriPokretanju();
+      generacijaPoolova += 1;
+      const snimka = izgradiSnimkuPoolova({
+        clanovi,
+        jeAktivnaURjecnika: (rijec) => rijecGrupe.has(rijec),
+        verzijaRjecnika: verzija,
+        generacija: generacijaPoolova,
+      });
+      upraviteljPoolova.objavi(snimka);
+      console.info(
+        `Poolovi botova: ${snimka.clanovi.size} aktivnih članova, generacija ${snimka.generacija}`,
+      );
+    } catch (greska) {
+      // Tablica možda još nije migrirana (stari testovi) — prazna snimka samo pri prvom učitavanju.
+      // Živu snimku ne briši: blip/seed race ne smije ugasiti agresivnost do sljedećeg uspjeha.
+      console.warn('Učitavanje bot poolova nije uspjelo; zadržavam postojeću snimku ako postoji.', greska);
+      if (upraviteljPoolova.dohvati().clanovi.size === 0) {
+        upraviteljPoolova.objavi(izgradiSnimkuPoolova({
+          clanovi: [],
+          jeAktivnaURjecnika: () => false,
+          verzijaRjecnika: verzija,
+          generacija: generacijaPoolova,
+        }));
+      }
+    }
   }
 
   /** Spoji više admin izmjena u jedan rebuild (setImmediate). */
@@ -444,6 +508,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     osvjeziIzvedeneBrojace();
     verzija += 1;
     obnoviRepertoarBotova();
+    await obnoviPooloveIzBaze();
     ocistiMemorijuNajopasnijihRijeci();
   }
 
@@ -528,6 +593,70 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     if (!lista) return false;
     for (const rijec of lista) {
       if (jePostojecaRijec(rijec)) return true;
+    }
+    return false;
+  }
+
+  /** Jedan prolaz po `poPrefiksu`: prva igriva → null; inače baza vs. iskorišteno. */
+  function stanjePrefiksaJedanProlaz(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): RazlogMrtvihSlova | null {
+    const lista = poPrefiksu.get(dvaGrafema);
+    if (!lista) return 'mrtva_slova_baza';
+    let vidjenaPostojeca = false;
+    for (const rijec of lista) {
+      if (jePostojecaRijec(rijec)) vidjenaPostojeca = true;
+      if (jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
+        return null;
+      }
+    }
+    return vidjenaPostojeca ? 'mrtva_slova_iskoristeno' : 'mrtva_slova_baza';
+  }
+
+  function stanjePrefiksa(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): RazlogMrtvihSlova | null {
+    return stanjePrefiksaJedanProlaz(
+      dvaGrafema,
+      iskoristeneGrupe,
+      dopusteneVrste,
+      samoOsnovniOblici,
+      minDuljinaRijeci,
+    );
+  }
+
+  async function imaSlobodnuRijecNaNastavivo(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    predaj: () => Promise<void>,
+    aktivan: () => boolean,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): Promise<boolean | 'otkazano'> {
+    const lista = poPrefiksu.get(dvaGrafema);
+    if (!lista) return false;
+    let n = 0;
+    let pocetakSlicea = performance.now();
+    for (const rijec of lista) {
+      n += 1;
+      if (jeIgriva(rijec, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
+        return true;
+      }
+      const budzetIstekao = performance.now() - pocetakSlicea >= BUDZET_SLICE_MS;
+      if (n % CHECKPOINT_ZAPISA === 0 || budzetIstekao) {
+        await predaj();
+        pocetakSlicea = performance.now();
+        if (!aktivan()) return 'otkazano';
+      }
     }
     return false;
   }
@@ -685,7 +814,9 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     jeOsnovniOblik,
     jeIgrivaRijec: jeIgriva,
     postojeRijeciNa,
+    stanjePrefiksa,
     imaSlobodnuRijecNa,
+    imaSlobodnuRijecNaNastavivo,
     igriviKandidati,
     verzijaRjecnika: () => verzija,
     nasumicnaPocetnaRijec: (iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci) => {
@@ -734,6 +865,9 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     },
     repertoarBotova: () => upraviteljRepertoara.dohvati(),
     verzijaRepertoara: () => upraviteljRepertoara.verzija(),
+    pooloviBotova: () => upraviteljPoolova.dohvati(),
+    verzijaPoolova: () => upraviteljPoolova.verzija(),
+    obnoviPoolove: obnoviPooloveIzBaze,
     prefiksiRjecnika: () => [...poPrefiksu.keys()],
     rijeciNaPrefiksu: (prefiks: string) => poPrefiksu.get(prefiks) ?? [],
     ponovoUcitaj: ucitaj,

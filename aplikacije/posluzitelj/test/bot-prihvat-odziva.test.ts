@@ -9,15 +9,15 @@ import {
   odaberiPotezNastavivo,
   stvoriStanjeBota,
 } from '../src/bot/odabir-rijeci.js';
-import { CHECKPOINT_ZAPISA } from '../src/bot/raspored-odziva.js';
+import { BUDZET_SLICE_MS, CHECKPOINT_ZAPISA } from '../src/bot/raspored-odziva.js';
+import { poznatiNastavciNastavivo, type SnimkaRepertoara } from '../src/bot/repertoar.js';
 import { ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
 
 const konfig: KonfiguracijaBota = {
   ...ZADANA_KONFIGURACIJA_BOTA,
-  vjerojatnostPropustaKa: 0,
-  vjerojatnostOstavljanjaKa: 0,
   vjerojatnostNeznanjaUMalomSkupu: 0,
-  vjerojatnostTaktickogPoteza: 0,
+  vjerojatnostAgresivnosti: 0,
+  vjerojatnostShielda: 0,
 };
 
 function rng(seed: number): () => number {
@@ -32,8 +32,9 @@ function rng(seed: number): () => number {
 }
 
 describe('CI prihvat odziva botova', () => {
-  it('rani prekid: postoji nastavak bez čitanja ostatka velikog prefiksa', () => {
+  it('običan potez ne pregledava nastavke (skupe provjere samo u taktici)', () => {
     let pregledano = 0;
+    let indeksPoziva = 0;
     const poznatiKandidatiNa = () => ({
       *[Symbol.iterator](): Generator<string> {
         for (let i = 0; i < 10_000; i += 1) {
@@ -48,16 +49,16 @@ describe('CI prihvat odziva botova', () => {
       kandidati: ['masa'],
       frekvencijaZa: () => 500,
       grupeZa: (r) => [`imenica:${r}`],
-      pravila: 'ka_zna',
+      pravila: 'klasicni',
       brojAktivnih: 2,
       iskoristeneGrupe: new Set(),
-      imaSlobodnuRijecNa: () => true,
+      imaSlobodnuRijecNa: () => { indeksPoziva += 1; return true; },
       poznatiKandidatiNa,
       turnToken: 't-rani',
     }, stvoriStanjeBota(konfig, rng(1)), konfig, rng(1));
     expect(odluka.vrsta).toBe('rijec');
-    // izbjegni + filtriraj mogu dvaput krenuti bez cachea — uz predmemoriju jednom.
-    expect(pregledano).toBeLessThanOrEqual(4);
+    expect(pregledano).toBe(0);
+    expect(indeksPoziva).toBe(0);
   });
 
   it('cache ne raste s poviješću tokena (100 uzastopnih)', () => {
@@ -66,7 +67,9 @@ describe('CI prihvat odziva botova', () => {
     for (let i = 0; i < 100; i += 1) {
       pred.uskladiKontekst(`t-${i}`, 1);
       for (let j = 0; j < 50; j += 1) {
-        pred.dohvatiIliIzracunaj(`k-${j}`, () => j % 2 === 0);
+        pred.dohvatiIliIzracunaj(`k-${j}`, () => (
+          j % 2 === 0 ? { ishod: 'poznat', cestihNeovisnih: 0 } : { ishod: 'mrtvo' }
+        ));
       }
       peak = Math.max(peak, pred.brojZapisa());
       expect(pred.brojZapisa()).toBeLessThanOrEqual(50);
@@ -80,10 +83,10 @@ describe('CI prihvat odziva botova', () => {
     const pred = new PredmemorijaLegalnosti();
     pred.uskladiKontekst('t1', 1);
     for (let i = 0; i < PredmemorijaLegalnosti.LIMIT_ZAPISA + 10; i += 1) {
-      expect(pred.dohvatiIliIzracunaj(`x-${i}`, () => true)).toBe(true);
+      expect(pred.dohvatiIliIzracunaj(`x-${i}`, () => ({ ishod: 'indeks' }))).toEqual({ ishod: 'indeks' });
     }
     expect(pred.brojZapisa()).toBe(PredmemorijaLegalnosti.LIMIT_ZAPISA);
-    expect(pred.dohvatiIliIzracunaj('x-extra', () => false)).toBe(false);
+    expect(pred.dohvatiIliIzracunaj('x-extra', () => ({ ishod: 'mrtvo' }))).toEqual({ ishod: 'mrtvo' });
   });
 
   it('nastavivi odabir predaje kontrolu najmanje jednom na dugom skenu', async () => {
@@ -95,7 +98,7 @@ describe('CI prihvat odziva botova', () => {
         kandidati: ['masa'],
         frekvencijaZa: () => 500,
         grupeZa: (r) => [`imenica:${r}`],
-        pravila: 'ka_zna',
+        pravila: 'klasicni',
         brojAktivnih: 2,
         iskoristeneGrupe: new Set(),
         imaSlobodnuRijecNa: () => true,
@@ -123,13 +126,43 @@ describe('CI prihvat odziva botova', () => {
     expect(predaja).toBeGreaterThanOrEqual(1);
   });
 
+  it('odbačeni repertoar zapisi ulaze u checkpoint n (prije igrivost filtera)', async () => {
+    const N = CHECKPOINT_ZAPISA + 10;
+    const glavni = Array.from({ length: N }, (_, i) => (i === N - 1 ? 'lampa' : `xx${i}`));
+    const snimka: SnimkaRepertoara = {
+      generacija: 1,
+      poPrefiksu: new Map([
+        ['la', { glavni, rezerva: [] }],
+      ]),
+    };
+    const igrive = new Set(['lampa']);
+    let predaja = 0;
+    let yieldano = 0;
+    const predaj = async () => { predaja += 1; };
+    // Produkcijska putanja (kontroler → poznatiNastavciNastavivo).
+    for await (const rijec of poznatiNastavciNastavivo(
+      snimka,
+      'la',
+      (r) => igrive.has(r),
+      predaj,
+      () => true,
+    )) {
+      yieldano += 1;
+      void rijec;
+    }
+    expect(yieldano).toBe(1);
+    // Ako bi se brojali samo legalni (1), predaja bi bila 0 — pad.
+    expect(predaja).toBeGreaterThanOrEqual(1);
+    expect(BUDZET_SLICE_MS).toBe(2);
+  });
+
   it('seeded ekvivalencija sinkronog i nastavivog odabira na malom fixtureu', async () => {
     const ulaz = {
       trazenaSlova: 'ma' as const,
       kandidati: ['masa', 'mast', 'maslac', 'maska'],
       frekvencijaZa: (r: string) => (r === 'maska' ? 200 : 800),
       grupeZa: (r: string) => [`imenica:${r}`],
-      pravila: 'ka_zna' as const,
+      pravila: 'klasicni' as const,
       brojAktivnih: 2,
       iskoristeneGrupe: new Set<string>(),
       imaSlobodnuRijecNa: () => true,

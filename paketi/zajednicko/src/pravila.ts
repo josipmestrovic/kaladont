@@ -88,6 +88,17 @@ export interface RjecnikSucelje {
     samoOsnovniOblici?: boolean,
     minDuljinaRijeci?: number,
   ): boolean;
+  /**
+   * Jedan prolaz po prefiksu — živ nastavak (null) ili razlog mrtvih slova.
+   * Ako nije implementirano, `odrediRazlogMrtvihSlova` pada na dvostruki prolaz.
+   */
+  stanjePrefiksa?(
+    dvaGrafema: string,
+    iskoristeneGrupe: ReadonlySet<string>,
+    dopusteneVrste?: ReadonlySet<VrstaRijeci>,
+    samoOsnovniOblici?: boolean,
+    minDuljinaRijeci?: number,
+  ): RazlogMrtvihSlova | null;
   /** Sigurna početna imenica; ako je nema, rezervna igriva riječ sa slobodnim nastavkom. */
   nasumicnaPocetnaRijec(
     iskoristeneGrupe: ReadonlySet<string>,
@@ -195,6 +206,15 @@ export function odrediRazlogMrtvihSlova(
   samoOsnovniOblici?: boolean,
   minDuljinaRijeci?: number,
 ): RazlogMrtvihSlova | null {
+  if (rjecnik.stanjePrefiksa) {
+    return rjecnik.stanjePrefiksa(
+      dvaGrafema,
+      iskoristeneGrupe,
+      dopusteneVrste,
+      samoOsnovniOblici,
+      minDuljinaRijeci,
+    );
+  }
   if (rjecnik.imaSlobodnuRijecNa(dvaGrafema, iskoristeneGrupe, dopusteneVrste, samoOsnovniOblici, minDuljinaRijeci)) {
     return null;
   }

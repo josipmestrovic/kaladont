@@ -320,8 +320,8 @@ describe('Zagrijavanje', () => {
     }
   });
 
-  // PR08 — tri ulaza (klasični Troboj-trening / KA-ZNA / Dokaži) + izolacija javnih agregata.
-  it('PR08 klasični trening: tri_igraca, Iskusni 1/2 i različiti avatari', async () => {
+  // ADR-019 — Trening isključivo Klasični; broj botova ne ovisi o pravilniku.
+  it('ADR-019 klasicni bez brojRacunala: dva_igraca, jedan Iskusni', async () => {
     const prije = await snimkaNapretka();
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
@@ -335,15 +335,13 @@ describe('Zagrijavanje', () => {
       const runda = await rundaPromise;
       expect(runda.naPotezuId).toBe(pocetak.mojIgracId);
       expect(runda.istekPotezaIso).toBeNull();
-      expect(pocetak.mod).toBe('tri_igraca');
+      expect(pocetak.mod).toBe('dva_igraca');
       expect(pocetak.pravila).toBe('klasicni');
       expect(pocetak.kontekst).toBe('trening');
-      expect(pocetak.sjedala).toHaveLength(3);
+      expect(pocetak.sjedala).toHaveLength(2);
       const racunala = pocetak.sjedala.filter((s) => s.jeBot);
-      expect(racunala).toHaveLength(2);
-      expect(racunala.map((s) => s.nadimak).sort()).toEqual(['BOTANIČAR', 'BOTOGRAF']);
-      const avatari = new Set(racunala.map((s) => JSON.stringify(s.avatarConfig)));
-      expect(avatari.size).toBe(2);
+      expect(racunala).toHaveLength(1);
+      expect(racunala[0]?.nadimak).toBe('BOTANIČAR');
       // #108: ispadanje jedinog čovjeka odmah završava Zagrijavanje (bez bot-vs-bot).
       const kraj = cekaj<KrajPartije>(socket, 'partija:kraj', () => true, 5_000);
       socket.emit('partija:izadji');
@@ -354,13 +352,13 @@ describe('Zagrijavanje', () => {
     expect(await snimkaNapretka()).toEqual(prije);
   });
 
-  it('PR08 ka_zna i dokazi_nastavak trening ostaju Dvoboj s jednim Iskusnim', async () => {
+  it('ADR-019 stari ka_zna/dokazi_nastavak payload normalizira na klasicni', async () => {
     for (const pravila of ['ka_zna', 'dokazi_nastavak'] as const) {
       const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
       try {
         const { pocetak } = await odigrajTreningDoKraja(socket, false, pravila);
         expect(pocetak.mod).toBe('dva_igraca');
-        expect(pocetak.pravila).toBe(pravila);
+        expect(pocetak.pravila).toBe('klasicni');
         expect(pocetak.sjedala).toHaveLength(2);
         expect(pocetak.sjedala.filter((s) => s.jeBot)).toHaveLength(1);
         expect(pocetak.sjedala.some((s) => s.nadimak === 'BOTANIČAR')).toBe(true);
@@ -379,9 +377,11 @@ describe('Zagrijavanje', () => {
       });
       expect(potvrda.pokrenut).toBe(true);
       const pocetak = await pocetakPromise;
+      expect(pocetak.pravila).toBe('klasicni');
       expect(pocetak.sjedala.some((s) => s.nadimak === 'BOTOKRAT')).toBe(true);
       const konfig = posluzitelj.dohvatiKonfiguracijuBotaPartije(pocetak.partijaId);
-      expect(konfig?.vjerojatnostTaktickogPoteza).toBe(0.5);
+      expect(konfig?.vjerojatnostAgresivnosti).toBe(0.6);
+      expect(konfig?.vjerojatnostShielda).toBe(0.75);
       socket.emit('partija:izadji');
       await cekaj(socket, 'partija:kraj', () => true, 10_000);
     } finally {
@@ -389,12 +389,12 @@ describe('Zagrijavanje', () => {
     }
   });
 
-  it('PR08 stari ulaz bez payload-a ostaje ka_zna Dvoboj', async () => {
+  it('ADR-019 stari ulaz bez payload-a → klasicni Dvoboj', async () => {
     const socket = await spoji(`gost.${randomUUID().replaceAll('-', '')}`);
     try {
       const { pocetak } = await odigrajTreningDoKraja(socket);
       expect(pocetak.mod).toBe('dva_igraca');
-      expect(pocetak.pravila ?? 'ka_zna').toBe('ka_zna');
+      expect(pocetak.pravila).toBe('klasicni');
       expect(pocetak.sjedala).toHaveLength(2);
     } finally {
       socket.disconnect();
@@ -418,7 +418,7 @@ describe('Zagrijavanje', () => {
     try {
       const runda = cekaj<RundaOtvorena>(socket, 'partija:runda-otvorena');
       const potvrda = await new Promise<{ pokrenut: boolean }>((resolve) => {
-        socket.emit('trening:zapocni', { pravila: 'ka_zna' }, resolve);
+        socket.emit('trening:zapocni', { pravila: 'klasicni' }, resolve);
       });
       expect(potvrda.pokrenut).toBe(true);
       await runda;

@@ -6,7 +6,7 @@
  * odvojen od odluke o riječi; bez namjernog izostanka.
  * PR07: odaberiPotez dobiva pravilnik + broj aktivnih; čekač dokaza ne dobiva reakciju ispadanja.
  */
-import type { BrzaPoruka, KontekstPartije } from 'zajednicko';
+import type { BrzaPoruka, KontekstPartije, ProfilBotaIzazova } from 'zajednicko';
 import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import type { KonfiguracijaBota } from './konfiguracija-bota.js';
@@ -14,6 +14,7 @@ import {
   BOT_POTEZ_BEZ_ROKA_MS,
   odaberiPotezNastavivo,
   odgodaBezRokaMs,
+  potpisPotrosenihGrupa,
   PredmemorijaLegalnosti,
   stvoriStanjeBota,
   trajanjeRazmisljanjaMs,
@@ -21,12 +22,20 @@ import {
   type Rng,
   type StanjeBotaUPartiji,
 } from './odabir-rijeci.js';
+import { stvoriBotDebugTrag, type BotDebugTrag } from './bot-debug-trag.js';
+import type { BotDebugPretplate } from './bot-debug-pretplata.js';
+import { POLUGE_PROFILA_BOTA } from './profili-bota.js';
 import {
   igriviKandidatiIzRepertoara,
   poznatiNastavciIzRepertoara,
+  poznatiNastavciNastavivo,
   type SnimkaRepertoara,
 } from './repertoar.js';
-import { CHECKPOINT_ZAPISA, RasporedjivacOdziva, predajSetImmediate } from './raspored-odziva.js';
+import {
+  RasporedjivacOdziva,
+  predajSetImmediate,
+  type KontekstPosla,
+} from './raspored-odziva.js';
 import {
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
@@ -43,8 +52,30 @@ export type NaredbaBota =
 /** Brza igra (javna): nakon toliko bot-duel poteza sljedeći bot forsira „Ne znam”. */
 export const MAKS_POTEZA_BOT_DUELA_BRZA = 10;
 
+/**
+ * Koliko puta smijemo ponovno računati odluku zbog promjene verzije rječnika
+ * unutar istog plana (sprječava beskonačni refresh loop).
+ */
+export const MAKS_OSVJEZAVANJA_VERZIJE_RJECNIKA = 2;
+
+/** Namjerno / forsiranje „Ne znam” ostaje važeće i nakon refresh-a rječnika. */
+function zadrziOdustaniPriPromjeniVerzije(odluka: OdlukaBota): boolean {
+  if (odluka.vrsta !== 'odustani') return false;
+  return odluka.razlog === 'namjerni_propust' || odluka.razlogInterni === 'bot_duel_limit';
+}
+
 export interface OvisnostiBotKontrolera {
-  rjecnik: Pick<RjecnikUMemoriji, 'igriviKandidati' | 'grupeZa' | 'verzijaRjecnika' | 'imaSlobodnuRijecNa' | 'repertoarBotova' | 'jeIgrivaRijec'> & {
+  rjecnik: Pick<
+    RjecnikUMemoriji,
+    | 'igriviKandidati'
+    | 'grupeZa'
+    | 'verzijaRjecnika'
+    | 'imaSlobodnuRijecNa'
+    | 'imaSlobodnuRijecNaNastavivo'
+    | 'repertoarBotova'
+    | 'pooloviBotova'
+    | 'jeIgrivaRijec'
+  > & {
     frekvencijaZa(rijec: string): number | null;
   };
   rasporedOdziva?: RasporedjivacOdziva;
@@ -66,6 +97,7 @@ export interface OvisnostiBotKontrolera {
   naAktivnost?: (igracId: string) => void;
   /** NODE_ENV; staging uključuje QA tempo bez roka (3 s / 0,2 s). */
   okruzenje?: string;
+  dohvatiNadimak?: (partijaId: string, igracId: string) => string;
 }
 
 export interface BrojaciBota {
@@ -97,6 +129,8 @@ interface PlaniranaAkcija {
   odgodaIstekla?: boolean;
   snimkaGrupa?: ReadonlySet<string>;
   verzijaRjecnika?: number;
+  /** Broj ponovnih izračuna zbog mismatcha verzije rječnika u ovom planu. */
+  brojOsvjezavanjaVerzije?: number;
   /** Greška nastavivog odabira prije isteka odgode — obrada tek kad odgoda istekne. */
   greskaOdabira?: unknown;
 }
@@ -134,6 +168,9 @@ export class BotKontroler {
   private readonly predajKontrolu: () => Promise<void>;
   private readonly zapisi: (poruka: string, podaci: Record<string, unknown>) => void;
   private readonly okruzenje: string;
+  /** Aktivan debug trag po partiji+turnToken (oporavci dijele isti trag). */
+  private readonly debugTragovi = new Map<string, BotDebugTrag>();
+  private botDebugPretplate: BotDebugPretplate | null = null;
   private zaustavljen = false;
   private generacijaPosla = 0;
   readonly brojaci: BrojaciBota = {
@@ -175,6 +212,11 @@ export class BotKontroler {
   dohvatiKonfiguracijuPartije(partijaId: string): KonfiguracijaBota | null {
     const snimka = this.konfiguracijePartija.get(partijaId);
     return snimka ? structuredClone(snimka) : null;
+  }
+
+  /** Staging: veže pretplate nakon što motor postoji (izbjegava kružnu ovisnost). */
+  postaviBotDebugPretplate(pretplate: BotDebugPretplate | null): void {
+    this.botDebugPretplate = pretplate;
   }
 
   private osigurajKonfiguracijuPartije(partijaId: string): KonfiguracijaBota {
@@ -308,6 +350,7 @@ export class BotKontroler {
       this.poslaniPozdravi.delete(dogadaj.partijaId);
       this.cekajuciPozdraviJavne.delete(dogadaj.partijaId);
       this.ocistiEliminacijskeKljuceve(dogadaj.partijaId);
+      this.ocistiDebugTragovePartije(dogadaj.partijaId);
       // Zakazane reakcije smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
       return;
     }
@@ -324,7 +367,8 @@ export class BotKontroler {
       stanjeBota.zadnjiToken = dogadaj.turnToken;
     }
 
-    // Računanje tijekom prozora razmišljanja (ne sinkrono ovdje) — Socket.IO može flushati prije CPU-a.
+    // Računanje tijekom prozora razmišljanja. Rasporedjivac odgađa prvi korak (setImmediate),
+    // pa Socket.IO može flushati potez:prihvacen/stanje prije CPU-a odabira.
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
     const imaAktivnogCovjeka = dogadaj.sudionici.some((s) => s.upravljac === 'covjek' && s.aktivan);
     const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rngPrezentacije, dogadaj.kontekst, {
@@ -376,7 +420,7 @@ export class BotKontroler {
     this.ovisnosti.naAktivnost?.(sudionik.igracId);
     this.brojaci.planirano += 1;
 
-    // Odmah pokreni nastavivi izračun (overlap s odgodom razmišljanja).
+    // Registriraj nastavivi izračun (overlap s odgodom razmišljanja; prvi korak nakon setImmediate).
     this.zakaziIzracunPlanNastavivo(dogadaj.partijaId, dogadaj, sudionik.igracId, stanjeBota, generacija, snimkaGrupa);
   }
 
@@ -397,12 +441,13 @@ export class BotKontroler {
     const postojeci = this.posloviRasporeda.get(partijaId);
     if (postojeci !== undefined) this.raspored.otkazi(postojeci);
     const aktivan = () => this.jeAktualanPlan(partijaId, generacija, dogadaj.turnToken, igracId);
-    const id = this.raspored.prijavi(async () => {
+    const id = this.raspored.prijavi(async ({ predaj }: KontekstPosla) => {
       if (!aktivan()) return 'odustani';
       try {
         // Verzija na početku izračuna — ne na kraju (inače refresh tijekom rada izgleda kao match).
         const verzijaZaOdluku = this.ovisnosti.rjecnik.verzijaRjecnika();
-        const odluka = await this.odluciNastavivo(dogadaj, stanjeBota, snimkaGrupa, aktivan);
+        // Scheduler-owned predaj: RR sliceovi između partija; event loop yield radi pump.
+        const odluka = await this.odluciNastavivo(dogadaj, stanjeBota, snimkaGrupa, aktivan, new Set(), predaj);
         if (!aktivan()) return 'odustani';
         const plan = this.planirano.get(partijaId);
         if (!plan || plan.generacija !== generacija) return 'odustani';
@@ -474,14 +519,32 @@ export class BotKontroler {
         return;
       }
       if (verzijaPriPlanu !== undefined && this.ovisnosti.rjecnik.verzijaRjecnika() !== verzijaPriPlanu) {
-        if (odluka.vrsta === 'odustani') {
+        // namjerni_propust / bot_duel_limit: zadrži odluku. nema_rijeci i rijec: osvježi.
+        if (zadrziOdustaniPriPromjeniVerzije(odluka)) {
           this.posloviRasporeda.delete(partijaId);
           this.planirano.delete(partijaId);
           this.izvrsi(aktualni, igracId, turnToken, odluka, 0, new Set());
           return;
         }
+        const brojOsvjezavanja = (plan.brojOsvjezavanjaVerzije ?? 0) + 1;
+        if (brojOsvjezavanja > MAKS_OSVJEZAVANJA_VERZIJE_RJECNIKA) {
+          this.posloviRasporeda.delete(partijaId);
+          this.planirano.delete(partijaId);
+          this.izvrsi(aktualni, igracId, turnToken, odluka, 0, new Set());
+          return;
+        }
+        plan.brojOsvjezavanjaVerzije = brojOsvjezavanja;
         plan.odluka = undefined;
         plan.vrsta = null;
+        plan.verzijaRjecnika = undefined;
+        // Očisti predmemoriranu odluku istog tokena da odluciNastavivo ne vrati stale nema_rijeci.
+        const predmemorirana = this.odluke.get(partijaId);
+        if (
+          predmemorirana?.turnToken === turnToken
+          && !(predmemorirana.odluka.vrsta === 'odustani' && zadrziOdustaniPriPromjeniVerzije(predmemorirana.odluka))
+        ) {
+          this.odluke.delete(partijaId);
+        }
         this.zakaziIzracunPlanNastavivo(
           partijaId,
           dogadajAktualni,
@@ -517,6 +580,7 @@ export class BotKontroler {
     this.poslaneEliminacijskeReakcije.clear();
     this.sljedecaReakcijaMs.clear();
     this.poteziBotDuela.clear();
+    this.debugTragovi.clear();
   }
 
   /** Javna Brza igra: točno 2 aktivna bota, bez aktivnog čovjeka. */
@@ -571,6 +635,10 @@ export class BotKontroler {
     return this.ovisnosti.rjecnik.repertoarBotova();
   }
 
+  /**
+   * Sinkroni snapshot kandidata — može sam premašiti BUDZET_SLICE_MS na velikom prefiksu.
+   * Isto vrijedi za klasificirajPoznatiSkup u odabiru; sken rječnika nije u ovom commitu.
+   */
   private kandidatiZaPotez(
     trazenaSlova: string,
     iskoristene: ReadonlySet<string>,
@@ -587,24 +655,12 @@ export class BotKontroler {
     potrosene: ReadonlySet<string>,
     dopusteneVrste: DogadajPoteza['dopusteneVrste'],
     aktivan: () => boolean,
+    predaj: () => Promise<void>,
   ): AsyncIterable<string> {
     const snimka = this.snimkaRepertoara();
     const rjecnik = this.ovisnosti.rjecnik;
     const provjeri = (rijec: string) => rjecnik.jeIgrivaRijec(rijec, potrosene, dopusteneVrste);
-    const predaj = this.predajKontrolu;
-    return {
-      async *[Symbol.asyncIterator](): AsyncGenerator<string> {
-        let n = 0;
-        for (const rijec of poznatiNastavciIzRepertoara(snimka, prefiks, provjeri)) {
-          n += 1;
-          yield rijec;
-          if (n % CHECKPOINT_ZAPISA === 0) {
-            await predaj();
-            if (!aktivan()) return;
-          }
-        }
-      },
-    };
+    return poznatiNastavciNastavivo(snimka, prefiks, provjeri, predaj, aktivan);
   }
 
   private predmemorijaZa(partijaId: string): PredmemorijaLegalnosti {
@@ -618,7 +674,7 @@ export class BotKontroler {
 
   private zabiljeziOdluku(odluka: OdlukaBota, stanjeBota: StanjeBotaUPartiji, turnToken: string, verzijaRjecnika: number, partijaId: string): void {
     if (odluka.vrsta === 'rijec' && odluka.propustKa) this.brojaci.propustPrimljenogKa += 1;
-    if (odluka.vrsta === 'rijec' && odluka.takticki) this.brojaci.taktickihPoteza += 1;
+    if (odluka.vrsta === 'rijec' && odluka.izPoola) this.brojaci.taktickihPoteza += 1;
     if (odluka.vrsta === 'rijec' && odluka.izborKa && stanjeBota.zadnjiTokenKa !== turnToken) {
       stanjeBota.zadnjiTokenKa = turnToken;
       if (odluka.izborKa === 'dobrovoljni') this.brojaci.dobrovoljniKa += 1;
@@ -627,40 +683,141 @@ export class BotKontroler {
     this.odluke.set(partijaId, { turnToken, odluka, verzijaRjecnika });
   }
 
+  private kljucDebugTraga(partijaId: string, turnToken: string): string {
+    return `${partijaId}:${turnToken}`;
+  }
+
+  private ocistiDebugTragovePartije(partijaId: string): void {
+    const prefiks = `${partijaId}:`;
+    for (const kljuc of [...this.debugTragovi.keys()]) {
+      if (kljuc.startsWith(prefiks)) this.debugTragovi.delete(kljuc);
+    }
+  }
+
+  private osigurajDebugTrag(dogadaj: DogadajPoteza, oporavak: boolean): BotDebugTrag {
+    const kljuc = this.kljucDebugTraga(dogadaj.partijaId, dogadaj.turnToken);
+    const postojeci = this.debugTragovi.get(kljuc);
+    if (postojeci) {
+      if (oporavak && postojeci.aktivan) postojeci.zapisiPosebno('oporavak');
+      return postojeci;
+    }
+    const ukljuci = !!this.botDebugPretplate?.imaPretplatnika(dogadaj.partijaId)
+      && dogadaj.kontekst !== 'privatna';
+    const trag = stvoriBotDebugTrag(ukljuci);
+    // Ne-op tragove ne držimo u mapi (produkcija / bez pretplatnika).
+    if (trag.aktivan) this.debugTragovi.set(kljuc, trag);
+    if (oporavak && trag.aktivan) trag.zapisiPosebno('oporavak');
+    return trag;
+  }
+
+  private profilZaKonfig(konfig: KonfiguracijaBota): ProfilBotaIzazova {
+    for (const [id, poluge] of Object.entries(POLUGE_PROFILA_BOTA) as Array<[ProfilBotaIzazova, typeof POLUGE_PROFILA_BOTA[ProfilBotaIzazova]]>) {
+      if (
+        poluge.vjerojatnostAgresivnosti === konfig.vjerojatnostAgresivnosti
+        && poluge.vjerojatnostShielda === konfig.vjerojatnostShielda
+        && poluge.prioritetPoolova === konfig.prioritetPoolova
+      ) {
+        return id;
+      }
+    }
+    return 'iskusni';
+  }
+
+  private objaviDebugZapis(
+    dogadaj: DogadajPoteza,
+    igracId: string,
+    trag: BotDebugTrag,
+    pokusaj: number,
+  ): void {
+    try {
+      const pretplate = this.botDebugPretplate;
+      if (!pretplate || !trag.aktivan) return;
+      const poolovi = this.ovisnosti.rjecnik.pooloviBotova();
+      const zapis = trag.izgradiZapis({
+        partijaId: dogadaj.partijaId,
+        igracId,
+        nadimak: this.ovisnosti.dohvatiNadimak?.(dogadaj.partijaId, igracId) ?? igracId,
+        profil: this.profilZaKonfig(this.osigurajKonfiguracijuPartije(dogadaj.partijaId)),
+        redniBrojPoteza: this.stanjeBota(dogadaj.partijaId, igracId).brojPoteza,
+        turnToken: dogadaj.turnToken,
+        brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
+        trazenaSlova: dogadaj.trazenaSlova ?? '',
+        verzijaRjecnika: this.ovisnosti.rjecnik.verzijaRjecnika(),
+        generacijaPoolova: poolovi.generacija,
+        pokusaj,
+      });
+      if (zapis) pretplate.objavi(dogadaj.partijaId, zapis);
+    } catch (greska) {
+      this.zapisi('Bot debug emit nije uspio', {
+        partijaId: dogadaj.partijaId,
+        greska: greska instanceof Error ? greska.message : String(greska),
+      });
+    }
+  }
+
   private async odluciNastavivo(
     dogadaj: DogadajPoteza,
     stanjeBota: StanjeBotaUPartiji,
     snimkaGrupa: ReadonlySet<string>,
     aktivan: () => boolean,
     odbijene: ReadonlySet<string> = new Set(),
+    predaj: () => Promise<void> = this.predajKontrolu,
+    kandidatiPretpostavljeni?: readonly string[],
   ): Promise<OdlukaBota | null> {
     if (!aktivan()) return null;
     const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const prethodna = this.odluke.get(dogadaj.partijaId);
     const ista = prethodna?.turnToken === dogadaj.turnToken ? prethodna : undefined;
-    if (ista?.odluka.vrsta === 'odustani' && ista.odluka.razlogInterni === 'bot_duel_limit') return ista.odluka;
-    if (this.azurirajBotDuelIForsiraj(dogadaj)) {
+    const trag = this.osigurajDebugTrag(dogadaj, ista !== undefined && odbijene.size > 0);
+    const t0 = this.sada();
+    if (ista?.odluka.vrsta === 'odustani' && zadrziOdustaniPriPromjeniVerzije(ista.odluka)) {
+      return ista.odluka;
+    }
+    if (this.azurirajBotDuelIForsiraj(dogadaj) && dogadaj.trazenaSlova !== 'ka') {
       const forsiran: OdlukaBota = {
         vrsta: 'odustani',
         razlog: 'namjerni_propust',
         razlogInterni: 'bot_duel_limit',
       };
+      trag.zapisiPosebno('bot_duel_limit');
+      trag.zapisiTrajanjeIzracuna(this.sada() - t0);
       this.zabiljeziOdluku(forsiran, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
       return forsiran;
     }
-    if (ista?.odluka.vrsta === 'odustani') return ista.odluka;
+    // nema_rijeci: samo uz istu verziju rječnika — inače ponovni izračun (nova riječ nakon refresh-a).
+    if (ista?.odluka.vrsta === 'odustani' && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
-    const kandidati = this.kandidatiZaPotez(dogadaj.trazenaSlova!, snimkaGrupa, dogadaj.dopusteneVrste).filter((rijec) => !odbijene.has(rijec));
+    if (ista && ista.verzijaRjecnika !== verzijaRjecnika && trag.aktivan) {
+      trag.zapisiPosebno('ponovni_izracun_rjecnika');
+    }
+    if (dogadaj.trazenaSlova === 'ka' && !odbijene.has('kaladont')) {
+      stanjeBota.brojKandidata = 1;
+      const kaladont: OdlukaBota = { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
+      trag.zapisiPosebno('primljeni_ka');
+      trag.zapisiIzvor('kaladont', 'kaladont');
+      trag.zapisiTrajanjeIzracuna(this.sada() - t0);
+      this.zabiljeziOdluku(kaladont, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
+      return kaladont;
+    }
+    if (dogadaj.trazenaSlova === 'ka' && odbijene.has('kaladont')) {
+      const odustani: OdlukaBota = { vrsta: 'odustani', razlog: 'nema_rijeci' };
+      trag.zapisiPosebno('nema_rijeci');
+      trag.zapisiTrajanjeIzracuna(this.sada() - t0);
+      this.zabiljeziOdluku(odustani, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
+      return odustani;
+    }
+    const kandidati = kandidatiPretpostavljeni
+      ? [...kandidatiPretpostavljeni]
+      : this.kandidatiZaPotez(dogadaj.trazenaSlova!, snimkaGrupa, dogadaj.dopusteneVrste).filter((rijec) => !odbijene.has(rijec));
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && (kandidati.includes(ista.odluka.rijec) || dogadaj.trazenaSlova === 'ka')) {
       ista.verzijaRjecnika = verzijaRjecnika;
       return ista.odluka;
     }
     if (!aktivan()) return null;
     const predmemorija = this.predmemorijaZa(dogadaj.partijaId);
-    predmemorija.uskladiKontekst(dogadaj.turnToken, verzijaRjecnika);
+    predmemorija.uskladiKontekst(dogadaj.turnToken, verzijaRjecnika, potpisPotrosenihGrupa(snimkaGrupa));
     const rjecnik = this.ovisnosti.rjecnik;
     const dopusteneVrste = dogadaj.dopusteneVrste;
-    const predaj = this.predajKontrolu;
     const odluka = await odaberiPotezNastavivo({
       trazenaSlova: dogadaj.trazenaSlova!,
       kandidati,
@@ -668,24 +825,38 @@ export class BotKontroler {
       grupeZa: (rijec) => rjecnik.grupeZa(rijec),
       turnToken: dogadaj.turnToken,
       oporavak: ista !== undefined,
-      pravila: dogadaj.pravila ?? 'ka_zna',
+      pravila: dogadaj.pravila ?? 'klasicni',
       faza: dogadaj.faza ?? 'obican_potez',
       brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
       iskoristeneGrupe: snimkaGrupa,
       dopusteneVrste,
       imaSlobodnuRijecNa: (prefiks, potrosene, vrste) =>
         rjecnik.imaSlobodnuRijecNa(prefiks, potrosene, vrste),
+      imaSlobodnuRijecNaNastavivo: (prefiks, potrosene, predajFn, aktivanFn, vrste) =>
+        rjecnik.imaSlobodnuRijecNaNastavivo(prefiks, potrosene, predajFn, aktivanFn, vrste),
+      dohvatiVerzijuRjecnika: () => rjecnik.verzijaRjecnika(),
       poznatiKandidatiNa: (prefiks, potrosene) => {
         const snimka = this.snimkaRepertoara();
         const provjeri = (rijec: string) => rjecnik.jeIgrivaRijec(rijec, potrosene, dopusteneVrste);
         return poznatiNastavciIzRepertoara(snimka, prefiks, provjeri);
       },
       poznatiKandidatiNaNastavivo: (prefiks, potrosene) =>
-        this.poznatiNastavciIterator(prefiks, potrosene, dopusteneVrste, aktivan),
+        this.poznatiNastavciIterator(prefiks, potrosene, dopusteneVrste, aktivan, predaj),
+      poolovi: rjecnik.pooloviBotova(),
+      jeIgrivaRijec: (rijec, potrosene, vrste) => rjecnik.jeIgrivaRijec(rijec, potrosene, vrste),
+      odbijeneRijeci: odbijene,
       predmemorija,
       verzijaRjecnika,
+      debugTrag: trag.aktivan ? trag : undefined,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng, predaj, aktivan);
-    if (!odluka || !aktivan()) return odluka;
+    trag.zapisiTrajanjeIzracuna(this.sada() - t0);
+    if (!odluka || !aktivan()) {
+      if (!odluka && trag.aktivan) {
+        trag.zapisiPosebno('otkazan_zastarjeli');
+        trag.zapisiIshod('otkazan');
+      }
+      return odluka;
+    }
     this.zabiljeziOdluku(odluka, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
     return odluka;
   }
@@ -708,21 +879,44 @@ export class BotKontroler {
       this.oporavi(dogadaj, igracId, pokusaj, odbijene, greska);
       return;
     }
+    const trag = this.debugTragovi.get(this.kljucDebugTraga(dogadaj.partijaId, turnToken));
     if (rezultat.ishod === 'prihvacen') {
       this.ovisnosti.naAktivnost?.(igracId);
       if (this.aktualniPotezi.has(dogadaj.partijaId)) this.dovrseniTokeni.set(dogadaj.partijaId, turnToken);
       if (odluka.vrsta === 'rijec') this.brojaci.odigranihRijeci += 1;
       else if (odluka.razlog === 'namjerni_propust') this.brojaci.namjernihPropusta += 1;
       else this.brojaci.bezRijeci += 1;
+      if (trag) {
+        trag.zapisiIshod(odluka.vrsta === 'odustani' ? 'odustani' : 'prihvacen');
+        this.objaviDebugZapis(dogadaj, igracId, trag, pokusaj);
+        this.debugTragovi.delete(this.kljucDebugTraga(dogadaj.partijaId, turnToken));
+      }
       return;
     }
     if (rezultat.ishod === 'ignoriran') {
       this.brojaci.zastarjelo += 1;
+      if (trag) {
+        trag.zapisiIshod('ignoriran');
+        trag.zapisiPosebno('otkazan_zastarjeli');
+        this.objaviDebugZapis(dogadaj, igracId, trag, pokusaj);
+        this.debugTragovi.delete(this.kljucDebugTraga(dogadaj.partijaId, turnToken));
+      }
       return;
     }
     if (rezultat.kod === 'STARI_TURN_TOKEN' || rezultat.kod === 'NIJE_TVOJ_POTEZ' || rezultat.kod === 'SUSTAV_BIRA_RIJEC') {
       this.brojaci.zastarjelo += 1;
+      if (trag) {
+        trag.zapisiIshod('otkazan');
+        trag.zapisiPosebno('otkazan_zastarjeli');
+        this.objaviDebugZapis(dogadaj, igracId, trag, pokusaj);
+        this.debugTragovi.delete(this.kljucDebugTraga(dogadaj.partijaId, turnToken));
+      }
       return;
+    }
+    if (trag) {
+      trag.zapisiIshod('odbijen');
+      this.objaviDebugZapis(dogadaj, igracId, trag, pokusaj);
+      // Zadrži trag za oporavak istog tokena (novi pokušaj se dodaje).
     }
     if (odluka.vrsta === 'rijec') odbijene.add(odluka.rijec);
     this.oporavi(dogadaj, igracId, pokusaj, odbijene, new Error(`Botova naredba odbijena: ${rezultat.kod}`));
@@ -818,25 +1012,73 @@ export class BotKontroler {
     const stanjeBota = this.stanjeBota(partijaId, igracId);
     const generacija = generacijaOporavka ?? ++this.generacijaPosla;
     const aktivan = () => this.jeAktualanPlan(partijaId, generacija, dogadaj.turnToken, igracId);
-    try {
-      const kandidati = this.kandidatiZaPotez(dogadaj.trazenaSlova!, dogadaj.iskoristeneGrupe, dogadaj.dopusteneVrste).filter((rijec) => !odbijene.has(rijec));
-      // Prazan repertoar nakon odbijenih = normalan odustanak, ne tehnička greška.
-      if (kandidati.length === 0 && dogadaj.trazenaSlova?.toLowerCase() !== 'ka') {
-        if (!aktivan()) return;
-        this.izvrsi(dogadaj, igracId, dogadaj.turnToken, { vrsta: 'odustani', razlog: 'nema_rijeci' }, pokusaj, odbijene);
-        return;
+
+    const postojeci = this.posloviRasporeda.get(partijaId);
+    if (postojeci !== undefined) this.raspored.otkazi(postojeci);
+
+    const id = this.raspored.prijavi(async ({ predaj }: KontekstPosla) => {
+      if (!aktivan()) return 'odustani';
+      try {
+        if (dogadaj.trazenaSlova === 'ka' && odbijene.has('kaladont')) {
+          if (!aktivan()) return 'odustani';
+          this.izvrsi(
+            dogadaj,
+            igracId,
+            dogadaj.turnToken,
+            { vrsta: 'odustani', razlog: 'nema_rijeci' },
+            pokusaj,
+            odbijene,
+          );
+          return 'gotovo';
+        }
+        const preskociSkupljanje = dogadaj.trazenaSlova === 'ka' && !odbijene.has('kaladont');
+        let odluka: OdlukaBota | null;
+        if (preskociSkupljanje) {
+          odluka = await this.odluciNastavivo(
+            dogadaj,
+            stanjeBota,
+            dogadaj.iskoristeneGrupe,
+            aktivan,
+            odbijene,
+            predaj,
+          );
+        } else {
+          // Prikupljanje unutar raspoređivača (zajednički CPU budžet / RR).
+          // Prazan obični repertoar ≠ odmah odustani: poolovi mogu imati legalne kandidate.
+          const kandidati = this.kandidatiZaPotez(
+            dogadaj.trazenaSlova!,
+            dogadaj.iskoristeneGrupe,
+            dogadaj.dopusteneVrste,
+          ).filter((rijec) => !odbijene.has(rijec));
+          odluka = await this.odluciNastavivo(
+            dogadaj,
+            stanjeBota,
+            dogadaj.iskoristeneGrupe,
+            aktivan,
+            odbijene,
+            predaj,
+            kandidati,
+          );
+        }
+        if (!odluka || !aktivan()) return 'odustani';
+        this.izvrsi(dogadaj, igracId, dogadaj.turnToken, odluka, pokusaj, odbijene);
+        return 'gotovo';
+      } catch (novaGreska) {
+        if (!aktivan()) return 'odustani';
+        this.oporaviNastavivo(dogadaj, igracId, pokusaj, odbijene, novaGreska);
+        return 'odustani';
+      } finally {
+        // Ne briši noviji handle ako je izvrsi sinkrono registrirao novi posao.
+        if (this.posloviRasporeda.get(partijaId) === id) {
+          this.posloviRasporeda.delete(partijaId);
+        }
+        const plan = this.planirano.get(partijaId);
+        if (plan?.generacija === generacija && plan.vrsta === 'oporavak') {
+          this.planirano.delete(partijaId);
+        }
       }
-      const odluka = await this.odluciNastavivo(dogadaj, stanjeBota, dogadaj.iskoristeneGrupe, aktivan, odbijene);
-      if (!odluka || !aktivan()) return;
-      this.izvrsi(dogadaj, igracId, dogadaj.turnToken, odluka, pokusaj, odbijene);
-    } catch (novaGreska) {
-      this.oporaviNastavivo(dogadaj, igracId, pokusaj, odbijene, novaGreska);
-    } finally {
-      const plan = this.planirano.get(partijaId);
-      if (plan?.generacija === generacija && plan.vrsta === 'oporavak') {
-        this.planirano.delete(partijaId);
-      }
-    }
+    });
+    this.posloviRasporeda.set(partijaId, id);
   }
 
   private oporaviNastavivo(

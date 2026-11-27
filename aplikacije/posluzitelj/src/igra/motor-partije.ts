@@ -1310,6 +1310,12 @@ export function stvoriUpraviteljPartija(
     if (kontekst === 'trening' && brojAktivnihTreninga() >= maksimalnoAktivnihTreninga) {
       return Promise.resolve({ ishod: 'limit', partijaId: null });
     }
+    // Botovi V8: botovi samo u Klasičnom — ne „glume” Klasicni unutar KA-ZNA/Dokaži partije.
+    const imaBota = sudioniciUlaz.some((s) => (s.upravljac ?? 'covjek') === 'bot');
+    if (imaBota && pravilaStola !== 'klasicni') {
+      console.error(`zapocniPartiju: botovi nisu dopušteni uz pravilnik ${pravilaStola}.`);
+      return Promise.resolve({ ishod: 'greska', partijaId: null });
+    }
     if (kontekst === 'javna' && sudioniciUlaz.length !== javnaSjedalaZaMod(mod)) {
       console.error(`zapocniPartiju: očekivano ${javnaSjedalaZaMod(mod)} sudionika za ${mod}, dobiveno ${sudioniciUlaz.length}.`);
       return Promise.resolve({ ishod: 'greska', partijaId: null });
@@ -3942,6 +3948,11 @@ export function stvoriUpraviteljPartija(
     if (zaustavljanje || partije.size >= maksimalnoAktivnihPartija) return '';
     const izmjesano = promijesajNiz(sudioniciUlaz);
     const pravilaSobe = postavkeSobe.pravila ?? ZADANI_PRAVILNIK;
+    // Obrana: botovi samo uz Klasični (privatne sobe inače nemaju botove).
+    if (sudioniciUlaz.some((s) => (s.upravljac ?? 'covjek') === 'bot') && pravilaSobe !== 'klasicni') {
+      console.error(`zapocniPrivatnuPartiju: botovi nisu dopušteni uz pravilnik ${pravilaSobe}.`);
+      return '';
+    }
     const sudionici: SudionikPartije[] = izmjesano.map((s, sjedalo) => {
       const rangNaziv = izracunajRangIzAgregata(s.rangSumaJedinica ?? 0, s.rangBrojPartija ?? 0);
       return {
@@ -4147,6 +4158,16 @@ export function stvoriUpraviteljPartija(
     naredbaBota,
     mozePokrenutiPartiju: () => !zaustavljanje,
     nadimak,
+    nadimakIgraca: (partijaId: string, igracId: string) => {
+      const stanje = partije.get(partijaId);
+      return stanje ? nadimak(stanje, igracId) : igracId;
+    },
+    kontekstPartije: (partijaId: string) => partije.get(partijaId)?.kontekst ?? null,
+    jeSudionikPartije: (partijaId: string, igracId: string) => {
+      const stanje = partije.get(partijaId);
+      return Boolean(stanje?.sudionici.some((s) => s.igracId === igracId));
+    },
+    partijaIdZaIgraca: (igracId: string) => partijaPoIgracu.get(igracId) ?? null,
     imaAktivnuPartiju: (igracId: string) => {
       const partijaId = partijaPoIgracu.get(igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;

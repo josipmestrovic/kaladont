@@ -81,8 +81,8 @@ describe('GET /admin/statistike/cekanje', () => {
     expect((await spremi({ ...prije.konfiguracija, jitterPotezaBotaMs: 9_999 })).status).toBe(400);
     expect((await spremi({ ...prije.konfiguracija, brziRazvoj: true })).status).toBe(400);
     const odgovori = await Promise.all([
-      spremi({ ...prije.konfiguracija, brziRazvoj: false, vjerojatnostOstavljanjaKa: 0.22 }),
-      spremi({ ...prije.konfiguracija, brziRazvoj: false, vjerojatnostOstavljanjaKa: 0.33 }),
+      spremi({ ...prije.konfiguracija, brziRazvoj: false, vjerojatnostAgresivnosti: 0.22 }),
+      spremi({ ...prije.konfiguracija, brziRazvoj: false, vjerojatnostAgresivnosti: 0.33 }),
     ]);
     expect(odgovori.map((stavka) => stavka.status).sort()).toEqual([200, 409]);
     const uspjeh = await odgovori.find((stavka) => stavka.status === 200)!.json() as ZapisPostavkiBotova;

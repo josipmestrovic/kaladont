@@ -1,16 +1,12 @@
 <script lang="ts">
-  import { Check, Cpu, Crown, Play, Users } from 'lucide-svelte';
+  import { Check, Cpu, Play, Users } from 'lucide-svelte';
   import {
     NAZIVI_PROFILA_BOTA,
     PROFILI_BOTA_IZAZOVA,
-    type PravilnikPartije,
+    ZADANI_PROFIL_TRENINGA,
     type ProfilBotaIzazova,
   } from 'zajednicko';
-  import {
-    REDOSLIJED_PRAVILNIKA,
-    TEKSTOVI_PRAVILNIKA,
-    putanjaZagrijavanjaBotova,
-  } from '$lib/igraj-rute.js';
+  import { putanjaZagrijavanjaBotova } from '$lib/igraj-rute.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
 
   const OPCIJE_BOTOVA = [
@@ -19,12 +15,10 @@
     { broj: 3 as const, naziv: '3 bota' },
   ];
 
-  // Default = prvi u redu (lijevo), kao u modalu.
-  let pravilnik = $state<PravilnikPartije>(REDOSLIJED_PRAVILNIKA[0]!);
-  let profil = $state<ProfilBotaIzazova>(PROFILI_BOTA_IZAZOVA[0]!);
+  let profil = $state<ProfilBotaIzazova>(ZADANI_PROFIL_TRENINGA);
   let brojBotova = $state<1 | 2 | 3>(OPCIJE_BOTOVA[0]!.broj);
 
-  const startHref = $derived(putanjaZagrijavanjaBotova(brojBotova, pravilnik, profil));
+  const startHref = $derived(putanjaZagrijavanjaBotova(brojBotova, profil));
 </script>
 
 <svelte:head>
@@ -34,38 +28,10 @@
 <main class="trening-setup" data-testid="trening-setup">
   <header class="uvod">
     <h1>Trening</h1>
-    <p class="podnaslov">Namjesti pravila i vježbaj protiv računala.</p>
+    <p class="podnaslov">Odaberi težinu i broj botova.</p>
   </header>
 
   <div class="postavke">
-    <section class="grupa" aria-labelledby="naslov-pravila">
-      <div class="grupa-glava">
-        <span class="grupa-ikona" aria-hidden="true">
-          <Crown size={22} strokeWidth={2.2} />
-        </span>
-        <h2 id="naslov-pravila">Pravila igre</h2>
-      </div>
-
-      <div class="opcije-gumbi" role="radiogroup" aria-label="Pravilnik">
-        {#each REDOSLIJED_PRAVILNIKA as p (p)}
-          <button
-            type="button"
-            class="odabir-gumb"
-            class:odabran={pravilnik === p}
-            role="radio"
-            aria-checked={pravilnik === p}
-            onclick={() => (pravilnik = p)}
-          >
-            {#if pravilnik === p}
-              <Check size={16} strokeWidth={2.6} aria-hidden="true" />
-            {/if}
-            {TEKSTOVI_PRAVILNIKA[p].naziv}
-          </button>
-        {/each}
-      </div>
-      <p class="opis">{TEKSTOVI_PRAVILNIKA[pravilnik].opis}</p>
-    </section>
-
     <section class="grupa" aria-labelledby="naslov-tezina">
       <div class="grupa-glava">
         <span class="grupa-ikona" aria-hidden="true">
@@ -240,13 +206,6 @@
     background: var(--boja-cta-pozadina);
     border-color: var(--boja-cta-pozadina);
     color: var(--boja-cta-tekst);
-  }
-
-  .opis {
-    margin: 0;
-    color: var(--boja-tekst-sekundarni);
-    font-size: var(--tekst-sitni);
-    line-height: 1.45;
   }
 
   .akcije {

@@ -1,13 +1,20 @@
 /**
- * MVP cooperative raspoređivač za botov odabir (commit 2).
- * Jedan pump, zajednički budžet, setImmediate — ne microtask.
+ * Cooperative raspoređivač za botov odabir (Botovi V8 commit 03 + stabilizacija).
+ * Jedan pump, zajednički CPU budžet, stvarni round-robin sliceova.
+ * Početak pumpa i predaja event loopu = setImmediate (ne microtask).
+ * ctx.predaj() parkira posao i prepušta sljedeći u redu — ne samo event loop.
  */
 
-/** Pregledani zapisi rječnika između predaja kontrole. */
+import { performance } from 'node:perf_hooks';
+
+/** Pregledani zapisi repertoara/rječnika između predaja kontrole. */
 export const CHECKPOINT_ZAPISA = 256;
 
-/** Ciljani CPU budžet jednog pump bloka (ms); nije real-time jamstvo. */
+/** Ciljani zajednički CPU budžet jednog pump bloka (ms); nije real-time jamstvo. */
 export const BUDZET_BLOKA_MS = 5;
+
+/** Ciljani budžet jednog posla prije forsiranog predaj (ms); checkpoint i dalje po zapisima. */
+export const BUDZET_SLICE_MS = 2;
 
 export function predajSetImmediate(): Promise<void> {
   return new Promise((resolve) => {
@@ -15,38 +22,75 @@ export function predajSetImmediate(): Promise<void> {
   });
 }
 
-export type PosaoPumpa = {
+export type KontekstPosla = {
+  /** Parkira posao i prepušta raspoređivaču; nastavlja kad ponovno dođe na red. */
+  predaj: () => Promise<void>;
+};
+
+export type RunPosla = (ctx: KontekstPosla) => Promise<'gotovo' | 'odustani'>;
+
+type PosaoPumpa = {
   id: number;
-  korak: () => Promise<'nastavi' | 'gotovo' | 'odustani'>;
+  run: RunPosla;
+  pokrenut: boolean;
+  otkazan: boolean;
+  /** Resolve za nastavak nakon parkiranog predaj. */
+  nastaviPark: (() => void) | null;
+  /** Resolve kad slice završi (predaj ili završetak run-a) — signal pumpi. */
+  krajSlicea: (() => void) | null;
+  /** Promise završetka run-a. */
+  zavrsetak: Promise<'gotovo' | 'odustani'> | null;
+  /** Jednokratno pohranjeni ishod — bez per-slice Promise.race na završetku. */
+  zavrsenIshod: 'gotovo' | 'odustani' | null;
 };
 
 /**
  * Jedan zajednički pump za sve aktivne bot-poslove.
- * Round-robin; nakon budžeta ili CHECKPOINT-a vraća kontrolu event loopu.
+ * Round-robin po sliceovima; nakon zajedničkog budžeta vraća kontrolu event loopu.
  */
 export class RasporedjivacOdziva {
   private readonly red: PosaoPumpa[] = [];
   private pumpAktivan = false;
   private generacija = 0;
-  private readonly predaj: () => Promise<void>;
+  private readonly predajEventLoop: () => Promise<void>;
   private readonly sada: () => number;
 
   constructor(opcije: { predaj?: () => Promise<void>; sada?: () => number } = {}) {
-    this.predaj = opcije.predaj ?? predajSetImmediate;
-    this.sada = opcije.sada ?? Date.now;
+    this.predajEventLoop = opcije.predaj ?? predajSetImmediate;
+    this.sada = opcije.sada ?? (() => performance.now());
   }
 
   /** Registrira posao; vraća id za otkazivanje. */
-  prijavi(korak: PosaoPumpa['korak']): number {
+  prijavi(run: RunPosla): number {
     const id = ++this.generacija;
-    this.red.push({ id, korak });
+    this.red.push({
+      id,
+      run,
+      pokrenut: false,
+      otkazan: false,
+      nastaviPark: null,
+      krajSlicea: null,
+      zavrsetak: null,
+      zavrsenIshod: null,
+    });
     this.pokreniPump();
     return id;
   }
 
   otkazi(id: number): void {
     const i = this.red.findIndex((p) => p.id === id);
-    if (i >= 0) this.red.splice(i, 1);
+    if (i < 0) return;
+    const posao = this.red[i]!;
+    posao.otkazan = true;
+    this.red.splice(i, 1);
+    // Odblokiraj parkirani predaj da Promise ne curi; run treba završiti preko aktivan()/gotovo.
+    const nastavi = posao.nastaviPark;
+    posao.nastaviPark = null;
+    if (nastavi) nastavi();
+    // Ako čekamo slice signal a job je otkazan prije predaj — odblokiraj wait.
+    const kraj = posao.krajSlicea;
+    posao.krajSlicea = null;
+    if (kraj) kraj();
   }
 
   brojAktivnih(): number {
@@ -56,38 +100,104 @@ export class RasporedjivacOdziva {
   private pokreniPump(): void {
     if (this.pumpAktivan) return;
     this.pumpAktivan = true;
-    void this.pump();
+    setImmediate(() => {
+      void this.pump();
+    });
+  }
+
+  private izradiKontekst(posao: PosaoPumpa): KontekstPosla {
+    return {
+      predaj: () => {
+        if (posao.otkazan) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          posao.nastaviPark = resolve;
+          const kraj = posao.krajSlicea;
+          posao.krajSlicea = null;
+          if (kraj) kraj();
+        });
+      },
+    };
+  }
+
+  private async izvrsiSlice(posao: PosaoPumpa): Promise<'gotovo' | 'odustani' | 'nastavi'> {
+    if (posao.otkazan) return 'odustani';
+
+    if (!posao.pokrenut) {
+      posao.pokrenut = true;
+      const ctx = this.izradiKontekst(posao);
+      posao.zavrsenIshod = null;
+      posao.zavrsetak = Promise.resolve()
+        .then(() => posao.run(ctx))
+        .catch(() => 'odustani' as const);
+      // Jednokratni settle — buđenje preko krajSlicea (isti put kao predaj), bez Promise.race po sliceu.
+      void posao.zavrsetak.then((ishod) => {
+        posao.zavrsenIshod = ishod;
+        const kraj = posao.krajSlicea;
+        posao.krajSlicea = null;
+        if (kraj) kraj();
+      });
+    } else if (posao.nastaviPark) {
+      const nastavi = posao.nastaviPark;
+      posao.nastaviPark = null;
+      nastavi();
+    } else if (posao.zavrsetak) {
+      // Još radi sinkrono unutar slicea — čekaj završetak ili sljedeći predaj.
+    } else {
+      return 'odustani';
+    }
+
+    await new Promise<void>((resolve) => {
+      if (posao.zavrsenIshod !== null) {
+        resolve();
+        return;
+      }
+      posao.krajSlicea = resolve;
+    });
+
+    if (posao.zavrsenIshod !== null) {
+      return posao.zavrsenIshod === 'gotovo' ? 'gotovo' : 'odustani';
+    }
+    if (posao.otkazan) return 'odustani';
+    return 'nastavi';
   }
 
   private async pump(): Promise<void> {
     try {
       while (this.red.length > 0) {
         const pocetak = this.sada();
+        const budzetIstekao = () => this.sada() - pocetak >= BUDZET_BLOKA_MS;
         let i = 0;
         while (i < this.red.length) {
           const posao = this.red[i]!;
-          let ishod: 'nastavi' | 'gotovo' | 'odustani';
+          let ishod: 'gotovo' | 'odustani' | 'nastavi';
           try {
-            ishod = await posao.korak();
+            ishod = await this.izvrsiSlice(posao);
           } catch {
             ishod = 'odustani';
           }
-          // Nakon awaita indeks može biti pomaknut (otkazi drugog/ovog posla).
           const josIndex = this.red.findIndex((p) => p.id === posao.id);
           if (josIndex < 0) {
-            // Već uklonjen tijekom koraka — ne spliceaj sljedeći posao.
+            // Otkazan / uklonjen — slice je potrošio CPU; provjeri budžet.
+            if (budzetIstekao()) break;
             continue;
           }
           if (ishod !== 'nastavi') {
             this.red.splice(josIndex, 1);
             i = josIndex;
+            if (budzetIstekao()) break;
             continue;
           }
-          i = josIndex + 1;
-          // Jedan korak po poslu pa predaja ako je budžet potrošen (ili sat ne napreduje).
-          if (this.sada() - pocetak >= BUDZET_BLOKA_MS) break;
+          // Premjesti na kraj — inače budžet-break uvijek kreće od i=0 i izgladnuje ostale.
+          if (josIndex !== this.red.length - 1) {
+            const [p] = this.red.splice(josIndex, 1);
+            this.red.push(p!);
+            i = josIndex;
+          } else {
+            i = josIndex + 1;
+          }
+          if (budzetIstekao()) break;
         }
-        if (this.red.length > 0) await this.predaj();
+        if (this.red.length > 0) await this.predajEventLoop();
       }
     } finally {
       this.pumpAktivan = false;

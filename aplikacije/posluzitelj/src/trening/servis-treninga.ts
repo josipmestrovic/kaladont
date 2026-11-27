@@ -1,6 +1,7 @@
 /**
- * Zagrijavanje (ADR-017 / PR08 / PR02): trening protiv privremenih botova po profilu težine.
- * UI bira 1–3 botova i profil; stari klijent bez profileId dobiva Iskusni.
+ * Zagrijavanje (ADR-017 / ADR-019 / PR08 / PR02): trening protiv privremenih botova po profilu težine.
+ * Pravilnik je uvijek Klasični (stari ka_zna/dokazi_nastavak se normaliziraju).
+ * UI bira 1–3 botova i profil; stari klijent bez profileId dobiva Iskusni, bez brojRacunala → 1.
  * Igrač smije imati samo jedan aktivni kontekst igranja; ulazak u trening napušta javni red.
  */
 import { randomUUID } from 'node:crypto';
@@ -10,7 +11,6 @@ import {
   jePoznatiProfilBota,
   PRAVILNICI_PARTIJE,
   PROFILI_BOTA_IZAZOVA,
-  ZADANI_PRAVILNIK,
   ZADANI_PROFIL_TRENINGA,
   type AvatarConfigV1,
   type KodGreske,
@@ -31,13 +31,19 @@ import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 
 const PREFIKS_RACUNALA = 'racunalo-';
+const PRAVILNIK_TRENINGA: PravilnikPartije = 'klasicni';
+const ZADANI_BROJ_RACUNALA_TRENINGA: 1 | 2 | 3 = 1;
 
 /** @deprecated Koristi nadimakProfilaBota; zadržano radi starih importa u testovima. */
 export const NADIMAK_RACUNALA = 'Računalo';
 
-/** Stari ulaz po pravilniku: klasični Zagrijavanje treba 2 bota zbog eliminacije „sljedećeg”. */
+/**
+ * @deprecated ADR-019: broj botova više ne ovisi o pravilniku; izostanak = 1.
+ * Zadržano radi starih importa; uvijek vraća 1.
+ */
 export function brojRacunalaZaTrening(pravila: PravilnikPartije): 1 | 2 {
-  return pravila === 'klasicni' ? 2 : 1;
+  void pravila;
+  return 1;
 }
 
 const ShemaTreningZapocni = z.object({
@@ -134,10 +140,9 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
       }
       opcije.ukloniIzJavnogReda(socket.data.igracId);
 
-      const brojRacunala = parse.data?.brojRacunala ?? brojRacunalaZaTrening(parse.data?.pravila ?? ZADANI_PRAVILNIK);
-      // Eksplicitna pravila imaju prednost; inače 1 bot → KA-zna, 2+ → Klasični.
-      const pravila =
-        parse.data?.pravila ?? (brojRacunala >= 2 ? 'klasicni' : ZADANI_PRAVILNIK);
+      // ADR-019: Trening je isključivo Klasični; stari ka_zna/dokazi_nastavak se normaliziraju.
+      const brojRacunala = parse.data?.brojRacunala ?? ZADANI_BROJ_RACUNALA_TRENINGA;
+      const pravila = PRAVILNIK_TRENINGA;
       const profileId: ProfilBotaIzazova = jePoznatiProfilBota(parse.data?.profileId)
         ? parse.data!.profileId!
         : ZADANI_PROFIL_TRENINGA;

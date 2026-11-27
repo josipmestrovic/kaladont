@@ -526,6 +526,13 @@
       "when": 1795100000000,
       "tag": "0074_operativne_primjene",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1795110000000,
+      "tag": "0075_bot_pool_clanovi",
+      "breakpoints": true
     }
   ]
 }

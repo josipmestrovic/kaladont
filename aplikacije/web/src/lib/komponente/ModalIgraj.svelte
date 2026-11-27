@@ -1,7 +1,8 @@
 <script lang="ts">
   /**
-   * Trening modal: pravilnik → profil → broj botova.
-   * Ranked / Brza igra više ne koriste ovaj modal (izravni ulaz u red).
+   * Legacy modal: Brza/ranked (pravilnik → format) ili Trening (profil → botovi).
+   * ADR-019: Trening forsira Klasični i preskače odabir pravilnika.
+   * Naslovnica više ne koristi ovaj modal kao glavni ulaz.
    */
   import { onMount } from 'svelte';
   import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko';
@@ -44,8 +45,13 @@
 
   $effect(() => {
     if (otvoren) {
-      korak = 'pravilnik';
-      odabranaPravila = null;
+      if (nacin === 'laganini') {
+        korak = 'profil';
+        odabranaPravila = 'klasicni';
+      } else {
+        korak = 'pravilnik';
+        odabranaPravila = null;
+      }
       odabraniProfil = ZADANI_PROFIL_TRENINGA;
       prethodniFokus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       queueMicrotask(() => dijalogEl?.focus());
@@ -69,7 +75,7 @@
 
   function odaberiPravilnik(pravila: PravilnikPartije) {
     odabranaPravila = pravila;
-    korak = nacin === 'laganini' ? 'profil' : 'format';
+    korak = 'format';
     queueMicrotask(() => dijalogEl?.focus());
   }
 
@@ -81,9 +87,6 @@
 
   function natrag() {
     if (korak === 'format') {
-      korak = 'pravilnik';
-      odabranaPravila = null;
-    } else if (korak === 'profil') {
       korak = 'pravilnik';
       odabranaPravila = null;
     } else if (korak === 'botovi') {
@@ -166,8 +169,8 @@
           {/each}
         </div>
         <button type="button" class="natrag-modal" onclick={natrag}>Natrag</button>
-      {:else if korak === 'profil' && odabranaPravila}
-        <p class="modal-nadnaslov">Trening · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv}</p>
+      {:else if korak === 'profil'}
+        <p class="modal-nadnaslov">Trening · Klasični Kaladont</p>
         <h2 id="modal-naslov">Odaberi težinu bota</h2>
         <div class="modal-opcije">
           {#each PROFILI_BOTA_IZAZOVA as profil (profil)}
@@ -182,16 +185,16 @@
             </button>
           {/each}
         </div>
-        <button type="button" class="natrag-modal" onclick={natrag}>Natrag</button>
-      {:else if korak === 'botovi' && odabranaPravila}
+        <button type="button" class="natrag-modal" onclick={zatvori}>Zatvori</button>
+      {:else if korak === 'botovi'}
         <p class="modal-nadnaslov">
-          Trening · {TEKSTOVI_PRAVILNIKA[odabranaPravila].naziv} · {NAZIVI_PROFILA_BOTA[odabraniProfil]}
+          Trening · Klasični Kaladont · {NAZIVI_PROFILA_BOTA[odabraniProfil]}
         </p>
         <h2 id="modal-naslov">Koliko botova želiš?</h2>
         <div class="modal-opcije">
           {#each OPCIJE_BOTOVA as opcija (opcija.broj)}
             <a
-              href={putanjaZagrijavanjaBotova(opcija.broj, odabranaPravila, odabraniProfil)}
+              href={putanjaZagrijavanjaBotova(opcija.broj, odabraniProfil)}
               class="modal-opcija modal-opcija-tekst"
             >
               <span>

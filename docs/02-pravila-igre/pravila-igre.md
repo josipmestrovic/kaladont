@@ -16,7 +16,7 @@ Format javnog stola i pravilnik odvojene su osi. Pod „Igraj” igrač prvo bir
 - Gosti i registrirani igraju pod istim pravilima.
 - **Privatna soba** prima 2 do 8 igrača. Domaćin bira pravilnik, trajanje poteza (15/30/60 s ili bez tajmera), vrste riječi i bodove za eliminacije. Imenice su uvijek dopuštene.
 - Javni formati koriste javni red, bodovanje, jedan univerzalni rang i ljestvice po formatu. Privatna soba ima samo privremenu ljestvicu.
-- U javnom redu prazna mjesta nakon pragova popunjavaju **botovi**. **Zagrijavanje** igra odabrani pravilnik: Klasični ima čovjeka + 2 Računala; KA-zna i Dokaži nastavak čovjeka + 1 Računalo. Detalji: [botovi.md](botovi.md).
+- U javnom redu prazna mjesta nakon pragova popunjavaju **botovi**. **Zagrijavanje** (Trening) igra isključivo **Klasični** pravilnik; igrač bira težinu i 1–3 Računala ([ADR-019](../03-arhitektura/odluke/019-trening-samo-klasicni.md)). Detalji: [botovi.md](botovi.md).
 
 ### Pravilnici
 

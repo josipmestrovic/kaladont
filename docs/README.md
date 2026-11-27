@@ -61,6 +61,7 @@ Folderi su numerirani redoslijedom čitanja. Novi suradnik kreće od `01-proizvo
 | [konvencije.md](06-razvoj/konvencije.md)                         | Jezik, imenovanje, commitovi, stil |
 | [audio.md](06-razvoj/audio.md)                                   | Plan razvoja, asseti i testiranje zvukova |
 | [testiranje.md](06-razvoj/testiranje.md)                         | Što se testira i kako              |
+| [botovi-v8-kontrolna-tocka.md](06-razvoj/botovi-v8-kontrolna-tocka.md) | V7 vs V8 mjerenje (fixture bench) |
 
 ### 07 — Operacije
 

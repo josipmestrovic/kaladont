@@ -507,17 +507,20 @@ describe('privatne sobe', () => {
       expect(stanje.clanovi).toHaveLength(2);
       expect(stanje.clanovi.map((clan) => clan.igracId)).toContain(gost.token);
 
+      // Listeneri za runda/kraj PRIJE pokretanja — inače se prva runda-otvorena može propustiti
+      // (ODGODA=0; utrka koja je na CI davala 20 s timeout).
       const pocetakVlasnik = cekajDogadaj<PocetakPartije>(vlasnik.socket, 'partija:pocetak');
       const pocetakGost = cekajDogadaj<PocetakPartije>(gost.socket, 'partija:pocetak');
+      const krajVlasnik = cekajDogadaj<KrajPartije>(vlasnik.socket, 'partija:kraj');
+      const krajGost = cekajDogadaj<KrajPartije>(gost.socket, 'partija:kraj');
+      const prvaRundaIliKraj = cekajRunduIliKraj([vlasnik, gost]);
       vlasnik.socket.emit('soba:pokreni');
       const [pocetak, pocetakDrugog] = await Promise.all([pocetakVlasnik, pocetakGost]);
       expect(pocetak.jePrivatna).toBe(true);
       expect(pocetak.kodSobe).toBe(kod);
       expect(pocetakDrugog.partijaId).toBe(pocetak.partijaId);
 
-      const krajVlasnik = cekajDogadaj<KrajPartije>(vlasnik.socket, 'partija:kraj');
-      const krajGost = cekajDogadaj<KrajPartije>(gost.socket, 'partija:kraj');
-      let rezultat = await cekajRunduIliKraj([vlasnik, gost]);
+      let rezultat = await prvaRundaIliKraj;
       for (let i = 0; i < 8 && rezultat.vrsta !== 'kraj'; i += 1) {
         const naPotezuId = rezultat.runda!.naPotezuId;
         const naPotezu = naPotezuId === vlasnik.token ? vlasnik : gost;
@@ -548,6 +551,8 @@ describe('privatne sobe', () => {
       expect(drugiPocetak.partijaId).not.toBe(pocetak.partijaId);
       expect(drugiPocetakDrugog.partijaId).toBe(drugiPocetak.partijaId);
     } finally {
+      vlasnik.socket.emit('partija:izadji');
+      gost.socket.emit('partija:izadji');
       vlasnik.socket.disconnect();
       gost.socket.disconnect();
     }

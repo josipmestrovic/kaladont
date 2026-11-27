@@ -1,6 +1,7 @@
 /**
  * URL-ovi i oznake za Igraj (Brza igra / Trening / privatna).
- * Javni ulaz: samo Brza igra (Troboj · Klasični). Trening zadržava pravilnik + botove.
+ * Javni ulaz: samo Brza igra (Troboj · Klasični).
+ * Trening (ADR-019): isključivo Klasični + broj botova + profil težine.
  */
 import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko';
 import {
@@ -86,18 +87,18 @@ export function putanjaBrzeIgre(): string {
   return BRZA_IGRA.putanja;
 }
 
-/** Glavni UI Trening — pravila + broj botova (1–3) + profil. */
+/** Glavni UI Trening — Klasični + broj botova (1–3) + profil. */
 export function putanjaZagrijavanjaBotova(
   brojRacunala: 1 | 2 | 3,
-  pravila: PravilnikPartije,
   profileId: ProfilBotaIzazova = ZADANI_PROFIL_TRENINGA,
 ): string {
-  return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}&botovi=${brojRacunala}&profil=${encodeURIComponent(profileId)}`;
+  return `/zagrijavanje?pravila=klasicni&botovi=${brojRacunala}&profil=${encodeURIComponent(profileId)}`;
 }
 
-/** Misije / Igraj opet — stari ulaz po pravilniku (klasični = 2 bota, zadani Iskusni). */
-export function putanjaZagrijavanja(pravila: PravilnikPartije): string {
-  return `/zagrijavanje?pravila=${encodeURIComponent(pravila)}`;
+/** Misije / Igraj opet — legacy ulaz; ADR-019 forsira Klasični. */
+export function putanjaZagrijavanja(pravila?: PravilnikPartije): string {
+  void pravila;
+  return '/zagrijavanje?pravila=klasicni';
 }
 
 export function parsajProfilIzQuery(vrijednost: string | null | undefined): ProfilBotaIzazova {
@@ -138,7 +139,6 @@ export function putanjaPonovneIgre(
   if (kontekst === 'trening') {
     return putanjaZagrijavanjaBotova(
       brojRacunalaIzTreningModa(mod),
-      p,
       jePoznatiProfilBota(profileId) ? profileId : ZADANI_PROFIL_TRENINGA,
     );
   }

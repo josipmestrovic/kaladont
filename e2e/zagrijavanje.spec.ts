@@ -4,28 +4,23 @@ import { otvoriZagrijavanjeKorak1 } from './pomocnici/naslovnica.js';
 test('gost pokreće Zagrijavanje, odustaje i vidi kraj treninga bez napretka', async ({ page }) => {
   const setup = await otvoriZagrijavanjeKorak1(page);
 
-  // Defaulti = prvi u redu (lijevo): Klasični, Početnik, 1 bot.
-  await expect(setup.getByRole('radio', { name: 'Klasični Kaladont' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  );
-  await expect(setup.getByRole('radio', { name: 'Početnik' })).toHaveAttribute('aria-checked', 'true');
+  // ADR-019: nema odabira pravilnika; zadano Iskusni + 1 bot.
+  await expect(setup.getByRole('heading', { name: 'Pravila igre' })).toHaveCount(0);
+  await expect(setup.getByRole('radio', { name: 'Iskusni' })).toHaveAttribute('aria-checked', 'true');
   await expect(setup.getByRole('radio', { name: '1 bot' })).toHaveAttribute('aria-checked', 'true');
 
-  await setup.getByRole('radio', { name: 'KA-zna' }).click();
   await setup.getByRole('radio', { name: 'Iskusni' }).click();
   await setup.getByRole('radio', { name: '1 bot' }).click();
   await setup.getByTestId('trening-zapocni').click();
 
-  await expect(page).toHaveURL(/\/zagrijavanje\?pravila=ka_zna&botovi=1&profil=iskusni$/);
+  await expect(page).toHaveURL(/\/zagrijavanje\?pravila=klasicni&botovi=1&profil=iskusni$/);
 
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });
   const sjedala = page.locator('.igraci-red > li');
   await expect(sjedala).toHaveCount(2);
   await expect(page.locator('.igraci-red').getByText('BOTaničar')).toBeVisible();
-  // Težina više nije na traci; ostaju način i pravilnik.
   await expect(page.getByTestId('trening-meta')).toContainText('Trening');
-  await expect(page.getByTestId('trening-meta')).toContainText('KA-zna');
+  await expect(page.getByTestId('trening-meta')).toContainText('Klasični');
   await expect(page.locator('.timer-prsten')).toHaveCount(0);
 
   // Čovjek odustaje čim dođe na potez; bot igra samo.

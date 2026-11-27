@@ -20,7 +20,7 @@ Poslužitelj razrješava identitet (ili stvara novog gosta) i veže socket uz `i
 | Događaj | Payload | Opis |
 |---|---|---|
 | `red:udji` | `{}` | Ulazak u red čekanja |
-| `trening:zapocni` | bez payloada, opcionalni ack | Pokreće Zagrijavanje (dvoboj protiv „Računala”); napušta javni red, odbija se uz aktivnu partiju ili sobu |
+| `trening:zapocni` | opcionalni `{ pravila?, brojRacunala?, profileId? }` + ack | Pokreće Trening (Klasični + 1–3 bota); napušta javni red, odbija se uz aktivnu partiju ili sobu |
 | `trening:nastavi` | `{}` | Izričito nastavlja aktivni vlastiti trening i resetira ljudsku neaktivnost; ne utječe na redni timer poteza |
 | `red:izadji` | `{}` | Dobrovoljni izlazak iz reda |
 | `partija:stanje` | `{}` | Zahtjev za trenutačnim stanjem partije nakon ponovnog spajanja |
@@ -64,7 +64,7 @@ Tipovi klijenta nisu validacija mrežnih podataka. Poslužitelj svaki ulazni pay
 
 Ack za `red:udji` je opcionalan: poziv bez callbacka podržan je za fire-and-forget klijente. Ako je callback poslan, mora biti funkcija; poslužitelj ga poziva najviše jednom s `StanjeReda` ili `null`. Klijent koji želi zadani mod uz ack šalje `{}` kao payload; ne šalje eksplicitni `undefined` jer se na žici serijalizira kao `null`. Svi ostali događaji su jednosmjerni i ne prihvaćaju dodatni callback.
 
-`trening:zapocni` prihvaća stari oblik (samo opcionalni ack) i novi `{ pravila? }` pa ack. Izostanak `pravila` = `ka_zna`. Ack prima `{ pokrenut: true }` ili `{ pokrenut: false, kod, poruka }` (kodovi `VEC_U_PARTIJI`, `VEC_U_SOBI`, `PREVISE_PARTIJA`, `TRENING_NEDOSTUPAN`, `INTERNA`, `NEVALJAN_PAYLOAD`). Sama partija kreće redovnim `partija:pocetak`.
+`trening:zapocni` prihvaća stari oblik (samo opcionalni ack) i `{ pravila?, brojRacunala?, profileId? }` pa ack. **ADR-019:** poslužitelj uvijek pokreće `klasicni`; izostanak / `ka_zna` / `dokazi_nastavak` normalizira se na `klasicni`. Izostanak `brojRacunala` = 1; izostanak `profileId` = Iskusni. Nepoznate vrijednosti i dalje = `NEVALJAN_PAYLOAD`. Ack prima `{ pokrenut: true }` ili `{ pokrenut: false, kod, poruka }` (kodovi `VEC_U_PARTIJI`, `VEC_U_SOBI`, `PREVISE_PARTIJA`, `TRENING_NEDOSTUPAN`, `INTERNA`, `NEVALJAN_PAYLOAD`). Sama partija kreće redovnim `partija:pocetak`.
 
 `red:udji` / `red:stanje`: izostanak `pravila` = `ka_zna`; nepoznat pravilnik ili `mod: 'tri_igraca'` (do PR06) = `NEVALJAN_PAYLOAD` — Troboj se **nikad** ne preusmjerava u Četveroboj.
 

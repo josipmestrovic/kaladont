@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ZADANA_KONFIGURACIJA_BOTA } from '../src/bot/konfiguracija-bota.js';
+import { ucitajKonfiguracijuBota, ZADANA_KONFIGURACIJA_BOTA } from '../src/bot/konfiguracija-bota.js';
 import {
+  konfiguracijaZaJavnuBrzu,
   nadimakProfilaBota,
   POLUGE_PROFILA_BOTA,
   razrijesiProfilBota,
@@ -9,24 +10,19 @@ import {
 } from '../src/bot/profili-bota.js';
 
 describe('profili bota (PR02)', () => {
-  it('profil v2 i Iskusni KA/taktika parity s ZADANA', () => {
+  it('profil v3 i Iskusni agresivnost/shield parity s ZADANA', () => {
     const { konfiguracija, profileId, botProfileVersion } = razrijesiProfilBota('iskusni');
     expect(profileId).toBe('iskusni');
     expect(botProfileVersion).toBe(VERZIJA_PROFILA_BOTA);
-    expect(VERZIJA_PROFILA_BOTA).toBe(2);
-    expect(konfiguracija.vjerojatnostTaktickogPoteza).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza);
-    expect(konfiguracija.vjerojatnostPropustaKa).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropustaKa);
-    expect(konfiguracija.vjerojatnostOstavljanjaKa).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa);
+    expect(VERZIJA_PROFILA_BOTA).toBe(3);
+    expect(konfiguracija.vjerojatnostAgresivnosti).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostAgresivnosti);
+    expect(konfiguracija.vjerojatnostShielda).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostShielda);
     expect(POLUGE_PROFILA_BOTA.iskusni).toEqual({
-      vjerojatnostTaktickogPoteza: 0.25,
+      vjerojatnostAgresivnosti: 0.3,
+      vjerojatnostShielda: 0.6,
+      prioritetPoolova: 'p2_p1',
       vjerojatnostNeznanjaUMalomSkupu: 0.18,
-      vjerojatnostPropustaKa: 0.08,
-      vjerojatnostOstavljanjaKa: 0.015,
       maksimalnoOpcijaMalogSkupa: 5,
-      dokaziBudzetDetaljneProvjere: 8,
-      dokaziBudzetDodatneProvjere: 8,
-      vjerojatnostDokaziPreskokaPotvrde: 0.12,
-      dokaziFaktorPropusaPotvrde: 0.3,
     });
   });
 
@@ -37,39 +33,30 @@ describe('profili bota (PR02)', () => {
     const majstor = razrijesiProfilBota('majstor').konfiguracija;
     const velemajstor = razrijesiProfilBota('velemajstor').konfiguracija;
 
-    expect(pocetnik.vjerojatnostTaktickogPoteza).toBe(0.1);
-    expect(velemajstor.vjerojatnostTaktickogPoteza).toBe(0.75);
+    expect(pocetnik.vjerojatnostAgresivnosti).toBe(0);
+    expect(pocetnik.vjerojatnostShielda).toBe(0);
+    expect(velemajstor.vjerojatnostAgresivnosti).toBe(1);
+    expect(velemajstor.vjerojatnostShielda).toBe(1);
+    expect(iskusni.prioritetPoolova).toBe('p2_p1');
+    expect(majstor.prioritetPoolova).toBe('p1_p2');
 
     expect(pocetnik.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(iskusni.vjerojatnostNeznanjaUMalomSkupu);
     expect(iskusni.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(majstor.vjerojatnostNeznanjaUMalomSkupu);
     expect(majstor.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(velemajstor.vjerojatnostNeznanjaUMalomSkupu);
 
-    expect(pocetnik.dokaziFaktorPropusaPotvrde).toBeGreaterThan(iskusni.dokaziFaktorPropusaPotvrde);
-    expect(iskusni.dokaziFaktorPropusaPotvrde).toBeGreaterThan(majstor.dokaziFaktorPropusaPotvrde);
-    expect(majstor.dokaziFaktorPropusaPotvrde).toBeGreaterThan(velemajstor.dokaziFaktorPropusaPotvrde);
-
-    expect(pocetnik.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(iskusni.vjerojatnostDokaziPreskokaPotvrde);
-    expect(iskusni.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(majstor.vjerojatnostDokaziPreskokaPotvrde);
-    expect(majstor.vjerojatnostDokaziPreskokaPotvrde).toBeGreaterThan(velemajstor.vjerojatnostDokaziPreskokaPotvrde);
-
     expect(pocetnik.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(iskusni.maksimalnoOpcijaMalogSkupa);
     expect(iskusni.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(majstor.maksimalnoOpcijaMalogSkupa);
     expect(majstor.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(velemajstor.maksimalnoOpcijaMalogSkupa);
 
-    expect(pocetnik.dokaziBudzetDetaljneProvjere).toBeLessThan(iskusni.dokaziBudzetDetaljneProvjere);
-    expect(iskusni.dokaziBudzetDetaljneProvjere).toBeLessThanOrEqual(majstor.dokaziBudzetDetaljneProvjere);
-
-    expect(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza).toBe(prije.vjerojatnostTaktickogPoteza);
-    expect(pocetnik.maksimalnoTaktickihKandidata).toBe(12);
-    expect(velemajstor.maksimalnoTaktickihKandidata).toBe(12);
+    expect(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostAgresivnosti).toBe(prije.vjerojatnostAgresivnosti);
     expect(pocetnik.trajanjePotezaBotaMs).toBe(ZADANA_KONFIGURACIJA_BOTA.trajanjePotezaBotaMs);
   });
 
-  it('javni ZADANA ostaje strog na Dokaži polugama', () => {
-    expect(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostDokaziPreskokaPotvrde).toBe(0);
-    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziFaktorPropusaPotvrde).toBe(0);
-    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziBudzetDetaljneProvjere).toBe(12);
-    expect(ZADANA_KONFIGURACIJA_BOTA.dokaziBudzetDodatneProvjere).toBe(12);
+  it('javni ZADANA nema uklonjena Dokaži polja', () => {
+    expect('dokaziBudzetDetaljneProvjere' in ZADANA_KONFIGURACIJA_BOTA).toBe(false);
+    expect('dokaziBudzetDodatneProvjere' in ZADANA_KONFIGURACIJA_BOTA).toBe(false);
+    expect('vjerojatnostDokaziPreskokaPotvrde' in ZADANA_KONFIGURACIJA_BOTA).toBe(false);
+    expect('dokaziFaktorPropusaPotvrde' in ZADANA_KONFIGURACIJA_BOTA).toBe(false);
   });
 
   it('izostanak profileId → Iskusni; nepoznat id baca', () => {
@@ -89,7 +76,38 @@ describe('profili bota (PR02)', () => {
   it('snapshot je neovisan o kasnijoj mutaciji baze', () => {
     const baza = structuredClone(ZADANA_KONFIGURACIJA_BOTA);
     const { konfiguracija } = razrijesiProfilBota('majstor', baza);
-    baza.vjerojatnostTaktickogPoteza = 0.99;
-    expect(konfiguracija.vjerojatnostTaktickogPoteza).toBe(0.5);
+    baza.vjerojatnostAgresivnosti = 0.99;
+    expect(konfiguracija.vjerojatnostAgresivnosti).toBe(0.6);
+  });
+
+  it('javna Brza forsira Iskusni poluge bez obzira na admin bazu', () => {
+    const baza = structuredClone(ZADANA_KONFIGURACIJA_BOTA);
+    baza.vjerojatnostAgresivnosti = 0.99;
+    baza.vjerojatnostShielda = 0;
+    baza.prioritetPoolova = 'p1_p2';
+    baza.vjerojatnostNeznanjaUMalomSkupu = 0.01;
+    baza.maksimalnoOpcijaMalogSkupa = 2;
+    baza.trajanjePotezaBotaMs = 3_500;
+
+    const konfig = konfiguracijaZaJavnuBrzu(baza);
+    expect(konfig.vjerojatnostAgresivnosti).toBe(0.3);
+    expect(konfig.vjerojatnostShielda).toBe(0.6);
+    expect(konfig.prioritetPoolova).toBe('p2_p1');
+    expect(konfig.vjerojatnostNeznanjaUMalomSkupu).toBe(0.18);
+    expect(konfig.maksimalnoOpcijaMalogSkupa).toBe(5);
+    expect(konfig.trajanjePotezaBotaMs).toBe(3_500);
+  });
+
+  it('stari env taktike ne nadjačava nove poluge', () => {
+    const konfig = ucitajKonfiguracijuBota({
+      ...process.env,
+      BOT_VJEROJATNOST_TAKTICKOG_POTEZA: '0.99',
+      BOT_MAKS_TAKTICKIH_KANDIDATA: '40',
+      BOT_VJEROJATNOST_AGRESIVNOSTI: '0.55',
+      BOT_VJEROJATNOST_SHIELDA: '0.44',
+    });
+    expect(konfig.vjerojatnostAgresivnosti).toBe(0.55);
+    expect(konfig.vjerojatnostShielda).toBe(0.44);
+    expect('vjerojatnostTaktickogPoteza' in konfig).toBe(false);
   });
 });
