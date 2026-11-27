@@ -1,6 +1,7 @@
 /**
  * Verzionirani profili botova za Trening i Izazov (PR02).
- * Javna/privatna i dalje koriste globalni admin/env resolver — ovi profili ih ne diraju.
+ * Javna Brza forsira Iskusni poluge (`konfiguracijaZaJavnuBrzu`); privatne sobe
+ * i dalje koriste globalni admin/env resolver.
  */
 import {
   jePoznatiProfilBota,
@@ -93,4 +94,14 @@ export function razrijesiProfilBotaIliZadani(
 ): RazrijesenaKonfiguracijaBota {
   const id = jePoznatiProfilBota(profileId) ? profileId : ZADANI_PROFIL_TRENINGA;
   return razrijesiProfilBota(id, baza);
+}
+
+/**
+ * Javna Brza: uvijek Iskusni poluge (agresivnost/Shield/prioritet/neznanje),
+ * ostalo (tempo, popuna, …) ostaje iz admin/env baze.
+ */
+export function konfiguracijaZaJavnuBrzu(
+  baza: KonfiguracijaBota = ZADANA_KONFIGURACIJA_BOTA,
+): KonfiguracijaBota {
+  return razrijesiProfilBota('iskusni', baza).konfiguracija;
 }

@@ -12,8 +12,9 @@
     odgodaReakcijeMinMs: number;
     vjerojatnostNeznanjaUMalomSkupu: number;
     maksimalnoOpcijaMalogSkupa: number;
-    vjerojatnostTaktickogPoteza: number;
-    maksimalnoTaktickihKandidata: number;
+    vjerojatnostAgresivnosti: number;
+    vjerojatnostShielda: number;
+    prioritetPoolova: 'p2_p1' | 'p1_p2';
     brziRazvoj: boolean;
     odstupanjaPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
     pragoviPopuneMs: { dva_igraca: [number]; tri_igraca: [number, number]; cetiri_igraca: [number, number, number] };
@@ -218,9 +219,16 @@
             <label>Ponder duljine po slovu<input type="number" min="0" max="2" step="0.01" bind:value={nacrt.ponderDuljinePoGrafemu} /></label>
             <label>„Ne znam” u malom skupu<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostNeznanjaUMalomSkupu} /><span>{postotak(nacrt.vjerojatnostNeznanjaUMalomSkupu)}</span></label>
             <label>Maks. opcija malog skupa<input type="number" min="1" max="20" bind:value={nacrt.maksimalnoOpcijaMalogSkupa} /></label>
-            <label>Taktički potez<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostTaktickogPoteza} /><span>{postotak(nacrt.vjerojatnostTaktickogPoteza)}</span></label>
-            <label>Maks. taktičkih kandidata<input type="number" min="1" max="50" bind:value={nacrt.maksimalnoTaktickihKandidata} /></label>
+            <label>Agresivnost (poolovi)<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostAgresivnosti} /><span>{postotak(nacrt.vjerojatnostAgresivnosti)}</span></label>
+            <label>Shield (dvoboj)<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostShielda} /><span>{postotak(nacrt.vjerojatnostShielda)}</span></label>
+            <label>Prioritet poolova
+              <select bind:value={nacrt.prioritetPoolova}>
+                <option value="p2_p1">Pool 2 → Pool 1</option>
+                <option value="p1_p2">Pool 1 → Pool 2</option>
+              </select>
+            </label>
           </div>
+          <p class="napomena">Javna Brza igra forsira Iskusni poluge (agresivnost/Shield/prioritet/neznanje) bez obzira na ove postavke. Poolovi se uređuju seedom/syncem, ne ovdje.</p>
         </fieldset>
         <fieldset><legend>Popuna javnog reda</legend>
           <div class="polja">

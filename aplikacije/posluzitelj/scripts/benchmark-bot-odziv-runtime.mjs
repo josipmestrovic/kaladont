@@ -251,7 +251,7 @@ function pripremiScenarij(ime, prefiksUlaz, puniPoPrefiksu, meta, kandidatiZa, z
     case 'normalan':
       break;
     case 'tezak-takticki':
-      konfig = { ...konfigBaza, vjerojatnostTaktickogPoteza: 1 };
+      konfig = { ...konfigBaza, vjerojatnostAgresivnosti: 1, vjerojatnostShielda: 1 };
       break;
     case 'primljeni-ka':
       trazenaSlova = 'ka';

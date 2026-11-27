@@ -55,6 +55,7 @@ import {
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 import { BotKontroler } from './bot/kontroler.js';
 import { ucitajKonfiguracijuBota } from './bot/konfiguracija-bota.js';
+import { konfiguracijaZaJavnuBrzu } from './bot/profili-bota.js';
 import { pragoviPopuneZaOkruzenje } from './red/raspored-popune.js';
 import { FondBotova, ucitajIdentiteteBotova } from './bot/fond.js';
 import { registrirajTrening } from './trening/servis-treninga.js';
@@ -774,9 +775,11 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     io,
     async (stol, mod, meta) => {
       // Kanonska pravila iz ključa reda (spojeni Dvoboj → ka_zna); odabranaPravila ostaje na sudioniku.
+      // Javna Brza: forsira Iskusni poluge (agresivnost/Shield/neznanje).
       const { ishod } = await upravitelj.zapocniPartiju(stol, mod, {
         pravila: meta.pravila,
         spojeniDvoboj: meta.spojeniDvoboj,
+        botKonfiguracija: konfiguracijaZaJavnuBrzu(postavkeBotova),
       });
       if (ishod === 'pokrenuta') void osvjeziProsjekCekanja();
       return ishod;
@@ -1021,7 +1024,10 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     dohvatiKonfiguracijuBotaPartije: (partijaId) => botKontroler.dohvatiKonfiguracijuPartije(partijaId),
     fondBotova,
     zapocniJavnuPartiju: async (sudionici, mod, pravila) => {
-      const { ishod } = await upravitelj.zapocniPartiju(sudionici, mod, { pravila });
+      const { ishod } = await upravitelj.zapocniPartiju(sudionici, mod, {
+        pravila,
+        botKonfiguracija: konfiguracijaZaJavnuBrzu(postavkeBotova),
+      });
       return ishod;
     },
     voditeljIzazova: voditeljIzazova ?? undefined,

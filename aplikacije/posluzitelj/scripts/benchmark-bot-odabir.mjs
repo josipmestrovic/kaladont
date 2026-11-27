@@ -143,7 +143,8 @@ async function main() {
     return {
       ...konfig,
       vjerojatnostNeznanjaUMalomSkupu: 0,
-      vjerojatnostTaktickogPoteza: 0,
+      vjerojatnostAgresivnosti: 0,
+      vjerojatnostShielda: 0,
     };
   }
 

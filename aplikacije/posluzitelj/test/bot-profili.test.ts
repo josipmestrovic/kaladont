@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ZADANA_KONFIGURACIJA_BOTA } from '../src/bot/konfiguracija-bota.js';
+import { ucitajKonfiguracijuBota, ZADANA_KONFIGURACIJA_BOTA } from '../src/bot/konfiguracija-bota.js';
 import {
+  konfiguracijaZaJavnuBrzu,
   nadimakProfilaBota,
   POLUGE_PROFILA_BOTA,
   razrijesiProfilBota,
@@ -77,5 +78,36 @@ describe('profili bota (PR02)', () => {
     const { konfiguracija } = razrijesiProfilBota('majstor', baza);
     baza.vjerojatnostAgresivnosti = 0.99;
     expect(konfiguracija.vjerojatnostAgresivnosti).toBe(0.6);
+  });
+
+  it('javna Brza forsira Iskusni poluge bez obzira na admin bazu', () => {
+    const baza = structuredClone(ZADANA_KONFIGURACIJA_BOTA);
+    baza.vjerojatnostAgresivnosti = 0.99;
+    baza.vjerojatnostShielda = 0;
+    baza.prioritetPoolova = 'p1_p2';
+    baza.vjerojatnostNeznanjaUMalomSkupu = 0.01;
+    baza.maksimalnoOpcijaMalogSkupa = 2;
+    baza.trajanjePotezaBotaMs = 3_500;
+
+    const konfig = konfiguracijaZaJavnuBrzu(baza);
+    expect(konfig.vjerojatnostAgresivnosti).toBe(0.3);
+    expect(konfig.vjerojatnostShielda).toBe(0.3);
+    expect(konfig.prioritetPoolova).toBe('p2_p1');
+    expect(konfig.vjerojatnostNeznanjaUMalomSkupu).toBe(0.18);
+    expect(konfig.maksimalnoOpcijaMalogSkupa).toBe(5);
+    expect(konfig.trajanjePotezaBotaMs).toBe(3_500);
+  });
+
+  it('stari env taktike ne nadjačava nove poluge', () => {
+    const konfig = ucitajKonfiguracijuBota({
+      ...process.env,
+      BOT_VJEROJATNOST_TAKTICKOG_POTEZA: '0.99',
+      BOT_MAKS_TAKTICKIH_KANDIDATA: '40',
+      BOT_VJEROJATNOST_AGRESIVNOSTI: '0.55',
+      BOT_VJEROJATNOST_SHIELDA: '0.44',
+    });
+    expect(konfig.vjerojatnostAgresivnosti).toBe(0.55);
+    expect(konfig.vjerojatnostShielda).toBe(0.44);
+    expect('vjerojatnostTaktickogPoteza' in konfig).toBe(false);
   });
 });

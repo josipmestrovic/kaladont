@@ -166,3 +166,15 @@ Uvjeti prije C09:
 | `bench-rezultati/v8-microbench.jsonl` | potpis / ponder / load |
 
 Worktree V7: `.worktrees/botovi-v7-4cb69ed` @ `4cb69ed` (ne koristiti `.worktrees/bench-prije-b818815`).
+
+## Follow-up — Commitovi 09–11
+
+Uvedeno na grani `feat/botovi-v8` (PR #167), nakon ove kontrolne točke:
+
+| Commit | Sadržaj |
+| --- | --- |
+| C09 | Seed P1/P2, `bot_pool_clanovi`, asimetrični sync, memorijski indeks |
+| C10 | Agresivnost + Shield (zamjena 1-ply taktike); `VERZIJA_BOT_POLITIKE=8`, profili v3 |
+| C11 | Javna Brza → Iskusni poluge; admin UI bez taktičkih polja; env `BOT_VJEROJATNOST_AGRESIVNOSTI` / `BOT_VJEROJATNOST_SHIELDA` |
+
+Seed poolova: `pnpm --filter posluzitelj seed-bot-poolova`. Bez novih benchova u C09–11.
