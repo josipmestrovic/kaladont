@@ -1,9 +1,10 @@
 /**
  * Zajednički dohvat GET /naslovnica/sazetak za Header i naslovnicu.
- * Deduplikacija in-flight zahtjeva, zaštita od zastarjelih odgovora i miješanja korisnika.
+ * Semantika u naslovnica-resurs.ts; ovdje hidracija profila/sandučića + Svelte stanje.
  */
 import { browser } from '$app/environment';
 import type {
+  AvatarConfigV1,
   NaslovnicaMisijeSazetak,
   OdgovorNaslovnicaSazetka,
   SanducicPorukaDetalj,
@@ -11,34 +12,36 @@ import type {
 import { api, ApiGreska } from '$lib/api.js';
 import { osvjeziGostSesijuNakon401 } from '$lib/identitet.js';
 import {
+  stvoriNaslovnicaResurs,
+  type NaslovnicaResurs,
+  type StatusNaslovnice,
+} from '$lib/naslovnica-resurs.js';
+import {
   postaviProfilIzSazetka,
   type ProfilSnapshot,
 } from '$lib/stanje-profila.svelte.js';
 import { primijeniSazetakSanducicaIzNaslovnice } from '$lib/stanje-sanducica.svelte.js';
 
-export type StatusNaslovnice = 'prazno' | 'ucitavanje' | 'spreman' | 'greska';
+export type { StatusNaslovnice };
 
-type StanjeNaslovnice = {
+type StanjeNaslovniceUi = {
   status: StatusNaslovnice;
   igracId: string | null;
   sazetak: OdgovorNaslovnicaSazetka | null;
-  /** Početna stranica nepročitanih za NaslovnicaObavijesti. */
   obavijestiLista: {
     poruke: SanducicPorukaDetalj[];
     sljedeciCursor: string | null;
   } | null;
 };
 
-const stanje = $state<StanjeNaslovnice>({
+const stanje = $state<StanjeNaslovniceUi>({
   status: 'prazno',
   igracId: null,
   sazetak: null,
   obavijestiLista: null,
 });
 
-let generacija = 0;
-let inFlight: Promise<void> | null = null;
-let igracIdZahtjeva: string | null = null;
+let resurs: NaslovnicaResurs | null = null;
 
 function uProfilSnapshot(sazetak: OdgovorNaslovnicaSazetka): ProfilSnapshot {
   const p = sazetak.profil;
@@ -54,60 +57,39 @@ function uProfilSnapshot(sazetak: OdgovorNaslovnicaSazetka): ProfilSnapshot {
   };
 }
 
-function primijeniOdgovor(odgovor: OdgovorNaslovnicaSazetka): void {
-  stanje.sazetak = odgovor;
-  stanje.igracId = odgovor.igracId;
-  stanje.status = 'spreman';
-  stanje.obavijestiLista = {
-    poruke: odgovor.obavijesti.neprocitane,
-    sljedeciCursor: odgovor.obavijesti.sljedeciCursor,
-  };
-  postaviProfilIzSazetka(uProfilSnapshot(odgovor));
-  primijeniSazetakSanducicaIzNaslovnice({
-    brojNeprocitanih: odgovor.obavijesti.brojNeprocitanih,
-    zaNajavu: odgovor.obavijesti.zaNajavu,
-  });
+function sinkroniziraj() {
+  if (!resurs) return;
+  stanje.status = resurs.status;
+  stanje.igracId = resurs.igracId;
+  stanje.sazetak = resurs.sazetak;
+  stanje.obavijestiLista = resurs.obavijestiLista;
 }
 
-async function dohvati(mojaGeneracija: number, ocekivaniIgracId: string | null): Promise<void> {
-  if (!stanje.sazetak) {
-    stanje.status = 'ucitavanje';
+function osigurajResurs(): NaslovnicaResurs | null {
+  if (!browser) return null;
+  if (!resurs) {
+    resurs = stvoriNaslovnicaResurs({
+      api,
+      oporavi401: async () => {
+        await osvjeziGostSesijuNakon401({ emitirajIdentitet: false });
+      },
+      jeApiGreska401: (greska) => greska instanceof ApiGreska && greska.status === 401,
+      naPrimjenu: (odgovor) => {
+        postaviProfilIzSazetka(uProfilSnapshot(odgovor));
+        primijeniSazetakSanducicaIzNaslovnice({
+          brojNeprocitanih: odgovor.obavijesti.brojNeprocitanih,
+          zaNajavu: odgovor.obavijesti.zaNajavu,
+        });
+      },
+    });
+    resurs.pretplatiSe(sinkroniziraj);
+    sinkroniziraj();
   }
-
-  let oporavakOdrađen = false;
-  let pokusaj = 0;
-  const maxPokusaja = 3;
-  while (pokusaj < maxPokusaja) {
-    if (mojaGeneracija !== generacija) return;
-    try {
-      const odgovor = await api<OdgovorNaslovnicaSazetka>('/naslovnica/sazetak');
-      if (mojaGeneracija !== generacija) return;
-      if (ocekivaniIgracId && odgovor.igracId !== ocekivaniIgracId) return;
-      if (igracIdZahtjeva && odgovor.igracId !== igracIdZahtjeva && mojaGeneracija === generacija) {
-        // Identitet se promijenio tijekom leta — zanemari.
-        return;
-      }
-      primijeniOdgovor(odgovor);
-      return;
-    } catch (greska) {
-      if (mojaGeneracija !== generacija) return;
-      if (!oporavakOdrađen && greska instanceof ApiGreska && greska.status === 401) {
-        oporavakOdrađen = true;
-        await osvjeziGostSesijuNakon401({ emitirajIdentitet: false }).catch(() => {});
-        if (mojaGeneracija !== generacija) return;
-        continue;
-      }
-      pokusaj += 1;
-      if (pokusaj < maxPokusaja) await new Promise((r) => setTimeout(r, 250 * pokusaj));
-    }
-  }
-  if (mojaGeneracija !== generacija) return;
-  // Zadrži zadnji uspješan sažetak pri mrežnoj grešci.
-  if (!stanje.sazetak) stanje.status = 'greska';
-  else stanje.status = 'spreman';
+  return resurs;
 }
 
 export function dohvatiStanjeNaslovnice() {
+  osigurajResurs();
   return {
     get status() {
       return stanje.status;
@@ -128,50 +110,36 @@ export function dohvatiStanjeNaslovnice() {
 }
 
 export function invalidirajNaslovnicaSazetak(): void {
-  generacija += 1;
-  inFlight = null;
-  igracIdZahtjeva = null;
-  stanje.status = 'prazno';
-  stanje.igracId = null;
-  stanje.sazetak = null;
-  stanje.obavijestiLista = null;
+  osigurajResurs()?.invalidiraj();
 }
 
 export function potrosiPocetnuListuObavijesti(): {
   poruke: SanducicPorukaDetalj[];
   sljedeciCursor: string | null;
 } | null {
-  const lista = stanje.obavijestiLista;
-  stanje.obavijestiLista = null;
+  const aktivni = osigurajResurs();
+  if (!aktivni) return null;
+  const lista = aktivni.potrosiPocetnuListuObavijesti();
+  sinkroniziraj();
   return lista;
+}
+
+export function azurirajAvatarNaslovnice(avatarConfig: AvatarConfigV1): void {
+  osigurajResurs()?.azurirajAvatar(avatarConfig);
+}
+
+export function oznaciNovostiMisijaPregledane(skupine: readonly ('dnevna' | 'tjedna')[]): void {
+  osigurajResurs()?.oznaciNovostiMisijaPregledane(skupine);
+}
+
+export function ukloniObavijestiIzNaslovnice(ids: readonly string[]): void {
+  osigurajResurs()?.ukloniObavijestiIzListe(ids);
 }
 
 export async function osigurajNaslovnicaSazetak(
   opcije: { forsaj?: boolean; igracId?: string | null } = {},
 ): Promise<void> {
-  if (!browser) return;
-
-  if (opcije.forsaj) {
-    generacija += 1;
-    if (inFlight) await inFlight.catch(() => {});
-    if (inFlight) {
-      await inFlight;
-      return;
-    }
-  } else if (inFlight) {
-    await inFlight;
-    return;
-  } else if (stanje.status === 'spreman' && stanje.sazetak) {
-    if (!opcije.igracId || stanje.igracId === opcije.igracId) return;
-  }
-
-  const mojaGeneracija = generacija;
-  igracIdZahtjeva = opcije.igracId ?? stanje.igracId;
-  const ovaj = dohvati(mojaGeneracija, opcije.igracId ?? null);
-  inFlight = ovaj;
-  try {
-    await ovaj;
-  } finally {
-    if (inFlight === ovaj) inFlight = null;
-  }
+  const aktivni = osigurajResurs();
+  if (!aktivni) return;
+  await aktivni.osiguraj(opcije);
 }

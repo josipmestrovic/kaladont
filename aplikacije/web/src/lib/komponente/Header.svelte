@@ -11,6 +11,7 @@
     stanjeProfila,
   } from '$lib/stanje-profila.svelte.js';
   import {
+    azurirajAvatarNaslovnice,
     invalidirajNaslovnicaSazetak,
     osigurajNaslovnicaSazetak,
   } from '$lib/stanje-naslovnica.svelte.js';
@@ -61,12 +62,13 @@
     const azurirajAvatar = (dogadaj: Event) => {
       const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1 }>).detail;
       azurirajAvatarProfila(detalji.avatarConfig);
+      azurirajAvatarNaslovnice(detalji.avatarConfig);
     };
     const azurirajIdentitet = () => {
       invalidirajProfil();
-      invalidirajNaslovnicaSazetak();
-      if ($page.url.pathname === '/') void osigurajNaslovnicaSazetak({ forsaj: true });
-      else void osigurajProfil({ forsaj: true });
+      // Na / +page invalidira i forsira sažetak; Header samo čisti profil snapshot.
+      if ($page.url.pathname === '/') return;
+      void osigurajProfil({ forsaj: true });
     };
     const naKlikIzvana = (dogadaj: MouseEvent) => {
       if (!otvorenIzbornik || !omotIzbornika) return;

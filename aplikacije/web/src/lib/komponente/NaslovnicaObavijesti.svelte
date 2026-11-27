@@ -15,6 +15,7 @@
   import {
     osigurajNaslovnicaSazetak,
     potrosiPocetnuListuObavijesti,
+    ukloniObavijestiIzNaslovnice,
   } from '$lib/stanje-naslovnica.svelte.js';
 
   const DESKTOP_MQ = '(min-width: 1000px)';
@@ -158,6 +159,7 @@
     oznacavanjeId = poruka.id;
     try {
       await oznaciSanducicProcitane([poruka.id]);
+      ukloniObavijestiIzNaslovnice([poruka.id]);
       if (!aktivan) return;
       const stari = indeks;
       const ukupno = poruke.length;

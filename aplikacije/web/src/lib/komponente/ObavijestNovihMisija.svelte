@@ -5,6 +5,7 @@
   import { oznaciPregledMisija } from '$lib/misije-klijent.js';
   import {
     dohvatiStanjeNaslovnice,
+    oznaciNovostiMisijaPregledane,
     osigurajNaslovnicaSazetak,
   } from '$lib/stanje-naslovnica.svelte.js';
 
@@ -50,13 +51,14 @@
     poruka = tekstZa(skupine);
   }
 
-  async function pokreni(opcije: { forsaj?: boolean } = {}) {
+  async function pokreni() {
     const ova = ++generacija;
     if (!smijePrikazati()) {
       ocisti();
       return;
     }
-    await osigurajNaslovnicaSazetak({ forsaj: opcije.forsaj });
+    // Bez forsaja — dijeli sažetak s +page/Headerom.
+    await osigurajNaslovnicaSazetak();
     if (ova !== generacija || !smijePrikazati()) return;
     primijeniNovosti();
   }
@@ -70,6 +72,7 @@
         // Best-effort: toast se svejedno sklanja.
       }
     }
+    oznaciNovostiMisijaPregledane(skupine);
   }
 
   async function zatvori() {
@@ -98,7 +101,7 @@
     const naIdentitet = () => {
       generacija += 1;
       ocisti();
-      void pokreni({ forsaj: true });
+      // +page forsira sažetak; toast se napuni kad store postane spreman.
     };
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
     return () => {
@@ -114,11 +117,13 @@
     }
   });
 
-  // Referenca da store ostane živ dok je toast mountan.
+  // Reagiraj na osvježeni sažetak (npr. nakon identiteta / partije) bez vlastitog forsaja.
   $effect(() => {
-    void naslovnica.status;
+    if ($page.url.pathname !== '/') return;
+    if (naslovnica.status !== 'spreman') return;
     void naslovnica.misije?.novosti.dnevne;
     void naslovnica.misije?.novosti.tjedne;
+    primijeniNovosti();
   });
 </script>
 
