@@ -1,6 +1,7 @@
 /**
- * MVP cooperative raspoređivač za botov odabir (commit 2).
- * Jedan pump, zajednički budžet, setImmediate — ne microtask.
+ * Cooperative raspoređivač za botov odabir (Botovi V8 commit 02).
+ * Jedan pump, zajednički budžet; početak i predaja između blokova = setImmediate (ne microtask),
+ * kako bi Socket.IO mogao flushati potez:prihvacen/stanje prije CPU-a odabira.
  */
 
 /** Pregledani zapisi rječnika između predaja kontrole. */
@@ -55,8 +56,12 @@ export class RasporedjivacOdziva {
 
   private pokreniPump(): void {
     if (this.pumpAktivan) return;
+    // Označi aktivnim prije setImmediate — drugi prijavi ne zakazuje drugi pump.
     this.pumpAktivan = true;
-    void this.pump();
+    // Macrotask: prijavi() samo enqueua; prvi korak / odabir kreće tek nakon predaje event loopu.
+    setImmediate(() => {
+      void this.pump();
+    });
   }
 
   private async pump(): Promise<void> {

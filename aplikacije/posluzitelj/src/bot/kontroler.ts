@@ -324,7 +324,8 @@ export class BotKontroler {
       stanjeBota.zadnjiToken = dogadaj.turnToken;
     }
 
-    // Računanje tijekom prozora razmišljanja (ne sinkrono ovdje) — Socket.IO može flushati prije CPU-a.
+    // Računanje tijekom prozora razmišljanja. Rasporedjivac odgađa prvi korak (setImmediate),
+    // pa Socket.IO može flushati potez:prihvacen/stanje prije CPU-a odabira.
     const rok = dogadaj.istekPotezaMs === null ? null : Math.max(0, dogadaj.istekPotezaMs - this.sada());
     const imaAktivnogCovjeka = dogadaj.sudionici.some((s) => s.upravljac === 'covjek' && s.aktivan);
     const izracunataOdgoda = trajanjeRazmisljanjaMs(rok, stanjeBota.konfiguracija, this.rngPrezentacije, dogadaj.kontekst, {
@@ -376,7 +377,7 @@ export class BotKontroler {
     this.ovisnosti.naAktivnost?.(sudionik.igracId);
     this.brojaci.planirano += 1;
 
-    // Odmah pokreni nastavivi izračun (overlap s odgodom razmišljanja).
+    // Registriraj nastavivi izračun (overlap s odgodom razmišljanja; prvi korak nakon setImmediate).
     this.zakaziIzracunPlanNastavivo(dogadaj.partijaId, dogadaj, sudionik.igracId, stanjeBota, generacija, snimkaGrupa);
   }
 

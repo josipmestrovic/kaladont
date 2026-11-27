@@ -77,12 +77,51 @@ describe('raspored odziva', () => {
     expect(odluka === null || odluka.vrsta === 'rijec').toBe(true);
   });
 
+  it('prijavi ne pokreće korak sinkrono (setImmediate)', async () => {
+    const raspored = new RasporedjivacOdziva();
+    let pokrenut = false;
+    raspored.prijavi(async () => {
+      pokrenut = true;
+      return 'gotovo';
+    });
+    expect(pokrenut).toBe(false);
+    expect(raspored.brojAktivnih()).toBe(1);
+    await new Promise((r) => setImmediate(r));
+    expect(pokrenut).toBe(true);
+    expect(raspored.brojAktivnih()).toBe(0);
+  });
+
   it('otkazivanje uklanja posao iz rasporeda', async () => {
     const raspored = new RasporedjivacOdziva({ predaj: async () => undefined });
     const korak = vi.fn(async () => 'nastavi' as const);
     const id = raspored.prijavi(korak);
     raspored.otkazi(id);
     await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    expect(korak).not.toHaveBeenCalled();
+    expect(raspored.brojAktivnih()).toBe(0);
+  });
+
+  it('dva prijavi dijele jedan pump (nema paralelnih koraka)', async () => {
+    let istodobno = 0;
+    let maxIstodobno = 0;
+    const raspored = new RasporedjivacOdziva({
+      predaj: () => new Promise((r) => setImmediate(r)),
+    });
+    const napravi = () =>
+      raspored.prijavi(async () => {
+        istodobno += 1;
+        maxIstodobno = Math.max(maxIstodobno, istodobno);
+        await new Promise((r) => setImmediate(r));
+        istodobno -= 1;
+        return 'gotovo';
+      });
+    napravi();
+    napravi();
+    for (let i = 0; i < 40 && raspored.brojAktivnih() > 0; i += 1) {
+      await new Promise((r) => setImmediate(r));
+    }
+    expect(maxIstodobno).toBe(1);
     expect(raspored.brojAktivnih()).toBe(0);
   });
 

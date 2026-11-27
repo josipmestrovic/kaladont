@@ -1041,6 +1041,45 @@ describe('bot kontroler', () => {
     kontroler.zaustavi();
   });
 
+  it('naPromjenuPoteza ne pokreće odabir sinkrono; posao čeka setImmediate', async () => {
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, raspored } = stvori(izvrsi);
+    kontroler.naPromjenuPoteza(dogadaj());
+    expect(raspored.brojAktivnih()).toBe(1);
+    expect(kontroler.pregledPlanova()[0]?.vrsta).toBeNull();
+    expect(izvrsi).not.toHaveBeenCalled();
+    // Bez setImmediate odluka još nije spremna.
+    expect(kontroler.pregledPlanova()[0]?.vrsta).toBeNull();
+    await dovršiAsyncOdluku();
+    expect(kontroler.pregledPlanova()[0]?.vrsta).toBe('rijec');
+    expect(izvrsi).not.toHaveBeenCalled();
+    kontroler.zaustavi();
+  });
+
+  it('odluka spremna prije odgode ne zove izvrsi dok timer ne istekne', async () => {
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri } = stvori(izvrsi);
+    kontroler.naPromjenuPoteza(dogadaj());
+    await dovršiAsyncOdluku();
+    expect(kontroler.pregledPlanova()[0]?.vrsta).toBe('rijec');
+    expect(izvrsi).not.toHaveBeenCalled();
+    expect(timeri[0]!.ms).toBe(4_000);
+    timeri[0]!.posao();
+    expect(izvrsi).toHaveBeenCalledTimes(1);
+    kontroler.zaustavi();
+  });
+
+  it('zaustavi tijekom računanja ne proizvodi potez', async () => {
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, timeri } = stvori(izvrsi);
+    kontroler.naPromjenuPoteza(dogadaj());
+    kontroler.zaustavi();
+    await dovršiAsyncOdluku();
+    for (const t of timeri) t.posao();
+    await dovršiAsyncOdluku();
+    expect(izvrsi).not.toHaveBeenCalled();
+  });
+
   it('novi token otkazuje zastarjeli nastavivi posao (generacija)', async () => {
     let predaja = 0;
     const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
