@@ -596,7 +596,14 @@ describe('privatne sobe', () => {
   }, 20_000);
 
   it('PR08 pokreće partiju s 2 i 3 igrača uz različite pravilnike; revanš čuva pravila', async () => {
-    async function pokreniIProvjeri(brojClanova: number, pravila: PravilnikPartije): Promise<TestniIgrac[]> {
+    async function pokreniIProvjeri(
+      brojClanova: number,
+      pravila: PravilnikPartije,
+    ): Promise<{
+      igraciSobe: TestniIgrac[];
+      prvaRundaIliKraj: Awaited<ReturnType<typeof cekajRunduIliKraj>>;
+      krajPromise: Promise<KrajPartije>;
+    }> {
       const igraciSobe = await Promise.all(Array.from({ length: brojClanova }, () => spojiIgraca()));
       const { kod, stanje } = await stvoriSobu(igraciSobe[0]!.socket, {
         trajanjePotezaSek: 15,
@@ -607,28 +614,31 @@ describe('privatne sobe', () => {
       for (const clan of igraciSobe.slice(1)) {
         expect((await udjiUSobu(clan, kod)).postavke.pravila).toBe(pravila);
       }
+      // Listeneri PRIJE pokretanja — inače se prva runda-otvorena propusti (ODGODA=0 na CI).
       const pocetci = igraciSobe.map((ig) => cekajDogadaj<PocetakPartije>(ig.socket, 'partija:pocetak'));
+      const krajPromise = cekajDogadaj<KrajPartije>(igraciSobe[0]!.socket, 'partija:kraj');
+      const prvaRundaIliKrajP = cekajRunduIliKraj(igraciSobe);
       igraciSobe[0]!.socket.emit('soba:pokreni');
       const [pocetak] = await Promise.all(pocetci);
       expect(pocetak.jePrivatna).toBe(true);
       expect(pocetak.pravila).toBe(pravila);
       expect(pocetak.sjedala).toHaveLength(brojClanova);
-      return igraciSobe;
+      return { igraciSobe, prvaRundaIliKraj: await prvaRundaIliKrajP, krajPromise };
     }
 
     // 2 igrača + klasicni: odigraj do kraja i revanš s istim pravilima.
-    const dva = await pokreniIProvjeri(2, 'klasicni');
+    const { igraciSobe: dva, prvaRundaIliKraj, krajPromise } = await pokreniIProvjeri(2, 'klasicni');
     try {
-      // Listener PRIJE petlje; ako cekajRunduIliKraj već vrati kraj, ne čekaj drugi put.
-      const krajPromise = cekajDogadaj<KrajPartije>(dva[0]!.socket, 'partija:kraj');
-      let rezultat = await cekajRunduIliKraj(dva);
+      let rezultat = prvaRundaIliKraj;
       for (let i = 0; i < 8 && rezultat.vrsta !== 'kraj'; i += 1) {
-        const naPotezu = dva.find((ig) => ig.token === rezultat.runda!.naPotezuId)!;
+        const naPotezu = dva.find((ig) => ig.token === rezultat.runda!.naPotezuId);
+        expect(naPotezu).toBeTruthy();
         const sljedeci = cekajRunduIliKraj(dva);
-        naPotezu.socket.emit('potez:ne-znam');
+        naPotezu!.socket.emit('potez:ne-znam');
         rezultat = await sljedeci;
       }
-      if (rezultat.vrsta !== 'kraj') await krajPromise;
+      expect(rezultat.vrsta).toBe('kraj');
+      await krajPromise;
 
       const lobbyP = cekajDogadaj<StanjePrivatneSobe>(dva[0]!.socket, 'soba:stanje');
       dva[0]!.socket.emit('soba:stanje');
@@ -644,7 +654,7 @@ describe('privatne sobe', () => {
     }
 
     // 3 igrača + dokazi: samo pokretanje i pravilnik (puna igra pokrivena drugdje).
-    const tri = await pokreniIProvjeri(3, 'dokazi_nastavak');
+    const { igraciSobe: tri } = await pokreniIProvjeri(3, 'dokazi_nastavak');
     for (const ig of tri) ig.socket.disconnect();
   }, 40_000);
 
