@@ -1,5 +1,8 @@
 /** Tipovi i predlošci za trajni sandučic (mailbox) igrača. */
 
+/** Maksimalni broj zadržanih poruka po igraču (pročitane + nepročitane). */
+export const MAKS_SANDUCIC_PORUKA_PO_IGRACU = 20;
+
 export const TIP_SANDUCIC_TEST = 'test' as const;
 export const TIP_SANDUCIC_DOBRODOSLICA = 'dobrodoslica' as const;
 export const TIP_SANDUCIC_EMAIL_POTVRDEN = 'email_potvrden' as const;

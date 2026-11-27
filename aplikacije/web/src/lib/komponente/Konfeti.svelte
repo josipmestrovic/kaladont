@@ -13,7 +13,8 @@
 <style>
   .konfeti {
     position: fixed;
-    z-index: 120;
+    /* Iznad mobilnog fokusa (1100) i stolnih panela (1000); ispod dijaloga (2000). */
+    z-index: 1200;
     inset: 0;
     pointer-events: none;
     overflow: hidden;

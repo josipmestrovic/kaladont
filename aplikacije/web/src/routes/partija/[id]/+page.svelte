@@ -249,7 +249,7 @@
     iskoristeniOblik = null;
     vlastitoImeRijec = null;
     zadnjaPoslanaRijec = rijec;
-    unosNastavkaRijeci = '';
+    // #161: ne prazni unos tijekom validacije — iOS tipkovnica ostaje; briše se tek na prihvaćanju.
     dohvatiSocket()
       .timeout(TRAJANJE_CEKANJA_POTVRDE_MS)
       .emit(
@@ -268,6 +268,7 @@
           obradiPotvrduNaredbe(potvrda);
         },
       );
+    queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
   }
 
   function nastaviTrening() {
@@ -381,6 +382,8 @@
     void tick().then(() => {
       // #156: ne vraćaj fokus nakon isteka/eliminacije (kasni potez:odbijen).
       if (!jeNaPotezu) return;
+      // #161: ne bounceaj tipkovnicu ako je input već fokusiran.
+      if (document.activeElement === unosInput) return;
       unosInput?.focus({ preventScroll: true });
     });
   }
@@ -1192,8 +1195,12 @@
         : rezervniRokRezultataMs;
 
     // #159: pljesak pobjede lokalnom ljudskom pobjedniku; ne duplirati nakon Kaladonta.
+    // U Izazovima samo uz uspješan izazov — pobjeda partije bez ispunjenih uvjeta ne svira pljesak.
     const pobjednikId = kraj.plasmani.find((igrac) => igrac.plasman === 1)?.igracId;
-    pokusajPljesakPobjede(kraj.partijaId, stanje.mojIgracId, pobjednikId);
+    const pljesakIzazovaOk = !jeIzazov || stanje.izazovTerminal?.status === 'uspjeh';
+    if (pljesakIzazovaOk) {
+      pokusajPljesakPobjede(kraj.partijaId, stanje.mojIgracId, pobjednikId);
+    }
 
     const otkrijRezultate = () => {
       stanje.rezultatiPrikazaniPartijaId = kraj.partijaId;
@@ -1390,6 +1397,7 @@
       neZnamDijalog = false;
       if (potez.igracId === stanje.mojIgracId) {
         kontrolerSlanja.zavrsiZahtjev('prihvacen', { partijaId });
+        unosNastavkaRijeci = '';
       }
       // Red / prefiks / streak / nagrada: samo globalni listener (stanje-igre).
       prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
@@ -2382,6 +2390,11 @@
                     if (mobilniZaslon()) osigurajZastituPovijesti('fokus');
                   }}
                   onblur={() => {
+                    // #161: tijekom validacije ne dopusti gubitak fokusa (iOS spušta tipkovnicu).
+                    if (jeNaPotezu && slanjeUTijeku) {
+                      queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
+                      return;
+                    }
                     // Ručni blur (tipkovnica zatvorena): skini fokus entry s history stacka.
                     if (
                       mobilniZaslon() &&
@@ -2411,7 +2424,6 @@
                       : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
                   aria-invalid={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}
                   aria-busy={jeNaPotezu && slanjeUTijeku}
-                  readonly={jeNaPotezu && slanjeUTijeku}
                   disabled={!jeNaPotezu || !vezaSpremna}
                 />
               </div>
@@ -2431,6 +2443,7 @@
                 class="posalji-gumb"
                 class:posalji-odbijen={posaljiOdbijen && jeNaPotezu}
                 disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna || posaljiOdbijen}
+                onmousedown={(e) => e.preventDefault()}
                 aria-label={!jeNaPotezu
                   ? `Pošalji (nije tvoj red), niz bez greške: ${stanje.trenutniStreak}`
                   : posaljiOdbijen
@@ -3697,7 +3710,7 @@
   :global(.mobilni-potez) .mobilni-tvoj-red {
     display: block;
     margin: 0;
-    padding: 0 3.6rem 0 0;
+    padding: 0;
     color: var(--boja-uspjeh-tekst);
     font-family: var(--font-naslov);
     font-size: 1.2rem;
@@ -3706,8 +3719,9 @@
     line-height: 1.2;
     text-align: center;
   }
-  :global(.mobilni-potez) .mobilni-zaglavlje:not(:has(.mobilni-timer-crta)) .mobilni-tvoj-red {
-    padding-right: 0;
+  /* Simetrične bočne zone kad timer sjedi desno — naslov ostaje u sredini zaglavlja. */
+  :global(.mobilni-potez) .mobilni-zaglavlje:has(.mobilni-timer-crta) .mobilni-tvoj-red {
+    padding-inline: 3.6rem;
   }
   :global(.mobilni-potez) .mobilni-timer-crta {
     display: block;

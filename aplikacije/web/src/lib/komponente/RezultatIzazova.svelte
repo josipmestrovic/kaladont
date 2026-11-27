@@ -139,7 +139,7 @@
     if (tehnicki || terminalReason === 'prekid_veze') return 'Partija je prekinuta.';
     if (terminalReason === 'odustao') return 'Odustao si od igre.';
     if (terminalReason === 'nevaljana_rijec' || terminalReason === 'zavrsio_na_ka') {
-      return 'Prekršen uvjet izazova.';
+      return 'Uvjet izazova nije ispunjen.';
     }
     if (terminalReason === 'eliminiran' || gameWon === false) return 'Ispao si iz igre.';
     if (gameWonBezCilja) return 'Pobijedio si u partiji.';
@@ -225,7 +225,7 @@
 
   function oznakaStatusa(s: 'met' | 'prekseno' | 'nije'): string {
     if (s === 'met') return 'Ispunjeno';
-    if (s === 'prekseno') return 'Prekršeno';
+    // I „prekršeno” i „nije” prikazuju isti tekst — bez riječi „prekršeno”.
     return 'Nije ispunjeno';
   }
 

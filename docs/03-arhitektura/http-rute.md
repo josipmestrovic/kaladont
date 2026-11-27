@@ -49,12 +49,12 @@ Admin (sesija `vrsta=admin`): `GET /api/admin/prijave?status=nova&tip=…`, `POS
 
 ## Sandučic (mailbox)
 
-Autorizirani gost ili registrirani (`zahtijevajIdentifikaciju`). Primatelj je uvijek iz sesije; klijent ne bira tuđi pretinac. Odgovori imaju `Cache-Control: private, no-store`. Poruke starije od 3 dana brišu se periodički.
+Autorizirani gost ili registrirani (`zahtijevajIdentifikaciju`). Primatelj je uvijek iz sesije; klijent ne bira tuđi pretinac. Odgovori imaju `Cache-Control: private, no-store`. Po igraču ostaje najviše 20 najnovijih poruka; starije od 3 dana i višak iznad limita brišu se pri upisu i periodički.
 
 | Operacija | Ruta | Opis |
 |---|---|---|
 | Sažetak | `GET /api/sanducic/sazetak` | `brojNeprocitanih` + paket `zaNajavu` (nenajavljene i nepročitane) |
-| Lista | `GET /api/sanducic?cursor=…` | Paginacija, najnovije prve; feed prikazuje `naslov` + `tekst` |
+| Lista | `GET /api/sanducic?cursor=…&limit=…` | Najnovije prve; default/cap `limit=20`; feed prikazuje `naslov` + `tekst` |
 | Detalj | `GET /api/sanducic/:id` | Jedna vlastita poruka (deep-link) |
 | Pročitaj | `POST /api/sanducic/procitano` | Tijelo `{ ids: string[] }` — idempotentno |
 | Pročitaj sve | `POST /api/sanducic/procitano-sve` | Ulazak u `/obavijesti` automatski šalje ovu rutu; granica ne proguta kasnije poruke |

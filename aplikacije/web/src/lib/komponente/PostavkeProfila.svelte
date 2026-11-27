@@ -6,6 +6,7 @@
   import AudioKontrola from './AudioKontrola.svelte';
   import KontrolePristupacnosti from './KontrolePristupacnosti.svelte';
   import PrekidacTeme from './PrekidacTeme.svelte';
+  import UnosLozinke from './UnosLozinke.svelte';
 
   interface Profil {
     email: string | null;
@@ -109,7 +110,7 @@
         <p class="podtekst">Trenutni email: <strong>{profil.email}</strong></p>
         <form onsubmit={promijeniEmail} class="forma">
           <label class="labela">Novi email<input type="email" bind:value={noviEmail} required placeholder="novi@email.com" /></label>
-          <label class="labela">Lozinka (za potvrdu)<input type="password" bind:value={lozinkaZaEmail} required placeholder="Lozinka" /></label>
+          <UnosLozinke bind:vrijednost={lozinkaZaEmail} oznaka="Lozinka (za potvrdu)" placeholder="Lozinka" />
           <button type="submit" class="spremnik-gumb">Promijeni email</button>
         </form>
         {#if porukaEmail}<p class="obavijest">{porukaEmail}</p>{/if}
@@ -118,8 +119,8 @@
       <section class="sekcija">
         <h3>Promjena lozinke</h3>
         <form onsubmit={promijeniLozinku} class="forma">
-          <label class="labela">Trenutna lozinka<input type="password" bind:value={trenutnaLozinka} required placeholder="Trenutna lozinka" /></label>
-          <label class="labela">Nova lozinka (min. 8 znakova)<input type="password" bind:value={novaLozinka} minlength={8} required placeholder="Nova lozinka" /></label>
+          <UnosLozinke bind:vrijednost={trenutnaLozinka} oznaka="Trenutna lozinka" placeholder="Trenutna lozinka" />
+          <UnosLozinke bind:vrijednost={novaLozinka} oznaka="Nova lozinka (min. 8 znakova)" placeholder="Nova lozinka" najmanjaDuljina={8} />
           <button type="submit" class="spremnik-gumb">Promijeni lozinku</button>
         </form>
         {#if porukaLozinka}<p class="obavijest">{porukaLozinka}</p>{/if}

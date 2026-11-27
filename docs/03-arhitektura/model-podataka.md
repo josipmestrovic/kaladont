@@ -270,7 +270,7 @@ Revizijski trag **ručnih** promjena rječnika. Masovni uvoz se ne bilježi ovdj
 
 ## sanducic_poruke / sanducic_prekretnice
 
-Trajni mailbox ljudskog igrača (gost i registrirani). `sanducic_poruke` drži tip, tipizirani `podaci` (snapshot), `deduplikacijski_kljuc`, `procitano_at` i `najavljeno_at`. Jedinstvenost `(igrac_id, deduplikacijski_kljuc)`. Poruke starije od 3 dana se hard-brišu. `sanducic_prekretnice` bilježi potrošene pragove (prva igra, XP razine, zvjezdice, kolekcija, `forma_10:{mod}:{prag}`, `gost_sazetak:{prag}`, claim `dovrsena:{tip}:{id}`) bez poplave povijesne pošte pri uključivanju.
+Trajni mailbox ljudskog igrača (gost i registrirani). `sanducic_poruke` drži tip, tipizirani `podaci` (snapshot), `deduplikacijski_kljuc`, `procitano_at` i `najavljeno_at`. Jedinstvenost `(igrac_id, deduplikacijski_kljuc)`. Po igraču ostaje najviše 20 najnovijih poruka; starije od 3 dana i višak iznad limita hard-brišu se pri upisu i periodički. `sanducic_prekretnice` bilježi potrošene pragove (prva igra, XP razine, zvjezdice, kolekcija, `forma_10:{mod}:{prag}`, `gost_sazetak:{prag}`, claim `dovrsena:{tip}:{id}`) bez poplave povijesne pošte pri uključivanju.
 
 ## Izvedeni podaci (bez tablica)
 

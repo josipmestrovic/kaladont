@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import {
+  MAKS_SANDUCIC_PORUKA_PO_IGRACU,
   renderirajSanducicPoruku,
   type SanducicPorukaDetalj,
   type SanducicPorukaSazetak,
@@ -7,7 +8,7 @@ import {
 } from 'zajednicko';
 import { baza } from '../baza/klijent.js';
 import { sanducicPoruke } from '../baza/shema.js';
-import { granicaZadrzavanjaSanducica } from './ciscenje.js';
+import { granicaZadrzavanjaSanducica, ograniciPorukeIgraca } from './ciscenje.js';
 import type { TxSanducic } from './prekretnice.js';
 
 type SocketZaSanducic = {
@@ -103,8 +104,11 @@ export async function stvoriPoruku(
     })
     .returning();
 
-  const trebaEmitirati = opcije.emitiraj ?? (opcije.tx == null);
-  if (red && trebaEmitirati) emitirajPromjenuSanducica(ulaz.igracId, 'nova');
+  if (red) {
+    await ograniciPorukeIgraca(ulaz.igracId, db);
+    const trebaEmitirati = opcije.emitiraj ?? (opcije.tx == null);
+    if (trebaEmitirati) emitirajPromjenuSanducica(ulaz.igracId, 'nova');
+  }
   return red ?? null;
 }
 
@@ -159,7 +163,10 @@ export async function dohvatiListu(
   igracId: string,
   opcije: { samoNeprocitane?: boolean; limit?: number; cursor?: string | null } = {},
 ): Promise<{ poruke: SanducicPorukaDetalj[]; sljedeciCursor: string | null }> {
-  const limit = Math.min(Math.max(opcije.limit ?? 30, 1), 50);
+  const limit = Math.min(
+    Math.max(opcije.limit ?? MAKS_SANDUCIC_PORUKA_PO_IGRACU, 1),
+    MAKS_SANDUCIC_PORUKA_PO_IGRACU,
+  );
   const uvjeti = [uvjetSvjeze(igracId)];
   if (opcije.samoNeprocitane) uvjeti.push(isNull(sanducicPoruke.procitanoAt));
 

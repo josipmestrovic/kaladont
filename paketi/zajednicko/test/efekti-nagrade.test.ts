@@ -42,6 +42,14 @@ describe('odrediEfektPrihvacenogPoteza', () => {
     ).toBe('veliki');
   });
 
+  it('samo rijetke_rijeci bez nagrade i dalje okida konfete (Brza igra)', () => {
+    expect(odrediEfektPrihvacenogPoteza('rijetka', [stavka('rijetke_rijeci', 15)], null)).toEqual({
+      vrsta: 'duza_rijetka',
+      intenzitetKonfeta: 'mali',
+      zvuk: null,
+    });
+  });
+
   it('kombinira XP i nagradu u jedan jači intenzitet', () => {
     expect(
       odrediEfektPrihvacenogPoteza('rijec', [stavka('duge_rijeci', 10)], nagrada('srednji')),

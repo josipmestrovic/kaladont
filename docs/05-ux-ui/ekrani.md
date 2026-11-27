@@ -24,7 +24,7 @@ Svi ekrani dizajniraju se **mobile-first (portret)**. Većina desktop prikaza ce
 - Ulaz je isključivo ikona u Headeru (naslovnica i app rute); nema stavke u glavnoj navigaciji ni bannera.
 - Toast „Imaš N novih obavijesti” + Pročitaj na dopuštenim ekranima; potisnut u `/red`, aktivnoj partiji i tijekom završnog odbrojavanja. Na završnom ekranu rezultata diskretan klikabilan sažetak umjesto toasta.
 - Pročitano ≠ najavljeno: nestanak toasta ne čita poruku; crvena točka prati nepročitane.
-- Viewer `/obavijesti` je feed obavijesti: po defaultu filter **Nove** (nepročitane), s prekidačem **Sve** za cijeli feed. Ulazak odmah označava sve pročitanima (točka nestaje); stavke pokazuju naslov i puni tekst bez zasebnog detalja, vizualna oznaka „Novo” za poruke koje su baš bile nepročitane. LVL i nazivi dostignuća/kolekcionarskih razina ističu se boldom u stilu igre. Umjesto „Označi sve pročitanim” postoji „Obriši sve obavijesti”. Prazno (Nove vs Sve) i greška razdvojeni.
+- Viewer `/obavijesti` je jedan feed najnovijih obavijesti (max 20 po igraču), bez filtera i bez „Označi sve”. Ulazak odmah označava sve pročitanima (točka nestaje); stavke ostaju na popisu s oznakom pročitanosti. Jedina skupna akcija je „Obriši sve obavijesti” (s potvrdom; onemogućena kad je prazno). LVL i nazivi dostignuća/kolekcionarskih razina ističu se boldom u stilu igre.
 
 ## Globalne obavijesti
 
