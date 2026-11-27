@@ -16,6 +16,7 @@ export type ProfilSnapshot = {
   email: string | null;
   vrsta: 'gost' | 'registriran' | 'admin';
   avatarConfig: AvatarConfigV1 | null;
+  avatarSlikaHash?: string | null;
   iskustvo?: ProfilIskustvo;
 };
 
@@ -109,9 +110,9 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
     postavi(null, 'prazno');
   }
 
-  function azurirajAvatar(avatarConfig: AvatarConfigV1) {
+  function azurirajAvatar(avatarConfig: AvatarConfigV1, avatarSlikaHash: string | null = null) {
     if (!snapshot) return;
-    postavi({ ...snapshot, avatarConfig }, status === 'greska' || status === 'prazno' ? 'spreman' : status);
+    postavi({ ...snapshot, avatarConfig, avatarSlikaHash }, status === 'greska' || status === 'prazno' ? 'spreman' : status);
   }
 
   /** Hidracija iz `GET /naslovnica/sazetak` — bez zasebnog GET /profil. */

@@ -13,6 +13,7 @@ import {
   type OdgovorNaslovnicaSazetka,
 } from 'zajednicko';
 import { eq } from 'drizzle-orm';
+import { hashSlikeAvatara } from '../avatar/hash.js';
 import { baza } from '../baza/klijent.js';
 import {
   dostignucaIgraca,
@@ -150,6 +151,7 @@ export async function izgradiNaslovnicaSazetak(igrac: IgracSesije): Promise<Odgo
     vrsta: igrac.vrsta,
     avatarId: igrac.avatarId,
     avatarConfig: (igrac.avatarConfig as AvatarConfigV1 | null) ?? null,
+    avatarSlikaHash: hashSlikeAvatara(igrac.avatarConfig),
     email: igrac.email,
     rang,
     rang1v1: rang,

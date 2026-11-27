@@ -64,6 +64,10 @@ services:
       SIMULACIJA_ADRESA: http://aplikacija:3000
       VERZIJA: ${VERZIJA:?Postavi verziju izdanja}
       DIGEST: ${DIGEST:?Postavi digest izdanja}
+      AVATAR_DIJELOVI_DIR: /app/avatar-dijelovi
+      AVATARI_GENERIRANI_DIR: /app/podaci/avatari-generirani
+    volumes:
+      - avatari_generirani_staging:/app/podaci/avatari-generirani
     depends_on:
       baza:
         condition: service_healthy
@@ -107,6 +111,7 @@ volumes:
   caddy_staging_podaci:
   caddy_staging_konfiguracija:
   postgres_staging_podaci:
+  avatari_generirani_staging:
 
 networks:
   javna:

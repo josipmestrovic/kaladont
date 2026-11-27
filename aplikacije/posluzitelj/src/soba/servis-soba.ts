@@ -13,6 +13,7 @@ import {
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
 import { z } from 'zod';
+import { hashSlikeAvatara } from '../avatar/hash.js';
 import type { ProvjeriOgranicenjeDogadaja } from '../sigurnost/socket-ogranicenja.js';
 import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost/socket-handler.js';
 
@@ -265,6 +266,7 @@ export function registrirajPrivatneSobe(
         jeGost: c.vrsta === 'gost',
         avatarId: c.avatarId,
         avatarConfig: c.avatarConfig,
+        avatarSlikaHash: hashSlikeAvatara(c.avatarConfig),
         avatarRevision: c.avatarRevision,
         rang: rang === 'Piskaralo' ? null : rang,
         razina: stanjeIskustva(c.iskustvoUkupno ?? 0).razina,

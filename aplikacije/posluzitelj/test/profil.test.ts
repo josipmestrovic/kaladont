@@ -509,9 +509,16 @@ describe('PUT /profil/avatar', () => {
       body: JSON.stringify({ avatarConfig: ZADANI_AVATAR_CONFIG }),
     });
     expect(odgovor.status).toBe(200);
-    const tijelo = (await odgovor.json()) as { ok: boolean; avatarConfig: unknown };
+    const tijelo = (await odgovor.json()) as { ok: boolean; avatarConfig: unknown; avatarSlikaHash: string | null };
     expect(tijelo.ok).toBe(true);
     expect(validirajAvatarConfig(tijelo.avatarConfig)).toBe(true);
+    expect(tijelo.avatarSlikaHash).toMatch(/^[a-f0-9]{64}$/);
+    const slika = await fetch(`${adresa}/avatari/g/${tijelo.avatarSlikaHash}/64.webp`);
+    expect(slika.status).toBe(200);
+    expect(slika.headers.get('content-type')).toContain('image/webp');
+    expect(slika.headers.get('cache-control')).toContain('immutable');
+    const kriva = await fetch(`${adresa}/avatari/g/${'a'.repeat(64)}/999.webp`);
+    expect(kriva.status).toBe(404);
   });
 
   it('odbija avatarId izvan raspona', async () => {

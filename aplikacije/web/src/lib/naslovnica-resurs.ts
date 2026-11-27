@@ -142,7 +142,7 @@ export function stvoriNaslovnicaResurs(ovisnosti: NaslovnicaResursOvisnosti) {
   /**
    * Lokalni avatar bez brisanja cachea. Povećava generaciju da kasni HTTP odgovor ne prepiše config.
    */
-  function azurirajAvatar(avatarConfig: AvatarConfigV1): void {
+  function azurirajAvatar(avatarConfig: AvatarConfigV1, avatarSlikaHash: string | null = null): void {
     generacija += 1;
     if (!sazetak) {
       objavi();
@@ -150,7 +150,7 @@ export function stvoriNaslovnicaResurs(ovisnosti: NaslovnicaResursOvisnosti) {
     }
     sazetak = {
       ...sazetak,
-      profil: { ...sazetak.profil, avatarConfig },
+      profil: { ...sazetak.profil, avatarConfig, avatarSlikaHash },
     };
     primijenjenaGeneracija = generacija;
     status = 'spreman';

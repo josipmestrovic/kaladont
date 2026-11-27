@@ -60,9 +60,9 @@
 
   onMount(() => {
     const azurirajAvatar = (dogadaj: Event) => {
-      const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1 }>).detail;
-      azurirajAvatarProfila(detalji.avatarConfig);
-      azurirajAvatarNaslovnice(detalji.avatarConfig);
+      const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1; avatarSlikaHash?: string | null }>).detail;
+      azurirajAvatarProfila(detalji.avatarConfig, detalji.avatarSlikaHash ?? null);
+      azurirajAvatarNaslovnice(detalji.avatarConfig, detalji.avatarSlikaHash ?? null);
     };
     const azurirajIdentitet = () => {
       invalidirajProfil();
@@ -147,6 +147,7 @@
                 <Avatar
                   avatarId={profil.avatarId}
                   avatarConfig={profil.avatarConfig}
+                  avatarSlikaHash={profil.avatarSlikaHash}
                   rang={profil.rang === 'Piskaralo' ? null : profil.rang}
                   gost={jeGost}
                   velicina={50}

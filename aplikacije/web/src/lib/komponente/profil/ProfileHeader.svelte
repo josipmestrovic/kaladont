@@ -40,6 +40,7 @@
         <Avatar
           avatarId={profil.avatarId}
           avatarConfig={profil.avatarConfig}
+          avatarSlikaHash={profil.avatarSlikaHash}
           rang={profil.rang === 'Piskaralo' ? null : profil.rang}
           gost={jeGost}
           velicina={velicinaAvatara}
@@ -55,6 +56,7 @@
         <Avatar
           avatarId={profil.avatarId}
           avatarConfig={profil.avatarConfig}
+          avatarSlikaHash={profil.avatarSlikaHash}
           rang={profil.rang === 'Piskaralo' ? null : profil.rang}
           gost={false}
           velicina={velicinaAvatara}

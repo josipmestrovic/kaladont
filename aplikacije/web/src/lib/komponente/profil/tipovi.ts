@@ -81,6 +81,7 @@ export interface JavniDioProfila {
   nadimak: string;
   avatarId: number;
   avatarConfig: AvatarConfigV1 | null;
+  avatarSlikaHash?: string | null;
   odigrane: number;
   pobjede: number;
   eliminacijeUkupno: number;

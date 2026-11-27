@@ -209,6 +209,7 @@ export interface RedakLjestvice {
   vrijednost: VrijednostLjestvice;
   avatarId: number;
   avatarConfig: AvatarConfigV1 | null;
+  avatarSlikaHash?: string | null;
   avatarRevision: number;
 }
 

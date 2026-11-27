@@ -57,8 +57,8 @@ export function invalidirajProfil(): void {
   osigurajResurs()?.invalidiraj();
 }
 
-export function azurirajAvatarProfila(avatarConfig: AvatarConfigV1): void {
-  osigurajResurs()?.azurirajAvatar(avatarConfig);
+export function azurirajAvatarProfila(avatarConfig: AvatarConfigV1, avatarSlikaHash: string | null = null): void {
+  osigurajResurs()?.azurirajAvatar(avatarConfig, avatarSlikaHash);
 }
 
 /** Hidracija snapshota iz `/naslovnica/sazetak` (Header dijeli podatke bez GET /profil). */

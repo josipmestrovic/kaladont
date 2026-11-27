@@ -53,6 +53,7 @@ function uProfilSnapshot(sazetak: OdgovorNaslovnicaSazetka): ProfilSnapshot {
     email: p.email,
     vrsta: p.vrsta,
     avatarConfig: p.avatarConfig,
+    avatarSlikaHash: p.avatarSlikaHash ?? null,
     iskustvo: p.iskustvo,
   };
 }
@@ -126,8 +127,8 @@ export function potrosiPocetnuListuObavijesti(): {
   return lista;
 }
 
-export function azurirajAvatarNaslovnice(avatarConfig: AvatarConfigV1): void {
-  osigurajResurs()?.azurirajAvatar(avatarConfig);
+export function azurirajAvatarNaslovnice(avatarConfig: AvatarConfigV1, avatarSlikaHash: string | null = null): void {
+  osigurajResurs()?.azurirajAvatar(avatarConfig, avatarSlikaHash);
 }
 
 export function oznaciNovostiMisijaPregledane(skupine: readonly ('dnevna' | 'tjedna')[]): void {

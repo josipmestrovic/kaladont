@@ -15,6 +15,7 @@ export * from './misije.js';
 export * from './pohvale-igre.js';
 export * from './dnk.js';
 export * from './avatar.js';
+export * from './avatar-kompozicija.js';
 export * from './nadimak.js';
 export * from './forma.js';
 export * from './ljestvice.js';

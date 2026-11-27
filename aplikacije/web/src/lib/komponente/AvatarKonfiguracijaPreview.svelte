@@ -1,7 +1,14 @@
 <script lang="ts">
-  import { ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
+  import {
+    AVATAR_POZADINA,
+    AVATAR_VIEWBOX,
+    PREFIKS_DIJELOVA_AVATARA,
+    ZADANI_AVATAR_CONFIG,
+    slojeviKompozicije,
+    type AvatarConfigV1,
+  } from 'zajednicko';
   import { bojaBordera, debljinaBorderaRanga } from '$lib/avatari.js';
-  import { bojiStroke, dohvatiObojeniSvg, okvirDijela, putanjaDijela } from '$lib/avatar-render.js';
+  import { dohvatiObojeniSvg } from '$lib/avatar-render.js';
 
   interface Props {
     konfiguracija?: AvatarConfigV1;
@@ -17,41 +24,17 @@
   let identitetiSlojeva = $state<Record<string, string>>({});
   let generacijaBojanja = 0;
 
-  const dioPutanja = putanjaDijela;
+  const slojevi = $derived(slojeviKompozicije(konfiguracija));
 
-  const slojevi = $derived([
-    { kategorija: 'background', vrijednost: konfiguracija.parts.background, x: 0, y: 0, sirina: 380, visina: 380 },
-    { kategorija: 'base', vrijednost: konfiguracija.parts.base, x: 90, y: 43, sirina: 200, visina: 320 },
-    { kategorija: 'ears', vrijednost: konfiguracija.parts.ears, x: 94, y: 174, sirina: 48, visina: 48 },
-    { kategorija: 'shirt', vrijednost: konfiguracija.parts.shirt ?? 'open', x: 47, y: 290, sirina: 281, visina: 93 },
-    { kategorija: 'eyes', vrijednost: konfiguracija.parts.eyes, x: 152, y: 139, sirina: 96, visina: 48 },
-    { kategorija: 'eyebrows', vrijednost: konfiguracija.parts.eyebrows, x: 115, y: 122, sirina: 149, visina: 51 },
-    { kategorija: 'nose', vrijednost: konfiguracija.parts.nose, x: 188, y: 167, sirina: 32, visina: 40 },
-    { kategorija: 'facialHair', vrijednost: konfiguracija.parts.facialHair, x: 124, y: 150, sirina: 164, visina: 154 },
-    { kategorija: 'mouth', vrijednost: konfiguracija.parts.mouth, x: 172, y: 194, sirina: 72, visina: 64 },
-    { kategorija: 'earrings', vrijednost: konfiguracija.parts.earrings, x: 89, y: 207, sirina: 52, visina: 52 },
-    { kategorija: 'glasses', vrijednost: konfiguracija.parts.glasses, x: 116, y: 132, sirina: 151, visina: 65 },
-    { kategorija: 'hair', vrijednost: konfiguracija.parts.hair, x: 59, y: 28, sirina: 240, visina: 203 },
-  ].map((sloj) => ({ ...sloj, ...(okvirDijela(sloj.kategorija, sloj.vrijednost) ?? {}) })));
-
-  function bojaZaKategoriju(kategorija: string): string | null {
-    if (kategorija === 'base' || kategorija === 'ears') return konfiguracija.colors.skin ?? null;
-    if (kategorija === 'shirt') return konfiguracija.parts.shirt === null ? konfiguracija.colors.skin ?? null : konfiguracija.colors.shirt ?? null;
-    if (kategorija === 'hair') return konfiguracija.colors.hair ?? null;
-    if (kategorija === 'eyes') return konfiguracija.colors.eyes ?? null;
-    if (kategorija === 'eyebrows') return konfiguracija.colors.eyebrows ?? null;
-    if (kategorija === 'facialHair') return konfiguracija.colors.facialHair ?? null;
-    if (kategorija === 'glasses') return konfiguracija.colors.glasses ?? null;
-    if (kategorija === 'earrings') return konfiguracija.colors.earrings ?? null;
-    return null;
+  function putanjaSloja(nazivDatoteke: string | null): string | null {
+    return nazivDatoteke ? `${PREFIKS_DIJELOVA_AVATARA}/${nazivDatoteke}` : null;
   }
 
   function identitetSloja(kategorija: string, vrijednost: string | null, boja: string | null): string {
     return `${kategorija}|${vrijednost ?? ''}|${boja ?? ''}`;
   }
 
-  function hrefSloja(kategorija: string, vrijednost: string | null, putanja: string): string {
-    const boja = bojaZaKategoriju(kategorija);
+  function hrefSloja(kategorija: string, vrijednost: string | null, putanja: string, boja: string | null): string {
     const id = identitetSloja(kategorija, vrijednost, boja);
     if (identitetiSlojeva[kategorija] === id && obojanePutanje[kategorija]) {
       return obojanePutanje[kategorija]!;
@@ -62,14 +45,14 @@
 
   $effect(() => {
     const trenutnaGeneracija = ++generacijaBojanja;
-    const slojeviZaBojanje = slojevi.filter((sloj) => dioPutanja(sloj.kategorija, sloj.vrijednost) && bojaZaKategoriju(sloj.kategorija));
+    const slojeviZaBojanje = slojevi.filter((sloj) => sloj.vidljiv && sloj.nazivDatoteke && sloj.boja);
 
     const ucitavanja = slojeviZaBojanje.map(async (sloj) => {
-      const putanja = dioPutanja(sloj.kategorija, sloj.vrijednost)!;
-      const boja = bojaZaKategoriju(sloj.kategorija)!;
+      const putanja = putanjaSloja(sloj.nazivDatoteke)!;
+      const boja = sloj.boja!;
       const id = identitetSloja(sloj.kategorija, sloj.vrijednost, boja);
       try {
-        const url = await dohvatiObojeniSvg(putanja, boja, bojiStroke(sloj.kategorija));
+        const url = await dohvatiObojeniSvg(putanja, boja, sloj.obojiStroke);
         return [sloj.kategorija, url, id] as const;
       } catch {
         return [sloj.kategorija, putanja, id] as const;
@@ -99,13 +82,13 @@
   style:--boja-rang={border ?? 'transparent'}
   style:--debljina-rang="{debljina}px"
 >
-  <svg viewBox="0 0 380 380" role="img" aria-label="Sastavljeni Kaladont avatar">
-    <circle cx="190" cy="190" r="190" fill="#FFEDEF" />
+  <svg viewBox={`0 0 ${AVATAR_VIEWBOX.sirina} ${AVATAR_VIEWBOX.visina}`} role="img" aria-label="Sastavljeni Kaladont avatar">
+    <circle cx="190" cy="190" r="190" fill={AVATAR_POZADINA} />
     {#each slojevi as sloj (sloj.kategorija)}
-      {@const putanja = dioPutanja(sloj.kategorija, sloj.vrijednost)}
-      {#if putanja && sloj.kategorija !== 'background' && (sloj.kategorija !== 'earrings' || konfiguracija.parts.ears !== 'detached')}
+      {@const putanja = putanjaSloja(sloj.nazivDatoteke)}
+      {#if sloj.vidljiv && putanja}
         <image
-          href={hrefSloja(sloj.kategorija, sloj.vrijednost, putanja)}
+          href={hrefSloja(sloj.kategorija, sloj.vrijednost, putanja, sloj.boja)}
           x={sloj.x}
           y={sloj.y}
           width={sloj.sirina}

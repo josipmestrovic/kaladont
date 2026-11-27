@@ -9,6 +9,7 @@ import {
   AKTUALNA_VERZIJA_UVJETA,
   DEFINICIJE_DOSTIGNUCA,
   validirajAvatarConfig,
+  type AvatarConfigV1,
   izgradiAgregateLevela,
   izracunajRangIzAgregata,
   izracunajUniverzalniUcinak,
@@ -49,6 +50,8 @@ import {
 } from '../baza/shema.js';
 import { dohvatiZavrseneChallengeIds } from '../izazovi/pohrana.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
+import { hashSlikeAvatara } from '../avatar/hash.js';
+import { osigurajGeneriraneAvatare } from '../avatar/generator.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { porukaPotvrdeEmaila, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
@@ -743,6 +746,7 @@ export async function registrirajProfilRute(
       vrsta: igrac.vrsta,
       avatarId: igrac.avatarId,
       avatarConfig: igrac.avatarConfig,
+      avatarSlikaHash: hashSlikeAvatara(igrac.avatarConfig),
       avatarRevision: igrac.avatarRevision,
       email: igrac.email,
       emailNaCekanju: igrac.emailNaCekanju,
@@ -828,6 +832,7 @@ export async function registrirajProfilRute(
       nadimak: igrac.nadimak,
       avatarId: igrac.avatarId,
       avatarConfig: igrac.avatarConfig,
+      avatarSlikaHash: hashSlikeAvatara(igrac.avatarConfig),
       avatarRevision: igrac.avatarRevision,
       odigrane: igrac.odigrane,
       pobjede: igrac.pobjede,
@@ -876,13 +881,24 @@ export async function registrirajProfilRute(
       if (!validirajAvatarConfig((tijelo as { avatarConfig?: unknown }).avatarConfig)) {
         return odgovor.code(400).send({ ok: false, greska: 'Neispravna konfiguracija avatara.' });
       }
-      const konfiguracija = (tijelo as { avatarConfig: unknown }).avatarConfig;
+      const konfiguracijaAvatara = (tijelo as { avatarConfig: AvatarConfigV1 }).avatarConfig;
       const [azurirani] = await baza
         .update(igraci)
-        .set({ avatarConfig: konfiguracija, avatarRevision: sql`${igraci.avatarRevision} + 1` })
+        .set({ avatarConfig: konfiguracijaAvatara, avatarRevision: sql`${igraci.avatarRevision} + 1` })
         .where(eq(igraci.id, igrac.id))
         .returning({ avatarConfig: igraci.avatarConfig, avatarRevision: igraci.avatarRevision });
-      return { ok: true, avatarConfig: azurirani?.avatarConfig ?? konfiguracija, avatarRevision: azurirani?.avatarRevision ?? igrac.avatarRevision + 1 };
+      let avatarSlikaHash: string | null = null;
+      try {
+        avatarSlikaHash = await osigurajGeneriraneAvatare(konfiguracijaAvatara);
+      } catch (greska) {
+        zahtjev.log.error({ greska }, 'Generiranje avatara nije uspjelo');
+      }
+      return {
+        ok: true,
+        avatarConfig: azurirani?.avatarConfig ?? konfiguracijaAvatara,
+        avatarRevision: azurirani?.avatarRevision ?? igrac.avatarRevision + 1,
+        avatarSlikaHash,
+      };
     }
 
     const rezultat = ShemaAvatar.safeParse(tijelo);

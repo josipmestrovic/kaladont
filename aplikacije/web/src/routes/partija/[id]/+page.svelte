@@ -2127,7 +2127,7 @@
                 {/if}
                 <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                   {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
+                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} avatarSlikaHash={sjedalo.jeBot ? null : sjedalo.avatarSlikaHash} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
                   {/key}
                   {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                     <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -2161,7 +2161,7 @@
                 {/if}
                 <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                   {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
+                    <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} avatarSlikaHash={sjedalo.jeBot ? null : sjedalo.avatarSlikaHash} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
                   {/key}
                   {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                     <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -2219,7 +2219,7 @@
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                 {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
+                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} avatarSlikaHash={sjedalo.jeBot ? null : sjedalo.avatarSlikaHash} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, sjedalo.jeBot === true)} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                   <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />
@@ -2259,7 +2259,7 @@
               {/if}
               <span class="avatar-omot" class:avatar-nemiran={aktivno && avatarJeNemiran}>
                 {#key odskociAvatara[sjedalo.igracId] ?? 0}
-                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, false)} /></span>
+                  <span class="avatar-animacija"><Avatar avatarId={sjedalo.avatarId} avatarConfig={sjedalo.avatarConfig} avatarSlikaHash={sjedalo.avatarSlikaHash} rang={sjedalo.rang} gost={sjedalo.jeGost} velicina={72} razinaVatre={sjedalo.razinaVatre} nizPobjeda={sjedalo.trenutniNiz} vanjskaSlika={slikaSjedala(sjedalo.igracId, sjedalo.nadimak, false)} /></span>
                 {/key}
                 {#if aktivno && stanje.istekPotezaIso && !stanje.kraj}
                   <TimerPrsten istekIso={stanje.istekPotezaIso} serverVrijemeIso={stanje.serverVrijemeIso} trajanjeSek={stanje.trajanjePotezaSek ?? 30} velicina={84} {promijeniNemirAvatara} />

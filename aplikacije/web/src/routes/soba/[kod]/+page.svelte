@@ -194,7 +194,7 @@
         <div class="clanovi-lista">
           {#each stanjeSobe.clanovi as clan (clan.igracId)}
             <div class="clan-redak" class:clan-odspojen={clan.privremenoOdspojen}>
-              <Avatar avatarId={clan.avatarId} avatarConfig={clan.avatarConfig} rang={clan.rang} gost={clan.jeGost} velicina={48} />
+              <Avatar avatarId={clan.avatarId} avatarConfig={clan.avatarConfig} avatarSlikaHash={clan.avatarSlikaHash} rang={clan.rang} gost={clan.jeGost} velicina={48} />
               <div class="clan-info">
                 <span class="clan-ime">{clan.nadimak}</span>
                 <span class="clan-rang">{clan.rang ?? 'Piskaralo'} <span aria-hidden="true">|</span> LVL {clan.razina}</span>

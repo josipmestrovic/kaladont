@@ -23,6 +23,7 @@ import {
 } from 'zajednicko';
 
 import { z } from 'zod';
+import { hashSlikeAvatara } from '../avatar/hash.js';
 import type { KaladontIo } from '../server.js';
 import { RedCekanja, prvihN, type StavkaReda } from './red-cekanja.js';
 import { dohvatiProsjekCekanjaSek } from './prosjek-cekanja.js';
@@ -193,6 +194,7 @@ export function registrirajRedCekanja(
         jeBot,
         avatarId: stavka.avatarId,
         avatarConfig: stavka.avatarConfig,
+        avatarSlikaHash: hashSlikeAvatara(stavka.avatarConfig),
         avatarRevision: stavka.avatarRevision,
         rang: jeBot || rang === 'Piskaralo' ? null : rang,
         razina: jeBot ? 0 : stanjeIskustva(stavka.iskustvoUkupno ?? 0).razina,

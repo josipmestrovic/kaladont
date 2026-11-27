@@ -1,6 +1,7 @@
 <script lang="ts">
   import { bojaBordera, debljinaBorderaRanga, nazivAvatara, putanjaAvatara } from '$lib/avatari.js';
-  import { type AvatarConfigV1, type RazinaVatre } from 'zajednicko';
+  import { ADRESA_POSLUZITELJA } from '$lib/konfiguracija.js';
+  import { putanjaGeneriranogAvatara, velicinaGeneriranogAvatara, type AvatarConfigV1, type RazinaVatre } from 'zajednicko';
   import AvatarKonfiguracijaPreview from './AvatarKonfiguracijaPreview.svelte';
   import AvatarVatra from './AvatarVatra.svelte';
 
@@ -12,6 +13,8 @@
     velicina?: number;
     prikaziRangBorder?: boolean;
     avatarConfig?: AvatarConfigV1 | null;
+    /** Hash generirane WebP slike. Ako se ne učita, prikaz pada na SVG konfiguraciju. */
+    avatarSlikaHash?: string | null;
     razinaVatre?: RazinaVatre;
     nizPobjeda?: number;
     /** Fiksna ilustracija (npr. bot za Zagrijavanje) umjesto konfiguracije / kataloga. */
@@ -20,9 +23,16 @@
     opisSlike?: string | null;
   }
 
-  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null, razinaVatre = 0, nizPobjeda = 0, vanjskaSlika = null, opisSlike = null }: Props = $props();
+  const { avatarId, rang = null, gost = false, velicina = 48, prikaziRangBorder = true, avatarConfig = null, avatarSlikaHash = null, razinaVatre = 0, nizPobjeda = 0, vanjskaSlika = null, opisSlike = null }: Props = $props();
   const altTekst = $derived(opisSlike ?? (gost ? 'Gost' : nazivAvatara(avatarId)));
   const gostFontSize = $derived(Math.max(9, Math.round(velicina * 0.26)));
+  let pokvareniHash = $state<string | null>(null);
+  const prikaziGeneriranu = $derived(Boolean(avatarSlikaHash) && pokvareniHash !== avatarSlikaHash);
+  const srcGenerirane = $derived(
+    avatarSlikaHash
+      ? `${ADRESA_POSLUZITELJA}${putanjaGeneriranogAvatara(avatarSlikaHash, velicinaGeneriranogAvatara(velicina))}`
+      : '',
+  );
 
   const border = $derived(!prikaziRangBorder || vanjskaSlika || gost ? null : bojaBordera(rang));
   const debljina = $derived(border ? debljinaBorderaRanga(velicina) : 0);
@@ -45,6 +55,14 @@
         <img class="vanjska-slika" src={vanjskaSlika} alt={altTekst} />
       {:else if gost}
         <div class="gost-avatar" style:font-size="{gostFontSize}px" aria-label={altTekst}>Gost</div>
+      {:else if prikaziGeneriranu}
+        <img
+          src={srcGenerirane}
+          alt={altTekst}
+          onerror={() => {
+            pokvareniHash = avatarSlikaHash;
+          }}
+        />
       {:else if avatarConfig}
         <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} />
       {:else}

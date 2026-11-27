@@ -17,4 +17,7 @@ skripte/uvoz-rjecnika/podaci/
 
 # Lokalni worktreei i sirovi bench JSONL (kontrolne točke)
 .worktrees/
+
+# Generirani WebP avatari (lokalno); u Dockeru ide na imenovani volume
+.podaci/
 bench-rezultati/

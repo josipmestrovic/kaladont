@@ -1,7 +1,10 @@
 import path from 'node:path';
 import { isIP } from 'node:net';
+import { fileURLToPath } from 'node:url';
 import { config as ucitajDotenv } from 'dotenv';
 import { z } from 'zod';
+
+const korijenRepozitorija = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 // Lokalni CI postavlja KALADONT_PRESKOCI_DOTENV=1 da root .env ne vrati razvojne URL-ove/tajne.
 if (process.env.KALADONT_PRESKOCI_DOTENV !== '1') {
@@ -60,6 +63,10 @@ const shemaKonfiguracije = z.object({
   DOPUSTI_VLASTITA_IMENA: z.enum(['true', 'false']).default(() =>
     process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'production' ? 'false' : 'true',
   ),
+  /** SVG dijelovi avatara. U Dockeru: /app/avatar-dijelovi. */
+  AVATAR_DIJELOVI_DIR: z.string().default(() => path.join(korijenRepozitorija, 'aplikacije/web/static/avatari/dijelovi')),
+  /** Trajno spremište generiranih WebP slika. U Dockeru: volume na /app/podaci/avatari-generirani. */
+  AVATARI_GENERIRANI_DIR: z.string().default(() => path.join(korijenRepozitorija, '.podaci/avatari-generirani')),
 });
 
 export const konfiguracija = shemaKonfiguracije.parse(process.env);

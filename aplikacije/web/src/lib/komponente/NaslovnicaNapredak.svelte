@@ -87,6 +87,7 @@
       <Avatar
         avatarId={profil.avatarId}
         avatarConfig={profil.avatarConfig}
+        avatarSlikaHash={profil.avatarSlikaHash}
         rang={profil.rang}
         gost={profil.vrsta === 'gost'}
         velicina={52}

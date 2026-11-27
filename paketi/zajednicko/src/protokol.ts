@@ -94,6 +94,8 @@ export interface PayloadReakcijaPosalji {
 export interface PayloadAvatarAzuriraj {
   avatarConfig: AvatarConfigV1;
   avatarRevision: number;
+  /** Klijent može poslati hash; poslužitelj ga računa iz konfiguracije. */
+  avatarSlikaHash?: string | null;
 }
 
 // Poslužitelj -> klijent
@@ -110,6 +112,8 @@ export interface StanjeReda {
     jeBot: boolean;
     avatarId: number;
     avatarConfig: AvatarConfigV1 | null;
+    /** Hash generirane WebP slike; `null` ako konfiguracija nije valjana. */
+    avatarSlikaHash?: string | null;
     avatarRevision: number;
     rang: string | null;
     razina: number;
@@ -139,6 +143,7 @@ export interface ClanSobe {
   jeGost: boolean;
   avatarId: number;
   avatarConfig: AvatarConfigV1 | null;
+  avatarSlikaHash?: string | null;
   avatarRevision: number;
   rang: string | null;
   razina: number;
@@ -189,6 +194,7 @@ export interface PocetakPartije {
     jeBot: boolean;
     avatarId: number;
     avatarConfig: AvatarConfigV1 | null;
+    avatarSlikaHash?: string | null;
     avatarRevision: number;
     rang: string | null;
     razina: number;

@@ -19,6 +19,7 @@ import {
   type RedakLjestvice,
 } from 'zajednicko';
 import { konfiguracija } from '../konfiguracija.js';
+import { hashSlikeAvatara } from '../avatar/hash.js';
 import { pokusajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
 import { odgovorNajopasnijihRijeci } from './najopasnije-rijeci.js';
 import { izgradiOdgovorSazetkaLjestvice } from './sazetak.js';
@@ -44,6 +45,7 @@ function uRedak(stavka: StavkaPoretka, mojId: string | null): RedakLjestvice {
     vrijednost: stavka.vrijednost,
     avatarId: stavka.avatarId,
     avatarConfig: stavka.avatarConfig,
+    avatarSlikaHash: hashSlikeAvatara(stavka.avatarConfig),
     avatarRevision: stavka.avatarRevision,
   };
 }
