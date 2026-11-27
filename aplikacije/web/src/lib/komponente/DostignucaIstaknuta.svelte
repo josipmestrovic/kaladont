@@ -105,7 +105,7 @@
             <img class="ikona" src={ikonaDostignuca(dostignuce.id)} alt="" aria-hidden="true" />
             <span class="zvjezdice" aria-label={`${dostignuce.razina} od ${dostignuce.pragovi.length} zvjezdica`}>
               {#each dostignuce.pragovi as _, indeks}
-                <img src={indeks < dostignuce.razina ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />
+                <img src={indeks < dostignuce.razina ? '/ikone/27-zvjezdica-puna.webp' : '/ikone/26-zvjezdica-prazna.webp'} alt="" aria-hidden="true" loading="lazy" decoding="async" />
               {/each}
             </span>
           </button>

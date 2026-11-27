@@ -12,7 +12,7 @@
 {#if razina > 0}
   <div class={`avatar-vatra razina-${razina}`} role="img" aria-label={`Pobjednički niz: ${niz} ${niz === 1 ? 'pobjeda' : 'pobjede'}`}>
     {#each Array(razina) as _}
-      <img src="/ikone/19-vatra.png" alt="" aria-hidden="true" />
+      <img src="/ikone/19-vatra.webp" alt="" aria-hidden="true" />
     {/each}
   </div>
 {/if}

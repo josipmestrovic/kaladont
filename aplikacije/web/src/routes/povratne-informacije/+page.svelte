@@ -110,7 +110,7 @@
                     aria-pressed={ocjene[pitanje.kljuc] === ocjena}
                     onclick={() => postaviOcjenu(pitanje.kljuc, ocjena)}
                   ><img
-                    src={(ocjene[pitanje.kljuc] ?? 0) >= ocjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'}
+                    src={(ocjene[pitanje.kljuc] ?? 0) >= ocjena ? '/ikone/27-zvjezdica-puna.webp' : '/ikone/26-zvjezdica-prazna.webp'}
                     alt=""
                     aria-hidden="true"
                   /></button>

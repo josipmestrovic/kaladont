@@ -50,8 +50,7 @@ import {
 } from '../baza/shema.js';
 import { dohvatiZavrseneChallengeIds } from '../izazovi/pohrana.js';
 import { BROJ_AVATARA } from '../identitet/identitet.js';
-import { hashSlikeAvatara } from '../avatar/hash.js';
-import { osigurajGeneriraneAvatare } from '../avatar/generator.js';
+import { osigurajGeneriraneAvatare, osigurajHashSlikeAvatara } from '../avatar/generator.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import { porukaPotvrdeEmaila, pokusajPoslatiEmail } from '../email.js';
 import { konfiguracija } from '../konfiguracija.js';
@@ -728,7 +727,7 @@ export async function registrirajProfilRute(
   app.get('/profil', { preHandler: zahtijevajIdentifikaciju }, async (zahtjev, odgovor) => {
     odgovor.header('Cache-Control', 'private, no-store');
     const igrac = (zahtjev as ZahtjevSIgracem).igrac!;
-    const [statistikaCetiri, agregat, dostignuca, aktivnostDana, rekordi, napredakIzazova] = await Promise.all([
+    const [statistikaCetiri, agregat, dostignuca, aktivnostDana, rekordi, napredakIzazova, avatarSlikaHash] = await Promise.all([
       dohvatiStatistiku(igrac.id, 'cetiri_igraca'),
       sastaviProfilDnkIFormate(igrac),
       dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
@@ -737,6 +736,9 @@ export async function registrirajProfilRute(
         : dohvatiSažetakAktivnostiDana(igrac.id),
       dohvatiOsobneRekorde(igrac.id),
       dohvatiNapredakIzazovaZaProfil(igrac.id),
+      osigurajHashSlikeAvatara(igrac.avatarConfig, (greska) => {
+        zahtjev.log.error({ greska }, 'Osiguranje avatara na profilu nije uspjelo');
+      }),
     ]);
     const rang = izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija);
     return {
@@ -746,7 +748,7 @@ export async function registrirajProfilRute(
       vrsta: igrac.vrsta,
       avatarId: igrac.avatarId,
       avatarConfig: igrac.avatarConfig,
-      avatarSlikaHash: hashSlikeAvatara(igrac.avatarConfig),
+      avatarSlikaHash,
       avatarRevision: igrac.avatarRevision,
       email: igrac.email,
       emailNaCekanju: igrac.emailNaCekanju,
@@ -814,12 +816,15 @@ export async function registrirajProfilRute(
       .limit(1);
     if (!igrac) return odgovor.code(404).send({ ok: false, greska: 'Profil nije pronađen.' });
 
-    const [statistikaCetiri, agregat, dostignuca, rekordi, napredakIzazova] = await Promise.all([
+    const [statistikaCetiri, agregat, dostignuca, rekordi, napredakIzazova, avatarSlikaHash] = await Promise.all([
       dohvatiStatistiku(igrac.id, 'cetiri_igraca'),
       sastaviProfilDnkIFormate(igrac),
       dohvatiDostignucaZaIgraca(igrac.id, igrac.iskustvoUkupno),
       dohvatiOsobneRekorde(igrac.id),
       dohvatiNapredakIzazovaZaProfil(igrac.id),
+      osigurajHashSlikeAvatara(igrac.avatarConfig, (greska) => {
+        zahtjev.log.error({ greska }, 'Osiguranje avatara na javnom profilu nije uspjelo');
+      }),
     ]);
     const rang = izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija);
     const jeAdmin = (zahtjev as ZahtjevSIgracem).igrac?.vrsta === 'admin';
@@ -832,7 +837,7 @@ export async function registrirajProfilRute(
       nadimak: igrac.nadimak,
       avatarId: igrac.avatarId,
       avatarConfig: igrac.avatarConfig,
-      avatarSlikaHash: hashSlikeAvatara(igrac.avatarConfig),
+      avatarSlikaHash,
       avatarRevision: igrac.avatarRevision,
       odigrane: igrac.odigrane,
       pobjede: igrac.pobjede,

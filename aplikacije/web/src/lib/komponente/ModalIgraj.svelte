@@ -5,6 +5,7 @@
    * Naslovnica više ne koristi ovaj modal kao glavni ulaz.
    */
   import { onMount } from 'svelte';
+  import { ucitajModalIgraAsete } from '$lib/asetovi-core.js';
   import type { ModPartije, PravilnikPartije, ProfilBotaIzazova } from 'zajednicko';
   import { NAZIVI_PROFILA_BOTA, PROFILI_BOTA_IZAZOVA, ZADANI_PROFIL_TRENINGA } from 'zajednicko';
   import { X } from 'lucide-svelte';
@@ -103,6 +104,7 @@
   }
 
   onMount(() => {
+    ucitajModalIgraAsete();
     return () => {
       /* fokus vraća zatvori() */
     };
@@ -154,9 +156,9 @@
               data-mod={mod}
             >
               {#if mod === 'dva_igraca'}
-                <img src="/ikone/17-soba-2-igraca.png" alt="" aria-hidden="true" />
+                <img src="/ikone/17-soba-2-igraca.webp" alt="" aria-hidden="true" />
               {:else if mod === 'cetiri_igraca'}
-                <img src="/ikone/16-soba-4-igraca.png" alt="" aria-hidden="true" />
+                <img src="/ikone/16-soba-4-igraca.webp" alt="" aria-hidden="true" />
               {:else}
                 <!-- HINT PR14: Troboj ikona naknadno — samo tekstualni placeholder. -->
                 <span class="modal-opcija-ikona troboj-placeholder" aria-hidden="true">3</span>

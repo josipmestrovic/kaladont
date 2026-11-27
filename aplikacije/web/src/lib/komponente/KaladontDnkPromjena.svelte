@@ -43,7 +43,7 @@
 <section class="dnk-promjena" aria-labelledby="dnk-promjena-naslov">
   <div class="dnk-promjena-zaglavlje">
     <div>
-      <p class="dnk-natpis"><img src="/ikone/15-kaladont-dnk.png" alt="" aria-hidden="true" />Novi profil igre</p>
+      <p class="dnk-natpis"><img src="/ikone/15-kaladont-dnk.webp" alt="" aria-hidden="true" />Novi profil igre</p>
       <h3 id="dnk-promjena-naslov">{naslov}</h3>
     </div>
     {#if !otkljucan}

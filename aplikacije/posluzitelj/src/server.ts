@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -20,6 +20,7 @@ import {
   type StanjePartije,
 } from 'zajednicko';
 import { registrirajRuteGeneriranihAvatara } from './avatar/rute.js';
+import { CACHE_NEVERZIONIRANIH_ASETA, razrijesiPutanjuUnutarKorijena } from './sigurnost/staticki-aseti.js';
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
@@ -320,26 +321,32 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
     const { handler } = await import(pathToFileURL(putanjaWebHandlera).href);
 
-    // Statični asseti nisu sadržajno hashani kao _app/immutable - adapter-node im ne daje
-    // dugotrajni cache, pa ih serviramo posebno prije SvelteKit catch-alla (staging/produkcija;
-    // dev koristi Vite).
+    // Neverzionirani statični asseti (ikone/fontovi/zvukovi) — kratki cache + revalidacija.
+    // Hashirani generirani avatari (/avatari/g) ostaju na zasebnoj ruti s immutable cacheom.
+    // Serviramo prije SvelteKit catch-alla (staging/produkcija; lokalni dev koristi Vite).
     const direktorijKlijenta = path.join(path.dirname(putanjaWebHandlera), 'client');
-    const CACHE_STATICKIH = 'public, max-age=31536000, immutable';
 
     const servirajStatickiDirektorij = (
       putanjaUrl: string,
       poddirektorij: string,
       mimePoEkstenziji: Record<string, string>,
     ) => {
-      const korijen = path.join(direktorijKlijenta, poddirektorij);
+      const korijen = path.resolve(direktorijKlijenta, poddirektorij);
       app.get(putanjaUrl, { config: { rateLimit: false } }, async (zahtjev, odgovor) => {
         const trazenaPutanja = (zahtjev.params as { '*': string })['*'];
-        const puniPuta = path.join(korijen, trazenaPutanja);
-        if (!puniPuta.startsWith(korijen) || !existsSync(puniPuta)) {
+        const puniPuta = razrijesiPutanjuUnutarKorijena(korijen, trazenaPutanja);
+        if (!puniPuta) {
+          return odgovor.code(404).send();
+        }
+        try {
+          if (!statSync(puniPuta).isFile()) {
+            return odgovor.code(404).send();
+          }
+        } catch {
           return odgovor.code(404).send();
         }
         const mime = mimePoEkstenziji[path.extname(puniPuta).toLowerCase()] ?? 'application/octet-stream';
-        odgovor.header('cache-control', CACHE_STATICKIH).type(mime);
+        odgovor.header('cache-control', CACHE_NEVERZIONIRANIH_ASETA).type(mime);
         return odgovor.send(createReadStream(puniPuta));
       });
     };
@@ -361,6 +368,22 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       '.webp': 'image/webp',
       '.svg': 'image/svg+xml',
       '.gif': 'image/gif',
+    });
+    // Botovi / SVG dijelovi — ne diraj /avatari/g (hashirani generirani avatar, zasebna ruta).
+    servirajStatickiDirektorij('/avatari/botovi/*', path.join('avatari', 'botovi'), {
+      '.webp': 'image/webp',
+      '.png': 'image/png',
+      '.svg': 'image/svg+xml',
+    });
+    servirajStatickiDirektorij('/avatari/dijelovi/*', path.join('avatari', 'dijelovi'), {
+      '.svg': 'image/svg+xml',
+    });
+    servirajStatickiDirektorij('/fontovi/*', 'fontovi', {
+      '.woff2': 'font/woff2',
+      '.otf': 'font/otf',
+      '.ttf': 'font/ttf',
+      '.css': 'text/css; charset=utf-8',
+      '.txt': 'text/plain; charset=utf-8',
     });
 
     app.route({

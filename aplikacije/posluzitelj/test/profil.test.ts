@@ -1,13 +1,17 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { eq, inArray } from 'drizzle-orm';
-import { validirajAvatarConfig, ZADANI_AVATAR_CONFIG } from 'zajednicko';
+import { validirajAvatarConfig, ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
 import { izgradiPosluzitelj } from '../src/server.js';
 import { baza } from '../src/baza/klijent.js';
 import { botovi, dnkStatistikeIgraca, igraci, obracuniPartija, osobniRekordiIgraca, partije, potezi, statistikeRijeciIgraca, sudioniciPartije } from '../src/baza/shema.js';
 import { zakljuciPartijuUBazi } from '../src/igra/upis-partije.js';
 import { ocistiMemorijuTopRijeci } from '../src/profil/rute.js';
+import { hashAvataraConfig } from '../src/avatar/hash.js';
+import { konfiguracija } from '../src/konfiguracija.js';
 
 let app: FastifyInstance;
 let adresa: string;
@@ -519,6 +523,80 @@ describe('PUT /profil/avatar', () => {
     expect(slika.headers.get('cache-control')).toContain('immutable');
     const kriva = await fetch(`${adresa}/avatari/g/${'a'.repeat(64)}/999.webp`);
     expect(kriva.status).toBe(404);
+  });
+
+  it('postojećem korisniku s avatarConfig u bazi osigurava WebP na GET /profil', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
+    });
+    const { sesijskiToken, igracId } = (await registracija.json()) as { sesijskiToken: string; igracId: string };
+
+    const postojećiConfig: AvatarConfigV1 = {
+      ...ZADANI_AVATAR_CONFIG,
+      colors: { ...ZADANI_AVATAR_CONFIG.colors, skin: '#F1B28D' },
+    };
+    const hash = hashAvataraConfig(postojećiConfig);
+    await rm(path.join(konfiguracija.AVATARI_GENERIRANI_DIR, hash), { recursive: true, force: true });
+    await baza.update(igraci).set({ avatarConfig: postojećiConfig }).where(eq(igraci.id, igracId));
+
+    const profil = await fetch(`${adresa}/api/profil`, {
+      headers: { authorization: `Bearer ${sesijskiToken}` },
+    });
+    expect(profil.status).toBe(200);
+    const tijelo = (await profil.json()) as { avatarSlikaHash: string | null };
+    expect(tijelo.avatarSlikaHash).toBe(hash);
+
+    const slika = await fetch(`${adresa}/avatari/g/${hash}/128.webp`);
+    expect(slika.status).toBe(200);
+    expect(slika.headers.get('content-type')).toContain('image/webp');
+    expect(slika.headers.get('cache-control')).toContain('immutable');
+    const bajtovi = Buffer.from(await slika.arrayBuffer());
+    expect(bajtovi.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(bajtovi.subarray(8, 12).toString('ascii')).toBe('WEBP');
+  });
+
+  it('promjena avatara daje novi hash i WebP', async () => {
+    const registracija = await fetch(`${adresa}/api/racuni/registracija`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, lozinka: LOZINKA, potvrdaDob16: true, prihvacamUvjete: true }),
+    });
+    const { sesijskiToken } = (await registracija.json()) as { sesijskiToken: string };
+
+    const prvi: AvatarConfigV1 = {
+      ...ZADANI_AVATAR_CONFIG,
+      colors: { ...ZADANI_AVATAR_CONFIG.colors, hair: '#B97945' },
+    };
+    const drugi: AvatarConfigV1 = {
+      ...ZADANI_AVATAR_CONFIG,
+      colors: { ...ZADANI_AVATAR_CONFIG.colors, hair: '#E77979' },
+    };
+
+    const spremi = async (avatarConfig: AvatarConfigV1) => {
+      const odgovor = await fetch(`${adresa}/api/profil/avatar`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${sesijskiToken}` },
+        body: JSON.stringify({ avatarConfig }),
+      });
+      expect(odgovor.status).toBe(200);
+      return (await odgovor.json()) as { avatarSlikaHash: string };
+    };
+
+    const prviOdgovor = await spremi(prvi);
+    const drugiOdgovor = await spremi(drugi);
+    expect(prviOdgovor.avatarSlikaHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(drugiOdgovor.avatarSlikaHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(drugiOdgovor.avatarSlikaHash).not.toBe(prviOdgovor.avatarSlikaHash);
+
+    for (const hash of [prviOdgovor.avatarSlikaHash, drugiOdgovor.avatarSlikaHash]) {
+      const slika = await fetch(`${adresa}/avatari/g/${hash}/64.webp`);
+      expect(slika.status).toBe(200);
+      expect(slika.headers.get('content-type')).toContain('image/webp');
+      const bajtovi = Buffer.from(await slika.arrayBuffer());
+      expect(bajtovi.subarray(8, 12).toString('ascii')).toBe('WEBP');
+    }
   });
 
   it('odbija avatarId izvan raspona', async () => {

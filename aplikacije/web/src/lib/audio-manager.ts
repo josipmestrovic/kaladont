@@ -68,11 +68,13 @@ const GAMEPLAY_ZVUKOVI: AudioDogadaj[] = [
   'tvoj-red',
   'promjena-reda',
   'eliminacija',
-  'aplauz-kaladont',
-  'partija-kraj',
   'pred-istek-vremena',
   'chat-poruka',
 ];
+
+/** Teži SFX kraja — warm tek približavanjem / na kraj partije. */
+const KRAJ_ZVUKOVI: AudioDogadaj[] = ['aplauz-kaladont', 'partija-kraj'];
+let krajZvukoviPokrenuti = false;
 
 interface AudioPostavke {
   volumen: number;
@@ -226,6 +228,15 @@ export function zagrijGameplayZvukove(): void {
   if (gameplayZvukoviPokrenuti) return;
   gameplayZvukoviPokrenuti = true;
   zagrijZvukove(GAMEPLAY_ZVUKOVI);
+  // Kraj SFX idle nakon gameplay warm-a — spremni prije aplauza, ne u kritičnom pathu ulaska.
+  pokreniUPozadini(() => zagrijKrajZvukove());
+}
+
+/** Warm aplauza / kraja partije — zove se iz gameplay warm-a (idle) i kao rezervni na kraj. */
+export function zagrijKrajZvukove(): void {
+  if (krajZvukoviPokrenuti) return;
+  krajZvukoviPokrenuti = true;
+  zagrijZvukove(KRAJ_ZVUKOVI);
 }
 
 const TIMEOUT_PLAY_RETRY_MS = 1_500;

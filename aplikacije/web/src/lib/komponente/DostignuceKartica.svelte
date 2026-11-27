@@ -29,7 +29,7 @@
 </script>
 
 <article class:otkljucano={dostignuce.razina > 0} class:novo={pokaziNovo} class="dostignuce-kartica">
-  <div class="medaljon" aria-hidden="true"><img src={ikonaDostignuca(dostignuce.id)} alt="" /></div>
+  <div class="medaljon" aria-hidden="true"><img src={ikonaDostignuca(dostignuce.id)} alt="" loading="lazy" decoding="async" /></div>
   <div class="sadrzaj">
     <header>
       <div>
@@ -45,7 +45,7 @@
     <div class="zvjezdice" aria-label={`${dostignuce.razina} od ${dostignuce.pragovi.length} razina`}>
       {#each dostignuce.pragovi as _, indeks}
         <img
-          src={indeks < dostignuce.razina ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'}
+          src={indeks < dostignuce.razina ? '/ikone/27-zvjezdica-puna.webp' : '/ikone/26-zvjezdica-prazna.webp'}
           alt=""
           aria-hidden="true"
         />

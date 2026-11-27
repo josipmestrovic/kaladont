@@ -13,7 +13,7 @@ import {
   type OdgovorNaslovnicaSazetka,
 } from 'zajednicko';
 import { eq } from 'drizzle-orm';
-import { hashSlikeAvatara } from '../avatar/hash.js';
+import { osigurajHashSlikeAvatara } from '../avatar/generator.js';
 import { baza } from '../baza/klijent.js';
 import {
   dostignucaIgraca,
@@ -145,21 +145,17 @@ async function iliNull<T>(fn: () => Promise<T>): Promise<T | null> {
 export async function izgradiNaslovnicaSazetak(igrac: IgracSesije): Promise<OdgovorNaslovnicaSazetka> {
   const rang = izracunajRangIzAgregata(igrac.rangSumaJedinica, igrac.rangBrojPartija);
   const iskustvo = stanjeIskustva(igrac.iskustvoUkupno);
-  const profil: OdgovorNaslovnicaSazetka['profil'] = {
-    igracId: igrac.id,
-    nadimak: igrac.nadimak,
-    vrsta: igrac.vrsta,
-    avatarId: igrac.avatarId,
-    avatarConfig: (igrac.avatarConfig as AvatarConfigV1 | null) ?? null,
-    avatarSlikaHash: hashSlikeAvatara(igrac.avatarConfig),
-    email: igrac.email,
-    rang,
-    rang1v1: rang,
-    iskustvo,
-  };
-
-  const [izazovi, misije, ukupnoOtkljucano, dostignuca, ljestvice, sanducicSazetak, sanducicLista] =
-    await Promise.all([
+  const [
+    avatarSlikaHash,
+    izazovi,
+    misije,
+    ukupnoOtkljucano,
+    dostignuca,
+    ljestvice,
+    sanducicSazetak,
+    sanducicLista,
+  ] = await Promise.all([
+      osigurajHashSlikeAvatara(igrac.avatarConfig),
       iliNull(() => dohvatiSazetakIzazova(igrac.id)),
       iliNull(() => dohvatiSazetakMisija(igrac)),
       iliNull(() => dohvatiBrojOtkljucanihKolekcije(igrac.id)),
@@ -168,6 +164,19 @@ export async function izgradiNaslovnicaSazetak(igrac: IgracSesije): Promise<Odgo
       iliNull(() => dohvatiSazetak(igrac.id)),
       iliNull(() => dohvatiListu(igrac.id, { samoNeprocitane: true, limit: 20 })),
     ]);
+
+  const profil: OdgovorNaslovnicaSazetka['profil'] = {
+    igracId: igrac.id,
+    nadimak: igrac.nadimak,
+    vrsta: igrac.vrsta,
+    avatarId: igrac.avatarId,
+    avatarConfig: (igrac.avatarConfig as AvatarConfigV1 | null) ?? null,
+    avatarSlikaHash,
+    email: igrac.email,
+    rang,
+    rang1v1: rang,
+    iskustvo,
+  };
 
   // Gost: misije namjerno null. Registriran + pad: također null (ne lažne nule).
   const misijeOdgovor =

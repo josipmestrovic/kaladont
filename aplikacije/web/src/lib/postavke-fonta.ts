@@ -1,11 +1,23 @@
 import { writable } from 'svelte/store';
 
 const KLJUC_POSTAVKE = 'kaladont_font_postavke_v1';
+const ID_STILA_OPENDYSLEXIC = 'kaladont-open-dyslexic-font';
 
 export const openDyslexicUkljucen = writable(false);
 
+function osigurajOpenDyslexicStil(): void {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(ID_STILA_OPENDYSLEXIC)) return;
+  const link = document.createElement('link');
+  link.id = ID_STILA_OPENDYSLEXIC;
+  link.rel = 'stylesheet';
+  link.href = '/fontovi/open-dyslexic.css';
+  document.head.appendChild(link);
+}
+
 function primijeniFont(ukljucen: boolean): void {
   if (typeof document === 'undefined') return;
+  if (ukljucen) osigurajOpenDyslexicStil();
   document.documentElement.toggleAttribute('data-font-disleksiju', ukljucen);
 }
 

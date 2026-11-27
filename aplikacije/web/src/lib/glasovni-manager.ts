@@ -64,14 +64,22 @@ export function osvjeziGovornoOkruzenje(): void {
   });
 }
 
-export function inicijalizirajGlas(): void {
+/** SpeechSynthesis probe — samo kad još nije provjereno ili se glas tek uključuje. */
+export function osigurajGovornoOkruzenje(): void {
   if (typeof window === 'undefined') return;
 
-  osvjeziGovornoOkruzenje();
+  if (!get(govornoOkruzenje).provjereno) {
+    osvjeziGovornoOkruzenje();
+  }
   if (!slusateljGlasovaRegistriran && window.speechSynthesis) {
     window.speechSynthesis.addEventListener('voiceschanged', osvjeziGovornoOkruzenje);
     slusateljGlasovaRegistriran = true;
   }
+}
+
+/** Obnavlja lokalnu postavku; SpeechSynthesis se pali tek ako je glas već uključen. */
+export function inicijalizirajGlas(): void {
+  if (typeof window === 'undefined') return;
 
   let ukljucen = false;
   try {
@@ -81,6 +89,7 @@ export function inicijalizirajGlas(): void {
   }
 
   glasUkljucen.set(ukljucen);
+  if (ukljucen) osigurajGovornoOkruzenje();
 }
 
 export function postaviGlas(ukljucen: boolean): void {
@@ -93,6 +102,8 @@ export function postaviGlas(ukljucen: boolean): void {
     } catch {
       // Isključivanje postavke ne smije prekinuti sučelje.
     }
+  } else {
+    osigurajGovornoOkruzenje();
   }
   try {
     window.localStorage.setItem(KLJUC_POSTAVKE, String(ukljucen));
@@ -129,4 +140,18 @@ export function zaustaviGovor(): void {
   } catch {
     // Čišćenje govora ne smije ometati napuštanje partije.
   }
+}
+
+/** Samo za testove — resetira listener flag. */
+export function __resetirajGlasZaTestove(): void {
+  slusateljGlasovaRegistriran = false;
+  glasUkljucen.set(false);
+  govornoOkruzenje.set({
+    provjereno: false,
+    podrzavaSintezu: false,
+    platforma: 'nepoznat sustav',
+    jeziciPreglednika: [],
+    jeziciGlasova: [],
+    hrvatskiGlas: false,
+  });
 }

@@ -8,9 +8,9 @@ import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { jeVelicinaGeneriranogAvatara } from 'zajednicko';
 import { konfiguracija } from '../konfiguracija.js';
+import { CACHE_HASHIRANIH_ASETA } from '../sigurnost/staticki-aseti.js';
 
 const UZORAK_HASHA = /^[a-f0-9]{64}$/;
-const CACHE = 'public, max-age=31536000, immutable';
 
 export async function registrirajRuteGeneriranihAvatara(
   app: FastifyInstance,
@@ -40,7 +40,7 @@ export async function registrirajRuteGeneriranihAvatara(
         return odgovor.code(404).send();
       }
 
-      odgovor.header('cache-control', CACHE).type('image/webp');
+      odgovor.header('cache-control', CACHE_HASHIRANIH_ASETA).type('image/webp');
       return odgovor.send(createReadStream(putanja));
     },
   );

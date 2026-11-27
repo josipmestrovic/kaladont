@@ -4,7 +4,6 @@
   import { afterNavigate, beforeNavigate } from '$app/navigation';
   import { navigating, page } from '$app/stores';
   import { pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
-  import PadajuceRijeci from '$lib/komponente/PadajuceRijeci.svelte';
   import { inicijalizirajGostSesiju } from '$lib/identitet.js';
   import { pokreniEvidencijuAktivnogDana } from '$lib/aktivnost-dana.js';
   import { pokreniObavijestiDostignuca } from '$lib/obavijesti-dostignuca.svelte.js';
@@ -21,16 +20,20 @@
     animiranaPozadinaUkljucena,
     inicijalizirajAnimacijuPozadine,
   } from '$lib/postavke-animacije.js';
-  import { inicijalizirajGlas } from '$lib/glasovni-manager.js';
+  import { glasUkljucen, inicijalizirajGlas } from '$lib/glasovni-manager.js';
+  import {
+    ucitajCitanjeNaglasObavijest,
+    ucitajPadajuceRijeci,
+  } from '$lib/dinamicni-ucitavac.js';
   import Header from '$lib/komponente/Header.svelte';
   import VezaObavijest from '$lib/komponente/VezaObavijest.svelte';
   import UspjehObavijest from '$lib/komponente/UspjehObavijest.svelte';
   import DostignuceObavijest from '$lib/komponente/DostignuceObavijest.svelte';
-  import CitanjeNaglasObavijest from '$lib/komponente/CitanjeNaglasObavijest.svelte';
   import SanducicToast from '$lib/komponente/SanducicToast.svelte';
   import ObavijestNovihMisija from '$lib/komponente/ObavijestNovihMisija.svelte';
   import RedCekanjaKostur from '$lib/komponente/RedCekanjaKostur.svelte';
   import { jeIndeksabilnaPutanja } from '$lib/seo.js';
+  import type { Component } from 'svelte';
 
   let { children, data } = $props();
   let sesijaSpreman = $state(false);
@@ -41,6 +44,8 @@
   let mozeNaprijed = $state(false);
   let povijestAplikacije: string[] = [];
   let indeksPovijesti = -1;
+  let PadajuceRijeciKomponenta = $state<Component | null>(null);
+  let CitanjeNaglasKomponenta = $state<Component | null>(null);
 
   function putanja(dogadaj: { url: URL }): string {
     return `${dogadaj.url.pathname}${dogadaj.url.search}${dogadaj.url.hash}`;
@@ -103,6 +108,37 @@
       animacijaUkljucena &&
       !reducedMotion,
   );
+
+  $effect(() => {
+    if (!prikaziPadajuceRijeci || PadajuceRijeciKomponenta) return;
+    let otkazano = false;
+    void ucitajPadajuceRijeci()
+      .then((komponenta) => {
+        if (!otkazano) PadajuceRijeciKomponenta = komponenta as Component;
+      })
+      .catch(() => {
+        // Dekorativna animacija — tihi pad ne smije blokirati naslovnicu.
+      });
+    return () => {
+      otkazano = true;
+    };
+  });
+
+  $effect(() => {
+    const ukljucen = $glasUkljucen;
+    if (!ukljucen || CitanjeNaglasKomponenta) return;
+    let otkazano = false;
+    void ucitajCitanjeNaglasObavijest()
+      .then((komponenta) => {
+        if (!otkazano) CitanjeNaglasKomponenta = komponenta as Component;
+      })
+      .catch(() => {
+        // Obavijest o čitanju nije kritična za igru.
+      });
+    return () => {
+      otkazano = true;
+    };
+  });
 
   onMount(() => {
     inicijalizirajTemu();
@@ -185,9 +221,13 @@
     <SanducicToast />
     <ObavijestNovihMisija />
     <DostignuceObavijest />
-    <CitanjeNaglasObavijest />
+    {#if CitanjeNaglasKomponenta}
+      <CitanjeNaglasKomponenta />
+    {/if}
   </div>
-  {#if prikaziPadajuceRijeci}<PadajuceRijeci />{/if}
+  {#if prikaziPadajuceRijeci && PadajuceRijeciKomponenta}
+    <PadajuceRijeciKomponenta />
+  {/if}
   <!-- Naslovnica: Header (s h1) i u SSR-u prije gost-sesije, radi indeksabilnog naslova. -->
   {#if !bezHeadera && (sesijaSpreman || $page.url.pathname === '/')}
     <Header {prethodnaPutanja} {mozeNaprijed} />

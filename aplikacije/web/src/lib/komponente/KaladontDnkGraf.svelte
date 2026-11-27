@@ -32,7 +32,7 @@
   <div class="dnk-zaglavlje">
     <div>
       <div class="dnk-naslov-redak">
-        <img class="dnk-ikona" src="/ikone/15-kaladont-dnk.png" alt="" aria-hidden="true" />
+        <img class="dnk-ikona" src="/ikone/15-kaladont-dnk.webp" alt="" aria-hidden="true" />
         <h3 id="dnk-naslov">{naslov}</h3>
       </div>
     </div>

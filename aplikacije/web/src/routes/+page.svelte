@@ -212,7 +212,7 @@
           <span class="stavka-sadrzaj">
             <img
               class="stavka-ikona stavka-ikona--primarna"
-              src="/ikone/33-dnk-brzina.png"
+              src="/ikone/33-dnk-brzina.webp"
               alt=""
               width="86"
               height="86"
@@ -252,7 +252,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-izazovi-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/06-trofej.png" alt="" width="58" height="58" />
+            <img class="stavka-ikona" src="/ikone/06-trofej.webp" alt="" width="58" height="58" />
             <span class="stavka-tekst">
               <strong id="naslov-izazovi">Izazovi</strong>
               <small id="opis-izazovi">{izazoviPrikaz.opis}</small>
@@ -305,7 +305,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-privatna-soba-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/18-privatna-soba.png" alt="" width="58" height="58" />
+            <img class="stavka-ikona" src="/ikone/18-privatna-soba.webp" alt="" width="58" height="58" />
             <span class="stavka-tekst">
               <strong id="naslov-privatna">Privatna soba</strong>
               <small id="opis-privatna">Pozovi ekipu i igrajte po svojim pravilima.</small>
@@ -323,7 +323,7 @@
           onclick={() => zabiljeziUmamiDogadjaj('naslovnica-ljestvice-klik')}
         >
           <span class="stavka-sadrzaj">
-            <img class="stavka-ikona" src="/ikone/09-ljestvice.png" alt="" width="58" height="58" />
+            <img class="stavka-ikona" src="/ikone/09-ljestvice.webp" alt="" width="58" height="58" />
             <span class="stavka-tekst">
               <strong id="naslov-ljestvice">Ljestvice</strong>
               <small id="opis-ljestvice" data-testid="naslovnica-ljestvice-status">
@@ -377,7 +377,7 @@
             onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
           >
             <span class="sporedni-precac__ikona">
-              <img src="/ikone/08-pravila.png" alt="" width="48" height="48" />
+              <img src="/ikone/08-pravila.webp" alt="" width="48" height="48" />
             </span>
             <span class="sporedni-precac__tekst">
               <span class="sporedni-precac__naslov">Kolekcija</span>
@@ -400,7 +400,7 @@
             onclick={() => zabiljeziUmamiDogadjaj('naslovnica-dostignuca-klik')}
           >
             <span class="sporedni-precac__ikona">
-              <img src="/ikone/27-zvjezdica-puna.png" alt="" width="48" height="48" />
+              <img src="/ikone/27-zvjezdica-puna.webp" alt="" width="48" height="48" />
             </span>
             <span class="sporedni-precac__tekst">
               <span class="sporedni-precac__naslov">Dostignuća</span>
