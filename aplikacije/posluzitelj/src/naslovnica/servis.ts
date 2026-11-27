@@ -173,22 +173,16 @@ export async function izgradiNaslovnicaSazetak(igrac: IgracSesije): Promise<Odgo
   const misijeOdgovor =
     igrac.vrsta === 'gost' ? null : misije === null ? null : misije;
 
-  let obavijesti: OdgovorNaslovnicaSazetka['obavijesti'] = null;
-  if (sanducicSazetak && sanducicLista) {
-    obavijesti = {
-      brojNeprocitanih: sanducicSazetak.brojNeprocitanih,
-      zaNajavu: sanducicSazetak.zaNajavu,
-      neprocitane: sanducicLista.poruke,
-      sljedeciCursor: sanducicLista.sljedeciCursor,
-    };
-  } else if (sanducicSazetak) {
-    obavijesti = {
-      brojNeprocitanih: sanducicSazetak.brojNeprocitanih,
-      zaNajavu: sanducicSazetak.zaNajavu,
-      neprocitane: [],
-      sljedeciCursor: null,
-    };
-  }
+  // Oba dijela sandučića moraju uspjeti — inače null (klijent zadržava prethodnu listu).
+  const obavijesti: OdgovorNaslovnicaSazetka['obavijesti'] =
+    sanducicSazetak && sanducicLista
+      ? {
+          brojNeprocitanih: sanducicSazetak.brojNeprocitanih,
+          zaNajavu: sanducicSazetak.zaNajavu,
+          neprocitane: sanducicLista.poruke,
+          sljedeciCursor: sanducicLista.sljedeciCursor,
+        }
+      : null;
 
   return {
     ok: true,

@@ -36,8 +36,9 @@
 
   function primijeniNovosti() {
     const misije = naslovnica.misije;
+    // Null kod registriranog = pad podservisa — ne briši postojeći toast.
     if (!misije) {
-      ocisti();
+      if (naslovnica.sazetak?.profil.vrsta === 'gost') ocisti();
       return;
     }
     const skupine: Skupina[] = [];

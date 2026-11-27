@@ -619,6 +619,7 @@ describe('privatne sobe', () => {
     // 2 igrača + klasicni: odigraj do kraja i revanš s istim pravilima.
     const dva = await pokreniIProvjeri(2, 'klasicni');
     try {
+      // Listener PRIJE petlje; ako cekajRunduIliKraj već vrati kraj, ne čekaj drugi put.
       const krajPromise = cekajDogadaj<KrajPartije>(dva[0]!.socket, 'partija:kraj');
       let rezultat = await cekajRunduIliKraj(dva);
       for (let i = 0; i < 8 && rezultat.vrsta !== 'kraj'; i += 1) {
@@ -627,7 +628,7 @@ describe('privatne sobe', () => {
         naPotezu.socket.emit('potez:ne-znam');
         rezultat = await sljedeci;
       }
-      await krajPromise;
+      if (rezultat.vrsta !== 'kraj') await krajPromise;
 
       const lobbyP = cekajDogadaj<StanjePrivatneSobe>(dva[0]!.socket, 'soba:stanje');
       dva[0]!.socket.emit('soba:stanje');
