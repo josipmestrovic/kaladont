@@ -1043,6 +1043,259 @@ describe('Botovi V8 Commit 10 — agresivnost i shield', () => {
   });
 });
 
+describe('Botovi V8 — Shield prioritet i oporavak', () => {
+  const igrive = (...rijeci: string[]) => (r: string) => rijeci.includes(r);
+  const grupe = (r: string) => [`imenica:${r}`];
+  const frek = () => 500;
+
+  function snimkaPoolova(clanovi: Array<{ rijec: string; kategorija: 'pool_1' | 'pool_2' }>) {
+    return izgradiSnimkuPoolova({
+      clanovi: clanovi.map((c) => ({ ...c, stanje: 'razrijeseno' as const })),
+      jeAktivnaURjecnika: () => true,
+      verzijaRjecnika: 1,
+      generacija: 1,
+    });
+  }
+
+  it('oba poola sigurna + Shield: bira samo prioritetni (p2_p1 → P2)', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 1,
+      vjerojatnostShielda: 1,
+      prioritetPoolova: 'p2_p1',
+    };
+    // marmor/madrac ne završavaju na ka i nema Pool1 na njihovim nastavcima → sigurni
+    const poolovi = snimkaPoolova([
+      { rijec: 'marmor', kategorija: 'pool_1' },
+      { rijec: 'madrac', kategorija: 'pool_2' },
+    ]);
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      frekvencijaZa: frek,
+      grupeZa: grupe,
+      brojAktivnih: 2,
+      turnToken: 't-sig-oba',
+      pravila: 'klasicni',
+      poolovi,
+      jeIgrivaRijec: igrive('masa', 'marmor', 'madrac'),
+    }, stvoriStanjeBota(konfig, () => 0), konfig, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'madrac', izPoola: true });
+  });
+
+  it('oba poola sigurna + Shield + p1_p2: bira P1', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 1,
+      vjerojatnostShielda: 1,
+      prioritetPoolova: 'p1_p2',
+    };
+    const poolovi = snimkaPoolova([
+      { rijec: 'marmor', kategorija: 'pool_1' },
+      { rijec: 'madrac', kategorija: 'pool_2' },
+    ]);
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      frekvencijaZa: frek,
+      grupeZa: grupe,
+      brojAktivnih: 2,
+      turnToken: 't-sig-p1',
+      pravila: 'klasicni',
+      poolovi,
+      jeIgrivaRijec: igrive('masa', 'marmor', 'madrac'),
+    }, stvoriStanjeBota(konfig, () => 0), konfig, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'marmor', izPoola: true });
+  });
+
+  it('prioritetni rizičan, sekundarni siguran → sekundarni', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 1,
+      vjerojatnostShielda: 1,
+      prioritetPoolova: 'p2_p1',
+    };
+    // maska (P2) završava na ka → rizična; marmor (P1) sigurna
+    const poolovi = snimkaPoolova([
+      { rijec: 'marmor', kategorija: 'pool_1' },
+      { rijec: 'maska', kategorija: 'pool_2' },
+    ]);
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      frekvencijaZa: frek,
+      grupeZa: grupe,
+      brojAktivnih: 2,
+      turnToken: 't-prio-riz',
+      pravila: 'klasicni',
+      poolovi,
+      jeIgrivaRijec: igrive('masa', 'marmor', 'maska'),
+    }, stvoriStanjeBota(konfig, () => 0), konfig, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'marmor', izPoola: true });
+  });
+
+  it('oba poola rizična, obična sigurna → obična', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 1,
+      vjerojatnostShielda: 1,
+      prioritetPoolova: 'p2_p1',
+    };
+    const poolovi = snimkaPoolova([
+      { rijec: 'marka', kategorija: 'pool_1' },
+      { rijec: 'maska', kategorija: 'pool_2' },
+    ]);
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      frekvencijaZa: frek,
+      grupeZa: grupe,
+      brojAktivnih: 2,
+      turnToken: 't-obic-sig',
+      pravila: 'klasicni',
+      poolovi,
+      jeIgrivaRijec: igrive('masa', 'marka', 'maska'),
+    }, stvoriStanjeBota(konfig, () => 0), konfig, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'masa' });
+    if (odluka.vrsta === 'rijec') expect(odluka.izPoola).not.toBe(true);
+  });
+
+  it('sve dostupne riječi rizične → ipak igra, ne odustaje', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 1,
+      vjerojatnostShielda: 1,
+      prioritetPoolova: 'p1_p2',
+    };
+    const poolovi = snimkaPoolova([
+      { rijec: 'marka', kategorija: 'pool_1' },
+      { rijec: 'maska', kategorija: 'pool_2' },
+    ]);
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['matka'],
+      frekvencijaZa: frek,
+      grupeZa: grupe,
+      brojAktivnih: 2,
+      turnToken: 't-sve-riz',
+      pravila: 'klasicni',
+      poolovi,
+      jeIgrivaRijec: igrive('matka', 'marka', 'maska'),
+    }, stvoriStanjeBota(konfig, () => 0), konfig, () => 0);
+    expect(odluka.vrsta).toBe('rijec');
+    if (odluka.vrsta === 'rijec') expect(['marka', 'maska', 'matka']).toContain(odluka.rijec);
+  });
+
+  it('neuspješan roll agresivnosti + Shield ne dira napadačke poolove', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 0,
+      vjerojatnostShielda: 1,
+      prioritetPoolova: 'p2_p1',
+    };
+    const poolovi = snimkaPoolova([
+      { rijec: 'madrac', kategorija: 'pool_2' },
+    ]);
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      frekvencijaZa: frek,
+      grupeZa: grupe,
+      brojAktivnih: 2,
+      turnToken: 't-bez-agg',
+      pravila: 'klasicni',
+      poolovi,
+      jeIgrivaRijec: igrive('masa', 'madrac'),
+    }, stvoriStanjeBota(konfig, () => 0), konfig, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'masa' });
+    if (odluka.vrsta === 'rijec') expect(odluka.izPoola).not.toBe(true);
+  });
+
+  it('odbijena pool riječ + prazan obični + druga legalna u poolu', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 1,
+      vjerojatnostShielda: 0,
+      prioritetPoolova: 'p2_p1',
+    };
+    const poolovi = snimkaPoolova([
+      { rijec: 'marmor', kategorija: 'pool_1' },
+      { rijec: 'madrac', kategorija: 'pool_2' },
+    ]);
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: [],
+      frekvencijaZa: frek,
+      grupeZa: grupe,
+      brojAktivnih: 3,
+      turnToken: 't-odb-praz',
+      poolovi,
+      odbijeneRijeci: new Set(['madrac']),
+      jeIgrivaRijec: igrive('marmor', 'madrac'),
+    }, stvoriStanjeBota(konfig, () => 0.5), konfig, () => 0.5);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'marmor', izPoola: true });
+  });
+
+  it('završetak ka = Shield prijetnja i kad jeIgriva(kaladont) vraća false', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 0,
+      vjerojatnostShielda: 1,
+    };
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa', 'maska'],
+      frekvencijaZa: (r) => (r === 'maska' ? 900 : 100),
+      grupeZa: grupe,
+      brojAktivnih: 2,
+      turnToken: 't-ka-motor',
+      pravila: 'klasicni',
+      poolovi: PRAZNI_POOLOVI,
+      // namjerno: kaladont nije u rječniku / nije igriv
+      jeIgrivaRijec: (r) => r === 'masa' || r === 'maska',
+    }, stvoriStanjeBota(konfig, () => 0), konfig, () => 0);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'masa' });
+  });
+
+  it('sinkroni i nastavivi selektor daju isti ishod na fiksturi prioriteta', async () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostAgresivnosti: 1,
+      vjerojatnostShielda: 1,
+      prioritetPoolova: 'p2_p1',
+    };
+    const poolovi = snimkaPoolova([
+      { rijec: 'marmor', kategorija: 'pool_1' },
+      { rijec: 'madrac', kategorija: 'pool_2' },
+    ]);
+    const ulaz = {
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      frekvencijaZa: frek,
+      grupeZa: grupe,
+      brojAktivnih: 2,
+      turnToken: 't-eq-prio',
+      pravila: 'klasicni' as const,
+      poolovi,
+      jeIgrivaRijec: igrive('masa', 'marmor', 'madrac'),
+      poznatiKandidatiNaNastavivo: async function* () {
+        yield 'masa';
+      },
+    };
+    const a = odaberiPotez(ulaz, stvoriStanjeBota(konfig, () => 0), konfig, () => 0);
+    const b = await odaberiPotezNastavivo(
+      { ...ulaz, turnToken: 't-eq-prio-n' },
+      stvoriStanjeBota(konfig, () => 0),
+      konfig,
+      () => 0,
+      async () => undefined,
+      () => true,
+    );
+    expect(a).toMatchObject({ vrsta: 'rijec', rijec: 'madrac', izPoola: true });
+    expect(b).toMatchObject({ vrsta: 'rijec', rijec: 'madrac', izPoola: true });
+  });
+});
+
 describe('validacija admin postavki bota', () => {
   it('prihvaća zadane postavke i odbija nepoznate ključeve', () => {
     expect(ShemaKonfiguracijeBota.safeParse(ZADANA_KONFIGURACIJA_BOTA).success).toBe(true);

@@ -506,7 +506,9 @@ function jeShieldPrijetnja(
   let prijetnja = false;
 
   if (ending === 'ka') {
-    prijetnja = jeIgriva(ulaz, 'kaladont', potrosene);
+    // Motor: RIJECI_KALADONT je posebna riječ (validirajPotez) — ne ovisi o rječničkoj mapi grupa.
+    // Dokaži nastavak ne tretira obični kaladont kao KA efekt.
+    prijetnja = (ulaz.pravila ?? 'klasicni') !== 'dokazi_nastavak';
   } else if (ulaz.poolovi) {
     const kandidati = kandidatiPoola(ulaz.poolovi, ending, 'pool_1');
     for (const nastavak of kandidati) {
@@ -542,43 +544,6 @@ function legalniPoolKandidati(
   return legalni;
 }
 
-function odaberiIzPoola(
-  ulaz: UlazOdabira,
-  stanje: StanjeBotaUPartiji,
-  konfig: KonfiguracijaBota,
-  iskoristene: ReadonlySet<string>,
-  shieldAktivan: boolean,
-  rng: Rng,
-): string | null {
-  if (!ulaz.poolovi) return null;
-  const pools = poredakPoolova(konfig.prioritetPoolova);
-  const grupe = pools
-    .map((pool) => ({ pool, kandidati: legalniPoolKandidati(ulaz, iskoristene, ulaz.trazenaSlova, pool) }))
-    .filter((g) => g.kandidati.length > 0);
-  if (!grupe.length) return null;
-
-  if (shieldAktivan) {
-    const sigurne: string[] = [];
-    for (const { kandidati } of grupe) {
-      for (const rijec of kandidati) {
-        if (!jeShieldPrijetnja(rijec, ulaz, iskoristene, stanje)) sigurne.push(rijec);
-      }
-    }
-    if (sigurne.length) return izaberiUniformno(sigurne, rng);
-
-    for (const pool of pools) {
-      const grupa = grupe.find((g) => g.pool === pool);
-      if (!grupa) continue;
-      const rizicne = grupa.kandidati.filter((rijec) => jeShieldPrijetnja(rijec, ulaz, iskoristene, stanje));
-      if (rizicne.length) return izaberiUniformno(rizicne, rng);
-    }
-    return null;
-  }
-
-  const prva = grupe[0]!;
-  return izaberiUniformno(prva.kandidati, rng);
-}
-
 function filtrirajSigurneZaShield(
   kandidati: readonly string[],
   ulaz: UlazOdabira,
@@ -590,6 +555,79 @@ function filtrirajSigurneZaShield(
     if (!jeShieldPrijetnja(rijec, ulaz, iskoristene, stanje)) sigurne.push(rijec);
   }
   return sigurne;
+}
+
+function odlukaIzPoolRijeci(
+  rijec: string,
+  ulaz: UlazOdabira,
+  stanje: StanjeBotaUPartiji,
+  konfig: KonfiguracijaBota,
+): OdlukaBota {
+  stanje.brojKandidata = 1;
+  return {
+    vrsta: 'rijec',
+    rijec,
+    kategorija: kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig),
+    izPoola: true,
+    ...(zadnjaDva(rijec) === 'ka' ? { izborKa: 'dobrovoljni' as const } : {}),
+  };
+}
+
+/** Poznati obični kandidati (bez članova poolova). */
+function pripremiObicnePoznate(ctx: KontekstOdabira): {
+  poznati: string[];
+  klasifikacija: KlasifikacijaSkupa;
+} {
+  const poolSnimka = ctx.ulaz.poolovi;
+  const obicniKandidati = poolSnimka
+    ? ctx.sviKandidati.filter((rijec) => !jeClanBiloKojegPoola(poolSnimka, rijec))
+    : ctx.sviKandidati;
+  const klasifikacija = klasificirajPoznatiSkup(
+    obicniKandidati,
+    ctx.ulaz.frekvencijaZa,
+    ctx.ulaz.grupeZa,
+    ctx.konfig,
+  );
+  let poznati = klasifikacija.poznateRijeci;
+  if (klasifikacija.vrsta === 'dovoljan' && poznati.length < obicniKandidati.length) {
+    poznati = obicniKandidati.filter((rijec) => !jeNepoznataBotu(rijec, ctx.ulaz.frekvencijaZa(rijec)));
+  }
+  return { poznati, klasifikacija };
+}
+
+function odlukaIzObicnih(
+  poznati: string[],
+  klasifikacija: KlasifikacijaSkupa,
+  ctx: KontekstOdabira,
+  shield: boolean,
+  forsiranjeSigurnih: boolean,
+): OdlukaBota {
+  const { ulaz, stanje, konfig, rng, iskoristene } = ctx;
+  stanje.brojKandidata = poznati.length;
+  if (poznati.length === 0) {
+    return { vrsta: 'odustani', razlog: 'nema_rijeci' };
+  }
+  if (klasifikacija.vrsta === 'mali') {
+    if (odlukaNeznanjaZaToken(stanje, ulaz.turnToken, ulaz.oporavak, konfig.vjerojatnostNeznanjaUMalomSkupu, rng)) {
+      return { vrsta: 'odustani', razlog: 'namjerni_propust' };
+    }
+  }
+  let radni = poznati;
+  if (forsiranjeSigurnih && shield) {
+    const sigurne = filtrirajSigurneZaShield(radni, ulaz, iskoristene, stanje);
+    if (sigurne.length) radni = sigurne;
+  } else if (shield && radni.length > 0) {
+    const sigurne = filtrirajSigurneZaShield(radni, ulaz, iskoristene, stanje);
+    if (sigurne.length && sigurne.length < radni.length) radni = sigurne;
+  }
+  const rijec = odaberiObicnuRijec(radni, stanje, ulaz, konfig, false, iskoristene, rng);
+  const izborKa = izborKaZaSkup(radni, rijec);
+  return {
+    vrsta: 'rijec',
+    rijec,
+    kategorija: kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig),
+    ...(izborKa ? { izborKa } : {}),
+  };
 }
 
 function izborKaZaSkup(poznati: readonly string[], rijec: string): 'dobrovoljni' | 'prisilni' | undefined {
@@ -660,59 +698,45 @@ function odaberiIzKonteksta(ctx: KontekstOdabira): OdlukaBota {
   const { ulaz, stanje, konfig, rng, iskoristene } = ctx;
   const { agresivno, shield } = rijesiAgresivnostIShield(ctx);
 
-  if (agresivno) {
-    const izPoola = odaberiIzPoola(ulaz, stanje, konfig, iskoristene, shield, rng);
-    if (izPoola) {
-      stanje.brojKandidata = 1;
-      return {
-        vrsta: 'rijec',
-        rijec: izPoola,
-        kategorija: kategorijaRijeci(ulaz.frekvencijaZa(izPoola), konfig),
-        izPoola: true,
-        ...(zadnjaDva(izPoola) === 'ka' ? { izborKa: 'dobrovoljni' as const } : {}),
-      };
+  if (agresivno && ulaz.poolovi) {
+    const pools = poredakPoolova(konfig.prioritetPoolova);
+    const poolLegalni = pools.map((pool) => ({
+      pool,
+      kandidati: legalniPoolKandidati(ulaz, iskoristene, ulaz.trazenaSlova, pool),
+    }));
+
+    if (shield) {
+      // 1–2: sigurni poolovi po prioritetu (bez spajanja kategorija)
+      for (const { kandidati } of poolLegalni) {
+        const sigurne = filtrirajSigurneZaShield(kandidati, ulaz, iskoristene, stanje);
+        if (sigurne.length) return odlukaIzPoolRijeci(izaberiUniformno(sigurne, rng), ulaz, stanje, konfig);
+      }
+      // 3: sigurni obični
+      const { poznati, klasifikacija } = pripremiObicnePoznate(ctx);
+      const sigurneObicne = filtrirajSigurneZaShield(poznati, ulaz, iskoristene, stanje);
+      if (sigurneObicne.length) {
+        return odlukaIzObicnih(sigurneObicne, { ...klasifikacija, poznateRijeci: sigurneObicne }, ctx, false, false);
+      }
+      // 4–5: rizični poolovi po prioritetu
+      for (const { kandidati } of poolLegalni) {
+        const rizicne = kandidati.filter((rijec) => jeShieldPrijetnja(rijec, ulaz, iskoristene, stanje));
+        if (rizicne.length) return odlukaIzPoolRijeci(izaberiUniformno(rizicne, rng), ulaz, stanje, konfig);
+      }
+      // 6: rizični / preostali obični (Shield ne forsira Ne znam)
+      return odlukaIzObicnih(poznati, klasifikacija, ctx, false, false);
+    }
+
+    // Bez Shieda: prvi neprazan pool po prioritetu
+    for (const { kandidati } of poolLegalni) {
+      if (kandidati.length) {
+        return odlukaIzPoolRijeci(izaberiUniformno(kandidati, rng), ulaz, stanje, konfig);
+      }
     }
   }
 
-  const poolSnimka = ulaz.poolovi;
-  const obicniKandidati = poolSnimka
-    ? ctx.sviKandidati.filter((rijec) => !jeClanBiloKojegPoola(poolSnimka, rijec))
-  : ctx.sviKandidati;
-
-  const klasifikacija = klasificirajPoznatiSkup(obicniKandidati, ulaz.frekvencijaZa, ulaz.grupeZa, konfig);
-  let poznati = klasifikacija.poznateRijeci;
-  if (klasifikacija.vrsta === 'dovoljan' && poznati.length < obicniKandidati.length) {
-    poznati = obicniKandidati.filter((rijec) => !jeNepoznataBotu(rijec, ulaz.frekvencijaZa(rijec)));
-  }
-  stanje.brojKandidata = poznati.length;
-
-  if (poznati.length === 0) {
-    return { vrsta: 'odustani', razlog: 'nema_rijeci' };
-  }
-
-  if (klasifikacija.vrsta === 'mali') {
-    if (odlukaNeznanjaZaToken(stanje, ulaz.turnToken, ulaz.oporavak, konfig.vjerojatnostNeznanjaUMalomSkupu, rng)) {
-      return { vrsta: 'odustani', razlog: 'namjerni_propust' };
-    }
-  }
-
-  if (shield && poznati.length > 0) {
-    const sigurne = filtrirajSigurneZaShield(poznati, ulaz, iskoristene, stanje);
-    if (sigurne.length === 0) {
-      // Puni sken prije uzorkovanja — ostani na cijelom skupu poznatih.
-    } else if (sigurne.length < poznati.length) {
-      poznati = sigurne;
-    }
-  }
-
-  const rijec = odaberiObicnuRijec(poznati, stanje, ulaz, konfig, shield, iskoristene, rng);
-  const izborKa = izborKaZaSkup(poznati, rijec);
-  return {
-    vrsta: 'rijec',
-    rijec,
-    kategorija: kategorijaRijeci(ulaz.frekvencijaZa(rijec), konfig),
-    ...(izborKa ? { izborKa } : {}),
-  };
+  // !agresivno (ili prazni poolovi): samo obični; Shield ne otvara napadačke poolove
+  const { poznati, klasifikacija } = pripremiObicnePoznate(ctx);
+  return odlukaIzObicnih(poznati, klasifikacija, ctx, shield, true);
 }
 
 function kljucAnalizeNastavka(
@@ -986,7 +1010,7 @@ export async function odaberiPotezNastavivo(
   await predaj();
   if (!aktivan()) return null;
 
-  const { agresivno, shield } = rijesiAgresivnostIShield({
+  const ctx: KontekstOdabira = {
     ulaz,
     stanje,
     konfig,
@@ -994,21 +1018,34 @@ export async function odaberiPotezNastavivo(
     sviKandidati,
     iskoristene,
     brojAktivnih,
-  });
+  };
+  const { agresivno, shield } = rijesiAgresivnostIShield(ctx);
 
+  // Kooperativni lazy sken: poolovi po prioritetu; obični Shield sken samo ako treba.
   if (agresivno && ulaz.poolovi) {
-    const poolSnimka = ulaz.poolovi;
     const pools = poredakPoolova(konfig.prioritetPoolova);
     let pregledano = 0;
     for (const pool of pools) {
-      const raw = kandidatiPoola(poolSnimka, ulaz.trazenaSlova, pool);
-      for (const rijec of raw) {
-        pregledano += 1;
-        void jeIgriva(ulaz, rijec, iskoristene);
-        if (pregledano % CHECKPOINT_ZAPISA === 0) {
-          await predaj();
-          if (!aktivan()) return null;
+      const kandidati = legalniPoolKandidati(ulaz, iskoristene, ulaz.trazenaSlova, pool);
+      if (shield) {
+        const sigurne: string[] = [];
+        for (const rijec of kandidati) {
+          pregledano += 1;
+          if (!jeShieldPrijetnja(rijec, ulaz, iskoristene, stanje)) sigurne.push(rijec);
+          if (pregledano % CHECKPOINT_ZAPISA === 0) {
+            await predaj();
+            if (!aktivan()) return null;
+          }
         }
+        if (sigurne.length) {
+          // Siguran prioritetni/sekundarni pool — ne skeniraj obične unaprijed.
+          return odlukaIzPoolRijeci(izaberiUniformno(sigurne, rng), ulaz, stanje, konfig);
+        }
+      } else if (kandidati.length) {
+        // Bez Shieda: prvi neprazan pool; yield pa sinkroni ostatak.
+        await predaj();
+        if (!aktivan()) return null;
+        return odaberiIzKonteksta({ ...ctx, agresivno, shield });
       }
     }
   }
@@ -1036,13 +1073,7 @@ export async function odaberiPotezNastavivo(
   if (!aktivan()) return null;
 
   return odaberiIzKonteksta({
-    ulaz,
-    stanje,
-    konfig,
-    rng,
-    sviKandidati,
-    iskoristene,
-    brojAktivnih,
+    ...ctx,
     agresivno,
     shield,
   });

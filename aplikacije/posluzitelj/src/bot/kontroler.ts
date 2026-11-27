@@ -915,17 +915,12 @@ export class BotKontroler {
           );
         } else {
           // Prikupljanje unutar raspoređivača (zajednički CPU budžet / RR).
+          // Prazan obični repertoar ≠ odmah odustani: poolovi mogu imati legalne kandidate.
           const kandidati = this.kandidatiZaPotez(
             dogadaj.trazenaSlova!,
             dogadaj.iskoristeneGrupe,
             dogadaj.dopusteneVrste,
           ).filter((rijec) => !odbijene.has(rijec));
-          // Prazan repertoar nakon odbijenih = normalan odustanak, ne tehnička greška.
-          if (kandidati.length === 0 && dogadaj.trazenaSlova?.toLowerCase() !== 'ka') {
-            if (!aktivan()) return 'odustani';
-            this.izvrsi(dogadaj, igracId, dogadaj.turnToken, { vrsta: 'odustani', razlog: 'nema_rijeci' }, pokusaj, odbijene);
-            return 'gotovo';
-          }
           odluka = await this.odluciNastavivo(
             dogadaj,
             stanjeBota,
