@@ -249,7 +249,7 @@
     iskoristeniOblik = null;
     vlastitoImeRijec = null;
     zadnjaPoslanaRijec = rijec;
-    unosNastavkaRijeci = '';
+    // #161: ne prazni unos tijekom validacije — iOS tipkovnica ostaje; briše se tek na prihvaćanju.
     dohvatiSocket()
       .timeout(TRAJANJE_CEKANJA_POTVRDE_MS)
       .emit(
@@ -268,6 +268,7 @@
           obradiPotvrduNaredbe(potvrda);
         },
       );
+    queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
   }
 
   function nastaviTrening() {
@@ -381,6 +382,8 @@
     void tick().then(() => {
       // #156: ne vraćaj fokus nakon isteka/eliminacije (kasni potez:odbijen).
       if (!jeNaPotezu) return;
+      // #161: ne bounceaj tipkovnicu ako je input već fokusiran.
+      if (document.activeElement === unosInput) return;
       unosInput?.focus({ preventScroll: true });
     });
   }
@@ -1394,6 +1397,7 @@
       neZnamDijalog = false;
       if (potez.igracId === stanje.mojIgracId) {
         kontrolerSlanja.zavrsiZahtjev('prihvacen', { partijaId });
+        unosNastavkaRijeci = '';
       }
       // Red / prefiks / streak / nagrada: samo globalni listener (stanje-igre).
       prethodnaRijecStola = prikazanaRijec?.rijec ?? null;
@@ -2386,6 +2390,11 @@
                     if (mobilniZaslon()) osigurajZastituPovijesti('fokus');
                   }}
                   onblur={() => {
+                    // #161: tijekom validacije ne dopusti gubitak fokusa (iOS spušta tipkovnicu).
+                    if (jeNaPotezu && slanjeUTijeku) {
+                      queueMicrotask(() => unosInput?.focus({ preventScroll: true }));
+                      return;
+                    }
                     // Ručni blur (tipkovnica zatvorena): skini fokus entry s history stacka.
                     if (
                       mobilniZaslon() &&
@@ -2415,7 +2424,6 @@
                       : `Dovrši riječ na ${prefiksRijeci.toUpperCase()}`}
                   aria-invalid={jeNaPotezu && brojGreskeUnosa > 0 && porukaPoteza !== null}
                   aria-busy={jeNaPotezu && slanjeUTijeku}
-                  readonly={jeNaPotezu && slanjeUTijeku}
                   disabled={!jeNaPotezu || !vezaSpremna}
                 />
               </div>
@@ -2435,6 +2443,7 @@
                 class="posalji-gumb"
                 class:posalji-odbijen={posaljiOdbijen && jeNaPotezu}
                 disabled={!jeNaPotezu || slanjeUTijeku || !vezaSpremna || posaljiOdbijen}
+                onmousedown={(e) => e.preventDefault()}
                 aria-label={!jeNaPotezu
                   ? `Pošalji (nije tvoj red), niz bez greške: ${stanje.trenutniStreak}`
                   : posaljiOdbijen
