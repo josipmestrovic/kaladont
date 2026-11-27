@@ -239,11 +239,16 @@ export function pokreniSanducic(): () => void {
   putanja = window.location.pathname;
 
   const socket = dohvatiSocket();
-  // Promjena + reconnect uvijek; početni/focus/identitet na `/` pokriva naslovnica/sazetak.
+  // Prvi connect ne smije duplicirati bootstrap; reconnect mora osvježiti.
+  let imaoSpojenje = socket.connected;
   const naPromjenu = () => {
     void osvjeziSazetakSanducica();
   };
   const naSpoj = () => {
+    if (!imaoSpojenje) {
+      imaoSpojenje = true;
+      return;
+    }
     void osvjeziSazetakSanducica();
   };
   const naVidljivost = () => {
@@ -261,6 +266,7 @@ export function pokreniSanducic(): () => void {
   socket.on('connect', naSpoj);
   document.addEventListener('visibilitychange', naVidljivost);
   window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
+  // Na `/` sažetak dolazi iz naslovnica/sazetak (Header + page).
   if (trebaSamostalniSazetak()) void osvjeziSazetakSanducica();
 
   return () => {
