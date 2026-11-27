@@ -9,18 +9,11 @@
   import Avatar from '$lib/komponente/Avatar.svelte';
   import TimerPrsten from '$lib/komponente/TimerPrsten.svelte';
   import TimerCrta from '$lib/komponente/TimerCrta.svelte';
-  import Konfeti from '$lib/komponente/Konfeti.svelte';
-  import IskustvoPartije from '$lib/komponente/IskustvoPartije.svelte';
-  import NapredakMisijaPartije from '$lib/komponente/NapredakMisijaPartije.svelte';
   import NapredakCiljevaIzazova from '$lib/komponente/NapredakCiljevaIzazova.svelte';
   import TreningMeta from '$lib/komponente/TreningMeta.svelte';
   import PocetnoOdbrojavanje from '$lib/komponente/PocetnoOdbrojavanje.svelte';
-  import RezultatIzazova from '$lib/komponente/RezultatIzazova.svelte';
-  import KaladontDnkPromjena from '$lib/komponente/KaladontDnkPromjena.svelte';
   import PojamPomoc from '$lib/komponente/PojamPomoc.svelte';
   import Header from '$lib/komponente/Header.svelte';
-  import PanelPrijavaRijeci from '$lib/komponente/PanelPrijavaRijeci.svelte';
-  import PanelPrijavaIgraca from '$lib/komponente/PanelPrijavaIgraca.svelte';
   import { pokaziUspjeh } from '$lib/uspjeh-obavijest.svelte.js';
   import {
     kratkiSazetakNeuspjehaIzazova,
@@ -37,14 +30,26 @@
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
   import NadimakBota from '$lib/komponente/NadimakBota.svelte';
-  import BotDebugPanel from '$lib/komponente/BotDebugPanel.svelte';
   import {
     botDebugOtvoren,
     botDebugPretplacen,
     dodajBotDebugZapis,
+    postaviBotDebugOtvoren,
     postaviBotDebugPretplacen,
     resetirajBotDebugZaPartiju,
   } from '$lib/bot-debug-store.svelte.js';
+  import {
+    pripremiZavrsniEkranPartije,
+    ucitajBotDebugPanel,
+    ucitajIskustvoPartije,
+    ucitajKaladontDnkPromjena,
+    ucitajKonfeti,
+    ucitajNapredakMisijaPartije,
+    ucitajPanelPrijavaIgraca,
+    ucitajPanelPrijavaRijeci,
+    ucitajRezultatIzazova,
+  } from '$lib/dinamicni-ucitavac.js';
+  import type { Component } from 'svelte';
   import { profilIzNadimkaTreningBota, putanjaPonovneIgre } from '$lib/igraj-rute.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
   import { ikonaDostignuca } from '$lib/ikone-dostignuca.js';
@@ -1030,6 +1035,20 @@
     stagingOkruzenje && botDebugDesktop && botDebugKontekstOk && !stanje.kraj,
   );
 
+  // Dinamički chunkovi završnog ekrana / dekoracije — props se ne tipiziraju strogo.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type DinamicnaKomponenta = Component<any>;
+
+  let KonfetiKomponenta = $state<DinamicnaKomponenta | null>(null);
+  let RezultatIzazovaKomponenta = $state<DinamicnaKomponenta | null>(null);
+  let IskustvoPartijeKomponenta = $state<DinamicnaKomponenta | null>(null);
+  let NapredakMisijaKomponenta = $state<DinamicnaKomponenta | null>(null);
+  let KaladontDnkKomponenta = $state<DinamicnaKomponenta | null>(null);
+  let PanelPrijavaRijeciKomponenta = $state<DinamicnaKomponenta | null>(null);
+  let PanelPrijavaIgracaKomponenta = $state<DinamicnaKomponenta | null>(null);
+  let BotDebugPanelKomponenta = $state<DinamicnaKomponenta | null>(null);
+  let botDebugUcitavanje = $state(false);
+
   function naBotDebugZapis(zapis: BotDebugZapis): void {
     if (zapis.partijaId !== partijaId) return;
     dodajBotDebugZapis(zapis);
@@ -1040,6 +1059,19 @@
     const socket = dohvatiSocket();
     socket.emit('bot:debug:pretplati', { partijaId });
     postaviBotDebugPretplacen(true);
+  }
+
+  async function otvoriBotDebugPanel(): Promise<void> {
+    if (!botDebugVidljiv || botDebugUcitavanje) return;
+    botDebugUcitavanje = true;
+    try {
+      BotDebugPanelKomponenta = (await ucitajBotDebugPanel()) as DinamicnaKomponenta;
+      postaviBotDebugOtvoren(true);
+    } catch {
+      // Staging alat — tihi pad ne smije ometati partiju.
+    } finally {
+      botDebugUcitavanje = false;
+    }
   }
 
   $effect(() => {
@@ -1079,6 +1111,70 @@
         }
       }
       resetirajBotDebugZaPartiju();
+    };
+  });
+
+  async function dodijeliZavrsneKomponente(otkazano: () => boolean): Promise<void> {
+    const [rezultat, iskustvo, misije, dnk, panelRijeci, panelIgraca] = await Promise.all([
+      ucitajRezultatIzazova(),
+      ucitajIskustvoPartije(),
+      ucitajNapredakMisijaPartije(),
+      ucitajKaladontDnkPromjena(),
+      ucitajPanelPrijavaRijeci(),
+      ucitajPanelPrijavaIgraca(),
+    ]);
+    if (otkazano()) return;
+    RezultatIzazovaKomponenta = rezultat as DinamicnaKomponenta;
+    IskustvoPartijeKomponenta = iskustvo as DinamicnaKomponenta;
+    NapredakMisijaKomponenta = misije as DinamicnaKomponenta;
+    KaladontDnkKomponenta = dnk as DinamicnaKomponenta;
+    PanelPrijavaRijeciKomponenta = panelRijeci as DinamicnaKomponenta;
+    PanelPrijavaIgracaKomponenta = panelIgraca as DinamicnaKomponenta;
+  }
+
+  // Konfeti + završni ekran: pripremi chunkove tijekom aktivne partije.
+  onMount(() => {
+    void ucitajKonfeti()
+      .then((k) => {
+        KonfetiKomponenta = k as DinamicnaKomponenta;
+      })
+      .catch(() => {});
+
+    let otkazano = false;
+    const idle =
+      typeof requestIdleCallback === 'function'
+        ? requestIdleCallback
+        : (cb: () => void) => window.setTimeout(cb, 400);
+    const cancelIdle =
+      typeof cancelIdleCallback === 'function'
+        ? cancelIdleCallback
+        : (id: number) => clearTimeout(id);
+    const idleId = idle(() => {
+      void pripremiZavrsniEkranPartije({ izazov: true, dnk: true })
+        .then(() => dodijeliZavrsneKomponente(() => otkazano))
+        .catch(() => {});
+    });
+    return () => {
+      otkazano = true;
+      cancelIdle(idleId as number);
+    };
+  });
+
+  // Ako kraj dođe prije preloada — učitaj odmah.
+  $effect(() => {
+    if (!stanje.kraj || !prikaziRezultate) return;
+    if (
+      IskustvoPartijeKomponenta &&
+      PanelPrijavaRijeciKomponenta &&
+      (!jeIzazov || RezultatIzazovaKomponenta) &&
+      (!stanje.kraj.mojDnk || KaladontDnkKomponenta)
+    ) {
+      return;
+    }
+    let otkazano = false;
+    void dodijeliZavrsneKomponente(() => otkazano).catch(() => {});
+    return () => {
+      otkazano = true;
     };
   });
 
@@ -1757,42 +1853,46 @@
   </section>
 {/if}
 {/snippet}
-{#if stanje.intenzitetKonfetaIskustva}
+{#if KonfetiKomponenta && stanje.intenzitetKonfetaIskustva}
   {#key stanje.oznakaKonfetaIskustva}
-    <Konfeti intenzitet={stanje.intenzitetKonfetaIskustva} />
+    <KonfetiKomponenta intenzitet={stanje.intenzitetKonfetaIskustva} />
   {/key}
 {/if}
-{#if prikaziKonfetiRezultata}
-  <Konfeti intenzitet="veliki" />
+{#if KonfetiKomponenta && prikaziKonfetiRezultata}
+  <KonfetiKomponenta intenzitet="veliki" />
 {/if}
 {#if stanje.kraj && prikaziRezultate}
   <div class="zavrsni-header"><Header /></div>
   {#if jeIzazov}
-    <RezultatIzazova
-      kraj={stanje.kraj}
-      challengeId={izazovChallengeId}
-      goalProgress={stanje.goalProgress}
-      terminalStatus={stanje.izazovTerminal?.status ?? null}
-      terminalReason={stanje.izazovTerminal?.reason ?? null}
-      gameWon={stanje.izazovTerminal?.gameWon ?? null}
-      odbijenaRijec={odbijenaRijecZaIzazov}
-      mojIgracId={stanje.mojIgracId}
-      {brojSanducicSazetka}
-    />
-    <PanelPrijavaRijeci
-      partijaId={partijaId!}
-      potezi={lokalniPoteziZaPrijavu}
-      {odbijeneRijeci}
-      bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
-      bind:brojDodavanje={brojPrijavaDodavanje}
-      bind:limitDodavanjeDosegnut
-      ucitavanje={ucitavanjePotezaPrijava}
-      greska={greskaPotezaPrijava}
-      imaJos={imaJosPotezaPrijava}
-      naUcitajJos={() => void ucitajPotezeZaPrijavu(true)}
-      naOtvori={() => void ucitajPotezeZaPrijavu(false)}
-      otvorenoPocetno={true}
-    />
+    {#if RezultatIzazovaKomponenta}
+      <RezultatIzazovaKomponenta
+        kraj={stanje.kraj}
+        challengeId={izazovChallengeId}
+        goalProgress={stanje.goalProgress}
+        terminalStatus={stanje.izazovTerminal?.status ?? null}
+        terminalReason={stanje.izazovTerminal?.reason ?? null}
+        gameWon={stanje.izazovTerminal?.gameWon ?? null}
+        odbijenaRijec={odbijenaRijecZaIzazov}
+        mojIgracId={stanje.mojIgracId}
+        {brojSanducicSazetka}
+      />
+    {/if}
+    {#if PanelPrijavaRijeciKomponenta}
+      <PanelPrijavaRijeciKomponenta
+        partijaId={partijaId!}
+        potezi={lokalniPoteziZaPrijavu}
+        {odbijeneRijeci}
+        bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
+        bind:brojDodavanje={brojPrijavaDodavanje}
+        bind:limitDodavanjeDosegnut
+        ucitavanje={ucitavanjePotezaPrijava}
+        greska={greskaPotezaPrijava}
+        imaJos={imaJosPotezaPrijava}
+        naUcitajJos={() => void ucitajPotezeZaPrijavu(true)}
+        naOtvori={() => void ucitajPotezeZaPrijavu(false)}
+        otvorenoPocetno={true}
+      />
+    {/if}
     <div class="kraj-donje-praznine" aria-hidden="true"></div>
   {:else}
   <h2>{jeTrening ? 'Kraj treninga' : 'Završni poredak'}</h2>
@@ -1863,13 +1963,13 @@
     {/if}
   </section>
   {/if}
-  {#if stanje.kraj.mojeIskustvo}
-    <IskustvoPartije obracun={stanje.kraj.mojeIskustvo} ukupnoIskustvo={stanje.kraj.ukupnoIskustvo ?? null} />
-  {:else if stanje.kraj.ukupnoIskustvo}
-    <IskustvoPartije ukupnoIskustvo={stanje.kraj.ukupnoIskustvo} />
+  {#if IskustvoPartijeKomponenta && stanje.kraj.mojeIskustvo}
+    <IskustvoPartijeKomponenta obracun={stanje.kraj.mojeIskustvo} ukupnoIskustvo={stanje.kraj.ukupnoIskustvo ?? null} />
+  {:else if IskustvoPartijeKomponenta && stanje.kraj.ukupnoIskustvo}
+    <IskustvoPartijeKomponenta ukupnoIskustvo={stanje.kraj.ukupnoIskustvo} />
   {/if}
-  {#if stanje.kraj.promjeneMisija && stanje.kraj.promjeneMisija.length > 0}
-    <NapredakMisijaPartije promjene={stanje.kraj.promjeneMisija} />
+  {#if NapredakMisijaKomponenta && stanje.kraj.promjeneMisija && stanje.kraj.promjeneMisija.length > 0}
+    <NapredakMisijaKomponenta promjene={stanje.kraj.promjeneMisija} />
   {/if}
   {#if stanje.kraj.pohvale && stanje.kraj.pohvale.length > 0}
     <section class="pohvale-igre" aria-labelledby="pohvale-igre-naslov">
@@ -1942,8 +2042,8 @@
       {/if}
     </section>
   {/if}
-  {#if stanje.kraj.mojDnk}
-    <KaladontDnkPromjena
+  {#if KaladontDnkKomponenta && stanje.kraj.mojDnk}
+    <KaladontDnkKomponenta
       prije={stanje.kraj.mojDnk.prije}
       poslije={stanje.kraj.mojDnk.poslije}
       odigrano={stanje.kraj.mojDnk.odigrano}
@@ -2054,27 +2154,40 @@
     </p>
     <a href="/registracija">Registriraj se</a>
   {/if}
-  <PanelPrijavaRijeci
-    partijaId={partijaId!}
-    potezi={lokalniPoteziZaPrijavu}
-    {odbijeneRijeci}
-    bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
-    bind:brojDodavanje={brojPrijavaDodavanje}
-    bind:limitDodavanjeDosegnut
-    ucitavanje={ucitavanjePotezaPrijava}
-    greska={greskaPotezaPrijava}
-    imaJos={imaJosPotezaPrijava}
-    naUcitajJos={() => void ucitajPotezeZaPrijavu(true)}
-    naOtvori={() => void ucitajPotezeZaPrijavu(false)}
-    otvorenoPocetno={true}
-  />
-  {#if !jeTrening && igraciZaPrijavu.length > 0}
-    <PanelPrijavaIgraca partijaId={partijaId!} igraci={igraciZaPrijavu} otvorenoPocetno={false} />
+  {#if PanelPrijavaRijeciKomponenta}
+    <PanelPrijavaRijeciKomponenta
+      partijaId={partijaId!}
+      potezi={lokalniPoteziZaPrijavu}
+      {odbijeneRijeci}
+      bind:prijavljeneOdbijene={prijavljeneOdbijeneRijeci}
+      bind:brojDodavanje={brojPrijavaDodavanje}
+      bind:limitDodavanjeDosegnut
+      ucitavanje={ucitavanjePotezaPrijava}
+      greska={greskaPotezaPrijava}
+      imaJos={imaJosPotezaPrijava}
+      naUcitajJos={() => void ucitajPotezeZaPrijavu(true)}
+      naOtvori={() => void ucitajPotezeZaPrijavu(false)}
+      otvorenoPocetno={true}
+    />
+  {/if}
+  {#if !jeTrening && igraciZaPrijavu.length > 0 && PanelPrijavaIgracaKomponenta}
+    <PanelPrijavaIgracaKomponenta partijaId={partijaId!} igraci={igraciZaPrijavu} otvorenoPocetno={false} />
   {/if}
   <div class="kraj-donje-praznine" aria-hidden="true"></div>
   {/if}
 {:else}
-  <BotDebugPanel vidljiv={botDebugVidljiv} />
+  {#if BotDebugPanelKomponenta}
+    <BotDebugPanelKomponenta vidljiv={botDebugVidljiv} />
+  {:else if botDebugVidljiv}
+    <button
+      type="button"
+      class="bot-debug-gumb-ucitavanje"
+      disabled={botDebugUcitavanje}
+      onclick={() => void otvoriBotDebugPanel()}
+    >
+      {botDebugUcitavanje ? 'Bot debug…' : 'Bot debug'}
+    </button>
+  {/if}
   <div class="aktivna-partija-sadrzaj">
   {#if jeIzazov && !prikaziRezultate}
     <NapredakCiljevaIzazova
@@ -4502,6 +4615,29 @@
     margin-bottom: 0;
   }
   .kraj-donje-praznine { height: 100px; }
+  .bot-debug-gumb-ucitavanje {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 25;
+    padding: 6px 10px;
+    border: 1px solid var(--boja-obrub-jaci);
+    border-radius: 6px;
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-osnovni);
+    font-size: var(--tekst-sitni);
+    cursor: pointer;
+    box-shadow: var(--sjena-modal);
+  }
+  .bot-debug-gumb-ucitavanje:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+  @media (max-width: 999px) {
+    .bot-debug-gumb-ucitavanje {
+      display: none !important;
+    }
+  }
   .igraj-opet-gumb {
     display: inline-block;
     background: var(--boja-cta-pozadina);

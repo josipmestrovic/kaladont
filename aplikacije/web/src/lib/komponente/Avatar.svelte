@@ -1,9 +1,10 @@
 <script lang="ts">
   import { bojaBordera, debljinaBorderaRanga, nazivAvatara, putanjaAvatara } from '$lib/avatari.js';
   import { ADRESA_POSLUZITELJA } from '$lib/konfiguracija.js';
+  import { ucitajAvatarKonfiguracijaPreview } from '$lib/dinamicni-ucitavac.js';
   import { putanjaGeneriranogAvatara, velicinaGeneriranogAvatara, type AvatarConfigV1, type RazinaVatre } from 'zajednicko';
-  import AvatarKonfiguracijaPreview from './AvatarKonfiguracijaPreview.svelte';
   import AvatarVatra from './AvatarVatra.svelte';
+  import type { Component } from 'svelte';
 
   interface Props {
     avatarId: number;
@@ -28,6 +29,7 @@
   const gostFontSize = $derived(Math.max(9, Math.round(velicina * 0.26)));
   let pokvareniHash = $state<string | null>(null);
   const prikaziGeneriranu = $derived(Boolean(avatarSlikaHash) && pokvareniHash !== avatarSlikaHash);
+  const trebaSvgFallback = $derived(!vanjskaSlika && !gost && !prikaziGeneriranu && Boolean(avatarConfig));
   const srcGenerirane = $derived(
     avatarSlikaHash
       ? `${ADRESA_POSLUZITELJA}${putanjaGeneriranogAvatara(avatarSlikaHash, velicinaGeneriranogAvatara(velicina))}`
@@ -36,6 +38,28 @@
 
   const border = $derived(!prikaziRangBorder || vanjskaSlika || gost ? null : bojaBordera(rang));
   const debljina = $derived(border ? debljinaBorderaRanga(velicina) : 0);
+
+  type PreviewProps = { konfiguracija: AvatarConfigV1; velicina?: number };
+  let PreviewKomponenta = $state<Component<PreviewProps> | null>(null);
+  let previewGreska = $state(false);
+
+  $effect(() => {
+    if (!trebaSvgFallback || !avatarConfig) {
+      return;
+    }
+    let otkazano = false;
+    previewGreska = false;
+    void ucitajAvatarKonfiguracijaPreview()
+      .then((komponenta) => {
+        if (!otkazano) PreviewKomponenta = komponenta as Component<PreviewProps>;
+      })
+      .catch(() => {
+        if (!otkazano) previewGreska = true;
+      });
+    return () => {
+      otkazano = true;
+    };
+  });
 </script>
 
 <div
@@ -63,8 +87,13 @@
             pokvareniHash = avatarSlikaHash;
           }}
         />
+      {:else if avatarConfig && PreviewKomponenta}
+        <PreviewKomponenta konfiguracija={avatarConfig} {velicina} />
+      {:else if avatarConfig && previewGreska}
+        <img src={putanjaAvatara(avatarId)} alt={altTekst} />
       {:else if avatarConfig}
-        <AvatarKonfiguracijaPreview konfiguracija={avatarConfig} velicina={velicina} />
+        <!-- Rezerviraj prostor dok se SVG preview chunk učitava (bez layout shifta). -->
+        <div class="avatar-fallback-mjesto" aria-hidden="true"></div>
       {:else}
         <img src={putanjaAvatara(avatarId)} alt={altTekst} />
       {/if}
@@ -113,6 +142,13 @@
     object-fit: contain;
     padding: 6%;
     box-sizing: border-box;
+  }
+
+  .avatar-fallback-mjesto {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--boja-povrsina-2);
   }
 
   .gost-avatar {

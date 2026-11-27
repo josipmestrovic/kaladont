@@ -64,7 +64,8 @@ export function osvjeziGovornoOkruzenje(): void {
   });
 }
 
-export function inicijalizirajGlas(): void {
+/** SpeechSynthesis probe — samo kad je glas uključen ili se tek uključuje. */
+export function osigurajGovornoOkruzenje(): void {
   if (typeof window === 'undefined') return;
 
   osvjeziGovornoOkruzenje();
@@ -72,6 +73,11 @@ export function inicijalizirajGlas(): void {
     window.speechSynthesis.addEventListener('voiceschanged', osvjeziGovornoOkruzenje);
     slusateljGlasovaRegistriran = true;
   }
+}
+
+/** Obnavlja lokalnu postavku; SpeechSynthesis se pali tek ako je glas već uključen. */
+export function inicijalizirajGlas(): void {
+  if (typeof window === 'undefined') return;
 
   let ukljucen = false;
   try {
@@ -81,6 +87,7 @@ export function inicijalizirajGlas(): void {
   }
 
   glasUkljucen.set(ukljucen);
+  if (ukljucen) osigurajGovornoOkruzenje();
 }
 
 export function postaviGlas(ukljucen: boolean): void {
@@ -93,6 +100,8 @@ export function postaviGlas(ukljucen: boolean): void {
     } catch {
       // Isključivanje postavke ne smije prekinuti sučelje.
     }
+  } else {
+    osigurajGovornoOkruzenje();
   }
   try {
     window.localStorage.setItem(KLJUC_POSTAVKE, String(ukljucen));
@@ -108,6 +117,8 @@ export function izgovoriRijec(rijec: string): void {
     !get(glasUkljucen) ||
     !('speechSynthesis' in window)
   ) return;
+
+  osigurajGovornoOkruzenje();
 
   try {
     const izgovor = new SpeechSynthesisUtterance(rijec);
