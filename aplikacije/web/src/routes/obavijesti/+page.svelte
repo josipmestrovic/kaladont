@@ -4,13 +4,12 @@
   import { api } from '$lib/api.js';
   import { relativnoVrijemeObavijesti } from '$lib/naslovnica-obavijesti.js';
   import {
-    dohvatiStanjeSanducica,
     obrisiSavSanducic,
-    oznaciSanducicProcitane,
     oznaciSavSanducicProcitanim,
     osvjeziSazetakSanducica,
   } from '$lib/stanje-sanducica.svelte.js';
   import {
+    MAKS_SANDUCIC_PORUKA_PO_IGRACU,
     TIP_SANDUCIC_NOVA_KOLEKCIONARSKA_RAZINA,
     TIP_SANDUCIC_NOVA_XP_RAZINA,
     TIP_SANDUCIC_NOVA_ZVJEZDICA,
@@ -25,34 +24,22 @@
     type SanducicPorukaDetalj,
   } from 'zajednicko';
 
-  type Prikaz = 'neprocitane' | 'sve';
-
-  let prikaz = $state<Prikaz>('sve');
   let poruke = $state<SanducicPorukaDetalj[]>([]);
-  let sljedeciCursor = $state<string | null>(null);
   let ucitavanje = $state(true);
   let greska = $state<string | null>(null);
   let greskaAkcije = $state<string | null>(null);
   let brisanje = $state(false);
   let oznacavanjeSve = $state(false);
-  let oznacavanjeIds = $state<Set<string>>(new Set());
   let istaknutiId = $state<string | null>(null);
   let ciljanaPoruka = $state<SanducicPorukaDetalj | null>(null);
   let ciljanaNedostupna = $state(false);
   let zahtjevGen = 0;
-
-  const stanjeSanducica = dohvatiStanjeSanducica();
 
   const prikazanePoruke = $derived.by(() => {
     if (!ciljanaPoruka) return poruke;
     if (poruke.some((p) => p.id === ciljanaPoruka!.id)) return poruke;
     return [ciljanaPoruka, ...poruke];
   });
-
-  /** Globalni brojač — ne samo učitana stranica. */
-  const imaNeprocitanih = $derived(
-    stanjeSanducica.brojNeprocitanih > 0 || prikazanePoruke.some((p) => !p.procitano),
-  );
 
   function formatirajVrijeme(iso: string): string {
     try {
@@ -95,93 +82,44 @@
     );
   }
 
-  async function ucitaj(reset = true): Promise<void> {
+  async function ucitaj(): Promise<void> {
     const gen = ++zahtjevGen;
     ucitavanje = true;
     greska = null;
     try {
       const params = new URLSearchParams();
-      params.set('limit', '30');
-      if (prikaz === 'neprocitane') params.set('filter', 'neprocitane');
-      if (!reset && sljedeciCursor) params.set('cursor', sljedeciCursor);
+      params.set('limit', String(MAKS_SANDUCIC_PORUKA_PO_IGRACU));
       const odgovor = await api<{ ok: true; poruke: SanducicPorukaDetalj[]; sljedeciCursor: string | null }>(
         `/sanducic?${params.toString()}`,
       );
       if (gen !== zahtjevGen) return;
-      if (reset) {
-        poruke = odgovor.poruke;
-        sljedeciCursor = odgovor.sljedeciCursor;
-      } else {
-        const poznati = new Set(poruke.map((p) => p.id));
-        poruke = [...poruke, ...odgovor.poruke.filter((p) => !poznati.has(p.id))];
-        sljedeciCursor = odgovor.sljedeciCursor;
-      }
+      poruke = odgovor.poruke;
       if (ciljanaPoruka && poruke.some((p) => p.id === ciljanaPoruka!.id)) {
         ciljanaPoruka = null;
       }
     } catch {
       if (gen !== zahtjevGen) return;
       greska = 'Ne mogu učitati obavijesti.';
-      if (reset) {
-        poruke = [];
-        sljedeciCursor = null;
-      }
+      poruke = [];
     } finally {
       if (gen === zahtjevGen) ucitavanje = false;
     }
   }
 
-  async function postaviPrikaz(novi: Prikaz): Promise<void> {
-    if (novi === prikaz) return;
-    prikaz = novi;
-    istaknutiId = null;
-    ciljanaPoruka = null;
-    ciljanaNedostupna = false;
-    sljedeciCursor = null;
-    await ucitaj(true);
-  }
-
-  async function oznaciJednu(id: string): Promise<void> {
-    if (oznacavanjeIds.has(id)) return;
-    oznacavanjeIds = new Set([...oznacavanjeIds, id]);
-    greskaAkcije = null;
-    try {
-      await oznaciSanducicProcitane([id]);
-      poruke = poruke.map((p) => (p.id === id ? { ...p, procitano: true } : p));
-      if (ciljanaPoruka?.id === id) ciljanaPoruka = { ...ciljanaPoruka, procitano: true };
-      if (prikaz === 'neprocitane') {
-        poruke = poruke.filter((p) => p.id !== id);
-        if (ciljanaPoruka?.id === id) ciljanaPoruka = null;
-      }
-    } catch {
-      greskaAkcije = 'Ne mogu označiti obavijest pročitanom.';
-    } finally {
-      const sljedeci = new Set(oznacavanjeIds);
-      sljedeci.delete(id);
-      oznacavanjeIds = sljedeci;
-    }
-  }
-
   async function oznaciSve(): Promise<void> {
-    if (oznacavanjeSve || !imaNeprocitanih) return;
+    if (oznacavanjeSve) return;
     oznacavanjeSve = true;
     greskaAkcije = null;
     const granica = new Date();
     try {
       await oznaciSavSanducicProcitanim(granica);
-      if (prikaz === 'neprocitane') {
-        poruke = [];
-        sljedeciCursor = null;
-        ciljanaPoruka = null;
-      } else {
-        poruke = poruke.map((p) =>
-          !p.procitano && new Date(p.stvorenaAt).getTime() <= granica.getTime()
-            ? { ...p, procitano: true }
-            : p,
-        );
-        if (ciljanaPoruka && !ciljanaPoruka.procitano) {
-          ciljanaPoruka = { ...ciljanaPoruka, procitano: true };
-        }
+      poruke = poruke.map((p) =>
+        !p.procitano && new Date(p.stvorenaAt).getTime() <= granica.getTime()
+          ? { ...p, procitano: true }
+          : p,
+      );
+      if (ciljanaPoruka && !ciljanaPoruka.procitano) {
+        ciljanaPoruka = { ...ciljanaPoruka, procitano: true };
       }
     } catch {
       greskaAkcije = 'Ne mogu označiti sve obavijesti pročitanima.';
@@ -200,7 +138,6 @@
       poruke = [];
       ciljanaPoruka = null;
       ciljanaNedostupna = false;
-      sljedeciCursor = null;
       istaknutiId = null;
       await osvjeziSazetakSanducica();
     } catch {
@@ -218,18 +155,15 @@
   }
 
   async function obradiDeepLink(id: string): Promise<void> {
-    prikaz = 'sve';
     if (poruke.some((p) => p.id === id)) {
       istakniPoruku(id);
-      if (!poruke.find((p) => p.id === id)?.procitano) await oznaciJednu(id);
       return;
     }
     try {
       const odgovor = await api<{ ok: true; poruka: SanducicPorukaDetalj }>(`/sanducic/${id}`);
-      ciljanaPoruka = odgovor.poruka;
+      ciljanaPoruka = { ...odgovor.poruka, procitano: true };
       ciljanaNedostupna = false;
       istakniPoruku(id);
-      if (!odgovor.poruka.procitano) await oznaciJednu(id);
     } catch {
       ciljanaPoruka = null;
       ciljanaNedostupna = true;
@@ -238,7 +172,7 @@
 
   onMount(() => {
     void (async () => {
-      await ucitaj(true);
+      await ucitaj();
       const id = $page.url.searchParams.get('id');
       // Ulazak na stranicu = sve pročitano (prije deep-linka da badge nestane odmah).
       await oznaciSve();
@@ -255,46 +189,14 @@
   <header class="zaglavlje">
     <h1>Obavijesti</h1>
     <div class="akcije">
-      <div class="filter" role="group" aria-label="Filter obavijesti">
-        <button
-          type="button"
-          class="filter-gumb"
-          class:aktivan={prikaz === 'sve'}
-          aria-pressed={prikaz === 'sve'}
-          disabled={ucitavanje}
-          onclick={() => void postaviPrikaz('sve')}
-        >
-          Sve
-        </button>
-        <button
-          type="button"
-          class="filter-gumb"
-          class:aktivan={prikaz === 'neprocitane'}
-          aria-pressed={prikaz === 'neprocitane'}
-          disabled={ucitavanje}
-          onclick={() => void postaviPrikaz('neprocitane')}
-        >
-          Nepročitane
-        </button>
-      </div>
-      <div class="akcije-desno">
-        <button
-          type="button"
-          class="oznaci-sve"
-          disabled={oznacavanjeSve || !imaNeprocitanih}
-          onclick={() => void oznaciSve()}
-        >
-          Označi sve pročitanima
-        </button>
-        <button
-          type="button"
-          class="obrisi-sve"
-          disabled={brisanje || prikazanePoruke.length === 0}
-          onclick={() => void obrisiSve()}
-        >
-          Obriši sve obavijesti
-        </button>
-      </div>
+      <button
+        type="button"
+        class="obrisi-sve"
+        disabled={brisanje || prikazanePoruke.length === 0}
+        onclick={() => void obrisiSve()}
+      >
+        Obriši sve obavijesti
+      </button>
     </div>
   </header>
 
@@ -309,21 +211,12 @@
   {#if greska}
     <div class="greska" role="alert">
       <p>{greska}</p>
-      <button type="button" onclick={() => void ucitaj(true)}>Pokušaj ponovno</button>
+      <button type="button" onclick={() => void ucitaj()}>Pokušaj ponovno</button>
     </div>
   {:else if ucitavanje && prikazanePoruke.length === 0}
     <p class="stanje">Učitavanje…</p>
   {:else if prikazanePoruke.length === 0}
-    {#if prikaz === 'neprocitane'}
-      <div class="stanje prazno-nove">
-        <p>Nema nepročitanih obavijesti.</p>
-        <button type="button" class="filter-gumb aktivan" onclick={() => void postaviPrikaz('sve')}>
-          Prikaži sve
-        </button>
-      </div>
-    {:else}
-      <p class="stanje">Zasad nema obavijesti.</p>
-    {/if}
+    <p class="stanje">Zasad nema obavijesti.</p>
   {:else}
     <ul class="lista">
       {#each prikazanePoruke as poruka (poruka.id)}
@@ -410,16 +303,6 @@
                   {relativnoVrijemeObavijesti(poruka.stvorenaAt)}
                   <span class="meta-apsolutno">({formatirajVrijeme(poruka.stvorenaAt)})</span>
                 </time>
-                {#if !poruka.procitano}
-                  <button
-                    type="button"
-                    class="oznaci-jednu"
-                    disabled={oznacavanjeIds.has(poruka.id)}
-                    onclick={() => void oznaciJednu(poruka.id)}
-                  >
-                    Označi pročitanom
-                  </button>
-                {/if}
               </div>
               {#if poruka.poveznica}
                 <a class="poveznica" href={poruka.poveznica}>Otvori</a>
@@ -429,12 +312,6 @@
         </li>
       {/each}
     </ul>
-
-    {#if sljedeciCursor}
-      <button type="button" class="ucitaj-jos" disabled={ucitavanje} onclick={() => void ucitaj(false)}>
-        Učitaj starije
-      </button>
-    {/if}
   {/if}
 </main>
 
@@ -462,25 +339,10 @@
     flex-wrap: wrap;
     gap: 12px;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
   }
 
-  .akcije-desno {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .filter {
-    display: inline-flex;
-    gap: 6px;
-  }
-
-  .filter-gumb,
   .obrisi-sve,
-  .oznaci-sve,
-  .ucitaj-jos,
-  .oznaci-jednu,
   .greska button {
     min-height: 40px;
     padding: 8px 14px;
@@ -492,22 +354,9 @@
     font-weight: 600;
   }
 
-  .filter-gumb.aktivan {
-    border-color: var(--boja-isticanje-tekst);
-    color: var(--boja-isticanje-tekst);
-    background: color-mix(in srgb, var(--boja-isticanje-tekst) 10%, transparent);
-  }
-
-  .filter-gumb:disabled,
-  .obrisi-sve:disabled,
-  .oznaci-sve:disabled,
-  .oznaci-jednu:disabled {
+  .obrisi-sve:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
-
-  .oznaci-sve {
-    border-color: color-mix(in srgb, var(--boja-akcent) 35%, transparent);
   }
 
   .stanje,
@@ -519,12 +368,6 @@
   .upozorenje {
     padding: 8px;
     opacity: 0.9;
-  }
-
-  .prazno-nove {
-    display: grid;
-    gap: 12px;
-    justify-items: center;
   }
 
   .lista {
@@ -675,12 +518,6 @@
   .meta-apsolutno {
     margin-left: 4px;
     opacity: 0.8;
-  }
-
-  .oznaci-jednu {
-    min-height: 32px;
-    padding: 4px 10px;
-    font-size: 0.85rem;
   }
 
   .poveznica {

@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import {
+  MAKS_SANDUCIC_PORUKA_PO_IGRACU,
   TIP_SANDUCIC_DOBRODOSLICA,
   TIP_SANDUCIC_EMAIL_POTVRDEN,
   TIP_SANDUCIC_FEEDBACK,
@@ -20,7 +21,11 @@ import { baza } from '../src/baza/klijent.js';
 import { igraci, sanducicPoruke, sanducicPrekretnice } from '../src/baza/shema.js';
 import { izdajSesiju, stvoriGostSesiju } from '../src/racuni/sesije.js';
 import { obrisiRacun } from '../src/racuni/brisanje.js';
-import { ocistiStareSanducicPoruke, ROK_SANDUCIC_PORUKE_MS } from '../src/sanducic/ciscenje.js';
+import {
+  ocistiStareSanducicPoruke,
+  ograniciSveSanduciceNaLimit,
+  ROK_SANDUCIC_PORUKE_MS,
+} from '../src/sanducic/ciscenje.js';
 import {
   mozdaObavijestiPrvuIgru,
   obradiDovrsenuIgruSanducic,
@@ -34,6 +39,7 @@ import {
   stvoriPorukuPromjeneRanga,
 } from '../src/sanducic/okidaci.js';
 import {
+  dohvatiListu,
   dohvatiSazetak,
   obrisiSvePoruke,
   oznaciProcitane,
@@ -574,6 +580,46 @@ describe('sandučic', () => {
     const sazeci = gostPoruke.filter((r) => r.tip === TIP_SANDUCIC_GOST_SAZETAK_5);
     expect(sazeci.length).toBeGreaterThanOrEqual(2);
     expect(sazeci.every((r) => r.podaci?.registriran === true)).toBe(true);
+  });
+
+  it('zadržava najviše 20 najnovijih poruka po igraču i ne dira tuđi sandučić', async () => {
+    const igrac = await noviIgrac();
+    const drugi = await noviIgrac();
+    const bazaVremena = Date.now();
+
+    for (let i = 0; i < MAKS_SANDUCIC_PORUKA_PO_IGRACU + 3; i += 1) {
+      await stvoriPoruku({
+        igracId: igrac.id,
+        tip: TIP_SANDUCIC_TEST,
+        deduplikacijskiKljuc: `test:limit-${i}`,
+        podaci: { tekst: `Poruka ${i}` },
+        stvorenaAt: new Date(bazaVremena + i),
+      });
+    }
+    await stvoriPoruku({
+      igracId: drugi.id,
+      tip: TIP_SANDUCIC_TEST,
+      deduplikacijskiKljuc: 'test:limit-tudja',
+      podaci: { tekst: 'Tuđa' },
+    });
+
+    const vlastite = await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, igrac.id));
+    expect(vlastite).toHaveLength(MAKS_SANDUCIC_PORUKA_PO_IGRACU);
+    const kljucevi = new Set(vlastite.map((p) => p.deduplikacijskiKljuc));
+    expect(kljucevi.has('test:limit-0')).toBe(false);
+    expect(kljucevi.has('test:limit-1')).toBe(false);
+    expect(kljucevi.has('test:limit-2')).toBe(false);
+    expect(kljucevi.has(`test:limit-${MAKS_SANDUCIC_PORUKA_PO_IGRACU + 2}`)).toBe(true);
+
+    const lista = await dohvatiListu(igrac.id);
+    expect(lista.poruke).toHaveLength(MAKS_SANDUCIC_PORUKA_PO_IGRACU);
+    expect(lista.sljedeciCursor).toBeNull();
+    expect(lista.poruke[0]?.podaci.tekst).toBe(`Poruka ${MAKS_SANDUCIC_PORUKA_PO_IGRACU + 2}`);
+
+    expect(await baza.select().from(sanducicPoruke).where(eq(sanducicPoruke.igracId, drugi.id))).toHaveLength(1);
+
+    // Backfill trim ostaje idempotentan kad je već unutar limita.
+    expect(await ograniciSveSanduciceNaLimit()).toBe(0);
   });
 
   it('PR5: ulazak u feed označava sve pročitanima; obrisi-sve briše samo vlastite', async () => {

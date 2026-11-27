@@ -21,7 +21,7 @@ async function seedPoruku(page: Page, token: string, tekst: string): Promise<str
   return tijelo.id;
 }
 
-test('feed prikazuje Sve, eksplicitno čita i briše', async ({ page }) => {
+test('feed automatski čita, zadržava popis i briše', async ({ page }) => {
   const token = await cekajGostSesiju(page);
   const tekst = `Bravo! Otključano dostignuće test ${Date.now()}.`;
   await seedPoruku(page, token, tekst);
@@ -32,13 +32,13 @@ test('feed prikazuje Sve, eksplicitno čita i briše', async ({ page }) => {
   await page.getByRole('link', { name: /Obavijesti/ }).first().click();
   await expect(page).toHaveURL('/obavijesti');
   await expect(page.getByRole('heading', { name: 'Obavijesti' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Sve', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: 'Nepročitane' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sve', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Nepročitane' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Označi sve pročitanima' })).toHaveCount(0);
   await expect(page.getByText(tekst)).toBeVisible();
-  // Ulazak na /obavijesti automatski označi sve pročitanima.
+  // Ulazak na /obavijesti automatski označi sve pročitanima; poruka ostaje na popisu.
   await expect(page.getByText('Pročitano', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole('button', { name: 'Označi sve pročitanima' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeEnabled();
 
   await page.goto('/');
   await expect(page.getByRole('banner').locator('.avatar')).toBeVisible({ timeout: 20_000 });
@@ -46,15 +46,11 @@ test('feed prikazuje Sve, eksplicitno čita i briše', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Obavijesti,/ })).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Obavijesti', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Sve', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText(tekst)).toBeVisible();
-  await page.getByRole('button', { name: 'Nepročitane' }).click();
-  await expect(page.getByText('Nema nepročitanih obavijesti.')).toBeVisible();
-  await page.getByRole('button', { name: 'Prikaži sve' }).click();
   await expect(page.getByText(tekst)).toBeVisible();
   page.once('dialog', (dijalog) => dijalog.accept());
   await page.getByRole('button', { name: 'Obriši sve obavijesti' }).click();
   await expect(page.getByText('Zasad nema obavijesti.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Obriši sve obavijesti' })).toBeDisabled();
 });
 
 test('toast se potisne u redu bez gubitka badgea', async ({ page }) => {
