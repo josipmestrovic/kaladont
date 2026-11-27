@@ -736,17 +736,6 @@ function smijeSpremitiAnalizu(ulaz: UlazOdabira): boolean {
   return true;
 }
 
-function dodajBodNastavka(bod: number, analiza: AnalizaNastavkaSpremljena): number {
-  if (analiza.ishod === 'mrtvo') return bod - 1000;
-  if (analiza.ishod === 'poznat') {
-    let novi = bod + 5;
-    novi += Math.max(0, 3 - analiza.cestihNeovisnih) * 0.5;
-    return novi;
-  }
-  if (analiza.ishod === 'indeks') return bod + 5;
-  return bod;
-}
-
 export function analizirajNastavak(
   rijec: string,
   ulaz: UlazOdabira,
