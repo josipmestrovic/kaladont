@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost/socket-handler.js';
 import { and, eq, inArray } from 'drizzle-orm';
 import { konfiguracija } from '../konfiguracija.js';
+import { hashSlikeAvatara } from '../avatar/hash.js';
 import { nadopuniIskoristeneGrupe } from '../rjecnik/iskoristene-grupe.js';
 import { promijesajNiz } from './raspored-sjedala.js';
 import {
@@ -1094,6 +1095,7 @@ export function stvoriUpraviteljPartija(
         jeBot: upravljac === 'bot',
         avatarId,
         avatarConfig,
+        avatarSlikaHash: hashSlikeAvatara(avatarConfig),
         avatarRevision,
         rang,
         razina,
@@ -1547,6 +1549,7 @@ export function stvoriUpraviteljPartija(
           jeBot: s.upravljac === 'bot',
           avatarId: s.avatarId,
           avatarConfig: s.avatarConfig,
+          avatarSlikaHash: hashSlikeAvatara(s.avatarConfig),
           avatarRevision: s.avatarRevision,
           rang: s.rang,
           razina: s.razina,
@@ -4101,6 +4104,7 @@ export function stvoriUpraviteljPartija(
           jeBot: s.upravljac === 'bot',
           avatarId: s.avatarId,
           avatarConfig: s.avatarConfig,
+          avatarSlikaHash: hashSlikeAvatara(s.avatarConfig),
           avatarRevision: s.avatarRevision,
           rang: s.rang,
           razina: s.razina,

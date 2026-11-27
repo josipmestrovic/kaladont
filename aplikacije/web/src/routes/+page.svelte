@@ -1,16 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { BROJ_AKTIVNIH_IZAZOVA } from 'zajednicko';
-  import { api } from '$lib/api.js';
   import { NAJNOVIJE_IZDANJE } from '$lib/izdanja.js';
   import { zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
-  import { dohvatiKatalogIzazova } from '$lib/izazovi-klijent.js';
   import {
     defaultOpisIzazova,
-    izracunajPrikazIzazova,
     type PrikazIzazovaKartice,
   } from '$lib/naslovnica-izazovi.js';
   import BrzePostavke from '$lib/komponente/BrzePostavke.svelte';
@@ -21,34 +18,61 @@
     labelaZvjezdicaDostignuca,
     MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
     natpisBadgaDostignuca,
-    normalizirajZvjezdiceDostignuca,
     type PrikazZvjezdicaDostignuca,
   } from '$lib/naslovnica-dostignuca.js';
   import {
     ariaBadgaMisija,
     jedinicaAktivnihMisija,
     natpisBadgaMisija,
+    type PrikazAktivnihMisija,
   } from '$lib/naslovnica-misije.js';
+  import { spojiSazetakNaBadgee } from '$lib/naslovnica-sazetak-ui.js';
+  import type { TekstSazetkaLjestvice } from '$lib/naslovnica-ljestvice.js';
   import {
     NASLOVNICA_SEO_DESCRIPTION,
     NASLOVNICA_SEO_TITLE,
     naslovnicaJsonLd,
   } from '$lib/seo.js';
+  import { stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import {
-    dohvatiStanjeMisijaStore,
-    invalidirajStanjeMisija,
-    osigurajStanjeMisija,
-  } from '$lib/stanje-misija.svelte.js';
-  import { osigurajProfil, stanjeProfila } from '$lib/stanje-profila.svelte.js';
-  import { tekstSazetkaLjestvice } from '$lib/naslovnica-ljestvice.js';
+    dohvatiStanjeNaslovnice,
+    invalidirajNaslovnicaSazetak,
+    osigurajNaslovnicaSazetak,
+  } from '$lib/stanje-naslovnica.svelte.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
-  import type { OdgovorSazetkaLjestvice } from 'zajednicko';
 
-  const misijeStore = dohvatiStanjeMisijaStore();
-  const misijeBadge = $derived(natpisBadgaMisija(misijeStore.aktivne));
-  const misijeBroj = $derived(misijeStore.aktivne.ukupnoAktivnih);
+  const naslovnica = dohvatiStanjeNaslovnice();
+  const prazneMisije: PrikazAktivnihMisija = {
+    dnevneAktivne: 0,
+    tjedneAktivne: 0,
+    ukupnoAktivnih: 0,
+  };
+  // Gost: null = nema misija. Registriran + null = pad podservisa — zadrži zadnji prikaz.
+  let zadnjeMisijeRegistriranog = $state<PrikazAktivnihMisija>(prazneMisije);
+  $effect(() => {
+    const misije = naslovnica.misije;
+    if (!misije || naslovnica.sazetak?.profil.vrsta === 'gost') return;
+    zadnjeMisijeRegistriranog = {
+      dnevneAktivne: misije.dnevneAktivne,
+      tjedneAktivne: misije.tjedneAktivne,
+      ukupnoAktivnih: misije.ukupnoAktivnih,
+    };
+  });
+  const misijeAktivne = $derived(
+    naslovnica.misije
+      ? {
+          dnevneAktivne: naslovnica.misije.dnevneAktivne,
+          tjedneAktivne: naslovnica.misije.tjedneAktivne,
+          ukupnoAktivnih: naslovnica.misije.ukupnoAktivnih,
+        }
+      : naslovnica.sazetak?.profil.vrsta === 'gost'
+        ? prazneMisije
+        : zadnjeMisijeRegistriranog,
+  );
+  const misijeBadge = $derived(natpisBadgaMisija(misijeAktivne));
+  const misijeBroj = $derived(misijeAktivne.ukupnoAktivnih);
   const misijeJedinica = $derived(jedinicaAktivnihMisija(misijeBroj));
-  const misijeAria = $derived(ariaBadgaMisija(misijeStore.aktivne));
+  const misijeAria = $derived(ariaBadgaMisija(misijeAktivne));
   const godinaCopyright = new Date().getFullYear();
 
   const FOCUS_REFRESH_MS = 45_000;
@@ -57,11 +81,7 @@
     vrsta: 'default',
     opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA),
   });
-  let izazoviGeneracija = 0;
-  let kolekcijaGeneracija = 0;
-  let dostignucaGeneracija = 0;
-  let ljestviceGeneracija = 0;
-  let ljestviceTekst = $state<ReturnType<typeof tekstSazetkaLjestvice>>(null);
+  let ljestviceTekst = $state<TekstSazetkaLjestvice | null>(null);
   let brojRijeciKolekcije = $state<number | null>(null);
   let dostignucaZvjezdice = $state<PrikazZvjezdicaDostignuca>({
     ukupno: 0,
@@ -97,91 +117,53 @@
     zagrijGameplayZvukove();
   }
 
-  async function osvjeziIzazove() {
-    const generacija = ++izazoviGeneracija;
-    try {
-      const katalog = await dohvatiKatalogIzazova();
-      if (generacija !== izazoviGeneracija) return;
-      izazoviPrikaz = izracunajPrikazIzazova(katalog);
-    } catch {
-      if (generacija !== izazoviGeneracija) return;
-      izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
+  function primijeniSazetakNaUi() {
+    const sazetak = naslovnica.sazetak;
+    if (!sazetak) return;
+    const spojeno = spojiSazetakNaBadgee(
+      { izazoviPrikaz, brojRijeciKolekcije, dostignucaZvjezdice, ljestviceTekst },
+      sazetak,
+    );
+    izazoviPrikaz = spojeno.izazoviPrikaz;
+    brojRijeciKolekcije = spojeno.brojRijeciKolekcije;
+    dostignucaZvjezdice = spojeno.dostignucaZvjezdice;
+    ljestviceTekst = spojeno.ljestviceTekst;
+  }
+
+  function resetirajBadgee() {
+    izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
+    brojRijeciKolekcije = null;
+    dostignucaZvjezdice = {
+      ukupno: 0,
+      maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
+    };
+    ljestviceTekst = null;
+    zadnjeMisijeRegistriranog = prazneMisije;
+  }
+
+  async function osvjeziNaslovnicu(opcije: { forsaj?: boolean } = {}) {
+    await osigurajNaslovnicaSazetak({ forsaj: opcije.forsaj });
+    if (naslovnica.status === 'spreman' || naslovnica.status === 'greska') {
+      primijeniSazetakNaUi();
     }
   }
 
-  async function osvjeziKolekciju() {
-    const generacija = ++kolekcijaGeneracija;
-    try {
-      const odgovor = await api<{
-        ukupnoOtkljucano?: number;
-      }>('/profil/kolekcija');
-      if (generacija !== kolekcijaGeneracija) return;
-      const broj = odgovor.ukupnoOtkljucano;
-      brojRijeciKolekcije =
-        typeof broj === 'number' && Number.isFinite(broj) && broj >= 0 ? Math.floor(broj) : null;
-    } catch {
-      // Zadrži zadnji uspješan sažetak; ne piši 0 preko stvarnog napretka.
-      if (generacija !== kolekcijaGeneracija) return;
+  afterNavigate(({ from, to }) => {
+    if (!to || to.url.pathname !== '/') return;
+    // Povratak na `/` iz druge rute — forsaj da badgei nisu zastarjeli (npr. nakon prijave).
+    if (from && from.url.pathname !== '/') {
+      void osvjeziNaslovnicu({ forsaj: true });
     }
-  }
-
-  async function osvjeziDostignucaZvjezdice() {
-    const generacija = ++dostignucaGeneracija;
-    try {
-      const odgovor = await api<{
-        ukupnoZvjezdica?: number;
-        maksimalnoZvjezdica?: number;
-      }>('/dostignuca');
-      if (generacija !== dostignucaGeneracija) return;
-      dostignucaZvjezdice = normalizirajZvjezdiceDostignuca(odgovor);
-    } catch {
-      // Zadrži zadnji uspješan sažetak; ne piši 0 zvjezdica preko stvarnog napretka.
-      if (generacija !== dostignucaGeneracija) return;
-    }
-  }
-
-  async function osvjeziLjestviceSazetak() {
-    const generacija = ++ljestviceGeneracija;
-    try {
-      const odgovor = await api<OdgovorSazetkaLjestvice>('/ljestvice/sazetak');
-      if (generacija !== ljestviceGeneracija) return;
-      ljestviceTekst = tekstSazetkaLjestvice(odgovor.status);
-    } catch {
-      // Zadrži zadnji uspješan sažetak; ne briši rang zbog prolazne greške mreže.
-      if (generacija !== ljestviceGeneracija) return;
-    }
-  }
-
-  function osvjeziNaslovnicu() {
-    void osigurajProfil({ forsaj: true }).then(() => {
-      if (stanjeProfila.status === 'spreman' || stanjeProfila.status === 'greska') {
-        void osvjeziIzazove();
-        void osigurajStanjeMisija({ forsaj: true });
-        void osvjeziKolekciju();
-        void osvjeziDostignucaZvjezdice();
-        void osvjeziLjestviceSazetak();
-      }
-    });
-  }
+  });
 
   onMount(() => {
     // ?igraj=1 → izravno Troboj / Brza igra (bez modala).
     if ($page.url.searchParams.get('igraj') === '1') idiUBrzuIgru({ izQueryja: true });
 
     const naIdentitet = () => {
-      izazoviGeneracija += 1;
-      kolekcijaGeneracija += 1;
-      dostignucaGeneracija += 1;
-      ljestviceGeneracija += 1;
-      izazoviPrikaz = { vrsta: 'default', opis: defaultOpisIzazova(BROJ_AKTIVNIH_IZAZOVA) };
-      brojRijeciKolekcije = null;
-      dostignucaZvjezdice = {
-        ukupno: 0,
-        maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
-      };
-      ljestviceTekst = null;
-      invalidirajStanjeMisija();
-      osvjeziNaslovnicu();
+      invalidirajNaslovnicaSazetak();
+      resetirajBadgee();
+      void osvjeziNaslovnicu({ forsaj: true });
     };
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
 
@@ -191,26 +173,16 @@
       const sada = Date.now();
       if (sada - zadnjiFocusRefresh < FOCUS_REFRESH_MS) return;
       zadnjiFocusRefresh = sada;
-      osvjeziNaslovnicu();
+      void osvjeziNaslovnicu({ forsaj: true });
     };
     document.addEventListener('visibilitychange', naVidljivost);
 
-    // Dijeli in-flight s Headerom; zatim GET /izazovi, /misije, kolekcija, dostignuća i ljestvice.
-    void osigurajProfil().then(() => {
-      void osvjeziIzazove();
-      void osigurajStanjeMisija();
-      void osvjeziKolekciju();
-      void osvjeziDostignucaZvjezdice();
-      void osvjeziLjestviceSazetak();
-    });
+    // Jedan GET /naslovnica/sazetak — dijeli se s Headerom (dedup in-flight).
+    void osvjeziNaslovnicu();
 
     return () => {
       window.removeEventListener('kaladont:identitet-promijenjen', naIdentitet);
       document.removeEventListener('visibilitychange', naVidljivost);
-      izazoviGeneracija += 1;
-      kolekcijaGeneracija += 1;
-      dostignucaGeneracija += 1;
-      ljestviceGeneracija += 1;
     };
   });
 </script>

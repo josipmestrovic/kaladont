@@ -26,6 +26,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HRLEX_PODACI_DIR=/tmp/kaladont-hrlex
+ENV AVATAR_DIJELOVI_DIR=/app/avatar-dijelovi
+ENV AVATARI_GENERIRANI_DIR=/app/podaci/avatari-generirani
 
 RUN addgroup -S kaladont \
   && adduser -S --ingroup kaladont kaladont
@@ -37,6 +39,10 @@ COPY --from=builder --chown=kaladont:kaladont /app/aplikacije/posluzitelj/drizzl
 COPY --from=builder --chown=kaladont:kaladont /app/aplikacije/web/build /app/web/build
 COPY --from=builder --chown=kaladont:kaladont /uvoz-runtime /app/alati/uvoz-rjecnika
 COPY --from=builder --chown=kaladont:kaladont /app/skripte/uvoz-rjecnika/dist /app/alati/uvoz-rjecnika/dist
+COPY --from=builder --chown=kaladont:kaladont /app/aplikacije/web/static/avatari/dijelovi /app/avatar-dijelovi
+
+RUN mkdir -p /app/podaci/avatari-generirani \
+  && chown -R kaladont:kaladont /app/podaci
 
 LABEL org.opencontainers.image.title="Kaladont"
 LABEL org.opencontainers.image.description="Hrvatska višeigračka igra riječi"

@@ -4,14 +4,14 @@
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { oznaciPregledMisija } from '$lib/misije-klijent.js';
   import {
-    dohvatiStanjeMisijaStore,
-    invalidirajStanjeMisija,
-    osigurajStanjeMisija,
-  } from '$lib/stanje-misija.svelte.js';
+    dohvatiStanjeNaslovnice,
+    oznaciNovostiMisijaPregledane,
+    osigurajNaslovnicaSazetak,
+  } from '$lib/stanje-naslovnica.svelte.js';
 
   type Skupina = 'dnevna' | 'tjedna';
 
-  const misijeStore = dohvatiStanjeMisijaStore();
+  const naslovnica = dohvatiStanjeNaslovnice();
   let poruka = $state<string | null>(null);
   let skupineNaCekanju = $state<Skupina[]>([]);
   let zatvaranje = $state(false);
@@ -34,27 +34,34 @@
     skupineNaCekanju = [];
   }
 
-  async function pokreni() {
-    const ova = ++generacija;
-    if (!smijePrikazati()) {
-      ocisti();
-      return;
-    }
-    const stanje = await osigurajStanjeMisija({ forsaj: true });
-    if (ova !== generacija || !smijePrikazati()) return;
-    if (!stanje) {
-      ocisti();
+  function primijeniNovosti() {
+    const misije = naslovnica.misije;
+    // Null kod registriranog = pad podservisa — ne briši postojeći toast.
+    if (!misije) {
+      if (naslovnica.sazetak?.profil.vrsta === 'gost') ocisti();
       return;
     }
     const skupine: Skupina[] = [];
-    if (stanje.novosti.dnevne) skupine.push('dnevna');
-    if (stanje.novosti.tjedne) skupine.push('tjedna');
+    if (misije.novosti.dnevne) skupine.push('dnevna');
+    if (misije.novosti.tjedne) skupine.push('tjedna');
     if (skupine.length === 0) {
       ocisti();
       return;
     }
     skupineNaCekanju = skupine;
     poruka = tekstZa(skupine);
+  }
+
+  async function pokreni() {
+    const ova = ++generacija;
+    if (!smijePrikazati()) {
+      ocisti();
+      return;
+    }
+    // Bez forsaja — dijeli sažetak s +page/Headerom.
+    await osigurajNaslovnicaSazetak();
+    if (ova !== generacija || !smijePrikazati()) return;
+    primijeniNovosti();
   }
 
   async function oznaciSveNaCekanju() {
@@ -66,6 +73,7 @@
         // Best-effort: toast se svejedno sklanja.
       }
     }
+    oznaciNovostiMisijaPregledane(skupine);
   }
 
   async function zatvori() {
@@ -94,8 +102,7 @@
     const naIdentitet = () => {
       generacija += 1;
       ocisti();
-      invalidirajStanjeMisija();
-      void pokreni();
+      // +page forsira sažetak; toast se napuni kad store postane spreman.
     };
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
     return () => {
@@ -111,9 +118,13 @@
     }
   });
 
-  // Referenca da store ostane živ za badge na naslovnici dok je toast mountan.
+  // Reagiraj na osvježeni sažetak (npr. nakon identiteta / partije) bez vlastitog forsaja.
   $effect(() => {
-    void misijeStore.status;
+    if ($page.url.pathname !== '/') return;
+    if (naslovnica.status !== 'spreman') return;
+    void naslovnica.misije?.novosti.dnevne;
+    void naslovnica.misije?.novosti.tjedne;
+    primijeniNovosti();
   });
 </script>
 

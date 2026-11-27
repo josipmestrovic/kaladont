@@ -1,5 +1,9 @@
 /** Sažetak napretka izazova za karticu na naslovnici. */
-import { BROJ_AKTIVNIH_IZAZOVA, type OdgovorKatalogaIzazova } from 'zajednicko';
+import {
+  BROJ_AKTIVNIH_IZAZOVA,
+  type NaslovnicaIzazoviSazetak,
+  type OdgovorKatalogaIzazova,
+} from 'zajednicko';
 
 export type PrikazIzazovaKartice =
   | { vrsta: 'default'; opis: string }
@@ -16,17 +20,18 @@ export function defaultOpisIzazova(ukupno = BROJ_AKTIVNIH_IZAZOVA): string {
   return `Svladavaj ${ukupno} sve težih izazova.`;
 }
 
-export function izracunajPrikazIzazova(
-  odgovor: OdgovorKatalogaIzazova | null | undefined,
+function izracunajPrikazBrojeva(
+  omogucen: boolean,
+  zavrsenoSirovo: number,
+  ukupnoSirovo: number,
 ): PrikazIzazovaKartice {
   const defaultOpis = defaultOpisIzazova();
-  if (!odgovor || !odgovor.omogucen || !odgovor.katalog?.length) {
+  if (!omogucen || ukupnoSirovo <= 0) {
     return { vrsta: 'default', opis: defaultOpis };
   }
 
-  const ukupno = odgovor.katalog.length;
-  const zavrseno = odgovor.napredak.leveli.reduce((zbroj, level) => zbroj + level.zavrseno, 0);
-  const omeđeno = Math.min(Math.max(0, zavrseno), ukupno);
+  const ukupno = ukupnoSirovo;
+  const omeđeno = Math.min(Math.max(0, zavrsenoSirovo), ukupno);
   const sveZavrseno = omeđeno >= ukupno;
 
   return {
@@ -41,4 +46,21 @@ export function izracunajPrikazIzazova(
     postotak: Math.min(100, Math.max(0, (100 * omeđeno) / ukupno)),
     sveZavrseno,
   };
+}
+
+export function izracunajPrikazIzazovaIzSazetka(
+  sazetak: NaslovnicaIzazoviSazetak | null | undefined,
+): PrikazIzazovaKartice {
+  if (!sazetak) return { vrsta: 'default', opis: defaultOpisIzazova() };
+  return izracunajPrikazBrojeva(sazetak.omogucen, sazetak.zavrseno, sazetak.ukupno);
+}
+
+export function izracunajPrikazIzazova(
+  odgovor: OdgovorKatalogaIzazova | null | undefined,
+): PrikazIzazovaKartice {
+  if (!odgovor || !odgovor.katalog?.length) {
+    return { vrsta: 'default', opis: defaultOpisIzazova() };
+  }
+  const zavrseno = odgovor.napredak.leveli.reduce((zbroj, level) => zbroj + level.zavrseno, 0);
+  return izracunajPrikazBrojeva(odgovor.omogucen, zavrseno, odgovor.katalog.length);
 }

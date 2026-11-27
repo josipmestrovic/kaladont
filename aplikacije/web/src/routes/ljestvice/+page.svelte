@@ -567,6 +567,7 @@
                       <Avatar
                         avatarId={redak.avatarId}
                         avatarConfig={redak.avatarConfig}
+                        avatarSlikaHash={redak.avatarSlikaHash}
                         gost={!redak.jeJavanProfil}
                         velicina={36}
                         prikaziRangBorder={false}
@@ -610,6 +611,7 @@
                       <Avatar
                         avatarId={mojRedak.avatarId}
                         avatarConfig={mojRedak.avatarConfig}
+                        avatarSlikaHash={mojRedak.avatarSlikaHash}
                         gost={!mojRedak.jeJavanProfil}
                         velicina={36}
                         prikaziRangBorder={false}

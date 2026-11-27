@@ -11,6 +11,7 @@ import rateLimit from '@fastify/rate-limit';
 import { Server as SocketIoServer, type Socket } from 'socket.io';
 import {
   validirajAvatarConfig,
+  ZADANI_AVATAR_CONFIG,
   type AvatarConfigV1,
   type DogadajiKlijentPoslužitelj,
   type DogadajiPosluziteljKlijent,
@@ -18,6 +19,7 @@ import {
   type KodRazlogaVeze,
   type StanjePartije,
 } from 'zajednicko';
+import { registrirajRuteGeneriranihAvatara } from './avatar/rute.js';
 import { ucitajRjecnik } from './rjecnik/ucitaj.js';
 import { jeValjaniToken, razrijesiIdentitet, RegistarVeza } from './identitet/identitet.js';
 import { registrirajRedCekanja } from './red/servis-reda.js';
@@ -30,6 +32,7 @@ import {
   type OpcijeAuthRateLimita,
 } from './racuni/rute.js';
 import { registrirajProfilRute } from './profil/rute.js';
+import { registrirajNaslovnicaRute } from './naslovnica/rute.js';
 import { registrirajLjestviceRute } from './ljestvice/rute.js';
 import { registrirajMisijeRute } from './misije/rute.js';
 import { registrirajDostignucaRute } from './dostignuca/rute.js';
@@ -87,6 +90,7 @@ export const MAX_SOCKET_PORUKA_BAJTOVA = 16 * 1024;
 const ShemaAvatarAzuriraj = z.object({
   avatarConfig: z.custom<AvatarConfigV1>(validirajAvatarConfig),
   avatarRevision: z.number().int().nonnegative().safe(),
+  avatarSlikaHash: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(),
 }).strict();
 
 export interface PodaciSocketa {
@@ -242,6 +246,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
         naSesijeIgracaOpozvane: (igracId) => opozoviSocketSesijeIgraca(igracId),
       });
       await registrirajProfilRute(apiApp, rjecnik);
+      await registrirajNaslovnicaRute(apiApp);
       await registrirajLjestviceRute(apiApp);
       await registrirajMisijeRute(apiApp);
       await registrirajIzazoviRute(apiApp);
@@ -288,6 +293,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     { prefix: '/api' },
   );
   registrirajStariLinkPotvrdeEmaila(app);
+  await registrirajRuteGeneriranihAvatara(app);
 
   app.route({
     method: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -1038,6 +1044,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     await new Promise<void>((resolve) => io.close(() => resolve()));
     await app.close();
   };
+
+  void import('./avatar/generator.js')
+    .then(({ osigurajGeneriraneAvatare }) => osigurajGeneriraneAvatare(ZADANI_AVATAR_CONFIG))
+    .catch((greska: unknown) => {
+      app.log.warn({ greska }, 'Zadani generirani avatar nije spreman');
+    });
 
   void obradiNeobradeneTop10Dokaze().then((poIgracu) => {
     for (const [igracId, obavijesti] of poIgracu) emitirajNovostiDostignuca(igracId, obavijesti);

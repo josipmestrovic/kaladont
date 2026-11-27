@@ -126,6 +126,19 @@ describe('profil-resurs', () => {
     expect(pozivi).toBe(2);
   });
 
+  it('postaviIzSazetka hidrira snapshot bez HTTP-a', () => {
+    const api = vi.fn();
+    const resurs = stvoriProfilResurs({
+      api,
+      oporavi401: async () => {},
+      jeApiGreska401: () => false,
+    });
+    resurs.postaviIzSazetka(bazaProfila('IzSazetka'));
+    expect(api).not.toHaveBeenCalled();
+    expect(resurs.status).toBe('spreman');
+    expect(resurs.snapshot?.nadimak).toBe('IzSazetka');
+  });
+
   it('paralelni forsaj dijeljenja završava u spreman statusu', async () => {
     let otkazi!: (v: ProfilSnapshot) => void;
     let pozivi = 0;

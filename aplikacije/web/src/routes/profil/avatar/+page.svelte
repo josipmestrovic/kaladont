@@ -48,14 +48,20 @@
     spremanje = true;
     greskaSpremanja = null;
     try {
-      const odgovor = await api<{ avatarConfig: AvatarConfigV1; avatarRevision: number }>('/profil/avatar', {
+      const odgovor = await api<{ avatarConfig: AvatarConfigV1; avatarRevision: number; avatarSlikaHash?: string | null }>('/profil/avatar', {
         method: 'PUT',
         body: JSON.stringify({ avatarConfig: novaKonfiguracija }),
       });
       konfiguracija = odgovor.avatarConfig;
       legacyBezConfiga = false;
-      dohvatiSocket().emit('igrac:avatar-azuriraj', { avatarConfig: odgovor.avatarConfig, avatarRevision: odgovor.avatarRevision });
-      window.dispatchEvent(new CustomEvent('kaladont:avatar-promijenjen', { detail: { avatarConfig: odgovor.avatarConfig } }));
+      dohvatiSocket().emit('igrac:avatar-azuriraj', {
+        avatarConfig: odgovor.avatarConfig,
+        avatarRevision: odgovor.avatarRevision,
+        avatarSlikaHash: odgovor.avatarSlikaHash ?? null,
+      });
+      window.dispatchEvent(new CustomEvent('kaladont:avatar-promijenjen', {
+        detail: { avatarConfig: odgovor.avatarConfig, avatarSlikaHash: odgovor.avatarSlikaHash ?? null },
+      }));
       void goto('/profil');
     } catch (e) {
       greskaSpremanja = e instanceof Error ? e.message : 'Spremanje avatara nije uspjelo.';

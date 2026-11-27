@@ -83,6 +83,19 @@ export function ocistiStanjeSanducica(): void {
   ocistiLokalno();
 }
 
+/**
+ * Hidracija iz `GET /naslovnica/sazetak` — izbjegava zasebni GET /sanducic/sazetak na naslovnici.
+ * Ne pokreće toast najavu (layout/socket i dalje upravljaju ACK tokom).
+ */
+export function primijeniSazetakSanducicaIzNaslovnice(ulaz: {
+  brojNeprocitanih: number;
+  zaNajavu: SanducicPorukaSazetak[];
+}): void {
+  brojNeprocitanih = ulaz.brojNeprocitanih;
+  zaNajavu = ulaz.zaNajavu.filter((p) => !lokalnoNajavljeno.has(p.id));
+  revizija += 1;
+}
+
 async function potvrdiNajavu(ids: string[]): Promise<void> {
   const svjeze = ids.filter((id) => !lokalnoNajavljeno.has(id));
   if (svjeze.length === 0) return;

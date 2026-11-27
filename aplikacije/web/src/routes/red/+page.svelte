@@ -246,6 +246,7 @@
         <Avatar
           avatarId={mjesto.avatarId}
           avatarConfig={mjesto.avatarConfig}
+          avatarSlikaHash={mjesto.jeBot ? null : mjesto.avatarSlikaHash}
           rang={mjesto.jeBot ? null : mjesto.rang}
           gost={mjesto.jeGost}
           velicina={84}

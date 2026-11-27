@@ -10,6 +10,11 @@
     osigurajProfil,
     stanjeProfila,
   } from '$lib/stanje-profila.svelte.js';
+  import {
+    azurirajAvatarNaslovnice,
+    invalidirajNaslovnicaSazetak,
+    osigurajNaslovnicaSazetak,
+  } from '$lib/stanje-naslovnica.svelte.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
   import { type AvatarConfigV1 } from 'zajednicko';
@@ -48,17 +53,23 @@
     await prijediNaGostujucuSesiju();
     await osvjeziSocketIdentitet().catch(() => {});
     invalidirajProfil();
+    invalidirajNaslovnicaSazetak();
     window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
     window.location.assign('/');
   }
 
   onMount(() => {
     const azurirajAvatar = (dogadaj: Event) => {
-      const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1 }>).detail;
-      azurirajAvatarProfila(detalji.avatarConfig);
+      const detalji = (dogadaj as CustomEvent<{ avatarConfig: AvatarConfigV1; avatarSlikaHash?: string | null }>).detail;
+      azurirajAvatarProfila(detalji.avatarConfig, detalji.avatarSlikaHash ?? null);
+      azurirajAvatarNaslovnice(detalji.avatarConfig, detalji.avatarSlikaHash ?? null);
     };
     const azurirajIdentitet = () => {
       invalidirajProfil();
+      // Uvijek invalidiraj sažetak — +page može biti unmountan izvan `/`.
+      invalidirajNaslovnicaSazetak();
+      // Na `/` +page forsira osvježenje; drugdje samo profil.
+      if ($page.url.pathname === '/') return;
       void osigurajProfil({ forsaj: true });
     };
     const naKlikIzvana = (dogadaj: MouseEvent) => {
@@ -75,7 +86,9 @@
     document.addEventListener('click', naKlikIzvana);
     document.addEventListener('keydown', naTipku);
 
-    void osigurajProfil();
+    // Na naslovnici dijeli GET /naslovnica/sazetak s +page; drugdje i dalje GET /profil.
+    if ($page.url.pathname === '/') void osigurajNaslovnicaSazetak();
+    else void osigurajProfil();
 
     return () => {
       window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);
@@ -134,6 +147,7 @@
                 <Avatar
                   avatarId={profil.avatarId}
                   avatarConfig={profil.avatarConfig}
+                  avatarSlikaHash={profil.avatarSlikaHash}
                   rang={profil.rang === 'Piskaralo' ? null : profil.rang}
                   gost={jeGost}
                   velicina={50}

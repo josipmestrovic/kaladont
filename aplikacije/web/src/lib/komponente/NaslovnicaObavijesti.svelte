@@ -12,6 +12,11 @@
     dohvatiStanjeSanducica,
     oznaciSanducicProcitane,
   } from '$lib/stanje-sanducica.svelte.js';
+  import {
+    osigurajNaslovnicaSazetak,
+    potrosiPocetnuListuObavijesti,
+    ukloniObavijestiIzNaslovnice,
+  } from '$lib/stanje-naslovnica.svelte.js';
 
   const DESKTOP_MQ = '(min-width: 1000px)';
   const LIMIT = 20;
@@ -63,6 +68,25 @@
     if (reset) {
       ucitavanje = true;
       greska = null;
+
+      // Prvi reset: iskoristi listu iz /naslovnica/sazetak ako je dostupna.
+      await osigurajNaslovnicaSazetak();
+      if (gen !== zahtjevGen || !aktivan) return;
+      const pocetna = potrosiPocetnuListuObavijesti();
+      if (pocetna) {
+        const stariId = poruke[indeks]?.id ?? null;
+        poruke = pocetna.poruke.filter((p) => !p.procitano);
+        sljedeciCursor = pocetna.sljedeciCursor;
+        if (stariId) {
+          const idx = poruke.findIndex((p) => p.id === stariId);
+          indeks = idx >= 0 ? idx : 0;
+        } else {
+          indeks = 0;
+        }
+        zadnjaRevizija = stanje.revizija;
+        ucitavanje = false;
+        return;
+      }
     } else {
       ucitavanjeStranice = true;
     }
@@ -135,6 +159,7 @@
     oznacavanjeId = poruka.id;
     try {
       await oznaciSanducicProcitane([poruka.id]);
+      ukloniObavijestiIzNaslovnice([poruka.id]);
       if (!aktivan) return;
       const stari = indeks;
       const ukupno = poruke.length;

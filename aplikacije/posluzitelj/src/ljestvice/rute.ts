@@ -4,30 +4,27 @@ import {
   jeNapredakMetrika,
   kanonskiModLjestvice,
   METRIKE_LJESTVICA,
-  METRIKE_NAPRETKA_LJESTVICA,
-  METRIKE_VREMENSKE_LJESTVICA,
   minimumIgaraZaRazdoblje,
   minimumPrihvacenihPotezaZaRazdoblje,
-  odaberiSazetakLjestvice,
   PRIKAZI_LJESTVICA,
   prozorOkoMjesta,
   RAZDOBLJA_LJESTVICA,
   VELICINA_PRIKAZA_LJESTVICE,
-  type KandidatSazetkaLjestvice,
   type MetrikaLjestvice,
   type MetrikaNapretkaLjestvice,
   type MetrikaVremenskaLjestvice,
   type OdgovorLjestvice,
-  type OdgovorSazetkaLjestvice,
   type PozicijaNaLjestvici,
   type RazdobljeLjestvice,
   type RedakLjestvice,
 } from 'zajednicko';
 import { konfiguracija } from '../konfiguracija.js';
+import { hashSlikeAvatara } from '../avatar/hash.js';
 import { pokusajIdentifikaciju, type ZahtjevSIgracem } from '../racuni/autentikacija.js';
 import { odgovorNajopasnijihRijeci } from './najopasnije-rijeci.js';
-import { dohvatiPoredakNapretka, pozicijaNapretka } from './servis-napredak.js';
+import { izgradiOdgovorSazetkaLjestvice } from './sazetak.js';
 import { dohvatiPoredak, obuhvatiRazdoblja, pozicijaIgraca, type Poredak, type StavkaPoretka } from './servis.js';
+import { dohvatiPoredakNapretka, pozicijaNapretka } from './servis-napredak.js';
 
 const ShemaUpitaLjestvice = z.object({
   // Stari mod parametri (2p/4p) se kanonski normaliziraju na Troboj — bez tihog miješanja metrika.
@@ -48,6 +45,7 @@ function uRedak(stavka: StavkaPoretka, mojId: string | null): RedakLjestvice {
     vrijednost: stavka.vrijednost,
     avatarId: stavka.avatarId,
     avatarConfig: stavka.avatarConfig,
+    avatarSlikaHash: hashSlikeAvatara(stavka.avatarConfig),
     avatarRevision: stavka.avatarRevision,
   };
 }
@@ -172,38 +170,7 @@ export async function registrirajLjestviceRute(app: FastifyInstance): Promise<vo
 
   app.get('/ljestvice/sazetak', { preHandler: pokusajIdentifikaciju }, async (zahtjev, odgovor) => {
     const mojId = (zahtjev as ZahtjevSIgracem).igrac?.id ?? null;
-    const sada = new Date();
-    const izracunatoU = sada.toISOString();
-    if (!mojId) {
-      const tijelo: OdgovorSazetkaLjestvice = { ok: true, status: { vrsta: 'neutralan' }, izracunatoU };
-      void odgovor.header('cache-control', 'private, no-store');
-      return tijelo;
-    }
-
-    const mod = kanonskiModLjestvice('tri_igraca');
-    const obuhvati = obuhvatiRazdoblja(sada, new Date(konfiguracija.LJESTVICE_POCETAK));
-    const kandidati: KandidatSazetkaLjestvice[] = [];
-
-    await Promise.all([
-      ...METRIKE_VREMENSKE_LJESTVICA.flatMap((metrika) =>
-        RAZDOBLJA_LJESTVICA.map(async (razdoblje) => {
-          const obuhvat = obuhvati[razdoblje];
-          if (obuhvat.zakljucano) return;
-          const poredak = await dohvatiPoredak(mod, metrika, razdoblje, obuhvat.od, obuhvat.doUpita, sada);
-          kandidati.push({ metrika, razdoblje, pozicija: pozicijaIgraca(poredak, mojId) });
-        }),
-      ),
-      ...METRIKE_NAPRETKA_LJESTVICA.map(async (metrika) => {
-        const poredak = await dohvatiPoredakNapretka(metrika, sada);
-        kandidati.push({ metrika, razdoblje: null, pozicija: pozicijaNapretka(poredak, mojId) });
-      }),
-    ]);
-
-    const tijelo: OdgovorSazetkaLjestvice = {
-      ok: true,
-      status: odaberiSazetakLjestvice(kandidati),
-      izracunatoU,
-    };
+    const tijelo = await izgradiOdgovorSazetkaLjestvice(mojId);
     void odgovor.header('cache-control', 'private, no-store');
     return tijelo;
   });
