@@ -13,5 +13,7 @@ export const load: LayoutServerLoad = () => {
   const ukljucen = url === DOPUSTENI_UMAMI_URL && websiteId.length > 0;
   return {
     umami: ukljucen ? { url, websiteId } : null,
+    /** Autoritativni runtime okoliš (isti digest staging/prod) — ADR-012; ne hostname. */
+    okruzenje: process.env.NODE_ENV ?? 'development',
   };
 };

@@ -56,6 +56,7 @@ import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 import { BotKontroler } from './bot/kontroler.js';
 import { ucitajKonfiguracijuBota } from './bot/konfiguracija-bota.js';
 import { konfiguracijaZaJavnuBrzu } from './bot/profili-bota.js';
+import { BotDebugPretplate } from './bot/bot-debug-pretplata.js';
 import { pragoviPopuneZaOkruzenje } from './red/raspored-popune.js';
 import { FondBotova, ucitajIdentiteteBotova } from './bot/fond.js';
 import { registrirajTrening } from './trening/servis-treninga.js';
@@ -451,6 +452,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     konfiguracija: postavkeBotova,
     okruzenje: konfiguracija.NODE_ENV,
     zapisi: (poruka, podaci) => app.log.warn(podaci, poruka),
+    dohvatiNadimak: (partijaId, igracId) => upravitelj.nadimakIgraca(partijaId, igracId),
   });
   const aktivneVeze = {
     dohvatiSocket: (igracId: string) => {
@@ -459,6 +461,14 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     },
     jeAktivnaVeza: (igracId: string, socketId: string) => registarVeza.dohvatiSocketId(igracId) === socketId,
   };
+  const botDebugPretplate = new BotDebugPretplate(
+    konfiguracija.NODE_ENV,
+    (igracId, zapis) => {
+      aktivneVeze.dohvatiSocket(igracId)?.emit('bot:debug:zapis', zapis);
+    },
+    (partijaId, igracId) => upravitelj.jeSudionikPartije(partijaId, igracId),
+  );
+  botKontroler.postaviBotDebugPretplate(botDebugPretplate);
   postaviVezeZaObavijestiDostignuca(aktivneVeze);
   postaviVezeZaSanducic(aktivneVeze);
   type VoditeljIzazova = ReturnType<typeof stvoriVoditeljIzazova>;
@@ -483,6 +493,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       naKonfiguracijuBotovaPartije: (partijaId, konfiguracija) => botKontroler.postaviKonfiguracijuPartije(partijaId, konfiguracija),
       naEliminacijuZaBotove: (partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId, razlog) => botKontroler.naEliminaciju(partijaId, kontekst, zrtvaId, bodZaId, sudionici, eliminacijaId, razlog),
       naPartijaZavrsila: (partijaId) => {
+        botDebugPretplate.ocistiPartiju(partijaId);
         sobaServis?.naPartijaZavrsila(partijaId);
         naJavnaPartijaZavrsila(partijaId);
         // Ne briši goalProgress/terminal odmah — soba još živi (resultsVisibleAt / 15 s hold).
@@ -759,8 +770,27 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
 
     upravitelj.registrirajHandlere(socket);
 
+    socket.on('bot:debug:pretplati', omotajSocketHandler(socket, 'bot:debug:pretplati', zapisSocketHandlerGreske, (payload: unknown) => {
+      if (konfiguracija.NODE_ENV !== 'staging') return;
+      const partijaId = typeof payload === 'object' && payload && 'partijaId' in payload
+        ? String((payload as { partijaId: unknown }).partijaId ?? '')
+        : '';
+      if (!partijaId) return;
+      const kontekst = upravitelj.kontekstPartije(partijaId);
+      botDebugPretplate.pretplati(partijaId, igracId, kontekst);
+    }));
+    socket.on('bot:debug:otkazi', omotajSocketHandler(socket, 'bot:debug:otkazi', zapisSocketHandlerGreske, (payload: unknown) => {
+      if (konfiguracija.NODE_ENV !== 'staging') return;
+      const partijaId = typeof payload === 'object' && payload && 'partijaId' in payload
+        ? String((payload as { partijaId: unknown }).partijaId ?? '')
+        : '';
+      if (!partijaId) return;
+      botDebugPretplate.otkazi(partijaId, igracId);
+    }));
+
     socket.on('disconnect', omotajSocketHandler(socket, 'disconnect', zapisSocketHandlerGreske, () => {
       metrike.zabiljeziPrekid();
+      botDebugPretplate.otkaziIgraca(igracId);
       registarVeza.ukloni(igracId, socket.id);
     }));
   });

@@ -104,7 +104,7 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   vjerojatnostNeznanjaUMalomSkupu: 0.1,
   maksimalnoOpcijaMalogSkupa: 3,
   vjerojatnostAgresivnosti: 0.3,
-  vjerojatnostShielda: 0.3,
+  vjerojatnostShielda: 0.6,
   prioritetPoolova: 'p2_p1',
   brziRazvoj: false,
   odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [0, 0], cetiri_igraca: [3_000, 3_000, 3_000] },

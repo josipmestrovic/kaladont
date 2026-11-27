@@ -39,7 +39,7 @@ export const POLUGE_PROFILA_BOTA: Readonly<Record<ProfilBotaIzazova, PolugeProfi
   },
   iskusni: {
     vjerojatnostAgresivnosti: 0.3,
-    vjerojatnostShielda: 0.3,
+    vjerojatnostShielda: 0.6,
     prioritetPoolova: 'p2_p1',
     vjerojatnostNeznanjaUMalomSkupu: 0.18,
     maksimalnoOpcijaMalogSkupa: 5,

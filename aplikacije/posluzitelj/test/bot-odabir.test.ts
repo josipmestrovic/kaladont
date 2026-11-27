@@ -832,7 +832,7 @@ describe('odabir riječi bota', () => {
     expect(parsano.verzija).toBe(VERZIJA_BOT_POLITIKE);
     expect(parsano.vjerojatnostNeznanjaUMalomSkupu).toBe(0.1);
     expect(parsano.vjerojatnostAgresivnosti).toBe(0.3);
-    expect(parsano.vjerojatnostShielda).toBe(0.3);
+    expect(parsano.vjerojatnostShielda).toBe(0.6);
     expect('vjerojatnostTaktickogPoteza' in parsano).toBe(false);
     expect(parsano.botoviDvoboj).toBe(true);
     expect('vjerojatnostNeznanjaPoSudjelovanju' in parsano).toBe(false);

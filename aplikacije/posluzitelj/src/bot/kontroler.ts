@@ -6,7 +6,7 @@
  * odvojen od odluke o riječi; bez namjernog izostanka.
  * PR07: odaberiPotez dobiva pravilnik + broj aktivnih; čekač dokaza ne dobiva reakciju ispadanja.
  */
-import type { BrzaPoruka, KontekstPartije } from 'zajednicko';
+import type { BrzaPoruka, KontekstPartije, ProfilBotaIzazova } from 'zajednicko';
 import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
 import type { KonfiguracijaBota } from './konfiguracija-bota.js';
@@ -22,6 +22,9 @@ import {
   type Rng,
   type StanjeBotaUPartiji,
 } from './odabir-rijeci.js';
+import { stvoriBotDebugTrag, type BotDebugTrag } from './bot-debug-trag.js';
+import type { BotDebugPretplate } from './bot-debug-pretplata.js';
+import { POLUGE_PROFILA_BOTA } from './profili-bota.js';
 import {
   igriviKandidatiIzRepertoara,
   poznatiNastavciIzRepertoara,
@@ -94,6 +97,7 @@ export interface OvisnostiBotKontrolera {
   naAktivnost?: (igracId: string) => void;
   /** NODE_ENV; staging uključuje QA tempo bez roka (3 s / 0,2 s). */
   okruzenje?: string;
+  dohvatiNadimak?: (partijaId: string, igracId: string) => string;
 }
 
 export interface BrojaciBota {
@@ -164,6 +168,9 @@ export class BotKontroler {
   private readonly predajKontrolu: () => Promise<void>;
   private readonly zapisi: (poruka: string, podaci: Record<string, unknown>) => void;
   private readonly okruzenje: string;
+  /** Aktivan debug trag po partiji+turnToken (oporavci dijele isti trag). */
+  private readonly debugTragovi = new Map<string, BotDebugTrag>();
+  private botDebugPretplate: BotDebugPretplate | null = null;
   private zaustavljen = false;
   private generacijaPosla = 0;
   readonly brojaci: BrojaciBota = {
@@ -205,6 +212,11 @@ export class BotKontroler {
   dohvatiKonfiguracijuPartije(partijaId: string): KonfiguracijaBota | null {
     const snimka = this.konfiguracijePartija.get(partijaId);
     return snimka ? structuredClone(snimka) : null;
+  }
+
+  /** Staging: veže pretplate nakon što motor postoji (izbjegava kružnu ovisnost). */
+  postaviBotDebugPretplate(pretplate: BotDebugPretplate | null): void {
+    this.botDebugPretplate = pretplate;
   }
 
   private osigurajKonfiguracijuPartije(partijaId: string): KonfiguracijaBota {
@@ -669,6 +681,70 @@ export class BotKontroler {
     this.odluke.set(partijaId, { turnToken, odluka, verzijaRjecnika });
   }
 
+  private kljucDebugTraga(partijaId: string, turnToken: string): string {
+    return `${partijaId}:${turnToken}`;
+  }
+
+  private osigurajDebugTrag(dogadaj: DogadajPoteza, oporavak: boolean): BotDebugTrag {
+    const kljuc = this.kljucDebugTraga(dogadaj.partijaId, dogadaj.turnToken);
+    const postojeci = this.debugTragovi.get(kljuc);
+    if (postojeci) {
+      if (oporavak && postojeci.aktivan) postojeci.zapisiPosebno('oporavak');
+      return postojeci;
+    }
+    const ukljuci = !!this.botDebugPretplate?.imaPretplatnika(dogadaj.partijaId)
+      && dogadaj.kontekst !== 'privatna';
+    const trag = stvoriBotDebugTrag(ukljuci);
+    this.debugTragovi.set(kljuc, trag);
+    if (oporavak && trag.aktivan) trag.zapisiPosebno('oporavak');
+    return trag;
+  }
+
+  private profilZaKonfig(konfig: KonfiguracijaBota): ProfilBotaIzazova {
+    for (const [id, poluge] of Object.entries(POLUGE_PROFILA_BOTA) as Array<[ProfilBotaIzazova, typeof POLUGE_PROFILA_BOTA[ProfilBotaIzazova]]>) {
+      if (
+        poluge.vjerojatnostAgresivnosti === konfig.vjerojatnostAgresivnosti
+        && poluge.vjerojatnostShielda === konfig.vjerojatnostShielda
+        && poluge.prioritetPoolova === konfig.prioritetPoolova
+      ) {
+        return id;
+      }
+    }
+    return 'iskusni';
+  }
+
+  private objaviDebugZapis(
+    dogadaj: DogadajPoteza,
+    igracId: string,
+    trag: BotDebugTrag,
+    pokusaj: number,
+  ): void {
+    try {
+      const pretplate = this.botDebugPretplate;
+      if (!pretplate || !trag.aktivan) return;
+      const poolovi = this.ovisnosti.rjecnik.pooloviBotova();
+      const zapis = trag.izgradiZapis({
+        partijaId: dogadaj.partijaId,
+        igracId,
+        nadimak: this.ovisnosti.dohvatiNadimak?.(dogadaj.partijaId, igracId) ?? igracId,
+        profil: this.profilZaKonfig(this.osigurajKonfiguracijuPartije(dogadaj.partijaId)),
+        redniBrojPoteza: this.stanjeBota(dogadaj.partijaId, igracId).brojPoteza,
+        turnToken: dogadaj.turnToken,
+        brojAktivnih: dogadaj.sudionici.filter((s) => s.aktivan).length,
+        trazenaSlova: dogadaj.trazenaSlova ?? '',
+        verzijaRjecnika: this.ovisnosti.rjecnik.verzijaRjecnika(),
+        generacijaPoolova: poolovi.generacija,
+        pokusaj,
+      });
+      if (zapis) pretplate.objavi(dogadaj.partijaId, zapis);
+    } catch (greska) {
+      this.zapisi('Bot debug emit nije uspio', {
+        partijaId: dogadaj.partijaId,
+        greska: greska instanceof Error ? greska.message : String(greska),
+      });
+    }
+  }
+
   private async odluciNastavivo(
     dogadaj: DogadajPoteza,
     stanjeBota: StanjeBotaUPartiji,
@@ -682,6 +758,8 @@ export class BotKontroler {
     const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const prethodna = this.odluke.get(dogadaj.partijaId);
     const ista = prethodna?.turnToken === dogadaj.turnToken ? prethodna : undefined;
+    const trag = this.osigurajDebugTrag(dogadaj, ista !== undefined && odbijene.size > 0);
+    const t0 = this.sada();
     if (ista?.odluka.vrsta === 'odustani' && zadrziOdustaniPriPromjeniVerzije(ista.odluka)) {
       return ista.odluka;
     }
@@ -691,20 +769,30 @@ export class BotKontroler {
         razlog: 'namjerni_propust',
         razlogInterni: 'bot_duel_limit',
       };
+      trag.zapisiPosebno('bot_duel_limit');
+      trag.zapisiTrajanjeIzracuna(this.sada() - t0);
       this.zabiljeziOdluku(forsiran, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
       return forsiran;
     }
     // nema_rijeci: samo uz istu verziju rječnika — inače ponovni izračun (nova riječ nakon refresh-a).
     if (ista?.odluka.vrsta === 'odustani' && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
+    if (ista && ista.verzijaRjecnika !== verzijaRjecnika && trag.aktivan) {
+      trag.zapisiPosebno('ponovni_izracun_rjecnika');
+    }
     if (dogadaj.trazenaSlova === 'ka' && !odbijene.has('kaladont')) {
       stanjeBota.brojKandidata = 1;
       const kaladont: OdlukaBota = { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
+      trag.zapisiPosebno('primljeni_ka');
+      trag.zapisiIzvor('kaladont', 'kaladont');
+      trag.zapisiTrajanjeIzracuna(this.sada() - t0);
       this.zabiljeziOdluku(kaladont, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
       return kaladont;
     }
     if (dogadaj.trazenaSlova === 'ka' && odbijene.has('kaladont')) {
       const odustani: OdlukaBota = { vrsta: 'odustani', razlog: 'nema_rijeci' };
+      trag.zapisiPosebno('nema_rijeci');
+      trag.zapisiTrajanjeIzracuna(this.sada() - t0);
       this.zabiljeziOdluku(odustani, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
       return odustani;
     }
@@ -749,8 +837,16 @@ export class BotKontroler {
       odbijeneRijeci: odbijene,
       predmemorija,
       verzijaRjecnika,
+      debugTrag: trag.aktivan ? trag : undefined,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng, predaj, aktivan);
-    if (!odluka || !aktivan()) return odluka;
+    trag.zapisiTrajanjeIzracuna(this.sada() - t0);
+    if (!odluka || !aktivan()) {
+      if (!odluka && trag.aktivan) {
+        trag.zapisiPosebno('otkazan_zastarjeli');
+        trag.zapisiIshod('otkazan');
+      }
+      return odluka;
+    }
     this.zabiljeziOdluku(odluka, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
     return odluka;
   }
@@ -773,21 +869,44 @@ export class BotKontroler {
       this.oporavi(dogadaj, igracId, pokusaj, odbijene, greska);
       return;
     }
+    const trag = this.debugTragovi.get(this.kljucDebugTraga(dogadaj.partijaId, turnToken));
     if (rezultat.ishod === 'prihvacen') {
       this.ovisnosti.naAktivnost?.(igracId);
       if (this.aktualniPotezi.has(dogadaj.partijaId)) this.dovrseniTokeni.set(dogadaj.partijaId, turnToken);
       if (odluka.vrsta === 'rijec') this.brojaci.odigranihRijeci += 1;
       else if (odluka.razlog === 'namjerni_propust') this.brojaci.namjernihPropusta += 1;
       else this.brojaci.bezRijeci += 1;
+      if (trag) {
+        trag.zapisiIshod(odluka.vrsta === 'odustani' ? 'odustani' : 'prihvacen');
+        this.objaviDebugZapis(dogadaj, igracId, trag, pokusaj);
+        this.debugTragovi.delete(this.kljucDebugTraga(dogadaj.partijaId, turnToken));
+      }
       return;
     }
     if (rezultat.ishod === 'ignoriran') {
       this.brojaci.zastarjelo += 1;
+      if (trag) {
+        trag.zapisiIshod('ignoriran');
+        trag.zapisiPosebno('otkazan_zastarjeli');
+        this.objaviDebugZapis(dogadaj, igracId, trag, pokusaj);
+        this.debugTragovi.delete(this.kljucDebugTraga(dogadaj.partijaId, turnToken));
+      }
       return;
     }
     if (rezultat.kod === 'STARI_TURN_TOKEN' || rezultat.kod === 'NIJE_TVOJ_POTEZ' || rezultat.kod === 'SUSTAV_BIRA_RIJEC') {
       this.brojaci.zastarjelo += 1;
+      if (trag) {
+        trag.zapisiIshod('otkazan');
+        trag.zapisiPosebno('otkazan_zastarjeli');
+        this.objaviDebugZapis(dogadaj, igracId, trag, pokusaj);
+        this.debugTragovi.delete(this.kljucDebugTraga(dogadaj.partijaId, turnToken));
+      }
       return;
+    }
+    if (trag) {
+      trag.zapisiIshod('odbijen');
+      this.objaviDebugZapis(dogadaj, igracId, trag, pokusaj);
+      // Zadrži trag za oporavak istog tokena (novi pokušaj se dodaje).
     }
     if (odluka.vrsta === 'rijec') odbijene.add(odluka.rijec);
     this.oporavi(dogadaj, igracId, pokusaj, odbijene, new Error(`Botova naredba odbijena: ${rezultat.kod}`));

@@ -623,6 +623,92 @@ export type PotvrdaIzazova = (ishod:
   | { rezerviran: false; kod: KodGreske; poruka: string }
 ) => void;
 
+/** Staging-only: pretplata na bot debug zapise jedne partije. */
+export interface PayloadBotDebugPretplata {
+  partijaId: string;
+}
+
+export type BotDebugIzvorRijeci = 'pool_1' | 'pool_2' | 'obicni' | 'kaladont';
+
+export type BotDebugRazlogPreskoka =
+  | 'odbijena_motorom'
+  | 'nije_aktivna'
+  | 'grupa_potrosena'
+  | 'nedopustena_vrsta'
+  | 'shield_prijetnja'
+  | 'nelegalan';
+
+export type BotDebugStatusPoola = 'razmatran' | 'nije_razmatran' | 'prazan';
+
+export interface BotDebugKandidatDetalj {
+  rijec: string;
+  razlog?: BotDebugRazlogPreskoka;
+  prijetnja?: string;
+}
+
+export interface BotDebugPoolSloj {
+  pool: 'pool_1' | 'pool_2';
+  status: BotDebugStatusPoola;
+  pregledano: number;
+  legalnih: number;
+  sigurnih: number;
+  rizicnih: number;
+  detalji: BotDebugKandidatDetalj[];
+  poruka: string;
+}
+
+export interface BotDebugZapis {
+  verzija: 1;
+  partijaId: string;
+  igracId: string;
+  nadimak: string;
+  profil: string;
+  redniBrojPoteza: number;
+  turnToken: string;
+  brojAktivnih: number;
+  trazenaSlova: string;
+  verzijaRjecnika?: number;
+  generacijaPoolova?: number;
+  agresivnost: {
+    vjerojatnost: number;
+    aktivirana: boolean;
+    roll?: number;
+    prioritet: 'p2_p1' | 'p1_p2';
+    poolovi: BotDebugPoolSloj[];
+    odabrana?: string;
+    razlogPrelaska?: string;
+  };
+  shield: {
+    vjerojatnost: number;
+    primjenjiv: boolean;
+    aktiviran: boolean;
+    roll?: number;
+    utjecao: boolean;
+    sigurnih: number;
+    rizicnih: number;
+    rizicniDetalji: BotDebugKandidatDetalj[];
+    rizicniFallback: boolean;
+    poruke: string[];
+  };
+  posebnaOdluka?:
+    | 'namjerni_propust'
+    | 'nema_rijeci'
+    | 'bot_duel_limit'
+    | 'primljeni_ka'
+    | 'oporavak'
+    | 'ponovni_izracun_rjecnika'
+    | 'otkazan_zastarjeli';
+  rezultat: {
+    rijec?: string;
+    izvor?: BotDebugIzvorRijeci;
+    ishodMotora?: 'prihvacen' | 'odbijen' | 'ignoriran' | 'odustani' | 'otkazan';
+    eliminacija?: boolean;
+    trajanjeIzracunaMs?: number;
+  };
+  pokusaj: number;
+  linije: string[];
+}
+
 /** Mapa svih događaja klijent -> poslužitelj, za tipiziranu upotrebu Socket.IO. */
 export interface DogadajiKlijentPoslužitelj {
   'red:udji': (payload: PayloadUdjiURed | undefined, potvrda?: PotvrdaUlaskaURed) => void;
@@ -633,6 +719,9 @@ export interface DogadajiKlijentPoslužitelj {
   'red:stanje': (payload?: PayloadUdjiURed) => void;
   'red:izadji': () => void;
   'partija:izadji': () => void;
+  /** Staging-only bot debug pretplata (ignorira se izvan staginga). */
+  'bot:debug:pretplati': (payload: PayloadBotDebugPretplata) => void;
+  'bot:debug:otkazi': (payload: PayloadBotDebugPretplata) => void;
   'partija:stanje': (
     payload?: { partijaId?: string; requestId?: string },
     /** Klasični ACK ili socket.timeout `(err, odgovor)` — labavo zbog Socket.IO timeout overloada. */
@@ -680,5 +769,7 @@ export interface DogadajiPosluziteljKlijent {
   'soba:vlasnik-napustio': (payload: { kod: string }) => void;
   'soba:izbacen': (payload: { kod: string }) => void;
   'veza:zatvorena': (payload: ZatvaranjeVeze) => void;
+  /** Staging-only: stvarni zapis odluke bota za pretplatnike partije. */
+  'bot:debug:zapis': (payload: BotDebugZapis) => void;
   greska: (payload: PayloadGreska) => void;
 }

@@ -4158,6 +4158,16 @@ export function stvoriUpraviteljPartija(
     naredbaBota,
     mozePokrenutiPartiju: () => !zaustavljanje,
     nadimak,
+    nadimakIgraca: (partijaId: string, igracId: string) => {
+      const stanje = partije.get(partijaId);
+      return stanje ? nadimak(stanje, igracId) : igracId;
+    },
+    kontekstPartije: (partijaId: string) => partije.get(partijaId)?.kontekst ?? null,
+    jeSudionikPartije: (partijaId: string, igracId: string) => {
+      const stanje = partije.get(partijaId);
+      return Boolean(stanje?.sudionici.some((s) => s.igracId === igracId));
+    },
+    partijaIdZaIgraca: (igracId: string) => partijaPoIgracu.get(igracId) ?? null,
     imaAktivnuPartiju: (igracId: string) => {
       const partijaId = partijaPoIgracu.get(igracId);
       const stanje = partijaId ? partije.get(partijaId) : undefined;

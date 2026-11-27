@@ -19,7 +19,7 @@ describe('profili bota (PR02)', () => {
     expect(konfiguracija.vjerojatnostShielda).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostShielda);
     expect(POLUGE_PROFILA_BOTA.iskusni).toEqual({
       vjerojatnostAgresivnosti: 0.3,
-      vjerojatnostShielda: 0.3,
+      vjerojatnostShielda: 0.6,
       prioritetPoolova: 'p2_p1',
       vjerojatnostNeznanjaUMalomSkupu: 0.18,
       maksimalnoOpcijaMalogSkupa: 5,
@@ -91,7 +91,7 @@ describe('profili bota (PR02)', () => {
 
     const konfig = konfiguracijaZaJavnuBrzu(baza);
     expect(konfig.vjerojatnostAgresivnosti).toBe(0.3);
-    expect(konfig.vjerojatnostShielda).toBe(0.3);
+    expect(konfig.vjerojatnostShielda).toBe(0.6);
     expect(konfig.prioritetPoolova).toBe('p2_p1');
     expect(konfig.vjerojatnostNeznanjaUMalomSkupu).toBe(0.18);
     expect(konfig.maksimalnoOpcijaMalogSkupa).toBe(5);
