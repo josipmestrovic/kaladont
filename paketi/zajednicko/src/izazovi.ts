@@ -85,7 +85,7 @@ export const VARIJANTE_IZAZOVA = [
 
 export const NAZIVI_FORMATA_IZAZOVA: Readonly<Record<FormatIzazova, string>> = {
   DV: 'Dvoboj',
-  TR: 'Brza igra',
+  TR: 'Troboj',
   CE: 'Četveroboj',
 };
 

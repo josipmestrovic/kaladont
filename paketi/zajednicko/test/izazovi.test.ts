@@ -15,6 +15,7 @@ import {
   jePoznatiProfilBota,
   KATALOG_IZAZOVA,
   levelDostupan,
+  NAZIVI_FORMATA_IZAZOVA,
   PRAG_DUGE_RIJECI_IZAZOVA,
   sekundiBrzogPotezaIzazova,
   UKUPNI_NOMINALNI_XP_IZAZOVA,
@@ -24,6 +25,14 @@ import {
 } from '../src/izazovi.js';
 
 describe('katalog izazova v3', () => {
+  it('format TR u Izazovima zove se Troboj, ne Brza igra', () => {
+    expect(NAZIVI_FORMATA_IZAZOVA).toEqual({
+      DV: 'Dvoboj',
+      TR: 'Troboj',
+      CE: 'Četveroboj',
+    });
+  });
+
   it('validira 60 definicija, fond XP i verziju', () => {
     expect(() => validirajKatalogIzazova()).not.toThrow();
     expect(KATALOG_IZAZOVA).toHaveLength(60);
