@@ -118,7 +118,7 @@
             </tr>
             <tr>
               <th scope="row">Zagrijavanje</th>
-              <td data-label="Tko igra">Ti + 1 ili 2 Računala (ovisno o pravilniku)</td>
+              <td data-label="Tko igra">Ti + 1 do 3 Računala (Klasični pravilnik)</td>
               <td data-label="Bodovi i rang">Ne</td>
               <td data-label="Dostignuća">Djelomično</td>
             </tr>

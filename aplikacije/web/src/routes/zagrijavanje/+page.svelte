@@ -7,41 +7,29 @@
   import { dohvatiStanjeIgre, pokreniSlusateljeIgre } from '$lib/stanje-igre.svelte.js';
   import { aktivirajAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import {
-    jePoznatiPravilnik,
     NAZIVI_PROFILA_BOTA,
     type PocetakPartije,
     type PotvrdaTreninga,
-    type PravilnikPartije,
     type ProfilBotaIzazova,
     type RundaOtvorena,
     type StanjePartije,
   } from 'zajednicko';
-  import { parsajProfilIzQuery, TEKSTOVI_PRAVILNIKA } from '$lib/igraj-rute.js';
+  import { parsajProfilIzQuery } from '$lib/igraj-rute.js';
   import TreningMeta from '$lib/komponente/TreningMeta.svelte';
 
   const igra = dohvatiStanjeIgre();
   const savjeti = dohvatiSavjete('dva_igraca');
+  const PRAVILNIK_TRENINGA = 'klasicni' as const;
 
-  /** Glavni UI: ?botovi=1|2|3&profil=. Misije / stari linkovi: ?pravila=. */
+  /** Glavni UI: ?botovi=1|2|3&profil=. Stari ?pravila= se ignorira (ADR-019 → klasicni). */
   const trazeniBotovi = $derived(((): 1 | 2 | 3 | null => {
     const sirovo = $page.url.searchParams.get('botovi');
     if (sirovo === '1' || sirovo === '2' || sirovo === '3') return Number(sirovo) as 1 | 2 | 3;
     return null;
   })());
-  const trazenaPravila = $derived(((): PravilnikPartije | null => {
-    const pravila = $page.url.searchParams.get('pravila');
-    return jePoznatiPravilnik(pravila) ? pravila : null;
-  })());
   const trazeniProfil = $derived(parsajProfilIzQuery($page.url.searchParams.get('profil')));
   const nazivProfila = $derived(NAZIVI_PROFILA_BOTA[trazeniProfil]);
-  const nazivPravila = $derived(
-    trazenaPravila ? TEKSTOVI_PRAVILNIKA[trazenaPravila].naziv : null,
-  );
-  const tekstPripreme = $derived(
-    nazivPravila
-      ? `Pripremamo trening · ${nazivPravila} · ${nazivProfila}…`
-      : `Pripremamo trening · ${nazivProfila}…`,
-  );
+  const tekstPripreme = $derived(`Pripremamo trening · ${nazivProfila}…`);
 
   let poruka = $state<string | null>(null);
   let pokretanjeUTijeku = $state(false);
@@ -77,15 +65,15 @@
       poruka = ishod.poruka;
     };
     const profileId: ProfilBotaIzazova = trazeniProfil;
-    if (trazeniBotovi && trazenaPravila) {
-      socket.emit('trening:zapocni', { pravila: trazenaPravila, brojRacunala: trazeniBotovi, profileId }, potvrda);
-    } else if (trazeniBotovi) {
-      socket.emit('trening:zapocni', { brojRacunala: trazeniBotovi, profileId }, potvrda);
-    } else if (trazenaPravila) {
-      socket.emit('trening:zapocni', { pravila: trazenaPravila, profileId }, potvrda);
+    if (trazeniBotovi) {
+      socket.emit(
+        'trening:zapocni',
+        { pravila: PRAVILNIK_TRENINGA, brojRacunala: trazeniBotovi, profileId },
+        potvrda,
+      );
     } else {
-      // Stari klijent / prazan URL — server defaulta na Iskusni.
-      socket.emit('trening:zapocni', potvrda);
+      // Stari URL bez botovi — server forsira klasicni + 1 bot + Iskusni ako nema profila.
+      socket.emit('trening:zapocni', { pravila: PRAVILNIK_TRENINGA, profileId }, potvrda);
     }
   }
 
@@ -134,7 +122,7 @@
     </div>
   {:else}
     <h1 aria-live="polite">{tekstPripreme}</h1>
-    <TreningMeta pravila={trazenaPravila} profileId={trazeniProfil} />
+    <TreningMeta pravila={PRAVILNIK_TRENINGA} profileId={trazeniProfil} />
     <p class="napomena">Ovo je trening. XP, kolekcija i dostignuća riječi se bilježe, ali bez bodova, ranga, forme i ljestvice. Registriranim igračima pobjeda broji dostignuće Zagrijan.</p>
     <a href="/" class="sporedni-gumb">Odustani</a>
   {/if}

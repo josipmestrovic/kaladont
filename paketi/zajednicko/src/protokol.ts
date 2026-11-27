@@ -587,9 +587,13 @@ export interface PayloadUdjiURed {
 }
 
 export interface PayloadTreningZapocni {
-  /** Izostanak = ka_zna (ili klasicni ako je brojRacunala ≥ 2). */
+  /**
+   * ADR-019: Trening koristi isključivo Klasični.
+   * Izostanak / `ka_zna` / `dokazi_nastavak` → poslužitelj normalizira na `klasicni`.
+   * Nepoznate vrijednosti i dalje padaju na validaciji.
+   */
   pravila?: PravilnikPartije;
-  /** 1 = Dvoboj, 2 = Troboj, 3 = Četveroboj. Izostanak → iz pravilnika (klasični = 2, ostalo = 1). */
+  /** 1 = Dvoboj, 2 = Troboj, 3 = Četveroboj. Izostanak = 1 (ne ovisi o pravilniku). */
   brojRacunala?: 1 | 2 | 3;
   /** PR02: Početnik/Iskusni/Majstor/Velemajstor. Izostanak = Iskusni (stari klijent). */
   profileId?: import('./izazovi.js').ProfilBotaIzazova;

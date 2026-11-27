@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
 import {
   definicijaIzazova,
+  KATALOG_IZAZOVA,
   type KrajPartije,
   type PocetakPartije,
   type PravilnikPartije,
@@ -130,6 +131,10 @@ describe('Izazov PR03 — evaluacija (čista)', () => {
     expect(ok.stop).toBe(false);
     expect(ok.cinjenice.dugeRijeci).toBe(1);
     expect(ok.cinjenice.zavrsioNaKa).toBe(false);
+  });
+
+  it('katalog v3: svi izazovi koriste klasicni pravilnik', () => {
+    expect(KATALOG_IZAZOVA.every((d) => d.pravila === 'klasicni')).toBe(true);
   });
 });
 
@@ -262,7 +267,7 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
     });
   }
 
-  async function pokreniIzazov(challengeId: 'IZ-L1-DV-01' | 'IZ-L1-DV-03' | 'IZ-L1-DV-04' | 'IZ-L1-TR-02' = 'IZ-L1-DV-01'): Promise<{
+  async function pokreniIzazov(challengeId: 'IZ-L1-DV-01' | 'IZ-L1-DV-03' | 'IZ-L1-DV-04' | 'IZ-L1-DV-05' | 'IZ-L1-TR-02' = 'IZ-L1-DV-01'): Promise<{
     socket: ClientSocket;
     igracId: string;
     token: string;
@@ -430,6 +435,38 @@ describe('Izazov PR03 — motor start, timer, rani stop', () => {
       sat.unaprijedi(2);
       const elim = await elimPromise;
       expect(elim.razlog).toBe('istek');
+    } finally {
+      socket.disconnect();
+    }
+  });
+
+  it('finale: botova riječ na ka ne forsira zavrsio_na_ka (samo čovjek)', async () => {
+    const { socket, igracId, partijaId, pocetak } = await pokreniIzazov('IZ-L1-DV-05');
+    try {
+      expect(definicijaIzazova('IZ-L1-DV-05').ciljevi.bezZavrsavanjaNaKa).toBe(true);
+      const bot = pocetak.sjedala.find((s) => s.jeBot);
+      expect(bot).toBeTruthy();
+      const voditelj = posluzitelj.voditeljIzazova!;
+      const botStop = voditelj.naPrihvacenPotez({
+        partijaId,
+        igracId: bot!.igracId,
+        rijecNormalizirana: 'banka',
+        brojGrafema: 5,
+        frekvencija: 10,
+        uspjesanDokaz: false,
+      });
+      expect(botStop.zaustavi).toBe(false);
+
+      const covjekStop = voditelj.naPrihvacenPotez({
+        partijaId,
+        igracId,
+        rijecNormalizirana: 'banka',
+        brojGrafema: 5,
+        frekvencija: 10,
+        uspjesanDokaz: false,
+      });
+      expect(covjekStop.zaustavi).toBe(true);
+      if (covjekStop.zaustavi) expect(covjekStop.razlog).toBe('zavrsio_na_ka');
     } finally {
       socket.disconnect();
     }

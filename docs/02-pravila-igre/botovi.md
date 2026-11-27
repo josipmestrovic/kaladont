@@ -78,7 +78,7 @@ Postavke se učitavaju jednom pri pokretanju procesa. Ako trajni zapis još ne p
 
 - Trening / Izazovi: fiksna imena protivnika po težini (npr. Početnik → BOTINI/BOTULJAK/BOTONJA); oznake težina u UI ostaju Početnik/Iskusni/Majstor/Velemajstor. Privremeni `racunalo-*` ID-evi; ista imena dijele iste WebP ilustracije kao javni botovi. Dostupno gostima i registriranima.
 - Pokreće se odmah, bez javnog reda i bez trošenja javnog fonda botova. Igrač može imati samo jedan aktivni kontekst igranja (red, soba, partija ili trening).
-- Pravila valjanosti i eliminacije prate odabrani pravilnik; trening nema timer poteza. Bot odigrava nakon ~4 s (±0,3 s), kao i ostali botovi (tempo v5).
+- Pravila valjanosti i eliminacije prate **Klasični** pravilnik ([ADR-019](../03-arhitektura/odluke/019-trening-samo-klasicni.md)); trening nema timer poteza. Bot odigrava nakon ~4 s (±0,3 s), kao i ostali botovi (tempo v5).
 - Trening ne bilježi partiju, poteze ni natjecateljski napredak: nema bodova, XP-a, ranga, forme, nizova, kolekcije riječi ni općih dostignuća. Gostu i privremenom botu ne sprema se ništa.
 - Registrirani čovjek koji prirodno pobijedi dobiva napredak dostignuća **Zagrijan** na 1, 5, 20, 50 i 100 trening pobjeda. Ne dodjeljuje se pri izlasku, porazu, tehničkom prekidu ili neaktivnosti. Gosti nemaju dostignuće Zagrijan.
 - Neaktivni trening upozorava nakon 4 minute i tehnički se zatvara nakon 5 minuta bez ljudskog prihvaćenog poteza ili izričitog nastavka. Otkucaji veze i potezi Računala ne resetiraju neaktivnost. Zatvaranje nije pobjeda ni poraz.

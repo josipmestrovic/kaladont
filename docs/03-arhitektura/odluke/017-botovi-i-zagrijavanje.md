@@ -1,6 +1,6 @@
 # ADR-017: Serverski botovi za popunu reda i trening „Zagrijavanje”
 
-- **Status:** prihvaćen (djelomično nadograđen 2026-11-11: botovi više nisu na ljestvicama/javnim profilima; aktivni fond bez gost-botova; vizualna transparentnost namjenskim avatarima)
+- **Status:** djelomično zamijenjen [ADR-om 019](019-trening-samo-klasicni.md) (odabir pravilnika u Zagrijavanju); inače prihvaćen (djelomično nadograđen 2026-11-11: botovi više nisu na ljestvicama/javnim profilima; aktivni fond bez gost-botova; vizualna transparentnost namjenskim avatarima)
 - **Datum:** 2026-10-09
 - **Mijenja:** [ADR-008](008-bez-matchmakinga-u-mvp.md) (djelomično: ukida odluku „čeka se isključivo ljude”; zajednički red i strategija uparivanja ostaju)
 

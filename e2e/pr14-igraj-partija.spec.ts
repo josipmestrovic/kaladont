@@ -254,12 +254,12 @@ test('dokaz UI: uspjeh nakon odlaska čekača pokazuje ishod, ne samo prekid', a
   }
 });
 
-test('klasični trening ima dva Iskusna (3 sjedala)', async ({ page }) => {
+test('klasični trening bez botovi queryja ima jednog Iskusnog (2 sjedala)', async ({ page }) => {
+  // ADR-019: izostanak brojRacunala → 1 bot (više ne 2 iz legacy mapiranja).
   await page.goto('/zagrijavanje?pravila=klasicni');
   await expect(page).toHaveURL(/\/partija\/[0-9a-f-]+$/, { timeout: 20_000 });
-  await expect(page.locator('.igraci-red > li')).toHaveCount(3);
-  // Fiksna postava Iskusni: BOTANIČAR / BOTOGRAF / BOTOVNIK (UI: BOTaničar…).
-  await expect(page.locator('.igraci-red').getByText(/BOTaničar|BOTograf|BOTovnik/i)).toHaveCount(2);
+  await expect(page.locator('.igraci-red > li')).toHaveCount(2);
+  await expect(page.locator('.igraci-red').getByText(/BOTaničar/i)).toHaveCount(1);
   await expect(page.getByTestId('trening-meta')).toContainText('Trening');
   await expect(page.getByTestId('trening-meta')).toContainText('Klasični');
 });
