@@ -64,11 +64,13 @@ export function osvjeziGovornoOkruzenje(): void {
   });
 }
 
-/** SpeechSynthesis probe — samo kad je glas uključen ili se tek uključuje. */
+/** SpeechSynthesis probe — samo kad još nije provjereno ili se glas tek uključuje. */
 export function osigurajGovornoOkruzenje(): void {
   if (typeof window === 'undefined') return;
 
-  osvjeziGovornoOkruzenje();
+  if (!get(govornoOkruzenje).provjereno) {
+    osvjeziGovornoOkruzenje();
+  }
   if (!slusateljGlasovaRegistriran && window.speechSynthesis) {
     window.speechSynthesis.addEventListener('voiceschanged', osvjeziGovornoOkruzenje);
     slusateljGlasovaRegistriran = true;
@@ -118,8 +120,6 @@ export function izgovoriRijec(rijec: string): void {
     !('speechSynthesis' in window)
   ) return;
 
-  osigurajGovornoOkruzenje();
-
   try {
     const izgovor = new SpeechSynthesisUtterance(rijec);
     izgovor.lang = 'hr-HR';
@@ -140,4 +140,18 @@ export function zaustaviGovor(): void {
   } catch {
     // Čišćenje govora ne smije ometati napuštanje partije.
   }
+}
+
+/** Samo za testove — resetira listener flag. */
+export function __resetirajGlasZaTestove(): void {
+  slusateljGlasovaRegistriran = false;
+  glasUkljucen.set(false);
+  govornoOkruzenje.set({
+    provjereno: false,
+    podrzavaSintezu: false,
+    platforma: 'nepoznat sustav',
+    jeziciPreglednika: [],
+    jeziciGlasova: [],
+    hrvatskiGlas: false,
+  });
 }

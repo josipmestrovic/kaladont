@@ -41,14 +41,16 @@
   import {
     pripremiZavrsniEkranPartije,
     ucitajBotDebugPanel,
-    ucitajIskustvoPartije,
-    ucitajKaladontDnkPromjena,
     ucitajKonfeti,
-    ucitajNapredakMisijaPartije,
     ucitajPanelPrijavaIgraca,
-    ucitajPanelPrijavaRijeci,
-    ucitajRezultatIzazova,
+    ucitajZavrsneChunkove,
+    type RezultatZavrsnogChunka,
   } from '$lib/dinamicni-ucitavac.js';
+  import {
+    kriticniZavrsniChunkovi,
+    odaberiZavrsneChunkove,
+    type ZavrsniChunk,
+  } from '$lib/odaberi-zavrsne-chunkove.js';
   import type { Component } from 'svelte';
   import { profilIzNadimkaTreningBota, putanjaPonovneIgre } from '$lib/igraj-rute.js';
   import { povuciScroll } from '$lib/povuci-klizac.js';
@@ -1048,6 +1050,9 @@
   let PanelPrijavaIgracaKomponenta = $state<DinamicnaKomponenta | null>(null);
   let BotDebugPanelKomponenta = $state<DinamicnaKomponenta | null>(null);
   let botDebugUcitavanje = $state(false);
+  let panelIgracaUcitavanje = $state(false);
+  let zavrsniChunkGreske = $state<Partial<Record<ZavrsniChunk, boolean>>>({});
+  let zavrsniChunkUcitavanje = $state(false);
 
   function naBotDebugZapis(zapis: BotDebugZapis): void {
     if (zapis.partijaId !== partijaId) return;
@@ -1071,6 +1076,96 @@
       // Staging alat — tihi pad ne smije ometati partiju.
     } finally {
       botDebugUcitavanje = false;
+    }
+  }
+
+  async function otvoriPanelPrijavaIgraca(): Promise<void> {
+    if (PanelPrijavaIgracaKomponenta || panelIgracaUcitavanje) return;
+    panelIgracaUcitavanje = true;
+    try {
+      PanelPrijavaIgracaKomponenta = (await ucitajPanelPrijavaIgraca()) as DinamicnaKomponenta;
+      zavrsniChunkGreske = { ...zavrsniChunkGreske, panelIgraca: false };
+    } catch {
+      zavrsniChunkGreske = { ...zavrsniChunkGreske, panelIgraca: true };
+    } finally {
+      panelIgracaUcitavanje = false;
+    }
+  }
+
+  function primijeniZavrsneRezultate(rezultati: RezultatZavrsnogChunka[]): void {
+    const greske = { ...zavrsniChunkGreske };
+    for (const rezultat of rezultati) {
+      if (rezultat.komponenta) {
+        const komponenta = rezultat.komponenta as DinamicnaKomponenta;
+        switch (rezultat.chunk) {
+          case 'rezultatIzazova':
+            RezultatIzazovaKomponenta = komponenta;
+            break;
+          case 'iskustvo':
+            IskustvoPartijeKomponenta = komponenta;
+            break;
+          case 'misije':
+            NapredakMisijaKomponenta = komponenta;
+            break;
+          case 'dnk':
+            KaladontDnkKomponenta = komponenta;
+            break;
+          case 'panelRijeci':
+            PanelPrijavaRijeciKomponenta = komponenta;
+            break;
+          case 'panelIgraca':
+            PanelPrijavaIgracaKomponenta = komponenta;
+            break;
+        }
+        greske[rezultat.chunk] = false;
+      } else if (rezultat.greska) {
+        greske[rezultat.chunk] = true;
+      }
+    }
+    zavrsniChunkGreske = greske;
+  }
+
+  function ulazZavrsnihChunkova(predvidanje: boolean) {
+    const kraj = stanje.kraj;
+    return {
+      kontekst: kraj?.kontekst ?? stanje.kontekst,
+      imaXp: Boolean(kraj?.mojeIskustvo || kraj?.ukupnoIskustvo),
+      imaMisije: Boolean(kraj?.promjeneMisija && kraj.promjeneMisija.length > 0),
+      imaDnk: Boolean(kraj?.mojDnk),
+      imaIgraceZaPrijavu: igraciZaPrijavu.length > 0,
+      predvidanje,
+    };
+  }
+
+  async function ucitajOdabraneZavrsneChunkove(predvidanje: boolean, otkazano: () => boolean): Promise<void> {
+    const ulaz = ulazZavrsnihChunkova(predvidanje);
+    const chunkovi = odaberiZavrsneChunkove(ulaz);
+    if (chunkovi.size === 0) return;
+    zavrsniChunkUcitavanje = true;
+    try {
+      const rezultati = await ucitajZavrsneChunkove(chunkovi, { retry: 2 });
+      if (otkazano()) return;
+      primijeniZavrsneRezultate(rezultati);
+    } finally {
+      if (!otkazano()) zavrsniChunkUcitavanje = false;
+    }
+  }
+
+  async function ponoviKriticneZavrsneChunkove(): Promise<void> {
+    const ulaz = ulazZavrsnihChunkova(false);
+    const kriticni = [...kriticniZavrsniChunkovi(ulaz)].filter((chunk) => {
+      if (chunk === 'rezultatIzazova') return !RezultatIzazovaKomponenta;
+      if (chunk === 'iskustvo') return !IskustvoPartijeKomponenta;
+      if (chunk === 'panelRijeci') return !PanelPrijavaRijeciKomponenta;
+      return false;
+    });
+    if (kriticni.length === 0) return;
+    zavrsniChunkUcitavanje = true;
+    try {
+      const rezultati = await ucitajZavrsneChunkove(kriticni, { retry: 2 });
+      primijeniZavrsneRezultate(rezultati);
+    } finally {
+      zavrsniChunkUcitavanje = false;
     }
   }
 
@@ -1114,25 +1209,7 @@
     };
   });
 
-  async function dodijeliZavrsneKomponente(otkazano: () => boolean): Promise<void> {
-    const [rezultat, iskustvo, misije, dnk, panelRijeci, panelIgraca] = await Promise.all([
-      ucitajRezultatIzazova(),
-      ucitajIskustvoPartije(),
-      ucitajNapredakMisijaPartije(),
-      ucitajKaladontDnkPromjena(),
-      ucitajPanelPrijavaRijeci(),
-      ucitajPanelPrijavaIgraca(),
-    ]);
-    if (otkazano()) return;
-    RezultatIzazovaKomponenta = rezultat as DinamicnaKomponenta;
-    IskustvoPartijeKomponenta = iskustvo as DinamicnaKomponenta;
-    NapredakMisijaKomponenta = misije as DinamicnaKomponenta;
-    KaladontDnkKomponenta = dnk as DinamicnaKomponenta;
-    PanelPrijavaRijeciKomponenta = panelRijeci as DinamicnaKomponenta;
-    PanelPrijavaIgracaKomponenta = panelIgraca as DinamicnaKomponenta;
-  }
-
-  // Konfeti + završni ekran: pripremi chunkove tijekom aktivne partije.
+  // Konfeti + mode-aware preload tijekom aktivne partije.
   onMount(() => {
     void ucitajKonfeti()
       .then((k) => {
@@ -1150,8 +1227,10 @@
         ? cancelIdleCallback
         : (id: number) => clearTimeout(id);
     const idleId = idle(() => {
-      void pripremiZavrsniEkranPartije({ izazov: true, dnk: true })
-        .then(() => dodijeliZavrsneKomponente(() => otkazano))
+      void pripremiZavrsniEkranPartije(ulazZavrsnihChunkova(true))
+        .then((rezultati) => {
+          if (!otkazano) primijeniZavrsneRezultate(rezultati);
+        })
         .catch(() => {});
     });
     return () => {
@@ -1160,19 +1239,11 @@
     };
   });
 
-  // Ako kraj dođe prije preloada — učitaj odmah.
+  // Čim postoji kraj — učitaj mode-aware chunkove tijekom odgode prikaza.
   $effect(() => {
-    if (!stanje.kraj || !prikaziRezultate) return;
-    if (
-      IskustvoPartijeKomponenta &&
-      PanelPrijavaRijeciKomponenta &&
-      (!jeIzazov || RezultatIzazovaKomponenta) &&
-      (!stanje.kraj.mojDnk || KaladontDnkKomponenta)
-    ) {
-      return;
-    }
+    if (!stanje.kraj) return;
     let otkazano = false;
-    void dodijeliZavrsneKomponente(() => otkazano).catch(() => {});
+    void ucitajOdabraneZavrsneChunkove(false, () => otkazano).catch(() => {});
     return () => {
       otkazano = true;
     };
@@ -1876,6 +1947,15 @@
         mojIgracId={stanje.mojIgracId}
         {brojSanducicSazetka}
       />
+    {:else}
+      <section class="zavrsni-chunk-mjesto" aria-busy={zavrsniChunkUcitavanje} aria-live="polite">
+        {#if zavrsniChunkGreske.rezultatIzazova}
+          <p>Rezultat izazova nije učitan.</p>
+          <button type="button" onclick={() => void ponoviKriticneZavrsneChunkove()}>Pokušaj ponovo</button>
+        {:else}
+          <p>Učitavanje rezultata…</p>
+        {/if}
+      </section>
     {/if}
     {#if PanelPrijavaRijeciKomponenta}
       <PanelPrijavaRijeciKomponenta
@@ -1892,6 +1972,15 @@
         naOtvori={() => void ucitajPotezeZaPrijavu(false)}
         otvorenoPocetno={true}
       />
+    {:else}
+      <section class="zavrsni-chunk-mjesto" aria-busy={zavrsniChunkUcitavanje}>
+        {#if zavrsniChunkGreske.panelRijeci}
+          <p>Panel prijave riječi nije učitan.</p>
+          <button type="button" onclick={() => void ponoviKriticneZavrsneChunkove()}>Pokušaj ponovo</button>
+        {:else}
+          <p>Učitavanje prijave riječi…</p>
+        {/if}
+      </section>
     {/if}
     <div class="kraj-donje-praznine" aria-hidden="true"></div>
   {:else}
@@ -1967,6 +2056,15 @@
     <IskustvoPartijeKomponenta obracun={stanje.kraj.mojeIskustvo} ukupnoIskustvo={stanje.kraj.ukupnoIskustvo ?? null} />
   {:else if IskustvoPartijeKomponenta && stanje.kraj.ukupnoIskustvo}
     <IskustvoPartijeKomponenta ukupnoIskustvo={stanje.kraj.ukupnoIskustvo} />
+  {:else if stanje.kraj.mojeIskustvo || stanje.kraj.ukupnoIskustvo}
+    <section class="zavrsni-chunk-mjesto" aria-busy={zavrsniChunkUcitavanje} aria-live="polite">
+      {#if zavrsniChunkGreske.iskustvo}
+        <p>Pregled iskustva nije učitan.</p>
+        <button type="button" onclick={() => void ponoviKriticneZavrsneChunkove()}>Pokušaj ponovo</button>
+      {:else}
+        <p>Učitavanje iskustva…</p>
+      {/if}
+    </section>
   {/if}
   {#if NapredakMisijaKomponenta && stanje.kraj.promjeneMisija && stanje.kraj.promjeneMisija.length > 0}
     <NapredakMisijaKomponenta promjene={stanje.kraj.promjeneMisija} />
@@ -2169,9 +2267,36 @@
       naOtvori={() => void ucitajPotezeZaPrijavu(false)}
       otvorenoPocetno={true}
     />
+  {:else}
+    <section class="zavrsni-chunk-mjesto" aria-busy={zavrsniChunkUcitavanje}>
+      {#if zavrsniChunkGreske.panelRijeci}
+        <p>Panel prijave riječi nije učitan.</p>
+        <button type="button" onclick={() => void ponoviKriticneZavrsneChunkove()}>Pokušaj ponovo</button>
+      {:else}
+        <p>Učitavanje prijave riječi…</p>
+      {/if}
+    </section>
   {/if}
-  {#if !jeTrening && igraciZaPrijavu.length > 0 && PanelPrijavaIgracaKomponenta}
-    <PanelPrijavaIgracaKomponenta partijaId={partijaId!} igraci={igraciZaPrijavu} otvorenoPocetno={false} />
+  {#if !jeTrening && igraciZaPrijavu.length > 0}
+    {#if PanelPrijavaIgracaKomponenta}
+      <PanelPrijavaIgracaKomponenta partijaId={partijaId!} igraci={igraciZaPrijavu} otvorenoPocetno={true} />
+    {:else}
+      <section class="panel-prijava-igraca-ucitavanje">
+        <button
+          type="button"
+          class="naslov"
+          aria-expanded="false"
+          disabled={panelIgracaUcitavanje}
+          onclick={() => void otvoriPanelPrijavaIgraca()}
+        >
+          <span>Prijavi igrača radi pogrdnog nadimka</span>
+          <span aria-hidden="true">{panelIgracaUcitavanje ? '…' : '+'}</span>
+        </button>
+        {#if zavrsniChunkGreske.panelIgraca}
+          <p class="greska" role="alert">Panel nije učitan. Pokušaj ponovo.</p>
+        {/if}
+      </section>
+    {/if}
   {/if}
   <div class="kraj-donje-praznine" aria-hidden="true"></div>
   {/if}
@@ -4615,6 +4740,48 @@
     margin-bottom: 0;
   }
   .kraj-donje-praznine { height: 100px; }
+  .zavrsni-chunk-mjesto {
+    margin: 16px 0;
+    padding: 14px 16px;
+    min-height: 72px;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 10px;
+    background: var(--boja-povrsina-2);
+    color: var(--boja-tekst-sekundarni);
+  }
+  .zavrsni-chunk-mjesto p { margin: 0 0 8px; }
+  .zavrsni-chunk-mjesto button {
+    padding: 6px 12px;
+    border: 1px solid var(--boja-obrub-jaci);
+    border-radius: 6px;
+    background: var(--boja-povrsina);
+    color: var(--boja-tekst-osnovni);
+    cursor: pointer;
+  }
+  .panel-prijava-igraca-ucitavanje {
+    margin: 16px 0;
+    border: 1px solid var(--boja-obrub);
+    border-radius: 10px;
+    background: var(--boja-povrsina-2);
+  }
+  .panel-prijava-igraca-ucitavanje .naslov {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+  }
+  .panel-prijava-igraca-ucitavanje .greska {
+    margin: 0 14px 12px;
+    color: var(--boja-upozorenje, #c44);
+  }
   .bot-debug-gumb-ucitavanje {
     position: fixed;
     top: 12px;
