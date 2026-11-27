@@ -161,6 +161,36 @@ describe('raspored odziva', () => {
     expect(raspored.brojAktivnih()).toBe(0);
   });
 
+  it('kratki poslovi bez predaj() vraćaju event loop nakon zajedničkog budžeta', async () => {
+    let sat = 0;
+    let predajaEventLoopa = 0;
+    let dovrsenoPrijeYielda = 0;
+    let yieldVidjen = false;
+    const raspored = new RasporedjivacOdziva({
+      predaj: async () => {
+        predajaEventLoopa += 1;
+        yieldVidjen = true;
+      },
+      // Svaki poziv sada() troši cijeli budžet → nakon prvog slicea mora biti yield.
+      sada: () => {
+        sat += BUDZET_BLOKA_MS;
+        return sat;
+      },
+    });
+    const N = 8;
+    for (let i = 0; i < N; i += 1) {
+      raspored.prijavi(async () => {
+        if (!yieldVidjen) dovrsenoPrijeYielda += 1;
+        return 'gotovo';
+      });
+    }
+    await cekajPrazan(raspored);
+    expect(predajaEventLoopa).toBeGreaterThanOrEqual(1);
+    // Bez budžet-provjere na putu 'gotovo' svi bi završili prije prvog yielda.
+    expect(dovrsenoPrijeYielda).toBeLessThan(N);
+    expect(raspored.brojAktivnih()).toBe(0);
+  });
+
   it('jedan aktivan CPU slice (nema paralelnih run blokova)', async () => {
     let istodobno = 0;
     let maxIstodobno = 0;

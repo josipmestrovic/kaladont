@@ -10,7 +10,7 @@ import {
   stvoriStanjeBota,
 } from '../src/bot/odabir-rijeci.js';
 import { BUDZET_SLICE_MS, CHECKPOINT_ZAPISA } from '../src/bot/raspored-odziva.js';
-import { kandidatiRepertoaraNaPrefiksu, type SnimkaRepertoara } from '../src/bot/repertoar.js';
+import { poznatiNastavciNastavivo, type SnimkaRepertoara } from '../src/bot/repertoar.js';
 import { ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
 
 const konfig: KonfiguracijaBota = {
@@ -135,18 +135,22 @@ describe('CI prihvat odziva botova', () => {
     };
     const igrive = new Set(['lampa']);
     let predaja = 0;
-    let n = 0;
+    let yieldano = 0;
     const predaj = async () => { predaja += 1; };
-    // Isti ugovor kao poznatiNastavciIterator u kontroleru.
-    for (const rijec of kandidatiRepertoaraNaPrefiksu(snimka, 'la')) {
-      n += 1;
-      if (igrive.has(rijec)) {
-        // yield — ovdje samo brojimo sken
-      }
-      if (n % CHECKPOINT_ZAPISA === 0) await predaj();
+    // Produkcijska putanja (kontroler → poznatiNastavciNastavivo).
+    for await (const rijec of poznatiNastavciNastavivo(
+      snimka,
+      'la',
+      (r) => igrive.has(r),
+      predaj,
+      () => true,
+    )) {
+      yieldano += 1;
+      void rijec;
     }
-    expect(n).toBe(N);
-    expect(predaja).toBe(1);
+    expect(yieldano).toBe(1);
+    // Ako bi se brojali samo legalni (1), predaja bi bila 0 — pad.
+    expect(predaja).toBeGreaterThanOrEqual(1);
     expect(BUDZET_SLICE_MS).toBe(2);
   });
 

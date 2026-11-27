@@ -1,5 +1,5 @@
 /**
- * Cooperative raspoređivač za botov odabir (Botovi V8 commit 03).
+ * Cooperative raspoređivač za botov odabir (Botovi V8 commit 03 + stabilizacija).
  * Jedan pump, zajednički CPU budžet, stvarni round-robin sliceova.
  * Početak pumpa i predaja event loopu = setImmediate (ne microtask).
  * ctx.predaj() parkira posao i prepušta sljedeći u redu — ne samo event loop.
@@ -29,6 +29,8 @@ export type KontekstPosla = {
 
 export type RunPosla = (ctx: KontekstPosla) => Promise<'gotovo' | 'odustani'>;
 
+type IshodOznaka = { vrsta: 'gotovo'; ishod: 'gotovo' | 'odustani' };
+
 type PosaoPumpa = {
   id: number;
   run: RunPosla;
@@ -40,6 +42,8 @@ type PosaoPumpa = {
   krajSlicea: (() => void) | null;
   /** Promise završetka run-a. */
   zavrsetak: Promise<'gotovo' | 'odustani'> | null;
+  /** Jednokratno tagirani završetak — bez per-slice .then na istom Promiseu. */
+  zavrsetakOznaka: Promise<IshodOznaka> | null;
 };
 
 /**
@@ -69,6 +73,7 @@ export class RasporedjivacOdziva {
       nastaviPark: null,
       krajSlicea: null,
       zavrsetak: null,
+      zavrsetakOznaka: null,
     });
     this.pokreniPump();
     return id;
@@ -127,6 +132,10 @@ export class RasporedjivacOdziva {
       posao.zavrsetak = Promise.resolve()
         .then(() => posao.run(ctx))
         .catch(() => 'odustani' as const);
+      posao.zavrsetakOznaka = posao.zavrsetak.then((ishod) => ({
+        vrsta: 'gotovo' as const,
+        ishod,
+      }));
     } else if (posao.nastaviPark) {
       const nastavi = posao.nastaviPark;
       posao.nastaviPark = null;
@@ -141,9 +150,9 @@ export class RasporedjivacOdziva {
       posao.krajSlicea = resolve;
     });
 
-    const zavrsetak = posao.zavrsetak!;
+    const oznaka = posao.zavrsetakOznaka!;
     const pobjednik = await Promise.race([
-      zavrsetak.then((ishod) => ({ vrsta: 'gotovo' as const, ishod })),
+      oznaka,
       slicePromise.then(() => ({ vrsta: 'slice' as const })),
     ]);
 
@@ -153,7 +162,7 @@ export class RasporedjivacOdziva {
     }
     // Slice signal — ako je run već gotov u istom ticku, preferiraj završetak.
     const odmah = await Promise.race([
-      zavrsetak.then((ishod) => ({ vrsta: 'gotovo' as const, ishod })),
+      oznaka,
       Promise.resolve({ vrsta: 'slice' as const }),
     ]);
     if (odmah.vrsta === 'gotovo') {
@@ -167,6 +176,7 @@ export class RasporedjivacOdziva {
     try {
       while (this.red.length > 0) {
         const pocetak = this.sada();
+        const budzetIstekao = () => this.sada() - pocetak >= BUDZET_BLOKA_MS;
         let i = 0;
         while (i < this.red.length) {
           const posao = this.red[i]!;
@@ -178,11 +188,14 @@ export class RasporedjivacOdziva {
           }
           const josIndex = this.red.findIndex((p) => p.id === posao.id);
           if (josIndex < 0) {
+            // Otkazan / uklonjen — slice je potrošio CPU; provjeri budžet.
+            if (budzetIstekao()) break;
             continue;
           }
           if (ishod !== 'nastavi') {
             this.red.splice(josIndex, 1);
             i = josIndex;
+            if (budzetIstekao()) break;
             continue;
           }
           // Premjesti na kraj — inače budžet-break uvijek kreće od i=0 i izgladnuje ostale.
@@ -193,7 +206,7 @@ export class RasporedjivacOdziva {
           } else {
             i = josIndex + 1;
           }
-          if (this.sada() - pocetak >= BUDZET_BLOKA_MS) break;
+          if (budzetIstekao()) break;
         }
         if (this.red.length > 0) await this.predajEventLoop();
       }
