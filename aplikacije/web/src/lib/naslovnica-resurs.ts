@@ -159,6 +159,8 @@ export function stvoriNaslovnicaResurs(ovisnosti: NaslovnicaResursOvisnosti) {
 
   function oznaciNovostiMisijaPregledane(skupine: readonly ('dnevna' | 'tjedna')[]): void {
     if (!sazetak?.misije) return;
+    // Povećaj generaciju da kasni HTTP odgovor ne vrati dismissane novosti.
+    generacija += 1;
     const novosti = { ...sazetak.misije.novosti };
     for (const s of skupine) {
       if (s === 'dnevna') novosti.dnevne = false;
@@ -168,12 +170,16 @@ export function stvoriNaslovnicaResurs(ovisnosti: NaslovnicaResursOvisnosti) {
       ...sazetak,
       misije: { ...sazetak.misije, novosti },
     };
+    primijenjenaGeneracija = generacija;
+    status = 'spreman';
     objavi();
   }
 
   function ukloniObavijestiIzListe(ids: readonly string[]): void {
     if (ids.length === 0) return;
     const skup = new Set(ids);
+    // Povećaj generaciju da kasni HTTP odgovor ne vrati uklonjene poruke.
+    generacija += 1;
     if (obavijestiLista) {
       obavijestiLista = {
         ...obavijestiLista,
@@ -193,6 +199,8 @@ export function stvoriNaslovnicaResurs(ovisnosti: NaslovnicaResursOvisnosti) {
         },
       };
     }
+    primijenjenaGeneracija = generacija;
+    if (sazetak) status = 'spreman';
     objavi();
   }
 

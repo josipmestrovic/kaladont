@@ -143,6 +143,31 @@ describe('naslovnica-resurs', () => {
     expect(resurs.sazetak?.misije?.novosti.dnevne).toBe(false);
   });
 
+  it('kasni HTTP odgovor ne vraća dismissane novosti misija', async () => {
+    let otkazi!: (v: OdgovorNaslovnicaSazetka) => void;
+    const api = vi
+      .fn()
+      .mockResolvedValueOnce(bazaSazetka('reg-1'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<OdgovorNaslovnicaSazetka>((resolve) => {
+            otkazi = resolve;
+          }),
+      );
+    const resurs = stvoriNaslovnicaResurs({
+      api,
+      oporavi401: async () => {},
+      jeApiGreska401: () => false,
+    });
+    await resurs.osiguraj();
+    const forsaj = resurs.osiguraj({ forsaj: true });
+    resurs.oznaciNovostiMisijaPregledane(['dnevna']);
+    expect(resurs.sazetak?.misije?.novosti.dnevne).toBe(false);
+    otkazi(bazaSazetka('reg-1'));
+    await forsaj;
+    expect(resurs.sazetak?.misije?.novosti.dnevne).toBe(false);
+  });
+
   it('ukloniObavijestiIzListe ažurira cache liste', async () => {
     const saObavijesti: OdgovorNaslovnicaSazetka = {
       ...bazaSazetka('id-1'),

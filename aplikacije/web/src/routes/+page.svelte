@@ -136,9 +136,10 @@
 
   afterNavigate(({ from, to }) => {
     if (!to || to.url.pathname !== '/') return;
-    const izPartije = from?.url.pathname.startsWith('/partija/') ?? false;
-    if (!izPartije) return;
-    void osvjeziNaslovnicu({ forsaj: true });
+    // Povratak na `/` iz druge rute — forsaj da badgei nisu zastarjeli (npr. nakon prijave).
+    if (from && from.url.pathname !== '/') {
+      void osvjeziNaslovnicu({ forsaj: true });
+    }
   });
 
   onMount(() => {
