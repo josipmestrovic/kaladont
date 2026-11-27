@@ -14,3 +14,7 @@ playwright-report-image/
 
 # hrLex je CC BY-SA - izvedeni podaci se ne commitaju (ADR-010)
 skripte/uvoz-rjecnika/podaci/
+
+# Lokalni worktreei i sirovi bench JSONL (kontrolne točke)
+.worktrees/
+bench-rezultati/

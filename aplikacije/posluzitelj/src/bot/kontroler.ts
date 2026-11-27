@@ -49,6 +49,18 @@ export type NaredbaBota =
 /** Brza igra (javna): nakon toliko bot-duel poteza sljedeći bot forsira „Ne znam”. */
 export const MAKS_POTEZA_BOT_DUELA_BRZA = 10;
 
+/**
+ * Koliko puta smijemo ponovno računati odluku zbog promjene verzije rječnika
+ * unutar istog plana (sprječava beskonačni refresh loop).
+ */
+export const MAKS_OSVJEZAVANJA_VERZIJE_RJECNIKA = 2;
+
+/** Namjerno / forsiranje „Ne znam” ostaje važeće i nakon refresh-a rječnika. */
+function zadrziOdustaniPriPromjeniVerzije(odluka: OdlukaBota): boolean {
+  if (odluka.vrsta !== 'odustani') return false;
+  return odluka.razlog === 'namjerni_propust' || odluka.razlogInterni === 'bot_duel_limit';
+}
+
 export interface OvisnostiBotKontrolera {
   rjecnik: Pick<
     RjecnikUMemoriji,
@@ -112,6 +124,8 @@ interface PlaniranaAkcija {
   odgodaIstekla?: boolean;
   snimkaGrupa?: ReadonlySet<string>;
   verzijaRjecnika?: number;
+  /** Broj ponovnih izračuna zbog mismatcha verzije rječnika u ovom planu. */
+  brojOsvjezavanjaVerzije?: number;
   /** Greška nastavivog odabira prije isteka odgode — obrada tek kad odgoda istekne. */
   greskaOdabira?: unknown;
 }
@@ -491,14 +505,32 @@ export class BotKontroler {
         return;
       }
       if (verzijaPriPlanu !== undefined && this.ovisnosti.rjecnik.verzijaRjecnika() !== verzijaPriPlanu) {
-        if (odluka.vrsta === 'odustani') {
+        // namjerni_propust / bot_duel_limit: zadrži odluku. nema_rijeci i rijec: osvježi.
+        if (zadrziOdustaniPriPromjeniVerzije(odluka)) {
           this.posloviRasporeda.delete(partijaId);
           this.planirano.delete(partijaId);
           this.izvrsi(aktualni, igracId, turnToken, odluka, 0, new Set());
           return;
         }
+        const brojOsvjezavanja = (plan.brojOsvjezavanjaVerzije ?? 0) + 1;
+        if (brojOsvjezavanja > MAKS_OSVJEZAVANJA_VERZIJE_RJECNIKA) {
+          this.posloviRasporeda.delete(partijaId);
+          this.planirano.delete(partijaId);
+          this.izvrsi(aktualni, igracId, turnToken, odluka, 0, new Set());
+          return;
+        }
+        plan.brojOsvjezavanjaVerzije = brojOsvjezavanja;
         plan.odluka = undefined;
         plan.vrsta = null;
+        plan.verzijaRjecnika = undefined;
+        // Očisti predmemoriranu odluku istog tokena da odluciNastavivo ne vrati stale nema_rijeci.
+        const predmemorirana = this.odluke.get(partijaId);
+        if (
+          predmemorirana?.turnToken === turnToken
+          && !(predmemorirana.odluka.vrsta === 'odustani' && zadrziOdustaniPriPromjeniVerzije(predmemorirana.odluka))
+        ) {
+          this.odluke.delete(partijaId);
+        }
         this.zakaziIzracunPlanNastavivo(
           partijaId,
           dogadajAktualni,
@@ -649,7 +681,9 @@ export class BotKontroler {
     const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
     const prethodna = this.odluke.get(dogadaj.partijaId);
     const ista = prethodna?.turnToken === dogadaj.turnToken ? prethodna : undefined;
-    if (ista?.odluka.vrsta === 'odustani' && ista.odluka.razlogInterni === 'bot_duel_limit') return ista.odluka;
+    if (ista?.odluka.vrsta === 'odustani' && zadrziOdustaniPriPromjeniVerzije(ista.odluka)) {
+      return ista.odluka;
+    }
     if (this.azurirajBotDuelIForsiraj(dogadaj) && dogadaj.trazenaSlova !== 'ka') {
       const forsiran: OdlukaBota = {
         vrsta: 'odustani',
@@ -659,7 +693,8 @@ export class BotKontroler {
       this.zabiljeziOdluku(forsiran, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
       return forsiran;
     }
-    if (ista?.odluka.vrsta === 'odustani') return ista.odluka;
+    // nema_rijeci: samo uz istu verziju rječnika — inače ponovni izračun (nova riječ nakon refresh-a).
+    if (ista?.odluka.vrsta === 'odustani' && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
     if (dogadaj.trazenaSlova === 'ka' && !odbijene.has('kaladont')) {
       stanjeBota.brojKandidata = 1;

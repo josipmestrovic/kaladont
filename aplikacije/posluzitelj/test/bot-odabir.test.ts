@@ -1407,6 +1407,81 @@ describe('bot kontroler', () => {
     kontroler.zaustavi();
   });
 
+  it('nema_rijeci + nova verzija rječnika s legalnom riječi → ponovni izračun, ne stale odustani', async () => {
+    let verzija = 1;
+    let kandidati: string[] = [];
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, odgubi } = stvori(izvrsi, () => verzija, konfigBezPropusta, {
+      rjecnik: {
+        igriviKandidati: function* () {
+          yield* kandidati;
+        },
+        frekvencijaZa: () => 500,
+        grupeZa: (r: string) => [`imenica:${r}`],
+        verzijaRjecnika: () => verzija,
+        imaSlobodnuRijecNa: () => kandidati.length > 0,
+        jeIgrivaRijec: (r: string) => kandidati.includes(r),
+        repertoarBotova: () => izgradiRepertoarBotova({
+          prefiksi: () => ['ma'].values(),
+          rijeciNaPrefiksu: () => kandidati,
+          frekvencijaZa: () => 500,
+          grupeZa: (r) => [`imenica:${r}`],
+          jeOsnovniOblik: () => true,
+          jePostojecaRijec: (r) => kandidati.includes(r),
+        }, verzija),
+      },
+    });
+    kontroler.naPromjenuPoteza(dogadaj());
+    // Odluka nema_rijeci spremna; prije izvršenja refresh + nova riječ.
+    await dovršiAsyncOdluku();
+    for (let i = 0; i < 40; i += 1) await dovršiAsyncOdluku();
+    verzija = 2;
+    kandidati = ['mama'];
+    await odgubi(0);
+    expect(izvrsi).toHaveBeenCalledTimes(1);
+    expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', expect.objectContaining({
+      vrsta: 'rijec',
+      rijec: 'mama',
+      turnToken: 't1',
+    }));
+    expect(kontroler.brojaci.bezRijeci).toBe(0);
+    kontroler.zaustavi();
+  });
+
+  it('nema_rijeci bez nove riječi nakon verzije i dalje odustaje', async () => {
+    let verzija = 1;
+    const kandidati: string[] = [];
+    const izvrsi = vi.fn(() => ({ ishod: 'prihvacen' }) as RezultatNaredbe);
+    const { kontroler, odgubi } = stvori(izvrsi, () => verzija, konfigBezPropusta, {
+      rjecnik: {
+        igriviKandidati: function* () {
+          yield* kandidati;
+        },
+        frekvencijaZa: () => 500,
+        grupeZa: (r: string) => [`imenica:${r}`],
+        verzijaRjecnika: () => verzija,
+        imaSlobodnuRijecNa: () => false,
+        jeIgrivaRijec: () => false,
+        repertoarBotova: () => izgradiRepertoarBotova({
+          prefiksi: () => ['ma'].values(),
+          rijeciNaPrefiksu: () => kandidati,
+          frekvencijaZa: () => 500,
+          grupeZa: (r) => [`imenica:${r}`],
+          jeOsnovniOblik: () => true,
+          jePostojecaRijec: () => false,
+        }, verzija),
+      },
+    });
+    kontroler.naPromjenuPoteza(dogadaj());
+    await dovršiAsyncOdluku();
+    for (let i = 0; i < 40; i += 1) await dovršiAsyncOdluku();
+    verzija = 2;
+    await odgubi(0);
+    expect(izvrsi).toHaveBeenCalledWith('p1', 'bot', { vrsta: 'odustani', turnToken: 't1' });
+    expect(kontroler.brojaci.bezRijeci).toBe(1);
+    kontroler.zaustavi();
+  });
+
   it('novi bot na potezu koristi snapshot cijele partije, a nova partija nove postavke', () => {
     const konfiguracija = structuredClone(konfigBezPropusta);
     const { kontroler, timeri } = stvori(() => ({ ishod: 'prihvacen' }), () => 1, konfiguracija);

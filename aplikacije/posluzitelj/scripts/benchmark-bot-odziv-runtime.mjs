@@ -1,23 +1,33 @@
 #!/usr/bin/env node
 /**
  * Lokalni benchmark nastavivog runtime puta (RasporedjivacOdziva + odaberiPotezNastavivo).
+ * „Checkpoint honesty“: imaSlobodnuRijecNa skenira puni prefiks; kandidati samo repertoar.
  * Nije dio uobičajenog PR CI. Ne predstavlja produkcijske performanse.
  *
  * Upotreba (iz aplikacije/posluzitelj):
  *   pnpm exec tsx scripts/benchmark-bot-odziv-runtime.mjs
- *   pnpm exec tsx scripts/benchmark-bot-odziv-runtime.mjs "--oznaka=poslije" "--poslova=1,10,25,50,100" "--seed-baza=42"
+ *   node --import tsx scripts/benchmark-bot-odziv-runtime.mjs "--poslova=1" "--zagrijavanje=0"
  *
  * Opcionalni veliki dataset: KALADONT_BENCH_RJECNIK (JSON/JSONL, read-only).
  * Incomplete run (timeout / nedovršeni / pogreške) → non-zero exit.
  */
 import { performance } from 'node:perf_hooks';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, '..');
+const defaultRoot = resolve(__dirname, '..');
+
+const DOZVOLJENI_SCENARIJI = new Set([
+  'normalan',
+  'tezak-takticki',
+  'primljeni-ka',
+  'veliki-prefiks',
+  'gotovo-iscrpljen',
+  'potpuno-iscrpljen',
+]);
 
 function parseArgs(argv) {
   const out = {
@@ -29,10 +39,17 @@ function parseArgs(argv) {
     seedBaza: 42,
     timeoutMs: 120_000,
     tezakTakticki: false,
+    zagrijavanje: 1,
+    dolazak: 'burst',
+    scenariji: ['normalan', 'tezak-takticki'],
+    izlaz: null,
+    api: 'auto',
+    moduliKorijen: null,
   };
+  let scenarijiIzCli = false;
   for (const a of argv) {
     if (a.startsWith('--prefiksi=')) out.prefiksi = a.slice(11).split(',').map((s) => s.trim()).filter(Boolean);
-    if (a.startsWith('--ponavljanja=')) out.ponavljanja = Math.max(1, Number(a.slice(14)) || 3);
+    if (a.startsWith('--ponavljanja=')) out.ponavljanja = Math.max(0, Number(a.slice(14)) || 3);
     if (a.startsWith('--poslova=')) {
       out.poslova = a.slice(10).split(',').map((s) => Number(s.trim())).filter((n) => n >= 1 && n <= 100);
     }
@@ -43,9 +60,27 @@ function parseArgs(argv) {
     if (a.startsWith('--seed-baza=')) out.seedBaza = Number(a.slice(12)) || 42;
     if (a.startsWith('--timeout-ms=')) out.timeoutMs = Math.max(1000, Number(a.slice(13)) || 120_000);
     if (a === '--tezak-takticki') out.tezakTakticki = true;
+    if (a.startsWith('--zagrijavanje=')) out.zagrijavanje = Math.max(0, Number(a.slice(15)) || 0);
+    if (a.startsWith('--dolazak=')) {
+      const v = a.slice(10).trim();
+      if (v === 'burst' || v === 'razmazano') out.dolazak = v;
+    }
+    if (a.startsWith('--scenariji=')) {
+      scenarijiIzCli = true;
+      const lista = a.slice(12).split(',').map((s) => s.trim()).filter(Boolean);
+      out.scenariji = lista.filter((s) => DOZVOLJENI_SCENARIJI.has(s));
+    }
+    if (a.startsWith('--izlaz=')) out.izlaz = a.slice(8).trim() || null;
+    if (a.startsWith('--api=')) {
+      const v = a.slice(6).trim();
+      if (v === 'auto' || v === 'v7-step' || v === 'v8-slice') out.api = v;
+    }
+    if (a.startsWith('--moduli-korijen=')) out.moduliKorijen = resolve(a.slice(17).trim());
   }
   if (out.poslova.length === 0) out.poslova = [1, 10, 25, 50, 100];
   if (out.aktivnih.length === 0) out.aktivnih = [2, 3, 4];
+  if (out.tezakTakticki && !scenarijiIzCli) out.scenariji = ['tezak-takticki'];
+  if (out.scenariji.length === 0) out.scenariji = ['normalan', 'tezak-takticki'];
   return out;
 }
 
@@ -110,24 +145,26 @@ function ucitajDataset() {
 }
 
 /**
- * Snimka u formatu SnimkaRepertoara (glavni/rezerva) + meta.
- * Ako je dostupan izgradiRepertoarBotova — produkcijski limiti 256+256.
- * Inače: simulirana polovica liste (označeno u meta rezultata).
+ * puniPoPrefiksu = svi zapisi; snimka = repertoar (256+256 ili simulirana polovica).
  */
 function indeksirajSnimku(zapisi, izgradiRepertoarBotova = null) {
   const meta = new Map();
-  const poPrefiksuListe = new Map();
+  const puniPoPrefiksu = new Map();
   for (const z of zapisi) {
     const pref = z.prefiks ?? String(z.rijec).slice(0, 2);
-    if (!poPrefiksuListe.has(pref)) poPrefiksuListe.set(pref, []);
-    poPrefiksuListe.get(pref).push(z.rijec);
-    meta.set(z.rijec, z);
+    if (!puniPoPrefiksu.has(pref)) puniPoPrefiksu.set(pref, []);
+    puniPoPrefiksu.get(pref).push(z.rijec);
+    meta.set(z.rijec, {
+      grupe: z.grupe ?? [`imenica:${z.rijec}`],
+      frekvencija: z.frekvencija ?? 0,
+      vrste: z.vrste ?? ['imenica'],
+    });
   }
 
   if (typeof izgradiRepertoarBotova === 'function') {
     const izvor = {
-      prefiksi: () => poPrefiksuListe.keys(),
-      rijeciNaPrefiksu: (p) => poPrefiksuListe.get(p) ?? [],
+      prefiksi: () => puniPoPrefiksu.keys(),
+      rijeciNaPrefiksu: (p) => puniPoPrefiksu.get(p) ?? [],
       frekvencijaZa: (r) => meta.get(r)?.frekvencija ?? null,
       grupeZa: (r) => meta.get(r)?.grupe ?? [`imenica:${r}`],
       jeOsnovniOblik: () => true,
@@ -137,6 +174,7 @@ function indeksirajSnimku(zapisi, izgradiRepertoarBotova = null) {
     return {
       snimka,
       meta,
+      puniPoPrefiksu,
       nacinSnimke: 'izgradiRepertoarBotova',
       kandidatiZa: (pref) => {
         const s = snimka.poPrefiksu.get(pref);
@@ -147,7 +185,7 @@ function indeksirajSnimku(zapisi, izgradiRepertoarBotova = null) {
   }
 
   const poPrefiksu = new Map();
-  for (const [pref, lista] of poPrefiksuListe) {
+  for (const [pref, lista] of puniPoPrefiksu) {
     const polovica = Math.ceil(lista.length / 2);
     poPrefiksu.set(pref, {
       glavni: lista.slice(0, polovica),
@@ -157,6 +195,7 @@ function indeksirajSnimku(zapisi, izgradiRepertoarBotova = null) {
   return {
     snimka: { generacija: 1, poPrefiksu },
     meta,
+    puniPoPrefiksu,
     nacinSnimke: 'simulirana-polovica',
     kandidatiZa: (pref) => {
       const s = poPrefiksu.get(pref);
@@ -164,6 +203,119 @@ function indeksirajSnimku(zapisi, izgradiRepertoarBotova = null) {
       return [...s.glavni, ...s.rezerva];
     },
   };
+}
+
+function najveciPrefiks(puniPoPrefiksu) {
+  let best = 'ma';
+  let bestLen = 0;
+  for (const [pref, lista] of puniPoPrefiksu) {
+    if (lista.length > bestLen) {
+      bestLen = lista.length;
+      best = pref;
+    }
+  }
+  return { prefiks: best, velicinaPunog: bestLen };
+}
+
+function grupeNaPrefiksu(prefiks, puniPoPrefiksu, meta) {
+  const grupe = [];
+  for (const r of puniPoPrefiksu.get(prefiks) ?? []) {
+    const m = meta.get(r);
+    if (!m) continue;
+    for (const g of m.grupe ?? [`imenica:${r}`]) grupe.push(g);
+  }
+  return grupe;
+}
+
+function oznaciPotroseneGrupe(prefiks, omjer, puniPoPrefiksu, meta) {
+  const sve = grupeNaPrefiksu(prefiks, puniPoPrefiksu, meta);
+  const cilj = omjer >= 1 ? sve.length : Math.floor(sve.length * omjer);
+  const set = new Set();
+  for (let i = 0; i < cilj && i < sve.length; i += 1) set.add(sve[i]);
+  return set;
+}
+
+function pripremiScenarij(ime, prefiksUlaz, puniPoPrefiksu, meta, kandidatiZa, zadanaKonfig) {
+  const konfigBaza = {
+    ...zadanaKonfig,
+    vjerojatnostNeznanjaUMalomSkupu: 0,
+  };
+  let konfig = konfigBaza;
+  let prefiks = prefiksUlaz;
+  let trazenaSlova = prefiks;
+  let kandidati = kandidatiZa(prefiks);
+  let iskoristeneGrupe = [];
+  const detalji = { ime };
+
+  switch (ime) {
+    case 'normalan':
+      break;
+    case 'tezak-takticki':
+      konfig = { ...konfigBaza, vjerojatnostTaktickogPoteza: 1 };
+      break;
+    case 'primljeni-ka':
+      trazenaSlova = 'ka';
+      kandidati = kandidatiZa('ka').length ? kandidatiZa('ka').slice(0, 2) : [];
+      detalji.trazenaSlova = 'ka';
+      detalji.kandidata = kandidati.length;
+      break;
+    case 'veliki-prefiks': {
+      const veliki = najveciPrefiks(puniPoPrefiksu);
+      prefiks = veliki.prefiks;
+      trazenaSlova = prefiks;
+      kandidati = kandidatiZa(prefiks);
+      detalji.velikiPrefiks = veliki.prefiks;
+      detalji.velicinaPunogPrefiksa = veliki.velicinaPunog;
+      detalji.kandidataRepertoar = kandidati.length;
+      break;
+    }
+    case 'gotovo-iscrpljen': {
+      const set = oznaciPotroseneGrupe(prefiks, 0.9, puniPoPrefiksu, meta);
+      iskoristeneGrupe = [...set];
+      detalji.potrosenihGrupa = set.size;
+      detalji.ukupnoGrupa = grupeNaPrefiksu(prefiks, puniPoPrefiksu, meta).length;
+      break;
+    }
+    case 'potpuno-iscrpljen': {
+      const set = oznaciPotroseneGrupe(prefiks, 1, puniPoPrefiksu, meta);
+      iskoristeneGrupe = [...set];
+      detalji.potrosenihGrupa = set.size;
+      detalji.ukupnoGrupa = grupeNaPrefiksu(prefiks, puniPoPrefiksu, meta).length;
+      break;
+    }
+    default:
+      break;
+  }
+
+  return {
+    ime,
+    konfig,
+    prefiks,
+    trazenaSlova,
+    kandidati,
+    iskoristeneGrupe,
+    detalji,
+  };
+}
+
+function odrediApiVarijantu(rasporedMod, apiArg) {
+  if (apiArg === 'v7-step') return 'v7-step';
+  if (apiArg === 'v8-slice') return 'v8-slice';
+  if (rasporedMod.BUDZET_SLICE_MS !== undefined) return 'v8-slice';
+  return 'v7-step';
+}
+
+function prijaviPosao(raspored, apiVarijanta, predajSetImmediate, runV8, onPrviSlice) {
+  if (apiVarijanta === 'v8-slice') {
+    return raspored.prijavi(async (ctx) => {
+      onPrviSlice();
+      return runV8(ctx.predaj);
+    });
+  }
+  return raspored.prijavi(async () => {
+    onPrviSlice();
+    return runV8(predajSetImmediate);
+  });
 }
 
 function percentile(arr, p) {
@@ -205,7 +357,8 @@ function pokreniUzorkovanjeLaga(uzorci, intervalMs = 2) {
   return () => { aktivno = false; };
 }
 
-async function ucitajModule() {
+async function ucitajModule(moduliKorijen) {
+  const root = moduliKorijen;
   const srcOdabir = resolve(root, 'src/bot/odabir-rijeci.ts');
   const srcRaspored = resolve(root, 'src/bot/raspored-odziva.ts');
   const srcKonfig = resolve(root, 'src/bot/konfiguracija-bota.ts');
@@ -234,10 +387,13 @@ async function ucitajModule() {
         potpisPotrosenihGrupa: odabir.potpisPotrosenihGrupa,
         RasporedjivacOdziva: raspored.RasporedjivacOdziva,
         CHECKPOINT_ZAPISA: raspored.CHECKPOINT_ZAPISA,
+        predajSetImmediate: raspored.predajSetImmediate,
+        BUDZET_SLICE_MS: raspored.BUDZET_SLICE_MS,
         ZADANA_KONFIGURACIJA_BOTA: konfigMod.ZADANA_KONFIGURACIJA_BOTA,
         poznatiNastavciNastavivo,
         izgradiRepertoarBotova,
         izvor: 'tsx-src',
+        moduliKorijen: root,
       };
     } catch (e) {
       console.error('tsx-src import nije uspio:', e instanceof Error ? e.message : e);
@@ -255,15 +411,18 @@ async function pokreniScenarij({
   stvoriStanjeBota,
   PredmemorijaLegalnosti,
   potpisPotrosenihGrupa,
+  predajSetImmediate,
+  apiVarijanta,
   konfig,
-  prefiks,
-  kandidati,
+  scenarij,
   snimka,
   meta,
+  puniPoPrefiksu,
   brojPoslova,
   brojAktivnihIgraca,
   seed,
   timeoutMs,
+  dolazak,
 }) {
   const raspored = new RasporedjivacOdziva();
   const waitToFirstSlice = [];
@@ -289,22 +448,6 @@ async function pokreniScenarij({
     objedinjeneAnalize: 0,
   };
 
-  // Fixture stand-in za puni prefiks: skenira snimku repertoara, ali broji kao preglediPunogPrefiksa
-  // (ne kao preglediRepertoara) — vidi meta.napomena.
-  const imaSlobodnu = (pref, potrosene) => {
-    const stavka = snimka.poPrefiksu.get(pref);
-    if (!stavka) return false;
-    for (const r of [...stavka.glavni, ...stavka.rezerva]) {
-      brojaci.preglediPunogPrefiksa += 1;
-      const m = meta.get(r);
-      if (!m || (m.frekvencija ?? 0) <= 0) continue;
-      const grupe = m.grupe ?? [`imenica:${r}`];
-      if (grupe.some((g) => potrosene.has(g))) continue;
-      return true;
-    }
-    return false;
-  };
-
   const provjeriIgrivost = (rijec, potrosene) => {
     brojaci.igrivost += 1;
     const m = meta.get(rijec);
@@ -313,130 +456,161 @@ async function pokreniScenarij({
     return !grupe.some((g) => potrosene.has(g));
   };
 
+  const imaSlobodnu = (pref, potrosene) => {
+    const lista = puniPoPrefiksu.get(pref);
+    if (!lista) return false;
+    for (const r of lista) {
+      brojaci.preglediPunogPrefiksa += 1;
+      if (provjeriIgrivost(r, potrosene)) return true;
+    }
+    return false;
+  };
+
+  const kandidatiScenarija = scenarij.kandidati;
+  const trazenaSlova = scenarij.trazenaSlova;
+  const iskoristenePredlozak = scenarij.iskoristeneGrupe;
+
+  async function runBotJob(idx, predaj) {
+    const rng = seededRng((seed + idx * 9176) >>> 0);
+    let zadnjiSlice = performance.now();
+    const predajMjeri = async () => {
+      const prije = performance.now();
+      await predaj();
+      const poslije = performance.now();
+      waitIzmeduSliceova.push(poslije - prije);
+      zadnjiSlice = poslije;
+    };
+    const t0 = performance.now();
+    const stanje = stvoriStanjeBota(konfig, rng);
+    const iskoristeneGrupe = new Set(iskoristenePredlozak);
+    try {
+      const verzijaRjecnika = snimka.generacija ?? 1;
+      const turnToken = `bench-${seed}-${trazenaSlova}-${idx}`;
+      let predmemorija = null;
+      if (PredmemorijaLegalnosti) {
+        predmemorija = new PredmemorijaLegalnosti();
+        const potpis = potpisPotrosenihGrupa
+          ? potpisPotrosenihGrupa(iskoristeneGrupe)
+          : undefined;
+        try {
+          predmemorija.uskladiKontekst(turnToken, verzijaRjecnika, potpis);
+        } catch {
+          predmemorija.uskladiKontekst(turnToken, verzijaRjecnika);
+        }
+        const origPeek = predmemorija.peek.bind(predmemorija);
+        const origSpremi = predmemorija.spremi.bind(predmemorija);
+        const origDohvati = predmemorija.dohvatiIliIzracunaj.bind(predmemorija);
+        predmemorija.peek = (kljuc) => {
+          const v = origPeek(kljuc);
+          if (v !== undefined) brojaci.pogodciPredmemorije += 1;
+          return v;
+        };
+        predmemorija.spremi = (kljuc, vrijednost) => {
+          if (origPeek(kljuc) === undefined) {
+            brojaci.promasajiPredmemorije += 1;
+            brojaci.objedinjeneAnalize += 1;
+          }
+          return origSpremi(kljuc, vrijednost);
+        };
+        predmemorija.dohvatiIliIzracunaj = (kljuc, izracunaj) => {
+          if (origPeek(kljuc) !== undefined) {
+            brojaci.pogodciPredmemorije += 1;
+          } else {
+            brojaci.promasajiPredmemorije += 1;
+            brojaci.objedinjeneAnalize += 1;
+          }
+          return origDohvati(kljuc, izracunaj);
+        };
+      }
+      const odluka = await odaberiPotezNastavivo(
+        {
+          trazenaSlova,
+          kandidati: kandidatiScenarija,
+          frekvencijaZa: (r) => meta.get(r)?.frekvencija ?? 0,
+          grupeZa: (r) => meta.get(r)?.grupe ?? [`imenica:${r}`],
+          pravila: 'klasicni',
+          brojAktivnih: brojAktivnihIgraca,
+          iskoristeneGrupe,
+          imaSlobodnuRijecNa: imaSlobodnu,
+          poznatiKandidatiNa: (p, potrosene) => {
+            const stavka = snimka.poPrefiksu.get(p);
+            if (!stavka) return [];
+            const izlaz = [];
+            for (const rijec of [...stavka.glavni, ...stavka.rezerva]) {
+              brojaci.preglediRepertoara += 1;
+              if (provjeriIgrivost(rijec, potrosene)) izlaz.push(rijec);
+            }
+            return izlaz;
+          },
+          poznatiKandidatiNaNastavivo: (p, potrosene) => {
+            if (poznatiNastavciNastavivo) {
+              return poznatiNastavciNastavivo(
+                snimka,
+                p,
+                (r) => {
+                  brojaci.preglediRepertoara += 1;
+                  return provjeriIgrivost(r, potrosene);
+                },
+                predajMjeri,
+                () => true,
+              );
+            }
+            return {
+              async *[Symbol.asyncIterator]() {
+                let n = 0;
+                const stavka = snimka.poPrefiksu.get(p);
+                if (!stavka) return;
+                for (const rijec of [...stavka.glavni, ...stavka.rezerva]) {
+                  n += 1;
+                  brojaci.preglediRepertoara += 1;
+                  if (provjeriIgrivost(rijec, potrosene)) yield rijec;
+                  if (n % CHECKPOINT_ZAPISA === 0) await predajMjeri();
+                }
+              },
+            };
+          },
+          predmemorija: predmemorija ?? undefined,
+          verzijaRjecnika,
+          dohvatiVerzijuRjecnika: () => verzijaRjecnika,
+          turnToken,
+        },
+        stanje,
+        konfig,
+        rng,
+        predajMjeri,
+        () => true,
+      );
+      void odluka;
+      dovrseno += 1;
+      trajanjaOdabira.push(performance.now() - t0);
+      return 'gotovo';
+    } catch {
+      pogreska += 1;
+      return 'odustani';
+    }
+  }
+
+  const registacije = [];
+  const rngDolazak = seededRng(seed ^ 0xdeadbeef);
   for (let i = 0; i < brojPoslova; i += 1) {
     const idx = i;
-    const rng = seededRng((seed + idx * 9176) >>> 0);
     const tReg = performance.now();
-    let zadnjiSlice = null;
-    const id = raspored.prijavi(async ({ predaj }) => {
-      const first = performance.now();
-      waitToFirstSlice.push(first - tReg);
-      zadnjiSlice = first;
-      const predajMjeri = async () => {
-        const prije = performance.now();
-        await predaj();
-        const poslije = performance.now();
-        if (zadnjiSlice !== null) waitIzmeduSliceova.push(poslije - prije);
-        zadnjiSlice = poslije;
-      };
-      const t0 = performance.now();
-      const stanje = stvoriStanjeBota(konfig, rng);
-      try {
-        const verzijaRjecnika = snimka.generacija ?? 1;
-        const turnToken = `bench-${seed}-${prefiks}-${idx}`;
-        let predmemorija = null;
-        if (PredmemorijaLegalnosti) {
-          predmemorija = new PredmemorijaLegalnosti();
-          predmemorija.uskladiKontekst(
-            turnToken,
-            verzijaRjecnika,
-            potpisPotrosenihGrupa ? potpisPotrosenihGrupa(new Set()) : undefined,
-          );
-          const origPeek = predmemorija.peek.bind(predmemorija);
-          const origSpremi = predmemorija.spremi.bind(predmemorija);
-          const origDohvati = predmemorija.dohvatiIliIzracunaj.bind(predmemorija);
-          // Nastavivi put koristi peek+spremi; sync put dohvatiIliIzracunaj.
-          predmemorija.peek = (kljuc) => {
-            const v = origPeek(kljuc);
-            if (v !== undefined) brojaci.pogodciPredmemorije += 1;
-            return v;
-          };
-          predmemorija.spremi = (kljuc, vrijednost) => {
-            if (origPeek(kljuc) === undefined) {
-              brojaci.promasajiPredmemorije += 1;
-              brojaci.objedinjeneAnalize += 1;
-            }
-            return origSpremi(kljuc, vrijednost);
-          };
-          predmemorija.dohvatiIliIzracunaj = (kljuc, izracunaj) => {
-            if (origPeek(kljuc) !== undefined) {
-              brojaci.pogodciPredmemorije += 1;
-            } else {
-              brojaci.promasajiPredmemorije += 1;
-              brojaci.objedinjeneAnalize += 1;
-            }
-            return origDohvati(kljuc, izracunaj);
-          };
-        }
-        const odluka = await odaberiPotezNastavivo(
-          {
-            trazenaSlova: prefiks,
-            kandidati,
-            frekvencijaZa: (r) => meta.get(r)?.frekvencija ?? 0,
-            grupeZa: (r) => meta.get(r)?.grupe ?? [`imenica:${r}`],
-            pravila: 'klasicni',
-            brojAktivnih: brojAktivnihIgraca,
-            iskoristeneGrupe: new Set(),
-            imaSlobodnuRijecNa: imaSlobodnu,
-            poznatiKandidatiNa: (p, potrosene) => {
-              const stavka = snimka.poPrefiksu.get(p);
-              if (!stavka) return [];
-              const izlaz = [];
-              for (const rijec of [...stavka.glavni, ...stavka.rezerva]) {
-                brojaci.preglediRepertoara += 1;
-                if (provjeriIgrivost(rijec, potrosene)) izlaz.push(rijec);
-              }
-              return izlaz;
-            },
-            poznatiKandidatiNaNastavivo: (p, potrosene) => {
-              if (poznatiNastavciNastavivo) {
-                return poznatiNastavciNastavivo(
-                  snimka,
-                  p,
-                  (r) => {
-                    brojaci.preglediRepertoara += 1;
-                    return provjeriIgrivost(r, potrosene);
-                  },
-                  predajMjeri,
-                  () => true,
-                );
-              }
-              return {
-                async *[Symbol.asyncIterator]() {
-                  let n = 0;
-                  const stavka = snimka.poPrefiksu.get(p);
-                  if (!stavka) return;
-                  for (const rijec of [...stavka.glavni, ...stavka.rezerva]) {
-                    n += 1;
-                    brojaci.preglediRepertoara += 1;
-                    if (provjeriIgrivost(rijec, potrosene)) yield rijec;
-                    if (n % CHECKPOINT_ZAPISA === 0) await predajMjeri();
-                  }
-                },
-              };
-            },
-            predmemorija: predmemorija ?? undefined,
-            verzijaRjecnika,
-            dohvatiVerzijuRjecnika: () => verzijaRjecnika,
-            turnToken,
-          },
-          stanje,
-          konfig,
-          rng,
-          predajMjeri,
-          () => true,
-        );
-        void odluka;
-        dovrseno += 1;
-        trajanjaOdabira.push(performance.now() - t0);
-        return 'gotovo';
-      } catch {
-        pogreska += 1;
-        return 'odustani';
-      }
-    });
-    ids.push(id);
+    const kasnjenjeMs = dolazak === 'razmazano' ? Math.floor(rngDolazak() * 6) * i : 0;
+    registacije.push(
+      new Promise((res) => {
+        const registriraj = () => {
+          const id = prijaviPosao(raspored, apiVarijanta, predajSetImmediate, (predaj) => runBotJob(idx, predaj), () => {
+            waitToFirstSlice.push(performance.now() - tReg);
+          });
+          ids.push(id);
+          res();
+        };
+        if (kasnjenjeMs <= 0) registriraj();
+        else setTimeout(registriraj, kasnjenjeMs);
+      }),
+    );
   }
+  await Promise.all(registacije);
 
   const syncNakonPrijaveMs = performance.now() - tPrijave;
   const deadline = tPrijave + timeoutMs;
@@ -452,7 +626,6 @@ async function pokreniScenarij({
     while (raspored.brojAktivnih() > 0 && performance.now() < cleanupDeadline) {
       await new Promise((r) => setImmediate(r));
     }
-    // Preostali nedovršeni nakon otkaza brojimo kao otkazane (timeout cleanup).
     const ostatak = brojPoslova - dovrseno - pogreska - otkazano;
     if (ostatak > 0) otkazano += ostatak;
   }
@@ -498,11 +671,24 @@ function spojiBrojeve(ponavljanja, kljuc) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const moduliKorijen = args.moduliKorijen ?? defaultRoot;
   const { zapisi, oznaka: datasetOznaka } = ucitajDataset();
+
+  let emit;
+  if (args.izlaz) {
+    const putIzlaz = resolve(args.izlaz);
+    emit = (obj) => {
+      const line = JSON.stringify(obj);
+      console.log(line);
+      appendFileSync(putIzlaz, `${line}\n`, 'utf8');
+    };
+  } else {
+    emit = (obj) => console.log(JSON.stringify(obj));
+  }
 
   let mods;
   try {
-    mods = await ucitajModule();
+    mods = await ucitajModule(moduliKorijen);
   } catch (e) {
     console.error('Učitavanje modula nije uspjelo. Koristi: pnpm exec tsx scripts/benchmark-bot-odziv-runtime.mjs');
     console.error(e);
@@ -510,20 +696,17 @@ async function main() {
     return;
   }
 
-  const { snimka, meta, kandidatiZa, nacinSnimke } = indeksirajSnimku(zapisi, mods.izgradiRepertoarBotova);
+  const apiVarijanta = odrediApiVarijantu(mods, args.api);
+  const { snimka, meta, puniPoPrefiksu, kandidatiZa, nacinSnimke } = indeksirajSnimku(
+    zapisi,
+    mods.izgradiRepertoarBotova,
+  );
 
-  const konfigNormal = {
-    ...mods.ZADANA_KONFIGURACIJA_BOTA,
-    vjerojatnostNeznanjaUMalomSkupu: 0,
-  };
+  const napomenaIskrenosti =
+    'imaSlobodnuRijecNa skenira puniPoPrefiksu (svi zapisi dataseta po prefiksu); '
+    + 'poznatiKandidatiNa i nastavivo skeniraju samo repertoar (izgradiRepertoarBotova 256+256 ili simulirana polovica u meta).';
 
-  const konfigTezak = {
-    ...mods.ZADANA_KONFIGURACIJA_BOTA,
-    vjerojatnostNeznanjaUMalomSkupu: 0,
-    vjerojatnostTaktickogPoteza: 1,
-  };
-
-  console.log(JSON.stringify({
+  emit({
     tip: 'meta',
     oznaka: args.oznaka,
     seedBaza: args.seedBaza,
@@ -531,68 +714,114 @@ async function main() {
     putanjaDataset: process.env.KALADONT_BENCH_RJECNIK ?? null,
     zapisa: zapisi.length,
     izvorModula: mods.izvor,
+    moduliKorijen: mods.moduliKorijen,
+    apiVarijanta,
+    apiArg: args.api,
     prefiksi: args.prefiksi,
     poslova: args.poslova,
     brojAktivnihIgraca: args.aktivnih,
     ponavljanja: args.ponavljanja,
-    agregacija: 'sva-ponavljanja',
+    zagrijavanje: args.zagrijavanje,
+    dolazak: args.dolazak,
+    scenariji: args.scenariji,
+    izlaz: args.izlaz,
+    agregacija: 'mjerena-ponavljanja',
     validacijaRijeci: 'fixture-frekvencija-grupe',
     putRepertoara: mods.poznatiNastavciNastavivo ? 'poznatiNastavciNastavivo' : 'fallback-iterator',
     nacinSnimke,
-    napomena: 'Lokalni simulirani fixture (vidi nacinSnimke) — nije produkcijski p95/VPS. Brojači: igrivost, preglediRepertoara, preglediPunogPrefiksa, predmemorija, objedinjeneAnalize.',
-  }));
+    napomenaIskrenosti,
+    napomena: 'Lokalni benchmark — nije produkcijski p95/VPS. Brojači: igrivost, preglediRepertoara, preglediPunogPrefiksa, predmemorija.',
+  });
 
   let ikadFail = false;
-  const scenariji = args.tezakTakticki
-    ? [{ ime: 'tezak-takticki', konfig: konfigTezak }]
-    : [
-      { ime: 'normalan', konfig: konfigNormal },
-      { ime: 'tezak-takticki', konfig: konfigTezak },
-    ];
+  const zajednickiParam = {
+    RasporedjivacOdziva: mods.RasporedjivacOdziva,
+    CHECKPOINT_ZAPISA: mods.CHECKPOINT_ZAPISA,
+    poznatiNastavciNastavivo: mods.poznatiNastavciNastavivo,
+    odaberiPotezNastavivo: mods.odaberiPotezNastavivo,
+    stvoriStanjeBota: mods.stvoriStanjeBota,
+    PredmemorijaLegalnosti: mods.PredmemorijaLegalnosti,
+    potpisPotrosenihGrupa: mods.potpisPotrosenihGrupa,
+    predajSetImmediate: mods.predajSetImmediate,
+    apiVarijanta,
+    snimka,
+    meta,
+    puniPoPrefiksu,
+    timeoutMs: args.timeoutMs,
+    dolazak: args.dolazak,
+  };
 
-  for (const scenarij of scenariji) {
+  for (const scenarijIme of args.scenariji) {
     for (const brojPoslova of args.poslova) {
       for (const brojAktivnihIgraca of args.aktivnih) {
-        for (const pref of args.prefiksi) {
-          const kandidati = kandidatiZa(pref);
+        const prefiksi =
+          scenarijIme === 'veliki-prefiks'
+            ? [najveciPrefiks(puniPoPrefiksu).prefiks]
+            : args.prefiksi;
+
+        for (const prefUlaz of prefiksi) {
+          const scenarij = pripremiScenarij(
+            scenarijIme,
+            prefUlaz,
+            puniPoPrefiksu,
+            meta,
+            kandidatiZa,
+            mods.ZADANA_KONFIGURACIJA_BOTA,
+          );
+          const prefIzlaz = scenarij.prefiks;
+          const kandidati = scenarij.kandidati;
+
+          for (let w = 0; w < args.zagrijavanje; w += 1) {
+            const seedW = izracunajSeed(args.seedBaza, scenarijIme, -1 - w, brojPoslova, brojAktivnihIgraca, prefIzlaz);
+            const rw = await pokreniScenarij({
+              ...zajednickiParam,
+              konfig: scenarij.konfig,
+              scenarij,
+              brojPoslova,
+              brojAktivnihIgraca,
+              seed: seedW,
+            });
+            if (!rw.uspjeh) ikadFail = true;
+          }
+
           const runovi = [];
           for (let p = 0; p < args.ponavljanja; p += 1) {
-            const seed = izracunajSeed(args.seedBaza, scenarij.ime, p, brojPoslova, brojAktivnihIgraca, pref);
+            const seed = izracunajSeed(args.seedBaza, scenarijIme, p, brojPoslova, brojAktivnihIgraca, prefIzlaz);
             const r = await pokreniScenarij({
-              RasporedjivacOdziva: mods.RasporedjivacOdziva,
-              CHECKPOINT_ZAPISA: mods.CHECKPOINT_ZAPISA,
-              poznatiNastavciNastavivo: mods.poznatiNastavciNastavivo,
-              odaberiPotezNastavivo: mods.odaberiPotezNastavivo,
-              stvoriStanjeBota: mods.stvoriStanjeBota,
-              PredmemorijaLegalnosti: mods.PredmemorijaLegalnosti,
-              potpisPotrosenihGrupa: mods.potpisPotrosenihGrupa,
+              ...zajednickiParam,
               konfig: scenarij.konfig,
-              prefiks: pref,
-              kandidati,
-              snimka,
-              meta,
+              scenarij,
               brojPoslova,
               brojAktivnihIgraca,
               seed,
-              timeoutMs: args.timeoutMs,
             });
             if (!r.uspjeh) ikadFail = true;
             runovi.push(r);
           }
 
+          if (runovi.length === 0) continue;
+
           const syncovi = runovi.map((r) => r.syncNakonPrijaveMs);
           const ukupni = runovi.map((r) => r.ukupnoMs);
-          console.log(JSON.stringify({
+          emit({
             tip: 'rezultat',
             oznaka: args.oznaka,
-            scenarij: scenarij.ime,
+            scenarij: scenarijIme,
+            scenarijDetalji: scenarij.detalji,
+            apiVarijanta,
+            dolazak: args.dolazak,
+            zagrijavanje: args.zagrijavanje,
             dataset: datasetOznaka,
-            prefiks: pref,
+            prefiks: prefIzlaz,
+            trazenaSlova: scenarij.trazenaSlova,
             kandidata: kandidati.length,
+            velicinaPunogPrefiksa: (puniPoPrefiksu.get(prefIzlaz) ?? []).length,
+            kandidataRepertoar: kandidati.length,
             brojPoslova,
             brojAktivnihIgraca,
-            agregacija: 'sva-ponavljanja',
+            agregacija: 'mjerena-ponavljanja',
             validacijaRijeci: 'fixture-frekvencija-grupe',
+            napomenaIskrenosti,
             medSyncNakonPrijaveMs: Number(percentile(syncovi, 50).toFixed(3)),
             medUkupnoMs: Number(percentile(ukupni, 50).toFixed(3)),
             p95UkupnoMs: Number(percentile(ukupni, 95).toFixed(3)),
@@ -616,14 +845,14 @@ async function main() {
             objedinjeneAnalizeUkupno: runovi.reduce((a, r) => a + (r.objedinjeneAnalize ?? 0), 0),
             medPreglediRepertoaraPoRunu: Math.round(percentile(runovi.map((r) => r.preglediRepertoara ?? 0), 50)),
             medPreglediPunogPrefiksaPoRunu: Math.round(percentile(runovi.map((r) => r.preglediPunogPrefiksa ?? 0), 50)),
-          }));
+          });
         }
       }
     }
   }
 
   if (ikadFail) {
-    console.error(JSON.stringify({ tip: 'fail', razlog: 'nedovrseni ili pogreska poslovi' }));
+    emit({ tip: 'fail', razlog: 'nedovršeni ili pogreška poslovi' });
     process.exitCode = 1;
   }
 }
