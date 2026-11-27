@@ -4,11 +4,13 @@
   let {
     vrijednost = $bindable(''),
     oznaka = 'Lozinka',
+    placeholder,
     najmanjaDuljina,
     required = true,
   }: {
     vrijednost?: string;
     oznaka?: string;
+    placeholder?: string;
     najmanjaDuljina?: number;
     required?: boolean;
   } = $props();
@@ -23,6 +25,7 @@
       type={vidljiva ? 'text' : 'password'}
       aria-label={oznaka}
       bind:value={vrijednost}
+      {placeholder}
       minlength={najmanjaDuljina}
       {required}
     />
