@@ -51,7 +51,7 @@ test('profili prikazuju istaknuta dostignuća i tooltip na osobnom i javnom prof
   await expect(gumbiDostignuca.nth(3)).toHaveAttribute('aria-label', 'Rijetkolovac, 2 od 5 zvjezdica');
   await expect(gumbiDostignuca.nth(4)).toHaveAttribute('aria-label', 'Dugometraš, 2 od 5 zvjezdica');
   await expect(gumbiDostignuca.nth(5)).toHaveAttribute('aria-label', 'Slijepa ulica, 2 od 5 zvjezdica');
-  await expect(gumbiDostignuca.nth(0).locator('.ikona')).toHaveAttribute('src', '/ikone/39-iskusnjara.png');
+  await expect(gumbiDostignuca.nth(0).locator('.ikona')).toHaveAttribute('src', '/ikone/39-iskusnjara.webp');
   await gumbiDostignuca.nth(0).click();
   const opisDostignuca = page.getByRole('tooltip');
   await expect(opisDostignuca).toContainText('Dosegni razine iskustva.');

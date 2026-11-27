@@ -1,14 +1,14 @@
-/** Statički katalog avatara; novi avatar dodaje se ovdje i u static/avatari. */
+/** Statički katalog avatara (legacy ID); preferiraj generirani WebP / konfiguraciju. */
 export const AVATARI = [
-  { id: 0, putanja: '/avatari/avatar-borat-1.jpg', naziv: 'Borat 1' },
-  { id: 1, putanja: '/avatari/avatar-borat-2.jpg', naziv: 'Borat 2' },
-  { id: 2, putanja: '/avatari/avatar-cage-1.jpg', naziv: 'Cage' },
-  { id: 3, putanja: '/avatari/avatar-test-1.jpg', naziv: 'Avatar 4' },
-  { id: 4, putanja: '/avatari/avatar-test-2.jpg', naziv: 'Avatar 5' },
-  { id: 5, putanja: '/avatari/avatar-test-3.jpg', naziv: 'Avatar 6' },
-  { id: 6, putanja: '/avatari/avatar-test-4.jpg', naziv: 'Avatar 7' },
-  { id: 7, putanja: '/avatari/avatar-test-5.jpg', naziv: 'Avatar 8' },
-  { id: 8, putanja: '/avatari/avatar-test-6.jpg', naziv: 'Avatar 9' },
+  { id: 0, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 1' },
+  { id: 1, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 2' },
+  { id: 2, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 3' },
+  { id: 3, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 4' },
+  { id: 4, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 5' },
+  { id: 5, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 6' },
+  { id: 6, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 7' },
+  { id: 7, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 8' },
+  { id: 8, putanja: '/ikone/29-random-avatar.webp', naziv: 'Avatar 9' },
 ] as const;
 
 export const BROJ_AVATARA = AVATARI.length;
@@ -43,4 +43,3 @@ export function bojaBordera(rang: string | null): string | null {
 export function debljinaBorderaRanga(velicina: number): number {
   return Math.min(16, Math.max(3, Math.round(velicina * 0.065)));
 }
-

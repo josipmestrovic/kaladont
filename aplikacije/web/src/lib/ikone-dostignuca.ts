@@ -1,16 +1,16 @@
 export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
-  iskusnjara: '/ikone/39-iskusnjara.png',
-  rijetkolovac: '/ikone/40-rijetkolovac.png',
-  dugometras: '/ikone/41-dugometras.png',
-  jezik_u_plamenu: '/ikone/42-jezik-u-plamenu.png',
+  iskusnjara: '/ikone/39-iskusnjara.webp',
+  rijetkolovac: '/ikone/40-rijetkolovac.webp',
+  dugometras: '/ikone/41-dugometras.webp',
+  jezik_u_plamenu: '/ikone/42-jezik-u-plamenu.webp',
   vladar_niza: '/ikone/65-vladar-niza.webp',
   xp_prvak: '/ikone/66-xp-prvak.webp',
-  kaladont: '/ikone/43-kaladont.png',
-  ka_zna: '/ikone/44-ka-zna.png',
-  lovac_na_glave: '/ikone/45-lovac-na-glave.png',
-  slijepa_ulica: '/ikone/46-slijepa-ulica.png',
-  zavrsna_rijec: '/ikone/47-zavrsna-rijec.png',
-  glas_zajednice: '/ikone/48-glas-zajednice.png',
+  kaladont: '/ikone/43-kaladont.webp',
+  ka_zna: '/ikone/44-ka-zna.webp',
+  lovac_na_glave: '/ikone/45-lovac-na-glave.webp',
+  slijepa_ulica: '/ikone/46-slijepa-ulica.webp',
+  zavrsna_rijec: '/ikone/47-zavrsna-rijec.webp',
+  glas_zajednice: '/ikone/48-glas-zajednice.webp',
   zagrijan: '/ikone/64-zagrijan.webp',
   stalno_si_tu: '/ikone/63-stalno-si-tu.webp',
   covjek_na_misiji: '/ikone/68-covjek-na-misiji.webp',
@@ -27,9 +27,9 @@ export const IKONE_DOSTIGNUCA: Readonly<Record<string, string>> = {
   jezicni_detektiv: '/ikone/79-jezicni-detektiv.webp',
   cinkaros: '/ikone/80-cinkaros.webp',
   // HINT PR13: treca_sreca / imam_nastavak / salji_dalje / stara_skola namjerno
-  // nisu mapirani — ikonaDostignuca pada na /ikone/06-trofej.png dok vlasnik ne dostavi asset.
+  // nisu mapirani — ikonaDostignuca pada na /ikone/06-trofej.webp dok vlasnik ne dostavi asset.
 };
 
 export function ikonaDostignuca(id: string): string {
-  return IKONE_DOSTIGNUCA[id] ?? '/ikone/06-trofej.png';
+  return IKONE_DOSTIGNUCA[id] ?? '/ikone/06-trofej.webp';
 }

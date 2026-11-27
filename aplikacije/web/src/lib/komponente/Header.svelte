@@ -115,16 +115,16 @@
     {:else}
       <div class="lijeve-akcije">
         <button type="button" class="header-akcija" aria-label="Nazad" onclick={vratiSe}>
-          <img class="header-ikona" src="/ikone/03-nazad.png" alt="" aria-hidden="true" />
+          <img class="header-ikona" src="/ikone/03-nazad.webp" alt="" aria-hidden="true" />
         </button>
         {#if prikaziPovratakNaPocetnu}
           <a href="/" class="header-akcija" aria-label="Početna">
-            <img class="header-ikona" src="/ikone/04-naslovna.png" alt="" aria-hidden="true" />
+            <img class="header-ikona" src="/ikone/04-naslovna.webp" alt="" aria-hidden="true" />
           </a>
         {/if}
         {#if mozeNaprijed}
           <button type="button" class="header-akcija" aria-label="Naprijed" onclick={idiNaprijed}>
-            <img class="header-ikona" src="/ikone/05-naprijed.png" alt="" aria-hidden="true" />
+            <img class="header-ikona" src="/ikone/05-naprijed.webp" alt="" aria-hidden="true" />
           </button>
         {/if}
       </div>

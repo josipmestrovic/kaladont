@@ -46,14 +46,14 @@
     svih_vremena: 'ukupni',
   };
   const IKONE_METRIKA: Record<MetrikaLjestvice, string> = {
-    prosjek_bodova: '/ikone/06-trofej.png',
-    niz_pobjeda: '/ikone/19-vatra.png',
-    najbrzi_igraci: '/ikone/33-dnk-brzina.png',
-    niz_rijeci: '/ikone/42-jezik-u-plamenu.png',
-    iskustvo: '/ikone/39-iskusnjara.png',
-    kolekcija: '/ikone/21-kolekcija.png',
-    izazovi: '/ikone/06-trofej.png',
-    dostignuca: '/ikone/27-zvjezdica-puna.png',
+    prosjek_bodova: '/ikone/06-trofej.webp',
+    niz_pobjeda: '/ikone/19-vatra.webp',
+    najbrzi_igraci: '/ikone/33-dnk-brzina.webp',
+    niz_rijeci: '/ikone/42-jezik-u-plamenu.webp',
+    iskustvo: '/ikone/39-iskusnjara.webp',
+    kolekcija: '/ikone/21-kolekcija.webp',
+    izazovi: '/ikone/06-trofej.webp',
+    dostignuca: '/ikone/27-zvjezdica-puna.webp',
   };
 
   const url = $derived($page.url);

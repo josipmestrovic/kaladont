@@ -25,7 +25,7 @@
     postaviZavrsniEkranSanducica,
     potvrdiZavrsniSazetak,
   } from '$lib/stanje-sanducica.svelte.js';
-  import { pustiAudio } from '$lib/audio-manager.js';
+  import { pustiAudio, zagrijKrajZvukove } from '$lib/audio-manager.js';
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
@@ -1242,6 +1242,7 @@
   // Čim postoji kraj — učitaj mode-aware chunkove tijekom odgode prikaza.
   $effect(() => {
     if (!stanje.kraj) return;
+    zagrijKrajZvukove();
     let otkazano = false;
     void ucitajOdabraneZavrsneChunkove(false, () => otkazano).catch(() => {});
     return () => {
@@ -2021,7 +2022,7 @@
           {#if ocjenaIgraca !== null && ocjenaIgraca !== undefined}
             <span class="plasman-ocjena" aria-label={`Ocjena: ${ocjenaIgraca} od 5 zvjezdica`}>
               {#each Array.from({ length: 5 }, (_, indeks) => indeks < ocjenaIgraca) as ispunjena}
-                <img src={ispunjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />
+                <img src={ispunjena ? '/ikone/27-zvjezdica-puna.webp' : '/ikone/26-zvjezdica-prazna.webp'} alt="" aria-hidden="true" />
               {/each}
             </span>
           {/if}
@@ -2042,7 +2043,7 @@
       <strong>Tvoja ocjena</strong>
       <span class="ocjena-zvjezdice" aria-label={`Moja ocjena: ${stanje.kraj.mojaOcjenaIgre} od 5 zvjezdica`}>
         {#each Array.from({ length: 5 }, (_, indeks) => indeks < (stanje.kraj?.mojaOcjenaIgre ?? 0)) as ispunjena}
-          <img src={ispunjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />
+          <img src={ispunjena ? '/ikone/27-zvjezdica-puna.webp' : '/ikone/26-zvjezdica-prazna.webp'} alt="" aria-hidden="true" />
         {/each}
       </span>
       <PojamPomoc
@@ -2769,7 +2770,7 @@
                       <span class="posalji-streak" aria-hidden="true">
                         <span class="posalji-vatre">
                           {#each Array(brojVatriUGumbu) as _}
-                            <img src="/ikone/19-vatra.png" alt="" />
+                            <img src="/ikone/19-vatra.webp" alt="" />
                           {/each}
                         </span>
                         <strong>{stanje.trenutniStreak}</strong>

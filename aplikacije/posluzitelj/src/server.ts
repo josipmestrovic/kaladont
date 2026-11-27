@@ -362,6 +362,22 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
       '.svg': 'image/svg+xml',
       '.gif': 'image/gif',
     });
+    // Botovi / SVG dijelovi — ne diraj /avatari/g (hashirani generirani avatar, zasebna ruta).
+    servirajStatickiDirektorij('/avatari/botovi/*', path.join('avatari', 'botovi'), {
+      '.webp': 'image/webp',
+      '.png': 'image/png',
+      '.svg': 'image/svg+xml',
+    });
+    servirajStatickiDirektorij('/avatari/dijelovi/*', path.join('avatari', 'dijelovi'), {
+      '.svg': 'image/svg+xml',
+    });
+    servirajStatickiDirektorij('/fontovi/*', 'fontovi', {
+      '.woff2': 'font/woff2',
+      '.otf': 'font/otf',
+      '.ttf': 'font/ttf',
+      '.css': 'text/css; charset=utf-8',
+      '.txt': 'text/plain; charset=utf-8',
+    });
 
     app.route({
       method: ['GET', 'HEAD'],

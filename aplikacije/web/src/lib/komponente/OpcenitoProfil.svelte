@@ -75,7 +75,7 @@
           <span class="stat-broj">
             <span class="ocjena-zvjezdice" aria-label={`Prosječna ocjena ${ocjena} od 5`}>
               {#each Array.from({ length: 5 }, (_, i) => i < ocjena) as jeIspunjena}
-                <img src={jeIspunjena ? '/ikone/27-zvjezdica-puna.png' : '/ikone/26-zvjezdica-prazna.png'} alt="" aria-hidden="true" />
+                <img src={jeIspunjena ? '/ikone/27-zvjezdica-puna.webp' : '/ikone/26-zvjezdica-prazna.webp'} alt="" aria-hidden="true" />
               {/each}
             </span>
           </span>
