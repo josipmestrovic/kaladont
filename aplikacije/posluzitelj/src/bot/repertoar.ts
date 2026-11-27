@@ -16,8 +16,6 @@ function jeNepoznataBotu(rijec: string, frekvencija: number | null): boolean {
 export const REPERTOAR_GLAVNI_PO_PREFIKSU = 256;
 export const REPERTOAR_REZERVA_PO_PREFIKSU = 256;
 export const RADNI_UZORAK_PO_POTEZU = 100;
-export const DETALJNA_PROVJERA_PO_POTEZU = 12;
-export const UKUPNO_DETALJNO_PROVJERA = 24;
 
 /** Završeci koji taktici dodaju bod (teži nastavak za protivnika). */
 export const OPASNI_ZAVRSETCI_ZA_TAKTIKU: readonly string[] = ['ća', 'će', 'ši'];

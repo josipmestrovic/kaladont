@@ -109,16 +109,43 @@ function ucitajDataset() {
   return { zapisi, oznaka: 'rjecnik' };
 }
 
-/** Snimka u formatu SnimkaRepertoara (glavni/rezerva) + meta. */
-function indeksirajSnimku(zapisi) {
-  const poPrefiksuListe = new Map();
+/**
+ * Snimka u formatu SnimkaRepertoara (glavni/rezerva) + meta.
+ * Ako je dostupan izgradiRepertoarBotova — produkcijski limiti 256+256.
+ * Inače: simulirana polovica liste (označeno u meta rezultata).
+ */
+function indeksirajSnimku(zapisi, izgradiRepertoarBotova = null) {
   const meta = new Map();
+  const poPrefiksuListe = new Map();
   for (const z of zapisi) {
     const pref = z.prefiks ?? String(z.rijec).slice(0, 2);
     if (!poPrefiksuListe.has(pref)) poPrefiksuListe.set(pref, []);
     poPrefiksuListe.get(pref).push(z.rijec);
     meta.set(z.rijec, z);
   }
+
+  if (typeof izgradiRepertoarBotova === 'function') {
+    const izvor = {
+      prefiksi: () => poPrefiksuListe.keys(),
+      rijeciNaPrefiksu: (p) => poPrefiksuListe.get(p) ?? [],
+      frekvencijaZa: (r) => meta.get(r)?.frekvencija ?? null,
+      grupeZa: (r) => meta.get(r)?.grupe ?? [`imenica:${r}`],
+      jeOsnovniOblik: () => true,
+      jePostojecaRijec: (r) => meta.has(r),
+    };
+    const snimka = izgradiRepertoarBotova(izvor, 1);
+    return {
+      snimka,
+      meta,
+      nacinSnimke: 'izgradiRepertoarBotova',
+      kandidatiZa: (pref) => {
+        const s = snimka.poPrefiksu.get(pref);
+        if (!s) return [];
+        return [...s.glavni, ...s.rezerva];
+      },
+    };
+  }
+
   const poPrefiksu = new Map();
   for (const [pref, lista] of poPrefiksuListe) {
     const polovica = Math.ceil(lista.length / 2);
@@ -130,6 +157,7 @@ function indeksirajSnimku(zapisi) {
   return {
     snimka: { generacija: 1, poPrefiksu },
     meta,
+    nacinSnimke: 'simulirana-polovica',
     kandidatiZa: (pref) => {
       const s = poPrefiksu.get(pref);
       if (!s) return [];
@@ -188,12 +216,15 @@ async function ucitajModule() {
       const raspored = await import(pathToFileURL(srcRaspored).href);
       const konfigMod = await import(pathToFileURL(srcKonfig).href);
       let poznatiNastavciNastavivo = null;
+      let izgradiRepertoarBotova = null;
       if (existsSync(srcRepertoar)) {
         try {
           const rep = await import(pathToFileURL(srcRepertoar).href);
           poznatiNastavciNastavivo = rep.poznatiNastavciNastavivo ?? null;
+          izgradiRepertoarBotova = rep.izgradiRepertoarBotova ?? null;
         } catch {
           poznatiNastavciNastavivo = null;
+          izgradiRepertoarBotova = null;
         }
       }
       return {
@@ -203,6 +234,7 @@ async function ucitajModule() {
         CHECKPOINT_ZAPISA: raspored.CHECKPOINT_ZAPISA,
         ZADANA_KONFIGURACIJA_BOTA: konfigMod.ZADANA_KONFIGURACIJA_BOTA,
         poznatiNastavciNastavivo,
+        izgradiRepertoarBotova,
         izvor: 'tsx-src',
       };
     } catch (e) {
@@ -244,7 +276,14 @@ async function pokreniScenarij({
   const memPrije = process.memoryUsage();
   const zaustaviLag = pokreniUzorkovanjeLaga(lagUzorci);
 
+  const brojaci = {
+    igrivost: 0,
+    poznatiNastavak: 0,
+    puniIndeks: 0,
+  };
+
   const imaSlobodnu = (pref, potrosene) => {
+    brojaci.puniIndeks += 1;
     const stavka = snimka.poPrefiksu.get(pref);
     if (!stavka) return false;
     for (const r of [...stavka.glavni, ...stavka.rezerva]) {
@@ -258,6 +297,7 @@ async function pokreniScenarij({
   };
 
   const provjeriIgrivost = (rijec, potrosene) => {
+    brojaci.igrivost += 1;
     const m = meta.get(rijec);
     if (!m || (m.frekvencija ?? 0) <= 0) return false;
     const grupe = m.grupe ?? [`imenica:${rijec}`];
@@ -294,11 +334,13 @@ async function pokreniScenarij({
             iskoristeneGrupe: new Set(),
             imaSlobodnuRijecNa: imaSlobodnu,
             poznatiKandidatiNa: (p, potrosene) => {
+              brojaci.poznatiNastavak += 1;
               const stavka = snimka.poPrefiksu.get(p);
               if (!stavka) return [];
               return [...stavka.glavni, ...stavka.rezerva].filter((r) => provjeriIgrivost(r, potrosene));
             },
             poznatiKandidatiNaNastavivo: (p, potrosene) => {
+              brojaci.poznatiNastavak += 1;
               if (poznatiNastavciNastavivo) {
                 return poznatiNastavciNastavivo(
                   snimka,
@@ -387,6 +429,9 @@ async function pokreniScenarij({
     heapUsedMbPoslije: Number((memPoslije.heapUsed / 1024 / 1024).toFixed(2)),
     rssMbPoslije: Number((memPoslije.rss / 1024 / 1024).toFixed(2)),
     uspjeh: !timeoutPogoden && pogreska === 0 && nedovrseno === 0,
+    brojaciIgrivost: brojaci.igrivost,
+    brojaciPoznatiNastavak: brojaci.poznatiNastavak,
+    brojaciPuniIndeks: brojaci.puniIndeks,
   };
 }
 
@@ -397,7 +442,6 @@ function spojiBrojeve(ponavljanja, kljuc) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const { zapisi, oznaka: datasetOznaka } = ucitajDataset();
-  const { snimka, meta, kandidatiZa } = indeksirajSnimku(zapisi);
 
   let mods;
   try {
@@ -408,6 +452,8 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+
+  const { snimka, meta, kandidatiZa, nacinSnimke } = indeksirajSnimku(zapisi, mods.izgradiRepertoarBotova);
 
   const konfigNormal = {
     ...mods.ZADANA_KONFIGURACIJA_BOTA,
@@ -439,7 +485,8 @@ async function main() {
     agregacija: 'sva-ponavljanja',
     validacijaRijeci: 'fixture-frekvencija-grupe',
     putRepertoara: mods.poznatiNastavciNastavivo ? 'poznatiNastavciNastavivo' : 'fallback-iterator',
-    napomena: 'Lokalni fixture/bench — nije produkcijski p95/VPS.',
+    nacinSnimke,
+    napomena: 'Lokalni fixture/bench — nije produkcijski p95/VPS. Brojači: igrivost/poznati/puniIndeks.',
   }));
 
   let ikadFail = false;
@@ -506,6 +553,11 @@ async function main() {
             cpuUserUsMed: Math.round(percentile(runovi.map((r) => r.cpuUserUs), 50)),
             heapUsedMbPoslijeMed: Number(percentile(runovi.map((r) => r.heapUsedMbPoslije), 50).toFixed(2)),
             rssMbPoslijeMed: Number(percentile(runovi.map((r) => r.rssMbPoslije), 50).toFixed(2)),
+            brojaciIgrivostUkupno: runovi.reduce((a, r) => a + (r.brojaciIgrivost ?? 0), 0),
+            brojaciPoznatiNastavakUkupno: runovi.reduce((a, r) => a + (r.brojaciPoznatiNastavak ?? 0), 0),
+            brojaciPuniIndeksUkupno: runovi.reduce((a, r) => a + (r.brojaciPuniIndeks ?? 0), 0),
+            medPoznatiNastavakPoRunu: Math.round(percentile(runovi.map((r) => r.brojaciPoznatiNastavak ?? 0), 50)),
+            medPuniIndeksPoRunu: Math.round(percentile(runovi.map((r) => r.brojaciPuniIndeks ?? 0), 50)),
           }));
         }
       }

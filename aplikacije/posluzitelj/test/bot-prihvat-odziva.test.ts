@@ -33,8 +33,9 @@ function rng(seed: number): () => number {
 }
 
 describe('CI prihvat odziva botova', () => {
-  it('rani prekid: postoji nastavak bez čitanja ostatka velikog prefiksa', () => {
+  it('običan potez ne pregledava nastavke (skupe provjere samo u taktici)', () => {
     let pregledano = 0;
+    let indeksPoziva = 0;
     const poznatiKandidatiNa = () => ({
       *[Symbol.iterator](): Generator<string> {
         for (let i = 0; i < 10_000; i += 1) {
@@ -52,13 +53,13 @@ describe('CI prihvat odziva botova', () => {
       pravila: 'klasicni',
       brojAktivnih: 2,
       iskoristeneGrupe: new Set(),
-      imaSlobodnuRijecNa: () => true,
+      imaSlobodnuRijecNa: () => { indeksPoziva += 1; return true; },
       poznatiKandidatiNa,
       turnToken: 't-rani',
     }, stvoriStanjeBota(konfig, rng(1)), konfig, rng(1));
     expect(odluka.vrsta).toBe('rijec');
-    // izbjegni + filtriraj mogu dvaput krenuti bez cachea — uz predmemoriju jednom.
-    expect(pregledano).toBeLessThanOrEqual(4);
+    expect(pregledano).toBe(0);
+    expect(indeksPoziva).toBe(0);
   });
 
   it('cache ne raste s poviješću tokena (100 uzastopnih)', () => {

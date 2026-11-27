@@ -1,7 +1,7 @@
 /**
- * Čisti odabir botove riječi (ADR-017 / PR02).
- * Kontekstualno neznanje po tokenu, duel oprez i ograničena 1-ply taktika.
- * Procjena nastavka koristi javni repertoar profila; ista za čovjeka i bota.
+ * Čisti odabir botove riječi (ADR-017 / PR02 / Botovi V8).
+ * Kontekstualno neznanje po tokenu, oprezna KA politika i ograničena 1-ply taktika.
+ * Skupa analiza nastavaka samo u taktičkom budžetu — ne prije radnog uzorka.
  */
 import { grafemi, PRAGOVI_DULJINE, zadnjaDva, type FazaPoteza, type PravilnikPartije, type VrstaRijeci } from 'zajednicko';
 import { promijesajNiz } from '../igra/raspored-sjedala.js';
@@ -478,40 +478,6 @@ function brojCestihPoznatihNastavaka(
   return broj;
 }
 
-function filtrirajSigurne(
-  rijeci: readonly string[],
-  ulaz: UlazOdabira,
-  iskoristene: ReadonlySet<string>,
-): string[] {
-  const sigurne: string[] = [];
-  const nepoznate: string[] = [];
-  for (const rijec of rijeci) {
-    const nastavak = imaPoznatiNastavak(rijec, ulaz, iskoristene);
-    if (nastavak === true) sigurne.push(rijec);
-    else if (nastavak === null) nepoznate.push(rijec);
-  }
-  return sigurne.length ? sigurne : (nepoznate.length ? nepoznate : [...rijeci]);
-}
-
-function izbjegniSamoeliminaciju(
-  rijeci: readonly string[],
-  ulaz: UlazOdabira,
-  iskoristene: ReadonlySet<string>,
-): string[] {
-  const sigurne: string[] = [];
-  const nepoznate: string[] = [];
-  const mrtve: string[] = [];
-  for (const rijec of rijeci) {
-    const nastavak = imaPoznatiNastavak(rijec, ulaz, iskoristene);
-    if (nastavak === true) sigurne.push(rijec);
-    else if (nastavak === false) mrtve.push(rijec);
-    else nepoznate.push(rijec);
-  }
-  if (sigurne.length) return sigurne;
-  if (nepoznate.length) return nepoznate;
-  return mrtve;
-}
-
 function odaberiPoVrsti(
   skupina: readonly string[],
   stanje: StanjeBotaUPartiji,
@@ -640,13 +606,9 @@ export function odaberiPotez(
     }
   }
 
-  // Duel oprez: preferiraj riječi s legalnim poznatim nastavkom.
-  if (politika === 'oprezni') {
-    poznati = izbjegniSamoeliminaciju(poznati, ulaz, iskoristene);
-    const sigurne = filtrirajSigurne(poznati, ulaz, iskoristene);
-    if (sigurne.length) poznati = sigurne;
-  }
-
+  // Klasični: mrtvi završetak eliminira sljedećeg, ne autora — nema obveznog duel
+  // filtra nastavaka prije uzorka (distribucija u dvoboju može se promijeniti).
+  // Skupa analiza nastavaka ide samo u taktički budžet (≤ maksimalnoTaktickihKandidata).
   if (poznati.length > RADNI_UZORAK_PO_POTEZU) {
     poznati = uzorkujPonderirano(poznati, RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig);
   }
@@ -831,7 +793,17 @@ export async function odaberiPotezNastavivo(
   const klasifikacija = klasificirajPoznatiSkup(sviKandidati, ulaz.frekvencijaZa, ulaz.grupeZa, konfig);
   let poznati = klasifikacija.poznateRijeci;
   if (klasifikacija.vrsta === 'dovoljan' && poznati.length < sviKandidati.length) {
-    poznati = sviKandidati.filter((rijec) => !jeNepoznataBotu(rijec, ulaz.frekvencijaZa(rijec)));
+    // Dopuna poznatih: predaj na duljim petljama (broji stvarno pregledane zapise).
+    const dopuna: string[] = [];
+    for (let i = 0; i < sviKandidati.length; i += 1) {
+      const rijec = sviKandidati[i]!;
+      if (!jeNepoznataBotu(rijec, ulaz.frekvencijaZa(rijec))) dopuna.push(rijec);
+      if ((i + 1) % CHECKPOINT_ZAPISA === 0) {
+        await predaj();
+        if (!aktivan()) return null;
+      }
+    }
+    poznati = dopuna;
   }
   stanje.brojKandidata = poznati.length;
 
@@ -853,32 +825,14 @@ export async function odaberiPotezNastavivo(
     }
   }
 
-  if (politika === 'oprezni') {
-    const sigurne: string[] = [];
-    const nepoznate: string[] = [];
-    const mrtve: string[] = [];
-    for (let i = 0; i < poznati.length; i += 1) {
-      const rijec = poznati[i]!;
-      const nastavak = await imaPoznatiNastavakNastavivo(rijec, ulaz, iskoristene, predaj, aktivan);
-      if (nastavak === 'otkazano') return null;
-      if (nastavak === true) sigurne.push(rijec);
-      else if (nastavak === false) mrtve.push(rijec);
-      else nepoznate.push(rijec);
-      if (i > 0 && i % 8 === 0) {
-        await predaj();
-        if (!aktivan()) return null;
-      }
-    }
-    poznati = sigurne.length ? sigurne : (nepoznate.length ? nepoznate : mrtve);
-    if (sigurne.length || nepoznate.length) {
-      const pool = sigurne.length ? sigurne : nepoznate;
-      if (pool.length) poznati = pool;
-    }
-  }
-
+  // Ista politika kao sync: bez obveznog filtra nastavaka prije radnog uzorka.
   if (poznati.length > RADNI_UZORAK_PO_POTEZU) {
     poznati = uzorkujPonderirano(poznati, RADNI_UZORAK_PO_POTEZU, ulaz.frekvencijaZa, rng, konfig);
   }
+
+  if (!aktivan()) return null;
+  await predaj();
+  if (!aktivan()) return null;
 
   const { skupina: odabranaSkupina, prisilniKa } = pripremiSkupinuZaIzbor(poznati, politika, konfig, rng);
   if (odabranaSkupina.length === 0) {
