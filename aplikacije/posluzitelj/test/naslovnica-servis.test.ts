@@ -51,8 +51,10 @@ vi.mock('../src/baza/klijent.js', () => ({
 
 import { LJESTVICE_TIMEOUT_MS, izgradiNaslovnicaSazetak } from '../src/naslovnica/servis.js';
 import { izgradiOdgovorSazetkaLjestvice } from '../src/ljestvice/sazetak.js';
+import { dohvatiSazetak } from '../src/sanducic/servis.js';
 
 const mockLjestvice = vi.mocked(izgradiOdgovorSazetkaLjestvice);
+const mockSanducic = vi.mocked(dohvatiSazetak);
 
 function gostIgrac() {
   return {
@@ -73,7 +75,7 @@ describe('izgradiNaslovnicaSazetak', () => {
     vi.clearAllMocks();
   });
 
-  it('pri sporoj ljestvici vraća profil i neutralan status unutar timeouta', async () => {
+  it('pri sporoj ljestvici vraća profil i null ljestvice unutar timeouta', async () => {
     mockLjestvice.mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -96,15 +98,18 @@ describe('izgradiNaslovnicaSazetak', () => {
     expect(odgovor.ok).toBe(true);
     expect(odgovor.profil.nadimak).toBe('Gost');
     expect(odgovor.profil.igracId).toBe(gostIgrac().id);
-    expect(odgovor.ljestvice.status).toEqual({ vrsta: 'neutralan' });
+    expect(odgovor.ljestvice).toBeNull();
     expect(trajanje).toBeLessThan(LJESTVICE_TIMEOUT_MS + 150);
   });
 
-  it('pri padu ljestvice i dalje vraća profil', async () => {
+  it('pri padu ljestvice i sandučića vraća null sekcije, ne lažne nule', async () => {
     mockLjestvice.mockRejectedValue(new Error('ljestvice pad'));
+    mockSanducic.mockRejectedValue(new Error('sanducic pad'));
     const odgovor = await izgradiNaslovnicaSazetak(gostIgrac() as never);
     expect(odgovor.profil.nadimak).toBe('Gost');
-    expect(odgovor.ljestvice.status).toEqual({ vrsta: 'neutralan' });
-    expect(odgovor.kolekcija.ukupnoOtkljucano).toBe(0);
+    expect(odgovor.ljestvice).toBeNull();
+    expect(odgovor.obavijesti).toBeNull();
+    expect(odgovor.kolekcija).toEqual({ ukupnoOtkljucano: 0 });
+    expect(odgovor.misije).toBeNull();
   });
 });

@@ -76,10 +76,12 @@ function osigurajResurs(): NaslovnicaResurs | null {
       jeApiGreska401: (greska) => greska instanceof ApiGreska && greska.status === 401,
       naPrimjenu: (odgovor) => {
         postaviProfilIzSazetka(uProfilSnapshot(odgovor));
-        primijeniSazetakSanducicaIzNaslovnice({
-          brojNeprocitanih: odgovor.obavijesti.brojNeprocitanih,
-          zaNajavu: odgovor.obavijesti.zaNajavu,
-        });
+        if (odgovor.obavijesti) {
+          primijeniSazetakSanducicaIzNaslovnice({
+            brojNeprocitanih: odgovor.obavijesti.brojNeprocitanih,
+            zaNajavu: odgovor.obavijesti.zaNajavu,
+          });
+        }
       },
     });
     resurs.pretplatiSe(sinkroniziraj);

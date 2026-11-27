@@ -8,7 +8,6 @@
   import { putanjaBrzeIgre } from '$lib/igraj-rute.js';
   import {
     defaultOpisIzazova,
-    izracunajPrikazIzazovaIzSazetka,
     type PrikazIzazovaKartice,
   } from '$lib/naslovnica-izazovi.js';
   import BrzePostavke from '$lib/komponente/BrzePostavke.svelte';
@@ -19,7 +18,6 @@
     labelaZvjezdicaDostignuca,
     MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
     natpisBadgaDostignuca,
-    normalizirajZvjezdiceDostignuca,
     type PrikazZvjezdicaDostignuca,
   } from '$lib/naslovnica-dostignuca.js';
   import {
@@ -28,6 +26,7 @@
     natpisBadgaMisija,
     type PrikazAktivnihMisija,
   } from '$lib/naslovnica-misije.js';
+  import { spojiSazetakNaBadgee } from '$lib/naslovnica-sazetak-ui.js';
   import {
     NASLOVNICA_SEO_DESCRIPTION,
     NASLOVNICA_SEO_TITLE,
@@ -39,7 +38,6 @@
     invalidirajNaslovnicaSazetak,
     osigurajNaslovnicaSazetak,
   } from '$lib/stanje-naslovnica.svelte.js';
-  import { tekstSazetkaLjestvice } from '$lib/naslovnica-ljestvice.js';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const naslovnica = dohvatiStanjeNaslovnice();
@@ -108,10 +106,14 @@
   function primijeniSazetakNaUi() {
     const sazetak = naslovnica.sazetak;
     if (!sazetak) return;
-    izazoviPrikaz = izracunajPrikazIzazovaIzSazetka(sazetak.izazovi);
-    brojRijeciKolekcije = sazetak.kolekcija.ukupnoOtkljucano;
-    dostignucaZvjezdice = normalizirajZvjezdiceDostignuca(sazetak.dostignuca);
-    ljestviceTekst = tekstSazetkaLjestvice(sazetak.ljestvice.status);
+    const spojeno = spojiSazetakNaBadgee(
+      { izazoviPrikaz, brojRijeciKolekcije, dostignucaZvjezdice, ljestviceTekst },
+      sazetak,
+    );
+    izazoviPrikaz = spojeno.izazoviPrikaz;
+    brojRijeciKolekcije = spojeno.brojRijeciKolekcije;
+    dostignucaZvjezdice = spojeno.dostignucaZvjezdice;
+    ljestviceTekst = spojeno.ljestviceTekst;
   }
 
   function resetirajBadgee() {

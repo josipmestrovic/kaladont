@@ -1,6 +1,7 @@
 /**
  * Ugovor za objedinjeni sažetak naslovnice (`GET /api/naslovnica/sazetak`).
  * Namijenjen isključivo prikazu naslovnice / Headera — detaljne stranice zadržavaju svoje endpointe.
+ * Sekcije osim `profil` smiju biti `null` kad podservis padne — klijent zadržava zadnji uspješan prikaz.
  */
 import type { AvatarConfigV1 } from './avatar.js';
 import type { StanjeIskustva } from './iskustvo.js';
@@ -15,6 +16,8 @@ export interface NaslovnicaProfilSazetak {
   vrsta: VrstaIgracaNaslovnice;
   avatarId: number;
   avatarConfig: AvatarConfigV1 | null;
+  /** Hash generirane WebP slike; `null` ako nije dostupna. */
+  avatarSlikaHash?: string | null;
   email: string | null;
   rang: string | null;
   rang1v1: string | null;
@@ -55,11 +58,15 @@ export interface OdgovorNaslovnicaSazetka {
   ok: true;
   igracId: string;
   profil: NaslovnicaProfilSazetak;
-  izazovi: NaslovnicaIzazoviSazetak;
-  /** `null` za gosta — misije zahtijevaju registraciju. */
+  /** `null` = podservis nije uspio; klijent zadržava prethodni prikaz. */
+  izazovi: NaslovnicaIzazoviSazetak | null;
+  /**
+   * `null` za gosta (misije nedostupne) ili kad podservis padne za registriranog.
+   * Gost vs greška: klijent razlikuje po `profil.vrsta`.
+   */
   misije: NaslovnicaMisijeSazetak | null;
-  kolekcija: { ukupnoOtkljucano: number };
-  dostignuca: NaslovnicaDostignucaSazetak;
-  ljestvice: NaslovnicaLjestviceSazetak;
-  obavijesti: NaslovnicaObavijestiSazetak;
+  kolekcija: { ukupnoOtkljucano: number } | null;
+  dostignuca: NaslovnicaDostignucaSazetak | null;
+  ljestvice: NaslovnicaLjestviceSazetak | null;
+  obavijesti: NaslovnicaObavijestiSazetak | null;
 }

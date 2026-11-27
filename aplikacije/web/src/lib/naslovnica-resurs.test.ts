@@ -182,7 +182,48 @@ describe('naslovnica-resurs', () => {
     });
     await resurs.osiguraj();
     resurs.ukloniObavijestiIzListe(['p1']);
-    expect(resurs.sazetak?.obavijesti.neprocitane.map((p) => p.id)).toEqual(['p2']);
-    expect(resurs.sazetak?.obavijesti.brojNeprocitanih).toBe(1);
+    expect(resurs.sazetak?.obavijesti?.neprocitane.map((p) => p.id)).toEqual(['p2']);
+    expect(resurs.sazetak?.obavijesti?.brojNeprocitanih).toBe(1);
+  });
+
+  it('null obavijesti ne brišu prethodnu listu', async () => {
+    const sObavijestima = bazaSazetka('id-1');
+    const bezObavijesti: OdgovorNaslovnicaSazetka = {
+      ...bazaSazetka('id-1'),
+      obavijesti: null,
+      kolekcija: { ukupnoOtkljucano: 3 },
+    };
+    const api = vi
+      .fn()
+      .mockResolvedValueOnce(sObavijestima)
+      .mockResolvedValueOnce(bezObavijesti);
+    const resurs = stvoriNaslovnicaResurs({
+      api,
+      oporavi401: async () => {},
+      jeApiGreska401: () => false,
+    });
+    await resurs.osiguraj();
+    expect(resurs.obavijestiLista?.poruke).toEqual([]);
+    await resurs.osiguraj({ forsaj: true });
+    expect(resurs.sazetak?.kolekcija?.ukupnoOtkljucano).toBe(3);
+    expect(resurs.sazetak?.obavijesti).toBeNull();
+    expect(resurs.obavijestiLista?.poruke).toEqual([]);
+  });
+
+  it('invalidiraj podiže generaciju i forsaj dohvaća novi sažetak', async () => {
+    const api = vi
+      .fn()
+      .mockResolvedValueOnce(bazaSazetka('id-1', 'Stari'))
+      .mockResolvedValueOnce(bazaSazetka('id-2', 'Novi'));
+    const resurs = stvoriNaslovnicaResurs({
+      api,
+      oporavi401: async () => {},
+      jeApiGreska401: () => false,
+    });
+    await resurs.osiguraj();
+    resurs.invalidiraj();
+    await resurs.osiguraj({ forsaj: true });
+    expect(resurs.sazetak?.profil.nadimak).toBe('Novi');
+    expect(api).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,14 +1,12 @@
 /**
  * Objedinjeni sažetak naslovnice — tanki SQL / postojeći servisi, bez internog HTTP-a.
- * Parcijalne greške i spora ljestvica ne ruše cijeli odgovor.
+ * Parcijalne greške vraćaju `null` sekcije (klijent zadržava zadnji uspješan prikaz).
  */
 import {
   BROJ_AKTIVNIH_IZAZOVA,
-  DEFINICIJE_DOSTIGNUCA,
   izgradiAgregateLevela,
   izracunajRangIzAgregata,
   izracunajSazetakZvjezdicaDostignuca,
-  jeDostignuceVidljivo,
   kolekcijskiKljucGrupe,
   stanjeIskustva,
   type AvatarConfigV1,
@@ -33,11 +31,6 @@ type IgracSesije = typeof igraci.$inferSelect;
 
 /** Ne blokiraj osnovni profil na sporom poretku ljestvica. */
 export const LJESTVICE_TIMEOUT_MS = 400;
-
-const MAKS_ZVJEZDICA_FALLBACK = DEFINICIJE_DOSTIGNUCA.filter((d) => jeDostignuceVidljivo(d.id)).reduce(
-  (z, d) => z + d.pragovi.length,
-  0,
-);
 
 function izazovOmogucen(): boolean {
   return konfiguracija.IZAZOV_OMOGUCEN === 'true';
@@ -88,7 +81,9 @@ async function dohvatiSazetakZvjezdica(
   };
 }
 
-async function dohvatiSazetakIzazova(igracId: string): Promise<OdgovorNaslovnicaSazetka['izazovi']> {
+async function dohvatiSazetakIzazova(
+  igracId: string,
+): Promise<NonNullable<OdgovorNaslovnicaSazetka['izazovi']>> {
   const omogucen = izazovOmogucen();
   const ukupno = BROJ_AKTIVNIH_IZAZOVA;
   if (!omogucen) {
@@ -106,34 +101,21 @@ async function dohvatiSazetakIzazova(igracId: string): Promise<OdgovorNaslovnica
 
 async function dohvatiSazetakMisija(igrac: IgracSesije): Promise<OdgovorNaslovnicaSazetka['misije']> {
   if (igrac.vrsta === 'gost') return null;
-  try {
-    const stanje = await baza.transaction((tx) => izgradiStanjeMisijaDto(tx, igrac.id));
-    const dnevneAktivne = stanje.dnevne.aktivne.length;
-    const tjedneAktivne = stanje.tjedne.misije.filter((m) => m.status === 'aktivna').length;
-    return {
-      dnevneAktivne,
-      tjedneAktivne,
-      ukupnoAktivnih: dnevneAktivne + tjedneAktivne,
-      novosti: stanje.novosti,
-    };
-  } catch {
-    return {
-      dnevneAktivne: 0,
-      tjedneAktivne: 0,
-      ukupnoAktivnih: 0,
-      novosti: { dnevne: false, tjedne: false },
-    };
-  }
-}
-
-function neutralneLjestvice(sada = new Date()): OdgovorNaslovnicaSazetka['ljestvice'] {
-  return { status: { vrsta: 'neutralan' }, izracunatoU: sada.toISOString() };
+  const stanje = await baza.transaction((tx) => izgradiStanjeMisijaDto(tx, igrac.id));
+  const dnevneAktivne = stanje.dnevne.aktivne.length;
+  const tjedneAktivne = stanje.tjedne.misije.filter((m) => m.status === 'aktivna').length;
+  return {
+    dnevneAktivne,
+    tjedneAktivne,
+    ukupnoAktivnih: dnevneAktivne + tjedneAktivne,
+    novosti: stanje.novosti,
+  };
 }
 
 async function dohvatiLjestviceSTimeoutom(
   igracId: string,
   timeoutMs = LJESTVICE_TIMEOUT_MS,
-): Promise<OdgovorNaslovnicaSazetka['ljestvice']> {
+): Promise<NonNullable<OdgovorNaslovnicaSazetka['ljestvice']>> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const rezultat = await Promise.race([
@@ -141,23 +123,21 @@ async function dohvatiLjestviceSTimeoutom(
         status: odgovor.status,
         izracunatoU: odgovor.izracunatoU,
       })),
-      new Promise<OdgovorNaslovnicaSazetka['ljestvice']>((resolve) => {
-        timer = setTimeout(() => resolve(neutralneLjestvice()), timeoutMs);
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('ljestvice-timeout')), timeoutMs);
       }),
     ]);
     return rezultat;
-  } catch {
-    return neutralneLjestvice();
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
 }
 
-async function sigurno<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+async function iliNull<T>(fn: () => Promise<T>): Promise<T | null> {
   try {
     return await fn();
   } catch {
-    return fallback;
+    return null;
   }
 }
 
@@ -176,49 +156,47 @@ export async function izgradiNaslovnicaSazetak(igrac: IgracSesije): Promise<Odgo
     iskustvo,
   };
 
-  const prazanSanducic = {
-    brojNeprocitanih: 0,
-    zaNajavu: [] as OdgovorNaslovnicaSazetka['obavijesti']['zaNajavu'],
-  };
-  const praznaLista = {
-    poruke: [] as OdgovorNaslovnicaSazetka['obavijesti']['neprocitane'],
-    sljedeciCursor: null as string | null,
-  };
-
   const [izazovi, misije, ukupnoOtkljucano, dostignuca, ljestvice, sanducicSazetak, sanducicLista] =
     await Promise.all([
-      sigurno(
-        () => dohvatiSazetakIzazova(igrac.id),
-        { omogucen: false, zavrseno: 0, ukupno: BROJ_AKTIVNIH_IZAZOVA },
-      ),
-      dohvatiSazetakMisija(igrac),
-      sigurno(() => dohvatiBrojOtkljucanihKolekcije(igrac.id), 0),
-      sigurno(
-        () => dohvatiSazetakZvjezdica(igrac.id, igrac.iskustvoUkupno),
-        { ukupnoZvjezdica: 0, maksimalnoZvjezdica: MAKS_ZVJEZDICA_FALLBACK },
-      ),
-      dohvatiLjestviceSTimeoutom(igrac.id),
-      sigurno(() => dohvatiSazetak(igrac.id), prazanSanducic),
-      sigurno(
-        () => dohvatiListu(igrac.id, { samoNeprocitane: true, limit: 20 }),
-        praznaLista,
-      ),
+      iliNull(() => dohvatiSazetakIzazova(igrac.id)),
+      iliNull(() => dohvatiSazetakMisija(igrac)),
+      iliNull(() => dohvatiBrojOtkljucanihKolekcije(igrac.id)),
+      iliNull(() => dohvatiSazetakZvjezdica(igrac.id, igrac.iskustvoUkupno)),
+      iliNull(() => dohvatiLjestviceSTimeoutom(igrac.id)),
+      iliNull(() => dohvatiSazetak(igrac.id)),
+      iliNull(() => dohvatiListu(igrac.id, { samoNeprocitane: true, limit: 20 })),
     ]);
+
+  // Gost: misije namjerno null. Registriran + pad: također null (ne lažne nule).
+  const misijeOdgovor =
+    igrac.vrsta === 'gost' ? null : misije === null ? null : misije;
+
+  let obavijesti: OdgovorNaslovnicaSazetka['obavijesti'] = null;
+  if (sanducicSazetak && sanducicLista) {
+    obavijesti = {
+      brojNeprocitanih: sanducicSazetak.brojNeprocitanih,
+      zaNajavu: sanducicSazetak.zaNajavu,
+      neprocitane: sanducicLista.poruke,
+      sljedeciCursor: sanducicLista.sljedeciCursor,
+    };
+  } else if (sanducicSazetak) {
+    obavijesti = {
+      brojNeprocitanih: sanducicSazetak.brojNeprocitanih,
+      zaNajavu: sanducicSazetak.zaNajavu,
+      neprocitane: [],
+      sljedeciCursor: null,
+    };
+  }
 
   return {
     ok: true,
     igracId: igrac.id,
     profil,
     izazovi,
-    misije,
-    kolekcija: { ukupnoOtkljucano },
+    misije: misijeOdgovor,
+    kolekcija: ukupnoOtkljucano === null ? null : { ukupnoOtkljucano },
     dostignuca,
     ljestvice,
-    obavijesti: {
-      brojNeprocitanih: sanducicSazetak.brojNeprocitanih,
-      zaNajavu: sanducicSazetak.zaNajavu,
-      neprocitane: sanducicLista.poruke,
-      sljedeciCursor: sanducicLista.sljedeciCursor,
-    },
+    obavijesti,
   };
 }

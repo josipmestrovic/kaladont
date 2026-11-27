@@ -46,10 +46,13 @@ export function stvoriNaslovnicaResurs(ovisnosti: NaslovnicaResursOvisnosti) {
     igracId = odgovor.igracId;
     status = 'spreman';
     primijenjenaGeneracija = mojaGeneracija;
-    obavijestiLista = {
-      poruke: odgovor.obavijesti.neprocitane,
-      sljedeciCursor: odgovor.obavijesti.sljedeciCursor,
-    };
+    // Null obavijesti = podservis pao — zadrži prethodnu listu.
+    if (odgovor.obavijesti) {
+      obavijestiLista = {
+        poruke: odgovor.obavijesti.neprocitane,
+        sljedeciCursor: odgovor.obavijesti.sljedeciCursor,
+      };
+    }
     ovisnosti.naPrimjenu?.(odgovor);
     objavi();
   }
@@ -177,7 +180,7 @@ export function stvoriNaslovnicaResurs(ovisnosti: NaslovnicaResursOvisnosti) {
         poruke: obavijestiLista.poruke.filter((p) => !skup.has(p.id)),
       };
     }
-    if (sazetak) {
+    if (sazetak?.obavijesti) {
       const neprocitane = sazetak.obavijesti.neprocitane.filter((p) => !skup.has(p.id));
       const broj = Math.max(0, sazetak.obavijesti.brojNeprocitanih - ids.length);
       sazetak = {

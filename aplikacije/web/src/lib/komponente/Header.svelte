@@ -66,7 +66,9 @@
     };
     const azurirajIdentitet = () => {
       invalidirajProfil();
-      // Na / +page invalidira i forsira sažetak; Header samo čisti profil snapshot.
+      // Uvijek invalidiraj sažetak — +page može biti unmountan izvan `/`.
+      invalidirajNaslovnicaSazetak();
+      // Na `/` +page forsira osvježenje; drugdje samo profil.
       if ($page.url.pathname === '/') return;
       void osigurajProfil({ forsaj: true });
     };

@@ -55,13 +55,13 @@ describe('GET /api/naslovnica/sazetak', () => {
       expect.objectContaining({ razina: expect.any(Number), ukupno: expect.any(Number) }),
     );
     expect(tijelo.misije).toBeNull();
-    expect(tijelo.kolekcija.ukupnoOtkljucano).toBeGreaterThanOrEqual(0);
-    expect(tijelo.dostignuca.ukupnoZvjezdica).toBeGreaterThanOrEqual(0);
-    expect(tijelo.dostignuca.maksimalnoZvjezdica).toBeGreaterThan(0);
-    expect(tijelo.izazovi.ukupno).toBeGreaterThan(0);
-    expect(tijelo.ljestvice.status).toBeDefined();
-    expect(tijelo.obavijesti.brojNeprocitanih).toBeGreaterThanOrEqual(0);
-    expect(Array.isArray(tijelo.obavijesti.neprocitane)).toBe(true);
+    expect(tijelo.kolekcija?.ukupnoOtkljucano).toBeGreaterThanOrEqual(0);
+    expect(tijelo.dostignuca?.ukupnoZvjezdica).toBeGreaterThanOrEqual(0);
+    expect(tijelo.dostignuca?.maksimalnoZvjezdica).toBeGreaterThan(0);
+    expect(tijelo.izazovi?.ukupno).toBeGreaterThan(0);
+    expect(tijelo.ljestvice?.status).toBeDefined();
+    expect(tijelo.obavijesti?.brojNeprocitanih).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(tijelo.obavijesti?.neprocitane)).toBe(true);
   });
 
   it('vraća sažetak misija za registriranog igrača', async () => {
