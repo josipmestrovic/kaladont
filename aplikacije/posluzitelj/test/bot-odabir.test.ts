@@ -1141,7 +1141,10 @@ describe('bot kontroler', () => {
 
   it('promjena rječnika tijekom čekanja ponovno bira riječ, a odbijena riječ se broji kao tehnička greška', async () => {
     let verzija = 1;
-    const izvrsi = vi.fn((_p: string, _i: string, n: { vrsta: string }) => (n.vrsta === 'rijec' ? { ishod: 'odbijen', kod: 'RIJEC_NE_POSTOJI', poruka: '' } : { ishod: 'prihvacen' }) as RezultatNaredbe);
+    const izvrsi = vi.fn((...args: [string, string, { vrsta: string }]) => {
+      const n = args[2];
+      return (n.vrsta === 'rijec' ? { ishod: 'odbijen', kod: 'RIJEC_NE_POSTOJI', poruka: '' } : { ishod: 'prihvacen' }) as RezultatNaredbe;
+    });
     const { kontroler, timeri, prekini, odgubi } = stvori(izvrsi, () => verzija);
     kontroler.naPromjenuPoteza(dogadaj());
     verzija = 2;
@@ -1180,7 +1183,7 @@ describe('bot kontroler', () => {
     let kontrolerRef: BotKontroler | null = null;
     let zadrziNoviPosao = false;
     let pustiNoviPosao: (() => void) | null = null;
-    const izvrsi = vi.fn((_p: string, _i: string, _n: unknown) => {
+    const izvrsi = vi.fn(() => {
       if (prviPokusaj) {
         prviPokusaj = false;
         throw new Error('Privremeni kvar za oporavak');
