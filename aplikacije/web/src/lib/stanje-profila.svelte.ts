@@ -61,4 +61,9 @@ export function azurirajAvatarProfila(avatarConfig: AvatarConfigV1): void {
   osigurajResurs()?.azurirajAvatar(avatarConfig);
 }
 
+/** Hidracija snapshota iz `/naslovnica/sazetak` (Header dijeli podatke bez GET /profil). */
+export function postaviProfilIzSazetka(snapshot: ProfilSnapshot): void {
+  osigurajResurs()?.postaviIzSazetka(snapshot);
+}
+
 export type { ProfilSnapshot, StatusProfila };

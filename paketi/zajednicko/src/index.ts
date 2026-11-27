@@ -25,3 +25,4 @@ export * from './kolekcija.js';
 export * from './uvjeti.js';
 export * from './bot-identiteti.js';
 export * from './izazovi.js';
+export * from './naslovnica.js';

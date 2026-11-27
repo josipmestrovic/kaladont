@@ -4,14 +4,13 @@
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { oznaciPregledMisija } from '$lib/misije-klijent.js';
   import {
-    dohvatiStanjeMisijaStore,
-    invalidirajStanjeMisija,
-    osigurajStanjeMisija,
-  } from '$lib/stanje-misija.svelte.js';
+    dohvatiStanjeNaslovnice,
+    osigurajNaslovnicaSazetak,
+  } from '$lib/stanje-naslovnica.svelte.js';
 
   type Skupina = 'dnevna' | 'tjedna';
 
-  const misijeStore = dohvatiStanjeMisijaStore();
+  const naslovnica = dohvatiStanjeNaslovnice();
   let poruka = $state<string | null>(null);
   let skupineNaCekanju = $state<Skupina[]>([]);
   let zatvaranje = $state(false);
@@ -34,27 +33,32 @@
     skupineNaCekanju = [];
   }
 
-  async function pokreni() {
-    const ova = ++generacija;
-    if (!smijePrikazati()) {
-      ocisti();
-      return;
-    }
-    const stanje = await osigurajStanjeMisija({ forsaj: true });
-    if (ova !== generacija || !smijePrikazati()) return;
-    if (!stanje) {
+  function primijeniNovosti() {
+    const misije = naslovnica.misije;
+    if (!misije) {
       ocisti();
       return;
     }
     const skupine: Skupina[] = [];
-    if (stanje.novosti.dnevne) skupine.push('dnevna');
-    if (stanje.novosti.tjedne) skupine.push('tjedna');
+    if (misije.novosti.dnevne) skupine.push('dnevna');
+    if (misije.novosti.tjedne) skupine.push('tjedna');
     if (skupine.length === 0) {
       ocisti();
       return;
     }
     skupineNaCekanju = skupine;
     poruka = tekstZa(skupine);
+  }
+
+  async function pokreni(opcije: { forsaj?: boolean } = {}) {
+    const ova = ++generacija;
+    if (!smijePrikazati()) {
+      ocisti();
+      return;
+    }
+    await osigurajNaslovnicaSazetak({ forsaj: opcije.forsaj });
+    if (ova !== generacija || !smijePrikazati()) return;
+    primijeniNovosti();
   }
 
   async function oznaciSveNaCekanju() {
@@ -94,8 +98,7 @@
     const naIdentitet = () => {
       generacija += 1;
       ocisti();
-      invalidirajStanjeMisija();
-      void pokreni();
+      void pokreni({ forsaj: true });
     };
     window.addEventListener('kaladont:identitet-promijenjen', naIdentitet);
     return () => {
@@ -111,9 +114,11 @@
     }
   });
 
-  // Referenca da store ostane živ za badge na naslovnici dok je toast mountan.
+  // Referenca da store ostane živ dok je toast mountan.
   $effect(() => {
-    void misijeStore.status;
+    void naslovnica.status;
+    void naslovnica.misije?.novosti.dnevne;
+    void naslovnica.misije?.novosti.tjedne;
   });
 </script>
 

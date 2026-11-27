@@ -114,6 +114,13 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
     postavi({ ...snapshot, avatarConfig }, status === 'greska' || status === 'prazno' ? 'spreman' : status);
   }
 
+  /** Hidracija iz `GET /naslovnica/sazetak` — bez zasebnog GET /profil. */
+  function postaviIzSazetka(novi: ProfilSnapshot) {
+    generacija += 1;
+    inFlight = null;
+    postavi(novi, 'spreman');
+  }
+
   return {
     get snapshot() {
       return snapshot;
@@ -130,6 +137,7 @@ export function stvoriProfilResurs(ovisnosti: ProfilResursOvisnosti) {
     osiguraj,
     invalidiraj,
     azurirajAvatar,
+    postaviIzSazetka,
     pretplatiSe(cb: () => void) {
       pretplatnici.add(cb);
       return () => {

@@ -47,6 +47,10 @@ Stari `GET /api/ljestvica` ostaje privremeno radi kompatibilnosti (`mod=dva_igra
 
 Admin (sesija `vrsta=admin`): `GET /api/admin/prijave?status=nova&tip=…`, `POST …/obrisi-rijec|dodaj-rijec|dismiss`; `GET /api/admin/prijave-igraca`, `POST …/obrisi-racun|dismiss`. Izmjene rječnika zovu `ponovoUcitaj()`.
 
+## Naslovnica (BFF sažetak)
+
+`GET /api/naslovnica/sazetak` zahtijeva identifikaciju (`gost` ili registrirani). Jedan odgovor za prikaz naslovnice i Headera: tanki profil (nadimak, avatar, XP/level, rang), sažetak izazova, broj aktivnih misija + novosti (ili `misije: null` za gosta), broj otključanih riječi, zvjezdice dostignuća, status ljestvice te sandučić (broj nepročitanih, `zaNajavu`, prva stranica nepročitanih). `Cache-Control: private, no-store`. Detaljne stranice i dalje koriste postojeće endpointe (`/profil`, `/izazovi`, `/misije`, `/profil/kolekcija`, `/dostignuca`, `/ljestvice/sazetak`, `/sanducic…`).
+
 ## Sandučic (mailbox)
 
 Autorizirani gost ili registrirani (`zahtijevajIdentifikaciju`). Primatelj je uvijek iz sesije; klijent ne bira tuđi pretinac. Odgovori imaju `Cache-Control: private, no-store`. Po igraču ostaje najviše 20 najnovijih poruka; starije od 3 dana i višak iznad limita brišu se pri upisu i periodički.

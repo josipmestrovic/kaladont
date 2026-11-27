@@ -10,6 +10,10 @@
     osigurajProfil,
     stanjeProfila,
   } from '$lib/stanje-profila.svelte.js';
+  import {
+    invalidirajNaslovnicaSazetak,
+    osigurajNaslovnicaSazetak,
+  } from '$lib/stanje-naslovnica.svelte.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
   import { type AvatarConfigV1 } from 'zajednicko';
@@ -48,6 +52,7 @@
     await prijediNaGostujucuSesiju();
     await osvjeziSocketIdentitet().catch(() => {});
     invalidirajProfil();
+    invalidirajNaslovnicaSazetak();
     window.dispatchEvent(new CustomEvent('kaladont:identitet-promijenjen'));
     window.location.assign('/');
   }
@@ -59,7 +64,9 @@
     };
     const azurirajIdentitet = () => {
       invalidirajProfil();
-      void osigurajProfil({ forsaj: true });
+      invalidirajNaslovnicaSazetak();
+      if ($page.url.pathname === '/') void osigurajNaslovnicaSazetak({ forsaj: true });
+      else void osigurajProfil({ forsaj: true });
     };
     const naKlikIzvana = (dogadaj: MouseEvent) => {
       if (!otvorenIzbornik || !omotIzbornika) return;
@@ -75,7 +82,9 @@
     document.addEventListener('click', naKlikIzvana);
     document.addEventListener('keydown', naTipku);
 
-    void osigurajProfil();
+    // Na naslovnici dijeli GET /naslovnica/sazetak s +page; drugdje i dalje GET /profil.
+    if ($page.url.pathname === '/') void osigurajNaslovnicaSazetak();
+    else void osigurajProfil();
 
     return () => {
       window.removeEventListener('kaladont:avatar-promijenjen', azurirajAvatar);

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { BROJ_AKTIVNIH_IZAZOVA, type OdgovorKatalogaIzazova } from 'zajednicko';
-import { defaultOpisIzazova, izracunajPrikazIzazova } from './naslovnica-izazovi.js';
+import {
+  defaultOpisIzazova,
+  izracunajPrikazIzazova,
+  izracunajPrikazIzazovaIzSazetka,
+} from './naslovnica-izazovi.js';
 
 function odgovor(zavrseno: number, ukupno = BROJ_AKTIVNIH_IZAZOVA): OdgovorKatalogaIzazova {
   return {
@@ -56,5 +60,18 @@ describe('naslovnica-izazovi', () => {
   it('pri grešci ili isključenom katalogu ostaje default', () => {
     expect(izracunajPrikazIzazova(null).vrsta).toBe('default');
     expect(izracunajPrikazIzazova({ ...odgovor(10), omogucen: false }).vrsta).toBe('default');
+  });
+
+  it('sažetak naslovnice daje isti prikaz kao katalog', () => {
+    expect(
+      izracunajPrikazIzazovaIzSazetka({
+        omogucen: true,
+        zavrseno: 15,
+        ukupno: BROJ_AKTIVNIH_IZAZOVA,
+      }),
+    ).toEqual(izracunajPrikazIzazova(odgovor(15)));
+    expect(izracunajPrikazIzazovaIzSazetka({ omogucen: false, zavrseno: 3, ukupno: 10 }).vrsta).toBe(
+      'default',
+    );
   });
 });

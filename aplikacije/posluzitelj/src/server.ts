@@ -30,6 +30,7 @@ import {
   type OpcijeAuthRateLimita,
 } from './racuni/rute.js';
 import { registrirajProfilRute } from './profil/rute.js';
+import { registrirajNaslovnicaRute } from './naslovnica/rute.js';
 import { registrirajLjestviceRute } from './ljestvice/rute.js';
 import { registrirajMisijeRute } from './misije/rute.js';
 import { registrirajDostignucaRute } from './dostignuca/rute.js';
@@ -242,6 +243,7 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
         naSesijeIgracaOpozvane: (igracId) => opozoviSocketSesijeIgraca(igracId),
       });
       await registrirajProfilRute(apiApp, rjecnik);
+      await registrirajNaslovnicaRute(apiApp);
       await registrirajLjestviceRute(apiApp);
       await registrirajMisijeRute(apiApp);
       await registrirajIzazoviRute(apiApp);
