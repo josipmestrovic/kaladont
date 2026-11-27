@@ -9,19 +9,15 @@ import {
 } from '../src/bot/profili-bota.js';
 
 describe('profili bota (PR02)', () => {
-  it('profil v2 i Iskusni KA/taktika parity s ZADANA', () => {
+  it('profil v2 i Iskusni taktika parity s ZADANA', () => {
     const { konfiguracija, profileId, botProfileVersion } = razrijesiProfilBota('iskusni');
     expect(profileId).toBe('iskusni');
     expect(botProfileVersion).toBe(VERZIJA_PROFILA_BOTA);
     expect(VERZIJA_PROFILA_BOTA).toBe(2);
     expect(konfiguracija.vjerojatnostTaktickogPoteza).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza);
-    expect(konfiguracija.vjerojatnostPropustaKa).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropustaKa);
-    expect(konfiguracija.vjerojatnostOstavljanjaKa).toBe(ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa);
     expect(POLUGE_PROFILA_BOTA.iskusni).toEqual({
       vjerojatnostTaktickogPoteza: 0.25,
       vjerojatnostNeznanjaUMalomSkupu: 0.18,
-      vjerojatnostPropustaKa: 0.08,
-      vjerojatnostOstavljanjaKa: 0.015,
       maksimalnoOpcijaMalogSkupa: 5,
     });
   });
@@ -39,14 +35,6 @@ describe('profili bota (PR02)', () => {
     expect(pocetnik.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(iskusni.vjerojatnostNeznanjaUMalomSkupu);
     expect(iskusni.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(majstor.vjerojatnostNeznanjaUMalomSkupu);
     expect(majstor.vjerojatnostNeznanjaUMalomSkupu).toBeGreaterThan(velemajstor.vjerojatnostNeznanjaUMalomSkupu);
-
-    expect(pocetnik.vjerojatnostPropustaKa).toBeGreaterThan(iskusni.vjerojatnostPropustaKa);
-    expect(iskusni.vjerojatnostPropustaKa).toBeGreaterThan(majstor.vjerojatnostPropustaKa);
-    expect(majstor.vjerojatnostPropustaKa).toBeGreaterThan(velemajstor.vjerojatnostPropustaKa);
-
-    expect(pocetnik.vjerojatnostOstavljanjaKa).toBeGreaterThan(iskusni.vjerojatnostOstavljanjaKa);
-    expect(iskusni.vjerojatnostOstavljanjaKa).toBeGreaterThan(majstor.vjerojatnostOstavljanjaKa);
-    expect(majstor.vjerojatnostOstavljanjaKa).toBeGreaterThan(velemajstor.vjerojatnostOstavljanjaKa);
 
     expect(pocetnik.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(iskusni.maksimalnoOpcijaMalogSkupa);
     expect(iskusni.maksimalnoOpcijaMalogSkupa).toBeGreaterThan(majstor.maksimalnoOpcijaMalogSkupa);

@@ -457,15 +457,11 @@ async function main() {
 
   const konfigNormal = {
     ...mods.ZADANA_KONFIGURACIJA_BOTA,
-    vjerojatnostPropustaKa: 0,
-    vjerojatnostOstavljanjaKa: 0,
     vjerojatnostNeznanjaUMalomSkupu: 0,
   };
 
   const konfigTezak = {
     ...mods.ZADANA_KONFIGURACIJA_BOTA,
-    vjerojatnostPropustaKa: 0,
-    vjerojatnostOstavljanjaKa: 0,
     vjerojatnostNeznanjaUMalomSkupu: 0,
     vjerojatnostTaktickogPoteza: 1,
   };

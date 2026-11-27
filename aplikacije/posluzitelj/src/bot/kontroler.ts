@@ -640,7 +640,7 @@ export class BotKontroler {
     const prethodna = this.odluke.get(dogadaj.partijaId);
     const ista = prethodna?.turnToken === dogadaj.turnToken ? prethodna : undefined;
     if (ista?.odluka.vrsta === 'odustani' && ista.odluka.razlogInterni === 'bot_duel_limit') return ista.odluka;
-    if (this.azurirajBotDuelIForsiraj(dogadaj)) {
+    if (this.azurirajBotDuelIForsiraj(dogadaj) && dogadaj.trazenaSlova !== 'ka') {
       const forsiran: OdlukaBota = {
         vrsta: 'odustani',
         razlog: 'namjerni_propust',
@@ -651,6 +651,12 @@ export class BotKontroler {
     }
     if (ista?.odluka.vrsta === 'odustani') return ista.odluka;
     if (ista?.odluka.vrsta === 'rijec' && !odbijene.has(ista.odluka.rijec) && ista.verzijaRjecnika === verzijaRjecnika) return ista.odluka;
+    if (dogadaj.trazenaSlova === 'ka' && !odbijene.has('kaladont')) {
+      stanjeBota.brojKandidata = 1;
+      const kaladont: OdlukaBota = { vrsta: 'rijec', rijec: 'kaladont', kategorija: 'kaladont' };
+      this.zabiljeziOdluku(kaladont, stanjeBota, dogadaj.turnToken, verzijaRjecnika, dogadaj.partijaId);
+      return kaladont;
+    }
     const kandidati = kandidatiPretpostavljeni
       ? [...kandidatiPretpostavljeni]
       : this.kandidatiZaPotez(dogadaj.trazenaSlova!, snimkaGrupa, dogadaj.dopusteneVrste).filter((rijec) => !odbijene.has(rijec));
@@ -827,27 +833,40 @@ export class BotKontroler {
     const id = this.raspored.prijavi(async ({ predaj }: KontekstPosla) => {
       if (!aktivan()) return 'odustani';
       try {
-        // Prikupljanje unutar raspoređivača (zajednički CPU budžet / RR).
-        const kandidati = this.kandidatiZaPotez(
-          dogadaj.trazenaSlova!,
-          dogadaj.iskoristeneGrupe,
-          dogadaj.dopusteneVrste,
-        ).filter((rijec) => !odbijene.has(rijec));
-        // Prazan repertoar nakon odbijenih = normalan odustanak, ne tehnička greška.
-        if (kandidati.length === 0 && dogadaj.trazenaSlova?.toLowerCase() !== 'ka') {
-          if (!aktivan()) return 'odustani';
-          this.izvrsi(dogadaj, igracId, dogadaj.turnToken, { vrsta: 'odustani', razlog: 'nema_rijeci' }, pokusaj, odbijene);
-          return 'gotovo';
+        const preskociSkupljanje = dogadaj.trazenaSlova === 'ka' && !odbijene.has('kaladont');
+        let odluka: OdlukaBota | null;
+        if (preskociSkupljanje) {
+          odluka = await this.odluciNastavivo(
+            dogadaj,
+            stanjeBota,
+            dogadaj.iskoristeneGrupe,
+            aktivan,
+            odbijene,
+            predaj,
+          );
+        } else {
+          // Prikupljanje unutar raspoređivača (zajednički CPU budžet / RR).
+          const kandidati = this.kandidatiZaPotez(
+            dogadaj.trazenaSlova!,
+            dogadaj.iskoristeneGrupe,
+            dogadaj.dopusteneVrste,
+          ).filter((rijec) => !odbijene.has(rijec));
+          // Prazan repertoar nakon odbijenih = normalan odustanak, ne tehnička greška.
+          if (kandidati.length === 0 && dogadaj.trazenaSlova?.toLowerCase() !== 'ka') {
+            if (!aktivan()) return 'odustani';
+            this.izvrsi(dogadaj, igracId, dogadaj.turnToken, { vrsta: 'odustani', razlog: 'nema_rijeci' }, pokusaj, odbijene);
+            return 'gotovo';
+          }
+          odluka = await this.odluciNastavivo(
+            dogadaj,
+            stanjeBota,
+            dogadaj.iskoristeneGrupe,
+            aktivan,
+            odbijene,
+            predaj,
+            kandidati,
+          );
         }
-        const odluka = await this.odluciNastavivo(
-          dogadaj,
-          stanjeBota,
-          dogadaj.iskoristeneGrupe,
-          aktivan,
-          odbijene,
-          predaj,
-          kandidati,
-        );
         if (!odluka || !aktivan()) return 'odustani';
         this.izvrsi(dogadaj, igracId, dogadaj.turnToken, odluka, pokusaj, odbijene);
         return 'gotovo';

@@ -21,10 +21,6 @@ export interface KonfiguracijaBota {
   jitterPotezaBotaMs: number;
   /** Minimalna odgoda reakcije prije slanja (ms); plus nasumično 0–1000 ms. */
   odgodaReakcijeMinMs: number;
-  /** Vjerojatnost da bot ostavi riječ na „ka” kad takva postoji među poznatim kandidatima. */
-  vjerojatnostOstavljanjaKa: number;
-  /** Vjerojatnost da bot propusti tuđi „ka” i igra običnu riječ umjesto kaladonta. */
-  vjerojatnostPropustaKa: number;
   /** Vjerojatnost „Ne znam” kad je poznati skup mali (1–N opcija bez česte sigurne). */
   vjerojatnostNeznanjaUMalomSkupu: number;
   /** Gornja granica neovisnih opcija koja još čini „mali” skup. */
@@ -86,6 +82,9 @@ export const ZASTARJELA_POLJA_BOT_POLITIKE = [
   'dokaziBudzetDodatneProvjere',
   'vjerojatnostDokaziPreskokaPotvrde',
   'dokaziFaktorPropusaPotvrde',
+  // Botovi V8: KA bez vjerojatnosti propusta/ostavljanja.
+  'vjerojatnostOstavljanjaKa',
+  'vjerojatnostPropustaKa',
 ] as const;
 
 export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
@@ -95,8 +94,6 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   trajanjePotezaBotaMs: 4_000,
   jitterPotezaBotaMs: 300,
   odgodaReakcijeMinMs: 2_000,
-  vjerojatnostOstavljanjaKa: 0.015,
-  vjerojatnostPropustaKa: 0.08,
   vjerojatnostNeznanjaUMalomSkupu: 0.1,
   maksimalnoOpcijaMalogSkupa: 3,
   vjerojatnostTaktickogPoteza: 0.25,
@@ -139,8 +136,6 @@ export const ShemaKonfiguracijeBota = z.object({
   trajanjePotezaBotaMs: z.number().int().min(500).max(30_000),
   jitterPotezaBotaMs: z.number().int().min(0).max(2_000),
   odgodaReakcijeMinMs: z.number().int().min(0).max(10_000),
-  vjerojatnostOstavljanjaKa: Vjerojatnost,
-  vjerojatnostPropustaKa: Vjerojatnost.default(0.08),
   vjerojatnostNeznanjaUMalomSkupu: Vjerojatnost,
   maksimalnoOpcijaMalogSkupa: z.number().int().min(1).max(20),
   vjerojatnostTaktickogPoteza: Vjerojatnost,
@@ -197,8 +192,6 @@ export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): K
     botoviTroboj: env.BOTOVI_TROBOJ === 'true',
     botoviCetveroboj: env.BOTOVI_CETVEROBOJ === 'true',
     brziRazvoj: lokalnoTestiranje,
-    vjerojatnostOstavljanjaKa: postotak(env.BOT_VJEROJATNOST_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostOstavljanjaKa),
-    vjerojatnostPropustaKa: postotak(env.BOT_VJEROJATNOST_PROPUSTA_KA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostPropustaKa),
     vjerojatnostNeznanjaUMalomSkupu: postotak(env.BOT_NEZNANJE_U_MALOM_SKUPU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostNeznanjaUMalomSkupu),
     maksimalnoOpcijaMalogSkupa: cijeliBroj(env.BOT_MAKS_OPCIJA_MALOG_SKUPA, ZADANA_KONFIGURACIJA_BOTA.maksimalnoOpcijaMalogSkupa, 1, 20),
     vjerojatnostTaktickogPoteza: postotak(env.BOT_VJEROJATNOST_TAKTICKOG_POTEZA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza),

@@ -10,8 +10,6 @@
     trajanjePotezaBotaMs: number;
     jitterPotezaBotaMs: number;
     odgodaReakcijeMinMs: number;
-    vjerojatnostOstavljanjaKa: number;
-    vjerojatnostPropustaKa: number;
     vjerojatnostNeznanjaUMalomSkupu: number;
     maksimalnoOpcijaMalogSkupa: number;
     vjerojatnostTaktickogPoteza: number;
@@ -218,8 +216,6 @@
             <label>Udio imenica<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.udioImenica} /><span>{postotak(nacrt.udioImenica)}</span></label>
             <label>Skala log frekvencije<input type="number" min="0" max="10" step="0.1" bind:value={nacrt.skalaLogFrekvencije} /></label>
             <label>Ponder duljine po slovu<input type="number" min="0" max="2" step="0.01" bind:value={nacrt.ponderDuljinePoGrafemu} /></label>
-            <label>Dobrovoljni KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostOstavljanjaKa} /><span>{postotak(nacrt.vjerojatnostOstavljanjaKa)}</span></label>
-            <label>Propust tuđeg KA<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostPropustaKa} /><span>{postotak(nacrt.vjerojatnostPropustaKa)}</span></label>
             <label>„Ne znam” u malom skupu<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostNeznanjaUMalomSkupu} /><span>{postotak(nacrt.vjerojatnostNeznanjaUMalomSkupu)}</span></label>
             <label>Maks. opcija malog skupa<input type="number" min="1" max="20" bind:value={nacrt.maksimalnoOpcijaMalogSkupa} /></label>
             <label>Taktički potez<input type="number" min="0" max="1" step="0.01" bind:value={nacrt.vjerojatnostTaktickogPoteza} /><span>{postotak(nacrt.vjerojatnostTaktickogPoteza)}</span></label>

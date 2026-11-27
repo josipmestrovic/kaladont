@@ -11,8 +11,6 @@ import { ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from '../src/bot/ko
 
 const konfig: KonfiguracijaBota = {
   ...ZADANA_KONFIGURACIJA_BOTA,
-  vjerojatnostPropustaKa: 0,
-  vjerojatnostOstavljanjaKa: 0,
   vjerojatnostNeznanjaUMalomSkupu: 0,
   vjerojatnostTaktickogPoteza: 0,
 };

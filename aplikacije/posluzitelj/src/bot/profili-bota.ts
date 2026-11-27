@@ -22,8 +22,6 @@ export const VERZIJA_PROFILA_BOTA = 2;
 export interface PolugeProfilaBota {
   vjerojatnostTaktickogPoteza: number;
   vjerojatnostNeznanjaUMalomSkupu: number;
-  vjerojatnostPropustaKa: number;
-  vjerojatnostOstavljanjaKa: number;
   maksimalnoOpcijaMalogSkupa: number;
 }
 
@@ -31,29 +29,21 @@ export const POLUGE_PROFILA_BOTA: Readonly<Record<ProfilBotaIzazova, PolugeProfi
   pocetnik: {
     vjerojatnostTaktickogPoteza: 0.1,
     vjerojatnostNeznanjaUMalomSkupu: 0.4,
-    vjerojatnostPropustaKa: 0.2,
-    vjerojatnostOstavljanjaKa: 0.04,
     maksimalnoOpcijaMalogSkupa: 8,
   },
   iskusni: {
     vjerojatnostTaktickogPoteza: 0.25,
     vjerojatnostNeznanjaUMalomSkupu: 0.18,
-    vjerojatnostPropustaKa: 0.08,
-    vjerojatnostOstavljanjaKa: 0.015,
     maksimalnoOpcijaMalogSkupa: 5,
   },
   majstor: {
     vjerojatnostTaktickogPoteza: 0.5,
     vjerojatnostNeznanjaUMalomSkupu: 0.08,
-    vjerojatnostPropustaKa: 0.04,
-    vjerojatnostOstavljanjaKa: 0.008,
     maksimalnoOpcijaMalogSkupa: 3,
   },
   velemajstor: {
     vjerojatnostTaktickogPoteza: 0.75,
     vjerojatnostNeznanjaUMalomSkupu: 0.03,
-    vjerojatnostPropustaKa: 0.02,
-    vjerojatnostOstavljanjaKa: 0.003,
     maksimalnoOpcijaMalogSkupa: 2,
   },
 };
@@ -75,8 +65,6 @@ export function razrijesiProfilBota(
   const konfiguracija = structuredClone(baza);
   konfiguracija.vjerojatnostTaktickogPoteza = poluge.vjerojatnostTaktickogPoteza;
   konfiguracija.vjerojatnostNeznanjaUMalomSkupu = poluge.vjerojatnostNeznanjaUMalomSkupu;
-  konfiguracija.vjerojatnostPropustaKa = poluge.vjerojatnostPropustaKa;
-  konfiguracija.vjerojatnostOstavljanjaKa = poluge.vjerojatnostOstavljanjaKa;
   konfiguracija.maksimalnoOpcijaMalogSkupa = poluge.maksimalnoOpcijaMalogSkupa;
   return {
     konfiguracija,
