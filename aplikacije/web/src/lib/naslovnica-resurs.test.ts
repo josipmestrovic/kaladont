@@ -211,7 +211,7 @@ describe('naslovnica-resurs', () => {
     expect(resurs.sazetak?.obavijesti?.brojNeprocitanih).toBe(1);
   });
 
-  it('null obavijesti ne brišu prethodnu listu', async () => {
+  it('null obavijesti ne brišu prethodnu listu za istog igrača', async () => {
     const sObavijestima = bazaSazetka('id-1');
     const bezObavijesti: OdgovorNaslovnicaSazetka = {
       ...bazaSazetka('id-1'),
@@ -233,6 +233,44 @@ describe('naslovnica-resurs', () => {
     expect(resurs.sazetak?.kolekcija?.ukupnoOtkljucano).toBe(3);
     expect(resurs.sazetak?.obavijesti).toBeNull();
     expect(resurs.obavijestiLista?.poruke).toEqual([]);
+  });
+
+  it('null obavijesti brišu listu kad se igracId promijeni', async () => {
+    const stari: OdgovorNaslovnicaSazetka = {
+      ...bazaSazetka('stari'),
+      obavijesti: {
+        brojNeprocitanih: 1,
+        zaNajavu: [],
+        neprocitane: [
+          {
+            id: 'tuda',
+            tip: 'test',
+            naslov: 'Tuđa',
+            tekst: 'x',
+            podaci: {},
+            poveznica: null,
+            stvorenaAt: new Date().toISOString(),
+            procitano: false,
+          },
+        ],
+        sljedeciCursor: null,
+      },
+    };
+    const novi: OdgovorNaslovnicaSazetka = {
+      ...bazaSazetka('novi', 'Novi'),
+      obavijesti: null,
+    };
+    const api = vi.fn().mockResolvedValueOnce(stari).mockResolvedValueOnce(novi);
+    const resurs = stvoriNaslovnicaResurs({
+      api,
+      oporavi401: async () => {},
+      jeApiGreska401: () => false,
+    });
+    await resurs.osiguraj();
+    expect(resurs.obavijestiLista?.poruke.map((p) => p.id)).toEqual(['tuda']);
+    await resurs.osiguraj({ forsaj: true });
+    expect(resurs.igracId).toBe('novi');
+    expect(resurs.obavijestiLista).toBeNull();
   });
 
   it('invalidiraj podiže generaciju i forsaj dohvaća novi sažetak', async () => {

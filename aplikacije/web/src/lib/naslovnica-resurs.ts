@@ -42,17 +42,21 @@ export function stvoriNaslovnicaResurs(ovisnosti: NaslovnicaResursOvisnosti) {
   }
 
   function primijeniOdgovor(odgovor: OdgovorNaslovnicaSazetka, mojaGeneracija: number): void {
+    const prethodniIgracId = igracId;
     sazetak = odgovor;
     igracId = odgovor.igracId;
     status = 'spreman';
     primijenjenaGeneracija = mojaGeneracija;
-    // Null obavijesti = podservis pao — zadrži prethodnu listu.
     if (odgovor.obavijesti) {
       obavijestiLista = {
         poruke: odgovor.obavijesti.neprocitane,
         sljedeciCursor: odgovor.obavijesti.sljedeciCursor,
       };
+    } else if (prethodniIgracId !== odgovor.igracId) {
+      // Null + drugi igrac — ne zadržavaj tuđu listu (npr. nakon 401 oporavka).
+      obavijestiLista = null;
     }
+    // Null + isti igrac = pad podservisa — zadrži prethodnu listu.
     ovisnosti.naPrimjenu?.(odgovor);
     objavi();
   }
