@@ -350,6 +350,7 @@ export class BotKontroler {
       this.poslaniPozdravi.delete(dogadaj.partijaId);
       this.cekajuciPozdraviJavne.delete(dogadaj.partijaId);
       this.ocistiEliminacijskeKljuceve(dogadaj.partijaId);
+      this.ocistiDebugTragovePartije(dogadaj.partijaId);
       // Zakazane reakcije smiju se još izvršiti nakon kraja; ne otkazujemo ih ovdje.
       return;
     }
@@ -579,6 +580,7 @@ export class BotKontroler {
     this.poslaneEliminacijskeReakcije.clear();
     this.sljedecaReakcijaMs.clear();
     this.poteziBotDuela.clear();
+    this.debugTragovi.clear();
   }
 
   /** Javna Brza igra: točno 2 aktivna bota, bez aktivnog čovjeka. */
@@ -685,6 +687,13 @@ export class BotKontroler {
     return `${partijaId}:${turnToken}`;
   }
 
+  private ocistiDebugTragovePartije(partijaId: string): void {
+    const prefiks = `${partijaId}:`;
+    for (const kljuc of [...this.debugTragovi.keys()]) {
+      if (kljuc.startsWith(prefiks)) this.debugTragovi.delete(kljuc);
+    }
+  }
+
   private osigurajDebugTrag(dogadaj: DogadajPoteza, oporavak: boolean): BotDebugTrag {
     const kljuc = this.kljucDebugTraga(dogadaj.partijaId, dogadaj.turnToken);
     const postojeci = this.debugTragovi.get(kljuc);
@@ -695,7 +704,8 @@ export class BotKontroler {
     const ukljuci = !!this.botDebugPretplate?.imaPretplatnika(dogadaj.partijaId)
       && dogadaj.kontekst !== 'privatna';
     const trag = stvoriBotDebugTrag(ukljuci);
-    this.debugTragovi.set(kljuc, trag);
+    // Ne-op tragove ne držimo u mapi (produkcija / bez pretplatnika).
+    if (trag.aktivan) this.debugTragovi.set(kljuc, trag);
     if (oporavak && trag.aktivan) trag.zapisiPosebno('oporavak');
     return trag;
   }

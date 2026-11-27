@@ -84,6 +84,18 @@
                     <li>{linija}</li>
                   {/each}
                 </ul>
+                {#if z.preskoci?.length}
+                  <p>Preskočeni kandidati:</p>
+                  <ul>
+                    {#each z.preskoci as p}
+                      <li>
+                        {p.rijec}
+                        {#if p.razlog} — {p.razlog}{/if}
+                        {#if p.prijetnja} ({p.prijetnja}){/if}
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
                 {#if z.rezultat.trajanjeIzracunaMs !== undefined}
                   <p>Izračun: {z.rezultat.trajanjeIzracunaMs} ms · ishod: {z.rezultat.ishodMotora ?? '—'}</p>
                 {/if}

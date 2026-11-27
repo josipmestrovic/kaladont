@@ -384,4 +384,25 @@ describe('Bot debug — odabir instrumentacija', () => {
       pokusaj: 0,
     })).toBeNull();
   });
+
+  it('preskoci kandidata ulaze u emit zapis', () => {
+    const trag = stvoriBotDebugTrag(true);
+    trag.zapisiPreskok('madrac', 'odbijena_motorom');
+    trag.zapisiPreskok('xyz', 'nelegalan');
+    const zapis = trag.izgradiZapis({
+      partijaId: 'p',
+      igracId: 'b',
+      nadimak: 'Bot',
+      profil: 'iskusni',
+      redniBrojPoteza: 1,
+      turnToken: 't-pres',
+      brojAktivnih: 2,
+      trazenaSlova: 'ma',
+      pokusaj: 0,
+    });
+    expect(zapis?.preskoci).toEqual([
+      { rijec: 'madrac', razlog: 'odbijena_motorom' },
+      { rijec: 'xyz', razlog: 'nelegalan' },
+    ]);
+  });
 });

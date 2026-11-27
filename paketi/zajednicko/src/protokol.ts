@@ -698,6 +698,8 @@ export interface BotDebugZapis {
     | 'oporavak'
     | 'ponovni_izracun_rjecnika'
     | 'otkazan_zastarjeli';
+  /** Pregledani odbijeni/nelegalni kandidati (limitiran popis). */
+  preskoci?: BotDebugKandidatDetalj[];
   rezultat: {
     rijec?: string;
     izvor?: BotDebugIzvorRijeci;

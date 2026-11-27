@@ -236,6 +236,7 @@ class AktivanBotDebugTrag implements BotDebugTrag {
       agresivnost: this.agresivnost,
       shield: this.shield,
       posebnaOdluka: this.posebna,
+      preskoci: this.preskoci.length ? [...this.preskoci] : undefined,
       rezultat: {
         rijec: this.rijec,
         izvor: this.izvor,
