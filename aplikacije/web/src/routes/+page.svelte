@@ -49,20 +49,26 @@
   };
   // Gost: null = nema misija. Registriran + null = pad podservisa — zadrži zadnji prikaz.
   let zadnjeMisijeRegistriranog = $state<PrikazAktivnihMisija>(prazneMisije);
-  const misijeAktivne = $derived.by(() => {
+  $effect(() => {
     const misije = naslovnica.misije;
-    if (misije) {
-      const prikaz = {
-        dnevneAktivne: misije.dnevneAktivne,
-        tjedneAktivne: misije.tjedneAktivne,
-        ukupnoAktivnih: misije.ukupnoAktivnih,
-      };
-      if (naslovnica.sazetak?.profil.vrsta !== 'gost') zadnjeMisijeRegistriranog = prikaz;
-      return prikaz;
-    }
-    if (naslovnica.sazetak?.profil.vrsta === 'gost') return prazneMisije;
-    return zadnjeMisijeRegistriranog;
+    if (!misije || naslovnica.sazetak?.profil.vrsta === 'gost') return;
+    zadnjeMisijeRegistriranog = {
+      dnevneAktivne: misije.dnevneAktivne,
+      tjedneAktivne: misije.tjedneAktivne,
+      ukupnoAktivnih: misije.ukupnoAktivnih,
+    };
   });
+  const misijeAktivne = $derived(
+    naslovnica.misije
+      ? {
+          dnevneAktivne: naslovnica.misije.dnevneAktivne,
+          tjedneAktivne: naslovnica.misije.tjedneAktivne,
+          ukupnoAktivnih: naslovnica.misije.ukupnoAktivnih,
+        }
+      : naslovnica.sazetak?.profil.vrsta === 'gost'
+        ? prazneMisije
+        : zadnjeMisijeRegistriranog,
+  );
   const misijeBadge = $derived(natpisBadgaMisija(misijeAktivne));
   const misijeBroj = $derived(misijeAktivne.ukupnoAktivnih);
   const misijeJedinica = $derived(jedinicaAktivnihMisija(misijeBroj));
@@ -132,6 +138,7 @@
       maksimalno: MAKSIMALNO_ZVJEZDICA_NASLOVNICA,
     };
     ljestviceTekst = null;
+    zadnjeMisijeRegistriranog = prazneMisije;
   }
 
   async function osvjeziNaslovnicu(opcije: { forsaj?: boolean } = {}) {
