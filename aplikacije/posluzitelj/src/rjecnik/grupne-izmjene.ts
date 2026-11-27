@@ -534,6 +534,8 @@ async function deaktivirajPopis(
   if (deaktivirane.length === 0) return { deaktivirane: [], prvaIzmjenaId: null };
 
   const sortirane = deaktivirane.map((r) => r.rijec).sort((a, b) => a.localeCompare(b, 'hr'));
+  const { obrisiPoolClanstva } = await import('../bot/poolovi-trajno.js');
+  await obrisiPoolClanstva(tx, sortirane);
   const uneseni = await tx.insert(izmjeneRjecnika).values(
     sortirane.map((rijec) => ({
       rijec,

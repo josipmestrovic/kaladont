@@ -100,6 +100,7 @@ async function uskladiRjecnikNakonUbaci(rjecnik: RjecnikUMemoriji, rijecUlaz: st
     .limit(1);
   if (!redak || !redak.aktivna) {
     rjecnik.primijeniUklanjanje(rijec);
+    await rjecnik.obnoviPoolove();
     return;
   }
   rjecnik.primijeniUbaci({
@@ -109,6 +110,7 @@ async function uskladiRjecnikNakonUbaci(rjecnik: RjecnikUMemoriji, rijecUlaz: st
     grupe: redak.grupe,
     frekvencija: redak.frekvencija,
   });
+  await rjecnik.obnoviPoolove();
 }
 
 const ShemaRijec = z.object({ rijec: z.string().min(2), razlog: z.string().min(1) });
@@ -407,6 +409,7 @@ export async function registrirajAdminRute(
       }
       if (rezultat.promjena === 'deaktivirana' && rezultat.deaktivirane?.length) {
         rjecnik.primijeniUklanjanja(rezultat.deaktivirane);
+        await rjecnik.obnoviPoolove();
       }
       for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
       return {
@@ -693,6 +696,7 @@ export async function registrirajAdminRute(
       }
       if (rezultat.ishod.deaktivirane.length > 0) {
         rjecnik.primijeniUklanjanja(rezultat.ishod.deaktivirane);
+        await rjecnik.obnoviPoolove();
       }
       for (const stavka of rezultat.obavijesti) emitirajNovostiDostignuca(stavka.igracId, stavka.obavijesti);
       return {
@@ -733,6 +737,7 @@ export async function registrirajAdminRute(
       );
       if (ishod.promjena === 'deaktivirana') {
         rjecnik.primijeniUklanjanja([ishod.rijec]);
+        await rjecnik.obnoviPoolove();
       }
       return {
         ok: true,

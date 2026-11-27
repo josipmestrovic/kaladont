@@ -17,6 +17,7 @@
     "ci-fixture": "tsx src/cli/ci-fixture.ts",
     "testni-podaci-ljestvice": "tsx src/cli/testni-podaci-ljestvice.ts",
     "seed-botova": "tsx src/cli/seed-botova.ts",
+    "seed-bot-poolova": "tsx src/cli/seed-bot-poolova.ts",
     "zamijeni-fond-botova": "tsx src/cli/zamijeni-fond-botova.ts",
     "backfill-univerzalni-rang": "tsx src/cli/backfill-univerzalni-rang.ts",
     "prijelaz-ljestvice-pr11": "tsx src/cli/prijelaz-ljestvice-pr11.ts",

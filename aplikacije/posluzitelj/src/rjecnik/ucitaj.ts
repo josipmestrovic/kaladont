@@ -17,6 +17,12 @@ import {
 import { ucitajSigurnePocetneRijeciIzBaze } from './sigurni-skup.js';
 import { CHECKPOINT_ZAPISA, BUDZET_SLICE_MS } from '../bot/raspored-odziva.js';
 import { izgradiRepertoarBotova, type SnimkaRepertoara, UpraviteljRepertoara } from '../bot/repertoar.js';
+import {
+  izgradiSnimkuPoolova,
+  UpraviteljPoolova,
+  type SnimkaPoolova,
+} from '../bot/poolovi-indeks.js';
+import { uskladiPoolovePriPokretanju } from '../bot/poolovi-trajno.js';
 import { ocistiMemorijuNajopasnijihRijeci } from '../ljestvice/najopasnije-rijeci.js';
 
 const VELICINA_STRANICE = 50_000; // keyset paginacija - 1,2 M redaka ne materijalizirati odjednom
@@ -100,6 +106,11 @@ export interface RjecnikUMemoriji extends RjecnikSucelje {
   /** Zajednički botov repertoar (256+256 po prefiksu). */
   repertoarBotova(): SnimkaRepertoara;
   verzijaRepertoara(): number;
+  /** Zajednička snimka taktičkih poolova (C09). */
+  pooloviBotova(): SnimkaPoolova;
+  verzijaPoolova(): number;
+  /** Ponovno učitaj članstva poolova iz baze i objavi snimku. */
+  obnoviPoolove(): Promise<void>;
   /** Kljucevi početnih prefiksa u RAM mapi (za izgradnju repertoara). */
   prefiksiRjecnika(): readonly string[];
   rijeciNaPrefiksu(prefiks: string): readonly string[];
@@ -150,6 +161,8 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
   let ciljevi: CiljeviRijeci = { rijetke: { ukupno: 0, niska: 0, srednja: 0, jaka: 0 }, duge: { ukupno: 0, duga: 0, srednja: 0, jaka: 0 } };
   let verzija = 0;
   const upraviteljRepertoara = new UpraviteljRepertoara();
+  const upraviteljPoolova = new UpraviteljPoolova();
+  let generacijaPoolova = 0;
   let rebuildRepertoaraZakazan = false;
   let rebuildRepertoaraUTijeku = false;
 
@@ -173,6 +186,32 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     console.info(
       `Repertoar botova: ${snimka.poPrefiksu.size} prefiksa, generacija ${snimka.generacija}, ${ms} ms`,
     );
+  }
+
+  async function obnoviPooloveIzBaze(): Promise<void> {
+    try {
+      const clanovi = await uskladiPoolovePriPokretanju();
+      generacijaPoolova += 1;
+      const snimka = izgradiSnimkuPoolova({
+        clanovi,
+        jeAktivnaURjecnika: (rijec) => rijecGrupe.has(rijec),
+        verzijaRjecnika: verzija,
+        generacija: generacijaPoolova,
+      });
+      upraviteljPoolova.objavi(snimka);
+      console.info(
+        `Poolovi botova: ${snimka.clanovi.size} aktivnih članova, generacija ${snimka.generacija}`,
+      );
+    } catch (greska) {
+      // Tablica možda još nije migrirana (stari testovi) — prazna snimka.
+      console.warn('Učitavanje bot poolova nije uspjelo; nastavljam bez taktičkog indeksa.', greska);
+      upraviteljPoolova.objavi(izgradiSnimkuPoolova({
+        clanovi: [],
+        jeAktivnaURjecnika: () => false,
+        verzijaRjecnika: verzija,
+        generacija: generacijaPoolova,
+      }));
+    }
   }
 
   /** Spoji više admin izmjena u jedan rebuild (setImmediate). */
@@ -466,6 +505,7 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     osvjeziIzvedeneBrojace();
     verzija += 1;
     obnoviRepertoarBotova();
+    await obnoviPooloveIzBaze();
     ocistiMemorijuNajopasnijihRijeci();
   }
 
@@ -822,6 +862,9 @@ export async function ucitajRjecnik(opcije?: OpcijeUcitavanjaRjecnika): Promise<
     },
     repertoarBotova: () => upraviteljRepertoara.dohvati(),
     verzijaRepertoara: () => upraviteljRepertoara.verzija(),
+    pooloviBotova: () => upraviteljPoolova.dohvati(),
+    verzijaPoolova: () => upraviteljPoolova.verzija(),
+    obnoviPoolove: obnoviPooloveIzBaze,
     prefiksiRjecnika: () => [...poPrefiksu.keys()],
     rijeciNaPrefiksu: (prefiks: string) => poPrefiksu.get(prefiks) ?? [],
     ponovoUcitaj: ucitaj,

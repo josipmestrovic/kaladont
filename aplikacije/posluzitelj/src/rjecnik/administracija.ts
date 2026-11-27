@@ -130,13 +130,26 @@ export async function dodajRijec(
       if (!jeJedinstvenostPrekrsena(greska)) throw greska;
       const [ponovo] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
       if (!ponovo || ponovo.aktivna) return { promjena: 'nema', rijec };
-      return reaktiviraj();
+      const ishodKonflikta = await reaktiviraj();
+      if (ishodKonflikta.promjena === 'reaktivirana') {
+        const { razrijesiPoolClan } = await import('../bot/poolovi-trajno.js');
+        await razrijesiPoolClan(db, rijec);
+      }
+      return ishodKonflikta;
     }
     const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'dodana', razlog, adminId, prijavaId });
+    const { razrijesiPoolClan } = await import('../bot/poolovi-trajno.js');
+    await razrijesiPoolClan(db, rijec);
     return { promjena: 'dodana', rijec, izmjenaId };
   }
 
-  return reaktiviraj();
+  const ishod = await reaktiviraj();
+  if (ishod.promjena === 'reaktivirana') {
+    // Reaktivacija ne vraća obrisano pool članstvo — samo razrješava postojeće nerazriješeno.
+    const { razrijesiPoolClan } = await import('../bot/poolovi-trajno.js');
+    await razrijesiPoolClan(db, rijec);
+  }
+  return ishod;
 }
 
 /** Soft-delete (aktivna=false). Već neaktivna ili nepostojeća riječ je no-op. */
@@ -151,6 +164,8 @@ export async function deaktivirajRijec(
   const [postojeca] = await db.select({ aktivna: rijeci.aktivna }).from(rijeci).where(eq(rijeci.rijec, rijec)).for('update').limit(1);
   if (!postojeca?.aktivna) return { promjena: 'nema', rijec };
   await db.update(rijeci).set({ aktivna: false }).where(eq(rijeci.rijec, rijec));
+  const { obrisiPoolClanstvo } = await import('../bot/poolovi-trajno.js');
+  await obrisiPoolClanstvo(db, rijec);
   const izmjenaId = await zabiljeziIzmjenu(db, { rijec, akcija: 'uklonjena', razlog, adminId, prijavaId });
   return { promjena: 'deaktivirana', rijec, izmjenaId };
 }
