@@ -541,8 +541,9 @@ export async function analizirajNastavakNastavivo(
 
   const spremiAko = (analiza: AnalizaNastavkaSpremljena): AnalizaNastavka => {
     if (!aktivan()) return { ishod: 'otkazano' };
-    if (!smijeSpremitiAnalizu(ulaz)) return { ishod: 'otkazano' };
-    ulaz.predmemorija?.spremi(kljuc, analiza);
+    // Promjena verzije rječnika: ne truj cache aktualne verzije, ali vrati rezultat —
+    // inače odabir padne na null i potez visi do isteka tempa (izvršenje već ima refresh retry).
+    if (smijeSpremitiAnalizu(ulaz)) ulaz.predmemorija?.spremi(kljuc, analiza);
     return analiza;
   };
 

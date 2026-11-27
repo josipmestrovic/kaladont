@@ -146,7 +146,7 @@ describe('Botovi V8 Commit 08 — analiza nastavaka', () => {
     expect(analiza).toEqual({ ishod: 'otkazano' });
   });
 
-  it('nastavivo: promjena verzije rječnika prije spremanja → otkazano, bez cache upisa', async () => {
+  it('nastavivo: promjena verzije rječnika prije spremanja → rezultat bez cache upisa', async () => {
     let verzija = 1;
     const pred = new PredmemorijaLegalnosti();
     pred.uskladiKontekst('t-ver', 1);
@@ -166,7 +166,8 @@ describe('Botovi V8 Commit 08 — analiza nastavaka', () => {
       async () => undefined,
       () => true,
     );
-    expect(analiza).toEqual({ ishod: 'otkazano' });
+    // Ne otkazuj potez — izvršenje ima refresh; samo ne truj cache pod starom verzijom.
+    expect(analiza).toEqual({ ishod: 'poznat', cestihNeovisnih: 1 });
     expect(pred.brojZapisa()).toBe(0);
   });
 
