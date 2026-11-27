@@ -16,7 +16,8 @@ import { ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from '../src/bot/ko
 const konfig: KonfiguracijaBota = {
   ...ZADANA_KONFIGURACIJA_BOTA,
   vjerojatnostNeznanjaUMalomSkupu: 0,
-  vjerojatnostTaktickogPoteza: 0,
+  vjerojatnostAgresivnosti: 0,
+  vjerojatnostShielda: 0,
 };
 
 function rng(seed: number): () => number {

@@ -5,8 +5,10 @@
 import { z } from 'zod';
 import { PRAGOVI_POPUNE_MS } from '../red/raspored-popune.js';
 
-/** PR02 + v7: zajednički ograničeni repertoar i predvidljiv odabir. */
-export const VERZIJA_BOT_POLITIKE = 7;
+/** PR02 + v8: agresivnost poolova, shield i repertoar. */
+export const VERZIJA_BOT_POLITIKE = 8;
+
+export type PrioritetPoolova = 'p2_p1' | 'p1_p2';
 
 export type KategorijaRijeci = 'uobicajena' | 'srednja' | 'rijetka';
 
@@ -25,10 +27,12 @@ export interface KonfiguracijaBota {
   vjerojatnostNeznanjaUMalomSkupu: number;
   /** Gornja granica neovisnih opcija koja još čini „mali” skup. */
   maksimalnoOpcijaMalogSkupa: number;
-  /** Udio poteza u kojima se ocjenjuje uzorak kandidata (1-ply taktika). */
-  vjerojatnostTaktickogPoteza: number;
-  /** Maksimalan broj ponderirano uzorkovanih kandidata u taktičkom potezu. */
-  maksimalnoTaktickihKandidata: number;
+  /** Udio poteza u kojima bot traži riječ u taktičkim poolovima (jedan roll po tokenu). */
+  vjerojatnostAgresivnosti: number;
+  /** Udio poteza u dvoboju (2 aktivna) u kojem bot preferira „sigurne” riječi (jedan roll po tokenu). */
+  vjerojatnostShielda: number;
+  /** Redoslijed pregleda pool_1 / pool_2 kad je agresivnost aktivna. */
+  prioritetPoolova: PrioritetPoolova;
   brziRazvoj: boolean;
   odstupanjaPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
   pragoviPopuneMs: Record<'dva_igraca' | 'tri_igraca' | 'cetiri_igraca', readonly number[]>;
@@ -85,6 +89,9 @@ export const ZASTARJELA_POLJA_BOT_POLITIKE = [
   // Botovi V8: KA bez vjerojatnosti propusta/ostavljanja.
   'vjerojatnostOstavljanjaKa',
   'vjerojatnostPropustaKa',
+  // Botovi V8 C10: stara 1-ply taktika.
+  'vjerojatnostTaktickogPoteza',
+  'maksimalnoTaktickihKandidata',
 ] as const;
 
 export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
@@ -96,8 +103,9 @@ export const ZADANA_KONFIGURACIJA_BOTA: KonfiguracijaBota = {
   odgodaReakcijeMinMs: 2_000,
   vjerojatnostNeznanjaUMalomSkupu: 0.1,
   maksimalnoOpcijaMalogSkupa: 3,
-  vjerojatnostTaktickogPoteza: 0.25,
-  maksimalnoTaktickihKandidata: 12,
+  vjerojatnostAgresivnosti: 0.3,
+  vjerojatnostShielda: 0.3,
+  prioritetPoolova: 'p2_p1',
   brziRazvoj: false,
   odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [0, 0], cetiri_igraca: [3_000, 3_000, 3_000] },
   pragoviPopuneMs: structuredClone(PRAGOVI_POPUNE_MS),
@@ -138,8 +146,9 @@ export const ShemaKonfiguracijeBota = z.object({
   odgodaReakcijeMinMs: z.number().int().min(0).max(10_000),
   vjerojatnostNeznanjaUMalomSkupu: Vjerojatnost,
   maksimalnoOpcijaMalogSkupa: z.number().int().min(1).max(20),
-  vjerojatnostTaktickogPoteza: Vjerojatnost,
-  maksimalnoTaktickihKandidata: z.number().int().min(1).max(50),
+  vjerojatnostAgresivnosti: Vjerojatnost,
+  vjerojatnostShielda: Vjerojatnost,
+  prioritetPoolova: z.enum(['p2_p1', 'p1_p2']),
   brziRazvoj: z.boolean(),
   odstupanjaPopuneMs: Pragovi,
   pragoviPopuneMs: Pragovi,
@@ -194,7 +203,8 @@ export function ucitajKonfiguracijuBota(env: NodeJS.ProcessEnv = process.env): K
     brziRazvoj: lokalnoTestiranje,
     vjerojatnostNeznanjaUMalomSkupu: postotak(env.BOT_NEZNANJE_U_MALOM_SKUPU, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostNeznanjaUMalomSkupu),
     maksimalnoOpcijaMalogSkupa: cijeliBroj(env.BOT_MAKS_OPCIJA_MALOG_SKUPA, ZADANA_KONFIGURACIJA_BOTA.maksimalnoOpcijaMalogSkupa, 1, 20),
-    vjerojatnostTaktickogPoteza: postotak(env.BOT_VJEROJATNOST_TAKTICKOG_POTEZA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostTaktickogPoteza),
-    maksimalnoTaktickihKandidata: cijeliBroj(env.BOT_MAKS_TAKTICKIH_KANDIDATA, ZADANA_KONFIGURACIJA_BOTA.maksimalnoTaktickihKandidata, 1, 50),
+    vjerojatnostAgresivnosti: postotak(env.BOT_VJEROJATNOST_AGRESIVNOSTI, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostAgresivnosti),
+    vjerojatnostShielda: postotak(env.BOT_VJEROJATNOST_SHIELDA, ZADANA_KONFIGURACIJA_BOTA.vjerojatnostShielda),
+    prioritetPoolova: env.BOT_PRIORITET_POOLOVA === 'p1_p2' ? 'p1_p2' : ZADANA_KONFIGURACIJA_BOTA.prioritetPoolova,
   };
 }

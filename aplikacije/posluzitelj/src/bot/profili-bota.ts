@@ -11,38 +11,49 @@ import {
 import {
   ZADANA_KONFIGURACIJA_BOTA,
   type KonfiguracijaBota,
+  type PrioritetPoolova,
 } from './konfiguracija-bota.js';
 
 export { nadimakProfilaBota, ZADANI_PROFIL_TRENINGA };
 
 /** Verzija seta profilnih poluga; odvojena od VERZIJA_BOT_POLITIKE. */
-export const VERZIJA_PROFILA_BOTA = 2;
+export const VERZIJA_PROFILA_BOTA = 3;
 
-/** Poluge iz speka 08 — bez Dokaži-specifičnih budžeta (Botovi V8). */
+/** Poluge iz speka Botovi V8 C10. */
 export interface PolugeProfilaBota {
-  vjerojatnostTaktickogPoteza: number;
+  vjerojatnostAgresivnosti: number;
+  vjerojatnostShielda: number;
+  prioritetPoolova: PrioritetPoolova;
   vjerojatnostNeznanjaUMalomSkupu: number;
   maksimalnoOpcijaMalogSkupa: number;
 }
 
 export const POLUGE_PROFILA_BOTA: Readonly<Record<ProfilBotaIzazova, PolugeProfilaBota>> = {
   pocetnik: {
-    vjerojatnostTaktickogPoteza: 0.1,
+    vjerojatnostAgresivnosti: 0,
+    vjerojatnostShielda: 0,
+    prioritetPoolova: 'p2_p1',
     vjerojatnostNeznanjaUMalomSkupu: 0.4,
     maksimalnoOpcijaMalogSkupa: 8,
   },
   iskusni: {
-    vjerojatnostTaktickogPoteza: 0.25,
+    vjerojatnostAgresivnosti: 0.3,
+    vjerojatnostShielda: 0.3,
+    prioritetPoolova: 'p2_p1',
     vjerojatnostNeznanjaUMalomSkupu: 0.18,
     maksimalnoOpcijaMalogSkupa: 5,
   },
   majstor: {
-    vjerojatnostTaktickogPoteza: 0.5,
+    vjerojatnostAgresivnosti: 0.6,
+    vjerojatnostShielda: 0.75,
+    prioritetPoolova: 'p1_p2',
     vjerojatnostNeznanjaUMalomSkupu: 0.08,
     maksimalnoOpcijaMalogSkupa: 3,
   },
   velemajstor: {
-    vjerojatnostTaktickogPoteza: 0.75,
+    vjerojatnostAgresivnosti: 1,
+    vjerojatnostShielda: 1,
+    prioritetPoolova: 'p1_p2',
     vjerojatnostNeznanjaUMalomSkupu: 0.03,
     maksimalnoOpcijaMalogSkupa: 2,
   },
@@ -63,7 +74,9 @@ export function razrijesiProfilBota(
   }
   const poluge = POLUGE_PROFILA_BOTA[profileId];
   const konfiguracija = structuredClone(baza);
-  konfiguracija.vjerojatnostTaktickogPoteza = poluge.vjerojatnostTaktickogPoteza;
+  konfiguracija.vjerojatnostAgresivnosti = poluge.vjerojatnostAgresivnosti;
+  konfiguracija.vjerojatnostShielda = poluge.vjerojatnostShielda;
+  konfiguracija.prioritetPoolova = poluge.prioritetPoolova;
   konfiguracija.vjerojatnostNeznanjaUMalomSkupu = poluge.vjerojatnostNeznanjaUMalomSkupu;
   konfiguracija.maksimalnoOpcijaMalogSkupa = poluge.maksimalnoOpcijaMalogSkupa;
   return {

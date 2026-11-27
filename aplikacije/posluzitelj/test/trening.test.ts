@@ -380,7 +380,8 @@ describe('Zagrijavanje', () => {
       expect(pocetak.pravila).toBe('klasicni');
       expect(pocetak.sjedala.some((s) => s.nadimak === 'BOTOKRAT')).toBe(true);
       const konfig = posluzitelj.dohvatiKonfiguracijuBotaPartije(pocetak.partijaId);
-      expect(konfig?.vjerojatnostTaktickogPoteza).toBe(0.5);
+      expect(konfig?.vjerojatnostAgresivnosti).toBe(0.6);
+      expect(konfig?.vjerojatnostShielda).toBe(0.75);
       socket.emit('partija:izadji');
       await cekaj(socket, 'partija:kraj', () => true, 10_000);
     } finally {

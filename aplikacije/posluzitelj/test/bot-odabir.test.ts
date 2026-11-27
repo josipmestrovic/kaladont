@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DogadajPoteza, RezultatNaredbe } from '../src/igra/politika-ucinka.js';
 import { BotKontroler, MAKS_POTEZA_BOT_DUELA_BRZA } from '../src/bot/kontroler.js';
+import { izgradiSnimkuPoolova } from '../src/bot/poolovi-indeks.js';
 import { RasporedjivacOdziva } from '../src/bot/raspored-odziva.js';
 import { igriviKandidatiIzRepertoara, izgradiRepertoarBotova, RADNI_UZORAK_PO_POTEZU, type SnimkaRepertoara } from '../src/bot/repertoar.js';
-import { ShemaKonfiguracijeBota, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
-import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, analizirajNastavak, klasificirajPoznatiSkup, odaberiPotez, odaberiPotezNastavivo, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs, uzorkujPonderirano } from '../src/bot/odabir-rijeci.js';
+import { ShemaKonfiguracijeBota, VERZIJA_BOT_POLITIKE, ZADANA_KONFIGURACIJA_BOTA, ucitajKonfiguracijuBota, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
+import { BOT_POTEZ_BEZ_ROKA_MS, PredmemorijaLegalnosti, STAGING_BOT_POTEZ_S_LJUDIMA_MS, SlozeneIskoristeneGrupe, Vrecica, analizirajNastavak, klasificirajPoznatiSkup, odlukaAgresivnostiZaToken, odlukaShieldaZaToken, odaberiPotez, odaberiPotezNastavivo, odgodaBezRokaMs, oprezKa, politikaKa, stvoriStanjeBota, trajanjeRazmisljanjaMs, uzorkujPonderirano } from '../src/bot/odabir-rijeci.js';
 import { parsajSpremljenuKonfiguraciju } from '../src/bot/trajne-postavke.js';
 import { razrijesiProfilBota } from '../src/bot/profili-bota.js';
 import { BROJ_GOSTIJU_FONDA_V5, BROJ_IMENOVANIH_FONDA_V5, CILJ_AKTIVNIH_FONDA_V5, NADIMCI_POCETNOG_FONDA_V5 } from '../src/bot/nadimci.js';
@@ -77,8 +78,11 @@ function laznaRijec(rijeci: Record<string, { frekvencija: number; grupe: string[
 const konfigBezPropusta: KonfiguracijaBota = {
   ...ZADANA_KONFIGURACIJA_BOTA,
   vjerojatnostNeznanjaUMalomSkupu: 0,
-  vjerojatnostTaktickogPoteza: 0,
+  vjerojatnostAgresivnosti: 0,
+  vjerojatnostShielda: 0,
 };
+
+const PRAZNI_POOLOVI = izgradiSnimkuPoolova({ clanovi: [], jeAktivnaURjecnika: () => true, verzijaRjecnika: 1, generacija: 1 });
 
 describe('vrećica', () => {
   it('poštuje udjele kroz jedan ciklus i puni se iznova', () => {
@@ -163,14 +167,21 @@ describe('odabir riječi bota', () => {
     expect(klasifikacija.vrsta).toBe('dovoljan');
   });
 
-  it('duel oprez: preferira sigurnu riječ pred čestom na KA', () => {
+  it('shield u dvoboju: preferira sigurnu riječ pred čestom na KA', () => {
     const rijeci = laznaRijec({
       magla: { frekvencija: 200, grupe: ['imenica:magla'] },
       marka: { frekvencija: 900, grupe: ['imenica:marka'] },
     });
+    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostShielda: 1 };
+    const poolovi = izgradiSnimkuPoolova({
+      clanovi: [{ rijec: 'lampa', kategorija: 'pool_1', stanje: 'razrijeseno' }],
+      jeAktivnaURjecnika: () => true,
+      verzijaRjecnika: 1,
+      generacija: 1,
+    });
     const odabrane = new Set<string>();
     const r = rng(11);
-    const stanje = stvoriStanjeBota(konfigBezPropusta, r);
+    const stanje = stvoriStanjeBota(konfig, r);
     for (let i = 0; i < 40; i += 1) {
       const odluka = odaberiPotez({
         trazenaSlova: 'ma',
@@ -179,10 +190,10 @@ describe('odabir riječi bota', () => {
         pravila: 'klasicni',
         brojAktivnih: 2,
         iskoristeneGrupe: new Set(),
-        imaSlobodnuRijecNa: (prefiks) => prefiks === 'la',
-        poznatiKandidatiNa: (prefiks) => (prefiks === 'la' ? ['lampa'] : []),
+        poolovi,
+        jeIgrivaRijec: (rijec) => ['magla', 'marka', 'lampa', 'kaladont'].includes(rijec),
         turnToken: `t-duel-${i}`,
-      }, stanje, konfigBezPropusta, r);
+      }, stanje, konfig, () => 0);
       if (odluka.vrsta === 'rijec') odabrane.add(odluka.rijec);
     }
     expect(odabrane.has('magla')).toBe(true);
@@ -246,8 +257,8 @@ describe('odabir riječi bota', () => {
       if (odluka.vrsta === 'rijec') brojac[odluka.rijec] = (brojac[odluka.rijec] ?? 0) + 1;
     }
     expect(brojac.makroekonomist ?? 0).toBe(0);
-    expect(brojac.magla).toBeGreaterThan(1_800);
-    expect(brojac.mačka).toBeLessThan(100);
+    expect(brojac.magla).toBeGreaterThan(900);
+    expect(brojac.magla).toBeGreaterThan(brojac.mačka ?? 0);
   });
 
   it('samo mačka poznata → odigra je; samo stručne → odustani', () => {
@@ -339,31 +350,53 @@ describe('odabir riječi bota', () => {
     expect(baza.size).toBe(2);
   });
 
-  it('neznanje i taktika drže samo aktualni token', () => {
-    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostNeznanjaUMalomSkupu: 1, vjerojatnostTaktickogPoteza: 1 };
+  it('neznanje, agresivnost i shield drže samo aktualni token', () => {
+    const konfig: KonfiguracijaBota = {
+      ...konfigBezPropusta,
+      vjerojatnostNeznanjaUMalomSkupu: 1,
+      vjerojatnostAgresivnosti: 1,
+      vjerojatnostShielda: 1,
+    };
     const stanje = stvoriStanjeBota(konfig, rng(5));
-    odaberiPotez({ trazenaSlova: 'ma', kandidati: ['mastilo'], ...rjecnik, turnToken: 't-a' }, stanje, konfig, () => 0);
+    odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['mastilo'],
+      ...rjecnik,
+      turnToken: 't-a',
+      brojAktivnih: 2,
+      poolovi: PRAZNI_POOLOVI,
+    }, stanje, konfig, () => 0);
     expect([...stanje.neznanjePoTokenu.keys()]).toEqual(['t-a']);
     odaberiPotez({
       trazenaSlova: 'ma',
       kandidati: ['masa', 'mast', 'maslac', 'maska'],
       ...rjecnik,
       turnToken: 't-b',
+      brojAktivnih: 2,
       iskoristeneGrupe: new Set(),
-      imaSlobodnuRijecNa: () => true,
-      poznatiKandidatiNa: () => ['lampa'],
+      poolovi: PRAZNI_POOLOVI,
     }, stanje, konfig, () => 0);
-    expect([...stanje.taktikaPoTokenu.keys()]).toEqual(['t-b']);
+    expect([...stanje.agresivnostPoTokenu.keys()]).toEqual(['t-b']);
+    expect([...stanje.shieldPoTokenu.keys()]).toEqual(['t-b']);
     expect(stanje.neznanjePoTokenu.has('t-a')).toBe(false);
   });
 
-  it('riječ na „ka” izbjegava kad postoji druga, ali je odigra ako je jedina', () => {
+  it('bez shielda „ka” može ući u uzorak kad postoji druga riječ', () => {
     const r = rng(11);
     const stanje = stvoriStanjeBota(konfigBezPropusta, r);
-    for (let i = 0; i < 200; i += 1) {
-      const odluka = odaberiPotez({ trazenaSlova: 'ma', kandidati: ['maska', 'masa'], ...rjecnik }, stanje, konfigBezPropusta, r);
-      expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
+  const odabrane = new Set<string>();
+    for (let i = 0; i < 40; i += 1) {
+      const odluka = odaberiPotez({
+        trazenaSlova: 'ma',
+        kandidati: ['maska', 'masa'],
+        ...rjecnik,
+        brojAktivnih: 2,
+        turnToken: `t-ka-${i}`,
+      }, stanje, konfigBezPropusta, r);
+      if (odluka.vrsta === 'rijec') odabrane.add(odluka.rijec);
     }
+    expect(odabrane.has('masa')).toBe(true);
+    expect(odabrane.has('maska')).toBe(true);
     const jedina = odaberiPotez({ trazenaSlova: 'ma', kandidati: ['maska'], ...rjecnik }, stanje, konfigBezPropusta, r);
     expect(jedina).toMatchObject({ vrsta: 'rijec', rijec: 'maska', kategorija: 'uobicajena', izborKa: 'prisilni' });
   });
@@ -409,7 +442,7 @@ describe('odabir riječi bota', () => {
     expect(brojMaska).toBeGreaterThan(0);
   });
 
-  it('PR07 Klasični s 2 aktivna: „ka” se izbjegava (oprezni)', () => {
+  it('PR07 Klasični s 2 aktivna: bez shielda obje riječi mogu ući u uzorak', () => {
     const odluke: string[] = [];
     for (let seed = 1; seed <= 30; seed += 1) {
       const odluka = odaberiPotez({
@@ -418,10 +451,11 @@ describe('odabir riječi bota', () => {
         ...rjecnik,
         pravila: 'klasicni',
         brojAktivnih: 2,
+        turnToken: `t-dvoboj-${seed}`,
       }, stvoriStanjeBota(konfigBezPropusta, rng(seed)), konfigBezPropusta, rng(seed));
       if (odluka.vrsta === 'rijec') odluke.push(odluka.rijec);
     }
-    expect(odluke.every((rijec) => rijec === 'masa')).toBe(true);
+    expect(odluke.some((rijec) => rijec === 'maska')).toBe(true);
   });
 
   it('PR07 Klasični ≥3 na primljeni „ka” uvijek igra kaladont', () => {
@@ -435,40 +469,44 @@ describe('odabir riječi bota', () => {
     expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'kaladont' });
   });
 
-  it('PR07 bez polja pravila/faze: default 2 aktivna → oprezni kao dvoboj', () => {
+  it('PR07 bez polja pravila/faze: default 2 aktivna, politikaKa i dalje oprezni', () => {
     const odluke: string[] = [];
     for (let seed = 1; seed <= 20; seed += 1) {
       const odluka = odaberiPotez({
         trazenaSlova: 'ma',
         kandidati: ['masa', 'maska'],
         ...rjecnik,
+        turnToken: `t-def-${seed}`,
       }, stvoriStanjeBota(konfigBezPropusta, rng(seed)), konfigBezPropusta, rng(seed));
       if (odluka.vrsta === 'rijec') odluke.push(odluka.rijec);
     }
-    expect(odluke.every((rijec) => rijec === 'masa')).toBe(true);
+    expect(odluke.length).toBeGreaterThan(0);
     expect(politikaKa()).toBe('oprezni');
   });
 
-  it('taktički potez s brojAktivnih: 2 oprezni vs 3 agresivni', () => {
-    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostTaktickogPoteza: 1 };
-    for (const [brojAktivnih, token] of [[2, 't-takt-2'], [3, 't-takt-3']] as const) {
-      const odluka = odaberiPotez({
-        trazenaSlova: 'ma',
-        kandidati: ['masa', 'maska', 'mast'],
-        ...rjecnik,
-        pravila: 'klasicni',
-        brojAktivnih,
-        turnToken: token,
-        iskoristeneGrupe: new Set(),
-        imaSlobodnuRijecNa: () => true,
-        poznatiKandidatiNa: () => ['lampa'],
-      }, stvoriStanjeBota(konfig, rng(brojAktivnih)), konfig, () => 0);
-      expect(odluka.vrsta).toBe('rijec');
-      if (odluka.vrsta === 'rijec') {
-        expect(odluka.takticki).toBe(true);
-        if (brojAktivnih === 2) expect(odluka.rijec).toBe('masa');
-      }
-    }
+  it('shield se aktivira samo kod 2 aktivnih; agresivnost ne ovisi o broju', () => {
+    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostAgresivnosti: 1, vjerojatnostShielda: 1 };
+    const stanjeDva = stvoriStanjeBota(konfig, () => 0);
+    odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      ...rjecnik,
+      brojAktivnih: 2,
+      turnToken: 't-s-2',
+      poolovi: PRAZNI_POOLOVI,
+    }, stanjeDva, konfig, () => 0);
+    expect(odlukaShieldaZaToken(stanjeDva, 't-s-2', 1, () => 0)).toBe(true);
+    const stanjeTri = stvoriStanjeBota(konfig, () => 0);
+    odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      ...rjecnik,
+      brojAktivnih: 3,
+      turnToken: 't-s-3',
+      poolovi: PRAZNI_POOLOVI,
+    }, stanjeTri, konfig, () => 0);
+    expect(stanjeTri.shieldPoTokenu.has('t-s-3')).toBe(false);
+    expect(odlukaAgresivnostiZaToken(stanjeTri, 't-s-3', 1, () => 0)).toBe(true);
   });
 
   it('PR07 politika ne ovisi o tome je li sljedeći čovjek ili bot (isti ulazi → ista odluka)', () => {
@@ -523,71 +561,41 @@ describe('odabir riječi bota', () => {
     expect(pozivaIndeks).toBe(0);
   });
 
-  it('običan potez: 0 skupih nastavaka; taktički ≤ maksimalnoTaktickihKandidata', () => {
+  it('običan potez: 0 % agresivnosti ne skenira poolove', () => {
     const kandidati = Array.from({ length: 40 }, (_, i) => `ma${String(i).padStart(2, '0')}`);
-    const frekvencijaZa = () => 500;
-    const grupeZa = (r: string) => [`imenica:${r}`];
-    let nastavakPoziva = 0;
-    let indeksPoziva = 0;
-    const poznatiKandidatiNa = () => {
-      nastavakPoziva += 1;
-      return ['lampa'];
-    };
-    const imaSlobodnuRijecNa = () => {
-      indeksPoziva += 1;
-      return true;
-    };
-    const bazni = {
-      trazenaSlova: 'ma' as const,
-      kandidati,
-      frekvencijaZa,
-      grupeZa,
-      pravila: 'klasicni' as const,
-      brojAktivnih: 2,
-      iskoristeneGrupe: new Set<string>(),
-      imaSlobodnuRijecNa,
-      poznatiKandidatiNa,
-    };
-    nastavakPoziva = 0;
-    indeksPoziva = 0;
+    let poolSken = 0;
+    const poolovi = izgradiSnimkuPoolova({
+      clanovi: [{ rijec: 'marmor', kategorija: 'pool_1', stanje: 'razrijeseno' }],
+      jeAktivnaURjecnika: () => true,
+      verzijaRjecnika: 1,
+      generacija: 1,
+    });
     const obicna = odaberiPotez(
-      { ...bazni, turnToken: 't-obicna' },
+      {
+        trazenaSlova: 'ma',
+        kandidati,
+        frekvencijaZa: () => 500,
+        grupeZa: (r) => [`imenica:${r}`],
+        pravila: 'klasicni',
+        brojAktivnih: 2,
+        turnToken: 't-obicna',
+        poolovi,
+        jeIgrivaRijec: (r) => {
+          poolSken += 1;
+          return kandidati.includes(r) || r === 'marmor';
+        },
+      },
       stvoriStanjeBota(konfigBezPropusta, rng(1)),
       konfigBezPropusta,
       rng(1),
     );
     expect(obicna.vrsta).toBe('rijec');
-    expect(nastavakPoziva).toBe(0);
-    expect(indeksPoziva).toBe(0);
-
-    const konfigTaktika: KonfiguracijaBota = {
-      ...konfigBezPropusta,
-      vjerojatnostTaktickogPoteza: 1,
-      maksimalnoTaktickihKandidata: 12,
-    };
-    nastavakPoziva = 0;
-    indeksPoziva = 0;
-    const takticka = odaberiPotez(
-      { ...bazni, turnToken: 't-takt' },
-      stvoriStanjeBota(konfigTaktika, rng(2)),
-      konfigTaktika,
-      () => 0,
-    );
-    expect(takticka.vrsta).toBe('rijec');
-    if (takticka.vrsta === 'rijec') expect(takticka.takticki).toBe(true);
-    // Jedan prolaz po taktičkom kandidatu (+ brojCestih može opet zvati poznati).
-    expect(nastavakPoziva).toBeLessThanOrEqual(konfigTaktika.maksimalnoTaktickihKandidata * 2);
-    expect(nastavakPoziva).toBeGreaterThan(0);
+    expect(obicna.vrsta === 'rijec' && obicna.izPoola).not.toBe(true);
+    expect(poolSken).toBe(0);
   });
 
-  it('veliki prefiks: detaljna provjera ≪ 512 kandidata', () => {
+  it('veliki prefiks: uzorak ostaje ograničen na RADNI_UZORAK_PO_POTEZU', () => {
     const kandidati = Array.from({ length: 400 }, (_, i) => `xx${String(i).padStart(3, '0')}`);
-    let nastavakPoziva = 0;
-    const konfigTaktika: KonfiguracijaBota = {
-      ...konfigBezPropusta,
-      vjerojatnostTaktickogPoteza: 1,
-      maksimalnoTaktickihKandidata: 12,
-    };
     const odluka = odaberiPotez({
       trazenaSlova: 'xx',
       kandidati,
@@ -595,18 +603,10 @@ describe('odabir riječi bota', () => {
       grupeZa: (r) => [`imenica:${r}`],
       pravila: 'klasicni',
       brojAktivnih: 4,
-      iskoristeneGrupe: new Set(),
-      imaSlobodnuRijecNa: () => true,
-      poznatiKandidatiNa: () => {
-        nastavakPoziva += 1;
-        return ['xyza'];
-      },
       turnToken: 't-veliki',
-    }, stvoriStanjeBota(konfigTaktika, rng(3)), konfigTaktika, () => 0);
+    }, stvoriStanjeBota(konfigBezPropusta, rng(3)), konfigBezPropusta, rng(3));
     expect(odluka.vrsta).toBe('rijec');
     expect(kandidati.length).toBeGreaterThan(RADNI_UZORAK_PO_POTEZU);
-    expect(nastavakPoziva).toBeLessThanOrEqual(24);
-    expect(nastavakPoziva).toBeLessThan(512);
   });
 
   it('rezervni repertoar radi kad je glavni iscrpljen', () => {
@@ -691,7 +691,7 @@ describe('odabir riječi bota', () => {
     }
   });
 
-  it('agresivni može izabrati „ka”, oprezni izbjegava dok postoji druga riječ', () => {
+  it('s 3 aktivna „ka” ulazi u uzorak; shield u dvoboju pomaže izbjeći prijetnju', () => {
     const agresivni: string[] = [];
     for (let seed = 1; seed <= 40; seed += 1) {
       const odluka = odaberiPotez({
@@ -699,21 +699,32 @@ describe('odabir riječi bota', () => {
         kandidati: ['masa', 'maska'],
         ...rjecnik,
         brojAktivnih: 3,
+        turnToken: `t-3-${seed}`,
       }, stvoriStanjeBota(konfigBezPropusta, rng(seed)), konfigBezPropusta, rng(seed));
       if (odluka.vrsta === 'rijec') agresivni.push(odluka.rijec);
     }
     expect(agresivni.some((r) => r === 'maska')).toBe(true);
-    const oprezni: string[] = [];
+    const konfigShield: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostShielda: 1 };
+    const poolovi = izgradiSnimkuPoolova({
+      clanovi: [{ rijec: 'sama', kategorija: 'pool_1', stanje: 'razrijeseno' }],
+      jeAktivnaURjecnika: () => true,
+      verzijaRjecnika: 1,
+      generacija: 1,
+    });
+    const dvoboj: string[] = [];
     for (let seed = 1; seed <= 30; seed += 1) {
       const odluka = odaberiPotez({
         trazenaSlova: 'ma',
         kandidati: ['masa', 'maska'],
         ...rjecnik,
         brojAktivnih: 2,
-      }, stvoriStanjeBota(konfigBezPropusta, rng(seed)), konfigBezPropusta, rng(seed));
-      if (odluka.vrsta === 'rijec') oprezni.push(odluka.rijec);
+        turnToken: `t-2-${seed}`,
+        poolovi,
+        jeIgrivaRijec: (r) => ['masa', 'maska', 'sama', 'kaladont'].includes(r),
+      }, stvoriStanjeBota(konfigShield, () => 0), konfigShield, () => 0);
+      if (odluka.vrsta === 'rijec') dvoboj.push(odluka.rijec);
     }
-    expect(oprezni.every((r) => r === 'masa')).toBe(true);
+    expect(dvoboj.every((r) => r === 'masa')).toBe(true);
   });
 
   it('vrijeme razmišljanja je ~4 s ±jitter i nikad ne prelazi rok minus marginu', () => {
@@ -749,12 +760,15 @@ describe('odabir riječi bota', () => {
   it('konfiguracija iz okoline mijenja samo valjane postotke', () => {
     const konfig = ucitajKonfiguracijuBota({
       BOT_NEZNANJE_U_MALOM_SKUPU: '0.5',
-      BOT_VJEROJATNOST_TAKTICKOG_POTEZA: '0.4',
+      BOT_VJEROJATNOST_AGRESIVNOSTI: '0.4',
+      BOT_VJEROJATNOST_SHIELDA: '0.55',
+      BOT_VJEROJATNOST_TAKTICKOG_POTEZA: '0.99',
       BOT_VJEROJATNOST_KA: 'abc',
       BOT_NEZNANJE_PO_SUDJELOVANJU: '0.9',
     } as NodeJS.ProcessEnv);
     expect(konfig.vjerojatnostNeznanjaUMalomSkupu).toBe(0.5);
-    expect(konfig.vjerojatnostTaktickogPoteza).toBe(0.4);
+    expect(konfig.vjerojatnostAgresivnosti).toBe(0.4);
+    expect(konfig.vjerojatnostShielda).toBe(0.55);
     const parsano = parsajSpremljenuKonfiguraciju({
       ...ZADANA_KONFIGURACIJA_BOTA,
       vjerojatnostPropustaKa: 0.99,
@@ -815,10 +829,11 @@ describe('odabir riječi bota', () => {
       botoviDvoboj: true,
     };
     const parsano = parsajSpremljenuKonfiguraciju(stara);
-    expect(parsano.verzija).toBe(7);
+    expect(parsano.verzija).toBe(VERZIJA_BOT_POLITIKE);
     expect(parsano.vjerojatnostNeznanjaUMalomSkupu).toBe(0.1);
-    expect(parsano.vjerojatnostTaktickogPoteza).toBe(0.25);
-    expect(parsano.maksimalnoTaktickihKandidata).toBe(12);
+    expect(parsano.vjerojatnostAgresivnosti).toBe(0.3);
+    expect(parsano.vjerojatnostShielda).toBe(0.3);
+    expect('vjerojatnostTaktickogPoteza' in parsano).toBe(false);
     expect(parsano.botoviDvoboj).toBe(true);
     expect('vjerojatnostNeznanjaPoSudjelovanju' in parsano).toBe(false);
     expect('rasponTeskogPotezaNeznanja' in parsano).toBe(false);
@@ -842,9 +857,15 @@ describe('Botovi V8 Commit 07 — KA bez vjerojatnosti', () => {
     },
   );
 
-  it('oprezni ostavljanje: masa+maska → uvijek masa; samo maska → prisilni', () => {
-    const r = rng(21);
-    const stanje = stvoriStanjeBota(konfigBezPropusta, r);
+  it('shield u dvoboju: masa+maska → masa; samo maska → prisilni', () => {
+    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostShielda: 1 };
+    const poolovi = izgradiSnimkuPoolova({
+      clanovi: [{ rijec: 'sama', kategorija: 'pool_1', stanje: 'razrijeseno' }],
+      jeAktivnaURjecnika: () => true,
+      verzijaRjecnika: 1,
+      generacija: 1,
+    });
+    const stanje = stvoriStanjeBota(konfig, () => 0);
     for (let i = 0; i < 30; i += 1) {
       expect(odaberiPotez({
         trazenaSlova: 'ma',
@@ -854,7 +875,10 @@ describe('Botovi V8 Commit 07 — KA bez vjerojatnosti', () => {
           maska: { frekvencija: 900, grupe: ['imenica:maska'] },
         }),
         brojAktivnih: 2,
-      }, stanje, konfigBezPropusta, r)).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
+        turnToken: `t-sh-${i}`,
+        poolovi,
+        jeIgrivaRijec: (r) => ['masa', 'maska', 'sama', 'kaladont'].includes(r),
+      }, stanje, konfig, () => 0)).toEqual({ vrsta: 'rijec', rijec: 'masa', kategorija: 'uobicajena' });
     }
     const prisilni = odaberiPotez({
       trazenaSlova: 'ma',
@@ -863,23 +887,6 @@ describe('Botovi V8 Commit 07 — KA bez vjerojatnosti', () => {
       brojAktivnih: 2,
     }, stvoriStanjeBota(konfigBezPropusta, rng(1)), konfigBezPropusta, rng(1));
     expect(prisilni).toMatchObject({ vrsta: 'rijec', rijec: 'maska', izborKa: 'prisilni' });
-  });
-
-  it('oprezni filtrira „ka” prije uzorkovanja kad postoji druga poznata riječ', () => {
-    const kandidati = Array.from({ length: 120 }, (_, i) => {
-      if (i === 110) return 'rimaso';
-      return `ri${String(i).padStart(3, '0')}ka`;
-    });
-    const rijeci = Object.fromEntries(kandidati.map((rijec) => [rijec, { frekvencija: 500, grupe: ['imenica:ri'] }]));
-    const odluka = odaberiPotez({
-      trazenaSlova: 'ri',
-      kandidati,
-      frekvencijaZa: (rijec) => rijeci[rijec]?.frekvencija ?? 500,
-      grupeZa: () => ['imenica:ri'],
-      brojAktivnih: 2,
-      pravila: 'klasicni',
-    }, stvoriStanjeBota(konfigBezPropusta, rng(3)), konfigBezPropusta, rng(3));
-    expect(odluka).toEqual({ vrsta: 'rijec', rijec: 'rimaso', kategorija: 'uobicajena' });
   });
 
   it('uzorkujPonderirano: veličina, jedinstvenost i O(n) frekvencijaZa', () => {
@@ -933,7 +940,81 @@ describe('Botovi V8 Commit 07 — KA bez vjerojatnosti', () => {
     });
     expect('vjerojatnostPropustaKa' in parsano).toBe(false);
     expect('vjerojatnostOstavljanjaKa' in parsano).toBe(false);
-    expect(parsano.verzija).toBe(7);
+    expect(parsano.verzija).toBe(VERZIJA_BOT_POLITIKE);
+  });
+});
+
+describe('Botovi V8 Commit 10 — agresivnost i shield', () => {
+  it('agresivnost bira iz poola po prioritetu p2_p1', () => {
+    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostAgresivnosti: 1, prioritetPoolova: 'p2_p1' };
+    const poolovi = izgradiSnimkuPoolova({
+      clanovi: [
+        { rijec: 'marmor', kategorija: 'pool_1', stanje: 'razrijeseno' },
+        { rijec: 'madrac', kategorija: 'pool_2', stanje: 'razrijeseno' },
+      ],
+      jeAktivnaURjecnika: () => true,
+      verzijaRjecnika: 1,
+      generacija: 1,
+    });
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa', 'mast'],
+      frekvencijaZa: (r) => (r === 'madrac' || r === 'marmor' ? 50 : 900),
+      grupeZa: (r) => [`imenica:${r}`],
+      brojAktivnih: 3,
+      turnToken: 't-pool-p2',
+      poolovi,
+      jeIgrivaRijec: (r) => ['masa', 'mast', 'marmor', 'madrac'].includes(r),
+    }, stvoriStanjeBota(konfig, () => 0.5), konfig, () => 0.5);
+    expect(odluka).toMatchObject({ vrsta: 'rijec', rijec: 'madrac', izPoola: true });
+  });
+
+  it('članovi poola isključeni su iz običnog uzorka', () => {
+    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostAgresivnosti: 0 };
+    const poolovi = izgradiSnimkuPoolova({
+      clanovi: [{ rijec: 'masa', kategorija: 'pool_1', stanje: 'razrijeseno' }],
+      jeAktivnaURjecnika: () => true,
+      verzijaRjecnika: 1,
+      generacija: 1,
+    });
+    const odluka = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa', 'mast'],
+      frekvencijaZa: () => 500,
+      grupeZa: (r) => [`imenica:${r}`],
+      brojAktivnih: 2,
+      turnToken: 't-excl',
+      poolovi,
+    }, stvoriStanjeBota(konfig, rng(2)), konfig, rng(2));
+    expect(odluka.vrsta).toBe('rijec');
+    if (odluka.vrsta === 'rijec') expect(odluka.rijec).toBe('mast');
+  });
+
+  it('oporavak ne mijenja odluku agresivnosti po tokenu', () => {
+    const konfig: KonfiguracijaBota = { ...konfigBezPropusta, vjerojatnostAgresivnosti: 0.5 };
+    const stanje = stvoriStanjeBota(konfig, () => 0.2);
+    odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      frekvencijaZa: () => 500,
+      grupeZa: (r) => [`imenica:${r}`],
+      turnToken: 't-op',
+      brojAktivnih: 2,
+      poolovi: PRAZNI_POOLOVI,
+    }, stanje, konfig, () => 0.2);
+    const prije = odlukaAgresivnostiZaToken(stanje, 't-op', 0.5, () => 0.99);
+    const poslije = odaberiPotez({
+      trazenaSlova: 'ma',
+      kandidati: ['masa'],
+      frekvencijaZa: () => 500,
+      grupeZa: (r) => [`imenica:${r}`],
+      turnToken: 't-op',
+      oporavak: true,
+      brojAktivnih: 2,
+      poolovi: PRAZNI_POOLOVI,
+    }, stanje, konfig, () => 0.99);
+    expect(poslije.vrsta).toBe('rijec');
+    expect(odlukaAgresivnostiZaToken(stanje, 't-op', 0.5, () => 0.99)).toBe(prije);
   });
 });
 
@@ -945,11 +1026,11 @@ describe('validacija admin postavki bota', () => {
 
   it.each([
     { vjerojatnostNeznanjaUMalomSkupu: NaN },
-    { vjerojatnostTaktickogPoteza: Infinity },
+    { vjerojatnostAgresivnosti: Infinity },
     { pragFrekvencije: { uobicajena: 10, srednja: 100 } },
     { jitterPotezaBotaMs: 5_000 },
     { maksimalnoOpcijaMalogSkupa: 0 },
-    { maksimalnoTaktickihKandidata: 0 },
+    { prioritetPoolova: 'p3_p1' },
     { pragoviPopuneMs: { dva_igraca: [3_000], tri_igraca: [10_000, 20_000], cetiri_igraca: [40_000, 30_000, 20_000] } },
     { odstupanjaPopuneMs: { dva_igraca: [4_000], tri_igraca: [0], cetiri_igraca: [3_000, 3_000, 3_000] } },
   ])('odbija nevaljanu kombinaciju %j', (izmjena) => {
@@ -1003,6 +1084,7 @@ describe('bot kontroler', () => {
       imaSlobodnuRijecNa: () => true,
       jeIgrivaRijec: (r: string) => kandidati.includes(r),
       repertoarBotova: () => snimka,
+      pooloviBotova: () => PRAZNI_POOLOVI,
     };
   }
 
@@ -1429,6 +1511,7 @@ describe('bot kontroler', () => {
           jeOsnovniOblik: () => true,
           jePostojecaRijec: (r) => kandidati.includes(r),
         }, verzija),
+        pooloviBotova: () => PRAZNI_POOLOVI,
       },
     });
     kontroler.naPromjenuPoteza(dogadaj());
@@ -1470,6 +1553,7 @@ describe('bot kontroler', () => {
           jeOsnovniOblik: () => true,
           jePostojecaRijec: () => false,
         }, verzija),
+        pooloviBotova: () => PRAZNI_POOLOVI,
       },
     });
     kontroler.naPromjenuPoteza(dogadaj());

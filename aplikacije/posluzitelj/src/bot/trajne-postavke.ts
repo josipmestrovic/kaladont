@@ -47,12 +47,9 @@ export function parsajSpremljenuKonfiguraciju(
     botoviDvoboj: typeof ulaz.botoviDvoboj === 'boolean' ? ulaz.botoviDvoboj : zadano.botoviDvoboj,
     botoviTroboj: typeof ulaz.botoviTroboj === 'boolean' ? ulaz.botoviTroboj : zadano.botoviTroboj,
     botoviCetveroboj: typeof ulaz.botoviCetveroboj === 'boolean' ? ulaz.botoviCetveroboj : zadano.botoviCetveroboj,
-    maksimalnoTaktickihKandidata: Math.min(
-      typeof ulaz.maksimalnoTaktickihKandidata === 'number'
-        ? ulaz.maksimalnoTaktickihKandidata
-        : zadano.maksimalnoTaktickihKandidata,
-      12,
-    ),
+    prioritetPoolova: ulaz.prioritetPoolova === 'p1_p2' || ulaz.prioritetPoolova === 'p2_p1'
+      ? ulaz.prioritetPoolova
+      : zadano.prioritetPoolova,
   });
 }
 

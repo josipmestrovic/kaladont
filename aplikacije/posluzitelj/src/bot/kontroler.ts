@@ -70,6 +70,7 @@ export interface OvisnostiBotKontrolera {
     | 'imaSlobodnuRijecNa'
     | 'imaSlobodnuRijecNaNastavivo'
     | 'repertoarBotova'
+    | 'pooloviBotova'
     | 'jeIgrivaRijec'
   > & {
     frekvencijaZa(rijec: string): number | null;
@@ -659,7 +660,7 @@ export class BotKontroler {
 
   private zabiljeziOdluku(odluka: OdlukaBota, stanjeBota: StanjeBotaUPartiji, turnToken: string, verzijaRjecnika: number, partijaId: string): void {
     if (odluka.vrsta === 'rijec' && odluka.propustKa) this.brojaci.propustPrimljenogKa += 1;
-    if (odluka.vrsta === 'rijec' && odluka.takticki) this.brojaci.taktickihPoteza += 1;
+    if (odluka.vrsta === 'rijec' && odluka.izPoola) this.brojaci.taktickihPoteza += 1;
     if (odluka.vrsta === 'rijec' && odluka.izborKa && stanjeBota.zadnjiTokenKa !== turnToken) {
       stanjeBota.zadnjiTokenKa = turnToken;
       if (odluka.izborKa === 'dobrovoljni') this.brojaci.dobrovoljniKa += 1;
@@ -743,6 +744,8 @@ export class BotKontroler {
       },
       poznatiKandidatiNaNastavivo: (prefiks, potrosene) =>
         this.poznatiNastavciIterator(prefiks, potrosene, dopusteneVrste, aktivan, predaj),
+      poolovi: rjecnik.pooloviBotova(),
+      jeIgrivaRijec: (rijec, potrosene, vrste) => rjecnik.jeIgrivaRijec(rijec, potrosene, vrste),
       predmemorija,
       verzijaRjecnika,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng, predaj, aktivan);
