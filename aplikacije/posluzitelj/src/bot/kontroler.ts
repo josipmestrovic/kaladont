@@ -6,6 +6,7 @@
  * odvojen od odluke o riječi; bez namjernog izostanka.
  * PR07: odaberiPotez dobiva pravilnik + broj aktivnih; čekač dokaza ne dobiva reakciju ispadanja.
  */
+import { performance } from 'node:perf_hooks';
 import type { BrzaPoruka, KontekstPartije } from 'zajednicko';
 import type { DogadajPoteza, RezultatNaredbe } from '../igra/politika-ucinka.js';
 import type { RjecnikUMemoriji } from '../rjecnik/ucitaj.js';
@@ -23,10 +24,17 @@ import {
 } from './odabir-rijeci.js';
 import {
   igriviKandidatiIzRepertoara,
+  kandidatiRepertoaraNaPrefiksu,
   poznatiNastavciIzRepertoara,
   type SnimkaRepertoara,
 } from './repertoar.js';
-import { CHECKPOINT_ZAPISA, RasporedjivacOdziva, predajSetImmediate } from './raspored-odziva.js';
+import {
+  BUDZET_SLICE_MS,
+  CHECKPOINT_ZAPISA,
+  RasporedjivacOdziva,
+  predajSetImmediate,
+  type KontekstPosla,
+} from './raspored-odziva.js';
 import {
   odaberiReakcijuNaPocetku,
   odaberiReakcijuPriEliminacijiProtivnika,
@@ -398,12 +406,13 @@ export class BotKontroler {
     const postojeci = this.posloviRasporeda.get(partijaId);
     if (postojeci !== undefined) this.raspored.otkazi(postojeci);
     const aktivan = () => this.jeAktualanPlan(partijaId, generacija, dogadaj.turnToken, igracId);
-    const id = this.raspored.prijavi(async () => {
+    const id = this.raspored.prijavi(async ({ predaj }: KontekstPosla) => {
       if (!aktivan()) return 'odustani';
       try {
         // Verzija na početku izračuna — ne na kraju (inače refresh tijekom rada izgleda kao match).
         const verzijaZaOdluku = this.ovisnosti.rjecnik.verzijaRjecnika();
-        const odluka = await this.odluciNastavivo(dogadaj, stanjeBota, snimkaGrupa, aktivan);
+        // Scheduler-owned predaj: RR sliceovi između partija; event loop yield radi pump.
+        const odluka = await this.odluciNastavivo(dogadaj, stanjeBota, snimkaGrupa, aktivan, new Set(), predaj);
         if (!aktivan()) return 'odustani';
         const plan = this.planirano.get(partijaId);
         if (!plan || plan.generacija !== generacija) return 'odustani';
@@ -572,6 +581,10 @@ export class BotKontroler {
     return this.ovisnosti.rjecnik.repertoarBotova();
   }
 
+  /**
+   * Sinkroni snapshot kandidata — može sam premašiti BUDZET_SLICE_MS na velikom prefiksu.
+   * Isto vrijedi za klasificirajPoznatiSkup u odabiru; sken rječnika nije u ovom commitu.
+   */
   private kandidatiZaPotez(
     trazenaSlova: string,
     iskoristene: ReadonlySet<string>,
@@ -588,19 +601,23 @@ export class BotKontroler {
     potrosene: ReadonlySet<string>,
     dopusteneVrste: DogadajPoteza['dopusteneVrste'],
     aktivan: () => boolean,
+    predaj: () => Promise<void>,
   ): AsyncIterable<string> {
     const snimka = this.snimkaRepertoara();
     const rjecnik = this.ovisnosti.rjecnik;
     const provjeri = (rijec: string) => rjecnik.jeIgrivaRijec(rijec, potrosene, dopusteneVrste);
-    const predaj = this.predajKontrolu;
     return {
       async *[Symbol.asyncIterator](): AsyncGenerator<string> {
         let n = 0;
-        for (const rijec of poznatiNastavciIzRepertoara(snimka, prefiks, provjeri)) {
+        let pocetakSlicea = performance.now();
+        // Broji sve pregledane zapise (iskorištene, kriva vrsta, ostalo) — ne samo yieldane.
+        for (const rijec of kandidatiRepertoaraNaPrefiksu(snimka, prefiks)) {
           n += 1;
-          yield rijec;
-          if (n % CHECKPOINT_ZAPISA === 0) {
+          if (provjeri(rijec)) yield rijec;
+          const budzetIstekao = performance.now() - pocetakSlicea >= BUDZET_SLICE_MS;
+          if (n % CHECKPOINT_ZAPISA === 0 || budzetIstekao) {
             await predaj();
+            pocetakSlicea = performance.now();
             if (!aktivan()) return;
           }
         }
@@ -634,6 +651,7 @@ export class BotKontroler {
     snimkaGrupa: ReadonlySet<string>,
     aktivan: () => boolean,
     odbijene: ReadonlySet<string> = new Set(),
+    predaj: () => Promise<void> = this.predajKontrolu,
   ): Promise<OdlukaBota | null> {
     if (!aktivan()) return null;
     const verzijaRjecnika = this.ovisnosti.rjecnik.verzijaRjecnika();
@@ -661,7 +679,6 @@ export class BotKontroler {
     predmemorija.uskladiKontekst(dogadaj.turnToken, verzijaRjecnika);
     const rjecnik = this.ovisnosti.rjecnik;
     const dopusteneVrste = dogadaj.dopusteneVrste;
-    const predaj = this.predajKontrolu;
     const odluka = await odaberiPotezNastavivo({
       trazenaSlova: dogadaj.trazenaSlova!,
       kandidati,
@@ -682,7 +699,7 @@ export class BotKontroler {
         return poznatiNastavciIzRepertoara(snimka, prefiks, provjeri);
       },
       poznatiKandidatiNaNastavivo: (prefiks, potrosene) =>
-        this.poznatiNastavciIterator(prefiks, potrosene, dopusteneVrste, aktivan),
+        this.poznatiNastavciIterator(prefiks, potrosene, dopusteneVrste, aktivan, predaj),
       predmemorija,
       verzijaRjecnika,
     }, stanjeBota, stanjeBota.konfiguracija, this.rng, predaj, aktivan);

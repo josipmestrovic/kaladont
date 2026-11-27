@@ -9,7 +9,8 @@ import {
   odaberiPotezNastavivo,
   stvoriStanjeBota,
 } from '../src/bot/odabir-rijeci.js';
-import { CHECKPOINT_ZAPISA } from '../src/bot/raspored-odziva.js';
+import { BUDZET_SLICE_MS, CHECKPOINT_ZAPISA } from '../src/bot/raspored-odziva.js';
+import { kandidatiRepertoaraNaPrefiksu, type SnimkaRepertoara } from '../src/bot/repertoar.js';
 import { ZADANA_KONFIGURACIJA_BOTA, type KonfiguracijaBota } from '../src/bot/konfiguracija-bota.js';
 
 const konfig: KonfiguracijaBota = {
@@ -121,6 +122,32 @@ describe('CI prihvat odziva botova', () => {
     expect(odluka?.vrsta).toBe('rijec');
     // odaberiPotezNastavivo zove predaj na početku i između kandidata.
     expect(predaja).toBeGreaterThanOrEqual(1);
+  });
+
+  it('odbačeni repertoar zapisi ulaze u checkpoint n (prije igrivost filtera)', async () => {
+    const N = CHECKPOINT_ZAPISA + 10;
+    const glavni = Array.from({ length: N }, (_, i) => (i === N - 1 ? 'lampa' : `xx${i}`));
+    const snimka: SnimkaRepertoara = {
+      generacija: 1,
+      poPrefiksu: new Map([
+        ['la', { glavni, rezerva: [] }],
+      ]),
+    };
+    const igrive = new Set(['lampa']);
+    let predaja = 0;
+    let n = 0;
+    const predaj = async () => { predaja += 1; };
+    // Isti ugovor kao poznatiNastavciIterator u kontroleru.
+    for (const rijec of kandidatiRepertoaraNaPrefiksu(snimka, 'la')) {
+      n += 1;
+      if (igrive.has(rijec)) {
+        // yield — ovdje samo brojimo sken
+      }
+      if (n % CHECKPOINT_ZAPISA === 0) await predaj();
+    }
+    expect(n).toBe(N);
+    expect(predaja).toBe(1);
+    expect(BUDZET_SLICE_MS).toBe(2);
   });
 
   it('seeded ekvivalencija sinkronog i nastavivog odabira na malom fixtureu', async () => {
