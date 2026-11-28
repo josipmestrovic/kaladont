@@ -24,6 +24,7 @@ import {
   agregirajDostignucaPresjek,
   agregirajKolekcijuPresjek,
   nazivPredloskaIzSnimke,
+  odlukaFiltraMisijskogKonteksta,
   PRAG_MALI_UZORAK_GAMIFIKACIJE,
   raspodjelaRazinaXp,
   statistikaVremenaDovrsetkaSekundi,
@@ -113,15 +114,12 @@ export async function agregirajGamifikaciju(opcije: {
 }) {
   const { od, doGranica } = graniceDana(opcije.odDan, opcije.doDan);
   const kontekstFilter = opcije.kontekst;
-  const kontekstMisija =
-    kontekstFilter === 'javna' || kontekstFilter === 'trening' || kontekstFilter === 'izazov'
-      ? kontekstFilter
-      : undefined;
-  const kontekstNapomena = kontekstFilter && !kontekstMisija
-    ? 'Filter konteksta privatna ne vrijedi za misije/dotok/zamjene; doprinosi i nagrade s kontekstom su prazni za privatnu.'
-    : kontekstFilter
-      ? 'Filter konteksta vrijedi za doprinose i nagrade misija; dodjele/zamjene/dotok ostaju globalni.'
-      : null;
+  const odlukaKonteksta = odlukaFiltraMisijskogKonteksta(kontekstFilter);
+  const kontekstNapomena = odlukaKonteksta.nacin === 'neprimjenjivo'
+    ? 'Filter privatna: doprinosi i XP nagrade misija nisu primjenjivi (N/A). Dodjele/zamjene/dotok i trenutačni presjek ostaju globalni. XP izazova je zasebna metrika izazova.'
+    : odlukaKonteksta.nacin === 'filtriraj'
+      ? `Filter ${odlukaKonteksta.kontekst}: doprinosi i XP nagrade misija filtrirani po kontekstu izvora. Dodjele/zamjene/dotok i trenutačni presjek ostaju globalni. XP izazova je zasebna metrika izazova.`
+      : 'Bez filtera konteksta: svi podaci. XP izazova je zasebna metrika izazova.';
 
   const dodjele = await baza
     .select({
@@ -313,65 +311,77 @@ export async function agregirajGamifikaciju(opcije: {
     }
   }
 
-  const doprinosiUvjet = and(
-    gte(doprinosiMisijama.stvorenoU, od),
-    lt(doprinosiMisijama.stvorenoU, doGranica),
-    kontekstMisija ? eq(doprinosiMisijama.kontekstIzvora, kontekstMisija) : undefined,
-  );
-  const doprinosi = await baza
-    .select({
-      kontekst: doprinosiMisijama.kontekstIzvora,
-      broj: sql<number>`count(*)::int`,
-      igre: sql<number>`count(distinct ${doprinosiMisijama.izvorId})::int`,
-    })
-    .from(doprinosiMisijama)
-    .where(doprinosiUvjet)
-    .groupBy(doprinosiMisijama.kontekstIzvora);
-
   const doprinosiPoKontekstu = {
     javna: { doprinosi: 0, distinctIgara: 0 },
     trening: { doprinosi: 0, distinctIgara: 0 },
     izazov: { doprinosi: 0, distinctIgara: 0 },
   };
-  for (const r of doprinosi) {
-    if (r.kontekst in doprinosiPoKontekstu) {
-      doprinosiPoKontekstu[r.kontekst as keyof typeof doprinosiPoKontekstu] = {
-        doprinosi: Number(r.broj),
-        distinctIgara: Number(r.igre),
-      };
-    }
-  }
-
-  const nagradeUvjet = and(
-    gte(nagradeMisija.dodijeljenaU, od),
-    lt(nagradeMisija.dodijeljenaU, doGranica),
-    kontekstMisija ? eq(nagradeMisija.kontekstIzvora, kontekstMisija) : undefined,
-  );
-  const nagradeRedovi = await baza
-    .select({
-      igracId: nagradeMisija.igracId,
-      xpStvarno: nagradeMisija.xpStvarno,
-      xpNominalno: nagradeMisija.xpNominalno,
-      vrsta: dodjeleMisija.vrsta,
-    })
-    .from(nagradeMisija)
-    .innerJoin(dodjeleMisija, eq(nagradeMisija.dodjelaId, dodjeleMisija.id))
-    .where(nagradeUvjet);
-
   const xpMisija = {
     ukupnoStvarno: 0,
     ukupnoNominalno: 0,
     dnevneStvarno: 0,
     tjedneStvarno: 0,
-    brojNagrada: nagradeRedovi.length,
+    brojNagrada: 0,
     primatelji: new Set<string>(),
   };
-  for (const n of nagradeRedovi) {
-    xpMisija.ukupnoStvarno += n.xpStvarno;
-    xpMisija.ukupnoNominalno += n.xpNominalno;
-    xpMisija.primatelji.add(n.igracId);
-    if (n.vrsta === 'dnevna') xpMisija.dnevneStvarno += n.xpStvarno;
-    else xpMisija.tjedneStvarno += n.xpStvarno;
+  const doprinosiINagradeMisija = odlukaKonteksta.nacin === 'neprimjenjivo'
+    ? {
+      dostupno: false as const,
+      razlog: 'Doprinosi i XP nagrade misija ne postoje za privatne sobe.',
+    }
+    : { dostupno: true as const, razlog: null as string | null };
+
+  if (odlukaKonteksta.nacin !== 'neprimjenjivo') {
+    const doprinosiUvjet = and(
+      gte(doprinosiMisijama.stvorenoU, od),
+      lt(doprinosiMisijama.stvorenoU, doGranica),
+      odlukaKonteksta.nacin === 'filtriraj'
+        ? eq(doprinosiMisijama.kontekstIzvora, odlukaKonteksta.kontekst!)
+        : undefined,
+    );
+    const doprinosi = await baza
+      .select({
+        kontekst: doprinosiMisijama.kontekstIzvora,
+        broj: sql<number>`count(*)::int`,
+        igre: sql<number>`count(distinct ${doprinosiMisijama.izvorId})::int`,
+      })
+      .from(doprinosiMisijama)
+      .where(doprinosiUvjet)
+      .groupBy(doprinosiMisijama.kontekstIzvora);
+    for (const r of doprinosi) {
+      if (r.kontekst in doprinosiPoKontekstu) {
+        doprinosiPoKontekstu[r.kontekst as keyof typeof doprinosiPoKontekstu] = {
+          doprinosi: Number(r.broj),
+          distinctIgara: Number(r.igre),
+        };
+      }
+    }
+
+    const nagradeUvjet = and(
+      gte(nagradeMisija.dodijeljenaU, od),
+      lt(nagradeMisija.dodijeljenaU, doGranica),
+      odlukaKonteksta.nacin === 'filtriraj'
+        ? eq(nagradeMisija.kontekstIzvora, odlukaKonteksta.kontekst!)
+        : undefined,
+    );
+    const nagradeRedovi = await baza
+      .select({
+        igracId: nagradeMisija.igracId,
+        xpStvarno: nagradeMisija.xpStvarno,
+        xpNominalno: nagradeMisija.xpNominalno,
+        vrsta: dodjeleMisija.vrsta,
+      })
+      .from(nagradeMisija)
+      .innerJoin(dodjeleMisija, eq(nagradeMisija.dodjelaId, dodjeleMisija.id))
+      .where(nagradeUvjet);
+    xpMisija.brojNagrada = nagradeRedovi.length;
+    for (const n of nagradeRedovi) {
+      xpMisija.ukupnoStvarno += n.xpStvarno;
+      xpMisija.ukupnoNominalno += n.xpNominalno;
+      xpMisija.primatelji.add(n.igracId);
+      if (n.vrsta === 'dnevna') xpMisija.dnevneStvarno += n.xpStvarno;
+      else xpMisija.tjedneStvarno += n.xpStvarno;
+    }
   }
 
   const izazovXpRedovi = await baza
@@ -503,6 +513,7 @@ export async function agregirajGamifikaciju(opcije: {
         ...dotokBrojevi,
         napomena: 'Preskočeno nije nužno svjesno odustajanje; dani bez posjeta nemaju zapis.',
       },
+      doprinosiINagradeMisija,
       doprinosi: doprinosiPoKontekstu,
       xpMisija: {
         ukupnoStvarno: xpMisija.ukupnoStvarno,
@@ -516,6 +527,8 @@ export async function agregirajGamifikaciju(opcije: {
           : xpMisija.ukupnoStvarno / xpMisija.brojNagrada,
       },
       xpIzazova: {
+        zasebnaMetrika: 'izazovi' as const,
+        napomena: 'XP iz prvih uspjeha izazova (zavrseci_izazova); ne filtrira se kontekstom Brze/Treninga/Privatne.',
         prviUspjesi: izazovXpRedovi.length,
         jedinstveniIgraci: izazovPrimatelji.size,
         awardedXpUkupno: izazovXpUkupno,

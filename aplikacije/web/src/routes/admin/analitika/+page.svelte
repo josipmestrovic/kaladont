@@ -175,6 +175,8 @@
   let botoviAgregat = $state<AgregatBotova | null>(null);
   let gamifikacijaAgregat = $state<AgregatGamifikacije | null>(null);
   let izazovi = $state<AgregatIzazova | null>(null);
+  const PREDLOSCI_PO_STRANICI = 25;
+  let stranicaPredlozaka = $state(1);
 
   interface SazetakMisijaVrste {
     dodijeljene: number;
@@ -219,11 +221,23 @@
         tjedne: number;
         najcesceZamijenjeni: { predlozakId: string; naziv: string; broj: number }[];
         najcesceDobiveniKaoZamjena: { predlozakId: string; naziv: string; broj: number }[];
+        stopaPoPredloskuKohorteDodjela: {
+          predlozakId: string;
+          vrsta: string;
+          verzijaDefinicije: number;
+          naziv: string;
+          zamijenjeneDodjele: number;
+          dodjeleKohorte: number;
+          stopaZamjenjivanja: number | null;
+          maliUzorak: boolean;
+        }[];
       };
       dotokDnevnih: { dodijeljeno: number; preskoceno: number; napomena: string };
+      doprinosiINagradeMisija: { dostupno: boolean; razlog: string | null };
       doprinosi: Record<string, { doprinosi: number; distinctIgara: number }>;
       xpMisija: {
         ukupnoStvarno: number;
+        ukupnoNominalno: number;
         dnevneStvarno: number;
         tjedneStvarno: number;
         brojNagrada: number;
@@ -231,6 +245,8 @@
         prosjekStvarnogPoNagradi: number | null;
       };
       xpIzazova: {
+        zasebnaMetrika: 'izazovi';
+        napomena: string;
         prviUspjesi: number;
         jedinstveniIgraci: number;
         awardedXpUkupno: number;
@@ -256,6 +272,7 @@
         prosjekOtkljucanih: number | null;
         prosjekZvjezdica: number | null;
         medijanZvjezdica: number | null;
+        raspodjelaUkupnihZvjezdica: { raspon: string; broj: number }[];
         igraciSMaksimalnoDovrsenimPojedinim: number;
         poDostignucu: {
           id: string;
@@ -265,6 +282,7 @@
           naMaksimalnojRazini: number;
           prosjekZvjezdicaOtkljucanih: number | null;
           maksimalnaRazina: number;
+          raspodjelaRazina: { razina: number; broj: number }[];
         }[];
       };
       kolekcija: {
@@ -579,8 +597,12 @@
     else greske.push(c.reason instanceof Error ? c.reason.message : 'Analitika čekaonice nije dostupna.');
     if (b.status === 'fulfilled') botoviAgregat = b.value;
     else greske.push(b.reason instanceof Error ? b.reason.message : 'Analitika botova nije dostupna.');
-    if (g.status === 'fulfilled') gamifikacijaAgregat = g.value;
-    else greske.push(g.reason instanceof Error ? g.reason.message : 'Analitika gamifikacije nije dostupna.');
+    if (g.status === 'fulfilled') {
+      gamifikacijaAgregat = g.value;
+      stranicaPredlozaka = 1;
+    } else {
+      greske.push(g.reason instanceof Error ? g.reason.message : 'Analitika gamifikacije nije dostupna.');
+    }
     if (s.status === 'fulfilled') status = s.value;
     else greske.push(s.reason instanceof Error ? s.reason.message : 'Status nije dostupan.');
     if (iz.status === 'fulfilled') izazovi = iz.value;
@@ -1182,6 +1204,11 @@
 {/if}
 
 {#if gamifikacijaAgregat}
+  {@const predlosciSvi = gamifikacijaAgregat.razdoblje.predlosci}
+  {@const predlosciOd = (stranicaPredlozaka - 1) * PREDLOSCI_PO_STRANICI}
+  {@const predlosciStranica = predlosciSvi.slice(predlosciOd, predlosciOd + PREDLOSCI_PO_STRANICI)}
+  {@const predlosciUkupnoStranica = Math.max(1, Math.ceil(predlosciSvi.length / PREDLOSCI_PO_STRANICI))}
+  {@const misijeDostupne = gamifikacijaAgregat.razdoblje.doprinosiINagradeMisija?.dostupno !== false}
   <section aria-labelledby="gamifikacija-naslov">
     <h2 id="gamifikacija-naslov">Gamifikacija</h2>
     <p class="meta">
@@ -1198,15 +1225,68 @@
       <div><dt>Dnevne dodijeljene</dt><dd>{gamifikacijaAgregat.razdoblje.misije.dnevne.dodijeljene}</dd></div>
       <div><dt>Dnevne dovršene</dt><dd>{gamifikacijaAgregat.razdoblje.misije.dnevne.dovrsene} ({postotak(gamifikacijaAgregat.razdoblje.misije.dnevne.udioTrenutnoDovrsenih)})</dd></div>
       <div><dt>Dnevne terminalna stopa</dt><dd>{postotak(gamifikacijaAgregat.razdoblje.misije.dnevne.terminalnaStopaDovrsavanja)} (n={gamifikacijaAgregat.razdoblje.misije.dnevne.terminalniNazivnik})</dd></div>
-      <div><dt>Dnevne aktivne</dt><dd>{gamifikacijaAgregat.razdoblje.misije.dnevne.aktivne}</dd></div>
+      <div><dt>Dnevne aktivne / zamijenjene / istekle</dt><dd>{gamifikacijaAgregat.razdoblje.misije.dnevne.aktivne} / {gamifikacijaAgregat.razdoblje.misije.dnevne.zamijenjene} / {gamifikacijaAgregat.razdoblje.misije.dnevne.istekle}</dd></div>
+      <div><dt>Dnevne primatelji / dovršitelji</dt><dd>{gamifikacijaAgregat.razdoblje.misije.dnevne.primatelji} / {gamifikacijaAgregat.razdoblje.misije.dnevne.dovrsitelji}</dd></div>
+      <div><dt>Dnevne vrijeme dovršetka</dt><dd>prosjek {formatSekundi(gamifikacijaAgregat.razdoblje.misije.dnevne.vrijemeDovrsetka.prosjekSekundi)} · medijan {formatSekundi(gamifikacijaAgregat.razdoblje.misije.dnevne.vrijemeDovrsetka.medijanSekundi)} (n={gamifikacijaAgregat.razdoblje.misije.dnevne.vrijemeDovrsetka.uzorak})</dd></div>
       <div><dt>Tjedne dodijeljene</dt><dd>{gamifikacijaAgregat.razdoblje.misije.tjedne.dodijeljene}</dd></div>
       <div><dt>Tjedne dovršene</dt><dd>{gamifikacijaAgregat.razdoblje.misije.tjedne.dovrsene} ({postotak(gamifikacijaAgregat.razdoblje.misije.tjedne.udioTrenutnoDovrsenih)})</dd></div>
       <div><dt>Tjedne terminalna stopa</dt><dd>{postotak(gamifikacijaAgregat.razdoblje.misije.tjedne.terminalnaStopaDovrsavanja)} (n={gamifikacijaAgregat.razdoblje.misije.tjedne.terminalniNazivnik})</dd></div>
-      <div><dt>Zamjene (ukupno)</dt><dd>{gamifikacijaAgregat.razdoblje.zamjene.ukupno} · {gamifikacijaAgregat.razdoblje.zamjene.jedinstveniIgraci} igrača</dd></div>
+      <div><dt>Tjedne aktivne / zamijenjene / istekle</dt><dd>{gamifikacijaAgregat.razdoblje.misije.tjedne.aktivne} / {gamifikacijaAgregat.razdoblje.misije.tjedne.zamijenjene} / {gamifikacijaAgregat.razdoblje.misije.tjedne.istekle}</dd></div>
+      <div><dt>Tjedne primatelji / dovršitelji</dt><dd>{gamifikacijaAgregat.razdoblje.misije.tjedne.primatelji} / {gamifikacijaAgregat.razdoblje.misije.tjedne.dovrsitelji}</dd></div>
+      <div><dt>Tjedne vrijeme dovršetka</dt><dd>prosjek {formatSekundi(gamifikacijaAgregat.razdoblje.misije.tjedne.vrijemeDovrsetka.prosjekSekundi)} · medijan {formatSekundi(gamifikacijaAgregat.razdoblje.misije.tjedne.vrijemeDovrsetka.medijanSekundi)} (n={gamifikacijaAgregat.razdoblje.misije.tjedne.vrijemeDovrsetka.uzorak})</dd></div>
+      <div><dt>Zamjene (ukupno)</dt><dd>{gamifikacijaAgregat.razdoblje.zamjene.ukupno} · dnevne {gamifikacijaAgregat.razdoblje.zamjene.dnevne} / tjedne {gamifikacijaAgregat.razdoblje.zamjene.tjedne} · {gamifikacijaAgregat.razdoblje.zamjene.jedinstveniIgraci} igrača</dd></div>
     </dl>
 
+    {#if gamifikacijaAgregat.razdoblje.zamjene.najcesceZamijenjeni.length > 0}
+      <h3>Najčešće zamijenjeni predlošci</h3>
+      <table>
+        <thead><tr><th>Predložak</th><th>Broj</th></tr></thead>
+        <tbody>
+          {#each gamifikacijaAgregat.razdoblje.zamjene.najcesceZamijenjeni as red (`zam-stara-${red.predlozakId}-${red.naziv}`)}
+            <tr><td>{red.naziv}</td><td>{red.broj}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+    {#if gamifikacijaAgregat.razdoblje.zamjene.najcesceDobiveniKaoZamjena.length > 0}
+      <h3>Najčešće dobiveni kao zamjena</h3>
+      <table>
+        <thead><tr><th>Predložak</th><th>Broj</th></tr></thead>
+        <tbody>
+          {#each gamifikacijaAgregat.razdoblje.zamjene.najcesceDobiveniKaoZamjena as red (`zam-nova-${red.predlozakId}-${red.naziv}`)}
+            <tr><td>{red.naziv}</td><td>{red.broj}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+    {#if gamifikacijaAgregat.razdoblje.zamjene.stopaPoPredloskuKohorteDodjela?.length}
+      <h3>Stopa zamjene po predlošku (kohorta dodjela)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Predložak</th>
+            <th>Vrsta</th>
+            <th>Zamijenjene</th>
+            <th>Dodjele</th>
+            <th>Stopa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each gamifikacijaAgregat.razdoblje.zamjene.stopaPoPredloskuKohorteDodjela as red (`stopa-${red.predlozakId}-${red.vrsta}-${red.verzijaDefinicije}`)}
+            <tr>
+              <td>{red.naziv}</td>
+              <td>{red.vrsta}</td>
+              <td>{red.zamijenjeneDodjele}</td>
+              <td>{red.dodjeleKohorte}</td>
+              <td>{postotak(red.stopaZamjenjivanja)}{#if red.maliUzorak} · mali{/if}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+
     <h3>Uspješnost predložaka</h3>
-    {#if gamifikacijaAgregat.razdoblje.predlosci.length === 0}
+    {#if predlosciSvi.length === 0}
       <p class="meta">Nema dodjela u rasponu.</p>
     {:else}
       <table>
@@ -1222,7 +1302,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each gamifikacijaAgregat.razdoblje.predlosci.slice(0, 40) as red (`${red.predlozakId}-${red.vrsta}-${red.verzijaDefinicije}`)}
+          {#each predlosciStranica as red (`${red.predlozakId}-${red.vrsta}-${red.verzijaDefinicije}`)}
             <tr>
               <td>{red.naziv}</td>
               <td>{red.vrsta}</td>
@@ -1235,24 +1315,40 @@
           {/each}
         </tbody>
       </table>
+      {#if predlosciSvi.length > PREDLOSCI_PO_STRANICI}
+        <p class="meta">
+          <button type="button" disabled={stranicaPredlozaka <= 1} onclick={() => { stranicaPredlozaka -= 1; }}>Prethodna</button>
+          <span>Stranica {stranicaPredlozaka} / {predlosciUkupnoStranica} ({predlosciSvi.length} predložaka)</span>
+          <button type="button" disabled={stranicaPredlozaka >= predlosciUkupnoStranica} onclick={() => { stranicaPredlozaka += 1; }}>Sljedeća</button>
+        </p>
+      {/if}
     {/if}
 
     <h3>XP nagrade (razdoblje)</h3>
+    {#if !misijeDostupne}
+      <p class="meta">{gamifikacijaAgregat.razdoblje.doprinosiINagradeMisija.razlog ?? 'Doprinosi i XP nagrade misija nisu primjenjivi za ovaj kontekst.'}</p>
+    {/if}
     <dl class="kartice">
-      <div><dt>XP misija (stvarno)</dt><dd>{gamifikacijaAgregat.razdoblje.xpMisija.ukupnoStvarno}</dd></div>
-      <div><dt>Dnevne / tjedne</dt><dd>{gamifikacijaAgregat.razdoblje.xpMisija.dnevneStvarno} / {gamifikacijaAgregat.razdoblje.xpMisija.tjedneStvarno}</dd></div>
-      <div><dt>Nagrade misija</dt><dd>{gamifikacijaAgregat.razdoblje.xpMisija.brojNagrada} · {gamifikacijaAgregat.razdoblje.xpMisija.primatelji} primatelja</dd></div>
-      <div><dt>Prosjek XP/nagrada</dt><dd>{gamifikacijaAgregat.razdoblje.xpMisija.prosjekStvarnogPoNagradi?.toFixed(1) ?? '—'}</dd></div>
+      <div><dt>XP misija (stvarno / nominalno)</dt><dd>{misijeDostupne ? `${gamifikacijaAgregat.razdoblje.xpMisija.ukupnoStvarno} / ${gamifikacijaAgregat.razdoblje.xpMisija.ukupnoNominalno}` : 'N/A'}</dd></div>
+      <div><dt>Dnevne / tjedne (stvarno)</dt><dd>{misijeDostupne ? `${gamifikacijaAgregat.razdoblje.xpMisija.dnevneStvarno} / ${gamifikacijaAgregat.razdoblje.xpMisija.tjedneStvarno}` : 'N/A'}</dd></div>
+      <div><dt>Nagrade misija</dt><dd>{misijeDostupne ? `${gamifikacijaAgregat.razdoblje.xpMisija.brojNagrada} · ${gamifikacijaAgregat.razdoblje.xpMisija.primatelji} primatelja` : 'N/A'}</dd></div>
+      <div><dt>Prosjek XP/nagrada</dt><dd>{misijeDostupne ? (gamifikacijaAgregat.razdoblje.xpMisija.prosjekStvarnogPoNagradi?.toFixed(1) ?? '—') : 'N/A'}</dd></div>
       <div><dt>XP izazova (prvi uspjeh)</dt><dd>{gamifikacijaAgregat.razdoblje.xpIzazova.awardedXpUkupno}</dd></div>
       <div><dt>Prvi uspjesi</dt><dd>{gamifikacijaAgregat.razdoblje.xpIzazova.prviUspjesi} · {gamifikacijaAgregat.razdoblje.xpIzazova.jedinstveniIgraci} igrača</dd></div>
+      <div><dt>Prosjek XP po prvom uspjehu</dt><dd>{gamifikacijaAgregat.razdoblje.xpIzazova.prosjekPoPrvomUspjehu?.toFixed(1) ?? '—'}</dd></div>
       <div><dt>Dotok dnevnih</dt><dd>{gamifikacijaAgregat.razdoblje.dotokDnevnih.dodijeljeno} dodijeljeno / {gamifikacijaAgregat.razdoblje.dotokDnevnih.preskoceno} preskočeno</dd></div>
       <div><dt>Otključavanja (★ / riječi)</dt><dd>{gamifikacijaAgregat.razdoblje.prvaOtkljucavanjaDostignuca} / {gamifikacijaAgregat.razdoblje.otkljucavanjaRijeci}</dd></div>
     </dl>
-    <p class="meta">
-      Doprinosi: javna {gamifikacijaAgregat.razdoblje.doprinosi.javna?.doprinosi ?? 0}
-      · trening {gamifikacijaAgregat.razdoblje.doprinosi.trening?.doprinosi ?? 0}
-      · izazov {gamifikacijaAgregat.razdoblje.doprinosi.izazov?.doprinosi ?? 0}
-    </p>
+    <p class="meta">{gamifikacijaAgregat.razdoblje.xpIzazova.napomena ?? 'Zasebna metrika izazova.'}</p>
+    {#if misijeDostupne}
+      <p class="meta">
+        Doprinosi: javna {gamifikacijaAgregat.razdoblje.doprinosi.javna?.doprinosi ?? 0} ({gamifikacijaAgregat.razdoblje.doprinosi.javna?.distinctIgara ?? 0} igara)
+        · trening {gamifikacijaAgregat.razdoblje.doprinosi.trening?.doprinosi ?? 0} ({gamifikacijaAgregat.razdoblje.doprinosi.trening?.distinctIgara ?? 0} igara)
+        · izazov {gamifikacijaAgregat.razdoblje.doprinosi.izazov?.doprinosi ?? 0} ({gamifikacijaAgregat.razdoblje.doprinosi.izazov?.distinctIgara ?? 0} igara)
+      </p>
+    {:else}
+      <p class="meta">Doprinosi misija: N/A</p>
+    {/if}
 
     <h3>Raspodjela XP razina (trenutačno)</h3>
     <p class="meta">Baza igrača: {gamifikacijaAgregat.trenutacniPresjek.bazaIgraca} · nije XP zarađen u filteru datuma.</p>
@@ -1279,6 +1375,16 @@
       <div><dt>Prosjek / medijan ★</dt><dd>{gamifikacijaAgregat.trenutacniPresjek.dostignuca.prosjekZvjezdica?.toFixed(1) ?? '—'} / {gamifikacijaAgregat.trenutacniPresjek.dostignuca.medijanZvjezdica?.toFixed(1) ?? '—'}</dd></div>
       <div><dt>S max pojedinim</dt><dd>{gamifikacijaAgregat.trenutacniPresjek.dostignuca.igraciSMaksimalnoDovrsenimPojedinim}</dd></div>
     </dl>
+    {#if gamifikacijaAgregat.trenutacniPresjek.dostignuca.raspodjelaUkupnihZvjezdica?.length}
+      <table>
+        <thead><tr><th>Ukupne ★</th><th>Igrači</th></tr></thead>
+        <tbody>
+          {#each gamifikacijaAgregat.trenutacniPresjek.dostignuca.raspodjelaUkupnihZvjezdica as red (red.raspon)}
+            <tr><td>{red.raspon}</td><td>{red.broj}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
     {#if gamifikacijaAgregat.trenutacniPresjek.dostignuca.poDostignucu.length > 0}
       <table>
         <thead>
@@ -1286,8 +1392,10 @@
             <th>Dostignuće</th>
             <th>Otključano</th>
             <th>Udio</th>
-            <th>Na max</th>
+            <th>Maks. zvjezdica</th>
+            <th>Igrači na maksimumu</th>
             <th>Prosjek ★</th>
+            <th>Razine 0…max</th>
           </tr>
         </thead>
         <tbody>
@@ -1296,8 +1404,10 @@
               <td>{red.naziv}</td>
               <td>{red.otkljucani}</td>
               <td>{postotak(red.udioOtkljucanih)}</td>
-              <td>{red.naMaksimalnojRazini}/{red.maksimalnaRazina}</td>
+              <td>{red.maksimalnaRazina}</td>
+              <td>{red.naMaksimalnojRazini}</td>
               <td>{red.prosjekZvjezdicaOtkljucanih?.toFixed(2) ?? '—'}</td>
+              <td>{red.raspodjelaRazina?.map((r) => r.broj).join(' / ') ?? '—'}</td>
             </tr>
           {/each}
         </tbody>
@@ -1305,12 +1415,26 @@
     {/if}
 
     <h3>Kolekcije riječi (trenutačno)</h3>
+    <p class="meta">
+      Globalno distinct ≠ zbroj otključavanja po igračima.
+      Period otključavanja riječi ({gamifikacijaAgregat.razdoblje.otkljucavanjaRijeci}) ostaje odvojen od trenutačnog presjeka.
+    </p>
     <dl class="kartice">
       <div><dt>S barem jednom riječi</dt><dd>{gamifikacijaAgregat.trenutacniPresjek.kolekcija.igraciSBaremJednomRijeci}</dd></div>
       <div><dt>Distinct riječi</dt><dd>{gamifikacijaAgregat.trenutacniPresjek.kolekcija.distinctRijeciGlobalno}</dd></div>
       <div><dt>Prosjek / medijan veličine</dt><dd>{gamifikacijaAgregat.trenutacniPresjek.kolekcija.prosjekVelicine?.toFixed(1) ?? '—'} / {gamifikacijaAgregat.trenutacniPresjek.kolekcija.medijanVelicine?.toFixed(1) ?? '—'}</dd></div>
       <div><dt>Duge / rijetke (redovi)</dt><dd>{gamifikacijaAgregat.trenutacniPresjek.kolekcija.brojDugihOtkljucavanja} / {gamifikacijaAgregat.trenutacniPresjek.kolekcija.brojRijetkihOtkljucavanja}</dd></div>
     </dl>
+    {#if gamifikacijaAgregat.trenutacniPresjek.kolekcija.raspodjelaVelicine.length > 0}
+      <table>
+        <thead><tr><th>Veličina kolekcije</th><th>Igrači</th></tr></thead>
+        <tbody>
+          {#each gamifikacijaAgregat.trenutacniPresjek.kolekcija.raspodjelaVelicine as red (red.raspon)}
+            <tr><td>{red.raspon}</td><td>{red.broj}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
   </section>
 {/if}
 

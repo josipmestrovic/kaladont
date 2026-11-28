@@ -40,6 +40,20 @@ export function postotak(brojnik: number, nazivnik: number): number | null {
   return (brojnik / nazivnik) * 100;
 }
 
+export type NacinFiltraMisijskogKonteksta = 'sve' | 'filtriraj' | 'neprimjenjivo';
+
+/** Doprinosi/nagrade misija: privatna = N/A; javna/trening/izazov = filter; inače sve. */
+export function odlukaFiltraMisijskogKonteksta(
+  kontekst: string | undefined | null,
+): { nacin: NacinFiltraMisijskogKonteksta; kontekst?: 'javna' | 'trening' | 'izazov' } {
+  if (kontekst == null || kontekst === '') return { nacin: 'sve' };
+  if (kontekst === 'privatna') return { nacin: 'neprimjenjivo' };
+  if (kontekst === 'javna' || kontekst === 'trening' || kontekst === 'izazov') {
+    return { nacin: 'filtriraj', kontekst };
+  }
+  return { nacin: 'sve' };
+}
+
 export function stopeMisija(dodjele: number, dovrsene: number, zamijenjene: number, istekle: number) {
   const terminalni = dovrsene + zamijenjene + istekle;
   return {

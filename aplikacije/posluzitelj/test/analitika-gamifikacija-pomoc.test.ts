@@ -9,6 +9,7 @@ import {
   agregirajKolekcijuPresjek,
   kantaRazinaXp,
   nazivPredloskaIzSnimke,
+  odlukaFiltraMisijskogKonteksta,
   postotak,
   PRAG_MALI_UZORAK_GAMIFIKACIJE,
   raspodjelaRazinaXp,
@@ -17,6 +18,16 @@ import {
 } from '../src/analitika/gamifikacija-pomoc.js';
 
 describe('gamifikacija pomoćnici', () => {
+  it('odlučuje filter misijskog konteksta', () => {
+    expect(odlukaFiltraMisijskogKonteksta(undefined)).toEqual({ nacin: 'sve' });
+    expect(odlukaFiltraMisijskogKonteksta(null)).toEqual({ nacin: 'sve' });
+    expect(odlukaFiltraMisijskogKonteksta('')).toEqual({ nacin: 'sve' });
+    expect(odlukaFiltraMisijskogKonteksta('javna')).toEqual({ nacin: 'filtriraj', kontekst: 'javna' });
+    expect(odlukaFiltraMisijskogKonteksta('trening')).toEqual({ nacin: 'filtriraj', kontekst: 'trening' });
+    expect(odlukaFiltraMisijskogKonteksta('izazov')).toEqual({ nacin: 'filtriraj', kontekst: 'izazov' });
+    expect(odlukaFiltraMisijskogKonteksta('privatna')).toEqual({ nacin: 'neprimjenjivo' });
+  });
+
   it('računa udio i terminalnu stopu s ispravnim nazivnicima', () => {
     const s = stopeMisija(10, 4, 3, 1);
     expect(s.udioTrenutnoDovrsenih).toBe(40);
