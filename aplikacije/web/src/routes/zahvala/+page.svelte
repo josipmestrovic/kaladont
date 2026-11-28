@@ -24,31 +24,37 @@
           class="glavna-akcija"
           href="/red?mod=dva_igraca"
           onclick={() =>
-            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'brza_igra', izvor: 'ostalo' })}
+            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'brza_igra', izvor: 'zahvala' })}
         >Igrati Dvoboj</a>
         <a
           class="glavna-akcija"
           href="/red?mod=cetiri_igraca"
           onclick={() =>
-            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'brza_igra', izvor: 'ostalo' })}
+            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'brza_igra', izvor: 'zahvala' })}
         >Igrati Četveroboj</a>
         <a
           class="sporedna-akcija"
           href="/soba/kreiraj"
           onclick={() =>
-            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'privatna_soba', izvor: 'ostalo' })}
+            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'privatna_soba', izvor: 'zahvala' })}
         >Stvoriti privatnu sobu</a>
         <a
           class="sporedna-akcija"
           href="/pravila-kaladonta"
           onclick={() =>
-            zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'pravila', izvor: 'ostalo' })}
+            zabiljeziUmamiDogadjaj('navigacija-klik', {
+              odrediste: 'pravila',
+              izvor: 'zahvala',
+            })}
         >Pročitati pravila</a>
         <a
           class="sporedna-akcija"
           href="/profil"
           onclick={() =>
-            zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'profil', izvor: 'ostalo' })}
+            zabiljeziUmamiDogadjaj('navigacija-klik', {
+              odrediste: 'profil',
+              izvor: 'zahvala',
+            })}
         >Vidjeti svoj profil</a>
         <a class="sporedna-akcija" href="/postavke">Otvoriti postavke</a>
         <a
@@ -57,7 +63,7 @@
           onclick={() =>
             zabiljeziUmamiDogadjaj('navigacija-klik', {
               odrediste: 'ljestvice',
-              izvor: 'ostalo',
+              izvor: 'zahvala',
             })}
         >Pogledati ljestvice</a>
         <a class="sporedna-akcija" href="/o-igri">Saznaj više o igri</a>

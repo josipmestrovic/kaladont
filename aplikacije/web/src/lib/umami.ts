@@ -19,6 +19,14 @@ export type UmamiIzvor =
   | 'zavrsetak_treninga'
   | 'profil'
   | 'footer'
+  | 'misije'
+  | 'ljestvice'
+  | 'postavke'
+  | 'prijava'
+  | 'registracija'
+  | 'zahvala'
+  | 'avatar_editor'
+  | 'obavijest_misije'
   | 'ostalo';
 
 export type UmamiMod = 'brza_igra' | 'izazovi' | 'trening' | 'privatna_soba';

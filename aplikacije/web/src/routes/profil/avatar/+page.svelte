@@ -5,7 +5,7 @@
   import { api } from '$lib/api.js';
   import { dohvatiSocket } from '$lib/socket.js';
   import AvatarEditor from '$lib/komponente/AvatarEditor.svelte';
-  import { ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
+  import { kanonskiZapisAvatara, ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
   import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   let konfiguracija = $state<AvatarConfigV1>(ZADANI_AVATAR_CONFIG);
@@ -48,6 +48,10 @@
   async function spremiAvatar(novaKonfiguracija: AvatarConfigV1): Promise<void> {
     spremanje = true;
     greskaSpremanja = null;
+    // legacyBezConfiga = prvo spremanje (null → config); inače usporedi kanonski zapis.
+    const avatarPromijenjen =
+      legacyBezConfiga ||
+      kanonskiZapisAvatara(konfiguracija) !== kanonskiZapisAvatara(novaKonfiguracija);
     try {
       const odgovor = await api<{ avatarConfig: AvatarConfigV1; avatarRevision: number; avatarSlikaHash?: string | null }>('/profil/avatar', {
         method: 'PUT',
@@ -55,7 +59,9 @@
       });
       konfiguracija = odgovor.avatarConfig;
       legacyBezConfiga = false;
-      zabiljeziUmamiDogadjaj('avatar-spremljen');
+      if (avatarPromijenjen) {
+        zabiljeziUmamiDogadjaj('avatar-spremljen');
+      }
       dohvatiSocket().emit('igrac:avatar-azuriraj', {
         avatarConfig: odgovor.avatarConfig,
         avatarRevision: odgovor.avatarRevision,
@@ -93,12 +99,13 @@
         <a
           href="/prijava"
           class="gumb"
-          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'ostalo' })}
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'avatar_editor' })}
         >Prijavi se</a>
         <a
           href="/registracija"
           class="gumb sekundarni"
-          onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'avatar_editor' })}
         >Registriraj se</a>
       </div>
     </section>

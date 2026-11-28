@@ -137,7 +137,10 @@
         class="akcija"
         href="/misije"
         onclick={() => {
-          zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'misije', izvor: 'ostalo' });
+          zabiljeziUmamiDogadjaj('navigacija-klik', {
+            odrediste: 'misije',
+            izvor: 'obavijest_misije',
+          });
           void idiNaMisije();
         }}
       >Pogledaj</a>

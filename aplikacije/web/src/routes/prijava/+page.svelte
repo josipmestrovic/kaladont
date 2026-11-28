@@ -61,7 +61,7 @@
     Nemaš račun?
     <a
       href="/registracija"
-      onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+      onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'prijava' })}
     >Registriraj se</a>
   </p>
   <p class="registracija-link"><a href="/zaboravljena-lozinka">Zaboravio/la si lozinku?</a></p>

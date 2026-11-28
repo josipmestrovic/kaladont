@@ -118,7 +118,7 @@
       <a
         href="/registracija"
         class="cta-gumb"
-        onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+        onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'postavke' })}
       >Registriraj se</a>
     </section>
   {:else if greska}
@@ -130,7 +130,7 @@
         href="/profil/avatar"
         class="cta-gumb"
         onclick={() =>
-          zabiljeziUmamiDogadjaj('avatar-uredjivanje-otvoreno', { izvor: 'ostalo' })}
+          zabiljeziUmamiDogadjaj('avatar-uredjivanje-otvoreno', { izvor: 'postavke' })}
       >Uredi avatar</a>
     </section>
 

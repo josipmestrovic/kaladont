@@ -30,7 +30,7 @@
       Nemaš račun?
       <a
         href="/registracija"
-        onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+        onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'prijava' })}
       >Registriraj se</a>.
     </p>
   {:else}

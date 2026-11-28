@@ -196,7 +196,7 @@ Dopuštene vrijednosti:
 
 - `mod`: `brza_igra`, `izazovi`, `trening`, `privatna_soba`
 - `odrediste`: `ljestvice`, `misije`, `kolekcija`, `dostignuca`, `profil`, `pravila`, `novosti`
-- `izvor`: `naslovnica`, `izbornik_profila`, `zavrsetak_partije`, `zavrsetak_izazova`, `zavrsetak_treninga`, `profil`, `footer`, `ostalo`
+- `izvor`: `naslovnica`, `izbornik_profila`, `zavrsetak_partije`, `zavrsetak_izazova`, `zavrsetak_treninga`, `profil`, `footer`, `misije`, `ljestvice`, `postavke`, `prijava`, `registracija`, `zahvala`, `avatar_editor`, `obavijest_misije`, `ostalo` (samo kad nema preciznijeg)
 
 **Namjera vs potvrda:** `mod-klik` / `*-klik` / `avatar-uredjivanje-otvoreno` = namjera. `privatna-soba-kreirana`, `privatna-soba-link-kopiran`, `avatar-spremljen`, `povratne-informacije-poslane` = potvrđena akcija.
 
@@ -204,7 +204,26 @@ Dopuštene vrijednosti:
 
 U Umami UI-ju: Events → odaberi događaj → Properties / Filter po `mod`, `odrediste` ili `izvor`.
 
-Privatnost: bez emaila, nadimka, ID-eva igrača/partije/sesije, koda sobe, riječi, chata, sadržaja feedbacka ili avatar konfiguracije.
+### Privatnost payloada (before-send)
+
+Tracker učitava sinkroni `/umami-before-send.js` pa `data-before-send="kaladontUmamiBeforeSend"` (Umami 3.4.x). Handler sanitizira **automatske pageviewove i prilagođene događaje** prije slanja; stvarni URL u pregledniku se ne mijenja.
+
+| Stvarni URL | Analitički URL |
+| --- | --- |
+| `/partija/<uuid>` | `/partija/:id` |
+| `/partija/arhiva/<uuid>` | `/partija/arhiva/:id` |
+| `/soba/ABC123` | `/soba/:kod` |
+| `/profil/javni/<id>` | `/profil/javni/:id` |
+| `/potvrda-emaila?token=…` | `/potvrda-emaila` |
+| `/racuni/resetiraj-lozinku?token=…` | `/racuni/resetiraj-lozinku` |
+
+Iz queryja ostaju samo `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`. Referrer i naslov (UUID u title) također se čiste. Ako sanitizacija ne uspije, payload se **ne šalje**.
+
+Prilagođeni događaji i dalje ne smiju sadržavati email, nadimak, ID igrača/partije/sesije, kod sobe, riječi, chat, sadržaj feedbacka ni avatar konfiguraciju.
+
+**Napomena (`/zahvala`):** linkovi „Igrati Dvoboj / Četveroboj” i dalje vode na `/red?mod=…`, a u analitici su `mod-klik` + `mod=brza_igra` + `izvor=zahvala`. UX formata nije mijenjan u ovom commitu — eventualno usklađivanje UI-ja je zasebna odluka.
+
+**Operativni zadatak (nije dio deploya koda):** nakon uključivanja sanitizacije, ručno pregledati već prikupljene produkcijske pageviewove u Umamiju (URL-ovi s tokenima / kodovima soba / ID-evima partija) i odlučiti treba li čišćenje ili filtriranje u dashboardima. Povijesni podaci se automatski ne brišu.
 
 ---
 

@@ -280,12 +280,12 @@
         <a
           href="/prijava"
           class="gumb"
-          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'ostalo' })}
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'misije' })}
         >Prijavi se</a>
         <a
           href="/registracija"
           class="gumb sekundarni"
-          onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+          onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'misije' })}
         >Registriraj se</a>
       </div>
     </section>

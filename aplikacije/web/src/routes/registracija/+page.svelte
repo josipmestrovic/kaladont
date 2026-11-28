@@ -68,7 +68,7 @@
         Ako već imaš račun,
         <a
           href="/prijava"
-          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'ostalo' })}
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'registracija' })}
         >prijavi se</a>.
       </p>
       <p>

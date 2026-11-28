@@ -206,10 +206,13 @@
 <svelte:head>
   <meta name="robots" content={robotsMeta} />
   {#if data.umami}
+    <!-- Sinkrono prije defer trackera — vidi static/umami-before-send.js i umami-sanitizacija.ts -->
+    <script src="/umami-before-send.js"></script>
     <script
       defer
       src="{data.umami.url}/script.js"
       data-website-id={data.umami.websiteId}
+      data-before-send="kaladontUmamiBeforeSend"
     ></script>
   {/if}
 </svelte:head>

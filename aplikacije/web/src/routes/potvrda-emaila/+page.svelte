@@ -40,7 +40,7 @@
       {:else}
         <a
           href="/prijava"
-          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'ostalo' })}
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'prijava' })}
         >Prijavi se za igru</a>
       {/if}
     </p>

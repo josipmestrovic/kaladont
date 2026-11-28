@@ -59,6 +59,8 @@
   let poruka = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
   let timeoutOdgovora: ReturnType<typeof setTimeout> | null = null;
+  /** Lokalna zaštita od ponovljenog `soba:stvorena` za istu potvrdu. */
+  let umamiKreiranaKod: string | null = null;
 
   function ocistiTimeoutOdgovora() {
     if (timeoutOdgovora) {
@@ -110,7 +112,10 @@
     const naStvorenu = (payload: { kod: string }) => {
       ocistiTimeoutOdgovora();
       slanjeUTijeku = false;
-      zabiljeziUmamiDogadjaj('privatna-soba-kreirana');
+      if (payload.kod && payload.kod !== umamiKreiranaKod) {
+        umamiKreiranaKod = payload.kod;
+        zabiljeziUmamiDogadjaj('privatna-soba-kreirana');
+      }
       void goto(`/soba/${payload.kod}`);
     };
 

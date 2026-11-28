@@ -642,7 +642,7 @@
             <a
               class="veza-registracija"
               href="/registracija"
-              onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+              onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ljestvice' })}
             >Registriraj se</a>
           </aside>
         {/if}
