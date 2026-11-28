@@ -59,6 +59,6 @@ export async function dohvatiStatusAnalitike() {
       bezIshoda: igre?.bezIshoda ?? 0,
     },
     napomena:
-      'Minimalni slice: početne riječi/rani incidenti, dnevne igre, omjer gost/reg i 2+ igre. Nema Umamija, konverzije 7 dana, misija ni workera.',
+      'Slice: početne riječi/rani incidenti, dnevne igre, omjer gost/reg, 2+ igre, te DAU/WAU/MAU, novi/povratni, D1/D7/D30 i konverzija gost→reg (30d). Posjećenost i misije nisu uključeni; nema zasebnog workera.',
   };
 }

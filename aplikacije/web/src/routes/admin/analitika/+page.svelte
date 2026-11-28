@@ -121,6 +121,46 @@
     redovi: RedakIzazova[];
   }
 
+  interface AgregatIgraca {
+    od: string;
+    do: string;
+    kontekst: string | null;
+    vremenskaZona: string;
+    danas: string;
+    referentniDan: string;
+    referentniDanNezavrsen: boolean;
+    mjerenjeOd: string | null;
+    napomena: string;
+    kpi: {
+      dau: number;
+      wau: number;
+      mau: number;
+      dauMau: number | null;
+      registracijeRaspon: number;
+      konverzija30d: { gosti: number; konvertirani: number; postotak: number | null };
+      konverzijaDosadNezrele: { gosti: number; konvertirani: number; postotak: number | null };
+    };
+    retencijaUkupno: {
+      d1: { povratnici: number; kohorta: number; postotak: number | null };
+      d7: { povratnici: number; kohorta: number; postotak: number | null };
+      d30: { povratnici: number; kohorta: number; postotak: number | null };
+    };
+    dani: { dan: string; dau: number; novi: number; povratni: number; registracije: number }[];
+    retencijaKohorte: {
+      kohortaDan: string;
+      noviIgraci: number;
+      d1Povratnici: number | null;
+      d1Postotak: number | null;
+      d7Povratnici: number | null;
+      d7Postotak: number | null;
+      d30Povratnici: number | null;
+      d30Postotak: number | null;
+      d1Zrela: boolean;
+      d7Zrela: boolean;
+      d30Zrela: boolean;
+    }[];
+  }
+
   let od = $state('');
   let doDana = $state('');
   let kontekst = $state<'' | 'javna' | 'privatna' | 'trening' | 'izazov'>('');
@@ -129,6 +169,7 @@
   let status = $state<StatusAnalitike | null>(null);
   let agregat = $state<AgregatPocetnih | null>(null);
   let dnevno = $state<Dnevno | null>(null);
+  let igraciAgregat = $state<AgregatIgraca | null>(null);
   let izazovi = $state<AgregatIzazova | null>(null);
   let incidenti = $state<IncidentRedak[]>([]);
   let ukupnoIncidenata = $state(0);
@@ -141,6 +182,11 @@
   function postotak(vrijednost: number | null): string {
     if (vrijednost === null) return '—';
     return `${vrijednost.toFixed(1)} %`;
+  }
+
+  function retencijaTekst(postotakVrijednost: number | null, povratnici: number, kohorta: number): string {
+    if (postotakVrijednost === null) return 'Još nema dovoljno podataka';
+    return `${povratnici} / ${kohorta} (${postotak(postotakVrijednost)})`;
   }
 
   function lanacIncidente(incident: IncidentRedak): string {
@@ -230,11 +276,12 @@
       api<AgregatPocetnih & { ok: boolean }>(`/admin/analitika/pocetne-rijeci?${q}`),
       api<{ ok: boolean; ukupno: number; incidenti: IncidentRedak[] }>(`/admin/analitika/incidenti?${q}`),
       api<Dnevno & { ok: boolean; od: string; do: string }>(`/admin/analitika/dnevno?${q}`),
+      api<AgregatIgraca & { ok: boolean }>(`/admin/analitika/igraci?${q}`),
       api<StatusAnalitike & { ok: boolean }>('/admin/analitika/status'),
       api<AgregatIzazova & { ok: boolean }>(`/admin/analitika/izazovi?${qIz}`),
     ]);
     const greske: string[] = [];
-    const [a, i, d, s, iz] = rezultati;
+    const [a, i, d, ig, s, iz] = rezultati;
     if (a.status === 'fulfilled') {
       agregat = a.value;
       if (!od) od = a.value.od;
@@ -250,6 +297,8 @@
     }
     if (d.status === 'fulfilled') dnevno = d.value;
     else greske.push(d.reason instanceof Error ? d.reason.message : 'Dnevno igranje nije dostupno.');
+    if (ig.status === 'fulfilled') igraciAgregat = ig.value;
+    else greske.push(ig.reason instanceof Error ? ig.reason.message : 'Analitika igrača nije dostupna.');
     if (s.status === 'fulfilled') status = s.value;
     else greske.push(s.reason instanceof Error ? s.reason.message : 'Status nije dostupan.');
     if (iz.status === 'fulfilled') izazovi = iz.value;
@@ -278,7 +327,7 @@
 </svelte:head>
 
 <h1>Analitika</h1>
-<p class="opis">Minimalni pregled početnih riječi, dnevnog igranja i ponavljanja. Posjećenost još nije uključena.</p>
+<p class="opis">Pregled početnih riječi, dnevnog igranja, aktivnosti igrača, retencije i konverzije. Posjećenost još nije uključena.</p>
 
 {#if status}
   <p class="status" role="status">
@@ -405,6 +454,77 @@
         </tbody>
       </table>
     {/if}
+  </section>
+{/if}
+
+{#if igraciAgregat}
+  <section aria-labelledby="igraci-naslov">
+    <h2 id="igraci-naslov">Igrači i rast</h2>
+    <p class="meta">
+      Zona: {igraciAgregat.vremenskaZona} · {igraciAgregat.od} – {igraciAgregat.do}
+      · referentni dan {igraciAgregat.referentniDan}
+      · mjerenje od {igraciAgregat.mjerenjeOd ?? '—'}
+      {#if igraciAgregat.kontekst}
+        · kontekst: {igraciAgregat.kontekst} (aktivnost filtrirana; registracije uvijek globalne)
+      {/if}
+    </p>
+    {#if igraciAgregat.referentniDanNezavrsen}
+      <p class="meta" role="status">Referentni dan još nije završen — DAU/WAU/MAU su djelomični.</p>
+    {/if}
+    <p class="meta">{igraciAgregat.napomena}</p>
+    <dl class="kartice">
+      <div><dt>DAU</dt><dd>{igraciAgregat.kpi.dau}</dd></div>
+      <div><dt>WAU</dt><dd>{igraciAgregat.kpi.wau}</dd></div>
+      <div><dt>MAU</dt><dd>{igraciAgregat.kpi.mau}</dd></div>
+      <div><dt>DAU/MAU</dt><dd>{postotak(igraciAgregat.kpi.dauMau)}</dd></div>
+      <div><dt>Registracije (raspon)</dt><dd>{igraciAgregat.kpi.registracijeRaspon}</dd></div>
+      <div>
+        <dt>Konverzija 30d</dt>
+        <dd>
+          {#if igraciAgregat.kpi.konverzija30d.postotak === null && igraciAgregat.kpi.konverzija30d.gosti === 0}
+            Još nema dovoljno podataka
+          {:else}
+            {igraciAgregat.kpi.konverzija30d.konvertirani} / {igraciAgregat.kpi.konverzija30d.gosti}
+            ({postotak(igraciAgregat.kpi.konverzija30d.postotak)})
+          {/if}
+        </dd>
+      </div>
+      <div>
+        <dt>D1 retencija</dt>
+        <dd>{retencijaTekst(igraciAgregat.retencijaUkupno.d1.postotak, igraciAgregat.retencijaUkupno.d1.povratnici, igraciAgregat.retencijaUkupno.d1.kohorta)}</dd>
+      </div>
+      <div>
+        <dt>D7 retencija</dt>
+        <dd>{retencijaTekst(igraciAgregat.retencijaUkupno.d7.postotak, igraciAgregat.retencijaUkupno.d7.povratnici, igraciAgregat.retencijaUkupno.d7.kohorta)}</dd>
+      </div>
+      <div>
+        <dt>D30 retencija</dt>
+        <dd>{retencijaTekst(igraciAgregat.retencijaUkupno.d30.postotak, igraciAgregat.retencijaUkupno.d30.povratnici, igraciAgregat.retencijaUkupno.d30.kohorta)}</dd>
+      </div>
+    </dl>
+    {#if igraciAgregat.kpi.konverzijaDosadNezrele.gosti > 0}
+      <p class="meta">
+        Konverzija dosad (nezrele kohorte):
+        {igraciAgregat.kpi.konverzijaDosadNezrele.konvertirani} / {igraciAgregat.kpi.konverzijaDosadNezrele.gosti}
+        ({postotak(igraciAgregat.kpi.konverzijaDosadNezrele.postotak)})
+      </p>
+    {/if}
+    <table>
+      <thead>
+        <tr><th>Dan</th><th>DAU</th><th>Novi</th><th>Povratni</th><th>Registracije</th></tr>
+      </thead>
+      <tbody>
+        {#each igraciAgregat.dani as red (red.dan)}
+          <tr>
+            <td>{red.dan}</td>
+            <td>{red.dau}</td>
+            <td>{red.novi}</td>
+            <td>{red.povratni}</td>
+            <td>{red.registracije}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
   </section>
 {/if}
 

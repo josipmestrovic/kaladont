@@ -6,9 +6,9 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 
 ## Admin analitika (minimalni slice)
 
-`/admin/analitika` i `GET /api/admin/analitika/*` zahtijevaju admin sesiju (`Cache-Control: no-store`). Slice pokriva: sustavska otvaranja i rane incidente mrtvih slova, dnevne započete/završene igre, omjer gost/registriran među ljudskim sudjelovanjima te postotak igrača (isti ID) s 2+ igrama. Dan je Europe/Zagreb. Nema zasebnog workera: motor piše izravno u `analitika_otvaranja` / `analitika_igre` / `analitika_sudjelovanja`.
+`/admin/analitika` i `GET /api/admin/analitika/*` zahtijevaju admin sesiju (`Cache-Control: no-store`). Slice pokriva: sustavska otvaranja i rane incidente mrtvih slova, dnevne započete/završene igre, omjer gost/registriran među ljudskim sudjelovanjima, postotak igrača (isti ID) s 2+ igrama, te DAU/WAU/MAU, novi/povratni, D1/D7/D30 i konverziju gost→reg (30d) preko `GET /admin/analitika/igraci`. Dan je Europe/Zagreb. Nema zasebnog workera: motor piše izravno u `analitika_otvaranja` / `analitika_igre` / `analitika_sudjelovanja`. Definicije: [metrike-uspjeha.md](../01-proizvod/metrike-uspjeha.md).
 
-Namjerno izvan slicea: Umami/posjećenost, konverzija gost→račun u 7 dana, misije, event-red, retencija 90/13, P90 trajanja. Status ruta razlikuje „nema mjerenja” od „0 događaja u filteru”.
+Namjerno izvan slicea: Umami/posjećenost, misije, event-red, retencija 90/13, P90 trajanja. Status ruta razlikuje „nema mjerenja” od „0 događaja u filteru”.
 
 ## Admin nadzor aplikacije
 
