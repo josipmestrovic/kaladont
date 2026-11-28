@@ -171,13 +171,39 @@
   let dnevno = $state<Dnevno | null>(null);
   let igraciAgregat = $state<AgregatIgraca | null>(null);
   let partijeAgregat = $state<AgregatPartija | null>(null);
+  let cekanjeAgregat = $state<AgregatCekanjaOdgovor | null>(null);
   let izazovi = $state<AgregatIzazova | null>(null);
 
   interface TrajanjeStat {
     prosjekSekundi: number | null;
     medijanSekundi: number | null;
     p90Sekundi: number | null;
+    p95Sekundi?: number | null;
     uzorak: number;
+  }
+
+  interface SegmentCekanja {
+    terminalniPokusaji: number;
+    ishodi: { ishod: string; broj: number; postotak: number | null }[];
+    trajanjeDoUparivanja: TrajanjeStat;
+    trajanjeDoNapustanja: TrajanjeStat;
+    distribucijaNapustanja: { interval: string; broj: number; postotak: number | null }[];
+  }
+
+  interface AgregatCekanjaOdgovor {
+    ok: boolean;
+    dostupno: boolean;
+    razlog?: string;
+    od: string;
+    do: string;
+    kontekst?: string | null;
+    vremenskaZona?: string;
+    danas?: string;
+    mjerenjeOd?: string | null;
+    napomena?: string;
+    ukupno?: SegmentCekanja;
+    gosti?: SegmentCekanja;
+    registrirani?: SegmentCekanja;
   }
 
   interface AgregatPartija {
@@ -326,6 +352,15 @@
     return p;
   }
 
+  function nazivIshodaCekanja(i: string): string {
+    if (i === 'uparivanje') return 'Uparivanje';
+    if (i === 'napustanje') return 'Napuštanje';
+    if (i === 'prekid_veze') return 'Prekid veze';
+    if (i === 'promjena_reda') return 'Promjena reda';
+    if (i === 'uklonjen') return 'Uklonjen';
+    return i;
+  }
+
   function wilsonTekst(w: WilsonInterval | null): string {
     if (!w) return '—';
     return `${w.low.toFixed(1)}–${w.high.toFixed(1)} %`;
@@ -365,11 +400,12 @@
       api<Dnevno & { ok: boolean; od: string; do: string }>(`/admin/analitika/dnevno?${q}`),
       api<AgregatIgraca & { ok: boolean }>(`/admin/analitika/igraci?${q}`),
       api<AgregatPartija & { ok: boolean }>(`/admin/analitika/partije?${q}`),
+      api<AgregatCekanjaOdgovor>(`/admin/analitika/cekanje?${q}`),
       api<StatusAnalitike & { ok: boolean }>('/admin/analitika/status'),
       api<AgregatIzazova & { ok: boolean }>(`/admin/analitika/izazovi?${qIz}`),
     ]);
     const greske: string[] = [];
-    const [a, i, d, ig, p, s, iz] = rezultati;
+    const [a, i, d, ig, p, c, s, iz] = rezultati;
     if (a.status === 'fulfilled') {
       agregat = a.value;
       if (!od) od = a.value.od;
@@ -389,6 +425,8 @@
     else greske.push(ig.reason instanceof Error ? ig.reason.message : 'Analitika igrača nije dostupna.');
     if (p.status === 'fulfilled') partijeAgregat = p.value;
     else greske.push(p.reason instanceof Error ? p.reason.message : 'Analitika partija nije dostupna.');
+    if (c.status === 'fulfilled') cekanjeAgregat = c.value;
+    else greske.push(c.reason instanceof Error ? c.reason.message : 'Analitika čekaonice nije dostupna.');
     if (s.status === 'fulfilled') status = s.value;
     else greske.push(s.reason instanceof Error ? s.reason.message : 'Status nije dostupan.');
     if (iz.status === 'fulfilled') izazovi = iz.value;
@@ -417,7 +455,7 @@
 </svelte:head>
 
 <h1>Analitika</h1>
-<p class="opis">Pregled početnih riječi, dnevnog igranja, aktivnosti igrača, retencije i konverzije. Posjećenost još nije uključena.</p>
+<p class="opis">Pregled početnih riječi, dnevnog igranja, aktivnosti igrača, retencije, konverzije i javne čekaonice. Posjećenost još nije uključena.</p>
 
 {#if status}
   <p class="status" role="status">
@@ -675,6 +713,149 @@
       (medijan {formatSekundi(partijeAgregat.sazetak.trajanje.medijanSekundi)},
       P90 {formatSekundi(partijeAgregat.sazetak.trajanje.p90Sekundi)})
     </p>
+  </section>
+{/if}
+
+{#if cekanjeAgregat}
+  <section aria-labelledby="cekanje-naslov">
+    <h2 id="cekanje-naslov">Čekaonica (javna)</h2>
+    {#if !cekanjeAgregat.dostupno}
+      <p class="meta">{cekanjeAgregat.razlog ?? 'Nije dostupno za odabrani kontekst.'}</p>
+    {:else if cekanjeAgregat.ukupno}
+      <p class="meta">
+        Zona: {cekanjeAgregat.vremenskaZona} · {cekanjeAgregat.od} – {cekanjeAgregat.do}
+        · kohorta po kraju čekanja
+        · mjerenje od {cekanjeAgregat.mjerenjeOd ?? '—'}
+      </p>
+      <p class="meta">{cekanjeAgregat.napomena}</p>
+      <dl class="kartice">
+        <div><dt>Terminalni pokušaji</dt><dd>{cekanjeAgregat.ukupno.terminalniPokusaji}</dd></div>
+        <div>
+          <dt>Uparivanje</dt>
+          <dd>
+            {cekanjeAgregat.ukupno.ishodi.find((x) => x.ishod === 'uparivanje')?.broj ?? 0}
+            ({postotak(cekanjeAgregat.ukupno.ishodi.find((x) => x.ishod === 'uparivanje')?.postotak ?? null)})
+          </dd>
+        </div>
+        <div>
+          <dt>Napuštanje</dt>
+          <dd>
+            {cekanjeAgregat.ukupno.ishodi.find((x) => x.ishod === 'napustanje')?.broj ?? 0}
+            ({postotak(cekanjeAgregat.ukupno.ishodi.find((x) => x.ishod === 'napustanje')?.postotak ?? null)})
+          </dd>
+        </div>
+        <div>
+          <dt>Do uparivanja (medijan)</dt>
+          <dd>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoUparivanja.medijanSekundi)}</dd>
+        </div>
+        <div>
+          <dt>Do napuštanja (medijan)</dt>
+          <dd>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoNapustanja.medijanSekundi)}</dd>
+        </div>
+      </dl>
+      <h3>Ishodi</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Ishod</th>
+            <th>Broj</th>
+            <th>Udio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each cekanjeAgregat.ukupno.ishodi as red (red.ishod)}
+            <tr>
+              <td>{nazivIshodaCekanja(red.ishod)}</td>
+              <td>{red.broj}</td>
+              <td>{postotak(red.postotak)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+      <h3>Trajanje</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Metrika</th>
+            <th>Prosjek</th>
+            <th>Medijan</th>
+            <th>P90</th>
+            <th>P95</th>
+            <th>Uzorak</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Do uparivanja</td>
+            <td>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoUparivanja.prosjekSekundi)}</td>
+            <td>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoUparivanja.medijanSekundi)}</td>
+            <td>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoUparivanja.p90Sekundi)}</td>
+            <td>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoUparivanja.p95Sekundi ?? null)}</td>
+            <td>{cekanjeAgregat.ukupno.trajanjeDoUparivanja.uzorak}</td>
+          </tr>
+          <tr>
+            <td>Do napuštanja</td>
+            <td>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoNapustanja.prosjekSekundi)}</td>
+            <td>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoNapustanja.medijanSekundi)}</td>
+            <td>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoNapustanja.p90Sekundi)}</td>
+            <td>{formatSekundi(cekanjeAgregat.ukupno.trajanjeDoNapustanja.p95Sekundi ?? null)}</td>
+            <td>{cekanjeAgregat.ukupno.trajanjeDoNapustanja.uzorak}</td>
+          </tr>
+        </tbody>
+      </table>
+      <h3>Distribucija napuštanja</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Interval (s)</th>
+            <th>Broj</th>
+            <th>Udio napuštanja</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each cekanjeAgregat.ukupno.distribucijaNapustanja as red (red.interval)}
+            <tr>
+              <td>{red.interval}</td>
+              <td>{red.broj}</td>
+              <td>{postotak(red.postotak)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+      {#if cekanjeAgregat.gosti && cekanjeAgregat.registrirani}
+        <h3>Gosti vs registrirani</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Segment</th>
+              <th>Pokušaji</th>
+              <th>Uparivanje</th>
+              <th>Napuštanje</th>
+              <th>Medijan do uparivanja</th>
+              <th>Medijan do napuštanja</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Gosti</td>
+              <td>{cekanjeAgregat.gosti.terminalniPokusaji}</td>
+              <td>{cekanjeAgregat.gosti.ishodi.find((x) => x.ishod === 'uparivanje')?.broj ?? 0}</td>
+              <td>{cekanjeAgregat.gosti.ishodi.find((x) => x.ishod === 'napustanje')?.broj ?? 0}</td>
+              <td>{formatSekundi(cekanjeAgregat.gosti.trajanjeDoUparivanja.medijanSekundi)}</td>
+              <td>{formatSekundi(cekanjeAgregat.gosti.trajanjeDoNapustanja.medijanSekundi)}</td>
+            </tr>
+            <tr>
+              <td>Registrirani</td>
+              <td>{cekanjeAgregat.registrirani.terminalniPokusaji}</td>
+              <td>{cekanjeAgregat.registrirani.ishodi.find((x) => x.ishod === 'uparivanje')?.broj ?? 0}</td>
+              <td>{cekanjeAgregat.registrirani.ishodi.find((x) => x.ishod === 'napustanje')?.broj ?? 0}</td>
+              <td>{formatSekundi(cekanjeAgregat.registrirani.trajanjeDoUparivanja.medijanSekundi)}</td>
+              <td>{formatSekundi(cekanjeAgregat.registrirani.trajanjeDoNapustanja.medijanSekundi)}</td>
+            </tr>
+          </tbody>
+        </table>
+      {/if}
+    {/if}
   </section>
 {/if}
 

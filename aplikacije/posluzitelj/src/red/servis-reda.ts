@@ -32,6 +32,15 @@ import { omotajSocketHandler, type ZapisSocketHandlerGreske } from '../sigurnost
 import type { RezultatPokretanja } from '../igra/politika-ucinka.js';
 import { PRAGOVI_POPUNE_MS, PopunaReda } from './raspored-popune.js';
 import type { FondBotova } from '../bot/fond.js';
+import { mapirajVrstuRacuna } from '../analitika/igre.js';
+import {
+  oznaciPokretanjeCekanja,
+  otvoriPokusajCekanja,
+  zatvoriPokusajCekanja,
+  zatvoriSvePokusajeCekanja,
+  zavrsiPokretanjeNeuspjeh,
+  zavrsiPokretanjeUparivanje,
+} from '../analitika/cekanje-zivotni-ciklus.js';
 
 const ShemaPayloadReda = z.object({
   mod: z.enum(MODOVI_PARTIJE).optional(),
@@ -102,7 +111,11 @@ export function registrirajRedCekanja(
   provjeriDogadaj: ProvjeriOgranicenjeDogadaja,
   zapisSocketHandlerGreske: ZapisSocketHandlerGreske,
   popunaOpcije?: OpcijePopuneReda,
-): { ukloniIzReda: (igracId: string) => void; osvjeziPopunu: () => void; zaustaviPopunu: () => void } {
+): {
+  ukloniIzReda: (igracId: string) => void;
+  osvjeziPopunu: () => void;
+  zaustaviPopunu: () => void;
+} {
   /** Namjera: ključ reda + UI odabir. Identičan resend ≠ promjena pravilnika. */
   const namjere = new Map<string, { kljuc: KljucJavnogReda; mod: ModPartije; pravila: PravilnikPartije; generacija: number }>();
   let generacijaUlaska = 0;
@@ -238,8 +251,13 @@ export function registrirajRedCekanja(
   }
 
   /** Nakon neuspjelog starta vraća samo ljude koji još čekaju isti ključ; zadržava izvorni usaoU. */
-  function vratiURed(stol: readonly StavkaReda[], kljuc: KljucJavnogReda, generacije: ReadonlyMap<string, number>): void {
+  function vratiURed(
+    stol: readonly StavkaReda[],
+    kljuc: KljucJavnogReda,
+    generacije: ReadonlyMap<string, number>,
+  ): Set<string> {
     const kanal = kanalZa(kljuc);
+    const vraceni = new Set<string>();
     for (const stavka of stol) {
       if (stavka.upravljac === 'bot') continue;
       const namjera = namjere.get(stavka.igracId);
@@ -254,8 +272,10 @@ export function registrirajRedCekanja(
       ) {
         socket.join(kanal.soba);
         kanal.red.udji(stavka);
+        vraceni.add(stavka.igracId);
       }
     }
+    return vraceni;
   }
 
   function pokreniStolSRezultatom(stol: StavkaReda[], kljuc: KljucJavnogReda): Promise<RezultatPokretanja> {
@@ -264,8 +284,11 @@ export function registrirajRedCekanja(
     const generacije = new Map(
       stol.filter((stavka) => stavka.upravljac !== 'bot').map((stavka) => [stavka.igracId, namjere.get(stavka.igracId)?.generacija ?? -1]),
     );
+    const ljudskiSudionici = [...generacije.entries()].map(([igracId, generacija]) => ({ igracId, generacija }));
+    oznaciPokretanjeCekanja(ljudskiSudionici);
     const obradiNeuspjeh = () => {
-      vratiURed(stol, kljuc, generacije);
+      const vraceni = vratiURed(stol, kljuc, generacije);
+      zavrsiPokretanjeNeuspjeh(ljudskiSudionici, vraceni);
       if (zaustavljen || ponavljanja.has(kljuc)) return;
       const broj = (greskePokretanja.get(kljuc) ?? 0) + 1;
       greskePokretanja.set(kljuc, broj);
@@ -292,6 +315,7 @@ export function registrirajRedCekanja(
           for (const [igracId, generacija] of generacije) {
             if (namjere.get(igracId)?.generacija === generacija) namjere.delete(igracId);
           }
+          zavrsiPokretanjeUparivanje(ljudskiSudionici);
         }
         return konacni;
       }, (greska: unknown) => {
@@ -392,7 +416,18 @@ export function registrirajRedCekanja(
       const stariKljuc = ukloniIzSvihRedova(socket.data.igracId);
       leaveSvihSobaReda(socket);
       socket.join(kanal.soba);
-      namjere.set(socket.data.igracId, { kljuc, mod, pravila, generacija: ++generacijaUlaska });
+      const generacija = ++generacijaUlaska;
+      namjere.set(socket.data.igracId, { kljuc, mod, pravila, generacija });
+      const usaoU = Date.now();
+      otvoriPokusajCekanja({
+        igracId: socket.data.igracId,
+        generacija,
+        kljucReda: kljuc,
+        mod,
+        pravila,
+        vrstaRacuna: mapirajVrstuRacuna(socket.data.vrsta),
+        pocetakU: new Date(usaoU),
+      });
 
       kanal.red.udji({
         igracId: socket.data.igracId,
@@ -416,7 +451,7 @@ export function registrirajRedCekanja(
         trenutniNiz4p: socket.data.trenutniNiz4p ?? 0,
         trenutniNiz1v1: socket.data.trenutniNiz1v1 ?? 0,
         trenutniNiz3p: socket.data.trenutniNiz3p ?? 0,
-        usaoU: Date.now(),
+        usaoU,
         odabranaPravila: pravila,
       });
       potvrda?.(izracunajStanje(socket.data.igracId, kljuc, pravila));
@@ -438,6 +473,7 @@ export function registrirajRedCekanja(
       }
       if (!provjeriDogadaj(socket.data.igracId, 'red:izadji')) return;
       const stariKljuc = ukloniIzSvihRedova(socket.data.igracId);
+      zatvoriPokusajCekanja(socket.data.igracId, 'napustanje');
       leaveSvihSobaReda(socket);
       osvjeziSvePopune();
       if (stariKljuc) posaljiStanje(stariKljuc);
@@ -446,6 +482,7 @@ export function registrirajRedCekanja(
 
     socket.on('disconnect', omotajSocketHandler(socket, 'disconnect', zapisSocketHandlerGreske, () => {
       const stariKljuc = ukloniIzSvihRedova(socket.data.igracId);
+      zatvoriPokusajCekanja(socket.data.igracId, 'prekid_veze');
       osvjeziSvePopune();
       if (stariKljuc) posaljiStanje(stariKljuc);
       else posaljiStanjeSvih();
@@ -455,6 +492,7 @@ export function registrirajRedCekanja(
   return {
     ukloniIzReda: (igracId: string) => {
       const stariKljuc = ukloniIzSvihRedova(igracId);
+      zatvoriPokusajCekanja(igracId, 'uklonjen');
       osvjeziSvePopune();
       for (const socket of io.sockets.sockets.values()) {
         if (socket.data.igracId === igracId) leaveSvihSobaReda(socket);
@@ -471,6 +509,7 @@ export function registrirajRedCekanja(
       ponavljanja.clear();
       namjere.clear();
       greskePokretanja.clear();
+      zatvoriSvePokusajeCekanja('uklonjen');
       for (const kanal of kanali.values()) kanal.popuna?.zaustavi();
     },
   };

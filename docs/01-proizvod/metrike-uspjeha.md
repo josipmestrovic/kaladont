@@ -12,7 +12,7 @@ MVP je test tržišta — bez brojki nema zaključka. Od prvog dana mjerimo **vl
 | ------------- | ----------------------------------------------------------------- | ------------------------------- |
 | 1. Dolazak    | Jedinstveni posjetitelji, izvori prometa                          | Umami, nakon uključivanja       |
 | 2. Namjera    | Klik na Brzu igru (`mod-klik`, `mod=brza_igra`)                   | Umami event, nakon uključivanja |
-| 3. Strpljenje | Postotak koji dočeka stol; prosjek/medijan čekanja                | baza (`cekanje_ms`)             |
+| 3. Strpljenje | Postotak koji dočeka stol; prosjek/medijan čekanja                | baza (`analitika_cekanja`)      |
 | 4. Igra       | Završene/započete; načini, formati, pravila; trajanje             | baza (`analitika_igre`)         |
 | 5. Povratak   | DAU/WAU/MAU; novi vs povratni; retencija D1 / D7 / D30            | baza (`analitika_*`)            |
 | 6. Ulog       | Registracije; konverzija gost→reg unutar 30 dana                  | baza (`analitika_*`, `igraci`)  |
@@ -54,6 +54,24 @@ Admin: `/admin/analitika` → **Partije i načini igranja** (`GET /api/admin/ana
 | **Jedinstveni igrači** | Distinct `igrac_id` iz sudjelovanja u **završenim** igrama kohorte. Ukupno ≠ zbroj po kontekstima. Botovi nisu u `analitika_sudjelovanja`. |
 
 Dnevna statistika započetih/završenih po kalendarskom danu (`/dnevno`) ostaje zasebna i nije zamijenjena ovom kohortom.
+
+## Javna čekaonica (uparivanje i napuštanje)
+
+Admin: `/admin/analitika` → **Čekaonica (javna)** (`GET /api/admin/analitika/cekanje`). Samo javni red (Brza igra). Kohorta = terminalni pokušaji s `kraj_u` u odabranom rasponu (Europe/Zagreb). Jedan INSERT po završetku pokušaja (`analitika_cekanja`); bez `igrac_id` / PII. Ulazak u red ne piše red. Operativna statistika po stolu (`/admin/statistike/cekanje`, `cekanje_ms`) ostaje zasebna.
+
+| Metrika | Definicija |
+| --- | --- |
+| **Terminalni pokušaj** | Memorijski pokušaj zatvoren ishodom `uparivanje` / `napustanje` / `prekid_veze` / `promjena_reda` / `uklonjen`. Broj nije egzaktan broj svih ikad započetih čekanja (npr. pad procesa). |
+| **Uparivanje** | Stol uspješno pokrenut za taj pokušaj. |
+| **Napuštanje** | `red:izadji` dok pokušaj nije u tijeku pokretanja stola. Nije nužno klik „Odustani” u UI-ju. |
+| **Prekid veze** | Disconnect dok je igrač u redu. |
+| **Promjena reda** | Novi ulazak zatvara stari pokušaj (drugi ključ/pravila). |
+| **Uklonjen** | Steal/shutdown/neuspjeli start bez povratka u red. |
+| **Trajanje** | `kraj_u − pocetak_u` u sekundama; prosjek/medijan/P90/P95 za uparivanje i napuštanje zasebno. |
+| **Distribucija napuštanja** | Kantice 0–5 … 60+ s samo za ishod `napustanje`. |
+| **Gost / registriran** | Snimka `vrsta_racuna_na_pocetku` u trenutku ulaska. |
+
+Za kontekst filter ≠ `javna` (npr. privatna/trening/izazov) API/UI vraćaju N/A — čekaonica ne postoji izvan javnog reda.
 
 ## Zdravlje igre
 

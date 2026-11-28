@@ -1128,6 +1128,13 @@ export const analitikaOtvaranja = pgTable('analitika_otvaranja', {
 
 export const ishodAnalitikeIgre = pgEnum('ishod_analitike_igre', ['zavrsena', 'prekinuta', 'nepotpuno']);
 export const vrstaRacunaAnalitike = pgEnum('vrsta_racuna_analitike', ['gost', 'registriran']);
+export const ishodAnalitikeCekanja = pgEnum('ishod_analitike_cekanja', [
+  'uparivanje',
+  'napustanje',
+  'prekid_veze',
+  'promjena_reda',
+  'uklonjen',
+]);
 
 export const analitikaIgre = pgTable('analitika_igre', {
   igraId: uuid('igra_id').primaryKey(),
@@ -1150,6 +1157,21 @@ export const analitikaSudjelovanja = pgTable('analitika_sudjelovanja', {
 }, (tablica) => [
   primaryKey({ columns: [tablica.igraId, tablica.igracId] }),
   index('idx_analitika_sudjelovanja_igrac').on(tablica.igracId),
+]);
+
+/** Terminalni pokušaj javne čekaonice — jedan INSERT po završetku, bez igrac_id/PII. */
+export const analitikaCekanja = pgTable('analitika_cekanja', {
+  id: uuid('id').primaryKey(),
+  kljucReda: text('kljuc_reda').notNull(),
+  mod: modPartije('mod').notNull(),
+  pravila: pravilnikPartije('pravila').notNull(),
+  vrstaRacunaNaPocetku: vrstaRacunaAnalitike('vrsta_racuna_na_pocetku').notNull(),
+  pocetakU: timestamp('pocetak_u', { withTimezone: true }).notNull(),
+  krajU: timestamp('kraj_u', { withTimezone: true }).notNull(),
+  ishod: ishodAnalitikeCekanja('ishod').notNull(),
+}, (tablica) => [
+  index('idx_analitika_cekanja_kraj').on(tablica.krajU, tablica.ishod),
+  index('idx_analitika_cekanja_kraj_vrsta').on(tablica.krajU, tablica.vrstaRacunaNaPocetku),
 ]);
 
 /** Pokušaj kampanjskog Izazova — serverski izvor istine za start/ishod. */

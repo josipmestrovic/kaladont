@@ -61,6 +61,7 @@ import {
 import { agregirajDnevneIgre } from '../analitika/igre.js';
 import { agregirajAktivnostIgraca } from '../analitika/igraci.js';
 import { agregirajPartije } from '../analitika/partije.js';
+import { agregirajCekanje } from '../analitika/cekanje.js';
 import { dohvatiStatusAnalitike } from '../analitika/status.js';
 import {
   agregirajIzazove,
@@ -947,6 +948,33 @@ export async function registrirajAdminRute(
     });
     return {
       ok: true,
+      ...agregat,
+    };
+  });
+
+  app.get('/admin/analitika/cekanje', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const filter = parsirajFilterAnalitike(zahtjev.query);
+    if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
+    // Čekaonica postoji samo za javni red; drugi konteksti su N/A na UI.
+    if (filter.kontekst && filter.kontekst !== 'javna') {
+      return {
+        ok: true,
+        dostupno: false,
+        razlog: 'Čekaonica vrijedi samo za javnu Brzu igru.',
+        od: filter.od,
+        do: filter.do,
+        kontekst: filter.kontekst,
+      };
+    }
+    const agregat = await agregirajCekanje({
+      odDan: filter.od,
+      doDan: filter.do,
+    });
+    return {
+      ok: true,
+      dostupno: true,
+      kontekst: filter.kontekst ?? null,
       ...agregat,
     };
   });

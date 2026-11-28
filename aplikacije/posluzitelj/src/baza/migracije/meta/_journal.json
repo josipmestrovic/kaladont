@@ -540,6 +540,13 @@
       "when": 1795200000000,
       "tag": "0076_analitika_igre_pravila",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1795300000000,
+      "tag": "0077_analitika_cekanja",
+      "breakpoints": true
     }
   ]
 }
