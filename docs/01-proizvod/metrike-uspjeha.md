@@ -73,6 +73,21 @@ Admin: `/admin/analitika` → **Čekaonica (javna)** (`GET /api/admin/analitika/
 
 Za kontekst filter ≠ `javna` (npr. privatna/trening/izazov) API/UI vraćaju N/A — čekaonica ne postoji izvan javnog reda.
 
+## Botovi i balans
+
+Admin: `/admin/analitika` → **Botovi i balans** (`GET /api/admin/analitika/botovi`). Kohorta = igre s `pocetak_u` u rasponu (Europe/Zagreb). Detaljna analitika pokušaja Izazova ostaje zasebna.
+
+| Metrika | Definicija |
+| --- | --- |
+| **Snimka pri startu** | `broj_ljudi`, `broj_botova`, `profil_botova`, `verzija_bot_politike`, `verzija_profila_bota` na `analitika_igre`. Null = povijesno nepoznato; `broj_botova = 0` = pouzdano bez botova. Profil: `pocetnik` / `iskusni` / `majstor` / `velemajstor` / `prilagodeno`. Brza forsira Iskusni; Trening/Izazov šalju odabrani profil; privatna bez overlaya → klasifikacija poluga ili `prilagodeno`. |
+| **Pobjeda čovjeka vs bota** | Vrsta pobjednika (`covjek`/`bot`) na završenoj igri. Nije individualna stopa pobjeda po igraču. Prekinuta igra nema pobjednika. |
+| **Uspješnost protiv botova** | Samo `broj_botova > 0`, `ishod = zavrsena`, poznata `vrsta_pobjednika`. Segmenti: profil, format, pravilnik, verzije, sastav. Mali uzorak &lt; 30; Wilson 95 % kad postoji uzorak. |
+| **Sastav javnih stolova** | Stvarni `(broj_ljudi, broj_botova)`, ne pretpostavka iz moda. |
+| **Eliminacije** | JSONB brojači stvarnih ispadanja ljudi/botova (`ne_znam`/`istek`/`mrtva_slova`/`prekid`/`kaladont`). Pobjednik nije eliminiran. Eliminacija ≠ završni plasman. |
+| **Trajanje** | `kraj_u − pocetak_u` za završene igre s botovima; prosjek/medijan/P90 (nearest-rank). |
+
+Verzija politike/profila bilježi set poluga pri startu; nije dokaz da su svi admin parametri kroz povijest identični. Bez masovnog backfilla; read-path može dopuniti sastav/pobjednika iz `partije`/`igraci` kad je pouzdano.
+
 ## Zdravlje igre
 
 | Metrika                                                                        | Zašto                                                                 |

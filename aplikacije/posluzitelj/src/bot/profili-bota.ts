@@ -105,3 +105,50 @@ export function konfiguracijaZaJavnuBrzu(
 ): KonfiguracijaBota {
   return razrijesiProfilBota('iskusni', baza).konfiguracija;
 }
+
+/** Analitička klasifikacija: imenovani profil ili prilagođeno (bez lažnog defaulta na iskusni). */
+export type ProfilAnalitikeBotova =
+  | ProfilBotaIzazova
+  | 'prilagodeno';
+
+export interface SnimkaBotAnalitike {
+  profil: ProfilAnalitikeBotova;
+  verzijaPolitike: number;
+  verzijaProfila: number | null;
+}
+
+/** Točno podudaranje pet poluga profila; inače prilagodeno. */
+export function klasificirajProfilIzKonfiguracije(konfig: KonfiguracijaBota): SnimkaBotAnalitike {
+  for (const [id, poluge] of Object.entries(POLUGE_PROFILA_BOTA) as Array<
+    [ProfilBotaIzazova, PolugeProfilaBota]
+  >) {
+    if (
+      poluge.vjerojatnostAgresivnosti === konfig.vjerojatnostAgresivnosti
+      && poluge.vjerojatnostShielda === konfig.vjerojatnostShielda
+      && poluge.prioritetPoolova === konfig.prioritetPoolova
+      && poluge.vjerojatnostNeznanjaUMalomSkupu === konfig.vjerojatnostNeznanjaUMalomSkupu
+      && poluge.maksimalnoOpcijaMalogSkupa === konfig.maksimalnoOpcijaMalogSkupa
+    ) {
+      return {
+        profil: id,
+        verzijaPolitike: konfig.verzija,
+        verzijaProfila: VERZIJA_PROFILA_BOTA,
+      };
+    }
+  }
+  return {
+    profil: 'prilagodeno',
+    verzijaPolitike: konfig.verzija,
+    verzijaProfila: null,
+  };
+}
+
+export function snimkaBotAnalitikeIzRazrijesenog(
+  razrijeseno: RazrijesenaKonfiguracijaBota,
+): SnimkaBotAnalitike {
+  return {
+    profil: razrijeseno.profileId,
+    verzijaPolitike: razrijeseno.konfiguracija.verzija,
+    verzijaProfila: razrijeseno.botProfileVersion,
+  };
+}

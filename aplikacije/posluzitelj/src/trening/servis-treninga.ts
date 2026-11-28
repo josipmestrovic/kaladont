@@ -23,6 +23,8 @@ import type { KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
 import {
   nadimakProfilaBota,
   razrijesiProfilBotaIliZadani,
+  snimkaBotAnalitikeIzRazrijesenog,
+  type SnimkaBotAnalitike,
 } from '../bot/profili-bota.js';
 import type { KaladontIo, KaladontSocket } from '../server.js';
 import type { StavkaReda } from '../red/red-cekanja.js';
@@ -87,6 +89,7 @@ export interface OpcijeServisaTreninga {
     sudionici: StavkaReda[],
     pravila: PravilnikPartije,
     botKonfiguracija: KonfiguracijaBota,
+    botAnalitika: SnimkaBotAnalitike,
   ) => Promise<RezultatPokretanja>;
   igracImaAktivnuPartiju: (igracId: string) => boolean;
   igracImaPrivatnuSobu: (igracId: string) => boolean;
@@ -146,7 +149,9 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
       const profileId: ProfilBotaIzazova = jePoznatiProfilBota(parse.data?.profileId)
         ? parse.data!.profileId!
         : ZADANI_PROFIL_TRENINGA;
-      const { konfiguracija: botKonfiguracija } = razrijesiProfilBotaIliZadani(profileId);
+      const botRazrijeseno = razrijesiProfilBotaIliZadani(profileId);
+      const botKonfiguracija = botRazrijeseno.konfiguracija;
+      const botAnalitika = snimkaBotAnalitikeIzRazrijesenog(botRazrijeseno);
 
       const covjek: StavkaReda = {
         igracId: socket.data.igracId,
@@ -176,7 +181,7 @@ export function registrirajTrening(io: KaladontIo, opcije: OpcijeServisaTreninga
         racunala.push(izradiRacunalo(i, brojRacunala, pravila, profileId));
       }
 
-      void opcije.zapocniTrening([covjek, ...racunala], pravila, botKonfiguracija).then((rezultat) => {
+      void opcije.zapocniTrening([covjek, ...racunala], pravila, botKonfiguracija, botAnalitika).then((rezultat) => {
         if (rezultat === 'pokrenuta') {
           brojaci.zapoceti += 1;
           potvrda?.({ pokrenut: true });
