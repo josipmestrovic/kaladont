@@ -13,7 +13,7 @@ MVP je test tržišta — bez brojki nema zaključka. Od prvog dana mjerimo **vl
 | 1. Dolazak    | Jedinstveni posjetitelji, izvori prometa                          | Umami, nakon uključivanja       |
 | 2. Namjera    | Klik na Brzu igru (`mod-klik`, `mod=brza_igra`)                   | Umami event, nakon uključivanja |
 | 3. Strpljenje | Postotak koji dočeka stol; prosjek/medijan čekanja                | baza (`cekanje_ms`)             |
-| 4. Igra       | Završene partije / započete; trajanje partije                     | baza                            |
+| 4. Igra       | Završene/započete; načini, formati, pravila; trajanje             | baza (`analitika_igre`)         |
 | 5. Povratak   | DAU/WAU/MAU; novi vs povratni; retencija D1 / D7 / D30            | baza (`analitika_*`)            |
 | 6. Ulog       | Registracije; konverzija gost→reg unutar 30 dana                  | baza (`analitika_*`, `igraci`)  |
 
@@ -40,6 +40,21 @@ Filter konteksta (`javna` / `privatna` / `trening` / `izazov`) vrijedi za aktivn
 
 `zadnja_aktivnost` **nije** izvor za retenciju ni DAU (drugo značenje; nije pogodna za goste ni day-N kohorte).
 
+## Partije, načini, formati i pravila
+
+Admin: `/admin/analitika` → **Partije i načini igranja** (`GET /api/admin/analitika/partije`). Kohorta = igre s `pocetak_u` u odabranom rasponu (Europe/Zagreb). Ishodi su **trenutačno poznati** (igra započeta u rasponu može završiti nakon ponoći i i dalje ulazi u kohortu).
+
+| Metrika | Definicija |
+| --- | --- |
+| **Način igranja (kontekst)** | `javna` (Brza igra), `privatna`, `trening`, `izazov`. Jedna igra broji se jednom. |
+| **Format** | `mod` iz `analitika_igre`: `dva_igraca` / `tri_igraca` / `cetiri_igraca` (Dvoboj / Troboj / Četveroboj). Nije isto što i način igranja. Privatne sobe trenutačno u motoru bilježe `cetiri_igraca`. |
+| **Pravila** | `klasicni` / `ka_zna` / `dokazi_nastavak` iz `analitika_igre.pravila` (nullable). Read-path: `COALESCE(analitika_igre.pravila, partije.pravila)` po ID-u; inače **Nepoznato**. Bez masovnog backfilla. |
+| **Stopa završavanja** | `zavrsene / (zavrsene + prekinute + nepotpuno)` unutar kohorte početaka. Igre bez ishoda nisu prekinute; zasebno se prikazuje pokrivenost terminalnih ishoda. |
+| **Trajanje** | `kraj_u − pocetak_u` samo za `ishod = zavrsena` s valjanim vremenima. Prosjek, medijan, P90; prazan uzorak → `null` (ne 0). Prekinute isključene. Bez vremena čekanja. |
+| **Jedinstveni igrači** | Distinct `igrac_id` iz sudjelovanja u **završenim** igrama kohorte. Ukupno ≠ zbroj po kontekstima. Botovi nisu u `analitika_sudjelovanja`. |
+
+Dnevna statistika započetih/završenih po kalendarskom danu (`/dnevno`) ostaje zasebna i nije zamijenjena ovom kohortom.
+
 ## Zdravlje igre
 
 | Metrika                                                                        | Zašto                                                                 |
@@ -52,7 +67,7 @@ Filter konteksta (`javna` / `privatna` / `trening` / `izazov`) vrijedi za aktivn
 
 ## Faze mjerenja
 
-**Od prvog dana:** broj započetih i završenih partija, čekanje, razlozi ispadanja, DAU/WAU/MAU, D1/D7/D30, registracije, konverzija 30d, prijave i reakcije računaju se iz baze. Na tim podacima temelje se početne odluke o kvaliteti igre.
+**Od prvog dana:** broj započetih i završenih partija, načini/formati/pravila, trajanje, čekanje, razlozi ispadanja, DAU/WAU/MAU, D1/D7/D30, registracije, konverzija 30d, prijave i reakcije računaju se iz baze. Na tim podacima temelje se početne odluke o kvaliteti igre.
 
 **Nakon uključivanja Umamija** (`UMAMI_WEBSITE_ID` + DNS `analitika.kaladont.hr`): jedinstveni posjetitelji, izvori dolazaka te prilagođeni događaji (`mod-klik`, `navigacija-klik`, auth CTA, privatna soba, avatar, povratne informacije). Katalog: [runbook-umami.md](../07-operacije/runbook-umami.md#katalog-prilagođenih-događaja). Stari `igraj-klik` / forum događaji više se ne šalju. Dok website ID nije postavljen, te metrike nisu dostupne i ne procjenjuju se iz serverskih logova.
 

@@ -59,6 +59,6 @@ export async function dohvatiStatusAnalitike() {
       bezIshoda: igre?.bezIshoda ?? 0,
     },
     napomena:
-      'Slice: početne riječi/rani incidenti, dnevne igre, omjer gost/reg, 2+ igre, te DAU/WAU/MAU, novi/povratni, D1/D7/D30 i konverzija gost→reg (30d). Posjećenost i misije nisu uključeni; nema zasebnog workera.',
+      'Slice: početne riječi/rani incidenti, dnevne igre, omjer gost/reg, 2+ igre, DAU/WAU/MAU, retencija, konverzija 30d, te partije/načini/formati/pravila/trajanje. Posjećenost, čekaonica i misije nisu uključeni; nema zasebnog workera.',
   };
 }

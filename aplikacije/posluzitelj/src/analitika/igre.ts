@@ -24,6 +24,7 @@ export interface ZapisPocetkaIgre {
   igraId: string;
   kontekst: KontekstOtvaranjaAnalitike;
   mod: import('zajednicko').ModPartije;
+  pravila?: import('zajednicko').PravilnikPartije | null;
   pocetakU: Date;
   sudionici: readonly SudionikAnalitike[];
 }
@@ -33,6 +34,7 @@ export function mapirajVrstuRacuna(vrsta: 'gost' | 'registriran' | 'admin'): Vrs
 }
 
 export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> {
+  const pravila = zapis.pravila ?? null;
   await baza.transaction(async (tx) => {
     await tx
       .insert(analitikaIgre)
@@ -40,6 +42,7 @@ export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> 
         igraId: zapis.igraId,
         kontekst: zapis.kontekst,
         mod: zapis.mod,
+        pravila,
         pocetakU: zapis.pocetakU,
         krajU: null,
         ishod: null,
@@ -50,6 +53,8 @@ export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> 
           kontekst: zapis.kontekst,
           mod: zapis.mod,
           pocetakU: zapis.pocetakU,
+          // Ne pregazi poznati pravilnik s nullom; inače uzmi novu vrijednost.
+          ...(pravila != null ? { pravila } : {}),
         },
       });
 
@@ -70,6 +75,7 @@ export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> 
 export interface MetaKrajaIgre {
   kontekst: KontekstOtvaranjaAnalitike;
   mod: import('zajednicko').ModPartije;
+  pravila?: import('zajednicko').PravilnikPartije | null;
   pocetakU: Date;
 }
 
@@ -80,12 +86,14 @@ export async function upsertKrajIgre(
   ishod: IshodAnalitikeIgre,
   meta: MetaKrajaIgre,
 ): Promise<void> {
+  const pravila = meta.pravila ?? null;
   await baza
     .insert(analitikaIgre)
     .values({
       igraId,
       kontekst: meta.kontekst,
       mod: meta.mod,
+      pravila,
       pocetakU: meta.pocetakU,
       krajU,
       ishod,

@@ -1133,6 +1133,8 @@ export const analitikaIgre = pgTable('analitika_igre', {
   igraId: uuid('igra_id').primaryKey(),
   kontekst: kontekstAnalitike('kontekst').notNull(),
   mod: modPartije('mod').notNull(),
+  /** Nullable: povijesni zapisi bez backfilla; novi upisi šalju pravilnik s motora. */
+  pravila: pravilnikPartije('pravila'),
   pocetakU: timestamp('pocetak_u', { withTimezone: true }).notNull(),
   krajU: timestamp('kraj_u', { withTimezone: true }),
   ishod: ishodAnalitikeIgre('ishod'),

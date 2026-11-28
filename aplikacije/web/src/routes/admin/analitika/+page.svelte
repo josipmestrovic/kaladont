@@ -170,7 +170,65 @@
   let agregat = $state<AgregatPocetnih | null>(null);
   let dnevno = $state<Dnevno | null>(null);
   let igraciAgregat = $state<AgregatIgraca | null>(null);
+  let partijeAgregat = $state<AgregatPartija | null>(null);
   let izazovi = $state<AgregatIzazova | null>(null);
+
+  interface TrajanjeStat {
+    prosjekSekundi: number | null;
+    medijanSekundi: number | null;
+    p90Sekundi: number | null;
+    uzorak: number;
+  }
+
+  interface AgregatPartija {
+    od: string;
+    do: string;
+    kontekst: string | null;
+    vremenskaZona: string;
+    napomena: string;
+    sazetak: {
+      zapocete: number;
+      zavrsene: number;
+      prekinute: number;
+      nepotpuno: number;
+      bezIshoda: number;
+      jedinstveniIgraci: number;
+      stopaZavrsavanja: number | null;
+      pokrivenostTerminalnih: number | null;
+      trajanje: TrajanjeStat;
+      pokrivenostPravila: number | null;
+    };
+    nacini: {
+      kontekst: string;
+      zapocete: number;
+      zavrsene: number;
+      prekinute: number;
+      nepotpuno: number;
+      bezIshoda: number;
+      jedinstveniIgraci: number;
+      udioZapocetih: number | null;
+      stopaZavrsavanja: number | null;
+      pokrivenostTerminalnih: number | null;
+      trajanje: TrajanjeStat;
+    }[];
+    formati: {
+      kontekst: string | null;
+      mod: string;
+      zapocete: number;
+      zavrsene: number;
+      udioZapocetih: number | null;
+      stopaZavrsavanja: number | null;
+      trajanje: TrajanjeStat;
+    }[];
+    pravila: {
+      pravila: string;
+      zapocete: number;
+      zavrsene: number;
+      udioZapocetih: number | null;
+      stopaZavrsavanja: number | null;
+      trajanje: TrajanjeStat;
+    }[];
+  }
   let incidenti = $state<IncidentRedak[]>([]);
   let ukupnoIncidenata = $state(0);
   let stranica = $state(1);
@@ -239,6 +297,35 @@
     return `${(ms / 1000).toFixed(1)} s`;
   }
 
+  function formatSekundi(sekunde: number | null): string {
+    if (sekunde === null) return '—';
+    if (sekunde < 60) return `${sekunde.toFixed(0)} s`;
+    return `${(sekunde / 60).toFixed(1)} min`;
+  }
+
+  function nazivKonteksta(k: string): string {
+    if (k === 'javna') return 'Brza igra';
+    if (k === 'privatna') return 'Privatne sobe';
+    if (k === 'trening') return 'Trening';
+    if (k === 'izazov') return 'Izazovi';
+    return k;
+  }
+
+  function nazivModa(m: string): string {
+    if (m === 'dva_igraca') return 'Dvoboj';
+    if (m === 'tri_igraca') return 'Troboj';
+    if (m === 'cetiri_igraca') return 'Četveroboj';
+    return m;
+  }
+
+  function nazivPravila(p: string): string {
+    if (p === 'klasicni') return 'Klasični';
+    if (p === 'ka_zna') return 'KA-ZNA';
+    if (p === 'dokazi_nastavak') return 'Dokaži nastavak';
+    if (p === 'nepoznato') return 'Nepoznato';
+    return p;
+  }
+
   function wilsonTekst(w: WilsonInterval | null): string {
     if (!w) return '—';
     return `${w.low.toFixed(1)}–${w.high.toFixed(1)} %`;
@@ -277,11 +364,12 @@
       api<{ ok: boolean; ukupno: number; incidenti: IncidentRedak[] }>(`/admin/analitika/incidenti?${q}`),
       api<Dnevno & { ok: boolean; od: string; do: string }>(`/admin/analitika/dnevno?${q}`),
       api<AgregatIgraca & { ok: boolean }>(`/admin/analitika/igraci?${q}`),
+      api<AgregatPartija & { ok: boolean }>(`/admin/analitika/partije?${q}`),
       api<StatusAnalitike & { ok: boolean }>('/admin/analitika/status'),
       api<AgregatIzazova & { ok: boolean }>(`/admin/analitika/izazovi?${qIz}`),
     ]);
     const greske: string[] = [];
-    const [a, i, d, ig, s, iz] = rezultati;
+    const [a, i, d, ig, p, s, iz] = rezultati;
     if (a.status === 'fulfilled') {
       agregat = a.value;
       if (!od) od = a.value.od;
@@ -299,6 +387,8 @@
     else greske.push(d.reason instanceof Error ? d.reason.message : 'Dnevno igranje nije dostupno.');
     if (ig.status === 'fulfilled') igraciAgregat = ig.value;
     else greske.push(ig.reason instanceof Error ? ig.reason.message : 'Analitika igrača nije dostupna.');
+    if (p.status === 'fulfilled') partijeAgregat = p.value;
+    else greske.push(p.reason instanceof Error ? p.reason.message : 'Analitika partija nije dostupna.');
     if (s.status === 'fulfilled') status = s.value;
     else greske.push(s.reason instanceof Error ? s.reason.message : 'Status nije dostupan.');
     if (iz.status === 'fulfilled') izazovi = iz.value;
@@ -454,6 +544,137 @@
         </tbody>
       </table>
     {/if}
+  </section>
+{/if}
+
+{#if partijeAgregat}
+  <section aria-labelledby="partije-naslov">
+    <h2 id="partije-naslov">Partije i načini igranja</h2>
+    <p class="meta">
+      Zona: {partijeAgregat.vremenskaZona} · {partijeAgregat.od} – {partijeAgregat.do}
+      · kohorta po početku igre
+      {#if partijeAgregat.kontekst}
+        · kontekst: {nazivKonteksta(partijeAgregat.kontekst)}
+      {/if}
+    </p>
+    <p class="meta">{partijeAgregat.napomena}</p>
+    <dl class="kartice">
+      <div><dt>Započete</dt><dd>{partijeAgregat.sazetak.zapocete}</dd></div>
+      <div><dt>Završene</dt><dd>{partijeAgregat.sazetak.zavrsene}</dd></div>
+      <div><dt>Stopa završavanja</dt><dd>{postotak(partijeAgregat.sazetak.stopaZavrsavanja)}</dd></div>
+      <div><dt>Prosječno trajanje</dt><dd>{formatSekundi(partijeAgregat.sazetak.trajanje.prosjekSekundi)}</dd></div>
+      <div><dt>Jedinstveni igrači</dt><dd>{partijeAgregat.sazetak.jedinstveniIgraci}</dd></div>
+      <div><dt>Pokrivenost pravila</dt><dd>{postotak(partijeAgregat.sazetak.pokrivenostPravila)}</dd></div>
+    </dl>
+    <h3>Načini igranja</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Način</th>
+          <th>Započete</th>
+          <th>Završene</th>
+          <th>Prekinute</th>
+          <th>Bez ishoda</th>
+          <th>Udio</th>
+          <th>Stopa</th>
+          <th>Igrači</th>
+          <th>Prosjek / medijan / P90</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each partijeAgregat.nacini as red (red.kontekst)}
+          <tr>
+            <td>{nazivKonteksta(red.kontekst)}</td>
+            <td>{red.zapocete}</td>
+            <td>{red.zavrsene}</td>
+            <td>{red.prekinute}</td>
+            <td>{red.bezIshoda}</td>
+            <td>{postotak(red.udioZapocetih)}</td>
+            <td>{postotak(red.stopaZavrsavanja)}</td>
+            <td>{red.jedinstveniIgraci}</td>
+            <td>
+              {formatSekundi(red.trajanje.prosjekSekundi)}
+              / {formatSekundi(red.trajanje.medijanSekundi)}
+              / {formatSekundi(red.trajanje.p90Sekundi)}
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+    <h3>Formati</h3>
+    {#if partijeAgregat.formati.length === 0}
+      <p>Nema zapisa formata u odabranom razdoblju.</p>
+    {:else}
+      <table>
+        <thead>
+          <tr>
+            <th>Kontekst</th>
+            <th>Format</th>
+            <th>Započete</th>
+            <th>Završene</th>
+            <th>Udio</th>
+            <th>Stopa</th>
+            <th>Prosjek / medijan / P90</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each partijeAgregat.formati as red (`${red.kontekst}-${red.mod}`)}
+            <tr>
+              <td>{red.kontekst ? nazivKonteksta(red.kontekst) : '—'}</td>
+              <td>{nazivModa(red.mod)}</td>
+              <td>{red.zapocete}</td>
+              <td>{red.zavrsene}</td>
+              <td>{postotak(red.udioZapocetih)}</td>
+              <td>{postotak(red.stopaZavrsavanja)}</td>
+              <td>
+                {formatSekundi(red.trajanje.prosjekSekundi)}
+                / {formatSekundi(red.trajanje.medijanSekundi)}
+                / {formatSekundi(red.trajanje.p90Sekundi)}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+    <h3>Pravila</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Pravilnik</th>
+          <th>Započete</th>
+          <th>Završene</th>
+          <th>Udio</th>
+          <th>Stopa</th>
+          <th>Prosjek / medijan / P90</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each partijeAgregat.pravila as red (red.pravila)}
+          <tr>
+            <td>{nazivPravila(red.pravila)}</td>
+            <td>{red.zapocete}</td>
+            <td>{red.zavrsene}</td>
+            <td>{postotak(red.udioZapocetih)}</td>
+            <td>{postotak(red.stopaZavrsavanja)}</td>
+            <td>
+              {formatSekundi(red.trajanje.prosjekSekundi)}
+              / {formatSekundi(red.trajanje.medijanSekundi)}
+              / {formatSekundi(red.trajanje.p90Sekundi)}
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+    <p class="meta">
+      Ishodi ukupno: završene {partijeAgregat.sazetak.zavrsene},
+      prekinute {partijeAgregat.sazetak.prekinute},
+      nepotpuno {partijeAgregat.sazetak.nepotpuno},
+      bez ishoda {partijeAgregat.sazetak.bezIshoda}
+      · pokrivenost terminalnih {postotak(partijeAgregat.sazetak.pokrivenostTerminalnih)}
+      · trajanje uzorak {partijeAgregat.sazetak.trajanje.uzorak}
+      (medijan {formatSekundi(partijeAgregat.sazetak.trajanje.medijanSekundi)},
+      P90 {formatSekundi(partijeAgregat.sazetak.trajanje.p90Sekundi)})
+    </p>
   </section>
 {/if}
 

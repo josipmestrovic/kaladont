@@ -565,6 +565,7 @@ export function stvoriUpraviteljPartija(
       igraId: stanje.partijaId,
       kontekst: stanje.kontekst,
       mod: stanje.mod,
+      pravila: stanje.pravila,
       pocetakU: new Date(stanje.pocetakPartijeMs),
       sudionici: stanje.sudionici
         .filter((s) => s.upravljac === 'covjek')
@@ -579,6 +580,7 @@ export function stvoriUpraviteljPartija(
     return {
       kontekst: stanje.kontekst,
       mod: stanje.mod,
+      pravila: stanje.pravila,
       pocetakU: new Date(stanje.pocetakPartijeMs),
     };
   }
