@@ -128,11 +128,19 @@ export function trebaUcitatiTab(opcije: {
   ucitano: boolean;
   ucitava: boolean;
   snimkaUcitanog: string | null;
+  snimkaUTijeku: string | null;
   aktualnaSnimka: string;
 }): boolean {
-  if (opcije.ucitava) return false;
-  if (!opcije.ucitano) return true;
-  return opcije.snimkaUcitanog !== opcije.aktualnaSnimka;
+  if (opcije.ucitava && opcije.snimkaUTijeku === opcije.aktualnaSnimka) return false;
+  if (opcije.ucitano && opcije.snimkaUcitanog === opcije.aktualnaSnimka) return false;
+  return true;
+}
+
+/** Usporedi snimke zanemarujući stranicu incidenata (za odluku o punom vs. djelomičnom učitavanju). */
+export function istiOsnovniFilteriSnimke(a: string | null, b: string): boolean {
+  if (a == null) return false;
+  const bez = (s: string) => s.replace(/\|stranica=\d+/g, '');
+  return bez(a) === bez(b);
 }
 
 const REDOSLIJED_TABOVA: readonly TabAnalitike[] = [

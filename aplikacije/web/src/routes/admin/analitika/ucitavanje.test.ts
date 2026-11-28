@@ -4,6 +4,7 @@ import {
   endpointiOsvjezavanja,
   endpointiPaginacijeIncidenata,
   endpointiZaTab,
+  istiOsnovniFilteriSnimke,
   pomakniTabTipkovnicom,
   putanjaEndpointa,
   queryIzazovi,
@@ -95,26 +96,37 @@ describe('ucitavanje analitike', () => {
       ucitano: true,
       ucitava: false,
       snimkaUcitanog: a,
+      snimkaUTijeku: null,
       aktualnaSnimka: b,
     })).toBe(true);
     expect(trebaUcitatiTab({
       ucitano: true,
       ucitava: false,
       snimkaUcitanog: a,
+      snimkaUTijeku: null,
       aktualnaSnimka: a,
     })).toBe(false);
     expect(trebaUcitatiTab({
       ucitano: false,
       ucitava: false,
       snimkaUcitanog: null,
+      snimkaUTijeku: null,
       aktualnaSnimka: a,
     })).toBe(true);
     expect(trebaUcitatiTab({
       ucitano: false,
       ucitava: true,
       snimkaUcitanog: null,
+      snimkaUTijeku: a,
       aktualnaSnimka: a,
     })).toBe(false);
+    expect(trebaUcitatiTab({
+      ucitano: false,
+      ucitava: true,
+      snimkaUcitanog: null,
+      snimkaUTijeku: a,
+      aktualnaSnimka: b,
+    })).toBe(true);
   });
 
   it('ignorira kontekst u snimci za čekaonicu i izazove', () => {
@@ -141,5 +153,14 @@ describe('ucitavanje analitike', () => {
     expect(detaljIncidenteJeAktualan('a', 'a')).toBe(true);
     expect(detaljIncidenteJeAktualan('b', 'a')).toBe(false);
     expect(detaljIncidenteJeAktualan(null, 'a')).toBe(false);
+  });
+
+  it('isti osnovni filteri zanemaruju stranicu incidenata', () => {
+    const a = snimkaFilteraZaTab('rjecnik', bazaFilteri);
+    const b = snimkaFilteraZaTab('rjecnik', { ...bazaFilteri, stranicaIncidenata: 5 });
+    const c = snimkaFilteraZaTab('rjecnik', { ...bazaFilteri, od: '2025-03-01' });
+    expect(istiOsnovniFilteriSnimke(a, b)).toBe(true);
+    expect(istiOsnovniFilteriSnimke(a, c)).toBe(false);
+    expect(istiOsnovniFilteriSnimke(null, a)).toBe(false);
   });
 });

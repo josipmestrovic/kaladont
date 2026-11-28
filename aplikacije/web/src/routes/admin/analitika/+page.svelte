@@ -14,6 +14,7 @@
     detaljIncidenteJeAktualan,
     endpointiOsvjezavanja,
     endpointiPaginacijeIncidenata,
+    istiOsnovniFilteriSnimke,
     pomakniTabTipkovnicom,
     putanjaEndpointa,
     snimkaFilteraZaTab,
@@ -74,8 +75,10 @@
     rjecnik: praznoStanje(),
   });
   let statusGreska = $state<string | null>(null);
-  /** Snimka relevantnih filtera za koje su podaci taba učitani. */
+  /** Snimka relevantnih filtera za koje su podaci taba uspješno učitani. */
   let snimkeFiltera = $state<Partial<Record<TabAnalitike, string>>>({});
+  /** Snimka filtera zahtjeva koji je trenutačno u tijeku (zaštita od dupliciranja). */
+  let snimkeUTijeku = $state<Partial<Record<TabAnalitike, string>>>({});
 
   const tokeni = {
     igraci: new TokenUcitavanja(),
@@ -213,6 +216,7 @@
 
   async function ucitajTab(t: TabAnalitike, opcije: { samoIncidenti?: boolean; zadrziPodatke?: boolean } = {}) {
     const f = filteri();
+    const snimkaZahtjeva = snimkaFilteraZaTab(t, f);
     const endpointi = opcije.samoIncidenti
       ? endpointiPaginacijeIncidenata()
       : endpointiOsvjezavanja(t);
@@ -226,6 +230,7 @@
     // Paginacija incidenata ne zamjenjuje cijeli panel loadingom.
     if (!opcije.samoIncidenti) {
       stanja[t] = { ucitava: true, greska: null, ucitano: stanja[t].ucitano };
+      snimkeUTijeku = { ...snimkeUTijeku, [t]: snimkaZahtjeva };
     }
     if (endpointi.includes('status')) statusGreska = null;
 
@@ -247,13 +252,29 @@
       }
     }
 
-    snimkeFiltera = { ...snimkeFiltera, [t]: snimkaFilteraZaTab(t, f) };
-
-    stanja[t] = {
-      ucitava: false,
-      greska: greske.length > 0 ? greske.join(' ') : null,
-      ucitano: true,
-    };
+    const uspjeh = greske.length === 0;
+    if (opcije.samoIncidenti) {
+      // Samo ažuriraj stranicu u snimci ako je ostatak filtera već usklađen.
+      if (uspjeh && istiOsnovniFilteriSnimke(snimkeFiltera[t] ?? null, snimkaZahtjeva)) {
+        snimkeFiltera = { ...snimkeFiltera, [t]: snimkaZahtjeva };
+      }
+      stanja[t] = {
+        ...stanja[t],
+        greska: uspjeh ? null : greske.join(' '),
+      };
+    } else {
+      const ostaleUTijeku = { ...snimkeUTijeku };
+      delete ostaleUTijeku[t];
+      snimkeUTijeku = ostaleUTijeku;
+      if (uspjeh) {
+        snimkeFiltera = { ...snimkeFiltera, [t]: snimkaZahtjeva };
+      }
+      stanja[t] = {
+        ucitava: false,
+        greska: uspjeh ? null : greske.join(' '),
+        ucitano: uspjeh,
+      };
+    }
   }
 
   function odaberiTab(novi: TabAnalitike) {
@@ -264,6 +285,7 @@
       ucitano: stanja[novi].ucitano,
       ucitava: stanja[novi].ucitava,
       snimkaUcitanog: snimkeFiltera[novi] ?? null,
+      snimkaUTijeku: snimkeUTijeku[novi] ?? null,
       aktualnaSnimka: aktualna,
     })) {
       void ucitajTab(novi);
@@ -287,6 +309,11 @@
 
   function promijeniStranicuIncidenata(nova: number) {
     stranica = nova;
+    const aktualna = snimkaFilteraZaTab('rjecnik', filteri());
+    if (!istiOsnovniFilteriSnimke(snimkeFiltera.rjecnik ?? null, aktualna)) {
+      void ucitajTab('rjecnik');
+      return;
+    }
     void ucitajTab('rjecnik', { samoIncidenti: true, zadrziPodatke: true });
   }
 
