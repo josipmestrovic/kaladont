@@ -7,6 +7,7 @@
   import KontrolePristupacnosti from './KontrolePristupacnosti.svelte';
   import PrekidacTeme from './PrekidacTeme.svelte';
   import UnosLozinke from './UnosLozinke.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   interface Profil {
     email: string | null;
@@ -81,7 +82,11 @@
       <section class="sekcija gost-napomena">
         <h3>Dodatne postavke računa</h3>
         <p>Igraš kao gost. Za promjenu email adrese ili lozinke registriraj svoj račun.</p>
-        <a href="/registracija" class="cta-gumb">Registriraj se</a>
+        <a
+          href="/registracija"
+          class="cta-gumb"
+          onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'profil' })}
+        >Registriraj se</a>
       </section>
     </div>
   {:else if greska}
@@ -100,7 +105,12 @@
       <section class="sekcija" id="avatar">
         <h3>Prilagodi avatar</h3>
         <p class="podtekst">Sastavi svoj personalizirani avatar u zasebnom editoru.</p>
-        <a href="/profil/avatar" class="spremnik-gumb">Uredi avatar</a>
+        <a
+          href="/profil/avatar"
+          class="spremnik-gumb"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('avatar-uredjivanje-otvoreno', { izvor: 'profil' })}
+        >Uredi avatar</a>
       </section>
     </div>
 

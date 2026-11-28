@@ -3,7 +3,12 @@
  */
 import { and, eq, gte, lt, sql, type SQL } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
-import { analitikaIgre, analitikaSudjelovanja } from '../baza/shema.js';
+import {
+  analitikaIgre,
+  analitikaSudjelovanja,
+  type BrojaciEliminacijaAnalitike,
+} from '../baza/shema.js';
+import type { ProfilAnalitikeBotova } from '../bot/profili-bota.js';
 import {
   ANALITIKA_VREMENSKA_ZONA,
   danasZagrebIso,
@@ -14,25 +19,50 @@ import { uRedAnalitike } from './red-upisa.js';
 
 export type IshodAnalitikeIgre = 'zavrsena' | 'prekinuta' | 'nepotpuno';
 export type VrstaRacunaAnalitike = 'gost' | 'registriran';
+export type VrstaPobjednikaAnalitike = 'covjek' | 'bot';
+export type { BrojaciEliminacijaAnalitike };
 
 export interface SudionikAnalitike {
   igracId: string;
   vrstaRacunaNaPocetku: VrstaRacunaAnalitike;
 }
 
+export interface SnimkaBotovaPocetka {
+  brojLjudi: number;
+  brojBotova: number;
+  profilBotova: ProfilAnalitikeBotova | null;
+  verzijaBotPolitike: number | null;
+  verzijaProfilaBota: number | null;
+}
+
 export interface ZapisPocetkaIgre {
   igraId: string;
   kontekst: KontekstOtvaranjaAnalitike;
   mod: import('zajednicko').ModPartije;
+  pravila?: import('zajednicko').PravilnikPartije | null;
   pocetakU: Date;
   sudionici: readonly SudionikAnalitike[];
+  botovi?: SnimkaBotovaPocetka | null;
 }
 
 export function mapirajVrstuRacuna(vrsta: 'gost' | 'registriran' | 'admin'): VrstaRacunaAnalitike {
   return vrsta === 'gost' ? 'gost' : 'registriran';
 }
 
+export function prazniBrojaciEliminacija(): BrojaciEliminacijaAnalitike {
+  return {
+    ne_znam: 0,
+    istek: 0,
+    mrtva_slova: 0,
+    prekid: 0,
+    kaladont: 0,
+    nepoznato: 0,
+  };
+}
+
 export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> {
+  const pravila = zapis.pravila ?? null;
+  const botovi = zapis.botovi ?? null;
   await baza.transaction(async (tx) => {
     await tx
       .insert(analitikaIgre)
@@ -40,9 +70,15 @@ export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> 
         igraId: zapis.igraId,
         kontekst: zapis.kontekst,
         mod: zapis.mod,
+        pravila,
         pocetakU: zapis.pocetakU,
         krajU: null,
         ishod: null,
+        brojLjudi: botovi?.brojLjudi ?? null,
+        brojBotova: botovi?.brojBotova ?? null,
+        profilBotova: botovi?.profilBotova ?? null,
+        verzijaBotPolitike: botovi?.verzijaBotPolitike ?? null,
+        verzijaProfilaBota: botovi?.verzijaProfilaBota ?? null,
       })
       .onConflictDoUpdate({
         target: analitikaIgre.igraId,
@@ -50,6 +86,17 @@ export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> 
           kontekst: zapis.kontekst,
           mod: zapis.mod,
           pocetakU: zapis.pocetakU,
+          // Ne pregazi poznati pravilnik / bot snimku s nullom.
+          ...(pravila != null ? { pravila } : {}),
+          ...(botovi != null
+            ? {
+              brojLjudi: botovi.brojLjudi,
+              brojBotova: botovi.brojBotova,
+              profilBotova: botovi.profilBotova,
+              verzijaBotPolitike: botovi.verzijaBotPolitike,
+              verzijaProfilaBota: botovi.verzijaProfilaBota,
+            }
+            : {}),
         },
       });
 
@@ -70,7 +117,13 @@ export async function upsertPocetakIgre(zapis: ZapisPocetkaIgre): Promise<void> 
 export interface MetaKrajaIgre {
   kontekst: KontekstOtvaranjaAnalitike;
   mod: import('zajednicko').ModPartije;
+  pravila?: import('zajednicko').PravilnikPartije | null;
   pocetakU: Date;
+  /** Start snimka — popunjava se ako kraj stigne prije početka. */
+  botovi?: SnimkaBotovaPocetka | null;
+  vrstaPobjednika?: VrstaPobjednikaAnalitike | null;
+  eliminacijeLjudi?: BrojaciEliminacijaAnalitike | null;
+  eliminacijeBotova?: BrojaciEliminacijaAnalitike | null;
 }
 
 /** Atomarni upsert: nema select+insert utrke, bez hardkodiranog 1v1 konteksta. */
@@ -80,21 +133,48 @@ export async function upsertKrajIgre(
   ishod: IshodAnalitikeIgre,
   meta: MetaKrajaIgre,
 ): Promise<void> {
+  const pravila = meta.pravila ?? null;
+  const botovi = meta.botovi ?? null;
+  const vrstaPobjednika = meta.vrstaPobjednika ?? null;
+  const eliminacijeLjudi = meta.eliminacijeLjudi ?? null;
+  const eliminacijeBotova = meta.eliminacijeBotova ?? null;
   await baza
     .insert(analitikaIgre)
     .values({
       igraId,
       kontekst: meta.kontekst,
       mod: meta.mod,
+      pravila,
       pocetakU: meta.pocetakU,
       krajU,
       ishod,
+      brojLjudi: botovi?.brojLjudi ?? null,
+      brojBotova: botovi?.brojBotova ?? null,
+      profilBotova: botovi?.profilBotova ?? null,
+      verzijaBotPolitike: botovi?.verzijaBotPolitike ?? null,
+      verzijaProfilaBota: botovi?.verzijaProfilaBota ?? null,
+      vrstaPobjednika,
+      eliminacijeLjudi,
+      eliminacijeBotova,
     })
     .onConflictDoUpdate({
       target: analitikaIgre.igraId,
       set: {
         krajU,
         ishod,
+        ...(pravila != null ? { pravila } : {}),
+        ...(botovi != null
+          ? {
+            brojLjudi: botovi.brojLjudi,
+            brojBotova: botovi.brojBotova,
+            profilBotova: botovi.profilBotova,
+            verzijaBotPolitike: botovi.verzijaBotPolitike,
+            verzijaProfilaBota: botovi.verzijaProfilaBota,
+          }
+          : {}),
+        vrstaPobjednika,
+        eliminacijeLjudi,
+        eliminacijeBotova,
       },
       // Ne degradiraj završenu igru u prekinutu / nepotpuno; krajU se i dalje osvježava samo kad smijemo dirati ishod.
       setWhere: sql`${analitikaIgre.ishod} is distinct from 'zavrsena'`,

@@ -39,7 +39,8 @@
       class="naslovnica-napredak"
       data-testid="naslovnica-napredak"
       aria-label={ariaProfil}
-      onclick={() => zabiljeziUmamiDogadjaj('naslovnica-profil-klik')}
+      onclick={() =>
+        zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'profil', izvor: 'naslovnica' })}
     >
       {@render sadrzajNapretka()}
     </a>
@@ -65,7 +66,7 @@
         href="/registracija"
         class="naslovnica-gost-registracija"
         data-testid="naslovnica-gost-registracija"
-        onclick={() => zabiljeziUmamiDogadjaj('naslovnica-registracija-klik')}
+        onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'naslovnica' })}
       >
         <span class="naslovnica-gost-registracija__tekst">{gostCtaTekst}</span>
       </a>
@@ -74,7 +75,7 @@
         <a
           href="/prijava"
           data-testid="naslovnica-gost-prijava"
-          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-prijava-klik')}
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'naslovnica' })}
         >Prijavi se</a>
       </p>
     </div>

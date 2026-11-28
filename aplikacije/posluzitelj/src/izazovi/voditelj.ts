@@ -16,6 +16,7 @@ import {
 import {
   nadimakProfilaBota,
   razrijesiProfilBotaIliZadani,
+  snimkaBotAnalitikeIzRazrijesenog,
 } from '../bot/profili-bota.js';
 import type { KonfiguracijaBota } from '../bot/konfiguracija-bota.js';
 import type { RezultatPokretanja } from '../igra/politika-ucinka.js';
@@ -71,6 +72,7 @@ export interface OvisnostiVoditeljaIzazova {
       kontekst: 'izazov';
       pravila: SnapshotPokusajaIzazova['pravila'];
       botKonfiguracija: KonfiguracijaBota;
+      botAnalitika?: import('../bot/profili-bota.js').SnimkaBotAnalitike;
       trajanjePotezaSek: number;
       izazovTimerPolitika?: { covjekMs: number; botMs: number };
       izazovMeta?: import('zajednicko').IzazovPartijaMeta;
@@ -174,7 +176,9 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
     const snapshot = pokusaj.snapshot as SnapshotPokusajaIzazova;
     const definicija = definicijaIzazova(ulaz.challengeId);
     const profileId = snapshot.profileId ?? definicija.profileId;
-    const { konfiguracija: botKonfiguracija } = razrijesiProfilBotaIliZadani(profileId);
+    const botRazrijeseno = razrijesiProfilBotaIliZadani(profileId);
+    const botKonfiguracija = botRazrijeseno.konfiguracija;
+    const botAnalitika = snimkaBotAnalitikeIzRazrijesenog(botRazrijeseno);
     const brojBotova = (snapshot.brojIgraca - 1) as 1 | 2 | 3;
     const covjekMs = snapshot.turnDurationMs;
     const botMs = snapshot.botTurnDurationMs ?? 0;
@@ -220,6 +224,7 @@ export function stvoriVoditeljIzazova(ovisnosti: OvisnostiVoditeljaIzazova): {
         kontekst: 'izazov',
         pravila: snapshot.pravila,
         botKonfiguracija,
+        botAnalitika,
         trajanjePotezaSek,
         izazovTimerPolitika: { covjekMs, botMs },
         izazovMeta: {

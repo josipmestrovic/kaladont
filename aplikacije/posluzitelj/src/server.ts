@@ -59,7 +59,10 @@ import {
 import type { PostavkeMotoraPartije } from './igra/motor-partije.js';
 import { BotKontroler } from './bot/kontroler.js';
 import { ucitajKonfiguracijuBota } from './bot/konfiguracija-bota.js';
-import { konfiguracijaZaJavnuBrzu } from './bot/profili-bota.js';
+import {
+  razrijesiProfilBota,
+  snimkaBotAnalitikeIzRazrijesenog,
+} from './bot/profili-bota.js';
 import { BotDebugPretplate } from './bot/bot-debug-pretplata.js';
 import { pragoviPopuneZaOkruzenje } from './red/raspored-popune.js';
 import { FondBotova, ucitajIdentiteteBotova } from './bot/fond.js';
@@ -835,10 +838,12 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     async (stol, mod, meta) => {
       // Kanonska pravila iz ključa reda (spojeni Dvoboj → ka_zna); odabranaPravila ostaje na sudioniku.
       // Javna Brza: forsira Iskusni poluge (agresivnost/Shield/neznanje).
+      const botRazrijeseno = razrijesiProfilBota('iskusni', postavkeBotova);
       const { ishod } = await upravitelj.zapocniPartiju(stol, mod, {
         pravila: meta.pravila,
         spojeniDvoboj: meta.spojeniDvoboj,
-        botKonfiguracija: konfiguracijaZaJavnuBrzu(postavkeBotova),
+        botKonfiguracija: botRazrijeseno.konfiguracija,
+        botAnalitika: snimkaBotAnalitikeIzRazrijesenog(botRazrijeseno),
       });
       if (ishod === 'pokrenuta') void osvjeziProsjekCekanja();
       return ishod;
@@ -966,11 +971,16 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
   const treningServis = registrirajTrening(io, {
     omogucen: () => postavkeBotova.treningOmogucen && upravitelj.mozePokrenutiPartiju(),
     // Zagrijavanje: mod iz broja sudionika (čovjek + 1–3 botova profila).
-    zapocniTrening: async (sudionici, pravila, botKonfiguracija) => {
+    zapocniTrening: async (sudionici, pravila, botKonfiguracija, botAnalitika) => {
       const broj = sudionici.length;
       const mod =
         broj <= 2 ? ('dva_igraca' as const) : broj === 3 ? ('tri_igraca' as const) : ('cetiri_igraca' as const);
-      const { ishod } = await upravitelj.zapocniPartiju(sudionici, mod, { kontekst: 'trening', pravila, botKonfiguracija });
+      const { ishod } = await upravitelj.zapocniPartiju(sudionici, mod, {
+        kontekst: 'trening',
+        pravila,
+        botKonfiguracija,
+        botAnalitika,
+      });
       return ishod;
     },
     igracImaAktivnuPartiju: upravitelj.imaAktivnuPartiju,
@@ -1089,9 +1099,11 @@ export async function izgradiPosluzitelj(opcije: OpcijePosluzitelja = {}): Promi
     dohvatiKonfiguracijuBotaPartije: (partijaId) => botKontroler.dohvatiKonfiguracijuPartije(partijaId),
     fondBotova,
     zapocniJavnuPartiju: async (sudionici, mod, pravila) => {
+      const botRazrijeseno = razrijesiProfilBota('iskusni', postavkeBotova);
       const { ishod } = await upravitelj.zapocniPartiju(sudionici, mod, {
         pravila,
-        botKonfiguracija: konfiguracijaZaJavnuBrzu(postavkeBotova),
+        botKonfiguracija: botRazrijeseno.konfiguracija,
+        botAnalitika: snimkaBotAnalitikeIzRazrijesenog(botRazrijeseno),
       });
       return ishod;
     },

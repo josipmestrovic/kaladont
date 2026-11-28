@@ -28,6 +28,7 @@
   import { oblikEliminacija, oblikTroboja } from '$lib/naslovnica-ljestvice.js';
   import { osigurajProfil, stanjeProfila } from '$lib/stanje-profila.svelte.js';
   import Avatar from '$lib/komponente/Avatar.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   type Kategorija = 'igraci' | 'najopasnije';
 
@@ -638,7 +639,11 @@
           <aside class="cta-gost">
             <p class="cta-gost-naslov">Sačuvaj svoje mjesto na ljestvici!</p>
             <p>Registriraj se i zadrži svoje rezultate i dosadašnji napredak.</p>
-            <a class="veza-registracija" href="/registracija">Registriraj se</a>
+            <a
+              class="veza-registracija"
+              href="/registracija"
+              onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ljestvice' })}
+            >Registriraj se</a>
           </aside>
         {/if}
 

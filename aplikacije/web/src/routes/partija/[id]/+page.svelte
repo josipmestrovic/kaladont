@@ -26,6 +26,7 @@
     potvrdiZavrsniSazetak,
   } from '$lib/stanje-sanducica.svelte.js';
   import { pustiAudio, zagrijKrajZvukove } from '$lib/audio-manager.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import { glasUkljucen, izgovoriRijec, zaustaviGovor } from '$lib/glasovni-manager.js';
   import { izvediLokalniRedSjedala } from '$lib/raspored-sjedala.js';
   import { putanjaBotAvatara } from '$lib/bot-avatari.js';
@@ -2068,7 +2069,10 @@
     </section>
   {/if}
   {#if NapredakMisijaKomponenta && stanje.kraj.promjeneMisija && stanje.kraj.promjeneMisija.length > 0}
-    <NapredakMisijaKomponenta promjene={stanje.kraj.promjeneMisija} />
+    <NapredakMisijaKomponenta
+      promjene={stanje.kraj.promjeneMisija}
+      izvor={jeTrening ? 'zavrsetak_treninga' : 'zavrsetak_partije'}
+    />
   {/if}
   {#if stanje.kraj.pohvale && stanje.kraj.pohvale.length > 0}
     <section class="pohvale-igre" aria-labelledby="pohvale-igre-naslov">
@@ -2251,7 +2255,11 @@
     <p class="gost-poruka">
       Ova statistika je spremljena lokalno u ovom pregledniku. Registriraj se da je zadržiš zauvijek!
     </p>
-    <a href="/registracija">Registriraj se</a>
+    <a
+      href="/registracija"
+      onclick={() =>
+        zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'zavrsetak_partije' })}
+    >Registriraj se</a>
   {/if}
   {#if PanelPrijavaRijeciKomponenta}
     <PanelPrijavaRijeciKomponenta

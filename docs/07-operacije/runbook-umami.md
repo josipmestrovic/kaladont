@@ -82,6 +82,35 @@ sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml ps
 
 `umami` treba biti `running` / healthy. Ako pada, `docker compose --profile umami -f docker-compose.prod.yml logs umami --tail=80` (često: baza nije bootstrapana ili kriva lozinka).
 
+### Ograničenja resursa
+
+Umami je namjerno ograničen u Composeu (`cpus: 0.5`, `mem_limit: 512m`, `mem_reservation: 256m`) kako analitika ne bi mogla zauzeti nerazmjeran dio produkcijskog VPS-a. Kaladont i njegova baza imaju prednost.
+
+- Procijenjena stvarna potrošnja je ~0,2 GB RAM-a; tvrdi limit 512 MiB je strop, ne očekivano zauzeće.
+- `mem_reservation: 256m` je meki signal pri pritisku na memoriju — nije garantiran niti unaprijed alociran RAM.
+- Ako Umami prijeđe `mem_limit`, Docker ga može OOM-ubiti i `restart: unless-stopped` ga digne ponovno.
+- Umami i dalje dijeli PostgreSQL (`baza`) s igrom; ograničenja vrijede samo za Umami kontejner, ne za Postgres.
+
+Provjera stvarne potrošnje i statusa:
+
+```bash
+docker stats --no-stream
+```
+
+```bash
+docker compose --profile umami \
+  -f docker-compose.prod.yml ps
+```
+
+Provjera stvarno primijenjenih limita (zamijeni ime kontejnera ako treba):
+
+```bash
+docker inspect "$(docker compose --profile umami -f docker-compose.prod.yml ps -q umami)" \
+  --format 'Memory={{.HostConfig.Memory}} MemoryReservation={{.HostConfig.MemoryReservation}} NanoCpus={{.HostConfig.NanoCpus}}'
+```
+
+Očekivano: `Memory=536870912` (512 MiB), `MemoryReservation=268435456` (256 MiB), `NanoCpus=500000000` (0,5 CPU). Ako Umami redovito doseže limit ili se zbog njega restartira, prilagodi ograničenja na temelju mjerenja.
+
 Ako je Caddy već star bez `analitika` bloka, treba redeploy/compose koji povuče novi `Caddyfile`, zatim:
 
 ```bash
@@ -139,15 +168,65 @@ sudo -u deploy docker compose -f docker-compose.prod.yml --env-file .env up -d a
 Provjera:
 
 1. `https://kaladont.hr` → DevTools → Network → zahtjevi prema `analitika.kaladont.hr`
-2. Klik **Brza igra** na naslovnici → `naslovnica-brza-igra-klik` (stari `igraj-klik` više se ne šalje s naslovnice; ostaje u tipu radi povijesnih potrošača)
-3. Ostale kartice/prečaci: `naslovnica-izazovi-klik`, `naslovnica-trening-klik`, `naslovnica-privatna-soba-klik`, `naslovnica-ljestvice-klik`, `naslovnica-misije-klik`, `naslovnica-kolekcija-klik`, `naslovnica-profil-klik`, `naslovnica-pravila-klik`, `naslovnica-novosti-klik`
-4. Automatski `?igraj=1` **nije** klik-event
-5. Klik **Pridruži se zajednici** → `forum-klik-landing`
-6. Na `/o-igri` forum CTA → `forum-klik-o-igri`
-
-**Prijelaz (2026-11):** naslovnica prelazi na zasebne evente bez dual-write. Povijesni dashboardi na `igraj-klik` više ne reflektiraju klikove s nove naslovnice.
+2. Klik **Brza igra** na naslovnici → događaj `mod-klik` s `mod=brza_igra`, `izvor=naslovnica`
+3. Automatski `?igraj=1` **ne** šalje `mod-klik`
+4. Ostali smoke: kartice načina (`izazovi` / `trening` / `privatna_soba`), prečac ljestvica → `navigacija-klik`, CTA registracije → `registracija-klik`
 
 Gašenje trackera bez gašenja kontejnera: isprazni `UMAMI_URL` i `UMAMI_WEBSITE_ID`, restart `aplikacija`.
+
+### Katalog prilagođenih događaja
+
+Umami prati **korisničku namjeru i web navigaciju** (klikovi, otvaranje editora, uspješno kopiranje poveznice). **Interna analitika** Kaladonta prati stvarno ponašanje igre: partije, registracije, konverzije, retenciju, botove i gamifikaciju. Ne dupliciramo te podatke u Umami događajima.
+
+Centralni helper: `aplikacije/web/src/lib/umami.ts` (`zabiljeziUmamiDogadjaj`). Automatski pageview / posjetitelji / UTM / uređaji ostaju ugrađeni u tracker; ne šaljemo vlastite pageview događaje.
+
+| Događaj | Parametri | Trenutak slanja |
+| --- | --- | --- |
+| `mod-klik` | `mod`, `izvor` | Svjesni klik na način igranja (ne `?igraj=1`, ne reconnect, ne „igraj opet”) |
+| `navigacija-klik` | `odrediste`, `izvor` | Klik na sekundarnu funkcionalnost (ne tabovi unutar stranice) |
+| `registracija-klik` | `izvor` | Klik na CTA prema `/registracija` |
+| `prijava-klik` | `izvor` | Klik na CTA prema `/prijava` (ne submit obrasca, ne obnova sesije) |
+| `privatna-soba-kreirana` | — | Nakon potvrde `soba:stvorena` |
+| `privatna-soba-link-kopiran` | — | Nakon uspješnog `clipboard.writeText` (bez linka/koda u payloadu) |
+| `avatar-uredjivanje-otvoreno` | `izvor` | Svjesno otvaranje editora (`/profil/avatar`) |
+| `avatar-spremljen` | — | Nakon uspješnog PUT avatara |
+| `povratne-informacije-poslane` | — | Nakon uspješnog POST-a forme |
+
+Dopuštene vrijednosti:
+
+- `mod`: `brza_igra`, `izazovi`, `trening`, `privatna_soba`
+- `odrediste`: `ljestvice`, `misije`, `kolekcija`, `dostignuca`, `profil`, `pravila`, `novosti`
+- `izvor`: `naslovnica`, `izbornik_profila`, `zavrsetak_partije`, `zavrsetak_izazova`, `zavrsetak_treninga`, `profil`, `footer`, `misije`, `ljestvice`, `postavke`, `prijava`, `registracija`, `potvrda_emaila`, `reset_lozinke`, `zaboravljena_lozinka`, `zahvala`, `avatar_editor`, `obavijest_misije`, `ostalo` (samo kad nema preciznijeg)
+
+**Namjera vs potvrda:** `mod-klik` / `*-klik` / `avatar-uredjivanje-otvoreno` = namjera. `privatna-soba-kreirana`, `privatna-soba-link-kopiran`, `avatar-spremljen`, `povratne-informacije-poslane` = potvrđena akcija.
+
+**Ukloništa događaja:** više se ne šalju `igraj-klik`, `forum-klik-landing`, `forum-klik-o-igri` ni `naslovnica-*-klik`. Interes za Brzu igru: `mod-klik` + `mod=brza_igra`. Povijesni zapisi u Umami bazi ostaju; dashboardi na starim imenima više ne reflektuju nove klikove.
+
+U Umami UI-ju: Events → odaberi događaj → Properties / Filter po `mod`, `odrediste` ili `izvor`.
+
+### Privatnost payloada (before-send)
+
+Jedini izvor logike: `aplikacije/web/src/lib/umami-sanitizacija.ts`. Produkcijski `/umami-before-send.js` generira Vite/esbuild IIFE (ne uređuj ručno).
+
+Učitavanje: sync inline stub (`return false`, fail-closed) → `defer` IIFE → `defer` Umami s `data-before-send="kaladontUmamiBeforeSend"`. Nema sync mrežnog fetcha sanitizera. Ako IIFE ne stigne ili padne, stub sprječava slanje nesanitiziranih podataka.
+
+| Stvarni URL | Analitički URL |
+| --- | --- |
+| `/partija/<uuid>` | `/partija/:id` |
+| `/partija/arhiva/<uuid>` | `/partija/arhiva/:id` |
+| `/soba/AB23CD` | `/soba/:kod` |
+| `/soba/kreiraj` | `/soba/kreiraj` (statička ruta) |
+| `/profil/javni/<id>` | `/profil/javni/:id` |
+| `/potvrda-emaila?token=…` | `/potvrda-emaila` |
+| `/racuni/resetiraj-lozinku?token=…` | `/racuni/resetiraj-lozinku` |
+
+Iz queryja ostaju samo `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term` (vrijednosti skraćene; UTM nije zajamčeno anoniman). Vanjski referrer: samo origin. Naslov: UUID i kod sobe. Ako sanitizacija ne uspije, payload se **ne šalje**.
+
+Prilagođeni događaji i dalje ne smiju sadržavati email, nadimak, ID igrača/partije/sesije, kod sobe, riječi, chat, sadržaj feedbacka ni avatar konfiguraciju.
+
+**Napomena (`/zahvala`):** linkovi „Igrati Dvoboj / Četveroboj” i dalje vode na `/red?mod=…`, a u analitici su `mod-klik` + `mod=brza_igra` + `izvor=zahvala`. UX formata nije mijenjan u ovom commitu — eventualno usklađivanje UI-ja je zasebna odluka.
+
+**Operativni zadatak (nije dio deploya koda):** nakon uključivanja sanitizacije, ručno pregledati već prikupljene produkcijske pageviewove u Umamiju (URL-ovi s tokenima / kodovima soba / ID-evima partija) i odlučiti treba li čišćenje ili filtriranje u dashboardima. Povijesni podaci se automatski ne brišu.
 
 ---
 

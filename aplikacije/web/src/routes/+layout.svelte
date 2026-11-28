@@ -206,10 +206,14 @@
 <svelte:head>
   <meta name="robots" content={robotsMeta} />
   {#if data.umami}
+    <!-- Fail-closed stub (sync) → defer IIFE iz TS → defer Umami. Bez sync mrežnog fetcha sanitizera. -->
+    {@html `<script>window.kaladontUmamiBeforeSend=window.kaladontUmamiBeforeSend||function(){return false;};</script>`}
+    <script defer src="/umami-before-send.js"></script>
     <script
       defer
       src="{data.umami.url}/script.js"
       data-website-id={data.umami.websiteId}
+      data-before-send="kaladontUmamiBeforeSend"
     ></script>
   {/if}
 </svelte:head>

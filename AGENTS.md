@@ -1,6 +1,6 @@
 # AGENTS.md — Kaladont
 
-Trajne upute za AI agente koji rade u ovom repozitoriju. Vrijede za cijeli repozitorij, osim gdje konkretnije upute za poddirektorij propisuju dodatna pravila. Korisnik odobrava opseg, push (prema dogovoru), merge i objavu. Ovaj dokument ne daje ovlast za izmjene produkcije.
+Trajne upute za AI agente koji rade u ovom repozitoriju. Vrijede za cijeli repozitorij, osim gdje konkretnije upute za poddirektorij propisuju dodatna pravila. Korisnik odobrava opseg, merge i objavu. Push nakon dovršene odobrene cjeline u **draft** PR je zadano (vidi §5.2). Ovaj dokument ne daje ovlast za izmjene produkcije.
 
 ## 1. Način rada
 
@@ -8,7 +8,7 @@ Trajne upute za AI agente koji rade u ovom repozitoriju. Vrijede za cijeli repoz
 - Provjeri `git status --short --branch`, trenutnu granu i postojeće lokalne promjene. Nikad ne prepisuj tuđi rad, ne resetiraj granu, ne briši nepoznate datoteke i ne radi force-push.
 - **Ask:** razumij problem, postojeće ponašanje, rubne slučajeve i opseg. Ne implementiraj bez odobrenja.
 - **Plan:** navedi konkretne datoteke, promjene, rizike, testove i kriterije prihvaćanja. Ako postoje otvorena pitanja koja mijenjaju produkt, iznesi ih prije implementacije.
-- **Build:** implementiraj odobreni plan u malim logičkim cjelinama. Testiraj logiku u kodu; lokalni `ci:*` i Playwright samo na zahtjev (vidi §4). Ne širi opseg bez dogovora.
+- **Build:** implementiraj odobreni plan u malim logičkim cjelinama. Testiraj logiku u kodu; lokalni `ci:*` i Playwright samo na zahtjev (vidi §4). Završetak pojedinog commita nije kontrolna točka za GitHub CI i Bugbot (vidi §5). Ne širi opseg bez dogovora.
 - Jedan PR po smislenoj funkcionalnoj ili infrastrukturnoj cjelini. Ne stvaraj dodatne PR-ove ni grane bez potrebe. Ako je zadatak dio postojećeg PR-a, radi u njemu.
 
 ## 2. Jezik, struktura i kvaliteta
@@ -33,7 +33,7 @@ Trajne upute za AI agente koji rade u ovom repozitoriju. Vrijede za cijeli repoz
 
 ## 4. Lokalne provjere
 
-GitHub Actions je završna neovisna provjera (puni suite, migracije, E2E, Bugbot). Lokalno agent **nikad** ne pokreće puni CI.
+GitHub Actions (puni suite, migracije, E2E) i Bugbot služe za neovisnu provjeru na dogovorenim kontrolnim točkama i na kraju PR-a. Lokalno agent ne pokreće puni CI bez eksplicitnog zahtjeva korisnika.
 
 **Zabranjeno bez eksplicitnog zahtjeva korisnika** (nikad „usput”, „nakon cjeline” ni „prije pusha”):
 - svi lokalni `pnpm ci:*` profili: `ci:brzi`, `ci:test`, `ci:e2e`, `ci:lokalni`, `ci:puni` i ekvivalenti
@@ -60,29 +60,61 @@ Paketni Vitest / `node:test` (`pnpm --filter … test`) nisu `ci:*` ni Playwrigh
 
 ## 5. Git, draft PR, CI i Bugbot
 
-### Razvoj (draft)
+**Osnovno pravilo: commit je logička razvojna cjelina, a kontrolna točka je trenutak za puni CI i Bugbot. To nisu iste stvari.** Tijekom razvoja nije potrebno imati zelen CI i završen Bugbot nakon svakog commita. Cilj je dovršiti odobreni opseg uz kvalitetan kod, a skupe provjere i popravke grupirati.
 
-- Svaki PR otvaraj kao draft. Commitaj logičke cjeline lokalno; pushaj ih u dogovorenim turama u isti draft PR. Ne čekaj lokalni `ci:*` / Playwright osim ako korisnik to izričito zatraži. Ne moraš čekati puni GitHub CI niti Bugbot tijekom razvoja. Ne pushaj svaku sitnu izmjenu.
-- Ciljana konfiguracija: draft PR preskače skupe GitHub CI jobove i automatski Bugbot review. Dopuštena je samo kratka GitHub kontrola draft statusa; ona nije dokaz prolaza. Dok konfiguracija nije primijenjena i provjerena, ne tvrdi da draft gasi CI ili Bugbot.
-- Prije svakog pusha pregledaj diff, status, baznu granu i udaljene promjene (`git fetch`, usporedba lokalne i udaljene grane). Kod konflikta ili neočekivanih promjena stani; ne prepisuj povijest.
+### 5.1. Planiranje kontrolnih točaka
 
-### Prijelaz u review
+- Pri planiranju PR-a predloži logičke cjeline (commitove), redoslijed i eventualne međukontrolne točke. Kontrolne točke dogovori s korisnikom; nemoj ih uvoditi samostalno nakon svake cjeline.
+- Zadano je dovoljna **jedna završna kontrolna točka** nakon cijelog odobrenog opsega. Za veće ili rizične PR-ove predloži najviše tri ukupno: početnu nakon temelja, srednju nakon najosjetljivijih tehničkih cjelina i obveznu završnu. Dodatne kontrolne točke samo po dogovoru ili zbog stvarne blokade.
+- Početna i srednja kontrolna točka nisu obvezne. Odaberi ih prema riziku (npr. migracije, autentikacija, matchmaking, zajednički protokoli ili promjene arhitekture), a ne prema broju commitova.
+- Ne pokreći niti čekaj puni GitHub CI ili Bugbot samo zato što je dovršen commit, push ili pojedinačna funkcionalna cjelina. Korisnik može izričito zatražiti raniju provjeru.
 
-- Kad je cijeli odobreni opseg gotov, izvijesti korisnika što je gotovo i što ostaje GitHubu. Lokalni `ci:*` / Playwright predloži; pokreni samo na zahtjev. Ako predlažeš nove testove ili izmjene izvan plana, navedi razlog, pros/cons i preporuku; ne implementiraj ih bez odobrenja.
-- Pushaj konačno stanje, zatim **odmah označi PR Ready for review** na tom zadnjem SHA-u kako bi se pokrenuli puni GitHub CI i Bugbot. Ne čekaj lokalni `ci:*` / Playwright ni dodatno odobrenje samo za Ready ako je odobreni opseg dovršen. Provjeri da su se puni GitHub CI i Bugbot za posljednji SHA stvarno pokrenuli. Ne radi prazne commitove za pokretanje reviewa. Merge i objava i dalje zahtijevaju eksplicitno odobrenje.
+### 5.2. Razvoj (draft)
 
-### Review: popravci u turama (chunkovima)
+- Svaki novi PR otvaraj kao draft. Tijekom razvoja PR **mora ostati draft** — draft je namjera da se ne pokreću skupi GitHub CI jobovi ni automatski Bugbot.
+- Commitaj odobrene logičke cjeline lokalno. **Nakon svake dovršene odobrene cjeline** (kad bi inače stao i izvijestio): commit → `git diff --check` i ciljane lokalne provjere prema §4 → **odmah push** na granu draft PR-a. Ne čekaj da korisnik kaže „pushaj”. Ne pushaj svaku sitnu međuizmjenu unutar još nedovršene cjeline.
+- Prije pusha: potvrdi da je PR draft (`gh pr ready --undo` / `gh pr view` ako treba); pregledaj diff, status, baznu granu i udaljene promjene (`git fetch`, usporedba). Kod konflikta ili neočekivanih promjena stani; ne prepisuj povijest.
+- Ne pokreći lokalni `ci:*` / Playwright bez eksplicitnog zahtjeva. Nemoj dodavati neodobrene testove ili širiti opseg. Ne čekaj GitHub CI ni Bugbot nakon pusha u draft.
+- Ako je odobreno više cjelina, nastavi na sljedeću bez čekanja CI-ja ili Bugbota. Ako je odobrena samo jedna cjelina, pushaj je u draft i zaustavi se uz izvještaj (§6). Zastoj radi odluke o opsegu nije kontrolna točka.
+- Ciljana konfiguracija: draft PR preskače skupe GitHub CI jobove i automatski Bugbot review. Dopuštena je kratka GitHub kontrola draft statusa; ona nije dokaz prolaza. Dok konfiguracija nije primijenjena i provjerena, ne tvrdi da draft gasi CI ili Bugbot. Ako se provjere ipak pokreću, ne čekaj ih tijekom razvoja. Promjene workflowa ili Bugbot konfiguracije predloži zasebno; ne mijenjaj ih bez odobrenja.
+- Ako se nakon dogovorene kontrolne točke nastavlja implementacija novih funkcionalnih cjelina, vrati PR u draft prije nastavka razvoja (i prije pusha nove cjeline). Ako je postojeći PR već Ready, a korisnik odobri nastavak razvoja, također ga vrati u draft. Ne vraćaj ga u draft između pojedinačnih popravaka unutar iste review ture.
+
+### 5.3. Nalazi tijekom razvoja
+
+- Ako CI ili Bugbot ipak prijave problem tijekom razvoja, evidentiraj nalaz, zahvaćeni SHA, prioritet i dokaz. Ne prekidaj razvoj radi svakog nalaza i ne pokreći novu turu provjera nakon svakog popravka.
+- Potvrđene kritične probleme koji ugrožavaju sigurnost, privatnost, integritet podataka, migracije, gameplay ili mogućnost nastavka razvoja riješi odmah unutar odobrenog opsega. Ako popravak izlazi iz opsega, prijavi blokadu i zatraži odluku korisnika.
+- Ostale potvrđene nalaze grupiraj za dogovorenu kontrolnu točku, osim ako ih je jednostavnije i sigurnije riješiti unutar aktualne cjeline bez širenja opsega. Ne zanemaruj ih i ne označavaj riješenima bez dokaza.
+- Pri kontrolnoj točki ponovno provjeri vrijedi li raniji nalaz za aktualni kod. Ne popravljaj zastarjele nalaze samo zato što su ostali u komentaru.
+
+### 5.4. Prijelaz u review na kontrolnoj točki
+
+- Kad je dogovorena kontrolna točka dosegnuta, izvijesti korisnika što je gotovo, koje provjere su stvarno izvršene i što ostaje GitHubu. Lokalni `ci:*` / Playwright predloži; pokreni samo na zahtjev.
+- Pushaj grupirano stanje na kontrolnoj točki, zatim označi PR **Ready for review** na zadnjem SHA-u. Na završnoj kontrolnoj točki učini to odmah nakon dovršetka cijelog odobrenog opsega; ne čekaj lokalni `ci:*` / Playwright ni dodatno odobrenje samo za Ready. Push ostaje prema dogovoru s korisnikom.
+- Provjeri da su se puni GitHub CI i Bugbot za aktualni SHA stvarno pokrenuli. Ne radi prazne commitove za pokretanje reviewa. Ako se provjere ne pokrenu, prijavi konkretan razlog i koristi postojeći podržani način pokretanja, ako je dostupan i odobren.
+- Na kontrolnoj točki čekaj relevantne rezultate za aktualni SHA i riješi potvrđene nalaze u grupiranim turama prema §5.5. Tijekom ove faze ne miješaj razvoj novih funkcionalnosti s review popravcima.
+- Nakon uspješne međukontrolne točke izvijesti korisnika i nastavi preostali odobreni razvoj u draftu. Zeleni rezultati međukontrolne točke nisu zamjena za završnu provjeru cijelog PR-a.
+
+### 5.5. Review: popravci u turama (chunkovima)
 
 - Prati CI jobove, logove, artefakte i Bugbot komentare/status za posljednji head SHA i odgovarajući PR merge SHA; pričekaj završetak relevantnih jobova i reviewa prije planiranja ture, osim kod potvrđene blokade ili otkazivanja. Ne tretiraj starije zelene rezultate ni neutralni Bugbot status kao dokaz odsutnosti nalaza.
-- Prikupi sve nalaze iste ture. Razvrstaj: potvrđena greška u odobrenom opsegu, povezani simptomi istog uzroka, infrastrukturni/flaky problem, neutemeljen nalaz, prijedlog izvan opsega. Navedi dokaz i prioritet. Popravi potvrđene greške unutar odobrenog opsega; za sve ostalo predloži opcije, razlog, prednosti, nedostatke i preporuku te čekaj odobrenje. Ne proširuj opseg prema Bugbotu na svoju ruku.
+- Prikupi sve nalaze iste ture, uključujući još relevantne nalaze iz razvoja. Razvrstaj: potvrđena greška u odobrenom opsegu, povezani simptomi istog uzroka, infrastrukturni/flaky problem, neutemeljen nalaz, prijedlog izvan opsega. Navedi dokaz i prioritet. Popravi potvrđene greške unutar odobrenog opsega; za sve ostalo predloži opcije, razlog, prednosti, nedostatke i preporuku te čekaj odobrenje. Ne proširuj opseg prema Bugbotu na svoju ruku.
 - Analiziraj padove iz GitHub logova/artefakata; lokalni `ci:*` / Playwright za reprodukciju pokreni **samo** na eksplicitni zahtjev. Popravi grupu povezanih uzroka u odobrenom opsegu. Nove testove ili promjene testnih očekivanja mimo odobrenog plana samo predloži. Ne iskrivljuj test radi zelenog statusa.
-- Kad su svi popravci ture gotovi, commitaj logičke cjeline i napravi jedan grupirani push u isti PR. Ne pokreći lokalni `ci:*` / Playwright bez zahtjeva. PR ostaje Ready for review tijekom review popravaka; ne vraćaj ga u draft nakon svake greške. Prati novi GitHub CI i Bugbot za novi SHA i ponovi postupak. Potvrđenu prolaznu infrastrukturnu grešku rješavaj ograničenim rerunom neuspjelih jobova istog SHA, bez praznih commitova. Kod ponavljajućeg istog pada ili nedostupnog reviewa prijavi blokadu umjesto beskonačnih pokušaja.
+- Kad su svi popravci ture gotovi, commitaj logičke cjeline i napravi jedan grupirani push u isti PR. Ne pushaj nakon svakog pojedinačnog nalaza i ne pokreći lokalni `ci:*` / Playwright bez zahtjeva. PR ostaje Ready for review tijekom review popravaka. Prati novi GitHub CI i Bugbot za novi SHA i ponovi postupak.
+- Potvrđenu prolaznu infrastrukturnu grešku rješavaj ograničenim rerunom neuspjelih jobova istog SHA, bez praznih commitova. Kod ponavljajućeg istog pada ili nedostupnog reviewa prijavi blokadu umjesto beskonačnih pokušaja.
 - Ne zatvaraj Bugbot nalaz samo radi zelenog statusa. Za potvrđeni popravak navedi commit/test; za pogrešan nalaz obrazloži dokaz; za stvarni nalaz izvan opsega zatraži odluku. Ne tvrdi da je review dovršen bez potvrde. Ako agent nema pristup statusima/logovima, ne glumi praćenje; zatraži odgovarajući pristup ili rezultat korisnika.
-- Spremno za merge tek kad je puni obvezni GitHub CI zelen za aktualnu reviziju, Bugbot pregled aktualan i nema neriješenih blokirajućih nalaza, a sva ograničenja i odobrene iznimke su evidentirane. Nikad ne zaobilazi granske zaštite, ne mergeaj i ne objavljuj bez eksplicitnog odobrenja. Staging i produkcija slijede postojeće procedure.
+
+### 5.6. Završna kontrolna točka i merge
+
+- Završna kontrolna točka je obvezna za cijeli aktualni PR, neovisno o broju ranijih zelenih provjera. Ako se nakon nje izmijeni kod, potrebno je ponovno potvrditi relevantne obvezne provjere za novu reviziju.
+- Spremno za merge tek kad je puni obvezni GitHub CI zelen za aktualnu reviziju, Bugbot pregled aktualan i nema neriješenih blokirajućih nalaza, a sva ograničenja i odobrene iznimke su evidentirane.
+- Ako provjere još traju ili nisu dostupne, izvijesti korisnika o stvarnom stanju. Ne predstavljaj PR kao spreman za merge.
+- Nikad ne zaobilazi granske zaštite, ne mergeaj i ne objavljuj bez eksplicitnog odobrenja. Staging, ručni QA i produkcija slijede postojeće procedure.
 
 ## 6. Izvještaj na kraju rada
 
-Navedi: što je promijenjeno i zašto; relevantne datoteke; stvarno pokrenute naredbe (`ci:*`/Playwright samo ako ih je korisnik zatražio), broj prolaznih/neuspjelih/flaky testova ako je poznat, trajanje i status (`PROŠLO`, `PALO`, `BLOKIRANO`, `NIJE POKRENUTO`, `NIJE PRIMJENJIVO`); što ostaje za GitHub/staging; eventualne rizike i odstupanja; status CI-ja i Bugbota po SHA-u, popis nalaza i popravaka po turama te prijedloge neimplementiranih dodatnih testova/izmjena s pros/cons; commit SHA-ove i PR ako postoje. Ne tvrdi da je CI zelen ako nije potvrđen za točan commit. Ne tvrdi da si ručno testirao browser, mobilni uređaj ili produkcijsku sliku ako nisi.
+Nakon pojedine razvojne cjeline: pushaj u draft (§5.2), zatim navedi sažeto što je dovršeno, commit SHA, lokalne provjere, potvrdu pusha i draft statusa PR-a, poznate nalaze i rizike te sljedeću odobrenu cjelinu ili kontrolnu točku. CI i Bugbot tijekom draft razvoja: „ODGOĐENO DO KONTROLNE TOČKE” (ne čekaj ih). Ako su se ipak automatski pokrenuli, navedi stvarni poznati status bez čekanja.
+
+Na kontrolnoj točki i pri završetku PR-a navedi: što je promijenjeno i zašto; relevantne datoteke; stvarno pokrenute naredbe (`ci:*`/Playwright samo ako ih je korisnik zatražio), broj prolaznih/neuspjelih/flaky testova ako je poznat, trajanje i status (`PROŠLO`, `PALO`, `BLOKIRANO`, `NIJE POKRENUTO`, `NIJE PRIMJENJIVO`); što ostaje za GitHub/staging; eventualne rizike i odstupanja; status CI-ja i Bugbota po SHA-u, popis nalaza i popravaka po turama te prijedloge neimplementiranih dodatnih testova/izmjena s pros/cons; commit SHA-ove i PR ako postoje. Ne tvrdi da je CI zelen ako nije potvrđen za točan commit. Ne tvrdi da si ručno testirao browser, mobilni uređaj ili produkcijsku sliku ako nisi.
 
 ## 7. Dokumentacija
 

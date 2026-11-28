@@ -8,6 +8,7 @@
     oznaciNovostiMisijaPregledane,
     osigurajNaslovnicaSazetak,
   } from '$lib/stanje-naslovnica.svelte.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   type Skupina = 'dnevna' | 'tjedna';
 
@@ -132,7 +133,17 @@
   <aside class="misije-toast" role="status" aria-live="polite">
     <div class="sadrzaj">
       <strong>{poruka}</strong>
-      <a class="akcija" href="/misije" onclick={() => void idiNaMisije()}>Pogledaj</a>
+      <a
+        class="akcija"
+        href="/misije"
+        onclick={() => {
+          zabiljeziUmamiDogadjaj('navigacija-klik', {
+            odrediste: 'misije',
+            izvor: 'obavijest_misije',
+          });
+          void idiNaMisije();
+        }}
+      >Pogledaj</a>
     </div>
     <button type="button" class="zatvori" aria-label="Zatvori obavijest" onclick={() => void zatvori()} disabled={zatvaranje}>×</button>
   </aside>

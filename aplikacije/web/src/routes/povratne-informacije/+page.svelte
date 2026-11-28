@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { ApiGreska, api } from '$lib/api.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   type KljucOcjene = 'pravila' | 'rjecnik' | 'vrijemePoteza' | 'snalazenjeUAplikaciji' | 'brzinaUcitavanja' | 'gamifikacija';
   const pitanja: { kljuc: KljucOcjene; naziv: string }[] = [
@@ -59,6 +60,7 @@
         method: 'POST',
         body: JSON.stringify({ poruka, ...(prikaziAnketu ? { ocjene } : {}) }),
       });
+      zabiljeziUmamiDogadjaj('povratne-informacije-poslane');
       await goto('/zahvala-za-informacije');
     } catch (razlog) {
       if (razlog instanceof ApiGreska && razlog.status === 401) {

@@ -23,6 +23,7 @@
     type VrstaRijeci,
   } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const TIMEOUT_ODGOVORA_MS = 8000;
 
@@ -58,6 +59,8 @@
   let poruka = $state<string | null>(null);
   let slanjeUTijeku = $state(false);
   let timeoutOdgovora: ReturnType<typeof setTimeout> | null = null;
+  /** Lokalna zaštita od ponovljenog `soba:stvorena` za istu potvrdu. */
+  let umamiKreiranaKod: string | null = null;
 
   function ocistiTimeoutOdgovora() {
     if (timeoutOdgovora) {
@@ -109,6 +112,10 @@
     const naStvorenu = (payload: { kod: string }) => {
       ocistiTimeoutOdgovora();
       slanjeUTijeku = false;
+      if (payload.kod && payload.kod !== umamiKreiranaKod) {
+        umamiKreiranaKod = payload.kod;
+        zabiljeziUmamiDogadjaj('privatna-soba-kreirana');
+      }
       void goto(`/soba/${payload.kod}`);
     };
 

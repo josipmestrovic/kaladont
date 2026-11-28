@@ -12,6 +12,7 @@
   import AudioKontrola from '$lib/komponente/AudioKontrola.svelte';
   import PrekidacPostavke from '$lib/komponente/PrekidacPostavke.svelte';
   import UnosLozinke from '$lib/komponente/UnosLozinke.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   interface Profil {
     igracId: string;
@@ -114,14 +115,23 @@
       <p>
         Igraš kao gost. Za promjenu email adrese ili lozinke, registriraj svoj račun.
       </p>
-      <a href="/registracija" class="cta-gumb">Registriraj se</a>
+      <a
+        href="/registracija"
+        class="cta-gumb"
+        onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'postavke' })}
+      >Registriraj se</a>
     </section>
   {:else if greska}
     <p role="alert" class="greska">{greska}</p>
   {:else if profil}
     <section class="sekcija">
       <h2>Prilagodi avatar</h2>
-      <a href="/profil/avatar" class="cta-gumb">Uredi avatar</a>
+      <a
+        href="/profil/avatar"
+        class="cta-gumb"
+        onclick={() =>
+          zabiljeziUmamiDogadjaj('avatar-uredjivanje-otvoreno', { izvor: 'postavke' })}
+      >Uredi avatar</a>
     </section>
 
     <section class="sekcija">

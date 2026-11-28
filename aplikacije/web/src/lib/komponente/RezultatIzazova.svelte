@@ -26,6 +26,7 @@
   import IskustvoPartije from '$lib/komponente/IskustvoPartije.svelte';
   import NadimakBota from '$lib/komponente/NadimakBota.svelte';
   import NapredakMisijaPartije from '$lib/komponente/NapredakMisijaPartije.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   let {
     kraj,
@@ -423,7 +424,7 @@
   {/if}
 
   {#if kraj.promjeneMisija && kraj.promjeneMisija.length > 0}
-    <NapredakMisijaPartije promjene={kraj.promjeneMisija} />
+    <NapredakMisijaPartije promjene={kraj.promjeneMisija} izvor="zavrsetak_izazova" />
   {/if}
 
   {#if novaDostignuca.length > 0}
@@ -543,8 +544,18 @@
         <strong>postojeći</strong> račun ne spaja gost progres.
       </p>
       <div class="gost-akcije">
-        <a class="igraj-opet-gumb" href="/registracija">Registriraj se</a>
-        <a class="sporedni-gumb" href="/prijava">Prijavi se</a>
+        <a
+          class="igraj-opet-gumb"
+          href="/registracija"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'zavrsetak_izazova' })}
+        >Registriraj se</a>
+        <a
+          class="sporedni-gumb"
+          href="/prijava"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'zavrsetak_izazova' })}
+        >Prijavi se</a>
       </div>
     </div>
   {/if}

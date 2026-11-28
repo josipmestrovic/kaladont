@@ -4,6 +4,7 @@
   import { spremiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import UnosLozinke from '$lib/komponente/UnosLozinke.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import { jeValjanNadimak, MAKSIMALNA_DULJINA_NADIMKA, MINIMALNA_DULJINA_NADIMKA, PORUKA_NEVALJANOG_NADIMKA, UZORAK_NADIMKA } from 'zajednicko';
 
   let korak = $state<1 | 2>(1);
@@ -64,7 +65,11 @@
         Kada se registriraš, statistika će biti trajno pohranjena i moći ćeš pristupiti svom računu s bilo kojeg uređaja.
       </p>
       <p>
-        Ako već imaš račun, <a href="/prijava">prijavi se</a>.
+        Ako već imaš račun,
+        <a
+          href="/prijava"
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'registracija' })}
+        >prijavi se</a>.
       </p>
       <p>
         Za početak nam reci svoj nadimak koji ćeš koristiti u igri (ovo ostali igrači vide).

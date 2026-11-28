@@ -6,9 +6,9 @@ Skromno, ali dovoljno da se kvar ne otkriva od igrača: strukturirani lokalni lo
 
 ## Admin analitika (minimalni slice)
 
-`/admin/analitika` i `GET /api/admin/analitika/*` zahtijevaju admin sesiju (`Cache-Control: no-store`). Slice pokriva: sustavska otvaranja i rane incidente mrtvih slova, dnevne započete/završene igre, omjer gost/registriran među ljudskim sudjelovanjima te postotak igrača (isti ID) s 2+ igrama. Dan je Europe/Zagreb. Nema zasebnog workera: motor piše izravno u `analitika_otvaranja` / `analitika_igre` / `analitika_sudjelovanja`.
+`/admin/analitika` i `GET /api/admin/analitika/*` zahtijevaju admin sesiju (`Cache-Control: no-store`). UI je organiziran u tematske tabove (zadano **Igrači i rast**); pri otvaranju i promjeni taba/filtera učitava se status i samo aktivna cjelina. Tabovi: Igrači i rast (`igraci` + `dnevno`), Partije (`partije`), Čekaonica (`cekanje`, migracija `0077`), Botovi i balans (`botovi`, migracija `0078`), Izazovi (`izazovi`), Gamifikacija (`gamifikacija`, READ-ONLY), Rječnik i incidenti (`pocetne-rijeci` + `incidenti`). Dan je Europe/Zagreb. Nema zasebnog workera: motor/red pišu izravno u `analitika_otvaranja` / `analitika_igre` / `analitika_sudjelovanja` / `analitika_cekanja`. Nullable stupac `analitika_igre.pravila` (enum `pravilnik_partije`, migracija `0076`) puni se s motora; povijesni redovi ostaju NULL (UI „Nepoznato”; read-path može COALESCE s `partije.pravila` po ID-u). Definicije: [metrike-uspjeha.md](../01-proizvod/metrike-uspjeha.md).
 
-Namjerno izvan slicea: Umami/posjećenost, konverzija gost→račun u 7 dana, misije, event-red, retencija 90/13, P90 trajanja. Status ruta razlikuje „nema mjerenja” od „0 događaja u filteru”.
+Namjerno izvan slicea: Umami/posjećenost (zaseban alat), event-red, retencija 90/13, te per-potez bot dijagnostika (shield/aggression/pool). Status ruta razlikuje „nema mjerenja” od „0 događaja u filteru”.
 
 ## Admin nadzor aplikacije
 

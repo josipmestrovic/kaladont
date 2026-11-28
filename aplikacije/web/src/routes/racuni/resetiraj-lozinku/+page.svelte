@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
   import UnosLozinke from '$lib/komponente/UnosLozinke.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const token = $derived($page.url.searchParams.get('token') ?? '');
   let lozinka = $state('');
@@ -31,7 +32,13 @@
     <p role="alert">Poveznica za reset nije ispravna.</p>
   {:else if gotovo}
     <p>Lozinka je promijenjena.</p>
-    <button type="button" onclick={() => goto('/prijava')}>Prijavi se</button>
+    <button
+      type="button"
+      onclick={() => {
+        zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'reset_lozinke' });
+        void goto('/prijava');
+      }}
+    >Prijavi se</button>
   {:else}
     <form onsubmit={posalji}>
       <UnosLozinke bind:vrijednost={lozinka} oznaka="Nova lozinka (min. 8 znakova)" najmanjaDuljina={8} />

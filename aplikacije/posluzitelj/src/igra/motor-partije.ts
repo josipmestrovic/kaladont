@@ -109,7 +109,17 @@ import {
   type StatusOtvaranjaAnalitike,
   type UpravljacOtvaranjaAnalitike,
 } from '../analitika/otvaranja.js';
-import { mapirajVrstuRacuna, zabiljeziKrajIgre, zabiljeziPocetakIgre } from '../analitika/igre.js';
+import { sazetakBotAnalitikeIzStanja } from '../analitika/bot-sazetak.js';
+import {
+  mapirajVrstuRacuna,
+  zabiljeziKrajIgre,
+  zabiljeziPocetakIgre,
+  type SnimkaBotovaPocetka,
+} from '../analitika/igre.js';
+import {
+  klasificirajProfilIzKonfiguracije,
+  type SnimkaBotAnalitike,
+} from '../bot/profili-bota.js';
 
 const ShemaPotezRijec = z
   .object({
@@ -301,6 +311,8 @@ interface StanjeStola {
   izazovTimerPolitika?: { covjekMs: number; botMs: number };
   /** Autoritativni metadata kampanje (refresh/reconnect). */
   izazovMeta?: import('zajednicko').IzazovPartijaMeta;
+  /** Nepromjenjiva analitička snimka botova pri startu (sastav + profil + verzije). */
+  analitikaBotSnimka: SnimkaBotovaPocetka;
   sudionici: SudionikPartije[]; // svi 4 ili 2, fiksni redoslijed po sjedalu
   aktivni: Set<string>;
   eliminirani: string[]; // redoslijed ispadanja - prvi ispali je na indeksu 0
@@ -565,7 +577,9 @@ export function stvoriUpraviteljPartija(
       igraId: stanje.partijaId,
       kontekst: stanje.kontekst,
       mod: stanje.mod,
+      pravila: stanje.pravila,
       pocetakU: new Date(stanje.pocetakPartijeMs),
+      botovi: stanje.analitikaBotSnimka,
       sudionici: stanje.sudionici
         .filter((s) => s.upravljac === 'covjek')
         .map((s) => ({
@@ -575,11 +589,30 @@ export function stvoriUpraviteljPartija(
     });
   }
 
-  function metaKrajaAnalitike(stanje: StanjeStola) {
+  function sazetakBotAnalitikeKraja(
+    stanje: StanjeStola,
+    ishod: 'zavrsena' | 'prekinuta' | 'nepotpuno',
+  ) {
+    // Samo razloziEliminacije — ne stanje.eliminirani (fiktivni plasmani / terminal izazova).
+    return sazetakBotAnalitikeIzStanja({
+      ishod,
+      analitikaBotSnimka: stanje.analitikaBotSnimka,
+      aktivni: stanje.aktivni,
+      sudionici: stanje.sudionici,
+      razloziEliminacije: stanje.razloziEliminacije,
+    });
+  }
+
+  function metaKrajaAnalitike(
+    stanje: StanjeStola,
+    ishod: 'zavrsena' | 'prekinuta' | 'nepotpuno' = 'prekinuta',
+  ) {
     return {
       kontekst: stanje.kontekst,
       mod: stanje.mod,
+      pravila: stanje.pravila,
       pocetakU: new Date(stanje.pocetakPartijeMs),
+      ...sazetakBotAnalitikeKraja(stanje, ishod),
     };
   }
 
@@ -595,7 +628,7 @@ export function stvoriUpraviteljPartija(
     const partijaId = stanje.partijaId;
     stanje.zavrsena = true;
     zatvoriAnalitikaProzorNepotpuno(stanje);
-    zabiljeziKrajIgre(partijaId, new Date(sat.sada()), 'prekinuta', metaKrajaAnalitike(stanje));
+    zabiljeziKrajIgre(partijaId, new Date(sat.sada()), 'prekinuta', metaKrajaAnalitike(stanje, 'prekinuta'));
     namjerniIsteciBotova.delete(partijaId);
     if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
     if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
@@ -1172,7 +1205,7 @@ export function stvoriUpraviteljPartija(
       stanje.zavrsena = true;
       if (!vecZavrsena) {
         zatvoriAnalitikaProzorNepotpuno(stanje);
-        zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'prekinuta', metaKrajaAnalitike(stanje));
+        zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'prekinuta', metaKrajaAnalitike(stanje, 'prekinuta'));
       }
       if (stanje.timerHandle) sat.otkazi(stanje.timerHandle);
       if (stanje.izborHandle) sat.otkazi(stanje.izborHandle);
@@ -1297,6 +1330,8 @@ export function stvoriUpraviteljPartija(
       spojeniDvoboj?: boolean;
       /** PR02: per-partija bot snapshot (Trening/Izazov); javna bez ovoga koristi globalni resolver. */
       botKonfiguracija?: import('../bot/konfiguracija-bota.js').KonfiguracijaBota;
+      /** Analitička klasifikacija profila/verzija pri startu (ne mijenja gameplay). */
+      botAnalitika?: SnimkaBotAnalitike;
       /** PR03: per-stol timer (15/30) za Izazov; trening i dalje forsira 0. */
       trajanjePotezaSek?: number;
       /** Redizajn: odvojeni rok čovjek/bot. */
@@ -1360,6 +1395,43 @@ export function stvoriUpraviteljPartija(
     const partijaId = randomUUID();
     const prviIgracId = sudionici[0]!.igracId;
     let pocetakIso = '';
+    const brojLjudi = sudionici.filter((s) => s.upravljac === 'covjek').length;
+    const brojBotova = sudionici.filter((s) => s.upravljac === 'bot').length;
+    let analitikaBotSnimka: SnimkaBotovaPocetka;
+    if (brojBotova === 0) {
+      analitikaBotSnimka = {
+        brojLjudi,
+        brojBotova: 0,
+        profilBotova: null,
+        verzijaBotPolitike: null,
+        verzijaProfilaBota: null,
+      };
+    } else if (opcije.botAnalitika) {
+      analitikaBotSnimka = {
+        brojLjudi,
+        brojBotova,
+        profilBotova: opcije.botAnalitika.profil,
+        verzijaBotPolitike: opcije.botAnalitika.verzijaPolitike,
+        verzijaProfilaBota: opcije.botAnalitika.verzijaProfila,
+      };
+    } else if (opcije.botKonfiguracija) {
+      const klasa = klasificirajProfilIzKonfiguracije(opcije.botKonfiguracija);
+      analitikaBotSnimka = {
+        brojLjudi,
+        brojBotova,
+        profilBotova: klasa.profil,
+        verzijaBotPolitike: klasa.verzijaPolitike,
+        verzijaProfilaBota: klasa.verzijaProfila,
+      };
+    } else {
+      analitikaBotSnimka = {
+        brojLjudi,
+        brojBotova,
+        profilBotova: 'prilagodeno',
+        verzijaBotPolitike: null,
+        verzijaProfilaBota: null,
+      };
+    }
 
     const stanje: StanjeStola = {
       partijaId,
@@ -1369,6 +1441,7 @@ export function stvoriUpraviteljPartija(
       spojeniDvoboj,
       kontekst,
       politika,
+      analitikaBotSnimka,
       izazovTerminalHint: null,
       izazovPendingStopRazlog: null,
       izazovTimerPolitika: kontekst === 'izazov' ? opcije.izazovTimerPolitika : undefined,
@@ -1633,7 +1706,7 @@ export function stvoriUpraviteljPartija(
     stanje.zavrsena = true;
     povecajVerzijuStanja(stanje);
     zatvoriAnalitikaProzorNepotpuno(stanje);
-    zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'zavrsena', metaKrajaAnalitike(stanje));
+    zabiljeziKrajIgre(stanje.partijaId, new Date(sat.sada()), 'zavrsena', metaKrajaAnalitike(stanje, 'zavrsena'));
     if (stanje.treningUpozorenjeHandle) sat.otkazi(stanje.treningUpozorenjeHandle);
     if (stanje.treningZatvaranjeHandle) sat.otkazi(stanje.treningZatvaranjeHandle);
     // Retry preko ponoći ne smije premjestiti igru u drugi dan ljestvice.
@@ -3977,6 +4050,23 @@ export function stvoriUpraviteljPartija(
     const partijaId = randomUUID();
     const prviIgracId = sudionici[0]!.igracId;
     const odgodaMs = postavke.odgodaPocetkaPartijeMs ?? ODGODA_POCETKA_PARTIJE_MS;
+    const brojLjudiPrivatna = sudionici.filter((s) => s.upravljac === 'covjek').length;
+    const brojBotovaPrivatna = sudionici.filter((s) => s.upravljac === 'bot').length;
+    const analitikaBotSnimkaPrivatna: SnimkaBotovaPocetka = brojBotovaPrivatna === 0
+      ? {
+        brojLjudi: brojLjudiPrivatna,
+        brojBotova: 0,
+        profilBotova: null,
+        verzijaBotPolitike: null,
+        verzijaProfilaBota: null,
+      }
+      : {
+        brojLjudi: brojLjudiPrivatna,
+        brojBotova: brojBotovaPrivatna,
+        profilBotova: 'prilagodeno',
+        verzijaBotPolitike: null,
+        verzijaProfilaBota: null,
+      };
 
     const stanje: StanjeStola = {
       partijaId,
@@ -3986,6 +4076,7 @@ export function stvoriUpraviteljPartija(
       spojeniDvoboj: false,
       kontekst: 'privatna',
       politika: politikaZaKontekst('privatna'),
+      analitikaBotSnimka: analitikaBotSnimkaPrivatna,
       sudionici,
       aktivni: new Set(sudionici.map((s) => s.igracId)),
       eliminirani: [],

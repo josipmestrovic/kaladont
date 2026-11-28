@@ -1,5 +1,6 @@
 <script lang="ts">
   import Konfeti from '$lib/komponente/Konfeti.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 </script>
 
 <svelte:head>
@@ -19,13 +20,52 @@
     <section class="izbor-akcija" aria-labelledby="izbor-akcija-naslov">
       <h2 id="izbor-akcija-naslov">Što želiš sada?</h2>
       <div class="akcije">
-        <a class="glavna-akcija" href="/red?mod=dva_igraca">Igrati Dvoboj</a>
-        <a class="glavna-akcija" href="/red?mod=cetiri_igraca">Igrati Četveroboj</a>
-        <a class="sporedna-akcija" href="/soba/kreiraj">Stvoriti privatnu sobu</a>
-        <a class="sporedna-akcija" href="/pravila-kaladonta">Pročitati pravila</a>
-        <a class="sporedna-akcija" href="/profil">Vidjeti svoj profil</a>
+        <a
+          class="glavna-akcija"
+          href="/red?mod=dva_igraca"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'brza_igra', izvor: 'zahvala' })}
+        >Igrati Dvoboj</a>
+        <a
+          class="glavna-akcija"
+          href="/red?mod=cetiri_igraca"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'brza_igra', izvor: 'zahvala' })}
+        >Igrati Četveroboj</a>
+        <a
+          class="sporedna-akcija"
+          href="/soba/kreiraj"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('mod-klik', { mod: 'privatna_soba', izvor: 'zahvala' })}
+        >Stvoriti privatnu sobu</a>
+        <a
+          class="sporedna-akcija"
+          href="/pravila-kaladonta"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('navigacija-klik', {
+              odrediste: 'pravila',
+              izvor: 'zahvala',
+            })}
+        >Pročitati pravila</a>
+        <a
+          class="sporedna-akcija"
+          href="/profil"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('navigacija-klik', {
+              odrediste: 'profil',
+              izvor: 'zahvala',
+            })}
+        >Vidjeti svoj profil</a>
         <a class="sporedna-akcija" href="/postavke">Otvoriti postavke</a>
-        <a class="sporedna-akcija" href="/ljestvice">Pogledati ljestvice</a>
+        <a
+          class="sporedna-akcija"
+          href="/ljestvice"
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('navigacija-klik', {
+              odrediste: 'ljestvice',
+              izvor: 'zahvala',
+            })}
+        >Pogledati ljestvice</a>
         <a class="sporedna-akcija" href="/o-igri">Saznaj više o igri</a>
       </div>
     </section>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from '$lib/api.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   let email = $state('');
   let poslano = $state(false);
@@ -25,7 +26,13 @@
   <h1>Reset lozinke</h1>
   {#if poslano}
     <p>Ako račun postoji, poslali smo upute na unesenu email adresu.</p>
-    <p>Nemaš račun? <a href="/registracija">Registriraj se</a>.</p>
+    <p>
+      Nemaš račun?
+      <a
+        href="/registracija"
+        onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'zaboravljena_lozinka' })}
+      >Registriraj se</a>.
+    </p>
   {:else}
     <form onsubmit={posalji}>
       <label>Email <input type="email" bind:value={email} required placeholder="tvoj@email.com" /></label>

@@ -4,6 +4,7 @@
   import { api } from '$lib/api.js';
   import { jeRegistriranKorisnik } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const token = $derived($page.url.searchParams.get('token') ?? '');
   let poruka = $state('Potvrđujemo email adresu...');
@@ -32,5 +33,16 @@
 <main>
   <h1>Potvrda emaila</h1>
   <p role={uspjeh ? 'status' : 'alert'}>{poruka}</p>
-  {#if uspjeh}<p><a href={jeRegistriranKorisnik() ? '/red' : '/prijava'}>{jeRegistriranKorisnik() ? 'Nastavi igrati' : 'Prijavi se za igru'}</a></p>{/if}
+  {#if uspjeh}
+    <p>
+      {#if jeRegistriranKorisnik()}
+        <a href="/red">Nastavi igrati</a>
+      {:else}
+        <a
+          href="/prijava"
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'potvrda_emaila' })}
+        >Prijavi se za igru</a>
+      {/if}
+    </p>
+  {/if}
 </main>

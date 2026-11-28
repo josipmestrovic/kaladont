@@ -533,6 +533,27 @@
       "when": 1795110000000,
       "tag": "0075_bot_pool_clanovi",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1795200000000,
+      "tag": "0076_analitika_igre_pravila",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1795300000000,
+      "tag": "0077_analitika_cekanja",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1795400000000,
+      "tag": "0078_analitika_igre_botovi",
+      "breakpoints": true
     }
   ]
 }

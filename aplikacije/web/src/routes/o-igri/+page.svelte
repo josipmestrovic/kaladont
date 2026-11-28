@@ -246,7 +246,6 @@
         <a
           href="https://forum.kaladont.hr"
           rel="noopener noreferrer"
-          data-umami-event="forum-klik-o-igri"
         >Pridruži se zajednici →</a>
       </p>
     </section>

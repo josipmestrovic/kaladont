@@ -15,6 +15,7 @@
     type PogledProfila,
     type VlastitiProfil,
   } from './tipovi.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   let {
     nacin,
@@ -116,7 +117,11 @@
             <p>
               <strong>Igraš kao gost.</strong> Ovi podaci su privremeno spremljeni u ovom pregledniku i mogu biti izgubljeni brisanjem kolačića.
             </p>
-            <a href="/registracija" class="cta-gumb">Sačuvaj statistiku — Registriraj se</a>
+            <a
+              href="/registracija"
+              class="cta-gumb"
+              onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'profil' })}
+            >Sačuvaj statistiku — Registriraj se</a>
           </div>
         </div>
       {/if}

@@ -7,6 +7,7 @@
   import { aktivirajAudio, zagrijGameplayZvukove } from '$lib/audio-manager.js';
   import { ZADANI_PRAVILNIK, type PocetakPartije, type StanjePrivatneSobe, type VrstaRijeci } from 'zajednicko';
   import { nazivPravilnika } from '$lib/igraj-rute.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const kodSobe = $derived($page.params.kod?.toUpperCase() ?? '');
 
@@ -146,6 +147,7 @@
       const link = `${window.location.origin}/soba/${kodSobe}`;
       await navigator.clipboard.writeText(link);
       kopirano = true;
+      zabiljeziUmamiDogadjaj('privatna-soba-link-kopiran');
       setTimeout(() => (kopirano = false), 2500);
     } catch {
       kopirano = false;
