@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { generirajUmamiBeforeSend } from '../../skripte/generiraj-umami-before-send.mjs';
