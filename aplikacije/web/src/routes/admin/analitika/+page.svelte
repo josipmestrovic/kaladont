@@ -11,11 +11,15 @@
   import Partije from './komponente/Partije.svelte';
   import RjecnikIIncidenti from './komponente/RjecnikIIncidenti.svelte';
   import {
+    detaljIncidenteJeAktualan,
     endpointiOsvjezavanja,
     endpointiPaginacijeIncidenata,
+    pomakniTabTipkovnicom,
     putanjaEndpointa,
+    snimkaFilteraZaTab,
     tabPrikazujeIzazovFiltere,
     tabPrikazujeKontekst,
+    trebaUcitatiTab,
     TokenUcitavanja,
     type EndpointAnalitike,
   } from './ucitavanje.js';
@@ -70,6 +74,8 @@
     rjecnik: praznoStanje(),
   });
   let statusGreska = $state<string | null>(null);
+  /** Snimka relevantnih filtera za koje su podaci taba učitani. */
+  let snimkeFiltera = $state<Partial<Record<TabAnalitike, string>>>({});
 
   const tokeni = {
     igraci: new TokenUcitavanja(),
@@ -241,6 +247,8 @@
       }
     }
 
+    snimkeFiltera = { ...snimkeFiltera, [t]: snimkaFilteraZaTab(t, f) };
+
     stanja[t] = {
       ucitava: false,
       greska: greske.length > 0 ? greske.join(' ') : null,
@@ -251,9 +259,25 @@
   function odaberiTab(novi: TabAnalitike) {
     if (tab === novi) return;
     tab = novi;
-    if (!stanja[novi].ucitano && !stanja[novi].ucitava) {
+    const aktualna = snimkaFilteraZaTab(novi, filteri());
+    if (trebaUcitatiTab({
+      ucitano: stanja[novi].ucitano,
+      ucitava: stanja[novi].ucitava,
+      snimkaUcitanog: snimkeFiltera[novi] ?? null,
+      aktualnaSnimka: aktualna,
+    })) {
       void ucitajTab(novi);
     }
+  }
+
+  function tipkovnicaTabova(e: KeyboardEvent) {
+    const cilj = pomakniTabTipkovnicom(tab, e.key);
+    if (!cilj) return;
+    e.preventDefault();
+    odaberiTab(cilj);
+    queueMicrotask(() => {
+      document.getElementById(`tab-${cilj}`)?.focus();
+    });
   }
 
   function osvjeziAktivni() {
@@ -273,8 +297,10 @@
       const odgovor = await api<{ ok: boolean; incident: Record<string, unknown> }>(
         `/admin/analitika/incidenti/${id}`,
       );
+      if (!detaljIncidenteJeAktualan(odabraniId, id)) return;
       detalj = odgovor.incident;
     } catch (e) {
+      if (!detaljIncidenteJeAktualan(odabraniId, id)) return;
       stanja.rjecnik = {
         ...stanja.rjecnik,
         greska: e instanceof Error ? e.message : 'Detalj incidenta nije dostupan.',
@@ -369,7 +395,12 @@
   onOsvjezi={osvjeziAktivni}
 />
 
-<div class="tabovi" role="tablist" aria-label="Tematske cjeline analitike">
+<div
+  class="tabovi"
+  role="tablist"
+  aria-label="Tematske cjeline analitike"
+  onkeydown={tipkovnicaTabova}
+>
   {#each TABOVI_ANALITIKE as t (t.id)}
     <button
       type="button"

@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  detaljIncidenteJeAktualan,
   endpointiOsvjezavanja,
   endpointiPaginacijeIncidenata,
   endpointiZaTab,
+  pomakniTabTipkovnicom,
   putanjaEndpointa,
   queryIzazovi,
   queryZaTab,
+  snimkaFilteraZaTab,
   tabPrikazujeIzazovFiltere,
   tabPrikazujeKontekst,
+  trebaUcitatiTab,
   TokenUcitavanja,
 } from './ucitavanje.js';
 import type { FilteriAnalitike } from './ucitavanje.js';
@@ -81,5 +85,61 @@ describe('ucitavanje analitike', () => {
   it('prazan kontekst ne ide u query', () => {
     const q = queryZaTab('partije', { ...bazaFilteri, kontekst: '' });
     expect(q).not.toContain('kontekst');
+  });
+
+  it('ponovno učitava tab kad se relevantni filteri razlikuju', () => {
+    const a = snimkaFilteraZaTab('partije', bazaFilteri);
+    const b = snimkaFilteraZaTab('partije', { ...bazaFilteri, od: '2025-02-01' });
+    expect(a).not.toBe(b);
+    expect(trebaUcitatiTab({
+      ucitano: true,
+      ucitava: false,
+      snimkaUcitanog: a,
+      aktualnaSnimka: b,
+    })).toBe(true);
+    expect(trebaUcitatiTab({
+      ucitano: true,
+      ucitava: false,
+      snimkaUcitanog: a,
+      aktualnaSnimka: a,
+    })).toBe(false);
+    expect(trebaUcitatiTab({
+      ucitano: false,
+      ucitava: false,
+      snimkaUcitanog: null,
+      aktualnaSnimka: a,
+    })).toBe(true);
+    expect(trebaUcitatiTab({
+      ucitano: false,
+      ucitava: true,
+      snimkaUcitanog: null,
+      aktualnaSnimka: a,
+    })).toBe(false);
+  });
+
+  it('ignorira kontekst u snimci za čekaonicu i izazove', () => {
+    const c1 = snimkaFilteraZaTab('cekaonica', bazaFilteri);
+    const c2 = snimkaFilteraZaTab('cekaonica', { ...bazaFilteri, kontekst: 'javna' });
+    expect(c1).toBe(c2);
+    expect(c1).not.toContain('kontekst');
+
+    const i1 = snimkaFilteraZaTab('izazovi', bazaFilteri);
+    const i2 = snimkaFilteraZaTab('izazovi', { ...bazaFilteri, kontekst: 'trening' });
+    expect(i1).toBe(i2);
+    expect(i1).toContain('challenge=IZ-01');
+  });
+
+  it('pomakne tab tipkovnicom (strelica / Home / End)', () => {
+    expect(pomakniTabTipkovnicom('igraci', 'ArrowRight')).toBe('partije');
+    expect(pomakniTabTipkovnicom('igraci', 'ArrowLeft')).toBe('rjecnik');
+    expect(pomakniTabTipkovnicom('partije', 'Home')).toBe('igraci');
+    expect(pomakniTabTipkovnicom('partije', 'End')).toBe('rjecnik');
+    expect(pomakniTabTipkovnicom('botovi', 'Enter')).toBeNull();
+  });
+
+  it('detalj incidenta zanemaruje zakašnjeli odgovor', () => {
+    expect(detaljIncidenteJeAktualan('a', 'a')).toBe(true);
+    expect(detaljIncidenteJeAktualan('b', 'a')).toBe(false);
+    expect(detaljIncidenteJeAktualan(null, 'a')).toBe(false);
   });
 });

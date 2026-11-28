@@ -110,3 +110,62 @@ export function endpointiOsvjezavanja(tab: TabAnalitike): EndpointAnalitike[] {
 export function endpointiPaginacijeIncidenata(): EndpointAnalitike[] {
   return ['incidenti'];
 }
+
+/** Relevantni filteri za usporedbu „jesu li podaci taba još aktualni”. */
+export function snimkaFilteraZaTab(tab: TabAnalitike, filteri: FilteriAnalitike): string {
+  const dijelovi = [`od=${filteri.od}`, `do=${filteri.doDana}`];
+  if (tabPrikazujeKontekst(tab)) dijelovi.push(`kontekst=${filteri.kontekst}`);
+  if (tabPrikazujeIzazovFiltere(tab)) {
+    dijelovi.push(`challenge=${filteri.izazovChallengeId}`);
+    dijelovi.push(`racun=${filteri.izazovAccountType}`);
+  }
+  if (tab === 'rjecnik') dijelovi.push(`stranica=${filteri.stranicaIncidenata}`);
+  return dijelovi.join('|');
+}
+
+/** Treba li učitati tab pri povratku / odabiru (nema složeni cache). */
+export function trebaUcitatiTab(opcije: {
+  ucitano: boolean;
+  ucitava: boolean;
+  snimkaUcitanog: string | null;
+  aktualnaSnimka: string;
+}): boolean {
+  if (opcije.ucitava) return false;
+  if (!opcije.ucitano) return true;
+  return opcije.snimkaUcitanog !== opcije.aktualnaSnimka;
+}
+
+const REDOSLIJED_TABOVA: readonly TabAnalitike[] = [
+  'igraci',
+  'partije',
+  'cekaonica',
+  'botovi',
+  'izazovi',
+  'gamifikacija',
+  'rjecnik',
+];
+
+/** WAI-ARIA tablist: Left/Right (+ Up/Down), Home/End. */
+export function pomakniTabTipkovnicom(
+  trenutni: TabAnalitike,
+  tipka: string,
+  redoslijed: readonly TabAnalitike[] = REDOSLIJED_TABOVA,
+): TabAnalitike | null {
+  const n = redoslijed.length;
+  if (n === 0) return null;
+  const i = redoslijed.indexOf(trenutni);
+  if (i < 0) return null;
+  if (tipka === 'ArrowRight' || tipka === 'ArrowDown') return redoslijed[(i + 1) % n]!;
+  if (tipka === 'ArrowLeft' || tipka === 'ArrowUp') return redoslijed[(i - 1 + n) % n]!;
+  if (tipka === 'Home') return redoslijed[0]!;
+  if (tipka === 'End') return redoslijed[n - 1]!;
+  return null;
+}
+
+/** Odgovor detalja incidenta vrijedi samo za trenutačno odabrani id. */
+export function detaljIncidenteJeAktualan(
+  odabraniId: string | null,
+  zahtjevaniId: string,
+): boolean {
+  return odabraniId === zahtjevaniId;
+}
