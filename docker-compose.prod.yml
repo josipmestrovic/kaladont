@@ -84,6 +84,11 @@ services:
     profiles: ["umami"]
     restart: unless-stopped
     init: true
+    # Igra ima prednost: Umami ne smije zauzeti nerazmjeran dio VPS resursa.
+    # mem_reservation nije unaprijed alociran RAM — samo meki signal pri pritisku.
+    cpus: 0.5
+    mem_limit: 512m
+    mem_reservation: 256m
     environment:
       # Bez :? — inače `compose config` bez profila pada na starijim Compose verzijama.
       # Prazni defaulti (ne poznati „umami”/placeholder): bez tajni u .env kontejner neće zdravije dignuti.

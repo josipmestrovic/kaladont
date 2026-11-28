@@ -82,6 +82,35 @@ sudo -u deploy docker compose --profile umami -f docker-compose.prod.yml ps
 
 `umami` treba biti `running` / healthy. Ako pada, `docker compose --profile umami -f docker-compose.prod.yml logs umami --tail=80` (često: baza nije bootstrapana ili kriva lozinka).
 
+### Ograničenja resursa
+
+Umami je namjerno ograničen u Composeu (`cpus: 0.5`, `mem_limit: 512m`, `mem_reservation: 256m`) kako analitika ne bi mogla zauzeti nerazmjeran dio produkcijskog VPS-a. Kaladont i njegova baza imaju prednost.
+
+- Procijenjena stvarna potrošnja je ~0,2 GB RAM-a; tvrdi limit 512 MiB je strop, ne očekivano zauzeće.
+- `mem_reservation: 256m` je meki signal pri pritisku na memoriju — nije garantiran niti unaprijed alociran RAM.
+- Ako Umami prijeđe `mem_limit`, Docker ga može OOM-ubiti i `restart: unless-stopped` ga digne ponovno.
+- Umami i dalje dijeli PostgreSQL (`baza`) s igrom; ograničenja vrijede samo za Umami kontejner, ne za Postgres.
+
+Provjera stvarne potrošnje i statusa:
+
+```bash
+docker stats --no-stream
+```
+
+```bash
+docker compose --profile umami \
+  -f docker-compose.prod.yml ps
+```
+
+Provjera stvarno primijenjenih limita (zamijeni ime kontejnera ako treba):
+
+```bash
+docker inspect "$(docker compose --profile umami -f docker-compose.prod.yml ps -q umami)" \
+  --format 'Memory={{.HostConfig.Memory}} MemoryReservation={{.HostConfig.MemoryReservation}} NanoCpus={{.HostConfig.NanoCpus}}'
+```
+
+Očekivano: `Memory=536870912` (512 MiB), `MemoryReservation=268435456` (256 MiB), `NanoCpus=500000000` (0,5 CPU). Ako Umami redovito doseže limit ili se zbog njega restartira, prilagodi ograničenja na temelju mjerenja.
+
 Ako je Caddy već star bez `analitika` bloka, treba redeploy/compose koji povuče novi `Caddyfile`, zatim:
 
 ```bash
