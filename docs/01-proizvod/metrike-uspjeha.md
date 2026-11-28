@@ -19,7 +19,7 @@ MVP je test tržišta — bez brojki nema zaključka. Od prvog dana mjerimo **vl
 
 ## Aktivnost, retencija i konverzija (interna analitika)
 
-Admin pregled: `/admin/analitika` → sekcija **Igrači i rast** (`GET /api/admin/analitika/igraci`). Dan je **Europe/Zagreb**. Aktivnost se računa samo iz završenih igara (`analitika_igre.ishod = zavrsena`) po `kraj_u`; botovi nisu u `analitika_sudjelovanja`.
+Admin pregled: `/admin/analitika` → tab **Igrači i rast** (`GET /api/admin/analitika/igraci`, uz `dnevno`). Dan je **Europe/Zagreb**. Aktivnost se računa samo iz završenih igara (`analitika_igre.ishod = zavrsena`) po `kraj_u`; botovi nisu u `analitika_sudjelovanja`.
 
 | Metrika | Definicija |
 | --- | --- |
@@ -42,7 +42,7 @@ Filter konteksta (`javna` / `privatna` / `trening` / `izazov`) vrijedi za aktivn
 
 ## Partije, načini, formati i pravila
 
-Admin: `/admin/analitika` → **Partije i načini igranja** (`GET /api/admin/analitika/partije`). Kohorta = igre s `pocetak_u` u odabranom rasponu (Europe/Zagreb). Ishodi su **trenutačno poznati** (igra započeta u rasponu može završiti nakon ponoći i i dalje ulazi u kohortu).
+Admin: `/admin/analitika` → tab **Partije** (`GET /api/admin/analitika/partije`). Kohorta = igre s `pocetak_u` u odabranom rasponu (Europe/Zagreb). Ishodi su **trenutačno poznati** (igra započeta u rasponu može završiti nakon ponoći i i dalje ulazi u kohortu).
 
 | Metrika | Definicija |
 | --- | --- |
@@ -57,7 +57,7 @@ Dnevna statistika započetih/završenih po kalendarskom danu (`/dnevno`) ostaje 
 
 ## Javna čekaonica (uparivanje i napuštanje)
 
-Admin: `/admin/analitika` → **Čekaonica (javna)** (`GET /api/admin/analitika/cekanje`). Samo javni red (Brza igra). Kohorta = terminalni pokušaji s `kraj_u` u odabranom rasponu (Europe/Zagreb). Jedan INSERT po završetku pokušaja (`analitika_cekanja`); bez `igrac_id` / PII. Ulazak u red ne piše red. Operativna statistika po stolu (`/admin/statistike/cekanje`, `cekanje_ms`) ostaje zasebna.
+Admin: `/admin/analitika` → tab **Čekaonica** (`GET /api/admin/analitika/cekanje`). Samo javni red (Brza igra). Kohorta = terminalni pokušaji s `kraj_u` u odabranom rasponu (Europe/Zagreb). Jedan INSERT po završetku pokušaja (`analitika_cekanja`); bez `igrac_id` / PII. Ulazak u red ne piše red. Operativna statistika po stolu (`/admin/statistike/cekanje`, `cekanje_ms`) ostaje zasebna.
 
 | Metrika | Definicija |
 | --- | --- |
@@ -75,7 +75,7 @@ Za kontekst filter ≠ `javna` (npr. privatna/trening/izazov) API/UI vraćaju N/
 
 ## Botovi i balans
 
-Admin: `/admin/analitika` → **Botovi i balans** (`GET /api/admin/analitika/botovi`). Kohorta = igre s `pocetak_u` u rasponu (Europe/Zagreb). Detaljna analitika pokušaja Izazova ostaje zasebna.
+Admin: `/admin/analitika` → tab **Botovi i balans** (`GET /api/admin/analitika/botovi`). Kohorta = igre s `pocetak_u` u rasponu (Europe/Zagreb). Detaljna analitika pokušaja Izazova ostaje zasebna (tab **Izazovi**).
 
 | Metrika | Definicija |
 | --- | --- |
@@ -90,7 +90,7 @@ Verzija politike/profila bilježi set poluga pri startu; nije dokaz da su svi ad
 
 ## Gamifikacija i napredak
 
-Admin: `/admin/analitika` → **Gamifikacija** (`GET /api/admin/analitika/gamifikacija`). Bez novih upisa tijekom igre — samo čitanje postojećih tablica. Odgovor dijeli **razdoblje** (Europe/Zagreb `od`/`do`) i **trenutačni presjek** (stanje sada; filter datuma ga ne rekonstruira unatrag).
+Admin: `/admin/analitika` → tab **Gamifikacija** (`GET /api/admin/analitika/gamifikacija`). Bez novih upisa tijekom igre — samo čitanje postojećih tablica. Odgovor dijeli **razdoblje** (Europe/Zagreb `od`/`do`) i **trenutačni presjek** (stanje sada; filter datuma ga ne rekonstruira unatrag).
 
 | Metrika | Izvor / definicija |
 | --- | --- |
