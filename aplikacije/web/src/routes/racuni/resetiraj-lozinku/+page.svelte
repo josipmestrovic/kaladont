@@ -35,7 +35,7 @@
     <button
       type="button"
       onclick={() => {
-        zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'prijava' });
+        zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'reset_lozinke' });
         void goto('/prijava');
       }}
     >Prijavi se</button>

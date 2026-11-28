@@ -180,8 +180,9 @@ describe('analitika igrača', () => {
     expect(agregat.kpi.konverzija30d.gosti).toBeGreaterThanOrEqual(2);
     expect(agregat.kpi.konverzija30d.konvertirani).toBeGreaterThanOrEqual(1);
     expect(agregat.kpi.konverzija30d.postotak).not.toBeNull();
-    // Hladna registracija broji se u registracijama, ne u konverziji gostiju
-    expect(agregat.kpi.registracijeRaspon).toBeGreaterThanOrEqual(2);
+    // Hladna registracija na prviDan ulazi u registracije raspona; konvertirani (dan+5) ne.
+    expect(agregat.kpi.registracijeRaspon).toBeGreaterThanOrEqual(1);
+    expect(agregat.dani.find((d) => d.dan === prviDan)?.registracije).toBeGreaterThanOrEqual(1);
   });
 
   it('više partija istog igrača isti dan broji se jednom u DAU', async () => {

@@ -196,7 +196,7 @@ Dopuštene vrijednosti:
 
 - `mod`: `brza_igra`, `izazovi`, `trening`, `privatna_soba`
 - `odrediste`: `ljestvice`, `misije`, `kolekcija`, `dostignuca`, `profil`, `pravila`, `novosti`
-- `izvor`: `naslovnica`, `izbornik_profila`, `zavrsetak_partije`, `zavrsetak_izazova`, `zavrsetak_treninga`, `profil`, `footer`, `misije`, `ljestvice`, `postavke`, `prijava`, `registracija`, `zahvala`, `avatar_editor`, `obavijest_misije`, `ostalo` (samo kad nema preciznijeg)
+- `izvor`: `naslovnica`, `izbornik_profila`, `zavrsetak_partije`, `zavrsetak_izazova`, `zavrsetak_treninga`, `profil`, `footer`, `misije`, `ljestvice`, `postavke`, `prijava`, `registracija`, `potvrda_emaila`, `reset_lozinke`, `zaboravljena_lozinka`, `zahvala`, `avatar_editor`, `obavijest_misije`, `ostalo` (samo kad nema preciznijeg)
 
 **Namjera vs potvrda:** `mod-klik` / `*-klik` / `avatar-uredjivanje-otvoreno` = namjera. `privatna-soba-kreirana`, `privatna-soba-link-kopiran`, `avatar-spremljen`, `povratne-informacije-poslane` = potvrđena akcija.
 
