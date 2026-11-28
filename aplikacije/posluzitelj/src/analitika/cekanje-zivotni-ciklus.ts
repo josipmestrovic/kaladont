@@ -33,7 +33,7 @@ export interface AktivniPokusajCekanjaZaTest extends SnimkaPokusajaCekanja {
   odgodeniU: Date | null;
 }
 
-interface AktivniPokusaj extends AktivniPokusajCekanjaZaTest {}
+type AktivniPokusaj = AktivniPokusajCekanjaZaTest;
 
 export type ZabiljeziZapisCekanjaFn = (
   snimka: SnimkaPokusajaCekanja,

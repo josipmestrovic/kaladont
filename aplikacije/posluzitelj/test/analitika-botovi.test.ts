@@ -31,7 +31,6 @@ describe('analitika botova — upis i agregat', () => {
   });
 
   it('snima sastav bez botova i ne računa uspješnost vs botova', async () => {
-    const dan = danasZagrebIso();
     const sada = new Date();
     const igraId = randomUUID();
     await upsertPocetakIgre({

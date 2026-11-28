@@ -2,7 +2,7 @@
  * Agregati botova i balansa — kohorta po početku igre (Europe/Zagreb).
  * Ne duplicira analitiku Izazova; reuse Wilson / prag malog uzorka.
  */
-import { and, eq, gte, lt, sql, type SQL } from 'drizzle-orm';
+import { and, eq, gte, lt, type SQL } from 'drizzle-orm';
 import { baza } from '../baza/klijent.js';
 import {
   analitikaIgre,
