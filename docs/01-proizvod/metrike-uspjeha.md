@@ -88,6 +88,27 @@ Admin: `/admin/analitika` → **Botovi i balans** (`GET /api/admin/analitika/bot
 
 Verzija politike/profila bilježi set poluga pri startu; nije dokaz da su svi admin parametri kroz povijest identični. Bez masovnog backfilla; read-path može dopuniti sastav/pobjednika iz `partije`/`igraci` kad je pouzdano.
 
+## Gamifikacija i napredak
+
+Admin: `/admin/analitika` → **Gamifikacija** (`GET /api/admin/analitika/gamifikacija`). Bez novih upisa tijekom igre — samo čitanje postojećih tablica. Odgovor dijeli **razdoblje** (Europe/Zagreb `od`/`do`) i **trenutačni presjek** (stanje sada; filter datuma ga ne rekonstruira unatrag).
+
+| Metrika | Izvor / definicija |
+| --- | --- |
+| **Kohorta dodjela misija** | `dodjele_misija.stvoreno_u` u rasponu; zasebno `dnevna` / `tjedna`. Statusi: `aktivna`, `dovrsena`, `zamijenjena`, `istekla`. Dnevne **nemaju** kalendarski istek (`istjece_u` NULL). |
+| **Udio trenutno dovršenih** | `dovrsene / sve_dodjele_kohorte`. |
+| **Terminalna stopa** | `dovrsene / (dovrsene + zamijenjene + istekle)`. Aktivne nisu neuspjeh; prazan nazivnik → `null`. Nije konačna vjerojatnost da će sve dnevne biti dovršene. |
+| **Predlošci** | Grupiranje `(predlozak_id, vrsta, verzija_definicije)`; naziv iz `snapshot.naziv` (fallback ID). Mali uzorak &lt; 30. |
+| **Zamjene** | `zamjene_misija.stvoreno_u`; stopa po predlošku = zamijenjene dodjele / dodjele **iste kohorte**. |
+| **Dotok dnevnih** | `dotok_dnevnih_misija.lokalni_datum`: `dodijeljeno` / `preskoceno`. Preskočeno ≠ svjesno odustajanje. |
+| **Doprinosi** | `doprinosi_misijama` po `javna`/`trening`/`izazov`; distinct `izvor_id` ≠ broj igara s napretkom. |
+| **XP misija** | `nagrade_misija.xp_stvarno` (ne nominalno), filter `dodijeljena_u`. |
+| **XP izazova** | `zavrseci_izazova.awarded_xp` na prvim uspjesima (`vrijeme`). |
+| **XP razine (presjek)** | `igraci.iskustvo_ukupno` + `stanjeIskustva`; raspani 1–5 … 71–100. Nije XP zarađen u filteru. |
+| **Dostignuća (presjek)** | `max(spremljena, dinamička)` kao profil/`izracunajSazetakZvjezdicaDostignuca`. `prvo_otkljucano` samo za broj prvih otključavanja u razdoblju. |
+| **Kolekcija (presjek)** | `otkljucane_rijeci_igraca`; veličina = broj redova (riječ se ne broji dvaput). Period: broj otključavanja po `otkljucano`. |
+
+**Obuhvat:** botovi isključeni. Baza za postotke/presjeke = ljudski igrači s ≥1 završenom igrom u analitici, `obrisan_at IS NULL`. Misije/nagrade ionako samo registrirani. Soft-obrisani ostaju u povijesnim redovima razdoblja.
+
 ## Zdravlje igre
 
 | Metrika                                                                        | Zašto                                                                 |

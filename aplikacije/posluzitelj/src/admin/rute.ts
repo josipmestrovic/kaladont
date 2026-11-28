@@ -63,6 +63,7 @@ import { agregirajAktivnostIgraca } from '../analitika/igraci.js';
 import { agregirajPartije } from '../analitika/partije.js';
 import { agregirajCekanje } from '../analitika/cekanje.js';
 import { agregirajBotove } from '../analitika/botovi.js';
+import { agregirajGamifikaciju } from '../analitika/gamifikacija.js';
 import { dohvatiStatusAnalitike } from '../analitika/status.js';
 import {
   agregirajIzazove,
@@ -985,6 +986,18 @@ export async function registrirajAdminRute(
     const filter = parsirajFilterAnalitike(zahtjev.query);
     if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
     const agregat = await agregirajBotove({
+      odDan: filter.od,
+      doDan: filter.do,
+      kontekst: filter.kontekst,
+    });
+    return { ok: true, ...agregat };
+  });
+
+  app.get('/admin/analitika/gamifikacija', { preHandler: zahtijevajAdmina }, async (zahtjev, odgovor) => {
+    odgovor.header('Cache-Control', 'no-store');
+    const filter = parsirajFilterAnalitike(zahtjev.query);
+    if (!filter.ok) return odgovor.code(400).send({ ok: false, greska: filter.greska });
+    const agregat = await agregirajGamifikaciju({
       odDan: filter.od,
       doDan: filter.do,
       kontekst: filter.kontekst,

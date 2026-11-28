@@ -59,6 +59,6 @@ export async function dohvatiStatusAnalitike() {
       bezIshoda: igre?.bezIshoda ?? 0,
     },
     napomena:
-      'Slice: početne riječi/rani incidenti, dnevne igre, omjer gost/reg, 2+ igre, DAU/WAU/MAU, retencija, konverzija 30d, partije/načini/formati/pravila/trajanje, javna čekaonica, te botovi/balans. Posjećenost i misije nisu uključeni; nema zasebnog workera.',
+      'Slice: početne riječi/rani incidenti, dnevne igre, omjer gost/reg, 2+ igre, DAU/WAU/MAU, retencija, konverzija 30d, partije/načini/formati/pravila/trajanje, javna čekaonica, botovi/balans, te gamifikacija (misije/XP/dostignuća/kolekcija). Posjećenost nije uključena; nema zasebnog workera.',
   };
 }
