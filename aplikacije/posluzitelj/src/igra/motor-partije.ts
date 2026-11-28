@@ -109,9 +109,9 @@ import {
   type StatusOtvaranjaAnalitike,
   type UpravljacOtvaranjaAnalitike,
 } from '../analitika/otvaranja.js';
+import { sazetakBotAnalitikeIzStanja } from '../analitika/bot-sazetak.js';
 import {
   mapirajVrstuRacuna,
-  prazniBrojaciEliminacija,
   zabiljeziKrajIgre,
   zabiljeziPocetakIgre,
   type SnimkaBotovaPocetka,
@@ -593,30 +593,14 @@ export function stvoriUpraviteljPartija(
     stanje: StanjeStola,
     ishod: 'zavrsena' | 'prekinuta' | 'nepotpuno',
   ) {
-    const eliminacijeLjudi = prazniBrojaciEliminacija();
-    const eliminacijeBotova = prazniBrojaciEliminacija();
-    for (const igracId of stanje.eliminirani) {
-      const sudionik = stanje.sudionici.find((s) => s.igracId === igracId);
-      const razlog = nacinIspadanjaZaIgraca(stanje, igracId);
-      const brojac = sudionik?.upravljac === 'bot' ? eliminacijeBotova : eliminacijeLjudi;
-      brojac[razlog] += 1;
-    }
-    let vrstaPobjednika: 'covjek' | 'bot' | null = null;
-    if (ishod === 'zavrsena') {
-      const pobjednikId = [...stanje.aktivni][0];
-      const pobjednik = pobjednikId
-        ? stanje.sudionici.find((s) => s.igracId === pobjednikId)
-        : undefined;
-      if (pobjednik?.upravljac === 'bot' || pobjednik?.upravljac === 'covjek') {
-        vrstaPobjednika = pobjednik.upravljac;
-      }
-    }
-    return {
-      botovi: stanje.analitikaBotSnimka,
-      vrstaPobjednika,
-      eliminacijeLjudi,
-      eliminacijeBotova,
-    };
+    // Samo razloziEliminacije — ne stanje.eliminirani (fiktivni plasmani / terminal izazova).
+    return sazetakBotAnalitikeIzStanja({
+      ishod,
+      analitikaBotSnimka: stanje.analitikaBotSnimka,
+      aktivni: stanje.aktivni,
+      sudionici: stanje.sudionici,
+      razloziEliminacije: stanje.razloziEliminacije,
+    });
   }
 
   function metaKrajaAnalitike(

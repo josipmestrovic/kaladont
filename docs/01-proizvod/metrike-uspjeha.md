@@ -83,7 +83,7 @@ Admin: `/admin/analitika` → **Botovi i balans** (`GET /api/admin/analitika/bot
 | **Pobjeda čovjeka vs bota** | Vrsta pobjednika (`covjek`/`bot`) na završenoj igri. Nije individualna stopa pobjeda po igraču. Prekinuta igra nema pobjednika. |
 | **Uspješnost protiv botova** | Samo `broj_botova > 0`, `ishod = zavrsena`, poznata `vrsta_pobjednika`. Segmenti: profil, format, pravilnik, verzije, sastav. Mali uzorak &lt; 30; Wilson 95 % kad postoji uzorak. |
 | **Sastav javnih stolova** | Stvarni `(broj_ljudi, broj_botova)`, ne pretpostavka iz moda. |
-| **Eliminacije** | JSONB brojači stvarnih ispadanja ljudi/botova (`ne_znam`/`istek`/`mrtva_slova`/`prekid`/`kaladont`). Pobjednik nije eliminiran. Eliminacija ≠ završni plasman. |
+| **Eliminacije** | JSONB brojači stvarnih ispadanja ljudi/botova (`ne_znam`/`istek`/`mrtva_slova`/`prekid`/`kaladont`/`nepoznato`) iz `razloziEliminacije`. Pobjednik nije eliminiran. Eliminacija ≠ završni plasman: fiktivni unos u `eliminirani` pri ranom stopu treninga/izazova (`sabijPreostaleZaRaniStop`, terminal izazova bez standardnog razloga) **ne** ulazi u brojače. |
 | **Trajanje** | `kraj_u − pocetak_u` za završene igre s botovima; prosjek/medijan/P90 (nearest-rank). |
 
 Verzija politike/profila bilježi set poluga pri startu; nije dokaz da su svi admin parametri kroz povijest identični. Bez masovnog backfilla; read-path može dopuniti sastav/pobjednika iz `partije`/`igraci` kad je pouzdano.
