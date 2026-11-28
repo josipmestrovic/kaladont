@@ -168,15 +168,43 @@ sudo -u deploy docker compose -f docker-compose.prod.yml --env-file .env up -d a
 Provjera:
 
 1. `https://kaladont.hr` → DevTools → Network → zahtjevi prema `analitika.kaladont.hr`
-2. Klik **Brza igra** na naslovnici → `naslovnica-brza-igra-klik` (stari `igraj-klik` više se ne šalje s naslovnice; ostaje u tipu radi povijesnih potrošača)
-3. Ostale kartice/prečaci: `naslovnica-izazovi-klik`, `naslovnica-trening-klik`, `naslovnica-privatna-soba-klik`, `naslovnica-ljestvice-klik`, `naslovnica-misije-klik`, `naslovnica-kolekcija-klik`, `naslovnica-profil-klik`, `naslovnica-pravila-klik`, `naslovnica-novosti-klik`
-4. Automatski `?igraj=1` **nije** klik-event
-5. Klik **Pridruži se zajednici** → `forum-klik-landing`
-6. Na `/o-igri` forum CTA → `forum-klik-o-igri`
-
-**Prijelaz (2026-11):** naslovnica prelazi na zasebne evente bez dual-write. Povijesni dashboardi na `igraj-klik` više ne reflektiraju klikove s nove naslovnice.
+2. Klik **Brza igra** na naslovnici → događaj `mod-klik` s `mod=brza_igra`, `izvor=naslovnica`
+3. Automatski `?igraj=1` **ne** šalje `mod-klik`
+4. Ostali smoke: kartice načina (`izazovi` / `trening` / `privatna_soba`), prečac ljestvica → `navigacija-klik`, CTA registracije → `registracija-klik`
 
 Gašenje trackera bez gašenja kontejnera: isprazni `UMAMI_URL` i `UMAMI_WEBSITE_ID`, restart `aplikacija`.
+
+### Katalog prilagođenih događaja
+
+Umami prati **korisničku namjeru i web navigaciju** (klikovi, otvaranje editora, uspješno kopiranje poveznice). **Interna analitika** Kaladonta prati stvarno ponašanje igre: partije, registracije, konverzije, retenciju, botove i gamifikaciju. Ne dupliciramo te podatke u Umami događajima.
+
+Centralni helper: `aplikacije/web/src/lib/umami.ts` (`zabiljeziUmamiDogadjaj`). Automatski pageview / posjetitelji / UTM / uređaji ostaju ugrađeni u tracker; ne šaljemo vlastite pageview događaje.
+
+| Događaj | Parametri | Trenutak slanja |
+| --- | --- | --- |
+| `mod-klik` | `mod`, `izvor` | Svjesni klik na način igranja (ne `?igraj=1`, ne reconnect, ne „igraj opet”) |
+| `navigacija-klik` | `odrediste`, `izvor` | Klik na sekundarnu funkcionalnost (ne tabovi unutar stranice) |
+| `registracija-klik` | `izvor` | Klik na CTA prema `/registracija` |
+| `prijava-klik` | `izvor` | Klik na CTA prema `/prijava` (ne submit obrasca, ne obnova sesije) |
+| `privatna-soba-kreirana` | — | Nakon potvrde `soba:stvorena` |
+| `privatna-soba-link-kopiran` | — | Nakon uspješnog `clipboard.writeText` (bez linka/koda u payloadu) |
+| `avatar-uredjivanje-otvoreno` | `izvor` | Svjesno otvaranje editora (`/profil/avatar`) |
+| `avatar-spremljen` | — | Nakon uspješnog PUT avatara |
+| `povratne-informacije-poslane` | — | Nakon uspješnog POST-a forme |
+
+Dopuštene vrijednosti:
+
+- `mod`: `brza_igra`, `izazovi`, `trening`, `privatna_soba`
+- `odrediste`: `ljestvice`, `misije`, `kolekcija`, `dostignuca`, `profil`, `pravila`, `novosti`
+- `izvor`: `naslovnica`, `izbornik_profila`, `zavrsetak_partije`, `zavrsetak_izazova`, `zavrsetak_treninga`, `profil`, `footer`, `ostalo`
+
+**Namjera vs potvrda:** `mod-klik` / `*-klik` / `avatar-uredjivanje-otvoreno` = namjera. `privatna-soba-kreirana`, `privatna-soba-link-kopiran`, `avatar-spremljen`, `povratne-informacije-poslane` = potvrđena akcija.
+
+**Ukloništa događaja:** više se ne šalju `igraj-klik`, `forum-klik-landing`, `forum-klik-o-igri` ni `naslovnica-*-klik`. Interes za Brzu igru: `mod-klik` + `mod=brza_igra`. Povijesni zapisi u Umami bazi ostaju; dashboardi na starim imenima više ne reflektuju nove klikove.
+
+U Umami UI-ju: Events → odaberi događaj → Properties / Filter po `mod`, `odrediste` ili `izvor`.
+
+Privatnost: bez emaila, nadimka, ID-eva igrača/partije/sesije, koda sobe, riječi, chata, sadržaja feedbacka ili avatar konfiguracije.
 
 ---
 

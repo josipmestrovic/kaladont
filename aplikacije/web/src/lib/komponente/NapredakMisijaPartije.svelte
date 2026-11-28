@@ -1,7 +1,14 @@
 <script lang="ts">
   import type { PromjenaMisije } from 'zajednicko';
+  import { zabiljeziUmamiDogadjaj, type UmamiIzvor } from '$lib/umami.js';
 
-  let { promjene }: { promjene: PromjenaMisije[] } = $props();
+  let {
+    promjene,
+    izvor = 'zavrsetak_partije',
+  }: {
+    promjene: PromjenaMisije[];
+    izvor?: Extract<UmamiIzvor, 'zavrsetak_partije' | 'zavrsetak_izazova' | 'zavrsetak_treninga'>;
+  } = $props();
 
   function sortiraj(a: PromjenaMisije, b: PromjenaMisije): number {
     if (a.upravoDovrsena !== b.upravoDovrsena) return a.upravoDovrsena ? -1 : 1;
@@ -53,7 +60,12 @@
   <section class="napredak-misija" aria-labelledby="napredak-misija-naslov">
     <header class="zaglavlje">
       <h3 id="napredak-misija-naslov">Misije</h3>
-      <a href="/misije" class="sve-misije">Sve misije</a>
+      <a
+        href="/misije"
+        class="sve-misije"
+        onclick={() =>
+          zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'misije', izvor })}
+      >Sve misije</a>
     </header>
 
     {#if dnevne.length > 0}

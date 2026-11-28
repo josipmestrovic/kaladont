@@ -107,13 +107,15 @@
   );
 
   function idiUBrzuIgru(opcije: { izQueryja?: boolean } = {}) {
-    if (!opcije.izQueryja) zabiljeziUmamiDogadjaj('naslovnica-brza-igra-klik');
+    if (!opcije.izQueryja) {
+      zabiljeziUmamiDogadjaj('mod-klik', { mod: 'brza_igra', izvor: 'naslovnica' });
+    }
     zagrijGameplayZvukove();
     void goto(putanjaBrzeIgre());
   }
 
   function naTreningKlik() {
-    zabiljeziUmamiDogadjaj('naslovnica-trening-klik');
+    zabiljeziUmamiDogadjaj('mod-klik', { mod: 'trening', izvor: 'naslovnica' });
     zagrijGameplayZvukove();
   }
 
@@ -249,7 +251,7 @@
           aria-labelledby="naslov-izazovi"
           aria-describedby="opis-izazovi{izazoviPrikaz.vrsta === 'napredak' ? ' broj-izazovi' : ''}"
           data-testid="naslovnica-izazovi"
-          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-izazovi-klik')}
+          onclick={() => zabiljeziUmamiDogadjaj('mod-klik', { mod: 'izazovi', izvor: 'naslovnica' })}
         >
           <span class="stavka-sadrzaj">
             <img class="stavka-ikona" src="/ikone/06-trofej.webp" alt="" width="58" height="58" />
@@ -302,7 +304,7 @@
           aria-labelledby="naslov-privatna"
           aria-describedby="opis-privatna"
           data-testid="naslovnica-privatna-soba"
-          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-privatna-soba-klik')}
+          onclick={() => zabiljeziUmamiDogadjaj('mod-klik', { mod: 'privatna_soba', izvor: 'naslovnica' })}
         >
           <span class="stavka-sadrzaj">
             <img class="stavka-ikona" src="/ikone/18-privatna-soba.webp" alt="" width="58" height="58" />
@@ -320,7 +322,8 @@
           aria-labelledby="naslov-ljestvice"
           aria-describedby="opis-ljestvice"
           data-testid="naslovnica-ljestvice"
-          onclick={() => zabiljeziUmamiDogadjaj('naslovnica-ljestvice-klik')}
+          onclick={() =>
+            zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'ljestvice', izvor: 'naslovnica' })}
         >
           <span class="stavka-sadrzaj">
             <img class="stavka-ikona" src="/ikone/09-ljestvice.webp" alt="" width="58" height="58" />
@@ -349,7 +352,8 @@
             class="sporedni-precac"
             data-testid="naslovnica-misije"
             aria-label={`Misije, ${misijeAria}`}
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-misije-klik')}
+            onclick={() =>
+              zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'misije', izvor: 'naslovnica' })}
           >
             <span class="sporedni-precac__ikona">
               <img src="/ikone/62-misije.webp" alt="" width="48" height="48" />
@@ -374,7 +378,8 @@
             class="sporedni-precac"
             data-testid="naslovnica-kolekcija"
             aria-label={kolekcijaAria}
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-kolekcija-klik')}
+            onclick={() =>
+              zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'kolekcija', izvor: 'naslovnica' })}
           >
             <span class="sporedni-precac__ikona">
               <img src="/ikone/08-pravila.webp" alt="" width="48" height="48" />
@@ -397,7 +402,11 @@
             data-testid="naslovnica-dostignuca"
             aria-label={`Dostignuća, ${dostignucaAria}`}
             title={dostignucaTooltip}
-            onclick={() => zabiljeziUmamiDogadjaj('naslovnica-dostignuca-klik')}
+            onclick={() =>
+              zabiljeziUmamiDogadjaj('navigacija-klik', {
+                odrediste: 'dostignuca',
+                izvor: 'naslovnica',
+              })}
           >
             <span class="sporedni-precac__ikona">
               <img src="/ikone/27-zvjezdica-puna.webp" alt="" width="48" height="48" />
@@ -432,7 +441,8 @@
             <a
               class="sto-je-novo"
               href="/novosti"
-              onclick={() => zabiljeziUmamiDogadjaj('naslovnica-novosti-klik')}
+              onclick={() =>
+                zabiljeziUmamiDogadjaj('navigacija-klik', { odrediste: 'novosti', izvor: 'footer' })}
             >Što je novo?</a>
           </span>
         {/if}

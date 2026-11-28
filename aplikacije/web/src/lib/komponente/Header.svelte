@@ -17,6 +17,7 @@
   } from '$lib/stanje-naslovnica.svelte.js';
   import Avatar from './Avatar.svelte';
   import SanducicIkona from './SanducicIkona.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
   import { type AvatarConfigV1 } from 'zajednicko';
 
   let { prethodnaPutanja = null, mozeNaprijed = false } = $props<{ prethodnaPutanja?: string | null; mozeNaprijed?: boolean }>();
@@ -161,9 +162,26 @@
                 role="menu"
                 aria-label="Profil i račun"
               >
-                <a href="/profil" class="profil-stavka" role="menuitem">Moj profil</a>
+                <a
+                  href="/profil"
+                  class="profil-stavka"
+                  role="menuitem"
+                  onclick={() =>
+                    zabiljeziUmamiDogadjaj('navigacija-klik', {
+                      odrediste: 'profil',
+                      izvor: 'izbornik_profila',
+                    })}
+                >Moj profil</a>
                 {#if jeRegistriran}
-                  <a href="/profil/avatar" class="profil-stavka" role="menuitem">Uredi avatar</a>
+                  <a
+                    href="/profil/avatar"
+                    class="profil-stavka"
+                    role="menuitem"
+                    onclick={() =>
+                      zabiljeziUmamiDogadjaj('avatar-uredjivanje-otvoreno', {
+                        izvor: 'izbornik_profila',
+                      })}
+                  >Uredi avatar</a>
                 {/if}
                 <a href="/postavke" class="profil-stavka" role="menuitem">Postavke</a>
                 <a
@@ -171,14 +189,31 @@
                   class="profil-stavka"
                   role="menuitem"
                   data-testid="naslovnica-pravila"
+                  onclick={() =>
+                    zabiljeziUmamiDogadjaj('navigacija-klik', {
+                      odrediste: 'pravila',
+                      izvor: 'izbornik_profila',
+                    })}
                 >Pravila igre</a>
                 {#if jeRegistriran}
                   <a href="/povratne-informacije" class="profil-stavka" role="menuitem">Povratne informacije</a>
                 {/if}
                 <div class="profil-razdjelnik" role="separator"></div>
                 {#if jeGost}
-                  <a href="/prijava" class="profil-stavka" role="menuitem">Prijavi se</a>
-                  <a href="/registracija" class="profil-stavka" role="menuitem">Registriraj se</a>
+                  <a
+                    href="/prijava"
+                    class="profil-stavka"
+                    role="menuitem"
+                    onclick={() =>
+                      zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'izbornik_profila' })}
+                  >Prijavi se</a>
+                  <a
+                    href="/registracija"
+                    class="profil-stavka"
+                    role="menuitem"
+                    onclick={() =>
+                      zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'izbornik_profila' })}
+                  >Registriraj se</a>
                 {:else if jeRegistriran}
                   <button type="button" class="profil-stavka odjava" role="menuitem" onclick={odjaviSe}>
                     Odjavi se

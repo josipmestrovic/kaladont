@@ -6,6 +6,7 @@
   import { dohvatiSocket } from '$lib/socket.js';
   import AvatarEditor from '$lib/komponente/AvatarEditor.svelte';
   import { ZADANI_AVATAR_CONFIG, type AvatarConfigV1 } from 'zajednicko';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   let konfiguracija = $state<AvatarConfigV1>(ZADANI_AVATAR_CONFIG);
   let rang = $state<string | null>(null);
@@ -54,6 +55,7 @@
       });
       konfiguracija = odgovor.avatarConfig;
       legacyBezConfiga = false;
+      zabiljeziUmamiDogadjaj('avatar-spremljen');
       dohvatiSocket().emit('igrac:avatar-azuriraj', {
         avatarConfig: odgovor.avatarConfig,
         avatarRevision: odgovor.avatarRevision,
@@ -88,8 +90,16 @@
         Promjena avatara dostupna je samo registriranim igračima. Prijavi se ili otvori račun da urediš svoj izgled.
       </p>
       <div class="gost-akcije">
-        <a href="/prijava" class="gumb">Prijavi se</a>
-        <a href="/registracija" class="gumb sekundarni">Registriraj se</a>
+        <a
+          href="/prijava"
+          class="gumb"
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'ostalo' })}
+        >Prijavi se</a>
+        <a
+          href="/registracija"
+          class="gumb sekundarni"
+          onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+        >Registriraj se</a>
       </div>
     </section>
   {:else}

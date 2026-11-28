@@ -23,6 +23,7 @@
     type VrstaRijeci,
   } from 'zajednicko';
   import { dohvatiSocket } from '$lib/socket.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   const TIMEOUT_ODGOVORA_MS = 8000;
 
@@ -109,6 +110,7 @@
     const naStvorenu = (payload: { kod: string }) => {
       ocistiTimeoutOdgovora();
       slanjeUTijeku = false;
+      zabiljeziUmamiDogadjaj('privatna-soba-kreirana');
       void goto(`/soba/${payload.kod}`);
     };
 

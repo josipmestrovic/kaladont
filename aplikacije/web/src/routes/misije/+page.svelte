@@ -21,6 +21,7 @@
     tekstZamjenaPreostalo,
     tjedniBrojac,
   } from '$lib/misije-prikaz.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   let stanje = $state<StanjeMisijaDto | null>(null);
   let ucitava = $state(true);
@@ -276,8 +277,16 @@
       <h2 id="gost-naslov">Misije za registrirane igrače</h2>
       <p>Dnevne i tjedne misije prate tvoj napredak i dodjeljuju XP. Prijavi se ili otvori račun.</p>
       <div class="gost-akcije">
-        <a href="/prijava" class="gumb">Prijavi se</a>
-        <a href="/registracija" class="gumb sekundarni">Registriraj se</a>
+        <a
+          href="/prijava"
+          class="gumb"
+          onclick={() => zabiljeziUmamiDogadjaj('prijava-klik', { izvor: 'ostalo' })}
+        >Prijavi se</a>
+        <a
+          href="/registracija"
+          class="gumb sekundarni"
+          onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+        >Registriraj se</a>
       </div>
     </section>
   {:else if ucitava && !stanje}

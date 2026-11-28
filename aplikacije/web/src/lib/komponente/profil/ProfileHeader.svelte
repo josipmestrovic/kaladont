@@ -5,6 +5,7 @@
   import DostignucaIstaknuta from '$lib/komponente/DostignucaIstaknuta.svelte';
   import StilIgrePojasnjenje from '$lib/komponente/StilIgrePojasnjenje.svelte';
   import { formaTroboja, type JavniDioProfila } from './tipovi.js';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   let {
     profil,
@@ -36,7 +37,13 @@
 <div class="profil-zaglavlje-red">
   <div class="zaglavlje-profila">
     {#if vlasnik}
-      <a class="avatar-uredivanje" href="/profil/avatar" aria-label="Uredi avatar">
+      <a
+        class="avatar-uredivanje"
+        href="/profil/avatar"
+        aria-label="Uredi avatar"
+        onclick={() =>
+          zabiljeziUmamiDogadjaj('avatar-uredjivanje-otvoreno', { izvor: 'profil' })}
+      >
         <Avatar
           avatarId={profil.avatarId}
           avatarConfig={profil.avatarConfig}

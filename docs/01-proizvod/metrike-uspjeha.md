@@ -11,7 +11,7 @@ MVP je test tržišta — bez brojki nema zaključka. Od prvog dana mjerimo **vl
 | Korak         | Metrika                                                           | Izvor                           |
 | ------------- | ----------------------------------------------------------------- | ------------------------------- |
 | 1. Dolazak    | Jedinstveni posjetitelji, izvori prometa                          | Umami, nakon uključivanja       |
-| 2. Namjera    | Klik na IGRAJ (event `igraj-klik`)                                | Umami event, nakon uključivanja |
+| 2. Namjera    | Klik na Brzu igru (`mod-klik`, `mod=brza_igra`)                   | Umami event, nakon uključivanja |
 | 3. Strpljenje | Postotak koji dočeka stol; prosjek/medijan čekanja                | baza (`cekanje_ms`)             |
 | 4. Igra       | Završene partije / započete; trajanje partije                     | baza                            |
 | 5. Povratak   | Retencija D1 / D7 (gost ID omogućuje mjerenje i bez registracije) | baza (`zadnja_aktivnost`)       |
@@ -31,7 +31,7 @@ MVP je test tržišta — bez brojki nema zaključka. Od prvog dana mjerimo **vl
 
 **Od prvog dana:** broj započetih i završenih partija, čekanje, razlozi ispadanja, D1/D7 povratak, registracije, prijave i reakcije računaju se iz baze. Na tim podacima temelje se početne odluke o kvaliteti igre.
 
-**Nakon uključivanja Umamija** (`UMAMI_WEBSITE_ID` + DNS `analitika.kaladont.hr`): jedinstveni posjetitelji, izvori dolazaka te eventi `igraj-klik`, `forum-klik-landing`, `forum-klik-o-igri`. Dok website ID nije postavljen, te metrike nisu dostupne i ne procjenjuju se iz serverskih logova.
+**Nakon uključivanja Umamija** (`UMAMI_WEBSITE_ID` + DNS `analitika.kaladont.hr`): jedinstveni posjetitelji, izvori dolazaka te prilagođeni događaji (`mod-klik`, `navigacija-klik`, auth CTA, privatna soba, avatar, povratne informacije). Katalog: [runbook-umami.md](../07-operacije/runbook-umami.md#katalog-prilagođenih-događaja). Stari `igraj-klik` / forum događaji više se ne šalju. Dok website ID nije postavljen, te metrike nisu dostupne i ne procjenjuju se iz serverskih logova.
 
 ## Pragovi odluke (nakon 4 tjedna od lansiranja)
 

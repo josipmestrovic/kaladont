@@ -4,6 +4,7 @@
   import { spremiSesijskiToken } from '$lib/identitet.js';
   import { osvjeziSocketIdentitet } from '$lib/socket.js';
   import UnosLozinke from '$lib/komponente/UnosLozinke.svelte';
+  import { zabiljeziUmamiDogadjaj } from '$lib/umami.js';
 
   let email = $state('');
   let lozinka = $state('');
@@ -57,7 +58,11 @@
   {/if}
 
   <p class="registracija-link">
-    Nemaš račun? <a href="/registracija">Registriraj se</a>
+    Nemaš račun?
+    <a
+      href="/registracija"
+      onclick={() => zabiljeziUmamiDogadjaj('registracija-klik', { izvor: 'ostalo' })}
+    >Registriraj se</a>
   </p>
   <p class="registracija-link"><a href="/zaboravljena-lozinka">Zaboravio/la si lozinku?</a></p>
 </main>
