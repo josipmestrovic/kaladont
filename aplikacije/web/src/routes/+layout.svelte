@@ -206,8 +206,9 @@
 <svelte:head>
   <meta name="robots" content={robotsMeta} />
   {#if data.umami}
-    <!-- Sinkrono prije defer trackera — vidi static/umami-before-send.js i umami-sanitizacija.ts -->
-    <script src="/umami-before-send.js"></script>
+    <!-- Fail-closed stub (sync) → defer IIFE iz TS → defer Umami. Bez sync mrežnog fetcha sanitizera. -->
+    {@html `<script>window.kaladontUmamiBeforeSend=window.kaladontUmamiBeforeSend||function(){return false;};</script>`}
+    <script defer src="/umami-before-send.js"></script>
     <script
       defer
       src="{data.umami.url}/script.js"

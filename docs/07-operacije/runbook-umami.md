@@ -206,18 +206,21 @@ U Umami UI-ju: Events → odaberi događaj → Properties / Filter po `mod`, `od
 
 ### Privatnost payloada (before-send)
 
-Tracker učitava sinkroni `/umami-before-send.js` pa `data-before-send="kaladontUmamiBeforeSend"` (Umami 3.4.x). Handler sanitizira **automatske pageviewove i prilagođene događaje** prije slanja; stvarni URL u pregledniku se ne mijenja.
+Jedini izvor logike: `aplikacije/web/src/lib/umami-sanitizacija.ts`. Produkcijski `/umami-before-send.js` generira Vite/esbuild IIFE (ne uređuj ručno).
+
+Učitavanje: sync inline stub (`return false`, fail-closed) → `defer` IIFE → `defer` Umami s `data-before-send="kaladontUmamiBeforeSend"`. Nema sync mrežnog fetcha sanitizera. Ako IIFE ne stigne ili padne, stub sprječava slanje nesanitiziranih podataka.
 
 | Stvarni URL | Analitički URL |
 | --- | --- |
 | `/partija/<uuid>` | `/partija/:id` |
 | `/partija/arhiva/<uuid>` | `/partija/arhiva/:id` |
-| `/soba/ABC123` | `/soba/:kod` |
+| `/soba/AB23CD` | `/soba/:kod` |
+| `/soba/kreiraj` | `/soba/kreiraj` (statička ruta) |
 | `/profil/javni/<id>` | `/profil/javni/:id` |
 | `/potvrda-emaila?token=…` | `/potvrda-emaila` |
 | `/racuni/resetiraj-lozinku?token=…` | `/racuni/resetiraj-lozinku` |
 
-Iz queryja ostaju samo `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`. Referrer i naslov (UUID u title) također se čiste. Ako sanitizacija ne uspije, payload se **ne šalje**.
+Iz queryja ostaju samo `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term` (vrijednosti skraćene; UTM nije zajamčeno anoniman). Vanjski referrer: samo origin. Naslov: UUID i kod sobe. Ako sanitizacija ne uspije, payload se **ne šalje**.
 
 Prilagođeni događaji i dalje ne smiju sadržavati email, nadimak, ID igrača/partije/sesije, kod sobe, riječi, chat, sadržaj feedbacka ni avatar konfiguraciju.
 

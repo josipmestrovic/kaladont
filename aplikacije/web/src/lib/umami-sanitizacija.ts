@@ -1,11 +1,11 @@
 /**
- * Sanitizacija Umami pageview/event payloada — bez osobnih/dinamičkih identifikatora.
- * Handler se registrira na window prije učitavanja trackera (vidi +layout.svelte).
+ * Sanitizacija Umami pageview/event payloada — jedini izvor istine.
+ * Produkcijski IIFE generira Vite plugin iz umami-before-send-entry.ts.
  */
 
 export const IME_UMAMI_BEFORE_SEND = 'kaladontUmamiBeforeSend';
 
-/** Marketinški UTM parametri koje zadržavamo radi kampanja. */
+/** Marketinški UTM parametri koje zadržavamo radi kampanja (vrijednosti nisu zajamčeno anonimne). */
 export const UTM_ALLOWLISTA = [
   'utm_source',
   'utm_medium',
@@ -14,10 +14,17 @@ export const UTM_ALLOWLISTA = [
   'utm_term',
 ] as const;
 
+/** Max duljina UTM vrijednosti u analitičkom payloadu. */
+export const UTM_MAX_DULJINA = 64;
+
+/** Statičke rute pod /soba/ koje nisu kod sobe. */
+const SOBA_STATICKI = new Set(['kreiraj']);
+
 const UUID_SEGMENT =
   '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const CUID_ILI_ID = '[A-Za-z0-9_-]{8,}';
-const KOD_SOBE = '[A-Za-z0-9]{4,12}';
+/** Kod privatne sobe: 6 znakova alfabeta bez 0/O/1/I. */
+const KOD_SOBE = '[2-9A-HJ-NP-Z]{6}';
 
 const PUTANJE: Array<{ uzorak: RegExp; zamjena: string }> = [
   { uzorak: new RegExp(`^/partija/arhiva/${UUID_SEGMENT}$`, 'i'), zamjena: '/partija/arhiva/:id' },
@@ -29,14 +36,38 @@ const PUTANJE: Array<{ uzorak: RegExp; zamjena: string }> = [
   { uzorak: new RegExp(`^/pravila-kaladonta/${CUID_ILI_ID}$`, 'i'), zamjena: '/pravila-kaladonta/:tema' },
 ];
 
-const NASLOV_OSJETLJIVO = new RegExp(UUID_SEGMENT, 'ig');
+const NASLOV_UUID = new RegExp(UUID_SEGMENT, 'ig');
+const NASLOV_KOD_SOBE = new RegExp(`\\b${KOD_SOBE}\\b`, 'g');
+
+export function normalizirajPutanjuZaAnalitiku(putanja: string): string {
+  let cista = putanja.split('?')[0]?.split('#')[0] || '/';
+  try {
+    cista = decodeURIComponent(cista);
+  } catch {
+    // ostavi sirovo ako decode ne uspije
+  }
+  if (cista.length > 1 && cista.endsWith('/')) {
+    cista = cista.slice(0, -1);
+  }
+  return cista || '/';
+}
 
 export function sanitizirajUmamiPutanju(putanja: string): string {
-  const cista = putanja.split('?')[0]?.split('#')[0] || '/';
+  const cista = normalizirajPutanjuZaAnalitiku(putanja);
+  const dijelovi = cista.split('/');
+  // /soba/kreiraj — ne maskirati kao kod
+  if (dijelovi[1] === 'soba' && dijelovi[2] && SOBA_STATICKI.has(dijelovi[2].toLowerCase())) {
+    return cista;
+  }
   for (const { uzorak, zamjena } of PUTANJE) {
     if (uzorak.test(cista)) return zamjena;
   }
-  return cista || '/';
+  return cista;
+}
+
+function ocistiUtmVrijednost(sirova: string): string {
+  const bezKontrola = sirova.replace(/[\u0000-\u001f\u007f]/g, '');
+  return bezKontrola.slice(0, UTM_MAX_DULJINA);
 }
 
 function filtrirajQuery(searchParams: URLSearchParams): string {
@@ -44,7 +75,7 @@ function filtrirajQuery(searchParams: URLSearchParams): string {
   for (const kljuc of UTM_ALLOWLISTA) {
     const vrijednost = searchParams.get(kljuc);
     if (vrijednost != null && vrijednost !== '') {
-      zadrzani.set(kljuc, vrijednost);
+      zadrzani.set(kljuc, ocistiUtmVrijednost(vrijednost));
     }
   }
   const tekst = zadrzani.toString();
@@ -53,7 +84,7 @@ function filtrirajQuery(searchParams: URLSearchParams): string {
 
 /**
  * Normalizira apsolutni ili relativni URL za Umami payload.
- * Vraća path (+ dopušteni UTM), bez origin-a kad je ista domena — kompatibilno s trackerom.
+ * Vraća path (+ dopušteni UTM), bez origin-a.
  */
 export function sanitizirajUmamiUrl(sirovi: string, baza = 'https://kaladont.hr'): string {
   const url = new URL(sirovi, baza);
@@ -66,13 +97,17 @@ export function sanitizirajUmamiReferrer(sirovi: string, baza = 'https://kaladon
   if (!sirovi) return '';
   try {
     const url = new URL(sirovi, baza);
-    // Vanjski referrer: zadrži origin + sanitiziranu putanju (bez tokena u queryju).
+    const lokalni =
+      typeof globalThis.location?.origin === 'string'
+        ? globalThis.location.origin
+        : new URL(baza).origin;
+    // Vanjski referrer: samo origin (bez putanje/queryja).
+    if (url.origin !== lokalni && url.origin !== 'https://kaladont.hr') {
+      return url.origin;
+    }
     const putanja = sanitizirajUmamiPutanju(url.pathname);
     const query = filtrirajQuery(url.searchParams);
-    if (url.origin === new URL(baza).origin || url.origin === 'https://kaladont.hr') {
-      return `${putanja}${query}`;
-    }
-    return `${url.origin}${putanja}${query}`;
+    return `${putanja}${query}`;
   } catch {
     return '';
   }
@@ -80,7 +115,7 @@ export function sanitizirajUmamiReferrer(sirovi: string, baza = 'https://kaladon
 
 export function sanitizirajUmamiNaslov(naslov: unknown): string {
   if (typeof naslov !== 'string') return '';
-  return naslov.replace(NASLOV_OSJETLJIVO, ':id');
+  return naslov.replace(NASLOV_UUID, ':id').replace(NASLOV_KOD_SOBE, ':kod');
 }
 
 export type UmamiBeforeSendPayload = Record<string, unknown>;
