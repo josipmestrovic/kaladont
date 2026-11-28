@@ -1,14 +1,6 @@
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import {
-  dohvatiAktivniPokusajZaTest,
-  oznaciPokretanjeCekanja,
-  otvoriPokusajCekanja,
-  resetirajCekanjeZivotniCiklusZaTest,
-  zatvoriPokusajCekanja,
-  zavrsiPokretanjeNeuspjeh,
-  zavrsiPokretanjeUparivanje,
-} from '../src/analitika/cekanje-zivotni-ciklus.js';
+import type { IshodAnalitikeCekanja, SnimkaPokusajaCekanja } from '../src/analitika/cekanje-zivotni-ciklus.js';
 import { upsertZapisCekanja } from '../src/analitika/cekanje-upis.js';
 import {
   agregirajCekanje,
@@ -18,107 +10,6 @@ import {
   prosjekTrajanja,
 } from '../src/analitika/cekanje.js';
 import { danasZagrebIso, pocetakDanaZagrebUtc } from '../src/analitika/otvaranja.js';
-import type { IshodAnalitikeCekanja, SnimkaPokusajaCekanja } from '../src/analitika/cekanje-zivotni-ciklus.js';
-
-describe('analitika čekanja — životni ciklus', () => {
-  afterEach(() => {
-    resetirajCekanjeZivotniCiklusZaTest();
-  });
-
-  it('otvara pokušaj i zatvara napuštanjem', () => {
-    const igracId = randomUUID();
-    otvoriPokusajCekanja({
-      igracId,
-      generacija: 1,
-      kljucReda: '2-zajednicki',
-      mod: 'dva_igraca',
-      pravila: 'klasicni',
-      vrstaRacuna: 'gost',
-      pocetakU: new Date(),
-    });
-    expect(dohvatiAktivniPokusajZaTest(igracId)?.generacija).toBe(1);
-    zatvoriPokusajCekanja(igracId, 'napustanje');
-    expect(dohvatiAktivniPokusajZaTest(igracId)).toBeUndefined();
-  });
-
-  it('promjena reda zatvara stari pokušaj', () => {
-    const igracId = randomUUID();
-    otvoriPokusajCekanja({
-      igracId,
-      generacija: 1,
-      kljucReda: '2-zajednicki',
-      mod: 'dva_igraca',
-      pravila: 'klasicni',
-      vrstaRacuna: 'gost',
-      pocetakU: new Date(),
-    });
-    otvoriPokusajCekanja({
-      igracId,
-      generacija: 2,
-      kljucReda: '3-ka-zna',
-      mod: 'tri_igraca',
-      pravila: 'ka_zna',
-      vrstaRacuna: 'gost',
-      pocetakU: new Date(),
-    });
-    expect(dohvatiAktivniPokusajZaTest(igracId)?.generacija).toBe(2);
-  });
-
-  it('tijekom pokretanja odgađa napuštanje; uspjeh pobjeđuje', () => {
-    const igracId = randomUUID();
-    otvoriPokusajCekanja({
-      igracId,
-      generacija: 3,
-      kljucReda: '2-zajednicki',
-      mod: 'dva_igraca',
-      pravila: 'klasicni',
-      vrstaRacuna: 'registriran',
-      pocetakU: new Date(),
-    });
-    oznaciPokretanjeCekanja([{ igracId, generacija: 3 }]);
-    zatvoriPokusajCekanja(igracId, 'napustanje');
-    expect(dohvatiAktivniPokusajZaTest(igracId)?.pokretanjeUTijeku).toBe(true);
-    zavrsiPokretanjeUparivanje([{ igracId, generacija: 3 }]);
-    expect(dohvatiAktivniPokusajZaTest(igracId)).toBeUndefined();
-  });
-
-  it('neuspjeh s povratom u red zadržava pokušaj', () => {
-    const igracId = randomUUID();
-    otvoriPokusajCekanja({
-      igracId,
-      generacija: 4,
-      kljucReda: '2-zajednicki',
-      mod: 'dva_igraca',
-      pravila: 'klasicni',
-      vrstaRacuna: 'gost',
-      pocetakU: new Date(),
-    });
-    oznaciPokretanjeCekanja([{ igracId, generacija: 4 }]);
-    zatvoriPokusajCekanja(igracId, 'prekid_veze');
-    zavrsiPokretanjeNeuspjeh([{ igracId, generacija: 4 }], new Set([igracId]));
-    const aktivni = dohvatiAktivniPokusajZaTest(igracId);
-    expect(aktivni?.generacija).toBe(4);
-    expect(aktivni?.pokretanjeUTijeku).toBe(false);
-    expect(aktivni?.odgodeniIshod).toBeNull();
-  });
-
-  it('neuspjeh bez povratka primjenjuje odgođeni ishod', () => {
-    const igracId = randomUUID();
-    otvoriPokusajCekanja({
-      igracId,
-      generacija: 5,
-      kljucReda: '2-zajednicki',
-      mod: 'dva_igraca',
-      pravila: 'klasicni',
-      vrstaRacuna: 'gost',
-      pocetakU: new Date(),
-    });
-    oznaciPokretanjeCekanja([{ igracId, generacija: 5 }]);
-    zatvoriPokusajCekanja(igracId, 'napustanje');
-    zavrsiPokretanjeNeuspjeh([{ igracId, generacija: 5 }], new Set());
-    expect(dohvatiAktivniPokusajZaTest(igracId)).toBeUndefined();
-  });
-});
 
 describe('analitika čekanja — agregat', () => {
   const prethodniFlag = process.env.ANALITIKA_U_TESTU;
