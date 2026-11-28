@@ -103,6 +103,8 @@ export async function upsertKrajIgre(
       set: {
         krajU,
         ishod,
+        // Popuni pravilnik ako kraj zna vrijednost (npr. početak bez pravila).
+        ...(pravila != null ? { pravila } : {}),
       },
       // Ne degradiraj završenu igru u prekinutu / nepotpuno; krajU se i dalje osvježava samo kad smijemo dirati ishod.
       setWhere: sql`${analitikaIgre.ishod} is distinct from 'zavrsena'`,

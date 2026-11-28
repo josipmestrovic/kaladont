@@ -97,4 +97,26 @@ describe('analitika igre', () => {
     expect(samoJedan.ljudi.igraci).toBeGreaterThanOrEqual(4);
     expect(samoJedan.ljudi.ponavljanja.find((p) => p.prag === 2)?.broj).toBeGreaterThanOrEqual(1);
   });
+
+  it('popunjava pravila pri upsertu kraja nakon početka bez pravilnika', async () => {
+    const igraId = randomUUID();
+    const sada = new Date();
+    await upsertPocetakIgre({
+      igraId,
+      kontekst: 'javna',
+      mod: 'dva_igraca',
+      pravila: null,
+      pocetakU: sada,
+      sudionici: [{ igracId: randomUUID(), vrstaRacunaNaPocetku: 'gost' }],
+    });
+    await upsertKrajIgre(igraId, sada, 'zavrsena', {
+      kontekst: 'javna',
+      mod: 'dva_igraca',
+      pravila: 'dokazi_nastavak',
+      pocetakU: sada,
+    });
+    const [red] = await baza.select().from(analitikaIgre).where(eq(analitikaIgre.igraId, igraId)).limit(1);
+    expect(red?.pravila).toBe('dokazi_nastavak');
+    expect(red?.ishod).toBe('zavrsena');
+  });
 });
